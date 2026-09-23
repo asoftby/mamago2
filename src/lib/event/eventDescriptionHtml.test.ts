@@ -15,6 +15,26 @@ assert.ok(
   "long imported plain text must render as multiple paragraphs",
 );
 
+const semanticPlain =
+  "КУПИТЬ БИЛЕТЫ можно на сайте организатора. Возраст 6+. Продолжительность: 90 минут. Россия, 2026.";
+const semanticHtml = prepareEventDescriptionHtml(semanticPlain);
+assert.ok(
+  semanticHtml.includes("КУПИТЬ БИЛЕТЫ можно на сайте организатора."),
+  "render-time paragraph formatting must not remove ticket copy",
+);
+assert.ok(
+  semanticHtml.includes("Возраст 6+."),
+  "render-time paragraph formatting must not extract or rewrite age copy",
+);
+assert.ok(
+  semanticHtml.includes("Продолжительность: 90 минут."),
+  "render-time paragraph formatting must not extract or rewrite duration copy",
+);
+assert.ok(
+  semanticHtml.includes("Россия, 2026."),
+  "render-time paragraph formatting must not extract or rewrite country/year copy",
+);
+
 const richHtml =
   "<h2>Программа</h2><p><strong>Первый блок</strong></p><ul><li>Игра</li><li>Мастер-класс</li></ul>";
 const formattedRich = prepareEventDescriptionHtml(richHtml);
