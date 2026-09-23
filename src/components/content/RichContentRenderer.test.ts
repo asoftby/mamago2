@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   prepareRichContentHtml,
   sanitizeRichContent,
-} from "./RichContentRenderer";
+} from "./richContentHtml";
 
 test("preserves supported rich-text formatting used by event descriptions", () => {
   const html =

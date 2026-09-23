@@ -62,6 +62,9 @@ export default async function RootLayout({
             --font-heading: ${branding.fontHeading};
             --font-body: ${branding.fontBody};
           }
+          html[data-cc-consent-known="1"] #mamago-cookie-shell {
+            display: none !important;
+          }
         `}</style>
         <link
           rel="icon"

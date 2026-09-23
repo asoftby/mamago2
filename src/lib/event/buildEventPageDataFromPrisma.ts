@@ -3,7 +3,7 @@ import type { Intent } from "@/lib/intent";
 import { DEFAULT_CITY_HUB_PATH } from "@/lib/intent";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 import { extractPlainTextFromHtml } from "@/lib/richtext/utils";
-import { sanitizeRichContent } from "@/components/content/RichContentRenderer";
+import { sanitizeRichContent } from "@/components/content/richContentHtml";
 import { resolvePlaceLogoUrl } from "@/lib/place/resolvePlaceLogoImage";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import { BYN_SYMBOL, formatPrice, formatPriceAmount, formatPriceFrom } from "@/lib/formatters/format-price";
