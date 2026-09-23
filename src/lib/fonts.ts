@@ -2,7 +2,7 @@ import localFont from "next/font/local";
 
 /**
  * Единый локальный fallback для primary sans.
- * На DEV Google Sans подключается runtime через Google Fonts и переопределяет
+ * На DEV и PROD Google Sans подключается runtime через Google Fonts и переопределяет
  * --font-sans в root layout. NTSomic сохраняем как безопасный rollback/fallback.
  *
  * preload выключен, чтобы Next.js не создавал лишние font preload hints.
