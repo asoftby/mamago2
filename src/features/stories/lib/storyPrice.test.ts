@@ -30,5 +30,13 @@ assert.equal(
   formatStoryPrice({ priceText: "2 BYN" }),
   `2,00 ${BYN_SYMBOL}`,
 );
+assert.equal(
+  formatStoryPrice({ priceMode: "UNKNOWN", priceText: "детям 3-5 лет — 20 BYN" }),
+  `детям 3-5 лет — 20 ${BYN_SYMBOL}`,
+);
+assert.equal(
+  formatStoryPrice({ priceMode: "UNKNOWN", priceText: "не бесплатно" }),
+  "не бесплатно",
+);
 
 console.log("storyPrice tests: OK");
