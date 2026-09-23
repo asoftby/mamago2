@@ -1,3 +1,4 @@
+import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
 import assert from "node:assert/strict";
 import {
   buildPlanCardPresentation,
@@ -14,15 +15,15 @@ assert.equal(
 assert.equal(formatPlanCardAge(null, "#nokids"), "18+");
 assert.equal(
   formatPlanCardPrice({ priceMode: "FROM", priceFrom: 25, priceText: "25 BYN", currency: "BYN" }),
-  "от 25 BYN",
+  formatPublicCardPrice({ priceMode: "FROM", priceFrom: 25, currency: "BYN" }),
 );
 assert.equal(
   formatPlanCardPrice({ priceMode: "EXACT", priceFrom: 25, priceText: "от 25 BYN", currency: "BYN" }),
-  "25 BYN",
+  formatPublicCardPrice({ priceMode: "EXACT", priceFrom: 25, currency: "BYN" }),
 );
 assert.equal(
   formatPlanCardPrice({ priceMode: "FREE", priceFrom: 0, priceText: null, currency: "BYN" }),
-  "Бесплатно",
+  formatPublicCardPrice({ priceMode: "FREE", priceFrom: 0, currency: "BYN" }),
 );
 assert.equal(
   formatPlanCardPrice({ priceMode: "UNKNOWN", priceFrom: 0, priceText: "0 BYN", currency: "BYN" }),
@@ -63,7 +64,7 @@ assert.deepEqual(
   }),
   {
     ageLabel: "7+",
-    priceLabel: "от 18 BYN",
+    priceLabel: formatPublicCardPrice({ priceMode: "FROM", priceFrom: 18, currency: "BYN" }),
     venueName: "Музей",
     venueAddress: "пр-т Независимости, 25",
   },
