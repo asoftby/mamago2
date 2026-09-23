@@ -71,7 +71,7 @@ export function PlanOverviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] w-[min(980px,calc(100vw-32px))] max-w-none overflow-hidden rounded-[24px] p-0">
+      <DialogContent className="flex max-h-[88vh] w-[min(980px,calc(100vw-32px))] max-w-none flex-col overflow-hidden rounded-[24px] p-0">
         <DialogHeader className="border-b px-6 pb-5 pt-6 text-left sm:px-8 sm:pt-8">
           <div
             className="font-mono text-[10px] uppercase tracking-[0.14em]"
@@ -91,7 +91,7 @@ export function PlanOverviewDialog({
           </p>
         </DialogHeader>
 
-        <div className="overflow-y-auto px-6 pb-8 pt-2 sm:px-8">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-8 pt-2 sm:px-8">
           {dates.length > 0 ? (
             <div className="flex flex-col gap-8">
               {dates.map((date) => {
