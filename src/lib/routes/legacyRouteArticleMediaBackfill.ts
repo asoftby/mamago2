@@ -114,6 +114,13 @@ export function planLegacyRouteArticleMediaBackfill(input: {
 
     const legacyMediaIndex = mediaIndexes[0] ?? -1;
     const legacyMediaBlock = legacyMediaIndex >= 0 ? blocks[legacyMediaIndex] : null;
+    if (
+      legacyMediaIndex >= 0 &&
+      (legacyMediaIndex <= textIndex || legacyMediaIndex >= segmentEnd)
+    ) {
+      errors.push(`STOP_${stop.order}_LEGACY_MEDIA_OUTSIDE_STOP_SEGMENT`);
+      continue;
+    }
     const existingIds = legacyMediaBlock ? mediaIdsForBlock(legacyMediaBlock) : null;
 
     if (legacyMediaBlock && existingIds === null) {
