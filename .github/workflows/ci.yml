@@ -61,6 +61,9 @@ jobs:
           pnpm exec tsx src/lib/article/articleInfoBlockGrouping.test.ts
           pnpm exec tsx src/lib/article/articlePerformanceAnalytics.test.ts
 
+      - name: Legacy route article media backfill regressions
+        run: pnpm test:legacy-route-article-media-backfill
+
       - name: Cache and discovery performance regressions
         run: |
           pnpm exec tsx src/server/article/publicArticleListCacheWiring.test.ts
