@@ -107,7 +107,10 @@ jobs:
         run: pnpm exec tsx src/components/business/wizard/event/steps/location/eventLocationLeafletMap.test.ts
 
       - name: Event public rendering regressions
-        run: pnpm exec tsx src/components/content/RichContentRenderer.test.ts
+        run: |
+          pnpm exec tsx src/components/content/RichContentRenderer.test.ts
+          pnpm exec tsx src/lib/event/eventDescriptionHtml.test.ts
+          pnpm exec tsx src/lib/date/formatPlanTargetDateRu.test.ts
 
       - name: Security content and remote-fetch regressions
         run: |

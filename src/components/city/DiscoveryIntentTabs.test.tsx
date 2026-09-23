@@ -30,25 +30,26 @@ function assertVariantMarkup(html: string, currentIntent: "classes" | null) {
     "journal must follow kuda and precede classes",
   );
 
-  // 2. classes/birthday/routes не имеют href и семантически отмечены disabled.
-  for (const label of ["Занятия", "Праздник", "Маршруты"]) {
+  // 2. classes/birthday остаются disabled; routes не входит в primary navigation.
+  for (const label of ["Занятия", "Праздник"]) {
     assert.equal(findEnclosingTag(html, `alt="${label}"`), "disabled", `${label} must not be a link`);
   }
+  assert.ok(!html.includes('alt="Маршруты"'), "routes must not render in primary navigation");
   assert.ok(!html.includes('href="/minsk/classes"'));
   assert.ok(!html.includes('href="/minsk/birthday"'));
   assert.ok(!html.includes('href="/minsk/routes"'));
 
   // 3. aria-disabled="true" у недоступных пунктов — ровно по одному на раздел.
   const ariaDisabledCount = html.split('aria-disabled="true"').length - 1;
-  assert.equal(ariaDisabledCount, 3);
+  assert.equal(ariaDisabledCount, 2);
 
   // 4. Единый бейдж «Скоро» на каждый disabled-раздел.
   const badgeCount = html.split(">Скоро<").length - 1;
-  assert.equal(badgeCount, 3);
+  assert.equal(badgeCount, 2);
 
   // Не допускать перехода по клавиатуре: disabled-элементы без активного tabIndex.
   const disabledTabIndexCount = html.split('tabindex="-1"').length - 1;
-  assert.equal(disabledTabIndexCount, 3);
+  assert.equal(disabledTabIndexCount, 2);
 
   if (currentIntent === "classes") {
     // Активный раздел при прямом открытии его URL остаётся визуально текущим,
@@ -97,18 +98,19 @@ function assertCompactMarkup(html: string, currentIntent: "classes" | null) {
   assert.equal(findEnclosingTagByText(html, "Журнал"), "link");
   assert.ok(html.includes('href="/minsk/blog"'), "journal must link to the city blog");
 
-  // 2. classes/birthday/routes без href, семантически disabled.
-  for (const label of ["Занятия", "Праздник", "Маршруты"]) {
+  // 2. classes/birthday без href; routes отсутствует в primary navigation.
+  for (const label of ["Занятия", "Праздник"]) {
     assert.equal(findEnclosingTagByText(html, label), "disabled", `${label} must not be a link`);
   }
+  assert.ok(!html.includes(">Маршруты<"), "routes must not render in compact primary navigation");
   assert.ok(!html.includes('href="/minsk/classes"'));
   assert.ok(!html.includes('href="/minsk/birthday"'));
   assert.ok(!html.includes('href="/minsk/routes"'));
 
   // 3-4. aria-disabled / tabindex=-1 / бейдж «Скоро» — по одному на раздел.
-  assert.equal(html.split('aria-disabled="true"').length - 1, 3);
-  assert.equal(html.split('tabindex="-1"').length - 1, 3);
-  assert.equal(html.split(">Скоро<").length - 1, 3);
+  assert.equal(html.split('aria-disabled="true"').length - 1, 2);
+  assert.equal(html.split('tabindex="-1"').length - 1, 2);
+  assert.equal(html.split(">Скоро<").length - 1, 2);
 
   // Compact: без ряда иконок (никаких <img> в разметке) — только текст.
   assert.ok(!html.includes("<img"), "compact density must not render icons");

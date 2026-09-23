@@ -9,6 +9,7 @@ import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { persistActivitySave } from "@/features/save/persistActivitySave";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { formatPlanTargetDateRu } from "@/lib/date/formatPlanTargetDateRu";
 import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose } from "@/features/save/saveStatusFetchGuard";
 
 type SaveHeartProps = {
@@ -26,14 +27,6 @@ type SaveHeartProps = {
   iconClassName?: string;
   onSaveChange?: (isSaved: boolean) => void;
 };
-
-function formatPlanDateRu(iso: string) {
-  return new Date(`${iso}T12:00:00`).toLocaleDateString("ru-RU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-}
 
 function normalizePlanDateISO(value?: string | null): string | undefined {
   if (!value) return undefined;
@@ -149,9 +142,9 @@ export function SaveHeart({
         });
 
         if (result.action === "plan") {
-          toast.success("Добавлено в план", {
-            description: `Событие на ${formatPlanDateRu(result.dateISO)}`,
-          });
+          toast.success(
+            `Событие добавлено на ${formatPlanTargetDateRu(result.dateISO)}`,
+          );
         } else if (result.action === "ideas") {
           toast.success("Сохранено в идеи", {
             description: "Вы сможете вернуться к этому позже",

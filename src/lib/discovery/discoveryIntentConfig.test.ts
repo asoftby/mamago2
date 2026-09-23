@@ -18,7 +18,7 @@ for (const item of DISCOVERY_INTENT_ITEMS) {
 
 assert.deepEqual(
   PRIMARY_NAVIGATION_ITEMS.map((item) => item.label),
-  ["Куда пойти", "Журнал", "Занятия", "Праздник", "Маршруты"],
+  ["Куда пойти", "Журнал", "Занятия", "Праздник"],
 );
 const journal = PRIMARY_NAVIGATION_ITEMS.find((item) => item.id === "journal");
 assert.ok(journal);

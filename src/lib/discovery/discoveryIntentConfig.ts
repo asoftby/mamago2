@@ -94,5 +94,4 @@ export const PRIMARY_NAVIGATION_ITEMS: PrimaryNavigationItem[] = [
   },
   DISCOVERY_INTENT_CONFIG.classes,
   DISCOVERY_INTENT_CONFIG.birthday,
-  DISCOVERY_INTENT_CONFIG.routes,
 ];

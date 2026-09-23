@@ -19,6 +19,7 @@ import { PublicationStatsPanel } from "@/components/publication-stats";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { extractPlainTextLinesFromHtml } from "@/lib/richtext/utils";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { formatPlanTargetDateRu } from "@/lib/date/formatPlanTargetDateRu";
 import { useUpcomingSessions } from "./useUpcomingSessions";
 import { formatHHMM } from "@/lib/formatters/date";
 
@@ -220,9 +221,9 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
             }),
           });
           if (!res.ok) throw new Error("plan_save_failed");
-          toast.success("Добавлено в план", {
-            description: `Событие добавлено на ${formatPlanDateRu(result.dateISO)}`,
-          });
+          toast.success(
+            `Событие добавлено на ${formatPlanTargetDateRu(result.dateISO)}`,
+          );
         } else if (result.action === "ideas") {
           const res = await fetch("/api/save/idea", {
             method: "POST",
@@ -272,9 +273,9 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
         });
         if (!res.ok) throw new Error("plan_save_failed");
         await loadSaveStatus();
-        toast.success("Добавлено в план", {
-          description: `Событие добавлено на ${formatPlanDateRu(dateISO)}`,
-        });
+        toast.success(
+          `Событие добавлено на ${formatPlanTargetDateRu(dateISO)}`,
+        );
       } catch {
         toast.error("Не получилось выполнить действие", {
           description: "Попробуйте еще раз",

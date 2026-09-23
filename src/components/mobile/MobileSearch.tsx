@@ -236,7 +236,7 @@ export function MobileSearch({
             <div className="border-b border-gray-100 py-4">
               <div
                 ref={containerRef}
-                className="relative grid grid-cols-5 px-2"
+                className="relative grid grid-cols-4 px-2"
               >
                 {PRIMARY_NAVIGATION_ITEMS.map((intentConfig, index) => {
                   const isActive =
