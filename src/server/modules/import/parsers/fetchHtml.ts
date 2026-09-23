@@ -4,7 +4,7 @@ import type { LookupAddress } from "node:dns";
 import { lookup as dnsLookup } from "node:dns/promises";
 import { isIP, type LookupFunction } from "node:net";
 
-import { isPublicIpAddress } from "@/lib/media/safeRemoteImageUrl";
+import { assertSafeRemoteImageUrl, isPublicIpAddress } from "@/lib/media/safeRemoteImageUrl";
 import { resolveSourceSpecificTlsCa } from "./familyByTls";
 
 export interface FetchHtmlOptions {
@@ -19,12 +19,24 @@ export interface FetchHtmlOptions {
   headers?: Record<string, string>;
   encoding?: string;
   /**
-   * When native Node fetch/Undici fails before an HTTP response exists, retry
-   * the same URL once through Node's built-in http/https transport (IPv4).
-   * This keeps TLS verification enabled and is useful for legacy upstreams
-   * that intermittently fail at the Undici transport layer.
+   * Kept for call-site compatibility. HTML transport is now always the pinned
+   * Node http/https path used by fetchBinary(), so there is no unsafe native
+   * fetch fallback anymore.
    */
   nodeHttpFallback?: boolean;
+  /** Maximum response body size across HTML import requests. */
+  maxBytes?: number;
+  /** Maximum number of redirects; every hop is revalidated and DNS-pinned. */
+  maxRedirects?: number;
+  /**
+   * Optional source-specific URL policy. The generic public-http(s) SSRF
+   * policy is always applied first; this hook can further restrict hosts/path.
+   */
+  validateUrl?: (url: URL) => void;
+  /** @internal Deterministic security-test injection only. */
+  resolveHostname?: FetchBinaryOptions["resolveHostname"];
+  /** @internal Deterministic security-test injection only. */
+  request?: FetchBinaryOptions["request"];
 }
 
 export interface FetchHtmlResult {
@@ -37,7 +49,7 @@ export interface FetchHtmlResult {
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 350;
-const DEFAULT_NODE_HTTP_FALLBACK = true;
+const DEFAULT_HTML_MAX_BYTES = 5 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
 
 const DEFAULT_HEADERS: Record<string, string> = {
@@ -635,112 +647,64 @@ export async function fetchHtml(
   const attempts = Math.max(1, options.retries ?? DEFAULT_RETRIES);
   const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
   const encoding = options.encoding ?? "utf-8";
-  const nodeHttpFallback = options.nodeHttpFallback ?? DEFAULT_NODE_HTTP_FALLBACK;
+  const maxBytes = options.maxBytes ?? DEFAULT_HTML_MAX_BYTES;
+  const maxRedirects = options.maxRedirects ?? MAX_REDIRECTS;
   const headers = {
     ...DEFAULT_HEADERS,
+    // Low-level Node transport does not transparently decompress responses.
+    // Explicit identity encoding keeps HTML decoding deterministic.
+    "Accept-Encoding": "identity",
     ...options.headers,
+  };
+
+  const validateUrl = (candidate: URL) => {
+    // Generic SSRF policy: http(s) only, no credentials/private literals.
+    // fetchBinary additionally resolves every A/AAAA answer, rejects any
+    // non-public destination, and pins the approved address to the socket.
+    assertSafeRemoteImageUrl(candidate.toString());
+    options.validateUrl?.(candidate);
   };
 
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
     try {
-      let response: Response;
-
-      try {
-        response = await fetch(url, {
-          signal: controller.signal,
-          headers,
-        });
-      } catch (nativeError) {
-        if (!nodeHttpFallback || !shouldUseNodeHttpFallback(nativeError)) {
-          throw nativeError;
-        }
-
-        console.warn("[import.fetchHtml] native fetch transport failed; trying node http fallback", {
-          url,
-          attempt,
-          error: describeFetchError(nativeError),
-        });
-
-        try {
-          return await fetchHtmlViaNodeHttp(url, {
-            timeoutMs,
-            headers,
-            encoding,
-          });
-        } catch (fallbackError) {
-          throw createNodeTransportError(nativeError, fallbackError);
-        }
-      }
-
-      const responseHeaders = headersToRecord(response.headers);
-
-      if (!response.ok) {
-        const error = Object.assign(
-          new Error(buildStatusErrorMessage(url, response.status, response.statusText)),
-          {
-            status: response.status,
-            statusText: response.statusText,
-            responseHeaders,
-          },
-        );
-
-        console.warn("[import.fetchHtml] non-ok response", {
-          url,
-          attempt,
-          status: response.status,
-          statusText: response.statusText,
-          headers: responseHeaders,
-        });
-
-        throw error;
-      }
-
-      const buffer = await response.arrayBuffer();
-      const html = new TextDecoder(encoding).decode(buffer);
+      const response = await fetchBinary(url, {
+        timeoutMs,
+        headers,
+        maxBytes,
+        maxRedirects,
+        validateUrl,
+        resolveHostname: options.resolveHostname,
+        request: options.request,
+      });
 
       return {
-        html,
-        finalUrl: response.url || url,
+        html: new TextDecoder(encoding).decode(response.buffer),
+        finalUrl: response.finalUrl,
         status: response.status,
-        headers: responseHeaders,
+        headers: response.headers,
       };
     } catch (error) {
-      const status = readErrorField(error, "status");
-      const isHttpStatusError = typeof status === "number";
       const normalizedError =
-        error instanceof Error
-          ? error
-          : new Error(buildNetworkErrorMessage(url, error));
+        error instanceof Error ? error : new Error(buildNetworkErrorMessage(url, error));
 
       console.warn("[import.fetchHtml] request failed", {
         url,
         attempt,
         error: describeFetchError(error),
-        status: isHttpStatusError ? status : undefined,
       });
 
-      lastError = isHttpStatusError
-        ? normalizedError
-        : Object.assign(new Error(buildNetworkErrorMessage(url, error)), {
-            cause: error,
-          });
-
+      lastError = normalizedError;
       if (attempt < attempts) {
         await sleep(retryDelayMs);
-        continue;
       }
-    } finally {
-      clearTimeout(timer);
     }
   }
 
   const fallbackMessage = lastError?.message ?? `Failed to load ${url} (unknown error)`;
   throw Object.assign(new Error(fallbackMessage), {
     cause: lastError ?? undefined,
+    ...(hasHttpStatus(lastError) ? { httpStatus: lastError.httpStatus } : {}),
   });
 }
