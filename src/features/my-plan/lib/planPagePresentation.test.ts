@@ -12,9 +12,26 @@ assert.equal(
   "0+",
 );
 assert.equal(formatPlanCardAge(null, "#nokids"), "18+");
-assert.equal(formatPlanCardPrice({ priceFrom: 25, priceText: "25 BYN", currency: "BYN" }), "от 25 BYN");
-assert.equal(formatPlanCardPrice({ priceFrom: 0, priceText: null, currency: "BYN" }), "бесплатно");
-assert.equal(formatPlanCardPrice({ priceFrom: null, priceText: "уточняйте", currency: null }), "уточняйте");
+assert.equal(
+  formatPlanCardPrice({ priceMode: "FROM", priceFrom: 25, priceText: "25 BYN", currency: "BYN" }),
+  "от 25 BYN",
+);
+assert.equal(
+  formatPlanCardPrice({ priceMode: "EXACT", priceFrom: 25, priceText: "от 25 BYN", currency: "BYN" }),
+  "25 BYN",
+);
+assert.equal(
+  formatPlanCardPrice({ priceMode: "FREE", priceFrom: 0, priceText: null, currency: "BYN" }),
+  "Бесплатно",
+);
+assert.equal(
+  formatPlanCardPrice({ priceMode: "UNKNOWN", priceFrom: 0, priceText: "0 BYN", currency: "BYN" }),
+  null,
+);
+assert.equal(
+  formatPlanCardPrice({ priceFrom: null, priceText: "уточняйте", currency: null }),
+  "уточняйте",
+);
 
 assert.deepEqual(
   resolvePlanCardLocation({
@@ -32,6 +49,7 @@ assert.deepEqual(
   buildPlanCardPresentation({
     ageMinMonths: 84,
     ageLabel: "7–9 лет",
+    priceMode: "FROM",
     priceFrom: 18,
     priceText: null,
     currency: "BYN",
