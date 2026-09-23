@@ -1,5 +1,6 @@
 "use client";
 
+import "@/styles/event-page.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSetPublicationIntent } from "@/contexts/PublicationIntentContext";
 import { toast } from "@/lib/toast";

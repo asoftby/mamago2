@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import { getPublishedPageBySlug } from "@/lib/pages/service";
 import { PageType } from "@prisma/client";
-import { sanitizeRichContent } from "@/components/content/RichContentRenderer";
+import { sanitizeRichContent } from "@/components/content/richContentHtml";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
 type PageProps = {

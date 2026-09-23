@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import "@/styles/article-content.css";
 
 interface ArticleContentProps {
   children: ReactNode;

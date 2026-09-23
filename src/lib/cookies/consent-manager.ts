@@ -122,20 +122,54 @@ export async function openCookiePreferencesFromShell(): Promise<void> {
   if (typeof window === "undefined") return;
 
   await initCookieConsent();
+  // Library CSS + mamaGo overrides are not in the initial page bundle (see
+  // cookie-consent-provider.tsx); load them now so the Preferences modal
+  // never renders unstyled.
+  await import("@/components/providers/cookie-consent-preferences-styles");
   const { showPreferences } = await import("vanilla-cookieconsent");
-  showPreferences();
 
-  await new Promise<void>((resolve) =>
-    window.requestAnimationFrame(() => resolve()),
-  );
+  // CookieConsent v3 exposes an official cc:onModalShow event whose
+  // preferencesModal signal is emitted only after the modal is visible.
+  // Wait on that contract instead of inferring visibility from library-private
+  // DOM classes/computed styles, which produced false failures in Chrome.
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let timeoutId: number | undefined;
 
-  const preferences = document.querySelector<HTMLElement>("#cc-main .pm");
-  const isVisible =
-    document.documentElement.classList.contains("show--preferences") &&
-    preferences !== null &&
-    window.getComputedStyle(preferences).visibility !== "hidden";
+    const cleanup = () => {
+      window.removeEventListener("cc:onModalShow", handleModalShow);
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
 
-  if (!isVisible) {
-    throw new Error("Cookie preferences modal did not become visible");
-  }
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (error) reject(error);
+      else resolve();
+    };
+
+    const handleModalShow = (event: Event) => {
+      const detail = (event as CustomEvent<{ modalName?: string }>).detail;
+      if (detail?.modalName === "preferencesModal") {
+        finish();
+      }
+    };
+
+    window.addEventListener("cc:onModalShow", handleModalShow);
+    timeoutId = window.setTimeout(() => {
+      finish(new Error("Cookie preferences modal did not become visible"));
+    }, 1500);
+
+    try {
+      showPreferences();
+    } catch (error) {
+      finish(
+        error instanceof Error
+          ? error
+          : new Error("Cookie preferences modal failed to open"),
+      );
+    }
+  });
+
 }

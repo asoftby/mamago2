@@ -125,6 +125,22 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '10mb',
     },
+    // Inlines per-page critical CSS as <style> instead of render-blocking
+    // <link rel="stylesheet">. Cuts the render-blocking CSS requests on first
+    // load (e.g. /minsk); client navigations still use normal stylesheets.
+    //
+    // Enabled after a real-network A/B (Lighthouse --throttling-method=devtools,
+    // mobile Slow-4G + 4x CPU, 5 runs/variant on /minsk): eliminates 3
+    // render-blocking CSS requests (~3069ms opportunity) and cut median mobile
+    // LCP 1552ms -> 1012ms, FCP 1552ms -> 962ms, with no CLS/TBT/desktop
+    // regression. Trade-off: the external stylesheet's cacheable
+    // `public, max-age=31536000, immutable` response is no longer reused
+    // across page navigations (HTML itself is `no-store` either way), so the
+    // ~53-108KB compressed cost repeats on every SSR page load instead of
+    // being paid once per browser session. Accepted given the measured LCP/FCP
+    // win; simulated (Lantern) throttling had shown no benefit and was
+    // actively misleading here.
+    inlineCss: true,
   },
 
   /** Доступ к dev с localhost / кастомного local-domain / LAN без поломанной загрузки `/_next/*`. */
