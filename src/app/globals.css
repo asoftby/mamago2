@@ -110,8 +110,8 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* --font-sans не переопределяем здесь: next/font/local задаёт --font-sans на <html>.
-     Tailwind font-sans использует CSS var(--font-sans) напрямую через body. */
+  /* --font-sans задаётся в :root. Tailwind font-sans использует
+     CSS var(--font-sans) напрямую через наследование. */
   --font-mono: Menlo, ui-monospace, SFMono-Regular, SF Mono, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
   
@@ -169,6 +169,7 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 :root {
   /* Site-wide layout */
   --site-maxw: 1200px;
+  --font-sans: "Google Sans";
   --font-editorial: var(--font-pt-serif);
   --font-serif: var(--font-pt-serif);
   --font-display: var(--font-pt-serif);
@@ -322,8 +323,7 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   /* Меньше «резинового» overscroll у верха/низа страницы (Safari/macOS). */
   html {
     overscroll-behavior-y: none;
-    /* next/font/local задаёт --font-sans на <html> через className.
-       Применяем его явно, чтобы шрифт наследовался во всё дерево:
+    /* Primary sans inherits through the whole app:
        public, admin, business, editor, auth, modals, inputs, tables. */
     font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   }

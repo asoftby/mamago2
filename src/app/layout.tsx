@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import "./globals.css";
-import { ntSomic, ptSerif } from "@/lib/fonts";
+import { ptSerif } from "@/lib/fonts";
 import { Sonner } from "@/components/ui/sonner";
 import { AccountModeProvider } from "@/contexts/AccountModeContext";
 import { SaveIntentProvider } from "@/lib/save/SaveIntentContext";
@@ -45,12 +45,18 @@ export default async function RootLayout({
   return (
     <html
       lang="ru"
-      className={`${ntSomic.variable} ${ptSerif.variable}`}
+      className={ptSerif.variable}
       suppressHydrationWarning
     >
       <head>
         <script
           dangerouslySetInnerHTML={{ __html: buildNoFlashCookieShellScript() }}
+        />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap"
         />
         <style>{`
           :root {
