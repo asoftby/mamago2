@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { resolveRouteForUserSave } from "@/server/services/route.service";
+import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
 
 const planActivitySelect = {
   id: true,
@@ -10,6 +11,7 @@ const planActivitySelect = {
   ageLabel: true,
   ageMinMonths: true,
   eventCategory: { select: { nameRu: true } },
+  priceMode: true,
   priceFrom: true,
   priceText: true,
   currency: true,
@@ -71,6 +73,7 @@ export type PlanItemWithActivity = {
     ageLabel: string | null;
     ageMinMonths?: number | null;
     eventCategory: { nameRu: string } | null;
+    priceMode?: PublicationPriceMode | null;
     priceFrom: number | null;
     priceText: string | null;
     currency: string | null;
