@@ -1,0 +1,73 @@
+import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
+import assert from "node:assert/strict";
+import {
+  buildPlanCardPresentation,
+  formatPlanCardAge,
+  formatPlanCardPrice,
+  resolvePlanCardLocation,
+} from "./planPagePresentation";
+
+assert.equal(formatPlanCardAge(36, "3–5 лет, 5–7 лет"), "3+");
+assert.equal(
+  formatPlanCardAge(null, "0–1 год, 1–3 года, 3–5 лет, 5–7 лет, #nokids"),
+  "0+",
+);
+assert.equal(formatPlanCardAge(null, "#nokids"), "18+");
+assert.equal(
+  formatPlanCardPrice({ priceMode: "FROM", priceFrom: 25, priceText: "25 BYN", currency: "BYN" }),
+  formatPublicCardPrice({ priceMode: "FROM", priceFrom: 25, currency: "BYN" }),
+);
+assert.equal(
+  formatPlanCardPrice({ priceMode: "EXACT", priceFrom: 25, priceText: "от 25 BYN", currency: "BYN" }),
+  formatPublicCardPrice({ priceMode: "EXACT", priceFrom: 25, currency: "BYN" }),
+);
+assert.equal(
+  formatPlanCardPrice({ priceMode: "FREE", priceFrom: 0, priceText: null, currency: "BYN" }),
+  formatPublicCardPrice({ priceMode: "FREE", priceFrom: 0, currency: "BYN" }),
+);
+assert.equal(
+  formatPlanCardPrice({ priceMode: "UNKNOWN", priceFrom: 0, priceText: "0 BYN", currency: "BYN" }),
+  null,
+);
+assert.equal(
+  formatPlanCardPrice({ priceFrom: null, priceText: "уточняйте", currency: null }),
+  "уточняйте",
+);
+
+assert.deepEqual(
+  resolvePlanCardLocation({
+    venue: {
+      title: "Небо.Река",
+      addressLine: "ул. Октябрьская, 16",
+      place: null,
+    },
+    place: null,
+  }),
+  { venueName: "Небо.Река", venueAddress: "ул. Октябрьская, 16" },
+);
+
+assert.deepEqual(
+  buildPlanCardPresentation({
+    ageMinMonths: 84,
+    ageLabel: "7–9 лет",
+    priceMode: "FROM",
+    priceFrom: 18,
+    priceText: null,
+    currency: "BYN",
+    venue: null,
+    place: {
+      title: "Музей",
+      shortAddress: "пр-т Независимости, 25",
+      formattedAddr: null,
+      customAddress: null,
+    },
+  }),
+  {
+    ageLabel: "7+",
+    priceLabel: formatPublicCardPrice({ priceMode: "FROM", priceFrom: 18, currency: "BYN" }),
+    venueName: "Музей",
+    venueAddress: "пр-т Независимости, 25",
+  },
+);
+
+console.log("planPagePresentation tests: OK");
