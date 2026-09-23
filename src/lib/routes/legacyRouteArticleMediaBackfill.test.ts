@@ -152,10 +152,11 @@ function testMovedLegacyMediaRefuses() {
 function testFrozenManifestIntegrity() {
   assert.equal(LEGACY_ROUTE_ARTICLE_MEDIA_MANIFEST.length, 13);
   assert.equal(LEGACY_ROUTE_ARTICLE_MEDIA_ATTACHMENT_COUNT, 577);
-  assert.ok(
-    LEGACY_ROUTE_ARTICLE_MEDIA_MANIFEST.every(
-      (route) => route.sourceRecordKey !== "wordpress-db:routes:46963",
+  assert.equal(
+    LEGACY_ROUTE_ARTICLE_MEDIA_MANIFEST.map((route) => String(route.sourceRecordKey)).includes(
+      "wordpress-db:routes:46963",
     ),
+    false,
   );
 
   const sourceKeys = LEGACY_ROUTE_ARTICLE_MEDIA_MANIFEST.map((route) => route.sourceRecordKey);
