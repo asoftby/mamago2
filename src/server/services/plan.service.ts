@@ -8,6 +8,7 @@ const planActivitySelect = {
   type: true,
   coverImageUrl: true,
   ageLabel: true,
+  ageMinMonths: true,
   eventCategory: { select: { nameRu: true } },
   priceFrom: true,
   priceText: true,
@@ -20,6 +21,7 @@ const planActivitySelect = {
   },
   place: {
     select: {
+      title: true,
       shortAddress: true,
       formattedAddr: true,
       customAddress: true,
@@ -28,10 +30,12 @@ const planActivitySelect = {
   },
   venue: {
     select: {
+      title: true,
       addressLine: true,
       kind: true,
       place: {
         select: {
+          title: true,
           shortAddress: true,
           formattedAddr: true,
           customAddress: true,
@@ -65,6 +69,7 @@ export type PlanItemWithActivity = {
     type: string;
     coverImageUrl: string | null;
     ageLabel: string | null;
+    ageMinMonths: number | null;
     eventCategory: { nameRu: string } | null;
     priceFrom: number | null;
     priceText: string | null;
@@ -74,15 +79,18 @@ export type PlanItemWithActivity = {
       business: { operationalStatus: string } | null;
     } | null;
     place: {
+      title: string;
       shortAddress: string | null;
       formattedAddr: string | null;
       customAddress: string | null;
       city: { name: string } | null;
     } | null;
     venue: {
+      title: string | null;
       addressLine: string | null;
       kind: string;
       place: {
+        title: string;
         shortAddress: string | null;
         formattedAddr: string | null;
         customAddress: string | null;
