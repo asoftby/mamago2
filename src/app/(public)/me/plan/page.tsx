@@ -11,6 +11,7 @@ import {
   listActivitySessionsForPlanItems,
 } from "@/server/services/dayScenario.service";
 import { resolveMyPlanItemEffectiveTime } from "@/features/my-plan/lib/scenarioProjection";
+import { buildPlanCardPresentation } from "@/features/my-plan/lib/planPagePresentation";
 
 export default async function PlanPage() {
   const user = await getCurrentUser();
@@ -115,6 +116,10 @@ export default async function PlanPage() {
       { startsAt: item.startsAt, sessions: sessions.map((startsAt) => ({ startsAt })) },
       scenarioOverridesByPlanItemId.get(item.id) ?? null,
     );
+    const presentation = item.activity
+      ? buildPlanCardPresentation(item.activity)
+      : { ageLabel: null, priceLabel: null, venueName: null, venueAddress: null };
+
     return {
       id: item.id,
       date: item.date,
@@ -131,8 +136,11 @@ export default async function PlanPage() {
             title: item.activity.title,
             type: item.activity.type,
             coverImageUrl: item.activity.coverImageUrl,
-            ageLabel: item.activity.ageLabel,
+            ageLabel: presentation.ageLabel,
             categoryLabel: item.activity.eventCategory?.nameRu ?? null,
+            priceLabel: presentation.priceLabel,
+            venueName: presentation.venueName,
+            venueAddress: presentation.venueAddress,
           }
         : null,
     };
