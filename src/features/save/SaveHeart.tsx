@@ -149,9 +149,9 @@ export function SaveHeart({
         });
 
         if (result.action === "plan") {
-          toast.success("Добавлено в план", {
-            description: `Событие на ${formatPlanDateRu(result.dateISO)}`,
-          });
+          toast.success(
+            `Событие добавлено на ${formatPlanDateRu(result.dateISO)}`,
+          );
         } else if (result.action === "ideas") {
           toast.success("Сохранено в идеи", {
             description: "Вы сможете вернуться к этому позже",
