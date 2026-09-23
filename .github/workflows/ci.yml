@@ -109,6 +109,11 @@ jobs:
       - name: Event public rendering regressions
         run: pnpm exec tsx src/components/content/RichContentRenderer.test.ts
 
+      - name: Security content and remote-fetch regressions
+        run: |
+          pnpm test:jsonld-safety
+          pnpm test:instagram-reels-ssrf
+
       - name: Telegram plan notification regressions
         run: |
           NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/telegram/telegramNotificationBootstrap.service.test.ts
