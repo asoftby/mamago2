@@ -25,6 +25,7 @@ import type { PlaceImportParser } from "./base.parser";
 import type { ParserResult, ParsedRawRecord } from "../types";
 import { errorParserResult } from "./base.parser";
 import { fetchHtml } from "./fetchHtml";
+import { assertSafeFamilyByImportUrl } from "./familyByUrlPolicy";
 
 const PARSER_KEY = "family-by-place";
 const BASE_URL = "https://family.by";
@@ -174,13 +175,23 @@ export const familyByPlaceParser: PlaceImportParser = {
   entityType: "PLACE",
 
   async parse(source: ImportSource): Promise<ParserResult> {
-    const targetUrl = source.baseUrl?.trim();
+    const rawTargetUrl = source.baseUrl?.trim();
 
-    if (!targetUrl) {
+    if (!rawTargetUrl) {
       return errorParserResult(
         PARSER_KEY,
         "ImportSource.baseUrl is required for family-by-place parser. " +
         "Set it to a family.by listing URL, e.g. https://family.by/spravka/dosug/",
+      );
+    }
+
+    let targetUrl: string;
+    try {
+      targetUrl = assertSafeFamilyByImportUrl(rawTargetUrl, { pathPrefix: "/spravka/" }).toString();
+    } catch (error) {
+      return errorParserResult(
+        PARSER_KEY,
+        error instanceof Error ? error.message : "Invalid family.by import URL",
       );
     }
 
@@ -190,6 +201,9 @@ export const familyByPlaceParser: PlaceImportParser = {
         encoding: "windows-1251",
         timeoutMs: 15_000,
         retries: 2,
+        validateUrl: (candidate) => {
+          assertSafeFamilyByImportUrl(candidate, { pathPrefix: "/spravka/" });
+        },
       });
       html = response.html;
     } catch (err) {
