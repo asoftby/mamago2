@@ -13,7 +13,7 @@ export type PlanPresentationActivity = {
   currency: string | null;
   place: PlanPresentationPlace | null;
   venue: {
-    title: string | null;
+    title?: string | null;
     addressLine: string | null;
     place: PlanPresentationPlace | null;
   } | null;
