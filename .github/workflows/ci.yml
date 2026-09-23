@@ -72,7 +72,10 @@ jobs:
           pnpm exec tsx src/server/place/placeDetailPerf.test.ts
 
       - name: Stories playback regressions
-        run: pnpm exec tsx src/features/stories/components/StoryProgress.test.tsx
+        run: |
+          pnpm exec tsx src/features/stories/components/StoryProgress.test.tsx
+          pnpm exec tsx src/features/stories/lib/storyPrice.test.ts
+          pnpm exec tsx src/features/stories/components/StoryModalActionCard.contract.test.ts
 
       - name: Place wizard regressions
         run: |
