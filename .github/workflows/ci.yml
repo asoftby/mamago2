@@ -106,6 +106,11 @@ jobs:
       - name: Event map regressions
         run: pnpm exec tsx src/components/business/wizard/event/steps/location/eventLocationLeafletMap.test.ts
 
+      - name: My Plan presentation regressions
+        run: |
+          pnpm exec tsx src/features/my-plan/lib/planItemMeta.test.ts
+          pnpm exec tsx src/features/my-plan/lib/planPagePresentation.test.ts
+
       - name: Event public rendering regressions
         run: |
           pnpm exec tsx src/components/content/RichContentRenderer.test.ts
