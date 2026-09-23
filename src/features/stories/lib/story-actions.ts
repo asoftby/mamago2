@@ -35,7 +35,7 @@ export const STORY_ACTIONS: Record<StoryItemType, StoryAction[]> = {
     { label: "Подробнее об акции", href: toHref, variant: "primary", isAvailable: hasHref },
   ],
   "breaking-news": [
-    { label: "Читать статью", href: toHref, variant: "primary", isAvailable: hasHref },
+    { label: "Подробнее", href: toHref, variant: "primary", isAvailable: hasHref },
   ],
   route: [
     { label: "Смотреть маршрут", href: toHref, variant: "primary", isAvailable: hasHref },
