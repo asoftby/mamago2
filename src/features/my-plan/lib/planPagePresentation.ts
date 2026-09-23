@@ -1,3 +1,6 @@
+import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
+import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
+
 export type PlanPresentationPlace = {
   title?: string | null;
   shortAddress: string | null;
@@ -8,6 +11,7 @@ export type PlanPresentationPlace = {
 export type PlanPresentationActivity = {
   ageMinMonths?: number | null;
   ageLabel: string | null;
+  priceMode?: PublicationPriceMode | null;
   priceFrom: number | null;
   priceText: string | null;
   currency: string | null;
@@ -25,12 +29,6 @@ function firstNonEmpty(...values: Array<string | null | undefined>): string | nu
     if (trimmed) return trimmed;
   }
   return null;
-}
-
-function formatAmount(value: number): string {
-  return Number.isInteger(value)
-    ? String(value)
-    : value.toLocaleString("ru-RU", { maximumFractionDigits: 2 });
 }
 
 /**
@@ -59,19 +57,24 @@ export function formatPlanCardAge(
 }
 
 /**
- * Plan cards intentionally present priceFrom as "от", matching the field's
- * product meaning. Free stays explicit; unstructured legacy text is used only
- * as a fallback when no numeric price exists.
+ * My Plan uses the same public pricing contract as discovery cards.
+ * Structured priceMode is authoritative: EXACT must not become "от", and
+ * historical zero placeholders must not become "Бесплатно" unless mode=FREE.
+ * The raw text fallback exists only for old/synthetic objects that predate
+ * priceMode entirely.
  */
 export function formatPlanCardPrice(activity: Pick<
   PlanPresentationActivity,
-  "priceFrom" | "priceText" | "currency"
+  "priceMode" | "priceFrom" | "priceText" | "currency"
 >): string | null {
-  if (activity.priceFrom === 0) return "бесплатно";
-  if (activity.priceFrom != null && Number.isFinite(activity.priceFrom)) {
-    return `от ${formatAmount(activity.priceFrom)} ${activity.currency?.trim() || "BYN"}`;
-  }
-  return firstNonEmpty(activity.priceText);
+  const canonical = formatPublicCardPrice({
+    priceMode: activity.priceMode,
+    priceFrom: activity.priceFrom,
+    currency: activity.currency,
+  });
+  if (canonical) return canonical;
+
+  return activity.priceMode == null ? firstNonEmpty(activity.priceText) : null;
 }
 
 export function resolvePlanCardLocation(activity: Pick<
