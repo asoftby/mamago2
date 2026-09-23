@@ -48,14 +48,14 @@ export function formatPlanCardAge(
 
   const raw = rawAgeLabel?.trim();
   if (!raw) return null;
-  if (/#[\s-]*nokids/i.test(raw)) return "18+";
 
   const matches = [...raw.matchAll(/(?:^|[^\d])(\d{1,2})(?=\s*(?:\+|[-–—]|год|лет|года|$))/giu)]
     .map((match) => Number(match[1]))
     .filter((value) => Number.isFinite(value));
 
-  if (matches.length === 0) return null;
-  return `${Math.min(...matches)}+`;
+  if (matches.length > 0) return `${Math.min(...matches)}+`;
+  if (/#[\s-]*nokids/i.test(raw)) return "18+";
+  return null;
 }
 
 /**
