@@ -42,6 +42,7 @@ import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { cn } from "@/lib/utils";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { formatPlanTargetDateRu } from "@/lib/date/formatPlanTargetDateRu";
 import { useUpcomingSessions } from "./useUpcomingSessions";
 
 /* ── Helpers ──────────────────────────────────────────────── */
@@ -477,7 +478,7 @@ export function EventPageView({
           });
           if (!res.ok) throw new Error("plan_save_failed");
           toast.success(
-            `Событие добавлено на ${formatPlanDateRu(result.dateISO)}`,
+            `Событие добавлено на ${formatPlanTargetDateRu(result.dateISO)}`,
           );
           requestPlanRefetchForDate(result.dateISO);
         } else if (result.action === "ideas") {
@@ -523,7 +524,7 @@ export function EventPageView({
         await loadSaveStatus();
         requestPlanRefetchForDate(dateISO);
         toast.success(
-          `Событие добавлено на ${formatPlanDateRu(dateISO)}`,
+          `Событие добавлено на ${formatPlanTargetDateRu(dateISO)}`,
         );
       } catch {
         toast.error("Не получилось выполнить действие", { description: "Попробуйте еще раз" });
