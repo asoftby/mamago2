@@ -111,7 +111,9 @@ jobs:
         run: pnpm exec tsx src/components/business/wizard/event/steps/location/eventLocationLeafletMap.test.ts
 
       - name: Public shell regressions
-        run: pnpm exec tsx src/components/shell/PublicFooter.contract.test.ts
+        run: |
+          pnpm exec tsx src/components/shell/PublicFooter.contract.test.ts
+          pnpm exec tsx src/lib/fontsRuntime.test.ts
 
       - name: My Plan presentation regressions
         run: |
