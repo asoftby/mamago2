@@ -243,13 +243,22 @@ export async function POST(req: Request) {
           });
           updated++;
         } catch (error: unknown) {
-          // Если ошибка уникальности имени (P2002), обновляем только координаты
-          if (error && typeof error === 'object' && 'code' in error && error.code === "P2002") {
-            await prisma.metroStation.update({
-              where: { id: existing.id },
-              data: { lat, lng, source: "OSM" },
+          // Overpass can return the same physical station as node/way/relation.
+          // If the canonical name already belongs to another row, never invent a
+          // user-visible suffix. Keep the canonical row and ignore this duplicate
+          // OSM representation.
+          if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+            const canonical = await prisma.metroStation.findFirst({
+              where: { cityId: city.id, name },
+              select: { id: true },
             });
-            updated++;
+
+            if (canonical && canonical.id !== existing.id) {
+              skipped++;
+            } else {
+              console.error(`Failed to update station ${name} (${osmId}) due to unique conflict:`, error);
+              skipped++;
+            }
           } else {
             console.error(`Failed to update station ${name} (${osmId}):`, error);
             skipped++;
@@ -270,25 +279,11 @@ export async function POST(req: Request) {
           });
           imported++;
         } catch (error: unknown) {
-          // Если ошибка уникальности имени (P2002), пробуем добавить суффикс
-          if (error && typeof error === 'object' && 'code' in error && error.code === "P2002") {
-             try {
-                await prisma.metroStation.create({
-                  data: {
-                    cityId: city.id,
-                    name: `${name} (OSM)`,
-                    lat,
-                    lng,
-                    osmType,
-                    osmId,
-                    source: "OSM",
-                  },
-                });
-                imported++;
-             } catch (retryError) {
-                console.error(`Failed to create station ${name} (${osmId}) with suffix:`, retryError);
-                skipped++;
-             }
+          // Name is unique per city. A P2002 here normally means Overpass
+          // returned another OSM object for the same physical station.
+          // Do not leak the technical source into the public station name.
+          if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+            skipped++;
           } else {
             console.error(`Failed to create station ${name} (${osmId}):`, error);
             skipped++;
