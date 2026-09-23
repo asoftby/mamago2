@@ -1,4 +1,5 @@
-import { cleanJsonLd } from "@/lib/seo/schema/cleanJsonLd";\nimport { serializeJsonLdForHtml } from "@/lib/seo/schema/serializeJsonLdForHtml";
+import { cleanJsonLd } from "@/lib/seo/schema/cleanJsonLd";
+import { serializeJsonLdForHtml } from "@/lib/seo/schema/serializeJsonLdForHtml";
 
 type JsonLdProps = {
   data: Record<string, unknown> | Array<Record<string, unknown>> | null | undefined;
