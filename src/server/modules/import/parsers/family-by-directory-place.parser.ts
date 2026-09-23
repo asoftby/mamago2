@@ -18,6 +18,7 @@ import type { PlaceImportParser } from "./base.parser";
 import type { ParserResult, ParsedRawRecord } from "../types";
 import { errorParserResult } from "./base.parser";
 import { fetchHtml } from "./fetchHtml";
+import { assertSafeFamilyByImportUrl } from "./familyByUrlPolicy";
 
 const PARSER_KEY = "family-by-directory-place";
 const BASE_URL = "https://family.by";
@@ -265,12 +266,15 @@ export const familyByDirectoryPlaceParser: PlaceImportParser = {
   entityType: "PLACE",
 
   async parse(source: ImportSource): Promise<ParserResult & { debug?: CrawlDebugInfo }> {
-    const startUrl = source.baseUrl?.trim() || DEFAULT_START_URL;
+    const rawStartUrl = source.baseUrl?.trim() || DEFAULT_START_URL;
 
-    if (!startUrl.includes("family.by/spravka")) {
+    let startUrl: string;
+    try {
+      startUrl = assertSafeFamilyByImportUrl(rawStartUrl, { pathPrefix: SPRAVKA_PREFIX }).toString();
+    } catch (error) {
       return errorParserResult(
         PARSER_KEY,
-        `Invalid baseUrl: "${startUrl}". Must be a family.by /spravka/ URL.`,
+        error instanceof Error ? error.message : "Invalid family.by import URL",
       );
     }
 
@@ -322,7 +326,14 @@ export const familyByDirectoryPlaceParser: PlaceImportParser = {
       // Fetch
       let html: string;
       try {
-        const response = await fetchHtml(url, { encoding: "windows-1251", timeoutMs: 12_000, retries: 2 });
+        const response = await fetchHtml(url, {
+          encoding: "windows-1251",
+          timeoutMs: 12_000,
+          retries: 2,
+          validateUrl: (candidate) => {
+            assertSafeFamilyByImportUrl(candidate, { pathPrefix: SPRAVKA_PREFIX });
+          },
+        });
         html = response.html;
         debug.pagesVisited++;
       } catch (err) {

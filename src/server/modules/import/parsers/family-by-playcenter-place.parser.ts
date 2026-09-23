@@ -32,6 +32,7 @@ import type { PlaceImportParser } from "./base.parser";
 import type { ParserResult, ParsedRawRecord } from "../types";
 import { errorParserResult } from "./base.parser";
 import { fetchHtml } from "./fetchHtml";
+import { assertSafeFamilyByImportUrl } from "./familyByUrlPolicy";
 
 const PARSER_KEY = "family-by-playcenter-place";
 const BASE_URL = "https://family.by";
@@ -181,11 +182,19 @@ export const familyByPlaycenterPlaceParser: PlaceImportParser = {
   entityType: "PLACE",
 
   async parse(source: ImportSource): Promise<ParserResult & { debug?: PlaycenterParserDebug }> {
-    const categoryUrl = source.baseUrl?.trim() || DEFAULT_CATEGORY_URL;
+    const rawCategoryUrl = source.baseUrl?.trim() || DEFAULT_CATEGORY_URL;
     const MAX_DETAIL_PAGES = source.crawlMaxDetailLinks ?? source.crawlMaxRecords ?? DEFAULT_MAX_DETAIL_PAGES;
 
-    if (!categoryUrl.includes("family.by")) {
-      return errorParserResult(PARSER_KEY, `Invalid baseUrl: "${categoryUrl}". Expected a family.by URL.`);
+    let categoryUrl: string;
+    try {
+      categoryUrl = assertSafeFamilyByImportUrl(rawCategoryUrl, {
+        pathPrefix: "/spravka/dosug/playcenter/",
+      }).toString();
+    } catch (error) {
+      return errorParserResult(
+        PARSER_KEY,
+        error instanceof Error ? error.message : "Invalid family.by import URL",
+      );
     }
 
     const debug: PlaycenterParserDebug = {
@@ -205,7 +214,14 @@ export const familyByPlaycenterPlaceParser: PlaceImportParser = {
     // ── Step 1: Load category page ───────────────────────────────────────
     let categoryHtml: string;
     try {
-      const result = await fetchHtml(categoryUrl, { encoding: "windows-1251", timeoutMs: 12_000, retries: 2 });
+      const result = await fetchHtml(categoryUrl, {
+        encoding: "windows-1251",
+        timeoutMs: 12_000,
+        retries: 2,
+        validateUrl: (candidate) => {
+          assertSafeFamilyByImportUrl(candidate, { pathPrefix: "/spravka/dosug/playcenter/" });
+        },
+      });
       categoryHtml = result.html;
       debug.finalUrl = result.finalUrl;
       debug.htmlLength = categoryHtml.length;
@@ -260,7 +276,14 @@ export const familyByPlaycenterPlaceParser: PlaceImportParser = {
 
       let html: string;
       try {
-        const result = await fetchHtml(detailUrl, { encoding: "windows-1251", timeoutMs: 12_000, retries: 2 });
+        const result = await fetchHtml(detailUrl, {
+          encoding: "windows-1251",
+          timeoutMs: 12_000,
+          retries: 2,
+          validateUrl: (candidate) => {
+            assertSafeFamilyByImportUrl(candidate, { pathPrefix: "/spravka/dosug/playcenter/" });
+          },
+        });
         html = result.html;
         debug.detailPagesVisited++;
       } catch (err) {
