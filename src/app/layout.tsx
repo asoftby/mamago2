@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Suspense, type CSSProperties } from "react";
 import "./globals.css";
 import { ntSomic, ptSerif } from "@/lib/fonts";
+import { shouldUseGoogleSans } from "@/lib/fontsRuntime";
 import { Sonner } from "@/components/ui/sonner";
 import { AccountModeProvider } from "@/contexts/AccountModeContext";
 import { SaveIntentProvider } from "@/lib/save/SaveIntentContext";
@@ -41,14 +42,14 @@ export default async function RootLayout({
     getBrandingConfig(),
   ]);
   const faviconHref = getBrandingFaviconRouteHref(branding);
-  const useGoogleSansTrial = process.env.APP_ENV?.trim().toLowerCase() === "dev";
+  const useGoogleSans = shouldUseGoogleSans(process.env.APP_ENV);
 
   return (
     <html
       lang="ru"
       className={`${ntSomic.variable} ${ptSerif.variable}`}
       style={
-        useGoogleSansTrial
+        useGoogleSans
           ? ({ "--font-sans": '"Google Sans"' } as CSSProperties)
           : undefined
       }
@@ -58,7 +59,7 @@ export default async function RootLayout({
         <script
           dangerouslySetInnerHTML={{ __html: buildNoFlashCookieShellScript() }}
         />
-        {useGoogleSansTrial ? (
+        {useGoogleSans ? (
           <>
             <link rel="preconnect" href="https://fonts.googleapis.com" />
             <link
