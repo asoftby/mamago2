@@ -113,6 +113,7 @@ jobs:
         run: |
           pnpm test:jsonld-safety
           pnpm test:instagram-reels-ssrf
+          pnpm test:import-html-ssrf
 
       - name: Telegram plan notification regressions
         run: |
