@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { resolveRouteForUserSave } from "@/server/services/route.service";
+import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
 
 const planActivitySelect = {
   id: true,
@@ -8,7 +9,9 @@ const planActivitySelect = {
   type: true,
   coverImageUrl: true,
   ageLabel: true,
+  ageMinMonths: true,
   eventCategory: { select: { nameRu: true } },
+  priceMode: true,
   priceFrom: true,
   priceText: true,
   currency: true,
@@ -20,6 +23,7 @@ const planActivitySelect = {
   },
   place: {
     select: {
+      title: true,
       shortAddress: true,
       formattedAddr: true,
       customAddress: true,
@@ -28,10 +32,12 @@ const planActivitySelect = {
   },
   venue: {
     select: {
+      title: true,
       addressLine: true,
       kind: true,
       place: {
         select: {
+          title: true,
           shortAddress: true,
           formattedAddr: true,
           customAddress: true,
@@ -65,7 +71,9 @@ export type PlanItemWithActivity = {
     type: string;
     coverImageUrl: string | null;
     ageLabel: string | null;
+    ageMinMonths?: number | null;
     eventCategory: { nameRu: string } | null;
+    priceMode?: PublicationPriceMode | null;
     priceFrom: number | null;
     priceText: string | null;
     currency: string | null;
@@ -74,15 +82,18 @@ export type PlanItemWithActivity = {
       business: { operationalStatus: string } | null;
     } | null;
     place: {
+      title?: string | null;
       shortAddress: string | null;
       formattedAddr: string | null;
       customAddress: string | null;
       city: { name: string } | null;
     } | null;
     venue: {
+      title?: string | null;
       addressLine: string | null;
       kind: string;
       place: {
+        title?: string | null;
         shortAddress: string | null;
         formattedAddr: string | null;
         customAddress: string | null;
