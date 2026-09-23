@@ -21,12 +21,31 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22.23.1
-          cache: pnpm
-      - name: Production dependency audit
+      - name: Production dependency audit summary
         shell: bash
         run: |
           set +e
-          pnpm audit --prod --json
+          pnpm audit --prod --json > audit.json
           code=$?
-          echo "PNPM_AUDIT_EXIT=$code"
-          exit 0
+          set -e
+          node <<'NODE'
+          const fs = require('fs');
+          const a = JSON.parse(fs.readFileSync('audit.json', 'utf8'));
+          const advisories = Object.values(a.advisories || {}).map((x) => ({
+            id: x.id,
+            ghsa: x.github_advisory_id,
+            module: x.module_name,
+            severity: x.severity,
+            title: x.title,
+            vulnerable: x.vulnerable_versions,
+            patched: x.patched_versions,
+            cvss: x.cvss?.score ?? null,
+            findings: (x.findings || []).map((f) => ({ version: f.version, paths: f.paths })),
+          }));
+          console.log('AUDIT_COMPACT_BEGIN');
+          console.log(JSON.stringify({metadata: a.metadata, advisories}, null, 2));
+          console.log('AUDIT_COMPACT_END');
+          console.log('PNPM_AUDIT_EXIT=' + process.env.AUDIT_EXIT);
+          NODE
+        env:
+          AUDIT_EXIT: ignored
