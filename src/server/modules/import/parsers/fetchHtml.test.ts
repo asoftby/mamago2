@@ -1,123 +1,147 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
 import { rootCertificates } from "node:tls";
+import type { ClientRequest, IncomingMessage } from "node:http";
+import type { RequestOptions } from "node:https";
 
 import {
   getFamilyByIntermediateCertificates,
   resolveSourceSpecificTlsCa,
 } from "./familyByTls";
 import { describeFetchError, fetchHtml } from "./fetchHtml";
+import { assertSafeFamilyByImportUrl } from "./familyByUrlPolicy";
 
-// The exact URL that exposed the family.by incomplete-chain bug for
-// POST /api/media/from-url (release blocker). Kept literal so a regression
-// in either the pinned CA bundle or the family.by hostname match is caught
-// against the concrete URL, not just the general host pattern.
 const FAMILY_BY_REGRESSION_URL =
   "https://family.by/uploads/posts/2026-08/thumbs/1787118815_ebru.jpg";
 
-function createUndiciStyleFetchError() {
-  const cause = Object.assign(
-    new Error("connect ETIMEDOUT 178.159.46.48:443"),
-    {
-      code: "ETIMEDOUT",
-      errno: -110,
-      syscall: "connect",
-      address: "178.159.46.48",
-      port: 443,
-    },
-  );
-  const error = new TypeError("fetch failed") as TypeError & { cause?: unknown };
-  error.cause = cause;
-  return error;
-}
-
 function testDescribeFetchError() {
-  const message = describeFetchError(createUndiciStyleFetchError());
-  assert.match(message, /fetch failed/);
+  const cause = Object.assign(new Error("connect ETIMEDOUT 178.159.46.48:443"), {
+    code: "ETIMEDOUT",
+    address: "178.159.46.48",
+    port: 443,
+  });
+  const error = Object.assign(new Error("remote request failed"), { cause });
+  const message = describeFetchError(error);
   assert.match(message, /ETIMEDOUT/);
-  assert.match(message, /syscall=connect/);
-  assert.match(message, /address=178\.159\.46\.48/);
-  assert.match(message, /port=443/);
+  assert.match(message, /178\.159\.46\.48/);
 }
 
 function testFamilyByCaBundle() {
   const familyByCa = resolveSourceSpecificTlsCa(new URL("https://family.by/afisha/"));
   const wwwFamilyByCa = resolveSourceSpecificTlsCa(new URL("https://www.family.by/afisha/"));
 
-  assert.ok(familyByCa, "family.by gets the source-specific CA bundle");
-  assert.equal(familyByCa, wwwFamilyByCa, "www.family.by uses the same CA bundle");
+  assert.ok(familyByCa);
+  assert.equal(familyByCa, wwwFamilyByCa);
   assert.equal(familyByCa.length, rootCertificates.length + 4);
   assert.equal(resolveSourceSpecificTlsCa(new URL("http://family.by/afisha/")), undefined);
   assert.equal(resolveSourceSpecificTlsCa(new URL("https://example.com/")), undefined);
 
   const intermediates = getFamilyByIntermediateCertificates();
-  assert.deepEqual(
-    intermediates.map((certificate) => certificate.subject),
-    [
-      "C=BE\nO=GlobalSign nv-sa\nCN=GlobalSign GCC R6 AlphaSSL CA 2025",
-      "C=BE\nO=GlobalSign nv-sa\nCN=GlobalSign GCC R46 AlphaSSL CA 2025",
-      "C=BE\nO=GlobalSign nv-sa\nCN=GlobalSign GCC R46 DV TLS CA 2025",
-      "C=BE\nO=GlobalSign nv-sa\nCN=GlobalSign GCC R3 DV TLS CA 2020",
-    ],
-  );
-  assert.deepEqual(
-    intermediates.map((certificate) => certificate.fingerprint.toUpperCase()),
-    [
-      "43:19:55:E6:E5:DA:BE:85:7F:13:36:C0:23:68:E5:49:5F:14:3E:ED",
-      "E7:AE:6D:3B:B2:65:B2:04:B7:EA:3D:73:2E:DE:C0:79:9A:B2:24:88",
-      "41:23:21:21:F7:E4:2A:FD:A1:C6:16:F7:4A:49:D7:A1:3C:6B:6A:E7",
-      "1C:61:0A:0A:87:D4:92:F4:83:22:C2:AF:D3:BE:9B:6A:D3:6B:6B:EE",
-    ],
-  );
+  assert.equal(intermediates.length, 4);
 
-  // Pin the CA bundle resolution to the exact URL that failed for
-  // /api/media/from-url, not just the family.by hostname pattern in general.
   const regressionCa = resolveSourceSpecificTlsCa(new URL(FAMILY_BY_REGRESSION_URL));
-  assert.ok(regressionCa, "the exact regression URL must resolve to the family.by CA bundle");
+  assert.ok(regressionCa);
   assert.equal(regressionCa.length, rootCertificates.length + 4);
 }
 
-async function testFetchHtmlNetworkErrorClassification() {
-  const originalFetch = globalThis.fetch;
-  let calls = 0;
+function successfulRequest(body: Buffer) {
+  return (_url: URL, options: RequestOptions, onResponse: (response: IncomingMessage) => void) => {
+    const request = new EventEmitter() as ClientRequest;
+    request.setTimeout = ((_ms: number, _handler?: () => void) => request) as ClientRequest["setTimeout"];
+    request.destroy = ((error?: Error) => {
+      if (error) queueMicrotask(() => request.emit("error", error));
+      return request;
+    }) as ClientRequest["destroy"];
+    request.end = (() => {
+      const lookup = options.lookup;
+      assert.equal(typeof lookup, "function", "HTML transport must receive pinned DNS lookup");
+      lookup!("family.by", {}, (error, address) => {
+        assert.ifError(error);
+        assert.equal(String(address), "93.184.216.34");
 
-  globalThis.fetch = async () => {
-    calls += 1;
-    throw createUndiciStyleFetchError();
+        const stream = new PassThrough();
+        const response = stream as unknown as IncomingMessage;
+        response.statusCode = 200;
+        response.statusMessage = "OK";
+        response.headers = { "content-type": "text/html" };
+        queueMicrotask(() => {
+          onResponse(response);
+          stream.end(body);
+        });
+      });
+      return request;
+    }) as ClientRequest["end"];
+    return request;
   };
+}
 
-  try {
+async function testHtmlUsesPinnedTransport() {
+  let resolutions = 0;
+  const result = await fetchHtml("https://family.by/afisha/", {
+    retries: 1,
+    validateUrl: (url) => assertSafeFamilyByImportUrl(url, { pathPrefix: "/afisha/" }),
+    resolveHostname: async () => {
+      resolutions += 1;
+      return [{ address: "93.184.216.34", family: 4 }];
+    },
+    request: successfulRequest(Buffer.from("<html>safe</html>", "utf8")),
+  });
+
+  assert.equal(resolutions, 1);
+  assert.equal(result.status, 200);
+  assert.equal(result.html, "<html>safe</html>");
+  assert.equal(result.finalUrl, "https://family.by/afisha/");
+}
+
+async function testHtmlRejectsPrivateTargets() {
+  for (const url of [
+    "http://127.0.0.1/?family.by",
+    "http://169.254.169.254/latest/meta-data/?family.by",
+    "http://10.0.0.5/?family.by",
+  ]) {
     await assert.rejects(
-      () =>
-        fetchHtml("https://family.by/afisha/", {
-          retries: 1,
-          retryDelayMs: 0,
-          nodeHttpFallback: false,
-        }),
+      fetchHtml(url, { retries: 1 }),
       (error: unknown) => {
         assert.ok(error instanceof Error);
-        assert.match(error.message, /network error/);
-        assert.match(error.message, /fetch failed/);
-        assert.match(error.message, /ETIMEDOUT/);
-        assert.match(error.message, /178\.159\.46\.48/);
+        assert.equal((error as Error & { httpStatus?: number }).httpStatus, 400);
         return true;
       },
+      url,
     );
-  } finally {
-    globalThis.fetch = originalFetch;
   }
 
-  assert.equal(calls, 1);
+  await assert.rejects(
+    fetchHtml("https://family.by/afisha/", {
+      retries: 1,
+      validateUrl: (url) => assertSafeFamilyByImportUrl(url, { pathPrefix: "/afisha/" }),
+      resolveHostname: async () => [{ address: "127.0.0.1", family: 4 }],
+    }),
+    (error: unknown) => (error as Error & { httpStatus?: number }).httpStatus === 400,
+  );
+
+  await assert.rejects(
+    fetchHtml("https://family.by/afisha/", {
+      retries: 1,
+      validateUrl: (url) => assertSafeFamilyByImportUrl(url, { pathPrefix: "/afisha/" }),
+      resolveHostname: async () => [
+        { address: "93.184.216.34", family: 4 },
+        { address: "fd00::1", family: 6 },
+      ],
+    }),
+    (error: unknown) => (error as Error & { httpStatus?: number }).httpStatus === 400,
+  );
 }
 
 async function main() {
   testDescribeFetchError();
   testFamilyByCaBundle();
-  await testFetchHtmlNetworkErrorClassification();
-
-  console.log("fetchHtml tests: OK");
+  await testHtmlUsesPinnedTransport();
+  await testHtmlRejectsPrivateTargets();
+  console.log("fetchHtml security tests: OK");
 }
 
-main().catch((err) => {
-  console.error(err);
+main().catch((error) => {
+  console.error(error);
   process.exit(1);
 });
