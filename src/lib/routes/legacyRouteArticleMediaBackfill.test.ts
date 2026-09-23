@@ -126,11 +126,30 @@ function testCustomMediaWithoutLegacySlotRefuses() {
   assert.ok(result.errors.includes("STOP_2_CUSTOM_MEDIA_PRESENT_WITHOUT_LEGACY_SLOT"));
 }
 
+
+function testMovedLegacyMediaRefuses() {
+  const content = baseContent();
+  const legacyImageId = legacyRouteArticleBlockId(sourceRecordKey, 1, "image");
+  const imageIndex = content.blocks.findIndex((block) => block.id === legacyImageId);
+  const [image] = content.blocks.splice(imageIndex, 1);
+  content.blocks.push(image!);
+
+  const result = planLegacyRouteArticleMediaBackfill({
+    sourceRecordKey,
+    currentContent: content,
+    stops: [{ order: 1, mediaIds: ["m1", "m2"] }, { order: 2, mediaIds: [] }],
+  });
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.ok(result.errors.includes("STOP_1_LEGACY_MEDIA_OUTSIDE_STOP_SEGMENT"));
+}
+
 function main() {
   testConvertsFirstImageToOrderedGalleryAndInsertsMissingSlot();
   testIdempotent();
   testFirstMediaMismatchRefuses();
   testCustomMediaWithoutLegacySlotRefuses();
+  testMovedLegacyMediaRefuses();
 }
 
 main();
