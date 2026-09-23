@@ -5,6 +5,10 @@ import {
   legacyRouteArticleBlockId,
   planLegacyRouteArticleMediaBackfill,
 } from "./legacyRouteArticleMediaBackfill";
+import {
+  LEGACY_ROUTE_ARTICLE_MEDIA_ATTACHMENT_COUNT,
+  LEGACY_ROUTE_ARTICLE_MEDIA_MANIFEST,
+} from "./legacyRouteArticleMediaManifest";
 
 const sourceRecordKey = "wordpress-db:routes:17822";
 
@@ -144,7 +148,41 @@ function testMovedLegacyMediaRefuses() {
   assert.ok(result.errors.includes("STOP_1_LEGACY_MEDIA_OUTSIDE_STOP_SEGMENT"));
 }
 
+
+function testFrozenManifestIntegrity() {
+  assert.equal(LEGACY_ROUTE_ARTICLE_MEDIA_MANIFEST.length, 13);
+  assert.equal(LEGACY_ROUTE_ARTICLE_MEDIA_ATTACHMENT_COUNT, 577);
+  assert.ok(
+    LEGACY_ROUTE_ARTICLE_MEDIA_MANIFEST.every(
+      (route) => route.sourceRecordKey !== "wordpress-db:routes:46963",
+    ),
+  );
+
+  const sourceKeys = LEGACY_ROUTE_ARTICLE_MEDIA_MANIFEST.map((route) => route.sourceRecordKey);
+  const slugs = LEGACY_ROUTE_ARTICLE_MEDIA_MANIFEST.map((route) => route.slug);
+  assert.equal(new Set(sourceKeys).size, sourceKeys.length);
+  assert.equal(new Set(slugs).size, slugs.length);
+
+  const actualCount = LEGACY_ROUTE_ARTICLE_MEDIA_MANIFEST.reduce(
+    (routeSum, route) =>
+      routeSum +
+      route.stops.reduce((stopSum, stop) => {
+        assert.ok(stop.order > 0);
+        assert.equal(new Set(stop.attachmentIds).size, stop.attachmentIds.length);
+        return stopSum + stop.attachmentIds.length;
+      }, 0),
+    0,
+  );
+  assert.equal(actualCount, LEGACY_ROUTE_ARTICLE_MEDIA_ATTACHMENT_COUNT);
+
+  for (const route of LEGACY_ROUTE_ARTICLE_MEDIA_MANIFEST) {
+    const orders = route.stops.map((stop) => stop.order);
+    assert.equal(new Set(orders).size, orders.length);
+  }
+}
+
 function main() {
+  testFrozenManifestIntegrity();
   testConvertsFirstImageToOrderedGalleryAndInsertsMissingSlot();
   testIdempotent();
   testFirstMediaMismatchRefuses();
