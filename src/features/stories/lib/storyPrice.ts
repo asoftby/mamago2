@@ -26,31 +26,8 @@ function formatLegacyStoryPrice(value: string | null | undefined): string | unde
   // when the whole value matches one of the supported compact price labels.
   if (/^(?:бесплатно|free)[.!]?$/iu.test(raw)) return "Бесплатно";
 
-  const currency = String.raw`(?:BYN|Br|б|руб(?:\\.|ля|лей)?|р\\.?)`;
-  const number = String.raw`(\\d+(?:[.,]\\d{1,2})?)`;
-
   const range = raw.match(
-    new RegExp(String.raw`^\\s*${number}\\s*[-–—]\\s*${number}\\s*(?:${currency})?\\s*[.!]?\\s*import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
-import {
-  formatPrice,
-  formatPriceFrom,
-  formatPriceRange,
-  normalizeUiCurrencyText,
-} from "@/lib/formatters/format-price";
-
-export type StoryPriceInput = {
-  priceMode?: PublicationPriceMode | null;
-  priceFrom?: number | null;
-  priceTo?: number | null;
-  priceText?: string | null;
-};
-
-function parseNumber(value: string): number | null {
-  const parsed = Number(value.replace(",", "."));
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-}
-
-, "iu"),
+    /^\s*(\d+(?:[.,]\d{1,2})?)\s*[-–—]\s*(\d+(?:[.,]\d{1,2})?)\s*(?:BYN|Br|б|руб(?:\.|ля|лей)?|р\.?)?\s*[.!]?\s*$/iu,
   );
   if (range) {
     const from = parseNumber(range[1]!);
@@ -61,27 +38,7 @@ function parseNumber(value: string): number | null {
   }
 
   const fromMatch = raw.match(
-    new RegExp(String.raw`^\\s*от\\s+${number}\\s*(?:${currency})?\\s*[.!]?\\s*import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
-import {
-  formatPrice,
-  formatPriceFrom,
-  formatPriceRange,
-  normalizeUiCurrencyText,
-} from "@/lib/formatters/format-price";
-
-export type StoryPriceInput = {
-  priceMode?: PublicationPriceMode | null;
-  priceFrom?: number | null;
-  priceTo?: number | null;
-  priceText?: string | null;
-};
-
-function parseNumber(value: string): number | null {
-  const parsed = Number(value.replace(",", "."));
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-}
-
-, "iu"),
+    /^\s*от\s+(\d+(?:[.,]\d{1,2})?)\s*(?:BYN|Br|б|руб(?:\.|ля|лей)?|р\.?)?\s*[.!]?\s*$/iu,
   );
   if (fromMatch) {
     const from = parseNumber(fromMatch[1]!);
@@ -89,27 +46,7 @@ function parseNumber(value: string): number | null {
   }
 
   const exact = raw.match(
-    new RegExp(String.raw`^\\s*${number}\\s*(?:${currency})?\\s*[.!]?\\s*import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
-import {
-  formatPrice,
-  formatPriceFrom,
-  formatPriceRange,
-  normalizeUiCurrencyText,
-} from "@/lib/formatters/format-price";
-
-export type StoryPriceInput = {
-  priceMode?: PublicationPriceMode | null;
-  priceFrom?: number | null;
-  priceTo?: number | null;
-  priceText?: string | null;
-};
-
-function parseNumber(value: string): number | null {
-  const parsed = Number(value.replace(",", "."));
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-}
-
-, "iu"),
+    /^\s*(\d+(?:[.,]\d{1,2})?)\s*(?:BYN|Br|б|руб(?:\.|ля|лей)?|р\.?)?\s*[.!]?\s*$/iu,
   );
   if (exact) {
     const amount = parseNumber(exact[1]!);
