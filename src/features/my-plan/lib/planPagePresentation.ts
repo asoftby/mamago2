@@ -1,12 +1,12 @@
 export type PlanPresentationPlace = {
-  title: string | null;
+  title?: string | null;
   shortAddress: string | null;
   formattedAddr: string | null;
   customAddress: string | null;
 };
 
 export type PlanPresentationActivity = {
-  ageMinMonths: number | null;
+  ageMinMonths?: number | null;
   ageLabel: string | null;
   priceFrom: number | null;
   priceText: string | null;
@@ -39,7 +39,7 @@ function formatAmount(value: number): string {
  * only needs the lower suitability boundary ("3+", "7+", "18+").
  */
 export function formatPlanCardAge(
-  ageMinMonths: number | null,
+  ageMinMonths: number | null | undefined,
   rawAgeLabel: string | null,
 ): string | null {
   if (ageMinMonths != null && Number.isFinite(ageMinMonths) && ageMinMonths >= 0) {
