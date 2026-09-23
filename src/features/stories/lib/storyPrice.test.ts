@@ -19,6 +19,10 @@ assert.equal(
   "Бесплатно",
 );
 assert.equal(
+  formatStoryPrice({ priceMode: "UNKNOWN", priceFrom: 0 }),
+  undefined,
+);
+assert.equal(
   formatStoryPrice({ priceMode: "UNKNOWN", priceText: "31 - 59" }),
   `31,00–59,00 ${BYN_SYMBOL}`,
 );
