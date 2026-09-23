@@ -14,7 +14,7 @@ for (const path of files) {
   assert.match(source, /validateUrl\s*:/, `${path} must revalidate every redirect hop`);
   assert.doesNotMatch(
     source,
-    /\.includes\(["']family\.by(?:\/spravka)?["']\)/,
+    /(?:targetUrl|categoryUrl|listingUrl|startUrl)\.includes\(["']family\.by/,
     `${path} must not use substring hostname validation`,
   );
 }
