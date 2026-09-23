@@ -110,6 +110,7 @@ jobs:
         run: |
           pnpm exec tsx src/components/content/RichContentRenderer.test.ts
           pnpm exec tsx src/lib/event/eventDescriptionHtml.test.ts
+          pnpm exec tsx src/lib/date/formatPlanTargetDateRu.test.ts
 
       - name: Security content and remote-fetch regressions
         run: |
