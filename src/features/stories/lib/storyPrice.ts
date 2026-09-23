@@ -22,24 +22,95 @@ function formatLegacyStoryPrice(value: string | null | undefined): string | unde
   const raw = value?.trim();
   if (!raw) return undefined;
 
-  if (/бесплат/i.test(raw)) return "Бесплатно";
+  // Legacy imports can contain arbitrary descriptive copy. Only parse a price
+  // when the whole value matches one of the supported compact price labels.
+  if (/^(?:бесплатно|free)[.!]?$/iu.test(raw)) return "Бесплатно";
 
-  const range = raw.match(/(\d+(?:[.,]\d+)?)\s*[-–—]\s*(\d+(?:[.,]\d+)?)/u);
+  const currency = String.raw`(?:BYN|Br|б|руб(?:\\.|ля|лей)?|р\\.?)`;
+  const number = String.raw`(\\d+(?:[.,]\\d{1,2})?)`;
+
+  const range = raw.match(
+    new RegExp(String.raw`^\\s*${number}\\s*[-–—]\\s*${number}\\s*(?:${currency})?\\s*[.!]?\\s*import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
+import {
+  formatPrice,
+  formatPriceFrom,
+  formatPriceRange,
+  normalizeUiCurrencyText,
+} from "@/lib/formatters/format-price";
+
+export type StoryPriceInput = {
+  priceMode?: PublicationPriceMode | null;
+  priceFrom?: number | null;
+  priceTo?: number | null;
+  priceText?: string | null;
+};
+
+function parseNumber(value: string): number | null {
+  const parsed = Number(value.replace(",", "."));
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+, "iu"),
+  );
   if (range) {
     const from = parseNumber(range[1]!);
     const to = parseNumber(range[2]!);
-    if (from != null && to != null) {
+    if (from != null && to != null && to >= from) {
       return formatPriceRange(from, to, { hideZero: true }) || undefined;
     }
   }
 
-  const fromMatch = raw.match(/(?:^|\s)от\s*(\d+(?:[.,]\d+)?)/iu);
+  const fromMatch = raw.match(
+    new RegExp(String.raw`^\\s*от\\s+${number}\\s*(?:${currency})?\\s*[.!]?\\s*import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
+import {
+  formatPrice,
+  formatPriceFrom,
+  formatPriceRange,
+  normalizeUiCurrencyText,
+} from "@/lib/formatters/format-price";
+
+export type StoryPriceInput = {
+  priceMode?: PublicationPriceMode | null;
+  priceFrom?: number | null;
+  priceTo?: number | null;
+  priceText?: string | null;
+};
+
+function parseNumber(value: string): number | null {
+  const parsed = Number(value.replace(",", "."));
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+, "iu"),
+  );
   if (fromMatch) {
     const from = parseNumber(fromMatch[1]!);
     if (from != null) return formatPriceFrom(from, { hideZero: true }) || undefined;
   }
 
-  const exact = raw.match(/^\s*(\d+(?:[.,]\d+)?)\s*(?:BYN|Br|руб\.?|р\.?)?\s*$/iu);
+  const exact = raw.match(
+    new RegExp(String.raw`^\\s*${number}\\s*(?:${currency})?\\s*[.!]?\\s*import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
+import {
+  formatPrice,
+  formatPriceFrom,
+  formatPriceRange,
+  normalizeUiCurrencyText,
+} from "@/lib/formatters/format-price";
+
+export type StoryPriceInput = {
+  priceMode?: PublicationPriceMode | null;
+  priceFrom?: number | null;
+  priceTo?: number | null;
+  priceText?: string | null;
+};
+
+function parseNumber(value: string): number | null {
+  const parsed = Number(value.replace(",", "."));
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+, "iu"),
+  );
   if (exact) {
     const amount = parseNumber(exact[1]!);
     if (amount != null) return formatPrice(amount, { hideZero: true }) || undefined;
