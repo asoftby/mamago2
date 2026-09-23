@@ -21,12 +21,10 @@ export function FooterPrimaryNavigationList({
     <nav aria-label="Разделы" className={FOOTER_META_TEXT_CLASS}>
       <ul className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 min-[769px]:flex-nowrap">
         {items.map((item, index) => (
-          <li key={item.id} className="flex items-center gap-3">
-            {index > 0 ? (
-              <span aria-hidden="true" className="hidden opacity-70 min-[769px]:inline">
-                |
-              </span>
-            ) : null}
+          <li
+            key={item.id}
+            className={index > 0 ? "flex items-center border-l border-muted-foreground/60 pl-3" : "flex items-center"}
+          >
             <Link
               href={buildPublicPath(item.href(citySlug))}
               scroll
