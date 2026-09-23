@@ -63,29 +63,8 @@ const DEFAULT_HEADERS: Record<string, string> = {
   "Pragma": "no-cache",
 };
 
-const TRANSPORT_ERROR_CODES = new Set([
-  "EAI_AGAIN",
-  "ENOTFOUND",
-  "ECONNRESET",
-  "ECONNREFUSED",
-  "ETIMEDOUT",
-  "ENETUNREACH",
-  "EHOSTUNREACH",
-  "EPIPE",
-  "CERT_HAS_EXPIRED",
-  "CERT_NOT_YET_VALID",
-  "DEPTH_ZERO_SELF_SIGNED_CERT",
-  "SELF_SIGNED_CERT_IN_CHAIN",
-  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
-  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
-]);
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function headersToRecord(headers: Headers): Record<string, string> {
-  return Object.fromEntries(headers.entries());
 }
 
 function nodeHeadersToRecord(headers: http.IncomingHttpHeaders): Record<string, string> {
@@ -109,9 +88,8 @@ function readErrorField(error: unknown, key: string): unknown {
 }
 
 /**
- * Node's native fetch normally throws only `TypeError: fetch failed` for
- * transport failures. The actionable diagnostic (DNS, TCP, TLS, timeout) is
- * stored in `error.cause`; preserve it for admin diagnostics and server logs.
+ * Preserve nested DNS/TCP/TLS/timeout diagnostics for admin logs without
+ * weakening the public error contract.
  */
 export function describeFetchError(error: unknown): string {
   const parts: string[] = [];
@@ -150,56 +128,6 @@ function buildNetworkErrorMessage(url: string, error: unknown) {
   return `Failed to load ${url} (network error: ${describeFetchError(error)})`;
 }
 
-function transportErrorCode(error: unknown): string | null {
-  let current: unknown = error;
-  const seenObjects = new Set<object>();
-
-  for (let depth = 0; depth < 4 && current; depth++) {
-    if (typeof current === "object") {
-      if (seenObjects.has(current as object)) break;
-      seenObjects.add(current as object);
-    }
-
-    const code = readErrorField(current, "code");
-    if (typeof code === "string" && code) return code;
-
-    const cause = readErrorField(current, "cause");
-    if (!cause || cause === current) break;
-    current = cause;
-  }
-
-  return null;
-}
-
-export function shouldUseNodeHttpFallback(error: unknown): boolean {
-  if (error instanceof Error && error.name === "AbortError") return false;
-
-  const code = transportErrorCode(error);
-  if (code && TRANSPORT_ERROR_CODES.has(code)) return true;
-
-  return error instanceof TypeError && /fetch failed/i.test(error.message);
-}
-
-function createNodeTransportError(
-  nativeError: unknown,
-  fallbackError: unknown,
-  httpStatus?: number,
-): Error {
-  const error = new Error(
-    `native fetch failed: ${describeFetchError(nativeError)}; ` +
-      `node http fallback failed: ${describeFetchError(fallbackError)}`,
-  );
-
-  Object.assign(error, {
-    cause: fallbackError,
-    nativeError,
-    fallbackError,
-    ...(httpStatus !== undefined ? { httpStatus } : {}),
-  });
-
-  return error;
-}
-
 function hasHttpStatus(error: unknown): error is Error & { httpStatus: number } {
   return (
     error instanceof Error &&
@@ -207,121 +135,6 @@ function hasHttpStatus(error: unknown): error is Error & { httpStatus: number } 
   );
 }
 
-async function fetchHtmlViaNodeHttp(
-  url: string,
-  options: {
-    timeoutMs: number;
-    headers: Record<string, string>;
-    encoding: string;
-  },
-  redirectCount = 0,
-): Promise<FetchHtmlResult> {
-  const parsedUrl = new URL(url);
-
-  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-    throw new Error(`Unsupported URL protocol for import fetch: ${parsedUrl.protocol}`);
-  }
-
-  if (redirectCount > MAX_REDIRECTS) {
-    throw new Error(`Too many redirects while loading ${url}`);
-  }
-
-  const transport = parsedUrl.protocol === "https:" ? https : http;
-  const sourceSpecificTlsCa = resolveSourceSpecificTlsCa(parsedUrl);
-
-  return new Promise<FetchHtmlResult>((resolve, reject) => {
-    const request = transport.request(
-      parsedUrl,
-      {
-        method: "GET",
-        headers: {
-          ...options.headers,
-          // Node's low-level transport does not transparently decompress like
-          // native fetch. Ask the upstream for the raw HTML body.
-          "Accept-Encoding": "identity",
-        },
-        // Source-specific CA bundles only extend the normal trusted roots for
-        // known upstreams with incomplete chains. Verification is never
-        // disabled, and unrelated hosts keep Node's default TLS behavior.
-        ca: sourceSpecificTlsCa,
-        // The fallback intentionally uses IPv4. It is only reached after
-        // native fetch has already failed, and avoids broken IPv6 routes on
-        // legacy upstream infrastructure without weakening TLS verification.
-        family: 4,
-      },
-      (response) => {
-        const status = response.statusCode ?? 0;
-        const statusText = response.statusMessage ?? "";
-        const responseHeaders = nodeHeadersToRecord(response.headers);
-        const location = response.headers.location;
-
-        if (status >= 300 && status < 400 && location) {
-          response.resume();
-
-          let redirectedUrl: string;
-          try {
-            redirectedUrl = new URL(location, parsedUrl).toString();
-          } catch (error) {
-            reject(error);
-            return;
-          }
-
-          void fetchHtmlViaNodeHttp(redirectedUrl, options, redirectCount + 1).then(
-            resolve,
-            reject,
-          );
-          return;
-        }
-
-        if (status < 200 || status >= 300) {
-          response.resume();
-          reject(
-            Object.assign(new Error(buildStatusErrorMessage(url, status, statusText)), {
-              status,
-              statusText,
-              responseHeaders,
-            }),
-          );
-          return;
-        }
-
-        const chunks: Buffer[] = [];
-
-        response.on("data", (chunk: Buffer | string) => {
-          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-        });
-
-        response.on("error", reject);
-
-        response.on("end", () => {
-          try {
-            const buffer = Buffer.concat(chunks);
-            const html = new TextDecoder(options.encoding).decode(buffer);
-            resolve({
-              html,
-              finalUrl: parsedUrl.toString(),
-              status,
-              headers: responseHeaders,
-            });
-          } catch (error) {
-            reject(error);
-          }
-        });
-      },
-    );
-
-    request.setTimeout(options.timeoutMs, () => {
-      request.destroy(
-        Object.assign(new Error(`request timed out after ${options.timeoutMs}ms`), {
-          code: "ETIMEDOUT",
-        }),
-      );
-    });
-
-    request.on("error", reject);
-    request.end();
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Binary transport (image/asset downloads)
