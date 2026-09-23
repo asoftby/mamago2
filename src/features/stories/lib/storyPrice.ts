@@ -78,7 +78,7 @@ export function formatStoryPrice(input: StoryPriceInput): string | undefined {
     case null:
     case undefined:
       return formatLegacyStoryPrice(input.priceText)
-        ?? (input.priceFrom != null
+        ?? (input.priceFrom != null && input.priceFrom > 0
           ? formatPrice(input.priceFrom, { hideZero: true }) || undefined
           : undefined);
   }
