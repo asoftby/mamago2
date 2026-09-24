@@ -7,6 +7,7 @@ import { SaveHeart } from "@/features/save/SaveHeart";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { EVENT_CARD_IMAGE_SIZES } from "@/components/events/eventCardLayout";
+import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 
 // ─── Public props ────────────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ export function EventCard({
           className="relative overflow-hidden rounded-[18px] bg-[#EDE8DF]"
           style={{ aspectRatio: coverRatio }}
         >
-          {imageUrl ? (
+          {imageUrl && canOptimizeWithNextImage(imageUrl) ? (
             <Image
               src={imageUrl}
               alt={title}
@@ -113,6 +114,15 @@ export function EventCard({
               loading={imagePriority ? "eager" : "lazy"}
               fetchPriority={imagePriority ? "high" : undefined}
               className="object-cover"
+            />
+          ) : imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- unknown external hosts are intentionally outside the Next/Image allowlist.
+            <img
+              src={imageUrl}
+              alt={title}
+              loading={imagePriority ? "eager" : "lazy"}
+              fetchPriority={imagePriority ? "high" : undefined}
+              className="h-full w-full object-cover"
             />
           ) : (
             <div

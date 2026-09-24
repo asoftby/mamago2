@@ -29,6 +29,7 @@ import {
   buildMainTitle,
 } from "@/features/city-home/lib/audiencePersonalization";
 import { applyPersonaRanking } from "@/features/city-home/lib/personaRanking";
+import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 
 const cardShell = EVENT_CARD_SHELL;
 const kudaCardShell = EVENT_CARD_SHELL;
@@ -320,7 +321,7 @@ export function CityHomeJournalSection({
                   ][index % 4],
                 )}
               >
-                {a.coverImageUrl && (
+                {a.coverImageUrl && canOptimizeWithNextImage(a.coverImageUrl) ? (
                   <Image
                     src={a.coverImageUrl}
                     alt={a.title}
@@ -328,7 +329,15 @@ export function CityHomeJournalSection({
                     sizes={ARTICLE_CARD_IMAGE_SIZES}
                     className="object-cover"
                   />
-                )}
+                ) : a.coverImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- unknown external hosts are intentionally outside the Next/Image allowlist.
+                  <img
+                    src={a.coverImageUrl}
+                    alt={a.title}
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                ) : null}
               </div>
               <div className="mb-1.5 flex items-center gap-2">
                 {a.category && (

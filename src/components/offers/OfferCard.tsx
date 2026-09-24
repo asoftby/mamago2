@@ -7,6 +7,7 @@ import { SaveHeart } from "@/features/save/SaveHeart";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
 import { EVENT_CARD_IMAGE_SIZES } from "@/components/events/eventCardLayout";
+import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 
 export type OfferCardProps = {
   id: string;
@@ -56,13 +57,21 @@ export function OfferCard({
           className="relative overflow-hidden rounded-[18px] bg-[#EDE8DF]"
           style={{ aspectRatio: "4/5" }}
         >
-          {imageUrl ? (
+          {imageUrl && canOptimizeWithNextImage(imageUrl) ? (
             <Image
               src={imageUrl}
               alt={title}
               fill
               sizes={EVENT_CARD_IMAGE_SIZES}
               className="object-cover transition-transform duration-[1000ms] ease-[cubic-bezier(0.2,0.7,0.2,1)] group-hover:scale-[1.04]"
+            />
+          ) : imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- unknown external hosts are intentionally outside the Next/Image allowlist.
+            <img
+              src={imageUrl}
+              alt={title}
+              loading="lazy"
+              className="h-full w-full object-cover transition-transform duration-[1000ms] ease-[cubic-bezier(0.2,0.7,0.2,1)] group-hover:scale-[1.04]"
             />
           ) : (
             <div
