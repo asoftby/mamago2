@@ -219,7 +219,7 @@ function afishaMetaLabel(item: ArticlePlaceAfishaItem): string | undefined {
 
 function AfishaRail({ items }: { items: ArticlePlaceAfishaItem[] }) {
   return (
-    <div className="flex gap-4 overflow-x-auto px-5 pb-4 pt-2">
+    <div className="flex gap-4 overflow-x-auto pb-4 pt-2">
       {items.map((item) => (
         <div key={item.id} className="w-[152px] shrink-0 sm:w-[176px]">
           <EventCard
@@ -308,7 +308,7 @@ export function ArticlePlaceEmbed({
     .join(", ");
 
   return (
-    <div className="not-prose my-8 md:my-10">
+    <div className="not-prose my-8 md:my-10 [&_a]:!no-underline [&_img]:!m-0 [&_img]:!rounded-none">
       <div style={{
         background: T.paper,
         border: `1px solid ${T.line}`,
@@ -491,7 +491,7 @@ export function ArticlePlaceEmbed({
                     position: "relative", display: "inline-flex", alignItems: "center", gap: 8, padding: "13px 12px",
                     fontSize: 13.5, fontWeight: 600, color: activeTab === id ? T.ink : T.ink3, whiteSpace: "nowrap",
                     background: "none", border: "none", cursor: "pointer",
-                    borderBottom: activeTab === id ? `2px solid ${T.accent}` : "2px solid transparent",
+                    borderBottom: "2px solid transparent",
                   }}
                 >
                   {TAB_LABELS[id]}{" "}
