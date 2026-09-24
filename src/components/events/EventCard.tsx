@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { SaveHeart } from "@/features/save/SaveHeart";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { EVENT_CARD_IMAGE_SIZES } from "@/components/events/eventCardLayout";
+import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 
 // ─── Public props ────────────────────────────────────────────────────────────
 
@@ -13,6 +16,8 @@ export type EventCardProps = {
   title: string;
   href: string;
   imageUrl?: string | null;
+  /** Keep genuinely above-the-fold covers eager and high priority. */
+  imagePriority?: boolean;
   /** Моно-капсы под изображением: "СПЕКТАКЛИ", "СПЕКТАКЛИ · ОНЛАЙН" и т.д. */
   categoryLabel?: string;
   /** Строка мета: "12+ · 6–7 июн." */
@@ -84,6 +89,7 @@ export function EventCard({
   title,
   href,
   imageUrl,
+  imagePriority = false,
   categoryLabel,
   metaLabel,
   priceLabel,
@@ -99,11 +105,23 @@ export function EventCard({
           className="relative overflow-hidden rounded-[18px] bg-[#EDE8DF]"
           style={{ aspectRatio: coverRatio }}
         >
-          {imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
+          {imageUrl && canOptimizeWithNextImage(imageUrl) ? (
+            <Image
+              src={imageUrl}
+              alt={title}
+              fill
+              sizes={EVENT_CARD_IMAGE_SIZES}
+              loading={imagePriority ? "eager" : "lazy"}
+              fetchPriority={imagePriority ? "high" : undefined}
+              className="object-cover"
+            />
+          ) : imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- unknown external hosts are intentionally outside the Next/Image allowlist.
             <img
               src={imageUrl}
               alt={title}
+              loading={imagePriority ? "eager" : "lazy"}
+              fetchPriority={imagePriority ? "high" : undefined}
               className="h-full w-full object-cover"
             />
           ) : (

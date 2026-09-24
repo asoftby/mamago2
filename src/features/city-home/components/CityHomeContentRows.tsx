@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useMemo } from "react";
 import { EventCard, activityMockToEventCard, EVENT_CARD_SHELL } from "@/components/events";
 import { OfferCard } from "@/components/offers/OfferCard";
@@ -28,6 +29,7 @@ import {
   buildMainTitle,
 } from "@/features/city-home/lib/audiencePersonalization";
 import { applyPersonaRanking } from "@/features/city-home/lib/personaRanking";
+import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 
 const cardShell = EVENT_CARD_SHELL;
 const kudaCardShell = EVENT_CARD_SHELL;
@@ -35,6 +37,9 @@ const kudaCardShell = EVENT_CARD_SHELL;
 const ARTICLE_CARD_SHELL =
   "shrink-0 snap-start w-[44vw] min-w-[160px] max-w-[230px] sm:max-w-[250px] " +
   "lg:w-[calc((100%-6rem)/5)] lg:max-w-none";
+const ARTICLE_CARD_IMAGE_SIZES =
+  "(min-width: 1200px) 208px, (min-width: 1024px) calc((100vw - 160px) / 5), " +
+  "(min-width: 568px) 250px, 44vw";
 
 function buildKudaSectionTitle(input: {
   citySlug: string;
@@ -134,9 +139,12 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
           />
         }
       >
-        {preview.map((activity) => (
+        {preview.map((activity, index) => (
           <div key={activity.id} className={kudaCardShell}>
-            <EventCard {...activityMockToEventCard(activity, citySlug)} />
+            <EventCard
+              {...activityMockToEventCard(activity, citySlug)}
+              imagePriority={index < 4}
+            />
           </div>
         ))}
       </HorizontalCardRow>
@@ -304,7 +312,7 @@ export function CityHomeJournalSection({
             >
               <div
                 className={cn(
-                  "w-full aspect-square rounded-xl mb-3 overflow-hidden bg-gradient-to-br",
+                  "relative w-full aspect-square rounded-xl mb-3 overflow-hidden bg-gradient-to-br",
                   [
                     "from-[#F2C8A7] to-[#E89460]",
                     "from-[#CDE3D6] to-[#9CC1AC]",
@@ -313,13 +321,23 @@ export function CityHomeJournalSection({
                   ][index % 4],
                 )}
               >
-                {a.coverImageUrl && (
+                {a.coverImageUrl && canOptimizeWithNextImage(a.coverImageUrl) ? (
+                  <Image
+                    src={a.coverImageUrl}
+                    alt={a.title}
+                    fill
+                    sizes={ARTICLE_CARD_IMAGE_SIZES}
+                    className="object-cover"
+                  />
+                ) : a.coverImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- unknown external hosts are intentionally outside the Next/Image allowlist.
                   <img
                     src={a.coverImageUrl}
                     alt={a.title}
-                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    className="h-full w-full object-cover"
                   />
-                )}
+                ) : null}
               </div>
               <div className="mb-1.5 flex items-center gap-2">
                 {a.category && (

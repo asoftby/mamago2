@@ -6,6 +6,7 @@ import {
   loadRedirectManifest,
 } from "./src/lib/seo/redirectManifest";
 import { resolveLegacySeoDestination } from "./src/lib/seo/legacySeoRedirectOverrides";
+import { NEXT_IMAGE_REMOTE_PATTERNS } from "./src/lib/media/nextImagePolicy";
 
 const defaultDevOrigins = [
   "http://localhost:3000",
@@ -100,24 +101,10 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['sharp'],
 
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "images.unsplash.com",
-      },
-      {
-        protocol: "https",
-        hostname: "**.unsplash.com",
-      },
-      {
-        protocol: "https",
-        hostname: "family.by",
-      },
-      {
-        protocol: "https",
-        hostname: "**.googleusercontent.com",
-      },
-    ],
+    // The card rails are 44vw on phones. Including the supported 390px viewport
+    // lets Next emit a 256px candidate instead of starting their srcset at 384px.
+    deviceSizes: [390, 640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    remotePatterns: [...NEXT_IMAGE_REMOTE_PATTERNS],
   },
 
   experimental: {

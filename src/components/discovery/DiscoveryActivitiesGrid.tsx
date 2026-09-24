@@ -155,12 +155,14 @@ export function DiscoveryActivitiesGrid({
           saveDateISO={activity.dateStart ?? null}
           saveDateEndISO={activity.dateEnd ?? null}
           className="h-full"
+          imagePriority={feedBucket === "primary" && position <= 4}
         />
       ) : (
         <EventCard
           {...activityMockToEventCard(activity, citySlug)}
           coverRatio={ratio}
           className="h-full"
+          imagePriority={feedBucket === "primary" && position <= 4}
         />
       )}
     </AnalyticsCardViewTracker>
