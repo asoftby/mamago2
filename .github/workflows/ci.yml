@@ -113,7 +113,7 @@ jobs:
       - name: Public shell regressions
         run: |
           pnpm exec tsx src/components/shell/PublicFooter.contract.test.ts
-          pnpm exec tsx src/lib/fontsRuntime.test.ts
+          pnpm exec tsx src/lib/fontsLocal.test.ts
 
       - name: My Plan presentation regressions
         run: |
