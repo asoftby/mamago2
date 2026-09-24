@@ -420,11 +420,11 @@ function HeroGallery({ urls, title }: { urls: string[]; title: string }) {
 
 // ─── Article body ─────────────────────────────────────────────────────────────
 
-type ContentBlock = Extract<ArticleMvpResolvedBlock, { type: "text" | "quote" | "contacts" | "price" | "openingHours" }>;
+type ContentBlock = Extract<ArticleMvpResolvedBlock, { type: "text" | "quote" | "contacts" | "price" | "openingHours" | "info" }>;
 
 function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
   const contentBlocks = blocks.filter((b): b is ContentBlock =>
-    b.type === "text" || b.type === "quote" || b.type === "contacts" || b.type === "price" || b.type === "openingHours",
+    b.type === "text" || b.type === "quote" || b.type === "contacts" || b.type === "price" || b.type === "openingHours" || b.type === "info",
   );
   const groups = groupArticleInfoBlocks(contentBlocks);
 
@@ -491,6 +491,11 @@ function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
                     )}
                   </div>
                 </blockquote>
+              )}
+              {block.type === "info" && (
+                <ArticlePerformanceScope blocks={structuredBlockRenders(block) ? [structuredDescriptor(block)] : []} mode="info">
+                  <ArticleInfoCard data={block.data} />
+                </ArticlePerformanceScope>
               )}
             </div>
             );

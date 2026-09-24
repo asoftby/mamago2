@@ -124,4 +124,25 @@ import { ArticleContactsBlock, ArticleInfoCard, ArticleOpeningHoursBlock, Articl
   );
 }
 
+{
+  const html = renderToStaticMarkup(<ArticleInfoCard data={{
+    locations: [
+      { id: "one", label: "Главный офис", address: "проспект Дзержинского, 115", coordinates: { latitude: 53.85, longitude: 27.47 } },
+      { id: "two", address: "ул. Ложинская, 23", mapUrl: "https://maps.example/second" },
+    ],
+    phones: [],
+    socials: [],
+    openingHours: { mode: "WEEKLY", timezone: "Europe/Minsk", rules: [{ dayOfWeek: "MON", isOpen: true, allDay: false, intervals: [{ startTime: "10:00", endTime: "20:00" }] }], exceptions: [] },
+  }} />);
+  assert.match(html, /Адреса/);
+  assert.match(html, /Главный офис/);
+  assert.match(html, /проспект Дзержинского, 115/);
+  assert.match(html, /ул\. Ложинская, 23/);
+  assert.equal((html.match(/Как добраться/g) ?? []).length, 2);
+  assert.match(html, /aria-expanded="false"/);
+  assert.match(html, /hidden=""/);
+}
+
+assert.equal(renderToStaticMarkup(<ArticleInfoCard data={{ locations: [], phones: [], socials: [] }} />), "");
+
 console.log("ArticleStructuredInfoBlocks.test.tsx: OK");

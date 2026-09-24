@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { ArticleContentPayloadSchema, DEFAULT_ARTICLE_PLACE_SECTIONS, articleContentValidationMessage, extractArticleMediaIds, extractArticleMediaUsage, newBlock, prepareArticleContentForSave, serializeArticleContent, type ArticleBlockMvp } from "./articleMvp";
 
-const allBlockTypes = ["intro", "text", "quote", "heading", "image", "gallery", "activityCard", "embed", "contacts", "price", "openingHours"] as const;
+const allBlockTypes = ["intro", "text", "quote", "heading", "image", "gallery", "activityCard", "embed", "contacts", "price", "openingHours", "info"] as const;
 
 // Every newly inserted empty block must remain saveable. In particular, the
 // blank PLACE reference is an intentional schema-valid editor draft, not a
