@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense, type CSSProperties } from "react";
 import "./globals.css";
-import { ntSomic, ptSerif } from "@/lib/fonts";
-import { shouldUseGoogleSans } from "@/lib/fontsRuntime";
+import { googleSans, ntSomic, ptSerif } from "@/lib/fonts";
 import { Sonner } from "@/components/ui/sonner";
 import { AccountModeProvider } from "@/contexts/AccountModeContext";
 import { SaveIntentProvider } from "@/lib/save/SaveIntentContext";
@@ -42,37 +41,20 @@ export default async function RootLayout({
     getBrandingConfig(),
   ]);
   const faviconHref = getBrandingFaviconRouteHref(branding);
-  const useGoogleSans = shouldUseGoogleSans(process.env.APP_ENV);
-
   return (
     <html
       lang="ru"
-      className={`${ntSomic.variable} ${ptSerif.variable}`}
-      style={
-        useGoogleSans
-          ? ({ "--font-sans": '"Google Sans"' } as CSSProperties)
-          : undefined
-      }
+      className={`${googleSans.variable} ${ntSomic.variable} ${ptSerif.variable}`}
+      style={{
+        "--font-sans":
+          "var(--font-google-sans), var(--font-ntsomic), ui-sans-serif, system-ui, sans-serif",
+      } as CSSProperties}
       suppressHydrationWarning
     >
       <head>
         <script
           dangerouslySetInnerHTML={{ __html: buildNoFlashCookieShellScript() }}
         />
-        {useGoogleSans ? (
-          <>
-            <link rel="preconnect" href="https://fonts.googleapis.com" />
-            <link
-              rel="preconnect"
-              href="https://fonts.gstatic.com"
-              crossOrigin="anonymous"
-            />
-            <link
-              rel="stylesheet"
-              href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&display=swap"
-            />
-          </>
-        ) : null}
         <style>{`
           :root {
             --color-primary: ${branding.colorPrimary};
