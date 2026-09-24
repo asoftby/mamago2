@@ -118,7 +118,7 @@ export default async function ProgramsPage({ params }: ProgramsPageProps) {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {programActivities.map((program) => {
+            {programActivities.map((program, index) => {
               const href = `/${city}/programs/${program.slug || program.id}`;
               const metaLabel = [program.ageLabel, program.place?.title]
                 .filter(Boolean)
@@ -142,6 +142,7 @@ export default async function ProgramsPage({ params }: ProgramsPageProps) {
                     imageUrl={program.coverImageUrl}
                     dateLabel={metaLabel}
                     priceLabel={priceLabel}
+                    imagePriority={index < 4}
                   />
                 </AnalyticsCardViewTracker>
               );

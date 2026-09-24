@@ -30,6 +30,7 @@ export type OfferCardProps = {
   saveSource?: string;
   /** Hide the save heart button (e.g. on the ideas page) */
   hideSave?: boolean;
+  imagePriority?: boolean;
   className?: string;
 };
 
@@ -47,6 +48,7 @@ export function OfferCard({
   saveDateEndISO,
   saveSource,
   hideSave,
+  imagePriority = false,
   className,
 }: OfferCardProps) {
   return (
@@ -63,6 +65,8 @@ export function OfferCard({
               alt={title}
               fill
               sizes={EVENT_CARD_IMAGE_SIZES}
+              loading={imagePriority ? "eager" : "lazy"}
+              fetchPriority={imagePriority ? "high" : undefined}
               className="object-cover transition-transform duration-[1000ms] ease-[cubic-bezier(0.2,0.7,0.2,1)] group-hover:scale-[1.04]"
             />
           ) : imageUrl ? (
@@ -70,7 +74,8 @@ export function OfferCard({
             <img
               src={imageUrl}
               alt={title}
-              loading="lazy"
+              loading={imagePriority ? "eager" : "lazy"}
+              fetchPriority={imagePriority ? "high" : undefined}
               className="h-full w-full object-cover transition-transform duration-[1000ms] ease-[cubic-bezier(0.2,0.7,0.2,1)] group-hover:scale-[1.04]"
             />
           ) : (
