@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { SaveHeart } from "@/features/save/SaveHeart";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { EVENT_CARD_IMAGE_SIZES } from "@/components/events/eventCardLayout";
 
 // ─── Public props ────────────────────────────────────────────────────────────
 
@@ -13,6 +15,8 @@ export type EventCardProps = {
   title: string;
   href: string;
   imageUrl?: string | null;
+  /** Keep genuinely above-the-fold covers eager and high priority. */
+  imagePriority?: boolean;
   /** Моно-капсы под изображением: "СПЕКТАКЛИ", "СПЕКТАКЛИ · ОНЛАЙН" и т.д. */
   categoryLabel?: string;
   /** Строка мета: "12+ · 6–7 июн." */
@@ -84,6 +88,7 @@ export function EventCard({
   title,
   href,
   imageUrl,
+  imagePriority = false,
   categoryLabel,
   metaLabel,
   priceLabel,
@@ -100,11 +105,14 @@ export function EventCard({
           style={{ aspectRatio: coverRatio }}
         >
           {imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={imageUrl}
               alt={title}
-              className="h-full w-full object-cover"
+              fill
+              sizes={EVENT_CARD_IMAGE_SIZES}
+              loading={imagePriority ? "eager" : "lazy"}
+              fetchPriority={imagePriority ? "high" : undefined}
+              className="object-cover"
             />
           ) : (
             <div

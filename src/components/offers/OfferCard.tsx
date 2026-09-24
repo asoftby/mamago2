@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { SaveHeart } from "@/features/save/SaveHeart";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
+import { EVENT_CARD_IMAGE_SIZES } from "@/components/events/eventCardLayout";
 
 export type OfferCardProps = {
   id: string;
@@ -55,11 +57,12 @@ export function OfferCard({
           style={{ aspectRatio: "4/5" }}
         >
           {imageUrl ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
+            <Image
               src={imageUrl}
               alt={title}
-              className="h-full w-full object-cover transition-transform duration-[1000ms] ease-[cubic-bezier(0.2,0.7,0.2,1)] group-hover:scale-[1.04]"
+              fill
+              sizes={EVENT_CARD_IMAGE_SIZES}
+              className="object-cover transition-transform duration-[1000ms] ease-[cubic-bezier(0.2,0.7,0.2,1)] group-hover:scale-[1.04]"
             />
           ) : (
             <div

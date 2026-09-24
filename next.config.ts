@@ -100,6 +100,9 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['sharp'],
 
   images: {
+    // The card rails are 44vw on phones. Including the supported 390px viewport
+    // lets Next emit a 256px candidate instead of starting their srcset at 384px.
+    deviceSizes: [390, 640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     remotePatterns: [
       {
         protocol: "https",
