@@ -219,9 +219,9 @@ function afishaMetaLabel(item: ArticlePlaceAfishaItem): string | undefined {
 
 function AfishaRail({ items }: { items: ArticlePlaceAfishaItem[] }) {
   return (
-    <div style={{ display: "flex", gap: 16, overflowX: "auto", padding: "2px 20px 4px" }}>
+    <div className="flex gap-4 overflow-x-auto px-5 pb-4 pt-2">
       {items.map((item) => (
-        <div key={item.id} style={{ flex: "0 0 160px" }}>
+        <div key={item.id} className="w-[152px] shrink-0 sm:w-[176px]">
           <EventCard
             id={item.id}
             title={item.title}
@@ -230,6 +230,7 @@ function AfishaRail({ items }: { items: ArticlePlaceAfishaItem[] }) {
             categoryLabel={item.categoryLabel ?? undefined}
             metaLabel={afishaMetaLabel(item)}
             priceLabel={item.priceLabel ?? undefined}
+            coverRatio="1/1"
           />
         </div>
       ))}
@@ -319,20 +320,18 @@ export function ArticlePlaceEmbed({
       }}>
         <div className={card.coverImageUrl ? "grid grid-cols-1 sm:grid-cols-[186px_1fr]" : "grid grid-cols-1"}>
           {card.coverImageUrl && (
-            <div className="flex items-center justify-center sm:p-5" style={{ background: T.paper2 }}>
-              <div className="relative w-full aspect-[16/9] sm:aspect-square sm:rounded-2xl overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={card.coverImageUrl} alt={card.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-                {card.coverImageCount > 1 && (
-                  <span style={{
-                    position: "absolute", bottom: 8, left: 8, height: 23, padding: "0 9px", borderRadius: 999,
-                    background: "rgba(20,18,16,.78)", color: T.paper, fontFamily: T.mono, fontSize: 9.5,
-                    letterSpacing: ".07em", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 5,
-                  }}>
-                    ◲ {card.coverImageCount} фото
-                  </span>
-                )}
-              </div>
+            <div className="relative aspect-[16/9] min-h-[180px] w-full overflow-hidden bg-[#EDE8DF] sm:aspect-auto sm:min-h-[240px]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={card.coverImageUrl} alt={card.title} className="absolute inset-0 h-full w-full object-cover" />
+              {card.coverImageCount > 1 && (
+                <span style={{
+                  position: "absolute", bottom: 8, left: 8, height: 23, padding: "0 9px", borderRadius: 999,
+                  background: "rgba(20,18,16,.78)", color: T.paper, fontFamily: T.mono, fontSize: 9.5,
+                  letterSpacing: ".07em", textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 5,
+                }}>
+                  ◲ {card.coverImageCount} фото
+                </span>
+              )}
             </div>
           )}
 
