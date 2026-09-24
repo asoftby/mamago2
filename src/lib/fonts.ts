@@ -1,12 +1,36 @@
 import localFont from "next/font/local";
 
-/**
- * Единый локальный fallback для primary sans.
- * На DEV и PROD Google Sans подключается runtime через Google Fonts и переопределяет
- * --font-sans в root layout. NTSomic сохраняем как безопасный rollback/fallback.
- *
- * preload выключен, чтобы Next.js не создавал лишние font preload hints.
- */
+/** Local Google Sans is the primary public sans; NTSomic remains its rollback. */
+export const googleSans = localFont({
+  src: [
+    {
+      path: "../../public/fonts/GoogleSans/GoogleSans-Regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/GoogleSans/GoogleSans-Medium.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/GoogleSans/GoogleSans-SemiBold.woff2",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/GoogleSans/GoogleSans-Bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+  ],
+  variable: "--font-google-sans",
+  display: "swap",
+  preload: false,
+  fallback: ["ui-sans-serif", "system-ui", "sans-serif"],
+});
+
+/** Kept as a local fallback and a one-line rollback option. */
 export const ntSomic = localFont({
   src: [
     {
@@ -30,7 +54,7 @@ export const ntSomic = localFont({
       style: "normal",
     },
   ],
-  variable: "--font-sans",
+  variable: "--font-ntsomic",
   display: "swap",
   preload: false,
   fallback: ["ui-sans-serif", "system-ui", "sans-serif"],
