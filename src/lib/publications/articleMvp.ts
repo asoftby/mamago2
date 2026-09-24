@@ -106,6 +106,26 @@ const ArticlePriceDataSchema = SharedPriceDataSchema.superRefine((value, ctx) =>
   });
 });
 
+export const ArticleInfoLocationSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().trim().min(1).optional(),
+  address: z.string().trim().min(1).optional(),
+  coordinates: SharedContactsDataSchema.shape.coordinates,
+  mapUrl: SharedContactsDataSchema.shape.mapUrl,
+});
+export type ArticleInfoLocation = z.infer<typeof ArticleInfoLocationSchema>;
+
+export const ArticleInfoDataSchema = z.object({
+  locations: z.array(ArticleInfoLocationSchema).default([]),
+  phones: SharedContactsDataSchema.shape.phones,
+  email: SharedContactsDataSchema.shape.email,
+  website: SharedContactsDataSchema.shape.website,
+  socials: SharedContactsDataSchema.shape.socials,
+  price: ArticlePriceDataSchema.optional(),
+  openingHours: SharedOpeningHoursDataSchema.optional(),
+});
+export type ArticleInfoData = z.infer<typeof ArticleInfoDataSchema>;
+
 export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
   base.extend({ type: z.literal("intro"), text: z.string() }),
   base.extend({ type: z.literal("text"), text: z.string() }),
@@ -152,6 +172,7 @@ export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
   base.extend({ type: z.literal("contacts"), subject: ArticleSubjectSchema.optional(), data: SharedContactsDataSchema }),
   base.extend({ type: z.literal("price"), subject: ArticleSubjectSchema.optional(), data: ArticlePriceDataSchema }),
   base.extend({ type: z.literal("openingHours"), subject: ArticleSubjectSchema.optional(), data: SharedOpeningHoursDataSchema }),
+  base.extend({ type: z.literal("info"), subject: ArticleSubjectSchema.optional(), data: ArticleInfoDataSchema }),
 ]).superRefine((block, ctx) => {
   if (block.type === "activityCard" && block.entityType !== "PLACE" && block.placeSections) {
     ctx.addIssue({ code: "custom", path: ["placeSections"], message: "Place sections are only valid for PLACE cards" });
@@ -191,6 +212,16 @@ export const ArticleBlockMvpSchema = z.discriminatedUnion("type", [
         block.data.note?.trim() ||
         block.data.exceptions.length ||
         block.data.rules.some((rule) => rule.isOpen || rule.allDay || rule.intervals.length > 0),
+    );
+    if (hasMeaningfulData && !block.subject.title.trim()) {
+      ctx.addIssue({ code: "custom", path: ["subject", "title"], message: "Structured blocks with data require a subject title" });
+    }
+  }
+
+  if (block.type === "info" && block.subject) {
+    const hasMeaningfulData = Boolean(
+      block.data.locations.length || block.data.email || block.data.website ||
+      block.data.phones.length || block.data.socials.length || block.data.price || block.data.openingHours,
     );
     if (hasMeaningfulData && !block.subject.title.trim()) {
       ctx.addIssue({ code: "custom", path: ["subject", "title"], message: "Structured blocks with data require a subject title" });
@@ -246,6 +277,117 @@ export function prepareArticleContactsForSave(data: z.infer<typeof SharedContact
   };
 }
 
+function prepareArticlePriceForSave(data: z.infer<typeof ArticlePriceDataSchema>) {
+  return {
+    ...data,
+    currency: data.currency.trim(),
+    note: data.note.trim(),
+    items: data.items.flatMap((item) => {
+      const label = item.label.trim();
+      const price = item.price.trim();
+      const description = item.description?.trim();
+      const oldPrice = item.oldPrice?.trim();
+      if (!label && !price && !description && !oldPrice) return [];
+      return [{ ...item, label, price, unit: item.unit.trim(), ...(description ? { description } : {}), ...(oldPrice ? { oldPrice } : {}) }];
+    }),
+  };
+}
+
+function prepareArticleOpeningHoursForSave(data: z.infer<typeof SharedOpeningHoursDataSchema>) {
+  return {
+    ...data,
+    note: data.note?.trim() || undefined,
+    exceptions: data.exceptions.filter((exception) =>
+      Boolean(exception.date.trim() || exception.note?.trim() || exception.intervals.length || exception.allDay),
+    ),
+  };
+}
+
+export function prepareArticleInfoForSave(data: ArticleInfoData): ArticleInfoData {
+  const contacts = prepareArticleContactsForSave({
+    phones: data.phones,
+    email: data.email,
+    website: data.website,
+    socials: data.socials,
+  });
+  return {
+    locations: data.locations.flatMap((location) => {
+      const label = location.label?.trim();
+      const address = location.address?.trim();
+      const mapUrl = location.mapUrl?.trim();
+      if (!address && !location.coordinates && !mapUrl) return [];
+      return [{
+        id: location.id,
+        ...(label ? { label } : {}),
+        ...(address ? { address } : {}),
+        ...(location.coordinates ? { coordinates: location.coordinates } : {}),
+        ...(mapUrl ? { mapUrl } : {}),
+      }];
+    }),
+    phones: contacts.phones,
+    ...(contacts.email ? { email: contacts.email } : {}),
+    ...(contacts.website ? { website: contacts.website } : {}),
+    socials: contacts.socials,
+    ...(data.price ? { price: prepareArticlePriceForSave(data.price) } : {}),
+    ...(data.openingHours ? { openingHours: prepareArticleOpeningHoursForSave(data.openingHours) } : {}),
+  };
+}
+
+type LegacyInfoBlock = Extract<ArticleBlockMvp, { type: "contacts" | "price" | "openingHours" }>;
+
+function legacyInfoBlockToData(blocks: LegacyInfoBlock[]): ArticleInfoData {
+  const contacts = blocks.find((block): block is Extract<LegacyInfoBlock, { type: "contacts" }> => block.type === "contacts");
+  const price = blocks.find((block): block is Extract<LegacyInfoBlock, { type: "price" }> => block.type === "price");
+  const openingHours = blocks.find((block): block is Extract<LegacyInfoBlock, { type: "openingHours" }> => block.type === "openingHours");
+  return {
+    locations: contacts && (contacts.data.address || contacts.data.coordinates || contacts.data.mapUrl) ? [{
+      id: `location_${contacts.id}`,
+      ...(contacts.data.address ? { address: contacts.data.address } : {}),
+      ...(contacts.data.coordinates ? { coordinates: contacts.data.coordinates } : {}),
+      ...(contacts.data.mapUrl ? { mapUrl: contacts.data.mapUrl } : {}),
+    }] : [],
+    phones: contacts?.data.phones ?? [],
+    ...(contacts?.data.email ? { email: contacts.data.email } : {}),
+    ...(contacts?.data.website ? { website: contacts.data.website } : {}),
+    socials: contacts?.data.socials ?? [],
+    ...(price ? { price: price.data } : {}),
+    ...(openingHours ? { openingHours: openingHours.data } : {}),
+  };
+}
+
+/** Converts only contiguous, unambiguous legacy runs for the admin/editor representation. */
+export function normalizeLegacyArticleInfoBlocks(blocks: ArticleBlockMvp[]): ArticleBlockMvp[] {
+  const result: ArticleBlockMvp[] = [];
+  let index = 0;
+  while (index < blocks.length) {
+    const first = blocks[index];
+    if (first.type !== "contacts" && first.type !== "price" && first.type !== "openingHours") {
+      result.push(first);
+      index += 1;
+      continue;
+    }
+    const run: LegacyInfoBlock[] = [];
+    const seen = new Set<string>();
+    const subjectId = first.subject?.id?.trim() || null;
+    while (index < blocks.length) {
+      const candidate = blocks[index];
+      if (candidate.type !== "contacts" && candidate.type !== "price" && candidate.type !== "openingHours") break;
+      const candidateSubjectId = candidate.subject?.id?.trim() || null;
+      if (candidateSubjectId !== subjectId || seen.has(candidate.type)) break;
+      seen.add(candidate.type);
+      run.push(candidate);
+      index += 1;
+    }
+    result.push({
+      id: first.id,
+      type: "info",
+      subject: first.subject,
+      data: legacyInfoBlockToData(run),
+    });
+  }
+  return result;
+}
+
 function prepareArticleSubjectForSave(subject: ArticleSubject | undefined): ArticleSubject | undefined {
   if (!subject) return undefined;
   const title = subject.title.trim();
@@ -286,6 +428,9 @@ export function prepareArticleContentForSave(payload: ArticleContentPayload): Ar
   return {
     ...payload,
     blocks: payload.blocks.map((block) => {
+      if (block.type === "info") {
+        return { ...block, subject: prepareStructuredSubjectForSave(block.subject), data: prepareArticleInfoForSave(block.data) };
+      }
       if (block.type === "contacts") {
         const data = prepareArticleContactsForSave(block.data);
         return {
@@ -295,12 +440,7 @@ export function prepareArticleContentForSave(payload: ArticleContentPayload): Ar
         };
       }
       if (block.type === "openingHours") {
-        const data = {
-          ...block.data,
-          exceptions: block.data.exceptions.filter((exception) =>
-            Boolean(exception.date.trim() || exception.note?.trim() || exception.intervals.length || exception.allDay),
-          ),
-        };
+        const data = prepareArticleOpeningHoursForSave(block.data);
         return {
           ...block,
           subject: prepareStructuredSubjectForSave(block.subject),
@@ -308,19 +448,7 @@ export function prepareArticleContentForSave(payload: ArticleContentPayload): Ar
         };
       }
       if (block.type !== "price") return block;
-      const data = {
-        ...block.data,
-        currency: block.data.currency.trim(),
-        note: block.data.note.trim(),
-        items: block.data.items.flatMap((item) => {
-          const label = item.label.trim();
-          const price = item.price.trim();
-          const description = item.description?.trim();
-          const oldPrice = item.oldPrice?.trim();
-          if (!label && !price && !description && !oldPrice) return [];
-          return [{ ...item, label, price, unit: item.unit.trim(), ...(description ? { description } : {}), ...(oldPrice ? { oldPrice } : {}) }];
-        }),
-      };
+      const data = prepareArticlePriceForSave(block.data);
       return {
         ...block,
         subject: prepareStructuredSubjectForSave(block.subject),
@@ -448,6 +576,13 @@ export function newBlock(
           rules: OPENING_HOURS_DAYS.map((dayOfWeek) => ({ dayOfWeek, isOpen: false, allDay: false, intervals: [] })),
           exceptions: [],
         },
+      };
+    case "info":
+      return {
+        id: bid,
+        type: "info",
+        subject: newArticleSubject("", () => `subject_${bid}`),
+        data: { locations: [], phones: [], socials: [] },
       };
     default: {
       const _x: never = type;

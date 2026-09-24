@@ -34,7 +34,7 @@ import { ArticleEditorGalleryField } from "@/components/admin/articles/ArticleEd
 import type { useArticleMediaSource } from "@/components/admin/articles/useArticleMediaSource";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { cn } from "@/lib/utils";
-import { ArticleContactsBlockEditor, ArticleOpeningHoursBlockEditor, ArticlePriceBlockEditor } from "./ArticleStructuredInfoBlockEditors";
+import { ArticleContactsBlockEditor, ArticleInfoBlockEditor, ArticleOpeningHoursBlockEditor, ArticlePriceBlockEditor } from "./ArticleStructuredInfoBlockEditors";
 import { ArticleStructuredBlockSubjectEditor } from "./ArticleStructuredBlockSubjectEditor";
 
 /** `image` → `gallery`, тот же порядок id, тот же MediaAsset — без перезагрузки/копирования файла. */
@@ -75,6 +75,7 @@ const BLOCK_LABEL: Record<ArticleBlockMvp["type"], string> = {
   contacts: "Контакты",
   price: "Стоимость",
   openingHours: "Режим работы",
+  info: "Полезная информация",
 };
 
 const PICKER_ITEMS: { type: ArticleBlockMvp["type"]; label: string; introOnly?: boolean }[] = [
@@ -87,9 +88,7 @@ const PICKER_ITEMS: { type: ArticleBlockMvp["type"]; label: string; introOnly?: 
   { type: "gallery", label: "Галерея" },
   { type: "activityCard", label: "Карточка активности" },
   { type: "embed", label: "Вставка" },
-  { type: "contacts", label: "Контакты" },
-  { type: "price", label: "Стоимость" },
-  { type: "openingHours", label: "Режим работы" },
+  { type: "info", label: "Полезная информация" },
 ];
 
 const PLACE_SECTION_LABELS: Array<[keyof ArticlePlaceSections, string]> = [
@@ -106,8 +105,8 @@ const PLACE_SECTION_LABELS: Array<[keyof ArticlePlaceSections, string]> = [
 
 function isStructuredInfoBlock(
   block: ArticleBlockMvp,
-): block is Extract<ArticleBlockMvp, { type: "contacts" | "price" | "openingHours" }> {
-  return block.type === "contacts" || block.type === "price" || block.type === "openingHours";
+): block is Extract<ArticleBlockMvp, { type: "contacts" | "price" | "openingHours" | "info" }> {
+  return block.type === "contacts" || block.type === "price" || block.type === "openingHours" || block.type === "info";
 }
 
 function SelectSkeleton({ className }: { className?: string }) {
@@ -326,17 +325,7 @@ export function ArticleBlocksMvpEditor({
   const updateSubjectAt = (i: number, subject: ArticleSubject) => {
     const current = blocks[i];
     if (!current || !isStructuredInfoBlock(current)) return;
-    const previousSubjectId = current.subject?.id;
-    const shouldUpdateGroup = Boolean(previousSubjectId && previousSubjectId === subject.id);
-    onChange(
-      blocks.map((block, index) => {
-        if (!isStructuredInfoBlock(block)) return block;
-        if (index === i || (shouldUpdateGroup && block.subject?.id === previousSubjectId)) {
-          return { ...block, subject };
-        }
-        return block;
-      }),
-    );
+    updateAt(i, { ...current, subject });
   };
 
   const removeAt = (i: number) => onChange(blocks.filter((_, k) => k !== i));
@@ -357,7 +346,7 @@ export function ArticleBlocksMvpEditor({
   };
 
   const subjectEditor = (
-    block: Extract<ArticleBlockMvp, { type: "contacts" | "price" | "openingHours" }>,
+    block: Extract<ArticleBlockMvp, { type: "contacts" | "price" | "openingHours" | "info" }>,
     i: number,
   ) => (
     <ArticleStructuredBlockSubjectEditor
@@ -500,6 +489,12 @@ export function ArticleBlocksMvpEditor({
         <>
           {subjectEditor(block, i)}
           <ArticleOpeningHoursBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />
+        </>
+      )}
+      {block.type === "info" && (
+        <>
+          {subjectEditor(block, i)}
+          <ArticleInfoBlockEditor value={block.data} onChange={(data) => updateAt(i, { ...block, data })} />
         </>
       )}
     </>

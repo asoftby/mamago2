@@ -28,6 +28,7 @@ import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { CopyCoordinatesButton } from "./CopyCoordinatesButton";
 import { OpeningHoursSchedule } from "./OpeningHoursSchedule";
+import type { ArticleInfoData, ArticleInfoLocation } from "@/lib/publications/articleMvp";
 
 const DAY: Record<(typeof OPENING_HOURS_DAYS)[number], string> = { MON: "Понедельник", TUE: "Вторник", WED: "Среда", THU: "Четверг", FRI: "Пятница", SAT: "Суббота", SUN: "Воскресенье" };
 const WEEKDAY_FULL: Record<(typeof OPENING_HOURS_DAYS)[number], string> = { MON: "понедельник", TUE: "вторник", WED: "среда", THU: "четверг", FRI: "пятница", SAT: "суббота", SUN: "воскресенье" };
@@ -77,7 +78,7 @@ function Row({ label, action, children }: { label: string; action?: ReactNode; c
   );
 }
 
-function contactMapHref(data: SharedContactsData): string | null {
+function contactMapHref(data: Pick<SharedContactsData, "address" | "coordinates" | "mapUrl">): string | null {
   if (data.mapUrl) return data.mapUrl;
   if (data.coordinates) {
     const query = encodeURIComponent(`${data.coordinates.latitude},${data.coordinates.longitude}`);
@@ -404,30 +405,55 @@ function isOpeningHoursDataEmpty(data: SharedOpeningHoursData | undefined): bool
 }
 
 /**
- * Contacts, price and openingHours are authored as three independent blocks
- * (see articleMvp.ts), but when they land next to each other in the article
- * body they read as one fact sheet about the same place — so they render as
- * a single merged card instead of three stacked Shells. Any section (or two)
- * can be missing; the remaining ones simply take the freed-up space.
+ * Canonical articles pass one ArticleInfoData object. The legacy props remain
+ * temporarily for old contentJson and live Place cards, and are adapted to the
+ * same visual model here so every surface keeps one public implementation.
  */
 export function ArticleInfoCard({
+  data,
   contacts,
   price,
   openingHours,
 }: {
+  data?: ArticleInfoData;
+  /** @deprecated legacy/live-place compatibility */
   contacts?: SharedContactsData;
+  /** @deprecated legacy/live-place compatibility */
   price?: SharedPriceData;
+  /** @deprecated legacy/live-place compatibility */
   openingHours?: SharedOpeningHoursData;
 }) {
+  const resolved: ArticleInfoData = data ?? {
+    locations: contacts && (contacts.address || contacts.coordinates || contacts.mapUrl) ? [{
+      id: "legacy-location",
+      ...(contacts.address ? { address: contacts.address } : {}),
+      ...(contacts.coordinates ? { coordinates: contacts.coordinates } : {}),
+      ...(contacts.mapUrl ? { mapUrl: contacts.mapUrl } : {}),
+    }] : [],
+    phones: contacts?.phones ?? [],
+    ...(contacts?.email ? { email: contacts.email } : {}),
+    ...(contacts?.website ? { website: contacts.website } : {}),
+    socials: contacts?.socials ?? [],
+    ...(price ? { price } : {}),
+    ...(openingHours ? { openingHours } : {}),
+  };
+  const resolvedContacts: SharedContactsData = {
+    phones: resolved.phones,
+    email: resolved.email,
+    website: resolved.website,
+    socials: resolved.socials,
+  };
+  price = resolved.price;
+  openingHours = resolved.openingHours;
+  contacts = resolvedContacts;
   const hasContacts = !isContactsDataEmpty(contacts);
   const hasPrice = !isPriceDataEmpty(price);
   const hasHours = !isOpeningHoursDataEmpty(openingHours);
-  if (!hasContacts && !hasPrice && !hasHours) return null;
+  const hasAddressBand = resolved.locations.length > 0;
+  if (!hasContacts && !hasPrice && !hasHours && !hasAddressBand) return null;
 
   const priceSummary = hasPrice && price ? formatSharedPrice(price) : null;
 
-  const mapHref = hasContacts && contacts ? contactMapHref(contacts) : null;
-  const hasAddressBand = hasContacts && contacts && Boolean(contacts.address || mapHref);
   const hasPhonesBand = hasContacts && contacts && contacts.phones.length > 0;
   const hasLinksBand = hasContacts && contacts && Boolean(contacts.website || contacts.email || contacts.socials.length > 0);
 
@@ -450,7 +476,7 @@ export function ArticleInfoCard({
                         </b>
                         {caption && <span className="text-[12px] text-muted-foreground">· {caption}</span>}
                       </div>
-                      {weeklyDayRows(openingHours, todayKey, todayException).map((row) => (
+                      <OpeningHoursSchedule>{weeklyDayRows(openingHours, todayKey, todayException).map((row) => (
                         <div key={row.day} className="flex items-baseline gap-3 border-t border-border py-2 first:border-t-0 first:pt-0">
                           <span className={cn("shrink-0 text-[13.5px]", row.isToday ? "font-bold text-foreground" : "font-medium text-foreground/80")}>
                             {DAY[row.day]}
@@ -478,6 +504,7 @@ export function ArticleInfoCard({
                         </div>
                       )}
                       {openingHours.note && <p className="mt-3 text-xs text-muted-foreground">{openingHours.note}</p>}
+                      </OpeningHoursSchedule>
                     </div>
                   );
                 })()
@@ -537,40 +564,27 @@ export function ArticleInfoCard({
         </div>
       )}
 
-      {hasAddressBand && contacts && (
+      {hasAddressBand && (
         <div className="border-t border-border px-5 py-3.5 md:px-6">
-          <div className="mb-2 font-mono text-[9.5px] uppercase tracking-[0.13em] text-muted-foreground">Адрес</div>
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="flex min-w-0 flex-1 items-center gap-2 text-[14.5px]">
-              <MapPin className="h-4 w-4 shrink-0 text-brand" />
-              {contacts.address ? (
-                <span className="min-w-0">
-                  <span className="font-normal">{contacts.address}</span>
-                  {contacts.coordinates && (
-                    <small className="ml-2 font-mono text-xs text-muted-foreground">
-                      {contacts.coordinates.latitude}, {contacts.coordinates.longitude}
-                    </small>
-                  )}
+          <div className="mb-2 font-mono text-[9.5px] uppercase tracking-[0.13em] text-muted-foreground">{resolved.locations.length > 1 ? "Адреса" : "Адрес"}</div>
+          <div className="divide-y divide-border">
+            {resolved.locations.map((location: ArticleInfoLocation) => {
+              const mapHref = contactMapHref(location);
+              return <div key={location.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center">
+                <span className="flex min-w-0 flex-1 items-start gap-2 text-[14.5px]">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                  <span className="min-w-0 break-words">
+                    {location.label && <strong className="mb-0.5 block font-medium">{location.label}</strong>}
+                    {location.address && <span className="block">{location.address}</span>}
+                    {location.coordinates && <small className="block break-all font-mono text-xs text-muted-foreground">{location.coordinates.latitude}, {location.coordinates.longitude}</small>}
+                  </span>
                 </span>
-              ) : (
-                <a className="underline underline-offset-2" href={mapHref ?? undefined} target="_blank" rel="noreferrer">
-                  Открыть на карте
-                </a>
-              )}
-            </span>
-            <span className="flex shrink-0 flex-wrap items-center gap-2">
-              {contacts.coordinates && <CopyCoordinatesButton value={`${contacts.coordinates.latitude}, ${contacts.coordinates.longitude}`} />}
-              {mapHref && (
-                <a
-                  href={mapHref}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex h-[30px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-background px-2.5 text-xs font-medium !text-foreground !no-underline transition-colors hover:border-foreground/40"
-                >
-                  <ExternalLink className="h-[13px] w-[13px]" />Как добраться
-                </a>
-              )}
-            </span>
+                <span className="flex flex-wrap items-center gap-2 sm:shrink-0">
+                  {location.coordinates && <CopyCoordinatesButton value={`${location.coordinates.latitude}, ${location.coordinates.longitude}`} />}
+                  {mapHref && <a href={mapHref} target="_blank" rel="noreferrer" className="inline-flex h-[30px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-background px-2.5 text-xs font-medium !text-foreground !no-underline transition-colors hover:border-foreground/40"><ExternalLink className="h-[13px] w-[13px]" />Как добраться</a>}
+                </span>
+              </div>;
+            })}
           </div>
         </div>
       )}

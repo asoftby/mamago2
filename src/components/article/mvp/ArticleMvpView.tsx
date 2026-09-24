@@ -300,6 +300,10 @@ export function ArticleMvpView({
                 }
                 if (block.type === "gallery") return <ArticleGallery images={block.images} presentation={block.presentation} caption={block.caption} />;
                 if (block.type === "embed") return <ArticleEmbedBlock value={block.embedHtml} caption={block.caption} />;
+                if (block.type === "info") {
+                  const descriptor = structuredBlockRenders(block) ? [structuredDescriptor(block)] : [];
+                  return <ArticlePerformanceScope blocks={descriptor} mode="info"><ArticleInfoCard data={block.data} /></ArticlePerformanceScope>;
+                }
                 if (block.type === "activityCard") {
                   const c = block.card;
                   const cardTitle = c && "title" in c ? c.title : null;

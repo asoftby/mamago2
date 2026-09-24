@@ -4,6 +4,7 @@ import prisma, { searchIndexer } from "@/lib/prisma";
 import type { ArticleEditorSnapshot, ArticleSaveInput } from "@/lib/article/articleAdminTypes";
 import {
   parseArticleContentJson,
+  normalizeLegacyArticleInfoBlocks,
   serializeArticleContent,
 } from "@/lib/publications/articleMvp";
 import { resolveArticleSlugOnSaveInTransaction } from "@/lib/slug/resolvePublicationSlug";
@@ -70,7 +71,10 @@ function toSnapshot(row: {
     slug: row.slug,
     subtitle: row.subtitle,
     excerpt: row.excerpt,
-    content: parseArticleContentJson(row.contentJson),
+    content: (() => {
+      const content = parseArticleContentJson(row.contentJson);
+      return { ...content, blocks: normalizeLegacyArticleInfoBlocks(content.blocks) };
+    })(),
     heroImage: row.heroImage,
     coverImageId: row.coverImageId,
     coverImageUrl: row.coverImage?.publicUrl ?? null,

@@ -15,7 +15,7 @@ import { CONTACT_SOCIAL_KINDS, SharedContactsDataSchema, formatAddressFromGoogle
 import { SharedPriceDataSchema, type SharedPriceData } from "@/domain/pricing/structuredPrice";
 import { SharedOpeningHoursDataSchema, type SharedOpeningHoursData } from "@/domain/opening-hours/structuredOpeningHours";
 import { randomId } from "@/lib/utils/randomId";
-import { prepareArticleContactsForSave } from "@/lib/publications/articleMvp";
+import { prepareArticleContactsForSave, type ArticleInfoData, type ArticleInfoLocation } from "@/lib/publications/articleMvp";
 import { PHONE_LABEL_MAX_LENGTH } from "@/lib/phones/normalizePhones";
 import {
   addExceptionInterval,
@@ -34,14 +34,73 @@ const clean = (value: string) => value.trim() || undefined;
 const validationMessage = (value: unknown, schema: { safeParse: (value: unknown) => { success: boolean } }) =>
   schema.safeParse(value).success ? null : "Проверьте заполненные поля: email, ссылки, суммы и время должны быть корректными.";
 
-export function ArticleContactsBlockEditor({ value, onChange }: { value: SharedContactsData; onChange: (value: SharedContactsData) => void }) {
+function ArticleInfoLocationEditor({ value, index, onChange, onRemove }: {
+  value: ArticleInfoLocation;
+  index: number;
+  onChange: (value: ArticleInfoLocation) => void;
+  onRemove: () => void;
+}) {
+  const [isMapOpen, setIsMapOpen] = useState(false);
+  return <div className="space-y-3 rounded-lg border border-border p-3">
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-sm font-medium">Адрес {index + 1}</p>
+      <Delete onClick={onRemove} label={`Удалить адрес ${index + 1}`} />
+    </div>
+    <Field label="Подпись"><Input placeholder="Например: ТЦ Galileo (необязательно)" value={value.label ?? ""} onChange={(e) => onChange({ ...value, label: clean(e.target.value) })} /></Field>
+    <Field label="Адрес">
+      <PlaceSearchInput
+        initialValue={value.address ?? ""}
+        onInputChange={(address) => onChange({ ...value, address: clean(address), coordinates: undefined, mapUrl: undefined })}
+        onPlaceSelect={({ placeName, lat, lng, formattedAddr, addressJson }) => onChange({
+          ...value,
+          address: clean(formatAddressFromGoogleComponents(addressJson, formattedAddr || placeName)),
+          coordinates: { latitude: lat, longitude: lng },
+          mapUrl: undefined,
+        })}
+      />
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Button type="button" variant="link" className="h-auto gap-1.5 px-0 py-0 text-sm" onClick={() => setIsMapOpen(true)}><MapPin className="h-4 w-4" />Указать точку на карте</Button>
+        {value.coordinates ? <span className="text-xs text-muted-foreground">Точка на карте выбрана</span> : null}
+      </div>
+    </Field>
+    {isMapOpen ? <PlaceMapModal isOpen onClose={() => setIsMapOpen(false)} initialLat={value.coordinates?.latitude} initialLng={value.coordinates?.longitude} onConfirm={({ lat, lng }) => onChange({ ...value, coordinates: { latitude: lat, longitude: lng }, mapUrl: undefined })} /> : null}
+  </div>;
+}
+
+export function ArticleInfoBlockEditor({ value, onChange }: { value: ArticleInfoData; onChange: (value: ArticleInfoData) => void }) {
+  const [priceOpen, setPriceOpen] = useState(Boolean(value.price));
+  const [hoursOpen, setHoursOpen] = useState(Boolean(value.openingHours));
+  const contacts: SharedContactsData = { phones: value.phones, email: value.email, website: value.website, socials: value.socials };
+  return <div className="space-y-6">
+    <section className="space-y-3">
+      <h3 className="text-sm font-semibold">Адреса и контакты</h3>
+      {value.locations.map((location, index) => <ArticleInfoLocationEditor key={location.id} value={location} index={index} onChange={(locationValue) => onChange({ ...value, locations: value.locations.map((item, itemIndex) => itemIndex === index ? locationValue : item) })} onRemove={() => onChange({ ...value, locations: value.locations.filter((_, itemIndex) => itemIndex !== index) })} />)}
+      <Add onClick={() => onChange({ ...value, locations: [...value.locations, { id: randomId() }] })}>Добавить адрес</Add>
+      <ArticleContactsBlockEditor value={contacts} onChange={(next) => onChange({ ...value, phones: next.phones, email: next.email, website: next.website, socials: next.socials })} hideAddress />
+    </section>
+    <details className="rounded-lg border border-border p-4" open={priceOpen} onToggle={(event) => setPriceOpen(event.currentTarget.open)}>
+      <summary className="cursor-pointer text-sm font-semibold">Стоимость</summary>
+      <div className="mt-4">
+        {value.price ? <><ArticlePriceBlockEditor value={value.price} onChange={(price) => onChange({ ...value, price })} /><Button type="button" size="sm" variant="ghost" className="mt-3 text-destructive" onClick={() => onChange({ ...value, price: undefined })}>Удалить стоимость</Button></> : <Button type="button" size="sm" variant="outline" onClick={() => onChange({ ...value, price: { mode: "UNKNOWN", currency: "BYN", min: null, max: null, items: [], note: "" } })}>Добавить стоимость</Button>}
+      </div>
+    </details>
+    <details className="rounded-lg border border-border p-4" open={hoursOpen} onToggle={(event) => setHoursOpen(event.currentTarget.open)}>
+      <summary className="cursor-pointer text-sm font-semibold">Режим работы</summary>
+      <div className="mt-4">
+        {value.openingHours ? <><ArticleOpeningHoursBlockEditor value={value.openingHours} onChange={(openingHours) => onChange({ ...value, openingHours })} /><Button type="button" size="sm" variant="ghost" className="mt-3 text-destructive" onClick={() => onChange({ ...value, openingHours: undefined })}>Удалить режим работы</Button></> : <Button type="button" size="sm" variant="outline" onClick={() => onChange({ ...value, openingHours: { mode: "WEEKLY", timezone: "Europe/Minsk", rules: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map((dayOfWeek) => ({ dayOfWeek: dayOfWeek as SharedOpeningHoursData["rules"][number]["dayOfWeek"], isOpen: false, allDay: false, intervals: [] })), exceptions: [] } })}>Добавить режим работы</Button>}
+      </div>
+    </details>
+  </div>;
+}
+
+export function ArticleContactsBlockEditor({ value, onChange, hideAddress = false }: { value: SharedContactsData; onChange: (value: SharedContactsData) => void; hideAddress?: boolean }) {
   const [isMapOpen, setIsMapOpen] = useState(false);
   const errors = contactsDraftFieldErrors(value);
   const error = validationMessage(prepareArticleContactsForSave(value), SharedContactsDataSchema);
   const coordinates = value.coordinates;
 
   return <div className="space-y-4">
-    <Field label="Адрес">
+    {!hideAddress && <Field label="Адрес">
       <PlaceSearchInput
         initialValue={value.address ?? ""}
         onInputChange={(address) => onChange({
@@ -65,9 +124,9 @@ export function ArticleContactsBlockEditor({ value, onChange }: { value: SharedC
         {coordinates ? <span className="text-xs text-muted-foreground">Точка на карте выбрана</span> : null}
       </div>
       <p className="text-xs text-muted-foreground">Выберите адрес из подсказок Google. Адрес можно отредактировать или удалить вручную; если нужного адреса нет, укажите точку на карте.</p>
-    </Field>
+    </Field>}
 
-    {isMapOpen ? <PlaceMapModal
+    {!hideAddress && isMapOpen ? <PlaceMapModal
       isOpen
       onClose={() => setIsMapOpen(false)}
       initialLat={coordinates?.latitude}

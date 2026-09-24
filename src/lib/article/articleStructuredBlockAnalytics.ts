@@ -4,7 +4,7 @@ import type { ArticlePerformanceBlockDescriptor } from "@/lib/article/articlePer
 
 export type StructuredResolvedBlock = Extract<
   ArticleMvpResolvedBlock,
-  { type: "contacts" | "price" | "openingHours" }
+  { type: "contacts" | "price" | "openingHours" | "info" }
 >;
 
 export function structuredDescriptor(block: StructuredResolvedBlock): ArticlePerformanceBlockDescriptor {
@@ -22,6 +22,12 @@ export function structuredDescriptor(block: StructuredResolvedBlock): ArticlePer
 
 /** Keep analytics impressions aligned with the exact omission rules used by ArticleInfoCard. */
 export function structuredBlockRenders(block: StructuredResolvedBlock): boolean {
+  if (block.type === "info") {
+    return Boolean(
+      block.data.locations.length || block.data.email || block.data.website || block.data.phones.length ||
+      block.data.socials.length || block.data.price || block.data.openingHours,
+    );
+  }
   if (block.type === "contacts") {
     const data = block.data;
     return Boolean(

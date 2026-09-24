@@ -9,6 +9,7 @@ export const ArticlePerformanceTrackedBlockTypeSchema = z.enum([
   "contacts",
   "price",
   "openingHours",
+  "info",
   "activityCard",
 ]);
 export type ArticlePerformanceTrackedBlockType = z.infer<typeof ArticlePerformanceTrackedBlockTypeSchema>;
