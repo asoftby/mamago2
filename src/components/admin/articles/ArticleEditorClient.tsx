@@ -830,7 +830,7 @@ export function ArticleEditorClient({
 
   return (
     <>
-    <div className={cn("p-6 md:p-4 space-y-8 max-w-4xl", everDirty && "pb-28 md:pb-24")}>
+    <div className={cn("w-full max-w-4xl space-y-6 px-4 py-4 sm:space-y-8 sm:px-6 sm:py-6", everDirty && "pb-[calc(8rem+env(safe-area-inset-bottom))] md:pb-24")}>
       <div className="flex flex-wrap items-start justify-between gap-3 gap-y-2">
         <div className="min-w-0 flex-1 pr-2">
           <p className="text-xs font-medium text-muted-foreground mb-1">Статья</p>
@@ -854,13 +854,13 @@ export function ArticleEditorClient({
 
       {/* Основная информация */}
       <Card className="border-gray-200 shadow-sm">
-        <CardHeader>
+        <CardHeader className="px-4 sm:px-6">
           <CardTitle className="text-lg">Основная информация</CardTitle>
           <CardDescription>
             Заголовок, категория, адрес страницы, обложка, автор и городской контекст
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-5 px-4 sm:px-6">
           <div className="space-y-2">
             <Label>Заголовок</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -1119,11 +1119,11 @@ export function ArticleEditorClient({
 
       {/* Контент */}
       <Card className="border-gray-200 shadow-sm">
-        <CardHeader>
+        <CardHeader className="px-4 sm:px-6">
           <CardTitle className="text-lg">Контент статьи</CardTitle>
           <CardDescription>Блоки в фиксированном порядке</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           <ArticleBlocksMvpEditor
             blocks={content.blocks}
             onChange={(blocks) => setContent((prev) => ({ ...prev, blocks }))}
@@ -1199,14 +1199,14 @@ export function ArticleEditorClient({
       ) : null}
 
       <AlertDialog open={leaveDialogOpen} onOpenChange={onLeaveDialogOpenChange}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-h-[92dvh] max-w-[calc(100%-1rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">
           <AlertDialogHeader>
             <AlertDialogTitle>Несохранённые изменения</AlertDialogTitle>
             <AlertDialogDescription>
               Вы изменили статью. Уйти без сохранения? Несохранённые правки будут потеряны.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="gap-2 [&_button]:min-h-11 sm:gap-0 sm:[&_button]:min-h-9">
             <AlertDialogCancel type="button">Остаться</AlertDialogCancel>
             <AlertDialogAction type="button" onClick={confirmLeave}>
               Уйти без сохранения
@@ -1216,7 +1216,7 @@ export function ArticleEditorClient({
       </AlertDialog>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-h-[92dvh] max-w-[calc(100%-1rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">
           <AlertDialogHeader>
             <AlertDialogTitle>Удалить черновик?</AlertDialogTitle>
             <AlertDialogDescription asChild>
@@ -1225,7 +1225,7 @@ export function ArticleEditorClient({
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="gap-2 [&_button]:min-h-11 sm:gap-0 sm:[&_button]:min-h-9">
             <AlertDialogCancel type="button" disabled={deleting}>
               Отмена
             </AlertDialogCancel>

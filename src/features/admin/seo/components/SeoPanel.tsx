@@ -272,7 +272,7 @@ export function SeoPanel({
 
   return (
     <Card className="overflow-hidden rounded-2xl border-gray-200 shadow-sm">
-      <CardHeader className="space-y-3">
+      <CardHeader className="space-y-3 px-4 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
             <CardTitle className="text-lg">SEO</CardTitle>
@@ -284,6 +284,7 @@ export function SeoPanel({
             type="button"
             variant="outline"
             size="sm"
+            className="min-h-11 sm:min-h-8"
             onClick={handleAutofill}
             disabled={disabled || !hasAutofillSource || !hasEmptyAutofillTargets}
           >
@@ -315,7 +316,7 @@ export function SeoPanel({
         ) : null}
       </CardHeader>
 
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-5 px-4 sm:px-6">
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
             <Label htmlFor="seo-title">SEO title</Label>
