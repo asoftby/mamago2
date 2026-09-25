@@ -1057,6 +1057,16 @@ function BookingMonthGrid({
   const selectedKey = toDateKey(selectedDate);
   const todayKey = toDateKey(new Date());
   const mobileCells = cells.filter((cell) => cell.date.getMonth() === monthAnchor.getMonth());
+  const selectedMobileDayRef = useRef<HTMLButtonElement | null>(null);
+  const visibleMonthKey = `${monthAnchor.getFullYear()}-${monthAnchor.getMonth()}`;
+
+  useEffect(() => {
+    selectedMobileDayRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [selectedKey, visibleMonthKey]);
 
   return (
     <>
@@ -1069,6 +1079,7 @@ function BookingMonthGrid({
             return (
               <button
                 key={cell.key}
+                ref={isSelected ? selectedMobileDayRef : undefined}
                 type="button"
                 onClick={() => onSelectDate(cell.date)}
                 className={cn(
