@@ -28,6 +28,7 @@ const placeAbout = read("src/components/place/marketplace/PlaceAboutSection.tsx"
 const placeOffers = read("src/components/place/marketplace/PlaceOffersSection.tsx");
 const placeEvents = read("src/components/place/marketplace/PlaceEventsSection.tsx");
 const placeReviews = read("src/components/place/marketplace/PlaceReviewsSection.tsx");
+const placeStickyActionBar = read("src/components/place/marketplace/PlaceStickyActionBar.tsx");
 
 const discoveryGridContract =
   /grid grid-cols-1 gap-5 min-\[360px\]:grid-cols-2 lg:grid-cols-4/g;
@@ -134,6 +135,22 @@ assert.match(
   placeOffers,
   /inline-flex min-h-11 items-center/,
   "Place Offers 'all offers' action must expose a 44px touch target",
+);
+
+assert.match(
+  placeStickyActionBar,
+  /hasThreeActions && "hidden sm:block"/,
+  "Place sticky bar must hide secondary detail copy on phones when all three actions are present",
+);
+assert.match(
+  placeStickyActionBar,
+  /hasThreeActions \? "w-\[46px\] px-0 sm:w-auto sm:px-5" : "px-5"/,
+  "Place sticky call action must become a 46px icon target in the three-action mobile layout",
+);
+assert.match(
+  placeStickyActionBar,
+  /hasThreeActions && "sr-only sm:not-sr-only"/,
+  "Place sticky call label must remain accessible while visually compact on phones",
 );
 
 console.log("publicDetailMobileContract.test.ts: OK");
