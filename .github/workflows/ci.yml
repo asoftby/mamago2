@@ -130,6 +130,10 @@ jobs:
           pnpm exec tsx src/components/admin/articles/ArticleBlocksMvpEditor.test.ts
           pnpm test:article-gallery
 
+      - name: Admin responsive regressions
+        run: |
+          pnpm test:responsive-admin
+
       - name: My Plan presentation regressions
         run: |
           pnpm exec tsx src/features/my-plan/lib/planItemMeta.test.ts

@@ -7,7 +7,7 @@ export function SearchDiscoveryBlock({ model }: { model: DiscoveryQualityViewMod
 
   return (
     <AdminDashboardBlock title={block.title} href={block.href} size={block.size}>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
         <div>
           <div className="text-lg font-bold text-gray-900">
             {model.queriesTotal === null ? "Нет данных" : model.queriesTotal}

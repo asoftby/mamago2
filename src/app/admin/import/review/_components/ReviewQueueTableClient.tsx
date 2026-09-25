@@ -283,17 +283,17 @@ export function ReviewQueueTableClient({ records }: Props) {
       </div>
 
       {selectedIds.length > 0 && (
-        <div className="fixed bottom-4 left-1/2 z-40 flex w-[min(92vw,760px)] -translate-x-1/2 items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-xl">
+        <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex w-[min(92vw,760px)] -translate-x-1/2 flex-col gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-xl sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <div className="text-sm font-medium text-gray-900">Выбрано объектов: {selectedIds.length}</div>
             <div className="text-xs text-gray-500">Массовое удаление работает только для сырого импорта, который ещё не связан с Place/Event.</div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setSelectedIds([])} disabled={bulkPending}>
+            <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setSelectedIds([])} disabled={bulkPending}>
               <X className="mr-1.5 h-4 w-4" />
               Снять выбор
             </Button>
-            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkPending}>
+            <Button variant="destructive" className="flex-1 sm:flex-none" onClick={handleBulkDelete} disabled={bulkPending}>
               <Trash2 className="mr-1.5 h-4 w-4" />
               {bulkPending ? "Удаляем…" : "Удалить выбранное"}
             </Button>
