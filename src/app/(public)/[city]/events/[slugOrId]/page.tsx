@@ -144,6 +144,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
           ? {
               name: locationName,
               address: locationAddress,
+              addressLocality: getCityNominativeName(city),
             }
           : undefined,
       pricing: {

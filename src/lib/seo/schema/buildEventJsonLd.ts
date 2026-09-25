@@ -11,16 +11,19 @@ export type BuildEventJsonLdInput = {
   startDate?: Date | string | null;
   sessions?: Array<{
     startsAt?: Date | string | null;
+    isSaleOpen?: boolean | null;
   }> | null;
   format?: EventAttendanceFormat;
   location?: {
     name?: string | null;
     address?: string | null;
+    addressLocality?: string | null;
   } | null;
   pricing?: {
     mode?: EventPriceMode;
     priceFrom?: number | null;
     currency?: string | null;
+    validFrom?: Date | string | null;
   } | null;
   publicBaseUrl?: string;
 };
@@ -142,7 +145,22 @@ function mapAttendanceMode(format: EventAttendanceFormat): string | undefined {
   }
 }
 
-function buildEventOffer(pricing: BuildEventJsonLdInput["pricing"]): Record<string, unknown> | undefined {
+function resolveOfferAvailability(
+  sessions: BuildEventJsonLdInput["sessions"],
+): string | undefined {
+  const knownStates = (sessions ?? [])
+    .map((session) => session.isSaleOpen)
+    .filter((value): value is boolean => typeof value === "boolean");
+  if (knownStates.some(Boolean)) return "https://schema.org/InStock";
+  if (knownStates.length > 0) return "https://schema.org/OutOfStock";
+  return undefined;
+}
+
+function buildEventOffer(
+  pricing: BuildEventJsonLdInput["pricing"],
+  canonicalUrl: string,
+  availability: string | undefined,
+): Record<string, unknown> | undefined {
   if (!pricing) return undefined;
   const mode = typeof pricing.mode === "string" ? pricing.mode.toUpperCase() : "";
   if (mode === "NONE" || mode === "UNKNOWN" || !mode) return undefined;
@@ -162,10 +180,15 @@ function buildEventOffer(pricing: BuildEventJsonLdInput["pricing"]): Record<stri
 
   if (price == null) return undefined;
 
+  const validFrom = normalizeSessionDate(pricing.validFrom)?.toISOString();
+
   return {
     "@type": "Offer",
     price,
     priceCurrency: currency,
+    url: canonicalUrl,
+    availability,
+    validFrom,
   };
 }
 
@@ -176,7 +199,12 @@ export function buildEventJsonLd(input: BuildEventJsonLdInput): Record<string, u
   const image = absolutePublicImageUrl(input.image, input.publicBaseUrl);
   const locationName = input.location?.name?.trim() || undefined;
   const locationAddress = input.location?.address?.trim() || undefined;
-  const offers = buildEventOffer(input.pricing);
+  const addressLocality = input.location?.addressLocality?.trim() || undefined;
+  const offers = buildEventOffer(
+    input.pricing,
+    input.canonicalUrl,
+    resolveOfferAvailability(input.sessions),
+  );
 
   return {
     "@context": "https://schema.org",
@@ -197,6 +225,8 @@ export function buildEventJsonLd(input: BuildEventJsonLdInput): Record<string, u
               ? {
                   "@type": "PostalAddress",
                   streetAddress: locationAddress,
+                  addressLocality,
+                  addressCountry: "BY",
                 }
               : undefined,
           }

@@ -21,6 +21,7 @@ import {
   canonicalPublicActivityPath,
   resolveCanonicalCitySlugForEvent,
 } from "@/lib/business/eventPublicLink";
+import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
 
 const EVENT_LIST_LIMIT = 500;
 
@@ -287,8 +288,14 @@ export const eventProvider: SeoEntityProvider = {
           ? {
               name: locationName,
               address: locationAddress,
+              addressLocality: getCityNominativeName(citySlug),
             }
           : undefined,
+      pricing: {
+        mode: loaded.priceMode,
+        priceFrom: loaded.priceFrom,
+        currency: loaded.currency,
+      },
       publicBaseUrl: publicBase,
     });
   },
