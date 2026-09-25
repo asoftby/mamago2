@@ -114,6 +114,8 @@ jobs:
         run: |
           pnpm exec tsx src/components/shell/PublicFooter.contract.test.ts
           pnpm exec tsx src/lib/fontsLocal.test.ts
+          pnpm exec tsx src/lib/responsive/mobileHeaderBreakpointContract.test.ts
+          pnpm test:responsive-public-mobile
 
       - name: My Plan presentation regressions
         run: |
