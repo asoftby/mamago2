@@ -95,6 +95,7 @@ export function StoryModal({
           "absolute z-[60]",
           "md:top-6 md:right-6",
           // Mobile: below the progress bar strip, not flush with/overlapping it
+          "h-11 w-11 md:h-10 md:w-10",
           "max-md:top-[calc(env(safe-area-inset-top)+32px)] max-md:right-4",
         )}
       />
