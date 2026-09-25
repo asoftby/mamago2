@@ -118,6 +118,7 @@ jobs:
           pnpm test:responsive-public-mobile
           pnpm test:responsive-public-detail
           pnpm test:responsive-public-overlay
+          pnpm test:responsive-business
 
       - name: My Plan presentation regressions
         run: |
