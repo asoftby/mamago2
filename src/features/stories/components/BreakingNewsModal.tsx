@@ -71,9 +71,8 @@ export function BreakingNewsModal({
         onClick={onClose}
         className={cn(
           "absolute z-[60]",
-          "md:top-6 md:right-6",
           "h-11 w-11 md:h-10 md:w-10",
-          "right-4 top-[max(1rem,env(safe-area-inset-top))] md:top-6",
+          "right-4 top-[max(1rem,env(safe-area-inset-top))] md:right-6 md:top-6",
         )}
       />
 
