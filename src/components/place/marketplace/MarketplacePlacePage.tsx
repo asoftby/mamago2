@@ -266,7 +266,7 @@ export function MarketplacePlacePage({
             background: "#ffffff",
           }}
         >
-          <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
+          <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-7">
             <div className="kicker-row" style={{ marginBottom: 24 }}>
               <span className="text-kicker">Цены</span>
               <span className="kicker-line" />
@@ -380,11 +380,8 @@ function MetaStrip({ items, isOpenNow }: { items: Array<[string, string, string]
       }}
     >
       <div
-        className="meta-grid"
+        className="meta-grid mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-7"
         style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          padding: "0 28px",
           display: "grid",
           gridTemplateColumns: `repeat(${items.length}, 1fr)`,
           gap: 0,
@@ -499,11 +496,8 @@ function WorkingHoursSection({ summary }: { summary: string }) {
       }}
     >
       <div
-        className="hours-grid"
+        className="hours-grid mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-7"
         style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          padding: "0 28px",
           display: "grid",
           gridTemplateColumns: "320px 1fr",
           gap: 56,
@@ -608,10 +602,7 @@ function WorkingHoursSection({ summary }: { summary: string }) {
 
       <style>{`
         @media (max-width: 900px) {
-          .hours-grid { grid-template-columns: 1fr !important; gap: 24px !important; padding: 0 22px !important; }
-        }
-        @media (max-width: 520px) {
-          .hours-grid { padding: 0 18px !important; }
+          .hours-grid { grid-template-columns: 1fr !important; gap: 24px !important; }
         }
       `}</style>
     </section>
