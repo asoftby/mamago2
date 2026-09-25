@@ -399,7 +399,7 @@ export function EmailTemplatesPageClient() {
   }
 
   return (
-    <div className="space-y-6 p-6 md:p-4">
+    <div className="space-y-6 p-4 sm:p-6">
       <AdminPageHeader
         title="Email Studio"
         subtitle="Часть домена «Коммуникации»: шаблоны, preview, тестовая отправка и версии в одном потоке."

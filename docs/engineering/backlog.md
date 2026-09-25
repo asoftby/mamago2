@@ -4876,3 +4876,41 @@ distributor_company_id=550) и хотели бы уточнить несколь
   `fix/perf-public-critical-css-20260921` (2026-09-21 recovery of
   `fix/perf-public-critical-css-20260914`); not fixed in that PR per its
   own instructions ("не исправляй, только owner + next-task").
+
+## [BACKLOG-157] Admin nested card padding has the same mobile/desktop inversion as the old page-gutter contract
+
+- Status: OPEN
+- Priority: P3
+- Area: Admin / Responsive
+- Added: 2026-09-26
+- Reason deferred: `fix/admin-spacing-responsive-cleanup-20260926` was
+  explicitly scoped to page-level Admin containers only ("нормализовать
+  только page-level Admin spacing"); nested card/panel padding was
+  explicitly out of scope per that task's brief ("если `p-6 md:p-4`
+  используется не как page gutter, а как внутренний padding сущности — не
+  меняй автоматически"). Fixing it now would have turned a mechanical
+  cleanup PR into a second redesign pass.
+- Context: while normalizing the page-level `p-6 md:p-4` → `p-4 sm:p-6`
+  pattern, found the same inversion (mobile gets 24px, `md+` gets 16px) on
+  nested `bg-white border border-gray-200 rounded-lg p-6 md:p-4` cards:
+  `src/components/admin/media/AdminMediaUploader.tsx:61`,
+  `src/components/admin/media/MediaActions.tsx:129`, and three panels in
+  `src/app/admin/media/[id]/page.tsx` (Usage Map / File Info / System
+  Info). The UI Lab's own `LayoutContractSection.tsx` "Standard Card
+  Pattern" example (Card / Shell Contract section) documents this same
+  `p-6 md:p-4` string as the sanctioned card pattern, so new cards will
+  keep copying the inversion until that section and these call sites are
+  fixed together.
+- Current state: not fixed. Deliberately left unchanged in
+  `fix/admin-spacing-responsive-cleanup-20260926` — verified those are the
+  only card-level occurrences in `src/app/admin/**` and
+  `src/components/admin/**` (grep for `bg-white.*p-6 md:p-4` returns
+  exactly these 5 lines).
+- Dependencies: none blocking.
+- Acceptance criteria: nested Admin card padding normalized to
+  `p-4 sm:p-6` (or equivalent mobile-first order) at the 5 call sites
+  above, and the "Standard Card Pattern" example in
+  `src/app/(ui)/ui-lab-admin/_sections/LayoutContractSection.tsx` updated
+  to match so the pattern doesn't propagate back into new cards.
+- Source: found during `fix/admin-spacing-responsive-cleanup-20260926`
+  self-review grep (`git grep -n "p-6 md:p-4"`), 2026-09-26.

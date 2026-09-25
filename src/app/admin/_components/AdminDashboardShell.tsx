@@ -103,7 +103,7 @@ export function AdminDashboardShell({
   }
 
   return (
-    <div className="p-6 md:p-4 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl md:text-xl font-bold">Панель управления</h1>

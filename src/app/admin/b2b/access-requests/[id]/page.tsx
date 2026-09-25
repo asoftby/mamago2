@@ -45,7 +45,7 @@ export default async function BusinessAccessRequestDetailPage({
   const canReview = user?.role === "ADMIN" && request.status === "PENDING";
 
   return (
-    <div className="p-6 md:p-4 space-y-6 max-w-3xl">
+    <div className="p-4 sm:p-6 space-y-6 max-w-3xl">
       <Link
         href={adminPath("/b2b/access-requests")}
         className="text-sm text-primary hover:text-primary/80"

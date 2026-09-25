@@ -118,7 +118,7 @@ export default async function AdminMediaDetailPage({
   const pageTitle = effectiveMetadata.title || filenameWithoutExt;
 
   return (
-    <div className="p-6 md:p-4 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* AdminPageHeader */}
       <div className="flex items-center justify-between">
         <div>

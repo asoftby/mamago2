@@ -13,7 +13,7 @@ export default async function AdminNewEditorialRequestPage() {
   const catalog = await listEditorialRequestFormCatalog();
 
   return (
-    <div className="space-y-6 p-6 md:p-4">
+    <div className="space-y-6 p-4 sm:p-6">
       <AdminPageHeader
         title="Новый Editorial Request"
         subtitle="Phase 1: настраиваем критерии подбора и сохраняем preview без Telegram и биллинга."

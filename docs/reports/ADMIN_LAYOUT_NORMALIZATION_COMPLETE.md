@@ -1,5 +1,16 @@
 # Admin Layout Normalization Complete
 
+> **Superseded 2026-09-26 (page-level spacing only):** the `p-6 md:p-4`
+> AdminPageContainer padding documented below put *more* padding on phones
+> (24px) than on `md+` screens (16px) — inverted from the mobile-first
+> contract (`docs/release/dev-to-prod-checklist.md` / responsive initiative).
+> Admin page-level containers now use `p-4 sm:p-6` (16px phone / 24px `sm+`).
+> This history is left as-is below for the record of what this pass actually
+> did; do not copy its `p-6 md:p-4` examples into new pages — copy the
+> current pattern from `/ui-lab-admin` instead. Nested card/panel padding
+> (e.g. `bg-white border rounded-lg p-6 md:p-4`) was intentionally left
+> unchanged in the spacing cleanup and is a separate, still-open item.
+
 ## Overview
 Performed UI normalization pass on admin panel pages to align with the Layout Contract defined in `/ui-lab-admin`.
 

@@ -16,14 +16,57 @@
  * - the Import review bulk-action bar clears the mobile home-indicator area
  *   and stacks instead of squeezing two buttons into ~90vw;
  * - dashboard KPI trio grids stack on phone widths instead of wrapping
- *   multi-word labels into illegible 3-up columns.
+ *   multi-word labels into illegible 3-up columns;
+ * - page-level Admin spacing is mobile-first (`p-4 sm:p-6`: 16px phone /
+ *   24px sm+), not the legacy inverted `p-6 md:p-4` (24px phone / 16px
+ *   md+) from the 2026-09-26 spacing cleanup. Nested card/panel padding
+ *   (e.g. `bg-white border rounded-lg p-6 md:p-4`) is intentionally out of
+ *   scope for that cleanup (see BACKLOG-157) and is excluded from the scan
+ *   below via its `bg-white` marker, not treated as a page-level offender.
  *
  * Run: pnpm test:responsive-admin
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import path from "node:path";
 
 const read = (path: string) => readFileSync(path, "utf8");
+
+/** Recursively collects .tsx/.ts files under a directory. */
+function collectSourceFiles(root: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(root)) {
+    const full = path.join(root, entry);
+    const stat = statSync(full);
+    if (stat.isDirectory()) {
+      out.push(...collectSourceFiles(full));
+    } else if (/\.tsx?$/.test(entry) && !entry.endsWith(".test.ts") && !entry.endsWith(".test.tsx")) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+/**
+ * Scans admin source for the legacy inverted page-gutter pattern.
+ * A line is a page-level offender only if it contains the legacy class pair
+ * WITHOUT the `bg-white` nested-card marker — mirrors the exact heuristic
+ * used to apply the 2026-09-26 cleanup, so a legitimate nested card (which
+ * keeps `bg-white border ... rounded-lg p-6 md:p-4`, see BACKLOG-157) is not
+ * flagged as a page-root regression.
+ */
+function findLegacyPageGutterOffenders(root: string): string[] {
+  const offenders: string[] = [];
+  for (const file of collectSourceFiles(root)) {
+    const lines = read(file).split("\n");
+    lines.forEach((line, index) => {
+      if (line.includes("p-6 md:p-4") && !line.includes("bg-white")) {
+        offenders.push(`${file}:${index + 1}`);
+      }
+    });
+  }
+  return offenders;
+}
 
 const layout = read("src/app/admin/layout.tsx");
 const header = read("src/components/admin/AdminHeader.tsx");
@@ -157,5 +200,39 @@ for (const block of dashboardBlocks) {
     "Dashboard KPI trio grids must stack to 1 column below sm and expand to 3 at sm+",
   );
 }
+
+// --- Page-level spacing contract: mobile-first, legacy pattern must not return ---
+
+const legacyPageGutterOffenders = [
+  ...findLegacyPageGutterOffenders("src/app/admin"),
+  ...findLegacyPageGutterOffenders("src/components/admin"),
+];
+assert.deepEqual(
+  legacyPageGutterOffenders,
+  [],
+  `Legacy inverted page-gutter pattern (p-6 md:p-4 — 24px phone / 16px md+) found outside nested cards:\n${legacyPageGutterOffenders.join("\n")}`,
+);
+
+const representativeAdminPages = [
+  "src/app/admin/orders/page.tsx",
+  "src/app/admin/users/page.tsx",
+  "src/app/admin/seo/layout.tsx",
+  "src/app/admin/_components/AdminDashboardShell.tsx",
+  "src/components/admin/discovery/discoveryTaxonomyClasses.ts",
+].map(read);
+for (const page of representativeAdminPages) {
+  assert.match(
+    page,
+    /p-4 sm:p-6/,
+    "Representative Admin page roots must use the mobile-first p-4 sm:p-6 gutter",
+  );
+}
+
+const uiLabLayoutContract = read("src/app/(ui)/ui-lab-admin/_sections/LayoutContractSection.tsx");
+assert.match(
+  uiLabLayoutContract,
+  /\/\/ AdminPageContainer\n<div className="p-4 sm:p-6 space-y-6">/,
+  "UI Lab's AdminPageContainer example must demonstrate the current mobile-first contract",
+);
 
 console.log("adminMobileLayoutContract.test.ts: OK");

@@ -21,7 +21,7 @@ export default async function AdminCommunicationsOverviewPage() {
   const publishedCount = templates.filter((template) => template.status === "PUBLISHED").length;
 
   return (
-    <div className="space-y-6 p-6 md:p-4">
+    <div className="space-y-6 p-4 sm:p-6">
       <AdminPageHeader
         title="Коммуникации"
         subtitle="Сообщения, уведомления и каналы доставки для пользователей и бизнес-партнёров."
