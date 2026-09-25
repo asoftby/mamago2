@@ -16,6 +16,8 @@ assert.match(shell, /px-4 py-5 sm:px-6/, "Business content must keep the 16/24px
 assert.match(header, /h-11 w-11[^\n]*lg:hidden/, "Business mobile navigation must expose a 44px target");
 assert.match(bookings, /grid grid-cols-2 gap-3 lg:grid-cols-5/, "Booking stats must use a compact two-column mobile layout");
 assert.match(bookings, /aria-label="Выбор дня месяца"/, "Bookings must provide a compact mobile day selector");
+assert.match(bookings, /selectedMobileDayRef\.current\?\.scrollIntoView/, "Selected mobile booking day must scroll into view");
+assert.match(bookings, /inline:\s*"center"/, "Selected mobile booking day should be centered in the rail");
 assert.match(bookings, /hidden overflow-hidden[^\n]*sm:block/, "The dense seven-column month grid must be tablet/desktop only");
 assert.match(bookings, /min-h-11 shrink-0 snap-start/, "Booking filter rails must keep 44px snap targets");
 assert.match(bookings, /h-\[92dvh\]/, "Booking detail sheet must use dynamic viewport height");
