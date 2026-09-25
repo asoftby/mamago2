@@ -25,8 +25,7 @@ export function PlaceEventsSection({ activities, citySlug }: PlaceEventsSectionP
       }}
     >
       <div
-        style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}
-        className="events-wrap"
+        className="events-wrap mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-7"
         id="events"
       >
         <div
@@ -67,14 +66,7 @@ export function PlaceEventsSection({ activities, citySlug }: PlaceEventsSectionP
         </HorizontalCardRow>
       </div>
 
-      <style>{`
-        @media (max-width: 900px) {
-          .events-wrap { padding: 0 22px !important; }
-        }
-        @media (max-width: 520px) {
-          .events-wrap { padding: 0 18px !important; }
-        }
-      `}</style>
+
     </section>
   );
 }
