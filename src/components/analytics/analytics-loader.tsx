@@ -141,7 +141,7 @@ export function AnalyticsLoader({
 }: {
   config: ExternalAnalyticsConfig;
 }) {
-  const { canUseAnalytics } = useCookieConsent();
+  const { canUseAnalytics, hasValidConsent } = useCookieConsent();
   const yandexActiveRef = useRef(false);
   const googleInitializedRef = useRef(false);
   const [yandexReady, setYandexReady] = useState(false);
@@ -153,28 +153,34 @@ export function AnalyticsLoader({
   // MUST be queued before gtag.js is inserted; initialization happens once.
   useEffect(() => {
     if (!config.enabled || !googleId) return;
+    if (googleInitializedRef.current) return;
 
-    if (!googleInitializedRef.current) {
-      const gtag = ensureGtag();
-      gtag("consent", "default", GOOGLE_DEFAULT_CONSENT);
-      ensureExternalScript(
-        "mamago-google-analytics",
-        `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(googleId)}`,
-      );
-      gtag("js", new Date());
-      gtag("config", googleId, {
-        // Marketing/advertising consent is a separate mamaGo category.
-        allow_google_signals: false,
-        allow_ad_personalization_signals: false,
-      });
-      googleInitializedRef.current = true;
-    }
+    const gtag = ensureGtag();
+    gtag("consent", "default", GOOGLE_DEFAULT_CONSENT);
+    ensureExternalScript(
+      "mamago-google-analytics",
+      `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(googleId)}`,
+    );
+    gtag("js", new Date());
+    gtag("config", googleId, {
+      // Marketing/advertising consent is a separate mamaGo category.
+      allow_google_signals: false,
+      allow_ad_personalization_signals: false,
+    });
+    googleInitializedRef.current = true;
+  }, [config.enabled, googleId]);
+
+  // Do not turn the initial unknown snapshot into an explicit denied update:
+  // that would end wait_for_update before CookieConsent restores the actual
+  // persisted choice. Updates start only once the CMP has a valid decision.
+  useEffect(() => {
+    if (!config.enabled || !googleId || !hasValidConsent) return;
 
     ensureGtag()("consent", "update", {
       ...GOOGLE_DENIED_CONSENT,
       analytics_storage: canUseAnalytics ? "granted" : "denied",
     });
-  }, [canUseAnalytics, config.enabled, googleId]);
+  }, [canUseAnalytics, config.enabled, googleId, hasValidConsent]);
 
   // Yandex remains fully consent-gated and is destroyed on revoke.
   useEffect(() => {

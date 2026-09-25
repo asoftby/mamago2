@@ -41,6 +41,15 @@ function main() {
     consentUpdate && !consentUpdate[1].includes("wait_for_update"),
     "wait_for_update must never be included in consent update",
   );
+  assert.ok(
+    loader.includes("const { canUseAnalytics, hasValidConsent } = useCookieConsent()") &&
+      /if \(!config\.enabled \|\| !googleId \|\| !hasValidConsent\) return;[\s\S]*?ensureGtag\(\)\("consent", "update"/.test(loader),
+    "Google consent update must not run while CookieConsent state is still unknown",
+  );
+  assert.ok(
+    /\[canUseAnalytics, config\.enabled, googleId, hasValidConsent\]/.test(loader),
+    "Once consent becomes valid, Google update must react to the current analytics choice",
+  );
   const consentDefault = loader.indexOf('gtag("consent", "default", GOOGLE_DEFAULT_CONSENT)');
   const googleScript = loader.indexOf('"mamago-google-analytics"');
   const googleJs = loader.indexOf('gtag("js", new Date())');
@@ -118,7 +127,7 @@ function main() {
     "AnalyticsLoader must send gtag('config', measurementId, ...) once during initialization",
   );
   assert.ok(
-    /if\s*\(!googleInitializedRef\.current\)/.test(loader) &&
+    /if\s*\(googleInitializedRef\.current\)\s*return/.test(loader) &&
       /googleInitializedRef\.current\s*=\s*true/.test(loader),
     "Google script/js/config initialization must be guarded against consent-update reinitialization",
   );
