@@ -39,15 +39,12 @@ export function PlaceAboutSection({
       }}
     >
       <div
+        className="about-grid mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-7"
         style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          padding: "0 28px",
           display: "grid",
           gridTemplateColumns: "320px 1fr",
           gap: 56,
         }}
-        className="about-grid"
       >
         {/* Left: heading */}
         <div>
@@ -145,11 +142,6 @@ export function PlaceAboutSection({
           .about-grid {
             grid-template-columns: 1fr !important;
             gap: 32px !important;
-          }
-        }
-        @media (max-width: 1100px) {
-          .about-grid {
-            padding: 0 22px !important;
           }
         }
       `}</style>
