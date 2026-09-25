@@ -61,10 +61,7 @@ export function PlaceReviewsSection({
         background: "#ffffff",
       }}
     >
-      <div
-        style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}
-        className="reviews-wrap"
-      >
+      <div className="reviews-wrap mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-7">
         {/* Header */}
         <div
           style={{
@@ -82,14 +79,13 @@ export function PlaceReviewsSection({
               <span className="kicker-line" style={{ width: 120 }} />
             </div>
             <h2
+              className="text-[26px] leading-tight sm:text-[30px]"
               style={{
-                fontSize: 30,
                 margin: 0,
                 letterSpacing: "-.02em",
                 color: "#141210",
                 fontFamily: "var(--font-sans)",
                 fontWeight: 400,
-                whiteSpace: "nowrap",
               }}
             >
               <em style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>{displayRating.toFixed(1)}</em>
@@ -99,10 +95,10 @@ export function PlaceReviewsSection({
           <button
             type="button"
             onClick={() => setAllOpen(true)}
+            className="inline-flex min-h-11 items-center rounded-lg px-2"
             style={{
               background: "none",
               border: "none",
-              padding: 0,
               fontSize: 14,
               color: "#3A332B",
               textDecoration: "underline",
@@ -166,10 +162,8 @@ export function PlaceReviewsSection({
       <style>{`
         @media (max-width: 900px) {
           .reviews-grid { grid-template-columns: 1fr !important; }
-          .reviews-wrap { padding: 0 22px !important; }
         }
         @media (max-width: 520px) {
-          .reviews-wrap { padding: 0 18px !important; }
         }
       `}</style>
     </section>
