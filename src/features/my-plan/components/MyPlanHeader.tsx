@@ -13,7 +13,7 @@ export function MyPlanHeader({ onClose, compact = false }: MyPlanHeaderProps) {
         alignItems: "center",
         justifyContent: "space-between",
         gap: 14,
-        padding: compact ? "18px 20px 14px" : "22px 24px 18px",
+        padding: compact ? "16px 16px 12px" : "22px 24px 18px",
         borderBottom: "1px solid rgba(20,18,16,.10)",
         background: "#FAF7F1",
       }}
@@ -37,8 +37,8 @@ export function MyPlanHeader({ onClose, compact = false }: MyPlanHeaderProps) {
         aria-label="Закрыть мой план"
         onClick={() => onClose?.()}
         style={{
-          width: 36,
-          height: 36,
+          width: compact ? 44 : 40,
+          height: compact ? 44 : 40,
           borderRadius: 99,
           background: "transparent",
           border: "1px solid rgba(20,18,16,.18)",
