@@ -114,9 +114,7 @@ export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
       <PageViewTracker />
       <NotificationSurfaceBootstrap surface="public" />
 
-      <main
-        className={cn("flex-1", !hideBottomBar ? MOBILE_MAIN_BOTTOM : "lg:pb-0")}
-      >
+      <main className="flex-1">
         {children}
       </main>
 
