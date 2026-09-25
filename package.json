@@ -180,12 +180,13 @@
     "test:abws-shared-resync-guard": "tsx src/lib/business/syncEventActivitySessions.test.ts && tsx src/lib/event/recurringScheduleMaterialization.test.ts && tsx src/lib/event/eventTimezoneContract.test.ts",
     "test:abws-review-queue-pagination": "tsx src/app/admin/import/review/page.pagination.test.ts",
     "prepare": "husky",
-    "check:push": "tsc --noEmit && pnpm test:responsive-wizard && pnpm test:responsive-public-mobile && pnpm test:jsonld-safety && pnpm test:instagram-reels-ssrf && pnpm test:import-html-ssrf && pnpm test:family-by-event-normalization && pnpm test:abws-event-matching && pnpm test:abws-quality-flags && pnpm test:abws-activity-session-publish && pnpm test:abws-performances-parser && pnpm test:abws-saleframe-url && pnpm test:abws-event-field-mapper && pnpm test:abws-readonly-import-schedule && pnpm test:abws-legacy-activities-route-readonly-wiring && pnpm test:abws-shared-resync-guard && pnpm test:abws-review-queue-pagination && pnpm build",
+    "check:push": "tsc --noEmit && pnpm test:responsive-wizard && pnpm test:responsive-public-mobile && pnpm test:responsive-public-detail && pnpm test:jsonld-safety && pnpm test:instagram-reels-ssrf && pnpm test:import-html-ssrf && pnpm test:family-by-event-normalization && pnpm test:abws-event-matching && pnpm test:abws-quality-flags && pnpm test:abws-activity-session-publish && pnpm test:abws-performances-parser && pnpm test:abws-saleframe-url && pnpm test:abws-event-field-mapper && pnpm test:abws-readonly-import-schedule && pnpm test:abws-legacy-activities-route-readonly-wiring && pnpm test:abws-shared-resync-guard && pnpm test:abws-review-queue-pagination && pnpm build",
     "check:no-old-social-links": "sh -c 'OLD_URL=$(printf \"%s%s\" \"https://www.tiktok.com/\" \"@mamago.by\"); if git grep -n \"$OLD_URL\" -- src prisma public .env.example; then echo \"Old TikTok URL found in tracked source/example files\"; exit 1; fi'",
     "test:legacy-route-article-media-backfill": "tsx src/lib/routes/legacyRouteArticleMediaBackfill.test.ts",
     "test:jsonld-safety": "tsx src/lib/seo/schema/serializeJsonLdForHtml.test.ts",
     "test:instagram-reels-ssrf": "tsx src/lib/instagram/fetchReelsThumbnail.test.ts && tsx src/server/modules/import/parsers/safeRemoteFetch.test.ts",
-    "test:import-html-ssrf": "tsx src/server/modules/import/parsers/fetchHtml.test.ts && tsx src/server/modules/import/parsers/safeRemoteFetch.test.ts && tsx src/server/modules/import/parsers/familyByUrlPolicy.test.ts && tsx src/server/modules/import/parsers/familyByImportSsrfWiring.test.ts"
+    "test:import-html-ssrf": "tsx src/server/modules/import/parsers/fetchHtml.test.ts && tsx src/server/modules/import/parsers/safeRemoteFetch.test.ts && tsx src/server/modules/import/parsers/familyByUrlPolicy.test.ts && tsx src/server/modules/import/parsers/familyByImportSsrfWiring.test.ts",
+    "test:responsive-public-detail": "tsx src/lib/responsive/publicDetailMobileContract.test.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
