@@ -34,22 +34,18 @@ export function FormWizardHeader({
       )}
     >
       <div className={`${SHELL_MAX} px-4 py-3 sm:px-6 sm:py-4 lg:px-8`}>
-        <div className="mb-2 flex items-start justify-between gap-3 sm:mb-3">
+        <div className="mb-2 flex flex-col gap-2 sm:mb-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold leading-tight tracking-tight sm:text-2xl">{title}</h1>
             {subtitle != null && (
               <p className="mt-1 text-sm leading-snug text-muted-foreground">{subtitle}</p>
             )}
           </div>
-          <div
-            className={cn(
-              "hidden shrink-0 text-right text-xs text-muted-foreground sm:block sm:pt-1",
-              trailing == null && "invisible",
-            )}
-            aria-hidden={trailing == null}
-          >
-            {trailing ?? " "}
-          </div>
+          {trailing != null ? (
+            <div className="shrink-0 text-left text-xs text-muted-foreground sm:pt-1 sm:text-right">
+              {trailing}
+            </div>
+          ) : null}
         </div>
         {children}
       </div>
