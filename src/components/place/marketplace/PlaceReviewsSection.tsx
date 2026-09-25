@@ -163,8 +163,6 @@ export function PlaceReviewsSection({
         @media (max-width: 900px) {
           .reviews-grid { grid-template-columns: 1fr !important; }
         }
-        @media (max-width: 520px) {
-        }
       `}</style>
     </section>
   );
