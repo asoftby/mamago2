@@ -1,6 +1,6 @@
 /** Shared format contract for the vanilla-cookieconsent cookie. */
 export const CONSENT_COOKIE_NAME = "cc_cookie_mamago";
-export const CONSENT_REVISION = 1;
+export const CONSENT_REVISION = 2;
 
 type RawConsentCookie = {
   consentId?: unknown;

@@ -25,14 +25,23 @@ function main() {
     "Ordinary denied consent must not use ga-disable, which would suppress Advanced Consent Mode pings",
   );
   assert.ok(
-    loader.includes('gtag("consent", "default", GOOGLE_DENIED_CONSENT)') &&
+    loader.includes('gtag("consent", "default", GOOGLE_DEFAULT_CONSENT)') &&
       loader.includes('analytics_storage: "denied"') &&
       loader.includes('ad_storage: "denied"') &&
       loader.includes('ad_user_data: "denied"') &&
       loader.includes('ad_personalization: "denied"'),
     "GA4 must queue a denied consent default for analytics and every advertising category",
   );
-  const consentDefault = loader.indexOf('gtag("consent", "default", GOOGLE_DENIED_CONSENT)');
+  assert.ok(
+    /const GOOGLE_DEFAULT_CONSENT\s*=\s*\{[\s\S]*?\.\.\.GOOGLE_DENIED_CONSENT,[\s\S]*?wait_for_update:\s*500,[\s\S]*?\}\s*as const/.test(loader),
+    "GA default consent must wait briefly for async restoration of a persisted choice",
+  );
+  const consentUpdate = loader.match(/ensureGtag\(\)\("consent", "update", \{([\s\S]*?)\}\);/);
+  assert.ok(
+    consentUpdate && !consentUpdate[1].includes("wait_for_update"),
+    "wait_for_update must never be included in consent update",
+  );
+  const consentDefault = loader.indexOf('gtag("consent", "default", GOOGLE_DEFAULT_CONSENT)');
   const googleScript = loader.indexOf('"mamago-google-analytics"');
   const googleJs = loader.indexOf('gtag("js", new Date())');
   const googleConfig = loader.indexOf('gtag("config", googleId');
@@ -159,8 +168,8 @@ function main() {
   const consentConfig = source("src/lib/cookies/consent-config.ts");
   const revisionMatch = consentConfig.match(/revision:\s*(\d+)/);
   assert.ok(
-    revisionMatch && Number(revisionMatch[1]) > 0,
-    "Cookie consent revision must be > 0 once the external provider set changed, to force re-consent",
+    revisionMatch && Number(revisionMatch[1]) === 2,
+    "Cookie consent revision must be 2 for the Advanced Consent Mode semantics change",
   );
   assert.ok(
     consentConfig.includes("_ym_"),

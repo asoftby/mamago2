@@ -77,6 +77,14 @@ const GOOGLE_DENIED_CONSENT = {
   ad_personalization: "denied",
 } as const;
 
+const GOOGLE_DEFAULT_CONSENT = {
+  ...GOOGLE_DENIED_CONSENT,
+  // CookieConsent restores a persisted choice asynchronously. Give it time
+  // to publish the returning visitor's real state before the initial config
+  // sends measurement; this option belongs only on the default command.
+  wait_for_update: 500,
+} as const;
+
 function clearYandexLocalStorage(): void {
   try {
     const remove: string[] = [];
@@ -148,7 +156,7 @@ export function AnalyticsLoader({
 
     if (!googleInitializedRef.current) {
       const gtag = ensureGtag();
-      gtag("consent", "default", GOOGLE_DENIED_CONSENT);
+      gtag("consent", "default", GOOGLE_DEFAULT_CONSENT);
       ensureExternalScript(
         "mamago-google-analytics",
         `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(googleId)}`,
