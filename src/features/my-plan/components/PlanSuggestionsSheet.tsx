@@ -56,7 +56,10 @@ export function PlanSuggestionsSheet({
   const content = (
     <div className="flex h-full min-h-0 flex-col">
       {/* Header */}
-      <div className="flex-shrink-0 border-b border-neutral-200 px-5 py-4">
+      <div className={cn(
+        "flex-shrink-0 border-b border-neutral-200",
+        isDesktop ? "px-5 py-4" : "px-4 py-3",
+      )}>
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -80,7 +83,7 @@ export function PlanSuggestionsSheet({
       </div>
 
       {/* Content */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
         {suggestionItem ? (
           <div className="space-y-4">
             <RecommendationCard
@@ -98,7 +101,7 @@ export function PlanSuggestionsSheet({
                   type="button"
                   onClick={onShowPrevious}
                   disabled={variantPosition === 1}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition-colors hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label="Предыдущий вариант"
                 >
                   <ChevronLeft className="h-5 w-5" />
@@ -110,7 +113,7 @@ export function PlanSuggestionsSheet({
                   type="button"
                   onClick={onShowNext}
                   disabled={variantPosition === variantTotal}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition-colors hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-neutral-200 text-neutral-600 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label="Следующий вариант"
                 >
                   <ChevronRight className="h-5 w-5" />
@@ -130,7 +133,14 @@ export function PlanSuggestionsSheet({
 
       {/* Footer */}
       {suggestionItem ? (
-        <div className="flex-shrink-0 border-t border-neutral-200 bg-white px-5 py-4">
+        <div
+          className={cn(
+            "flex-shrink-0 border-t border-neutral-200 bg-white",
+            isDesktop
+              ? "px-5 py-4"
+              : "px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3",
+          )}
+        >
           <Button
             onClick={() => {
               onAddToPlan(suggestionItem);
@@ -163,7 +173,8 @@ export function PlanSuggestionsSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="flex h-[85vh] max-h-[85vh] flex-col gap-0 p-0"
+        showCloseButton={false}
+        className="flex h-[88dvh] max-h-[calc(100dvh-0.5rem)] flex-col gap-0 overflow-hidden rounded-t-3xl p-0"
       >
         {content}
       </SheetContent>
