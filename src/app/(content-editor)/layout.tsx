@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function ContentEditorGroupLayout({ children }: { children: React.ReactNode }) {
   return (
     <EditorProviders>
-      <div className="flex min-h-screen flex-col bg-background text-foreground">{children}</div>
+      <div className="flex min-h-dvh flex-col bg-background text-foreground">{children}</div>
     </EditorProviders>
   );
 }
