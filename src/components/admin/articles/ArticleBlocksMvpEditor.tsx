@@ -513,7 +513,7 @@ export function ArticleBlocksMvpEditor({
             <div key={block.id}>
               <Card className={cn("border-border/60 shadow-none transition-colors", block.type === "intro" && "border-primary/25 bg-primary/[0.03]")}>
                 <div className="flex min-w-0 flex-row items-center gap-2 border-b border-border/50 px-2 py-2 sm:px-4">
-                  <span className={cn("text-xs font-medium tracking-tight", block.type === "intro" ? "text-primary" : "text-muted-foreground")}>
+                  <span className={cn("min-w-0 flex-1 truncate text-xs font-medium tracking-tight", block.type === "intro" ? "text-primary" : "text-muted-foreground")}>
                     {BLOCK_LABEL[block.type]}
                     {block.type === "intro" ? <span className="ml-1.5 hidden font-normal text-muted-foreground sm:inline">· начало статьи</span> : null}
                   </span>
