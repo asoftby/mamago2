@@ -78,7 +78,7 @@ assert.match(
 );
 assert.match(
   progress,
-  /aria-label=\{\`Шаг \\$\{step\.id\}: \\$\{step\.label\}\`\}/,
+  /aria-label=\{\`Шаг \$\{step\.id\}: \$\{step\.label\}\`\}/,
   "Hidden mobile labels must remain available to assistive technology",
 );
 
