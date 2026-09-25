@@ -4914,3 +4914,39 @@ distributor_company_id=550) и хотели бы уточнить несколь
   to match so the pattern doesn't propagate back into new cards.
 - Source: found during `fix/admin-spacing-responsive-cleanup-20260926`
   self-review grep (`git grep -n "p-6 md:p-4"`), 2026-09-26.
+
+## [BACKLOG-158] Import Review queue and Taxonomy → Cities lack a mobile card fallback
+
+- Status: OPEN
+- Priority: P3
+- Area: Admin / Responsive
+- Added: 2026-09-26
+- Reason deferred: found during the responsive/mobile initiative's closure
+  audit (read-only source scan after `fix/admin-spacing-responsive-cleanup-20260926`),
+  which explicitly only flags P0/P1 (operationally impossible on phone),
+  not P2/P3 UX-consistency gaps. Both tables remain fully operable via
+  horizontal scroll — inconvenient, not broken — so this does not meet the
+  bar to reopen or extend an already-closed responsive pass.
+- Context: `src/app/admin/import/review/_components/ReviewQueueTableClient.tsx`
+  (`TableContainer minWidthClassName="min-w-[860px]"`) and
+  `src/app/admin/taxonomy/cities/page.tsx`
+  (`TableContainer minWidthClassName="min-w-[900px]"`, per the Admin
+  responsive-audit inventory from `fix/admin-mobile-responsive-20260926`)
+  only ship the horizontal-scroll `TableContainer` pattern (Pattern B) with
+  no `DataCardList` mobile-card fallback (Pattern A), unlike
+  `AdminOrdersClient.tsx` and `PartnersTable.tsx`, which got the card
+  treatment in the same Admin responsive pass. On a 375px phone every
+  checkbox/link/action button in these two tables is still reachable and
+  tappable via horizontal scroll — verified by reading the current source,
+  not assumed.
+- Current state: not fixed, not touched by any merged responsive PR
+  (#369–#377).
+- Dependencies: none blocking. Reuses the existing shared
+  `DataCardList`/`DataCard`/`DataCardHeader`/`DataCardBody`/`DataCardRow`/
+  `DataCardActions` primitives from `src/components/ui/data-card-list.tsx`
+  — no new component needed, same pattern as `AdminOrdersClient.tsx`.
+- Acceptance criteria: both tables render a `hidden md:block` desktop table
+  (unchanged) plus a `DataCardList` mobile view reading the same data/
+  handlers, matching the Orders/Partners precedent; `test:responsive-admin`
+  extended to guard the new mobile view the same way it guards Orders.
+- Source: responsive/mobile initiative closure audit, 2026-09-26.
