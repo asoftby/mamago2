@@ -605,7 +605,7 @@ export function MediaUploadField({
               />
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
               {items.map((item, index) => (
                 <div
                   key={item.id}
@@ -662,13 +662,13 @@ export function MediaUploadField({
             </div>
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-xs text-muted-foreground">
               {mode === "single"
                 ? "Главное изображение выбрано"
                 : `${items.length} из ${effectiveMaxFiles} изображений`}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               {mode === "single" ? (
                 <Button type="button" variant="ghost" className="text-destructive hover:text-destructive" disabled={disabled} onClick={() => commitItems([])}>
                   <Trash2 className="mr-2 h-4 w-4" />
