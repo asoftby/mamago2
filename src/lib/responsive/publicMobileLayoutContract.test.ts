@@ -106,10 +106,11 @@ assert.match(
   "Mobile menu close target must be 44px",
 );
 
-assert.match(
-  planSuggestionsSheet,
-  /showCloseButton=\{false\}/,
-  "Plan suggestions mobile sheet must not render a duplicate SheetContent close button",
+const planSuggestionCloseOverrides =
+  planSuggestionsSheet.match(/showCloseButton=\{false\}/g) ?? [];
+assert.ok(
+  planSuggestionCloseOverrides.length >= 2,
+  "Plan suggestions DialogContent and SheetContent must not render duplicate close buttons",
 );
 assert.match(
   planSuggestionsSheet,
