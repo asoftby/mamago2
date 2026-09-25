@@ -28,7 +28,7 @@ export function HabitBlock({ model }: { model: HabitViewModel }) {
 
   return (
     <AdminDashboardBlock title={block.title} size={block.size}>
-      <div className="grid grid-cols-3 gap-4 text-center">
+      <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3 sm:gap-4">
         <Stat label="W1 Retention" value={model.w1} deltaPp={model.w1DeltaPp} />
         <Stat label="W4 Retention" value={model.w4} deltaPp={model.w4DeltaPp} />
         <Stat label="3/4 Week Habit" value={model.habit3of4} deltaPp={model.habit3of4DeltaPp} />

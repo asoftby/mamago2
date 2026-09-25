@@ -27,6 +27,8 @@ interface AdminHeaderProps {
   hasApprovedBusinessProfile?: boolean;
   moderationCounts: ModerationNavCounts;
   b2bPendingVerificationCount?: number;
+  importPendingReviewCount?: number;
+  reviewsPendingCount?: number;
   buildInfo: BuildInfo;
 }
 
@@ -36,6 +38,8 @@ export function AdminHeader({
   hasApprovedBusinessProfile = false,
   moderationCounts,
   b2bPendingVerificationCount = 0,
+  importPendingReviewCount = 0,
+  reviewsPendingCount = 0,
   buildInfo,
 }: AdminHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -90,7 +94,8 @@ export function AdminHeader({
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden shrink-0 p-2 -ml-2 hover:bg-gray-100 rounded-lg"
+            className="lg:hidden shrink-0 -ml-2 flex h-11 w-11 items-center justify-center rounded-lg hover:bg-gray-100"
+            aria-label="Открыть меню навигации"
           >
             {mobileMenuOpen ? (
               <X className="h-5 w-5 text-gray-600" />
@@ -168,6 +173,8 @@ export function AdminHeader({
         <AdminSidebar
           moderationCounts={moderationCounts}
           b2bPendingVerificationCount={b2bPendingVerificationCount}
+          importPendingReviewCount={importPendingReviewCount}
+          reviewsPendingCount={reviewsPendingCount}
           onNavigate={() => setMobileMenuOpen(false)}
           buildInfo={buildInfo}
         />

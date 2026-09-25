@@ -23,7 +23,7 @@ export function FunnelBlock({ model }: { model: EngagementFunnelViewModel }) {
           {model.engagedUsers === null ? "Нет данных" : model.engagedUsers.toLocaleString("ru-RU")}
         </span>
       </div>
-      <div className="grid grid-cols-3 gap-3 text-center pt-3 border-t border-gray-100">
+      <div className="grid grid-cols-1 gap-2 text-center pt-3 border-t border-gray-100 sm:grid-cols-3 sm:gap-3">
         <div>
           <div className="text-base font-semibold text-gray-900">{fmtPct(model.saveRate)}</div>
           <div className="text-xs text-gray-500">Save rate</div>

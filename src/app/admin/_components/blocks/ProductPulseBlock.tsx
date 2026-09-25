@@ -11,7 +11,7 @@ export function ProductPulseBlock({ model }: { model: ProductPulseViewModel }) {
 
   return (
     <AdminDashboardBlock title={block.title} href={block.href} size={block.size}>
-      <div className="grid grid-cols-3 gap-2 text-center">
+      <div className="grid grid-cols-1 gap-1.5 text-center sm:grid-cols-3 sm:gap-2">
         <div>
           <div className="text-lg font-bold text-gray-900">{fmt(model.dau)}</div>
           <div className="text-xs text-gray-500">DAU</div>

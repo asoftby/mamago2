@@ -23,7 +23,7 @@ export function GrowthBlock({ model }: { model: GrowthViewModel }) {
 
   return (
     <AdminDashboardBlock title={block.title} size={block.size}>
-      <div className="grid grid-cols-3 gap-4 text-center">
+      <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3 sm:gap-4">
         <div>
           <DeltaValue percent={model.mauGrowthPercent} />
           <div className="text-xs text-gray-500 mt-1">MAU / 30д</div>
