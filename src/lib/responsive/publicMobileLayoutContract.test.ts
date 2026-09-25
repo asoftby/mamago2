@@ -37,7 +37,7 @@ assert.match(
 );
 assert.doesNotMatch(
   publicLayout,
-  /<main[\s\S]{0,160}MOBILE_MAIN_BOTTOM/,
+  /<main[^>]*MOBILE_MAIN_BOTTOM/,
   "Mobile bottom-nav clearance must not be duplicated on <main>",
 );
 
