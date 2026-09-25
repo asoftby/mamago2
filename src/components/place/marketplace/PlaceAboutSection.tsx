@@ -78,8 +78,8 @@ export function PlaceAboutSection({
                 html={description}
                 className={cn(
                   "prose-gray max-w-none mb-0",
-                  "text-[19px] leading-[1.5] tracking-[-0.005em]",
-                  "prose-p:text-[19px] prose-p:leading-[1.5] prose-p:text-[#141210]",
+                  "text-[17px] leading-[1.55] tracking-[-0.005em] sm:text-[19px] sm:leading-[1.5]",
+                  "prose-p:text-[17px] prose-p:leading-[1.55] prose-p:text-[#141210] sm:prose-p:text-[19px] sm:prose-p:leading-[1.5]",
                   "prose-headings:text-[#141210] prose-strong:text-[#141210]",
                 )}
               />
