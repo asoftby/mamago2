@@ -96,7 +96,7 @@ export function OfferCard({
 
           {/* Promo badge — top right */}
           {promoBadge && (
-            <span className="absolute right-3 top-3 inline-flex h-7 items-center rounded-full bg-[#E86A3A] px-3 text-[12px] font-semibold text-white shadow-[0_2px_8px_rgba(232,106,58,0.35)]">
+            <span className="absolute left-3 top-3 inline-flex h-7 max-w-[calc(100%-4.5rem)] items-center truncate rounded-full bg-[#E86A3A] px-3 text-[12px] font-semibold text-white shadow-[0_2px_8px_rgba(232,106,58,0.35)] sm:max-w-[calc(100%-3.75rem)]">
               {promoBadge}
             </span>
           )}
