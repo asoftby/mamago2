@@ -67,7 +67,8 @@ export function BusinessHeader({ user, buildInfo }: BusinessHeaderProps) {
           <button
             type="button"
             onClick={() => setMobileNavOpen(!mobileNavOpen)}
-            className="lg:hidden shrink-0 p-2 -ml-2 hover:bg-stone-100 rounded-lg"
+            className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl hover:bg-stone-100 lg:hidden"
+            aria-label={mobileNavOpen ? "Закрыть навигацию" : "Открыть навигацию"}
           >
             {mobileNavOpen ? (
               <X className="h-5 w-5 text-stone-600" />

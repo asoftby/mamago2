@@ -41,7 +41,7 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
   }
 
   return (
-    <div className="rounded-3xl border border-stone-200 bg-white p-6">
+    <div className="rounded-3xl border border-stone-200 bg-white p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-stone-950">Последние операции</h3>
         <Link
@@ -64,14 +64,14 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
             <div
               key={transaction.id}
               className="
-                flex items-center justify-between p-4 rounded-2xl
+                flex min-w-0 flex-col gap-3 p-4 rounded-2xl sm:flex-row sm:items-center sm:justify-between
                 border border-stone-200 bg-stone-50/50
                 hover:bg-white hover:border-stone-300 transition-colors
               "
             >
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium text-stone-950">
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <span className="break-words text-sm font-medium text-stone-950">
                     {transaction.typeLabel}
                   </span>
                   <span
@@ -83,12 +83,12 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
                     {statusInfo.label}
                   </span>
                 </div>
-                <p className="text-sm text-stone-600 truncate">{transaction.description}</p>
+                <p className="break-words text-sm text-stone-600">{transaction.description}</p>
                 <p className="text-xs text-stone-500 mt-1">
                   {format(transaction.occurredAt, "d MMMM yyyy, HH:mm", { locale: ru })}
                 </p>
               </div>
-              <div className="ml-4 text-right flex-shrink-0">
+              <div className="text-left sm:ml-4 sm:flex-shrink-0 sm:text-right">
                 <p
                   className={`
                     text-lg font-bold
