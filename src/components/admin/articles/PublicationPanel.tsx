@@ -179,13 +179,13 @@ export function PublicationPanel({
 
   return (
     <Card className="border-gray-200 shadow-sm">
-      <CardHeader>
+      <CardHeader className="px-4 sm:px-6">
         <CardTitle className="text-lg">Публикация</CardTitle>
         {metaParts.length > 0 ? (
           <CardDescription>{metaParts.join(" · ")}</CardDescription>
         ) : null}
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 px-4 sm:px-6">
         {showGeoScopeField ? (
           <PublicationGeoScopeField
             geoScope={geoScope ?? null}
@@ -280,7 +280,7 @@ export function PublicationPanel({
         </div>
 
         {/* ── Контекстные действия ── */}
-        <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between [&_button]:min-h-11 sm:[&_button]:min-h-9">
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             {actionPolicy.primary?.kind === "submit" ? (
               <Button type="button" onClick={onSubmitForModeration} disabled={actionsBusy}>

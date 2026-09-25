@@ -120,6 +120,16 @@ jobs:
           pnpm test:responsive-public-overlay
           pnpm test:responsive-business
 
+      - name: Content editor responsive regressions
+        run: |
+          pnpm test:responsive-content-editor
+          pnpm test:article-editor-dirty-state
+          pnpm exec tsx src/lib/publications/articleMvp.test.ts
+          pnpm exec tsx src/components/media/MediaUploadField.test.ts
+          pnpm exec tsx "src/app/api/admin/articles/[id]/media/route.test.ts"
+          pnpm exec tsx src/components/admin/articles/ArticleBlocksMvpEditor.test.ts
+          pnpm test:article-gallery
+
       - name: My Plan presentation regressions
         run: |
           pnpm exec tsx src/features/my-plan/lib/planItemMeta.test.ts
