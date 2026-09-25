@@ -682,7 +682,7 @@ export function MediaUploadField({
       )}
 
       <Dialog open={libraryOpen} onOpenChange={setLibraryOpen}>
-        <DialogContent className="flex h-[92dvh] max-h-[92dvh] w-[calc(100%-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:h-auto sm:max-h-[85dvh]">
+        <DialogContent className="flex h-[92dvh] max-h-[92dvh] w-[calc(100%-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl p-0 [&_[data-slot=dialog-close]]:h-11 [&_[data-slot=dialog-close]]:w-11 sm:h-auto sm:max-h-[85dvh] sm:[&_[data-slot=dialog-close]]:h-10 sm:[&_[data-slot=dialog-close]]:w-10">
           <DialogHeader className="px-4 pb-2 pt-5 sm:px-6 sm:pt-6">
             <DialogTitle>{mediaLibraryTitle}</DialogTitle>
             <DialogDescription>
