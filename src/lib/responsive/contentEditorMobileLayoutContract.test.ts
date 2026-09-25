@@ -96,7 +96,7 @@ assert.match(
 
 assert.match(
   media,
-  /grid grid-cols-1 gap-3 min-\[360px\]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4/,
+  /grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4/,
   "Selected gallery media must stay single-column across phone widths so 44px controls fit",
 );
 assert.ok(
