@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Portal } from "@/components/ui/portal";
+import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { useRefinementFilters } from "@/contexts/RefinementFiltersContext";
 import { SecondaryFiltersForm } from "@/components/discovery/SecondaryFiltersForm";
 import type { Intent } from "@/lib/intent";
@@ -81,15 +81,13 @@ export function RefinementFiltersModal() {
   const intent = currentIntent as Intent;
 
   const stickyHeader = (
-    <div className="flex items-center justify-between bg-white border-b border-gray-200 pb-4">
+    <div className="flex items-center justify-between border-b border-gray-200 bg-white pb-3">
       <h2 className="text-lg font-semibold text-gray-900">Фильтры</h2>
-      <button
+      <ModalCloseButton
         type="button"
         onClick={() => setIsOpen(false)}
-        className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200 hover:scale-110 active:scale-95"
-      >
-        <X className="h-5 w-5 text-gray-500" />
-      </button>
+        className="h-11 w-11 bg-gray-50 text-gray-600 shadow-none hover:bg-gray-100"
+      />
     </div>
   );
 
@@ -109,13 +107,18 @@ export function RefinementFiltersModal() {
 
         <div
           className={cn(
-            "fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl max-h-[85vh] overflow-hidden transition-transform duration-300 ease-out flex flex-col",
+            "fixed bottom-0 left-0 right-0 flex h-[88dvh] max-h-[calc(100dvh-0.75rem)] flex-col overflow-hidden rounded-t-3xl bg-white transition-transform duration-300 ease-out",
             isOpen ? "translate-y-0" : "translate-y-full",
           )}
         >
-          <div className="flex-shrink-0 p-6 pb-0">{stickyHeader}</div>
+          <div className="flex-shrink-0 px-4 pb-0 pt-3 sm:px-6 sm:pt-5">
+            <div className="mb-2 flex justify-center" aria-hidden>
+              <span className="h-1.5 w-12 rounded-full bg-neutral-300" />
+            </div>
+            {stickyHeader}
+          </div>
 
-          <div className="flex-1 overflow-y-auto px-6 pt-4">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 sm:px-6">
             {intent === "kuda" ? (
               <EventAdvancedFilters citySlug={citySlug} onApply={() => setIsOpen(false)} />
             ) : (
