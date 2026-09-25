@@ -18,11 +18,34 @@ function main() {
 
   assert.ok(
     loader.includes("canUseAnalytics"),
-    "AnalyticsLoader must gate provider loading on analytics consent",
+    "AnalyticsLoader must react to analytics consent",
   );
   assert.ok(
-    loader.includes("ga-disable-"),
-    "AnalyticsLoader must set the GA opt-out flag for revoke handling",
+    !loader.includes("ga-disable-"),
+    "Ordinary denied consent must not use ga-disable, which would suppress Advanced Consent Mode pings",
+  );
+  assert.ok(
+    loader.includes('gtag("consent", "default", GOOGLE_DENIED_CONSENT)') &&
+      loader.includes('analytics_storage: "denied"') &&
+      loader.includes('ad_storage: "denied"') &&
+      loader.includes('ad_user_data: "denied"') &&
+      loader.includes('ad_personalization: "denied"'),
+    "GA4 must queue a denied consent default for analytics and every advertising category",
+  );
+  const consentDefault = loader.indexOf('gtag("consent", "default", GOOGLE_DENIED_CONSENT)');
+  const googleScript = loader.indexOf('"mamago-google-analytics"');
+  const googleJs = loader.indexOf('gtag("js", new Date())');
+  const googleConfig = loader.indexOf('gtag("config", googleId');
+  assert.ok(
+    consentDefault >= 0 &&
+      consentDefault < googleScript &&
+      googleScript < googleJs &&
+      googleJs < googleConfig,
+    "GA order must be consent default -> script -> js -> config",
+  );
+  assert.ok(
+    loader.includes('analytics_storage: canUseAnalytics ? "granted" : "denied"'),
+    "Accept and revoke must update analytics_storage without changing advertising consent",
   );
   assert.ok(
     loader.includes("allow_google_signals: false") &&
@@ -83,13 +106,20 @@ function main() {
   );
   assert.ok(
     /gtag\(\s*"config"\s*,\s*googleId\s*,/.test(loader),
-    "AnalyticsLoader must send gtag('config', measurementId, ...) after consent",
+    "AnalyticsLoader must send gtag('config', measurementId, ...) once during initialization",
   );
   assert.ok(
-    /if\s*\(!canUseAnalytics\)\s*\{[^}]*setGoogleDisabled\(googleId,\s*true\)/.test(
-      loader,
-    ),
-    "Consent revoke must re-set ga-disable-<id> to true before any Google init runs",
+    /if\s*\(!googleInitializedRef\.current\)/.test(loader) &&
+      /googleInitializedRef\.current\s*=\s*true/.test(loader),
+    "Google script/js/config initialization must be guarded against consent-update reinitialization",
+  );
+  assert.ok(
+    !/if\s*\(!canUseAnalytics\)[\s\S]{0,500}mamago-google-analytics/.test(loader),
+    "Google script loading must not be inside the denied-consent branch",
+  );
+  assert.ok(
+    /if\s*\(!canUseAnalytics\)[\s\S]{0,500}"destruct"/.test(loader),
+    "Yandex must remain consent-gated and destruct on revoke",
   );
 
   const cookieConsentProvider = source(

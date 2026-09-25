@@ -7,8 +7,9 @@
  * Contract:
  * - rendered only for public pages;
  * - runtime config is fail-closed on the server;
- * - no provider script is inserted before analytics consent;
- * - consent withdrawal disables/destructs already-loaded providers;
+ * - Google uses Advanced Consent Mode and loads after a denied default;
+ * - Yandex remains fully gated by analytics consent;
+ * - consent withdrawal updates Google consent and destructs Yandex;
  * - Google pageviews rely on GA4 Enhanced Measurement history changes;
  * - Yandex SPA views use defer:true + explicit hit calls.
  */
@@ -69,14 +70,12 @@ function ensureYm(): NonNullable<AnalyticsWindow["ym"]> {
   return w.ym;
 }
 
-type GoogleDisableWindow = Window & {
-  [key: `ga-disable-${string}`]: boolean | undefined;
-};
-
-function setGoogleDisabled(measurementId: string, disabled: boolean): void {
-  const w = window as unknown as GoogleDisableWindow;
-  w[`ga-disable-${measurementId}`] = disabled;
-}
+const GOOGLE_DENIED_CONSENT = {
+  analytics_storage: "denied",
+  ad_storage: "denied",
+  ad_user_data: "denied",
+  ad_personalization: "denied",
+} as const;
 
 function clearYandexLocalStorage(): void {
   try {
@@ -142,40 +141,48 @@ export function AnalyticsLoader({
   const googleId = config.enabled ? config.googleAnalyticsId : null;
   const yandexId = config.enabled ? config.yandexMetrikaId : null;
 
-  // Provider lifecycle: load only after consent; actively disable on revoke.
+  // Google lifecycle is independent of analytics consent. The denied default
+  // MUST be queued before gtag.js is inserted; initialization happens once.
   useEffect(() => {
-    if (!config.enabled) return;
+    if (!config.enabled || !googleId) return;
 
-    if (!canUseAnalytics) {
-      if (googleId) {
-        setGoogleDisabled(googleId, true);
-      }
-      if (yandexId && yandexActiveRef.current) {
-        const ym = analyticsWindow().ym;
-        if (ym) ym(yandexId, "destruct");
-        yandexActiveRef.current = false;
-        setYandexReady(false);
-      }
-      clearYandexLocalStorage();
-      return;
-    }
-
-    if (googleId) {
-      setGoogleDisabled(googleId, false);
+    if (!googleInitializedRef.current) {
       const gtag = ensureGtag();
+      gtag("consent", "default", GOOGLE_DENIED_CONSENT);
       ensureExternalScript(
         "mamago-google-analytics",
         `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(googleId)}`,
       );
-      if (!googleInitializedRef.current) {
-        gtag("js", new Date());
-        googleInitializedRef.current = true;
-      }
+      gtag("js", new Date());
       gtag("config", googleId, {
         // Marketing/advertising consent is a separate mamaGo category.
         allow_google_signals: false,
         allow_ad_personalization_signals: false,
       });
+      googleInitializedRef.current = true;
+    }
+
+    ensureGtag()("consent", "update", {
+      ...GOOGLE_DENIED_CONSENT,
+      analytics_storage: canUseAnalytics ? "granted" : "denied",
+    });
+  }, [canUseAnalytics, config.enabled, googleId]);
+
+  // Yandex remains fully consent-gated and is destroyed on revoke.
+  useEffect(() => {
+    if (!config.enabled) return;
+
+    if (!canUseAnalytics) {
+      if (yandexId && yandexActiveRef.current) {
+        const ym = analyticsWindow().ym;
+        if (ym) ym(yandexId, "destruct");
+        yandexActiveRef.current = false;
+        const readyTimer = window.setTimeout(() => setYandexReady(false), 0);
+        clearYandexLocalStorage();
+        return () => window.clearTimeout(readyTimer);
+      }
+      clearYandexLocalStorage();
+      return;
     }
 
     if (yandexId && !yandexActiveRef.current) {
@@ -192,9 +199,10 @@ export function AnalyticsLoader({
         webvisor: true,
       });
       yandexActiveRef.current = true;
-      setYandexReady(true);
+      const readyTimer = window.setTimeout(() => setYandexReady(true), 0);
+      return () => window.clearTimeout(readyTimer);
     }
-  }, [canUseAnalytics, config.enabled, googleId, yandexId]);
+  }, [canUseAnalytics, config.enabled, yandexId]);
 
   if (!config.enabled || !canUseAnalytics || !yandexId || !yandexReady) {
     return null;
