@@ -96,8 +96,8 @@ assert.match(
 
 assert.match(
   media,
-  /grid grid-cols-1 gap-3 min-\[360px\]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4/,
-  "Selected gallery media must stay single-column below 360px, then use 2/3/4 responsive columns",
+  /grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4/,
+  "Selected gallery media must stay single-column across phone widths so 44px controls fit",
 );
 assert.ok(
   (media.match(/h-11 w-11 rounded-full[^"]*sm:h-8 sm:w-8/g) ?? []).length >= 3,
