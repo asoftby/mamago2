@@ -36,31 +36,7 @@ import { useHydrated } from "@/hooks/use-hydrated";
 import { cn } from "@/lib/utils";
 import { ArticleContactsBlockEditor, ArticleInfoBlockEditor, ArticleOpeningHoursBlockEditor, ArticlePriceBlockEditor } from "./ArticleStructuredInfoBlockEditors";
 import { ArticleStructuredBlockSubjectEditor } from "./ArticleStructuredBlockSubjectEditor";
-
-/** `image` → `gallery`, тот же порядок id, тот же MediaAsset — без перезагрузки/копирования файла. */
-export function convertImageBlockToGallery(block: Extract<ArticleBlockMvp, { type: "image" }>): ArticleBlockMvp {
-  return {
-    id: block.id,
-    type: "gallery",
-    mediaIds: block.mediaId ? [block.mediaId] : [],
-    presentation: "carousel",
-    caption: block.caption,
-  };
-}
-
-/** Два соседних `image`-блока → один `gallery` на месте первого, порядок A,B сохранён. */
-export function mergeImageBlocksIntoGallery(
-  a: Extract<ArticleBlockMvp, { type: "image" }>,
-  b: Extract<ArticleBlockMvp, { type: "image" }>,
-): ArticleBlockMvp {
-  return {
-    id: a.id,
-    type: "gallery",
-    mediaIds: [a.mediaId, b.mediaId].filter((id): id is string => Boolean(id)),
-    presentation: "carousel",
-    caption: a.caption || b.caption,
-  };
-}
+import { convertImageBlockToGallery, mergeImageBlocksIntoGallery } from "./ArticleBlocksMvpEditorHelpers";
 
 const BLOCK_LABEL: Record<ArticleBlockMvp["type"], string> = {
   intro: "Лид",

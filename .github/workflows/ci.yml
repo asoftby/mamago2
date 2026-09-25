@@ -124,8 +124,7 @@ jobs:
         run: |
           pnpm test:responsive-content-editor
           pnpm test:article-editor-dirty-state
-          pnpm exec tsx src/lib/publications/articleMvp.test.ts
-          pnpm exec tsx src/components/admin/articles/ArticleBlocksMvpEditor.test.ts
+          pnpm test:article-media-picker
           pnpm test:article-gallery
 
       - name: My Plan presentation regressions
