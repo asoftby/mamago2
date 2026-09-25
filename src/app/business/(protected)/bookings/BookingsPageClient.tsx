@@ -703,11 +703,11 @@ export function BookingsPageClient() {
   return (
     <div className="space-y-5">
       <div className="rounded-[28px] border border-stone-200/90 bg-white/95 p-5 shadow-[0_24px_70px_rgba(15,23,42,0.06)]">
-        <div className="grid gap-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           {topStats.map((stat) => (
             <div
               key={stat.key}
-              className="rounded-[22px] border border-stone-200 bg-white px-5 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.03)]"
+              className="min-w-0 rounded-[22px] border border-stone-200 bg-white px-4 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.03)] sm:px-5"
             >
               <div className="flex items-center gap-2 text-sm font-medium text-stone-500">
                 <span>{stat.label}</span>
@@ -725,7 +725,7 @@ export function BookingsPageClient() {
                   </span>
                 ) : null}
               </div>
-              <div className="mt-3 text-[2.05rem] font-semibold leading-none tracking-tight text-stone-950">
+              <div className="mt-3 break-words text-[1.75rem] font-semibold leading-none tracking-tight text-stone-950 sm:text-[2.05rem]">
                 {stat.value}
               </div>
               <div className="mt-2 text-sm text-stone-400">{stat.hint}</div>
@@ -769,7 +769,7 @@ export function BookingsPageClient() {
 
       <div className="space-y-4" ref={listRef}>
         <div className="rounded-[28px] border border-stone-200 bg-white px-4 py-4 shadow-[0_18px_55px_rgba(15,23,42,0.05)]">
-          <div className="flex flex-wrap items-center gap-2 border-b border-stone-100 pb-4">
+          <div className="-mx-1 flex snap-x gap-2 overflow-x-auto border-b border-stone-100 px-1 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {tabs.map((item) => {
               const active = tab === item.value;
               return (
@@ -785,7 +785,7 @@ export function BookingsPageClient() {
                     });
                   }}
                   className={cn(
-                    "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition",
+                    "inline-flex min-h-11 shrink-0 snap-start items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition",
                     active
                       ? "bg-stone-950 text-white shadow-[0_10px_24px_rgba(15,23,42,0.18)]"
                       : "text-stone-600 hover:bg-stone-100",
@@ -987,14 +987,16 @@ function BookingCalendarHeader({
         <button
           type="button"
           onClick={onPrevMonth}
-          className="flex h-10 w-10 items-center justify-center rounded-2xl border border-stone-200 text-stone-500 transition hover:bg-stone-50"
+          className="flex h-11 w-11 items-center justify-center rounded-2xl border border-stone-200 text-stone-500 transition hover:bg-stone-50"
+          aria-label="Предыдущий месяц"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
         <button
           type="button"
           onClick={onNextMonth}
-          className="flex h-10 w-10 items-center justify-center rounded-2xl border border-stone-200 text-stone-500 transition hover:bg-stone-50"
+          className="flex h-11 w-11 items-center justify-center rounded-2xl border border-stone-200 text-stone-500 transition hover:bg-stone-50"
+          aria-label="Следующий месяц"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -1007,7 +1009,7 @@ function BookingCalendarHeader({
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="inline-flex rounded-2xl border border-stone-200 bg-stone-50 p-1">
+        <div className="hidden rounded-2xl border border-stone-200 bg-stone-50 p-1 sm:inline-flex">
           {(["month", "week", "day"] as CalendarViewMode[]).map((mode) => (
             <button
               key={mode}
@@ -1030,7 +1032,7 @@ function BookingCalendarHeader({
         <button
           type="button"
           onClick={onToday}
-          className="inline-flex h-10 items-center justify-center rounded-2xl border border-stone-200 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+          className="inline-flex h-11 items-center justify-center rounded-2xl border border-stone-200 bg-white px-4 text-sm font-medium text-stone-700 transition hover:bg-stone-50"
         >
           Сегодня
         </button>
@@ -1054,9 +1056,35 @@ function BookingMonthGrid({
 }) {
   const selectedKey = toDateKey(selectedDate);
   const todayKey = toDateKey(new Date());
+  const mobileCells = cells.filter((cell) => cell.date.getMonth() === monthAnchor.getMonth());
 
   return (
-    <div className="overflow-hidden rounded-[24px] border border-stone-200">
+    <>
+      <div className="-mx-1 overflow-x-auto px-1 pb-2 sm:hidden" aria-label="Выбор дня месяца">
+        <div className="flex w-max snap-x snap-mandatory gap-2">
+          {mobileCells.map((cell) => {
+            const bucket = calendarBuckets.get(cell.key);
+            const isSelected = cell.key === selectedKey;
+            const isTodayCell = cell.key === todayKey;
+            return (
+              <button
+                key={cell.key}
+                type="button"
+                onClick={() => onSelectDate(cell.date)}
+                className={cn(
+                  "flex h-[72px] w-14 shrink-0 snap-start flex-col items-center justify-center rounded-2xl border text-sm transition",
+                  isSelected ? "border-sky-300 bg-sky-50 text-sky-800" : "border-stone-200 bg-white text-stone-700",
+                )}
+              >
+                <span className="text-[11px] uppercase text-stone-400">{CALENDAR_WEEKDAYS[(cell.date.getDay() + 6) % 7]}</span>
+                <span className={cn("mt-1 font-semibold", isTodayCell && "text-sky-600")}>{cell.date.getDate()}</span>
+                <span className="mt-1 text-[10px] text-stone-400">{bucket?.total ? formatBookingsCount(bucket.total) : "—"}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="hidden overflow-hidden rounded-[24px] border border-stone-200 sm:block">
       <div className="grid grid-cols-7 border-b border-stone-200 bg-stone-50">
         {CALENDAR_WEEKDAYS.map((day) => (
           <div key={day} className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-stone-500">
@@ -1084,7 +1112,8 @@ function BookingMonthGrid({
           );
         })}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -1163,7 +1192,7 @@ function BookingCalendarDayPanel({
   const label = bookings.length === 0 ? "Нет записей" : formatBookingsCount(bookings.length);
 
   return (
-    <div className="flex h-full min-h-[580px] flex-col p-5 sm:p-6">
+    <div className="flex h-full min-h-[320px] flex-col p-4 sm:min-h-[580px] sm:p-6">
       <div className="flex items-start justify-between gap-4 border-b border-stone-100 pb-4">
         <div>
           <h3 className="text-lg font-semibold text-stone-950">{formatCalendarHeaderDate(selectedDate)}</h3>
@@ -1236,12 +1265,12 @@ function QuickDateCarousel({
   onReset: () => void;
 }) {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1">
+    <div className="flex snap-x gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <button
         type="button"
         onClick={onReset}
         className={cn(
-          "shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition",
+          "min-h-11 shrink-0 snap-start rounded-full border px-4 py-2 text-sm font-medium transition",
           activeDateKey == null
             ? "border-stone-900 bg-stone-900 text-white"
             : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50",
@@ -1255,7 +1284,7 @@ function QuickDateCarousel({
           type="button"
           onClick={() => onSelectDate(item.date)}
           className={cn(
-            "shrink-0 rounded-full border px-4 py-2 text-sm font-medium whitespace-nowrap transition",
+            "min-h-11 shrink-0 snap-start rounded-full border px-4 py-2 text-sm font-medium whitespace-nowrap transition",
             activeDateKey === item.key
               ? "border-sky-200 bg-sky-50 text-sky-700"
               : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50",
@@ -1276,13 +1305,13 @@ function OrderDatePicker({
   onChange: (date: Date | null) => void;
 }) {
   return (
-    <label className="flex h-12 items-center gap-3 rounded-2xl border border-stone-200 bg-white px-4 text-sm text-stone-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+    <label className="flex h-12 w-full min-w-0 items-center gap-3 rounded-2xl border border-stone-200 bg-white px-4 text-sm text-stone-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] sm:w-auto">
       <CalendarDays className="h-4 w-4 text-stone-400" />
       <input
         type="date"
         value={value ? toDateKey(value) : ""}
         onChange={(event) => onChange(event.target.value ? startOfDay(fromDateKey(event.target.value)) : null)}
-        className="min-w-[150px] bg-transparent outline-none"
+        className="min-w-0 flex-1 bg-transparent outline-none sm:min-w-[150px]"
       />
     </label>
   );
@@ -1296,12 +1325,12 @@ function OrderSortSelect({
   onChange: (value: SortMode) => void;
 }) {
   return (
-    <label className="flex h-12 items-center gap-3 rounded-2xl border border-stone-200 bg-white px-4 text-sm text-stone-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
+    <label className="flex h-12 w-full min-w-0 items-center gap-3 rounded-2xl border border-stone-200 bg-white px-4 text-sm text-stone-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] sm:w-auto">
       <ArrowUpDown className="h-4 w-4 text-stone-400" />
       <select
         value={value}
         onChange={(event) => onChange(event.target.value as SortMode)}
-        className="min-w-[170px] bg-transparent outline-none"
+        className="min-w-0 flex-1 bg-transparent outline-none sm:min-w-[170px]"
       >
         {SORT_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
@@ -1355,7 +1384,7 @@ function BookingListItem({
 
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium text-stone-500">{formatShortSchedule(booking)}</div>
-          <div className="mt-1 line-clamp-2 text-[1.8rem] font-semibold leading-tight tracking-tight text-stone-950 sm:text-[2rem]">
+          <div className="mt-1 line-clamp-2 text-[1.4rem] font-semibold leading-tight tracking-tight text-stone-950 sm:text-[2rem]">
             {booking.display.title}
           </div>
           <div className="mt-2 text-base text-stone-500">
@@ -1457,7 +1486,7 @@ function BookingDetailsDrawer({
         <div className="min-h-full bg-white">
           <div className="mx-auto flex w-full max-w-[680px] flex-col p-4 sm:p-6">
             <aside className="overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.06)]">
-              <div className="flex items-start justify-between gap-4 border-b border-stone-100 px-5 pb-6 pt-5 sm:px-7 sm:pt-7">
+              <div className="flex flex-col gap-4 border-b border-stone-100 px-5 pb-6 pt-5 sm:flex-row sm:items-start sm:justify-between sm:px-7 sm:pt-7">
                 <div>
                   <div className="flex flex-wrap items-center gap-3">
                     <span className={cn("rounded-full px-3 py-1 text-sm font-semibold", meta.chipClass)}>
@@ -1476,9 +1505,9 @@ function BookingDetailsDrawer({
                   <div className="mt-2 text-lg text-stone-500">{formatShortSchedule(booking)}</div>
                 </div>
 
-                <div className="flex shrink-0 items-start gap-3">
+                <div className="flex w-full flex-wrap items-center justify-between gap-3 sm:w-auto sm:shrink-0 sm:items-start">
                   <div className="text-right">
-                    <div className="text-[1.8rem] font-semibold leading-none tracking-tight text-stone-950 whitespace-nowrap sm:text-[2.2rem]">
+                    <div className="text-[1.5rem] font-semibold leading-none tracking-tight text-stone-950 whitespace-nowrap sm:text-[2.2rem]">
                       {price ?? "—"}
                     </div>
                     <div className="mt-2 text-sm text-stone-400">{booking.display.typeLabel}</div>
@@ -1523,11 +1552,11 @@ function BookingDetailsDrawer({
                   secondary={[booking.customerPhone, booking.customerEmail].filter(Boolean) as string[]}
                   trailing={
                     <div className="flex items-center gap-4 text-stone-400">
-                      <a href={`tel:${booking.customerPhone}`} className="hover:text-stone-700">
+                      <a href={`tel:${booking.customerPhone}`} className="flex h-11 w-11 items-center justify-center rounded-xl hover:bg-stone-50 hover:text-stone-700" aria-label="Позвонить клиенту">
                         <Phone className="h-5 w-5" />
                       </a>
                       {booking.customerEmail ? (
-                        <a href={`mailto:${booking.customerEmail}`} className="hover:text-stone-700">
+                        <a href={`mailto:${booking.customerEmail}`} className="flex h-11 w-11 items-center justify-center rounded-xl hover:bg-stone-50 hover:text-stone-700" aria-label="Написать клиенту">
                           <Mail className="h-5 w-5" />
                         </a>
                       ) : (
@@ -1570,7 +1599,7 @@ function BookingDetailsDrawer({
               </div>
 
               <div className="px-5 pb-5 pt-6 sm:px-7 sm:pb-7">
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-center">
                   {canConfirm ? (
                     <ActionButton
                       label="Подтвердить заявку"
@@ -1681,7 +1710,7 @@ function ActionButton({
       onClick={onClick}
       disabled={loading}
       className={cn(
-        "inline-flex h-14 items-center justify-center rounded-2xl px-6 text-sm font-semibold transition",
+        "inline-flex h-14 w-full items-center justify-center rounded-2xl px-6 text-sm font-semibold transition sm:w-auto",
         tone === "primary" && "bg-stone-950 text-white shadow-[0_12px_26px_rgba(15,23,42,0.22)] hover:bg-stone-800",
         tone === "secondary" && "border border-stone-200 bg-white text-stone-700 hover:bg-stone-50",
         tone === "ghost" && "border border-stone-200 bg-white text-stone-500 hover:bg-stone-50",
@@ -1697,7 +1726,7 @@ function ActionLink({ href, label }: { href: string; label: string }) {
   return (
     <a
       href={href}
-      className="inline-flex h-14 items-center justify-center rounded-2xl border border-stone-200 bg-white px-6 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+      className="inline-flex h-14 w-full items-center justify-center rounded-2xl border border-stone-200 bg-white px-6 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 sm:w-auto"
     >
       {label}
     </a>

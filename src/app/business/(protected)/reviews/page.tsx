@@ -158,8 +158,8 @@ export default function BusinessReviewsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Всего отзывов</p>
@@ -169,7 +169,7 @@ export default function BusinessReviewsPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Средний рейтинг</p>
@@ -183,7 +183,7 @@ export default function BusinessReviewsPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="col-span-2 rounded-lg border border-gray-200 bg-white p-4 sm:p-6 md:col-span-1">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Без ответа</p>
@@ -271,10 +271,10 @@ export default function BusinessReviewsPage() {
           {reviews.map((review) => (
             <div
               key={review.id}
-              className="bg-white border border-gray-200 rounded-lg p-6 space-y-4"
+              className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 sm:p-6"
             >
               {/* Header */}
-              <div className="flex items-start justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-1 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-semibold text-lg">{review.place.title}</h3>
@@ -301,7 +301,7 @@ export default function BusinessReviewsPage() {
                 </div>
 
                 {/* Rating */}
-                <div className="flex items-center gap-1">
+                <div className="flex shrink-0 items-center gap-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Star
                       key={star}
@@ -324,7 +324,7 @@ export default function BusinessReviewsPage() {
 
               {/* Owner Reply */}
               {review.ownerReplyText && (
-                <div className="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4 ml-8">
+                <div className="rounded-lg border-l-4 border-blue-500 bg-blue-50 p-4 sm:ml-8">
                   <div className="flex items-start justify-between mb-2">
                     <p className="text-sm font-medium text-blue-900">Ваш ответ</p>
                     <p className="text-xs text-blue-700">
@@ -342,7 +342,7 @@ export default function BusinessReviewsPage() {
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-2 pt-2 border-t flex-wrap">
+              <div className="flex flex-col gap-2 border-t pt-2 sm:flex-row sm:flex-wrap sm:items-center [&_button]:min-h-11">
                 {/* mamaGo actions - only for PUBLISHED reviews */}
                 {review.source === "MAMAGO" && review.status === "PUBLISHED" && (
                   <>
@@ -411,10 +411,10 @@ export default function BusinessReviewsPage() {
 
       {/* Reply Modal */}
       {replyModalOpen && replyReview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 space-y-4">
-              <h2 className="text-2xl font-bold">Ответить на отзыв</h2>
+        <div className="fixed inset-0 z-50 flex items-end bg-black/50 sm:items-center sm:justify-center sm:p-4">
+          <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl bg-white sm:rounded-2xl">
+            <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
+              <h2 className="text-xl font-bold sm:text-2xl">Ответить на отзыв</h2>
 
               {/* Review Info */}
               <div className="bg-gray-50 rounded-lg p-4 space-y-2">
@@ -454,7 +454,7 @@ export default function BusinessReviewsPage() {
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-2 justify-end">
+              <div className="sticky bottom-0 -mx-4 flex flex-col-reverse gap-2 border-t bg-white px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 sm:static sm:mx-0 sm:flex-row sm:justify-end sm:border-0 sm:p-0 [&_button]:min-h-11">
                 <Button
                   onClick={() => {
                     setReplyModalOpen(false);
