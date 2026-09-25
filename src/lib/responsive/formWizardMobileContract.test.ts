@@ -34,6 +34,16 @@ assert.match(
   /px-4 py-3 sm:px-6 sm:py-4 lg:px-8/,
   "Mobile header should keep a compact 16px viewport inset",
 );
+assert.doesNotMatch(
+  header,
+  /hidden shrink-0 text-right text-xs text-muted-foreground sm:block/,
+  "Mobile header must not hide trailing save/error status",
+);
+assert.match(
+  header,
+  /shrink-0 text-left text-xs text-muted-foreground sm:pt-1 sm:text-right/,
+  "Trailing save/error status must remain visible and readable on mobile",
+);
 assert.match(
   content,
   /pb-40 pt-3 sm:px-6 sm:pb-32 sm:pt-6 lg:px-8/,
