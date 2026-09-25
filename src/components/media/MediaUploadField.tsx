@@ -505,7 +505,7 @@ export function MediaUploadField({
   };
 
   const actionButtons = (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center [&_button]:min-h-11 sm:[&_button]:min-h-9">
       {canOpenLibrary ? (
         <Button type="button" variant="outline" disabled={disabled || libraryLoading || uploading} onClick={openLibrary}>
           {libraryButtonLabel}
@@ -618,7 +618,7 @@ export function MediaUploadField({
                       alt={item.alt ?? item.title ?? ""}
                       className="aspect-square w-full object-cover"
                     />
-                    <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 transition group-hover:opacity-100">
+                    <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">
                       <div className="flex items-center gap-1">
                         {allowReorder && items.length > 1 ? (
                           <>
@@ -626,7 +626,7 @@ export function MediaUploadField({
                               type="button"
                               size="icon"
                               variant="ghost"
-                              className="h-8 w-8 rounded-full bg-white/80 text-foreground hover:bg-white"
+                              className="h-11 w-11 rounded-full bg-white/90 text-foreground hover:bg-white sm:h-8 sm:w-8 sm:bg-white/80"
                               disabled={disabled || index === 0}
                               onClick={() => moveItem(index, -1)}
                             >
@@ -636,7 +636,7 @@ export function MediaUploadField({
                               type="button"
                               size="icon"
                               variant="ghost"
-                              className="h-8 w-8 rounded-full bg-white/80 text-foreground hover:bg-white"
+                              className="h-11 w-11 rounded-full bg-white/90 text-foreground hover:bg-white sm:h-8 sm:w-8 sm:bg-white/80"
                               disabled={disabled || index === items.length - 1}
                               onClick={() => moveItem(index, 1)}
                             >
@@ -649,7 +649,7 @@ export function MediaUploadField({
                         type="button"
                         size="icon"
                         variant="ghost"
-                        className="h-8 w-8 rounded-full bg-white/80 text-destructive hover:bg-white"
+                        className="h-11 w-11 rounded-full bg-white/90 text-destructive hover:bg-white sm:h-8 sm:w-8 sm:bg-white/80"
                         disabled={disabled}
                         onClick={() => removeAt(index)}
                       >
@@ -682,8 +682,8 @@ export function MediaUploadField({
       )}
 
       <Dialog open={libraryOpen} onOpenChange={setLibraryOpen}>
-        <DialogContent className="flex max-h-[85vh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
-          <DialogHeader className="px-6 pb-2 pt-6">
+        <DialogContent className="flex h-[92dvh] max-h-[92dvh] w-[calc(100%-1rem)] max-w-4xl flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:h-auto sm:max-h-[85dvh]">
+          <DialogHeader className="px-4 pb-2 pt-5 sm:px-6 sm:pt-6">
             <DialogTitle>{mediaLibraryTitle}</DialogTitle>
             <DialogDescription>
               {mediaLibraryDescription ??
@@ -699,14 +699,14 @@ export function MediaUploadField({
               onValueChange={(v) => setActiveSourceTab(v === "author" ? "author" : "article")}
               className="flex min-h-0 flex-1 flex-col"
             >
-              <div className="px-6">
-                <TabsList>
+              <div className="overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:px-6">
+                <TabsList className="w-max min-w-full">
                   <TabsTrigger value="article">{articleLibrary.tabLabel ?? "Фото этой статьи"}</TabsTrigger>
                   <TabsTrigger value="author">{authorLibraryTabLabel}</TabsTrigger>
                 </TabsList>
               </div>
 
-              <div ref={libraryScrollRef} className="min-h-[220px] flex-1 overflow-y-auto px-6 pb-4">
+              <div ref={libraryScrollRef} className="min-h-[220px] flex-1 overflow-y-auto px-4 pb-4 sm:px-6">
                 <TabsContent value="article" className="mt-3">
                   {articleLibrary.loading ? (
                     <div className="flex justify-center py-12">
@@ -751,7 +751,7 @@ export function MediaUploadField({
               </div>
             </Tabs>
           ) : (
-            <div ref={libraryScrollRef} className="min-h-[220px] flex-1 overflow-y-auto px-6 pb-4">
+            <div ref={libraryScrollRef} className="min-h-[220px] flex-1 overflow-y-auto px-4 pb-4 sm:px-6">
               {libraryLoading ? (
                 <div className="flex justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -774,7 +774,7 @@ export function MediaUploadField({
           )}
 
           {mode === "multiple" ? (
-            <DialogFooter className="border-t border-border px-6 py-4">
+            <DialogFooter className="gap-2 border-t border-border px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:py-4 [&_button]:min-h-11 sm:[&_button]:min-h-9">
               <Button type="button" variant="outline" onClick={() => setLibraryOpen(false)}>
                 Закрыть
               </Button>
