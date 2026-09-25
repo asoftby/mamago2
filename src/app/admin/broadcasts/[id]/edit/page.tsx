@@ -17,7 +17,7 @@ export default async function EditBroadcastPage({ params }: Props) {
   if (!broadcast) notFound();
 
   return (
-    <div className="p-6 md:p-4 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <AdminPageHeader
         title="Редактировать сообщение"
         subtitle={broadcast.title}

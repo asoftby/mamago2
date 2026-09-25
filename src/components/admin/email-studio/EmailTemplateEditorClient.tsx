@@ -723,7 +723,7 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
 
   if (state === "loading") {
     return (
-      <div className="space-y-6 p-6 md:p-4">
+      <div className="space-y-6 p-4 sm:p-6">
         <AdminPageHeader
           title="Email Studio"
           subtitle="Загружаем редактор…"
@@ -746,7 +746,7 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
 
   if (state === "error" || !editor) {
     return (
-      <div className="space-y-6 p-6 md:p-4">
+      <div className="space-y-6 p-4 sm:p-6">
         <AdminPageHeader
           title="Email Studio"
           subtitle="Не удалось открыть редактор."
@@ -773,7 +773,7 @@ export function EmailTemplateEditorClient({ templateId }: { templateId: string }
 
   return (
     <>
-      <div className="space-y-6 p-6 md:p-4">
+      <div className="space-y-6 p-4 sm:p-6">
         <AdminPageHeader
           title={editor.name || "Новый шаблон"}
           subtitle={`${getEmailTemplateTypeRuLabel(editor.type)} · ${getEmailTemplateClassificationLabel(

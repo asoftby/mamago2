@@ -79,7 +79,7 @@ export default async function AdminBillingPage() {
   }
 
   return (
-    <div className="p-6 md:p-4 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <AdminPageHeader
         title="Billing Overview"
         subtitle="Финансовое состояние системы"

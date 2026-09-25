@@ -71,7 +71,7 @@ export default async function AdminBillingPlansPage({
   type ResolvedPriceRow = (typeof resolvedPrices)[number];
 
   return (
-    <div className="p-6 md:p-4">
+    <div className="p-4 sm:p-6">
       <AdminBillingPricingClient
         initialGlobalRates={globalRates.map(serializeRate)}
         initialBusinessRates={businessRates.map(serializeRate)}

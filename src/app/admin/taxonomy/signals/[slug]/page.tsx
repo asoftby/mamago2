@@ -117,7 +117,7 @@ export default function EditSignalPage() {
 
   if (loading) {
     return (
-      <div className="p-6 md:p-4">
+      <div className="p-4 sm:p-6">
         <p className="text-sm text-gray-600">Загрузка…</p>
       </div>
     );
@@ -125,7 +125,7 @@ export default function EditSignalPage() {
 
   if (notFound || !signal) {
     return (
-      <div className="p-6 md:p-4 space-y-4">
+      <div className="p-4 sm:p-6 space-y-4">
         <p className="text-sm text-gray-700">Сигнал не найден.</p>
         <Button variant="outline" asChild>
           <Link href={LIST_HREF}>К списку сигналов</Link>
@@ -135,7 +135,7 @@ export default function EditSignalPage() {
   }
 
   return (
-    <div className="p-6 md:p-4 space-y-6 max-w-4xl">
+    <div className="p-4 sm:p-6 space-y-6 max-w-4xl">
       <div>
         <Link
           href={LIST_HREF}

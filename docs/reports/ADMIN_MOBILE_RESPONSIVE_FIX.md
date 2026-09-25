@@ -193,7 +193,12 @@ All changes follow the patterns documented in `/ui-lab-admin`:
 - Drawer: 280px width, full height, backdrop overlay
 
 ### Layout Contract
-- Pages already use `p-6 md:p-4` (responsive padding)
+- Pages used `p-6 md:p-4` (responsive padding) at the time of this report
+- **Superseded 2026-09-26:** that class order put more padding on phones
+  (24px) than on `md+` (16px) — inverted from the mobile-first contract.
+  Admin page containers now use `p-4 sm:p-6` (16px phone / 24px `sm+`); see
+  `docs/reports/ADMIN_LAYOUT_NORMALIZATION_COMPLETE.md` and the
+  `fix/admin-spacing-responsive-cleanup-20260926` PR.
 - Content adapts to full width on mobile
 - No layout changes needed in individual pages
 
