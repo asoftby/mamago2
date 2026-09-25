@@ -194,7 +194,7 @@ export function DiscoveryActivitiesGrid({
       {!showEmpty && (
       <div
         className={cn(
-          "grid grid-cols-2 gap-5 lg:grid-cols-4",
+          "grid grid-cols-1 gap-5 min-[360px]:grid-cols-2 lg:grid-cols-4",
           className,
         )}
       >
@@ -221,7 +221,7 @@ export function DiscoveryActivitiesGrid({
             {secondaryHeading}
           </h2>
           <div
-            className="grid grid-cols-2 gap-5 lg:grid-cols-4"
+            className="grid grid-cols-1 gap-5 min-[360px]:grid-cols-2 lg:grid-cols-4"
           >
             {secondary.map((activity, index) =>
               renderCard(activity, primary.length + index + 1, "secondary"),
