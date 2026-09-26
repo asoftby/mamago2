@@ -100,7 +100,7 @@ export default async function AdminContractsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="text-left py-3 px-4 font-medium text-gray-700">Бизнес</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-700">Клиент</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-700">Номер договора</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-700">Тип</th>
                 <th className="text-center py-3 px-4 font-medium text-gray-700">Статус</th>
