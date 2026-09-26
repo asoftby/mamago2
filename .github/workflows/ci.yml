@@ -134,6 +134,7 @@ jobs:
         run: |
           pnpm test:responsive-admin
           pnpm exec tsx src/components/admin/ui/AdminFilterTabs.contract.test.ts
+          pnpm exec tsx src/app/admin/billing/page.contract.test.ts
 
       - name: My Plan presentation regressions
         run: |
