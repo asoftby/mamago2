@@ -5,6 +5,10 @@ const wizard = readFileSync(
   "src/app/admin/commercial/contracts/CreateContractWizard.tsx",
   "utf8",
 );
+const unpField = readFileSync(
+  "src/components/business/UnpLookupField.tsx",
+  "utf8",
+);
 const route = readFileSync(
   "src/app/api/admin/commercial/contracts/route.ts",
   "utf8",
@@ -79,6 +83,22 @@ assert.match(
   route,
   /items:[\s\S]*create: normalizedItems\.map/,
   "contract creation must persist service lines",
+);
+
+assert.match(
+  route,
+  /Math\.abs\(value \* 100 - Math\.round\(value \* 100\)\) < 1e-8/,
+  "service prices must reject sub-cent precision before Decimal(12,2) persistence",
+);
+assert.match(
+  unpField,
+  /currentValueRef\.current !== unp/,
+  "UNP lookup must ignore stale async responses after the field value changes",
+);
+assert.match(
+  wizard,
+  /if \(date && !customPostpaymentDue\)[\s\S]*setPostpaymentDueAt\(addDaysIso\(date, 30\)\)/,
+  "custom prepayment dates must recalculate derived postpayment while it is not manually customized",
 );
 
 assert.match(
