@@ -133,6 +133,7 @@ jobs:
       - name: Admin responsive regressions
         run: |
           pnpm test:responsive-admin
+          pnpm exec tsx src/components/admin/ui/AdminFilterTabs.contract.test.ts
 
       - name: My Plan presentation regressions
         run: |

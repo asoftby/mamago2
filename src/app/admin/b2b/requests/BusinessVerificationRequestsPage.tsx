@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { BusinessVerificationSidePanel } from "./BusinessVerificationSidePanel";
 import { LoadingBlock, EmptyBlock, ErrorBlock } from "@/components/admin/ui/StateBlock";
 import { TableContainer } from "@/components/ui/table";
+import { AdminFilterTabs } from "@/components/admin/ui/AdminFilterTabs";
 
 type Business = {
   id: string;
@@ -35,6 +36,11 @@ const STATUS_COLORS: Record<string, string> = {
   APPROVED: "bg-green-100 text-green-800",
   REJECTED: "bg-red-100 text-red-800",
 };
+
+const STATUS_TABS = ["PENDING", "APPROVED", "REJECTED", "DRAFT"].map((status) => ({
+  value: status,
+  label: STATUS_LABELS[status],
+}));
 
 export function BusinessVerificationRequestsPage({
   initialStatus,
@@ -117,24 +123,13 @@ export function BusinessVerificationRequestsPage({
         </div>
       </div>
 
-      {/* AdminPageToolbar - Status tabs */}
-      <div className="border-b border-gray-200 -mx-6 md:mx-0 px-6 md:px-0">
-        <div className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {["PENDING", "APPROVED", "REJECTED", "DRAFT"].map((status) => (
-            <button
-              key={status}
-              onClick={() => handleStatusChange(status)}
-              className={`px-4 py-2 font-medium border-b-2 transition-colors whitespace-nowrap text-sm ${
-                activeStatus === status
-                  ? "border-primary text-primary"
-                  : "border-transparent text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              {STATUS_LABELS[status]}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* AdminPageToolbar - shared status filter */}
+      <AdminFilterTabs
+        items={STATUS_TABS}
+        value={activeStatus}
+        onValueChange={handleStatusChange}
+        ariaLabel="Статус заявки на верификацию"
+      />
 
       {/* AdminPageContent */}
       <div>
