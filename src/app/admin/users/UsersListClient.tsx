@@ -182,8 +182,8 @@ export function UsersListClient() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-3 md:items-center">
-        <div className="flex-1 md:max-w-md">
+      <div className="grid grid-cols-2 gap-3 md:flex md:items-center">
+        <div className="col-span-2 md:flex-1 md:max-w-md">
           <Input
             placeholder="Поиск по email или телефону..."
             value={query}
