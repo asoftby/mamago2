@@ -77,7 +77,16 @@ export async function POST(request: NextRequest) {
       ? await resolveCompanyByUnp(unp).catch(() => ({ legalName: null, source: null }))
       : { legalName: null, source: null };
 
-    const totalAmount = input.items.reduce((sum, item) => sum + item.amount, 0);
+    const normalizedItems = input.items.map((item) => ({
+      name: item.name,
+      amount: Math.round(item.amount * 100) / 100,
+    }));
+    const totalAmount =
+      normalizedItems.reduce(
+        (sumCents, item) => sumCents + Math.round(item.amount * 100),
+        0,
+      ) / 100;
+
     const signedAt = localDateToUtc(input.signedAt);
     const prepaymentDueAt = input.prepaymentDueAt
       ? localDateToUtc(input.prepaymentDueAt)
@@ -85,6 +94,33 @@ export async function POST(request: NextRequest) {
     const postpaymentDueAt = input.postpaymentDueAt
       ? localDateToUtc(input.postpaymentDueAt)
       : null;
+
+    if (input.prepaymentPercent > 0 && !prepaymentDueAt) {
+      return NextResponse.json(
+        { error: "Укажите срок предоплаты" },
+        { status: 400 },
+      );
+    }
+
+    if (input.prepaymentPercent < 100 && !postpaymentDueAt) {
+      return NextResponse.json(
+        { error: input.prepaymentPercent > 0 ? "Укажите срок постоплаты" : "Укажите срок оплаты" },
+        { status: 400 },
+      );
+    }
+
+    const paymentBaseDate =
+      input.prepaymentPercent > 0 ? prepaymentDueAt : signedAt;
+    if (
+      postpaymentDueAt &&
+      paymentBaseDate &&
+      postpaymentDueAt.getTime() < paymentBaseDate.getTime()
+    ) {
+      return NextResponse.json(
+        { error: "Срок постоплаты не может быть раньше базовой даты оплаты" },
+        { status: 400 },
+      );
+    }
 
     const contract = await prisma.$transaction(async (tx) => {
       const linkedBusiness = unp
@@ -187,7 +223,7 @@ export async function POST(request: NextRequest) {
           paymentComment: input.paymentComment || null,
           platform: "MAMAGO_BY",
           items: {
-            create: input.items.map((item, index) => ({
+            create: normalizedItems.map((item, index) => ({
               name: item.name,
               amount: item.amount,
               sortOrder: index,
