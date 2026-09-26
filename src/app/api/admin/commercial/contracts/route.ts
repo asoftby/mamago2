@@ -167,7 +167,10 @@ export async function POST(request: NextRequest) {
 
       return tx.businessContract.create({
         data: {
-          businessId: linkedBusiness?.id ?? null,
+          // Wizard contracts are commercial-client documents, not an
+          // implicit platform-access grant. A matching mamaGo Business is linked
+          // through CommercialCounterparty.businessId instead.
+          businessId: null,
           counterpartyId: counterparty.id,
           contractNumber: input.contractNumber,
           type: "MASTER",
