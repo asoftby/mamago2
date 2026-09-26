@@ -80,6 +80,8 @@ const dashboardBlocks = [
   "src/app/admin/_components/blocks/TrafficBlock.tsx",
 ].map(read);
 const growthKpiTiles = read("src/app/admin/_components/growth/GrowthKpiTiles.tsx");
+const billingBusinesses = read("src/app/admin/billing/businesses/BillingBusinessesClient.tsx");
+const contractsPage = read("src/app/admin/commercial/contracts/page.tsx");
 
 // --- Admin shell breakpoint contract -------------------------------------
 
@@ -202,6 +204,29 @@ assert.match(
   /grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4/,
   "Growth KPI tiles must stack on phones, go 2-up at sm and 4-up only at lg",
 );
+
+// --- Admin page header actions: stack below title on mobile -----------------
+
+for (const [name, source, label] of [
+  ["billing businesses", billingBusinesses, "Пополнить баланс"],
+  ["contracts", contractsPage, "Создать договор"],
+] as const) {
+  assert.match(
+    source,
+    /flex flex-col gap-4 md:flex-row md:items-start md:justify-between/,
+    `${name} header action must stack below the title on mobile and return to the right at md+`,
+  );
+  assert.match(
+    source,
+    /w-full[^"]*bg-primary[^"]*text-primary-foreground[^"]*md:w-auto/,
+    `${name} primary action must be full-width on mobile and compact at md+`,
+  );
+  assert.equal(
+    source.includes(label),
+    true,
+    `${name} primary action label must remain visible`,
+  );
+}
 
 // --- Page-level spacing contract: mobile-first, legacy pattern must not return ---
 
