@@ -196,6 +196,14 @@ export function CreateContractWizard() {
         return false;
       }
 
+      if (
+        prepaymentDueAt &&
+        prepaymentDueAt < signedAt
+      ) {
+        setError("Срок предоплаты не может быть раньше даты договора");
+        return false;
+      }
+
       if (prepaymentPercent < 100 && !postpaymentDueAt) {
         setError(
           prepaymentPercent > 0
