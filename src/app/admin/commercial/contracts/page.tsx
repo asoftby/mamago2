@@ -8,7 +8,7 @@ import { ru } from "date-fns/locale";
 import { FileText, CheckCircle } from "lucide-react";
 import { CommercialToolbarFilterSelects } from "@/components/admin/commercial/CommercialToolbarFilterSelects";
 import { TableContainer } from "@/components/ui/table";
-import type { ContractStatus } from "@prisma/client";
+import { CreateContractWizard } from "./CreateContractWizard";
 
 export default async function AdminContractsPage() {
   const user = await getCurrentUser();
@@ -17,18 +17,7 @@ export default async function AdminContractsPage() {
     redirect("/login");
   }
 
-  let contracts: Array<{
-    id: string;
-    businessId: string;
-    contractNumber: string;
-    type: string;
-    status: ContractStatus;
-    signedAt: Date | null;
-    startsAt: Date;
-    endsAt: Date;
-    autoRenew: boolean;
-    business: { name: string };
-  }> = [];
+  let contracts: Awaited<ReturnType<typeof getContracts>> = [];
   let error = null;
 
   try {
@@ -69,9 +58,7 @@ export default async function AdminContractsPage() {
           <h1 className="text-2xl md:text-xl font-bold text-gray-900">Договоры</h1>
           <p className="text-sm text-gray-600 mt-1">Управление коммерческими договорами</p>
         </div>
-        <button className="h-10 w-full rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 md:w-auto">
-          + Создать договор
-        </button>
+        <CreateContractWizard />
       </div>
 
       {/* AdminPageToolbar */}
@@ -126,10 +113,16 @@ export default async function AdminContractsPage() {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {contracts.map((contract) => {
-                const daysUntilEnd = Math.ceil(
-                  (contract.endsAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-                );
-                const isExpiringSoon = daysUntilEnd <= 30 && daysUntilEnd > 0;
+                const daysUntilEnd = contract.endsAt
+                  ? Math.ceil(
+                      (contract.endsAt.getTime() - new Date().getTime()) /
+                        (1000 * 60 * 60 * 24),
+                    )
+                  : null;
+                const isExpiringSoon =
+                  daysUntilEnd != null && daysUntilEnd <= 30 && daysUntilEnd > 0;
+                const clientName =
+                  contract.counterparty?.name ?? contract.business?.name ?? "—";
 
                 return (
                   <tr
@@ -139,12 +132,16 @@ export default async function AdminContractsPage() {
                     }`}
                   >
                     <td className="py-3 px-4">
-                      <Link
-                        href={`/admin/businesses/${contract.businessId}/commercial`}
-                        className="font-medium text-blue-600 hover:text-blue-700"
-                      >
-                        {contract.business.name}
-                      </Link>
+                      {contract.businessId && contract.business ? (
+                        <Link
+                          href={`/admin/businesses/${contract.businessId}/commercial`}
+                          className="font-medium text-blue-600 hover:text-blue-700"
+                        >
+                          {clientName}
+                        </Link>
+                      ) : (
+                        <span className="font-medium text-gray-900">{clientName}</span>
+                      )}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
@@ -166,18 +163,22 @@ export default async function AdminContractsPage() {
                         : "—"}
                     </td>
                     <td className="py-3 px-4 text-gray-700">
-                      {format(contract.startsAt, "dd MMM yyyy", { locale: ru })}
+                      {contract.startsAt
+                        ? format(contract.startsAt, "dd MMM yyyy", { locale: ru })
+                        : "—"}
                     </td>
                     <td className="py-3 px-4">
                       <div>
                         <p className="text-gray-900">
-                          {format(contract.endsAt, "dd MMM yyyy", { locale: ru })}
+                          {contract.endsAt
+                            ? format(contract.endsAt, "dd MMM yyyy", { locale: ru })
+                            : "—"}
                         </p>
-                        {isExpiringSoon && (
+                        {isExpiringSoon && daysUntilEnd != null ? (
                           <p className="text-xs text-orange-600 font-medium mt-0.5">
                             Через {daysUntilEnd} дн.
                           </p>
-                        )}
+                        ) : null}
                       </div>
                     </td>
                     <td className="py-3 px-4 text-center">
