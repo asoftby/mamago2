@@ -4950,3 +4950,30 @@ distributor_company_id=550) и хотели бы уточнить несколь
   handlers, matching the Orders/Partners precedent; `test:responsive-admin`
   extended to guard the new mobile view the same way it guards Orders.
 - Source: responsive/mobile initiative closure audit, 2026-09-26.
+
+## [BACKLOG-159] Yandex.Metrika Reporting API as the traffic-source layer for the /admin dashboard
+
+- Status: OPEN
+- Priority: P2
+- Area: Admin / Analytics
+- Added: 2026-09-26
+- Reason deferred: the owner chose to ship the growth-first /admin dashboard
+  (`feat/admin-growth-dashboard`) first and connect Metrika later. The
+  dashboard currently answers "is the product growing" from first-party
+  telemetry + GSC only.
+- Context: GA4 and Metrika exist only as client-side counters
+  (`GOOGLE_ANALYTICS_ID`, `YANDEX_METRIKA_ID`,
+  `src/lib/analytics/externalAnalyticsConfig.ts`); there is no server-side
+  Reporting API pull. As a result, audience cannot be split by acquisition
+  source (search / Instagram / direct / referral), which is exactly the
+  question the growth block cannot answer today.
+- Proposed scope: a fail-closed `metrika_traffic_sources` MetricCollector
+  (OAuth token with Metrika stats read scope, `METRIKA_OAUTH_TOKEN`),
+  weekly visits by `ym:s:lastTrafficSource`, projected into `kpis` and shown
+  as one "откуда пришли" row under the growth tiles; plus a reconciliation
+  check of Metrika visitors vs `canonicalAudience`. GA4 intentionally out of
+  scope (duplicates Metrika; Metrika coverage in BY is better).
+- Dependencies: owner issues the OAuth token.
+- Acceptance criteria: collector writes nothing (not 0) when the token is
+  absent or the API fails; source split shown only for completed weeks.
+- Source: /admin dashboard rework, 2026-09-26.

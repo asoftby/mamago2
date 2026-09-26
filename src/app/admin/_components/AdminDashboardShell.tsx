@@ -7,30 +7,13 @@ import { Button } from "@/components/ui/button";
 import type { NodeKey, NodeState } from "@/server/ops/types";
 import { formatFreshness } from "../_lib/operationsSignalPresentation";
 import { OperationsBlock, type DashboardSignal } from "./OperationsBlock";
-import { ProductPulseBlock } from "./blocks/ProductPulseBlock";
-import { NorthStarBlock } from "./blocks/NorthStarBlock";
-import { HabitBlock } from "./blocks/HabitBlock";
-import { FunnelBlock } from "./blocks/FunnelBlock";
-import { GrowthBlock } from "./blocks/GrowthBlock";
-import { GscSeoBlock } from "./blocks/GscSeoBlock";
-import { SearchDiscoveryBlock } from "./blocks/SearchDiscoveryBlock";
-import { SupplyHealthBlock } from "./blocks/SupplyHealthBlock";
-import { B2BHealthBlock } from "./blocks/B2BHealthBlock";
 import { OperationalLoadBlock } from "./blocks/OperationalLoadBlock";
-import { DataQualityBlock } from "./blocks/DataQualityBlock";
-import type { GscSeoViewModel } from "@/lib/admin/gscSeoViewModel";
-import type {
-  ProductPulseViewModel,
-  NorthStarViewModel,
-  HabitViewModel,
-  EngagementFunnelViewModel,
-  GrowthViewModel,
-  DiscoveryQualityViewModel,
-  SupplyHealthViewModel,
-  B2BHealthViewModel,
-  WorkloadViewModel,
-  DataQualityViewModel,
-} from "@/lib/admin/dashboardViewModels";
+import { OrganicRecoveryBlock } from "./growth/OrganicRecoveryBlock";
+import { GrowthKpiTiles } from "./growth/GrowthKpiTiles";
+import { ValuePathBlock } from "./growth/ValuePathBlock";
+import { SupplyPartnersBlock } from "./growth/SupplyPartnersBlock";
+import type { WorkloadViewModel } from "@/lib/admin/dashboardViewModels";
+import type { GrowthOverviewViewModel, OrganicRecoveryViewModel } from "@/lib/admin/growthDashboardViewModel";
 
 const AUTO_REFRESH_MS = 60_000;
 
@@ -44,17 +27,9 @@ export interface AdminDashboardShellProps {
   canResolve: boolean;
   serverNow: Date;
   isDev: boolean;
-  product: ProductPulseViewModel;
-  northStar: NorthStarViewModel;
-  habit: HabitViewModel;
-  funnel: EngagementFunnelViewModel;
-  growth: GrowthViewModel;
-  seo: GscSeoViewModel;
-  search: DiscoveryQualityViewModel;
-  supply: SupplyHealthViewModel;
-  b2b: B2BHealthViewModel;
+  organic: OrganicRecoveryViewModel;
+  growth: GrowthOverviewViewModel;
   workload: WorkloadViewModel;
-  dataQuality: DataQualityViewModel;
 }
 
 export function AdminDashboardShell({
@@ -67,17 +42,9 @@ export function AdminDashboardShell({
   canResolve,
   serverNow,
   isDev,
-  product,
-  northStar,
-  habit,
-  funnel,
+  organic,
   growth,
-  seo,
-  search,
-  supply,
-  b2b,
   workload,
-  dataQuality,
 }: AdminDashboardShellProps) {
   const router = useRouter();
   const [now, setNow] = useState(serverNow);
@@ -107,7 +74,7 @@ export function AdminDashboardShell({
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl md:text-xl font-bold">Панель управления</h1>
-          <p className="text-sm text-gray-600 mt-1">Состояние продукта сегодня</p>
+          <p className="text-sm text-gray-600 mt-1">Работает ли система и растёт ли продукт</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500">
@@ -136,33 +103,20 @@ export function AdminDashboardShell({
         isDev={isDev}
       />
 
-      <div>
-        <h2 className="text-base font-semibold text-gray-700 mb-3">Company Pulse</h2>
+      <div className="space-y-4">
+        <h2 className="text-base font-semibold text-gray-700">Рост</h2>
+        <OrganicRecoveryBlock model={organic} />
+        <GrowthKpiTiles model={growth} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ProductPulseBlock model={product} />
-          <NorthStarBlock model={northStar} />
+          <ValuePathBlock model={growth} />
+          <SupplyPartnersBlock model={growth} />
         </div>
       </div>
 
-      <HabitBlock model={habit} />
-      <FunnelBlock model={funnel} />
-      <GrowthBlock model={growth} />
-      <GscSeoBlock model={seo} />
-
       <div>
+        <h2 className="text-base font-semibold text-gray-700 mb-3">Операционная работа</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <SearchDiscoveryBlock model={search} />
-          <SupplyHealthBlock model={supply} />
-        </div>
-      </div>
-
-      <B2BHealthBlock model={b2b} />
-
-      <div>
-        <h2 className="text-base font-semibold text-gray-700 mb-3">Operations & Data Quality</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <OperationalLoadBlock model={workload} />
-          <DataQualityBlock model={dataQuality} />
         </div>
       </div>
     </div>

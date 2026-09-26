@@ -75,15 +75,11 @@ const orders = read("src/app/admin/orders/AdminOrdersClient.tsx");
 const verificationPanel = read("src/app/admin/b2b/requests/BusinessVerificationSidePanel.tsx");
 const importReviewTable = read("src/app/admin/import/review/_components/ReviewQueueTableClient.tsx");
 const dashboardBlocks = [
-  "src/app/admin/_components/blocks/B2BHealthBlock.tsx",
-  "src/app/admin/_components/blocks/HabitBlock.tsx",
-  "src/app/admin/_components/blocks/FunnelBlock.tsx",
-  "src/app/admin/_components/blocks/SearchDiscoveryBlock.tsx",
-  "src/app/admin/_components/blocks/GrowthBlock.tsx",
-  "src/app/admin/_components/blocks/ProductPulseBlock.tsx",
+  "src/app/admin/_components/growth/ValuePathBlock.tsx",
+  "src/app/admin/_components/growth/SupplyPartnersBlock.tsx",
   "src/app/admin/_components/blocks/TrafficBlock.tsx",
-  "src/app/admin/_components/blocks/SupplyHealthBlock.tsx",
 ].map(read);
+const growthKpiTiles = read("src/app/admin/_components/growth/GrowthKpiTiles.tsx");
 
 // --- Admin shell breakpoint contract -------------------------------------
 
@@ -200,6 +196,12 @@ for (const block of dashboardBlocks) {
     "Dashboard KPI trio grids must stack to 1 column below sm and expand to 3 at sm+",
   );
 }
+
+assert.match(
+  growthKpiTiles,
+  /grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4/,
+  "Growth KPI tiles must stack on phones, go 2-up at sm and 4-up only at lg",
+);
 
 // --- Page-level spacing contract: mobile-first, legacy pattern must not return ---
 
