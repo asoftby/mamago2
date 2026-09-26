@@ -3721,6 +3721,7 @@ enum BillingActionType {
   BOOKING_CONFIRMED
   CONTACT_OPENED
   VISIT_CONFIRMED
+  PARTY_BOOKING_CONFIRMED
 }
 
 enum BillingRateScopeType {
@@ -3759,6 +3760,8 @@ enum BillingTransactionType {
   BONUS_CREDIT
   MANUAL_ADJUSTMENT
   CORRECTION
+  COMMISSION_REVERSAL
+  PENALTY_CHARGE
 }
 
 enum BillingTransactionStatus {
@@ -3780,6 +3783,8 @@ enum BillingReferenceType {
   PLACE
   REQUEST
   MANUAL
+  PARTY_COMMISSION
+  VENDOR_PENALTY
 }
 
 enum PromotionPublicationType {
@@ -4810,6 +4815,8 @@ enum BookingStatus {
   REJECTED
   CANCELLED
   COMPLETED
+  EXPIRED // Party: исполнитель не ответил до responseDeadlineAt
+  CHANGES_PROPOSED // Резерв (Phase 2, встречное предложение). Phase 1 не производит
 }
 
 /// Режим записи для публикации
@@ -4910,12 +4917,20 @@ enum BookingActivityType {
   STATUS_CHANGED
   PHONE_CLICKED
   COMMENT_ADDED
+  TERMS_PROPOSED
+  TERMS_ACCEPTED
+  UNIT_ASSIGNED
+  CANCELLED
+  EXPIRED
+  REPLACED
 }
 
 /// Актор события: бизнес или система
 enum BookingActivityActorType {
   BUSINESS
   SYSTEM
+  CUSTOMER
+  MAMAGO
 }
 
 /// История событий по заявке (timeline)
@@ -5632,4 +5647,95 @@ model ReleaseEvent {
 
   @@unique([buildId, processStartedAt])
   @@index([detectedAt(sort: Desc)])
+}
+
+// ============================================================================
+// PARTY CONSTRUCTOR — enum foundation (docs/engineering/party-mvp-spec.md)
+// Модели, использующие эти enum'ы, появляются в следующем PR.
+// ============================================================================
+
+/// Жизненный цикл праздника семьи
+enum PartyStatus {
+  DRAFT
+  SUBMITTED
+  IN_PROGRESS
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+/// Состояние роли (слота) в празднике
+enum PartySlotStatus {
+  PLANNED
+  REQUESTED
+  CONFIRMED
+  REPLACING
+  UNFILLED
+  CANCELLED
+}
+
+/// Чем заполнен слот: ничем / оффером mamaGo / своим вариантом клиента
+enum PartySlotFillMode {
+  EMPTY
+  OFFER
+  OWN
+}
+
+/// EXCLUSIVE — оффер обслуживается ограниченными BookingUnit и не продаётся дважды на один интервал
+enum CapacityMode {
+  EXCLUSIVE
+  MULTI
+}
+
+/// Предоплата, которую семья платит исполнителю напрямую
+enum PrepaymentType {
+  NONE
+  PERCENT
+  FIXED
+}
+
+enum PartyPricingUnit {
+  PER_EVENT
+  PER_HOUR
+  PER_CHILD
+}
+
+enum TermsSnapshotStatus {
+  PROPOSED
+  ACCEPTED
+  SUPERSEDED
+  DECLINED
+}
+
+enum PriceLineType {
+  BASE
+  EXTRA_CHILD
+  EXTRA_HOUR
+  OFF_SITE
+  DISCOUNT
+  OTHER
+}
+
+enum BookingUnitStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+/// SHADOW — начисление без движения баланса; LIVE — реальное списание
+enum PartyBillingMode {
+  SHADOW
+  LIVE
+}
+
+/// Комиссия за подтверждённую бронь; REVERSED — сделка не состоялась
+enum PartyCommissionStatus {
+  ACCRUED
+  REVERSED
+}
+
+/// Санкция исполнителю — отдельное от комиссии основание
+enum VendorPenaltyStatus {
+  ACCRUED
+  WAIVED
+  REVERSED
 }

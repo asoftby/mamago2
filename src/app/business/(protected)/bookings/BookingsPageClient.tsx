@@ -120,6 +120,24 @@ const STATUS_META: Record<
     dotClass: "bg-stone-300",
     icon: CircleX,
   },
+  EXPIRED: {
+    label: "Истекла",
+    shortLabel: "Истекла",
+    chipClass: "bg-stone-100 text-stone-500 ring-1 ring-inset ring-stone-200",
+    railClass: "bg-stone-300",
+    metricClass: "text-stone-500",
+    dotClass: "bg-stone-300",
+    icon: CircleX,
+  },
+  CHANGES_PROPOSED: {
+    label: "Изменения предложены",
+    shortLabel: "Изменения",
+    chipClass: "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-100",
+    railClass: "bg-amber-400",
+    metricClass: "text-amber-700",
+    dotClass: "bg-amber-400",
+    icon: Clock3,
+  },
 };
 
 const SORT_OPTIONS: Array<{ value: SortMode; label: string }> = [
@@ -134,6 +152,8 @@ const STATUS_FILTER_PARAM: Record<StatusFilter, string> = {
   COMPLETED: "completed",
   REJECTED: "cancelled",
   CANCELLED: "cancelled",
+  EXPIRED: "cancelled",
+  CHANGES_PROPOSED: "new",
 };
 
 function toDateKey(d: Date): string {
@@ -223,7 +243,9 @@ function parseStatusFilterParam(value: string | null): StatusFilter | null {
   if (value === "completed") return BookingStatus.COMPLETED;
   if (value === "cancelled") return BookingStatus.REJECTED;
   if (Object.values(BookingStatus).includes(value as BookingStatus)) {
-    return value === BookingStatus.CANCELLED ? BookingStatus.REJECTED : (value as BookingStatus);
+    if (value === BookingStatus.CANCELLED || value === BookingStatus.EXPIRED) return BookingStatus.REJECTED;
+    if (value === BookingStatus.CHANGES_PROPOSED) return BookingStatus.NEW;
+    return value as BookingStatus;
   }
   return null;
 }
@@ -235,7 +257,14 @@ function getStatusFilterParam(value: StatusFilter): string | null {
 function getStatusFilterMatch(status: BookingStatus, filter: StatusFilter): boolean {
   if (filter === "all") return true;
   if (filter === BookingStatus.REJECTED) {
-    return status === BookingStatus.REJECTED || status === BookingStatus.CANCELLED;
+    return (
+      status === BookingStatus.REJECTED ||
+      status === BookingStatus.CANCELLED ||
+      status === BookingStatus.EXPIRED
+    );
+  }
+  if (filter === BookingStatus.NEW) {
+    return status === BookingStatus.NEW || status === BookingStatus.CHANGES_PROPOSED;
   }
   return status === filter;
 }

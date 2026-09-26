@@ -12,6 +12,7 @@ const BILLING_ACTION_TYPES: BillingActionType[] = [
   "BOOKING_CONFIRMED",
   "CONTACT_OPENED",
   "VISIT_CONFIRMED",
+  "PARTY_BOOKING_CONFIRMED",
 ];
 
 export const DEFAULT_BILLING_ACTION_RULES: Record<
@@ -47,6 +48,14 @@ export const DEFAULT_BILLING_ACTION_RULES: Record<
   VISIT_CONFIRMED: {
     pricingType: "FREE",
     reason: "По умолчанию бесплатно",
+    isActive: false,
+  },
+  // PLACEHOLDER, disabled. 5% is NOT an approved rate: the party commission rate
+  // is an open question (party-mvp-spec §11) and must be set in admin pricing.
+  PARTY_BOOKING_CONFIRMED: {
+    pricingType: "PERCENT",
+    percentRate: 5,
+    reason: "PLACEHOLDER (выключено): ставка конструктора праздника не утверждена",
     isActive: false,
   },
 };

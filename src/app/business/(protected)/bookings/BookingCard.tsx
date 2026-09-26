@@ -18,6 +18,8 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
   REJECTED: "Отклонена",
   CANCELLED: "Отменена",
   COMPLETED: "Завершена",
+  EXPIRED: "Истекла",
+  CHANGES_PROPOSED: "Изменения предложены",
 };
 
 type ChipTone = "neutral" | "muted" | "accent" | "success" | "warning" | "danger";
@@ -28,6 +30,8 @@ const STATUS_TONE: Record<BookingStatus, ChipTone> = {
   REJECTED: "danger",
   CANCELLED: "muted",
   COMPLETED: "neutral",
+  EXPIRED: "muted",
+  CHANGES_PROPOSED: "warning",
 };
 
 // ─── SLA ─────────────────────────────────────────────────────────────────────
