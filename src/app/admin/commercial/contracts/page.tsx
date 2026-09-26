@@ -64,12 +64,12 @@ export default async function AdminContractsPage() {
   return (
     <div className="p-4 sm:p-6 space-y-6">
       {/* AdminPageHeader */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <h1 className="text-2xl md:text-xl font-bold text-gray-900">Договоры</h1>
           <p className="text-sm text-gray-600 mt-1">Управление коммерческими договорами</p>
         </div>
-        <button className="h-10 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm">
+        <button className="h-10 w-full rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 md:w-auto">
           + Создать договор
         </button>
       </div>
