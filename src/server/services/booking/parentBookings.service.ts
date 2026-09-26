@@ -442,8 +442,16 @@ export async function getParentBookings(userId: string): Promise<ParentBookingsR
 
   const items = rows.map(mapRow);
 
+  // EXPIRED (party: replacement in progress) and CHANGES_PROPOSED (reserved) are
+  // still open requests for the parent, so they stay in the active list.
   const active = items
-    .filter((b) => b.status === BookingStatus.NEW || b.status === BookingStatus.CONFIRMED)
+    .filter(
+      (b) =>
+        b.status === BookingStatus.NEW ||
+        b.status === BookingStatus.CONFIRMED ||
+        b.status === BookingStatus.EXPIRED ||
+        b.status === BookingStatus.CHANGES_PROPOSED,
+    )
     .sort((a, b) => {
       // CONFIRMED first, then NEW; within each group newest first
       if (a.status === BookingStatus.CONFIRMED && b.status !== BookingStatus.CONFIRMED) return -1;

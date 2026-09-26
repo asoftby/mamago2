@@ -381,7 +381,17 @@ export async function getAdminOrders(
   });
   const countsWhere = buildOrdersWhere(baseFilters);
 
-  const [rows, total, newCount, confirmedCount, rejectedCount, cancelledCount, completedCount] =
+  const [
+    rows,
+    total,
+    newCount,
+    confirmedCount,
+    rejectedCount,
+    cancelledCount,
+    completedCount,
+    expiredCount,
+    changesProposedCount,
+  ] =
     await prisma.$transaction([
     fetchAdminOrdersRows({ where, skip, take: limit }),
     prisma.bookingRequest.count({ where }),
@@ -390,6 +400,8 @@ export async function getAdminOrders(
     prisma.bookingRequest.count({ where: { ...countsWhere, status: "REJECTED" } }),
     prisma.bookingRequest.count({ where: { ...countsWhere, status: "CANCELLED" } }),
     prisma.bookingRequest.count({ where: { ...countsWhere, status: "COMPLETED" } }),
+    prisma.bookingRequest.count({ where: { ...countsWhere, status: "EXPIRED" } }),
+    prisma.bookingRequest.count({ where: { ...countsWhere, status: "CHANGES_PROPOSED" } }),
   ]);
 
   return {
@@ -404,6 +416,8 @@ export async function getAdminOrders(
       REJECTED: rejectedCount,
       CANCELLED: cancelledCount,
       COMPLETED: completedCount,
+      EXPIRED: expiredCount,
+      CHANGES_PROPOSED: changesProposedCount,
     },
   };
 }

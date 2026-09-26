@@ -77,6 +77,8 @@ const STATUS_LABELS: Record<BookingStatus, string> = {
   REJECTED: "Отклонена",
   CANCELLED: "Отменена",
   COMPLETED: "Завершена",
+  EXPIRED: "Истекла",
+  CHANGES_PROPOSED: "Изменения предложены",
 };
 
 const STATUS_BADGE_CLASS: Record<BookingStatus, string> = {
@@ -85,6 +87,8 @@ const STATUS_BADGE_CLASS: Record<BookingStatus, string> = {
   REJECTED: "border-red-200 bg-red-50 text-red-700",
   CANCELLED: "border-stone-200 bg-stone-100 text-stone-700",
   COMPLETED: "border-violet-200 bg-violet-50 text-violet-700",
+  EXPIRED: "border-stone-200 bg-stone-50 text-stone-500",
+  CHANGES_PROPOSED: "border-amber-200 bg-amber-50 text-amber-700",
 };
 
 const ENTITY_TYPE_LABELS: Record<EntityTypeFilter | "UNKNOWN", string> = {
@@ -102,6 +106,8 @@ const DEFAULT_COUNTS: Record<BookingStatus, number> = {
   REJECTED: 0,
   CANCELLED: 0,
   COMPLETED: 0,
+  EXPIRED: 0,
+  CHANGES_PROPOSED: 0,
 };
 
 function formatDateTime(value: string) {
