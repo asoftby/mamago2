@@ -64,7 +64,10 @@ export async function getContracts(filters: ContractFilters = {}) {
   const where: Prisma.BusinessContractWhereInput = {};
 
   if (filters.businessId) {
-    where.businessId = filters.businessId;
+    where.OR = [
+      { businessId: filters.businessId },
+      { counterparty: { businessId: filters.businessId } },
+    ];
   }
 
   if (filters.status) {
@@ -143,7 +146,12 @@ export async function getContractById(id: string) {
  */
 export async function getBusinessContracts(businessId: string) {
   return prisma.businessContract.findMany({
-    where: { businessId },
+    where: {
+      OR: [
+        { businessId },
+        { counterparty: { businessId } },
+      ],
+    },
     orderBy: {
       createdAt: "desc",
     },
