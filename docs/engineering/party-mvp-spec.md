@@ -1,8 +1,10 @@
 # ДЕТСКИЙ ПРАЗДНИК — MVP SPEC (release 15.10.2026)
 
-Статус: v1.1 · 2026-09-26 · база: `dev` @ 99fb5ca
+Статус: v1.2 · 2026-09-26 · база: `dev` @ 99fb5ca
 Сводит: аудит 26.09 + COMMERCE SPEC v1 (ветка `docs/commerce-spec-v1-preserved-20260924`) + implementation spec v2 (19.09) + решения 24–26.09.
 При конфликте источников действует этот документ.
+
+Изменения v1.2 (review #380): срочная замена со своим порогом lead-time; пакеты матчатся по категориям `PackageComponent`; matching трассируется через общий `RecommendationRun`/`RecommendationExposure` (исключение для ранжирования — на утверждение, §6.1); согласия входят в release gate.
 
 Изменения v1.1: эксклюзивность считается по `BookingUnit` + интервалу, а не по `offer + date`; сторно комиссии и штраф исполнителю — разные сущности; теневой период — 30 состоявшихся праздников или 30.11; «занятые даты» — после запуска.
 
@@ -80,7 +82,6 @@ model Party {
   submittedAt  DateTime?
   cancelledAt  DateTime?
   cancelReason String?
-  assemblyLog  Json?              // кандидаты финального ASSEMBLY, retention 90 дней
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   @@index([userId]) @@index([partyDate]) @@index([status])
@@ -125,6 +126,7 @@ model BusinessOrderSettings {
   acceptsPartyOrders       Boolean  @default(false)
   responseSlaHours         Int      @default(24)
   minLeadTimeHours         Int      @default(72)
+  urgentMinLeadTimeHours   Int?     // срочные замены: null = бизнес их не принимает (§5, §6)
   prepaymentType           PrepaymentType @default(NONE)
   prepaymentValue          Decimal? @db.Decimal(10, 2)
   freeCancellationHours    Int      @default(168)
@@ -282,6 +284,7 @@ model VendorPenalty {
 1. Слот → REPLACING. Matching `purpose=REPLACEMENT`, `exclude` = все бизнесы, уже задействованные в этом слоте.
 2. Клиенту: уведомление + экран «исполнитель не сможет, вот 3–5 вариантов». Выбор = новая `BookingRequest(NEW)` с `replacesBookingId` и тем же `partySlotId`. Новый исполнитель подтверждает сам.
 3. SLA замены: `min(responseSlaHours, 2ч)`, если до праздника < 72ч.
+3a. Lead-time для замены — отдельный порог: `urgentMinLeadTimeHours` бизнеса. Бизнесы без него (`null`) в срочной замене не участвуют, если до праздника меньше их обычного `minLeadTimeHours`. Онбординг просит каждого исполнителя явно указать, берёт ли он срочные заказы.
 4. Клиент не выбрал за 12ч (2ч при < 72ч до праздника) и `Party.autoReplace = true` → система сама отправляет top-1.
 5. Кандидатов нет или вторая замена сорвалась → слот UNFILLED, эскалация в Operations Center + TG админу, ручной поиск. Не нашли — честное сообщение клиенту, слот можно перевести в OWN.
 6. Площадка — якорь. Если отменяет площадка, остальные слоты не отменяются, клиенту приоритетно предлагается замена площадки.
@@ -290,12 +293,34 @@ model VendorPenalty {
 
 Read-only сервис, `purpose = ASSEMBLY | REPLACEMENT`.
 
-**Hard filters:** gate §3.11 · категория = слот · город, для OFF_SITE — район в `serviceDistrictIds` · возраст · вместимость · формат локации · `startAt − now ≥ minLeadTime` · EXCLUSIVE: нет ни одного свободного unit на интервал (`isUnitBusy`) → исключить · цена > бюджет слота × 1.4 → исключить · `exclude`.
+**Hard filters:**
+- gate §3.11;
+- **категория:** `PARTY_SERVICE` — `Offer.category = slot.category`; `PARTY_PACKAGE` (у него `Offer.category = null` по канону) — `slot.category ∈ categories(PackageComponent)`. Пакет становится якорем слота, остальные его категории закрывают слоты через `coveredBySlotId`;
+- город, для OFF_SITE — район в `serviceDistrictIds`;
+- возраст · вместимость · формат локации;
+- **lead-time:** `ASSEMBLY` — `startAt − now ≥ minLeadTimeHours`; `REPLACEMENT` — `startAt − now ≥ min(minLeadTimeHours, urgentMinLeadTimeHours ?? minLeadTimeHours)` (§5.3a);
+- EXCLUSIVE: нет ни одного свободного unit на интервал (`isUnitBusy`) → исключить;
+- цена > бюджет слота × 1.4 → исключить (для пакета — бюджет суммы покрываемых слотов);
+- `exclude`.
 
 **Ranking:** `fit 0.30 · priceFit 0.30 · themeMatch 0.20 · contentQuality 0.15 · recentActivity 0.05`. `reliability` добавляется после 30+ заявок. `priceFit` — близость к бюджету, а не «дешевле = лучше».
 
-**ASSEMBLY:** top-1 на слот. Пакет, закрывающий несколько слотов, конкурирует с суммой отдельных офферов по этим слотам. Кандидаты пишутся в `Party.assemblyLog`.
-**REPLACEMENT:** 3–5 кандидатов, без полного лога.
+**ASSEMBLY:** top-1 на слот. Пакет, закрывающий несколько слотов, конкурирует с суммой отдельных офферов по этим слотам.
+**REPLACEMENT:** 3–5 кандидатов.
+
+### 6.1 Связь с общим фундаментом рекомендаций (`docs/architecture/recommendation-data-foundation.md`)
+
+**Трассировка — всегда через общий фундамент, без параллельного лога:**
+- новая поверхность `RecommendationSurface.PARTY_BUILDER`;
+- каждый ASSEMBLY и REPLACEMENT пишет `RecommendationRun` (`algorithmVersion = party-assembly-v1`, context: partyId, slot, purpose) и `RecommendationExposure` на возвращённые офферы;
+- выбор клиентом и подтверждение исполнителем — обычные `UserEvent`, атрибутируемые через `RecommendationOutcome`;
+- `Party.assemblyLog` и отдельный `MatchRun` не вводятся.
+
+**Ранжирование — задокументированное исключение (ТРЕБУЕТ УТВЕРЖДЕНИЯ).** Основание по правилу фундамента («genuinely different entities/objectives»): задача конструктора — назначение исполнителя под жёсткие ограничения одного праздника (дата, интервал, ёмкость unit, бюджет, состав пакета), а не вовлечённость в ленту событий `engagement-freshness-v1`. Границы исключения:
+- свои только hard filters и сигналы, которых нет в общем пайплайне: `fit`, `priceFit`, доступность unit;
+- `themeMatch` не вводит своих весов поведения: берётся из `UserBehaviorProfile` / `behaviorSignalWeights.ts` и профиля ребёнка;
+- собственных behavior-весов и отдельной истины обратной связи нет;
+- веса версионируются через `algorithmVersion`, surface-ограничения (кол-во кандидатов, квоты) — через `RecommendationSurfacePolicy`.
 
 Golden tests на 15–20 реальных офферах.
 
@@ -355,21 +380,21 @@ Golden tests на 15–20 реальных офферах.
 | 2 | Модели §2.1, поля §2.2, relations, indexes, partial unique, exclusion constraint (`btree_gist`); backfill: `OfferPartyTerms(capacityMode=EXCLUSIVE)` + default unit для площадок | 1 |
 | 3 | Domain: resolve terms, quote, интервал, `confirmPartyBooking` + тест на гонку двух confirm | 2 |
 | 4 | Кабинет: «Заказы и условия» (7 полей), units, wizard-шаг «Цена и условия» для PARTY_*, состав пакета (категории), принятие PARTY_TERMS | 2 |
-| 5 | Matching service + golden tests | 3 |
-| 6 | Builder на реальных данных: DRAFT с `planToken`, автосборка, замена в слоте, submit → Party; `/me/birthdays` на реальных данных. За флагом `PARTY_BUILDER` | 3, 5 |
+| 5 | Matching service + golden tests; трассировка через `RecommendationRun`/`Exposure` (surface `PARTY_BUILDER`) | 3 |
+| 6 | Builder на реальных данных: DRAFT с `planToken`, автосборка, замена в слоте, submit → Party; `/me/birthdays` на реальных данных. **Согласия §9.3 при submit (обязательны, без них submit невозможен).** За флагом `PARTY_BUILDER` | 3, 5 |
 | 7 | Действия бизнеса: кабинет + TG-роутер + email-ссылки; отмена клиентом | 3 |
 | 8 | Worker: expire, replacement, эскалация, напоминания | 5, 7 |
 | 9 | Теневой биллинг: `PartyCommission`, сторно, `VendorPenalty`, блок в кабинете бизнеса, сигнал выхода из SHADOW | 3 |
-| 10 | Юр. страницы, согласия, удаление мок-слоя | 6 |
+| 10 | Юр. страницы (B2C-соглашение, «Гарантия праздника», приложение к B2B-оферте), удаление мок-слоя | 6 |
 
-Release gate: флаг `PARTY_BUILDER` включается только когда PR 6, 7 и 8 в проде.
+Release gate: флаг `PARTY_BUILDER` включается только когда в проде PR 6 (включая согласия), 7, 8 **и 10** (юридические страницы, на которые ссылаются согласия). Без согласий на передачу контактов и данных ребёнка submit не открывается.
 Параллельно, вне кода: онбординг исполнителей — минимум 5 площадок, 8 аниматоров/ведущих, 5 шоу, 3 торта, 3 декора, 3 фото в Минске с заполненными условиями.
 
 ### Сразу после запуска
 Занятые даты в TG (`BookingUnitBlackout`) · reliability score · отзывы после праздника · воронка конструктора в Operations Center (DRAFT → SUBMITTED, доля слотов, закрытых без замены) · решение о выходе из SHADOW.
 
 ### Phase 2
-RFQ (торт/декор по референсу) + binding selection через `confirmPartyBooking` · `CHANGES_PROPOSED` / встречное предложение · опциональные компоненты пакета и `priceDelta` · серверный движок сценария дня · `MatchRun` · платежи через mamaGo (checkout, сплит, агентская схема).
+RFQ (торт/декор по референсу) + binding selection через `confirmPartyBooking` · `CHANGES_PROPOSED` / встречное предложение · опциональные компоненты пакета и `priceDelta` · серверный движок сценария дня · платежи через mamaGo (checkout, сплит, агентская схема).
 
 ## 11. Решения и открытые вопросы
 
@@ -380,6 +405,7 @@ RFQ (торт/декор по референсу) + binding selection через
 - Эксклюзивность по `BookingUnit` + интервалу (§0.5, §4).
 
 Открыто:
+0. **Исключение для ранжирования конструктора (§6.1)** — утвердить или отправить matching целиком в общий пайплайн.
 1. **Ставка комиссии** — нужна для текста оферты до 10.10, на код не влияет.
 2. **Размер неустойки** за позднюю отмену и порог «поздней» — для оферты. Предложение из обсуждения 24.09: 10% от snapshot, 20% при отмене < 48ч.
 3. **Gate депозита для обычных броней** (не праздников) — вне скоупа 15.10?
