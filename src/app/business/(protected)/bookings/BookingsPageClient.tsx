@@ -630,12 +630,11 @@ export function BookingsPageClient() {
 
     for (const item of items) {
       next.all += 1;
-      if (item.status === BookingStatus.NEW) next.new += 1;
-      if (item.status === BookingStatus.CONFIRMED) next.confirmed += 1;
-      if (item.status === BookingStatus.COMPLETED) next.completed += 1;
-      if (item.status === BookingStatus.REJECTED || item.status === BookingStatus.CANCELLED) {
-        next.rejected += 1;
-      }
+      // Same grouping as getStatusFilterMatch, so a tab never shows more rows than its counter.
+      if (getStatusFilterMatch(item.status, BookingStatus.NEW)) next.new += 1;
+      if (getStatusFilterMatch(item.status, BookingStatus.CONFIRMED)) next.confirmed += 1;
+      if (getStatusFilterMatch(item.status, BookingStatus.COMPLETED)) next.completed += 1;
+      if (getStatusFilterMatch(item.status, BookingStatus.REJECTED)) next.rejected += 1;
     }
 
     return next;
