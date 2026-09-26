@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
 import { TableContainer } from "@/components/ui/table";
 import {
   DataCardList,
@@ -12,7 +12,6 @@ import {
   DataCardHeader,
   DataCardBody,
   DataCardRow,
-  DataCardActions,
 } from "@/components/ui/data-card-list";
 
 type Business = {
@@ -139,22 +138,32 @@ export function PartnersTable({ businesses }: PartnersTableProps) {
       ) : (
         <DataCardList>
           {filteredBusinesses.map((business) => (
-            <DataCard key={business.id}>
-              <DataCardHeader title={business.name} />
-              <DataCardBody>
-                <DataCardRow label="УНП" value={business.unp} />
-                <DataCardRow label="Email владельца" value={business.owner?.email} />
-                <DataCardRow label="Телефон" value={business.owner?.phoneE164} />
-                <DataCardRow label="Обновлено" value={new Date(business.updatedAt).toLocaleDateString("ru-RU")} />
-              </DataCardBody>
-              <DataCardActions>
-                <Link href={`/admin/b2b/partners/${business.id}`} className="w-full">
-                  <Button variant="outline" size="sm" className="w-full">
-                    Открыть
-                  </Button>
-                </Link>
-              </DataCardActions>
-            </DataCard>
+            <Link
+              key={business.id}
+              href={`/admin/b2b/partners/${business.id}`}
+              className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label={`Открыть контрагента ${business.name}`}
+            >
+              <DataCard className="transition-colors hover:bg-gray-50 active:bg-gray-100">
+                <DataCardHeader
+                  title={
+                    <span className="inline-flex min-w-0 items-center gap-1.5">
+                      <span className="truncate">{business.name}</span>
+                      <ChevronRight
+                        aria-hidden="true"
+                        className="h-4 w-4 shrink-0 text-gray-400"
+                      />
+                    </span>
+                  }
+                />
+                <DataCardBody>
+                  <DataCardRow label="УНП" value={business.unp} />
+                  <DataCardRow label="Email владельца" value={business.owner?.email} />
+                  <DataCardRow label="Телефон" value={business.owner?.phoneE164} />
+                  <DataCardRow label="Обновлено" value={new Date(business.updatedAt).toLocaleDateString("ru-RU")} />
+                </DataCardBody>
+              </DataCard>
+            </Link>
           ))}
         </DataCardList>
       )}
