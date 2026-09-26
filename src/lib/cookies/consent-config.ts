@@ -15,7 +15,7 @@ type RunConfig = Parameters<typeof import("vanilla-cookieconsent").run>[0];
 export const BANNER = {
   title: "Cookies и данные",
   description:
-    "Для работы сайта нужны необходимые cookies и базовые данные сервиса. Сторонние инструменты веб-аналитики и рекламы мы подключаем только с вашего согласия.",
+    "Для работы сайта нужны необходимые cookies и базовые данные сервиса. Google Analytics до вашего согласия работает без аналитических и рекламных cookies; Яндекс.Метрика и рекламные технологии подключаются только с согласия.",
   acceptAll: "Принять все",
   necessaryOnly: "Только необходимые",
   customize: "Настроить",
@@ -36,7 +36,7 @@ const PREFERENCES = {
     analytics: {
       title: "Внешняя веб-аналитика",
       description:
-        "Управляет только подключением сторонних сервисов аналитики: Google Analytics 4 и Яндекс.Метрика. Без согласия они не загружаются. Это не отключает учёт действий внутри mamaGo, который нужен для работы продукта (сохранения, план, улучшение сервиса на наших серверах).",
+        "Разрешает Google Analytics 4 использовать аналитические cookies и подключает Яндекс.Метрику. До согласия Google получает только измерения без аналитических и рекламных cookies, а Метрика не загружается. Это не отключает учёт действий внутри mamaGo на наших серверах.",
     },
     marketing: {
       title: "Маркетинг и реклама",
@@ -52,7 +52,7 @@ export function createCookieConsentRunConfig(
   return {
     mode: "opt-in",
     // Keep this literal in sync with CONSENT_REVISION.
-    revision: 1,
+    revision: 2,
     // The first-paint shell owns initial visibility; this config owns consent state.
     autoShow: false,
     autoClearCookies: true,

@@ -24,7 +24,7 @@ export function TrafficBlock({ model }: { model: TrafficViewModel }) {
   return (
     <AdminDashboardBlock title={block.title} size={block.size}>
       <div className="space-y-3">
-        <div className="text-xs font-medium text-gray-500">Сегодня</div>
+        <div className="text-xs font-medium text-gray-500">Фактический трафик mamaGo · сегодня</div>
 
         <div className="grid grid-cols-1 gap-1.5 text-xs sm:grid-cols-3 sm:gap-2">
           <div>

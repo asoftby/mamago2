@@ -7,8 +7,9 @@
  * Contract:
  * - rendered only for public pages;
  * - runtime config is fail-closed on the server;
- * - no provider script is inserted before analytics consent;
- * - consent withdrawal disables/destructs already-loaded providers;
+ * - Google uses Advanced Consent Mode and loads after a denied default;
+ * - Yandex remains fully gated by analytics consent;
+ * - consent withdrawal updates Google consent and destructs Yandex;
  * - Google pageviews rely on GA4 Enhanced Measurement history changes;
  * - Yandex SPA views use defer:true + explicit hit calls.
  */
@@ -69,14 +70,20 @@ function ensureYm(): NonNullable<AnalyticsWindow["ym"]> {
   return w.ym;
 }
 
-type GoogleDisableWindow = Window & {
-  [key: `ga-disable-${string}`]: boolean | undefined;
-};
+const GOOGLE_DENIED_CONSENT = {
+  analytics_storage: "denied",
+  ad_storage: "denied",
+  ad_user_data: "denied",
+  ad_personalization: "denied",
+} as const;
 
-function setGoogleDisabled(measurementId: string, disabled: boolean): void {
-  const w = window as unknown as GoogleDisableWindow;
-  w[`ga-disable-${measurementId}`] = disabled;
-}
+const GOOGLE_DEFAULT_CONSENT = {
+  ...GOOGLE_DENIED_CONSENT,
+  // CookieConsent restores a persisted choice asynchronously. Give it time
+  // to publish the returning visitor's real state before the initial config
+  // sends measurement; this option belongs only on the default command.
+  wait_for_update: 500,
+} as const;
 
 function clearYandexLocalStorage(): void {
   try {
@@ -134,7 +141,7 @@ export function AnalyticsLoader({
 }: {
   config: ExternalAnalyticsConfig;
 }) {
-  const { canUseAnalytics } = useCookieConsent();
+  const { canUseAnalytics, hasValidConsent } = useCookieConsent();
   const yandexActiveRef = useRef(false);
   const googleInitializedRef = useRef(false);
   const [yandexReady, setYandexReady] = useState(false);
@@ -142,40 +149,54 @@ export function AnalyticsLoader({
   const googleId = config.enabled ? config.googleAnalyticsId : null;
   const yandexId = config.enabled ? config.yandexMetrikaId : null;
 
-  // Provider lifecycle: load only after consent; actively disable on revoke.
+  // Google lifecycle is independent of analytics consent. The denied default
+  // MUST be queued before gtag.js is inserted; initialization happens once.
+  useEffect(() => {
+    if (!config.enabled || !googleId) return;
+    if (googleInitializedRef.current) return;
+
+    const gtag = ensureGtag();
+    gtag("consent", "default", GOOGLE_DEFAULT_CONSENT);
+    ensureExternalScript(
+      "mamago-google-analytics",
+      `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(googleId)}`,
+    );
+    gtag("js", new Date());
+    gtag("config", googleId, {
+      // Marketing/advertising consent is a separate mamaGo category.
+      allow_google_signals: false,
+      allow_ad_personalization_signals: false,
+    });
+    googleInitializedRef.current = true;
+  }, [config.enabled, googleId]);
+
+  // Do not turn the initial unknown snapshot into an explicit denied update:
+  // that would end wait_for_update before CookieConsent restores the actual
+  // persisted choice. Updates start only once the CMP has a valid decision.
+  useEffect(() => {
+    if (!config.enabled || !googleId || !hasValidConsent) return;
+
+    ensureGtag()("consent", "update", {
+      ...GOOGLE_DENIED_CONSENT,
+      analytics_storage: canUseAnalytics ? "granted" : "denied",
+    });
+  }, [canUseAnalytics, config.enabled, googleId, hasValidConsent]);
+
+  // Yandex remains fully consent-gated and is destroyed on revoke.
   useEffect(() => {
     if (!config.enabled) return;
 
     if (!canUseAnalytics) {
-      if (googleId) {
-        setGoogleDisabled(googleId, true);
-      }
       if (yandexId && yandexActiveRef.current) {
         const ym = analyticsWindow().ym;
         if (ym) ym(yandexId, "destruct");
         yandexActiveRef.current = false;
-        setYandexReady(false);
+        const readyTimer = window.setTimeout(() => setYandexReady(false), 0);
+        clearYandexLocalStorage();
+        return () => window.clearTimeout(readyTimer);
       }
       clearYandexLocalStorage();
       return;
-    }
-
-    if (googleId) {
-      setGoogleDisabled(googleId, false);
-      const gtag = ensureGtag();
-      ensureExternalScript(
-        "mamago-google-analytics",
-        `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(googleId)}`,
-      );
-      if (!googleInitializedRef.current) {
-        gtag("js", new Date());
-        googleInitializedRef.current = true;
-      }
-      gtag("config", googleId, {
-        // Marketing/advertising consent is a separate mamaGo category.
-        allow_google_signals: false,
-        allow_ad_personalization_signals: false,
-      });
     }
 
     if (yandexId && !yandexActiveRef.current) {
@@ -192,9 +213,10 @@ export function AnalyticsLoader({
         webvisor: true,
       });
       yandexActiveRef.current = true;
-      setYandexReady(true);
+      const readyTimer = window.setTimeout(() => setYandexReady(true), 0);
+      return () => window.clearTimeout(readyTimer);
     }
-  }, [canUseAnalytics, config.enabled, googleId, yandexId]);
+  }, [canUseAnalytics, config.enabled, yandexId]);
 
   if (!config.enabled || !canUseAnalytics || !yandexId || !yandexReady) {
     return null;
