@@ -102,6 +102,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (
+      prepaymentDueAt &&
+      prepaymentDueAt.getTime() < signedAt.getTime()
+    ) {
+      return NextResponse.json(
+        { error: "Срок предоплаты не может быть раньше даты договора" },
+        { status: 400 },
+      );
+    }
+
     if (input.prepaymentPercent < 100 && !postpaymentDueAt) {
       return NextResponse.json(
         { error: input.prepaymentPercent > 0 ? "Укажите срок постоплаты" : "Укажите срок оплаты" },
