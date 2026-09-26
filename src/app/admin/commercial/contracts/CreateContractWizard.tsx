@@ -743,9 +743,13 @@ export function CreateContractWizard() {
                         className="mt-3 max-w-[220px]"
                         type="date"
                         value={prepaymentDueAt}
-                        onChange={(event) =>
-                          setPrepaymentDueAt(event.target.value)
-                        }
+                        onChange={(event) => {
+                          const date = event.target.value;
+                          setPrepaymentDueAt(date);
+                          if (date && !customPostpaymentDue) {
+                            setPostpaymentDueAt(addDaysIso(date, 30));
+                          }
+                        }}
                       />
                     ) : null}
                   </div>
