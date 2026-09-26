@@ -77,7 +77,7 @@ assert.match(
 );
 assert.match(
   route,
-  /items:[\s\S]*create: input\.items\.map/,
+  /items:[\s\S]*create: normalizedItems\.map/,
   "contract creation must persist service lines",
 );
 
