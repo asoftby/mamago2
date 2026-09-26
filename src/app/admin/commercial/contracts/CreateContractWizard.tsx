@@ -190,6 +190,33 @@ export function CreateContractWizard() {
       return false;
     }
 
+    if (currentStep === 5) {
+      if (prepaymentPercent > 0 && !prepaymentDueAt) {
+        setError("Укажите срок предоплаты");
+        return false;
+      }
+
+      if (prepaymentPercent < 100 && !postpaymentDueAt) {
+        setError(
+          prepaymentPercent > 0
+            ? "Укажите срок постоплаты"
+            : "Укажите срок оплаты",
+        );
+        return false;
+      }
+
+      const baseDate =
+        prepaymentPercent > 0 ? prepaymentDueAt : signedAt;
+      if (
+        postpaymentDueAt &&
+        baseDate &&
+        postpaymentDueAt < baseDate
+      ) {
+        setError("Срок постоплаты не может быть раньше базовой даты оплаты");
+        return false;
+      }
+    }
+
     return true;
   };
 
@@ -247,7 +274,7 @@ export function CreateContractWizard() {
   };
 
   const submit = async () => {
-    if (!validateStep(4)) return;
+    if (!validateStep(5)) return;
 
     setError("");
     setSaving(true);
