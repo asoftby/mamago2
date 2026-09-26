@@ -21,6 +21,7 @@ import {
   canonicalPublicActivityPath,
   resolveCanonicalCitySlugForEvent,
 } from "@/lib/business/eventPublicLink";
+import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
 
 const EVENT_LIST_LIMIT = 500;
 
@@ -274,6 +275,8 @@ export const eventProvider: SeoEntityProvider = {
       loaded.place?.formattedAddr ||
       loaded.place?.customAddress ||
       undefined;
+    const locationCitySlug =
+      loaded.venue?.place?.city?.slug || loaded.place?.city?.slug || citySlug;
     return buildEventJsonLd({
       canonicalUrl,
       title: loaded.title,
@@ -287,8 +290,14 @@ export const eventProvider: SeoEntityProvider = {
           ? {
               name: locationName,
               address: locationAddress,
+              addressLocality: getCityNominativeName(locationCitySlug),
             }
           : undefined,
+      pricing: {
+        mode: loaded.priceMode,
+        priceFrom: loaded.priceFrom,
+        currency: loaded.currency,
+      },
       publicBaseUrl: publicBase,
     });
   },

@@ -131,6 +131,8 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
       fromDb.place?.formattedAddr ||
       fromDb.place?.customAddress ||
       undefined;
+    const locationCitySlug =
+      fromDb.venue?.place?.city?.slug || fromDb.place?.city?.slug || city;
     const generatedJsonLd = buildEventJsonLd({
       canonicalUrl,
       title: fromDb.title,
@@ -144,6 +146,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
           ? {
               name: locationName,
               address: locationAddress,
+              addressLocality: getCityNominativeName(locationCitySlug),
             }
           : undefined,
       pricing: {

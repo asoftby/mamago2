@@ -57,6 +57,7 @@ const structuredLocation = buildEventJsonLd({
   location: {
     name: "Парк истории Сула",
     address: "Сула, 14, Сула, Минская область 222664",
+    addressLocality: "Минск",
   },
 });
 
@@ -69,6 +70,8 @@ assert.deepEqual(
     address: {
       "@type": "PostalAddress",
       streetAddress: "Сула, 14, Сула, Минская область 222664",
+      addressLocality: "Минск",
+      addressCountry: "BY",
     },
   },
   "physical Event addresses must be emitted as PostalAddress without guessing address components",
@@ -78,12 +81,25 @@ const freeEvent = buildEventJsonLd({
   canonicalUrl,
   title: "Free event",
   startDate: "2026-09-01T12:00:00+03:00",
-  pricing: { mode: "FREE", priceFrom: null, currency: "BYN" },
+  sessions: [{ startsAt: "2026-09-01T12:00:00+03:00", isSaleOpen: true }],
+  pricing: {
+    mode: "FREE",
+    priceFrom: null,
+    currency: "BYN",
+    validFrom: "2026-08-01T09:00:00+03:00",
+  },
 });
 assert.ok(freeEvent);
 assert.deepEqual(
   freeEvent.offers,
-  { "@type": "Offer", price: 0, priceCurrency: "BYN" },
+  {
+    "@type": "Offer",
+    price: 0,
+    priceCurrency: "BYN",
+    url: canonicalUrl,
+    availability: "https://schema.org/InStock",
+    validFrom: "2026-08-01T06:00:00.000Z",
+  },
   "FREE events must expose zero-price admission",
 );
 
@@ -101,7 +117,14 @@ for (const [mode, price] of [
   assert.ok(pricedEvent);
   assert.deepEqual(
     pricedEvent.offers,
-    { "@type": "Offer", price, priceCurrency: "BYN" },
+    {
+      "@type": "Offer",
+      price,
+      priceCurrency: "BYN",
+      url: canonicalUrl,
+      availability: undefined,
+      validFrom: undefined,
+    },
     `${mode} events must expose their lowest authoritative price`,
   );
 }
@@ -138,6 +161,63 @@ const invalidCurrency = buildEventJsonLd({
 });
 assert.ok(invalidCurrency);
 assert.equal(invalidCurrency.offers, undefined, "non-ISO currency labels must not enter JSON-LD");
+
+const closedEvent = buildEventJsonLd({
+  canonicalUrl,
+  title: "Closed sale event",
+  startDate: "2026-09-01T12:00:00+03:00",
+  sessions: [{ startsAt: "2026-09-01T12:00:00+03:00", isSaleOpen: false }],
+  pricing: { mode: "EXACT", priceFrom: 10, currency: "BYN", validFrom: "" },
+});
+assert.ok(closedEvent);
+assert.equal(
+  (closedEvent.offers as Record<string, unknown>).availability,
+  "https://schema.org/OutOfStock",
+);
+assert.equal(
+  (closedEvent.offers as Record<string, unknown>).validFrom,
+  undefined,
+  "validFrom must be omitted without an authoritative date",
+);
+
+const partiallyKnownAvailability = buildEventJsonLd({
+  canonicalUrl,
+  title: "Partially known sale state",
+  startDate: "2026-09-01T12:00:00+03:00",
+  sessions: [
+    { startsAt: "2026-09-01T12:00:00+03:00", isSaleOpen: false },
+    { startsAt: "2026-09-02T12:00:00+03:00", isSaleOpen: null },
+  ],
+  pricing: { mode: "EXACT", priceFrom: 10, currency: "BYN" },
+});
+assert.ok(partiallyKnownAvailability);
+assert.equal(
+  (partiallyKnownAvailability.offers as Record<string, unknown>).availability,
+  undefined,
+  "unknown session sale state must not be reported as OutOfStock",
+);
+
+const incompletePhysicalLocation = buildEventJsonLd({
+  canonicalUrl,
+  title: "Physical event without an address",
+  description: "",
+  image: "",
+  startDate: "2026-09-01T12:00:00+03:00",
+  location: { name: "Площадка", address: "", addressLocality: "Минск" },
+});
+assert.ok(incompletePhysicalLocation);
+assert.deepEqual(incompletePhysicalLocation.location, {
+  "@type": "Place",
+  name: "Площадка",
+  address: undefined,
+});
+const serializedIncomplete = JSON.stringify(incompletePhysicalLocation);
+assert.doesNotMatch(serializedIncomplete, /null|""/, "empty optional values must not be serialized");
+assert.match(
+  String(incompletePhysicalLocation.startDate),
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+  "startDate must remain ISO 8601",
+);
 
 assert.equal(
   buildEventJsonLd({

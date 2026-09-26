@@ -206,7 +206,11 @@ export async function loadPublicActivityForCityPage(
       width: img.width,
       height: img.height,
     })),
-    sessions: activity.sessions.map((s) => ({ id: s.id, startsAt: s.startsAt })),
+    sessions: activity.sessions.map((s) => ({
+      id: s.id,
+      startsAt: s.startsAt,
+      isSaleOpen: s.isSaleOpen,
+    })),
     schemaStartDate,
     place: place
       ? {

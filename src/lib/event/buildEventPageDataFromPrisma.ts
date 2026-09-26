@@ -57,7 +57,7 @@ export type ActivityForEventPageInput = {
     width?: number | null;
     height?: number | null;
   }>;
-  sessions: Array<{ id: string; startsAt: Date }>;
+  sessions: Array<{ id: string; startsAt: Date; isSaleOpen?: boolean | null }>;
   /** Контактные телефоны события (собственные, до фоллбэка на площадку) */
   phone?: string | null;
   phoneLabel?: string | null;
