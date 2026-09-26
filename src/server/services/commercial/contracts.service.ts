@@ -6,7 +6,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import type { ContractStatus, ContractType, Prisma } from "@prisma/client";
+import type { ContractStatus, ContractTemplateSource, ContractType, Prisma } from "@prisma/client";
 
 export interface ContractFilters {
   businessId?: string;
@@ -16,17 +16,31 @@ export interface ContractFilters {
 }
 
 export interface CreateContractInput {
-  businessId: string;
+  businessId?: string;
+  counterpartyId?: string;
   contractNumber: string;
   type: ContractType;
-  signedAt: Date;
-  startsAt: Date;
-  endsAt: Date;
+  templateSource?: ContractTemplateSource;
+  signedAt?: Date | null;
+  startsAt?: Date | null;
+  endsAt?: Date | null;
   autoRenew?: boolean;
   renewalTerms?: string;
   renewalPeriod?: number;
   documentUrl?: string;
   notes?: string;
+  totalAmount?: number;
+  currency?: string;
+  prepaymentPercent?: number;
+  prepaymentDueAt?: Date | null;
+  postpaymentDueAt?: Date | null;
+  paymentComment?: string;
+  platform?: string;
+  items?: Array<{
+    name: string;
+    amount: number;
+    sortOrder?: number;
+  }>;
 }
 
 export interface UpdateContractInput {
@@ -81,6 +95,19 @@ export async function getContracts(filters: ContractFilters = {}) {
           status: true,
         },
       },
+      counterparty: {
+        select: {
+          id: true,
+          name: true,
+          unp: true,
+          contactName: true,
+          phoneE164: true,
+          businessId: true,
+        },
+      },
+      items: {
+        orderBy: { sortOrder: "asc" },
+      },
     },
     orderBy: {
       endsAt: "asc",
@@ -103,6 +130,10 @@ export async function getContractById(id: string) {
           phone: true,
         },
       },
+      counterparty: true,
+      items: {
+        orderBy: { sortOrder: "asc" },
+      },
     },
   });
 }
@@ -123,20 +154,42 @@ export async function getBusinessContracts(businessId: string) {
  * Create new contract
  */
 export async function createContract(input: CreateContractInput) {
+  if (!input.businessId && !input.counterpartyId) {
+    throw new Error("Contract requires a business or commercial counterparty");
+  }
+
   return prisma.businessContract.create({
     data: {
       businessId: input.businessId,
+      counterpartyId: input.counterpartyId,
       contractNumber: input.contractNumber,
       type: input.type,
-      status: "DRAFT",
-      signedAt: input.signedAt,
-      startsAt: input.startsAt,
-      endsAt: input.endsAt,
+      templateSource: input.templateSource ?? "MAMAGO",
+      status: input.signedAt ? "ACTIVE" : "DRAFT",
+      signedAt: input.signedAt ?? null,
+      startsAt: input.startsAt ?? input.signedAt ?? null,
+      endsAt: input.endsAt ?? null,
       autoRenew: input.autoRenew ?? false,
       renewalTerms: input.renewalTerms,
       renewalPeriod: input.renewalPeriod,
       documentUrl: input.documentUrl,
       notes: input.notes,
+      totalAmount: input.totalAmount ?? 0,
+      currency: input.currency ?? "BYN",
+      prepaymentPercent: input.prepaymentPercent ?? 0,
+      prepaymentDueAt: input.prepaymentDueAt ?? null,
+      postpaymentDueAt: input.postpaymentDueAt ?? null,
+      paymentComment: input.paymentComment,
+      platform: input.platform ?? "MAMAGO_BY",
+      items: input.items?.length
+        ? {
+            create: input.items.map((item, index) => ({
+              name: item.name,
+              amount: item.amount,
+              sortOrder: item.sortOrder ?? index,
+            })),
+          }
+        : undefined,
     },
     include: {
       business: {
@@ -144,6 +197,10 @@ export async function createContract(input: CreateContractInput) {
           id: true,
           name: true,
         },
+      },
+      counterparty: true,
+      items: {
+        orderBy: { sortOrder: "asc" },
       },
     },
   });
