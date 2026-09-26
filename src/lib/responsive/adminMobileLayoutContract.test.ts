@@ -23,6 +23,9 @@
  *   (e.g. `bg-white border rounded-lg p-6 md:p-4`) is intentionally out of
  *   scope for that cleanup (see BACKLOG-157) and is excluded from the scan
  *   below via its `bg-white` marker, not treated as a page-level offender.
+ * - Search subnavigation is a touch-friendly horizontal slider on phones;
+ *   it owns its horizontal overflow instead of widening the whole page, and
+ *   keeps the active tab visible when navigating between search tools.
  *
  * Run: pnpm test:responsive-admin
  */
@@ -80,6 +83,7 @@ const dashboardBlocks = [
   "src/app/admin/_components/blocks/TrafficBlock.tsx",
 ].map(read);
 const growthKpiTiles = read("src/app/admin/_components/growth/GrowthKpiTiles.tsx");
+const searchLayout = read("src/components/admin/search/SearchLayout.tsx");
 
 // --- Admin shell breakpoint contract -------------------------------------
 
@@ -201,6 +205,39 @@ assert.match(
   growthKpiTiles,
   /grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4/,
   "Growth KPI tiles must stack on phones, go 2-up at sm and 4-up only at lg",
+);
+
+// --- Search: mobile tabs are a contained horizontal slider -----------------
+
+assert.match(
+  searchLayout,
+  /overflow-x-auto overscroll-x-contain/,
+  "Search tabs must own horizontal overflow instead of widening the Admin page",
+);
+assert.match(
+  searchLayout,
+  /flex w-max min-w-full snap-x snap-proximity/,
+  "Search tab rail must be swipeable and use scroll snapping on narrow screens",
+);
+assert.match(
+  searchLayout,
+  /inline-flex min-h-11 shrink-0 snap-start/,
+  "Search tabs must remain single-line 44px touch targets inside the slider",
+);
+assert.match(
+  searchLayout,
+  /activeTabRef\.current\?\.scrollIntoView\([\s\S]*?inline: "nearest"/,
+  "Search navigation must keep the active tab visible after route changes",
+);
+assert.equal(
+  (searchLayout.match(/mx-auto w-full max-w-7xl px-4/g) ?? []).length,
+  2,
+  "Search header and content must use 16px mobile gutters rather than desktop-only px-8",
+);
+assert.doesNotMatch(
+  searchLayout,
+  /max-w-7xl mx-auto px-8/,
+  "Search layout must not restore the old fixed 32px gutter on phones",
 );
 
 // --- Page-level spacing contract: mobile-first, legacy pattern must not return ---
