@@ -2523,7 +2523,9 @@ model CommercialCounterparty {
 
 model BusinessContract {
   id                      String                   @id @default(cuid())
+  /// Access-scoped/legacy Business link. Client-document wizard contracts leave this null.
   businessId              String?
+  /// Canonical client/counterparty for newly created commercial documents.
   counterpartyId          String?
   contractNumber          String                   @unique
   type                    ContractType
