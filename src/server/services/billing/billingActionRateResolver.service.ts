@@ -50,12 +50,12 @@ export const DEFAULT_BILLING_ACTION_RULES: Record<
     reason: "По умолчанию бесплатно",
     isActive: false,
   },
-  // PLACEHOLDER, disabled. 5% is NOT an approved rate: the party commission rate
-  // is an open question (party-mvp-spec §11) and must be set in admin pricing.
+  // Disabled, FREE by design. No commercial rate is stored until the party
+  // commission is approved by a separate decision (party-mvp-spec §11) and
+  // configured in admin pricing.
   PARTY_BOOKING_CONFIRMED: {
-    pricingType: "PERCENT",
-    percentRate: 5,
-    reason: "PLACEHOLDER (выключено): ставка конструктора праздника не утверждена",
+    pricingType: "FREE",
+    reason: "Выключено: коммерческие условия конструктора праздника включаются отдельным решением",
     isActive: false,
   },
 };
