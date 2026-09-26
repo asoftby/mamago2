@@ -23,8 +23,8 @@ export function LayoutContractSection() {
             <p className="text-sm text-gray-700">Every admin page must follow this structure:</p>
             <pre className="bg-gray-900 text-green-400 p-4 rounded-lg text-xs font-mono overflow-x-auto">
 {`// AdminPageContainer
-<div className="p-6 md:p-4 space-y-6">
-  
+<div className="p-4 sm:p-6 space-y-6">
+
   {/* AdminPageHeader */}
   <div className="flex items-center justify-between">
     <div>

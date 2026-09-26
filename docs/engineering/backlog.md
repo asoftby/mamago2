@@ -4876,3 +4876,104 @@ distributor_company_id=550) и хотели бы уточнить несколь
   `fix/perf-public-critical-css-20260921` (2026-09-21 recovery of
   `fix/perf-public-critical-css-20260914`); not fixed in that PR per its
   own instructions ("не исправляй, только owner + next-task").
+
+## [BACKLOG-157] Admin nested card padding has the same mobile/desktop inversion as the old page-gutter contract
+
+- Status: OPEN
+- Priority: P3
+- Area: Admin / Responsive
+- Added: 2026-09-26
+- Reason deferred: `fix/admin-spacing-responsive-cleanup-20260926` was
+  explicitly scoped to page-level Admin containers only ("нормализовать
+  только page-level Admin spacing"); nested card/panel padding was
+  explicitly out of scope per that task's brief ("если `p-6 md:p-4`
+  используется не как page gutter, а как внутренний padding сущности — не
+  меняй автоматически"). Fixing it now would have turned a mechanical
+  cleanup PR into a second redesign pass.
+- Context: while normalizing the page-level `p-6 md:p-4` → `p-4 sm:p-6`
+  pattern, found the same inversion (mobile gets 24px, `md+` gets 16px) on
+  nested `bg-white border border-gray-200 rounded-lg p-6 md:p-4` cards:
+  `src/components/admin/media/AdminMediaUploader.tsx:61`,
+  `src/components/admin/media/MediaActions.tsx:129`, and three panels in
+  `src/app/admin/media/[id]/page.tsx` (Usage Map / File Info / System
+  Info). The UI Lab's own `LayoutContractSection.tsx` "Standard Card
+  Pattern" example (Card / Shell Contract section) documents this same
+  `p-6 md:p-4` string as the sanctioned card pattern, so new cards will
+  keep copying the inversion until that section and these call sites are
+  fixed together.
+- Current state: not fixed. Deliberately left unchanged in
+  `fix/admin-spacing-responsive-cleanup-20260926` — verified those are the
+  only card-level occurrences in `src/app/admin/**` and
+  `src/components/admin/**` (grep for `bg-white.*p-6 md:p-4` returns
+  exactly these 5 lines).
+- Dependencies: none blocking.
+- Acceptance criteria: nested Admin card padding normalized to
+  `p-4 sm:p-6` (or equivalent mobile-first order) at the 5 call sites
+  above, and the "Standard Card Pattern" example in
+  `src/app/(ui)/ui-lab-admin/_sections/LayoutContractSection.tsx` updated
+  to match so the pattern doesn't propagate back into new cards.
+- Source: found during `fix/admin-spacing-responsive-cleanup-20260926`
+  self-review grep (`git grep -n "p-6 md:p-4"`), 2026-09-26.
+
+## [BACKLOG-158] Import Review queue and Taxonomy → Cities lack a mobile card fallback
+
+- Status: OPEN
+- Priority: P3
+- Area: Admin / Responsive
+- Added: 2026-09-26
+- Reason deferred: found during the responsive/mobile initiative's closure
+  audit (read-only source scan after `fix/admin-spacing-responsive-cleanup-20260926`),
+  which explicitly only flags P0/P1 (operationally impossible on phone),
+  not P2/P3 UX-consistency gaps. Both tables remain fully operable via
+  horizontal scroll — inconvenient, not broken — so this does not meet the
+  bar to reopen or extend an already-closed responsive pass.
+- Context: `src/app/admin/import/review/_components/ReviewQueueTableClient.tsx`
+  (`TableContainer minWidthClassName="min-w-[860px]"`) and
+  `src/app/admin/taxonomy/cities/page.tsx`
+  (`TableContainer minWidthClassName="min-w-[900px]"`, per the Admin
+  responsive-audit inventory from `fix/admin-mobile-responsive-20260926`)
+  only ship the horizontal-scroll `TableContainer` pattern (Pattern B) with
+  no `DataCardList` mobile-card fallback (Pattern A), unlike
+  `AdminOrdersClient.tsx` and `PartnersTable.tsx`, which got the card
+  treatment in the same Admin responsive pass. On a 375px phone every
+  checkbox/link/action button in these two tables is still reachable and
+  tappable via horizontal scroll — verified by reading the current source,
+  not assumed.
+- Current state: not fixed, not touched by any merged responsive PR
+  (#369–#377).
+- Dependencies: none blocking. Reuses the existing shared
+  `DataCardList`/`DataCard`/`DataCardHeader`/`DataCardBody`/`DataCardRow`/
+  `DataCardActions` primitives from `src/components/ui/data-card-list.tsx`
+  — no new component needed, same pattern as `AdminOrdersClient.tsx`.
+- Acceptance criteria: both tables render a `hidden md:block` desktop table
+  (unchanged) plus a `DataCardList` mobile view reading the same data/
+  handlers, matching the Orders/Partners precedent; `test:responsive-admin`
+  extended to guard the new mobile view the same way it guards Orders.
+- Source: responsive/mobile initiative closure audit, 2026-09-26.
+
+## [BACKLOG-159] Yandex.Metrika Reporting API as the traffic-source layer for the /admin dashboard
+
+- Status: OPEN
+- Priority: P2
+- Area: Admin / Analytics
+- Added: 2026-09-26
+- Reason deferred: the owner chose to ship the growth-first /admin dashboard
+  (`feat/admin-growth-dashboard`) first and connect Metrika later. The
+  dashboard currently answers "is the product growing" from first-party
+  telemetry + GSC only.
+- Context: GA4 and Metrika exist only as client-side counters
+  (`GOOGLE_ANALYTICS_ID`, `YANDEX_METRIKA_ID`,
+  `src/lib/analytics/externalAnalyticsConfig.ts`); there is no server-side
+  Reporting API pull. As a result, audience cannot be split by acquisition
+  source (search / Instagram / direct / referral), which is exactly the
+  question the growth block cannot answer today.
+- Proposed scope: a fail-closed `metrika_traffic_sources` MetricCollector
+  (OAuth token with Metrika stats read scope, `METRIKA_OAUTH_TOKEN`),
+  weekly visits by `ym:s:lastTrafficSource`, projected into `kpis` and shown
+  as one "откуда пришли" row under the growth tiles; plus a reconciliation
+  check of Metrika visitors vs `canonicalAudience`. GA4 intentionally out of
+  scope (duplicates Metrika; Metrika coverage in BY is better).
+- Dependencies: owner issues the OAuth token.
+- Acceptance criteria: collector writes nothing (not 0) when the token is
+  absent or the API fails; source split shown only for completed weeks.
+- Source: /admin dashboard rework, 2026-09-26.

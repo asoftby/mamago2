@@ -6,6 +6,7 @@ import { BusinessVisibilityControl } from "@/components/admin/business/BusinessV
 import { normalizeBusinessVisibilityStatus } from "@/lib/business/businessStatusModel";
 import { BusinessDangerZonePlaceholder } from "@/components/admin/business/BusinessDangerZonePlaceholder";
 import { Textarea } from "@/components/ui/textarea";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 type BusinessDetail = {
   id: string;
@@ -196,28 +197,28 @@ export function BusinessVerificationSidePanel({
   };
 
   return (
-    <>
-      {/* Overlay */}
-      <div
-        className="fixed inset-0 bg-black/20 z-40"
-        onClick={onClose}
-      />
+    <Sheet open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        className="flex h-dvh w-full flex-col gap-0 border-l bg-white p-0 sm:max-w-2xl"
+      >
+        <SheetTitle className="sr-only">Детали заявки</SheetTitle>
 
-      {/* Side Panel */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl z-50 overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 z-10 flex flex-shrink-0 items-center justify-between border-b bg-white px-6 py-4">
           <h2 className="text-xl font-bold">Детали заявки</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-gray-100"
+            aria-label="Закрыть"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="flex-1 overflow-y-auto p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
           {loading && (
             <div className="text-center py-8">Загрузка...</div>
           )}
@@ -421,7 +422,7 @@ export function BusinessVerificationSidePanel({
             </div>
           )}
         </div>
-      </div>
-    </>
+      </SheetContent>
+    </Sheet>
   );
 }

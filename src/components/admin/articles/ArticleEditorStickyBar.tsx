@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, Check, ExternalLink, Loader2 } from "lucide-react";
+import { AlertCircle, Check, ExternalLink, Eye, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -53,12 +53,12 @@ export function ArticleEditorStickyBar({
       )}
     >
       <div className="mx-auto w-full max-w-[1400px]">
-        <div className="flex h-14 max-w-4xl items-center justify-between gap-3 overflow-x-auto px-6 md:px-4">
+        <div className="max-w-4xl px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 md:flex md:h-14 md:items-center md:justify-between md:gap-3 md:px-4 md:py-0">
           <span
             role="status"
             aria-live="polite"
             className={cn(
-              "inline-flex min-w-0 shrink items-center gap-1.5 truncate text-xs font-medium",
+              "mb-2 inline-flex min-w-0 max-w-full items-center gap-1.5 truncate text-xs font-medium md:mb-0 md:shrink",
               status === "error" ? "text-red-600" : "text-muted-foreground",
             )}
           >
@@ -72,8 +72,15 @@ export function ArticleEditorStickyBar({
             <span className="truncate">{statusLabel}</span>
           </span>
 
-          <div className="flex shrink-0 items-center gap-1.5">
-            <Button type="button" size="sm" variant="outline" onClick={onSave} disabled={saveDisabled}>
+          <div className="flex min-w-0 items-stretch gap-2 md:shrink-0 md:items-center md:gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              variant={approveAction == null ? "default" : "outline"}
+              className="h-11 min-w-0 flex-1 px-4 md:h-8 md:flex-none md:px-3"
+              onClick={onSave}
+              disabled={saveDisabled}
+            >
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
               Сохранить
             </Button>
@@ -82,7 +89,7 @@ export function ArticleEditorStickyBar({
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
+                className="h-11 min-w-0 flex-1 px-4 md:h-8 md:flex-none md:px-3"
                 onClick={approveAction.onClick}
                 disabled={approveAction.disabled}
                 title={approveAction.disabledReason ?? undefined}
@@ -90,20 +97,21 @@ export function ArticleEditorStickyBar({
                 {approveAction.loading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                 ) : null}
-                {approveAction.label}
+                <span className="truncate">{approveAction.label}</span>
               </Button>
             ) : null}
 
             {previewHref != null ? (
               <Button
                 type="button"
-                size="sm"
+                size="icon"
                 variant="ghost"
-                className="text-muted-foreground hover:text-foreground"
+                className="h-11 w-11 shrink-0 text-muted-foreground hover:text-foreground md:h-8 md:w-auto md:px-3"
                 asChild
               >
-                <Link href={previewHref} target="_blank" rel="noopener noreferrer">
-                  Предпросмотр
+                <Link href={previewHref} target="_blank" rel="noopener noreferrer" aria-label="Предпросмотр" title="Предпросмотр">
+                  <Eye className="h-4 w-4 md:mr-1.5" aria-hidden />
+                  <span className="hidden md:inline">Предпросмотр</span>
                 </Link>
               </Button>
             ) : null}
@@ -111,14 +119,14 @@ export function ArticleEditorStickyBar({
             {publicUrl != null ? (
               <Button
                 type="button"
-                size="sm"
+                size="icon"
                 variant="ghost"
-                className="text-muted-foreground hover:text-foreground"
+                className="h-11 w-11 shrink-0 text-muted-foreground hover:text-foreground md:h-8 md:w-auto md:px-3"
                 asChild
               >
-                <Link href={publicUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="mr-1 h-3.5 w-3.5" aria-hidden />
-                  Открыть на сайте
+                <Link href={publicUrl} target="_blank" rel="noopener noreferrer" aria-label="Открыть на сайте" title="Открыть на сайте">
+                  <ExternalLink className="h-4 w-4 md:mr-1.5" aria-hidden />
+                  <span className="hidden md:inline">Открыть на сайте</span>
                 </Link>
               </Button>
             ) : null}

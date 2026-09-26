@@ -125,11 +125,8 @@ export function PlaceHero({
     >
       {/* Breadcrumbs */}
       <div
-        className="breadcrumbs"
+        className="breadcrumbs mx-auto w-full max-w-[1200px] px-4 pb-2.5 pt-5 sm:px-6 lg:px-7"
         style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          padding: "20px 28px 10px",
           display: "flex",
           gap: 8,
           alignItems: "center",
@@ -154,11 +151,8 @@ export function PlaceHero({
 
       {/* Hero grid */}
       <div
-        className="hero-grid"
+        className="hero-grid mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-7"
         style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          padding: "0 28px",
           display: "grid",
           gridTemplateColumns: "1fr 420px",
           gap: 56,
@@ -212,10 +206,10 @@ export function PlaceHero({
 
           {/* Title */}
           <h1
+            className="text-[34px] sm:text-[40px]"
             style={{
               fontFamily: "var(--font-sans)",
               fontWeight: 600,
-              fontSize: 40,
               lineHeight: 1.1,
               letterSpacing: "-.025em",
               margin: "0 0 8px",
@@ -227,10 +221,10 @@ export function PlaceHero({
 
           {/* Subtitle */}
           <div
+            className="text-[17px] sm:text-[19px]"
             style={{
               maxWidth: 600,
               color: "#3A332B",
-              fontSize: 19,
               lineHeight: 1.5,
               marginBottom: 8,
             }}
@@ -380,11 +374,6 @@ export function PlaceHero({
           .hero-grid {
             grid-template-columns: 1fr !important;
             gap: 36px !important;
-          }
-        }
-        @media (max-width: 1100px) {
-          .hero-grid {
-            padding: 0 22px !important;
           }
         }
       `}</style>

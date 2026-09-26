@@ -85,7 +85,7 @@ export async function collectSnapshotPayload(
     prisma.releaseEvent.findFirst({ orderBy: { detectedAt: "desc" } }),
     prisma.operationsSnapshot.findUnique({ where: { id: "current" } }),
     projectOperationsQueues(prisma),
-    projectOperationsKpis(prisma),
+    projectOperationsKpis(prisma, now),
   ]);
 
   const existingPayload = existingSnapshot?.payload as OperationsSnapshotPayload | null | undefined;

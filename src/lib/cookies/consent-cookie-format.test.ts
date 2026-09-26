@@ -30,9 +30,11 @@ assert.equal(hasValidConsentCookieValue(undefined), false);
 assert.equal(hasValidConsentCookieValue(null), false);
 assert.equal(hasValidConsentCookieValue(""), false);
 assert.equal(hasValidConsentCookieValue("not%20json%20at%20all"), false);
+assert.equal(CONSENT_REVISION, 2, "Advanced Consent Mode semantics require revision 2");
 assert.equal(
-  hasValidConsentCookieValue(encodeCookieValue(validRecord({ revision: CONSENT_REVISION - 1 }))),
+  hasValidConsentCookieValue(encodeCookieValue(validRecord({ revision: 1 }))),
   false,
+  "a revision 1 choice made under the old all-providers-gated promise must be invalid",
 );
 assert.equal(
   hasValidConsentCookieValue(encodeCookieValue(validRecord({ consentId: undefined }))),

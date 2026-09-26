@@ -205,7 +205,7 @@ export default async function AdminOrderDetailsPage({
   const publicationHref = getPublicationHref(order);
 
   return (
-    <div className="p-6 md:p-4 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div className="space-y-2">
         <Link href="/admin/orders" className="text-sm text-blue-600 hover:text-blue-700">
           Назад к списку заказов

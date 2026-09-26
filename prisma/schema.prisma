@@ -1052,6 +1052,7 @@ model Business {
   bookingRequests         BookingRequest[]
   owner                   User                          @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   contracts               BusinessContract[]
+  commercialCounterparty  CommercialCounterparty?
   invites                 BusinessInvite[]
   members                 BusinessMember[]
   placements              BusinessPlacement[]
@@ -2503,29 +2504,73 @@ model PromotionAction {
   @@index([promotionId, actionType, createdAt])
 }
 
+model CommercialCounterparty {
+  id            String             @id @default(cuid())
+  name          String
+  unp           String?            @unique
+  contactName   String?
+  phoneE164     String?
+  businessId    String?            @unique
+  egrVerifiedAt DateTime?
+  egrSource     String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  business      Business?          @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  contracts     BusinessContract[]
+
+  @@index([name])
+}
+
 model BusinessContract {
   id                      String                   @id @default(cuid())
-  businessId              String
+  /// Access-scoped/legacy Business link. Client-document wizard contracts leave this null.
+  businessId              String?
+  /// Canonical client/counterparty for newly created commercial documents.
+  counterpartyId          String?
   contractNumber          String                   @unique
   type                    ContractType
+  templateSource          ContractTemplateSource   @default(MAMAGO)
   status                  ContractStatus           @default(DRAFT)
   signedAt                DateTime?
-  startsAt                DateTime
-  endsAt                  DateTime
+  startsAt                DateTime?
+  endsAt                  DateTime?
   autoRenew               Boolean                  @default(false)
   renewalTerms            String?
   renewalPeriod           Int?
   documentUrl             String?
   notes                   String?
+  totalAmount             Decimal                  @default(0) @db.Decimal(12, 2)
+  currency                String                   @default("BYN")
+  prepaymentPercent       Int                      @default(0)
+  prepaymentDueAt         DateTime?
+  postpaymentDueAt        DateTime?
+  paymentComment          String?
+  platform                String                   @default("MAMAGO_BY")
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
-  business                Business                 @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business                Business?                @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  counterparty            CommercialCounterparty?  @relation(fields: [counterpartyId], references: [id], onDelete: Restrict)
+  items                   BusinessContractItem[]
   commercialNotifications CommercialNotification[]
 
   @@index([businessId])
+  @@index([counterpartyId])
   @@index([status])
   @@index([endsAt])
   @@index([status, endsAt])
+}
+
+model BusinessContractItem {
+  id         String           @id @default(cuid())
+  contractId String
+  name       String
+  amount     Decimal          @db.Decimal(12, 2)
+  sortOrder  Int              @default(0)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  contract   BusinessContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
 }
 
 model BusinessPlacement {
@@ -3812,6 +3857,11 @@ enum ContractStatus {
   EXPIRING
   EXPIRED
   TERMINATED
+}
+
+enum ContractTemplateSource {
+  MAMAGO
+  CLIENT
 }
 
 enum ContractType {

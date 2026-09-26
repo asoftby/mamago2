@@ -42,6 +42,11 @@ export function UnpLookupField({
   const [isLookupLoading, setIsLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState("");
   const lookupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const currentValueRef = useRef(value);
+
+  useEffect(() => {
+    currentValueRef.current = value;
+  }, [value]);
 
   useEffect(() => {
     return () => {
@@ -72,6 +77,10 @@ export function UnpLookupField({
         throw new Error("UNP lookup failed");
       }
 
+      if (currentValueRef.current !== unp) {
+        return;
+      }
+
       if (json.legalName) {
         onResolved?.({
           legalName: json.legalName,
@@ -85,6 +94,10 @@ export function UnpLookupField({
         });
       }
     } catch (error) {
+      if (currentValueRef.current !== unp) {
+        return;
+      }
+
       console.error("[UnpLookupField] Lookup failed:", error);
       setLookupError("Не удалось быстро определить название. Заполните вручную — мы проверим данные при модерации.");
       onResolved?.({
@@ -92,7 +105,9 @@ export function UnpLookupField({
         source: null,
       });
     } finally {
-      setIsLookupLoading(false);
+      if (currentValueRef.current === unp) {
+        setIsLookupLoading(false);
+      }
     }
   };
 
@@ -115,12 +130,14 @@ export function UnpLookupField({
 
   const handleChange = (nextValue: string) => {
     const cleaned = nextValue.replace(/\D/g, "").slice(0, 9);
+    currentValueRef.current = cleaned;
     onValueChange(cleaned);
     scheduleLookup(cleaned);
   };
 
   const handleBlur = () => {
     const cleaned = value.replace(/\D/g, "").slice(0, 9);
+    currentValueRef.current = cleaned;
     if (cleaned.length === 9 && !isLookupLoading) {
       if (lookupTimeoutRef.current) {
         clearTimeout(lookupTimeoutRef.current);

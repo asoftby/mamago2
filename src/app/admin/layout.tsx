@@ -103,6 +103,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           hasApprovedBusinessProfile={hasApprovedBusinessProfile}
           moderationCounts={moderationCounts}
           b2bPendingVerificationCount={b2bPendingVerificationCount}
+          importPendingReviewCount={importPendingReviewCount}
+          reviewsPendingCount={reviewsPendingCount}
           buildInfo={buildInfo}
         />
 

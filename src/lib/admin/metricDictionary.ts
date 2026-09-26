@@ -29,6 +29,17 @@ export interface MetricDictionaryEntry {
 const EXCLUDES_STAFF = "Исключены роли ADMIN и MODERATOR";
 
 export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
+  "external_analytics.ga4_coverage": {
+    metricKey: "external_analytics.ga4_coverage",
+    displayName: "External Analytics Coverage",
+    businessMeaning: "Доля фактического трафика mamaGo, наблюдаемая в GA4",
+    formula: "observed GA4 traffic / first-party mamaGo traffic за одинаковое окно и сопоставимую единицу",
+    source: "GA4 reporting export/API + UserEvent (PAGE_VIEW); GA4 источник пока не подключён",
+    window: "Одинаковое явно заданное окно для числителя и знаменателя",
+    exclusions: "Не вычисляется без внешнего GA4-наблюдения; sessions нельзя выводить из UserEvent",
+    version: "1.0.0",
+    verifiable: false,
+  },
   "audience.dau": {
     metricKey: "audience.dau",
     displayName: "DAU",

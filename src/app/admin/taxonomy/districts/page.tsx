@@ -169,7 +169,7 @@ export default function DistrictsPage() {
   }
 
   return (
-    <div className="p-6 md:p-4 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* AdminPageHeader */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>

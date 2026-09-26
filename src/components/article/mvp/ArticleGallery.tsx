@@ -135,7 +135,7 @@ function ArticleGalleryLightbox({
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-label="Просмотр изображения"
@@ -143,7 +143,7 @@ function ArticleGalleryLightbox({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="absolute left-4 top-4 z-10 rounded-full bg-black/50 px-3 py-1 text-xs font-medium text-white">
+      <div className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-10 rounded-full bg-black/50 px-3 py-1 text-xs font-medium text-white sm:left-4 sm:top-4">
         {index + 1} / {total}
       </div>
 
@@ -155,7 +155,7 @@ function ArticleGalleryLightbox({
           onClose();
         }}
         aria-label="Закрыть галерею"
-        className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:right-4 sm:top-4 sm:h-9 sm:w-9"
       >
         <X className="h-5 w-5" />
       </button>
@@ -168,7 +168,7 @@ function ArticleGalleryLightbox({
             goPrev();
           }}
           aria-label="Предыдущее изображение"
-          className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          className="absolute left-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:left-3 sm:h-10 sm:w-10"
         >
           <ChevronLeft className="h-6 w-6" />
         </button>
@@ -182,14 +182,14 @@ function ArticleGalleryLightbox({
             goNext();
           }}
           aria-label="Следующее изображение"
-          className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          className="absolute right-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:right-3 sm:h-10 sm:w-10"
         >
           <ChevronRight className="h-6 w-6" />
         </button>
       ) : null}
 
       <div
-        className="flex max-h-[90vh] max-w-[92vw] flex-col items-center justify-center gap-2"
+        className="flex max-h-[90dvh] max-w-[94vw] flex-col items-center justify-center gap-2 sm:max-w-[92vw]"
         onClick={(e) => e.stopPropagation()}
       >
         {current.url ? (
@@ -198,7 +198,7 @@ function ArticleGalleryLightbox({
             src={current.url}
             alt={current.alt ?? ""}
             aria-describedby={current.caption ? "article-gallery-lightbox-caption" : undefined}
-            className="max-h-[80vh] w-auto max-w-[92vw] object-contain"
+            className="max-h-[80dvh] w-auto max-w-[94vw] object-contain sm:max-w-[92vw]"
             style={{ ...RESET_ARTICLE_BODY_IMG_STYLE, width: "auto" }}
           />
         ) : (
@@ -369,7 +369,7 @@ export function ArticleGallery({
                 type="button"
                 onClick={goMobilePrev}
                 aria-label="Предыдущее изображение"
-                className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
@@ -380,7 +380,7 @@ export function ArticleGallery({
                 type="button"
                 onClick={goMobileNext}
                 aria-label="Следующее изображение"
-                className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <ChevronRight className="h-5 w-5" />
               </button>

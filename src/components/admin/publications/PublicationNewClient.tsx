@@ -45,7 +45,7 @@ export function PublicationNewClient({
 
   if (!valid) {
     return (
-      <div className="p-6 md:p-4 space-y-6 max-w-lg">
+      <div className="p-4 sm:p-6 space-y-6 max-w-lg">
         <div className="flex items-center gap-3">
           <BackButton href="/admin/content/publications" />
           <h1 className="text-2xl md:text-xl font-bold text-gray-900">Тип публикации</h1>
@@ -65,7 +65,7 @@ export function PublicationNewClient({
   }
 
   return (
-    <div className="p-6 md:p-4 space-y-8">
+    <div className="p-4 sm:p-6 space-y-8">
       <div className="flex max-w-3xl items-start gap-3">
         <BackButton href="/admin/content/publications" />
         <div className="min-w-0">

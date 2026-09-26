@@ -6,6 +6,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FilterSelect } from "@/components/ui/filter-select";
+import { TableContainer } from "@/components/ui/table";
+import { AdminFilterTabs } from "@/components/admin/ui/AdminFilterTabs";
+import {
+  DataCardList,
+  DataCard,
+  DataCardHeader,
+  DataCardBody,
+  DataCardRow,
+  DataCardActions,
+} from "@/components/ui/data-card-list";
 import type { BookingStatus } from "@prisma/client";
 
 type EntityTypeFilter = "all" | "CAMP_SHIFT" | "EVENT" | "OFFER" | "PLACE";
@@ -270,34 +280,15 @@ export function AdminOrdersClient() {
         </div>
       )}
 
-      <div className="flex items-center gap-2 overflow-x-auto rounded-xl border border-stone-200 bg-white p-1">
-        {statusTabs.map((tab) => (
-          <button
-            key={tab.value}
-            type="button"
-            onClick={() => {
-              setStatus(tab.value);
-              setPage(1);
-            }}
-            className={[
-              "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors",
-              status === tab.value
-                ? "bg-stone-900 text-white"
-                : "text-stone-600 hover:bg-stone-100",
-            ].join(" ")}
-          >
-            {tab.label}
-            <span
-              className={[
-                "rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none",
-                status === tab.value ? "bg-white/20 text-white" : "bg-stone-100 text-stone-600",
-              ].join(" ")}
-            >
-              {tab.count}
-            </span>
-          </button>
-        ))}
-      </div>
+      <AdminFilterTabs
+        items={statusTabs}
+        value={status}
+        onValueChange={(value) => {
+          setStatus(value as "all" | BookingStatus);
+          setPage(1);
+        }}
+        ariaLabel="Статус заказа"
+      />
 
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -366,22 +357,6 @@ export function AdminOrdersClient() {
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-gray-600">Статус</label>
-            <FilterSelect
-              value={status}
-              placeholder="Все статусы"
-              onChange={(value) => resetPageAndSet(setStatus, value as "all" | BookingStatus)}
-              options={[
-                { value: "NEW", label: STATUS_LABELS.NEW },
-                { value: "CONFIRMED", label: STATUS_LABELS.CONFIRMED },
-                { value: "COMPLETED", label: STATUS_LABELS.COMPLETED },
-                { value: "REJECTED", label: STATUS_LABELS.REJECTED },
-                { value: "CANCELLED", label: STATUS_LABELS.CANCELLED },
-              ]}
-            />
-          </div>
-
           <div className="flex items-end">
             <Button
               type="button"
@@ -420,100 +395,168 @@ export function AdminOrdersClient() {
           Заявки не найдены
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-700">Создано</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-700">Клиент</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-700">Статус</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-700">Бизнес</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-700">Публикация</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-700">Последняя активность</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-700">Действия</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {ordersData.orders.map((order) => {
-                const publicationHref = getPublicationHref(order);
-                return (
-                  <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 align-top text-gray-700">
-                      <div className="font-medium text-gray-900">{formatDateTime(order.createdAt)}</div>
-                      <div className="text-xs text-gray-500">{order.id}</div>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <div className="font-medium text-gray-900">{order.customerName}</div>
-                      <div className="text-gray-600">{order.customerPhone}</div>
-                      <div className="text-gray-500">{order.customerEmail || "—"}</div>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <Badge
-                        variant="outline"
-                        className={STATUS_BADGE_CLASS[order.status]}
-                      >
+        <>
+          {/* Desktop: table */}
+          <div className="hidden md:block overflow-hidden rounded-lg border border-gray-200 bg-white">
+            <TableContainer
+              minWidthClassName="min-w-[900px]"
+              scrollLabel="Список заказов, прокручивается по горизонтали"
+            >
+              <table className="w-full text-sm">
+                <thead className="border-b border-gray-200 bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-gray-700">Создано</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-700">Клиент</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-700">Статус</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-700">Бизнес</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-700">Публикация</th>
+                    <th className="px-4 py-3 text-left font-medium text-gray-700">Последняя активность</th>
+                    <th className="px-4 py-3 text-right font-medium text-gray-700">Действия</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {ordersData.orders.map((order) => {
+                    const publicationHref = getPublicationHref(order);
+                    return (
+                      <tr key={order.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 align-top text-gray-700">
+                          <div className="font-medium text-gray-900">{formatDateTime(order.createdAt)}</div>
+                          <div className="text-xs text-gray-500">{order.id}</div>
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <div className="font-medium text-gray-900">{order.customerName}</div>
+                          <div className="text-gray-600">{order.customerPhone}</div>
+                          <div className="text-gray-500">{order.customerEmail || "—"}</div>
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <Badge
+                            variant="outline"
+                            className={STATUS_BADGE_CLASS[order.status]}
+                          >
+                            {STATUS_LABELS[order.status]}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <Link
+                            href={`/admin/b2b/partners/${order.business.id}`}
+                            className="font-medium text-blue-600 hover:text-blue-700"
+                          >
+                            {order.business.name}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <div className="space-y-1">
+                            <Badge variant="outline" className="border-stone-200 bg-stone-50 text-stone-700">
+                              {ENTITY_TYPE_LABELS[order.entityType]}
+                            </Badge>
+                            {publicationHref ? (
+                              <Link
+                                href={publicationHref}
+                                className="block font-medium text-blue-600 hover:text-blue-700"
+                              >
+                                {order.entityTitle || "Открыть публикацию"}
+                              </Link>
+                            ) : (
+                              <div className="font-medium text-gray-900">{order.entityTitle || "—"}</div>
+                            )}
+                            {order.campShiftSnapshot && (
+                              <div className="text-xs text-gray-500">
+                                Смена: {order.campShiftSnapshot.title || "Без названия"} ·{" "}
+                                {formatCompactDate(order.campShiftSnapshot.dateFrom)} -{" "}
+                                {formatCompactDate(order.campShiftSnapshot.dateTo)}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 align-top text-gray-600">
+                          {order.latestActivity ? (
+                            <div className="space-y-1">
+                              <div className="font-medium text-gray-900">{order.latestActivity.type}</div>
+                              <div className="text-xs text-gray-500">
+                                {order.latestActivity.actorType} ·{" "}
+                                {formatDateTime(order.latestActivity.createdAt)}
+                              </div>
+                            </div>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-4 py-3 align-top text-right">
+                          <Link
+                            href={`/admin/orders/${order.id}`}
+                            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                          >
+                            Открыть детали
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </TableContainer>
+          </div>
+
+          {/* Mobile: order cards — same data, same actions */}
+          <DataCardList>
+            {ordersData.orders.map((order) => {
+              const publicationHref = getPublicationHref(order);
+              return (
+                <DataCard key={order.id}>
+                  <DataCardHeader
+                    title={order.customerName}
+                    subtitle={formatDateTime(order.createdAt)}
+                    badge={
+                      <Badge variant="outline" className={STATUS_BADGE_CLASS[order.status]}>
                         {STATUS_LABELS[order.status]}
                       </Badge>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <Link
-                        href={`/admin/b2b/partners/${order.business.id}`}
-                        className="font-medium text-blue-600 hover:text-blue-700"
-                      >
-                        {order.business.name}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <div className="space-y-1">
-                        <Badge variant="outline" className="border-stone-200 bg-stone-50 text-stone-700">
-                          {ENTITY_TYPE_LABELS[order.entityType]}
-                        </Badge>
-                        {publicationHref ? (
-                          <Link
-                            href={publicationHref}
-                            className="block font-medium text-blue-600 hover:text-blue-700"
-                          >
-                            {order.entityTitle || "Открыть публикацию"}
+                    }
+                  />
+                  <DataCardBody>
+                    <DataCardRow label="Телефон" value={order.customerPhone} />
+                    <DataCardRow label="Email" value={order.customerEmail || undefined} />
+                    <DataCardRow
+                      label="Бизнес"
+                      value={
+                        <Link
+                          href={`/admin/b2b/partners/${order.business.id}`}
+                          className="font-medium text-blue-600 hover:text-blue-700"
+                        >
+                          {order.business.name}
+                        </Link>
+                      }
+                    />
+                    <DataCardRow
+                      label="Публикация"
+                      value={
+                        publicationHref ? (
+                          <Link href={publicationHref} className="font-medium text-blue-600 hover:text-blue-700">
+                            {order.entityTitle || ENTITY_TYPE_LABELS[order.entityType]}
                           </Link>
                         ) : (
-                          <div className="font-medium text-gray-900">{order.entityTitle || "—"}</div>
-                        )}
-                        {order.campShiftSnapshot && (
-                          <div className="text-xs text-gray-500">
-                            Смена: {order.campShiftSnapshot.title || "Без названия"} ·{" "}
-                            {formatCompactDate(order.campShiftSnapshot.dateFrom)} -{" "}
-                            {formatCompactDate(order.campShiftSnapshot.dateTo)}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-top text-gray-600">
-                      {order.latestActivity ? (
-                        <div className="space-y-1">
-                          <div className="font-medium text-gray-900">{order.latestActivity.type}</div>
-                          <div className="text-xs text-gray-500">
-                            {order.latestActivity.actorType} ·{" "}
-                            {formatDateTime(order.latestActivity.createdAt)}
-                          </div>
-                        </div>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-4 py-3 align-top text-right">
-                      <Link
-                        href={`/admin/orders/${order.id}`}
-                        className="text-sm font-medium text-blue-600 hover:text-blue-700"
-                      >
+                          order.entityTitle || ENTITY_TYPE_LABELS[order.entityType]
+                        )
+                      }
+                    />
+                    {order.latestActivity && (
+                      <DataCardRow
+                        label="Активность"
+                        value={`${order.latestActivity.type} · ${formatDateTime(order.latestActivity.createdAt)}`}
+                      />
+                    )}
+                  </DataCardBody>
+                  <DataCardActions>
+                    <Link href={`/admin/orders/${order.id}`} className="w-full">
+                      <Button variant="outline" size="sm" className="w-full">
                         Открыть детали
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </Button>
+                    </Link>
+                  </DataCardActions>
+                </DataCard>
+              );
+            })}
+          </DataCardList>
+        </>
       )}
 
       <div className="flex items-center justify-end gap-2">

@@ -16,6 +16,7 @@ import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCar
 import { BusinessEmptyState } from "@/components/business/ui/BusinessEmptyState";
 import { BusinessChip } from "@/components/business/ui/BusinessChip";
 import { TableContainer } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 type ApiTransaction = {
   id: string;
@@ -145,13 +146,13 @@ export default function BillingTransactionsPage() {
       />
 
       <BusinessSurfaceCard className="p-4 md:p-5">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-stone-500" />
             <span className="text-sm font-medium text-stone-700">Фильтры</span>
           </div>
 
-          <div className="flex min-w-[220px] items-center gap-2">
+          <div className="flex min-w-0 flex-col gap-2 sm:min-w-[220px] sm:flex-row sm:items-center">
             <label className="shrink-0 text-sm text-stone-600">Тип:</label>
             <FilterSelect
               value={selectedType}
@@ -160,11 +161,11 @@ export default function BillingTransactionsPage() {
                 label: type.label,
               }))}
               onChange={(value) => setSelectedType(value as TransactionType | "all")}
-              className="min-w-[180px]"
+              className="w-full min-w-0 sm:min-w-[180px]"
             />
           </div>
 
-          <div className="flex min-w-[220px] items-center gap-2">
+          <div className="flex min-w-0 flex-col gap-2 sm:min-w-[220px] sm:flex-row sm:items-center">
             <label className="shrink-0 text-sm text-stone-600">Статус:</label>
             <FilterSelect
               value={selectedStatus}
@@ -175,11 +176,11 @@ export default function BillingTransactionsPage() {
               onChange={(value) =>
                 setSelectedStatus(value as TransactionStatus | "all")
               }
-              className="min-w-[180px]"
+              className="w-full min-w-0 sm:min-w-[180px]"
             />
           </div>
 
-          <div className="ml-auto">
+          <div className="sm:ml-auto">
             <BusinessChip tone="muted">
               Найдено: {countLabel}
             </BusinessChip>
@@ -207,6 +208,43 @@ export default function BillingTransactionsPage() {
         />
       ) : !isLoading && !loadError ? (
         <BusinessSurfaceCard className="overflow-hidden p-0">
+          <div className="divide-y divide-stone-100 md:hidden">
+            {filteredTransactions.map((transaction) => (
+              <div key={transaction.id} className="p-4">
+                <button
+                  type="button"
+                  className="flex min-h-11 w-full items-start justify-between gap-3 text-left"
+                  onClick={() => setSelectedTransaction(selectedTransaction === transaction.id ? null : transaction.id)}
+                  aria-expanded={selectedTransaction === transaction.id}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-stone-950">{getTransactionTypeLabel(transaction.type)}</span>
+                      <TransactionStatusBadge status={transaction.status} />
+                    </div>
+                    <p className="mt-2 break-words text-sm text-stone-600">{transaction.description}</p>
+                    <p className="mt-2 text-xs text-stone-500">{formatDateTime(transaction.date)}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className={transaction.amount > 0 ? "font-semibold text-green-600" : "font-semibold text-stone-950"}>
+                      {transaction.amount > 0 ? "+" : ""}{formatPrice(Math.abs(transaction.amount))}
+                    </div>
+                    <ChevronDown className={cn("ml-auto mt-2 h-5 w-5 text-stone-400 transition-transform", selectedTransaction === transaction.id && "rotate-180")} />
+                  </div>
+                </button>
+                {selectedTransaction === transaction.id ? (
+                  <div className="mt-4 rounded-2xl bg-stone-50 p-4 text-sm">
+                    <p className="text-stone-500">ID транзакции</p>
+                    <p className="mt-1 break-all font-mono text-stone-950">{transaction.id}</p>
+                    {transaction.relatedEntity ? (
+                      <><p className="mt-3 text-stone-500">Связанная сущность</p><p className="mt-1 break-words text-stone-950">{transaction.relatedEntity.name}</p></>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          <div className="hidden md:block">
           <TableContainer minWidthClassName="min-w-[760px]" scrollLabel="История операций, таблица">
             <table className="w-full">
               <thead className="bg-stone-50/90">
@@ -330,6 +368,7 @@ export default function BillingTransactionsPage() {
               </tbody>
             </table>
           </TableContainer>
+          </div>
         </BusinessSurfaceCard>
       ) : null}
     </div>

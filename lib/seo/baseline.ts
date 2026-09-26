@@ -241,7 +241,7 @@ function getConfiguredActualEvergreen(isoWeek: string): number | null {
   return isFiniteNonNegative(value) ? value : null;
 }
 
-function getLinearGateTargetShare(isoWeek: string): number | null {
+export function getLinearGateTargetShare(isoWeek: string): number | null {
   const startWeek = parseIsoWeekStart(SEO_BASELINE.measurementStartIsoWeek);
   const targetWeek = parseIsoWeekStart(SEO_BASELINE.targetIsoWeek);
   const currentWeek = parseIsoWeekStart(isoWeek);

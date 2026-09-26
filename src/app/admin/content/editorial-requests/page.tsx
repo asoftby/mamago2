@@ -21,7 +21,7 @@ export default async function AdminEditorialRequestsPage() {
   const items = await listEditorialRequests();
 
   return (
-    <div className="space-y-6 p-6 md:p-4">
+    <div className="space-y-6 p-4 sm:p-6">
       <AdminPageHeader
         title="Редакционные запросы"
         subtitle="Внутренние редакционные запросы с preview бизнесов по опубликованным офферам."

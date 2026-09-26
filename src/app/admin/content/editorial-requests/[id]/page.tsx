@@ -38,7 +38,7 @@ export default async function AdminEditorialRequestDetailPage({
   }
 
   return (
-    <div className="space-y-6 p-6 md:p-4">
+    <div className="space-y-6 p-4 sm:p-6">
       <AdminPageHeader
         title={request.title}
         subtitle="Редактор критериев и preview matched businesses для Phase 1."

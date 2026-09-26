@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /** Оболочка страницы Discovery / Taxonomy (как Event Categories). */
-export const DISCOVERY_PAGE_SHELL = "p-6 md:p-4 space-y-6";
+export const DISCOVERY_PAGE_SHELL = "p-4 sm:p-6 space-y-6";
 
 export const DISCOVERY_TABLE_WRAP = "border border-gray-200 rounded-lg overflow-hidden bg-white";
 

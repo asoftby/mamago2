@@ -195,7 +195,7 @@ function PriceRangeControl({
                 aria-valuenow={current}
                 aria-valuetext={formatPrice(current)}
                 className={cn(
-                  "absolute top-1/2 z-10 h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full",
+                  "absolute top-1/2 z-10 h-11 w-11 -translate-x-1/2 -translate-y-1/2 rounded-full sm:h-9 sm:w-9",
                   "border-2 border-primary bg-background shadow-[0_6px_20px_rgba(0,0,0,0.14)]",
                   "outline-none transition-transform hover:scale-105",
                   "focus-visible:ring-4 focus-visible:ring-primary/20",
@@ -366,21 +366,23 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
         )}
       </fieldset>
 
-      <div className="sticky bottom-0 flex items-center justify-between border-t bg-white pt-4">
+      <div className="sticky bottom-0 z-10 -mx-4 flex items-center gap-2 border-t bg-white/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:mx-0 lg:justify-between lg:px-0 lg:pb-0 lg:pt-4 lg:backdrop-blur-none">
         <MobileOverlayResetAction
-          className="lg:rounded-none lg:px-0 lg:py-0 lg:font-semibold lg:text-foreground lg:underline lg:hover:bg-transparent lg:hover:text-foreground lg:active:bg-transparent"
+          className="min-h-11 px-2 lg:min-h-0 lg:rounded-none lg:px-0 lg:py-0 lg:font-semibold lg:text-foreground lg:underline lg:hover:bg-transparent lg:hover:text-foreground lg:active:bg-transparent"
           onClick={() => setDraft((current) => resetEventRefinements(current))}
         >
-          Сбросить уточнения
+          <span className="sm:hidden">Сбросить</span>
+          <span className="hidden sm:inline">Сбросить уточнения</span>
         </MobileOverlayResetAction>
         <Button
-          className="rounded-full px-6"
+          className="min-h-11 min-w-0 flex-1 rounded-full px-4 text-sm lg:flex-none lg:px-6"
           onClick={() => {
             actions.commitFilters(draft);
             onApply?.();
           }}
         >
-          Показать {count ?? "…"} событий
+          <span className="sm:hidden">Показать {count ?? "…"}</span>
+          <span className="hidden sm:inline">Показать {count ?? "…"} событий</span>
         </Button>
       </div>
     </div>
