@@ -123,6 +123,8 @@ export default async function AdminContractsPage() {
                   daysUntilEnd != null && daysUntilEnd <= 30 && daysUntilEnd > 0;
                 const clientName =
                   contract.counterparty?.name ?? contract.business?.name ?? "—";
+                const linkedBusinessId =
+                  contract.businessId ?? contract.counterparty?.businessId ?? null;
 
                 return (
                   <tr
@@ -132,9 +134,9 @@ export default async function AdminContractsPage() {
                     }`}
                   >
                     <td className="py-3 px-4">
-                      {contract.businessId && contract.business ? (
+                      {linkedBusinessId ? (
                         <Link
-                          href={`/admin/businesses/${contract.businessId}/commercial`}
+                          href={`/admin/businesses/${linkedBusinessId}/commercial`}
                           className="font-medium text-blue-600 hover:text-blue-700"
                         >
                           {clientName}
