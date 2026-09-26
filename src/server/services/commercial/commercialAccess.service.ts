@@ -390,7 +390,7 @@ function determineEnabledFeatures(context: {
  * Generate warnings for business
  */
 function generateWarnings(context: {
-  contract: { status?: string; endsAt?: Date } | null;
+  contract: { status?: string; endsAt?: Date | null } | null;
   placement: PlacementData | null;
   servicePlacements: ServicePlacementData[];
   isInGracePeriod: boolean;
