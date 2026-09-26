@@ -275,6 +275,8 @@ export const eventProvider: SeoEntityProvider = {
       loaded.place?.formattedAddr ||
       loaded.place?.customAddress ||
       undefined;
+    const locationCitySlug =
+      loaded.venue?.place?.city?.slug || loaded.place?.city?.slug || citySlug;
     return buildEventJsonLd({
       canonicalUrl,
       title: loaded.title,
@@ -288,7 +290,7 @@ export const eventProvider: SeoEntityProvider = {
           ? {
               name: locationName,
               address: locationAddress,
-              addressLocality: getCityNominativeName(citySlug),
+              addressLocality: getCityNominativeName(locationCitySlug),
             }
           : undefined,
       pricing: {

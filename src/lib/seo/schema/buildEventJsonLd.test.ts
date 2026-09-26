@@ -180,6 +180,23 @@ assert.equal(
   "validFrom must be omitted without an authoritative date",
 );
 
+const partiallyKnownAvailability = buildEventJsonLd({
+  canonicalUrl,
+  title: "Partially known sale state",
+  startDate: "2026-09-01T12:00:00+03:00",
+  sessions: [
+    { startsAt: "2026-09-01T12:00:00+03:00", isSaleOpen: false },
+    { startsAt: "2026-09-02T12:00:00+03:00", isSaleOpen: null },
+  ],
+  pricing: { mode: "EXACT", priceFrom: 10, currency: "BYN" },
+});
+assert.ok(partiallyKnownAvailability);
+assert.equal(
+  (partiallyKnownAvailability.offers as Record<string, unknown>).availability,
+  undefined,
+  "unknown session sale state must not be reported as OutOfStock",
+);
+
 const incompletePhysicalLocation = buildEventJsonLd({
   canonicalUrl,
   title: "Physical event without an address",

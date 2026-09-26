@@ -152,7 +152,9 @@ function resolveOfferAvailability(
     .map((session) => session.isSaleOpen)
     .filter((value): value is boolean => typeof value === "boolean");
   if (knownStates.some(Boolean)) return "https://schema.org/InStock";
-  if (knownStates.length > 0) return "https://schema.org/OutOfStock";
+  if ((sessions?.length ?? 0) > 0 && sessions?.every((session) => session.isSaleOpen === false)) {
+    return "https://schema.org/OutOfStock";
+  }
   return undefined;
 }
 
