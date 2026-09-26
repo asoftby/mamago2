@@ -5,19 +5,19 @@ import type { MetricCollector, MetricCollectorContext, MetricSampleDraft } from 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SEARCH_ANALYTICS_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
 const SEARCH_ANALYTICS_BASE = "https://www.googleapis.com/webmasters/v3/sites";
-const DATA_LAG_DAYS = 3;
+export const DATA_LAG_DAYS = 3;
 const DETAIL_ROW_LIMIT = 50;
 const DETAIL_SAMPLES_PER_DIMENSION = 20;
 const MOVERS_LIMIT = 3;
 const MAX_DIM_KEY_LENGTH = 128;
 
-interface GscConfig {
+export interface GscConfig {
   siteUrl: string;
   clientEmail: string;
   privateKey: string;
 }
 
-interface GscRow {
+export interface GscRow {
   keys?: string[];
   clicks: number;
   impressions: number;
@@ -29,7 +29,7 @@ interface GscResponse {
   rows?: GscRow[];
 }
 
-interface DateRange {
+export interface DateRange {
   startDate: string;
   endDate: string;
 }
@@ -76,7 +76,7 @@ export function buildServiceAccountAssertion(config: GscConfig, now: Date): stri
   return `${unsigned}.${signer.sign(config.privateKey, "base64url")}`;
 }
 
-async function getAccessToken(config: GscConfig, now: Date): Promise<string> {
+export async function getAccessToken(config: GscConfig, now: Date): Promise<string> {
   const body = new URLSearchParams({
     grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
     assertion: buildServiceAccountAssertion(config, now),
@@ -96,12 +96,13 @@ async function getAccessToken(config: GscConfig, now: Date): Promise<string> {
   return json.access_token;
 }
 
-async function querySearchAnalytics(
+export async function querySearchAnalytics(
   config: GscConfig,
   accessToken: string,
   range: DateRange,
   dimensions: string[] = [],
   rowLimit = 1,
+  startRow = 0,
 ): Promise<GscRow[]> {
   const endpoint = `${SEARCH_ANALYTICS_BASE}/${encodeURIComponent(config.siteUrl)}/searchAnalytics/query`;
   const response = await fetch(endpoint, {
@@ -115,6 +116,7 @@ async function querySearchAnalytics(
       ...(dimensions.length ? { dimensions } : {}),
       type: "web",
       rowLimit,
+      ...(startRow > 0 ? { startRow } : {}),
     }),
   });
   if (!response.ok) {
@@ -130,7 +132,7 @@ function validRow(row: GscRow): boolean {
   );
 }
 
-function ptDateYmd(date: Date): string {
+export function ptDateYmd(date: Date): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
     year: "numeric",
@@ -141,7 +143,7 @@ function ptDateYmd(date: Date): string {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-function shiftYmd(ymd: string, days: number): string {
+export function shiftYmd(ymd: string, days: number): string {
   const date = new Date(`${ymd}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
@@ -174,8 +176,16 @@ function compactDimension(raw: string, kind: "page" | "query"): string {
   return `${value.slice(0, MAX_DIM_KEY_LENGTH - 9)}…${hash}`;
 }
 
-function aggregateRow(rows: GscRow[]): GscRow {
-  return rows[0] ?? { clicks: 0, impressions: 0, ctr: 0, position: 0 };
+/**
+ * An aggregate (no-dimension) query with no rows means GSC has no finished
+ * data for that window yet — not that the site had zero clicks. Fail the
+ * cycle instead of writing a fabricated 0 that the dashboard would render
+ * as a traffic collapse; the previous values stay projected.
+ */
+export function aggregateRow(rows: GscRow[], window: string): GscRow {
+  const row = rows[0];
+  if (!row) throw new Error(`GSC returned no aggregate row for the ${window} window`);
+  return row;
 }
 
 function metricRows(prefix: string, kind: "page" | "query", rows: GscRow[]): MetricSampleDraft[] {
@@ -257,8 +267,8 @@ export async function collectGoogleSearchConsoleMetrics(
     querySearchAnalytics(config, accessToken, ranges.current, ["query"], DETAIL_ROW_LIMIT),
   ]);
 
-  const current = aggregateRow(currentAggregateRows);
-  const previous = aggregateRow(previousAggregateRows);
+  const current = aggregateRow(currentAggregateRows, "current");
+  const previous = aggregateRow(previousAggregateRows, "previous");
   return [
     { metric: "gsc.clicks_7d", value: current.clicks },
     { metric: "gsc.clicks_prev_7d", value: previous.clicks },
