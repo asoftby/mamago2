@@ -259,6 +259,8 @@ async function seedCommercialLayer() {
 
     // Create notifications for expiring/expired items
     for (const contract of contracts) {
+      if (!contract.endsAt) continue;
+
       if (contract.status === "EXPIRING") {
         await prisma.commercialNotification.create({
           data: {

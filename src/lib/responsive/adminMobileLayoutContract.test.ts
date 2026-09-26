@@ -80,6 +80,9 @@ const dashboardBlocks = [
   "src/app/admin/_components/blocks/TrafficBlock.tsx",
 ].map(read);
 const growthKpiTiles = read("src/app/admin/_components/growth/GrowthKpiTiles.tsx");
+const billingBusinesses = read("src/app/admin/billing/businesses/BillingBusinessesClient.tsx");
+const contractsPage = read("src/app/admin/commercial/contracts/page.tsx");
+const contractWizard = read("src/app/admin/commercial/contracts/CreateContractWizard.tsx");
 
 // --- Admin shell breakpoint contract -------------------------------------
 
@@ -202,6 +205,32 @@ assert.match(
   /grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4/,
   "Growth KPI tiles must stack on phones, go 2-up at sm and 4-up only at lg",
 );
+
+// --- Admin page header actions: stack below title on mobile -----------------
+
+assert.match(
+  billingBusinesses,
+  /flex flex-col gap-4 md:flex-row md:items-start md:justify-between/,
+  "billing businesses header action must stack below the title on mobile and return to the right at md+",
+);
+assert.match(
+  billingBusinesses,
+  /w-full[^"]*bg-primary[^"]*text-primary-foreground[^"]*md:w-auto/,
+  "billing businesses primary action must be full-width on mobile and compact at md+",
+);
+assert.equal(billingBusinesses.includes("Пополнить баланс"), true);
+
+assert.match(
+  contractsPage,
+  /flex flex-col gap-4 md:flex-row md:items-start md:justify-between/,
+  "contracts header action must stack below the title on mobile and return to the right at md+",
+);
+assert.match(
+  contractWizard,
+  /className="h-10 w-full md:w-auto"/,
+  "contract create trigger must be full-width on mobile and compact at md+",
+);
+assert.equal(contractWizard.includes("Создать договор"), true);
 
 // --- Page-level spacing contract: mobile-first, legacy pattern must not return ---
 
