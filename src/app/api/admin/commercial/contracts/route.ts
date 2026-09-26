@@ -29,7 +29,15 @@ const CreateContractWizardSchema = z.object({
     .array(
       z.object({
         name: z.string().trim().min(1, "Укажите название услуги").max(300),
-        amount: z.number().finite().positive("Сумма должна быть больше нуля").max(1_000_000_000),
+        amount: z
+          .number()
+          .finite()
+          .positive("Сумма должна быть больше нуля")
+          .max(1_000_000_000)
+          .refine(
+            (value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-8,
+            "Не более 2 знаков после запятой",
+          ),
       }),
     )
     .min(1, "Добавьте хотя бы одну услугу")
