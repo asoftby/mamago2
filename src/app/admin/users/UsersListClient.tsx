@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Send } from "lucide-react";
+import { ChevronRight, Send } from "lucide-react";
 import { Role, UserStatus } from "@/types/admin";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,6 @@ import {
   DataCardHeader,
   DataCardBody,
   DataCardRow,
-  DataCardActions,
 } from "@/components/ui/data-card-list";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -318,58 +317,62 @@ export function UsersListClient() {
           {/* Mobile: cards — same data, same handlers */}
           <DataCardList>
             {data.users.map((user) => (
-              <DataCard key={user.id}>
-                <DataCardHeader
-                  title={
-                    <span className="inline-flex items-center gap-1.5">
-                      {user.email}
-                      {user.emailVerifiedAt && (
-                        <span className="text-green-600" title="Email подтвержден">✓</span>
-                      )}
-                    </span>
-                  }
-                  badge={<Badge className={STATUS_COLORS[user.status]}>{STATUS_LABELS[user.status]}</Badge>}
-                />
-                <DataCardBody>
-                  <DataCardRow label="Роль" value={<Badge className={ROLE_COLORS[user.role]}>{ROLE_LABELS[user.role]}</Badge>} />
-                  <DataCardRow
-                    label="Телефон"
-                    value={
-                      user.phoneE164 ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          {user.phoneE164}
-                          {user.phoneVerifiedAt && (
-                            <span className="text-green-600" title="Телефон подтвержден">✓</span>
-                          )}
-                        </span>
-                      ) : null
+              <Link
+                key={user.id}
+                href={`/admin/users/${user.id}`}
+                className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-label={`Открыть пользователя ${user.email}`}
+              >
+                <DataCard className="transition-colors hover:bg-gray-50 active:bg-gray-100">
+                  <DataCardHeader
+                    title={
+                      <span className="inline-flex min-w-0 items-center gap-1.5">
+                        <span className="truncate">{user.email}</span>
+                        {user.emailVerifiedAt && (
+                          <span className="shrink-0 text-green-600" title="Email подтвержден">✓</span>
+                        )}
+                        <ChevronRight
+                          aria-hidden="true"
+                          className="h-4 w-4 shrink-0 text-gray-400"
+                        />
+                      </span>
                     }
+                    badge={<Badge className={STATUS_COLORS[user.status]}>{STATUS_LABELS[user.status]}</Badge>}
                   />
-                  <DataCardRow
-                    label="Telegram"
-                    value={user.telegramId ? <TelegramStatusCell user={user} /> : null}
-                  />
-                  <DataCardRow
-                    label="Последний вход"
-                    value={
-                      user.lastLoginAt
-                        ? formatDistanceToNow(new Date(user.lastLoginAt), { addSuffix: true, locale: ru })
-                        : "Никогда"
-                    }
-                  />
-                  <DataCardRow
-                    label="Регистрация"
-                    value={formatDistanceToNow(new Date(user.createdAt), { addSuffix: true, locale: ru })}
-                  />
-                </DataCardBody>
-                <DataCardActions>
-                  <Link href={`/admin/users/${user.id}`} className="w-full">
-                    <Button variant="outline" size="sm" className="w-full">
-                      Открыть
-                    </Button>
-                  </Link>
-                </DataCardActions>
-              </DataCard>
+                  <DataCardBody>
+                    <DataCardRow label="Роль" value={<Badge className={ROLE_COLORS[user.role]}>{ROLE_LABELS[user.role]}</Badge>} />
+                    <DataCardRow
+                      label="Телефон"
+                      value={
+                        user.phoneE164 ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            {user.phoneE164}
+                            {user.phoneVerifiedAt && (
+                              <span className="text-green-600" title="Телефон подтвержден">✓</span>
+                            )}
+                          </span>
+                        ) : null
+                      }
+                    />
+                    <DataCardRow
+                      label="Telegram"
+                      value={user.telegramId ? <TelegramStatusCell user={user} /> : null}
+                    />
+                    <DataCardRow
+                      label="Последний вход"
+                      value={
+                        user.lastLoginAt
+                          ? formatDistanceToNow(new Date(user.lastLoginAt), { addSuffix: true, locale: ru })
+                          : "Никогда"
+                      }
+                    />
+                    <DataCardRow
+                      label="Регистрация"
+                      value={formatDistanceToNow(new Date(user.createdAt), { addSuffix: true, locale: ru })}
+                    />
+                  </DataCardBody>
+                </DataCard>
+              </Link>
             ))}
           </DataCardList>
 
