@@ -78,6 +78,7 @@ export interface MediaUploadFieldProps {
   uploadSuccessMessage?: string;
   librarySelectSuccessMessage?: string;
   allowReorder?: boolean;
+  firstItemBadge?: string;
   className?: string;
   /**
    * Second, non-paginated source shown as a first "Фото этой статьи"-style tab
@@ -215,6 +216,7 @@ export function MediaUploadField({
   uploadSuccessMessage,
   librarySelectSuccessMessage,
   allowReorder = false,
+  firstItemBadge,
   className,
   articleLibrary,
   authorLibraryTabLabel = "Медиатека автора",
@@ -612,6 +614,9 @@ export function MediaUploadField({
                   className="group overflow-hidden rounded-2xl border border-gray-200 bg-muted"
                 >
                   <div className="relative">
+                    {index === 0 && firstItemBadge ? (
+                      <span className="absolute left-2 top-2 z-10 rounded-full bg-black/70 px-2 py-1 text-xs font-medium text-white">{firstItemBadge}</span>
+                    ) : null}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={item.url}
