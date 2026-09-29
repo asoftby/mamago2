@@ -131,8 +131,13 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
       fromDb.place?.formattedAddr ||
       fromDb.place?.customAddress ||
       undefined;
+    // The route city is a listing/canonical concern, not proof of the physical address locality.
+    // If the venue/place city is unknown, omit addressLocality instead of inventing it from the URL.
     const locationCitySlug =
-      fromDb.venue?.place?.city?.slug || fromDb.place?.city?.slug || city;
+      fromDb.venue?.place?.city?.slug ||
+      fromDb.venue?.city?.slug ||
+      fromDb.place?.city?.slug ||
+      undefined;
     const generatedJsonLd = buildEventJsonLd({
       canonicalUrl,
       title: fromDb.title,
@@ -146,7 +151,9 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
           ? {
               name: locationName,
               address: locationAddress,
-              addressLocality: getCityNominativeName(locationCitySlug),
+              addressLocality: locationCitySlug
+                ? getCityNominativeName(locationCitySlug)
+                : undefined,
             }
           : undefined,
       pricing: {

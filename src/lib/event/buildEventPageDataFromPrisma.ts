@@ -92,6 +92,7 @@ export type ActivityForEventPageInput = {
     kind: EventVenueKind;
     title: string | null;
     addressLine: string | null;
+    city?: { slug: string } | null;
     place: {
       id: string;
       slug: string | null;

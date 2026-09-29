@@ -275,8 +275,13 @@ export const eventProvider: SeoEntityProvider = {
       loaded.place?.formattedAddr ||
       loaded.place?.customAddress ||
       undefined;
+    // Canonical/listing city can differ from the physical venue city.
+    // Do not claim addressLocality unless the linked physical place provides it.
     const locationCitySlug =
-      loaded.venue?.place?.city?.slug || loaded.place?.city?.slug || citySlug;
+      loaded.venue?.place?.city?.slug ||
+      loaded.venue?.city?.slug ||
+      loaded.place?.city?.slug ||
+      undefined;
     return buildEventJsonLd({
       canonicalUrl,
       title: loaded.title,
@@ -290,7 +295,9 @@ export const eventProvider: SeoEntityProvider = {
           ? {
               name: locationName,
               address: locationAddress,
-              addressLocality: getCityNominativeName(locationCitySlug),
+              addressLocality: locationCitySlug
+                ? getCityNominativeName(locationCitySlug)
+                : undefined,
             }
           : undefined,
       pricing: {
