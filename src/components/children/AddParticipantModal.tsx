@@ -482,11 +482,14 @@ function ParticipantFlow({
       setIsLoading(true);
       setError(null);
       const birthIso = toBirthIso(birthMonth, birthYear);
+      // This modal has no custom-interest UI: on create there's nothing to
+      // preserve, so [] is correct there; on edit, omit the field entirely
+      // so the non-destructive PUT leaves any existing custom interests alone.
       const body = {
         name: childName.trim(),
         birthDate: birthIso,
         systemInterests: childInterests,
-        customInterests: [] as string[],
+        ...(isEditChild ? {} : { customInterests: [] as string[] }),
       };
       try {
         const url = isEditChild ? `/api/children/${childData!.id}` : "/api/children";

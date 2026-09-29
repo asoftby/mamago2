@@ -21,7 +21,6 @@ import { UpcomingPlanBlock } from "./UpcomingPlanBlock";
 import { selectUpcomingPlanItems } from "../lib/upcomingPlanItems";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { QuickAddChildModal } from "@/components/children/QuickAddChildModal";
-import { QuickAddAdultModal } from "@/components/adults/QuickAddAdultModal";
 import { AddPersonaTypeModal } from "./AddPersonaTypeModal";
 import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
@@ -411,7 +410,6 @@ export function PlanMainContent({
   const [removingIdeaActivityId, setRemovingIdeaActivityId] = useState<string | null>(null);
   const [addingActivityId, setAddingActivityId] = useState<string | null>(null);
   const [showAddChildModal, setShowAddChildModal] = useState(false);
-  const [showAddAdultModal, setShowAddAdultModal] = useState(false);
   const [showAddPersonaTypeModal, setShowAddPersonaTypeModal] = useState(false);
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
@@ -1174,7 +1172,6 @@ export function PlanMainContent({
           open={showAddPersonaTypeModal}
           onOpenChange={setShowAddPersonaTypeModal}
           onSelectChild={() => setShowAddChildModal(true)}
-          onSelectAdult={() => setShowAddAdultModal(true)}
           layout="desktop"
         />
 
@@ -1183,14 +1180,6 @@ export function PlanMainContent({
           onOpenChange={setShowAddChildModal}
           onSuccess={() => {
             toast.success("Ребёнок добавлен");
-          }}
-        />
-
-        <QuickAddAdultModal
-          open={showAddAdultModal}
-          onOpenChange={setShowAddAdultModal}
-          onSuccess={() => {
-            toast.success("Взрослый добавлен");
           }}
         />
 
@@ -1271,7 +1260,6 @@ export function PlanMainContent({
         open={showAddPersonaTypeModal}
         onOpenChange={setShowAddPersonaTypeModal}
         onSelectChild={() => setShowAddChildModal(true)}
-        onSelectAdult={() => setShowAddAdultModal(true)}
         layout="default"
       />
 
@@ -1280,14 +1268,6 @@ export function PlanMainContent({
         onOpenChange={setShowAddChildModal}
         onSuccess={() => {
           toast.success("Ребёнок добавлен");
-        }}
-      />
-
-      <QuickAddAdultModal
-        open={showAddAdultModal}
-        onOpenChange={setShowAddAdultModal}
-        onSuccess={() => {
-          toast.success("Взрослый добавлен");
         }}
       />
 
