@@ -10,6 +10,13 @@ assert.ok(source.includes("snap-x") && source.includes("snap-mandatory"));
 assert.ok(source.includes("w-full shrink-0 snap-start"));
 assert.ok(source.includes("overflow-x-auto"));
 assert.ok(!source.includes("touch-action:pan-y"));
+
+const lightboxSource = readFileSync(new URL("./MediaLightbox.tsx", import.meta.url), "utf8");
+assert.ok(lightboxSource.includes("handleTouchStart"));
+assert.ok(lightboxSource.includes("handleTouchEnd"));
+assert.ok(lightboxSource.includes("Math.abs(dx) < 48"));
+assert.ok(lightboxSource.includes("onTouchStart={handleTouchStart}"));
+assert.ok(lightboxSource.includes("onTouchEnd={handleTouchEnd}"));
 assert.equal(renderToStaticMarkup(<MobileMediaCarousel items={[]} />), "");
 
 const items: MediaGalleryItem[] = [
