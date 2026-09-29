@@ -12,8 +12,12 @@ import {
   recordRecommendationRun,
   verifyRecommendationAttribution,
 } from "@/server/services/recommendations/RecommendationTraceService";
-import { buildSubjectsSnapshot, findMostRecentSubjectsSnapshot } from "@/lib/decision/subjects";
-import { DecisionContextV1Schema } from "@/lib/decision/decisionContext";
+import {
+  buildSubjectsSnapshot,
+  findMostRecentSubjectsSnapshot,
+  recordPlanAudienceSnapshot,
+} from "@/lib/decision/subjects";
+import { DecisionContextV1Schema, type Subject } from "@/lib/decision/decisionContext";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -41,6 +45,20 @@ async function makeUser(): Promise<string> {
   });
   userIds.push(user.id);
   return user.id;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// linkRecommendationOutcome is fire-and-forget inside trackUserEvent, so a
+// positive check must poll and a negative check must give it time to (not) land.
+async function outcomeFor(userEventId: string, { expect }: { expect: boolean }) {
+  for (let i = 0; i < 20; i++) {
+    const row = await prisma.recommendationOutcome.findFirst({ where: { userEventId } });
+    if (row) return row;
+    if (!expect && i >= 5) break;
+    await sleep(100);
+  }
+  return null;
 }
 
 async function main() {
@@ -414,6 +432,218 @@ async function main() {
     await trackFirstOccurrenceEvent({ userId: owner, eventType: marker9Type });
     const afterSecond = await prisma.userEvent.count({ where: { userId: owner, eventType: marker9Type } });
     assert.equal(afterSecond, 1, "second call must NOT record a duplicate milestone event");
+
+    // ---- follow-up: post-auth /api/save/plan chain with EXPLICIT anonymousId + exposureId ----
+    // RecommendationRun(userId=null, anonymousId=A) -> Exposure E
+    //   -> post-auth save (userId=U, anonymousId=A, exposureId=E)
+    //   -> UserEvent(userId=U, anonymousId=A, decisionId=original run) -> RecommendationOutcome(E)
+    const guestExposureB = guestTrace!.exposureIdByEntityKey.get(`EVENT:${activityIdB}`)!;
+    const bridgeUser = await makeUser();
+    assert.equal(
+      (await trackUserEvent({
+        userId: bridgeUser,
+        anonymousId,
+        eventType: "PLAN_ADD",
+        entityType: "EVENT",
+        entityId: activityIdB,
+        meta: { source: "recommendation", planAddSource: "recommendation", recommendationExposureId: guestExposureB },
+      })).ok,
+      true,
+    );
+    const bridged = await prisma.userEvent.findFirst({
+      where: { userId: bridgeUser, eventType: "PLAN_ADD", entityId: activityIdB },
+      orderBy: { createdAt: "desc" },
+    });
+    assert.ok(bridged);
+    eventIds.push(bridged!.id);
+    assert.equal(bridged!.anonymousId, anonymousId, "UserEvent keeps the guest anonymousId next to userId");
+    assert.equal(bridged!.decisionId, guestTrace!.runId, "attributed to the ORIGINAL guest run");
+    const bridgedOutcome = await outcomeFor(bridged!.id, { expect: true });
+    assert.ok(bridgedOutcome, "RecommendationOutcome(E) created for the bridged event");
+    assert.equal(bridgedOutcome!.exposureId, guestExposureB);
+
+    // Wrong anonymousId with the same explicit exposure -> no attribution, no outcome, id stripped.
+    assert.equal(
+      (await trackUserEvent({
+        userId: bridgeUser,
+        anonymousId: randomUUID(),
+        eventType: "PLAN_ADD",
+        entityType: "EVENT",
+        entityId: activityIdB,
+        meta: { source: "recommendation", recommendationExposureId: guestExposureB },
+      })).ok,
+      true,
+    );
+    const wrongAnonEvents = await prisma.userEvent.findMany({
+      where: { userId: bridgeUser, eventType: "PLAN_ADD", entityId: activityIdB },
+      orderBy: { createdAt: "desc" },
+    });
+    const wrongAnon = wrongAnonEvents[0]!;
+    eventIds.push(wrongAnon.id);
+    assert.notEqual(wrongAnon.id, bridged!.id);
+    assert.equal(wrongAnon.decisionId, null, "wrong anonymousId must not attribute");
+    assert.equal(await outcomeFor(wrongAnon.id, { expect: false }), null, "wrong anonymousId must not create an outcome");
+
+    // Foreign exposure (someone else's guest run) -> no attribution.
+    const otherGuestTrace = await recordRecommendationRun({
+      anonymousId: randomUUID(),
+      surface: RecommendationSurface.MY_PLAN,
+      citySlug: "minsk",
+      algorithmVersion: "test-v1",
+      candidateCount: 1,
+      decisionContext: { intent: "guest_plan_generate", subjects: [], actor: { kind: "guest", id: null } },
+      items: [{ entityType: AnalyticsEntityType.EVENT, entityId: activityIdB, position: 1 }],
+    });
+    runIds.push(otherGuestTrace!.runId);
+    assert.equal(
+      (await trackUserEvent({
+        userId: bridgeUser,
+        anonymousId,
+        eventType: "PLAN_ADD",
+        entityType: "EVENT",
+        entityId: activityIdB,
+        meta: {
+          source: "recommendation",
+          recommendationExposureId: otherGuestTrace!.exposureIdByEntityKey.get(`EVENT:${activityIdB}`),
+        },
+      })).ok,
+      true,
+    );
+    const foreignExposureEvent = (
+      await prisma.userEvent.findMany({
+        where: { userId: bridgeUser, eventType: "PLAN_ADD", entityId: activityIdB },
+        orderBy: { createdAt: "desc" },
+      })
+    )[0]!;
+    eventIds.push(foreignExposureEvent.id);
+    assert.equal(foreignExposureEvent.decisionId, null, "another guest's exposure must not attribute");
+    assert.equal(await outcomeFor(foreignExposureEvent.id, { expect: false }), null);
+
+    // ---- follow-up: an invalid subject can never be persisted into a run's context ----
+    const junkMarker = randomUUID();
+    const junkRun = await recordRecommendationRun({
+      anonymousId: junkMarker,
+      surface: RecommendationSurface.MY_PLAN,
+      citySlug: "minsk",
+      algorithmVersion: "test-v1",
+      candidateCount: 1,
+      decisionContext: {
+        intent: "guest_plan_generate",
+        // Deliberately non-canonical free text, cast past the type system.
+        subjects: [
+          { kind: "child", refId: null, ageRange: "free text <script>", source: "manual" },
+        ] as unknown as Subject[],
+        actor: { kind: "guest", id: junkMarker },
+      },
+      items: [{ entityType: AnalyticsEntityType.EVENT, entityId: activityIdA, position: 1 }],
+    });
+    assert.equal(junkRun, null, "invalid context aborts the whole trace write");
+    assert.equal(
+      await prisma.recommendationRun.count({ where: { anonymousId: junkMarker } }),
+      0,
+      "transaction rolled back: no run row left behind with a missing/invalid context",
+    );
+
+    // ---- follow-up: same-date audience update must not leave a stale snapshot ----
+    const snapshotPlaceId = `place-snap-${marker}`;
+    const planItemP = `planitem-${marker}-snap`;
+    const kidBefore = [{ kind: "child" as const, refId: child.id, ageRange: "3-5" as const, source: "profile" as const }];
+    const kidAfter = [{ kind: "child" as const, refId: child.id, ageRange: "5-7" as const, source: "profile" as const }];
+
+    // (a) create item date A subjects X; move to date B subjects Y; remove on B -> Y
+    assert.equal(
+      (await trackUserEvent({
+        userId: owner,
+        eventType: "PLAN_ADD",
+        entityType: "EVENT",
+        entityId: snapshotPlaceId,
+        meta: { planItemId: planItemP, dateFrom: "2026-11-01", dateTo: "2026-11-01", subjects: kidBefore, decisionContextVersion: 1 },
+      })).ok,
+      true,
+    );
+    await sleep(15);
+    await recordPlanAudienceSnapshot({
+      userId: owner,
+      entityType: AnalyticsEntityType.EVENT,
+      entityId: snapshotPlaceId,
+      planItemId: planItemP,
+      date: "2026-11-02",
+      subjects: kidAfter,
+    });
+    const movedRemove = await findMostRecentSubjectsSnapshot({
+      userId: owner,
+      entityType: AnalyticsEntityType.EVENT,
+      entityId: snapshotPlaceId,
+      planItemId: planItemP,
+      currentDate: "2026-11-02",
+    });
+    assert.equal(movedRemove.length, 1);
+    assert.equal(movedRemove[0]!.ageRange, "5-7", "moved A->B with new audience Y: remove on B yields Y");
+
+    // (b) item already on date B with X; explicit update on the SAME date with Y -> Y, not X
+    await sleep(15);
+    await recordPlanAudienceSnapshot({
+      userId: owner,
+      entityType: AnalyticsEntityType.EVENT,
+      entityId: snapshotPlaceId,
+      planItemId: planItemP,
+      date: "2026-11-02",
+      subjects: kidBefore, // audience on B is X ...
+    });
+    await sleep(15);
+    await recordPlanAudienceSnapshot({
+      userId: owner,
+      entityType: AnalyticsEntityType.EVENT,
+      entityId: snapshotPlaceId,
+      planItemId: planItemP,
+      date: "2026-11-02",
+      subjects: kidAfter, // ... then explicitly updated to Y on the same date
+    });
+    const sameDateRemove = await findMostRecentSubjectsSnapshot({
+      userId: owner,
+      entityType: AnalyticsEntityType.EVENT,
+      entityId: snapshotPlaceId,
+      planItemId: planItemP,
+      currentDate: "2026-11-02",
+    });
+    assert.equal(sameDateRemove[0]!.ageRange, "5-7", "same-date update X->Y: remove yields Y, never stale X");
+
+    // (c) audience explicitly cleared on the same date -> [] (never X or Y)
+    await sleep(15);
+    await recordPlanAudienceSnapshot({
+      userId: owner,
+      entityType: AnalyticsEntityType.EVENT,
+      entityId: snapshotPlaceId,
+      planItemId: planItemP,
+      date: "2026-11-02",
+      subjects: [],
+    });
+    assert.deepEqual(
+      await findMostRecentSubjectsSnapshot({
+        userId: owner,
+        entityType: AnalyticsEntityType.EVENT,
+        entityId: snapshotPlaceId,
+        planItemId: planItemP,
+        currentDate: "2026-11-02",
+      }),
+      [],
+      "cleared audience beats any older non-empty snapshot",
+    );
+
+    // Snapshots are NOT positive signals: only the one real PLAN_ADD exists.
+    const eventTypesForItem = await prisma.userEvent.groupBy({
+      by: ["eventType"],
+      where: { userId: owner, entityId: snapshotPlaceId },
+      _count: true,
+    });
+    const countOf = (type: string) => eventTypesForItem.find((row) => row.eventType === type)?._count ?? 0;
+    assert.equal(countOf("PLAN_ADD"), 1, "audience re-saves must not add PLAN_ADD rows");
+    assert.equal(countOf("PLAN_AUDIENCE_SNAPSHOT"), 4, "each re-save is recorded as a distinct snapshot event");
+    const snapshotRows = await prisma.userEvent.findMany({
+      where: { userId: owner, entityId: snapshotPlaceId },
+      select: { id: true },
+    });
+    eventIds.push(...snapshotRows.map((row) => row.id));
 
     // ---- 10. PII scan over everything this test wrote ----
     const allEvents = await prisma.userEvent.findMany({ where: { id: { in: eventIds } } });

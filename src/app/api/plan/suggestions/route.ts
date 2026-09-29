@@ -8,7 +8,11 @@ import { recordRecommendationRun } from "@/server/services/recommendations/Recom
 import { trackFirstOccurrenceEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { SUGGESTIONS_PER_BATCH } from "@/features/my-plan/lib/suggestionsConfig";
 import { buildSubjectsSnapshot } from "@/lib/decision/subjects";
-import { sanitizeCanonicalAgeRanges } from "@/lib/decision/decisionContext";
+import { parseCanonicalAgeRangesQuery } from "@/lib/decision/decisionContext";
+import { parseSafeOpaqueId } from "@/lib/decision/identifiers";
+import { isPersonalizedResult } from "@/lib/decision/personalization";
+
+const MAX_PERSONA_IDS = 20;
 
 /**
  * GET /api/plan/suggestions?city=minsk&date=YYYY-MM-DD&exclude=id1,id2&ageRanges=1-3,3-5&personaIds=...
@@ -33,11 +37,24 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get("date") ?? undefined;
     const excludeParam =
       searchParams.get("exclude")?.split(",").filter(Boolean) ?? [];
-    const ageRangesParam = sanitizeCanonicalAgeRanges(
-      searchParams.get("ageRanges")?.split(",").filter(Boolean) ?? [],
-    );
-    const personaIds =
+    // Canonical + bounded: malformed/oversized input is rejected, not trimmed.
+    const ageRangesParsed = parseCanonicalAgeRangesQuery(searchParams.get("ageRanges"));
+    if (!ageRangesParsed.ok) {
+      return NextResponse.json({ error: "invalid_age_ranges" }, { status: 400 });
+    }
+    const ageRangesParam = ageRangesParsed.values;
+
+    const rawPersonaIds =
       searchParams.get("personaIds")?.split(",").map((value) => value.trim()).filter(Boolean) ?? [];
+    if (rawPersonaIds.length > MAX_PERSONA_IDS) {
+      return NextResponse.json({ error: "invalid_persona_ids" }, { status: 400 });
+    }
+    const personaIds: string[] = [];
+    for (const value of rawPersonaIds) {
+      const id = parseSafeOpaqueId(value);
+      if (!id) return NextResponse.json({ error: "invalid_persona_ids" }, { status: 400 });
+      personaIds.push(id);
+    }
 
     const plannedIds =
       date != null
@@ -120,12 +137,7 @@ export async function GET(request: NextRequest) {
       traced: Boolean(trace),
     });
 
-    // A milestone requires an actually-applied personalization input, not
-    // just a non-empty result — a generic/default ranking (no resolved
-    // subject, no canonical age filter) is not "personalized." An invalid
-    // or foreign personaId that resolved to subjects=[] doesn't count either.
-    const isPersonalized = subjects.length > 0 || ageRangesParam.length > 0;
-    if (suggestions.length > 0 && isPersonalized) {
+    if (suggestions.length > 0 && isPersonalizedResult(subjects, ageRangesParam)) {
       void trackFirstOccurrenceEvent({
         userId: user.id,
         sessionId: sessionRowId,

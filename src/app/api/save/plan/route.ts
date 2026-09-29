@@ -14,7 +14,12 @@ import {
 } from "@/server/services/plan.service";
 import { prisma } from "@/lib/prisma";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
-import { buildSubjectsSnapshot, findMostRecentSubjectsSnapshot } from "@/lib/decision/subjects";
+import {
+  buildSubjectsSnapshot,
+  findMostRecentSubjectsSnapshot,
+  recordPlanAudienceSnapshot,
+} from "@/lib/decision/subjects";
+import { readOptionalSafeOpaqueId } from "@/lib/decision/identifiers";
 
 function planningTimingForDate(dateKey: string): "same_day" | "weekend" | "advance" {
   if (dateKey === getLocalDateKey()) return "same_day";
@@ -79,14 +84,13 @@ export async function POST(request: NextRequest) {
       recommendationExposureId?: unknown;
     };
 
-    const validAnonymousId =
-      typeof anonymousId === "string" && anonymousId.trim().length > 0
-        ? anonymousId.trim()
-        : null;
-    const validRecommendationExposureId =
-      typeof recommendationExposureId === "string" && recommendationExposureId.trim().length > 0
-        ? recommendationExposureId.trim()
-        : null;
+    const anonymousIdParsed = readOptionalSafeOpaqueId(anonymousId);
+    const exposureIdParsed = readOptionalSafeOpaqueId(recommendationExposureId);
+    if (!anonymousIdParsed.ok || !exposureIdParsed.ok) {
+      return NextResponse.json({ error: "invalid_identifier" }, { status: 400 });
+    }
+    const validAnonymousId = anonymousIdParsed.value;
+    const validRecommendationExposureId = exposureIdParsed.value;
 
     // Articles have no date semantics — they can only be saved as an idea
     // (see /api/save/idea). Reject before the generic validation below so a
@@ -250,6 +254,22 @@ export async function POST(request: NextRequest) {
             meta: { recommendationSurface: "my_plan" },
           });
         }
+      } else {
+        // Existing PlanItem re-saved (same date with a new audience, or moved
+        // to another date): no new plan-add happened, but the CURRENT audience
+        // must still be recorded so a later remove can never fall back to a
+        // stale one. Separate event type — not a second positive signal.
+        void recordPlanAudienceSnapshot({
+          userId: user.id,
+          sessionId: await getSessionRowIdFromCookies(),
+          anonymousId: validAnonymousId,
+          entityType: "EVENT",
+          entityId: activityId,
+          cityId: await getActivityCityIdForAnalytics(activityId),
+          planItemId: planItem.id,
+          date,
+          subjects,
+        });
       }
     }
 

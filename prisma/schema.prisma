@@ -3313,6 +3313,10 @@ enum UserEventType {
   ONBOARDING_COMPLETED
   FIRST_PERSONALIZED_RESULT
   FIRST_PERSONALIZED_PLAN_ADD
+  /// Server-only audience snapshot for an already-existing PlanItem whose audience/date was
+  /// re-saved (no new plan-add happened). Deliberately NOT a PLAN_ADD so it can't inflate
+  /// positive-signal counts, ranking weights or promotion metrics.
+  PLAN_AUDIENCE_SNAPSHOT
 }
 
 enum AnalyticsEntityType {

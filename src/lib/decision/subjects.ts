@@ -67,8 +67,10 @@ export async function buildSubjectsSnapshot(
 
 /**
  * Best-effort recovery of "who this was for" when removing a plan item: the
- * PlanItem itself never stored participants, so we look at the PLAN_ADD
- * UserEvent that carries the SAME planItemId. Requiring both planItemId AND
+ * PlanItem itself never stored participants, so we look at the most recent
+ * PLAN_ADD / PLAN_AUDIENCE_SNAPSHOT UserEvent that carries the SAME planItemId
+ * (a same-date audience re-save writes a snapshot, so the newest matching
+ * record always reflects the audience last saved for the current date). Requiring both planItemId AND
  * the current target date to match protects against a stale snapshot from
  * before the item was moved to a different date (a fresh PLAN_ADD for the
  * new date always wins, since it's more recent and still matches). If no
@@ -85,7 +87,7 @@ export async function findMostRecentSubjectsSnapshot(input: {
   const events = await prisma.userEvent.findMany({
     where: {
       userId: input.userId,
-      eventType: "PLAN_ADD",
+      eventType: { in: ["PLAN_ADD", "PLAN_AUDIENCE_SNAPSHOT"] },
       entityType: input.entityType,
       entityId: input.entityId,
     },
@@ -115,6 +117,52 @@ export async function findMostRecentSubjectsSnapshot(input: {
   }
 
   return [];
+}
+
+/**
+ * Records the CURRENT audience for a PlanItem that already exists (so no new
+ * PLAN_ADD happened) whenever the user re-saves it — same date with a new
+ * audience, or moved to a new date. Written straight to UserEvent rather than
+ * through trackUserEvent on purpose: it is a snapshot, not behavior, so it
+ * must not reach the behavior projection, promotion actions or outcome
+ * linking, and it has its own event type so no PLAN_ADD-counting query can
+ * see it. An empty `subjects` is recorded too — "audience cleared" is a real
+ * current state and must beat an older non-empty snapshot.
+ */
+export async function recordPlanAudienceSnapshot(input: {
+  userId: string;
+  sessionId?: string | null;
+  anonymousId?: string | null;
+  entityType: AnalyticsEntityType;
+  entityId: string;
+  cityId?: string | null;
+  planItemId: string;
+  date: string;
+  subjects: Subject[];
+}): Promise<void> {
+  try {
+    await prisma.userEvent.create({
+      data: {
+        userId: input.userId,
+        sessionId: input.sessionId ?? undefined,
+        anonymousId: input.anonymousId ?? undefined,
+        eventType: "PLAN_AUDIENCE_SNAPSHOT",
+        entityType: input.entityType,
+        entityId: input.entityId,
+        vertical: "CITY",
+        cityId: input.cityId ?? undefined,
+        meta: {
+          planItemId: input.planItemId,
+          dateFrom: input.date,
+          dateTo: input.date,
+          decisionContextVersion: 1,
+          ...(input.subjects.length > 0 ? { subjects: input.subjects } : {}),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("[plan-audience-snapshot] write failed", error instanceof Error ? error.name : typeof error);
+  }
 }
 
 /**

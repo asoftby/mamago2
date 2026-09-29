@@ -27,6 +27,34 @@ export const CANONICAL_AGE_RANGE_VALUES = AGE_GROUPS.map((g) => g.value) as [
 ];
 export const MAX_AGE_RANGES = AGE_GROUPS.length;
 
+/** One canonical age-range value — the request-side twin of Subject.ageRange. */
+export const CanonicalAgeRangeSchema = z.enum(CANONICAL_AGE_RANGE_VALUES);
+
+/**
+ * Request-body contract for a list of age ranges: canonical values only and
+ * bounded. Malformed or oversized input is REJECTED (not silently trimmed),
+ * so no free-text or oversized value ever reaches ranking, persistence or a
+ * decision context.
+ */
+export const AgeRangesRequestSchema = z.array(CanonicalAgeRangeSchema).max(MAX_AGE_RANGES);
+
+const AGE_RANGES_QUERY_MAX_CHARS = 128;
+
+/**
+ * Strict parser for a comma-separated `ageRanges` query value. Absent/empty
+ * -> ok with []. Anything oversized, non-canonical or over-long -> not ok.
+ */
+export function parseCanonicalAgeRangesQuery(
+  raw: string | null | undefined,
+): { ok: true; values: string[] } | { ok: false } {
+  if (raw == null || raw === "") return { ok: true, values: [] };
+  if (raw.length > AGE_RANGES_QUERY_MAX_CHARS) return { ok: false };
+  const parts = raw.split(",").filter(Boolean);
+  const parsed = AgeRangesRequestSchema.safeParse(parts);
+  if (!parsed.success) return { ok: false };
+  return { ok: true, values: [...new Set(parsed.data)] };
+}
+
 export const SubjectSchema = z.object({
   kind: z.enum(["adult", "child"]),
   /** Child.id for an authorized child, User.id for the current adult, null for guest/manual participants. */
@@ -34,7 +62,7 @@ export const SubjectSchema = z.object({
   /** Adult only. */
   role: z.string().optional(),
   /** Child only — one of CANONICAL_AGE_RANGE_VALUES, e.g. "3-5". Never free text. */
-  ageRange: z.enum(CANONICAL_AGE_RANGE_VALUES).optional(),
+  ageRange: CanonicalAgeRangeSchema.optional(),
   source: z.enum(SUBJECT_SOURCE),
 });
 export type Subject = z.infer<typeof SubjectSchema>;

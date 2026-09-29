@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { AnalyticsEntityType, RecommendationSurface } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
@@ -9,21 +8,13 @@ import {
 } from "@/server/services/planSuggestions.service";
 import { recordRecommendationRun } from "@/server/services/recommendations/RecommendationTraceService";
 import { buildManualSubjectsSnapshot } from "@/lib/decision/subjects";
-import { sanitizeCanonicalAgeRanges } from "@/lib/decision/decisionContext";
+import { guestGenerateBodySchema } from "@/lib/decision/planRequestSchemas";
 import {
   quickGuestQuotaGate,
   recordGuestSuccessfulGeneration,
   resolveGuestUsageKey,
 } from "@/server/services/guestPlanQuota";
 import { getTrustedClientIp } from "@/lib/security/clientIp";
-
-const bodySchema = z.object({
-  anonymousId: z.string().optional().nullable(),
-  city: z.string().min(1).optional().default("minsk"),
-  date: z.string().optional(),
-  exclude: z.array(z.string()).optional(),
-  ageRanges: z.array(z.string()).optional(),
-});
 
 /**
  * POST /api/plan/generate — подборка для «Мой план».
@@ -41,7 +32,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    const parsed = bodySchema.safeParse(raw);
+    const parsed = guestGenerateBodySchema.safeParse(raw);
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Validation failed", details: parsed.error.flatten() },
@@ -51,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     const { anonymousId, city, date, exclude, ageRanges } = parsed.data;
     const excludeActivityIds = [...new Set((exclude ?? []).filter(Boolean))];
-    const ageRangeValues = sanitizeCanonicalAgeRanges(ageRanges ?? []);
+    const ageRangeValues = [...new Set(ageRanges ?? [])];
 
     if (user) {
       let plannedIds: string[] = [];
