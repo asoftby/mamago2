@@ -67,6 +67,12 @@ export function MobileMediaCarousel({
                     alt={item.type === "image" ? (item.alt ?? "") : ""}
                     className="absolute inset-0 h-full w-full object-cover"
                     draggable={false}
+                    onError={(event) => {
+                      const image = event.currentTarget;
+                      if (image.dataset.fallbackApplied === "true") return;
+                      image.dataset.fallbackApplied = "true";
+                      image.src = "/og-default.jpg";
+                    }}
                   />
                 ) : null}
                 {isReels ? (
