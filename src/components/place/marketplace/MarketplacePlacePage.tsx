@@ -67,6 +67,8 @@ interface MarketplacePlacePageProps {
 
     // Media
     media?: {
+      posterUrl?: string;
+      posterAlt: string;
       galleryItems: MediaGalleryItem[];
     };
 
