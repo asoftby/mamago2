@@ -100,7 +100,7 @@ export function Step4Photos({
       <div>
         <h3 className="font-medium mb-2">Логотип *</h3>
         <p className="text-sm text-muted-foreground mb-3">
-          Добавьте логотип или главное фото вашего места
+          Добавьте логотип места. Главное фото выбирается первым в блоке «Фото места» ниже.
         </p>
 
         <PlacePhotosInstagramField
@@ -122,9 +122,9 @@ export function Step4Photos({
 
       {/* Gallery */}
       <div>
-        <h3 className="font-medium mb-2">Галерея</h3>
+        <h3 className="font-medium mb-2">Фото места</h3>
         <p className="text-sm text-muted-foreground mb-4">
-          Добавьте дополнительные фотографии (необязательно)
+          Первое фото используется как главное на странице места. Перетащите другое фото на первое место, чтобы сменить главное.
         </p>
         <PlaceGalleryUploadTemp
           wizardSessionId={wizardSessionId || ""}

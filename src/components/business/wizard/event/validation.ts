@@ -234,7 +234,7 @@ function validateStep4(data: EventFormData): ValidationResult {
   const warnings: string[] = [];
 
   if (!data.coverImage) {
-    errors.push("Загрузите главное изображение");
+    errors.push("Добавьте хотя бы одно фото");
   }
 
   if (data.reelsUrl && !isValidUrl(data.reelsUrl)) {
@@ -242,7 +242,7 @@ function validateStep4(data: EventFormData): ValidationResult {
   }
 
   if (data.gallery.length === 0) {
-    warnings.push("Рекомендуется добавить фотографии в галерею");
+    warnings.push("Рекомендуется добавить ещё фотографии");
   }
 
   const isComplete = !!data.coverImage;

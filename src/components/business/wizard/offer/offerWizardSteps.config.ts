@@ -100,7 +100,7 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
     },
     photo: {
       title: "Фото и видео",
-      description: "Главное изображение, галерея и видео",
+      description: "Фото предложения и видео",
       shortLabel: "Фото",
     },
     conditions: {
@@ -456,7 +456,7 @@ export function getMissingFieldsForStep(
       break;
 
     case "photo":
-      if (!data.coverImage) missing.push("Главное изображение");
+      if (!data.coverImage) missing.push("Фото предложения");
       break;
 
     case "conditions":

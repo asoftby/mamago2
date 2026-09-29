@@ -23,6 +23,9 @@ export function ArticleEditorGalleryField({
   authorUserId,
   articleId,
   showHeading = true,
+  label,
+  description,
+  firstItemBadge,
   articleMediaSource,
 }: {
   value: string[];
@@ -31,6 +34,9 @@ export function ArticleEditorGalleryField({
   authorUserId?: string | null;
   articleId?: string | null;
   showHeading?: boolean;
+  label?: string;
+  description?: string;
+  firstItemBadge?: string;
   /** «Фото этой статьи» — первая вкладка picker'а. Без него picker остаётся одноисточниковым. */
   articleMediaSource?: ReturnType<typeof useArticleMediaSource>;
 }) {
@@ -145,7 +151,9 @@ export function ArticleEditorGalleryField({
 
   return (
     <MediaUploadField
-      label={showHeading ? "Галерея" : undefined}
+      label={showHeading ? (label ?? "Галерея") : undefined}
+      description={description}
+      firstItemBadge={firstItemBadge}
       mode="multiple"
       value={galleryValue}
       onChange={(next) => {
