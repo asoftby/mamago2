@@ -32,7 +32,7 @@ import {
   type ArticleContentPayload,
 } from "@/lib/publications/articleMvp";
 import { ArticleBlocksMvpEditor } from "@/components/admin/articles/ArticleBlocksMvpEditor";
-import { ArticleEditorCoverField } from "@/components/admin/articles/ArticleEditorCoverField";
+import { ArticleEditorGalleryField } from "@/components/admin/articles/ArticleEditorGalleryField";
 import { useArticleMediaSource } from "@/components/admin/articles/useArticleMediaSource";
 import {
   PublicationPanel,
@@ -72,6 +72,7 @@ import {
   fromLocalDatetimeValue,
   toLocalDatetimeValue,
 } from "@/lib/article/articleEditorComparable";
+import { hydrateArticleMainGallery, persistArticleMainGallery } from "@/lib/article/articleMainGallery";
 
 function applySnapshot(setters: {
   setTitle: (v: string) => void;
@@ -129,6 +130,10 @@ export function ArticleEditorClient({
   /** Только ADMIN/MODERATOR видят решения по статье в статусе PENDING. */
   canModerate?: boolean;
 }) {
+  const initialMainGallery = useMemo(
+    () => hydrateArticleMainGallery({ coverImageId: initial.coverImageId, content: initial.content }),
+    [initial.coverImageId, initial.content],
+  );
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -149,7 +154,8 @@ export function ArticleEditorClient({
   const [title, setTitle] = useState(initial.title);
   const [slug, setSlug] = useState(initial.slug ?? "");
   const [pinnedSlug, setPinnedSlug] = useState<string | null>(initial.slug?.trim() || null);
-  const [coverImageId, setCoverImageId] = useState(initial.coverImageId ?? "");
+  const [mainGalleryIds, setMainGalleryIds] = useState<string[]>(initialMainGallery.mediaIds);
+  const coverImageId = mainGalleryIds[0] ?? "";
   const [coverImagePreviewUrl, setCoverImagePreviewUrl] = useState(initial.coverImageUrl ?? "");
   const [authorUserId, setAuthorUserId] = useState<string | null>(initial.authorUserId ?? null);
   const [authorLabel, setAuthorLabel] = useState(initial.authorLabel ?? "");
@@ -168,7 +174,7 @@ export function ArticleEditorClient({
     { id: string; title: string; description: string | null; isActive: boolean }[]
   >([]);
   const [geoScopeError, setGeoScopeError] = useState<string | null>(null);
-  const [content, setContent] = useState<ArticleContentPayload>(initial.content);
+  const [content, setContent] = useState<ArticleContentPayload>(initialMainGallery.inlineContent);
   const [status, setStatus] = useState<ContentStatus>(initial.status);
   const [publishedAtLocal, setPublishedAtLocal] = useState(toLocalDatetimeValue(initial.publishedAt));
   const [scheduledAtLocal, setScheduledAtLocal] = useState(toLocalDatetimeValue(initial.scheduledAt));
@@ -176,6 +182,11 @@ export function ArticleEditorClient({
   const [seoDescription, setSeoDescription] = useState(initial.seoDescription ?? "");
   const [seoCanonicalUrl, setSeoCanonicalUrl] = useState(initial.seoCanonicalUrl ?? "");
   const [noindex, setNoindex] = useState(initial.noindex);
+
+  const persistedMainGallery = useMemo(
+    () => persistArticleMainGallery({ mediaIds: mainGalleryIds, inlineContent: content }),
+    [content, mainGalleryIds],
+  );
 
   const hydrated = useHydrated();
 
@@ -192,10 +203,14 @@ export function ArticleEditorClient({
   const articleMediaSource = useArticleMediaSource({
     articleId: hasPersistedId ? initial.id : null,
     coverImageId,
-    blocks: content.blocks,
+    blocks: persistedMainGallery.content.blocks,
   });
 
-  const savedComparableRef = useRef(buildSavedComparable(initial));
+  const savedComparableRef = useRef(buildSavedComparable({
+    ...initial,
+    coverImageId: persistArticleMainGallery({ mediaIds: initialMainGallery.mediaIds, inlineContent: initialMainGallery.inlineContent }).coverImageId,
+    content: persistArticleMainGallery({ mediaIds: initialMainGallery.mediaIds, inlineContent: initialMainGallery.inlineContent }).content,
+  }));
 
   const currentComparable = useMemo(
     () =>
@@ -213,7 +228,7 @@ export function ArticleEditorClient({
         geoScope,
         cityId,
         regionId,
-        content,
+        content: persistedMainGallery.content,
         status,
         publishedAtLocal,
         scheduledAtLocal,
@@ -236,7 +251,7 @@ export function ArticleEditorClient({
       geoScope,
       cityId,
       regionId,
-      content,
+      persistedMainGallery.content,
       status,
       publishedAtLocal,
       scheduledAtLocal,
@@ -345,7 +360,7 @@ export function ArticleEditorClient({
     () => ({
       setTitle,
       setSlug,
-      setCoverImageId,
+      setCoverImageId: (value: string) => setMainGalleryIds((ids) => value ? [value, ...ids.filter((id) => id !== value)] : []),
       setAuthorUserId,
       setAuthorLabel,
       setCityContext,
@@ -372,11 +387,29 @@ export function ArticleEditorClient({
   const applyEditorSnapshot = useCallback(
     (snap: ArticleEditorSnapshot) => {
       applySnapshot(editorSetters, snap);
+      const mainGallery = hydrateArticleMainGallery({ coverImageId: snap.coverImageId, content: snap.content });
+      setMainGalleryIds(mainGallery.mediaIds);
+      setContent(mainGallery.inlineContent);
       setPinnedSlug(snap.slug?.trim() || null);
       hydrateSlug(snap.slug);
     },
     [editorSetters, hydrateSlug],
   );
+
+  useEffect(() => {
+    if (!coverImageId) {
+      setCoverImagePreviewUrl("");
+      return;
+    }
+    let cancelled = false;
+    void fetch(`/api/admin/articles/media-preview?id=${encodeURIComponent(coverImageId)}`, { credentials: "include" })
+      .then((response) => response.ok ? response.json() as Promise<{ publicUrl: string | null }> : null)
+      .then((data) => {
+        if (!cancelled) setCoverImagePreviewUrl(data?.publicUrl ?? "");
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [coverImageId]);
 
   const showSuccessModal = useCallback(
     (payload: Omit<ContentSuccessPayload, "surface" | "returnTo">) => {
@@ -404,13 +437,15 @@ export function ArticleEditorClient({
   }, [geoScope, cityId, regionId]);
 
   const payload = useMemo(
-    () => ({
+    () => {
+      const mainGallery = persistArticleMainGallery({ mediaIds: mainGalleryIds, inlineContent: prepareArticleContentForSave(content) });
+      return ({
       title,
       slug: slug.trim() || null,
       subtitle: null as string | null,
       excerpt: deriveArticleExcerptFromContent(content),
-      content: prepareArticleContentForSave(content),
-      coverImageId: coverImageId.trim() || null,
+      content: mainGallery.content,
+      coverImageId: mainGallery.coverImageId,
       authorLabel: authorLabel.trim() || null,
       authorUserId: authorUserId || null,
       cityContext: cityContext.trim() || null,
@@ -431,12 +466,13 @@ export function ArticleEditorClient({
       seoOgDescription: null as string | null,
       seoRobots: null as string | null,
       noindex,
-    }),
+      });
+    },
     [
       title,
       slug,
       content,
-      coverImageId,
+      mainGalleryIds,
       authorLabel,
       authorUserId,
       cityContext,
@@ -950,15 +986,17 @@ export function ArticleEditorClient({
             showPublishedSlugWarning={showPublishedSlugWarning}
             slugHistorySupported
           />
-          <ArticleEditorCoverField
-            value={coverImageId}
-            initialPreviewUrl={initial.coverImageUrl}
+          <ArticleEditorGalleryField
+            value={mainGalleryIds}
             authorUserId={authorUserId}
             articleId={hasPersistedId ? initial.id : null}
-            onChange={(id, previewUrl) => {
-              setCoverImageId(id);
-              setCoverImagePreviewUrl(previewUrl ?? "");
+            onChange={(ids) => {
+              setMainGalleryIds(ids);
+              if (ids[0] !== coverImageId) setCoverImagePreviewUrl("");
             }}
+            label="Фото статьи"
+            description="Первое фото используется как главное изображение статьи."
+            firstItemBadge="Главное"
             articleMediaSource={articleMediaSource}
           />
 
