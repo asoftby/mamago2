@@ -47,12 +47,12 @@ export function PublicationMediaColumn({
 
   return (
     <div className={cn("space-y-2.5", className)}>
-      <div className="md:hidden">
+      <div className="lg:hidden">
         <MobileMediaCarousel items={lightboxItems} ariaLabel="Фото публикации" />
         <EventMediaStack media={media} showPoster={false} className="mt-2.5" />
       </div>
 
-      <div className="hidden space-y-2.5 md:block">
+      <div className="hidden space-y-2.5 lg:block">
         <EventMediaStack
           media={media}
           onPosterClick={lightboxItems.length > 0 ? () => setPosterLightboxOpen(true) : undefined}
