@@ -9,6 +9,7 @@ import { convertHeicFileToJpegIfNeeded } from "@/lib/uploads/heicConversion";
 import { MAX_IMAGE_FILES } from "@/lib/uploads/uploadConfig";
 import type { OfferFormData } from "../types";
 import { isValidVideoUrl } from "../mappers";
+import { mergePrimaryWithGallery, splitPrimaryFromGallery } from "@/lib/media/publicationMediaOrder";
 
 interface Step3MediaProps {
   data: OfferFormData;
@@ -137,22 +138,12 @@ export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
     return page;
   }, []);
 
-  const handleCoverChange = useCallback(
+  const handleMediaChange = useCallback(
     (value: MediaUploadItem | MediaUploadItem[] | null) => {
-      const item = value && !Array.isArray(value) ? value : null;
-      if (item) setMediaIdByUrl((prev) => ({ ...prev, [item.url]: item.id }));
-      const nextCover = item?.url ?? null;
-      onChange({ coverImage: nextCover });
-    },
-    [onChange],
-  );
-
-  const handleGalleryChange = useCallback(
-    (value: MediaUploadItem | MediaUploadItem[] | null) => {
-      const items = Array.isArray(value) ? value : [];
+      const items = Array.isArray(value) ? value : value ? [value] : [];
       setMediaIdByUrl((prev) => ({ ...prev, ...Object.fromEntries(items.map((item) => [item.url, item.id])) }));
-      const nextGallery = items.map((item) => item.url);
-      onChange({ gallery: nextGallery });
+      const { primary, gallery } = splitPrimaryFromGallery(items.map((item) => item.url));
+      onChange({ coverImage: primary, gallery });
     },
     [onChange],
   );
@@ -164,24 +155,15 @@ export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
   const videoUrlError =
     data.videoUrl && !isValidVideoUrl(data.videoUrl) ? "Некорректная ссылка на видео" : null;
 
-  const coverValue = data.coverImage
-    ? {
-        id: mediaIdByUrl[data.coverImage] ?? data.coverImage,
-        url: data.coverImage,
-        alt: null,
-        title: "Главное изображение",
-      }
-    : null;
-
-  const galleryValue = data.gallery.map((url) => ({
+  const mediaValue = mergePrimaryWithGallery(data.coverImage, data.gallery).map((url, index) => ({
     id: mediaIdByUrl[url] ?? url,
     url,
     alt: null,
-    title: "Изображение галереи",
+    title: index === 0 ? "Главное изображение" : "Изображение галереи",
   }));
   const usedIds = useMemo(
-    () => new Set([coverValue?.id, ...galleryValue.map((item) => item.id)].filter((id): id is string => Boolean(id))),
-    [coverValue?.id, galleryValue],
+    () => new Set(mediaValue.map((item) => item.id)),
+    [mediaValue],
   );
 
   return (
@@ -194,34 +176,21 @@ export function Step3Media({ data, onChange, isEditable }: Step3MediaProps) {
       </div>
 
       <MediaUploadField
-        label="Главное изображение"
-        description="Основное фото, которое будет показано в карточке предложения."
+        label="Фото предложения"
+        description="Первое фото используется как главное изображение и обложка. Перетащите другое фото на первое место, чтобы сменить обложку."
         required
-        mode="single"
-        value={coverValue}
-        onChange={handleCoverChange}
-        disabled={!isEditable}
-        allowMediaLibrary
-        allowUpload
-        onUploadFiles={uploadFilesToPublicMedia}
-        loadMediaLibraryPage={loadMediaLibraryPage}
-        mediaLibraryDescription="Выберите одно изображение из вашей медиатеки или загрузите новый файл."
-        usedIds={usedIds}
-      />
-
-      <MediaUploadField
-        label="Галерея"
-        description="Дополнительные фотографии для детального показа предложения."
         mode="multiple"
-        value={galleryValue}
-        onChange={handleGalleryChange}
+        value={mediaValue}
+        onChange={handleMediaChange}
         maxFiles={MAX_IMAGE_FILES}
         disabled={!isEditable}
         allowMediaLibrary
         allowUpload
+        allowReorder
+        firstItemBadge="Главное"
         onUploadFiles={uploadFilesToPublicMedia}
         loadMediaLibraryPage={loadMediaLibraryPage}
-        mediaLibraryDescription="Выберите несколько изображений из медиатеки или загрузите новые файлы."
+        mediaLibraryDescription="Выберите фотографии из медиатеки или загрузите новые файлы."
         usedIds={usedIds}
       />
 
