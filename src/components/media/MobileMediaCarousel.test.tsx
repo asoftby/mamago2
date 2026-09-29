@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MobileMediaCarousel } from "./MobileMediaCarousel";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
+import { nextLightboxIndex } from "./MediaLightbox";
 
 const source = readFileSync(new URL("./MobileMediaCarousel.tsx", import.meta.url), "utf8");
 assert.ok(source.includes("data-mobile-media-carousel"));
@@ -20,6 +21,13 @@ assert.ok(lightboxSource.includes("Math.abs(dx) < 48"));
 assert.ok(lightboxSource.includes("onTouchStart={handleTouchStart}"));
 assert.ok(lightboxSource.includes("onTouchEnd={handleTouchEnd}"));
 assert.ok(!lightboxSource.includes("hidden md:flex items-center justify-center"));
+assert.ok(lightboxSource.includes('data-lightbox-slide="incoming"'));
+assert.ok(lightboxSource.includes("prefers-reduced-motion: reduce"));
+assert.ok(lightboxSource.includes("if (total <= 1 || transition) return"));
+assert.ok(lightboxSource.includes('data-lightbox-dots'));
+assert.ok(lightboxSource.includes('"h-1 w-1 rounded-full"'));
+assert.equal(nextLightboxIndex(0, 3, 1), 1);
+assert.equal(nextLightboxIndex(0, 3, -1), 2);
 assert.equal(renderToStaticMarkup(<MobileMediaCarousel items={[]} />), "");
 
 const items: MediaGalleryItem[] = [

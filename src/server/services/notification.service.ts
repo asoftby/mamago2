@@ -749,10 +749,9 @@ function buildNotificationBaseWhere(
 ): Prisma.NotificationWhereInput {
   let where: Prisma.NotificationWhereInput;
 
+  where = mergeStreamFilter({ userId }, stream);
   if (options?.accessibleSurfaces && options.accessibleSurfaces.length > 0) {
-    where = mergeAccessibleSurfacesFilter({ userId }, options.accessibleSurfaces);
-  } else {
-    where = mergeStreamFilter({ userId }, stream);
+    where = mergeAccessibleSurfacesFilter(where, options.accessibleSurfaces);
   }
 
   return mergeHideWelcomeWhenTelegramConnected(where, options?.telegramConnected);
