@@ -1,22 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { AnalyticsEntityType, RecommendationSurface } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
-import { listPlanSuggestionsForCity } from "@/server/services/planSuggestions.service";
+import {
+  listPlanSuggestionsForCity,
+  rankPlanSuggestionsForCity,
+} from "@/server/services/planSuggestions.service";
+import { recordRecommendationRun } from "@/server/services/recommendations/RecommendationTraceService";
+import { buildManualSubjectsSnapshot } from "@/lib/decision/subjects";
+import { guestGenerateBodySchema } from "@/lib/decision/planRequestSchemas";
 import {
   quickGuestQuotaGate,
   recordGuestSuccessfulGeneration,
   resolveGuestUsageKey,
 } from "@/server/services/guestPlanQuota";
 import { getTrustedClientIp } from "@/lib/security/clientIp";
-
-const bodySchema = z.object({
-  anonymousId: z.string().optional().nullable(),
-  city: z.string().min(1).optional().default("minsk"),
-  date: z.string().optional(),
-  exclude: z.array(z.string()).optional(),
-  ageRanges: z.array(z.string()).optional(),
-});
 
 /**
  * POST /api/plan/generate — подборка для «Мой план».
@@ -34,7 +32,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    const parsed = bodySchema.safeParse(raw);
+    const parsed = guestGenerateBodySchema.safeParse(raw);
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Validation failed", details: parsed.error.flatten() },
@@ -44,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     const { anonymousId, city, date, exclude, ageRanges } = parsed.data;
     const excludeActivityIds = [...new Set((exclude ?? []).filter(Boolean))];
-    const ageRangeValues = [...new Set((ageRanges ?? []).filter(Boolean))];
+    const ageRangeValues = [...new Set(ageRanges ?? [])];
 
     if (user) {
       let plannedIds: string[] = [];
@@ -114,7 +112,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const activities = await listPlanSuggestionsForCity({
+    const batch = await rankPlanSuggestionsForCity({
       citySlug: city.toLowerCase(),
       excludeActivityIds,
       take: 6,
@@ -123,7 +121,7 @@ export async function POST(request: NextRequest) {
     console.log("[API] real data used", {
       endpoint: "/api/plan/generate",
       authenticated: false,
-      count: activities.length,
+      count: batch.suggestions.length,
     });
 
     const recorded = await recordGuestSuccessfulGeneration(key);
@@ -150,9 +148,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // anonymousId is the guest's primary product key (FAM-001); the quota
+    // `key` above may instead be an IP+UA hash fallback and is not identity.
+    const guestAnonymousId = anonymousId?.trim() || null;
+    const trace = await recordRecommendationRun({
+      anonymousId: guestAnonymousId,
+      surface: RecommendationSurface.MY_PLAN,
+      citySlug: city.toLowerCase(),
+      targetDateFrom: date ?? null,
+      targetDateTo: date ?? null,
+      algorithmVersion: batch.algorithmVersion,
+      candidateCount: batch.candidateCount,
+      decisionContext: {
+        intent: "guest_plan_generate",
+        subjects: buildManualSubjectsSnapshot(ageRangeValues),
+        constraints: {
+          ...(ageRangeValues.length > 0
+            ? { ageRanges: { value: ageRangeValues, source: "manual" as const } }
+            : {}),
+          excludedActivityCount: { value: excludeActivityIds.length, source: "derived" as const },
+          requestedLimit: { value: 6, source: "derived" as const },
+        },
+        actor: { kind: "guest", id: guestAnonymousId },
+      },
+      items: batch.suggestions.map((item, index) => ({
+        entityType: AnalyticsEntityType.EVENT,
+        entityId: item.activity.id,
+        position: index + 1,
+        score: item.score,
+        scoreBreakdown: item.scoreBreakdown,
+        reasonCodes: item.reasonCodes,
+      })),
+    });
+
+    const activities = batch.suggestions.map((item, index) => ({
+      ...item.activity,
+      recommendationRunId: trace?.runId ?? null,
+      recommendationExposureId:
+        trace?.exposureIdByEntityKey.get(`EVENT:${item.activity.id}`) ?? null,
+      recommendationPosition: index + 1,
+      recommendationAlgorithmVersion: batch.algorithmVersion,
+    }));
+
     return NextResponse.json({
       suggestions: activities,
       scenario: activities,
+      recommendationRunId: trace?.runId ?? null,
       ...(activities.length === 0 ? { message: "Нет данных для генерации" } : {}),
       requiresAuth: false,
       remainingGenerations: recorded.remainingGenerations,

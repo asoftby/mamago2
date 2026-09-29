@@ -3,6 +3,7 @@ import type {
   AnalyticsVertical,
   UserEventType,
 } from "@prisma/client";
+import type { Subject } from "@/lib/decision/decisionContext";
 
 /**
  * Lightweight context shared by first-party product telemetry.
@@ -26,6 +27,9 @@ export type AnalyticsMetaPayload = {
 
   /** Small, normalized user/context dimensions useful for later ranking. */
   selectedPersonaIds?: string[];
+  /** decisionContext.v1 participant snapshot — IDs/roles/ageRange only, never name or DOB. */
+  subjects?: Subject[];
+  decisionContextVersion?: 1;
   ageRanges?: string[];
   dateFrom?: string;
   dateTo?: string;
@@ -50,6 +54,8 @@ export type TrackUserEventInput = {
   userId?: string | null;
   /** Id строки Session (сервер) или клиентский anonymous id */
   sessionId?: string | null;
+  /** Guest product identity (client-generated UUID). Distinct from sessionId. */
+  anonymousId?: string | null;
   eventType: UserEventType;
   entityType?: AnalyticsEntityType | null;
   entityId?: string | null;

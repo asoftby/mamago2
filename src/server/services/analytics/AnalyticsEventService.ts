@@ -14,6 +14,7 @@ import { enrichSemanticEventMeta } from "@/server/services/analytics/SemanticEve
 import { registerPromotionActionFromUserEvent } from "@/server/services/promotion/promotion.service";
 import {
   findRecentRecommendationAttribution,
+  verifyRecommendationAttribution,
   linkRecommendationOutcome,
 } from "@/server/services/recommendations/RecommendationTraceService";
 
@@ -62,24 +63,40 @@ export async function trackUserEvent(
     // Existing recommendation call sites may not yet carry exposure IDs through
     // every action contract. Attribute a short-lived action to the user's most
     // recent matching exposure instead of forcing duplicate UI state into each
-    // feature. Explicit IDs always win.
+    // feature. A CLIENT-SUPPLIED exposure id is never trusted as-is — it is
+    // always re-verified server-side (entity match + actor ownership) before
+    // anything is built on top of it, exactly like the fallback lookup already
+    // does implicitly via its own scoped query. See decisionId below.
     const isRecommendationAction = metaObject?.source === "recommendation";
-    const hasExplicitExposure =
-      typeof metaObject?.recommendationExposureId === "string" &&
-      metaObject.recommendationExposureId.trim().length > 0;
-    if (
-      isRecommendationAction &&
-      !hasExplicitExposure &&
-      input.userId &&
-      input.entityType &&
-      input.entityId
-    ) {
-      const attribution = await findRecentRecommendationAttribution({
-        userId: input.userId,
-        entityType: input.entityType,
-        entityId: input.entityId,
-        maxAgeMinutes: 120,
-      });
+    const explicitExposureId =
+      typeof metaObject?.recommendationExposureId === "string"
+        ? metaObject.recommendationExposureId.trim()
+        : "";
+
+    let attribution: { exposureId: string; runId: string } | null = null;
+    if (isRecommendationAction && input.entityType && input.entityId) {
+      if (explicitExposureId) {
+        attribution = await verifyRecommendationAttribution({
+          exposureId: explicitExposureId,
+          entityType: input.entityType,
+          entityId: input.entityId,
+          userId: input.userId ?? null,
+          sessionId: input.sessionId ?? null,
+          anonymousId: input.anonymousId ?? null,
+        });
+      } else if (input.userId || input.anonymousId) {
+        // Also matches a guest-owned run (anonymousId) even once the actor
+        // is now authenticated — old guest history keeps its own identity,
+        // we just look it up by both keys instead of rewriting it.
+        attribution = await findRecentRecommendationAttribution({
+          userId: input.userId ?? null,
+          anonymousId: input.anonymousId ?? null,
+          entityType: input.entityType,
+          entityId: input.entityId,
+          maxAgeMinutes: 120,
+        });
+      }
+
       if (attribution) {
         metaObject = {
           ...(metaObject ?? {}),
@@ -87,13 +104,28 @@ export async function trackUserEvent(
           recommendationRunId: attribution.runId,
         };
         meta = metaObject as Prisma.InputJsonValue;
+      } else if (explicitExposureId) {
+        // Unverified client-supplied id: strip it rather than persist an
+        // unproven attribution claim anywhere (meta, decisionId, or the
+        // later linkRecommendationOutcome call below).
+        const { recommendationExposureId: _drop1, recommendationRunId: _drop2, ...rest } =
+          metaObject ?? {};
+        metaObject = rest;
+        meta = metaObject as Prisma.InputJsonValue;
       }
     }
+
+    // decisionId = RecommendationRun.id, set ONLY from a verified attribution
+    // above (explicit-and-verified, or the ownership-scoped fallback). Not a
+    // hard FK — see UserEvent.decisionId.
+    const decisionId = attribution?.runId;
 
     const userEvent = await prisma.userEvent.create({
       data: {
         userId: input.userId ?? undefined,
         sessionId: input.sessionId ?? undefined,
+        anonymousId: input.anonymousId ?? undefined,
+        decisionId,
         eventType: input.eventType,
         entityType: input.entityType ?? undefined,
         entityId: input.entityId ?? undefined,
@@ -126,13 +158,16 @@ export async function trackUserEvent(
       typeof metaObject?.recommendationExposureId === "string"
         ? metaObject.recommendationExposureId.trim()
         : "";
-    if (recommendationExposureId) {
+    if (recommendationExposureId && input.entityType && input.entityId) {
       void linkRecommendationOutcome({
         exposureId: recommendationExposureId,
+        entityType: input.entityType,
+        entityId: input.entityId,
         userEventId: userEvent.id,
         eventType: input.eventType,
         userId: input.userId ?? null,
         sessionId: input.sessionId ?? null,
+        anonymousId: input.anonymousId ?? null,
       });
     }
 
@@ -143,5 +178,26 @@ export async function trackUserEvent(
       ok: false,
       error: error instanceof Error ? error.message : "unknown_error",
     };
+  }
+}
+
+/**
+ * Fires `input.eventType` only if the user has never had one before
+ * (ONB-013 FIRST_PERSONALIZED_* milestones). Best-effort like `trackUserEvent`
+ * itself — a race between two concurrent requests can occasionally record the
+ * milestone twice, which is acceptable for funnel analytics.
+ */
+export async function trackFirstOccurrenceEvent(
+  input: TrackUserEventInput & { userId: string },
+): Promise<void> {
+  try {
+    const existing = await prisma.userEvent.findFirst({
+      where: { userId: input.userId, eventType: input.eventType },
+      select: { id: true },
+    });
+    if (existing) return;
+    await trackUserEvent(input);
+  } catch (error) {
+    console.error("[product-telemetry] trackFirstOccurrenceEvent failed:", error);
   }
 }

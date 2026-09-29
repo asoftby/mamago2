@@ -7,6 +7,8 @@ import {
 } from "./guestMyPlanDraftStorage";
 import { MY_PLAN_REFETCH_DATE_EVENT } from "./myPlanOpenIntent";
 import { persistSelectedPlanDate } from "@/features/my-plan/lib/planRecommendationDraftStorage";
+import { parseSafeOpaqueId } from "@/lib/decision/identifiers";
+import { extractGuestRecommendationTrace } from "./guestRecommendationTrace";
 
 const GUEST_SLOTS = ["morning", "afternoon", "evening"] as const;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -75,11 +77,20 @@ export async function syncGuestMyPlanDraft(
     };
   }
 
+  // The guest's product identity (NOT mg_analytics_sid) — lets the server
+  // verify the saved card against the guest's original RecommendationRun.
+  const anonymousId = parseSafeOpaqueId(draft.anonymousId);
+
   let selectedDate: string | null = null;
   for (const item of items) {
     const date = resolvePlanDate(draft, item);
     if (!date) throw new Error("guest_plan_invalid_date");
     selectedDate ??= date;
+
+    // Exposure of THIS activity's recommendation; older drafts only carry it
+    // on the activity object, so normalize from there as a fallback.
+    const trace = item.recommendationTrace ?? extractGuestRecommendationTrace(item.activity);
+    const exposureId = trace ? parseSafeOpaqueId(trace.exposureId) : null;
 
     const res = await fetchFn("/api/save/plan", {
       method: "POST",
@@ -93,6 +104,8 @@ export async function syncGuestMyPlanDraft(
         coverImageUrl:
           item.coverImageUrl ?? item.activity?.coverImageUrl ?? undefined,
         planAddSource: "recommendation",
+        ...(anonymousId ? { anonymousId } : {}),
+        ...(anonymousId && exposureId ? { recommendationExposureId: exposureId } : {}),
       }),
     });
 

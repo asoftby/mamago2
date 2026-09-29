@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import type { Idea } from "@prisma/client";
 import { resolveRouteForUserSave } from "@/server/services/route.service";
+import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 
 type OfferIdeaDelegate = {
   upsert: (args: {
@@ -213,13 +214,31 @@ export async function addRouteIdea(
   if (!route) {
     throw new Error("Route not found");
   }
-  return prisma.routeIdea.upsert({
+  const existing = await prisma.routeIdea.findUnique({
+    where: { userId_routeId: { userId, routeId: route.id } },
+    select: { userId: true },
+  });
+  const routeIdea = await prisma.routeIdea.upsert({
     where: {
       userId_routeId: { userId, routeId: route.id },
     },
     create: { userId, routeId: route.id },
     update: {},
   });
+  if (!existing) {
+    // See docs/engineering/backlog.md — planningActivity.ts still reads
+    // RouteIdea.createdAt directly via raw SQL for pre-existing rows; this
+    // real UserEvent is the write path for everything going forward.
+    void trackUserEvent({
+      userId,
+      eventType: "SAVE",
+      entityType: "ROUTE",
+      entityId: route.id,
+      vertical: "CITY",
+      meta: { source: "detail", section: "routes", targetAction: "ideas" },
+    });
+  }
+  return routeIdea;
 }
 
 /** Сохранить предложение в «Идеи» (idempotent). */

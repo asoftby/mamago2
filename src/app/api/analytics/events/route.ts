@@ -13,6 +13,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
+import { SafeOpaqueIdSchema } from "@/lib/decision/identifiers";
 
 const analyticsMetaSchema = z
   .record(z.string(), z.unknown())
@@ -23,7 +24,11 @@ const analyticsMetaSchema = z
   );
 
 const bodySchema = z.object({
-  eventType: z.nativeEnum(UserEventType),
+  // Server-only snapshot events are never accepted from a client.
+  eventType: z.nativeEnum(UserEventType).refine(
+    (type) => type !== UserEventType.PLAN_AUDIENCE_SNAPSHOT,
+    "server_only_event_type",
+  ),
   entityType: z.nativeEnum(AnalyticsEntityType).optional().nullable(),
   entityId: z.string().optional().nullable(),
   vertical: z.nativeEnum(AnalyticsVertical).optional().nullable(),
@@ -31,6 +36,7 @@ const bodySchema = z.object({
   citySlug: z.string().optional().nullable(),
   meta: analyticsMetaSchema.optional(),
   sessionId: z.string().optional().nullable(),
+  anonymousId: SafeOpaqueIdSchema.optional().nullable(),
 });
 
 export async function POST(request: NextRequest) {
@@ -53,6 +59,7 @@ export async function POST(request: NextRequest) {
     await trackUserEvent({
       userId: user?.id ?? null,
       sessionId,
+      anonymousId: body.anonymousId?.trim() || null,
       eventType: body.eventType,
       entityType: body.entityType ?? null,
       entityId: body.entityId ?? null,

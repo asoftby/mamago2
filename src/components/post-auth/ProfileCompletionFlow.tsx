@@ -27,6 +27,11 @@ import {
   trackPostAuthEvent,
   type PostAuthAnalyticsEvent,
 } from "@/lib/post-auth/analytics";
+import {
+  trackFamilyOnboardingStarted,
+  trackChildContextCompleted,
+  trackOnboardingCompleted,
+} from "@/lib/onboarding/firstPartyEvents";
 
 const MONTHS_RU = [
   { m: 0, label: "Январь" },
@@ -169,6 +174,7 @@ export function ProfileCompletionFlow({
           return;
         }
         track("completion_started", {});
+        trackFamilyOnboardingStarted();
         const start = data.resumeStep ?? "adult";
         setStep(start);
         track("completion_step_viewed", { completionStep: start });
@@ -370,6 +376,7 @@ export function ProfileCompletionFlow({
       if (!res.ok) throw new Error("save");
       notifyFamilyPersonasChanged();
       track("completion_step_completed", { completionStep: "child_interests" });
+      trackChildContextCompleted();
       await refreshState();
       setStep("add_more_children");
     } catch {
@@ -392,6 +399,7 @@ export function ProfileCompletionFlow({
 
   const handleFinish = () => {
     track("completion_finished", {});
+    trackOnboardingCompleted();
     onFinished({ alreadyComplete: false });
   };
 

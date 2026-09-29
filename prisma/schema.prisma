@@ -180,6 +180,13 @@ model UserEvent {
   entityId         String?
   vertical         AnalyticsVertical?
   cityId           String?
+  /// RecommendationRun.id that caused this action, if any. Intentionally not a
+  /// hard FK: raw event history must not depend on recommendation-retention
+  /// tables and must survive their pruning.
+  decisionId       String?
+  /// Guest product identity (client-generated UUID). Distinct from
+  /// `mg_analytics_sid`, which stays a web-analytics session id, not identity.
+  anonymousId      String?
   meta             Json?
   createdAt        DateTime             @default(now())
   promotionActions PromotionAction[]
@@ -191,6 +198,8 @@ model UserEvent {
   @@index([entityType, entityId, createdAt])
   @@index([vertical, createdAt])
   @@index([cityId, createdAt])
+  @@index([decisionId])
+  @@index([anonymousId, createdAt])
 }
 
 model Session {
@@ -3295,6 +3304,19 @@ enum UserEventType {
   BOOKING_COMPLETED
   BOOKING_CANCELLED
   FEEDBACK_LEFT
+  /// Onboarding funnel (ONB-013). Properties are IDs/step names/booleans only — never name, DOB, email, or phone.
+  AUTH_STARTED
+  AUTH_COMPLETED
+  FAMILY_ONBOARDING_STARTED
+  CHILD_SAVED
+  CHILD_CONTEXT_COMPLETED
+  ONBOARDING_COMPLETED
+  FIRST_PERSONALIZED_RESULT
+  FIRST_PERSONALIZED_PLAN_ADD
+  /// Server-only audience snapshot for an already-existing PlanItem whose audience/date was
+  /// re-saved (no new plan-add happened). Deliberately NOT a PLAN_ADD so it can't inflate
+  /// positive-signal counts, ranking weights or promotion metrics.
+  PLAN_AUDIENCE_SNAPSHOT
 }
 
 enum AnalyticsEntityType {
