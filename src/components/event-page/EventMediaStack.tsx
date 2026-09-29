@@ -10,10 +10,12 @@ export function EventMediaStack({
   media,
   className,
   onPosterClick,
+  showPoster = true,
 }: {
   media: EventPageMedia;
   className?: string;
   onPosterClick?: () => void;
+  showPoster?: boolean;
 }) {
   const { posterUrl, posterAlt, posterWidth, posterHeight, reel, trailerYoutubeId, trailerLabel } = media;
   const [displayPosterUrl, setDisplayPosterUrl] = useState(posterUrl);
@@ -50,25 +52,27 @@ export function EventMediaStack({
   return (
     <aside className={cn("flex flex-col gap-3.5", className)}>
       {/* Poster keeps its intrinsic ratio for portrait, landscape and square art. */}
-      <button
-        type="button"
-        onClick={onPosterClick}
-        disabled={!onPosterClick}
-        aria-label={onPosterClick ? "Открыть фото" : undefined}
-        className="block w-full overflow-hidden rounded-[18px] bg-[#E8E0D4] text-left disabled:cursor-default"
-      >
-        <Image
-          src={displayPosterUrl}
-          alt={posterAlt}
-          width={displayPosterUrl === posterUrl ? (posterWidth ?? 1200) : 1200}
-          height={displayPosterUrl === posterUrl ? (posterHeight ?? 630) : 630}
-          className="block h-auto w-full"
-          sizes="(min-width: 1024px) 440px, calc(100vw - 32px)"
-          priority
-          unoptimized={isAppMediaUrl(displayPosterUrl)}
-          onError={() => setDisplayPosterUrl("/og-default.jpg")}
-        />
-      </button>
+      {showPoster ? (
+        <button
+          type="button"
+          onClick={onPosterClick}
+          disabled={!onPosterClick}
+          aria-label={onPosterClick ? "Открыть фото" : undefined}
+          className="block w-full overflow-hidden rounded-[18px] bg-[#E8E0D4] text-left disabled:cursor-default"
+        >
+          <Image
+            src={displayPosterUrl}
+            alt={posterAlt}
+            width={displayPosterUrl === posterUrl ? (posterWidth ?? 1200) : 1200}
+            height={displayPosterUrl === posterUrl ? (posterHeight ?? 630) : 630}
+            className="block h-auto w-full"
+            sizes="(min-width: 1024px) 440px, calc(100vw - 32px)"
+            priority
+            unoptimized={isAppMediaUrl(displayPosterUrl)}
+            onError={() => setDisplayPosterUrl("/og-default.jpg")}
+          />
+        </button>
+      ) : null}
 
       {/* Trailer — 16:9 */}
       {trailerYoutubeId && (

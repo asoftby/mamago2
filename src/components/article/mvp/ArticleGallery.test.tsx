@@ -11,6 +11,8 @@ function image(id: string): ArticleGalleryImage {
 const source = readFileSync(new URL("./ArticleGallery.tsx", import.meta.url), "utf8");
 assert.ok(source.includes("data-article-gallery-track"));
 assert.ok(source.includes("scroll-smooth") && source.includes("snap-mandatory"));
+assert.ok(source.includes("overflow-x-auto") && source.includes("overscroll-x-contain"));
+assert.ok(!source.includes("touch-action:pan-y"));
 assert.ok(!source.includes("mobileImage") && !source.includes("groupImages"));
 assert.ok(source.includes("preloadStart") && source.includes("preloadEnd"));
 assert.ok(source.includes("data-gallery-skeleton"));

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
@@ -34,9 +34,40 @@ interface MediaLightboxProps {
 export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps) {
   const [idx, setIdx] = useState(startIndex);
   const total = items.length;
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const didSwipeRef = useRef(false);
 
   const prev = useCallback(() => setIdx((i) => (i - 1 + total) % total), [total]);
   const next = useCallback(() => setIdx((i) => (i + 1) % total), [total]);
+
+  function handleTouchStart(event: React.TouchEvent) {
+    const touch = event.touches[0];
+    if (!touch) return;
+    didSwipeRef.current = false;
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }
+
+  function handleTouchEnd(event: React.TouchEvent) {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    const touch = event.changedTouches[0];
+    if (!start || !touch || total <= 1) return;
+
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 48 || Math.abs(dx) <= Math.abs(dy)) return;
+    didSwipeRef.current = true;
+    if (dx < 0) next();
+    else prev();
+  }
+
+  function handleBackdropClick() {
+    if (didSwipeRef.current) {
+      didSwipeRef.current = false;
+      return;
+    }
+    onClose();
+  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -58,7 +89,9 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
   return (
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/92 p-4 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={handleBackdropClick}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
       role="dialog"
       aria-modal="true"
       aria-label="Просмотр медиа"
@@ -89,7 +122,7 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
           className={cn(
             "absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full p-2.5 text-white transition-colors",
             "bg-white/10 hover:bg-white/20",
-            "hidden md:flex items-center justify-center",
+            "flex items-center justify-center",
           )}
         >
           <ChevronLeft className="h-6 w-6" />
@@ -117,19 +150,6 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
         </button>
       )}
 
-      {/* Mobile tap zones */}
-      {total > 1 && (
-        <>
-          <div
-            className="absolute left-0 top-0 bottom-0 w-1/3 md:hidden"
-            onClick={(e) => { e.stopPropagation(); prev(); }}
-          />
-          <div
-            className="absolute right-0 top-0 bottom-0 w-1/3 md:hidden"
-            onClick={(e) => { e.stopPropagation(); next(); }}
-          />
-        </>
-      )}
     </div>
   );
 }
