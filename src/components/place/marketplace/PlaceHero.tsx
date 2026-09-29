@@ -254,10 +254,10 @@ export function PlaceHero({
 
           {media && mobileMediaItems.length > 0 && (
             <div style={{ marginTop: 8 }}>
-              <div className="md:hidden">
+              <div className="lg:hidden">
                 <MobileMediaCarousel items={mobileMediaItems} ariaLabel="Фото места" />
               </div>
-              <div className="hidden md:block">
+              <div className="hidden lg:block">
                 <MediaGalleryStrip items={media.galleryItems} maxVisible={3} />
               </div>
             </div>
