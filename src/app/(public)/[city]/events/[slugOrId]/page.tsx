@@ -134,7 +134,10 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
     // The route city is a listing/canonical concern, not proof of the physical address locality.
     // If the venue/place city is unknown, omit addressLocality instead of inventing it from the URL.
     const locationCitySlug =
-      fromDb.venue?.place?.city?.slug || fromDb.place?.city?.slug || undefined;
+      fromDb.venue?.place?.city?.slug ||
+      fromDb.venue?.city?.slug ||
+      fromDb.place?.city?.slug ||
+      undefined;
     const generatedJsonLd = buildEventJsonLd({
       canonicalUrl,
       title: fromDb.title,
