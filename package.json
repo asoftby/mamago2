@@ -191,7 +191,7 @@
     "test:responsive-business": "tsx src/lib/responsive/businessMobileLayoutContract.test.ts",
     "test:responsive-content-editor": "tsx src/lib/responsive/contentEditorMobileLayoutContract.test.ts",
     "test:responsive-admin": "tsx src/lib/responsive/adminMobileLayoutContract.test.ts",
-    "test:publication-media": "tsx src/lib/media/publicationMediaOrder.test.ts"
+    "test:publication-media": "tsx src/lib/media/publicationMediaOrder.test.ts && tsx src/components/media/MobileMediaCarousel.test.tsx"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
