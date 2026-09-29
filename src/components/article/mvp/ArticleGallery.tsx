@@ -287,7 +287,7 @@ export function ArticleGallery({
           ref={viewportRef}
           data-article-gallery-track
           onScroll={handleScroll}
-          className="flex snap-x snap-mandatory gap-0 overflow-x-auto scroll-smooth rounded-xl [scrollbar-width:none] [touch-action:pan-y_pinch-zoom] [&::-webkit-scrollbar]:hidden md:rounded-none"
+          className="flex snap-x snap-mandatory gap-0 overflow-x-auto scroll-smooth overscroll-x-contain rounded-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:rounded-none"
         >
           {deduplicatedImages.map((image, index) => (
             <button
