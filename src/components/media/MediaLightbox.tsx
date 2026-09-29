@@ -122,7 +122,7 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
           className={cn(
             "absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full p-2.5 text-white transition-colors",
             "bg-white/10 hover:bg-white/20",
-            "hidden md:flex items-center justify-center",
+            "flex items-center justify-center",
           )}
         >
           <ChevronLeft className="h-6 w-6" />
