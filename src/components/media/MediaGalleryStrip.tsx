@@ -89,18 +89,25 @@ interface MediaGalleryStripProps {
   items: MediaGalleryItem[];
   /** Max tiles shown before "+N". Default: 4. */
   maxVisible?: number;
+  /** Optional full lightbox sequence. Useful when the visible poster is item 0. */
+  lightboxItems?: MediaGalleryItem[];
+  /** Offset of this strip's first item inside lightboxItems. */
+  lightboxIndexOffset?: number;
   className?: string;
 }
 
 export function MediaGalleryStrip({
   items,
   maxVisible = 4,
+  lightboxItems,
+  lightboxIndexOffset = 0,
   className,
 }: MediaGalleryStripProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   if (items.length === 0) return null;
 
+  const resolvedLightboxItems = lightboxItems ?? items;
   const visibleItems = items.slice(0, maxVisible);
   const overflowCount = Math.max(0, items.length - maxVisible);
   // The last visible tile shows "+N" when there's overflow
@@ -145,7 +152,11 @@ export function MediaGalleryStrip({
               <Tile
                 item={item}
                 overflowCount={isLast && overflowCount > 0 ? overflowCount : undefined}
-                onClick={() => setLightboxIndex(isLast && overflowCount > 0 ? maxVisible - 1 : i)}
+                onClick={() =>
+                  setLightboxIndex(
+                    lightboxIndexOffset + (isLast && overflowCount > 0 ? maxVisible - 1 : i),
+                  )
+                }
               />
             </div>
           );
@@ -155,7 +166,7 @@ export function MediaGalleryStrip({
       {/* ── Lightbox ──────────────────────────────────────────── */}
       {lightboxIndex !== null && (
         <MediaLightbox
-          items={items}
+          items={resolvedLightboxItems}
           startIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
         />
