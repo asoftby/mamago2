@@ -8,6 +8,7 @@ import { recordRecommendationRun } from "@/server/services/recommendations/Recom
 import { trackFirstOccurrenceEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { SUGGESTIONS_PER_BATCH } from "@/features/my-plan/lib/suggestionsConfig";
 import { buildSubjectsSnapshot } from "@/lib/decision/subjects";
+import { sanitizeCanonicalAgeRanges } from "@/lib/decision/decisionContext";
 
 /**
  * GET /api/plan/suggestions?city=minsk&date=YYYY-MM-DD&exclude=id1,id2&ageRanges=1-3,3-5&personaIds=...
@@ -32,8 +33,9 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get("date") ?? undefined;
     const excludeParam =
       searchParams.get("exclude")?.split(",").filter(Boolean) ?? [];
-    const ageRangesParam =
-      searchParams.get("ageRanges")?.split(",").filter(Boolean) ?? [];
+    const ageRangesParam = sanitizeCanonicalAgeRanges(
+      searchParams.get("ageRanges")?.split(",").filter(Boolean) ?? [],
+    );
     const personaIds =
       searchParams.get("personaIds")?.split(",").map((value) => value.trim()).filter(Boolean) ?? [];
 
@@ -79,14 +81,17 @@ export async function GET(request: NextRequest) {
       targetDateTo: date ?? null,
       algorithmVersion: batch.algorithmVersion,
       candidateCount: batch.candidateCount,
-      context: {
-        contextVersion: 1,
+      decisionContext: {
         intent: "my_plan_suggestions",
-        ageRanges: ageRangesParam,
-        selectedPersonaIds: personaIds,
         subjects,
-        excludedActivityCount: excludeActivityIds.length,
-        requestedLimit: SUGGESTIONS_PER_BATCH,
+        constraints: {
+          ...(ageRangesParam.length > 0
+            ? { ageRanges: { value: ageRangesParam, source: "manual" as const } }
+            : {}),
+          excludedActivityCount: { value: excludeActivityIds.length, source: "derived" as const },
+          requestedLimit: { value: SUGGESTIONS_PER_BATCH, source: "derived" as const },
+        },
+        actor: { kind: "user", id: user.id },
       },
       items: batch.suggestions.map((item, index) => ({
         entityType: AnalyticsEntityType.EVENT,
@@ -115,7 +120,12 @@ export async function GET(request: NextRequest) {
       traced: Boolean(trace),
     });
 
-    if (suggestions.length > 0) {
+    // A milestone requires an actually-applied personalization input, not
+    // just a non-empty result — a generic/default ranking (no resolved
+    // subject, no canonical age filter) is not "personalized." An invalid
+    // or foreign personaId that resolved to subjects=[] doesn't count either.
+    const isPersonalized = subjects.length > 0 || ageRangesParam.length > 0;
+    if (suggestions.length > 0 && isPersonalized) {
       void trackFirstOccurrenceEvent({
         userId: user.id,
         sessionId: sessionRowId,

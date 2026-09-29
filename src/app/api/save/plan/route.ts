@@ -54,6 +54,8 @@ export async function POST(request: NextRequest) {
       coverImageUrl,
       selectedPersonaIds,
       planAddSource,
+      anonymousId,
+      recommendationExposureId,
     } = body as {
       activityId?: string;
       routeId?: string;
@@ -69,7 +71,22 @@ export async function POST(request: NextRequest) {
       coverImageUrl?: string;
       selectedPersonaIds?: unknown;
       planAddSource?: unknown;
+      /** Guest product identity — lets a guest-generated recommendation still
+       * be verifiably attributed after the visitor registers and saves it.
+       * Never trusted for ownership by itself; verifyRecommendationAttribution
+       * re-checks it server-side. */
+      anonymousId?: unknown;
+      recommendationExposureId?: unknown;
     };
+
+    const validAnonymousId =
+      typeof anonymousId === "string" && anonymousId.trim().length > 0
+        ? anonymousId.trim()
+        : null;
+    const validRecommendationExposureId =
+      typeof recommendationExposureId === "string" && recommendationExposureId.trim().length > 0
+        ? recommendationExposureId.trim()
+        : null;
 
     // Articles have no date semantics — they can only be saved as an idea
     // (see /api/save/idea). Reject before the generic validation below so a
@@ -120,6 +137,7 @@ export async function POST(request: NextRequest) {
       void trackUserEvent({
         userId: user.id,
         sessionId: sessionRowId,
+        anonymousId: validAnonymousId,
         eventType: "PLAN_ADD",
         entityType: "PLACE",
         entityId: placeId,
@@ -129,6 +147,7 @@ export async function POST(request: NextRequest) {
           source: "detail",
           section: "places",
           targetAction: "plan",
+          planItemId: planItem.id,
           ...planDateMeta,
           ...subjectsMeta,
         },
@@ -145,6 +164,7 @@ export async function POST(request: NextRequest) {
       void trackUserEvent({
         userId: user.id,
         sessionId: sessionRowId,
+        anonymousId: validAnonymousId,
         eventType: "PLAN_ADD",
         entityType: "ROUTE",
         entityId: routeId,
@@ -154,6 +174,7 @@ export async function POST(request: NextRequest) {
           source: "detail",
           section: "routes",
           targetAction: "plan",
+          planItemId: planItem.id,
           ...planDateMeta,
           ...subjectsMeta,
         },
@@ -200,6 +221,7 @@ export async function POST(request: NextRequest) {
         void trackUserEvent({
           userId: user.id,
           sessionId: sessionRowId,
+          anonymousId: validAnonymousId,
           eventType: "PLAN_ADD",
           entityType: "EVENT",
           entityId: activityId,
@@ -209,9 +231,13 @@ export async function POST(request: NextRequest) {
             source: sourceTag,
             section: "afisha",
             targetAction: "plan",
+            planItemId: planItem.id,
             ...planDateMeta,
             ...(planAddSource === "recommendation" || planAddSource === "idea"
               ? { planAddSource }
+              : {}),
+            ...(sourceTag === "recommendation" && validRecommendationExposureId
+              ? { recommendationExposureId: validRecommendationExposureId }
               : {}),
             ...subjectsMeta,
           },
@@ -271,6 +297,8 @@ export async function DELETE(request: NextRequest) {
           userId: user.id,
           entityType: "EVENT",
           entityId: existing.activityId,
+          planItemId,
+          currentDate: existing.date,
         });
         void trackUserEvent({
           userId: user.id,
@@ -296,6 +324,8 @@ export async function DELETE(request: NextRequest) {
           userId: user.id,
           entityType: "PLACE",
           entityId: existing.placeId,
+          planItemId,
+          currentDate: existing.date,
         });
         void trackUserEvent({
           userId: user.id,
@@ -317,6 +347,8 @@ export async function DELETE(request: NextRequest) {
           userId: user.id,
           entityType: "ROUTE",
           entityId: existing.routeId,
+          planItemId,
+          currentDate: existing.date,
         });
         void trackUserEvent({
           userId: user.id,

@@ -84,9 +84,13 @@ export async function trackUserEvent(
           sessionId: input.sessionId ?? null,
           anonymousId: input.anonymousId ?? null,
         });
-      } else if (input.userId) {
+      } else if (input.userId || input.anonymousId) {
+        // Also matches a guest-owned run (anonymousId) even once the actor
+        // is now authenticated — old guest history keeps its own identity,
+        // we just look it up by both keys instead of rewriting it.
         attribution = await findRecentRecommendationAttribution({
-          userId: input.userId,
+          userId: input.userId ?? null,
+          anonymousId: input.anonymousId ?? null,
           entityType: input.entityType,
           entityId: input.entityId,
           maxAgeMinutes: 120,

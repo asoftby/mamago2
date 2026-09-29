@@ -9,6 +9,7 @@ import {
 } from "@/server/services/planSuggestions.service";
 import { recordRecommendationRun } from "@/server/services/recommendations/RecommendationTraceService";
 import { buildManualSubjectsSnapshot } from "@/lib/decision/subjects";
+import { sanitizeCanonicalAgeRanges } from "@/lib/decision/decisionContext";
 import {
   quickGuestQuotaGate,
   recordGuestSuccessfulGeneration,
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     const { anonymousId, city, date, exclude, ageRanges } = parsed.data;
     const excludeActivityIds = [...new Set((exclude ?? []).filter(Boolean))];
-    const ageRangeValues = [...new Set((ageRanges ?? []).filter(Boolean))];
+    const ageRangeValues = sanitizeCanonicalAgeRanges(ageRanges ?? []);
 
     if (user) {
       let plannedIds: string[] = [];
@@ -158,21 +159,26 @@ export async function POST(request: NextRequest) {
 
     // anonymousId is the guest's primary product key (FAM-001); the quota
     // `key` above may instead be an IP+UA hash fallback and is not identity.
+    const guestAnonymousId = anonymousId?.trim() || null;
     const trace = await recordRecommendationRun({
-      anonymousId: anonymousId?.trim() || null,
+      anonymousId: guestAnonymousId,
       surface: RecommendationSurface.MY_PLAN,
       citySlug: city.toLowerCase(),
       targetDateFrom: date ?? null,
       targetDateTo: date ?? null,
       algorithmVersion: batch.algorithmVersion,
       candidateCount: batch.candidateCount,
-      context: {
-        contextVersion: 1,
+      decisionContext: {
         intent: "guest_plan_generate",
-        ageRanges: ageRangeValues,
         subjects: buildManualSubjectsSnapshot(ageRangeValues),
-        excludedActivityCount: excludeActivityIds.length,
-        requestedLimit: 6,
+        constraints: {
+          ...(ageRangeValues.length > 0
+            ? { ageRanges: { value: ageRangeValues, source: "manual" as const } }
+            : {}),
+          excludedActivityCount: { value: excludeActivityIds.length, source: "derived" as const },
+          requestedLimit: { value: 6, source: "derived" as const },
+        },
+        actor: { kind: "guest", id: guestAnonymousId },
       },
       items: batch.suggestions.map((item, index) => ({
         entityType: AnalyticsEntityType.EVENT,

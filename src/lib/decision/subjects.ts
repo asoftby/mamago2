@@ -1,7 +1,11 @@
 import type { AnalyticsEntityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ageRangeAt } from "@/lib/decision/ageRangeAt";
-import { SubjectSchema, type Subject } from "@/lib/decision/decisionContext";
+import {
+  SubjectSchema,
+  sanitizeCanonicalAgeRanges,
+  type Subject,
+} from "@/lib/decision/decisionContext";
 
 export type BuildSubjectsSnapshotInput = {
   userId: string;
@@ -63,16 +67,22 @@ export async function buildSubjectsSnapshot(
 
 /**
  * Best-effort recovery of "who this was for" when removing a plan item: the
- * PlanItem itself never stored participants, so we look at the most recent
- * matching PLAN_ADD UserEvent and copy its subjects snapshot, re-tagged as
- * "derived". Returns [] rather than fabricating data when none is found.
+ * PlanItem itself never stored participants, so we look at the PLAN_ADD
+ * UserEvent that carries the SAME planItemId. Requiring both planItemId AND
+ * the current target date to match protects against a stale snapshot from
+ * before the item was moved to a different date (a fresh PLAN_ADD for the
+ * new date always wins, since it's more recent and still matches). If no
+ * event proves currency, returns [] rather than attaching a wrong audience —
+ * never fabricate.
  */
 export async function findMostRecentSubjectsSnapshot(input: {
   userId: string;
   entityType: AnalyticsEntityType;
   entityId: string;
+  planItemId: string;
+  currentDate: string;
 }): Promise<Subject[]> {
-  const event = await prisma.userEvent.findFirst({
+  const events = await prisma.userEvent.findMany({
     where: {
       userId: input.userId,
       eventType: "PLAN_ADD",
@@ -80,20 +90,31 @@ export async function findMostRecentSubjectsSnapshot(input: {
       entityId: input.entityId,
     },
     orderBy: { createdAt: "desc" },
+    take: 20,
     select: { meta: true },
   });
-  const rawSubjects =
-    event?.meta && typeof event.meta === "object" && !Array.isArray(event.meta)
-      ? (event.meta as Record<string, unknown>).subjects
-      : undefined;
-  if (!Array.isArray(rawSubjects)) return [];
 
-  const derived: Subject[] = [];
-  for (const raw of rawSubjects) {
-    const parsed = SubjectSchema.safeParse({ ...(raw as object), source: "derived" });
-    if (parsed.success) derived.push(parsed.data);
+  for (const event of events) {
+    const metaObject =
+      event.meta && typeof event.meta === "object" && !Array.isArray(event.meta)
+        ? (event.meta as Record<string, unknown>)
+        : null;
+    if (!metaObject) continue;
+    if (metaObject.planItemId !== input.planItemId) continue;
+    if (metaObject.dateFrom !== input.currentDate) continue;
+
+    const rawSubjects = metaObject.subjects;
+    if (!Array.isArray(rawSubjects)) return [];
+
+    const derived: Subject[] = [];
+    for (const raw of rawSubjects) {
+      const parsed = SubjectSchema.safeParse({ ...(raw as object), source: "derived" });
+      if (parsed.success) derived.push(parsed.data);
+    }
+    return derived;
   }
-  return derived;
+
+  return [];
 }
 
 /**
@@ -102,7 +123,7 @@ export async function findMostRecentSubjectsSnapshot(input: {
  * "kidRanges" draft). No PII, no refId.
  */
 export function buildManualSubjectsSnapshot(ageRanges: string[]): Subject[] {
-  return [...new Set(ageRanges.filter((r) => r.trim().length > 0))].map((range) => ({
+  return sanitizeCanonicalAgeRanges(ageRanges).map((range) => ({
     kind: "child" as const,
     refId: null,
     ageRange: range,

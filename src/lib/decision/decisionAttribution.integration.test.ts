@@ -13,6 +13,7 @@ import {
   verifyRecommendationAttribution,
 } from "@/server/services/recommendations/RecommendationTraceService";
 import { buildSubjectsSnapshot, findMostRecentSubjectsSnapshot } from "@/lib/decision/subjects";
+import { DecisionContextV1Schema } from "@/lib/decision/decisionContext";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -91,8 +92,15 @@ async function main() {
       anonymousId,
       surface: RecommendationSurface.MY_PLAN,
       citySlug: "minsk",
+      targetDateFrom: "2026-09-30",
+      targetDateTo: "2026-09-30",
       algorithmVersion: "test-v1",
       candidateCount: 2,
+      decisionContext: {
+        intent: "guest_plan_generate",
+        subjects: [{ kind: "child", refId: null, ageRange: "3-5", source: "manual" }],
+        actor: { kind: "guest", id: anonymousId },
+      },
       items: [
         { entityType: AnalyticsEntityType.EVENT, entityId: activityIdA, position: 1 },
         { entityType: AnalyticsEntityType.EVENT, entityId: activityIdB, position: 2 },
@@ -110,19 +118,41 @@ async function main() {
     });
     assert.equal(guestExposures.length, 2, "both exposures were recorded");
 
+    // ---- P1 finding 1: persisted context is schema-valid, decisionId === RecommendationRun.id ----
+    const guestParsedContext = DecisionContextV1Schema.parse(guestRunRow.context);
+    assert.equal(guestParsedContext.decisionId, guestTrace!.runId, "persisted decisionId equals the run's own id");
+    assert.equal(guestParsedContext.intent, "guest_plan_generate");
+    assert.equal(guestParsedContext.actor.kind, "guest");
+    assert.equal(guestParsedContext.actor.id, anonymousId);
+
     // ---- authenticated run, for attribution tests ----
     const authedRun = await recordRecommendationRun({
       userId: owner,
       surface: RecommendationSurface.MY_PLAN,
       citySlug: "minsk",
+      targetDateFrom: "2026-09-30",
+      targetDateTo: "2026-09-30",
       algorithmVersion: "test-v1",
       candidateCount: 1,
+      decisionContext: {
+        intent: "my_plan_suggestions",
+        subjects: [{ kind: "adult", refId: owner, source: "profile" }],
+        actor: { kind: "user", id: owner },
+      },
       items: [{ entityType: AnalyticsEntityType.EVENT, entityId: activityIdA, position: 1 }],
     });
     assert.ok(authedRun);
     runIds.push(authedRun!.runId);
     const ownerExposureId = authedRun!.exposureIdByEntityKey.get(`EVENT:${activityIdA}`)!;
     assert.ok(ownerExposureId);
+
+    const authedRunRow = await prisma.recommendationRun.findUniqueOrThrow({
+      where: { id: authedRun!.runId },
+    });
+    const authedParsedContext = DecisionContextV1Schema.parse(authedRunRow.context);
+    assert.equal(authedParsedContext.decisionId, authedRun!.runId);
+    assert.equal(authedParsedContext.actor.kind, "user");
+    assert.equal(authedParsedContext.actor.id, owner);
 
     // ---- 3. valid attribution ----
     const validAttribution = await verifyRecommendationAttribution({
@@ -222,20 +252,84 @@ async function main() {
     eventIds.push(savedGuestEvent!.id);
     assert.equal(savedGuestEvent!.anonymousId, anonymousId);
 
+    // ---- P1 finding 2: guest -> post-auth continuity, without rewriting guest history ----
+    const newlyAuthedUser = await makeUser();
+
+    // Same guest anonymousId, now carried alongside a real userId (as the
+    // client does post-registration) -> the guest run (userId=null,
+    // anonymousId=<guest>) is still found via the fallback lookup, entirely
+    // by anonymousId ownership. No explicit exposureId is supplied here —
+    // this exercises the exact "old call sites, no UI plumbing" path.
+    const postAuthAttributed = await trackUserEvent({
+      userId: newlyAuthedUser,
+      anonymousId,
+      eventType: "PLAN_ADD",
+      entityType: "EVENT",
+      entityId: activityIdB, // guestTrace exposed this one too (position 2)
+      meta: { source: "recommendation" },
+    });
+    assert.equal(postAuthAttributed.ok, true);
+    const savedPostAuthEvent = await prisma.userEvent.findFirst({
+      where: { userId: newlyAuthedUser, eventType: "PLAN_ADD", entityId: activityIdB },
+      orderBy: { createdAt: "desc" },
+    });
+    assert.ok(savedPostAuthEvent);
+    eventIds.push(savedPostAuthEvent!.id);
+    assert.equal(
+      savedPostAuthEvent!.decisionId,
+      guestTrace!.runId,
+      "post-auth action attributed back to the original guest run via matching anonymousId",
+    );
+    // The guest run's own ownership is untouched — never rewritten to userId.
+    const guestRunAfterAuth = await prisma.recommendationRun.findUniqueOrThrow({
+      where: { id: guestTrace!.runId },
+    });
+    assert.equal(guestRunAfterAuth.userId, null, "guest run history is never rewritten to carry a userId");
+    assert.equal(guestRunAfterAuth.anonymousId, anonymousId);
+
+    // Wrong anonymousId (not the guest run's) + a userId with no owned run
+    // for this entity either -> no match, decisionId stays null.
+    const postAuthWrongAnonymous = await trackUserEvent({
+      userId: newlyAuthedUser,
+      anonymousId: randomUUID(),
+      eventType: "PLAN_ADD",
+      entityType: "EVENT",
+      entityId: activityIdA,
+      meta: { source: "recommendation" },
+    });
+    assert.equal(postAuthWrongAnonymous.ok, true);
+    const savedWrongAnon = await prisma.userEvent.findFirst({
+      where: { userId: newlyAuthedUser, eventType: "PLAN_ADD", entityId: activityIdA },
+      orderBy: { createdAt: "desc" },
+    });
+    assert.ok(savedWrongAnon);
+    eventIds.push(savedWrongAnon!.id);
+    assert.equal(
+      savedWrongAnon!.decisionId,
+      null,
+      "a non-matching anonymousId (and no owned run) must not produce an attribution",
+    );
+
     // ---- 8. findMostRecentSubjectsSnapshot (PLAN_REMOVE derivation) ----
+    const placeEntityId = `place-${marker}`;
+    const planItemIdOld = `planitem-${marker}-old`;
+
     const planAddWithSubjects = await trackUserEvent({
       userId: owner,
       eventType: "PLAN_ADD",
       entityType: "PLACE",
-      entityId: `place-${marker}`,
+      entityId: placeEntityId,
       meta: {
+        planItemId: planItemIdOld,
+        dateFrom: "2026-10-01",
+        dateTo: "2026-10-01",
         subjects: [{ kind: "child", refId: child.id, ageRange: "3-5", source: "profile" }],
         decisionContextVersion: 1,
       },
     });
     assert.equal(planAddWithSubjects.ok, true);
     const savedPlanAdd = await prisma.userEvent.findFirst({
-      where: { userId: owner, eventType: "PLAN_ADD", entityType: "PLACE", entityId: `place-${marker}` },
+      where: { userId: owner, eventType: "PLAN_ADD", entityType: "PLACE", entityId: placeEntityId },
       orderBy: { createdAt: "desc" },
     });
     eventIds.push(savedPlanAdd!.id);
@@ -243,11 +337,68 @@ async function main() {
     const derived = await findMostRecentSubjectsSnapshot({
       userId: owner,
       entityType: AnalyticsEntityType.PLACE,
-      entityId: `place-${marker}`,
+      entityId: placeEntityId,
+      planItemId: planItemIdOld,
+      currentDate: "2026-10-01",
     });
     assert.equal(derived.length, 1);
     assert.equal(derived[0]!.source, "derived", "recovered snapshot is re-tagged as derived, not profile");
     assert.equal(derived[0]!.refId, child.id);
+
+    // ---- P2 finding 4: never inherit a stale snapshot after the item moved ----
+
+    // Item "moved" to a different date (2026-10-05) with no fresh PLAN_ADD
+    // recorded for it — a remove there must get [] , never date-A's subjects.
+    const staleAttempt = await findMostRecentSubjectsSnapshot({
+      userId: owner,
+      entityType: AnalyticsEntityType.PLACE,
+      entityId: placeEntityId,
+      planItemId: planItemIdOld,
+      currentDate: "2026-10-05",
+    });
+    assert.deepEqual(staleAttempt, [], "moved item without a fresh snapshot must get [], never date A's stale audience");
+
+    // A fresh PLAN_ADD recorded for the SAME planItemId at the NEW date
+    // (e.g. a real re-add) must resolve to the CURRENT snapshot, not A's.
+    const planAddDateB = await trackUserEvent({
+      userId: owner,
+      eventType: "PLAN_ADD",
+      entityType: "PLACE",
+      entityId: placeEntityId,
+      meta: {
+        planItemId: planItemIdOld,
+        dateFrom: "2026-10-05",
+        dateTo: "2026-10-05",
+        subjects: [{ kind: "child", refId: child.id, ageRange: "5-7", source: "profile" }],
+        decisionContextVersion: 1,
+      },
+    });
+    assert.equal(planAddDateB.ok, true);
+    const savedPlanAddB = await prisma.userEvent.findFirst({
+      where: { userId: owner, eventType: "PLAN_ADD", entityType: "PLACE", entityId: placeEntityId },
+      orderBy: { createdAt: "desc" },
+    });
+    eventIds.push(savedPlanAddB!.id);
+
+    const freshSnapshot = await findMostRecentSubjectsSnapshot({
+      userId: owner,
+      entityType: AnalyticsEntityType.PLACE,
+      entityId: placeEntityId,
+      planItemId: planItemIdOld,
+      currentDate: "2026-10-05",
+    });
+    assert.equal(freshSnapshot.length, 1);
+    assert.equal(freshSnapshot[0]!.ageRange, "5-7", "resolves the CURRENT (date B) snapshot, not the stale date-A one");
+
+    // A different planItemId must never borrow another item's snapshot.
+    const unrelatedPlanItem = await findMostRecentSubjectsSnapshot({
+      userId: owner,
+      entityType: AnalyticsEntityType.PLACE,
+      entityId: placeEntityId,
+      planItemId: `planitem-${marker}-unrelated`,
+      currentDate: "2026-10-05",
+    });
+    assert.deepEqual(unrelatedPlanItem, [], "a different planItemId must never inherit another item's snapshot");
 
     // ---- 9. trackFirstOccurrenceEvent: once-only ----
     const marker9Type = "FIRST_PERSONALIZED_RESULT" as const;
