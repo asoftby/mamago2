@@ -874,7 +874,7 @@ export function Step3Media({
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-sky-950">Постер найден в источнике</p>
                     <p className="text-[12px] text-sky-900/75">
-                      Это изображение можно сразу использовать как обложку события.
+                      Это изображение можно сразу использовать как главное фото события.
                     </p>
                     <p className="text-[12px] text-sky-900/60">
                       При применении изображение будет сохранено в медиатеку.
@@ -888,13 +888,13 @@ export function Step3Media({
                       onClick={() => void applyImportedCover(importedCoverCandidateUrl)}
                     >
                       {isApplyingImportedCover ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      {data.coverImage || coverPreview ? "Заменить на изображение из источника" : "Применить как обложку"}
+                      {data.coverImage || coverPreview ? "Сделать главным" : "Добавить как главное"}
                     </Button>
                   </div>
                   {chosenImportedCoverUrl === importedCoverCandidateUrl ? (
                     <div className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-[12px] font-medium text-emerald-800">
                       <Check className="h-3.5 w-3.5" />
-                      Обложка выбрана из источника
+                      Главное фото выбрано из источника
                     </div>
                   ) : null}
                 </div>
@@ -1162,6 +1162,37 @@ export function Step3Media({
               </div>
             )}
           </>
+        ) : null}
+
+        {hasRenderedGallery ? (
+          <MediaDropzone
+            selectionMode="gallery"
+            isEditable={isEditable}
+            isDragging={isDraggingGallery}
+            onDraggingChange={setIsDraggingGallery}
+            onFilesSelected={handleGalleryFilesSelect}
+            className="mt-4"
+          >
+            {({ openFilePicker }) => (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-[12px] text-muted-foreground">Добавьте ещё фото или перетащите их сюда.</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline" disabled={!isEditable} onClick={(e) => {
+                    e.stopPropagation();
+                    openPicker("gallery");
+                  }}>
+                    Из медиатеки
+                  </Button>
+                  <Button type="button" size="sm" disabled={!isEditable} onClick={(e) => {
+                    e.stopPropagation();
+                    openFilePicker();
+                  }}>
+                    Загрузить фото
+                  </Button>
+                </div>
+              </div>
+            )}
+          </MediaDropzone>
         ) : null}
 
       </div>
