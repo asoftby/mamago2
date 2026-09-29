@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
@@ -34,9 +34,29 @@ interface MediaLightboxProps {
 export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps) {
   const [idx, setIdx] = useState(startIndex);
   const total = items.length;
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const prev = useCallback(() => setIdx((i) => (i - 1 + total) % total), [total]);
   const next = useCallback(() => setIdx((i) => (i + 1) % total), [total]);
+
+  function handleTouchStart(event: React.TouchEvent) {
+    const touch = event.touches[0];
+    if (!touch) return;
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }
+
+  function handleTouchEnd(event: React.TouchEvent) {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    const touch = event.changedTouches[0];
+    if (!start || !touch || total <= 1) return;
+
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 48 || Math.abs(dx) <= Math.abs(dy)) return;
+    if (dx < 0) next();
+    else prev();
+  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -59,6 +79,8 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/92 p-4 backdrop-blur-sm"
       onClick={onClose}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
       role="dialog"
       aria-modal="true"
       aria-label="Просмотр медиа"
