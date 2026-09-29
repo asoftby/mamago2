@@ -5,7 +5,9 @@ import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import { prisma } from "@/lib/prisma";
 import { rankPlanSuggestionsForCity } from "@/server/services/planSuggestions.service";
 import { recordRecommendationRun } from "@/server/services/recommendations/RecommendationTraceService";
+import { trackFirstOccurrenceEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { SUGGESTIONS_PER_BATCH } from "@/features/my-plan/lib/suggestionsConfig";
+import { buildSubjectsSnapshot } from "@/lib/decision/subjects";
 
 /**
  * GET /api/plan/suggestions?city=minsk&date=YYYY-MM-DD&exclude=id1,id2&ageRanges=1-3,3-5&personaIds=...
@@ -64,6 +66,10 @@ export async function GET(request: NextRequest) {
     });
 
     const sessionRowId = await getSessionRowIdFromCookies();
+    const subjects =
+      personaIds.length > 0 && date
+        ? await buildSubjectsSnapshot({ userId: user.id, personaIds, targetDate: date })
+        : [];
     const trace = await recordRecommendationRun({
       userId: user.id,
       sessionId: sessionRowId,
@@ -74,8 +80,11 @@ export async function GET(request: NextRequest) {
       algorithmVersion: batch.algorithmVersion,
       candidateCount: batch.candidateCount,
       context: {
+        contextVersion: 1,
+        intent: "my_plan_suggestions",
         ageRanges: ageRangesParam,
         selectedPersonaIds: personaIds,
+        subjects,
         excludedActivityCount: excludeActivityIds.length,
         requestedLimit: SUGGESTIONS_PER_BATCH,
       },
@@ -105,6 +114,15 @@ export async function GET(request: NextRequest) {
       algorithmVersion: batch.algorithmVersion,
       traced: Boolean(trace),
     });
+
+    if (suggestions.length > 0) {
+      void trackFirstOccurrenceEvent({
+        userId: user.id,
+        sessionId: sessionRowId,
+        eventType: "FIRST_PERSONALIZED_RESULT",
+        meta: { recommendationSurface: "my_plan" },
+      });
+    }
 
     return NextResponse.json({
       suggestions,

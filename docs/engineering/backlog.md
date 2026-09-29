@@ -4977,3 +4977,57 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Acceptance criteria: collector writes nothing (not 0) when the token is
   absent or the API fails; source split shown only for completed weeks.
 - Source: /admin dashboard rework, 2026-09-26.
+
+## [BACKLOG-160] Remove planningActivity.ts raw-SQL RouteIdea.createdAt workaround
+
+- Status: OPEN
+- Priority: P3
+- Area: Analytics / Family Core instrumentation (PR A)
+- Added: 2026-09-29
+- Reason deferred: `addRouteIdea` (`src/server/services/idea.service.ts`) now
+  fires a real `SAVE`/ROUTE `UserEvent` on first save (PR A, FAM-005), but
+  existing `RouteIdea` rows created before this change have no matching
+  event, so the raw-SQL read cannot simply be swapped for a `UserEvent`
+  query without losing historical data. Needs either a backfill or a
+  documented cutover date.
+- Context: `src/server/services/analytics/planningActivity.ts` reads
+  `RouteIdea.createdAt` directly via raw SQL, with a comment noting the
+  write path fired no `UserEvent`. That comment is now only true for rows
+  created before this PR.
+- Dependencies: none blocking; safe to leave as-is indefinitely.
+- Acceptance criteria: `planningActivity.ts` reads from `UserEvent`
+  (SAVE/ROUTE) instead of `RouteIdea.createdAt`, either after a backfill
+  migration or once historical accuracy before the cutover date is judged
+  unnecessary.
+- Source: PR A implementation (decisionContext.v1 + event vocabulary).
+
+## [BACKLOG-161] `db:generate`/`db:validate`/`db:migrate:*` scripts' explicit `--schema prisma/schema.prisma` silently drops the domain-split schema files
+
+- Status: OPEN
+- Priority: P2
+- Area: Tooling / Prisma
+- Added: 2026-09-29
+- Reason deferred: discovered incidentally while implementing PR A; fixing it
+  is a one-line, low-risk change but touches a shared tooling script and
+  deserves its own isolated task/PR rather than riding along.
+- Context: `package.json`'s `db:generate`/`db:validate`/`db:migrate:status`/
+  `db:migrate:deploy` scripts all pass `--schema prisma/schema.prisma`
+  explicitly. On this Prisma version, an explicit single-file `--schema` does
+  NOT auto-discover sibling `*.prisma` files the way passing the directory
+  (or `prisma.config.ts`'s `schema: 'prisma'`) does — running `pnpm
+  db:generate` regenerates `@prisma/client` WITHOUT any model from
+  `prisma/recommendations.prisma` (`RecommendationRun`, `RecommendationExposure`,
+  `RecommendationOutcome`, `RecommendationSurfacePolicy`, `RecommendationSurface`
+  enum, etc.), breaking every caller of those models with `tsc` errors until
+  a bare `prisma generate` (or `prisma generate --schema prisma`) is run
+  again. `postinstall: "prisma generate"` (no `--schema` flag) is unaffected
+  and correctly picks up the whole directory via `prisma.config.ts` — so
+  normal installs/deploys are safe; only the manual `db:*` scripts are a trap.
+- Dependencies: none.
+- Acceptance criteria: the four scripts drop the `--schema prisma/schema.prisma`
+  flag (letting `prisma.config.ts` resolve the schema directory) or switch it
+  to `--schema prisma`; a regression check (e.g. grep the generated client's
+  `.prisma/client/schema.prisma` for `RecommendationSurface`) confirms the
+  fix.
+- Source: PR A implementation — hit while running `pnpm db:generate` after
+  editing `prisma/schema.prisma`.

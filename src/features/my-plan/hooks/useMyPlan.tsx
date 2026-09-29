@@ -329,6 +329,9 @@ function useMyPlanStore() {
       if (selectedAgeRangesKey.length > 0) {
         qs.set("ageRanges", selectedAgeRangesKey);
       }
+      if (family?.selectedPersonaIds && family.selectedPersonaIds.length > 0) {
+        qs.set("personaIds", family.selectedPersonaIds.join(","));
+      }
       const res = await fetch(`/api/plan/suggestions?${qs.toString()}`, {
         credentials: "include",
       });
@@ -352,6 +355,7 @@ function useMyPlanStore() {
     selectedPlanDate,
     planSuggestionExcludeSignature,
     selectedAgeRangesKey,
+    family?.selectedPersonaIds,
   ]);
 
   useEffect(() => {

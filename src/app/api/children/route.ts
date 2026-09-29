@@ -3,6 +3,8 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
+import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
+import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 
 const createChildSchema = z.object({
   name: z.string().min(1, "Укажите имя").max(50),
@@ -69,6 +71,16 @@ export async function POST(request: NextRequest) {
       }
 
       return child;
+    });
+
+    void trackUserEvent({
+      userId: user.id,
+      sessionId: await getSessionRowIdFromCookies(),
+      eventType: "CHILD_SAVED",
+      meta: {
+        hasBirthDate: Boolean(data.birthDate),
+        interestCount: validSystemInterests.length + data.customInterests.length,
+      },
     });
 
     return NextResponse.json({ success: true, child: result });

@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
-import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
+import {
+  trackUserEvent,
+  trackFirstOccurrenceEvent,
+} from "@/server/services/analytics/AnalyticsEventService";
 import {
   addPlacePlanItem,
   addPlanItem,
@@ -11,6 +14,7 @@ import {
 } from "@/server/services/plan.service";
 import { prisma } from "@/lib/prisma";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { buildSubjectsSnapshot, findMostRecentSubjectsSnapshot } from "@/lib/decision/subjects";
 
 function planningTimingForDate(dateKey: string): "same_day" | "weekend" | "advance" {
   if (dateKey === getLocalDateKey()) return "same_day";
@@ -89,6 +93,17 @@ export async function POST(request: NextRequest) {
     }
 
     const planDateMeta = planDateAnalyticsMeta(date);
+    const personaIds = Array.isArray(selectedPersonaIds)
+      ? selectedPersonaIds.filter((x): x is string => typeof x === "string")
+      : [];
+    const subjects =
+      personaIds.length > 0
+        ? await buildSubjectsSnapshot({ userId: user.id, personaIds, targetDate: date })
+        : [];
+    const subjectsMeta =
+      subjects.length > 0
+        ? { subjects, decisionContextVersion: 1 as const, selectedPersonaIds: personaIds }
+        : {};
     let planItem;
 
     if (placeId) {
@@ -115,6 +130,7 @@ export async function POST(request: NextRequest) {
           section: "places",
           targetAction: "plan",
           ...planDateMeta,
+          ...subjectsMeta,
         },
       });
     } else if (routeId) {
@@ -139,6 +155,7 @@ export async function POST(request: NextRequest) {
           section: "routes",
           targetAction: "plan",
           ...planDateMeta,
+          ...subjectsMeta,
         },
       });
     } else if (activityId) {
@@ -174,9 +191,6 @@ export async function POST(request: NextRequest) {
       if (planItem.created) {
         const cityId = await getActivityCityIdForAnalytics(activityId);
         const sessionRowId = await getSessionRowIdFromCookies();
-        const personaIds = Array.isArray(selectedPersonaIds)
-          ? selectedPersonaIds.filter((x): x is string => typeof x === "string")
-          : [];
         const sourceTag =
           planAddSource === "recommendation"
             ? ("recommendation" as const)
@@ -199,9 +213,17 @@ export async function POST(request: NextRequest) {
             ...(planAddSource === "recommendation" || planAddSource === "idea"
               ? { planAddSource }
               : {}),
-            ...(personaIds.length > 0 ? { selectedPersonaIds: personaIds } : {}),
+            ...subjectsMeta,
           },
         });
+        if (sourceTag === "recommendation") {
+          void trackFirstOccurrenceEvent({
+            userId: user.id,
+            sessionId: sessionRowId,
+            eventType: "FIRST_PERSONALIZED_PLAN_ADD",
+            meta: { recommendationSurface: "my_plan" },
+          });
+        }
       }
     }
 
@@ -234,16 +256,22 @@ export async function DELETE(request: NextRequest) {
 
     const existing = await prisma.planItem.findFirst({
       where: { id: planItemId, userId: user.id },
-      select: { activityId: true, placeId: true, routeId: true },
+      select: { activityId: true, placeId: true, routeId: true, date: true },
     });
 
     await removePlanItem(user.id, planItemId);
 
     if (existing) {
       const sessionRowId = await getSessionRowIdFromCookies();
+      const removeDateMeta = planDateAnalyticsMeta(existing.date);
 
       if (existing.activityId) {
         const cityId = await getActivityCityIdForAnalytics(existing.activityId);
+        const subjects = await findMostRecentSubjectsSnapshot({
+          userId: user.id,
+          entityType: "EVENT",
+          entityId: existing.activityId,
+        });
         void trackUserEvent({
           userId: user.id,
           sessionId: sessionRowId,
@@ -252,12 +280,22 @@ export async function DELETE(request: NextRequest) {
           entityId: existing.activityId,
           vertical: "CITY",
           cityId,
-          meta: { section: "afisha", targetAction: "plan" },
+          meta: {
+            section: "afisha",
+            targetAction: "plan",
+            ...removeDateMeta,
+            ...(subjects.length > 0 ? { subjects, decisionContextVersion: 1 } : {}),
+          },
         });
       } else if (existing.placeId) {
         const place = await prisma.place.findUnique({
           where: { id: existing.placeId },
           select: { cityId: true },
+        });
+        const subjects = await findMostRecentSubjectsSnapshot({
+          userId: user.id,
+          entityType: "PLACE",
+          entityId: existing.placeId,
         });
         void trackUserEvent({
           userId: user.id,
@@ -267,9 +305,19 @@ export async function DELETE(request: NextRequest) {
           entityId: existing.placeId,
           vertical: "CITY",
           cityId: place?.cityId ?? null,
-          meta: { section: "places", targetAction: "plan" },
+          meta: {
+            section: "places",
+            targetAction: "plan",
+            ...removeDateMeta,
+            ...(subjects.length > 0 ? { subjects, decisionContextVersion: 1 } : {}),
+          },
         });
       } else if (existing.routeId) {
+        const subjects = await findMostRecentSubjectsSnapshot({
+          userId: user.id,
+          entityType: "ROUTE",
+          entityId: existing.routeId,
+        });
         void trackUserEvent({
           userId: user.id,
           sessionId: sessionRowId,
@@ -278,7 +326,12 @@ export async function DELETE(request: NextRequest) {
           entityId: existing.routeId,
           vertical: "CITY",
           cityId: null,
-          meta: { section: "routes", targetAction: "plan" },
+          meta: {
+            section: "routes",
+            targetAction: "plan",
+            ...removeDateMeta,
+            ...(subjects.length > 0 ? { subjects, decisionContextVersion: 1 } : {}),
+          },
         });
       }
     }

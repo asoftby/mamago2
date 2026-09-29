@@ -31,6 +31,7 @@ const bodySchema = z.object({
   citySlug: z.string().optional().nullable(),
   meta: analyticsMetaSchema.optional(),
   sessionId: z.string().optional().nullable(),
+  anonymousId: z.string().optional().nullable(),
 });
 
 export async function POST(request: NextRequest) {
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
     await trackUserEvent({
       userId: user?.id ?? null,
       sessionId,
+      anonymousId: body.anonymousId?.trim() || null,
       eventType: body.eventType,
       entityType: body.entityType ?? null,
       entityId: body.entityId ?? null,

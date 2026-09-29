@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { AnalyticsEntityType, RecommendationSurface } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
-import { listPlanSuggestionsForCity } from "@/server/services/planSuggestions.service";
+import {
+  listPlanSuggestionsForCity,
+  rankPlanSuggestionsForCity,
+} from "@/server/services/planSuggestions.service";
+import { recordRecommendationRun } from "@/server/services/recommendations/RecommendationTraceService";
+import { buildManualSubjectsSnapshot } from "@/lib/decision/subjects";
 import {
   quickGuestQuotaGate,
   recordGuestSuccessfulGeneration,
@@ -114,7 +120,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const activities = await listPlanSuggestionsForCity({
+    const batch = await rankPlanSuggestionsForCity({
       citySlug: city.toLowerCase(),
       excludeActivityIds,
       take: 6,
@@ -123,7 +129,7 @@ export async function POST(request: NextRequest) {
     console.log("[API] real data used", {
       endpoint: "/api/plan/generate",
       authenticated: false,
-      count: activities.length,
+      count: batch.suggestions.length,
     });
 
     const recorded = await recordGuestSuccessfulGeneration(key);
@@ -150,9 +156,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // anonymousId is the guest's primary product key (FAM-001); the quota
+    // `key` above may instead be an IP+UA hash fallback and is not identity.
+    const trace = await recordRecommendationRun({
+      anonymousId: anonymousId?.trim() || null,
+      surface: RecommendationSurface.MY_PLAN,
+      citySlug: city.toLowerCase(),
+      targetDateFrom: date ?? null,
+      targetDateTo: date ?? null,
+      algorithmVersion: batch.algorithmVersion,
+      candidateCount: batch.candidateCount,
+      context: {
+        contextVersion: 1,
+        intent: "guest_plan_generate",
+        ageRanges: ageRangeValues,
+        subjects: buildManualSubjectsSnapshot(ageRangeValues),
+        excludedActivityCount: excludeActivityIds.length,
+        requestedLimit: 6,
+      },
+      items: batch.suggestions.map((item, index) => ({
+        entityType: AnalyticsEntityType.EVENT,
+        entityId: item.activity.id,
+        position: index + 1,
+        score: item.score,
+        scoreBreakdown: item.scoreBreakdown,
+        reasonCodes: item.reasonCodes,
+      })),
+    });
+
+    const activities = batch.suggestions.map((item, index) => ({
+      ...item.activity,
+      recommendationRunId: trace?.runId ?? null,
+      recommendationExposureId:
+        trace?.exposureIdByEntityKey.get(`EVENT:${item.activity.id}`) ?? null,
+      recommendationPosition: index + 1,
+      recommendationAlgorithmVersion: batch.algorithmVersion,
+    }));
+
     return NextResponse.json({
       suggestions: activities,
       scenario: activities,
+      recommendationRunId: trace?.runId ?? null,
       ...(activities.length === 0 ? { message: "Нет данных для генерации" } : {}),
       requiresAuth: false,
       remainingGenerations: recorded.remainingGenerations,

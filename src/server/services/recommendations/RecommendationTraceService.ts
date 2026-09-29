@@ -18,6 +18,8 @@ export type RecommendationTraceItem = {
 export type RecommendationRunTraceInput = {
   userId?: string | null;
   sessionId?: string | null;
+  /** Guest product identity (client-generated UUID) when userId is absent. */
+  anonymousId?: string | null;
   surface: RecommendationSurface;
   cityId?: string | null;
   citySlug?: string | null;
@@ -60,6 +62,7 @@ export async function recordRecommendationRun(
       data: {
         userId: input.userId ?? undefined,
         sessionId: input.sessionId ?? undefined,
+        anonymousId: input.anonymousId ?? undefined,
         surface: input.surface,
         cityId: input.cityId ?? undefined,
         citySlug: input.citySlug ?? undefined,
@@ -149,18 +152,66 @@ export async function findRecentRecommendationAttribution(
   }
 }
 
+export type RecommendationAttributionVerifyInput = {
+  exposureId: string;
+  entityType: AnalyticsEntityType;
+  entityId: string;
+  userId?: string | null;
+  sessionId?: string | null;
+  anonymousId?: string | null;
+};
+
+/**
+ * Verifies a CLIENT-SUPPLIED (explicit) exposure id before trusting it for
+ * anything — decisionId, RecommendationOutcome, etc. Trust requires both:
+ * (1) the exposure's entityType/entityId actually match the entity this
+ * action is about, and (2) the exposure's run belongs to the same actor
+ * (user, session, or guest anonymousId). Never trust an unverified id.
+ */
+export async function verifyRecommendationAttribution(
+  input: RecommendationAttributionVerifyInput,
+): Promise<{ exposureId: string; runId: string } | null> {
+  try {
+    if (!input.exposureId) return null;
+
+    const ownershipOr: Prisma.RecommendationRunWhereInput[] = [];
+    if (input.userId) ownershipOr.push({ userId: input.userId });
+    if (input.sessionId) ownershipOr.push({ sessionId: input.sessionId });
+    if (input.anonymousId) ownershipOr.push({ anonymousId: input.anonymousId });
+    if (ownershipOr.length === 0) return null;
+
+    const exposure = await prisma.recommendationExposure.findFirst({
+      where: {
+        id: input.exposureId,
+        entityType: input.entityType,
+        entityId: input.entityId,
+        run: { OR: ownershipOr },
+      },
+      select: { id: true, runId: true },
+    });
+    return exposure ? { exposureId: exposure.id, runId: exposure.runId } : null;
+  } catch (error) {
+    console.error("[recommendation-trace] attribution verification failed", error);
+    return null;
+  }
+}
+
 export type RecommendationOutcomeLinkInput = {
   exposureId: string;
+  entityType: AnalyticsEntityType;
+  entityId: string;
   userEventId: string;
   eventType: UserEventType;
   userId?: string | null;
   sessionId?: string | null;
+  anonymousId?: string | null;
 };
 
 /**
  * Attribute an existing first-party UserEvent to a recommendation exposure.
- * The ownership check prevents a client-supplied exposure id from linking an
- * event to another user's recommendation history.
+ * Delegates to verifyRecommendationAttribution so a client-supplied exposure
+ * id can never link an event to another actor's (or another entity's)
+ * recommendation history.
  */
 export async function linkRecommendationOutcome(
   input: RecommendationOutcomeLinkInput,
@@ -168,29 +219,18 @@ export async function linkRecommendationOutcome(
   try {
     if (!input.exposureId || !input.userEventId) return false;
 
-    const ownershipOr: Prisma.RecommendationRunWhereInput[] = [];
-    if (input.userId) ownershipOr.push({ userId: input.userId });
-    if (input.sessionId) ownershipOr.push({ sessionId: input.sessionId });
-    if (ownershipOr.length === 0) return false;
-
-    const exposure = await prisma.recommendationExposure.findFirst({
-      where: {
-        id: input.exposureId,
-        run: { OR: ownershipOr },
-      },
-      select: { id: true },
-    });
-    if (!exposure) return false;
+    const verified = await verifyRecommendationAttribution(input);
+    if (!verified) return false;
 
     await prisma.recommendationOutcome.upsert({
       where: { userEventId: input.userEventId },
       create: {
-        exposureId: exposure.id,
+        exposureId: verified.exposureId,
         userEventId: input.userEventId,
         eventType: input.eventType,
       },
       update: {
-        exposureId: exposure.id,
+        exposureId: verified.exposureId,
         eventType: input.eventType,
       },
     });
@@ -213,6 +253,7 @@ export async function getPublishedRecommendationSurfacePolicy(
 export const RecommendationTraceService = {
   recordRecommendationRun,
   findRecentRecommendationAttribution,
+  verifyRecommendationAttribution,
   linkRecommendationOutcome,
   getPublishedRecommendationSurfacePolicy,
 };
