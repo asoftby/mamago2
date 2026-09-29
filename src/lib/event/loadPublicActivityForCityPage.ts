@@ -149,9 +149,15 @@ export async function loadPublicActivityForCityPage(
     )?.startsAt ??
     null;
 
-  const [place, venuePlace] = await Promise.all([
+  const [place, venuePlace, venueCity] = await Promise.all([
     enrichPlaceWithResolvedLogo(activity.place),
     enrichPlaceWithResolvedLogo(activity.venue?.place ?? null),
+    activity.venue?.cityId
+      ? prisma.city.findUnique({
+          where: { id: activity.venue.cityId },
+          select: { slug: true },
+        })
+      : Promise.resolve(null),
   ]);
 
   const redirectToSlug =
@@ -236,6 +242,7 @@ export async function loadPublicActivityForCityPage(
           kind: activity.venue.kind,
           title: activity.venue.title,
           addressLine: activity.venue.addressLine,
+          city: venueCity,
           place: venuePlace
             ? {
                 id: venuePlace.id,
