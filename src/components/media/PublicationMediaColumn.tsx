@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { EventMediaStack } from "@/components/event-page/EventMediaStack";
 import { MediaGalleryStrip } from "@/components/media/MediaGalleryStrip";
 import { MediaLightbox } from "@/components/media/MediaLightbox";
+import { MobileMediaCarousel } from "@/components/media/MobileMediaCarousel";
 import type { EventPageMedia } from "@/lib/event/eventPageTypes";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 import { cn } from "@/lib/utils";
@@ -46,18 +47,26 @@ export function PublicationMediaColumn({
 
   return (
     <div className={cn("space-y-2.5", className)}>
-      <EventMediaStack
-        media={media}
-        onPosterClick={lightboxItems.length > 0 ? () => setPosterLightboxOpen(true) : undefined}
-      />
-      {hasGallery ? (
-        <MediaGalleryStrip
-          items={galleryItems!}
-          maxVisible={galleryMaxVisible}
-          lightboxItems={lightboxItems}
-          lightboxIndexOffset={lightboxItems.length > (galleryItems?.length ?? 0) ? 1 : 0}
+      <div className="md:hidden">
+        <MobileMediaCarousel items={lightboxItems} ariaLabel="Фото публикации" />
+        <EventMediaStack media={media} showPoster={false} className="mt-2.5" />
+      </div>
+
+      <div className="hidden space-y-2.5 md:block">
+        <EventMediaStack
+          media={media}
+          onPosterClick={lightboxItems.length > 0 ? () => setPosterLightboxOpen(true) : undefined}
         />
-      ) : null}
+        {hasGallery ? (
+          <MediaGalleryStrip
+            items={galleryItems!}
+            maxVisible={galleryMaxVisible}
+            lightboxItems={lightboxItems}
+            lightboxIndexOffset={lightboxItems.length > (galleryItems?.length ?? 0) ? 1 : 0}
+          />
+        ) : null}
+      </div>
+
       {posterLightboxOpen && lightboxItems.length > 0 ? (
         <MediaLightbox items={lightboxItems} startIndex={0} onClose={() => setPosterLightboxOpen(false)} />
       ) : null}
