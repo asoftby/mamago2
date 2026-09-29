@@ -219,6 +219,36 @@ assert.match(
   "startDate must remain ISO 8601",
 );
 
+const physicalLocationWithoutKnownLocality = buildEventJsonLd({
+  canonicalUrl,
+  title: "Physical event with unknown locality",
+  startDate: "2026-09-01T12:00:00+03:00",
+  location: {
+    name: "Ручная площадка",
+    address: "Неизвестный адрес",
+  },
+});
+assert.ok(physicalLocationWithoutKnownLocality);
+assert.deepEqual(
+  physicalLocationWithoutKnownLocality.location,
+  {
+    "@type": "Place",
+    name: "Ручная площадка",
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: "Неизвестный адрес",
+      addressLocality: undefined,
+      addressCountry: "BY",
+    },
+  },
+  "unknown physical locality must be omitted instead of inferred from a listing city",
+);
+assert.doesNotMatch(
+  JSON.stringify(physicalLocationWithoutKnownLocality),
+  /addressLocality/,
+  "undefined locality must not be serialized",
+);
+
 assert.equal(
   buildEventJsonLd({
     canonicalUrl,
