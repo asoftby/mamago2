@@ -80,7 +80,7 @@ export type ActivityForEventPageInput = {
     districtAuto: { name: string } | null;
     metroManual: { name: string } | null;
     metroAuto: { name: string } | null;
-    city: { slug: string } | null;
+    city?: { slug: string } | null;
     phone?: string | null;
     phoneLabel?: string | null;
     phone2?: string | null;
