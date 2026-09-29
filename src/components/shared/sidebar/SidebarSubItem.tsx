@@ -38,7 +38,7 @@ export function SidebarSubItem({
       onClick={onClick}
       suppressHydrationWarning
       className={cn(
-        "flex items-center justify-between rounded-2xl px-4 py-3 text-[13px] font-medium transition-colors duration-150",
+        "flex items-center justify-between rounded-2xl px-4 py-3 text-[13px] leading-4 font-medium transition-colors duration-150",
         "ml-11",
         subItemStateClass
       )}
