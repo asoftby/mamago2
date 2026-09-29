@@ -18,6 +18,7 @@ import {
   SidebarCardShare,
 } from "@/components/shared/SidebarCard";
 import { MediaGalleryStrip } from "@/components/media/MediaGalleryStrip";
+import { MobileMediaCarousel } from "@/components/media/MobileMediaCarousel";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 
 interface PlaceHeroProps {
@@ -44,6 +45,8 @@ interface PlaceHeroProps {
   onShareClick?: () => void;
   ownerEditPlaceId?: string;
   media?: {
+    posterUrl?: string;
+    posterAlt: string;
     galleryItems: MediaGalleryItem[];
   };
   /** Optional "Отправить заявку" CTA (Direct) — additive, rendered after the existing buttons. */
@@ -118,6 +121,23 @@ export function PlaceHero({
     : isOpenNow != null
       ? summaryPrimary
       : summaryExtra;
+
+  const mobileMediaItems: MediaGalleryItem[] = (() => {
+    const poster = media?.posterUrl?.trim();
+    const rest = (media?.galleryItems ?? []).filter(
+      (item) => item.type !== "image" || item.src.trim() !== poster,
+    );
+    if (!poster) return rest;
+    return [
+      {
+        type: "image",
+        id: "place-poster",
+        src: poster,
+        alt: media?.posterAlt || title,
+      },
+      ...rest,
+    ];
+  })();
 
   return (
     <section
@@ -232,9 +252,14 @@ export function PlaceHero({
             {shortDesc}
           </div>
 
-          {media && media.galleryItems.length > 0 && (
+          {media && mobileMediaItems.length > 0 && (
             <div style={{ marginTop: 8 }}>
-              <MediaGalleryStrip items={media.galleryItems} maxVisible={3} />
+              <div className="md:hidden">
+                <MobileMediaCarousel items={mobileMediaItems} ariaLabel="Фото места" />
+              </div>
+              <div className="hidden md:block">
+                <MediaGalleryStrip items={media.galleryItems} maxVisible={3} />
+              </div>
             </div>
           )}
         </div>
