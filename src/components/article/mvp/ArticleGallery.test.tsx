@@ -40,4 +40,5 @@ assert.ok(source.includes('data-article-lightbox-slide="outgoing"'));
 assert.ok(source.includes('data-article-lightbox-slide="incoming"'));
 assert.ok(source.includes("duration-[260ms]"));
 assert.ok(source.includes('prefers-reduced-motion: reduce'));
+assert.ok(source.includes('onClick={(e) => e.stopPropagation()}'));
 
