@@ -27,6 +27,27 @@ const DESKTOP_GROUP_SIZE = 3;
 export function desktopGroupStartForIndex(index: number, groupSize: number = DESKTOP_GROUP_SIZE): number {
   return Math.floor(index / groupSize) * groupSize;
 }
+
+export function mergeGalleryWarmIndexes(
+  current: readonly number[],
+  candidates: readonly number[],
+  total: number,
+): number[] {
+  const next = new Set(
+    current.filter((index) => Number.isInteger(index) && index >= 0 && index < total),
+  );
+  for (const index of candidates) {
+    if (Number.isInteger(index) && index >= 0 && index < total) next.add(index);
+  }
+  const sorted = [...next].sort((a, b) => a - b);
+  if (
+    sorted.length === current.length &&
+    sorted.every((index, position) => index === current[position])
+  ) {
+    return current as number[];
+  }
+  return sorted;
+}
 /** Article body width used elsewhere in this renderer to calibrate `sizes`. */
 const ARTICLE_WIDTH_PX = 720;
 
@@ -105,12 +126,15 @@ function GalleryImg({
   image,
   sizes,
   className,
+  loading,
 }: {
   image: ArticleGalleryImage;
   sizes: string;
   className?: string;
+  loading?: "eager" | "lazy";
 }) {
-  const [loaded, setLoaded] = useState(false);
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const loaded = Boolean(image.url && loadedUrl === image.url);
   if (!image.url) {
     return (
       <div className={cn("absolute inset-0 flex items-center justify-center bg-muted/30 text-xs text-muted-foreground", className)} aria-hidden>
@@ -133,7 +157,8 @@ function GalleryImg({
         className={cn("object-cover transition-opacity duration-300", loaded ? "opacity-100" : "opacity-0", className)}
         style={RESET_ARTICLE_BODY_IMG_STYLE}
         unoptimized={isAppMediaUrl(image.url)}
-        onLoad={() => setLoaded(true)}
+        loading={loading}
+        onLoad={() => setLoadedUrl(image.url)}
       />
     </>
   );
@@ -423,6 +448,9 @@ export function ArticleGallery({
   const [desktopGroupStart, setDesktopGroupStart] = useState(0);
   const [mobileIndex, setMobileIndex] = useState(0);
   const [mobilePreloadReady, setMobilePreloadReady] = useState(false);
+  const [mobileWarmIndexes, setMobileWarmIndexes] = useState<number[]>(() =>
+    total > 0 ? [0] : [],
+  );
   const [mobileTransition, setMobileTransition] = useState<{
     from: number;
     to: number;
@@ -434,6 +462,7 @@ export function ArticleGallery({
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
   const didMobileSwipeRef = useRef(false);
+  const mobileViewportRef = useRef<HTMLDivElement | null>(null);
 
   // Lightbox always browses the full collection; opening it from either breakpoint also parks
   // the mobile slider at that photo, matching the mobile slider's own pre-existing behavior of
@@ -473,12 +502,55 @@ export function ArticleGallery({
 
   useEffect(() => {
     const query = window.matchMedia(DESKTOP_MEDIA_QUERY);
-    const syncPreloadMode = () => setMobilePreloadReady(!query.matches);
+    let observer: IntersectionObserver | null = null;
+
+    const stopObserver = () => {
+      observer?.disconnect();
+      observer = null;
+    };
+
+    const syncPreloadMode = () => {
+      stopObserver();
+
+      if (query.matches) {
+        setMobilePreloadReady(false);
+        return;
+      }
+
+      const viewport = mobileViewportRef.current;
+      if (!viewport || typeof IntersectionObserver === "undefined") {
+        return;
+      }
+
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (!entries.some((entry) => entry.isIntersecting)) return;
+          setMobilePreloadReady(true);
+          stopObserver();
+        },
+        { rootMargin: "320px 0px", threshold: 0.01 },
+      );
+      observer.observe(viewport);
+    };
 
     syncPreloadMode();
     query.addEventListener("change", syncPreloadMode);
-    return () => query.removeEventListener("change", syncPreloadMode);
+    return () => {
+      query.removeEventListener("change", syncPreloadMode);
+      stopObserver();
+    };
   }, []);
+
+  useEffect(() => {
+    if (!mobilePreloadReady) return;
+    setMobileWarmIndexes((current) =>
+      mergeGalleryWarmIndexes(
+        current,
+        [mobileIndex - 1, mobileIndex, mobileIndex + 1],
+        total,
+      ),
+    );
+  }, [mobileIndex, mobilePreloadReady, total]);
 
   useEffect(() => {
     if (!mobileTransition || mobileTransition.moving) return;
@@ -498,6 +570,7 @@ export function ArticleGallery({
   }, [mobileTransition]);
 
   function handleMobileTouchStart(e: React.TouchEvent) {
+    setMobilePreloadReady(true);
     touchStartXRef.current = e.touches[0].clientX;
     touchStartYRef.current = e.touches[0].clientY;
   }
@@ -523,15 +596,15 @@ export function ArticleGallery({
   const groupSize = groupImages.length;
   const desktopImageWidthPx = Math.floor(ARTICLE_WIDTH_PX / groupSize);
   const mobileImage = images[mobileIndex];
-  const mobileTrackIndexes = Array.from(
-    new Set(
-      [
-        mobileIndex,
-        ...(mobilePreloadReady ? [mobileIndex - 1, mobileIndex + 1] : []),
-        ...(mobileTransition ? [mobileTransition.from, mobileTransition.to] : []),
-      ].filter((index) => index >= 0 && index < total),
-    ),
-  ).sort((a, b) => a - b);
+  const mobileTrackIndexes = mergeGalleryWarmIndexes(
+    mobileWarmIndexes,
+    [
+      mobileIndex,
+      ...(mobilePreloadReady ? [mobileIndex - 1, mobileIndex + 1] : []),
+      ...(mobileTransition ? [mobileTransition.from, mobileTransition.to] : []),
+    ],
+    total,
+  );
   const mobileTrackBaseIndex = mobileTransition?.from ?? mobileIndex;
   const mobileTrackShift = mobileTransition?.moving ? mobileTransition.direction : 0;
 
@@ -553,7 +626,17 @@ export function ArticleGallery({
       aria-label={`Открыть фото ${index + 1} из ${total}`}
       className="absolute inset-0"
     >
-      {!isDesktop ? <GalleryImg image={image} sizes="100vw" /> : null}
+      {!isDesktop ? (
+        <GalleryImg
+          image={image}
+          sizes="100vw"
+          loading={
+            mobilePreloadReady && Math.abs(index - mobileIndex) <= 1
+              ? "eager"
+              : "lazy"
+          }
+        />
+      ) : null}
     </button>
   );
 
@@ -624,6 +707,7 @@ export function ArticleGallery({
       {mobileImage ? (
         <div className="md:hidden">
           <div
+            ref={mobileViewportRef}
             className="relative aspect-[9/12] w-full overflow-hidden rounded-xl bg-muted/20"
             data-article-mobile-gallery-slide-viewport
             onTouchStart={handleMobileTouchStart}
