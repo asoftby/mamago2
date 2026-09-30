@@ -37,6 +37,50 @@ const ARTICLE_WIDTH_PX = 720;
  */
 const RESET_ARTICLE_BODY_IMG_STYLE = { margin: 0, borderRadius: 0 } as const;
 
+const lightboxImageReadyCache = new Map<string, Promise<void>>();
+
+function ensureLightboxImageReady(url: string): Promise<void> {
+  const cached = lightboxImageReadyCache.get(url);
+  if (cached) return cached;
+
+  const promise = new Promise<void>((resolve) => {
+    const image = new window.Image();
+    image.decoding = "async";
+    let finished = false;
+
+    const finish = async () => {
+      if (finished) return;
+      finished = true;
+      try {
+        if (typeof image.decode === "function") {
+          await image.decode();
+        }
+      } catch {
+        // A decoded frame is an optimization only; onload is still enough to render.
+      }
+      resolve();
+    };
+
+    image.onload = () => {
+      void finish();
+    };
+    image.onerror = () => {
+      if (!finished) {
+        finished = true;
+        resolve();
+      }
+    };
+    image.src = url;
+
+    if (image.complete) {
+      void finish();
+    }
+  });
+
+  lightboxImageReadyCache.set(url, promise);
+  return promise;
+}
+
 function GalleryImg({
   image,
   sizes,
@@ -91,16 +135,19 @@ function ArticleGalleryLightbox({
   const total = images.length;
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const touchStartXRef = useRef<number | null>(null);
+  const navigationTokenRef = useRef(0);
+  const preparingNavigationRef = useRef(false);
   const [transition, setTransition] = useState<{
     from: number;
     to: number;
     direction: SlideDirection;
     moving: boolean;
+    settling: boolean;
   } | null>(null);
 
   const navigate = useCallback(
     (direction: SlideDirection) => {
-      if (transition) return;
+      if (transition || preparingNavigationRef.current) return;
       const to = Math.max(0, Math.min(index + direction, total - 1));
       if (to === index) return;
 
@@ -109,9 +156,17 @@ function ArticleGalleryLightbox({
         return;
       }
 
-      setTransition({ from: index, to, direction, moving: false });
+      const token = ++navigationTokenRef.current;
+      const targetUrl = images[to]?.url;
+      preparingNavigationRef.current = true;
+
+      void (targetUrl ? ensureLightboxImageReady(targetUrl) : Promise.resolve()).then(() => {
+        if (navigationTokenRef.current !== token) return;
+        preparingNavigationRef.current = false;
+        setTransition({ from: index, to, direction, moving: false, settling: false });
+      });
     },
-    [index, onIndexChange, total, transition],
+    [images, index, onIndexChange, total, transition],
   );
 
   const goPrev = useCallback(() => navigate(-1), [navigate]);
@@ -126,13 +181,35 @@ function ArticleGalleryLightbox({
   }, [transition]);
 
   useEffect(() => {
-    if (!transition?.moving) return;
+    if (!transition?.moving || transition.settling) return;
     const timer = window.setTimeout(() => {
       onIndexChange(transition.to);
-      setTransition(null);
+      setTransition((value) => (value ? { ...value, settling: true } : null));
     }, 260);
     return () => window.clearTimeout(timer);
   }, [onIndexChange, transition]);
+
+  useEffect(() => {
+    if (!transition?.settling) return;
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        setTransition(null);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      if (secondFrame) cancelAnimationFrame(secondFrame);
+    };
+  }, [transition?.settling]);
+
+  useEffect(
+    () => () => {
+      navigationTokenRef.current += 1;
+      preparingNavigationRef.current = false;
+    },
+    [],
+  );
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -152,13 +229,13 @@ function ArticleGalleryLightbox({
     };
   }, [onClose, goPrev, goNext]);
 
-  // Prepare only the current + immediate neighbours — never the whole set.
+  // Decode only the current + immediate neighbours. Navigation also waits for
+  // the target decode, so the first swipe never animates into an empty frame.
   useEffect(() => {
-    for (const neighbourIndex of [index - 1, index + 1]) {
+    for (const neighbourIndex of [index - 1, index, index + 1]) {
       const url = images[neighbourIndex]?.url;
       if (!url) continue;
-      const preload = new window.Image();
-      preload.src = url;
+      void ensureLightboxImageReady(url);
     }
   }, [index, images]);
 
@@ -264,11 +341,18 @@ function ArticleGalleryLightbox({
         className="relative flex h-[90dvh] w-[94vw] items-center justify-center overflow-hidden sm:w-[92vw]"
         data-article-lightbox-slide-viewport
       >
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          data-article-lightbox-slide="current"
+        >
+          {renderSlide(current)}
+        </div>
+
         {transition ? (
           <>
             <div
               data-article-lightbox-slide="outgoing"
-              className="absolute inset-0 flex items-center justify-center transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
+              className="absolute inset-0 z-10 flex items-center justify-center transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
               style={{
                 transform: transition.moving
                   ? `translateX(${-transition.direction * 100}%)`
@@ -279,7 +363,7 @@ function ArticleGalleryLightbox({
             </div>
             <div
               data-article-lightbox-slide="incoming"
-              className="absolute inset-0 flex items-center justify-center transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
+              className="absolute inset-0 z-10 flex items-center justify-center transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
               style={{
                 transform: transition.moving
                   ? "translateX(0)"
@@ -289,11 +373,7 @@ function ArticleGalleryLightbox({
               {renderSlide(images[transition.to])}
             </div>
           </>
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center" data-article-lightbox-slide="current">
-            {renderSlide(current)}
-          </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
