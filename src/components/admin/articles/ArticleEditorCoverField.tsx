@@ -24,6 +24,8 @@ export function ArticleEditorCoverField({
   authorUserId,
   articleId,
   showHeading = true,
+  label = "Обложка",
+  description,
   uploadButtonLabel = "Загрузить обложку",
   successUploadMessage = "Обложка загружена",
   successPickMessage = "Обложка выбрана",
@@ -36,6 +38,8 @@ export function ArticleEditorCoverField({
   authorUserId?: string | null;
   articleId?: string | null;
   showHeading?: boolean;
+  label?: string;
+  description?: string;
   uploadButtonLabel?: string;
   successUploadMessage?: string;
   successPickMessage?: string;
@@ -134,7 +138,8 @@ export function ArticleEditorCoverField({
 
   return (
     <MediaUploadField
-      label={showHeading ? "Обложка" : undefined}
+      label={showHeading ? label : undefined}
+      description={description}
       mode="single"
       value={currentValue}
       onChange={(next) => {

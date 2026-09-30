@@ -83,3 +83,30 @@ export function normalizeCanonicalArticleMainGallery(input: {
     },
   });
 }
+
+
+/**
+ * Transitional cleanup for articles saved while the editor-level main gallery existed.
+ * Only the explicit service block is removed; ordinary inline galleries are preserved.
+ */
+export function detachLegacyArticleMainGallery(input: {
+  coverImageId?: string | null;
+  content: ArticleContentPayload;
+}): { coverImageId: string | null; content: ArticleContentPayload } {
+  const legacyBlock = input.content.blocks.find(
+    (block): block is Extract<ArticleBlockMvp, { type: "gallery" }> =>
+      block.type === "gallery" && block.id === MAIN_ARTICLE_GALLERY_BLOCK_ID,
+  );
+  const explicitCover = input.coverImageId?.trim() || null;
+  const legacyCover = legacyBlock?.mediaIds.find((id) => id.trim())?.trim() || null;
+
+  return {
+    coverImageId: explicitCover ?? legacyCover,
+    content: legacyBlock
+      ? {
+          ...input.content,
+          blocks: input.content.blocks.filter((block) => block !== legacyBlock),
+        }
+      : input.content,
+  };
+}
