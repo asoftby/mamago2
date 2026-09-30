@@ -186,7 +186,7 @@
     "test:decision-context": "tsx src/lib/decision/ageRangeAt.test.ts && tsx src/lib/decision/decisionContext.test.ts && tsx src/lib/my-plan/migrateGuestMyPlanAfterAuth.test.ts",
     "test:decision-attribution-integration": "tsx src/lib/decision/decisionAttribution.integration.test.ts",
     "test:profile-completion-flow": "tsx src/lib/post-auth/profileCompletionFlow.test.ts",
-    "test:child-birth": "tsx src/lib/child/birth.test.ts && tsx src/lib/child/birthApi.test.ts && tsx src/lib/child/childBirthWriters.contract.test.ts && tsx src/lib/child/childBirthMigration.contract.test.ts && tsx src/features/birthday/builder/lib/persistProfileChild.test.ts",
+    "test:child-birth": "tsx src/lib/child/birth.test.ts && tsx src/lib/child/birthApi.test.ts && tsx src/lib/child/childBirthWriters.contract.test.ts && tsx src/lib/child/childBirthMigration.contract.test.ts && tsx src/lib/family/buildChildPersonas.test.ts && tsx src/features/my-plan/lib/normalizeProfileChildren.test.ts && tsx src/features/birthday/builder/lib/profileChildSelection.test.ts && tsx src/features/birthday/builder/lib/persistProfileChild.test.ts && tsx src/features/birthday/builder/components/PartyForChildSection.refinement.contract.test.ts",
     "test:children-non-destructive-update-integration": "tsx \"src/app/api/children/[id]/route.non-destructive.integration.test.ts\"",
     "test:jsonld-safety": "tsx src/lib/seo/schema/serializeJsonLdForHtml.test.ts",
     "test:instagram-reels-ssrf": "tsx src/lib/instagram/fetchReelsThumbnail.test.ts && tsx src/server/modules/import/parsers/safeRemoteFetch.test.ts",

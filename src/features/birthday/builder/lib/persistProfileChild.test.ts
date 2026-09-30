@@ -43,3 +43,25 @@ test("existing profile child edit rejects before UI can report success", async (
     /validation failed/,
   );
 });
+
+test("refinement always PUTs explicit child B, independent of current selection", async () => {
+  const targets: string[] = [];
+  const fetcher = async (input: RequestInfo | URL) => {
+    targets.push(String(input));
+    return new Response(JSON.stringify({ child: { id: "child-b" } }), { status: 200 });
+  };
+  const refineB = () =>
+    persistBirthdayProfileChild(fetcher, {
+      id: "child-b",
+      name: "Б",
+      birthDate: "2020-05-17",
+      systemInterests: [],
+    });
+
+  await refineB(); // no selected child
+  const unrelatedCurrentSelection = "child-a";
+  assert.equal(unrelatedCurrentSelection, "child-a");
+  await refineB(); // selected A must not influence the mutation target
+
+  assert.deepEqual(targets, ["/api/children/child-b", "/api/children/child-b"]);
+});
