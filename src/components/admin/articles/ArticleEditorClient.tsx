@@ -980,6 +980,8 @@ export function ArticleEditorClient({
           <ArticleEditorCoverField
             value={coverImageId}
             initialPreviewUrl={initial.coverImageUrl}
+            label="Обложка статьи"
+            description="Используется только как обложка статьи и не выводится в тексте."
             authorUserId={authorUserId}
             articleId={hasPersistedId ? initial.id : null}
             onChange={(id, previewUrl) => {
