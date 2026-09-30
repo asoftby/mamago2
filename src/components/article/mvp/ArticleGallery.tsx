@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { isAppMediaUrl } from "@/lib/media/isAppMediaUrl";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import type { ArticleGalleryPresentation } from "@/lib/publications/articleMvp";
-import { uniqueMediaIdsPreserveOrder } from "@/lib/article/articleMainGallery";
 
 /** Matches the `md:` breakpoint used to switch between the desktop grid and the mobile slider. */
 const DESKTOP_MEDIA_QUERY = "(min-width: 768px)";
@@ -309,22 +308,31 @@ export function ArticleGallery({
   presentation?: ArticleGalleryPresentation;
   caption?: string;
 }) {
-  const deduplicatedImages = uniqueMediaIdsPreserveOrder(images.map((image) => image.id))
-    .map((id) => images.find((image) => image.id.trim() === id)!)
-    .filter(Boolean);
-  const total = deduplicatedImages.length;
+  const total = images.length;
+  // Gates which breakpoint's <Image> actually mounts (and fetches) — the CSS `hidden md:block` /
+  // `md:hidden` pair alone doesn't stop the browser from loading `display:none` images, so both
+  // variants would otherwise download regardless of which one is visible.
   const isDesktop = useMediaQuery(DESKTOP_MEDIA_QUERY);
-  const visibleCount = isDesktop ? DESKTOP_GROUP_SIZE : 1;
-  const maxStart = Math.max(0, total - visibleCount);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const boundedActiveIndex = Math.min(activeIndex, maxStart);
+  // Three independent notions of "current photo" — kept separate on purpose:
+  // - desktopGroupStart: which fixed group of DESKTOP_GROUP_SIZE the desktop grid shows.
+  // - mobileIndex: the mobile slider's current photo (mobile behavior is unchanged).
+  // - lightboxIndex: null when closed; otherwise the absolute index the lightbox is showing.
+  const [desktopGroupStart, setDesktopGroupStart] = useState(0);
+  const [mobileIndex, setMobileIndex] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const lastTriggerRef = useRef<HTMLElement | null>(null);
-  const viewportRef = useRef<HTMLDivElement>(null);
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
 
+  if (total === 0) return null;
+
+  // Lightbox always browses the full collection; opening it from either breakpoint also parks
+  // the mobile slider at that photo, matching the mobile slider's own pre-existing behavior of
+  // picking up wherever the lightbox was left — desktop's group state is never touched by this.
   const openLightbox = (index: number, trigger: HTMLElement | null) => {
     lastTriggerRef.current = trigger;
     setLightboxIndex(index);
+    setMobileIndex(index);
   };
   const closeLightbox = () => {
     setLightboxIndex(null);
@@ -332,67 +340,148 @@ export function ArticleGallery({
   };
   const handleLightboxIndexChange = (index: number) => {
     setLightboxIndex(index);
-    scrollToIndex(Math.min(index, maxStart));
+    setMobileIndex(index);
   };
+  const goMobilePrev = () => setMobileIndex((i) => Math.max(0, i - 1));
+  const goMobileNext = () => setMobileIndex((i) => Math.min(total - 1, i + 1));
 
-  function scrollToIndex(index: number) {
-    const next = Math.max(0, Math.min(index, maxStart));
-    const viewport = viewportRef.current;
-    if (viewport) viewport.scrollTo({ left: (viewport.clientWidth / visibleCount) * next, behavior: "smooth" });
-    setActiveIndex(next);
+  function handleMobileTouchStart(e: React.TouchEvent) {
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  }
+  function handleMobileTouchEnd(e: React.TouchEvent) {
+    const startX = touchStartXRef.current;
+    const startY = touchStartYRef.current;
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+    if (startX === null || startY === null) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx < 0) goMobileNext();
+    else goMobilePrev();
   }
 
-  function handleScroll() {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    const slideWidth = viewport.clientWidth / visibleCount;
-    if (slideWidth > 0) setActiveIndex(Math.max(0, Math.min(Math.round(viewport.scrollLeft / slideWidth), maxStart)));
-  }
-
-  if (total === 0) return null;
-
-  const preloadStart = Math.max(0, boundedActiveIndex - 1);
-  const preloadEnd = Math.min(total - 1, boundedActiveIndex + visibleCount);
+  const groupImages = images.slice(desktopGroupStart, desktopGroupStart + DESKTOP_GROUP_SIZE);
+  const groupSize = groupImages.length;
+  const desktopImageWidthPx = Math.floor(ARTICLE_WIDTH_PX / groupSize);
+  const mobileImage = images[mobileIndex];
 
   return (
     <div className="not-prose my-8 min-w-0 md:my-10">
-      <div className="relative">
+      {/* Desktop / tablet: up to 3-wide row + thumbnails */}
+      <div className="hidden md:block">
         <div
-          ref={viewportRef}
-          data-article-gallery-track
-          onScroll={handleScroll}
-          className="flex snap-x snap-mandatory gap-0 overflow-x-auto scroll-smooth overscroll-x-contain rounded-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:rounded-none"
+          className={cn(
+            "grid gap-3",
+            groupSize === 1 && "grid-cols-1",
+            groupSize === 2 && "grid-cols-2",
+            groupSize === 3 && "grid-cols-3",
+          )}
         >
-          {deduplicatedImages.map((image, index) => (
-            <button
-              key={image.id}
-              type="button"
-              onClick={(e) => openLightbox(index, e.currentTarget)}
-              aria-label={`Открыть фото ${index + 1} из ${total}`}
-              className="relative aspect-[9/12] w-full shrink-0 snap-start overflow-hidden border-border/60 bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-1/3 md:border-r md:last:border-r-0"
-            >
-              {index >= preloadStart && index <= preloadEnd ? (
-                <GalleryImg image={image} sizes={isDesktop ? `${Math.floor(ARTICLE_WIDTH_PX / 3)}px` : "100vw"} />
-              ) : (
-                <div className="absolute inset-0 bg-muted/30" aria-hidden />
-              )}
-            </button>
-          ))}
+          {groupImages.map((image, i) => {
+            const idx = desktopGroupStart + i;
+            return (
+              <button
+                key={image.id}
+                type="button"
+                onClick={(e) => openLightbox(idx, e.currentTarget)}
+                aria-label={`Открыть фото ${idx + 1} из ${total}`}
+                className="relative aspect-[9/12] w-full overflow-hidden rounded-xl border border-border/60 bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {isDesktop ? (
+                  <GalleryImg image={image} sizes={`(max-width: 767px) 100vw, ${desktopImageWidthPx}px`} />
+                ) : null}
+              </button>
+            );
+          })}
         </div>
 
-        {boundedActiveIndex > 0 ? (
-          <button type="button" onClick={() => scrollToIndex(boundedActiveIndex - visibleCount)} aria-label="Предыдущее изображение" className="absolute left-2 top-1/2 flex h-11 w-11 z-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm sm:h-10 sm:w-10"><ChevronLeft className="h-5 w-5" /></button>
+        {total > DESKTOP_GROUP_SIZE ? (
+          <div
+            className="mt-3 flex gap-2 overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            role="list"
+            aria-label="Миниатюры изображений"
+          >
+            {images.map((image, idx) => {
+              const isInCurrentGroup = idx >= desktopGroupStart && idx < desktopGroupStart + DESKTOP_GROUP_SIZE;
+              return (
+                <button
+                  key={image.id}
+                  type="button"
+                  data-thumb-index={idx}
+                  onClick={() => {
+                    const nextGroupStart = desktopGroupStartForIndex(idx);
+                    setDesktopGroupStart(nextGroupStart);
+                  }}
+                  aria-label={`Показать фото ${idx + 1} из ${total}`}
+                  aria-current={isInCurrentGroup}
+                  className={cn(
+                    "relative h-16 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted/20 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    isInCurrentGroup ? "opacity-100" : "opacity-50 hover:opacity-80",
+                  )}
+                  style={{ aspectRatio: "9 / 12" }}
+                >
+                  {isDesktop ? <GalleryImg image={image} sizes="64px" /> : null}
+                </button>
+              );
+            })}
+          </div>
         ) : null}
-        {boundedActiveIndex < maxStart ? (
-          <button type="button" onClick={() => scrollToIndex(boundedActiveIndex + visibleCount)} aria-label="Следующее изображение" className="absolute right-2 top-1/2 flex h-11 w-11 z-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm sm:h-10 sm:w-10"><ChevronRight className="h-5 w-5" /></button>
-        ) : null}
-        {total > 1 ? <div className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/45 px-2.5 py-1 text-xs text-white md:hidden">{boundedActiveIndex + 1} / {total}</div> : null}
       </div>
+
+      {/* Mobile: single-image slider */}
+      {mobileImage ? (
+        <div className="md:hidden">
+          <div
+            className="relative aspect-[9/12] w-full overflow-hidden rounded-xl bg-muted/20"
+            onTouchStart={handleMobileTouchStart}
+            onTouchEnd={handleMobileTouchEnd}
+          >
+            <button
+              type="button"
+              onClick={(e) => openLightbox(mobileIndex, e.currentTarget)}
+              aria-label={`Открыть фото ${mobileIndex + 1} из ${total}`}
+              className="absolute inset-0"
+            >
+              {!isDesktop ? <GalleryImg image={mobileImage} sizes="100vw" /> : null}
+            </button>
+
+            {total > 1 && mobileIndex > 0 ? (
+              <button
+                type="button"
+                onClick={goMobilePrev}
+                aria-label="Предыдущее изображение"
+                className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            ) : null}
+
+            {total > 1 && mobileIndex < total - 1 ? (
+              <button
+                type="button"
+                onClick={goMobileNext}
+                aria-label="Следующее изображение"
+                className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            ) : null}
+
+            {total > 1 ? (
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/45 px-2.5 py-1 text-xs text-white">
+                {mobileIndex + 1} / {total}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {caption ? <p className="mt-3 px-1 text-center text-sm text-muted-foreground">{caption}</p> : null}
 
       {lightboxIndex !== null ? (
-        <ArticleGalleryLightbox images={deduplicatedImages} index={lightboxIndex} onIndexChange={handleLightboxIndexChange} onClose={closeLightbox} />
+        <ArticleGalleryLightbox images={images} index={lightboxIndex} onIndexChange={handleLightboxIndexChange} onClose={closeLightbox} />
       ) : null}
     </div>
   );
