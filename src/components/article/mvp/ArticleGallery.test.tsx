@@ -182,13 +182,18 @@ assert.equal(renderToStaticMarkup(<ArticleGallery images={[]} />), "");
   assert.ok(source.includes("settling: true"), "incoming slide stays mounted while the committed frame paints underneath");
 }
 
-// Mobile in-article gallery must animate between photos without changing the restored desktop layout.
+// Mobile in-article gallery must animate immediately and preload adjacent photos.
 {
   const source = readFileSync(new URL("./ArticleGallery.tsx", import.meta.url), "utf8");
   assert.ok(source.includes("data-article-mobile-gallery-slide-viewport"));
-  assert.ok(source.includes('data-article-mobile-gallery-slide="outgoing"'));
-  assert.ok(source.includes('data-article-mobile-gallery-slide="incoming"'));
+  assert.ok(source.includes("mobileTrackIndexes"), "mobile gallery keeps a persistent slide track");
+  assert.ok(source.includes("mobileIndex - 1, mobileIndex + 1"), "adjacent photos preload before the gesture");
+  assert.ok(source.includes('"preloaded"'), "off-screen neighbour slides stay mounted");
+  assert.ok(source.includes('query.addEventListener("change", syncPreloadMode)'), "mobile preload follows breakpoint changes");
+  assert.ok(source.includes("tabIndex={interactive ? 0 : -1}"), "preloaded slides stay out of the tab order");
+  assert.ok(source.includes("aria-hidden={index !== mobileIndex}"), "off-screen slides stay hidden from assistive technology");
   assert.ok(source.includes("setMobileTransition({ from: mobileIndex, to, direction, moving: false })"));
+  assert.ok(!source.includes("waitForLightboxImageReady(targetUrl) : Promise.resolve(true)).then(\n        (ready) => {\n          if (navigationTokenRef.current !== token) return;\n          preparingNavigationRef.current = false;\n          if (!ready) return;\n          setMobileTransition"), "mobile carousel navigation must never wait for lightbox readiness");
   assert.ok(source.includes("didMobileSwipeRef"), "touch swipe must not open the lightbox via the synthetic click");
 }
 
