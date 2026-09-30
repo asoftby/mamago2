@@ -81,6 +81,26 @@ function ensureLightboxImageReady(url: string): Promise<void> {
   return promise;
 }
 
+async function waitForLightboxImageReady(
+  url: string,
+  timeoutMs = 1500,
+): Promise<boolean> {
+  let timeoutId = 0;
+  const ready = await Promise.race([
+    ensureLightboxImageReady(url).then(() => true),
+    new Promise<boolean>((resolve) => {
+      timeoutId = window.setTimeout(() => resolve(false), timeoutMs);
+    }),
+  ]);
+
+  if (timeoutId) window.clearTimeout(timeoutId);
+  if (!ready) {
+    // A stalled request must not poison the cache or lock all navigation.
+    lightboxImageReadyCache.delete(url);
+  }
+  return ready;
+}
+
 function GalleryImg({
   image,
   sizes,
@@ -160,11 +180,14 @@ function ArticleGalleryLightbox({
       const targetUrl = images[to]?.url;
       preparingNavigationRef.current = true;
 
-      void (targetUrl ? ensureLightboxImageReady(targetUrl) : Promise.resolve()).then(() => {
-        if (navigationTokenRef.current !== token) return;
-        preparingNavigationRef.current = false;
-        setTransition({ from: index, to, direction, moving: false, settling: false });
-      });
+      void (targetUrl ? waitForLightboxImageReady(targetUrl) : Promise.resolve(true)).then(
+        (ready) => {
+          if (navigationTokenRef.current !== token) return;
+          preparingNavigationRef.current = false;
+          if (!ready) return;
+          setTransition({ from: index, to, direction, moving: false, settling: false });
+        },
+      );
     },
     [images, index, onIndexChange, total, transition],
   );
