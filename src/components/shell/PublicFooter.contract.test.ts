@@ -10,6 +10,13 @@ assert.doesNotMatch(
   "Journal must not be rendered inside the Project footer column",
 );
 
+assert.doesNotMatch(
+  footerSource,
+  /CookieSettingsFooterLink|Настройки cookies/,
+  "Cookie consent must not render persistent text in the public footer",
+);
+
+
 assert.match(
   navSource,
   /index > 0[\s\S]*border-l[\s\S]*pl-3/,
