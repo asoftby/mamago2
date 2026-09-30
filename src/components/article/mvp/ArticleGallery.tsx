@@ -422,6 +422,7 @@ export function ArticleGallery({
   // - lightboxIndex: null when closed; otherwise the absolute index the lightbox is showing.
   const [desktopGroupStart, setDesktopGroupStart] = useState(0);
   const [mobileIndex, setMobileIndex] = useState(0);
+  const [mobilePreloadReady, setMobilePreloadReady] = useState(false);
   const [mobileTransition, setMobileTransition] = useState<{
     from: number;
     to: number;
@@ -471,6 +472,10 @@ export function ArticleGallery({
   const goMobileNext = useCallback(() => navigateMobile(1), [navigateMobile]);
 
   useEffect(() => {
+    setMobilePreloadReady(!window.matchMedia(DESKTOP_MEDIA_QUERY).matches);
+  }, []);
+
+  useEffect(() => {
     if (!mobileTransition || mobileTransition.moving) return;
     const frame = requestAnimationFrame(() => {
       setMobileTransition((value) => (value ? { ...value, moving: true } : null));
@@ -513,6 +518,17 @@ export function ArticleGallery({
   const groupSize = groupImages.length;
   const desktopImageWidthPx = Math.floor(ARTICLE_WIDTH_PX / groupSize);
   const mobileImage = images[mobileIndex];
+  const mobileTrackIndexes = Array.from(
+    new Set(
+      [
+        mobileIndex,
+        ...(mobilePreloadReady ? [mobileIndex - 1, mobileIndex + 1] : []),
+        ...(mobileTransition ? [mobileTransition.from, mobileTransition.to] : []),
+      ].filter((index) => index >= 0 && index < total),
+    ),
+  ).sort((a, b) => a - b);
+  const mobileTrackBaseIndex = mobileTransition?.from ?? mobileIndex;
+  const mobileTrackShift = mobileTransition?.moving ? mobileTransition.direction : 0;
 
   const renderMobileSlide = (image: ArticleGalleryImage, index: number) => (
     <button
@@ -603,36 +619,29 @@ export function ArticleGallery({
             onTouchStart={handleMobileTouchStart}
             onTouchEnd={handleMobileTouchEnd}
           >
-            {mobileTransition ? (
-              <>
+            {mobileTrackIndexes.map((index) => {
+              const offset =
+                (index - mobileTrackBaseIndex - mobileTrackShift) * 100;
+              const state =
+                mobileTransition?.moving && index === mobileTransition.to
+                  ? "incoming"
+                  : mobileTransition?.moving && index === mobileTransition.from
+                    ? "outgoing"
+                    : index === mobileIndex
+                      ? "current"
+                      : "preloaded";
+
+              return (
                 <div
-                  data-article-mobile-gallery-slide="outgoing"
+                  key={images[index].id}
+                  data-article-mobile-gallery-slide={state}
                   className="absolute inset-0 transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
-                  style={{
-                    transform: mobileTransition.moving
-                      ? `translateX(${-mobileTransition.direction * 100}%)`
-                      : "translateX(0)",
-                  }}
+                  style={{ transform: `translateX(${offset}%)` }}
                 >
-                  {renderMobileSlide(images[mobileTransition.from], mobileTransition.from)}
+                  {renderMobileSlide(images[index], index)}
                 </div>
-                <div
-                  data-article-mobile-gallery-slide="incoming"
-                  className="absolute inset-0 transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
-                  style={{
-                    transform: mobileTransition.moving
-                      ? "translateX(0)"
-                      : `translateX(${mobileTransition.direction * 100}%)`,
-                  }}
-                >
-                  {renderMobileSlide(images[mobileTransition.to], mobileTransition.to)}
-                </div>
-              </>
-            ) : (
-              <div className="absolute inset-0" data-article-mobile-gallery-slide="current">
-                {renderMobileSlide(mobileImage, mobileIndex)}
-              </div>
-            )}
+              );
+            })}
 
             {total > 1 && mobileIndex > 0 ? (
               <button
