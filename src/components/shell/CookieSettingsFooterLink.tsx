@@ -1,12 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { Cookie } from "lucide-react";
 import { openCookiePreferences } from "@/lib/cookies/consent-manager";
 import { cn } from "@/lib/utils";
 
 type Props = {
   className?: string;
   children?: ReactNode;
+  iconOnly?: boolean;
 };
 
 /**
@@ -15,7 +17,24 @@ type Props = {
 export function CookieSettingsFooterLink({
   className,
   children = "Настройки cookies",
+  iconOnly = false,
 }: Props) {
+  if (iconOnly) {
+    return (
+      <button
+        type="button"
+        onClick={() => openCookiePreferences()}
+        aria-label="Настройки cookies"
+        className={cn(
+          "inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-black/5 hover:text-primary",
+          className,
+        )}
+      >
+        <Cookie className="h-4 w-4" aria-hidden />
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"

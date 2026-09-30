@@ -174,6 +174,12 @@ assert.equal(renderToStaticMarkup(<ArticleGallery images={[]} />), "");
   assert.ok(source.includes('data-article-lightbox-slide="incoming"'));
   assert.ok(source.includes("duration-[260ms]"));
   assert.ok(source.includes('prefers-reduced-motion: reduce'));
+  assert.ok(source.includes("ensureLightboxImageReady"), "lightbox waits for the target image to be ready");
+  assert.ok(source.includes("await image.decode()"), "lightbox pre-decodes images before the first slide");
+  assert.ok(source.includes("waitForLightboxImageReady"), "lightbox readiness wait is bounded");
+  assert.ok(source.includes("Promise.race"), "stalled image requests cannot lock navigation forever");
+  assert.ok(source.includes("lightboxImageReadyCache.delete(url)"), "stalled readiness entries are retryable");
+  assert.ok(source.includes("settling: true"), "incoming slide stays mounted while the committed frame paints underneath");
 }
 
 // Mobile in-article gallery must animate between photos without changing the restored desktop layout.
