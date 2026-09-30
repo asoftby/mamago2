@@ -29,6 +29,12 @@ import {
   trackChildContextCompleted,
   trackOnboardingCompleted,
 } from "@/lib/onboarding/firstPartyEvents";
+import {
+  nextStepAfterAdultSave,
+  nextStepAfterChildSave,
+  nextStepAfterInterests,
+  resolveInitialProfileFlowAction,
+} from "@/lib/post-auth/profileCompletionFlow";
 
 const MONTHS_RU = [
   { m: 0, label: "Январь" },
@@ -144,11 +150,14 @@ export function ProfileCompletionFlow({
 
   const [selectedInterests, setSelectedInterests] = React.useState<string[]>([]);
 
+  const stepRef = React.useRef(step);
+  stepRef.current = step;
+
   const track = React.useCallback(
     (event: PostAuthAnalyticsEvent, props?: Record<string, unknown>) => {
-      trackPostAuthEvent(event, { entryPoint, step, ...props });
+      trackPostAuthEvent(event, { entryPoint, step: stepRef.current, ...props });
     },
-    [entryPoint, step],
+    [entryPoint],
   );
 
   const refreshState = React.useCallback(async () => {
@@ -165,13 +174,14 @@ export function ProfileCompletionFlow({
       try {
         const data = await refreshState();
         if (cancelled) return;
-        if (data.isProfileComplete) {
-          onFinishedRef.current({ alreadyComplete: true });
+        const initialAction = resolveInitialProfileFlowAction(data);
+        if (initialAction.kind === "finish") {
+          onFinishedRef.current({ alreadyComplete: initialAction.alreadyComplete });
           return;
         }
         track("completion_started", {});
         trackFamilyOnboardingStarted();
-        const start = data.resumeStep ?? "adult";
+        const start = initialAction.step;
         setStep(start);
         track("completion_step_viewed", { completionStep: start });
         setFamilyRole(data.user.familyRole ?? "");
@@ -269,8 +279,8 @@ export function ProfileCompletionFlow({
         notifyFamilyPersonasChanged();
       }
       track("completion_step_completed", { completionStep: "adult" });
-      const next = await refreshState();
-      setStep(next.resumeStep ?? "child");
+      await refreshState();
+      setStep(nextStepAfterAdultSave());
     } catch {
       setError("Не удалось сохранить");
     } finally {
@@ -325,8 +335,8 @@ export function ProfileCompletionFlow({
       }
       setAddingAnotherChild(false);
       track("completion_step_completed", { completionStep: "child" });
-      const next = await refreshState();
-      setStep(next.resumeStep ?? "child_interests");
+      await refreshState();
+      setStep(nextStepAfterChildSave());
     } catch {
       setError("Не удалось сохранить");
     } finally {
@@ -362,7 +372,7 @@ export function ProfileCompletionFlow({
       track("completion_step_completed", { completionStep: "child_interests" });
       trackChildContextCompleted();
       await refreshState();
-      setStep("add_more_children");
+      setStep(nextStepAfterInterests());
     } catch {
       setError("Не удалось сохранить интересы");
     } finally {
@@ -372,7 +382,7 @@ export function ProfileCompletionFlow({
 
   const handleSkipInterests = () => {
     track("completion_step_completed", { completionStep: "child_interests", skipped: true });
-    setStep("add_more_children");
+    setStep(nextStepAfterInterests());
   };
 
   const handleAddAnotherChild = () => {
