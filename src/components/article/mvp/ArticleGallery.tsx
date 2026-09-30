@@ -331,8 +331,6 @@ export function ArticleGallery({
   const touchStartYRef = useRef<number | null>(null);
   const didMobileSwipeRef = useRef(false);
 
-  if (total === 0) return null;
-
   // Lightbox always browses the full collection; opening it from either breakpoint also parks
   // the mobile slider at that photo, matching the mobile slider's own pre-existing behavior of
   // picking up wherever the lightbox was left — desktop's group state is never touched by this.
@@ -399,10 +397,14 @@ export function ArticleGallery({
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
     if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+    const direction: -1 | 1 = dx < 0 ? 1 : -1;
+    const to = Math.max(0, Math.min(mobileIndex + direction, total - 1));
+    if (to === mobileIndex) return;
     didMobileSwipeRef.current = true;
-    if (dx < 0) goMobileNext();
-    else goMobilePrev();
+    navigateMobile(direction);
   }
+
+  if (total === 0) return null;
 
   const groupImages = images.slice(desktopGroupStart, desktopGroupStart + DESKTOP_GROUP_SIZE);
   const groupSize = groupImages.length;
