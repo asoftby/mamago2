@@ -27,6 +27,27 @@ const DESKTOP_GROUP_SIZE = 3;
 export function desktopGroupStartForIndex(index: number, groupSize: number = DESKTOP_GROUP_SIZE): number {
   return Math.floor(index / groupSize) * groupSize;
 }
+
+export function mergeGalleryWarmIndexes(
+  current: readonly number[],
+  candidates: readonly number[],
+  total: number,
+): number[] {
+  const next = new Set(
+    current.filter((index) => Number.isInteger(index) && index >= 0 && index < total),
+  );
+  for (const index of candidates) {
+    if (Number.isInteger(index) && index >= 0 && index < total) next.add(index);
+  }
+  const sorted = [...next].sort((a, b) => a - b);
+  if (
+    sorted.length === current.length &&
+    sorted.every((index, position) => index === current[position])
+  ) {
+    return current as number[];
+  }
+  return sorted;
+}
 /** Article body width used elsewhere in this renderer to calibrate `sizes`. */
 const ARTICLE_WIDTH_PX = 720;
 
@@ -37,6 +58,7 @@ const ARTICLE_WIDTH_PX = 720;
  */
 const RESET_ARTICLE_BODY_IMG_STYLE = { margin: 0, borderRadius: 0 } as const;
 
+const galleryImageLoadedCache = new Set<string>();
 const lightboxImageReadyCache = new Map<string, Promise<void>>();
 
 function ensureLightboxImageReady(url: string): Promise<void> {
@@ -105,12 +127,17 @@ function GalleryImg({
   image,
   sizes,
   className,
+  loading,
 }: {
   image: ArticleGalleryImage;
   sizes: string;
   className?: string;
+  loading?: "eager" | "lazy";
 }) {
-  const [loaded, setLoaded] = useState(false);
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(() =>
+    image.url && galleryImageLoadedCache.has(image.url) ? image.url : null,
+  );
+  const loaded = Boolean(image.url && loadedUrl === image.url);
   if (!image.url) {
     return (
       <div className={cn("absolute inset-0 flex items-center justify-center bg-muted/30 text-xs text-muted-foreground", className)} aria-hidden>
@@ -133,7 +160,11 @@ function GalleryImg({
         className={cn("object-cover transition-opacity duration-300", loaded ? "opacity-100" : "opacity-0", className)}
         style={RESET_ARTICLE_BODY_IMG_STYLE}
         unoptimized={isAppMediaUrl(image.url)}
-        onLoad={() => setLoaded(true)}
+        loading={loading}
+        onLoad={() => {
+          galleryImageLoadedCache.add(image.url!);
+          setLoadedUrl(image.url);
+        }}
       />
     </>
   );
@@ -423,6 +454,9 @@ export function ArticleGallery({
   const [desktopGroupStart, setDesktopGroupStart] = useState(0);
   const [mobileIndex, setMobileIndex] = useState(0);
   const [mobilePreloadReady, setMobilePreloadReady] = useState(false);
+  const [mobileWarmIndexes, setMobileWarmIndexes] = useState<number[]>(() =>
+    total > 0 ? [0] : [],
+  );
   const [mobileTransition, setMobileTransition] = useState<{
     from: number;
     to: number;
@@ -481,6 +515,17 @@ export function ArticleGallery({
   }, []);
 
   useEffect(() => {
+    if (!mobilePreloadReady) return;
+    setMobileWarmIndexes((current) =>
+      mergeGalleryWarmIndexes(
+        current,
+        [mobileIndex - 1, mobileIndex, mobileIndex + 1],
+        total,
+      ),
+    );
+  }, [mobileIndex, mobilePreloadReady, total]);
+
+  useEffect(() => {
     if (!mobileTransition || mobileTransition.moving) return;
     const frame = requestAnimationFrame(() => {
       setMobileTransition((value) => (value ? { ...value, moving: true } : null));
@@ -523,15 +568,15 @@ export function ArticleGallery({
   const groupSize = groupImages.length;
   const desktopImageWidthPx = Math.floor(ARTICLE_WIDTH_PX / groupSize);
   const mobileImage = images[mobileIndex];
-  const mobileTrackIndexes = Array.from(
-    new Set(
-      [
-        mobileIndex,
-        ...(mobilePreloadReady ? [mobileIndex - 1, mobileIndex + 1] : []),
-        ...(mobileTransition ? [mobileTransition.from, mobileTransition.to] : []),
-      ].filter((index) => index >= 0 && index < total),
-    ),
-  ).sort((a, b) => a - b);
+  const mobileTrackIndexes = mergeGalleryWarmIndexes(
+    mobileWarmIndexes,
+    [
+      mobileIndex,
+      ...(mobilePreloadReady ? [mobileIndex - 1, mobileIndex + 1] : []),
+      ...(mobileTransition ? [mobileTransition.from, mobileTransition.to] : []),
+    ],
+    total,
+  );
   const mobileTrackBaseIndex = mobileTransition?.from ?? mobileIndex;
   const mobileTrackShift = mobileTransition?.moving ? mobileTransition.direction : 0;
 
@@ -553,7 +598,13 @@ export function ArticleGallery({
       aria-label={`Открыть фото ${index + 1} из ${total}`}
       className="absolute inset-0"
     >
-      {!isDesktop ? <GalleryImg image={image} sizes="100vw" /> : null}
+      {!isDesktop ? (
+        <GalleryImg
+          image={image}
+          sizes="100vw"
+          loading={Math.abs(index - mobileIndex) <= 1 ? "eager" : "lazy"}
+        />
+      ) : null}
     </button>
   );
 
