@@ -58,7 +58,6 @@ const ARTICLE_WIDTH_PX = 720;
  */
 const RESET_ARTICLE_BODY_IMG_STYLE = { margin: 0, borderRadius: 0 } as const;
 
-const galleryImageLoadedCache = new Set<string>();
 const lightboxImageReadyCache = new Map<string, Promise<void>>();
 
 function ensureLightboxImageReady(url: string): Promise<void> {
@@ -134,9 +133,7 @@ function GalleryImg({
   className?: string;
   loading?: "eager" | "lazy";
 }) {
-  const [loadedUrl, setLoadedUrl] = useState<string | null>(() =>
-    image.url && galleryImageLoadedCache.has(image.url) ? image.url : null,
-  );
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
   const loaded = Boolean(image.url && loadedUrl === image.url);
   if (!image.url) {
     return (
@@ -161,10 +158,7 @@ function GalleryImg({
         style={RESET_ARTICLE_BODY_IMG_STYLE}
         unoptimized={isAppMediaUrl(image.url)}
         loading={loading}
-        onLoad={() => {
-          galleryImageLoadedCache.add(image.url!);
-          setLoadedUrl(image.url);
-        }}
+        onLoad={() => setLoadedUrl(image.url)}
       />
     </>
   );
