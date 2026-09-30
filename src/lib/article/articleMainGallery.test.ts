@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { MAIN_ARTICLE_GALLERY_BLOCK_ID, hydrateArticleMainGallery, normalizeCanonicalArticleMainGallery, persistArticleMainGallery, uniqueMediaIdsPreserveOrder } from "./articleMainGallery";
+import { MAIN_ARTICLE_GALLERY_BLOCK_ID, detachLegacyArticleMainGallery, hydrateArticleMainGallery, normalizeCanonicalArticleMainGallery, persistArticleMainGallery, uniqueMediaIdsPreserveOrder } from "./articleMainGallery";
 import type { ArticleContentPayload } from "@/lib/publications/articleMvp";
 
 const content = (blocks: ArticleContentPayload["blocks"]): ArticleContentPayload => ({ version: 1, blocks });
@@ -27,3 +27,29 @@ const routeBlocks = [
 const route = hydrateArticleMainGallery({ coverImageId: "COVER", content: content(routeBlocks) });
 assert.deepEqual(route.mediaIds, ["COVER"]);
 assert.deepEqual(route.inlineContent.blocks, routeBlocks);
+
+
+const inlineGallery = gallery("inline-gallery", ["INLINE-A", "INLINE-B"]);
+const detached = detachLegacyArticleMainGallery({
+  coverImageId: "COVER",
+  content: content([
+    gallery(MAIN_ARTICLE_GALLERY_BLOCK_ID, ["COVER", "OLD-EXTRA"]),
+    inlineGallery,
+  ]),
+});
+assert.equal(detached.coverImageId, "COVER");
+assert.deepEqual(detached.content.blocks, [inlineGallery], "only the legacy editor gallery is removed");
+
+const recoveredCover = detachLegacyArticleMainGallery({
+  coverImageId: null,
+  content: content([gallery(MAIN_ARTICLE_GALLERY_BLOCK_ID, ["LEGACY-COVER", "OLD-EXTRA"])]),
+});
+assert.equal(recoveredCover.coverImageId, "LEGACY-COVER");
+assert.equal(recoveredCover.content.blocks.length, 0);
+
+const ordinaryTopGallery = detachLegacyArticleMainGallery({
+  coverImageId: "COVER",
+  content: content([inlineGallery]),
+});
+assert.equal(ordinaryTopGallery.coverImageId, "COVER");
+assert.deepEqual(ordinaryTopGallery.content.blocks, [inlineGallery], "ordinary inline galleries stay untouched");
