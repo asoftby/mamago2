@@ -35,3 +35,9 @@ for (const presentation of ["carousel", "mosaic", "sequential"] as const) {
   assert.equal(ArticleContentPayloadSchema.safeParse({ version: 1, blocks: [{ id: presentation, type: "gallery", mediaIds: ["a"], presentation }] }).success, true);
 }
 assert.ok(source.includes("ArticleGalleryLightbox images={deduplicatedImages}"));
+assert.ok(source.includes("data-article-lightbox-slide-viewport"));
+assert.ok(source.includes('data-article-lightbox-slide="outgoing"'));
+assert.ok(source.includes('data-article-lightbox-slide="incoming"'));
+assert.ok(source.includes("duration-[260ms]"));
+assert.ok(source.includes('prefers-reduced-motion: reduce'));
+
