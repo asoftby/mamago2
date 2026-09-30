@@ -1,13 +1,9 @@
 import type { EventPageMedia } from "@/lib/event/eventPageTypes";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 import type { OfferPageData } from "@/lib/offer/offerPageTypes";
-import { extractYouTubeId } from "@/lib/offer/offerPageFormat";
+import { parseVideoUrl } from "@/lib/media/parseVideoUrl";
 
 const FALLBACK_POSTER = "/og-default.jpg";
-
-function isInstagramReelUrl(url: string): boolean {
-  return /instagram\.com\/(?:reel|p)\//i.test(url);
-}
 
 export type PublicationMediaColumnModel = {
   media: EventPageMedia;
@@ -29,21 +25,19 @@ export function mapOfferPageMedia(
   let trailerLabel = media.videoLabel?.trim() || undefined;
 
   if (media.videoUrl?.trim()) {
-    const videoUrl = media.videoUrl.trim();
-    if (isInstagramReelUrl(videoUrl)) {
+    const video = parseVideoUrl(media.videoUrl);
+    if (video?.type === "instagram") {
       galleryItems.push({
-        type: "reels",
+        type: "instagram",
         id: "offer-reels",
-        url: videoUrl,
-        thumbnailSrc: media.videoThumbnail || (posterUrl !== FALLBACK_POSTER ? posterUrl : undefined),
+        url: video.url,
+        embedId: video.embedId,
+        posterSrc: media.videoThumbnail || (posterUrl !== FALLBACK_POSTER ? posterUrl : null),
         title: trailerLabel || "Reels",
       });
-    } else {
-      const youtubeId = extractYouTubeId(videoUrl);
-      if (youtubeId) {
-        trailerYoutubeId = youtubeId;
-        trailerLabel = trailerLabel || "Трейлер";
-      }
+    } else if (video?.type === "youtube") {
+      trailerYoutubeId = video.embedId;
+      trailerLabel = trailerLabel || "Трейлер";
     }
   }
 
