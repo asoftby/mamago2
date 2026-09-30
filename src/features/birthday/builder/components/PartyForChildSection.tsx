@@ -25,7 +25,6 @@ import {
   Sheet,
   SheetContent,
   SheetDescription,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -54,6 +53,7 @@ import { SavedProfileChildCard } from "./SavedProfileChildCard";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { buildAuthUrl } from "@/lib/auth/redirectTo";
+import { persistBirthdayProfileChild } from "../lib/persistProfileChild";
 
 type BuilderHook = BirthdayBuilderWithGate;
 
@@ -188,8 +188,9 @@ function ChildPickerPanelSections({
 
 type ApiChild = {
   id: string;
-  name: string;
+  name: string | null;
   birthDate: string;
+  birthPrecision: "DAY" | "MONTH" | null;
   systemInterests?: { interestSlug: string }[];
 };
 
@@ -203,7 +204,7 @@ function childToParty(c: ApiChild): PartyForChild {
   const years = ageYearsFromBirthDate(iso);
   return {
     profileChildId: c.id,
-    name: c.name.trim(),
+    name: c.name?.trim() ?? "",
     ageLabel: formatYearsRu(years),
     birthDateIso: iso,
     interestSlugs:
@@ -332,6 +333,15 @@ function PartyForChildSectionInner({
 
   const handleSelectChild = useCallback(
     (c: ApiChild) => {
+      if (c.birthPrecision !== "DAY") {
+        setModalMode("edit");
+        setName(c.name?.trim() ?? "");
+        setBirthDate("");
+        setInterestPick(new Set(c.systemInterests?.map((x) => x.interestSlug).filter(Boolean) ?? []));
+        setModalOpen(true);
+        toast.message("Уточните полную дату рождения для праздника");
+        return;
+      }
       const party = childToParty(c);
       setPartyForChild(party);
     },
@@ -344,8 +354,8 @@ function PartyForChildSectionInner({
       const party = childToParty(c);
       setPartyForChild(party);
       setModalMode("edit");
-      setName(c.name.trim());
-      setBirthDate(birthIsoFromApi(c.birthDate));
+      setName(c.name?.trim() ?? "");
+      setBirthDate(c.birthPrecision === "DAY" ? birthIsoFromApi(c.birthDate) : "");
       setInterestPick(
         new Set(
           c.systemInterests?.map((x) => x.interestSlug).filter(Boolean) ?? [],
@@ -502,12 +512,8 @@ function PartyForChildSectionInner({
     applyAgeFromBirthDate(p.birthDateIso, ageOptions, setBasics);
   }, [state.quiz.partyForChild, ageOptions, setBasics]);
 
-  const handleModalDone = useCallback(() => {
+  const handleModalDone = useCallback(async () => {
     const trimmed = name.trim();
-    if (trimmed.length < 2) {
-      toast.error("Введите имя (от 2 символов)");
-      return;
-    }
     if (!birthDate || birthDate.length < 10) {
       toast.error("Укажите дату рождения");
       return;
@@ -528,6 +534,22 @@ function PartyForChildSectionInner({
     if (modalMode === "edit") {
       const current = state.quiz.partyForChild;
       if (!current) return;
+      if (current.profileChildId) {
+        setSavingProfile(true);
+        try {
+          await persistBirthdayProfileChild(fetch, {
+            id: current.profileChildId,
+            name: trimmed,
+            birthDate,
+            systemInterests: slugs,
+          });
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "Ошибка сети");
+          return;
+        } finally {
+          setSavingProfile(false);
+        }
+      }
       const party: PartyForChild = {
         ...current,
         name: trimmed,
@@ -544,6 +566,7 @@ function PartyForChildSectionInner({
                   ...ch,
                   name: trimmed,
                   birthDate: `${birthDate}T00:00:00.000Z`,
+                  birthPrecision: "DAY",
                   systemInterests: slugs.map((interestSlug) => ({ interestSlug })),
                 }
               : ch,
@@ -602,6 +625,7 @@ function PartyForChildSectionInner({
         body: JSON.stringify({
           name: p.name,
           birthDate: p.birthDateIso,
+          birthPrecision: "DAY",
           systemInterests: p.interestSlugs,
           customInterests: [],
         }),
@@ -620,6 +644,7 @@ function PartyForChildSectionInner({
               name: p.name,
               birthDate:
                 data.child.birthDate ?? `${p.birthDateIso}T00:00:00.000Z`,
+              birthPrecision: "DAY",
               systemInterests: p.interestSlugs.map((interestSlug: string) => ({
                 interestSlug,
               })),

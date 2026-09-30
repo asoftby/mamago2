@@ -11,8 +11,9 @@ type MinimalUser = {
 
 type MinimalChild = {
   id: string;
-  name: string;
+  name: string | null;
   birthDate: Date | string | null;
+  birthPrecision?: "DAY" | "MONTH" | null;
   createdAt: Date | string;
   systemInterests?: { interestSlug: string }[];
 };
@@ -112,6 +113,7 @@ export function buildProfileStatePayload(
           ? c.birthDate
           : c.birthDate.toISOString()
         : null,
+      birthPrecision: c.birthPrecision ?? null,
       createdAt:
         typeof c.createdAt === "string" ? c.createdAt : c.createdAt.toISOString(),
       interestCount: c.systemInterests?.length ?? 0,

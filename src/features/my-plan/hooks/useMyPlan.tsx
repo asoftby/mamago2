@@ -774,14 +774,15 @@ function useMyPlanStore() {
     }): Promise<{ ok: boolean; error?: string }> => {
       setSubmittingChild(true);
       try {
-        const birthDate = new Date(input.birthYear, input.birthMonth - 1, 15);
         const res = await fetch("/api/children", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
             name: input.name.trim(),
-            birthDate: birthDate.toISOString(),
+            birthPrecision: "MONTH",
+            birthYear: input.birthYear,
+            birthMonth: input.birthMonth,
             systemInterests: input.systemInterests,
             customInterests: [],
           }),

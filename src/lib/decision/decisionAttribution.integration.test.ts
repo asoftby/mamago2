@@ -71,6 +71,7 @@ async function main() {
       data: {
         name: CHILD_NAME,
         birthDate: new Date("2022-06-01"), // ~4 years old relative to a 2026 target date
+        birthPrecision: "MONTH",
         parentId: owner,
       },
     });
@@ -657,7 +658,7 @@ async function main() {
       false,
       "the child's name must never appear in any UserEvent.meta or RecommendationRun.context written by this test",
     );
-    for (const forbidden of ["birthDate", "\"email\"", "\"phone\""]) {
+    for (const forbidden of ["birthDate", "dateOfBirth", "\"dob\"", CHILD_NAME, "\"email\"", "\"phone\""]) {
       assert.equal(
         haystacks.includes(forbidden),
         false,

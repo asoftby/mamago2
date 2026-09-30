@@ -3,12 +3,15 @@
 import { cn } from "@/lib/utils";
 import { getSystemInterestLabel } from "@/lib/config/interests";
 import { ageYearsFromBirthDate, formatYearsRu } from "../lib/partyChildUtils";
+import { childDisplayName } from "@/lib/child/birth";
+import { ageYearsAt } from "@/lib/child/birth";
 
 /** Совпадает с формой /api/children */
 export type SavedProfileChildRow = {
   id: string;
-  name: string;
+  name: string | null;
   birthDate: string;
+  birthPrecision: "DAY" | "MONTH" | null;
   systemInterests?: { interestSlug: string }[];
 };
 
@@ -31,8 +34,12 @@ export function SavedProfileChildCard({
   onEdit,
 }: SavedProfileChildCardProps) {
   const iso = birthIsoFromApi(child.birthDate);
-  const years = ageYearsFromBirthDate(iso);
+  const years = ageYearsAt(
+    { birthDate: child.birthDate, birthPrecision: child.birthPrecision },
+    new Date(),
+  ) ?? ageYearsFromBirthDate(iso);
   const ageText = formatYearsRu(years);
+  const displayName = childDisplayName(child.name);
   const slugs =
     child.systemInterests?.map((x) => x.interestSlug).filter(Boolean) ?? [];
   const interestsLine =
@@ -62,7 +69,7 @@ export function SavedProfileChildCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-1">
           <p className="text-sm font-medium text-foreground leading-snug">
-            {child.name.trim()}, {ageText}
+            {displayName}, {ageText}
           </p>
           <p className="text-xs text-muted-foreground leading-snug">
             {interestsLine}

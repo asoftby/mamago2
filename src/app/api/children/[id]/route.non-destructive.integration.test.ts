@@ -34,6 +34,7 @@ async function makeChildWithInterests(parentId: string): Promise<string> {
     data: {
       name: `NonDestructive ${marker}`,
       birthDate: new Date("2020-05-01"),
+      birthPrecision: "DAY",
       parentId,
       systemInterests: { create: [{ interestSlug: sysA }, { interestSlug: sysB }] },
       customInterests: { create: [{ label: `custom-${marker}-1` }, { label: `custom-${marker}-2` }] },
@@ -61,7 +62,12 @@ async function main() {
       const before = await readInterests(childId);
       assert.equal(before.systemInterests.length, 2, "fixture: 2 system interests before");
 
-      await applyChildUpdate(childId, { name: "NonDestructive updated", birthDate: "2020-06-01" });
+      await applyChildUpdate(childId, {
+        name: "NonDestructive updated",
+        birthPrecision: "MONTH",
+        birthYear: 2020,
+        birthMonth: 6,
+      });
 
       const after = await readInterests(childId);
       assert.equal(
@@ -77,7 +83,11 @@ async function main() {
       const before = await readInterests(childId);
       assert.equal(before.customInterests.length, 2, "fixture: 2 custom interests before");
 
-      await applyChildUpdate(childId, { name: "NonDestructive updated", birthDate: "2020-06-01" });
+      await applyChildUpdate(childId, {
+        name: "NonDestructive updated",
+        birthDate: "2020-06-17",
+        birthPrecision: "DAY",
+      });
 
       const after = await readInterests(childId);
       assert.equal(
@@ -85,6 +95,9 @@ async function main() {
         before.customInterests.length,
         "BEFORE: 2 custom interests / AFTER birthDate-only update: custom interests must survive unchanged",
       );
+      const updated = await prisma.child.findUniqueOrThrow({ where: { id: childId } });
+      assert.equal(updated.birthPrecision, "DAY", "DAY precision persisted");
+      assert.equal(updated.birthDate?.toISOString(), "2020-06-17T00:00:00.000Z");
     }
 
     // ---- Case 3: update system interests only must not wipe custom interests ----

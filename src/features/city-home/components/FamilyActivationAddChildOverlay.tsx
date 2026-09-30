@@ -17,48 +17,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  FilterSelect,
-  type FilterSelectOption,
-} from "@/components/ui/filter-select";
+  ChildBirthFields,
+  childBirthDraftPayload,
+  emptyChildBirthDraft,
+} from "@/components/children/ChildBirthFields";
 import { cn } from "@/lib/utils";
 import { notifyFamilyPersonasChanged } from "@/lib/family/familyPersonaEvents";
-
-const MONTHS_RU = [
-  { m: 0, label: "Январь" },
-  { m: 1, label: "Февраль" },
-  { m: 2, label: "Март" },
-  { m: 3, label: "Апрель" },
-  { m: 4, label: "Май" },
-  { m: 5, label: "Июнь" },
-  { m: 6, label: "Июль" },
-  { m: 7, label: "Август" },
-  { m: 8, label: "Сентябрь" },
-  { m: 9, label: "Октябрь" },
-  { m: 10, label: "Ноябрь" },
-  { m: 11, label: "Декабрь" },
-];
-
-const BIRTH_MONTH_FILTER_OPTIONS: FilterSelectOption[] = MONTHS_RU.map(
-  ({ m, label }) => ({ value: String(m), label }),
-);
-
-function birthYearOptions(): number[] {
-  const y = new Date().getFullYear();
-  return Array.from({ length: 26 }, (_, i) => y - i);
-}
-
-function birthYearFilterOptions(): FilterSelectOption[] {
-  return birthYearOptions().map((year) => ({
-    value: String(year),
-    label: String(year),
-  }));
-}
-
-function toBirthIso(month: number | "", year: number | ""): string | null {
-  if (month === "" || year === "") return null;
-  const d = new Date(year, month, 15, 12, 0, 0, 0);
-  return d.toISOString();
-}
 
 export type FamilyActivationAddChildOverlayProps = {
   open: boolean;
@@ -79,8 +43,7 @@ function FamilyActivationAddChildForm({
   const { interests: interestOptions, isLoading: interestsLoading } =
     useChildInterests();
   const [name, setName] = useState("");
-  const [birthMonth, setBirthMonth] = useState<number | "">("");
-  const [birthYear, setBirthYear] = useState<number | "">("");
+  const [birthDraft, setBirthDraft] = useState(emptyChildBirthDraft);
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,8 +51,7 @@ function FamilyActivationAddChildForm({
   useEffect(() => {
     if (!open) return;
     setName("");
-    setBirthMonth("");
-    setBirthYear("");
+    setBirthDraft(emptyChildBirthDraft());
     setSelectedSlugs([]);
     setError(null);
   }, [open]);
@@ -100,22 +62,20 @@ function FamilyActivationAddChildForm({
     );
   }, []);
 
-  const canSave =
-    name.trim().length >= 1 && birthMonth !== "" && birthYear !== "";
+  const canSave = childBirthDraftPayload(birthDraft) != null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSave) {
-      setError("Укажите имя, месяц и год рождения");
+      setError("Укажите месяц и год рождения");
       return;
     }
 
     setIsLoading(true);
     setError(null);
-    const birthIso = toBirthIso(birthMonth, birthYear);
     const body = {
       name: name.trim(),
-      birthDate: birthIso,
+      ...childBirthDraftPayload(birthDraft),
       systemInterests: selectedSlugs,
       customInterests: [] as string[],
     };
@@ -163,34 +123,7 @@ function FamilyActivationAddChildForm({
               autoFocus
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="min-w-0 space-y-2">
-              <Label htmlFor="fam-act-birth-month">Месяц</Label>
-              <FilterSelect
-                id="fam-act-birth-month"
-                value={birthMonth === "" ? "" : String(birthMonth)}
-                placeholder="Месяц"
-                options={BIRTH_MONTH_FILTER_OPTIONS}
-                onChange={(v) =>
-                  setBirthMonth(v === "" ? "" : Number(v))
-                }
-                selectClassName="h-11"
-              />
-            </div>
-            <div className="min-w-0 space-y-2">
-              <Label htmlFor="fam-act-birth-year">Год</Label>
-              <FilterSelect
-                id="fam-act-birth-year"
-                value={birthYear === "" ? "" : String(birthYear)}
-                placeholder="Год"
-                options={birthYearFilterOptions()}
-                onChange={(v) =>
-                  setBirthYear(v === "" ? "" : Number(v))
-                }
-                selectClassName="h-11"
-              />
-            </div>
-          </div>
+          <ChildBirthFields value={birthDraft} onChange={setBirthDraft} idPrefix="family-activation-child-birth" />
 
           <div className="space-y-2">
             <span className="text-sm font-medium text-neutral-900">

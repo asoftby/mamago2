@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  FilterSelect,
-  type FilterSelectOption,
-} from "@/components/ui/filter-select";
+  ChildBirthFields,
+  childBirthDraftFromStored,
+  childBirthDraftPayload,
+  emptyChildBirthDraft,
+} from "@/components/children/ChildBirthFields";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { useChildInterests } from "@/hooks/useChildInterests";
 import { cn } from "@/lib/utils";
@@ -17,7 +19,6 @@ import { notifyFamilyPersonasChanged } from "@/lib/family/familyPersonaEvents";
 import type {
   AuthEntryPoint,
   ProfileCompletionStepId,
-  ProfileMandatoryStepId,
   ProfileStatePayload,
 } from "@/lib/post-auth/types";
 import {
@@ -35,46 +36,6 @@ import {
   nextStepAfterInterests,
   resolveInitialProfileFlowAction,
 } from "@/lib/post-auth/profileCompletionFlow";
-
-const MONTHS_RU = [
-  { m: 0, label: "Январь" },
-  { m: 1, label: "Февраль" },
-  { m: 2, label: "Март" },
-  { m: 3, label: "Апрель" },
-  { m: 4, label: "Май" },
-  { m: 5, label: "Июнь" },
-  { m: 6, label: "Июль" },
-  { m: 7, label: "Август" },
-  { m: 8, label: "Сентябрь" },
-  { m: 9, label: "Октябрь" },
-  { m: 10, label: "Ноябрь" },
-  { m: 11, label: "Декабрь" },
-];
-
-const BIRTH_MONTH_OPTIONS: FilterSelectOption[] = MONTHS_RU.map(({ m, label }) => ({
-  value: String(m),
-  label,
-}));
-
-function birthYearOptions(): FilterSelectOption[] {
-  const y = new Date().getFullYear();
-  return Array.from({ length: 26 }, (_, i) => {
-    const year = y - i;
-    return { value: String(year), label: String(year) };
-  });
-}
-
-function toBirthIso(month: number, year: number): string {
-  const d = new Date(year, month, 1, 12, 0, 0, 0);
-  return d.toISOString();
-}
-
-function parseBirthParts(iso: string | null): { month: string; year: string } {
-  if (!iso) return { month: "", year: "" };
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return { month: "", year: "" };
-  return { month: String(d.getMonth()), year: String(d.getFullYear()) };
-}
 
 function CompletionProgressBar({
   step,
@@ -127,7 +88,6 @@ export interface ProfileCompletionFlowProps {
 
 export function ProfileCompletionFlow({
   entryPoint,
-  returnTo,
   onFinished,
 }: ProfileCompletionFlowProps) {
   const router = useRouter();
@@ -143,8 +103,7 @@ export function ProfileCompletionFlow({
   const [familyRole, setFamilyRole] = React.useState<string>("");
 
   const [childName, setChildName] = React.useState("");
-  const [birthMonth, setBirthMonth] = React.useState<string>("");
-  const [birthYear, setBirthYear] = React.useState<string>("");
+  const [birthDraft, setBirthDraft] = React.useState(emptyChildBirthDraft);
   const [activeChildId, setActiveChildId] = React.useState<string | null>(null);
   const [addingAnotherChild, setAddingAnotherChild] = React.useState(false);
 
@@ -189,9 +148,7 @@ export function ProfileCompletionFlow({
         if (primary) {
           setActiveChildId(primary.id);
           setChildName(primary.name || "");
-          const parts = parseBirthParts(primary.birthDate);
-          setBirthMonth(parts.month);
-          setBirthYear(parts.year);
+          setBirthDraft(childBirthDraftFromStored(primary));
         } else {
           setActiveChildId(null);
         }
@@ -290,14 +247,12 @@ export function ProfileCompletionFlow({
 
   const handleSaveChild = async () => {
     setError("");
-    if (birthMonth === "" || birthYear === "") {
-      setError("Выберите месяц и год рождения");
+    const birthPayload = childBirthDraftPayload(birthDraft);
+    if (!birthPayload) {
+      setError("Укажите дату рождения");
       return;
     }
-    const month = Number(birthMonth);
-    const year = Number(birthYear);
-    const birthDate = toBirthIso(month, year);
-    const name = childName.trim() || "Ребёнок";
+    const name = childName.trim();
     setLoading(true);
     try {
       if (activeChildId && !addingAnotherChild) {
@@ -307,7 +262,10 @@ export function ProfileCompletionFlow({
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ name, birthDate }),
+          body: JSON.stringify({
+            name,
+            ...birthPayload,
+          }),
         });
         if (!res.ok) throw new Error("save");
       } else {
@@ -317,7 +275,7 @@ export function ProfileCompletionFlow({
           credentials: "include",
           body: JSON.stringify({
             name,
-            birthDate,
+            ...birthPayload,
             systemInterests: [],
             customInterests: [],
           }),
@@ -349,21 +307,13 @@ export function ProfileCompletionFlow({
     setLoading(true);
     setError("");
     try {
-      const childRes = await fetch(`/api/children/${activeChildId}`, {
-        credentials: "include",
-      });
-      if (!childRes.ok) throw new Error("load");
-      const data = await childRes.json();
-      const c = data.child as { name: string; birthDate: string | null };
-      // This step only manages system interests (chip picker, no custom-interest
-      // UI) — omit customInterests so any existing custom interests survive.
+      // This step only manages system interests. Omit name, birth fields and
+      // customInterests so legacy precision and unrelated profile data survive.
       const res = await fetch(`/api/children/${activeChildId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          name: c.name,
-          birthDate: c.birthDate,
           systemInterests: selectedInterests,
         }),
       });
@@ -390,8 +340,7 @@ export function ProfileCompletionFlow({
     setAddingAnotherChild(true);
     setActiveChildId(null);
     setChildName("");
-    setBirthMonth("");
-    setBirthYear("");
+    setBirthDraft(emptyChildBirthDraft());
     setSelectedInterests([]);
     setStep("child");
   };
@@ -466,33 +415,12 @@ export function ProfileCompletionFlow({
               className="rounded-xl"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Месяц рождения</Label>
-              <FilterSelect
-                value={birthMonth}
-                onChange={setBirthMonth}
-                options={BIRTH_MONTH_OPTIONS}
-                placeholder="Месяц"
-                aria-label="Месяц рождения"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Год рождения</Label>
-              <FilterSelect
-                value={birthYear}
-                onChange={setBirthYear}
-                options={birthYearOptions()}
-                placeholder="Год"
-                aria-label="Год рождения"
-              />
-            </div>
-          </div>
+          <ChildBirthFields value={birthDraft} onChange={setBirthDraft} idPrefix="profile-child-birth" />
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
           <Button
             className="w-full rounded-2xl font-semibold"
             size="lg"
-            disabled={birthMonth === "" || birthYear === "" || loading}
+            disabled={!childBirthDraftPayload(birthDraft) || loading}
             onClick={() => void handleSaveChild()}
           >
             Далее
