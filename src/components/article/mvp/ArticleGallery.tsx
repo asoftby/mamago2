@@ -182,7 +182,7 @@ function ArticleGalleryLightbox({
 
   function renderSlide(image: ArticleGalleryImage) {
     return (
-      <div className="flex max-h-[90dvh] max-w-[94vw] flex-col items-center justify-center gap-2 sm:max-w-[92vw]">
+      <div className="flex max-h-[90dvh] max-w-[94vw] flex-col items-center justify-center gap-2 sm:max-w-[92vw]" onClick={(e) => e.stopPropagation()}>
         {image.url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -264,7 +264,6 @@ function ArticleGalleryLightbox({
       <div
         className="relative flex h-[90dvh] w-[94vw] items-center justify-center overflow-hidden sm:w-[92vw]"
         data-article-lightbox-slide-viewport
-        onClick={(e) => e.stopPropagation()}
       >
         {transition ? (
           <>
