@@ -12,10 +12,7 @@ import {
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { useChildInterests } from "@/hooks/useChildInterests";
 import { cn } from "@/lib/utils";
-import {
-  FAMILY_ROLE_OPTIONS,
-  ADULT_AGE_BANDS,
-} from "@/lib/family/adultPersonaOptions";
+import { FAMILY_ROLE_OPTIONS } from "@/lib/family/adultPersonaOptions";
 import { notifyFamilyPersonasChanged } from "@/lib/family/familyPersonaEvents";
 import type {
   AuthEntryPoint,
@@ -32,6 +29,12 @@ import {
   trackChildContextCompleted,
   trackOnboardingCompleted,
 } from "@/lib/onboarding/firstPartyEvents";
+import {
+  nextStepAfterAdultSave,
+  nextStepAfterChildSave,
+  nextStepAfterInterests,
+  resolveInitialProfileFlowAction,
+} from "@/lib/post-auth/profileCompletionFlow";
 
 const MONTHS_RU = [
   { m: 0, label: "Январь" },
@@ -128,7 +131,7 @@ export function ProfileCompletionFlow({
   onFinished,
 }: ProfileCompletionFlowProps) {
   const router = useRouter();
-  const { interests, isLoading: interestsLoading } = useChildInterests();
+  const { interests, isLoading: interestsLoading, error: interestsError, retry: retryInterests } = useChildInterests();
   const onFinishedRef = React.useRef(onFinished);
   onFinishedRef.current = onFinished;
 
@@ -138,7 +141,6 @@ export function ProfileCompletionFlow({
   const [step, setStep] = React.useState<ProfileCompletionStepId>("adult");
 
   const [familyRole, setFamilyRole] = React.useState<string>("");
-  const [ageBand, setAgeBand] = React.useState<string>("");
 
   const [childName, setChildName] = React.useState("");
   const [birthMonth, setBirthMonth] = React.useState<string>("");
@@ -148,11 +150,14 @@ export function ProfileCompletionFlow({
 
   const [selectedInterests, setSelectedInterests] = React.useState<string[]>([]);
 
+  const stepRef = React.useRef(step);
+  stepRef.current = step;
+
   const track = React.useCallback(
     (event: PostAuthAnalyticsEvent, props?: Record<string, unknown>) => {
-      trackPostAuthEvent(event, { entryPoint, step, ...props });
+      trackPostAuthEvent(event, { entryPoint, step: stepRef.current, ...props });
     },
-    [entryPoint, step],
+    [entryPoint],
   );
 
   const refreshState = React.useCallback(async () => {
@@ -169,17 +174,17 @@ export function ProfileCompletionFlow({
       try {
         const data = await refreshState();
         if (cancelled) return;
-        if (data.isProfileComplete) {
-          onFinishedRef.current({ alreadyComplete: true });
+        const initialAction = resolveInitialProfileFlowAction(data);
+        if (initialAction.kind === "finish") {
+          onFinishedRef.current({ alreadyComplete: initialAction.alreadyComplete });
           return;
         }
         track("completion_started", {});
         trackFamilyOnboardingStarted();
-        const start = data.resumeStep ?? "adult";
+        const start = initialAction.step;
         setStep(start);
         track("completion_step_viewed", { completionStep: start });
         setFamilyRole(data.user.familyRole ?? "");
-        setAgeBand(data.user.ageBandLabel ?? "");
         const primary = data.children[0];
         if (primary) {
           setActiveChildId(primary.id);
@@ -241,17 +246,6 @@ export function ProfileCompletionFlow({
     [familyRole],
   );
 
-  const ageChipItems = React.useMemo<ChipItem[]>(
-    () =>
-      ADULT_AGE_BANDS.map((band) => ({
-        id: band,
-        label: band,
-        active: ageBand === band,
-        onClick: () => setAgeBand(band),
-      })),
-    [ageBand],
-  );
-
   const interestChipItems = React.useMemo<ChipItem[]>(
     () =>
       interests.map((i) => ({
@@ -271,20 +265,22 @@ export function ProfileCompletionFlow({
 
   const handleSaveAdult = async () => {
     setError("");
-    if (!familyRole || !ageBand) return;
+    // Role is optional and never blocks — only persist it if the user picked one.
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/me", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ familyRole, ageBandLabel: ageBand }),
-      });
-      if (!res.ok) throw new Error("save");
-      notifyFamilyPersonasChanged();
+      if (familyRole) {
+        const res = await fetch("/api/auth/me", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ familyRole }),
+        });
+        if (!res.ok) throw new Error("save");
+        notifyFamilyPersonasChanged();
+      }
       track("completion_step_completed", { completionStep: "adult" });
-      const next = await refreshState();
-      setStep(next.resumeStep ?? "child");
+      await refreshState();
+      setStep(nextStepAfterAdultSave());
     } catch {
       setError("Не удалось сохранить");
     } finally {
@@ -305,16 +301,13 @@ export function ProfileCompletionFlow({
     setLoading(true);
     try {
       if (activeChildId && !addingAnotherChild) {
+        // This step never touches interests — omit both fields entirely so
+        // the non-destructive PUT leaves whatever interests already exist.
         const res = await fetch(`/api/children/${activeChildId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({
-            name,
-            birthDate,
-            systemInterests: [],
-            customInterests: [],
-          }),
+          body: JSON.stringify({ name, birthDate }),
         });
         if (!res.ok) throw new Error("save");
       } else {
@@ -342,8 +335,8 @@ export function ProfileCompletionFlow({
       }
       setAddingAnotherChild(false);
       track("completion_step_completed", { completionStep: "child" });
-      const next = await refreshState();
-      setStep(next.resumeStep ?? "child_interests");
+      await refreshState();
+      setStep(nextStepAfterChildSave());
     } catch {
       setError("Не удалось сохранить");
     } finally {
@@ -362,6 +355,8 @@ export function ProfileCompletionFlow({
       if (!childRes.ok) throw new Error("load");
       const data = await childRes.json();
       const c = data.child as { name: string; birthDate: string | null };
+      // This step only manages system interests (chip picker, no custom-interest
+      // UI) — omit customInterests so any existing custom interests survive.
       const res = await fetch(`/api/children/${activeChildId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -370,7 +365,6 @@ export function ProfileCompletionFlow({
           name: c.name,
           birthDate: c.birthDate,
           systemInterests: selectedInterests,
-          customInterests: [],
         }),
       });
       if (!res.ok) throw new Error("save");
@@ -378,12 +372,17 @@ export function ProfileCompletionFlow({
       track("completion_step_completed", { completionStep: "child_interests" });
       trackChildContextCompleted();
       await refreshState();
-      setStep("add_more_children");
+      setStep(nextStepAfterInterests());
     } catch {
       setError("Не удалось сохранить интересы");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSkipInterests = () => {
+    track("completion_step_completed", { completionStep: "child_interests", skipped: true });
+    setStep(nextStepAfterInterests());
   };
 
   const handleAddAnotherChild = () => {
@@ -431,16 +430,15 @@ export function ProfileCompletionFlow({
           <div>
             <h3 className="text-base font-semibold text-neutral-900">Кто вы в семье?</h3>
             <p className="mt-1 text-sm text-neutral-500">
-              Это поможет подбирать форматы и активности
+              Необязательно — поможет подбирать форматы и активности
             </p>
           </div>
           <ChipsRow items={roleChipItems} layout="masonry" className="max-h-[200px]" />
-          <ChipsRow items={ageChipItems} layout="masonry" className="max-h-[200px]" />
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
           <Button
             className="w-full rounded-2xl font-semibold"
             size="lg"
-            disabled={!familyRole || !ageBand || loading}
+            disabled={loading}
             onClick={() => void handleSaveAdult()}
           >
             Далее
@@ -506,10 +504,22 @@ export function ProfileCompletionFlow({
         <div className="animate-in fade-in space-y-4 duration-200">
           <div>
             <h3 className="text-base font-semibold text-neutral-900">Интересы ребёнка</h3>
-            <p className="mt-1 text-sm text-neutral-500">Выберите хотя бы один вариант</p>
+            <p className="mt-1 text-sm text-neutral-500">Необязательно — можно пропустить</p>
           </div>
           {interestsLoading ? (
             <p className="text-sm text-neutral-500">Загрузка интересов…</p>
+          ) : interestsError ? (
+            <div className="space-y-2">
+              <p className="text-sm text-red-600">Не удалось загрузить список интересов</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-2xl"
+                onClick={() => retryInterests()}
+              >
+                Повторить
+              </Button>
+            </div>
           ) : (
             <ChipsRow
               items={interestChipItems}
@@ -522,12 +532,20 @@ export function ProfileCompletionFlow({
             className="w-full rounded-2xl font-semibold"
             size="lg"
             disabled={
-              interestsLoading || selectedInterests.length === 0 || loading
+              interestsLoading || Boolean(interestsError) || selectedInterests.length === 0 || loading
             }
             onClick={() => void handleSaveInterests()}
           >
             Далее
           </Button>
+          <button
+            type="button"
+            className="w-full text-center text-sm font-medium text-neutral-500 hover:text-neutral-700"
+            disabled={loading}
+            onClick={handleSkipInterests}
+          >
+            Пропустить
+          </button>
         </div>
       )}
 

@@ -43,9 +43,12 @@ export async function GET() {
     return NextResponse.json({ options });
   } catch (e) {
     console.error("[public/signals/interests]", e);
+    // Distinct from the "genuinely zero interests configured" case above:
+    // a non-200 status lets callers (useChildInterests) tell a real fetch
+    // failure apart from an empty catalog instead of treating both as OK.
     return NextResponse.json(
       { options: [] as PublicInterestSignalOption[], error: "fetch_failed" },
-      { status: 200 },
+      { status: 503 },
     );
   }
 }

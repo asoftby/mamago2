@@ -4,6 +4,26 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
 
+/**
+ * Deterministically PII-safe error log fields: error class name + Prisma
+ * error code (both symbolic, never user data) — never the raw message,
+ * which can be assembled by a lower layer from the request's own values
+ * (e.g. a Prisma constraint error can echo back a field value).
+ */
+function safeErrorInfo(error: unknown): { errorName: string; errorCode?: string } {
+  const errorName = error instanceof Error ? error.name : typeof error;
+  const code =
+    error && typeof error === "object" && "code" in error && typeof (error as { code: unknown }).code === "string"
+      ? (error as { code: string }).code
+      : undefined;
+  return code ? { errorName, errorCode: code } : { errorName };
+}
+
+// systemInterests/customInterests are intentionally NOT `.default([])`: an
+// omitted field means "don't touch this", while an explicit `[]` means
+// "clear it". Defaulting to [] here previously wiped a child's interests on
+// any update that didn't happen to know about them (e.g. a birth-date-only
+// save) — see docs/engineering/backlog.md D05.
 const updateChildSchema = z.object({
   name: z.string().min(1, "Укажите имя").max(50),
   birthDate: z
@@ -15,99 +35,99 @@ const updateChildSchema = z.object({
       const now = new Date();
       return parsed <= now && parsed > new Date(now.getFullYear() - 25, 0, 1);
     }, "Некорректная дата рождения"),
-  systemInterests: z.array(z.string()).default([]),
-  customInterests: z.array(z.string().max(50)).default([]),
+  systemInterests: z.array(z.string()).optional(),
+  customInterests: z.array(z.string().max(50)).optional(),
 });
+
+export type UpdateChildInput = z.infer<typeof updateChildSchema>;
+
+/**
+ * Pure update logic (no HTTP/auth), extracted so it's directly testable.
+ * `systemInterests`/`customInterests` being `undefined` (vs. `[]`) means
+ * "leave alone" — see the schema comment above.
+ */
+export async function applyChildUpdate(childId: string, data: UpdateChildInput) {
+  const touchesSystemInterests = data.systemInterests !== undefined;
+  const touchesCustomInterests = data.customInterests !== undefined;
+  const validSystemInterests = touchesSystemInterests
+    ? data.systemInterests!.filter(slug => SYSTEM_INTERESTS.some(interest => interest.slug === slug))
+    : [];
+
+  return prisma.$transaction(async (tx) => {
+    const child = await tx.child.update({
+      where: { id: childId },
+      data: {
+        name: data.name,
+        birthDate: data.birthDate ? new Date(data.birthDate) : null,
+      },
+    });
+
+    if (touchesSystemInterests) {
+      await tx.childInterest.deleteMany({ where: { childId } });
+      if (validSystemInterests.length > 0) {
+        await tx.childInterest.createMany({
+          data: validSystemInterests.map(slug => ({ childId, interestSlug: slug })),
+        });
+      }
+    }
+
+    if (touchesCustomInterests) {
+      await tx.childCustomInterest.deleteMany({ where: { childId } });
+      if (data.customInterests!.length > 0) {
+        await tx.childCustomInterest.createMany({
+          data: data.customInterests!.map(label => ({ childId, label: label.trim() })),
+        });
+      }
+    }
+
+    return child;
+  });
+}
 
 export async function PUT(
   request: NextRequest,
   context: { params: { id: string } }
 ) {
-  console.log("PUT /api/children/[id] - START");
-  console.log("Full context:", context);
-  console.log("Request URL:", request.url);
-  
-  // Try to extract ID from URL as fallback
   const url = new URL(request.url);
   const pathSegments = url.pathname.split('/');
   const idFromPath = pathSegments[pathSegments.length - 1];
-  
-  console.log("Path segments:", pathSegments);
-  console.log("ID from path:", idFromPath);
-  
   const { params } = context;
-  console.log("Context params:", params);
-  
-  // Use ID from params or fallback to path
   const childId = params?.id || idFromPath;
-  console.log("Final child ID:", childId);
-  
-  // Test database connection
-  try {
-    await prisma.$connect();
-    console.log("Database connection successful");
-  } catch (dbConnectionError) {
-    console.error("Database connection failed:", dbConnectionError);
-    return NextResponse.json(
-      { error: "Ошибка подключения к базе данных" },
-      { status: 500 }
-    );
-  }
-  
+
   try {
     if (!childId || childId === 'route.ts') {
-      console.error("Invalid child ID:", childId);
       return NextResponse.json(
         { error: "Некорректный ID ребенка" },
         { status: 400 }
       );
     }
 
-    let user;
-    try {
-      user = await getCurrentUser();
-      console.log("User lookup result:", user ? "found" : "not found");
-    } catch (userError) {
-      console.error("Error getting current user:", userError);
-      return NextResponse.json(
-        { error: "Ошибка авторизации" },
-        { status: 500 }
-      );
-    }
-
+    const user = await getCurrentUser();
     if (!user) {
-      console.log("No user found");
       return NextResponse.json(
         { error: "Требуется авторизация" },
         { status: 401 }
       );
     }
 
-    console.log("User found:", user.id);
-    console.log("Using child ID:", childId);
-    
-    let body;
+    let body: unknown;
     try {
       body = await request.json();
-      console.log("Request body:", body);
-    } catch (bodyError) {
-      console.error("Error parsing request body:", bodyError);
+    } catch {
       return NextResponse.json(
         { error: "Некорректный формат данных" },
         { status: 400 }
       );
     }
-    
-    let data;
+
+    let data: z.infer<typeof updateChildSchema>;
     try {
       data = updateChildSchema.parse(body);
-      console.log("Parsed data:", data);
     } catch (validationError) {
-      console.error("Validation error:", validationError);
       if (validationError instanceof z.ZodError) {
         return NextResponse.json(
-          { 
-            error: "Некорректные данные", 
+          {
+            error: "Некорректные данные",
             details: validationError.issues.map(issue => ({
               field: issue.path.join('.'),
               message: issue.message
@@ -127,10 +147,10 @@ export async function PUT(
     try {
       existingChild = await prisma.child.findFirst({
         where: { id: childId, parentId: user.id },
+        select: { id: true },
       });
-      console.log("Existing child found:", existingChild ? "yes" : "no");
     } catch (dbError) {
-      console.error("Database error finding child:", dbError);
+      console.error("[children/PUT] db error finding child", { childId, ...safeErrorInfo(dbError) });
       return NextResponse.json(
         { error: "Ошибка базы данных при поиске ребенка" },
         { status: 500 }
@@ -138,90 +158,29 @@ export async function PUT(
     }
 
     if (!existingChild) {
-      console.log("Child not found for user");
       return NextResponse.json(
         { error: "Ребенок не найден" },
         { status: 404 }
       );
     }
 
-    // Validate system interests
-    const validSystemInterests = data.systemInterests.filter(slug => 
-      SYSTEM_INTERESTS.some(interest => interest.slug === slug)
-    );
-
-    console.log("Valid system interests:", validSystemInterests);
-
-    // Update child with interests in a transaction
     let result;
     try {
-      result = await prisma.$transaction(async (tx) => {
-        console.log("Starting transaction");
-        
-        // Update child basic info
-        const child = await tx.child.update({
-          where: { id: childId },
-          data: {
-            name: data.name,
-            birthDate: data.birthDate ? new Date(data.birthDate) : null,
-          },
-        });
-
-        console.log("Child updated:", child);
-
-        // Delete existing interests
-        await tx.childInterest.deleteMany({
-          where: { childId },
-        });
-        await tx.childCustomInterest.deleteMany({
-          where: { childId },
-        });
-
-        console.log("Existing interests deleted");
-
-        // Add new system interests
-        if (validSystemInterests.length > 0) {
-          await tx.childInterest.createMany({
-            data: validSystemInterests.map(slug => ({
-              childId,
-              interestSlug: slug,
-            })),
-          });
-          console.log("System interests added:", validSystemInterests.length);
-        }
-
-        // Add new custom interests
-        if (data.customInterests.length > 0) {
-          await tx.childCustomInterest.createMany({
-            data: data.customInterests.map(label => ({
-              childId,
-              label: label.trim(),
-            })),
-          });
-          console.log("Custom interests added:", data.customInterests.length);
-        }
-
-        console.log("Transaction completed successfully");
-        return child;
-      });
+      result = await applyChildUpdate(childId, data);
     } catch (transactionError) {
-      console.error("Transaction error:", transactionError);
+      console.error("[children/PUT] transaction failed", { childId, ...safeErrorInfo(transactionError) });
       return NextResponse.json(
         { error: "Ошибка при обновлении данных ребенка" },
         { status: 500 }
       );
     }
 
-    console.log("Final result:", result);
     return NextResponse.json({ success: true, child: result });
   } catch (error) {
-    console.error("Update child error:", error);
-
     if (error instanceof z.ZodError) {
-      console.error("Validation errors:", error.issues);
       return NextResponse.json(
-        { 
-          error: "Некорректные данные", 
+        {
+          error: "Некорректные данные",
           details: error.issues.map(issue => ({
             field: issue.path.join('.'),
             message: issue.message
@@ -231,12 +190,7 @@ export async function PUT(
       );
     }
 
-    // Log the actual error for debugging
-    if (error instanceof Error) {
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
-    }
-
+    console.error("[children/PUT] update failed", { childId, ...safeErrorInfo(error) });
     return NextResponse.json(
       { error: "Не удалось обновить ребенка" },
       { status: 500 }
@@ -249,8 +203,6 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    console.log("GET /api/children/[id] - params:", params);
-    
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json(
@@ -260,7 +212,7 @@ export async function GET(
     }
 
     const childId = params.id;
-    
+
     const child = await prisma.child.findFirst({
       where: { id: childId, parentId: user.id },
       include: {
@@ -278,7 +230,7 @@ export async function GET(
 
     return NextResponse.json({ child });
   } catch (error) {
-    console.error("Get child error:", error);
+    console.error("[children/GET] failed", { childId: params?.id, ...safeErrorInfo(error) });
     return NextResponse.json(
       { error: "Не удалось загрузить ребенка" },
       { status: 500 }
@@ -290,28 +242,14 @@ export async function DELETE(
   request: NextRequest,
   context: { params: { id: string } }
 ) {
-  console.log("DELETE /api/children/[id] - START");
-  console.log("Full context:", context);
-  console.log("Request URL:", request.url);
-  
-  // Try to extract ID from URL as fallback
   const url = new URL(request.url);
   const pathSegments = url.pathname.split('/');
   const idFromPath = pathSegments[pathSegments.length - 1];
-  
-  console.log("Path segments:", pathSegments);
-  console.log("ID from path:", idFromPath);
-  
   const { params } = context;
-  console.log("Context params:", params);
-  
-  // Use ID from params or fallback to path
   const childId = params?.id || idFromPath;
-  console.log("Final child ID:", childId);
 
   try {
     if (!childId || childId === 'route.ts') {
-      console.error("Invalid child ID:", childId);
       return NextResponse.json(
         { error: "Некорректный ID ребенка" },
         { status: 400 }
@@ -319,55 +257,31 @@ export async function DELETE(
     }
 
     const user = await getCurrentUser();
-    console.log("User lookup result:", user ? "found" : "not found");
-    
     if (!user) {
-      console.log("No user found");
       return NextResponse.json(
         { error: "Требуется авторизация" },
         { status: 401 }
       );
     }
 
-    console.log("User found:", user.id);
-    console.log("Looking for child with ID:", childId, "and parentId:", user.id);
-
-    // Check if child belongs to user
     const existingChild = await prisma.child.findFirst({
       where: { id: childId, parentId: user.id },
+      select: { id: true },
     });
 
-    console.log("Existing child found:", existingChild ? "yes" : "no");
-    if (existingChild) {
-      console.log("Child details:", { id: existingChild.id, name: existingChild.name });
-    }
-
     if (!existingChild) {
-      console.log("Child not found for user");
       return NextResponse.json(
         { error: "Ребенок не найден" },
         { status: 404 }
       );
     }
 
-    console.log("Attempting to delete child:", childId);
-    
-    // Delete child (interests will be deleted via cascade)
-    const deleteResult = await prisma.child.delete({
-      where: { id: childId },
-    });
+    // Interests are deleted via cascade.
+    await prisma.child.delete({ where: { id: childId } });
 
-    console.log("Delete successful:", deleteResult);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Delete child error:", error);
-    
-    // Log the actual error for debugging
-    if (error instanceof Error) {
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
-    }
-    
+    console.error("[children/DELETE] failed", { childId, ...safeErrorInfo(error) });
     return NextResponse.json(
       { error: "Не удалось удалить ребенка" },
       { status: 500 }
