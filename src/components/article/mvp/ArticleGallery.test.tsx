@@ -1,7 +1,12 @@
 import assert from "node:assert";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ArticleGallery, desktopGroupStartForIndex, type ArticleGalleryImage } from "./ArticleGallery";
+import {
+  ArticleGallery,
+  desktopGroupStartForIndex,
+  mergeGalleryWarmIndexes,
+  type ArticleGalleryImage,
+} from "./ArticleGallery";
 import {
   ArticleContentPayloadSchema,
   newBlock,
@@ -68,6 +73,22 @@ assert.equal(newGallery.type === "gallery" ? newGallery.presentation : null, "ca
       `clicked index ${clickedIndex} must resolve to group start ${expectedGroupStart}`,
     );
   }
+}
+
+// Mobile warm-set persistence: once a slide has been mounted/preloaded it stays
+// in the track, so swiping backwards never remounts it and resets its loading state.
+{
+  const first = mergeGalleryWarmIndexes([0], [0, 1], 7);
+  assert.deepEqual(first, [0, 1]);
+
+  const second = mergeGalleryWarmIndexes(first, [1, 2], 7);
+  assert.deepEqual(second, [0, 1, 2]);
+
+  const third = mergeGalleryWarmIndexes(second, [2, 3], 7);
+  assert.deepEqual(third, [0, 1, 2, 3]);
+
+  const back = mergeGalleryWarmIndexes(third, [1, 2, 3], 7);
+  assert.deepEqual(back, [0, 1, 2, 3], "previously loaded slides remain mounted when navigating back");
 }
 
 // Empty gallery renders nothing.
@@ -187,6 +208,10 @@ assert.equal(renderToStaticMarkup(<ArticleGallery images={[]} />), "");
   const source = readFileSync(new URL("./ArticleGallery.tsx", import.meta.url), "utf8");
   assert.ok(source.includes("data-article-mobile-gallery-slide-viewport"));
   assert.ok(source.includes("mobileTrackIndexes"), "mobile gallery keeps a persistent slide track");
+  assert.ok(source.includes("mobileWarmIndexes"), "already warmed slides remain mounted for instant reverse navigation");
+  assert.ok(source.includes("mergeGalleryWarmIndexes"), "mobile track is monotonic for visited/preloaded slides");
+  assert.ok(source.includes('loading={Math.abs(index - mobileIndex) <= 1 ? "eager" : "lazy"}'), "current and adjacent mobile slides start fetching eagerly");
+  assert.ok(source.includes("galleryImageLoadedCache"), "remounts reuse known loaded state instead of flashing a skeleton");
   assert.ok(source.includes("mobileIndex - 1, mobileIndex + 1"), "adjacent photos preload before the gesture");
   assert.ok(source.includes('"preloaded"'), "off-screen neighbour slides stay mounted");
   assert.ok(source.includes('query.addEventListener("change", syncPreloadMode)'), "mobile preload follows breakpoint changes");
