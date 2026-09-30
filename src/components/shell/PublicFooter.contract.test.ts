@@ -11,10 +11,16 @@ assert.doesNotMatch(
   "Journal must not be rendered inside the Project footer column",
 );
 
+assert.match(
+  footerSource,
+  /<CookieSettingsFooterLink iconOnly \/>/,
+  "Footer keeps an icon-only trigger for reopening the cookie preferences modal",
+);
+
 assert.doesNotMatch(
   footerSource,
-  /CookieSettingsFooterLink|Настройки cookies/,
-  "Cookie consent must not render persistent text in the public footer",
+  /Настройки cookies/,
+  "Public footer must not render visible cookie-settings text",
 );
 
 
