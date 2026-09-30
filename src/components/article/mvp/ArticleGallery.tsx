@@ -472,7 +472,12 @@ export function ArticleGallery({
   const goMobileNext = useCallback(() => navigateMobile(1), [navigateMobile]);
 
   useEffect(() => {
-    setMobilePreloadReady(!window.matchMedia(DESKTOP_MEDIA_QUERY).matches);
+    const query = window.matchMedia(DESKTOP_MEDIA_QUERY);
+    const syncPreloadMode = () => setMobilePreloadReady(!query.matches);
+
+    syncPreloadMode();
+    query.addEventListener("change", syncPreloadMode);
+    return () => query.removeEventListener("change", syncPreloadMode);
   }, []);
 
   useEffect(() => {
@@ -530,9 +535,14 @@ export function ArticleGallery({
   const mobileTrackBaseIndex = mobileTransition?.from ?? mobileIndex;
   const mobileTrackShift = mobileTransition?.moving ? mobileTransition.direction : 0;
 
-  const renderMobileSlide = (image: ArticleGalleryImage, index: number) => (
+  const renderMobileSlide = (
+    image: ArticleGalleryImage,
+    index: number,
+    interactive: boolean,
+  ) => (
     <button
       type="button"
+      tabIndex={interactive ? 0 : -1}
       onClick={(e) => {
         if (didMobileSwipeRef.current) {
           didMobileSwipeRef.current = false;
@@ -635,10 +645,11 @@ export function ArticleGallery({
                 <div
                   key={images[index].id}
                   data-article-mobile-gallery-slide={state}
+                  aria-hidden={index !== mobileIndex}
                   className="absolute inset-0 transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
                   style={{ transform: `translateX(${offset}%)` }}
                 >
-                  {renderMobileSlide(images[index], index)}
+                  {renderMobileSlide(images[index], index, index === mobileIndex)}
                 </div>
               );
             })}
