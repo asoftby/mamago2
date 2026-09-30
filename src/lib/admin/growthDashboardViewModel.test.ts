@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 
 import { deriveGrowthOverview, deriveOrganicRecovery, MIN_RATE_SAMPLE } from "./growthDashboardViewModel";
+import { organicRecoveryTooltipRows } from "./organicRecoveryTooltip";
 
 // --- Organic recovery: collected weeks + config fallback ----------------------
 {
@@ -35,6 +36,21 @@ import { deriveGrowthOverview, deriveOrganicRecovery, MIN_RATE_SAMPLE } from "./
   assert.equal(model.series[0].trajectory, 529, "the path starts at the first measured week");
   assert.equal(model.series[8].trajectory, 1513, "the path ends at the gate");
   assert.equal(model.series[5].actual, null, "future weeks are unmeasured, not 0");
+}
+
+// --- Tooltip uses the exact chart point, including future plan-only weeks ---
+{
+  const actual = organicRecoveryTooltipRows({ isoWeek: "2026-W36", actual: 529, baseline: 1793, trajectory: 618 });
+  assert.deepEqual(actual, [
+    { label: "Факт", value: "529 кликов" },
+    { label: "% от базы", value: "29,5%" },
+    { label: "План", value: "618 кликов" },
+    { label: "Отклонение", value: "−89" },
+  ]);
+  assert.deepEqual(
+    organicRecoveryTooltipRows({ isoWeek: "2026-W44", actual: null, baseline: 1891, trajectory: 1513 }),
+    [{ label: "План", value: "1 513 кликов" }],
+  );
 }
 
 // --- Collected value overrides the hand-entered config week ---------------

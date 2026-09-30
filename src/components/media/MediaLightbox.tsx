@@ -6,6 +6,12 @@ import { cn } from "@/lib/utils";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 import { InstagramReelEmbed } from "./InstagramReelEmbed";
 
+type SlideDirection = -1 | 1;
+
+export function nextLightboxIndex(index: number, total: number, direction: SlideDirection) {
+  return (index + direction + total) % total;
+}
+
 /* ─── Single item renderer ──────────────────────────────────── */
 function LightboxItem({ item }: { item: MediaGalleryItem }) {
   if (item.type === "reels") {
@@ -33,12 +39,44 @@ interface MediaLightboxProps {
 
 export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps) {
   const [idx, setIdx] = useState(startIndex);
+  const [transition, setTransition] = useState<{
+    from: number;
+    to: number;
+    direction: SlideDirection;
+    moving: boolean;
+  } | null>(null);
   const total = items.length;
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const didSwipeRef = useRef(false);
 
-  const prev = useCallback(() => setIdx((i) => (i - 1 + total) % total), [total]);
-  const next = useCallback(() => setIdx((i) => (i + 1) % total), [total]);
+  const navigate = useCallback((direction: SlideDirection) => {
+    if (total <= 1 || transition) return;
+    const to = nextLightboxIndex(idx, total, direction);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setIdx(to);
+      return;
+    }
+    setTransition({ from: idx, to, direction, moving: false });
+  }, [idx, total, transition]);
+  const prev = useCallback(() => navigate(-1), [navigate]);
+  const next = useCallback(() => navigate(1), [navigate]);
+
+  useEffect(() => {
+    if (!transition || transition.moving) return;
+    const frame = requestAnimationFrame(() => {
+      setTransition((value) => value ? { ...value, moving: true } : null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [transition]);
+
+  useEffect(() => {
+    if (!transition?.moving) return;
+    const timer = window.setTimeout(() => {
+      setIdx(transition.to);
+      setTransition(null);
+    }, 260);
+    return () => window.clearTimeout(timer);
+  }, [transition]);
 
   function handleTouchStart(event: React.TouchEvent) {
     const touch = event.touches[0];
@@ -129,10 +167,39 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
         </button>
       )}
 
-      {/* Item */}
-      <div className="flex items-center justify-center">
-        <LightboxItem item={current} />
+      {/* Items: keep outgoing and incoming media in one fixed viewport so images and embeds do not resize the dialog. */}
+      <div className="relative flex h-[88vh] w-[88vw] items-center justify-center overflow-hidden" data-lightbox-slide-viewport>
+        {transition ? (
+          <>
+            <div
+              data-lightbox-slide="outgoing"
+              className="absolute inset-0 flex items-center justify-center transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
+              style={{ transform: transition.moving ? `translateX(${-transition.direction * 100}%)` : "translateX(0)" }}
+            >
+              <LightboxItem item={items[transition.from]} />
+            </div>
+            <div
+              data-lightbox-slide="incoming"
+              className="absolute inset-0 flex items-center justify-center transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
+              style={{ transform: transition.moving ? "translateX(0)" : `translateX(${transition.direction * 100}%)` }}
+            >
+              <LightboxItem item={items[transition.to]} />
+            </div>
+          </>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center" data-lightbox-slide="current">
+            <LightboxItem item={current} />
+          </div>
+        )}
       </div>
+
+      {total > 1 && total <= 10 && (
+        <div className="pointer-events-none absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 gap-1.5" data-lightbox-dots aria-hidden="true">
+          {items.map((item, index) => (
+            <span key={item.id} className={cn("h-1 w-1 rounded-full", index === idx ? "bg-white" : "bg-white/45")} />
+          ))}
+        </div>
+      )}
 
       {/* Next */}
       {total > 1 && (
@@ -141,9 +208,9 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
           onClick={(e) => { e.stopPropagation(); next(); }}
           aria-label="Следующее"
           className={cn(
-            "absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full p-2.5 text-white transition-colors",
+            "absolute right-3 top-1/2 z-20 -translate-y-1/2 rounded-full p-2.5 text-white transition-colors",
             "bg-white/10 hover:bg-white/20",
-            "hidden md:flex items-center justify-center",
+            "flex items-center justify-center",
           )}
         >
           <ChevronRight className="h-6 w-6" />
