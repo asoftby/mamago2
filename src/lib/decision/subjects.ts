@@ -49,10 +49,12 @@ export async function buildSubjectsSnapshot(
   if (childIds.length > 0) {
     const children = await prisma.child.findMany({
       where: { id: { in: childIds }, parentId: input.userId },
-      select: { id: true, birthDate: true },
+      select: { id: true, birthDate: true, birthPrecision: true },
     });
     for (const child of children) {
-      const ageRange = child.birthDate ? ageRangeAt(child.birthDate, targetDate) : null;
+      const ageRange = child.birthDate
+        ? ageRangeAt(child.birthDate, targetDate, child.birthPrecision)
+        : null;
       subjects.push({
         kind: "child",
         refId: child.id,

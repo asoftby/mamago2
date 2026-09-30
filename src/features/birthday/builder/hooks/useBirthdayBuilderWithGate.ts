@@ -20,7 +20,11 @@ import {
   clearPendingBirthdayBuilderAction,
   consumePendingBirthdayBuilderAction,
 } from "../lib/pendingBirthdayBuilderAction";
-import { ageYearsFromBirthDate, formatYearsRu } from "../lib/partyChildUtils";
+import { formatYearsRu } from "../lib/partyChildUtils";
+import {
+  profileChildAgeYears,
+  profileChildCanApplyDirectly,
+} from "../lib/profileChildSelection";
 
 /**
  * Конструктор: без логина — черновик в localStorage; gate на добавление услуг,
@@ -32,6 +36,11 @@ export function useBirthdayBuilderWithGate() {
   const searchParams = useSearchParams();
   const prefilledAge = parseAgeFromSearchParams(searchParams);
   const builder = useBirthdayBuilder(prefilledAge ? { ageGroup: prefilledAge } : undefined);
+  const {
+    replaceState,
+    selectBase: selectBaseDirect,
+    toggleAddon: toggleAddonDirect,
+  } = builder;
 
   const { isAuthenticated, isLoading, refetch, isEmailVerified } = useAuthMe();
   const { openAuthModal } = useBirthdayBuilderAuth();
@@ -44,6 +53,12 @@ export function useBirthdayBuilderWithGate() {
   const [postLoginChildrenList, setPostLoginChildrenList] = useState<
     ProfileChildPayload[]
   >([]);
+  const [postLoginRefinementChild, setPostLoginRefinementChild] =
+    useState<ProfileChildPayload | null>(null);
+  const clearPostLoginRefinementChild = useCallback(
+    () => setPostLoginRefinementChild(null),
+    [],
+  );
 
   /** Гость: восстановить черновик один раз */
   useEffect(() => {
@@ -52,9 +67,9 @@ export function useBirthdayBuilderWithGate() {
     guestHydratedRef.current = true;
     const draft = loadBirthdayBuilderDraft();
     if (draft) {
-      builder.replaceState(draft);
+      replaceState(draft);
     }
-  }, [isLoading, isAuthenticated, builder.replaceState, builder]);
+  }, [isLoading, isAuthenticated, replaceState]);
 
   /** После входа (bbAuth): черновик + отложенное действие + опционально выбор ребёнка из профиля */
   useEffect(() => {
@@ -68,14 +83,14 @@ export function useBirthdayBuilderWithGate() {
     postLoginHandledRef.current = true;
     const draft = loadBirthdayBuilderDraft();
     if (draft) {
-      builder.replaceState(draft);
+      replaceState(draft);
       clearBirthdayBuilderDraft();
     }
     const pending = consumePendingBirthdayBuilderAction();
     if (pending?.type === "selectBase") {
-      builder.selectBase(pending.offerId);
+      selectBaseDirect(pending.offerId);
     } else if (pending?.type === "toggleAddon") {
-      builder.toggleAddon(pending.offerId);
+      toggleAddonDirect(pending.offerId);
     }
     const params = new URLSearchParams(searchParams.toString());
     params.delete("bbAuth");
@@ -108,9 +123,9 @@ export function useBirthdayBuilderWithGate() {
     searchParams,
     pathname,
     router,
-    builder.replaceState,
-    builder.selectBase,
-    builder.toggleAddon,
+    replaceState,
+    selectBaseDirect,
+    toggleAddonDirect,
   ]);
 
   const resolvePostLoginChildChoice = useCallback(
@@ -124,11 +139,16 @@ export function useBirthdayBuilderWithGate() {
           description: "Все выбранные услуги сохранены",
         });
       } else {
+        if (!profileChildCanApplyDirectly(choice)) {
+          setPostLoginRefinementChild(choice);
+          setPostLoginChildModalOpen(false);
+          setPostLoginChildrenList([]);
+          return;
+        }
         builder.applyProfileChildToScenario(choice);
-        const birthIso = choice.birthDate.slice(0, 10);
-        const years = ageYearsFromBirthDate(birthIso);
+        const years = profileChildAgeYears(choice);
         toast.success(
-          `Сценарий обновлён под ребёнка: ${choice.name}, ${formatYearsRu(years)}`,
+          `Сценарий обновлён под ребёнка${years == null ? "" : `: ${formatYearsRu(years)}`}`,
           {
             description:
               "Мы обновили возраст и интересы для более точного сценария",
@@ -249,6 +269,8 @@ export function useBirthdayBuilderWithGate() {
     requestLoginToSubmit: openAuthModal,
     postLoginChildModalOpen,
     postLoginChildrenList,
+    postLoginRefinementChild,
+    clearPostLoginRefinementChild,
     resolvePostLoginChildChoice,
     handlePostLoginModalOpenChange,
   };

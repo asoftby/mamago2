@@ -23,12 +23,13 @@ import {
 import { MY_PLAN_REG_FOCUS_CHILD_SESSION_KEY } from "@/lib/family/postMyPlanRegistrationFocus";
 import { useAuthMe } from "@/lib/auth/useAuthMe";
 import { toast } from "@/lib/toast";
+import { buildChildPersonas, type FamilyChildRow } from "@/lib/family/buildChildPersonas";
 
 const STORAGE_SELECTED = "mamago:selectedPersonaIds";
 
 type MeApiUser = AccountMenuUser & Record<string, unknown>;
 
-function buildPersonas(me: MeApiUser, children: Array<{ id: string; name: string; birthDate?: string | null }>): FamilyPersona[] {
+function buildPersonas(me: MeApiUser, children: FamilyChildRow[]): FamilyPersona[] {
   const hasDisplayName = !!me.displayName?.trim();
   const adult: FamilyPersona = {
     id: me.id,
@@ -44,12 +45,7 @@ function buildPersonas(me: MeApiUser, children: Array<{ id: string; name: string
       typeof me.leisureFormatSignalId === "string" ? me.leisureFormatSignalId : null,
     isProfileComplete: hasDisplayName,
   };
-  const childPersonas: FamilyPersona[] = children.map((c) => ({
-    id: c.id,
-    kind: "child",
-    displayName: c.name,
-    birthDate: c.birthDate ?? null,
-  }));
+  const childPersonas = buildChildPersonas(children);
   return [adult, ...childPersonas];
 }
 
@@ -117,7 +113,7 @@ async function fetchChildrenRows() {
   }
 
   const data = (await chRes.json()) as {
-    children?: Array<{ id: string; name: string; birthDate?: string | null }>;
+    children?: FamilyChildRow[];
   };
   return Array.isArray(data.children) ? data.children : [];
 }
@@ -126,7 +122,7 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
   const pathname = usePathname();
   const { user, status, isLoading: authLoading, refetch: refetchAuth } = useAuthMe();
   const [childRows, setChildRows] = useState<
-    Array<{ id: string; name: string; birthDate?: string | null }>
+    FamilyChildRow[]
   >([]);
   const [childrenLoading, setChildrenLoading] = useState(false);
   const [selectedPersonaIds, setSelectedPersonaIdsState] = useState<string[]>([]);
@@ -329,12 +325,14 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
   );
 
   const childPersonasForFilter = useMemo(
-    () =>
-      childRows.map((c) => ({
+    () => {
+      const normalized = buildChildPersonas(childRows);
+      return childRows.map((c, index) => ({
         id: c.id,
-        name: c.name,
+        name: normalized[index]!.displayName,
         ...(c.birthDate ? { birthDate: c.birthDate } : {}),
-      })),
+      }));
+    },
     [childRows],
   );
 
