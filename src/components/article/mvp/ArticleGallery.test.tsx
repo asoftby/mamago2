@@ -176,4 +176,14 @@ assert.equal(renderToStaticMarkup(<ArticleGallery images={[]} />), "");
   assert.ok(source.includes('prefers-reduced-motion: reduce'));
 }
 
+// Mobile in-article gallery must animate between photos without changing the restored desktop layout.
+{
+  const source = readFileSync(new URL("./ArticleGallery.tsx", import.meta.url), "utf8");
+  assert.ok(source.includes("data-article-mobile-gallery-slide-viewport"));
+  assert.ok(source.includes('data-article-mobile-gallery-slide="outgoing"'));
+  assert.ok(source.includes('data-article-mobile-gallery-slide="incoming"'));
+  assert.ok(source.includes("setMobileTransition({ from: mobileIndex, to, direction, moving: false })"));
+  assert.ok(source.includes("didMobileSwipeRef"), "touch swipe must not open the lightbox via the synthetic click");
+}
+
 console.log("article gallery tests: OK");

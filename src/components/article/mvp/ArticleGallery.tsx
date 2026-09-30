@@ -319,12 +319,17 @@ export function ArticleGallery({
   // - lightboxIndex: null when closed; otherwise the absolute index the lightbox is showing.
   const [desktopGroupStart, setDesktopGroupStart] = useState(0);
   const [mobileIndex, setMobileIndex] = useState(0);
+  const [mobileTransition, setMobileTransition] = useState<{
+    from: number;
+    to: number;
+    direction: -1 | 1;
+    moving: boolean;
+  } | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const lastTriggerRef = useRef<HTMLElement | null>(null);
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
-
-  if (total === 0) return null;
+  const didMobileSwipeRef = useRef(false);
 
   // Lightbox always browses the full collection; opening it from either breakpoint also parks
   // the mobile slider at that photo, matching the mobile slider's own pre-existing behavior of
@@ -340,10 +345,44 @@ export function ArticleGallery({
   };
   const handleLightboxIndexChange = (index: number) => {
     setLightboxIndex(index);
+    setMobileTransition(null);
     setMobileIndex(index);
   };
-  const goMobilePrev = () => setMobileIndex((i) => Math.max(0, i - 1));
-  const goMobileNext = () => setMobileIndex((i) => Math.min(total - 1, i + 1));
+
+  const navigateMobile = useCallback(
+    (direction: -1 | 1) => {
+      if (mobileTransition) return;
+      const to = Math.max(0, Math.min(mobileIndex + direction, total - 1));
+      if (to === mobileIndex) return;
+
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        setMobileIndex(to);
+        return;
+      }
+
+      setMobileTransition({ from: mobileIndex, to, direction, moving: false });
+    },
+    [mobileIndex, mobileTransition, total],
+  );
+  const goMobilePrev = useCallback(() => navigateMobile(-1), [navigateMobile]);
+  const goMobileNext = useCallback(() => navigateMobile(1), [navigateMobile]);
+
+  useEffect(() => {
+    if (!mobileTransition || mobileTransition.moving) return;
+    const frame = requestAnimationFrame(() => {
+      setMobileTransition((value) => (value ? { ...value, moving: true } : null));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [mobileTransition]);
+
+  useEffect(() => {
+    if (!mobileTransition?.moving) return;
+    const timer = window.setTimeout(() => {
+      setMobileIndex(mobileTransition.to);
+      setMobileTransition(null);
+    }, 260);
+    return () => window.clearTimeout(timer);
+  }, [mobileTransition]);
 
   function handleMobileTouchStart(e: React.TouchEvent) {
     touchStartXRef.current = e.touches[0].clientX;
@@ -358,14 +397,36 @@ export function ArticleGallery({
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
     if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
-    if (dx < 0) goMobileNext();
-    else goMobilePrev();
+    const direction: -1 | 1 = dx < 0 ? 1 : -1;
+    const to = Math.max(0, Math.min(mobileIndex + direction, total - 1));
+    if (to === mobileIndex) return;
+    didMobileSwipeRef.current = true;
+    navigateMobile(direction);
   }
+
+  if (total === 0) return null;
 
   const groupImages = images.slice(desktopGroupStart, desktopGroupStart + DESKTOP_GROUP_SIZE);
   const groupSize = groupImages.length;
   const desktopImageWidthPx = Math.floor(ARTICLE_WIDTH_PX / groupSize);
   const mobileImage = images[mobileIndex];
+
+  const renderMobileSlide = (image: ArticleGalleryImage, index: number) => (
+    <button
+      type="button"
+      onClick={(e) => {
+        if (didMobileSwipeRef.current) {
+          didMobileSwipeRef.current = false;
+          return;
+        }
+        openLightbox(index, e.currentTarget);
+      }}
+      aria-label={`Открыть фото ${index + 1} из ${total}`}
+      className="absolute inset-0"
+    >
+      {!isDesktop ? <GalleryImg image={image} sizes="100vw" /> : null}
+    </button>
+  );
 
   return (
     <div className="not-prose my-8 min-w-0 md:my-10">
@@ -435,24 +496,47 @@ export function ArticleGallery({
         <div className="md:hidden">
           <div
             className="relative aspect-[9/12] w-full overflow-hidden rounded-xl bg-muted/20"
+            data-article-mobile-gallery-slide-viewport
             onTouchStart={handleMobileTouchStart}
             onTouchEnd={handleMobileTouchEnd}
           >
-            <button
-              type="button"
-              onClick={(e) => openLightbox(mobileIndex, e.currentTarget)}
-              aria-label={`Открыть фото ${mobileIndex + 1} из ${total}`}
-              className="absolute inset-0"
-            >
-              {!isDesktop ? <GalleryImg image={mobileImage} sizes="100vw" /> : null}
-            </button>
+            {mobileTransition ? (
+              <>
+                <div
+                  data-article-mobile-gallery-slide="outgoing"
+                  className="absolute inset-0 transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
+                  style={{
+                    transform: mobileTransition.moving
+                      ? `translateX(${-mobileTransition.direction * 100}%)`
+                      : "translateX(0)",
+                  }}
+                >
+                  {renderMobileSlide(images[mobileTransition.from], mobileTransition.from)}
+                </div>
+                <div
+                  data-article-mobile-gallery-slide="incoming"
+                  className="absolute inset-0 transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
+                  style={{
+                    transform: mobileTransition.moving
+                      ? "translateX(0)"
+                      : `translateX(${mobileTransition.direction * 100}%)`,
+                  }}
+                >
+                  {renderMobileSlide(images[mobileTransition.to], mobileTransition.to)}
+                </div>
+              </>
+            ) : (
+              <div className="absolute inset-0" data-article-mobile-gallery-slide="current">
+                {renderMobileSlide(mobileImage, mobileIndex)}
+              </div>
+            )}
 
             {total > 1 && mobileIndex > 0 ? (
               <button
                 type="button"
                 onClick={goMobilePrev}
                 aria-label="Предыдущее изображение"
-                className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="absolute left-2 top-1/2 flex h-11 w-11 z-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
@@ -463,15 +547,15 @@ export function ArticleGallery({
                 type="button"
                 onClick={goMobileNext}
                 aria-label="Следующее изображение"
-                className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="absolute right-2 top-1/2 flex h-11 w-11 z-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <ChevronRight className="h-5 w-5" />
               </button>
             ) : null}
 
             {total > 1 ? (
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/45 px-2.5 py-1 text-xs text-white">
-                {mobileIndex + 1} / {total}
+              <div className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/45 px-2.5 py-1 text-xs text-white">
+                {(mobileTransition?.to ?? mobileIndex) + 1} / {total}
               </div>
             ) : null}
           </div>
