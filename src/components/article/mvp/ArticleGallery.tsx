@@ -87,17 +87,53 @@ function ArticleGalleryLightbox({
   onIndexChange: (index: number) => void;
   onClose: () => void;
 }) {
+  type SlideDirection = -1 | 1;
+
   const total = images.length;
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const touchStartXRef = useRef<number | null>(null);
+  const [transition, setTransition] = useState<{
+    from: number;
+    to: number;
+    direction: SlideDirection;
+    moving: boolean;
+  } | null>(null);
 
-  const goPrev = useCallback(() => {
-    onIndexChange(Math.max(0, index - 1));
-  }, [index, onIndexChange]);
+  const navigate = useCallback(
+    (direction: SlideDirection) => {
+      if (transition) return;
+      const to = Math.max(0, Math.min(index + direction, total - 1));
+      if (to === index) return;
 
-  const goNext = useCallback(() => {
-    onIndexChange(Math.min(total - 1, index + 1));
-  }, [index, onIndexChange, total]);
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        onIndexChange(to);
+        return;
+      }
+
+      setTransition({ from: index, to, direction, moving: false });
+    },
+    [index, onIndexChange, total, transition],
+  );
+
+  const goPrev = useCallback(() => navigate(-1), [navigate]);
+  const goNext = useCallback(() => navigate(1), [navigate]);
+
+  useEffect(() => {
+    if (!transition || transition.moving) return;
+    const frame = requestAnimationFrame(() => {
+      setTransition((value) => (value ? { ...value, moving: true } : null));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [transition]);
+
+  useEffect(() => {
+    if (!transition?.moving) return;
+    const timer = window.setTimeout(() => {
+      onIndexChange(transition.to);
+      setTransition(null);
+    }, 260);
+    return () => window.clearTimeout(timer);
+  }, [onIndexChange, transition]);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -133,6 +169,7 @@ function ArticleGalleryLightbox({
   function handleTouchStart(e: React.TouchEvent) {
     touchStartXRef.current = e.touches[0].clientX;
   }
+
   function handleTouchEnd(e: React.TouchEvent) {
     const startX = touchStartXRef.current;
     touchStartXRef.current = null;
@@ -141,6 +178,32 @@ function ArticleGalleryLightbox({
     if (Math.abs(dx) < 40) return;
     if (dx < 0) goNext();
     else goPrev();
+  }
+
+  function renderSlide(image: ArticleGalleryImage) {
+    return (
+      <div className="flex max-h-[90dvh] max-w-[94vw] flex-col items-center justify-center gap-2 sm:max-w-[92vw]">
+        {image.url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={image.url}
+            alt={image.alt ?? ""}
+            aria-describedby={image.caption ? "article-gallery-lightbox-caption" : undefined}
+            className="max-h-[80dvh] w-auto max-w-[94vw] object-contain sm:max-w-[92vw]"
+            style={{ ...RESET_ARTICLE_BODY_IMG_STYLE, width: "auto" }}
+          />
+        ) : (
+          <div className="flex h-64 w-64 items-center justify-center rounded-xl bg-white/10 text-sm text-white/70">
+            Изображение недоступно
+          </div>
+        )}
+        {image.caption ? (
+          <p id="article-gallery-lightbox-caption" className="max-w-[92vw] px-2 text-center text-sm text-white/80">
+            {image.caption}
+          </p>
+        ) : null}
+      </div>
+    );
   }
 
   return (
@@ -178,7 +241,7 @@ function ArticleGalleryLightbox({
             goPrev();
           }}
           aria-label="Предыдущее изображение"
-          className="absolute left-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:left-3 sm:h-10 sm:w-10"
+          className="absolute left-2 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:left-3 sm:h-10 sm:w-10"
         >
           <ChevronLeft className="h-6 w-6" />
         </button>
@@ -192,35 +255,47 @@ function ArticleGalleryLightbox({
             goNext();
           }}
           aria-label="Следующее изображение"
-          className="absolute right-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:right-3 sm:h-10 sm:w-10"
+          className="absolute right-2 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:right-3 sm:h-10 sm:w-10"
         >
           <ChevronRight className="h-6 w-6" />
         </button>
       ) : null}
 
       <div
-        className="flex max-h-[90dvh] max-w-[94vw] flex-col items-center justify-center gap-2 sm:max-w-[92vw]"
+        className="relative flex h-[90dvh] w-[94vw] items-center justify-center overflow-hidden sm:w-[92vw]"
+        data-article-lightbox-slide-viewport
         onClick={(e) => e.stopPropagation()}
       >
-        {current.url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={current.url}
-            alt={current.alt ?? ""}
-            aria-describedby={current.caption ? "article-gallery-lightbox-caption" : undefined}
-            className="max-h-[80dvh] w-auto max-w-[94vw] object-contain sm:max-w-[92vw]"
-            style={{ ...RESET_ARTICLE_BODY_IMG_STYLE, width: "auto" }}
-          />
+        {transition ? (
+          <>
+            <div
+              data-article-lightbox-slide="outgoing"
+              className="absolute inset-0 flex items-center justify-center transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
+              style={{
+                transform: transition.moving
+                  ? `translateX(${-transition.direction * 100}%)`
+                  : "translateX(0)",
+              }}
+            >
+              {renderSlide(images[transition.from])}
+            </div>
+            <div
+              data-article-lightbox-slide="incoming"
+              className="absolute inset-0 flex items-center justify-center transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
+              style={{
+                transform: transition.moving
+                  ? "translateX(0)"
+                  : `translateX(${transition.direction * 100}%)`,
+              }}
+            >
+              {renderSlide(images[transition.to])}
+            </div>
+          </>
         ) : (
-          <div className="flex h-64 w-64 items-center justify-center rounded-xl bg-white/10 text-sm text-white/70">
-            Изображение недоступно
+          <div className="absolute inset-0 flex items-center justify-center" data-article-lightbox-slide="current">
+            {renderSlide(current)}
           </div>
         )}
-        {current.caption ? (
-          <p id="article-gallery-lightbox-caption" className="max-w-[92vw] px-2 text-center text-sm text-white/80">
-            {current.caption}
-          </p>
-        ) : null}
       </div>
     </div>
   );
