@@ -1,7 +1,12 @@
 import assert from "node:assert";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ArticleGallery, desktopGroupStartForIndex, type ArticleGalleryImage } from "./ArticleGallery";
+import {
+  ArticleGallery,
+  desktopGroupStartForIndex,
+  mergeGalleryWarmIndexes,
+  type ArticleGalleryImage,
+} from "./ArticleGallery";
 import {
   ArticleContentPayloadSchema,
   newBlock,
@@ -49,6 +54,27 @@ assert.equal(legacy.blocks.length, 1, "legacy gallery (no presentation) remains 
 
 const newGallery = newBlock("gallery", () => "new-gallery");
 assert.equal(newGallery.type === "gallery" ? newGallery.presentation : null, "carousel");
+
+/* Mobile warm-set persistence: once a slide has loaded or been preloaded it
+ * stays mounted, so reverse navigation never remounts it and flashes a
+ * placeholder. */
+{
+  const first = mergeGalleryWarmIndexes([0], [0, 1], 7);
+  assert.deepEqual(first, [0, 1]);
+
+  const second = mergeGalleryWarmIndexes(first, [1, 2], 7);
+  assert.deepEqual(second, [0, 1, 2]);
+
+  const third = mergeGalleryWarmIndexes(second, [2, 3], 7);
+  assert.deepEqual(third, [0, 1, 2, 3]);
+
+  const back = mergeGalleryWarmIndexes(third, [1, 2, 3], 7);
+  assert.deepEqual(
+    back,
+    [0, 1, 2, 3],
+    "previously warmed slides remain mounted when navigating backwards",
+  );
+}
 
 // --- Desktop fixed-grouping math -------------------------------------------------------------
 // This test harness has no jsdom/RTL to simulate a click-then-rerender, so the grouping formula
@@ -187,8 +213,17 @@ assert.equal(renderToStaticMarkup(<ArticleGallery images={[]} />), "");
   const source = readFileSync(new URL("./ArticleGallery.tsx", import.meta.url), "utf8");
   assert.ok(source.includes("data-article-mobile-gallery-slide-viewport"));
   assert.ok(source.includes("mobileTrackIndexes"), "mobile gallery keeps a persistent slide track");
+  assert.ok(source.includes("mobileWarmIndexes"), "already warmed slides remain mounted for instant reverse navigation");
+  assert.ok(source.includes("mergeGalleryWarmIndexes"), "mobile track is monotonic for visited/preloaded slides");
+  assert.ok(source.includes("galleryImageLoadedCache"), "loaded gallery images reuse known ready state instead of flashing a skeleton");
   assert.ok(source.includes("mobileIndex - 1, mobileIndex + 1"), "adjacent photos preload before the gesture");
   assert.ok(source.includes('"preloaded"'), "off-screen neighbour slides stay mounted");
+  assert.ok(source.includes("IntersectionObserver"), "neighbour eager loading only starts when the gallery approaches the viewport");
+  assert.ok(source.includes('rootMargin: "320px 0px"'), "near-viewport galleries warm shortly before interaction");
+  assert.ok(source.includes("setMobilePreloadReady(true)"), "touch interaction can warm neighbours immediately");
+  assert.ok(source.includes('loading={'), "mobile images explicitly control eager vs lazy loading");
+  assert.ok(source.includes('? "eager"'), "only the current/adjacent near-viewport slides become eager");
+  assert.ok(source.includes(': "lazy"'), "off-screen galleries and distant warmed slides remain lazy");
   assert.ok(source.includes('query.addEventListener("change", syncPreloadMode)'), "mobile preload follows breakpoint changes");
   assert.ok(source.includes("tabIndex={interactive ? 0 : -1}"), "preloaded slides stay out of the tab order");
   assert.ok(source.includes("aria-hidden={index !== mobileIndex}"), "off-screen slides stay hidden from assistive technology");
