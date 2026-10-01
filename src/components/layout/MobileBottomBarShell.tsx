@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useHideOnScrollDirection } from "@/hooks/useHideOnScrollDirection";
+import { useMobileBottomBarHidden } from "@/hooks/useMobileBottomBarHidden";
 import { cn } from "@/lib/utils";
 
 interface MobileBottomBarShellProps {
@@ -32,7 +32,7 @@ export function MobileBottomBarShell({
   className,
   disableHide = false,
 }: MobileBottomBarShellProps) {
-  const scrollHidden = useHideOnScrollDirection({ threshold: 8, topOffset: 24 });
+  const scrollHidden = useMobileBottomBarHidden();
   const hidden = !disableHide && scrollHidden;
   const ref = useRef<HTMLDivElement>(null);
 
