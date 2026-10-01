@@ -160,7 +160,7 @@ export function EventDecisionPanel({
       >
         {data.categoryLabel && (
           <span className="inline-flex h-7 items-center rounded-full bg-[#FFE8DC] px-3 text-[12px] font-semibold text-[#E86A3A]">
-            ● {data.categoryLabel}
+            {data.categoryLabel}
           </span>
         )}
         {data.ageFromBadge && (
