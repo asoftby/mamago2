@@ -185,10 +185,29 @@ export function EventStickyActionBar({
         <div className="mt-0.5 flex items-baseline gap-1">
           {(() => {
             const { amount, suffix } = splitUiPriceLabel(priceLabel);
+            const fromMatch = amount.match(/^(от)\s+/i);
+            const fromPrefix = fromMatch?.[1] ?? "";
+            const amountWithoutPrefix = fromMatch
+              ? amount.slice(fromMatch[0].length)
+              : amount;
             return (
               <>
+                {fromPrefix ? (
+                  <span
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: 16,
+                      fontWeight: 400,
+                      lineHeight: 1,
+                      letterSpacing: "-0.02em",
+                      color: "#141210",
+                    }}
+                  >
+                    {fromPrefix}
+                  </span>
+                ) : null}
                 <span style={{ fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
-                  {amount}
+                  {amountWithoutPrefix}
                 </span>
                 {suffix ? (
                   <span className="text-[11px] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
