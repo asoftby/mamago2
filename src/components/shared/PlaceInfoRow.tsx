@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LocationMetaList } from "@/components/shared/LocationMetaList";
 
 export interface PlaceInfoRowProps {
   name: string;
@@ -71,12 +72,7 @@ export function PlaceInfoRow({ name, logoUrl, address, district, metro, href }: 
             {address}
           </div>
         )}
-        {(district || metro) && (
-          <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: "4px 10px", fontSize: 13, color: "rgba(20,18,16,.55)", lineHeight: 1.4 }}>
-            {district && <span><span style={{ color: "#E86A3A" }}>●</span> {district} р-н</span>}
-            {metro && <span><span style={{ color: "#E86A3A" }}>●</span> ст. м. «{metro}»</span>}
-          </div>
-        )}
+        <LocationMetaList district={district} metro={metro} variant="inline" />
       </div>
     </div>
   );

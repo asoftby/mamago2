@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { formatPlanTargetDateRu } from "@/lib/date/formatPlanTargetDateRu";
 import { useUpcomingSessions } from "./useUpcomingSessions";
+import { formatVenueAddressForPublicDisplay } from "@/lib/event/formatVenueAddressForDisplay";
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
@@ -201,7 +202,7 @@ function EventLocationEditorial({ venue }: { venue: NonNullable<EventPageData["v
       name={venue.name}
       logoUrl={venue.logoUrl}
       tagline={venue.landmark}
-      address={venue.address}
+      address={formatVenueAddressForPublicDisplay(venue.address) || undefined}
       district={venue.district}
       metro={venue.metro}
       lat={venue.lat}
