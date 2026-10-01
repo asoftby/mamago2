@@ -2,6 +2,7 @@ import type { ActivityFormat, EventVenueKind } from "@prisma/client";
 import type { Intent } from "@/lib/intent";
 import { DEFAULT_CITY_HUB_PATH } from "@/lib/intent";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
+import { parseVideoUrl } from "@/lib/media/parseVideoUrl";
 import { extractPlainTextFromHtml } from "@/lib/richtext/utils";
 import { sanitizeRichContent } from "@/components/content/richContentHtml";
 import { resolvePlaceLogoUrl } from "@/lib/place/resolvePlaceLogoImage";
@@ -562,19 +563,19 @@ export function buildEventPageDataFromPrismaActivity(
 
 function resolveReelsUrl(activity: Pick<ActivityForEventPageInput, "scheduleJson">): string | undefined {
   const url = getScheduleJsonString(activity, "reelsUrl")?.trim() ?? "";
-  return url && isHttpUrl(url) ? url : undefined;
+  return parseVideoUrl(url)?.url;
 }
 
 /**
  * Builds the gallery strip items shown under the cover image:
- * [reels?, ...extra photos (excl. cover)]
+ * [extra photos (excl. cover), supported video?]
  */
-function buildGalleryItems(
+export function buildGalleryItems(
   activity: ActivityForEventPageInput,
   resolvedPosterUrl: string,
   reelsThumbnailUrl?: string,
 ): MediaGalleryItem[] | undefined {
-  const reelsUrl = resolveReelsUrl(activity);
+  const video = parseVideoUrl(getScheduleJsonString(activity, "reelsUrl"));
 
   // Extra gallery images = all images except the one used as cover
   const rawImages = activity.images ?? [];
@@ -594,26 +595,25 @@ function buildGalleryItems(
 
   const items: MediaGalleryItem[] = [];
 
-  if (reelsUrl) {
-    const thumbnailSrc =
-      reelsThumbnailUrl ??
-      (resolvedPosterUrl !== "/og-default.jpg" ? resolvedPosterUrl : undefined);
-    const isInstagramPost = /instagram\.com\/p\//i.test(reelsUrl);
-    items.push({
-      type: "reels",
-      id: "reels",
-      url: reelsUrl,
-      thumbnailSrc,
-      title: isInstagramPost ? "Post о событии" : "Reels о событии",
-    });
-  }
-
   for (const img of extraImages) {
     items.push({
       type: "image",
       id: img.id,
       src: img.url,
       alt: activity.title,
+    });
+  }
+
+  if (video) {
+    items.push({
+      type: video.type,
+      id: `${video.type}-video`,
+      url: video.url,
+      embedId: video.embedId,
+      posterSrc: video.type === "youtube"
+        ? `https://img.youtube.com/vi/${video.embedId}/hqdefault.jpg`
+        : reelsThumbnailUrl ?? null,
+      title: video.type === "youtube" ? "Видео о событии" : `${video.label} о событии`,
     });
   }
 
