@@ -2,7 +2,7 @@
 
 import { toast } from "@/lib/toast";
 import { migrateGuestMyPlanAfterAuth } from "@/lib/my-plan/migrateGuestMyPlanAfterAuth";
-import type { AuthEntryPoint } from "./types";
+import type { AuthEntryPoint, PendingPostAuthAction } from "./types";
 import { getPostAuthContext, clearPostAuthAction, clearPostAuthContext } from "./storage";
 import { executePendingPostAuthAction } from "./executePendingAction";
 import type { ProfileStatePayload } from "./types";
@@ -41,6 +41,26 @@ export interface RunPostAuthPipelineOptions {
   pendingActionExecutor?: () => Promise<void>;
 }
 
+export async function executePipelinePendingAction(input: {
+  storedAction: PendingPostAuthAction;
+  executor?: () => Promise<void>;
+}): Promise<boolean> {
+  if (input.executor) {
+    // Surface persistence is fail-closed: callers must never continue to
+    // onboarding/outcome after a failed callback-backed save.
+    await input.executor();
+    return true;
+  }
+  if (!input.storedAction) return false;
+  try {
+    await executePendingPostAuthAction(input.storedAction);
+    return true;
+  } catch (error) {
+    console.error("[post-auth] pending action failed", error);
+    return false;
+  }
+}
+
 /**
  * Единый post-auth pipeline после успешного login/register.
  * Не редиректит до completion: при incomplete возвращает kind "completion".
@@ -74,19 +94,12 @@ export async function runPostAuthPipeline(
   }
 
   if (pendingActionExecutor || ctx?.pendingAction) {
-    try {
-      if (pendingActionExecutor) {
-        await pendingActionExecutor();
-      } else {
-        await executePendingPostAuthAction(ctx?.pendingAction ?? null);
-      }
+    const executed = await executePipelinePendingAction({
+      storedAction: ctx?.pendingAction ?? null,
+      executor: pendingActionExecutor,
+    });
+    if (executed) {
       trackPostAuthEvent("pending_action_executed", { source });
-    } catch (e) {
-      // A surface-provided executor owns visible persistence state. Preserve
-      // its previous fail-closed contract instead of continuing to onboarding
-      // and eventually showing a false save success.
-      if (pendingActionExecutor) throw e;
-      console.error("[post-auth] pending action failed", e);
     }
   }
 

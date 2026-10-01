@@ -23,6 +23,7 @@ import {
 } from "@/lib/post-auth";
 import { trackPostAuthEvent } from "@/lib/post-auth/analytics";
 import type { PendingEntityType } from "@/lib/post-auth/types";
+import { buildSavePostAuthContext } from "@/lib/post-auth/saveFlowContext";
 
 export type SaveActivityFlowAdaptiveProps = {
   open: boolean;
@@ -152,35 +153,23 @@ export function SaveActivityFlowAdaptive({
       // Сохраняем pending action и переходим на auth
       setPending(result);
 
-      // Build pending action for automatic execution after auth
+      // Always replace any stale auth context. Callback-backed hosts have no
+      // serializable entity id, but still need the current source/returnTo.
       const entityId = pendingEntityId ?? activityId;
-      if (typeof window !== "undefined" && entityId) {
-        const pendingAction =
-          result.action === "ideas"
-            ? {
-                kind: "save_idea" as const,
-                entityType: pendingEntityType,
-                entityId,
-                title: activityTitle,
-                coverImageUrl: coverImageUrl,
-              }
-            : result.action === "plan"
-              ? {
-                  kind: "save_plan" as const,
-                  entityType: pendingEntityType,
-                  entityId,
-                  plannedDate: result.dateISO,
-                  timeSlotId: result.timeSlotId,
-                  title: activityTitle,
-                  coverImageUrl: coverImageUrl,
-                }
-              : null;
-
-        savePostAuthContext({
-          source: result.action === "ideas" ? "save_idea" : "save_plan",
-          pendingAction,
-          returnTo: `${window.location.pathname}${window.location.search}`,
-        });
+      if (
+        typeof window !== "undefined" &&
+        (result.action === "ideas" || result.action === "plan")
+      ) {
+        savePostAuthContext(
+          buildSavePostAuthContext({
+            result,
+            returnTo: resolvedNext,
+            entityId,
+            entityType: pendingEntityType,
+            title: activityTitle,
+            coverImageUrl,
+          }),
+        );
       }
       setPhase("auth");
     },
@@ -193,6 +182,7 @@ export function SaveActivityFlowAdaptive({
       coverImageUrl,
       pendingEntityType,
       pendingEntityId,
+      resolvedNext,
     ],
   );
 

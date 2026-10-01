@@ -12,6 +12,8 @@ test("auth and save surfaces delegate post-auth decisions to the shared pipeline
 
   assert.match(authModal, /runPostAuthPipeline\(/);
   assert.match(saveFlow, /runPostAuthPipeline\(/);
+  assert.match(saveFlow, /savePostAuthContext\(\s*buildSavePostAuthContext\(/);
+  assert.doesNotMatch(saveFlow, /window !== "undefined" && entityId/);
   assert.doesNotMatch(saveFlow, /fetch\("\/api\/me\/profile-state"/);
 });
 
