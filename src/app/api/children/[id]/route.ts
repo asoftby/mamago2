@@ -3,6 +3,8 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
+import { normalizeChildName, ChildBirthValidationError } from "@/lib/child/birth";
+import { parseChildBirthPayload } from "@/lib/child/birthApi";
 
 /**
  * Deterministically PII-safe error log fields: error class name + Prisma
@@ -25,16 +27,11 @@ function safeErrorInfo(error: unknown): { errorName: string; errorCode?: string 
 // any update that didn't happen to know about them (e.g. a birth-date-only
 // save) — see docs/engineering/backlog.md D05.
 const updateChildSchema = z.object({
-  name: z.string().min(1, "Укажите имя").max(50),
-  birthDate: z
-    .union([z.string(), z.null()])
-    .optional()
-    .refine((date) => {
-      if (date == null || date === "") return true;
-      const parsed = new Date(date);
-      const now = new Date();
-      return parsed <= now && parsed > new Date(now.getFullYear() - 25, 0, 1);
-    }, "Некорректная дата рождения"),
+  name: z.string().max(50).nullish(),
+  birthDate: z.union([z.string(), z.null()]).optional(),
+  birthPrecision: z.enum(["DAY", "MONTH"]).nullish(),
+  birthYear: z.number().int().optional(),
+  birthMonth: z.number().int().optional(),
   systemInterests: z.array(z.string()).optional(),
   customInterests: z.array(z.string().max(50)).optional(),
 });
@@ -47,6 +44,7 @@ export type UpdateChildInput = z.infer<typeof updateChildSchema>;
  * "leave alone" — see the schema comment above.
  */
 export async function applyChildUpdate(childId: string, data: UpdateChildInput) {
+  const birth = parseChildBirthPayload(data as Record<string, unknown>);
   const touchesSystemInterests = data.systemInterests !== undefined;
   const touchesCustomInterests = data.customInterests !== undefined;
   const validSystemInterests = touchesSystemInterests
@@ -57,8 +55,13 @@ export async function applyChildUpdate(childId: string, data: UpdateChildInput) 
     const child = await tx.child.update({
       where: { id: childId },
       data: {
-        name: data.name,
-        birthDate: data.birthDate ? new Date(data.birthDate) : null,
+        ...(data.name !== undefined ? { name: normalizeChildName(data.name) } : {}),
+        ...(birth.touched
+          ? {
+              birthDate: birth.value?.birthDate ?? null,
+              birthPrecision: birth.value?.birthPrecision ?? null,
+            }
+          : {}),
       },
     });
 
@@ -136,6 +139,9 @@ export async function PUT(
           { status: 400 }
         );
       }
+      if (validationError instanceof ChildBirthValidationError) {
+        return NextResponse.json({ error: validationError.message }, { status: 400 });
+      }
       return NextResponse.json(
         { error: "Ошибка валидации данных" },
         { status: 400 }
@@ -168,6 +174,9 @@ export async function PUT(
     try {
       result = await applyChildUpdate(childId, data);
     } catch (transactionError) {
+      if (transactionError instanceof ChildBirthValidationError) {
+        return NextResponse.json({ error: transactionError.message }, { status: 400 });
+      }
       console.error("[children/PUT] transaction failed", { childId, ...safeErrorInfo(transactionError) });
       return NextResponse.json(
         { error: "Ошибка при обновлении данных ребенка" },
@@ -188,6 +197,9 @@ export async function PUT(
         },
         { status: 400 }
       );
+    }
+    if (error instanceof ChildBirthValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     console.error("[children/PUT] update failed", { childId, ...safeErrorInfo(error) });

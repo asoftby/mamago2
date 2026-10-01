@@ -325,10 +325,16 @@ model TelegramConnection {
   @@index([environment, isActive])
 }
 
+enum BirthPrecision {
+  DAY
+  MONTH
+}
+
 model Child {
   id              String                @id @default(cuid())
-  name            String
+  name            String?
   birthDate       DateTime?
+  birthPrecision  BirthPrecision?
   interests       String?
   parentId        String
   createdAt       DateTime              @default(now())

@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  FilterSelect,
-  type FilterSelectOption,
-} from "@/components/ui/filter-select";
+  ChildBirthFields,
+  childBirthDraftFromStored,
+  childBirthDraftPayload,
+  emptyChildBirthDraft,
+} from "@/components/children/ChildBirthFields";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { BodyMuted } from "@/components/ui/typography";
 import { ArrowLeft, Baby, UserRound } from "lucide-react";
@@ -36,8 +38,9 @@ import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 
 export interface ParticipantChildData {
   id: string;
-  name: string;
+  name: string | null;
   birthDate: Date | null;
+  birthPrecision?: "DAY" | "MONTH" | null;
   systemInterests?: { interestSlug: string }[];
   customInterests?: { label: string }[];
 }
@@ -55,43 +58,6 @@ const STEP_ANIMATION =
   "animate-in fade-in slide-in-from-right-2 duration-200 fill-mode-both";
 
 const MAX_PREFERENCE_SIGNALS = 3;
-
-const MONTHS_RU = [
-  { m: 0, label: "Январь" },
-  { m: 1, label: "Февраль" },
-  { m: 2, label: "Март" },
-  { m: 3, label: "Апрель" },
-  { m: 4, label: "Май" },
-  { m: 5, label: "Июнь" },
-  { m: 6, label: "Июль" },
-  { m: 7, label: "Август" },
-  { m: 8, label: "Сентябрь" },
-  { m: 9, label: "Октябрь" },
-  { m: 10, label: "Ноябрь" },
-  { m: 11, label: "Декабрь" },
-];
-
-const BIRTH_MONTH_FILTER_OPTIONS: FilterSelectOption[] = MONTHS_RU.map(
-  ({ m, label }) => ({ value: String(m), label }),
-);
-
-function birthYearOptions(): number[] {
-  const y = new Date().getFullYear();
-  return Array.from({ length: 26 }, (_, i) => y - i);
-}
-
-function birthYearFilterOptions(): FilterSelectOption[] {
-  return birthYearOptions().map((year) => ({
-    value: String(year),
-    label: String(year),
-  }));
-}
-
-function toBirthIso(month: number | "", year: number | ""): string | null {
-  if (month === "" || year === "") return null;
-  const d = new Date(year, month, 1, 12, 0, 0, 0);
-  return d.toISOString();
-}
 
 type AdultPersonaSignalChip = {
   id: string;
@@ -202,8 +168,7 @@ function ParticipantFlow({
   const [participantType, setParticipantType] = useState<"child" | "adult">("child");
 
   const [childName, setChildName] = useState("");
-  const [birthMonth, setBirthMonth] = useState<number | "">("");
-  const [birthYear, setBirthYear] = useState<number | "">("");
+  const [birthDraft, setBirthDraft] = useState(emptyChildBirthDraft);
   const [childInterests, setChildInterests] = useState<string[]>([]);
 
   const [adultName, setAdultName] = useState("");
@@ -225,8 +190,7 @@ function ParticipantFlow({
     setStep(1);
     setParticipantType("child");
     setChildName("");
-    setBirthMonth("");
-    setBirthYear("");
+    setBirthDraft(emptyChildBirthDraft());
     setChildInterests([]);
     setAdultName("");
     setFamilyRole("");
@@ -294,15 +258,8 @@ function ParticipantFlow({
     if (childData) {
       setStep(2);
       setParticipantType("child");
-      setChildName(childData.name);
-      const bd = childData.birthDate ? new Date(childData.birthDate) : null;
-      if (bd && !Number.isNaN(bd.getTime())) {
-        setBirthMonth(bd.getMonth());
-        setBirthYear(bd.getFullYear());
-      } else {
-        setBirthMonth("");
-        setBirthYear("");
-      }
+      setChildName(childData.name ?? "");
+      setBirthDraft(childBirthDraftFromStored(childData));
       setChildInterests(childData.systemInterests?.map((i) => i.interestSlug) ?? []);
       return;
     }
@@ -415,7 +372,7 @@ function ParticipantFlow({
     setStep(1);
   };
 
-  const canSaveChild = childName.trim().length >= 1;
+  const canSaveChild = childBirthDraftPayload(birthDraft) != null;
 
   /** Все обязательные поля взрослого: имя, роль, возраст, предпочтения (если есть варианты), формат досуга (если есть варианты). */
   const prefsOk =
@@ -476,18 +433,17 @@ function ParticipantFlow({
 
     const saveChild = async () => {
       if (!canSaveChild) {
-        setError("Укажите имя ребёнка");
+        setError("Укажите месяц и год рождения");
         return;
       }
       setIsLoading(true);
       setError(null);
-      const birthIso = toBirthIso(birthMonth, birthYear);
       // This modal has no custom-interest UI: on create there's nothing to
       // preserve, so [] is correct there; on edit, omit the field entirely
       // so the non-destructive PUT leaves any existing custom interests alone.
       const body = {
         name: childName.trim(),
-        birthDate: birthIso,
+        ...childBirthDraftPayload(birthDraft),
         systemInterests: childInterests,
         ...(isEditChild ? {} : { customInterests: [] as string[] }),
       };
@@ -643,34 +599,7 @@ function ParticipantFlow({
                     autoComplete="given-name"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="min-w-0 space-y-2">
-                    <Label htmlFor="birth-month">Месяц рождения</Label>
-                    <FilterSelect
-                      id="birth-month"
-                      value={birthMonth === "" ? "" : String(birthMonth)}
-                      placeholder="Не указано"
-                      options={BIRTH_MONTH_FILTER_OPTIONS}
-                      onChange={(v) =>
-                        setBirthMonth(v === "" ? "" : Number(v))
-                      }
-                      selectClassName="h-11"
-                    />
-                  </div>
-                  <div className="min-w-0 space-y-2">
-                    <Label htmlFor="birth-year">Год рождения</Label>
-                    <FilterSelect
-                      id="birth-year"
-                      value={birthYear === "" ? "" : String(birthYear)}
-                      placeholder="Не указано"
-                      options={birthYearFilterOptions()}
-                      onChange={(v) =>
-                        setBirthYear(v === "" ? "" : Number(v))
-                      }
-                      selectClassName="h-11"
-                    />
-                  </div>
-                </div>
+                <ChildBirthFields value={birthDraft} onChange={setBirthDraft} idPrefix="participant-child-birth" />
                 <ParticipantChipField
                   label="Интересы"
                   hint="Рекомендуем заполнить, для более точных рекомендаций"

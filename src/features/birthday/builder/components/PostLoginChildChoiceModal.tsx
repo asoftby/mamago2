@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ProfileChildPayload } from "../hooks/useBirthdayBuilder";
-import { ageYearsFromBirthDate, formatYearsRu } from "../lib/partyChildUtils";
+import { profileChildLabel } from "../lib/profileChildSelection";
 
 type Props = {
   open: boolean;
@@ -62,8 +62,7 @@ export function PostLoginChildChoiceModal({
           <>
             <DialogHeader className="space-y-2 text-left">
               <DialogTitle className="text-lg font-semibold leading-snug text-foreground">
-                Собираем праздник для {first.name},{" "}
-                {formatYearsRu(ageYearsFromBirthDate(first.birthDate.slice(0, 10)))}?
+                Собираем праздник для {profileChildLabel(first)}?
               </DialogTitle>
               <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
                 В профиле есть этот ребёнок — можно подставить возраст и интересы для сценария.
@@ -118,8 +117,7 @@ export function PostLoginChildChoiceModal({
 
             <div className="space-y-2 pt-2" role="radiogroup" aria-label="Выбор ребёнка">
               {childrenList.map((c) => {
-                const years = ageYearsFromBirthDate(c.birthDate.slice(0, 10));
-                const label = `${c.name} — ${formatYearsRu(years)}`;
+                const label = profileChildLabel(c);
                 const on = selectedId === c.id;
                 return (
                   <button

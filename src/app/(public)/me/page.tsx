@@ -11,6 +11,7 @@ import { mapFamilyRoleToLabel } from "@/lib/account/mapFamilyRoleToLabel";
 import { listUserBirthdayParties } from "@/server/services/userBirthdays.service";
 import { buildAdultPreferenceDisplayLine } from "@/lib/adultPersonaSignals/buildAdultPreferenceLine";
 import { getSystemInterestLabel } from "@/lib/config/interests";
+import { childDisplayName } from "@/lib/child/birth";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 import { getPartyDisplayTitle } from "@/features/me/lib/userBirthdayPartyUi";
 import { getPartyScenarioFlowUi } from "@/features/me/lib/partyScenarioFlow";
@@ -124,10 +125,11 @@ export default async function MePage({ searchParams }: PageProps) {
           .filter((c) => c.childId === child.id)
           .map((c) => c.label),
       ].filter(Boolean);
+      const displayName = childDisplayName(child.name);
       return {
         key: child.id,
-        initial: child.name.charAt(0).toUpperCase(),
-        name: child.name,
+        initial: displayName.charAt(0).toUpperCase(),
+        name: displayName,
         role: ageLine(child.birthDate ? new Date(child.birthDate) : null),
         interests: interests.slice(0, 3),
         hint: "Добавьте интересы",
