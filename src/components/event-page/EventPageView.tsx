@@ -595,7 +595,7 @@ export function EventPageView({
         </div>
       )}
 
-      <section className="pt-12 pb-14">
+      <section className="pt-4 pb-14 lg:pt-12">
         <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
           <div className="mb-4 md:mb-0">
             <MobileSmartBackButton fallbackHref={getCityHomeHref(data.citySlug)} />
