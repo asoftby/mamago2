@@ -60,7 +60,7 @@ export function ArticleMobileBackNavigation({
               ? "bottom-[calc(5.75rem+env(safe-area-inset-bottom)+0.75rem)]"
               : "bottom-[max(1rem,env(safe-area-inset-bottom))]",
             hasBottomBar && bottomBarHidden
-              ? "translate-y-[calc(5.75rem+env(safe-area-inset-bottom))]"
+              ? "pointer-events-none translate-y-[calc(100%+5.75rem+env(safe-area-inset-bottom)+0.75rem)]"
               : "translate-y-0",
           )}
         >
