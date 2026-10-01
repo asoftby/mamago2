@@ -13,7 +13,7 @@ type MobileMediaCarouselProps = {
 };
 
 function slideBackground(item: MediaGalleryItem): string | undefined {
-  return item.type === "image" ? item.src : item.thumbnailSrc;
+  return item.type === "image" ? item.src : item.posterSrc ?? undefined;
 }
 
 export function MobileMediaCarousel({
@@ -47,9 +47,9 @@ export function MobileMediaCarousel({
         >
           {items.map((item, index) => {
             const bgSrc = slideBackground(item);
-            const isReels = item.type === "reels";
+            const isVideo = item.type !== "image";
             const mediaLabel =
-              isReels && /instagram\.com\/p\//i.test(item.url) ? "Post" : "Reels";
+              item.type === "instagram" && /instagram\.com\/p\//i.test(item.url) ? "Post" : item.type === "youtube" ? "YouTube" : "Reels";
 
             return (
               <button
@@ -57,7 +57,7 @@ export function MobileMediaCarousel({
                 type="button"
                 role="listitem"
                 onClick={() => setLightboxIndex(index)}
-                aria-label={isReels ? `Открыть ${mediaLabel}` : `Открыть фото ${index + 1} из ${items.length}`}
+                aria-label={isVideo ? `Открыть ${mediaLabel}` : `Открыть фото ${index + 1} из ${items.length}`}
                 className="group relative aspect-[4/5] w-full shrink-0 snap-start overflow-hidden bg-[#E8E0D4] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]"
               >
                 {bgSrc ? (
@@ -75,7 +75,7 @@ export function MobileMediaCarousel({
                     }}
                   />
                 ) : null}
-                {isReels ? (
+                {isVideo ? (
                   <>
                     <div className="absolute inset-0 bg-black/25" />
                     <span className="absolute inset-0 flex items-center justify-center">

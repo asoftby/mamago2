@@ -178,7 +178,7 @@ export function EventStickyActionBar({
     >
       <div className="flex-1 min-w-0">
         {sessionLine && (
-          <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#E86A3A]">
+          <div className="truncate whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.1em] text-[#E86A3A]">
             {sessionLine}
           </div>
         )}

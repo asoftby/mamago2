@@ -600,15 +600,8 @@ export function EventPageView({
             <MobileSmartBackButton fallbackHref={getCityHomeHref(data.citySlug)} />
           </div>
 
-          <div className="lg:hidden mb-8">
-            <PublicationMediaColumn
-              media={data.media}
-              galleryItems={data.galleryItems}
-            />
-          </div>
-
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-[440px_1fr] lg:gap-14 lg:items-start">
-            <div className="hidden lg:block">
+            <div>
               <PublicationMediaColumn
                 media={data.media}
                 galleryItems={data.galleryItems}

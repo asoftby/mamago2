@@ -10,11 +10,18 @@ export type MediaGalleryItem =
       alt?: string;
     }
   | {
-      type: "reels";
+      type: "instagram";
       id: string;
-      /** Original Instagram / Reels URL (shown as fallback "Открыть в Instagram"). */
       url: string;
-      /** Thumbnail image shown in the strip tile. Falls back to a branded placeholder. */
-      thumbnailSrc?: string;
+      embedId: string;
+      posterSrc: string | null;
+      title?: string;
+    }
+  | {
+      type: "youtube";
+      id: string;
+      url: string;
+      embedId: string;
+      posterSrc: string | null;
       title?: string;
     };

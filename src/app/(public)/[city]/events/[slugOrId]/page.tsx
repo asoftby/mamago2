@@ -20,6 +20,7 @@ import { resolveCanonicalEventPublicPathBySlugOrId } from "@/lib/business/resolv
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { resolveEventCanonicalUrl } from "@/lib/seo/resolveEventCanonicalUrl";
 import { fetchReelsThumbnail } from "@/lib/instagram/fetchReelsThumbnail";
+import { parseVideoUrl } from "@/lib/media/parseVideoUrl";
 import { tryResolvePublicationForCta } from "@/server/services/direct/directThread.service";
 import { getCityDisplayName, getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { PublicationType } from "@prisma/client";
@@ -201,7 +202,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
       typeof (fromDb.scheduleJson as Record<string, unknown>).reelsUrl === "string"
         ? ((fromDb.scheduleJson as Record<string, unknown>).reelsUrl as string).trim()
         : null;
-    const reelsThumbnailUrl = rawReelsUrl
+    const reelsThumbnailUrl = rawReelsUrl && parseVideoUrl(rawReelsUrl)?.type === "instagram"
       ? await fetchReelsThumbnail(rawReelsUrl)
       : null;
 

@@ -14,9 +14,21 @@ export function nextLightboxIndex(index: number, total: number, direction: Slide
 
 /* ─── Single item renderer ──────────────────────────────────── */
 function LightboxItem({ item }: { item: MediaGalleryItem }) {
-  if (item.type === "reels") {
-    // Официальный embed.js-плеер: Reels воспроизводится инлайн в модалке.
+  if (item.type === "instagram") {
     return <InstagramReelEmbed url={item.url} title={item.title} />;
+  }
+
+  if (item.type === "youtube") {
+    return (
+      <iframe
+        key={item.embedId}
+        src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(item.embedId)}`}
+        title={item.title ?? "YouTube видео"}
+        className="aspect-video w-[min(88vw,1100px)] rounded-xl bg-black shadow-2xl"
+        allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+      />
+    );
   }
 
   return (
@@ -48,16 +60,19 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
   const total = items.length;
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const didSwipeRef = useRef(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
 
   const navigate = useCallback((direction: SlideDirection) => {
     if (total <= 1 || transition) return;
     const to = nextLightboxIndex(idx, total, direction);
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (items[idx]?.type !== "image" || items[to]?.type !== "image" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setIdx(to);
       return;
     }
     setTransition({ from: idx, to, direction, moving: false });
-  }, [idx, total, transition]);
+  }, [idx, items, total, transition]);
   const prev = useCallback(() => navigate(-1), [navigate]);
   const next = useCallback(() => navigate(1), [navigate]);
 
@@ -108,16 +123,32 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
   }
 
   useEffect(() => {
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus();
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+      openerRef.current?.focus();
+    };
+  }, [onClose]);
+
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
       if (e.key === "ArrowLeft") prev();
       if (e.key === "ArrowRight") next();
+      if (e.key === "Tab") {
+        const focusable = dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], iframe, [tabindex]:not([tabindex="-1"])');
+        if (!focusable?.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
     }
     document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
     };
   }, [onClose, prev, next]);
 
@@ -126,6 +157,7 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/92 p-4 backdrop-blur-sm"
       onClick={handleBackdropClick}
       onTouchStart={handleTouchStart}
@@ -136,6 +168,7 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
     >
       {/* Close */}
       <button
+        ref={closeRef}
         type="button"
         onClick={onClose}
         aria-label="Закрыть"
