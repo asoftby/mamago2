@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { RecommendationSurface } from "@prisma/client";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
+import { SYSTEM_INTERESTS } from "@/lib/config/interests";
 
 /**
  * decisionContext.v1 — shared shape for "what is being decided, for whom,
@@ -78,6 +79,28 @@ const ConstraintValueSchema = z.object({
   source: z.enum(SUBJECT_SOURCE),
 });
 
+const CANONICAL_SYSTEM_INTEREST_VALUES = SYSTEM_INTERESTS.map((interest) => interest.slug) as [
+  string,
+  ...string[],
+];
+export const ProfileInterestsConstraintSchema = z.object({
+  value: z.array(z.enum(CANONICAL_SYSTEM_INTEREST_VALUES)).max(SYSTEM_INTERESTS.length),
+  source: z.literal("profile"),
+});
+const DecisionConstraintsSchema = z
+  .record(z.string(), ConstraintValueSchema)
+  .superRefine((constraints, ctx) => {
+    if (!("interests" in constraints)) return;
+    const parsed = ProfileInterestsConstraintSchema.safeParse(constraints.interests);
+    if (!parsed.success) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["interests"],
+        message: "interests must contain bounded canonical profile values",
+      });
+    }
+  });
+
 export const DecisionContextV1Schema = z.object({
   contextVersion: z.literal(DECISION_CONTEXT_VERSION),
   /** Set once the RecommendationRun exists; null while still being built. */
@@ -92,7 +115,7 @@ export const DecisionContextV1Schema = z.object({
     .nullable()
     .optional(),
   subjects: z.array(SubjectSchema),
-  constraints: z.record(z.string(), ConstraintValueSchema).optional(),
+  constraints: DecisionConstraintsSchema.optional(),
   /** Reserved for FAM-004 (Family/Person/Membership). Always null until then. */
   familyId: z.string().nullable(),
   actor: z.object({

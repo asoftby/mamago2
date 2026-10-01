@@ -11,7 +11,7 @@ import { mapFamilyRoleToLabel } from "@/lib/account/mapFamilyRoleToLabel";
 import { listUserBirthdayParties } from "@/server/services/userBirthdays.service";
 import { buildAdultPreferenceDisplayLine } from "@/lib/adultPersonaSignals/buildAdultPreferenceLine";
 import { getSystemInterestLabel } from "@/lib/config/interests";
-import { childDisplayName } from "@/lib/child/birth";
+import { ageYearsAt, childDisplayName } from "@/lib/child/birth";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 import { getPartyDisplayTitle } from "@/features/me/lib/userBirthdayPartyUi";
 import { getPartyScenarioFlowUi } from "@/features/me/lib/partyScenarioFlow";
@@ -28,14 +28,10 @@ type PageProps = {
 };
 
 /** «6 лет» / «8 мес.» / «Возраст не указан». */
-function ageLine(birthDate: Date | null): string {
-  if (!birthDate || Number.isNaN(birthDate.getTime())) return "Возраст не указан";
-  const now = new Date();
-  const months =
-    (now.getFullYear() - birthDate.getFullYear()) * 12 +
-    (now.getMonth() - birthDate.getMonth());
-  if (months < 12) return `${months} мес.`;
-  const years = Math.floor(months / 12);
+function ageLine(child: { birthDate: Date | null; birthPrecision: "DAY" | "MONTH" | null }): string {
+  const years = ageYearsAt(child, new Date());
+  if (years == null) return "Возраст не указан";
+  if (years === 0) return "До года";
   return `${years} ${years === 1 ? "год" : years < 5 ? "года" : "лет"}`;
 }
 
@@ -105,9 +101,7 @@ export default async function MePage({ searchParams }: PageProps) {
   });
 
   // ── Family: adult first, then children ──
-  const adultRole = [mapFamilyRoleToLabel(user.familyRole), user.ageBandLabel]
-    .filter((v) => v && String(v).trim())
-    .join(" · ");
+  const adultRole = mapFamilyRoleToLabel(user.familyRole);
   const family: AccountFamilyMember[] = [
     {
       key: "me",
@@ -116,7 +110,7 @@ export default async function MePage({ searchParams }: PageProps) {
       role: adultRole || "Родитель",
       hint: preferenceDisplayLine?.trim() || "Настроим рекомендации",
     },
-    ...childrenRaw.map((child): AccountFamilyMember => {
+    ...childrenRaw.map((child, index): AccountFamilyMember => {
       const interests = [
         ...systemInterestsData
           .filter((i) => i.childId === child.id)
@@ -125,12 +119,12 @@ export default async function MePage({ searchParams }: PageProps) {
           .filter((c) => c.childId === child.id)
           .map((c) => c.label),
       ].filter(Boolean);
-      const displayName = childDisplayName(child.name);
+      const displayName = childDisplayName(child.name, index + 1);
       return {
         key: child.id,
         initial: displayName.charAt(0).toUpperCase(),
         name: displayName,
-        role: ageLine(child.birthDate ? new Date(child.birthDate) : null),
+        role: ageLine(child),
         interests: interests.slice(0, 3),
         hint: "Добавьте интересы",
       };

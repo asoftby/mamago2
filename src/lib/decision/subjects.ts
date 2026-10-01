@@ -6,6 +6,7 @@ import {
   sanitizeCanonicalAgeRanges,
   type Subject,
 } from "@/lib/decision/decisionContext";
+import { SYSTEM_INTERESTS } from "@/lib/config/interests";
 
 export type BuildSubjectsSnapshotInput = {
   userId: string;
@@ -21,11 +22,11 @@ export type BuildSubjectsSnapshotInput = {
  * trusted. Age range is computed server-side; the client never sends a
  * birth date.
  */
-export async function buildSubjectsSnapshot(
+export async function buildSelectedProfileContext(
   input: BuildSubjectsSnapshotInput,
-): Promise<Subject[]> {
+): Promise<{ subjects: Subject[]; systemInterestSlugs: string[] }> {
   const personaIds = [...new Set(input.personaIds.filter((id) => id.trim().length > 0))];
-  if (personaIds.length === 0) return [];
+  if (personaIds.length === 0) return { subjects: [], systemInterestSlugs: [] };
 
   const targetDate = new Date(input.targetDate);
   const subjects: Subject[] = [];
@@ -49,8 +50,15 @@ export async function buildSubjectsSnapshot(
   if (childIds.length > 0) {
     const children = await prisma.child.findMany({
       where: { id: { in: childIds }, parentId: input.userId },
-      select: { id: true, birthDate: true, birthPrecision: true },
+      select: {
+        id: true,
+        birthDate: true,
+        birthPrecision: true,
+        systemInterests: { select: { interestSlug: true } },
+      },
     });
+    const allowedInterests = new Set(SYSTEM_INTERESTS.map((interest) => interest.slug));
+    const systemInterestSlugs = new Set<string>();
     for (const child of children) {
       const ageRange = child.birthDate
         ? ageRangeAt(child.birthDate, targetDate, child.birthPrecision)
@@ -61,10 +69,24 @@ export async function buildSubjectsSnapshot(
         ...(ageRange ? { ageRange } : {}),
         source: "profile",
       });
+      for (const interest of child.systemInterests) {
+        if (allowedInterests.has(interest.interestSlug)) {
+          systemInterestSlugs.add(interest.interestSlug);
+        }
+      }
     }
+    return {
+      subjects,
+      systemInterestSlugs: [...systemInterestSlugs].sort().slice(0, SYSTEM_INTERESTS.length),
+    };
   }
+  return { subjects, systemInterestSlugs: [] };
+}
 
-  return subjects;
+export async function buildSubjectsSnapshot(
+  input: BuildSubjectsSnapshotInput,
+): Promise<Subject[]> {
+  return (await buildSelectedProfileContext(input)).subjects;
 }
 
 /**

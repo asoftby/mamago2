@@ -271,13 +271,13 @@ export function AccountDesign(props: AccountDesignProps) {
                 className="member-add"
                 style={{ flex: "0 0 auto", minWidth: 110 }}
                 onClick={() => setIsAddMemberOpen(true)}
-                aria-label="Добавить участника"
+                aria-label="Добавить ребёнка"
               >
                 <div style={{ width: 38, height: 38, borderRadius: 99, border: "1.5px dashed var(--line-2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Ic.Plus />
                 </div>
                 <span style={{ fontSize: 12, color: "var(--ink-3)", textAlign: "center", lineHeight: 1.3 }}>
-                  Добавить<br />участника
+                  Добавить<br />ребёнка
                 </span>
               </button>
             </div>
@@ -458,6 +458,7 @@ export function AccountDesign(props: AccountDesignProps) {
       <AddParticipantModal
         isOpen={isAddMemberOpen}
         onClose={() => setIsAddMemberOpen(false)}
+        childOnly
       />
     </div>
   );
