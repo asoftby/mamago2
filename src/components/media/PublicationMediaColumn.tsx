@@ -85,9 +85,12 @@ export function PublicationMediaColumn({
 }: PublicationMediaColumnProps) {
   const items = useMemo<MediaGalleryItem[]>(() => {
     const poster = media.posterUrl?.trim();
-    const rest = (galleryItems ?? []).filter(
-      (item) => item.type !== "image" || item.src.trim() !== poster,
-    );
+    const rest: MediaGalleryItem[] = (galleryItems ?? [])
+      .filter((item) => item.type !== "image" || item.src.trim() !== poster)
+      .map((item) => {
+        if (item.type === "image" || item.posterSrc || !poster) return item;
+        return { ...item, posterSrc: poster };
+      });
 
     if (
       media.trailerYoutubeId &&
