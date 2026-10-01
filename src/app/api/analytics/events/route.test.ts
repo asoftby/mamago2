@@ -62,6 +62,19 @@ async function testOversizedMetaRejected() {
   assert.equal(rows.length, 0);
 }
 
+async function testServerOnlyExperienceEventsRejected() {
+  for (const eventType of ["PLAN_AUDIENCE_SNAPSHOT", "ATTENDED", "EXPERIENCE_FEEDBACK"]) {
+    const res = await postEvent({
+      eventType,
+      entityType: "EVENT",
+      entityId: FIXTURE_ENTITY_ID,
+    });
+    assert.equal(res.status, 400, `${eventType} must be server-only`);
+  }
+  const rows = await prisma.userEvent.findMany({ where: { entityId: FIXTURE_ENTITY_ID } });
+  assert.equal(rows.length, 0, "server-only event attempts must not write rows");
+}
+
 async function testMalformedJsonDoesNotCrash() {
   const req = new NextRequest("http://localhost:3000/api/analytics/events", {
     method: "POST",
@@ -76,6 +89,7 @@ async function main() {
   await cleanup(); // guard against leftovers from a previously interrupted run
   await testInvalidEventTypeRejected();
   await testOversizedMetaRejected();
+  await testServerOnlyExperienceEventsRejected();
   await testMalformedJsonDoesNotCrash();
   console.log("/api/analytics/events ingestion tests: OK");
   process.exit(0);

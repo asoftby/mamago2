@@ -24,9 +24,13 @@ const analyticsMetaSchema = z
   );
 
 const bodySchema = z.object({
-  // Server-only snapshot events are never accepted from a client.
+  // Server-only snapshot/outcome events are never accepted from a generic client.
+  // ATTENDED is valid only through the authenticated explicit plan check-in API.
   eventType: z.nativeEnum(UserEventType).refine(
-    (type) => type !== UserEventType.PLAN_AUDIENCE_SNAPSHOT,
+    (type) =>
+      type !== UserEventType.PLAN_AUDIENCE_SNAPSHOT &&
+      type !== UserEventType.ATTENDED &&
+      type !== UserEventType.EXPERIENCE_FEEDBACK,
     "server_only_event_type",
   ),
   entityType: z.nativeEnum(AnalyticsEntityType).optional().nullable(),

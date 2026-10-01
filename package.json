@@ -128,6 +128,8 @@
     "test:responsive-wizard": "tsx src/lib/responsive/formWizardMobileContract.test.ts",
     "test:responsive-public-mobile": "tsx src/lib/responsive/publicMobileLayoutContract.test.ts",
     "test:notifications-mvp": "tsx src/lib/notifications/userNotificationPresentation.test.ts && tsx src/lib/notifications/userNotificationSchedule.test.ts && tsx src/lib/notifications/planNotificationScheduleUi.test.ts && tsx src/server/notifications/notification-renderer.test.ts && tsx src/server/notifications/notification-dedupe.test.ts && tsx src/server/notifications/notification.service.test.ts && tsx src/server/notifications/jobs/run-plan-event-reminders.test.ts && tsx src/server/notifications/jobs/run-plan-tomorrow-digests.test.ts && tsx src/server/notifications/template-render.test.ts",
+    "test:plan-experience-contract": "tsx src/server/services/experience/experience.contract.test.ts",
+    "test:plan-experience-integration": "tsx src/server/services/experience/experience.integration.test.ts",
     "test:notification-templates": "tsx src/server/notifications/template-render.test.ts",
     "test:anti-repeat": "tsx src/features/hero-weather/model/anti-repeat.test.ts",
     "test:my-plan-default-participants": "tsx src/features/my-plan/lib/resolveDefaultParticipants.test.ts",
