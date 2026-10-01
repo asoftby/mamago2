@@ -72,7 +72,6 @@ function GalleryImage({
         fill
         className={className}
         sizes={thumbnail ? "192px" : "(min-width: 1024px) 440px, 100vw"}
-        quality={thumbnail ? 92 : 85}
         priority={priority}
         onError={onError}
       />
