@@ -17,12 +17,12 @@ import { ProfileCompletionFlow } from "@/components/post-auth/ProfileCompletionF
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
   savePostAuthContext,
-  clearPostAuthContext,
-  applyPostAuthCompletionOutcome,
+  finishPostAuthOnboarding,
+  runPostAuthPipeline,
   trackAuthCompleted,
 } from "@/lib/post-auth";
 import { trackPostAuthEvent } from "@/lib/post-auth/analytics";
-import type { PendingEntityType, ProfileStatePayload } from "@/lib/post-auth/types";
+import type { PendingEntityType } from "@/lib/post-auth/types";
 
 export type SaveActivityFlowAdaptiveProps = {
   open: boolean;
@@ -212,36 +212,16 @@ export function SaveActivityFlowAdaptive({
       trackAuthCompleted(
         pending.action === "ideas" ? "save_idea" : "save_plan",
       );
-      await runPersist(pending);
-      trackPostAuthEvent("pending_action_executed", {
-        kind: pending.action,
+      const result = await runPostAuthPipeline({
+        defaultSource: pending.action === "ideas" ? "save_idea" : "save_plan",
+        isMobile,
+        router,
+        pendingActionExecutor: () => runPersist(pending),
       });
-      clearPostAuthContext();
-
-      const res = await fetch("/api/me/profile-state", { credentials: "include" });
-      const profile = (await res.json()) as ProfileStatePayload;
-      if (!res.ok) {
-        finishSuccess();
-        return;
-      }
-
-      if (!profile.isProfileComplete) {
+      if (result.kind === "completion") {
         setPhase("completion");
         return;
       }
-
-      applyPostAuthCompletionOutcome(
-        pending.action === "ideas" ? "save_idea" : "save_plan",
-        {
-          isMobile,
-          router,
-          returnTo:
-            typeof window !== "undefined"
-              ? `${window.location.pathname}${window.location.search}`
-              : null,
-          toast,
-        },
-      );
       finishSuccess();
     } catch {
       // тост у onPersist; остаёмся на шаге входа
@@ -254,20 +234,19 @@ export function SaveActivityFlowAdaptive({
         finishSuccess();
         return;
       }
-      if (opts?.alreadyComplete !== true) {
-        applyPostAuthCompletionOutcome(
-          pending.action === "ideas" ? "save_idea" : "save_plan",
-          {
-            isMobile,
-            router,
-            returnTo:
-              typeof window !== "undefined"
-                ? `${window.location.pathname}${window.location.search}`
-                : null,
-            toast,
-          },
-        );
-      }
+      finishPostAuthOnboarding(
+        pending.action === "ideas" ? "save_idea" : "save_plan",
+        {
+          alreadyComplete: opts?.alreadyComplete,
+          isMobile,
+          router,
+          returnTo:
+            typeof window !== "undefined"
+              ? `${window.location.pathname}${window.location.search}`
+              : null,
+          toast,
+        },
+      );
       router.refresh();
       finishSuccess();
     },

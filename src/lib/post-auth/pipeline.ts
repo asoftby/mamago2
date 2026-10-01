@@ -6,7 +6,11 @@ import type { AuthEntryPoint } from "./types";
 import { getPostAuthContext, clearPostAuthAction, clearPostAuthContext } from "./storage";
 import { executePendingPostAuthAction } from "./executePendingAction";
 import type { ProfileStatePayload } from "./types";
-import { applyPostAuthCompletionOutcome, showAuthSuccessToast } from "./resolver";
+import {
+  applyPostAuthCompletionOutcome,
+  resolvePostAuthFlow,
+  showAuthSuccessToast,
+} from "./resolver";
 import { trackPostAuthEvent } from "./analytics";
 
 function isPlainAuthFlow(source: AuthEntryPoint): boolean {
@@ -29,6 +33,12 @@ export interface RunPostAuthPipelineOptions {
   };
   /** Для My Plan overlay: не делать router.push после готового профиля */
   skipNavigation?: boolean;
+  /**
+   * Surface-aware pending action. Save overlays use their existing persistence
+   * callback so local UI/cache updates stay intact while resolution remains
+   * centralized. When omitted, the serialized context action is executed.
+   */
+  pendingActionExecutor?: () => Promise<void>;
 }
 
 /**
@@ -38,7 +48,13 @@ export interface RunPostAuthPipelineOptions {
 export async function runPostAuthPipeline(
   options: RunPostAuthPipelineOptions,
 ): Promise<PostAuthPipelineResult> {
-  const { defaultSource = "profile", isMobile, router, skipNavigation } = options;
+  const {
+    defaultSource = "profile",
+    isMobile,
+    router,
+    skipNavigation,
+    pendingActionExecutor,
+  } = options;
 
   const ctx = getPostAuthContext();
   const source: AuthEntryPoint = ctx?.source ?? defaultSource;
@@ -57,11 +73,19 @@ export async function runPostAuthPipeline(
     console.error("[post-auth] guest my-plan migration failed", e);
   }
 
-  if (ctx?.pendingAction) {
+  if (pendingActionExecutor || ctx?.pendingAction) {
     try {
-      await executePendingPostAuthAction(ctx.pendingAction);
+      if (pendingActionExecutor) {
+        await pendingActionExecutor();
+      } else {
+        await executePendingPostAuthAction(ctx?.pendingAction ?? null);
+      }
       trackPostAuthEvent("pending_action_executed", { source });
     } catch (e) {
+      // A surface-provided executor owns visible persistence state. Preserve
+      // its previous fail-closed contract instead of continuing to onboarding
+      // and eventually showing a false save success.
+      if (pendingActionExecutor) throw e;
       console.error("[post-auth] pending action failed", e);
     }
   }
@@ -73,13 +97,14 @@ export async function runPostAuthPipeline(
   }
 
   const profile = (await res.json()) as ProfileStatePayload;
+  const resolution = resolvePostAuthFlow({ source, returnTo, profile });
 
   if (isPlainAuthFlow(source) && authAction) {
     showAuthSuccessToast(authAction, toast);
     clearPostAuthAction();
   }
 
-  if (!profile.isProfileComplete) {
+  if (resolution.kind === "completion") {
     trackPostAuthEvent("completion_started", { source });
     return { kind: "completion", source, returnTo };
   }
