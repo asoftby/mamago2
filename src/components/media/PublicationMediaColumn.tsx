@@ -20,6 +20,16 @@ function itemPoster(item: MediaGalleryItem): string | null {
   return item.type === "image" ? item.src : item.posterSrc;
 }
 
+function highQualityPoster(item: MediaGalleryItem): string | null {
+  const poster = itemPoster(item);
+  if (!poster || item.type !== "youtube") return poster;
+
+  return poster.replace(
+    /\/hqdefault\.jpg(?:\?.*)?$/i,
+    "/maxresdefault.jpg",
+  );
+}
+
 function videoProviderLabel(item: MediaGalleryItem): "Reels" | "Post" | "YouTube" | null {
   if (item.type === "youtube") return "YouTube";
   if (item.type === "instagram") {
@@ -37,13 +47,17 @@ function GalleryImage({
   priority: boolean;
   thumbnail?: boolean;
 }) {
+  const originalPoster = itemPoster(item);
   const [src, setSrc] = useState(
-    itemPoster(item) ?? (item.type === "image" ? "/og-default.jpg" : ""),
+    highQualityPoster(item) ?? (item.type === "image" ? "/og-default.jpg" : ""),
   );
   const alt = item.type === "image" ? (item.alt ?? "Фото") : "";
   const className = "absolute inset-0 h-full w-full object-cover";
   const onError = () =>
     setSrc((current) => {
+      if (item.type === "youtube" && originalPoster && current !== originalPoster) {
+        return originalPoster;
+      }
       if (item.type !== "image") return "";
       return current === "/og-default.jpg" ? current : "/og-default.jpg";
     });
@@ -57,7 +71,8 @@ function GalleryImage({
         alt={alt}
         fill
         className={className}
-        sizes={thumbnail ? "96px" : "(min-width: 1024px) 440px, 100vw"}
+        sizes={thumbnail ? "192px" : "(min-width: 1024px) 440px, 100vw"}
+        quality={thumbnail ? 92 : 85}
         priority={priority}
         onError={onError}
       />
