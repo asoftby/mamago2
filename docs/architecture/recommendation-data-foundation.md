@@ -79,7 +79,7 @@ Telegram feedback should produce a normal recommendation-attributed behavioral o
 
 `/admin/ranking/telegram` is the policy/configuration surface for Telegram recommendations.
 
-- It reuses the existing shared EVENT ranking contract `engagement-freshness-v1` and does not define Telegram behavior weights.
+- It reuses the shared EVENT ranking contract `engagement-profile-interest-v2` and does not define Telegram behavior weights. Profile-interest input is currently supplied only by authenticated My Plan; surfaces without it retain engagement/freshness ordering.
 - `RecommendationSurfacePolicy` stores draft/published policy versions separately from `algorithmVersion`.
 - The current policy fields are `resultCount`, `horizonDays`, `minimumScore`, `minimumResultCount`, `maxPerCategory`, and `repeatCooldownDays`.
 - Preview applies the policy read-only and deliberately does **not** write `RecommendationRun` / `RecommendationExposure`; admin experiments must not pollute recommendation telemetry or learning.
@@ -105,6 +105,6 @@ Recommendation trace account/session identifiers are logical, not hard foreign k
 
 My Plan currently ranks real EVENT candidates using the existing engagement score and freshness tie-break. The first trace version is:
 
-`engagement-freshness-v1`
+`engagement-profile-interest-v2`
 
-Tracing this behavior does not silently introduce a new recommender. Future ranking changes must intentionally bump `algorithmVersion`.
+This version adds a bounded canonical system-interest boost for selected owned child personas while preserving non-matching candidates. Future ranking changes must intentionally bump `algorithmVersion`.

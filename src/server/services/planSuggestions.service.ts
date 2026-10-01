@@ -7,13 +7,57 @@ import { activityInAnyOfCitiesWhere } from "@/server/discovery/activityInCityWhe
 import { resolveKudaDiscoveryCityIds } from "@/server/discovery/discoveryHubExpand";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
+import { SYSTEM_INTERESTS } from "@/lib/config/interests";
 
 /**
  * Current real shared EVENT ranking contract. This is deliberately versioned
  * before any ML/personal ranking is introduced so historic exposures remain
  * explainable after the algorithm evolves.
  */
-export const PLAN_SUGGESTION_ALGORITHM_VERSION = "engagement-freshness-v1";
+export const PLAN_SUGGESTION_ALGORITHM_VERSION = "engagement-profile-interest-v2";
+export const INTEREST_MATCH_WEIGHT = 4;
+export const MAX_INTEREST_MATCHES = 2;
+
+const CANONICAL_INTEREST_SLUGS = new Set(SYSTEM_INTERESTS.map((interest) => interest.slug));
+
+export function eventSystemInterestSlugs(scheduleJson: unknown): string[] {
+  if (!scheduleJson || typeof scheduleJson !== "object" || Array.isArray(scheduleJson)) return [];
+  const signals = (scheduleJson as Record<string, unknown>).signals;
+  if (!signals || typeof signals !== "object" || Array.isArray(signals)) return [];
+  const interests = (signals as Record<string, unknown>).interests;
+  if (!Array.isArray(interests)) return [];
+  return [...new Set(interests.filter(
+    (value): value is string => typeof value === "string" && CANONICAL_INTEREST_SLUGS.has(value),
+  ))];
+}
+
+export function profileInterestScore(
+  profileInterestSlugs: readonly string[],
+  scheduleJson: unknown,
+): { interestMatchCount: number; interestBoost: number } {
+  const selected = new Set(profileInterestSlugs.filter((slug) => CANONICAL_INTEREST_SLUGS.has(slug)));
+  const matchCount = eventSystemInterestSlugs(scheduleJson).filter((slug) => selected.has(slug)).length;
+  const interestMatchCount = Math.min(matchCount, MAX_INTEREST_MATCHES);
+  return { interestMatchCount, interestBoost: interestMatchCount * INTEREST_MATCH_WEIGHT };
+}
+
+export function planSuggestionScore(input: {
+  engagementScore: number;
+  profileInterestSlugs: readonly string[];
+  scheduleJson: unknown;
+}): {
+  score: number;
+  interestMatchCount: number;
+  interestBoost: number;
+  interestReasonCodes: string[];
+} {
+  const interest = profileInterestScore(input.profileInterestSlugs, input.scheduleJson);
+  return {
+    score: input.engagementScore + interest.interestBoost,
+    ...interest,
+    interestReasonCodes: interest.interestMatchCount > 0 ? ["INTEREST_MATCH"] : [],
+  };
+}
 
 /** Следующий календарный день для "YYYY-MM-DD" — чистая арифметика по частям даты, без Date/TZ. */
 function nextDateKey(dateIso: string): string {
@@ -106,6 +150,8 @@ export type RankedPlanSuggestion = {
   score: number;
   scoreBreakdown: {
     engagementScore: number;
+    interestMatchCount: number;
+    interestBoost: number;
     freshnessSortAt: string;
     ageFilterApplied: boolean;
     ageFallbackUsed: boolean;
@@ -137,6 +183,8 @@ export type PlanSuggestionsInput = {
    * unbounded query. This does not change scoring or signal interpretation.
    */
   exhaustiveCandidatePool?: boolean;
+  /** Server-resolved canonical ChildInterest.interestSlug values. Never client supplied. */
+  profileInterestSlugs?: string[];
 };
 
 /**
@@ -150,6 +198,9 @@ export async function rankPlanSuggestionsForCity(
   const take = input.take ?? 6;
   const exhaustiveCandidatePool = input.exhaustiveCandidatePool === true;
   const ageRangeValues = (input.ageRangeValues ?? []).filter(Boolean);
+  const profileInterestSlugs = [...new Set(input.profileInterestSlugs ?? [])]
+    .filter((slug) => CANONICAL_INTEREST_SLUGS.has(slug))
+    .slice(0, SYSTEM_INTERESTS.length);
   const city = await findCityBySlug(input.citySlug.toLowerCase());
   if (!city) {
     return {
@@ -250,8 +301,8 @@ export async function rankPlanSuggestionsForCity(
   const scoreMap = await getEventEngagementScores(rows.map((row) => row.id));
 
   rows.sort((a, b) => {
-    const scoreA = scoreMap.get(a.id) ?? 0;
-    const scoreB = scoreMap.get(b.id) ?? 0;
+    const scoreA = planSuggestionScore({ engagementScore: scoreMap.get(a.id) ?? 0, profileInterestSlugs, scheduleJson: a.scheduleJson }).score;
+    const scoreB = planSuggestionScore({ engagementScore: scoreMap.get(b.id) ?? 0, profileInterestSlugs, scheduleJson: b.scheduleJson }).score;
     if (scoreA !== scoreB) return scoreB - scoreA;
     const timeA = a.nextOccurrenceAt?.getTime() ?? a.createdAt.getTime();
     const timeB = b.nextOccurrenceAt?.getTime() ?? b.createdAt.getTime();
@@ -267,19 +318,24 @@ export async function rankPlanSuggestionsForCity(
       ...activity
     } = row;
     const engagementScore = scoreMap.get(row.id) ?? 0;
+    const interestSignal = planSuggestionScore({ engagementScore, profileInterestSlugs, scheduleJson: row.scheduleJson });
+    const { interestMatchCount, interestBoost } = interestSignal;
     const freshnessSortAt = (nextOccurrenceAt ?? createdAt).toISOString();
     const reasonCodes = [
       ...(ageFilterApplied ? ["AGE_SCOPE"] : []),
       ...(ageFallbackUsed ? ["AGE_FALLBACK"] : []),
       ...(engagementScore > 0 ? ["ENGAGEMENT"] : []),
+      ...interestSignal.interestReasonCodes,
       "FRESHNESS_TIE_BREAK",
     ];
 
     return {
       activity,
-      score: engagementScore,
+      score: interestSignal.score,
       scoreBreakdown: {
         engagementScore,
+        interestMatchCount,
+        interestBoost,
         freshnessSortAt,
         ageFilterApplied,
         ageFallbackUsed,

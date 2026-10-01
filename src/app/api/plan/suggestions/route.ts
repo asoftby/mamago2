@@ -7,7 +7,7 @@ import { rankPlanSuggestionsForCity } from "@/server/services/planSuggestions.se
 import { recordRecommendationRun } from "@/server/services/recommendations/RecommendationTraceService";
 import { trackFirstOccurrenceEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { SUGGESTIONS_PER_BATCH } from "@/features/my-plan/lib/suggestionsConfig";
-import { buildSubjectsSnapshot } from "@/lib/decision/subjects";
+import { buildSelectedProfileContext } from "@/lib/decision/subjects";
 import { parseCanonicalAgeRangesQuery } from "@/lib/decision/decisionContext";
 import { parseSafeOpaqueId } from "@/lib/decision/identifiers";
 import { isPersonalizedResult } from "@/lib/decision/personalization";
@@ -74,6 +74,11 @@ export async function GET(request: NextRequest) {
 
     const excludeActivityIds = [...new Set([...excludeParam, ...plannedIds])];
 
+    const selectedProfileContext =
+      personaIds.length > 0 && date
+        ? await buildSelectedProfileContext({ userId: user.id, personaIds, targetDate: date })
+        : { subjects: [], systemInterestSlugs: [] };
+
     const batch = await rankPlanSuggestionsForCity({
       citySlug,
       excludeActivityIds,
@@ -82,13 +87,11 @@ export async function GET(request: NextRequest) {
       ...(ageRangesParam.length > 0
         ? { ageRangeValues: ageRangesParam }
         : {}),
+      profileInterestSlugs: selectedProfileContext.systemInterestSlugs,
     });
 
     const sessionRowId = await getSessionRowIdFromCookies();
-    const subjects =
-      personaIds.length > 0 && date
-        ? await buildSubjectsSnapshot({ userId: user.id, personaIds, targetDate: date })
-        : [];
+    const subjects = selectedProfileContext.subjects;
     const trace = await recordRecommendationRun({
       userId: user.id,
       sessionId: sessionRowId,
@@ -104,6 +107,14 @@ export async function GET(request: NextRequest) {
         constraints: {
           ...(ageRangesParam.length > 0
             ? { ageRanges: { value: ageRangesParam, source: "manual" as const } }
+            : {}),
+          ...(selectedProfileContext.systemInterestSlugs.length > 0
+            ? {
+                interests: {
+                  value: selectedProfileContext.systemInterestSlugs,
+                  source: "profile" as const,
+                },
+              }
             : {}),
           excludedActivityCount: { value: excludeActivityIds.length, source: "derived" as const },
           requestedLimit: { value: SUGGESTIONS_PER_BATCH, source: "derived" as const },
