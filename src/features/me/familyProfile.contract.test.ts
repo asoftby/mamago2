@@ -7,6 +7,7 @@ const profilePage = readFileSync("src/app/(public)/me/profile/page.tsx", "utf8")
 const modal = readFileSync("src/components/children/AddParticipantModal.tsx", "utf8");
 const mePage = readFileSync("src/app/(public)/me/page.tsx", "utf8");
 const suggestionRoute = readFileSync("src/app/api/plan/suggestions/route.ts", "utf8");
+const planMain = readFileSync("src/features/my-plan/components/PlanMainContent.tsx", "utf8");
 
 assert.doesNotMatch(profilePage, /redirect\(["']\/me["']\)/);
 assert.match(profilePage, /redirect\("\/login\?redirectTo=\/me\/profile"\)/);
@@ -23,6 +24,10 @@ assert.match(mePage, /ageYearsAt/);
 assert.match(suggestionRoute, /buildSelectedProfileContext/);
 assert.match(suggestionRoute, /profileInterestSlugs: selectedProfileContext\.systemInterestSlugs/);
 assert.doesNotMatch(suggestionRoute, /searchParams\.get\(["']interestSlugs/);
+assert.match(planMain, /createPlanSuggestionAudienceSnapshot\(ageRangeValues, defaultParticipants\.participants\)/);
+assert.match(planMain, /lastRequestSnapshotRef\.current/);
+assert.match(planMain, /onRegenerate=\{handleRegenerate\}/);
+assert.match(planMain, /personaIds: draft\?\.personaIds \?\? \[\]/);
 const subjectsSource = readFileSync("src/lib/decision/subjects.ts", "utf8");
 assert.match(subjectsSource, /parentId: input\.userId/);
 assert.match(subjectsSource, /systemInterestSlugs/);

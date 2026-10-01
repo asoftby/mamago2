@@ -36,7 +36,9 @@ import { useResolveDefaultParticipants } from "../lib/useResolveDefaultParticipa
 import { writeLastPlanAgeRanges } from "../lib/lastPlanAgeRangesStorage";
 import {
   fetchPlanSuggestions,
+  createPlanSuggestionAudienceSnapshot,
   mapSuggestionToPlanItem,
+  type PlanSuggestionAudienceSnapshot,
   type PlanSuggestionItem,
 } from "../lib/fetchPlanSuggestions";
 import { getAgeGroupByValue } from "@/features/filters/age/ageGroups";
@@ -421,7 +423,10 @@ export function PlanMainContent({
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState(false);
   const [addedSuggestionActivityIds, setAddedSuggestionActivityIds] = useState<string[]>([]);
-  const lastAgeRangeValuesRef = useRef<string[]>([]);
+  const lastRequestSnapshotRef = useRef<PlanSuggestionAudienceSnapshot>({
+    ageRangeValues: [],
+    personaIds: [],
+  });
   /** Все id, когда-либо показанные в подборках этого сеанса — не даём «Ещё варианты» повторяться. */
   const shownSuggestionActivityIdsRef = useRef<Set<string>>(new Set());
   const hydratedDraftKeyRef = useRef<string | null>(null);
@@ -641,8 +646,12 @@ export function PlanMainContent({
    * этом сеансе (shownSuggestionActivityIdsRef) — «Ещё варианты» не повторяет офферы.
    */
   const handleFetchSuggestions = useCallback(
-    async (ageRangeValues: string[]) => {
-      lastAgeRangeValuesRef.current = ageRangeValues;
+    async (snapshot: PlanSuggestionAudienceSnapshot) => {
+      const requestSnapshot = {
+        ageRangeValues: [...snapshot.ageRangeValues],
+        personaIds: [...snapshot.personaIds],
+      };
+      lastRequestSnapshotRef.current = requestSnapshot;
       setIsFetchingSuggestions(true);
       setSuggestionsError(false);
       try {
@@ -657,7 +666,7 @@ export function PlanMainContent({
           citySlug: city,
           date: selectedDate,
           excludeActivityIds: exclude,
-          ageRangeValues,
+          ...requestSnapshot,
         });
         for (const item of results) {
           shownSuggestionActivityIdsRef.current.add(item.id);
@@ -688,14 +697,14 @@ export function PlanMainContent({
   const handleDecideClick = useCallback(() => {
     if (defaultParticipants.source === "needs-age") {
       if (needsAgeAnswerValues && needsAgeAnswerValues.length > 0) {
-        void handleFetchSuggestions(needsAgeAnswerValues);
+        void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(needsAgeAnswerValues, []));
         return;
       }
       setAwaitingAgeAnswer(true);
       return;
     }
     if (defaultParticipants.source === "last-used-age-ranges") {
-      void handleFetchSuggestions(defaultParticipants.ageRanges);
+      void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(defaultParticipants.ageRanges, []));
       return;
     }
     const resolvedChildIds = personas
@@ -704,7 +713,9 @@ export function PlanMainContent({
     const ageRangeValues = deriveAgeRangesFromChildren(childrenList, resolvedChildIds).map(
       (r) => r.range,
     );
-    void handleFetchSuggestions(ageRangeValues);
+    void handleFetchSuggestions(
+      createPlanSuggestionAudienceSnapshot(ageRangeValues, defaultParticipants.participants),
+    );
   }, [defaultParticipants, needsAgeAnswerValues, personas, childrenList, handleFetchSuggestions]);
 
   const handleAgeAnswerConfirm = useCallback(
@@ -713,7 +724,7 @@ export function PlanMainContent({
       setAwaitingAgeAnswer(false);
       writeLastPlanAgeRanges(ageRanges);
       onChangeSelectedAgeRanges(ageRanges.map((range) => ({ range, source: "manual" as const })));
-      void handleFetchSuggestions(ageRanges);
+      void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(ageRanges, []));
     },
     [onChangeSelectedAgeRanges, handleFetchSuggestions],
   );
@@ -721,6 +732,14 @@ export function PlanMainContent({
   const handleAgeAnswerCancel = useCallback(() => {
     setAwaitingAgeAnswer(false);
   }, []);
+
+  const handleRegenerate = useCallback(() => {
+    if (suggestionsGeneration > 0) {
+      void handleFetchSuggestions(lastRequestSnapshotRef.current);
+      return;
+    }
+    handleDecideClick();
+  }, [handleDecideClick, handleFetchSuggestions, suggestionsGeneration]);
 
   const handleRemoveIdea = async (activityId: string) => {
     if (!onRemoveIdea) return;
@@ -881,7 +900,10 @@ export function PlanMainContent({
     setSuggestionsGeneration(draft?.batchNumber ?? 0);
     setSuggestionsError(false);
     setAddedSuggestionActivityIds(draft?.addedActivityIds ?? []);
-    lastAgeRangeValuesRef.current = draft?.ageRangeValues ?? [];
+    lastRequestSnapshotRef.current = {
+      ageRangeValues: draft?.ageRangeValues ?? [],
+      personaIds: draft?.personaIds ?? [],
+    };
     shownSuggestionActivityIdsRef.current = new Set(draft?.shownActivityIds ?? []);
     hydratedDraftKeyRef.current = recommendationDraftKeyValue;
     skipNextDraftPersistRef.current = recommendationDraftKeyValue;
@@ -904,7 +926,8 @@ export function PlanMainContent({
         batchNumber: suggestionsGeneration,
         addedActivityIds: addedSuggestionActivityIds,
         shownActivityIds: [...shownSuggestionActivityIdsRef.current],
-        ageRangeValues: lastAgeRangeValuesRef.current,
+        ageRangeValues: lastRequestSnapshotRef.current.ageRangeValues,
+        personaIds: lastRequestSnapshotRef.current.personaIds,
         lastSuccessfulFetchAt: new Date().toISOString(),
       },
       selectedDate,
@@ -1037,7 +1060,7 @@ export function PlanMainContent({
             <p className="text-sm text-neutral-600">Не получилось загрузить рекомендации</p>
             <button
               type="button"
-              onClick={() => void handleFetchSuggestions(lastAgeRangeValuesRef.current)}
+              onClick={() => void handleFetchSuggestions(lastRequestSnapshotRef.current)}
               className="mt-2 text-sm font-medium text-primary underline-offset-2 hover:underline"
             >
               Попробовать снова
@@ -1046,7 +1069,7 @@ export function PlanMainContent({
         ) : suggestions.length === 0 ? (
           <div className="rounded-[24px] border border-dashed border-neutral-300 bg-neutral-50 p-4 text-center">
             <p className="text-sm text-neutral-600">
-              {buildEmptySuggestionsMessage(selectedDate, todayKey, lastAgeRangeValuesRef.current)}
+              {buildEmptySuggestionsMessage(selectedDate, todayKey, lastRequestSnapshotRef.current.ageRangeValues)}
             </p>
             <button
               type="button"
@@ -1154,7 +1177,7 @@ export function PlanMainContent({
 
           {suggestionsGeneration > 0 ? (
             <PlanRecommendationCta
-              onRegenerate={handleDecideClick}
+              onRegenerate={handleRegenerate}
               onCatalog={handleOpenCatalog}
               isRegenerating={isFetchingSuggestions}
               batchNumber={suggestionsGeneration}
@@ -1241,7 +1264,7 @@ export function PlanMainContent({
 
         {suggestionsGeneration > 0 ? (
           <PlanRecommendationCta
-            onRegenerate={handleDecideClick}
+            onRegenerate={handleRegenerate}
             onCatalog={handleOpenCatalog}
             isRegenerating={isFetchingSuggestions}
             batchNumber={suggestionsGeneration}
