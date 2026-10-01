@@ -2,6 +2,10 @@
 ALTER TYPE "UserEventType" ADD VALUE 'ATTENDED';
 ALTER TYPE "UserEventType" ADD VALUE 'EXPERIENCE_FEEDBACK';
 
+-- Nullable and server-only: existing/ordinary telemetry rows remain untouched.
+ALTER TABLE "UserEvent" ADD COLUMN "idempotencyKey" TEXT;
+CREATE UNIQUE INDEX "UserEvent_idempotencyKey_key" ON "UserEvent"("idempotencyKey");
+
 CREATE TYPE "ExperienceAttendance" AS ENUM ('ATTENDED', 'NOT_ATTENDED');
 CREATE TYPE "ExperienceSentiment" AS ENUM ('LIKE', 'NEUTRAL', 'DISLIKE');
 

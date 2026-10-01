@@ -3,6 +3,14 @@ import { readFileSync } from "node:fs";
 
 const service = readFileSync(new URL("./experience.service.ts", import.meta.url), "utf8");
 const schema = readFileSync(new URL("../../../../prisma/schema.prisma", import.meta.url), "utf8");
+const analyticsService = readFileSync(
+  new URL("../analytics/AnalyticsEventService.ts", import.meta.url),
+  "utf8",
+);
+const genericAnalyticsRoute = readFileSync(
+  new URL("../../../app/api/analytics/events/route.ts", import.meta.url),
+  "utf8",
+);
 const migration = readFileSync(
   new URL("../../../../prisma/migrations/20261001134500_add_plan_experience_feedback_loop/migration.sql", import.meta.url),
   "utf8",
@@ -38,7 +46,14 @@ assert.doesNotMatch(experienceModel, /sourcePlanItem\s+PlanItem/);
 assert.doesNotMatch(experienceModel, /activity\s+Activity/);
 assert.doesNotMatch(migration, /^\s*UPDATE\s+/im);
 assert.doesNotMatch(migration, /^\s*INSERT\s+INTO\s+"Experience"/im);
+assert.match(schema, /idempotencyKey\s+String\?\s+@unique/);
+assert.match(migration, /UserEvent_idempotencyKey_key/);
+assert.match(analyticsService, /PrismaClientKnownRequestError/);
+assert.match(analyticsService, /error\.code === "P2002"/);
+assert.doesNotMatch(genericAnalyticsRoute, /idempotencyKey/);
 assert.match(service, /date:\s*\{\s*gte:\s*oldestDate,\s*lt:\s*today\s*\}/);
+assert.match(service, /while \(candidates\.length < take\)/);
+assert.doesNotMatch(service, /take:\s*Math\.max\(take \* 4, 12\)/);
 assert.match(service, /eventType:\s*"ATTENDED"/);
 assert.doesNotMatch(reminder, /experience|ATTENDED|EXPERIENCE_FEEDBACK/i);
 assert.doesNotMatch(digest, /experience|ATTENDED|EXPERIENCE_FEEDBACK/i);

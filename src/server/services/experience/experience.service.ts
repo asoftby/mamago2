@@ -9,7 +9,6 @@ import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
 import { SubjectSchema, type Subject } from "@/lib/decision/decisionContext";
 import { findMostRecentSubjectsSnapshot } from "@/lib/decision/subjects";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
-import { verifyRecommendationAttribution } from "@/server/services/recommendations/RecommendationTraceService";
 import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
 
 export class ExperienceDomainError extends Error {
@@ -92,51 +91,66 @@ export async function listPendingExperienceCandidates(input: {
   const take = Math.min(3, Math.max(1, input.take ?? 3));
   const oldestDate = addDaysLocal(today, -lookbackDays);
 
-  const pool = await prisma.planItem.findMany({
-    where: {
-      userId: input.userId,
-      activityId: { not: null },
-      date: { gte: oldestDate, lt: today },
-    },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    take: Math.max(take * 4, 12),
-    select: {
-      id: true,
-      activityId: true,
-      date: true,
-      startsAt: true,
-      title: true,
-      activity: { select: { title: true } },
-    },
-  });
-  if (pool.length === 0) return [];
+  const candidates: PendingExperienceCandidate[] = [];
+  const pageSize = 12;
+  let cursor: string | undefined;
 
-  const existing = await prisma.experience.findMany({
-    where: { sourcePlanItemId: { in: pool.map((item) => item.id) } },
-    select: { sourcePlanItemId: true },
-  });
-  const completed = new Set(existing.map((item) => item.sourcePlanItemId));
+  // The date range is the hard bound. Page through it until `take` PENDING
+  // rows are found; never truncate the raw PlanItem pool before excluding
+  // completed occurrences.
+  while (candidates.length < take) {
+    const pool = await prisma.planItem.findMany({
+      where: {
+        userId: input.userId,
+        activityId: { not: null },
+        date: { gte: oldestDate, lt: today },
+      },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+      take: pageSize,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      select: {
+        id: true,
+        activityId: true,
+        date: true,
+        startsAt: true,
+        title: true,
+        activity: { select: { title: true } },
+      },
+    });
+    if (pool.length === 0) break;
+    cursor = pool.at(-1)?.id;
 
-  return pool
-    .filter(
-      (item): item is typeof item & { activityId: string; activity: { title: string } } =>
-        Boolean(item.activityId && item.activity && !completed.has(item.id)),
-    )
-    .slice(0, take)
-    .map((item) => ({
-      planItemId: item.id,
-      activityId: item.activityId,
-      title: item.activity.title || item.title || "Событие",
-      plannedDate: item.date,
-      plannedStartsAt: item.startsAt,
-    }));
+    const existing = await prisma.experience.findMany({
+      where: { sourcePlanItemId: { in: pool.map((item) => item.id) } },
+      select: { sourcePlanItemId: true },
+    });
+    const completed = new Set(existing.map((item) => item.sourcePlanItemId));
+    for (const item of pool) {
+      if (!item.activityId || !item.activity || completed.has(item.id)) continue;
+      candidates.push({
+        planItemId: item.id,
+        activityId: item.activityId,
+        title: item.activity.title || item.title || "Событие",
+        plannedDate: item.date,
+        plannedStartsAt: item.startsAt,
+      });
+      if (candidates.length === take) break;
+    }
+    if (pool.length < pageSize) break;
+  }
+  return candidates;
 }
 
 export async function resolveExperienceOrigin(input: {
   userId: string;
   planItemId: string;
   activityId: string;
-}): Promise<{ decisionId: string; exposureId: string } | null> {
+}): Promise<{
+  decisionId: string;
+  exposureId: string;
+  anonymousId: string | null;
+  sessionId: string | null;
+} | null> {
   const events = await prisma.userEvent.findMany({
     where: {
       userId: input.userId,
@@ -146,7 +160,7 @@ export async function resolveExperienceOrigin(input: {
     },
     orderBy: { createdAt: "desc" },
     take: 20,
-    select: { decisionId: true, meta: true },
+    select: { decisionId: true, anonymousId: true, sessionId: true, meta: true },
   });
 
   for (const event of events) {
@@ -156,15 +170,27 @@ export async function resolveExperienceOrigin(input: {
       typeof meta.recommendationExposureId === "string"
         ? meta.recommendationExposureId.trim()
         : "";
-    if (!exposureId) return null;
-    const verified = await verifyRecommendationAttribution({
-      exposureId,
-      entityType: "EVENT",
-      entityId: input.activityId,
-      userId: input.userId,
+    if (!exposureId || !event.decisionId) return null;
+    // The authenticated PLAN_ADD is canonical historical proof: its
+    // decisionId/meta pair was written only after server-side verification.
+    // Re-check immutable exposure/entity/run consistency without imposing the
+    // current actor on a guest-owned historical RecommendationRun.
+    const verified = await prisma.recommendationExposure.findFirst({
+      where: {
+        id: exposureId,
+        runId: event.decisionId,
+        entityType: "EVENT",
+        entityId: input.activityId,
+      },
+      select: { id: true, runId: true },
     });
-    if (!verified || (event.decisionId && event.decisionId !== verified.runId)) return null;
-    return { decisionId: verified.runId, exposureId: verified.exposureId };
+    if (!verified) return null;
+    return {
+      decisionId: verified.runId,
+      exposureId: verified.id,
+      anonymousId: event.anonymousId,
+      sessionId: event.sessionId,
+    };
   }
   return null;
 }
@@ -206,6 +232,13 @@ async function ensureExperienceTelemetry(
   }
 
   const subjects = safeSubjects(experience.subjects);
+  const origin = experience.sourceExposureId
+    ? await resolveExperienceOrigin({
+        userId: experience.userId,
+        planItemId: experience.sourcePlanItemId,
+        activityId: experience.entityId,
+      })
+    : null;
   const recommendationMeta = experience.sourceExposureId
     ? {
         source: "recommendation" as const,
@@ -213,8 +246,10 @@ async function ensureExperienceTelemetry(
       }
     : { source: "plan" as const };
   await trackUserEvent({
+    idempotencyKey: `experience:${experience.id}:${eventType.toLowerCase()}`,
     userId: experience.userId,
-    sessionId: context.sessionId ?? null,
+    sessionId: origin?.sessionId ?? context.sessionId ?? null,
+    anonymousId: origin?.anonymousId ?? null,
     eventType,
     entityType: "EVENT",
     entityId: experience.entityId,

@@ -10,6 +10,7 @@ import {
 import { recordPlanAudienceSnapshot } from "@/lib/decision/subjects";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { recordRecommendationRun } from "@/server/services/recommendations/RecommendationTraceService";
+import { resolvePlanActivityOccurrence } from "@/server/services/planOccurrence.service";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL must point at an isolated test database");
@@ -33,12 +34,35 @@ async function waitForOutcome(userEventId: string) {
   return null;
 }
 
+async function addPlanItem(userId: string, activityId: string, date: string) {
+  const occurrence = await resolvePlanActivityOccurrence({ userId, activityId, date });
+  if (occurrence.kind === "update") {
+    const updated = await prisma.planItem.update({
+      where: { id: occurrence.planItemId },
+      data: { date },
+      select: { id: true },
+    });
+    return { ...updated, created: false };
+  }
+  if (occurrence.kind === "completed_same_date") {
+    return { id: occurrence.planItemId, created: false };
+  }
+  const created = await prisma.planItem.create({
+    data: { userId, activityId, date },
+    select: { id: true },
+  });
+  return { ...created, created: true };
+}
+
 async function main() {
   const owner = await prisma.user.create({
     data: { email: `experience-owner-${marker}@example.invalid`, familyRole: "MOM" },
   });
   const stranger = await prisma.user.create({
     data: { email: `experience-stranger-${marker}@example.invalid` },
+  });
+  const paginationUser = await prisma.user.create({
+    data: { email: `experience-pagination-${marker}@example.invalid` },
   });
   const childA = await prisma.child.create({
     data: {
@@ -94,6 +118,44 @@ async function main() {
     assert.equal(candidates.some((candidate) => candidate.planItemId === today.id), false);
     assert.equal(candidates.some((candidate) => candidate.planItemId === future.id), false);
     assert.equal(candidates.some((candidate) => candidate.planItemId === place.id), false);
+
+    const paginationItems = await Promise.all(
+      Array.from({ length: 13 }, (_, index) =>
+        prisma.planItem.create({
+          data: {
+            userId: paginationUser.id,
+            activityId: activity.id,
+            date: `2026-09-${String(17 + index).padStart(2, "0")}`,
+            title: `pagination-${index}`,
+          },
+        }),
+      ),
+    );
+    const paginationNewestFirst = [...paginationItems].sort((a, b) =>
+      b.date.localeCompare(a.date),
+    );
+    await prisma.experience.createMany({
+      data: paginationNewestFirst.slice(0, 12).map((item) => ({
+        userId: paginationUser.id,
+        sourcePlanItemId: item.id,
+        entityType: "EVENT",
+        entityId: activity.id,
+        plannedDate: item.date,
+        attendance: "NOT_ATTENDED",
+        attendanceConfirmedAt: new Date(),
+      })),
+    });
+    const pagedCandidate = await listPendingExperienceCandidates({
+      userId: paginationUser.id,
+      today: "2026-10-01",
+      lookbackDays: 14,
+      take: 1,
+    });
+    assert.equal(pagedCandidate[0]?.planItemId, paginationNewestFirst[12]?.id);
+    await prisma.experience.deleteMany({
+      where: { sourcePlanItemId: { in: paginationItems.map((item) => item.id) } },
+    });
+    await prisma.planItem.deleteMany({ where: { id: { in: paginationItems.map((item) => item.id) } } });
 
     const trace = await recordRecommendationRun({
       userId: owner.id,
@@ -311,6 +373,17 @@ async function main() {
     const concurrentPlan = await prisma.planItem.create({
       data: { userId: owner.id, activityId: activity.id, date: "2026-09-25" },
     });
+    await trackUserEvent({
+      userId: owner.id,
+      eventType: "PLAN_ADD",
+      entityType: "EVENT",
+      entityId: activity.id,
+      meta: {
+        source: "recommendation",
+        recommendationExposureId: exposureId,
+        planItemId: concurrentPlan.id,
+      },
+    });
     const concurrent = await Promise.all([
       confirmPlanExperience({
         userId: owner.id,
@@ -330,6 +403,11 @@ async function main() {
       await prisma.experience.count({ where: { sourcePlanItemId: concurrentPlan.id } }),
       1,
     );
+    const concurrentAttendedEvents = await prisma.userEvent.findMany({
+      where: { idempotencyKey: `experience:${concurrent[0].id}:attended` },
+    });
+    assert.equal(concurrentAttendedEvents.length, 1);
+    assert.ok(await waitForOutcome(concurrentAttendedEvents[0]!.id));
     const concurrentFeedback = await Promise.all([
       submitExperienceFeedback({
         userId: owner.id,
@@ -344,11 +422,136 @@ async function main() {
     ]);
     assert.equal(concurrentFeedback[0].feedbackSentiment, "NEUTRAL");
     assert.equal(concurrentFeedback[1].feedbackSentiment, "NEUTRAL");
+    const concurrentFeedbackEvents = await prisma.userEvent.findMany({
+      where: { idempotencyKey: `experience:${concurrent[0].id}:experience_feedback` },
+    });
+    assert.equal(concurrentFeedbackEvents.length, 1);
+    assert.ok(await waitForOutcome(concurrentFeedbackEvents[0]!.id));
+
+    await prisma.recommendationOutcome.deleteMany({
+      where: { userEventId: concurrentAttendedEvents[0]!.id },
+    });
+    await prisma.userEvent.delete({ where: { id: concurrentAttendedEvents[0]!.id } });
+    await confirmPlanExperience({
+      userId: owner.id,
+      planItemId: concurrentPlan.id,
+      attendance: "ATTENDED",
+      today: "2026-10-01",
+    });
+    assert.equal(
+      await prisma.userEvent.count({
+        where: { idempotencyKey: `experience:${concurrent[0].id}:attended` },
+      }),
+      1,
+      "retry repairs missing telemetry exactly once",
+    );
+
+    const occurrenceActivity = await prisma.activity.create({
+      data: {
+        ownerUserId: owner.id,
+        title: `Occurrence event ${marker}`,
+        shortDesc: "fixture",
+        type: "EVENT",
+        scheduleMode: "ONE_TIME",
+        ageTags: [],
+      },
+    });
+    const firstOccurrence = await addPlanItem(owner.id, occurrenceActivity.id, "2026-09-20");
+    const movedBeforeExperience = await addPlanItem(owner.id, occurrenceActivity.id, "2026-09-21");
+    assert.equal(movedBeforeExperience.id, firstOccurrence.id);
+    const firstOccurrenceExperience = await confirmPlanExperience({
+      userId: owner.id,
+      planItemId: firstOccurrence.id,
+      attendance: "ATTENDED",
+      today: "2026-10-01",
+    });
+    const secondOccurrence = await addPlanItem(owner.id, occurrenceActivity.id, "2026-09-22");
+    assert.notEqual(secondOccurrence.id, firstOccurrence.id);
+    assert.equal(secondOccurrence.created, true);
+    const movedSecondOccurrence = await addPlanItem(owner.id, occurrenceActivity.id, "2026-09-23");
+    assert.equal(movedSecondOccurrence.id, secondOccurrence.id);
+    const secondOccurrenceExperience = await confirmPlanExperience({
+      userId: owner.id,
+      planItemId: secondOccurrence.id,
+      attendance: "ATTENDED",
+      today: "2026-10-01",
+    });
+    assert.notEqual(secondOccurrenceExperience.id, firstOccurrenceExperience.id);
+    assert.equal(firstOccurrenceExperience.sourcePlanItemId, firstOccurrence.id);
+
+    const guestAnonymousId = `guest-${marker}`;
+    const guestActivity = await prisma.activity.create({
+      data: {
+        ownerUserId: owner.id,
+        title: `Guest attributed event ${marker}`,
+        shortDesc: "fixture",
+        type: "EVENT",
+        scheduleMode: "ONE_TIME",
+        ageTags: [],
+      },
+    });
+    const guestPlan = await prisma.planItem.create({
+      data: { userId: owner.id, activityId: guestActivity.id, date: "2026-09-24" },
+    });
+    const guestTrace = await recordRecommendationRun({
+      anonymousId: guestAnonymousId,
+      surface: RecommendationSurface.MY_PLAN,
+      targetDateFrom: guestPlan.date,
+      targetDateTo: guestPlan.date,
+      algorithmVersion: "phase-c-guest-fixture-v1",
+      candidateCount: 1,
+      decisionContext: {
+        intent: "my_plan_suggestions",
+        subjects: [],
+        actor: { kind: "guest", id: guestAnonymousId },
+      },
+      items: [{ entityType: "EVENT", entityId: guestActivity.id, position: 1 }],
+    });
+    assert.ok(guestTrace);
+    const guestExposureId = guestTrace.exposureIdByEntityKey.get(`EVENT:${guestActivity.id}`);
+    assert.ok(guestExposureId);
+    await trackUserEvent({
+      userId: owner.id,
+      anonymousId: guestAnonymousId,
+      eventType: "PLAN_ADD",
+      entityType: "EVENT",
+      entityId: guestActivity.id,
+      meta: {
+        source: "recommendation",
+        recommendationExposureId: guestExposureId,
+        planItemId: guestPlan.id,
+      },
+    });
+    const guestPlanAdd = await prisma.userEvent.findFirstOrThrow({
+      where: { userId: owner.id, eventType: "PLAN_ADD", entityId: guestActivity.id },
+      orderBy: { createdAt: "desc" },
+    });
+    assert.equal(guestPlanAdd.decisionId, guestTrace.runId);
+    const guestExperience = await confirmPlanExperience({
+      userId: owner.id,
+      planItemId: guestPlan.id,
+      attendance: "ATTENDED",
+      today: "2026-10-01",
+    });
+    assert.equal(guestExperience.sourceDecisionId, guestTrace.runId);
+    assert.equal(guestExperience.sourceExposureId, guestExposureId);
+    const guestAttended = await prisma.userEvent.findUniqueOrThrow({
+      where: { idempotencyKey: `experience:${guestExperience.id}:attended` },
+    });
+    assert.equal(guestAttended.decisionId, guestTrace.runId);
+    assert.equal(
+      (guestAttended.meta as Record<string, unknown>).recommendationExposureId,
+      guestExposureId,
+    );
+    assert.equal((await waitForOutcome(guestAttended.id))?.exposureId, guestExposureId);
 
     const behaviorProfile = await prisma.userBehaviorProfile.findUniqueOrThrow({
       where: { userId: owner.id },
     });
-    assert.equal(behaviorProfile.totalPlanAdds, 1);
+    assert.equal(
+      behaviorProfile.totalPlanAdds,
+      await prisma.userEvent.count({ where: { userId: owner.id, eventType: "PLAN_ADD" } }),
+    );
     assert.equal(
       (behaviorProfile.preferredVerticals as Record<string, number> | null)?.CITY,
       undefined,
@@ -358,7 +561,9 @@ async function main() {
     await prisma.planItem.delete({ where: { id: past.id } });
     assert.equal(await prisma.experience.count({ where: { id: attended.id } }), 1);
   } finally {
-    await prisma.user.deleteMany({ where: { id: { in: [owner.id, stranger.id] } } });
+    await prisma.user.deleteMany({
+      where: { id: { in: [owner.id, stranger.id, paginationUser.id] } },
+    });
     await prisma.$disconnect();
   }
 }

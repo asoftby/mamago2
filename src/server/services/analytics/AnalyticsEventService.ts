@@ -5,7 +5,7 @@
  *
  * Папка `server/services/analytics` содержит и админские отчёты по UserEvent — имя историческое.
  */
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import type { TrackUserEventInput, TrackUserEventResult } from "@/lib/analytics/types";
@@ -120,20 +120,36 @@ export async function trackUserEvent(
     // hard FK — see UserEvent.decisionId.
     const decisionId = attribution?.runId;
 
-    const userEvent = await prisma.userEvent.create({
-      data: {
-        userId: input.userId ?? undefined,
-        sessionId: input.sessionId ?? undefined,
-        anonymousId: input.anonymousId ?? undefined,
-        decisionId,
-        eventType: input.eventType,
-        entityType: input.entityType ?? undefined,
-        entityId: input.entityId ?? undefined,
-        vertical: input.vertical ?? undefined,
-        cityId: cityId ?? undefined,
-        meta: meta === undefined ? undefined : meta,
-      },
-    });
+    let userEvent;
+    try {
+      userEvent = await prisma.userEvent.create({
+        data: {
+          idempotencyKey: input.idempotencyKey ?? undefined,
+          userId: input.userId ?? undefined,
+          sessionId: input.sessionId ?? undefined,
+          anonymousId: input.anonymousId ?? undefined,
+          decisionId,
+          eventType: input.eventType,
+          entityType: input.entityType ?? undefined,
+          entityId: input.entityId ?? undefined,
+          vertical: input.vertical ?? undefined,
+          cityId: cityId ?? undefined,
+          meta: meta === undefined ? undefined : meta,
+        },
+      });
+    } catch (error) {
+      if (
+        input.idempotencyKey &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        // The winning request already owns every downstream side effect. Do
+        // not aggregate behavior, register promotion actions, or link another
+        // recommendation outcome for this retry.
+        return { ok: true };
+      }
+      throw error;
+    }
 
     if (input.userId) {
       void applyUserBehaviorEvent({
