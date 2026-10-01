@@ -42,6 +42,7 @@ export function ArticleMobileBackNavigation({
   }, []);
 
   const hasBottomBar = !shouldHideMobileBottomNav(pathname);
+  const isArticlePreview = pathname?.startsWith("/preview/articles/") ?? false;
 
   return (
     <>
@@ -49,7 +50,7 @@ export function ArticleMobileBackNavigation({
         <MobileSmartBackButton fallbackHref={fallbackHref} />
       </div>
 
-      {showFloatingBack ? (
+      {showFloatingBack && !isArticlePreview ? (
         <div
           className={cn(
             "fixed left-4 z-[45] lg:hidden",
