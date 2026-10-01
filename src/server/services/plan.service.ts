@@ -445,7 +445,7 @@ export async function listPlanItemsByWeek(
   const endDateStr = endDate.toISOString().split("T")[0];
 
   return (await prisma.planItem.findMany({
-    where: { userId, date: { gte: weekStartDate, lte: endDateStr } },
+    where: { userId, cancelledAt: null, date: { gte: weekStartDate, lte: endDateStr } },
     include: {
       activity: { select: planActivitySelect },
     },
@@ -458,7 +458,7 @@ export async function listPlanItemsByWeek(
  */
 export async function listAllPlanItems(userId: string): Promise<PlanItemWithActivity[]> {
   return (await prisma.planItem.findMany({
-    where: { userId },
+    where: { userId, cancelledAt: null },
     include: {
       activity: { select: planActivitySelect },
     },
@@ -480,7 +480,7 @@ export async function listUpcomingPlanItems(
   const toDateStr = toDate.toISOString().split("T")[0]!;
 
   return (await prisma.planItem.findMany({
-    where: { userId, date: { gte: from, lte: toDateStr } },
+    where: { userId, cancelledAt: null, date: { gte: from, lte: toDateStr } },
     include: {
       activity: { select: planActivitySelect },
     },
@@ -498,7 +498,7 @@ export async function listPlanItemsInRange(
   to: string,
 ): Promise<PlanItemWithActivity[]> {
   return (await prisma.planItem.findMany({
-    where: { userId, date: { gte: from, lte: to } },
+    where: { userId, cancelledAt: null, date: { gte: from, lte: to } },
     include: {
       activity: { select: planActivitySelect },
     },
@@ -514,7 +514,7 @@ export async function listPlanItemsByDate(
   date: string
 ): Promise<PlanItemWithActivity[]> {
   return (await prisma.planItem.findMany({
-    where: { userId, date },
+    where: { userId, cancelledAt: null, date },
     include: {
       activity: { select: planActivitySelect },
     },
@@ -529,6 +529,7 @@ export async function listPlanItemsDueForReminder(args: {
   return (await prisma.planItem.findMany({
     where: {
       activityId: { not: null },
+      cancelledAt: null,
       startsAt: {
         gte: args.windowStart,
         lte: args.windowEnd,
@@ -583,6 +584,7 @@ export async function listPlanItemsForTomorrowDigest(args: {
     where: {
       date: args.date,
       activityId: { not: null },
+      cancelledAt: null,
     },
     include: {
       activity: { select: planActivitySelect },
@@ -598,6 +600,7 @@ export async function listPlanItemsForUserDates(
 
   return (await prisma.planItem.findMany({
     where: {
+      cancelledAt: null,
       OR: targets.map((target) => ({ userId: target.userId, date: target.date })),
     },
     include: { activity: { select: planActivitySelect } },
