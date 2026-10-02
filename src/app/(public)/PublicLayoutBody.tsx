@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils";
 import { useNavigationReloadDebug } from "@/hooks/useNavigationReloadDebug";
 import { NotificationSurfaceBootstrap } from "@/features/notifications/NotificationSurfaceBootstrap";
 import { PageViewTracker } from "@/components/analytics/PageViewTracker";
-import { installInternalHistoryTracking } from "@/lib/navigation/internalHistory";
 
 const MOBILE_MAIN_BOTTOM =
   "pb-[calc(5.75rem+env(safe-area-inset-bottom))] lg:pb-0";
@@ -49,8 +48,6 @@ export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const hideBottomBar = shouldHideMobileBottomNav(pathname);
   useNavigationReloadDebug(process.env.NODE_ENV !== "production");
-
-  useEffect(() => installInternalHistoryTracking(), []);
 
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_PUBLIC_LAYOUT_DEBUG === "true") {
