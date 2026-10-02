@@ -247,8 +247,8 @@ export function LocationBlock({
             {/* District / metro / tags — shared with compact venue rows. */}
             <LocationMetaList district={district} metro={metro} tags={tags} />
 
-            {/* Buttons — прижаты к низу карты */}
-            <div className="mt-auto flex flex-wrap gap-3">
+            {/* Desktop actions stay aligned to the bottom of the text column. */}
+            <div className="mt-auto hidden flex-wrap gap-3 md:flex">
               {mapsHref && (
                 <a
                   href={mapsHref}
@@ -294,6 +294,30 @@ export function LocationBlock({
                   />
                 ) : null}
               </div>
+            </div>
+          )}
+
+          {/* On mobile, actions follow the map instead of appearing above it. */}
+          {(mapsHref || placeHref) && (
+            <div className="flex flex-wrap gap-3 md:hidden">
+              {mapsHref && (
+                <a
+                  href={mapsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full bg-[#141210] px-5 py-2.5 text-[14px] font-semibold text-[#FAF7F1] transition-colors hover:bg-black"
+                >
+                  Маршрут <span aria-hidden>→</span>
+                </a>
+              )}
+              {placeHref && (
+                <a
+                  href={placeHref}
+                  className="inline-flex items-center gap-2 rounded-full border border-[rgba(20,18,16,0.18)] bg-[#FAF7F1] px-5 py-2.5 text-[14px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
+                >
+                  Подробнее о месте
+                </a>
+              )}
             </div>
           )}
         </div>

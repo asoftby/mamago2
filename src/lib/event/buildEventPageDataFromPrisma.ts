@@ -7,7 +7,7 @@ import { extractPlainTextFromHtml } from "@/lib/richtext/utils";
 import { sanitizeRichContent } from "@/components/content/richContentHtml";
 import { resolvePlaceLogoUrl } from "@/lib/place/resolvePlaceLogoImage";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
-import { BYN_SYMBOL, formatPrice, formatPriceAmount, formatPriceFrom } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, formatPrice, formatPriceAmount, formatPriceFrom, formatPriceRange } from "@/lib/formatters/format-price";
 import { formatHHMM } from "@/lib/formatters/date";
 import type { EventPageData } from "./eventPageTypes";
 import {
@@ -134,11 +134,25 @@ function normalizePriceCurrencyText(text: string): string {
     .trim();
 }
 
+function formatSimpleBynRange(text: string): string | null {
+  if (/€|\$|£|₽/.test(text)) return null;
+
+  const normalized = normalizePriceCurrencyText(text)
+    .replaceAll(BYN_SYMBOL, "")
+    .trim();
+  const match = normalized.match(/^(от\s+)?(\d+(?:[.,]\d+)?)\s*[-–—]\s*(\d+(?:[.,]\d+)?)$/i);
+  if (!match) return null;
+
+  const from = Number(match[2]!.replace(",", "."));
+  const to = Number(match[3]!.replace(",", "."));
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
+
+  const range = formatPriceRange(from, to);
+  return match[1] ? `от ${range}` : range;
+}
+
 /** Если в `priceText` только число/фраза без валюты — дописываем единый символ валюты. */
 function priceTextWithCurrencyIfNeeded(text: string): string {
-  if (/\bbyn\b/i.test(text) || /\bbr\b/i.test(text) || /руб\.?/i.test(text) || text.includes(BYN_SYMBOL)) {
-    return normalizePriceCurrencyText(text);
-  }
   const lower = text.toLowerCase();
   if (
     lower.includes("бесплатно") ||
@@ -147,6 +161,14 @@ function priceTextWithCurrencyIfNeeded(text: string): string {
   ) {
     return text;
   }
+
+  const simpleRange = formatSimpleBynRange(text);
+  if (simpleRange) return simpleRange;
+
+  if (/\bbyn\b/i.test(text) || /\bbr\b/i.test(text) || /руб\.?/i.test(text) || text.includes(BYN_SYMBOL)) {
+    return normalizePriceCurrencyText(text);
+  }
+
   // Если это чистое число (напр. "15" или "15.50") — форматируем через formatPriceAmount,
   // чтобы получить "15,00" с фиксированными двумя знаками после запятой.
   const numStr = formatPriceAmount(text);
