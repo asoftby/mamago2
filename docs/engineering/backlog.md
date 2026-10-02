@@ -1460,9 +1460,10 @@ P3 — cleanup / polish / optional
 ## [BACKLOG-054] `SearchDocument.cityId`/`SearchQueryLog` click fields: migrations exist but `schema.prisma` still doesn't declare them
 
 - Status: OPEN
-- Priority: P2
+- Priority: P1 (raised from P2 on 2026-09-26 — destructive-migration risk, see update below)
 - Area: Infra / Prisma migrations
 - Added: 2026-08-11
+- Updated: 2026-09-26 — re-confirmed during PR #381 verification; priority raised to P1.
 - Updated: 2026-09-12 — migration-file half of the original finding is
   resolved; the `schema.prisma` half is not. See "2026-09-12 update" below.
 - Reason deferred: discovered incidentally while applying Task 6's own
@@ -1505,6 +1506,25 @@ P3 — cleanup / polish / optional
   CLAUDE.md) — a separate, narrower mismatch confirmed by diffing two
   concrete migrations against two concrete model definitions, not a
   `prisma migrate dev` false-positive.
+- **2026-09-26 update (PR #381 verification):** re-confirmed on `dev` @ `99fb5ca`
+  with a valid check: `prisma migrate diff --from-migrations prisma/migrations
+  --to-schema-datamodel prisma` (multi-file schema dir) against a clean shadow
+  DB on Postgres 16. The generated SQL contains `ALTER TABLE "SearchDocument"
+  DROP COLUMN "cityId"` and `ALTER TABLE "SearchQueryLog" DROP COLUMN
+  "clickedAt", DROP COLUMN "clickedPosition", DROP COLUMN "searchId"` (plus
+  the matching index/FK drops). **Risk: this is no longer cosmetic drift —
+  any schema-driven migration generation (`migrate dev`, `migrate diff` used
+  as a migration source) would emit destructive `DROP COLUMN` statements
+  against environments that have data in these columns.** Raised to P1.
+  Same diff also shows, outside this item's scope and to be triaged here
+  before closing: FK re-creation for `Article.cityId`, `Article.relatedPlaceId`,
+  `ArticleSlugHistory.cityId` (definition mismatch between migrations and
+  schema) and 3 index renames (`HomeStoryItem` ×2, `UserNotificationSchedule`
+  — identifier truncation). The partial-unique `cityId_slug` indexes in the
+  same diff are the known `20260608114243_city_scoped_slugs` false positive.
+  PR #381 itself adds no drift (its diff SQL is byte-identical to `dev`'s).
+  Until this is resolved, never apply a generated migration without removing
+  these statements by hand.
 - Current state: not started. Migration files are on disk and (per the
   original finding) already applied to at least the local dev DB; whether
   DEV/PROD have them applied is unconfirmed. Still not decided whether
