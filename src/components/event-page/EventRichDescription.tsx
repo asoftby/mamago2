@@ -74,7 +74,7 @@ export function EventRichDescription({
             "[&_p]:my-5 [&_p]:text-[15px] [&_p]:leading-8 [&_p]:text-[#141210]",
             "[&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_p+_p]:mt-6",
             // Links / emphasis
-            "[&_a]:font-medium [&_a]:text-primary [&_a]:no-underline hover:[&_a]:underline",
+            "[&_a]:font-medium [&_a]:text-primary [&_a]:no-underline [&_a:hover]:underline",
             "[&_strong]:font-semibold [&_strong]:text-[#141210]",
             // Lists
             "[&_ul]:my-5 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:text-[15px] [&_ul]:text-[#141210]",
