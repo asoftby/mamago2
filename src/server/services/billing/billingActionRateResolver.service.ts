@@ -12,6 +12,7 @@ const BILLING_ACTION_TYPES: BillingActionType[] = [
   "BOOKING_CONFIRMED",
   "CONTACT_OPENED",
   "VISIT_CONFIRMED",
+  "PARTY_BOOKING_CONFIRMED",
 ];
 
 export const DEFAULT_BILLING_ACTION_RULES: Record<
@@ -47,6 +48,14 @@ export const DEFAULT_BILLING_ACTION_RULES: Record<
   VISIT_CONFIRMED: {
     pricingType: "FREE",
     reason: "По умолчанию бесплатно",
+    isActive: false,
+  },
+  // Disabled, FREE by design. No commercial rate is stored until the party
+  // commission is approved by a separate decision (party-mvp-spec §11) and
+  // configured in admin pricing.
+  PARTY_BOOKING_CONFIRMED: {
+    pricingType: "FREE",
+    reason: "Выключено: коммерческие условия конструктора праздника включаются отдельным решением",
     isActive: false,
   },
 };

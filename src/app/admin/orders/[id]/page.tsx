@@ -18,6 +18,8 @@ const STATUS_LABELS: Record<BookingStatus, string> = {
   REJECTED: "Отклонена",
   CANCELLED: "Отменена",
   COMPLETED: "Завершена",
+  EXPIRED: "Истекла",
+  CHANGES_PROPOSED: "Изменения предложены",
 };
 
 const STATUS_BADGE_CLASS: Record<BookingStatus, string> = {
@@ -26,6 +28,8 @@ const STATUS_BADGE_CLASS: Record<BookingStatus, string> = {
   REJECTED: "border-red-200 bg-red-50 text-red-700",
   CANCELLED: "border-stone-200 bg-stone-100 text-stone-700",
   COMPLETED: "border-violet-200 bg-violet-50 text-violet-700",
+  EXPIRED: "border-stone-200 bg-stone-50 text-stone-500",
+  CHANGES_PROPOSED: "border-amber-200 bg-amber-50 text-amber-700",
 };
 
 const TX_STATUS_LABELS: Record<BillingTransactionStatus, string> = {
@@ -50,6 +54,8 @@ const TX_TYPE_LABELS: Partial<Record<BillingTransactionType, string>> = {
   DEPOSIT_TOPUP: "Пополнение",
   SUBSCRIPTION_CHARGE: "Подписка",
   MANUAL_ADJUSTMENT: "Ручная корректировка",
+  COMMISSION_REVERSAL: "Сторно комиссии",
+  PENALTY_CHARGE: "Неустойка",
 };
 
 function formatDateTime(value: string) {

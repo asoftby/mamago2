@@ -10,6 +10,7 @@ export const BILLING_ACTION_TITLES: Record<BillingActionType, string> = {
   BOOKING_CONFIRMED: "Подтверждённый заказ",
   CONTACT_OPENED: "Открытие контакта",
   VISIT_CONFIRMED: "Подтверждённый визит",
+  PARTY_BOOKING_CONFIRMED: "Подтверждённая бронь в конструкторе праздника",
 };
 
 export const BILLING_ACTION_SHORT_TITLES: Record<BillingActionType, string> = {
@@ -17,6 +18,7 @@ export const BILLING_ACTION_SHORT_TITLES: Record<BillingActionType, string> = {
   BOOKING_CONFIRMED: "Подтверждённый заказ",
   CONTACT_OPENED: "Открытие контакта",
   VISIT_CONFIRMED: "Подтверждённый визит",
+  PARTY_BOOKING_CONFIRMED: "Бронь праздника",
 };
 
 export const BILLING_PRICING_TYPE_LABELS: Record<BillingActionPricingType, string> = {

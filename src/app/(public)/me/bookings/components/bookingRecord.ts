@@ -22,6 +22,8 @@ export const STATUS_TONE: Record<BookingStatus, StatusTone> = {
   COMPLETED: { label: "Завершено", color: "var(--ink-3)", bg: "rgba(20,18,16,.07)", dot: "✓" },
   REJECTED: { label: "Отклонена", color: "var(--hot)", bg: "var(--hot-bg)", dot: "✕" },
   CANCELLED: { label: "Отменена", color: "var(--ink-3)", bg: "rgba(20,18,16,.07)", dot: "✕" },
+  EXPIRED: { label: "Ищем замену", color: "var(--warn)", bg: "var(--warn-bg)", dot: "●" },
+  CHANGES_PROPOSED: { label: "Изменения предложены", color: "var(--warn)", bg: "var(--warn-bg)", dot: "●" },
 };
 
 /** Дата-блок: число + сокращённый месяц (без точки). */
