@@ -22,6 +22,19 @@ UserEvent (raw behavior)
   -> RecommendationOutcome attribution
 ```
 
+The first explicit post-plan outcome loop is:
+
+```text
+SAVE / PLAN_ADD (intent)
+  -> ATTENDED (explicit experience outcome)
+  -> EXPERIENCE_FEEDBACK (optional LIKE / NEUTRAL / DISLIKE)
+```
+
+`PLAN_ADD` is never treated as attendance. A past date, reminder, booking,
+notification open, or content view cannot infer `ATTENDED`; only the
+authenticated user action “Да, были” may create that outcome. Phase C records
+these facts without assigning them recommendation/ranking weights.
+
 A surface may change composition constraints (item count, horizon, diversity, cooldown, minimum score, no-send gate), but it must not fork the core ranking/learning interpretation.
 
 ## Sources of truth

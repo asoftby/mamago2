@@ -51,6 +51,8 @@ export type AnalyticsMetaPayload = {
 };
 
 export type TrackUserEventInput = {
+  /** Server-only DB-backed deduplication key; never part of the HTTP ingestion contract. */
+  idempotencyKey?: string | null;
   userId?: string | null;
   /** Id строки Session (сервер) или клиентский anonymous id */
   sessionId?: string | null;
