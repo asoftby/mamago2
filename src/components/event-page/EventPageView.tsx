@@ -70,10 +70,6 @@ function formatSessionCount(count: number): string {
   return `${count} ${pluralizeRu(count, ["сеанс", "сеанса", "сеансов"])}`;
 }
 
-function formatPriceItemCount(count: number): string {
-  return `${count} ${pluralizeRu(count, ["позиция", "позиции", "позиций"])}`;
-}
-
 /* ── Marquee ticker ───────────────────────────────────────── */
 function EventMarquee({ items }: { items: string[] }) {
   const row = [...items, ...items, ...items];
@@ -664,11 +660,6 @@ export function EventPageView({
                   <span style={{ fontFamily: "var(--font-sans)" }}>Сколько это </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>стоит</span>
                 </h2>
               </div>
-              {(data.priceItems?.length ?? 0) > 0 && (
-                <span className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] px-3 text-[13px] text-[#141210]" style={{ fontFamily: "Menlo, monospace" }}>
-                  {formatPriceItemCount(data.priceItems!.length)}
-                </span>
-              )}
             </div>
             <PriceListBlock
               items={data.priceItems ?? []}
