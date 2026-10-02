@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { resolveRouteForUserSave } from "@/server/services/route.service";
 import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
+import { resolvePlanActivityOccurrence } from "@/server/services/planOccurrence.service";
 
 const planActivitySelect = {
   id: true,
@@ -153,17 +154,17 @@ export async function addPlanItem(
 ): Promise<{ id: string; created: boolean }> {
   // Only deduplicate when activityId is present
   if (activityId) {
-    const existing = await prisma.planItem.findFirst({
-      where: { userId, activityId },
-      select: { id: true },
-    });
-    if (existing) {
+    const occurrence = await resolvePlanActivityOccurrence({ userId, activityId, date });
+    if (occurrence.kind === "update") {
       const updated = await prisma.planItem.update({
-        where: { id: existing.id },
+        where: { id: occurrence.planItemId },
         data: { date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
         select: { id: true },
       });
       return { ...updated, created: false };
+    }
+    if (occurrence.kind === "completed_same_date") {
+      return { id: occurrence.planItemId, created: false };
     }
   }
 

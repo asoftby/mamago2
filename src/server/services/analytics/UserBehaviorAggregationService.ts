@@ -180,7 +180,11 @@ export async function applyUserBehaviorEvent(
     let preferredFormats = asRecord(existing?.preferredFormats);
     let preferredSignals = asRecord(existing?.preferredSignals);
 
-    if (vertical) preferredVerticals = bump(preferredVerticals, vertical);
+    // Phase C outcomes are clean semantic truth first, not new ranking policy.
+    // Sentiment especially must not become positive merely because feedback exists.
+    const isExperienceOutcome =
+      eventType === "ATTENDED" || eventType === "EXPERIENCE_FEEDBACK";
+    if (vertical && !isExperienceOutcome) preferredVerticals = bump(preferredVerticals, vertical);
 
     const affinityDelta = behaviorAffinityDelta(eventType, metaRecord(meta));
     preferredCategories = bumpBy(

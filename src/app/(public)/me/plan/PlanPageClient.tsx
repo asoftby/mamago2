@@ -10,6 +10,11 @@ import { PlanOverviewDialog } from "./PlanOverviewDialog";
 import { PlanProfileCompletionGate } from "./PlanProfileCompletionGate";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import type { PlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
+import {
+  ExperienceCheckIn,
+  type ExperienceCheckInCandidate,
+  type ExperienceCheckInState,
+} from "./ExperienceCheckIn";
 
 export type SerializedPlanItem = {
   id: string;
@@ -59,6 +64,8 @@ type Props = {
   initialIdeas?: SerializedIdea[];
   /** date -> Scenario status; absent entries mean no Scenario exists yet. */
   scenarioStatusByDate?: Record<string, "ready" | "changed">;
+  experienceCandidates?: ExperienceCheckInCandidate[];
+  recentExperiences?: ExperienceCheckInState[];
   activeReminder?: {
     id: string;
     title: string;
@@ -238,6 +245,8 @@ export function PlanPageClient({
   ideaActivityIds,
   initialIdeas = [],
   scenarioStatusByDate = {},
+  experienceCandidates = [],
+  recentExperiences = [],
 }: Props) {
   const todayISO = getTodayISO();
   const searchParams = useSearchParams();
@@ -397,6 +406,14 @@ export function PlanPageClient({
             </button>
           </div>
         </div>
+      </Container>
+
+      {/* Explicit post-event check-in; never opened as an automatic modal. */}
+      <Container>
+        <ExperienceCheckIn
+          candidates={experienceCandidates}
+          recentExperiences={recentExperiences}
+        />
       </Container>
 
       {/* Week Calendar */}

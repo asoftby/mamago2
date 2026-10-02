@@ -99,6 +99,7 @@ model User {
   placeRevisions                    PlaceRevision[]                  @relation("PlaceRevisionReviewer")
   planItems                         PlanItem[]
   inboxItems                        InboxItem[]
+  experiences                       Experience[]
   dayScenarios                      DayScenario[]
   routes                            Route[]                          @relation("RouteAuthor")
   routeIdeas                        RouteIdea[]
@@ -174,6 +175,9 @@ model UserBehaviorProfile {
 
 model UserEvent {
   id               String               @id @default(cuid())
+  /// Optional server-only deduplication key. Client analytics ingestion never
+  /// accepts this field; nullable uniqueness leaves ordinary events unchanged.
+  idempotencyKey   String?              @unique
   userId           String?
   sessionId        String?
   eventType        UserEventType
@@ -573,6 +577,33 @@ model InboxItemPart {
   createdAt         DateTime      @default(now())
 
   @@index([inboxItemId])
+}
+
+/// Durable, explicit post-plan outcome. Historical references intentionally
+/// are not foreign keys: an experience survives PlanItem/content deletion.
+model Experience {
+  id                    String               @id @default(cuid())
+  userId                String
+  sourcePlanItemId      String               @unique
+  entityType            AnalyticsEntityType
+  entityId              String
+  plannedDate           String
+  plannedStartsAt       DateTime?
+  attendance            ExperienceAttendance
+  attendanceConfirmedAt DateTime
+  subjects              Json?
+  sourceDecisionId      String?
+  sourceExposureId      String?
+  feedbackSentiment     ExperienceSentiment?
+  feedbackAt            DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, plannedDate])
+  @@index([userId, entityType, entityId])
+  @@index([sourceDecisionId])
+  @@index([sourceExposureId])
 }
 
 /// Сценарий дня (Task 7 MVP) — минимальная persisted-разметка поверх
@@ -3481,6 +3512,19 @@ enum UserEventType {
   /// re-saved (no new plan-add happened). Deliberately NOT a PLAN_ADD so it can't inflate
   /// positive-signal counts, ranking weights or promotion metrics.
   PLAN_AUDIENCE_SNAPSHOT
+  ATTENDED
+  EXPERIENCE_FEEDBACK
+}
+
+enum ExperienceAttendance {
+  ATTENDED
+  NOT_ATTENDED
+}
+
+enum ExperienceSentiment {
+  LIKE
+  NEUTRAL
+  DISLIKE
 }
 
 enum AnalyticsEntityType {

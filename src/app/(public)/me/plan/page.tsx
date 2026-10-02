@@ -12,6 +12,10 @@ import {
 } from "@/server/services/dayScenario.service";
 import { resolveMyPlanItemEffectiveTime } from "@/features/my-plan/lib/scenarioProjection";
 import { buildPlanCardPresentation } from "@/features/my-plan/lib/planPagePresentation";
+import {
+  listPendingExperienceCandidates,
+  listRecentExperienceSummaries,
+} from "@/server/services/experience/experience.service";
 
 export default async function PlanPage() {
   const user = await getCurrentUser();
@@ -19,6 +23,10 @@ export default async function PlanPage() {
 
   // Load all plan items
   const planItems = await listAllPlanItems(user.id);
+  const [experienceCandidates, recentExperiences] = await Promise.all([
+    listPendingExperienceCandidates({ userId: user.id, lookbackDays: 14, take: 3 }),
+    listRecentExperienceSummaries({ userId: user.id, take: 1 }),
+  ]);
 
   // Load saved ideas for the sidebar
   const ideas = await prisma.idea.findMany({
@@ -165,6 +173,11 @@ export default async function PlanPage() {
       initialIdeas={serializedIdeas}
       childrenAges={childrenAges}
       scenarioStatusByDate={scenarioStatusByDate}
+      experienceCandidates={experienceCandidates.map((candidate) => ({
+        ...candidate,
+        plannedStartsAt: candidate.plannedStartsAt?.toISOString() ?? null,
+      }))}
+      recentExperiences={recentExperiences}
       activeReminder={
         activeReminder
           ? {
