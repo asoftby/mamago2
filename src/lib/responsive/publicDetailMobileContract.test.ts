@@ -29,6 +29,7 @@ const placeOffers = read("src/components/place/marketplace/PlaceOffersSection.ts
 const placeEvents = read("src/components/place/marketplace/PlaceEventsSection.tsx");
 const placeReviews = read("src/components/place/marketplace/PlaceReviewsSection.tsx");
 const placeStickyActionBar = read("src/components/place/marketplace/PlaceStickyActionBar.tsx");
+const locationBlock = read("src/components/shared/LocationBlock.tsx");
 
 const discoveryGridContract =
   /grid grid-cols-1 gap-5 min-\[360px\]:grid-cols-2 lg:grid-cols-4/g;
@@ -151,6 +152,17 @@ assert.match(
   placeStickyActionBar,
   /hasThreeActions && "sr-only sm:not-sr-only"/,
   "Place sticky call label must remain accessible while visually compact on phones",
+);
+
+assert.match(
+  locationBlock,
+  /mt-auto hidden flex-wrap gap-3 md:flex/,
+  "Location actions must stay in the desktop text column",
+);
+assert.match(
+  locationBlock,
+  /flex flex-wrap gap-3 md:hidden/,
+  "Location actions must render below the map on mobile",
 );
 
 console.log("publicDetailMobileContract.test.ts: OK");
