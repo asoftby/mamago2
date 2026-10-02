@@ -71,6 +71,16 @@
 | `src/app/api/me/export/route.ts:32-50` | чтение `{userId}` все записи; выборка `id,date,startsAt,createdAt,title,coverImageUrl,activityId,routeId,planRouteSlug,activity{…}` | **экспорт данных пользователя**: новые поля (`source`, `notes`, `locationText`, `priceAmount`, `arriveAt`, `endsAt`, `dueAt`, `cancelledAt`, requirements) не включены | **нет** (экспорт «всех данных»: отменённые включать) | PR9 (приватность): расширить выборку |
 | `src/server/account/deleteAccount.service.ts:95` | запись: `planItem.deleteMany {userId}` | порядок: удаляет `PlanItem` до пользователя; `PlanItemRequirement` удаляется каскадом, `InboxItem` каскадом от `User` | нет | PR2/PR9: проверить в `deleteAccount.integration.test.ts` каскад на новые таблицы |
 
+### Добавлено из `origin/dev` @ `334b959c..` (feedback loop «Experience», влито в ветку PR1)
+
+| Место | Что делает | Неявные допущения | `cancelledAt: null` | Действие |
+|---|---|---|---|---|
+| `src/server/services/experience/experience.service.ts:52` | чтение: заголовки по `id in` + `userId` для сводки опыта | адресный поиск; `activity?.title \|\| title \|\| "Событие"` | нет (по id) | не требуется |
+| `experience.service.ts:102` `listPendingExperienceCandidates` | чтение пользовательское: прошедшие записи за 14 дней с `activityId != null` для чек-ина «были ли» | только каталожные записи | **да** | PR1: фильтр (добавлен) |
+| `experience.service.ts:308` | чтение `findFirst {id,userId}` при подтверждении посещения | `if (!planItem.activityId) throw unsupported_entity` — записи бота не поддерживаются (ожидаемо до Stage 1.5) | нет (по id) | не требуется; решить в PR5/PR7, нужен ли чек-ин для записей бота |
+| `src/server/services/planOccurrence.service.ts:16` `resolvePlanActivityOccurrence` | чтение: до 25 записей `{userId, activityId}` для дедупа «update/create/completed_same_date» (вызывается из `addPlanItem`) | каталожный дедуп по `activityId` | нет (каталог) | не требуется |
+| `src/app/(public)/me/plan/ExperienceCheckIn.tsx`, `PlanPageClient.tsx`, `src/app/api/plan/experiences/**` | клиент и API чек-ина | работают с `Experience` (`sourcePlanItemId` — простая ссылка без FK, переживает удаление `PlanItem`) | нет | PR5: убедиться, что отмена бот-записи не создаёт «висящий» чек-ин |
+
 ## 3. Уведомления, дайджесты, напоминания
 
 | Место | Что делает | Неявные допущения | `cancelledAt: null` | Действие |

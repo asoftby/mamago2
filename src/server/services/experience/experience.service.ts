@@ -103,6 +103,7 @@ export async function listPendingExperienceCandidates(input: {
       where: {
         userId: input.userId,
         activityId: { not: null },
+        cancelledAt: null,
         date: { gte: oldestDate, lt: today },
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }],
