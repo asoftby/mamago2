@@ -55,6 +55,7 @@ CREATE TABLE "PlanItemRequirement" (
 CREATE TABLE "InboxItem" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
+    "environment" "TelegramEnvironment" NOT NULL,
     "telegramChatId" BIGINT NOT NULL,
     "mediaGroupId" TEXT,
     "sourceKind" "InboxSourceKind" NOT NULL,
@@ -86,6 +87,7 @@ CREATE TABLE "InboxItem" (
 CREATE TABLE "InboxItemPart" (
     "id" TEXT NOT NULL,
     "inboxItemId" TEXT NOT NULL,
+    "environment" "TelegramEnvironment" NOT NULL,
     "telegramUpdateId" BIGINT NOT NULL,
     "telegramMessageId" INTEGER NOT NULL,
     "kind" "InboxPartKind" NOT NULL,
@@ -113,10 +115,10 @@ CREATE INDEX "InboxItem_mediaGroupId_idx" ON "InboxItem"("mediaGroupId");
 CREATE INDEX "InboxItem_status_debounceUntil_idx" ON "InboxItem"("status", "debounceUntil");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "InboxItemPart_telegramUpdateId_key" ON "InboxItemPart"("telegramUpdateId");
+CREATE INDEX "InboxItemPart_inboxItemId_idx" ON "InboxItemPart"("inboxItemId");
 
 -- CreateIndex
-CREATE INDEX "InboxItemPart_inboxItemId_idx" ON "InboxItemPart"("inboxItemId");
+CREATE UNIQUE INDEX "InboxItemPart_environment_telegramUpdateId_key" ON "InboxItemPart"("environment", "telegramUpdateId");
 
 -- CreateIndex
 CREATE INDEX "PlanItem_userId_source_startsAt_idx" ON "PlanItem"("userId", "source", "startsAt");

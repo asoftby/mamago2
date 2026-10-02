@@ -523,6 +523,8 @@ model InboxItem {
   /// MVP-владелец; в коде доступ только через PlanOwner
   userId            String
   user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Окружение бота: update_id и chat_id независимы у DEV/PROD
+  environment       TelegramEnvironment
   telegramChatId    BigInt
   mediaGroupId      String?
   sourceKind        InboxSourceKind
@@ -564,8 +566,10 @@ model InboxItemPart {
   id                String        @id @default(cuid())
   inboxItemId       String
   inboxItem         InboxItem     @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
-  /// Повторная доставка не создаёт часть
-  telegramUpdateId  BigInt        @unique
+  /// Окружение бота: update_id независимы у разных ботов
+  environment       TelegramEnvironment
+  /// Повторная доставка не создаёт часть (ключ идемпотентности: environment + telegramUpdateId)
+  telegramUpdateId  BigInt
   telegramMessageId Int
   kind              InboxPartKind
   /// Текст или подпись; обнуляется purge-джобой
@@ -576,6 +580,7 @@ model InboxItemPart {
   position          Int
   createdAt         DateTime      @default(now())
 
+  @@unique([environment, telegramUpdateId])
   @@index([inboxItemId])
 }
 
