@@ -12,7 +12,7 @@ function streetScore(s: string): number {
   let n = 0;
   if (/\d/.test(s)) n += 2;
   if (
-    /(ул\.?|просп|пр\.|увул\.|бульв\.|пер\.|наб\.|шоссе|пл\.|линия|тупик|микрорайон|м-н)/i.test(
+    /(ул\.?|просп|пр-т|пр\.|увул\.|бульв\.|пер\.|наб\.|шоссе|пл\.|линия|тупик|микрорайон|м-н)/i.test(
       s,
     )
   ) {
@@ -39,8 +39,17 @@ function insertSpaceAfterDotAbbrev(s: string): string {
     .replace(/(г\.)([А-Яа-яЁё])/gi, "$1 $2");
 }
 
+function normalizePublicAddressPart(part: string): string {
+  return part
+    .trim()
+    .replace(/^г\.\s*/i, "")
+    .replace(/^город\s+/i, "")
+    .replace(/^просп(?:ект)?\.?\s*/i, "пр-т ")
+    .replace(/^пр-т\.?\s*/i, "пр-т ");
+}
+
 const STREET_HINT =
-  /(ул\.?|просп|пр\.|увул\.|бульв\.|пер\.|наб\.|шоссе|пл\.|линия|тупик|микрорайон|м-н)/i;
+  /(ул\.?|просп|пр-т|пр\.|увул\.|бульв\.|пер\.|наб\.|шоссе|пл\.|линия|тупик|микрорайон|м-н)/i;
 
 /** «пр. Независимости 50» → «пр. Независимости, 50» (только если похоже на строку улицы). */
 function commaBeforeTrailingHouseNumber(segment: string): string {
@@ -61,7 +70,7 @@ function addCommaBeforeHouseInLastSegment(s: string): string {
 
 /**
  * Показ: город и улица с домом; без области/края/вобласці и индекса.
- * Порядок: «Минск, пр. Независимости, 50» (город первым; запятая перед номером дома).
+ * Порядок: «Минск, пр-т Независимости, 50» (город первым; запятая перед номером дома).
  */
 export function formatVenueAddressForPublicDisplay(
   raw: string | undefined | null,
@@ -72,14 +81,15 @@ export function formatVenueAddressForPublicDisplay(
 
   for (const p of parts) {
     if (shouldDropRegionPart(p)) continue;
+    if (/^(?:беларусь|республика беларусь|belarus)$/i.test(p)) continue;
     if (/^\d{5,6}$/.test(p)) continue;
     const zipTail = /\s\d{5,6}$/;
     if (zipTail.test(p)) {
-      const z = p.replace(zipTail, "").trim();
+      const z = normalizePublicAddressPart(p.replace(zipTail, "").trim());
       if (z.length > 0) kept.push(z);
       continue;
     }
-    kept.push(p);
+    kept.push(normalizePublicAddressPart(p));
   }
 
   const reordered = reorderCityThenStreet(kept);
