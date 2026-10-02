@@ -39,6 +39,8 @@ export type AnalyticsMetaPayload = {
   /** Reserved for domains that expose stable genre IDs later. */
   genreIds?: string[];
   signalIds?: string[];
+  /** Canonical SYSTEM_INTERESTS slugs captured at event time. */
+  interestSlugs?: string[];
   format?: string;
   districtId?: string;
   metroId?: string;
