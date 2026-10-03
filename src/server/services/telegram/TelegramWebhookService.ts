@@ -12,6 +12,10 @@ import {
   touchTelegramConnectionByChatIdForCurrentEnvironment,
 } from "@/server/services/telegram/telegramConnection.service";
 import { TelegramChannel } from "./TelegramChannel";
+import { decodeCallback } from "./capture/callbackCodec";
+import { createDefaultCaptureRoutingDeps, type CaptureRoutingDeps } from "./capture/captureWiring";
+import { parseTelegramUpdate, type ParsedCapture, type RawTelegramUpdate } from "./capture/telegramUpdateParser";
+import { resolvePlanOwner } from "@/server/services/planOwner";
 import { renderDevBusinessApplicationMessage } from "./TelegramTemplateRenderer";
 
 type TelegramUser = {
@@ -39,22 +43,74 @@ type TelegramCallbackQuery = {
 };
 
 export type TelegramUpdate = {
+  update_id?: number;
   message?: TelegramMessage;
   callback_query?: TelegramCallbackQuery;
 };
 
-export class TelegramWebhookService {
-  constructor(private readonly channel = new TelegramChannel()) {}
+/** What the webhook route should do after answering 200. */
+export type HandleUpdateResult = {
+  afterResponse?: () => Promise<void>;
+};
 
-  async handleUpdate(update: TelegramUpdate): Promise<void> {
+export class TelegramWebhookService {
+  private readonly capture: CaptureRoutingDeps;
+
+  constructor(
+    private readonly channel = new TelegramChannel(),
+    capture?: CaptureRoutingDeps,
+  ) {
+    this.capture = capture ?? createDefaultCaptureRoutingDeps();
+  }
+
+  async handleUpdate(update: TelegramUpdate): Promise<HandleUpdateResult> {
+    // The raw payload carries more fields than the narrow legacy type.
+    const parsed = parseTelegramUpdate(update as unknown as RawTelegramUpdate);
+
+    if (parsed.kind === "callback" && decodeCallback(parsed.data)) {
+      // inb:/req: buttons: handlers arrive with PR4; acknowledge neutrally.
+      await this.capture.acknowledgeCallback(parsed.callbackQueryId);
+      return {};
+    }
+
+    if (parsed.kind === "capture") {
+      const handled = await this.tryCapture(parsed);
+      if (handled) return handled;
+      // Not enabled / not linked / not allowlisted: behave exactly as before.
+    }
+
     if (update.message) {
       await this.handleMessage(update.message);
-      return;
+      return {};
     }
 
     if (update.callback_query) {
       await this.handleCallbackQuery(update.callback_query);
     }
+    return {};
+  }
+
+  /**
+   * Gate: capture runs only for a private chat with an active connection whose
+   * userId is on TELEGRAM_CAPTURE_USER_IDS. Returns null when the gate is
+   * closed so the caller falls through to the legacy path. An empty allowlist
+   * returns before any database access.
+   */
+  private async tryCapture(parsed: ParsedCapture): Promise<HandleUpdateResult | null> {
+    const allowlist = this.capture.getAllowlist();
+    if (allowlist.size === 0) return null;
+
+    const chatId = String(parsed.chatId);
+    const connection = await this.capture.findActiveConnection(chatId);
+    if (!connection || !allowlist.has(connection.userId)) return null;
+
+    await this.capture.touchConnection(chatId);
+    const result = await this.capture.receive(
+      resolvePlanOwner(connection.userId),
+      this.capture.getEnvironment(),
+      parsed,
+    );
+    return result.afterResponse ? { afterResponse: result.afterResponse } : {};
   }
 
   private async handleMessage(message: TelegramMessage): Promise<void> {
