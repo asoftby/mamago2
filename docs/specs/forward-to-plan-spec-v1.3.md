@@ -8,6 +8,7 @@
 2. **Gate capture-пути (раздел 5):** нет активной `TelegramConnection` или `userId` не входит в `TELEGRAM_CAPTURE_USER_IDS` → capture-обработчики ничего не отправляют пользователю, поведение бота прежнее (`/start`, `link_<token>`, подключение Telegram, callback'и заявок не меняются). Ответы неподключённым пользователям не вводятся.
 3. **Очистка данных (разделы 11 и 13):** обязанности разделены: PR4 очищает `InboxItemPart.text` и `InboxItem.draft` при `CONFIRMED`/`DISCARDED` в той же транзакции; `inbox-purge` (PR9) страхует остальные случаи (брошенный `DRAFT_READY`, `FAILED`, зависшие `RECEIVED`/`PROCESSING`) и обнуляет не только `InboxItemPart.text`, но и `InboxItem.draft`.
 4. **Production gate пилота (раздел 15)** заменяет прежнее условие «после PR4+PR5+PR8»: пилот только после PR9 и подтверждённой работы purge (purge smoke PASS). Критерий описан в разделе 15.
+5. **`environment` в Inbox-таблицах (по замечанию ревью PR1).** `update_id` уникален только в пределах одного бота, поэтому ключ идемпотентности `(environment, telegramUpdateId)`, а не глобальный `telegramUpdateId` (так же, как `TelegramConnection` различает окружения). `environment` добавлен в `InboxItem` и `InboxItemPart`; ключ группировки альбома и advisory lock включают `environment`.
 
 ## Changelog v1.1 → v1.2
 
@@ -125,7 +126,7 @@ Telegram → POST /api/bot/webhook   (существует, проверяет x
                ├─ /start link_<token>            (как сейчас)
                ├─ callback_query inb:* / req:*   (новые)
                └─ text/photo/forward в private   → InboxService
-InboxService: InboxItemPart (уникальный update_id) → найти/создать InboxItem(RECEIVED) → 200
+InboxService: InboxItemPart (уникальный (environment, update_id)) → найти/создать InboxItem(RECEIVED) → 200
 Воркер разбора: склейка → файлы → LLM → правила → draft → карточка
 Применение: planEntry.service (создание/изменение/отмена PlanItem + requirements)
 ```
@@ -215,6 +216,7 @@ enum InboxPartKind { TEXT PHOTO }
 model InboxItem {
   id                String          @id @default(cuid())
   userId            String                                // MVP-владелец; в коде доступ только через PlanOwner
+  environment       TelegramEnvironment                   // окружение бота, тот же тип, что у TelegramConnection
   telegramChatId    BigInt
   mediaGroupId      String?
   sourceKind        InboxSourceKind
@@ -249,7 +251,8 @@ model InboxItemPart {
   id                String        @id @default(cuid())
   inboxItemId       String
   inboxItem         InboxItem     @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
-  telegramUpdateId  BigInt        @unique                 // чек получения: повторная доставка не создаёт часть
+  environment       TelegramEnvironment                   // окружение бота (то же значение, что у InboxItem; нужно для уникального индекса)
+  telegramUpdateId  BigInt                                // чек получения вместе с environment: повторная доставка не создаёт часть
   telegramMessageId Int
   kind              InboxPartKind
   text              String?                               // текст или подпись; обнуляется purge-джобой
@@ -257,14 +260,15 @@ model InboxItemPart {
   position          Int                                   // порядок по telegramMessageId
   createdAt         DateTime      @default(now())
 
+  @@unique([environment, telegramUpdateId])
   @@index([inboxItemId])
 }
 ```
 
 **Контракт приёма части** (реализуется в PR2). Шаги 1–3 выполняются **в одной транзакции**:
-1. Одиночное сообщение (нет `mediaGroupId`): создать `InboxItem` (`debounceUntil = now()`) и `InboxItemPart`; нарушение уникальности `telegramUpdateId` откатывает всю транзакцию и означает повторную доставку (выход без побочных эффектов, осиротевшего `InboxItem` не остаётся).
-2. Часть альбома: транзакция с `pg_advisory_xact_lock(hashtext(userId || ':' || mediaGroupId))`; сначала проверить, нет ли части с этим `telegramUpdateId` (есть: выход без побочных эффектов).
-3. Найти открытый `InboxItem` (`status = RECEIVED`, тот же `userId` и `mediaGroupId`) или создать; добавить часть; `debounceUntil = now() + 2,5 с`.
+1. Одиночное сообщение (нет `mediaGroupId`): создать `InboxItem` (`debounceUntil = now()`) и `InboxItemPart`; нарушение уникальности `(environment, telegramUpdateId)` откатывает всю транзакцию и означает повторную доставку (выход без побочных эффектов, осиротевшего `InboxItem` не остаётся).
+2. Часть альбома: транзакция с `pg_advisory_xact_lock(hashtext(userId || ':' || environment || ':' || mediaGroupId))`; сначала проверить, нет ли части с этим `(environment, telegramUpdateId)` (есть: выход без побочных эффектов).
+3. Найти открытый `InboxItem` (`status = RECEIVED`, тот же `userId`, `environment` и `mediaGroupId`) или создать; добавить часть; `debounceUntil = now() + 2,5 с`.
 4. Разбор стартует только через compare-and-set `UPDATE ... SET status = 'PROCESSING' WHERE id = ? AND status = 'RECEIVED' AND debounceUntil <= now()`; проигравший гонку ничего не делает.
 5. Часть альбома, пришедшая после перехода в `PROCESSING`, создаёт новый `InboxItem` и пишет код `ALBUM_LATE_PART`; это допустимая редкая деградация.
 6. Callback-апдейты не пишутся в чеки: их идемпотентность обеспечивают CAS-переходы статусов (раздел 9).
