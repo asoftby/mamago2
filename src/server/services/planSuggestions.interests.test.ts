@@ -36,7 +36,7 @@ assert.deepEqual(
     interestBoost: MAX_INTEREST_MATCHES * INTEREST_MATCH_WEIGHT,
   },
 );
-assert.equal(PLAN_SUGGESTION_ALGORITHM_VERSION, "engagement-profile-interest-v2");
+assert.equal(PLAN_SUGGESTION_ALGORITHM_VERSION, "engagement-profile-interest-experience-v3");
 const unchanged = planSuggestionScore({ engagementScore: 7, profileInterestSlugs: [], scheduleJson: scienceEvent });
 assert.equal(unchanged.score, 7, "no selected interests preserves v1 score ordering");
 assert.deepEqual(unchanged.interestReasonCodes, []);

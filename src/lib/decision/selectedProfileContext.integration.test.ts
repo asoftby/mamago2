@@ -93,7 +93,7 @@ async function main() {
     assert.ok(trace);
     runId = trace.runId;
     const stored = await prisma.recommendationRun.findUniqueOrThrow({ where: { id: trace.runId } });
-    assert.equal(stored.algorithmVersion, "engagement-profile-interest-v2");
+    assert.equal(stored.algorithmVersion, "engagement-profile-interest-experience-v3");
     const serializedContext = JSON.stringify(stored.context);
     assert.match(serializedContext, /science/);
     assert.doesNotMatch(serializedContext, /birthDate|dateOfBirth|dob|profile-owner/i);

@@ -8,34 +8,31 @@ import { resolveKudaDiscoveryCityIds } from "@/server/discovery/discoveryHubExpa
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
+import {
+  CANONICAL_EVENT_INTEREST_SLUGS,
+  eventSystemInterestSlugs,
+} from "@/lib/event/eventSystemInterests";
+import {
+  scoreCandidateExperienceAffinity,
+  type ExperienceAffinityContext,
+} from "@/server/services/recommendations/experienceAffinity";
+
+export { eventSystemInterestSlugs } from "@/lib/event/eventSystemInterests";
 
 /**
  * Current real shared EVENT ranking contract. This is deliberately versioned
  * before any ML/personal ranking is introduced so historic exposures remain
  * explainable after the algorithm evolves.
  */
-export const PLAN_SUGGESTION_ALGORITHM_VERSION = "engagement-profile-interest-v2";
+export const PLAN_SUGGESTION_ALGORITHM_VERSION = "engagement-profile-interest-experience-v3";
 export const INTEREST_MATCH_WEIGHT = 4;
 export const MAX_INTEREST_MATCHES = 2;
-
-const CANONICAL_INTEREST_SLUGS = new Set(SYSTEM_INTERESTS.map((interest) => interest.slug));
-
-export function eventSystemInterestSlugs(scheduleJson: unknown): string[] {
-  if (!scheduleJson || typeof scheduleJson !== "object" || Array.isArray(scheduleJson)) return [];
-  const signals = (scheduleJson as Record<string, unknown>).signals;
-  if (!signals || typeof signals !== "object" || Array.isArray(signals)) return [];
-  const interests = (signals as Record<string, unknown>).interests;
-  if (!Array.isArray(interests)) return [];
-  return [...new Set(interests.filter(
-    (value): value is string => typeof value === "string" && CANONICAL_INTEREST_SLUGS.has(value),
-  ))];
-}
 
 export function profileInterestScore(
   profileInterestSlugs: readonly string[],
   scheduleJson: unknown,
 ): { interestMatchCount: number; interestBoost: number } {
-  const selected = new Set(profileInterestSlugs.filter((slug) => CANONICAL_INTEREST_SLUGS.has(slug)));
+  const selected = new Set(profileInterestSlugs.filter((slug) => CANONICAL_EVENT_INTEREST_SLUGS.has(slug)));
   const matchCount = eventSystemInterestSlugs(scheduleJson).filter((slug) => selected.has(slug)).length;
   const interestMatchCount = Math.min(matchCount, MAX_INTEREST_MATCHES);
   return { interestMatchCount, interestBoost: interestMatchCount * INTEREST_MATCH_WEIGHT };
@@ -45,17 +42,37 @@ export function planSuggestionScore(input: {
   engagementScore: number;
   profileInterestSlugs: readonly string[];
   scheduleJson: unknown;
+  categoryId?: string | null;
+  discoverySignalIds?: readonly string[];
+  format?: string | null;
+  experienceAffinity?: ExperienceAffinityContext;
 }): {
   score: number;
   interestMatchCount: number;
   interestBoost: number;
   interestReasonCodes: string[];
+  experienceAffinityBoost: number;
+  experienceMatchedSubjectCount: number;
+  experienceReasonCodes: string[];
 } {
   const interest = profileInterestScore(input.profileInterestSlugs, input.scheduleJson);
+  const experience = scoreCandidateExperienceAffinity(input.experienceAffinity, {
+    categoryId: input.categoryId,
+    signalIds: input.discoverySignalIds,
+    format: input.format,
+    interestSlugs: eventSystemInterestSlugs(input.scheduleJson),
+  });
   return {
-    score: input.engagementScore + interest.interestBoost,
+    score: input.engagementScore + interest.interestBoost + experience.experienceAffinityBoost,
     ...interest,
     interestReasonCodes: interest.interestMatchCount > 0 ? ["INTEREST_MATCH"] : [],
+    ...experience,
+    experienceReasonCodes:
+      experience.experienceAffinityBoost > 0
+        ? ["EXPERIENCE_POSITIVE"]
+        : experience.experienceAffinityBoost < 0
+          ? ["EXPERIENCE_NEGATIVE"]
+          : [],
   };
 }
 
@@ -152,6 +169,8 @@ export type RankedPlanSuggestion = {
     engagementScore: number;
     interestMatchCount: number;
     interestBoost: number;
+    experienceAffinityBoost: number;
+    experienceMatchedSubjectCount: number;
     freshnessSortAt: string;
     ageFilterApplied: boolean;
     ageFallbackUsed: boolean;
@@ -185,6 +204,8 @@ export type PlanSuggestionsInput = {
   exhaustiveCandidatePool?: boolean;
   /** Server-resolved canonical ChildInterest.interestSlug values. Never client supplied. */
   profileInterestSlugs?: string[];
+  /** Compact, server-resolved subject outcome affinity. Never client supplied. */
+  experienceAffinity?: ExperienceAffinityContext;
 };
 
 /**
@@ -199,7 +220,7 @@ export async function rankPlanSuggestionsForCity(
   const exhaustiveCandidatePool = input.exhaustiveCandidatePool === true;
   const ageRangeValues = (input.ageRangeValues ?? []).filter(Boolean);
   const profileInterestSlugs = [...new Set(input.profileInterestSlugs ?? [])]
-    .filter((slug) => CANONICAL_INTEREST_SLUGS.has(slug))
+    .filter((slug) => CANONICAL_EVENT_INTEREST_SLUGS.has(slug))
     .slice(0, SYSTEM_INTERESTS.length);
   const city = await findCityBySlug(input.citySlug.toLowerCase());
   if (!city) {
@@ -268,6 +289,8 @@ export async function rankPlanSuggestionsForCity(
   type Row = PlanSuggestionActivity & {
     nextOccurrenceAt: Date | null;
     createdAt: Date;
+    discoverySignalIds: string[];
+    format: string;
   };
 
   async function fetchCandidateRows(withAgePreference: boolean): Promise<Row[]> {
@@ -286,6 +309,8 @@ export async function rankPlanSuggestionsForCity(
         ...suggestionActivitySelect,
         nextOccurrenceAt: true,
         createdAt: true,
+        discoverySignalIds: true,
+        format: true,
       },
     })) as Row[];
   }
@@ -300,9 +325,19 @@ export async function rankPlanSuggestionsForCity(
   const candidateCount = rows.length;
   const scoreMap = await getEventEngagementScores(rows.map((row) => row.id));
 
+  const scoreRow = (row: Row) => planSuggestionScore({
+    engagementScore: scoreMap.get(row.id) ?? 0,
+    profileInterestSlugs,
+    scheduleJson: row.scheduleJson,
+    categoryId: row.eventCategory?.id ?? null,
+    discoverySignalIds: row.discoverySignalIds,
+    format: row.format,
+    experienceAffinity: input.experienceAffinity,
+  });
+
   rows.sort((a, b) => {
-    const scoreA = planSuggestionScore({ engagementScore: scoreMap.get(a.id) ?? 0, profileInterestSlugs, scheduleJson: a.scheduleJson }).score;
-    const scoreB = planSuggestionScore({ engagementScore: scoreMap.get(b.id) ?? 0, profileInterestSlugs, scheduleJson: b.scheduleJson }).score;
+    const scoreA = scoreRow(a).score;
+    const scoreB = scoreRow(b).score;
     if (scoreA !== scoreB) return scoreB - scoreA;
     const timeA = a.nextOccurrenceAt?.getTime() ?? a.createdAt.getTime();
     const timeB = b.nextOccurrenceAt?.getTime() ?? b.createdAt.getTime();
@@ -315,10 +350,14 @@ export async function rankPlanSuggestionsForCity(
     const {
       nextOccurrenceAt,
       createdAt,
+      discoverySignalIds: _discoverySignalIds,
+      format: _format,
       ...activity
     } = row;
+    void _discoverySignalIds;
+    void _format;
     const engagementScore = scoreMap.get(row.id) ?? 0;
-    const interestSignal = planSuggestionScore({ engagementScore, profileInterestSlugs, scheduleJson: row.scheduleJson });
+    const interestSignal = scoreRow(row);
     const { interestMatchCount, interestBoost } = interestSignal;
     const freshnessSortAt = (nextOccurrenceAt ?? createdAt).toISOString();
     const reasonCodes = [
@@ -326,6 +365,7 @@ export async function rankPlanSuggestionsForCity(
       ...(ageFallbackUsed ? ["AGE_FALLBACK"] : []),
       ...(engagementScore > 0 ? ["ENGAGEMENT"] : []),
       ...interestSignal.interestReasonCodes,
+      ...interestSignal.experienceReasonCodes,
       "FRESHNESS_TIE_BREAK",
     ];
 
@@ -336,6 +376,8 @@ export async function rankPlanSuggestionsForCity(
         engagementScore,
         interestMatchCount,
         interestBoost,
+        experienceAffinityBoost: interestSignal.experienceAffinityBoost,
+        experienceMatchedSubjectCount: interestSignal.experienceMatchedSubjectCount,
         freshnessSortAt,
         ageFilterApplied,
         ageFallbackUsed,

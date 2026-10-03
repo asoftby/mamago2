@@ -193,6 +193,8 @@
     "test:selected-profile-context-integration": "tsx src/lib/decision/selectedProfileContext.integration.test.ts",
     "test:family-profile-b3b": "tsx src/features/me/familyProfile.contract.test.ts",
     "test:plan-interest-ranking": "tsx src/server/services/planSuggestions.interests.test.ts",
+    "test:experience-affinity": "tsx src/server/services/recommendations/experienceAffinity.test.ts",
+    "test:experience-affinity-integration": "tsx src/server/services/analytics/SemanticEventContextService.outcomes.integration.test.ts && tsx src/server/services/recommendations/experienceAffinity.integration.test.ts",
     "test:my-plan-persona-wiring": "tsx src/features/my-plan/lib/fetchPlanSuggestions.test.ts && tsx src/features/my-plan/lib/planRecommendationDraftStorage.test.ts && tsx src/features/my-plan/lib/planRecommendationFlow.integration.test.ts && tsx src/lib/account/buildMeProfileUpdateData.test.ts",
     "test:family-role-update-integration": "tsx src/lib/account/buildMeProfileUpdateData.integration.test.ts",
     "test:profile-completion-flow": "tsx src/lib/post-auth/profileCompletionFlow.test.ts && tsx src/lib/post-auth/resolver.test.ts && tsx src/lib/post-auth/saveFlowContext.test.ts && tsx src/lib/post-auth/pipeline.test.ts && tsx src/lib/post-auth/unifiedResolver.contract.test.ts",

@@ -11,6 +11,7 @@ import { buildSelectedProfileContext } from "@/lib/decision/subjects";
 import { parseCanonicalAgeRangesQuery } from "@/lib/decision/decisionContext";
 import { parseSafeOpaqueId } from "@/lib/decision/identifiers";
 import { isPersonalizedResult } from "@/lib/decision/personalization";
+import { resolveSelectedExperienceAffinity } from "@/server/services/recommendations/experienceAffinity";
 
 const MAX_PERSONA_IDS = 20;
 
@@ -78,6 +79,10 @@ export async function GET(request: NextRequest) {
       personaIds.length > 0 && date
         ? await buildSelectedProfileContext({ userId: user.id, personaIds, targetDate: date })
         : { subjects: [], systemInterestSlugs: [] };
+    const experienceAffinity = await resolveSelectedExperienceAffinity({
+      userId: user.id,
+      subjects: selectedProfileContext.subjects,
+    });
 
     const batch = await rankPlanSuggestionsForCity({
       citySlug,
@@ -88,6 +93,7 @@ export async function GET(request: NextRequest) {
         ? { ageRangeValues: ageRangesParam }
         : {}),
       profileInterestSlugs: selectedProfileContext.systemInterestSlugs,
+      experienceAffinity,
     });
 
     const sessionRowId = await getSessionRowIdFromCookies();
@@ -113,6 +119,17 @@ export async function GET(request: NextRequest) {
                 interests: {
                   value: selectedProfileContext.systemInterestSlugs,
                   source: "profile" as const,
+                },
+              }
+            : {}),
+          ...(experienceAffinity.outcomeEventCount > 0
+            ? {
+                experienceHistory: {
+                  value: {
+                    outcomeEventCount: experienceAffinity.outcomeEventCount,
+                    horizonDays: experienceAffinity.horizonDays,
+                  },
+                  source: "derived" as const,
                 },
               }
             : {}),
