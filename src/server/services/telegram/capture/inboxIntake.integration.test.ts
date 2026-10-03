@@ -147,6 +147,20 @@ test("same update id in another environment is a different receipt", async () =>
   assert.equal(await countItems(owner.userId), 2);
 });
 
+test("album with the same media_group_id in another environment is a separate item", async () => {
+  const owner = await makeUser("album-env");
+  const h = makeIntake();
+  const dev = await h.intake.receive(owner, "DEV", photo("grp-env"));
+  const prod = await h.intake.receive(owner, "PROD", photo("grp-env"));
+  const devId = dev.outcome.status === "stored" ? dev.outcome.inboxItemId : "";
+  const prodId = prod.outcome.status === "stored" ? prod.outcome.inboxItemId : "";
+  assert.ok(devId && prodId);
+  assert.notEqual(devId, prodId);
+  const items = await db.inboxItem.findMany({ where: { userId: owner.userId }, include: { parts: true } });
+  assert.equal(items.length, 2);
+  assert.ok(items.every((item) => item.parts.length === 1 && item.ruleCodes.length === 0));
+});
+
 test("album: redelivery of a part creates no extra part", async () => {
   const owner = await makeUser("album-dup");
   const h = makeIntake();

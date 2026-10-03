@@ -157,7 +157,7 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
   ): Promise<StoreResult> {
     try {
       return await db.$transaction(async (tx) => {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${owner.userId}:${mediaGroupId}`}))`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${owner.userId}:${environment}:${mediaGroupId}`}))`;
 
         const already = await tx.inboxItemPart.findUnique({
           where: {
@@ -170,7 +170,7 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
         const debounceUntil = new Date(now().getTime() + CAPTURE_LIMITS.albumDebounceMs);
 
         const open = await tx.inboxItem.findFirst({
-          where: { userId: owner.userId, mediaGroupId, status: "RECEIVED" },
+          where: { userId: owner.userId, environment, mediaGroupId, status: "RECEIVED" },
           orderBy: { createdAt: "desc" },
           select: { id: true, ruleCodes: true },
         });
@@ -207,7 +207,7 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
         if (await isRateLimited(tx, owner.userId)) return { status: "rejected", reason: "RATE_LIMITED" } as const;
 
         const earlier = await tx.inboxItem.findFirst({
-          where: { userId: owner.userId, mediaGroupId },
+          where: { userId: owner.userId, environment, mediaGroupId },
           select: { id: true },
         });
         const item = await tx.inboxItem.create({
