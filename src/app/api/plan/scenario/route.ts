@@ -82,7 +82,7 @@ const activitySelect = {
 async function loadCanonical(tx: Tx, userId: string, date: string, scenarioId: string) {
   const [items, overrideRows] = await Promise.all([
     tx.planItem.findMany({
-      where: { userId, date },
+      where: { userId, date, cancelledAt: null },
       include: { activity: { select: activitySelect } },
       orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
     }),

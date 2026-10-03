@@ -87,7 +87,7 @@ export async function listPlanItemsByDateForScenario(
   const windowEnd = new Date(`${addDaysLocal(date, 2)}T00:00:00.000Z`);
 
   const items = await prisma.planItem.findMany({
-    where: { userId, date },
+    where: { userId, date, cancelledAt: null },
     include: {
       activity: {
         select: {
