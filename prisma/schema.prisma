@@ -98,6 +98,7 @@ model User {
   reviewedBusinessAccessRequests    BusinessAccessRequest[]          @relation("BusinessAccessRequestReviewedBy")
   placeRevisions                    PlaceRevision[]                  @relation("PlaceRevisionReviewer")
   planItems                         PlanItem[]
+  inboxItems                        InboxItem[]
   experiences                       Experience[]
   dayScenarios                      DayScenario[]
   routes                            Route[]                          @relation("RouteAuthor")
@@ -360,6 +361,7 @@ model Child {
   parent          User                  @relation(fields: [parentId], references: [id], onDelete: Cascade)
   customInterests ChildCustomInterest[]
   systemInterests ChildInterest[]
+  planItems       PlanItem[]
 
   @@index([parentId])
 }
@@ -401,6 +403,51 @@ model Idea {
   @@index([userId])
 }
 
+enum PlanItemSource {
+  CATALOG
+  TELEGRAM_FORWARD
+  MANUAL
+}
+
+enum PlanEntryType {
+  EVENT
+  ACTIVITY
+  TASK
+}
+
+enum RequirementKind {
+  BRING
+  PAY
+  DOCUMENT
+}
+
+enum InboxStatus {
+  RECEIVED
+  PROCESSING
+  DRAFT_READY
+  CONFIRMED
+  DISCARDED
+  FAILED
+}
+
+enum InboxSourceKind {
+  TEXT
+  FORWARD
+  PHOTO
+}
+
+enum InboxIntent {
+  CREATE
+  UPDATE
+  CANCEL
+  NONE
+}
+
+enum InboxPartKind {
+  TEXT
+  PHOTO
+}
+
 model PlanItem {
   id                String                    @id @default(cuid())
   userId            String
@@ -419,12 +466,36 @@ model PlanItem {
   planPlaceSlug     String?
   /// Статья в плане (сохранённое чтение без привязки к событию/месту)
   articleId         String?
+  /// Происхождение записи; все существующие строки — CATALOG.
+  source            PlanItemSource            @default(CATALOG)
+  /// null для CATALOG
+  entryType         PlanEntryType?
+  childId           String?
+  arriveAt          DateTime?
+  endsAt            DateTime?
+  /// Только для самостоятельного TASK
+  dueAt             DateTime?
+  /// false: дедлайн только датой (dueAt = начало дня в поясе владельца)
+  dueHasTime        Boolean                   @default(false)
+  locationText      String?
+  notes             String?
+  priceAmount       Decimal?                  @db.Decimal(10, 2)
+  priceCurrency     String?                   @default("BYN")
+  /// Простая ссылка без FK: входящие чистятся независимо от записей плана
+  inboxItemId       String?
+  /// Канонический Place события (НЕ placeId: тот означает «запись плана — визит в место»)
+  venuePlaceId      String?
+  /// Мягкая отмена; отменённые записи не удаляются
+  cancelledAt       DateTime?
   activity          Activity?                 @relation(fields: [activityId], references: [id])
   route             Route?                    @relation(fields: [routeId], references: [id])
-  place             Place?                    @relation(fields: [placeId], references: [id])
+  place             Place?                    @relation("PlanItemToPlace", fields: [placeId], references: [id])
+  venuePlace        Place?                    @relation("PlanItemVenue", fields: [venuePlaceId], references: [id], onDelete: SetNull)
   article           Article?                  @relation(fields: [articleId], references: [id])
   user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  child             Child?                    @relation(fields: [childId], references: [id], onDelete: SetNull)
   scenarioOverrides DayScenarioItemOverride[]
+  requirements      PlanItemRequirement[]
 
   @@index([userId, date])
   @@index([userId])
@@ -435,6 +506,96 @@ model PlanItem {
   @@index([userId, planPlaceSlug])
   @@index([articleId])
   @@index([startsAt])
+  @@index([userId, source, startsAt])
+  @@index([childId])
+  @@index([venuePlaceId])
+}
+
+model PlanItemRequirement {
+  id         String          @id @default(cuid())
+  planItemId String
+  planItem   PlanItem        @relation(fields: [planItemId], references: [id], onDelete: Cascade)
+  kind       RequirementKind
+  /// «вода», «справка», «передать классному»
+  text       String
+  /// PAY/DOCUMENT; BRING по умолчанию = начало события
+  dueAt      DateTime?
+  /// false: только дата (dueAt = начало дня в поясе владельца)
+  dueHasTime Boolean         @default(false)
+  amount     Decimal?        @db.Decimal(10, 2)
+  currency   String?         @default("BYN")
+  doneAt     DateTime?
+  createdAt  DateTime        @default(now())
+
+  @@index([planItemId])
+  @@index([dueAt, doneAt])
+}
+
+/// Логический запрос «Отправить в mamaGo» (одно сообщение или один альбом).
+model InboxItem {
+  id                String          @id @default(cuid())
+  /// MVP-владелец; в коде доступ только через PlanOwner
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Окружение бота: update_id и chat_id независимы у DEV/PROD
+  environment       TelegramEnvironment
+  telegramChatId    BigInt
+  mediaGroupId      String?
+  sourceKind        InboxSourceKind
+  /// От первой части: forward_origin.date или message.date
+  anchorAt          DateTime
+  anchorIsForward   Boolean
+  /// now + 2,5 с при каждой новой части альбома
+  debounceUntil     DateTime
+  status            InboxStatus     @default(RECEIVED)
+  intent            InboxIntent?
+  /// CaptureDraft, валидирован zod
+  draft             Json?
+  draftVersion      Int             @default(0)
+  /// Для UPDATE/CANCEL
+  matchedPlanItemId String?
+  cardMessageId     Int?
+  awaitingEditUntil DateTime?
+  escalated         Boolean         @default(false)
+  /// Коды сработавших правил, без содержимого
+  ruleCodes         String[]
+  model             String?
+  tokensIn          Int?
+  tokensOut         Int?
+  /// Только код/класс ошибки, без содержимого
+  error             String?
+  editCount         Int             @default(0)
+  createdAt         DateTime        @default(now())
+  processedAt       DateTime?
+  purgeAfter        DateTime
+  parts             InboxItemPart[]
+
+  @@index([userId, status])
+  @@index([mediaGroupId])
+  @@index([status, debounceUntil])
+}
+
+/// Конкретный апдейт Telegram и одновременно чек получения (идемпотентность приёма).
+model InboxItemPart {
+  id                String        @id @default(cuid())
+  inboxItemId       String
+  inboxItem         InboxItem     @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
+  /// Окружение бота: update_id независимы у разных ботов
+  environment       TelegramEnvironment
+  /// Повторная доставка не создаёт часть (ключ идемпотентности: environment + telegramUpdateId)
+  telegramUpdateId  BigInt
+  telegramMessageId Int
+  kind              InboxPartKind
+  /// Текст или подпись; обнуляется purge-джобой
+  text              String?
+  /// file_id фото; сами файлы не храним
+  telegramFileId    String?
+  /// Порядок по telegramMessageId
+  position          Int
+  createdAt         DateTime      @default(now())
+
+  @@unique([environment, telegramUpdateId])
+  @@index([inboxItemId])
 }
 
 /// Durable, explicit post-plan outcome. Historical references intentionally
@@ -1377,7 +1538,9 @@ model Place {
   subcategories   PlaceSubcategory[]
   /// Articles where this place is the editorial subject (relatedPlace).
   relatedArticles Article[]           @relation("ArticleRelatedPlace")
-  planItems       PlanItem[]
+  planItems       PlanItem[]            @relation("PlanItemToPlace")
+  /// PlanItem.venuePlaceId: канонический Place события (не путать с planItems по placeId).
+  venuePlanItems  PlanItem[]            @relation("PlanItemVenue")
   placeIdeas      PlaceIdea[]
   directThreads   DirectThread[]
 
