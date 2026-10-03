@@ -50,6 +50,14 @@ const planActivitySelect = {
   scheduleJson: true,
 };
 
+/**
+ * PlanItem.date is nullable (undated intentions, Family Core B0). Every list
+ * that renders a day/week/calendar must only see dated rows. Queries that
+ * already constrain `date` (equality / gte / lte) exclude NULL implicitly;
+ * queries without a date constraint must add this filter explicitly.
+ */
+const DATED = { date: { not: null } } as const;
+
 export type PlanItemWithActivity = {
   id: string;
   userId: string;
@@ -411,11 +419,12 @@ export async function listArticlePlanItemsBatch(
   articleIds: string[],
 ): Promise<Array<{ id: string; articleId: string | null; date: string; startsAt: Date | null }>> {
   if (articleIds.length === 0) return [];
-  return prisma.planItem.findMany({
-    where: { userId, articleId: { in: articleIds } },
+  const rows = await prisma.planItem.findMany({
+    where: { userId, articleId: { in: articleIds }, ...DATED },
     select: { id: true, articleId: true, date: true, startsAt: true },
     orderBy: { date: "asc" },
   });
+  return rows.flatMap((row) => (row.date === null ? [] : [{ ...row, date: row.date }]));
 }
 
 /**
@@ -459,7 +468,7 @@ export async function listPlanItemsByWeek(
  */
 export async function listAllPlanItems(userId: string): Promise<PlanItemWithActivity[]> {
   return (await prisma.planItem.findMany({
-    where: { userId, cancelledAt: null },
+    where: { userId, cancelledAt: null, ...DATED },
     include: {
       activity: { select: planActivitySelect },
     },
@@ -531,6 +540,7 @@ export async function listPlanItemsDueForReminder(args: {
     where: {
       activityId: { not: null },
       cancelledAt: null,
+      ...DATED,
       startsAt: {
         gte: args.windowStart,
         lte: args.windowEnd,

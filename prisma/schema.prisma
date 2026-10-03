@@ -452,7 +452,9 @@ model PlanItem {
   id                String                    @id @default(cuid())
   userId            String
   activityId        String?
-  date              String
+  /// YYYY-MM-DD. null = запись без даты («намерение без даты», Family Core B0);
+  /// ни один текущий writer не создаёт такие строки.
+  date              String?
   startsAt          DateTime?
   createdAt         DateTime                  @default(now())
   title             String?
