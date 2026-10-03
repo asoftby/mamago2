@@ -12,7 +12,15 @@ import { createInboxIntake, type InboxIntakeDeps } from "./inboxIntake.service";
 import { createNotImplementedInboxProcessor, type InboxProcessor } from "./inboxProcessor";
 import type { ParsedCapture } from "./telegramUpdateParser";
 
-const db = new PrismaClient();
+// Parallel receipts wait on each other's advisory lock while holding a pooled
+// connection, so the test client needs a pool larger than the parallelism.
+function withPool(url: string, size: number): string {
+  const parsed = new URL(url);
+  parsed.searchParams.set("connection_limit", String(size));
+  return parsed.toString();
+}
+
+const db = new PrismaClient({ datasources: { db: { url: withPool(process.env.DATABASE_URL ?? "", 30) } } });
 const runId = randomUUID().slice(0, 8);
 const userIds: string[] = [];
 let updateCounter = 1_000_000 + Math.floor(Math.random() * 1_000_000);
@@ -250,6 +258,151 @@ test("rate limit: 30 items in 24h blocks the next one; older items do not count"
   // Items older than the rolling window stop counting.
   h.clock.t += CAPTURE_LIMITS.rateWindowMs;
   assert.equal((await h.intake.receive(owner, "DEV", capture())).outcome.status, "stored");
+});
+
+async function seedItems(userId: string, count: number, createdAt: Date): Promise<void> {
+  await db.inboxItem.createMany({
+    data: Array.from({ length: count }, () => ({
+      userId,
+      environment: "DEV" as const,
+      telegramChatId: BigInt(1),
+      sourceKind: "TEXT" as const,
+      anchorAt: new Date(),
+      anchorIsForward: false,
+      debounceUntil: new Date(),
+      purgeAfter: new Date(Date.now() + 86_400_000),
+      createdAt,
+    })),
+  });
+}
+
+test("rate limit is atomic: parallel updates at count=29 create exactly one item", async () => {
+  const owner = await makeUser("rate-atomic");
+  const h = makeIntake();
+  await seedItems(owner.userId, 29, new Date(h.clock.t - 60_000));
+
+  const results = await Promise.all(Array.from({ length: 8 }, () => h.intake.receive(owner, "DEV", capture())));
+  const stored = results.filter((r) => r.outcome.status === "stored").length;
+  const rejected = results.filter(
+    (r) => r.outcome.status === "rejected" && r.outcome.reason === "RATE_LIMITED",
+  ).length;
+  assert.equal(stored, 1);
+  assert.equal(rejected, 7);
+  assert.equal(await countItems(owner.userId), 30);
+  assert.deepEqual(h.replies, Array(7).fill(CAPTURE_REPLIES.rateLimited), "refusals are sent after the commit");
+});
+
+test("rate limit stays atomic when an album and singles of one user race at count=29", async () => {
+  const owner = await makeUser("rate-mixed");
+  const h = makeIntake();
+  await seedItems(owner.userId, 29, new Date(h.clock.t - 60_000));
+
+  const album = [photo("grp-mixed"), photo("grp-mixed"), photo("grp-mixed")];
+  const singles = [capture(), capture(), capture()];
+  const results = await Promise.all([...album, ...singles].map((c) => h.intake.receive(owner, "DEV", c)));
+  assert.ok(results.every((r) => ["stored", "rejected", "truncated"].includes(r.outcome.status)));
+  assert.equal(await countItems(owner.userId), 30);
+});
+
+test("an album and single updates of one user in parallel finish without deadlock", async () => {
+  const owner = await makeUser("no-deadlock");
+  const h = makeIntake();
+  const batch = [
+    photo("grp-dl"),
+    capture(),
+    photo("grp-dl"),
+    capture(),
+    photo("grp-dl"),
+    capture(),
+    capture(),
+  ];
+  const results = await Promise.race([
+    Promise.all(batch.map((c) => h.intake.receive(owner, "DEV", c))),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("deadlock suspected")), 15_000)),
+  ]);
+  assert.ok(results.every((r) => r.outcome.status === "stored"));
+  assert.equal(await countItems(owner.userId), 5, "one album item plus four singles");
+  const albumItem = await db.inboxItem.findFirstOrThrow({
+    where: { userId: owner.userId, mediaGroupId: "grp-dl" },
+    include: { parts: true },
+  });
+  assert.equal(albumItem.parts.length, 3);
+});
+
+test("another user is not blocked while a user lock is held", async () => {
+  const a = await makeUser("lock-a");
+  const b = await makeUser("lock-b");
+  const h = makeIntake();
+
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let locked!: () => void;
+  const lockTaken = new Promise<void>((resolve) => {
+    locked = resolve;
+  });
+  const holder = db.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${a.userId}:DEV`}))`;
+      locked();
+      await released;
+    },
+    { timeout: 20_000 },
+  );
+  await lockTaken;
+
+  const pendingA = h.intake.receive(a, "DEV", capture());
+  let aDone = false;
+  void pendingA.then(() => {
+    aDone = true;
+  });
+
+  const resultB = await Promise.race([
+    h.intake.receive(b, "DEV", capture()),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("user B was blocked")), 3_000)),
+  ]);
+  assert.equal(resultB.outcome.status, "stored");
+
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.equal(aDone, false, "user A waits for its own lock");
+
+  release();
+  await holder;
+  assert.equal((await pendingA).outcome.status, "stored");
+});
+
+test("a redelivered update does not wait for the user lock", async () => {
+  const owner = await makeUser("dup-fast");
+  const h = makeIntake();
+  const cap = capture();
+  assert.equal((await h.intake.receive(owner, "DEV", cap)).outcome.status, "stored");
+
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let locked!: () => void;
+  const lockTaken = new Promise<void>((resolve) => {
+    locked = resolve;
+  });
+  const holder = db.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${owner.userId}:DEV`}))`;
+      locked();
+      await released;
+    },
+    { timeout: 20_000 },
+  );
+  await lockTaken;
+
+  const duplicate = await Promise.race([
+    h.intake.receive(owner, "DEV", cap),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("duplicate waited for the lock")), 3_000)),
+  ]);
+  assert.equal(duplicate.outcome.status, "duplicate");
+  release();
+  await holder;
 });
 
 test("sixth photo is dropped with ALBUM_TRUNCATED set once", async () => {

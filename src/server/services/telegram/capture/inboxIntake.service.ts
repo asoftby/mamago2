@@ -63,6 +63,22 @@ function isUpdateIdConflict(error: unknown): boolean {
   return fields.some((field) => field.includes("telegramUpdateId"));
 }
 
+/** Interactive-transaction limits: a receipt may wait behind other updates of the same user. */
+const INTAKE_TX_OPTIONS = { maxWait: 5_000, timeout: 10_000 } as const;
+
+/**
+ * Per-user lock that serializes "count the 24h limit + create" so parallel
+ * updates cannot overshoot it. Lock order is always user first, then album
+ * (media group), in every receipt transaction, so no deadlock is possible.
+ */
+async function lockUserIntake(
+  tx: Prisma.TransactionClient,
+  owner: PlanOwner,
+  environment: TelegramEnvironment,
+): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${owner.userId}:${environment}`}))`;
+}
+
 export function createInboxIntake(deps: InboxIntakeDeps) {
   const { db, notifier, processor } = deps;
   const now = deps.now ?? (() => new Date());
@@ -122,27 +138,39 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
     environment: TelegramEnvironment,
     capture: ParsedCapture,
   ): Promise<StoreResult> {
-    // Redelivery of an already stored update must exit quietly, even at the rate limit.
-    const already = await db.inboxItemPart.findUnique({
-      where: {
-        environment_telegramUpdateId: { environment, telegramUpdateId: BigInt(capture.updateId) },
-      },
-      select: { id: true },
-    });
-    if (already) return { status: "duplicate" };
-    if (await isRateLimited(db, owner.userId)) return { status: "rejected", reason: "RATE_LIMITED" };
-    const debounceUntil = now();
+    const receiptKey = {
+      environment_telegramUpdateId: { environment, telegramUpdateId: BigInt(capture.updateId) },
+    };
+
+    // Fast path outside the lock: a redelivered update exits quietly without
+    // queueing behind the user lock, even at the rate limit.
+    if (await db.inboxItemPart.findUnique({ where: receiptKey, select: { id: true } })) {
+      return { status: "duplicate" };
+    }
+
     try {
-      // One statement-level nested create: a duplicate update id fails the
-      // whole write, so no orphaned InboxItem can remain.
-      const item = await db.inboxItem.create({
-        data: {
-          ...itemData(owner, environment, capture, debounceUntil, []),
-          parts: { create: partData(capture, environment, 0) },
-        },
-        select: { id: true },
-      });
-      return { status: "stored", inboxItemId: item.id, debounceUntil, isAlbumPart: false };
+      return await db.$transaction(async (tx) => {
+        await lockUserIntake(tx, owner, environment);
+
+        // Re-check under the lock (a concurrent delivery may have committed);
+        // the unique index stays the final guard.
+        if (await tx.inboxItemPart.findUnique({ where: receiptKey, select: { id: true } })) {
+          return { status: "duplicate" } as const;
+        }
+        if (await isRateLimited(tx, owner.userId)) return { status: "rejected", reason: "RATE_LIMITED" } as const;
+
+        const debounceUntil = now();
+        // Nested create in the same transaction: a duplicate update id rolls
+        // everything back, so no orphaned InboxItem can remain.
+        const item = await tx.inboxItem.create({
+          data: {
+            ...itemData(owner, environment, capture, debounceUntil, []),
+            parts: { create: partData(capture, environment, 0) },
+          },
+          select: { id: true },
+        });
+        return { status: "stored", inboxItemId: item.id, debounceUntil, isAlbumPart: false } as const;
+      }, INTAKE_TX_OPTIONS);
     } catch (error) {
       if (isUpdateIdConflict(error)) return { status: "duplicate" };
       throw error;
@@ -157,6 +185,7 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
   ): Promise<StoreResult> {
     try {
       return await db.$transaction(async (tx) => {
+        await lockUserIntake(tx, owner, environment);
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${owner.userId}:${environment}:${mediaGroupId}`}))`;
 
         const already = await tx.inboxItemPart.findUnique({
@@ -218,7 +247,7 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
           select: { id: true },
         });
         return { status: "stored", inboxItemId: item.id, debounceUntil, isAlbumPart: true } as const;
-      });
+      }, INTAKE_TX_OPTIONS);
     } catch (error) {
       if (isUpdateIdConflict(error)) return { status: "duplicate" };
       throw error;
