@@ -121,8 +121,8 @@ export class TelegramWebhookService {
 
     // Dev logging: received message
     if (process.env.NODE_ENV !== "production") {
-      console.log("[telegram:webhook] handleMessage chatId=%s from_id=%s text=%s",
-        chatId, message.from?.id ?? "unknown", text ?? "(no text)");
+      // No chat id, sender id or message text: forwarded messages are user content.
+      console.log("[telegram:webhook] handleMessage type=message");
     }
 
     // Not a /start command at all — ignore silently
@@ -139,7 +139,7 @@ export class TelegramWebhookService {
 
     // Dev logging: extracted payload
     if (process.env.NODE_ENV !== "production") {
-      console.log("[telegram:webhook] /start command detected - payload=%s", payload ?? "(none)");
+      console.log("[telegram:webhook] /start command detected - hasPayload=%s", payload !== null);
     }
 
     // Plain /start without link token — greet and explain
