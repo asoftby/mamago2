@@ -33,7 +33,9 @@ SAVE / PLAN_ADD (intent)
 `PLAN_ADD` is never treated as attendance. A past date, reminder, booking,
 notification open, or content view cannot infer `ATTENDED`; only the
 authenticated user action “Да, были” may create that outcome. Phase C records
-these facts without assigning them recommendation/ranking weights.
+these facts. Phase D interprets them only through a bounded, subject-aware
+request-time affinity for selected owned profile subjects; they remain excluded
+from global popularity and the account-wide behavior projection.
 
 A surface may change composition constraints (item count, horizon, diversity, cooldown, minimum score, no-send gate), but it must not fork the core ranking/learning interpretation.
 
@@ -92,7 +94,7 @@ Telegram feedback should produce a normal recommendation-attributed behavioral o
 
 `/admin/ranking/telegram` is the policy/configuration surface for Telegram recommendations.
 
-- It reuses the shared EVENT ranking contract `engagement-profile-interest-v2` and does not define Telegram behavior weights. Profile-interest input is currently supplied only by authenticated My Plan; surfaces without it retain engagement/freshness ordering.
+- It reuses the shared EVENT ranking contract `engagement-profile-interest-experience-v3` and does not define Telegram behavior weights. Profile-interest and subject-experience inputs are currently supplied only by authenticated My Plan; surfaces without them retain engagement/freshness ordering.
 - `RecommendationSurfacePolicy` stores draft/published policy versions separately from `algorithmVersion`.
 - The current policy fields are `resultCount`, `horizonDays`, `minimumScore`, `minimumResultCount`, `maxPerCategory`, and `repeatCooldownDays`.
 - Preview applies the policy read-only and deliberately does **not** write `RecommendationRun` / `RecommendationExposure`; admin experiments must not pollute recommendation telemetry or learning.
@@ -118,6 +120,11 @@ Recommendation trace account/session identifiers are logical, not hard foreign k
 
 My Plan currently ranks real EVENT candidates using the existing engagement score and freshness tie-break. The first trace version is:
 
-`engagement-profile-interest-v2`
+`engagement-profile-interest-experience-v3`
 
-This version adds a bounded canonical system-interest boost for selected owned child personas while preserving non-matching candidates. Future ranking changes must intentionally bump `algorithmVersion`.
+This version combines the bounded canonical system-interest boost with a
+bounded `[-6,+6]` subject-aware outcome affinity derived from at most 200
+immutable `ATTENDED` / `EXPERIENCE_FEEDBACK` events in a 365-day horizon.
+Historical subjects match only by `kind + refId`; manual subjects never become
+persistent preference identity. Non-matching and disliked candidates remain
+rankable. Future ranking changes must intentionally bump `algorithmVersion`.
