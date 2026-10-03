@@ -1,6 +1,15 @@
-# Отправить в mamaGo (Forward-to-Plan): спецификация MVP v1.2
+# Отправить в mamaGo (Forward-to-Plan): спецификация MVP v1.3
 
 Статус: **заморожена как implementation contract**. Во время PR1–PR3 архитектура не расширяется; изменения только через явную запись в changelog ниже. Основана на read-only аудите `dev` (HEAD `65cc16b8`). Ссылки вида `файл:строка` взяты из отчёта аудита; перед правкой каждого файла перечитывать актуальное состояние.
+
+## Changelog v1.2 → v1.3
+
+1. **Контракт приёма части (6.3): исправлен порядок шагов.** Часть нельзя вставить раньше `InboxItem` (у `InboxItemPart.inboxItemId` NOT NULL). Всё выполняется в одной транзакции; повторная доставка апдейта не оставляет осиротевший `InboxItem`.
+2. **Gate capture-пути (раздел 5):** нет активной `TelegramConnection` или `userId` не входит в `TELEGRAM_CAPTURE_USER_IDS` → capture-обработчики ничего не отправляют пользователю, поведение бота прежнее (`/start`, `link_<token>`, подключение Telegram, callback'и заявок не меняются). Ответы неподключённым пользователям не вводятся.
+3. **Очистка данных (разделы 11 и 13):** обязанности разделены: PR4 очищает `InboxItemPart.text` и `InboxItem.draft` при `CONFIRMED`/`DISCARDED` в той же транзакции; `inbox-purge` (PR9) страхует остальные случаи (брошенный `DRAFT_READY`, `FAILED`, зависшие `RECEIVED`/`PROCESSING`) и обнуляет не только `InboxItemPart.text`, но и `InboxItem.draft`.
+4. **Production gate пилота (раздел 15)** заменяет прежнее условие «после PR4+PR5+PR8»: пилот только после PR9 и подтверждённой работы purge (purge smoke PASS). Критерий описан в разделе 15.
+5. **`environment` в Inbox-таблицах (по замечанию ревью PR1).** `update_id` уникален только в пределах одного бота, поэтому ключ идемпотентности `(environment, telegramUpdateId)`, а не глобальный `telegramUpdateId` (так же, как `TelegramConnection` различает окружения). `environment` добавлен в `InboxItem` и `InboxItemPart`; ключ группировки альбома и advisory lock включают `environment`.
+6. **Лимит приёма атомарен (по замечанию ревью PR2).** Проверка «30 запросов за 24 часа» и создание `InboxItem` выполняются в одной транзакции под per-user advisory lock `hashtext(userId || ':' || environment)`; порядок захвата всегда «пользователь, затем альбом». Отказ по лимиту отправляется после коммита транзакции.
 
 ## Changelog v1.1 → v1.2
 
@@ -118,13 +127,14 @@ Telegram → POST /api/bot/webhook   (существует, проверяет x
                ├─ /start link_<token>            (как сейчас)
                ├─ callback_query inb:* / req:*   (новые)
                └─ text/photo/forward в private   → InboxService
-InboxService: InboxItemPart (уникальный update_id) → найти/создать InboxItem(RECEIVED) → 200
+InboxService: InboxItemPart (уникальный (environment, update_id)) → найти/создать InboxItem(RECEIVED) → 200
 Воркер разбора: склейка → файлы → LLM → правила → draft → карточка
 Применение: planEntry.service (создание/изменение/отмена PlanItem + requirements)
 ```
 
 - **Клиент Telegram:** голый `fetch` как в `TelegramChannel.ts`. `grammy` не используем. Добавить методы: `editMessageText`, `sendChatAction`, `getFile` + скачивание файла, `answerCallbackQuery`.
 - **Источник привязки:** `TelegramConnection(telegramChatId → userId)`. Дублирующие поля `User.telegramId/telegramConnected` не читаем.
+- **Gate capture-пути:** новая обработка `text/photo/forward` включается только для private-чата с активной `TelegramConnection`, у которой `userId` входит в `TELEGRAM_CAPTURE_USER_IDS`. Иначе capture-обработчики ничего не делают и ничего не отправляют; существующее поведение бота (`/start`, `link_<token>`, подключение Telegram, callback'и заявок) остаётся без изменений. Пустой или незаданный `TELEGRAM_CAPTURE_USER_IDS` = фича выключена.
 - **Webhook на PROD регистрируется вручную.** После выката проверить `getWebhookInfo`: `allowed_updates` должен включать `message` и `callback_query` (по умолчанию включает, если не сужен при регистрации).
 - **Разбор:** запускать из того же процесса через неблокирующий вызов после ответа 200 (`after`/`waitUntil`-подобный механизм) с подбором по статусу в БД; для обрыва процесса — `cron` подбирает `RECEIVED/PROCESSING` старше 2 минут (job `inbox-recover`, раздел 11). Очередь с ретраями не вводим. Для альбомов первый обработчик планирует отложенную проверку на `debounceUntil`; при потере процесса запись подхватывает `inbox-recover`.
 - **Владелец плана:** `src/server/services/planOwner.ts`: `resolvePlanOwner(userId): PlanOwner`. Сейчас возвращает `{ userId }`. Весь код capture принимает `PlanOwner`.
@@ -207,6 +217,7 @@ enum InboxPartKind { TEXT PHOTO }
 model InboxItem {
   id                String          @id @default(cuid())
   userId            String                                // MVP-владелец; в коде доступ только через PlanOwner
+  environment       TelegramEnvironment                   // окружение бота, тот же тип, что у TelegramConnection
   telegramChatId    BigInt
   mediaGroupId      String?
   sourceKind        InboxSourceKind
@@ -241,7 +252,8 @@ model InboxItemPart {
   id                String        @id @default(cuid())
   inboxItemId       String
   inboxItem         InboxItem     @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
-  telegramUpdateId  BigInt        @unique                 // чек получения: повторная доставка не создаёт часть
+  environment       TelegramEnvironment                   // окружение бота (то же значение, что у InboxItem; нужно для уникального индекса)
+  telegramUpdateId  BigInt                                // чек получения вместе с environment: повторная доставка не создаёт часть
   telegramMessageId Int
   kind              InboxPartKind
   text              String?                               // текст или подпись; обнуляется purge-джобой
@@ -249,14 +261,15 @@ model InboxItemPart {
   position          Int                                   // порядок по telegramMessageId
   createdAt         DateTime      @default(now())
 
+  @@unique([environment, telegramUpdateId])
   @@index([inboxItemId])
 }
 ```
 
-**Контракт приёма части** (реализуется в PR2):
-1. Для альбомов: транзакция с `pg_advisory_xact_lock(hashtext(userId || ':' || mediaGroupId))`; для одиночных сообщений блокировка не нужна.
-2. `INSERT InboxItemPart ... ON CONFLICT (telegramUpdateId) DO NOTHING`; конфликт → повторная доставка, выход без побочных эффектов.
-3. Найти открытый `InboxItem` (`status = RECEIVED`, тот же `userId` и `mediaGroupId`) или создать; `debounceUntil = now() + 2,5 с`.
+**Контракт приёма части** (реализуется в PR2). Шаги 1–3 выполняются **в одной транзакции**. Транзакция приёма всегда первым берёт per-user lock `pg_advisory_xact_lock(hashtext(userId || ':' || environment))` (затем, для альбома, lock по `mediaGroupId`; порядок один и тот же везде, чтобы не было deadlock); под этим lock'ом выполняются подсчёт лимита (раздел 13) и создание `InboxItem`. Проверка существующей части с тем же `(environment, telegramUpdateId)` выполняется и до lock'а (быстрый выход при повторной доставке), и под lock'ом (повторная проверка). Ответ-отказ по лимиту отправляется после коммита, не под lock'ом.
+1. Одиночное сообщение (нет `mediaGroupId`): создать `InboxItem` (`debounceUntil = now()`) и `InboxItemPart`; нарушение уникальности `(environment, telegramUpdateId)` откатывает всю транзакцию и означает повторную доставку (выход без побочных эффектов, осиротевшего `InboxItem` не остаётся).
+2. Часть альбома: транзакция с `pg_advisory_xact_lock(hashtext(userId || ':' || environment || ':' || mediaGroupId))`; сначала проверить, нет ли части с этим `(environment, telegramUpdateId)` (есть: выход без побочных эффектов).
+3. Найти открытый `InboxItem` (`status = RECEIVED`, тот же `userId`, `environment` и `mediaGroupId`) или создать; добавить часть; `debounceUntil = now() + 2,5 с`.
 4. Разбор стартует только через compare-and-set `UPDATE ... SET status = 'PROCESSING' WHERE id = ? AND status = 'RECEIVED' AND debounceUntil <= now()`; проигравший гонку ничего не делает.
 5. Часть альбома, пришедшая после перехода в `PROCESSING`, создаёт новый `InboxItem` и пишет код `ALBUM_LATE_PART`; это допустимая редкая деградация.
 6. Callback-апдейты не пишутся в чеки: их идемпотентность обеспечивают CAS-переходы статусов (раздел 9).
@@ -379,7 +392,7 @@ Callbacks (лимит `callback_data` 64 байта): `inb:add:<id>`, `inb:edit:
 ## 11. Дополнительные jobs (через существующий runner)
 
 - `inbox-recover`: подхватывает `RECEIVED/PROCESSING` старше 2 минут;
-- `inbox-purge`: обнуляет `InboxItemPart.text` у `CONFIRMED/DISCARDED` и после `purgeAfter`, удаляет `InboxItem` старше 30 дней.
+- `inbox-purge`: для всех `InboxItem` с `purgeAfter <= now()` (любой статус) обнуляет `InboxItemPart.text` и `InboxItem.draft`; удаляет `InboxItem` старше 30 дней. Очистка при `CONFIRMED/DISCARDED` выполняется не здесь, а в PR4.
 
 ## 12. UI «Моего плана» и совместимость потребителей
 
@@ -393,10 +406,10 @@ Callbacks (лимит `callback_data` 64 байта): `inb:add:<id>`, `inb:edit:
 ## 13. Приватность и безопасность
 
 - Файлы скачиваются в память, на диск и в хранилище не пишутся.
-- `InboxItemPart.text` обнуляется после подтверждения/отклонения и через 7 дней; в `PlanItem` остаются только извлечённые поля и `inboxItemId`.
+- `InboxItemPart.text` и `InboxItem.draft` обнуляются при `CONFIRMED`/`DISCARDED` (PR4, в той же транзакции) и в любом случае после `purgeAfter` (7 дней от создания; страхует `inbox-purge`, PR9); в `PlanItem` остаются только извлечённые поля и `inboxItemId`.
 - В логи не пишутся тексты, изображения и свободный текст модели, только идентификаторы, метрики и коды правил.
 - У модели нет инструментов; выход проходит zod; запись в план возможна только из обработчика callback.
-- Rate limit: 30 запросов в сутки на пользователя, изображение ≤ 5 МБ, ≤ 5 фото на запрос, текст ≤ 4000 символов.
+- Rate limit: 30 запросов (`InboxItem`) за скользящие 24 часа на пользователя, изображение ≤ 5 МБ, ≤ 5 фото на запрос, текст ≤ 4000 символов. Подсчёт и создание атомарны за счёт per-user lock (раздел 6.3): параллельные апдейты не могут превысить лимит.
 - Пункт об обработке пересланных сообщений внешней моделью добавить в политику конфиденциальности (99-З) и текст первого запуска в боте.
 
 ## 14. События и KPI
@@ -409,7 +422,7 @@ Callbacks (лимит `callback_data` 64 байта): `inb:add:<id>`, `inb:edit:
 
 **Вспомогательные:** доля `FAILED`, доля эскалаций, доля `update_card_rejected_as_new` (плохой матчинг), доля requirement, закрытых после напоминания, стоимость токенов на подтверждённую запись, медиана времени до карточки (цель ≤ 4 с).
 
-## 15. План PR (атомарные, на `dev`)
+## 15. План PR (атомарные; каждый в своей ветке и worktree от свежего `origin/dev`, в `dev` только через PR)
 
 | PR | Содержание | Зависимость |
 |---|---|---|
@@ -417,14 +430,31 @@ Callbacks (лимит `callback_data` 64 байта): `inb:add:<id>`, `inb:edit:
 | **PR1** | Инвентарь потребителей `PlanItem`; миграция (`source`, `entryType`, `childId`, поля времени/места/цены, `venuePlaceId`, `cancelledAt`, `PlanItemRequirement`, `InboxItem`, `InboxItemPart`); фильтр `cancelledAt` в списках; `resolvePlanOwner` | — |
 | **PR2** | Маршрутизация в `TelegramWebhookService`: private-чаты, callback_query, идемпотентность по `InboxItemPart` и CAS-переходы статусов, лимиты, allowlist, Telegram-клиент (`editMessageText`, `sendChatAction`, `getFile`), склейка альбомов, запись `InboxItem` | PR1 |
 | **PR3** | `openrouterClient`, контекст, `resolvePlaceCandidates`, `findPlanDuplicates`, zod-схема, правила (раздел 8), эскалация, тесты на фикстурах (15–20 реальных сообщений) | PR2 |
-| **PR4** | Карточки A/C, callbacks, `planEntry.service.createFromDraft`, выбор ребёнка | PR3 |
+| **PR4** | Карточки A/C, callbacks, `planEntry.service.createFromDraft`, выбор ребёнка; очистка `text`/`draft` при `CONFIRMED/DISCARDED` | PR3 |
 | **PR5** | UI: вариант карточки записи бота в «Моём плане» и совместимость потребителей (раздел 12), отметка requirement | PR1, PR4 |
 | **PR6** | Режим правки текстом | PR4 |
 | **PR7** | UPDATE/CANCEL для записей бота, diff-карточки B, `applyUpdate/cancel` | PR4, PR5 |
 | **PR8** | Сценарий `PLAN_REQUIREMENT_DUE`, job `plan-requirement-reminders`, расширение 2h-before и дайджеста на записи бота, BRING в текстах | PR0, PR4, PR5 |
-| **PR9** | `inbox-recover`, `inbox-purge`, события аналитики, политика конфиденциальности | PR2 |
+| **PR9** | `inbox-recover`, `inbox-purge`, скрипт/процедура purge smoke, события аналитики, политика конфиденциальности | PR2 |
 
-**Пилот:** после PR4+PR5+PR8 включить для 10 пользователей через allowlist; собирать zero-edit acceptance и repeat capture; решение о расширении принимать по ним.
+**Production gate пилота.** Реальные сообщения пользователей на PROD принимаются только после выполнения всех пунктов:
+
+1. PR0 выполнен: cron на PROD работает и подтверждён (раздел 10).
+2. PR4, PR5, PR8 и PR9 задеплоены на PROD.
+3. **Purge smoke PASS** на PROD (критерий ниже).
+4. Только после этого `TELEGRAM_CAPTURE_USER_IDS` на PROD расширяется до пилотной группы (10 пользователей).
+
+До прохождения gate allowlist на PROD пуст. Проверка владельцем на DEV допустима.
+
+**Критерий purge smoke (на синтетических данных, без реальных сообщений):**
+1. Служебным скриптом создать `InboxItem` + `InboxItemPart` с текстом-маркером (`PURGE_SMOKE_<случайная строка>`) и непустым `draft`, `purgeAfter` в прошлом: по одному в статусах `RECEIVED`, `DRAFT_READY`, `FAILED`, `CONFIRMED`; плюс один `InboxItem` старше 30 дней.
+2. Запустить `inbox-purge` тем же путём, которым его вызывает cron (маршрут с `CRON_SECRET` или runner).
+3. SQL-проверка: у всех строк `InboxItemPart.text IS NULL` и `InboxItem.draft IS NULL`; строка старше 30 дней удалена; маркер не находится ни в одной таблице.
+4. В логах job нет содержимого сообщений.
+5. Cron вызывает job по расписанию: в логе runner есть успешный запуск за последние сутки.
+6. Служебные строки удалены после проверки. Процедуру повторять после любого изменения purge.
+
+После включения пилота: собирать zero-edit acceptance и repeat capture, решение о расширении принимать по ним.
 
 ## 16. Известные ограничения MVP
 
