@@ -93,6 +93,9 @@ export async function deleteAccount(
     await tx.userNotificationSchedule.deleteMany({ where: { userId } });
     await tx.dayScenario.deleteMany({ where: { userId } });
     await tx.planItem.deleteMany({ where: { userId } });
+    // Inbox rows hold forwarded message text; the User row is retained as a tombstone,
+    // so the FK cascade never fires. InboxItemPart is removed by cascade from InboxItem.
+    await tx.inboxItem.deleteMany({ where: { userId } });
     await tx.idea.deleteMany({ where: { userId } });
     await tx.routeIdea.deleteMany({ where: { userId } });
     await tx.offerIdea.deleteMany({ where: { userId } });
