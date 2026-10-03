@@ -119,6 +119,41 @@ const clamped = buildSelectedExperienceAffinity(
 );
 assert.equal(clamped.subjects[0]?.interestScores.get("science"), AFFINITY_KEY_MAX);
 
+function assertAllSemanticScores(
+  events: ReturnType<typeof event>[],
+  expected: number,
+  message: string,
+): void {
+  const affinity = buildSelectedExperienceAffinity([childA], events).subjects[0];
+  assert.equal(affinity?.categoryScores.get("category-science"), expected, `${message}: category`);
+  assert.equal(affinity?.signalScores.get("signal-educational"), expected, `${message}: signal`);
+  assert.equal(affinity?.formatScores.get("OFFLINE"), expected, `${message}: format`);
+  assert.equal(affinity?.interestScores.get("science"), expected, `${message}: interest`);
+}
+
+const fiveLikesTwoDislikes = [
+  ...Array.from({ length: 5 }, () => event("EXPERIENCE_FEEDBACK", [childA], "LIKE")),
+  ...Array.from({ length: 2 }, () => event("EXPERIENCE_FEEDBACK", [childA], "DISLIKE")),
+];
+assertAllSemanticScores(fiveLikesTwoDislikes, 11, "raw sum clamps only after all events");
+assertAllSemanticScores([...fiveLikesTwoDislikes].reverse(), 11, "reverse permutation stays invariant");
+assertAllSemanticScores(
+  Array.from({ length: 10 }, () => event("EXPERIENCE_FEEDBACK", [childA], "LIKE")),
+  12,
+  "positive overflow",
+);
+assertAllSemanticScores(
+  Array.from({ length: 10 }, () => event("EXPERIENCE_FEEDBACK", [childA], "DISLIKE")),
+  -12,
+  "negative overflow",
+);
+const mixedOverflow = [
+  ...Array.from({ length: 10 }, () => event("EXPERIENCE_FEEDBACK", [childA], "LIKE")),
+  ...Array.from({ length: 10 }, () => event("EXPERIENCE_FEEDBACK", [childA], "DISLIKE")),
+];
+assertAllSemanticScores(mixedOverflow, -12, "mixed overflow");
+assertAllSemanticScores([...mixedOverflow].reverse(), -12, "reverse mixed overflow");
+
 for (const noPersonalization of [
   buildSelectedExperienceAffinity([], [event("ATTENDED", [childA])]),
   buildSelectedExperienceAffinity([manual], [event("ATTENDED", [manual])]),

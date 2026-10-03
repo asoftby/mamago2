@@ -87,7 +87,13 @@ export function experienceOutcomeDelta(
 function bump(map: Map<string, number>, keys: readonly string[], delta: number): void {
   if (delta === 0) return;
   for (const key of keys) {
-    map.set(key, clamp((map.get(key) ?? 0) + delta, AFFINITY_KEY_MIN, AFFINITY_KEY_MAX));
+    map.set(key, (map.get(key) ?? 0) + delta);
+  }
+}
+
+function clampAffinityMap(map: Map<string, number>): void {
+  for (const [key, value] of map) {
+    map.set(key, clamp(value, AFFINITY_KEY_MIN, AFFINITY_KEY_MAX));
   }
 }
 
@@ -145,6 +151,12 @@ export function buildSelectedExperienceAffinity(
       bump(affinity.interestScores, interestSlugs, delta);
       if (format) bump(affinity.formatScores, [format], delta);
     }
+  }
+  for (const affinity of selected.values()) {
+    clampAffinityMap(affinity.categoryScores);
+    clampAffinityMap(affinity.signalScores);
+    clampAffinityMap(affinity.formatScores);
+    clampAffinityMap(affinity.interestScores);
   }
   return {
     subjects: [...selected.values()],
