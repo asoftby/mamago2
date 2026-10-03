@@ -5031,3 +5031,14 @@ distributor_company_id=550) и хотели бы уточнить несколь
   fix.
 - Source: PR A implementation — hit while running `pnpm db:generate` after
   editing `prisma/schema.prisma`.
+
+## [BACKLOG-162] `deleteAccount` leaves `Experience` rows (User row is kept as a tombstone, so the FK cascade never fires)
+
+- Status: OPEN
+- Priority: P2
+- Area: Account deletion / Privacy
+- Added: 2026-10-03
+- Reason deferred: found while fixing `InboxItem` cleanup in forward-to-plan PR2; separate task by decision.
+- Context: `src/server/account/deleteAccount.service.ts` anonymizes `User` instead of deleting it and erases data via an explicit `deleteMany` list; `Experience` (`schema.prisma`, `onDelete: Cascade` from `User`) is not in that list.
+- Acceptance criteria: `Experience` rows of the deleted user are removed (or consciously anonymized) in `deleteAccount`, with an integration test like `deleteAccount.inbox.integration.test.ts`.
+- Source: forward-to-plan PR2 account-deletion audit.
