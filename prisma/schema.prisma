@@ -191,6 +191,12 @@ model UserEvent {
   /// Guest product identity (client-generated UUID). Distinct from
   /// `mg_analytics_sid`, which stays a web-analytics session id, not identity.
   anonymousId      String?
+  /// Family context of the event (Family Core). Server-only, intentionally not
+  /// a hard FK: raw event history must survive family deletion. Null for all
+  /// events written before the Family Core ships.
+  familyId         String?
+  /// Plan audience (PRIVATE | FAMILY) for plan-related events. Server-only.
+  planVisibility   PlanVisibility?
   meta             Json?
   createdAt        DateTime             @default(now())
   promotionActions PromotionAction[]
@@ -332,6 +338,14 @@ model TelegramConnection {
 enum BirthPrecision {
   DAY
   MONTH
+}
+
+/// Audience of a plan item at the moment an analytics event was written.
+/// Server-only; used by the Family Core to keep personal signals separate from
+/// family signals.
+enum PlanVisibility {
+  PRIVATE
+  FAMILY
 }
 
 model Child {

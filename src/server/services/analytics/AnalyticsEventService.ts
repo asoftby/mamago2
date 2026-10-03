@@ -128,6 +128,8 @@ export async function trackUserEvent(
           userId: input.userId ?? undefined,
           sessionId: input.sessionId ?? undefined,
           anonymousId: input.anonymousId ?? undefined,
+          familyId: input.familyId ?? undefined,
+          planVisibility: input.planVisibility ?? undefined,
           decisionId,
           eventType: input.eventType,
           entityType: input.entityType ?? undefined,

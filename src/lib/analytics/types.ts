@@ -1,6 +1,7 @@
 import type {
   AnalyticsEntityType,
   AnalyticsVertical,
+  PlanVisibility,
   UserEventType,
 } from "@prisma/client";
 import type { Subject } from "@/lib/decision/decisionContext";
@@ -58,6 +59,10 @@ export type TrackUserEventInput = {
   sessionId?: string | null;
   /** Guest product identity (client-generated UUID). Distinct from sessionId. */
   anonymousId?: string | null;
+  /** Server-only Family Core context; never part of the HTTP ingestion contract. */
+  familyId?: string | null;
+  /** Server-only plan audience for plan-related events; never accepted from clients. */
+  planVisibility?: PlanVisibility | null;
   eventType: UserEventType;
   entityType?: AnalyticsEntityType | null;
   entityId?: string | null;
