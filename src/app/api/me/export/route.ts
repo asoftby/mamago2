@@ -83,7 +83,9 @@ export async function GET() {
     activity: ideaActivityById.get(idea.activityId) ?? null,
   }));
 
-  const plansByDate = new Map<string, typeof planItemsRaw>();
+  // date is null for undated plan items (Family Core B0); they export as a
+  // separate group with date: null rather than being dropped.
+  const plansByDate = new Map<string | null, typeof planItemsRaw>();
   for (const item of planItemsRaw) {
     const existing = plansByDate.get(item.date) ?? [];
     existing.push(item);

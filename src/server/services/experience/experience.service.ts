@@ -16,6 +16,7 @@ export class ExperienceDomainError extends Error {
     public readonly code:
       | "not_found"
       | "not_eligible"
+      | "undated_plan_item"
       | "unsupported_entity"
       | "attendance_conflict"
       | "feedback_not_allowed"
@@ -127,7 +128,7 @@ export async function listPendingExperienceCandidates(input: {
     });
     const completed = new Set(existing.map((item) => item.sourcePlanItemId));
     for (const item of pool) {
-      if (!item.activityId || !item.activity || completed.has(item.id)) continue;
+      if (!item.activityId || !item.activity || item.date === null || completed.has(item.id)) continue;
       candidates.push({
         planItemId: item.id,
         activityId: item.activityId,
@@ -313,6 +314,12 @@ export async function confirmPlanExperience(input: {
   if (!planItem) throw new ExperienceDomainError("not_found", "Plan item not found");
   if (!planItem.activityId) {
     throw new ExperienceDomainError("unsupported_entity", "Only event plan items are supported");
+  }
+  if (planItem.date === null) {
+    throw new ExperienceDomainError(
+      "undated_plan_item",
+      "Undated plan item cannot be confirmed as attended",
+    );
   }
   if (planItem.date >= today) {
     throw new ExperienceDomainError("not_eligible", "Event is not eligible for check-in yet");

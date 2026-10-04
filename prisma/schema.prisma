@@ -73,6 +73,7 @@ model User {
   bookingFeedbacks                  BookingFeedback[]
   reviewedBusinessVerifications     BusinessVerificationLog[]        @relation("ReviewedBy")
   children                          Child[]
+  familyMemberships                 FamilyMembership[]
   contentEdits                      ContentEditLog[]                 @relation("ContentEditor")
   ideas                             Idea[]
   assignedImprovementRequests       ImprovementRequest[]             @relation("ImprovementRequestAssignee")
@@ -349,6 +350,57 @@ enum PlanVisibility {
   FAMILY
 }
 
+enum FamilyRole {
+  OWNER
+  ADULT
+}
+
+/// Какую историю семьи видит взрослый: ALL — всё; FROM_JOIN — только с момента вступления.
+enum FamilyHistoryAccess {
+  ALL
+  FROM_JOIN
+}
+
+/// Решение по записи плана. PROPOSED — предложение, ещё не принятое семьёй.
+enum PlanDecisionStatus {
+  PROPOSED
+  CONFIRMED
+  CANCELLED
+}
+
+/// Family Core: семья (общий профиль детей и «Мой план»).
+model Family {
+  id          String             @id @default(cuid())
+  name        String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  /// Закрытая семья (когда взрослых не осталось, B3/A2).
+  archivedAt  DateTime?
+  memberships FamilyMembership[]
+  children    Child[]
+  planItems   PlanItem[]
+}
+
+/// Членство взрослого в семье. Инварианты — partial unique индексы в миграции:
+///  - FamilyMembership_active_user: один активный membership на пользователя;
+///  - FamilyMembership_active_owner: один активный OWNER на семью.
+/// Prisma не выражает partial unique, поэтому в schema.prisma их нет.
+model FamilyMembership {
+  id            String              @id @default(cuid())
+  familyId      String
+  userId        String
+  role          FamilyRole          @default(ADULT)
+  historyAccess FamilyHistoryAccess @default(ALL)
+  joinedAt      DateTime            @default(now())
+  /// null = активное членство.
+  leftAt        DateTime?
+  family        Family              @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@index([userId])
+}
+
 model Child {
   id              String                @id @default(cuid())
   name            String?
@@ -356,14 +408,21 @@ model Child {
   birthPrecision  BirthPrecision?
   interests       String?
   parentId        String
+  /// Family Core: принадлежность ребёнка семье (источник ACL с B2). null до backfill.
+  familyId        String?
+  /// Кто создал запись; НЕ используется как ACL.
+  createdById     String?
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
   parent          User                  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  family          Family?               @relation(fields: [familyId], references: [id], onDelete: Cascade)
   customInterests ChildCustomInterest[]
   systemInterests ChildInterest[]
   planItems       PlanItem[]
 
+  @@unique([id, familyId])
   @@index([parentId])
+  @@index([familyId])
 }
 
 model ChildInterest {
@@ -452,7 +511,9 @@ model PlanItem {
   id                String                    @id @default(cuid())
   userId            String
   activityId        String?
-  date              String
+  /// YYYY-MM-DD. null = запись без даты («намерение без даты», Family Core B0);
+  /// ни один текущий writer не создаёт такие строки.
+  date              String?
   startsAt          DateTime?
   createdAt         DateTime                  @default(now())
   title             String?
@@ -487,6 +548,14 @@ model PlanItem {
   venuePlaceId      String?
   /// Мягкая отмена; отменённые записи не удаляются
   cancelledAt       DateTime?
+  /// Family Core: семья-владелец записи (источник ACL с B2). null до backfill.
+  familyId          String?
+  /// Аудитория записи. Существующие строки — FAMILY (семья из одного = как раньше).
+  visibility        PlanVisibility            @default(FAMILY)
+  /// Решение по записи; все существующие строки — CONFIRMED.
+  /// CHECK: visibility=PRIVATE и status=PROPOSED одновременно запрещены (см. миграцию).
+  status            PlanDecisionStatus        @default(CONFIRMED)
+  family            Family?                   @relation(fields: [familyId], references: [id], onDelete: Cascade)
   activity          Activity?                 @relation(fields: [activityId], references: [id])
   route             Route?                    @relation(fields: [routeId], references: [id])
   place             Place?                    @relation("PlanItemToPlace", fields: [placeId], references: [id])
@@ -509,6 +578,9 @@ model PlanItem {
   @@index([userId, source, startsAt])
   @@index([childId])
   @@index([venuePlaceId])
+  @@index([familyId, date])
+  @@index([familyId, visibility, status])
+  @@unique([id, familyId])
 }
 
 model PlanItemRequirement {
