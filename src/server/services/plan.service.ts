@@ -417,14 +417,15 @@ export async function addArticlePlanItem(
 export async function listArticlePlanItemsBatch(
   userId: string,
   articleIds: string[],
-): Promise<Array<{ id: string; articleId: string | null; date: string; startsAt: Date | null }>> {
+): Promise<Array<{ id: string; articleId: string | null; date: string | null; startsAt: Date | null }>> {
   if (articleIds.length === 0) return [];
-  const rows = await prisma.planItem.findMany({
-    where: { userId, articleId: { in: articleIds }, ...DATED },
+  // Undated rows are kept on purpose: the batched save status must agree with
+  // the single-item /api/save/status path (undated = "in plan" without a date).
+  return prisma.planItem.findMany({
+    where: { userId, articleId: { in: articleIds } },
     select: { id: true, articleId: true, date: true, startsAt: true },
     orderBy: { date: "asc" },
   });
-  return rows.flatMap((row) => (row.date === null ? [] : [{ ...row, date: row.date }]));
 }
 
 /**

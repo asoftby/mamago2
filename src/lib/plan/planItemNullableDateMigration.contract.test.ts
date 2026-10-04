@@ -19,9 +19,13 @@ assert.match(experience, /plannedDate\s+String\s/);
 // Lists without a date constraint must filter NULL dates explicitly.
 const plan = read("src/server/services/plan.service.ts");
 assert.match(plan, /const DATED = \{ date: \{ not: null \} \} as const;/);
-for (const fn of ["listAllPlanItems", "listArticlePlanItemsBatch", "listPlanItemsDueForReminder"]) {
+for (const fn of ["listAllPlanItems", "listPlanItemsDueForReminder"]) {
   const body = plan.slice(plan.indexOf(`export async function ${fn}`));
   assert.match(body.slice(0, body.indexOf("\n}\n")), /DATED/, `${fn} must filter undated rows`);
 }
+
+// The article batch keeps undated rows so batched and single save status agree.
+const batch = plan.slice(plan.indexOf("export async function listArticlePlanItemsBatch"));
+assert.doesNotMatch(batch.slice(0, batch.indexOf("\n}\n")), /DATED/);
 
 console.log("planItemNullableDateMigration.contract.test.ts: OK");
