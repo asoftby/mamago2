@@ -311,6 +311,37 @@ test("invalid output twice escalates once to the strong model", async () => {
   assert.equal(saved.tokensIn, 30, "usage is summed over every response, valid or not");
 });
 
+test("a message with two events: the exact place goes only to the event located there", async () => {
+  const twoEvents = {
+    intent: "CREATE",
+    entries: [
+      entry({
+        title: { value: "Экскурсия", state: "stated" },
+        startsAt: { value: "2026-10-20T10:00:00+03:00", state: "stated", basis: null },
+        location: { value: "Музей истории", placeId: null, state: "stated" },
+      }),
+      entry({
+        title: { value: "Родительское собрание", state: "stated" },
+        startsAt: { value: "2026-10-21T18:00:00+03:00", state: "stated", basis: null },
+        location: { value: "школа №5", placeId: null, state: "stated" },
+      }),
+    ],
+    match: { candidatePlanItemId: null, changes: [] },
+  };
+  const h = harness(okReply(twoEvents), { models: { fast: FAST, strong: null, responseFormat: "json_object" } });
+  const item = await makeItem({
+    owner: "zero",
+    text: "20 октября экскурсия в Музей истории, 21 октября собрание в школе №5.",
+    anchorAt: "2026-10-05T10:00:00Z",
+  });
+  await h.processor.process(item.id);
+  const saved = await reload(item.id);
+  const draft = CaptureDraftSchema.parse(saved.draft);
+  assert.equal(draft.entries[0]!.location.placeId, ids.museum);
+  assert.equal(draft.entries[1]!.location.placeId, null);
+  assert.ok(saved.ruleCodes.includes("PLACE_AUTO_EXACT"));
+});
+
 test("the strong model is never called twice: invalid strong output fails the item", async () => {
   const h = harness([okReply("x"), okReply("y"), okReply("z")]);
   const item = await makeItem({ owner: "zero", text: "Экскурсия 9 октября" });

@@ -1,4 +1,5 @@
 import type { CaptureDraft, CaptureEntry } from "./captureDraft.schema";
+import { normalizeText } from "./captureText";
 
 /**
  * Deterministic post-LLM rules (forward-to-plan spec v1.3, section 8).
@@ -100,7 +101,11 @@ export function applyPostLlmRules(input: CaptureDraft, context: RuleContext): Ru
       addCode(ruleCodes, RULE_CODES.placeIdRejected);
     }
     if (location.placeId === null && location.value !== null) {
-      const exact = context.placeShortlist.filter((place) => place.exact);
+      // Per entry: only a shortlisted place whose normalized title equals THIS
+      // entry's normalized location, and only when exactly one does. A place
+      // matched for one event of a message must never leak to another event.
+      const wanted = normalizeText(location.value);
+      const exact = wanted ? context.placeShortlist.filter((place) => normalizeText(place.title) === wanted) : [];
       if (exact.length === 1) {
         location.placeId = exact[0]!.id;
         addCode(ruleCodes, RULE_CODES.placeAutoExact);

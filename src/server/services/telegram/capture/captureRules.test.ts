@@ -108,22 +108,56 @@ test("place: with an empty shortlist any placeId is rejected", () => {
   assert.deepEqual(result.ruleCodes, ["PLACE_ID_REJECTED"]);
 });
 
-test("place: a single exact shortlist match is substituted when the model gave none; ambiguity is left alone", () => {
+test("place: a single exact match of THIS entry's location is substituted when the model gave none (single entry)", () => {
   const input = draft({ entries: [entry({ location: { value: "Музей истории", placeId: null, state: "stated" } })] });
   const single = applyPostLlmRules(input, { ...none, placeShortlist: [museum, museum2] });
   assert.equal(single.draft.entries[0]!.location.placeId, "place-museum");
   assert.equal(single.draft.entries[0]!.location.state, "inferred");
   assert.deepEqual(single.ruleCodes, ["PLACE_AUTO_EXACT"]);
 
-  const twoExact = applyPostLlmRules(input, {
-    ...none,
-    placeShortlist: [museum, { ...museum2, id: "place-museum-3", exact: true }],
-  });
-  assert.equal(twoExact.draft.entries[0]!.location.placeId, null);
-
   const noLocation = draft({ entries: [entry()] });
   const untouched = applyPostLlmRules(noLocation, { ...none, placeShortlist: [museum] });
   assert.equal(untouched.draft.entries[0]!.location.placeId, null);
+});
+
+test("place: two places with the same normalized title are ambiguous and stay unresolved", () => {
+  const input = draft({ entries: [entry({ location: { value: "Музей истории", placeId: null, state: "stated" } })] });
+  const twin = { ...museum, id: "place-museum-twin" };
+  const result = applyPostLlmRules(input, { ...none, placeShortlist: [museum, twin] });
+  assert.equal(result.draft.entries[0]!.location.placeId, null);
+  assert.deepEqual(result.ruleCodes, []);
+});
+
+test("place: with two events, the exact place is given only to the event whose location matches it", () => {
+  const input = draft({
+    entries: [
+      entry({ title: { value: "Экскурсия", state: "stated" }, location: { value: "Музей истории", placeId: null, state: "stated" } }),
+      entry({ title: { value: "Собрание", state: "stated" }, location: { value: "школа №5", placeId: null, state: "stated" } }),
+    ],
+  });
+  const result = applyPostLlmRules(input, { ...none, placeShortlist: [museum] });
+  assert.equal(result.draft.entries[0]!.location.placeId, "place-museum");
+  assert.equal(result.draft.entries[1]!.location.placeId, null, "the school must not inherit the museum");
+  assert.equal(result.draft.entries[1]!.location.state, "stated");
+  assert.deepEqual(result.ruleCodes, ["PLACE_AUTO_EXACT"]);
+});
+
+test("place: two events in the same museum both get its placeId", () => {
+  const input = draft({
+    entries: [
+      entry({ title: { value: "Экскурсия", state: "stated" }, location: { value: "Музей истории", placeId: null, state: "stated" } }),
+      entry({ title: { value: "Лекция", state: "stated" }, location: { value: "музей истории!", placeId: null, state: "stated" } }),
+    ],
+  });
+  const result = applyPostLlmRules(input, { ...none, placeShortlist: [museum] });
+  assert.deepEqual(result.draft.entries.map((e) => e.location.placeId), ["place-museum", "place-museum"]);
+  assert.deepEqual(result.ruleCodes, ["PLACE_AUTO_EXACT"]);
+});
+
+test("place: a location that only partially overlaps the title is not auto-substituted", () => {
+  const input = draft({ entries: [entry({ location: { value: "Музей", placeId: null, state: "stated" } })] });
+  const result = applyPostLlmRules(input, { ...none, placeShortlist: [museum] });
+  assert.equal(result.draft.entries[0]!.location.placeId, null);
 });
 
 test("match: only backend candidates are accepted; hallucinated ids are dropped", () => {
