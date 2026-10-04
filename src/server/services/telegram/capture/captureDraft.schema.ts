@@ -74,11 +74,19 @@ const MatchSchema = z.strictObject({
   ),
 });
 
-export const CaptureDraftSchema = z.strictObject({
-  intent: z.enum(["CREATE", "UPDATE", "CANCEL", "NONE"]),
-  entries: z.array(EntrySchema),
-  match: MatchSchema,
-});
+export const CaptureDraftSchema = z
+  .strictObject({
+    intent: z.enum(["CREATE", "UPDATE", "CANCEL", "NONE"]),
+    entries: z.array(EntrySchema),
+    match: MatchSchema,
+  })
+  .superRefine((draft, ctx) => {
+    // NONE means "nothing actionable": a draft that also carries entries is
+    // contradictory, so it is invalid output (retry / escalation), not data.
+    if (draft.intent === "NONE" && draft.entries.length > 0) {
+      ctx.addIssue({ code: "custom", path: ["entries"], message: "NONE requires empty entries" });
+    }
+  });
 
 export type CaptureDraft = z.infer<typeof CaptureDraftSchema>;
 export type CaptureEntry = CaptureDraft["entries"][number];

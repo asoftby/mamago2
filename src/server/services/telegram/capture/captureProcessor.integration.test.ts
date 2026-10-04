@@ -342,6 +342,39 @@ test("a message with two events: the exact place goes only to the event located 
   assert.ok(saved.ruleCodes.includes("PLACE_AUTO_EXACT"));
 });
 
+const contradictoryNone = () => ({ intent: "NONE", entries: [entry()], match: { candidatePlanItemId: null, changes: [] } });
+const emptyNone = () => ({ intent: "NONE", entries: [], match: { candidatePlanItemId: null, changes: [] } });
+
+test("NONE with entries is invalid output: it is retried, and a valid NONE then becomes DRAFT_READY", async () => {
+  const h = harness([okReply(contradictoryNone()), okReply(emptyNone())]);
+  const item = await makeItem({ owner: "zero", text: "Хороших выходных!" });
+  await h.processor.process(item.id);
+  const saved = await reload(item.id);
+  assert.equal(saved.status, "DRAFT_READY");
+  assert.equal(saved.intent, "NONE");
+  assert.deepEqual(CaptureDraftSchema.parse(saved.draft).entries, []);
+  assert.deepEqual(h.calls.map((c) => c.model), [FAST, FAST]);
+});
+
+test("NONE with entries on every attempt escalates once and never produces DRAFT_READY", async () => {
+  const h = harness([okReply(contradictoryNone()), okReply(contradictoryNone()), okReply(contradictoryNone())]);
+  const item = await makeItem({ owner: "zero", text: "Хороших выходных!" });
+  await h.processor.process(item.id);
+  const saved = await reload(item.id);
+  assert.equal(saved.status, "FAILED");
+  assert.equal(saved.error, "INVALID_MODEL_OUTPUT");
+  assert.equal(saved.escalated, true);
+  assert.equal(saved.draft, null);
+  assert.deepEqual(h.calls.map((c) => c.model), [FAST, FAST, STRONG]);
+
+  const strongFixes = harness([okReply(contradictoryNone()), okReply(contradictoryNone()), okReply(emptyNone())]);
+  const item2 = await makeItem({ owner: "zero", text: "Хороших выходных!" });
+  await strongFixes.processor.process(item2.id);
+  const saved2 = await reload(item2.id);
+  assert.equal(saved2.status, "DRAFT_READY");
+  assert.ok(saved2.ruleCodes.includes("ESCALATE_INVALID_JSON"));
+});
+
 test("the strong model is never called twice: invalid strong output fails the item", async () => {
   const h = harness([okReply("x"), okReply("y"), okReply("z")]);
   const item = await makeItem({ owner: "zero", text: "Экскурсия 9 октября" });

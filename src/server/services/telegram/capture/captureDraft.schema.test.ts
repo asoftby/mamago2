@@ -41,6 +41,16 @@ test("UPDATE with changes, CANCEL and NONE parse", () => {
   assert.ok(parseCaptureDraft(JSON.stringify(valid({ intent: "NONE", entries: [] }))).ok);
 });
 
+test("NONE is valid only with empty entries", () => {
+  assert.ok(parseCaptureDraft(JSON.stringify(valid({ intent: "NONE", entries: [] }))).ok);
+  assert.deepEqual(parseCaptureDraft(JSON.stringify(valid({ intent: "NONE", entries: [entry()] }))), {
+    ok: false,
+    code: "INVALID_SCHEMA",
+  });
+  // The reverse is not constrained here: CREATE with entries stays valid.
+  assert.ok(parseCaptureDraft(JSON.stringify(valid({ intent: "CREATE", entries: [entry()] }))).ok);
+});
+
 test("a markdown-fenced JSON object is accepted", () => {
   const fenced = "```json\n" + JSON.stringify(valid()) + "\n```";
   assert.ok(parseCaptureDraft(fenced).ok);
