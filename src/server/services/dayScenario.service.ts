@@ -12,6 +12,8 @@ export type FingerprintSource = {
   articleId?: string | null;
   date?: string | null;
   startsAt: Date | null;
+  endsAt?: Date | null;
+  childId?: string | null;
 };
 
 const scenarioPlaceSelect = {
@@ -180,6 +182,8 @@ export function computePlanFingerprint(
       articleId: item.articleId ?? null,
       date: item.date ?? null,
       startsAt: item.startsAt?.toISOString() ?? null,
+      endsAt: item.endsAt?.toISOString() ?? null,
+      childId: item.childId ?? null,
       overrideStartsAt: overrides.get(item.id)?.toISOString() ?? null,
     }))
     .sort();

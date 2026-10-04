@@ -1,16 +1,9 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import {
-  PLAN_SCOPE_STORAGE_KEY,
-  filterByScope,
-  parsePlanScopeFilter,
-  showFamilyUi,
-  type FamilyView,
-  type PlanScopeFilter,
-} from "@/features/my-plan/lib/planVisibilityView";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { PLAN_SCOPE_STORAGE_KEY, filterByScope, parsePlanScopeFilter, showFamilyUi, type FamilyView, type PlanScopeFilter } from "@/features/my-plan/lib/planVisibilityView";
 import type { PlanBookingState } from "@/server/family/planBookingPure";
 import { Container } from "@/components/ui/Container";
 import { WeekCalendar } from "./WeekCalendar";
@@ -24,9 +17,21 @@ import {
   type ExperienceCheckInCandidate,
   type ExperienceCheckInState,
 } from "./ExperienceCheckIn";
+import { ManualPlanEntryDialog } from "./ManualPlanEntryDialog";
+import { addDaysIso, getWeekStart } from "@/features/my-plan/lib/weekCalendar";
+import { shouldFetchCalendarWeek, upsertCalendarWeekItem } from "@/features/my-plan/lib/familyCalendarNavigation";
+import {
+  filterFamilyCalendarItems,
+  findFamilyCalendarConflictIds,
+  type FamilyCalendarFilter,
+} from "@/features/my-plan/lib/familyCalendar";
+import { toast } from "@/lib/toast";
+import { getLocalDateKey } from "@/lib/date/localDateKey";
 
 export type SerializedPlanItem = {
   id: string;
+  source: "CATALOG" | "TELEGRAM_FORWARD" | "MANUAL";
+  entryType: "EVENT" | "ACTIVITY" | "TASK" | null;
   date: string;
   /** Raw, authoritative source time — never mutated to reflect a Scenario
    * override. Presentation should read `effectiveStartsAt` instead. */
@@ -34,8 +39,15 @@ export type SerializedPlanItem = {
   /** Time to display: `startsAt` if set, else a Scenario-assigned override
    * for this item, else null (untimed). See `resolveMyPlanItemEffectiveTime`. */
   effectiveStartsAt: string | null;
+  endsAt: string | null;
+  dueAt: string | null;
+  dueHasTime: boolean;
   activityId: string | null;
   title: string | null;
+  childId: string | null;
+  childName: string | null;
+  locationText: string | null;
+  notes: string | null;
   coverImageUrl: string | null;
   /** Family Core M4b. Absent on items added client-side before a reload (= own, shared). */
   visibility?: "PRIVATE" | "FAMILY";
@@ -78,6 +90,9 @@ type Props = {
   initialItems: SerializedPlanItem[];
   /** Non-null only for a family with 2+ active adults (flag FAMILY_CORE_READS on). */
   familyView?: FamilyView | null;
+  initialSelectedDate: string;
+  initialRange: { from: string; to: string };
+  familyChildren: Array<{ id: string; name: string }>;
   ideaActivityIds: string[];
   childrenAges: number[];
   initialIdeas?: SerializedIdea[];
@@ -99,7 +114,11 @@ type Props = {
 const MONTHS_RU = ["ЯНВАРЬ","ФЕВРАЛЬ","МАРТ","АПРЕЛЬ","МАЙ","ИЮНЬ","ИЮЛЬ","АВГУСТ","СЕНТЯБРЬ","ОКТЯБРЬ","НОЯБРЬ","ДЕКАБРЬ"];
 
 function getTodayISO() {
-  return new Date().toISOString().split("T")[0];
+  return getLocalDateKey();
+}
+
+function itemForCacheMessage(item: SerializedPlanItem): string {
+  return item.source === "MANUAL" ? "Календарь обновлён" : "План обновлён";
 }
 
 function pluralizeDays(n: number) {
@@ -202,6 +221,7 @@ function IdeasSidebar({ ideas }: { ideas: SerializedIdea[] }) {
                 overflow: "hidden",
               }}>
                 {image && (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={image} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 )}
               </div>
@@ -257,11 +277,12 @@ function IdeasSidebar({ ideas }: { ideas: SerializedIdea[] }) {
   );
 }
 
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
 export function PlanPageClient({
   initialItems,
   familyView = null,
+  initialSelectedDate,
+  initialRange,
+  familyChildren,
   ideaActivityIds,
   initialIdeas = [],
   scenarioStatusByDate = {},
@@ -270,11 +291,17 @@ export function PlanPageClient({
 }: Props) {
   const todayISO = getTodayISO();
   const searchParams = useSearchParams();
-  const dateParam = searchParams.get("date");
-  const [selectedDate, setSelectedDate] = useState(
-    dateParam && DATE_PATTERN.test(dateParam) ? dateParam : todayISO,
-  );
-  const [items, setItems] = useState(initialItems);
+  const pathname = usePathname();
+  const router = useRouter();
+  const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
+  const [itemsByWeek, setItemsByWeek] = useState<Record<string, SerializedPlanItem[]>>({
+    [initialRange.from]: initialItems,
+  });
+  const [scenarioStatuses, setScenarioStatuses] = useState(scenarioStatusByDate);
+  const [loadingWeek, setLoadingWeek] = useState<string | null>(null);
+  const [calendarFilter, setCalendarFilter] = useState<FamilyCalendarFilter>("all");
+  const [manualDialogOpen, setManualDialogOpen] = useState(false);
+  const [editingManualItem, setEditingManualItem] = useState<SerializedPlanItem | null>(null);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const familyUi = showFamilyUi(familyView);
   const [scope, setScope] = useState<PlanScopeFilter>("all");
@@ -289,7 +316,7 @@ export function PlanPageClient({
   }, []);
   // Server data is the source of truth after a refresh (e.g. after a conflict).
   useEffect(() => {
-    setItems(initialItems);
+    setItemsByWeek({ [initialRange.from]: initialItems });
   }, [initialItems]);
 
   const changeScope = (next: PlanScopeFilter) => {
@@ -301,10 +328,40 @@ export function PlanPageClient({
     }
   };
 
+  const items = useMemo(() => Object.values(itemsByWeek).flat(), [itemsByWeek]);
   const visibleItems = useMemo(
     () => (familyUi ? filterByScope(items, scope, familyView?.currentUserId ?? "") : items),
     [items, scope, familyUi, familyView],
   );
+
+  const loadWeek = useCallback(async (date: string) => {
+    const from = getWeekStart(date);
+    if (!shouldFetchCalendarWeek(itemsByWeek, date) || loadingWeek === from) return;
+    const to = addDaysIso(from, 6);
+    setLoadingWeek(from);
+    try {
+      const response = await fetch(`/api/plan/calendar?from=${from}&to=${to}`);
+      const payload = await response.json() as {
+        items?: SerializedPlanItem[];
+        scenarioStatusByDate?: Record<string, "ready" | "changed">;
+      };
+      if (!response.ok || !payload.items) throw new Error("calendar_load_failed");
+      setItemsByWeek((current) => ({ ...current, [from]: payload.items! }));
+      setScenarioStatuses((current) => ({ ...current, ...(payload.scenarioStatusByDate ?? {}) }));
+    } catch {
+      toast.error("Не удалось загрузить неделю");
+    } finally {
+      setLoadingWeek(null);
+    }
+  }, [itemsByWeek, loadingWeek]);
+
+  const selectDate = useCallback((date: string) => {
+    setSelectedDate(date);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("date", date);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    void loadWeek(date);
+  }, [loadWeek, pathname, router, searchParams]);
 
   const itemsByDate = useMemo(() => {
     return visibleItems.reduce<Record<string, SerializedPlanItem[]>>((acc, item) => {
@@ -314,19 +371,50 @@ export function PlanPageClient({
     }, {});
   }, [visibleItems]);
 
-  const dayItems = itemsByDate[selectedDate] ?? [];
+  const dayItems = filterFamilyCalendarItems(itemsByDate[selectedDate] ?? [], calendarFilter);
+  const conflictIds = useMemo(() => findFamilyCalendarConflictIds(dayItems), [dayItems]);
   const totalItems = visibleItems.length;
   const totalDays = Object.keys(itemsByDate).length;
 
+  const replaceCachedItem = useCallback((saved: SerializedPlanItem) => {
+    setItemsByWeek((current) => upsertCalendarWeekItem(current, saved));
+    setScenarioStatuses((current) => {
+      const next = { ...current };
+      if (next[saved.date]) next[saved.date] = "changed";
+      if (editingManualItem && next[editingManualItem.date]) next[editingManualItem.date] = "changed";
+      return next;
+    });
+    selectDate(saved.date);
+    toast(itemForCacheMessage(saved), { duration: 2000 });
+  }, [editingManualItem, selectDate]);
+
   const handleRemoveItem = (itemId: string) => {
-    setItems((prev) => prev.filter((i) => i.id !== itemId));
+    const removed = items.find((item) => item.id === itemId);
+    if (removed) {
+      setScenarioStatuses((current) => current[removed.date]
+        ? { ...current, [removed.date]: "changed" }
+        : current);
+    }
+    setItemsByWeek((current) => Object.fromEntries(
+      Object.entries(current).map(([week, weekItems]) => [week, weekItems.filter((item) => item.id !== itemId)]),
+    ));
+  };
+
+  const openCreate = () => {
+    setEditingManualItem(null);
+    setManualDialogOpen(true);
+  };
+
+  const openEdit = (item: SerializedPlanItem) => {
+    setEditingManualItem(item);
+    setManualDialogOpen(true);
   };
 
   const handleVisibilityChange = (
     itemId: string,
     next: { visibility: "PRIVATE" | "FAMILY"; updatedAt: string },
   ) => {
-    setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, ...next } : i)));
+    setItemsByWeek((current) => Object.fromEntries(Object.entries(current).map(([week, weekItems]) => [week, weekItems.map((i) => i.id === itemId ? { ...i, ...next } : i)])));
   };
 
   const hasIdeas = initialIdeas.length > 0;
@@ -370,7 +458,7 @@ export function PlanPageClient({
                 className="font-mono uppercase"
                 style={{ fontSize: 11, letterSpacing: ".14em", color: "rgba(20,18,16,.55)" }}
               >
-                {MONTHS_RU[new Date().getMonth()]}
+                {MONTHS_RU[Number(selectedDate.slice(5, 7)) - 1]}
               </span>
             </div>
             <h1
@@ -403,7 +491,7 @@ export function PlanPageClient({
               type="button"
               onClick={() => totalItems > 0 && setOverviewOpen(true)}
               disabled={totalItems === 0}
-              aria-label={totalItems > 0 ? "Посмотреть весь план" : "План пока пуст"}
+              aria-label={totalItems > 0 ? "Посмотреть загруженные недели" : "План пока пуст"}
               style={{
                 padding: "14px 16px",
                 background: "#FAF7F1",
@@ -432,7 +520,7 @@ export function PlanPageClient({
                 className="font-mono uppercase"
                 style={{ fontSize: 11, letterSpacing: ".14em", color: "var(--primary)" }}
               >
-                ● в плане
+                ● загружено
               </span>
               <div
                 className="font-sans"
@@ -456,7 +544,7 @@ export function PlanPageClient({
                     color: "#C24E22",
                   }}
                 >
-                  Посмотреть все →
+                  Обзор недель →
                 </span>
               )}
             </button>
@@ -506,9 +594,33 @@ export function PlanPageClient({
       <Container className="pb-12">
         <WeekCalendar
           selectedDate={selectedDate}
-          onSelect={setSelectedDate}
+          onSelect={selectDate}
           itemsByDate={itemsByDate}
+          onToday={() => selectDate(todayISO)}
+          loading={loadingWeek != null}
         />
+        <div className="mt-4 flex flex-wrap gap-2" aria-label="Фильтр по члену семьи">
+          {([
+            ["all", "Все"],
+            ["family", "Я / Семья"],
+            ...familyChildren.map((child) => [`child:${child.id}`, child.name]),
+          ] as Array<[FamilyCalendarFilter, string]>).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={calendarFilter === value}
+              onClick={() => setCalendarFilter(value)}
+              className="min-h-11 rounded-full border px-4 text-sm font-medium"
+              style={{
+                background: calendarFilter === value ? "#141210" : "#fff",
+                color: calendarFilter === value ? "#fff" : "#141210",
+                borderColor: "rgba(20,18,16,.18)",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </Container>
 
       {/* Main: day list + ideas sidebar */}
@@ -528,7 +640,10 @@ export function PlanPageClient({
             onRemove={handleRemoveItem}
             familyView={familyUi ? familyView : null}
             onVisibilityChange={handleVisibilityChange}
-            scenarioStatus={scenarioStatusByDate[selectedDate]}
+            onAddManual={openCreate}
+            onEditManual={openEdit}
+            conflictIds={conflictIds}
+            scenarioStatus={scenarioStatuses[selectedDate]}
           />
           {hasIdeas && <IdeasSidebar ideas={initialIdeas} />}
         </div>
@@ -544,9 +659,18 @@ export function PlanPageClient({
         familyView={familyUi ? familyView : null}
         onVisibilityChange={handleVisibilityChange}
         onOpenDay={(date) => {
-          setSelectedDate(date);
+          selectDate(date);
           setOverviewOpen(false);
         }}
+      />
+
+      <ManualPlanEntryDialog
+        open={manualDialogOpen}
+        onOpenChange={setManualDialogOpen}
+        date={selectedDate}
+        familyChildren={familyChildren}
+        item={editingManualItem}
+        onSaved={replaceCachedItem}
       />
 
       <style>{`
