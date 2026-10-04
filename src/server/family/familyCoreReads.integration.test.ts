@@ -7,6 +7,7 @@ import { ensureFamilyForUser } from "./ensureFamily";
 import {
   addPlanItem,
   addPlacePlanItem,
+  listArticlePlanItemsBatch,
   listAllPlanItems,
   removePlanItem,
 } from "@/server/services/plan.service";
@@ -85,6 +86,58 @@ async function main() {
       data: { userId: a.id, familyId: famA, date: "2026-11-13", status: "CANCELLED" },
     });
     assert.ok(!(await listAllPlanItems(a.id)).some((i) => i.id === cancelled.id));
+
+    // P2 regression: a CANCELLED occurrence is history, not an active dedup target.
+    const activity = await prisma.activity.create({
+      data: {
+        ownerUserId: a.id,
+        title: `Cancelled dedup ${marker}`,
+        shortDesc: "fixture",
+        type: "EVENT",
+        scheduleMode: "ONE_TIME",
+        ageTags: [],
+      },
+    });
+    const oldCancelled = await prisma.planItem.create({
+      data: { userId: a.id, familyId: famA, activityId: activity.id, date: "2026-11-15", status: "CANCELLED", title: "old" },
+    });
+    for (const reads of [false, true]) {
+      setReads(reads);
+      await prisma.planItem.deleteMany({ where: { activityId: activity.id, status: "CONFIRMED" } });
+      const re = await addPlanItem(a.id, activity.id, "2026-11-16");
+      assert.equal(re.created, true, `reads=${reads}: re-add must create a new item`);
+      assert.notEqual(re.id, oldCancelled.id);
+      const fresh = await prisma.planItem.findUniqueOrThrow({ where: { id: re.id } });
+      assert.equal(fresh.status, "CONFIRMED");
+      assert.equal(fresh.date, "2026-11-16");
+      const old = await prisma.planItem.findUniqueOrThrow({ where: { id: oldCancelled.id } });
+      assert.equal(old.status, "CANCELLED");
+      assert.equal(old.date, "2026-11-15");
+      assert.equal(old.title, "old");
+      assert.ok((await listAllPlanItems(a.id)).some((i) => i.id === re.id));
+    }
+    // Same for route/place/article-style dedup via the status lookup helper.
+    setReads(false);
+    if (place) {
+      const cancelledPlace = await prisma.planItem.create({
+        data: { userId: a.id, familyId: famA, placeId: place.id, date: "2026-11-17", status: "CANCELLED" },
+      });
+      const placeItem2 = await addPlacePlanItem(a.id, place.id, "2026-11-18");
+      assert.notEqual(placeItem2.id, cancelledPlace.id);
+      assert.equal((await prisma.planItem.findUniqueOrThrow({ where: { id: cancelledPlace.id } })).status, "CANCELLED");
+    }
+    const article = await prisma.article.findFirst({ select: { id: true } });
+    if (article) {
+      const cancelledArticle = await prisma.planItem.create({
+        data: { userId: a.id, familyId: famA, articleId: article.id, date: "2026-11-19", status: "CANCELLED" },
+      });
+      for (const reads of [false, true]) {
+        setReads(reads);
+        const rows = await listArticlePlanItemsBatch(a.id, [article.id]);
+        assert.ok(!rows.some((r) => r.id === cancelledArticle.id), `reads=${reads}: cancelled must not be "in plan"`);
+      }
+      setReads(false);
+    }
 
     if (place) {
       const placeItem = await addPlacePlanItem(a.id, place.id, "2026-11-14");

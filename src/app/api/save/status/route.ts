@@ -9,7 +9,7 @@ import {
 } from "@/server/services/idea.service";
 import { prisma } from "@/lib/prisma";
 import { resolveIdeaPlanState } from "@/lib/plan/ideaPlanStatus";
-import { planScopeFor } from "@/server/family/familyAccess";
+import { activePlanScopeFor } from "@/server/family/familyAccess";
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     if (articleId) {
       const isIdea = await hasArticleIdea(user.id, articleId);
       const planItems = await prisma.planItem.findMany({
-        where: { ...(await planScopeFor(user.id)), articleId },
+        where: { ...(await activePlanScopeFor(user.id)), articleId },
         select: { id: true, date: true, startsAt: true },
         orderBy: { date: "asc" },
       });
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
     if (placeId) {
       const isIdea = await hasPlaceIdea(user.id, placeId);
       const planItems = await prisma.planItem.findMany({
-        where: { ...(await planScopeFor(user.id)), placeId },
+        where: { ...(await activePlanScopeFor(user.id)), placeId },
         select: { id: true, date: true, startsAt: true },
         orderBy: { date: "asc" },
       });
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
 
     // Check if in plan
     const planItems = await prisma.planItem.findMany({
-      where: { ...(await planScopeFor(user.id)), activityId: activityId! },
+      where: { ...(await activePlanScopeFor(user.id)), activityId: activityId! },
       select: { id: true, date: true, startsAt: true },
       orderBy: { date: "asc" },
     });

@@ -12,7 +12,7 @@ import { parseCanonicalAgeRangesQuery } from "@/lib/decision/decisionContext";
 import { parseSafeOpaqueId } from "@/lib/decision/identifiers";
 import { isPersonalizedResult } from "@/lib/decision/personalization";
 import { resolveSelectedExperienceAffinity } from "@/server/services/recommendations/experienceAffinity";
-import { planScopeFor } from "@/server/family/familyAccess";
+import { activePlanScopeFor } from "@/server/family/familyAccess";
 
 const MAX_PERSONA_IDS = 20;
 
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
         ? (
             await prisma.planItem.findMany({
               where: {
-                ...(await planScopeFor(user.id)),
+                ...(await activePlanScopeFor(user.id)),
                 date,
                 activityId: { not: null },
               },

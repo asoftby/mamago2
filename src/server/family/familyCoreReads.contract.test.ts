@@ -36,4 +36,33 @@ assert.match(plan, /\.\.\.\(await planScopeFor\(userId\)\)/);
 assert.doesNotMatch(read("src/server/account/deleteAccount.service.ts"), /familyId|familyMembership|ensureFamily/);
 assert.match(read("src/server/family/familyScope.ts"), /FAMILY_CORE_READS/);
 
+// Active-state lookups (planned / in plan / dedup) must exclude CANCELLED via
+// activePlanScopeFor; plain planScopeFor is reserved for ACL-only checks.
+const activeStateFiles = [
+  "src/server/services/plan.service.ts",
+  "src/server/services/planOccurrence.service.ts",
+  "src/server/services/dayScenario.service.ts",
+  "src/app/api/save/status/route.ts",
+  "src/app/api/save/ideas/route.ts",
+  "src/app/api/plan/suggestions/route.ts",
+  "src/app/api/plan/generate/route.ts",
+  "src/app/(public)/me/ideas/page.tsx",
+];
+for (const f of activeStateFiles) {
+  const src = read(f);
+  assert.match(src, /activePlanScopeFor/, `${f} must use activePlanScopeFor`);
+  const plainUses = (src.match(/\bplanScopeFor\(/g) ?? []).length;
+  // plan.service keeps exactly one ACL-only use: removePlanItem.
+  assert.equal(plainUses, f.endsWith("plan.service.ts") ? 1 : 0, `${f}: unexpected plain planScopeFor`);
+}
+const planSvc = read("src/server/services/plan.service.ts");
+const removeBody = planSvc.slice(planSvc.indexOf("export async function removePlanItem"));
+assert.match(removeBody.slice(0, removeBody.indexOf("\n}\n")), /planScopeFor\(userId\)/);
+// Every dedup findFirst in plan.service goes through the active scope.
+for (const m of planSvc.matchAll(/planItem\.findFirst\(\{\s*where: \{([^}]*)\}/g)) {
+  assert.match(m[1], /activePlanScopeFor/, "dedup findFirst must use activePlanScopeFor");
+}
+// The scenario duplicate check also ignores cancelled rows.
+assert.match(read("src/app/api/plan/scenario/route.ts"), /id: \{ not: replacement\.planItemId \}, \.\.\.NOT_CANCELLED/);
+
 console.log("familyCoreReads.contract.test.ts: OK");

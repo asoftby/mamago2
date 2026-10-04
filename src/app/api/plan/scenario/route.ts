@@ -169,7 +169,7 @@ export async function saveScenarioDraftForUser(
       const activity = await tx.activity.findUnique({ where: { id: replacement.newActivityId }, select: activitySelect });
       if (!activity || activity.status !== "PUBLISHED") throw new ScenarioSaveError(422, "INVALID_REPLACEMENT", replacement.newActivityId);
       const duplicate = await tx.planItem.findFirst({
-        where: { userId, activityId: activity.id, id: { not: replacement.planItemId } },
+        where: { userId, activityId: activity.id, id: { not: replacement.planItemId }, ...NOT_CANCELLED },
         select: { id: true },
       });
       if (duplicate) throw new ScenarioSaveError(422, "DUPLICATE_ACTIVITY", activity.id);

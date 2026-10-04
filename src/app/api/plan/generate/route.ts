@@ -15,7 +15,7 @@ import {
   resolveGuestUsageKey,
 } from "@/server/services/guestPlanQuota";
 import { getTrustedClientIp } from "@/lib/security/clientIp";
-import { planScopeFor } from "@/server/family/familyAccess";
+import { activePlanScopeFor } from "@/server/family/familyAccess";
 
 /**
  * POST /api/plan/generate — подборка для «Мой план».
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
         plannedIds = (
           await prisma.planItem.findMany({
             where: {
-              ...(await planScopeFor(user.id)),
+              ...(await activePlanScopeFor(user.id)),
               date,
               activityId: { not: null },
             },

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { resolveRouteForUserSave } from "@/server/services/route.service";
 import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
 import { resolvePlanActivityOccurrence } from "@/server/services/planOccurrence.service";
-import { NOT_CANCELLED, familyIdForWrite, planScopeFor } from "@/server/family/familyAccess";
+import { NOT_CANCELLED, activePlanScopeFor, familyIdForWrite, planScopeFor } from "@/server/family/familyAccess";
 
 const planActivitySelect = {
   id: true,
@@ -197,7 +197,7 @@ export async function addRoutePlanItem(
   const resolved = await resolveRouteForUserSave(routeId, routeSlug);
   if (resolved) {
     const existing = await prisma.planItem.findFirst({
-      where: { ...(await planScopeFor(userId)), routeId: resolved.id },
+      where: { ...(await activePlanScopeFor(userId)), routeId: resolved.id },
       select: { id: true },
     });
     if (existing) {
@@ -305,7 +305,7 @@ export async function addPlacePlanItem(
   const coverImageUrl = options?.coverImageUrl ?? resolved.coverImageUrl;
 
   const existing = await prisma.planItem.findFirst({
-    where: { ...(await planScopeFor(userId)), placeId: resolved.id },
+    where: { ...(await activePlanScopeFor(userId)), placeId: resolved.id },
     select: { id: true },
   });
 
@@ -375,7 +375,7 @@ export async function addArticlePlanItem(
   const coverImageUrl = options?.coverImageUrl ?? resolved.coverImageUrl;
 
   const existing = await prisma.planItem.findFirst({
-    where: { ...(await planScopeFor(userId)), articleId: resolved.id },
+    where: { ...(await activePlanScopeFor(userId)), articleId: resolved.id },
     select: { id: true },
   });
 
@@ -426,7 +426,7 @@ export async function listArticlePlanItemsBatch(
   // Undated rows are kept on purpose: the batched save status must agree with
   // the single-item /api/save/status path (undated = "in plan" without a date).
   return prisma.planItem.findMany({
-    where: { ...(await planScopeFor(userId)), articleId: { in: articleIds } },
+    where: { ...(await activePlanScopeFor(userId)), articleId: { in: articleIds } },
     select: { id: true, articleId: true, date: true, startsAt: true },
     orderBy: { date: "asc" },
   });
@@ -460,7 +460,7 @@ export async function listPlanItemsByWeek(
   const endDateStr = endDate.toISOString().split("T")[0];
 
   return (await prisma.planItem.findMany({
-    where: { ...(await planScopeFor(userId)), ...NOT_CANCELLED, date: { gte: weekStartDate, lte: endDateStr } },
+    where: { ...(await activePlanScopeFor(userId)), date: { gte: weekStartDate, lte: endDateStr } },
     include: {
       activity: { select: planActivitySelect },
     },
@@ -473,7 +473,7 @@ export async function listPlanItemsByWeek(
  */
 export async function listAllPlanItems(userId: string): Promise<PlanItemWithActivity[]> {
   return (await prisma.planItem.findMany({
-    where: { ...(await planScopeFor(userId)), ...NOT_CANCELLED, ...DATED },
+    where: { ...(await activePlanScopeFor(userId)), ...DATED },
     include: {
       activity: { select: planActivitySelect },
     },
@@ -495,7 +495,7 @@ export async function listUpcomingPlanItems(
   const toDateStr = toDate.toISOString().split("T")[0]!;
 
   return (await prisma.planItem.findMany({
-    where: { ...(await planScopeFor(userId)), ...NOT_CANCELLED, date: { gte: from, lte: toDateStr } },
+    where: { ...(await activePlanScopeFor(userId)), date: { gte: from, lte: toDateStr } },
     include: {
       activity: { select: planActivitySelect },
     },
@@ -513,7 +513,7 @@ export async function listPlanItemsInRange(
   to: string,
 ): Promise<PlanItemWithActivity[]> {
   return (await prisma.planItem.findMany({
-    where: { ...(await planScopeFor(userId)), ...NOT_CANCELLED, date: { gte: from, lte: to } },
+    where: { ...(await activePlanScopeFor(userId)), date: { gte: from, lte: to } },
     include: {
       activity: { select: planActivitySelect },
     },
@@ -529,7 +529,7 @@ export async function listPlanItemsByDate(
   date: string
 ): Promise<PlanItemWithActivity[]> {
   return (await prisma.planItem.findMany({
-    where: { ...(await planScopeFor(userId)), ...NOT_CANCELLED, date },
+    where: { ...(await activePlanScopeFor(userId)), date },
     include: {
       activity: { select: planActivitySelect },
     },
