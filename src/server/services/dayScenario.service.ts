@@ -9,7 +9,7 @@ export type FingerprintSource = {
   routeId?: string | null;
   placeId?: string | null;
   articleId?: string | null;
-  date?: string;
+  date?: string | null;
   startsAt: Date | null;
 };
 

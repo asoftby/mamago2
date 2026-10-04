@@ -309,17 +309,19 @@ export async function DELETE(request: NextRequest) {
 
     if (existing) {
       const sessionRowId = await getSessionRowIdFromCookies();
-      const removeDateMeta = planDateAnalyticsMeta(existing.date);
+      const removeDateMeta = existing.date ? planDateAnalyticsMeta(existing.date) : {};
 
       if (existing.activityId) {
         const cityId = await getActivityCityIdForAnalytics(existing.activityId);
-        const subjects = await findMostRecentSubjectsSnapshot({
-          userId: user.id,
-          entityType: "EVENT",
-          entityId: existing.activityId,
-          planItemId,
-          currentDate: existing.date,
-        });
+        const subjects = existing.date
+          ? await findMostRecentSubjectsSnapshot({
+              userId: user.id,
+              entityType: "EVENT",
+              entityId: existing.activityId,
+              planItemId,
+              currentDate: existing.date,
+            })
+          : [];
         void trackUserEvent({
           userId: user.id,
           sessionId: sessionRowId,
@@ -340,13 +342,15 @@ export async function DELETE(request: NextRequest) {
           where: { id: existing.placeId },
           select: { cityId: true },
         });
-        const subjects = await findMostRecentSubjectsSnapshot({
-          userId: user.id,
-          entityType: "PLACE",
-          entityId: existing.placeId,
-          planItemId,
-          currentDate: existing.date,
-        });
+        const subjects = existing.date
+          ? await findMostRecentSubjectsSnapshot({
+              userId: user.id,
+              entityType: "PLACE",
+              entityId: existing.placeId,
+              planItemId,
+              currentDate: existing.date,
+            })
+          : [];
         void trackUserEvent({
           userId: user.id,
           sessionId: sessionRowId,
@@ -363,13 +367,15 @@ export async function DELETE(request: NextRequest) {
           },
         });
       } else if (existing.routeId) {
-        const subjects = await findMostRecentSubjectsSnapshot({
-          userId: user.id,
-          entityType: "ROUTE",
-          entityId: existing.routeId,
-          planItemId,
-          currentDate: existing.date,
-        });
+        const subjects = existing.date
+          ? await findMostRecentSubjectsSnapshot({
+              userId: user.id,
+              entityType: "ROUTE",
+              entityId: existing.routeId,
+              planItemId,
+              currentDate: existing.date,
+            })
+          : [];
         void trackUserEvent({
           userId: user.id,
           sessionId: sessionRowId,

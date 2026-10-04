@@ -4,7 +4,8 @@ export type IdeaPlanStatus = "UNPLANNED" | "PLANNED_UPCOMING" | "PLANNED_PAST";
 
 export type PlanStatusCandidate = {
   id: string;
-  date: string;
+  /** null = undated plan item (still counts as "in plan", just without a date). */
+  date: string | null;
 };
 
 export type ResolvedIdeaPlanState = {
@@ -25,7 +26,12 @@ export function resolveIdeaPlanState(
     };
   }
 
-  const sorted = [...items].sort((a, b) => a.date.localeCompare(b.date));
+  const dated = items.flatMap((item) =>
+    item.date === null ? [] : [{ id: item.id, date: item.date }],
+  );
+  const undated = items.filter((item) => item.date === null);
+
+  const sorted = [...dated].sort((a, b) => a.date.localeCompare(b.date));
   const upcoming = sorted.filter((item) => item.date >= todayISO);
   if (upcoming.length > 0) {
     const nearest = upcoming[0]!;
@@ -34,6 +40,15 @@ export function resolveIdeaPlanState(
       isPlanned: true,
       plannedDate: nearest.date,
       planItemId: nearest.id,
+    };
+  }
+
+  // Undated intention: planned, but with no date to show.
+  if (undated.length > 0) {
+    return {
+      planStatus: "PLANNED_UPCOMING",
+      isPlanned: true,
+      planItemId: undated[0]!.id,
     };
   }
 

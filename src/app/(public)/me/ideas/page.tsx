@@ -282,8 +282,8 @@ async function getUserIdeas(userId: string): Promise<IdeaItem[]> {
     orderBy: { date: "asc" },
   })
     : [];
-  const plannedByActivityId = new Map<string, Array<{ id: string; date: string }>>();
-  const plannedByRouteId = new Map<string, Array<{ id: string; date: string }>>();
+  const plannedByActivityId = new Map<string, Array<{ id: string; date: string | null }>>();
+  const plannedByRouteId = new Map<string, Array<{ id: string; date: string | null }>>();
   for (const item of plannedItems) {
     if (item.activityId) {
       const existing = plannedByActivityId.get(item.activityId) ?? [];

@@ -128,7 +128,7 @@ async function main(): Promise<void> {
       });
 
       const planRepairs = planItems.flatMap((item) => {
-        if (!item.startsAt) return [];
+        if (!item.startsAt || item.date === null) return [];
         const legacyStartsAt = legacyByDate.get(item.date);
         const desiredStartsAt = desiredByDate.get(item.date);
         if (!legacyStartsAt || !desiredStartsAt) return [];
