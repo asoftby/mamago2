@@ -132,7 +132,7 @@ async function main() {
       ),
     );
     const paginationNewestFirst = [...paginationItems].sort((a, b) =>
-      b.date.localeCompare(a.date),
+      b.date!.localeCompare(a.date!),
     );
     await prisma.experience.createMany({
       data: paginationNewestFirst.slice(0, 12).map((item) => ({
@@ -140,7 +140,7 @@ async function main() {
         sourcePlanItemId: item.id,
         entityType: "EVENT",
         entityId: activity.id,
-        plannedDate: item.date,
+        plannedDate: item.date!,
         attendance: "NOT_ATTENDED",
         attendanceConfirmedAt: new Date(),
       })),
@@ -184,8 +184,8 @@ async function main() {
         source: "recommendation",
         recommendationExposureId: exposureId,
         planItemId: past.id,
-        dateFrom: past.date,
-        dateTo: past.date,
+        dateFrom: past.date!,
+        dateTo: past.date!,
         decisionContextVersion: 1,
         subjects: [{ kind: "child", refId: childA.id, ageRange: "5-7", source: "profile" }],
       },
@@ -196,7 +196,7 @@ async function main() {
       entityType: "EVENT",
       entityId: activity.id,
       planItemId: past.id,
-      date: past.date,
+      date: past.date!,
       subjects: [{ kind: "child", refId: childB.id, ageRange: "5-7", source: "profile" }],
     });
 
