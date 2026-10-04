@@ -63,10 +63,14 @@ export async function loadFamilyCalendarRange(input: {
     ),
   ]);
 
-  const itemsByDate = new Map<string, typeof fingerprintRows>();
+  type DatedFingerprintRow = (typeof fingerprintRows)[number] & { date: string };
+  const itemsByDate = new Map<string, DatedFingerprintRow[]>();
   for (const item of fingerprintRows) {
+    // Prisma's range predicate excludes null at the database boundary, but the
+    // generated result type remains nullable after Family Core B0.
+    if (item.date == null) continue;
     const rows = itemsByDate.get(item.date) ?? [];
-    rows.push(item);
+    rows.push({ ...item, date: item.date });
     itemsByDate.set(item.date, rows);
   }
 

@@ -331,6 +331,9 @@ export async function listFamilyCalendarItems(input: {
 }
 
 export function toFamilyCalendarItemDto(row: CalendarRow): FamilyCalendarItemDto {
+  if (row.date == null) {
+    throw new ManualPlanEntryError("NOT_FOUND", "calendar_item_has_no_date");
+  }
   const presentation = row.activity ? buildPlanCardPresentation(row.activity) : null;
   return {
     id: row.id,
