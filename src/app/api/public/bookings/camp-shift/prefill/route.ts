@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
+import { childScopeFor } from "@/server/family/familyAccess";
 
 function getAgeFromBirthDate(value?: Date | null): number | null {
   if (!value) return null;
@@ -26,7 +27,7 @@ export async function GET() {
   }
 
   const children = await prisma.child.findMany({
-    where: { parentId: user.id },
+    where: await childScopeFor(user.id),
     select: {
       id: true,
       name: true,

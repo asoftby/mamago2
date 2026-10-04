@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
+import { childScopeFor, familyIdForWrite } from "@/server/family/familyAccess";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
@@ -37,6 +38,8 @@ export async function POST(request: NextRequest) {
       SYSTEM_INTERESTS.some(interest => interest.slug === slug)
     );
 
+    const familyId = await familyIdForWrite(user.id);
+
     // Create child with interests in a transaction
     const result = await prisma.$transaction(async (tx) => {
       // Create child
@@ -46,6 +49,8 @@ export async function POST(request: NextRequest) {
           birthDate: birth.touched ? birth.value?.birthDate ?? null : null,
           birthPrecision: birth.touched ? birth.value?.birthPrecision ?? null : null,
           parentId: user.id,
+          familyId,
+          createdById: user.id,
         },
       });
 
@@ -123,7 +128,7 @@ export async function GET() {
     }
 
     const children = await prisma.child.findMany({
-      where: { parentId: user.id },
+      where: await childScopeFor(user.id),
       include: {
         systemInterests: true,
         customInterests: true,

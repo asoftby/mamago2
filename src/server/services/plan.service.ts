@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { resolveRouteForUserSave } from "@/server/services/route.service";
 import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
 import { resolvePlanActivityOccurrence } from "@/server/services/planOccurrence.service";
+import { NOT_CANCELLED, familyIdForWrite, planScopeFor } from "@/server/family/familyAccess";
 
 const planActivitySelect = {
   id: true,
@@ -177,7 +178,7 @@ export async function addPlanItem(
   }
 
   const created = await prisma.planItem.create({
-    data: { userId, activityId: activityId ?? null, date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
+    data: { userId, familyId: await familyIdForWrite(userId), activityId: activityId ?? null, date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
     select: { id: true },
   });
   return { ...created, created: true };
@@ -196,7 +197,7 @@ export async function addRoutePlanItem(
   const resolved = await resolveRouteForUserSave(routeId, routeSlug);
   if (resolved) {
     const existing = await prisma.planItem.findFirst({
-      where: { userId, routeId: resolved.id },
+      where: { ...(await planScopeFor(userId)), routeId: resolved.id },
       select: { id: true },
     });
     if (existing) {
@@ -216,6 +217,7 @@ export async function addRoutePlanItem(
     return prisma.planItem.create({
       data: {
         userId,
+        familyId: await familyIdForWrite(userId),
         routeId: resolved.id,
         planRouteSlug: null,
         activityId: null,
@@ -303,7 +305,7 @@ export async function addPlacePlanItem(
   const coverImageUrl = options?.coverImageUrl ?? resolved.coverImageUrl;
 
   const existing = await prisma.planItem.findFirst({
-    where: { userId, placeId: resolved.id },
+    where: { ...(await planScopeFor(userId)), placeId: resolved.id },
     select: { id: true },
   });
 
@@ -326,6 +328,7 @@ export async function addPlacePlanItem(
   return prisma.planItem.create({
     data: {
       userId,
+      familyId: await familyIdForWrite(userId),
       placeId: resolved.id,
       planPlaceSlug: resolved.slug,
       activityId: null,
@@ -372,7 +375,7 @@ export async function addArticlePlanItem(
   const coverImageUrl = options?.coverImageUrl ?? resolved.coverImageUrl;
 
   const existing = await prisma.planItem.findFirst({
-    where: { userId, articleId: resolved.id },
+    where: { ...(await planScopeFor(userId)), articleId: resolved.id },
     select: { id: true },
   });
 
@@ -396,6 +399,7 @@ export async function addArticlePlanItem(
   return prisma.planItem.create({
     data: {
       userId,
+      familyId: await familyIdForWrite(userId),
       articleId: resolved.id,
       activityId: null,
       routeId: null,
@@ -422,7 +426,7 @@ export async function listArticlePlanItemsBatch(
   // Undated rows are kept on purpose: the batched save status must agree with
   // the single-item /api/save/status path (undated = "in plan" without a date).
   return prisma.planItem.findMany({
-    where: { userId, articleId: { in: articleIds } },
+    where: { ...(await planScopeFor(userId)), articleId: { in: articleIds } },
     select: { id: true, articleId: true, date: true, startsAt: true },
     orderBy: { date: "asc" },
   });
@@ -438,7 +442,7 @@ export async function removePlanItem(
   await prisma.planItem.deleteMany({
     where: {
       id: planItemId,
-      userId, // Security: ensure user owns this plan item
+      ...(await planScopeFor(userId)), // Security: ownership by family scope (legacy: userId)
     },
   });
 }
@@ -456,7 +460,7 @@ export async function listPlanItemsByWeek(
   const endDateStr = endDate.toISOString().split("T")[0];
 
   return (await prisma.planItem.findMany({
-    where: { userId, cancelledAt: null, date: { gte: weekStartDate, lte: endDateStr } },
+    where: { ...(await planScopeFor(userId)), ...NOT_CANCELLED, date: { gte: weekStartDate, lte: endDateStr } },
     include: {
       activity: { select: planActivitySelect },
     },
@@ -469,7 +473,7 @@ export async function listPlanItemsByWeek(
  */
 export async function listAllPlanItems(userId: string): Promise<PlanItemWithActivity[]> {
   return (await prisma.planItem.findMany({
-    where: { userId, cancelledAt: null, ...DATED },
+    where: { ...(await planScopeFor(userId)), ...NOT_CANCELLED, ...DATED },
     include: {
       activity: { select: planActivitySelect },
     },
@@ -491,7 +495,7 @@ export async function listUpcomingPlanItems(
   const toDateStr = toDate.toISOString().split("T")[0]!;
 
   return (await prisma.planItem.findMany({
-    where: { userId, cancelledAt: null, date: { gte: from, lte: toDateStr } },
+    where: { ...(await planScopeFor(userId)), ...NOT_CANCELLED, date: { gte: from, lte: toDateStr } },
     include: {
       activity: { select: planActivitySelect },
     },
@@ -509,7 +513,7 @@ export async function listPlanItemsInRange(
   to: string,
 ): Promise<PlanItemWithActivity[]> {
   return (await prisma.planItem.findMany({
-    where: { userId, cancelledAt: null, date: { gte: from, lte: to } },
+    where: { ...(await planScopeFor(userId)), ...NOT_CANCELLED, date: { gte: from, lte: to } },
     include: {
       activity: { select: planActivitySelect },
     },
@@ -525,7 +529,7 @@ export async function listPlanItemsByDate(
   date: string
 ): Promise<PlanItemWithActivity[]> {
   return (await prisma.planItem.findMany({
-    where: { userId, cancelledAt: null, date },
+    where: { ...(await planScopeFor(userId)), ...NOT_CANCELLED, date },
     include: {
       activity: { select: planActivitySelect },
     },
@@ -540,7 +544,7 @@ export async function listPlanItemsDueForReminder(args: {
   return (await prisma.planItem.findMany({
     where: {
       activityId: { not: null },
-      cancelledAt: null,
+      ...NOT_CANCELLED,
       ...DATED,
       startsAt: {
         gte: args.windowStart,
@@ -596,7 +600,7 @@ export async function listPlanItemsForTomorrowDigest(args: {
     where: {
       date: args.date,
       activityId: { not: null },
-      cancelledAt: null,
+      ...NOT_CANCELLED,
     },
     include: {
       activity: { select: planActivitySelect },
@@ -612,7 +616,7 @@ export async function listPlanItemsForUserDates(
 
   return (await prisma.planItem.findMany({
     where: {
-      cancelledAt: null,
+      ...NOT_CANCELLED,
       OR: targets.map((target) => ({ userId: target.userId, date: target.date })),
     },
     include: { activity: { select: planActivitySelect } },

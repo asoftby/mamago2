@@ -132,6 +132,8 @@
     "test:plan-item-nullable-date-integration": "NODE_OPTIONS=--conditions=react-server tsx src/server/services/planItemNullableDate.integration.test.ts",
     "test:family-core-foundation": "tsx src/server/family/familyCoreFoundation.contract.test.ts",
     "test:family-core-foundation-integration": "NODE_OPTIONS=--conditions=react-server tsx src/server/family/familyCoreBackfill.integration.test.ts",
+    "test:family-core-reads": "tsx src/server/family/familyScope.test.ts && tsx src/server/services/planOwner.test.ts && tsx src/server/family/familyCoreReads.contract.test.ts",
+    "test:family-core-reads-integration": "NODE_OPTIONS=--conditions=react-server tsx src/server/family/familyCoreReads.integration.test.ts",
     "test:plan-experience-contract": "tsx src/server/services/experience/experience.contract.test.ts",
     "test:plan-experience-integration": "tsx src/server/services/experience/experience.integration.test.ts",
     "test:notification-templates": "tsx src/server/notifications/template-render.test.ts",

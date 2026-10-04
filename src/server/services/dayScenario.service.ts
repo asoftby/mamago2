@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { BookingStatus, Prisma, type DayScenario, type DayScenarioItemOverride } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
+import { NOT_CANCELLED, planScopeFor } from "@/server/family/familyAccess";
 
 export type FingerprintSource = {
   id: string;
@@ -87,7 +88,7 @@ export async function listPlanItemsByDateForScenario(
   const windowEnd = new Date(`${addDaysLocal(date, 2)}T00:00:00.000Z`);
 
   const items = await prisma.planItem.findMany({
-    where: { userId, date, cancelledAt: null },
+    where: { ...(await planScopeFor(userId)), date, ...NOT_CANCELLED },
     include: {
       activity: {
         select: {

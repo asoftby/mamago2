@@ -15,7 +15,7 @@ import { TelegramChannel } from "./TelegramChannel";
 import { decodeCallback } from "./capture/callbackCodec";
 import { createDefaultCaptureRoutingDeps, type CaptureRoutingDeps } from "./capture/captureWiring";
 import { parseTelegramUpdate, type ParsedCapture, type RawTelegramUpdate } from "./capture/telegramUpdateParser";
-import { resolvePlanOwner } from "@/server/services/planOwner";
+import { planOwnerWithoutFamily } from "@/server/services/planOwner";
 import { renderDevBusinessApplicationMessage } from "./TelegramTemplateRenderer";
 
 type TelegramUser = {
@@ -106,7 +106,7 @@ export class TelegramWebhookService {
 
     await this.capture.touchConnection(chatId);
     const result = await this.capture.receive(
-      resolvePlanOwner(connection.userId),
+      planOwnerWithoutFamily(connection.userId),
       this.capture.getEnvironment(),
       parsed,
     );

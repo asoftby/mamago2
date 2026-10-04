@@ -13,6 +13,7 @@ import {
   conflictsForScenarioItems,
   type ScenarioClientItem,
 } from "@/features/my-plan/lib/scenarioDraft";
+import { NOT_CANCELLED } from "@/server/family/familyScope";
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -82,7 +83,7 @@ const activitySelect = {
 async function loadCanonical(tx: Tx, userId: string, date: string, scenarioId: string) {
   const [items, overrideRows] = await Promise.all([
     tx.planItem.findMany({
-      where: { userId, date, cancelledAt: null },
+      where: { userId, date, ...NOT_CANCELLED },
       include: { activity: { select: activitySelect } },
       orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
     }),
