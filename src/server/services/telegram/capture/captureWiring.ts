@@ -1,7 +1,10 @@
 import "server-only";
 
 import type { TelegramEnvironment } from "@prisma/client";
+import { createOpenRouterClient, readCaptureModelConfig } from "@/lib/ai/openrouterClient";
 import { prismaBase } from "@/lib/prisma";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
+import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
 import { getTelegramConfig } from "@/server/config/telegram.config";
 import type { PlanOwner } from "@/server/services/planOwner";
 import {
@@ -10,8 +13,8 @@ import {
 } from "@/server/services/telegram/telegramConnection.service";
 import { TelegramChannel } from "../TelegramChannel";
 import { CAPTURE_ALLOWLIST_ENV, parseCaptureAllowlist } from "./captureAllowlist";
+import { createCaptureInboxProcessor } from "./captureProcessor";
 import { createInboxIntake, type IntakeNotifier, type IntakeResult } from "./inboxIntake.service";
-import { createNotImplementedInboxProcessor } from "./inboxProcessor";
 import { getTelegramCaptureClient } from "./telegramCaptureClient";
 import type { ParsedCapture } from "./telegramUpdateParser";
 
@@ -47,7 +50,19 @@ export function createDefaultCaptureRoutingDeps(): CaptureRoutingDeps {
     intake ??= createInboxIntake({
       db: prismaBase,
       notifier: createNotifier(),
-      processor: createNotImplementedInboxProcessor(prismaBase),
+      processor: createCaptureInboxProcessor({
+        db: prismaBase,
+        openrouter: createOpenRouterClient(),
+        telegram: getTelegramCaptureClient(),
+        models: () => readCaptureModelConfig(),
+        context: {
+          db: prismaBase,
+          city: {
+            findCityIdBySlug: async (slug) => (await findCityBySlug(slug, { select: { id: true } }))?.id ?? null,
+          },
+          places: { publicPlaceWhere: getPublicPublishedPlaceWhere() },
+        },
+      }),
     });
     return intake;
   };
