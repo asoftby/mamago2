@@ -130,6 +130,8 @@
     "test:notifications-mvp": "tsx src/lib/notifications/userNotificationPresentation.test.ts && tsx src/lib/notifications/userNotificationSchedule.test.ts && tsx src/lib/notifications/planNotificationScheduleUi.test.ts && tsx src/server/notifications/notification-renderer.test.ts && tsx src/server/notifications/notification-dedupe.test.ts && tsx src/server/notifications/notification.service.test.ts && tsx src/server/notifications/jobs/run-plan-event-reminders.test.ts && tsx src/server/notifications/jobs/run-plan-tomorrow-digests.test.ts && tsx src/server/notifications/template-render.test.ts",
     "test:plan-item-nullable-date": "tsx src/lib/plan/ideaPlanStatus.test.ts && tsx src/lib/plan/planItemNullableDateMigration.contract.test.ts",
     "test:plan-item-nullable-date-integration": "NODE_OPTIONS=--conditions=react-server tsx src/server/services/planItemNullableDate.integration.test.ts",
+    "test:family-core-foundation": "tsx src/server/family/familyCoreFoundation.contract.test.ts",
+    "test:family-core-foundation-integration": "NODE_OPTIONS=--conditions=react-server tsx src/server/family/familyCoreBackfill.integration.test.ts",
     "test:plan-experience-contract": "tsx src/server/services/experience/experience.contract.test.ts",
     "test:plan-experience-integration": "tsx src/server/services/experience/experience.integration.test.ts",
     "test:notification-templates": "tsx src/server/notifications/template-render.test.ts",
