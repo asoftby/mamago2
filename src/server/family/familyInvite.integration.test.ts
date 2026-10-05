@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import test, { after } from "node:test";
 import { PrismaClient } from "@prisma/client";
 import { ensureFamilyForUser } from "./ensureFamily";
+import { previewFamilyInviteMerge } from "./familyMerge.service";
 import {
   FamilyInviteError,
   acceptFamilyInvite,
@@ -28,6 +29,8 @@ const deps = { env };
 
 after(async () => {
   const families = await db.familyMembership.findMany({ where: { userId: { in: userIds } }, select: { familyId: true } });
+  await db.childInterest.deleteMany({ where: { child: { parentId: { in: userIds } } } });
+  await db.childCustomInterest.deleteMany({ where: { child: { parentId: { in: userIds } } } });
   await db.consentRecord.deleteMany({ where: { userId: { in: userIds } } });
   await db.planItem.deleteMany({ where: { userId: { in: userIds } } });
   await db.child.deleteMany({ where: { parentId: { in: userIds } } });
@@ -125,4 +128,59 @@ test("concurrent accepts of one invite: exactly one wins", async () => {
     code(acceptFamilyInvite(db, { userId: b, token, consentTextVersion: "v1" }, deps)),
   ]);
   assert.deepEqual([...results].sort(), ["invalid_invite", "ok"]);
+});
+
+test("M3b merge: explicit decisions, SAME/ADD/SKIP, plan PRIVATE by default", async () => {
+  const owner = await mkUser("owner5");
+  const joiner = await mkUser("joiner5");
+  const ownerFamily = await ensureFamilyForUser(db, owner);
+  const joinerFamily = await ensureFamilyForUser(db, joiner);
+  const same = await db.child.create({ data: { parentId: owner, familyId: ownerFamily, createdById: owner, name: "Степа", birthDate: new Date(Date.UTC(2020, 1, 1)), interests: "Плавание" } });
+  const jSame = await db.child.create({ data: { parentId: joiner, familyId: joinerFamily, createdById: joiner, name: "степа", birthDate: new Date(Date.UTC(2020, 5, 5)), interests: "Футбол" } });
+  const jAdd = await db.child.create({ data: { parentId: joiner, familyId: joinerFamily, createdById: joiner, name: "Маша" } });
+  const jSkip = await db.child.create({ data: { parentId: joiner, familyId: joinerFamily, createdById: joiner, name: "Витя" } });
+  await db.childInterest.create({ data: { childId: jSame.id, interestSlug: "sport" } });
+  await db.childCustomInterest.create({ data: { childId: jSame.id, label: "Лего" } });
+  const p1 = await db.planItem.create({ data: { userId: joiner, familyId: joinerFamily, date: "2026-12-01", title: "p1", childId: jSame.id } });
+  const p2 = await db.planItem.create({ data: { userId: joiner, familyId: joinerFamily, date: "2026-12-02", title: "p2", childId: jSkip.id } });
+  const { token } = await createFamilyInvite(db, { userId: owner }, deps);
+
+  assert.equal(await code(acceptFamilyInvite(db, { userId: joiner, token, consentTextVersion: "v1" }, deps)), "needs_merge");
+  const preview = await previewFamilyInviteMerge(db, { userId: joiner, token, consentTextVersion: "v1" });
+  assert.equal(preview.suggestions[jSame.id], same.id);
+  assert.equal(preview.suggestions[jAdd.id], null);
+
+  // Incomplete decision is rejected, nothing changes.
+  assert.equal(
+    await code(acceptFamilyInvite(db, { userId: joiner, token, consentTextVersion: "v1", merge: { plan: "PRIVATE", children: [{ childId: jAdd.id, action: "ADD" }] } }, deps)),
+    "merge_invalid",
+  );
+  assert.equal((await db.child.findUniqueOrThrow({ where: { id: jAdd.id } })).familyId, joinerFamily);
+
+  const { familyId } = await acceptFamilyInvite(db, {
+    userId: joiner, token, consentTextVersion: "v1",
+    merge: { plan: "PRIVATE", children: [
+      { childId: jSame.id, action: "SAME", targetChildId: same.id },
+      { childId: jAdd.id, action: "ADD" },
+      { childId: jSkip.id, action: "SKIP" },
+    ] },
+  }, deps);
+  assert.equal(familyId, ownerFamily);
+
+  assert.equal(await db.child.findUnique({ where: { id: jSame.id } }), null, "duplicate removed");
+  const kept = await db.child.findUniqueOrThrow({ where: { id: same.id } });
+  assert.equal(kept.birthDate?.getUTCFullYear(), 2020);
+  assert.equal(kept.interests, "Плавание, Футбол");
+  assert.equal(await db.childInterest.count({ where: { childId: same.id, interestSlug: "sport" } }), 1);
+  assert.equal(await db.childCustomInterest.count({ where: { childId: same.id, label: "Лего" } }), 1);
+  assert.equal((await db.child.findUniqueOrThrow({ where: { id: jAdd.id } })).familyId, ownerFamily);
+  assert.equal((await db.child.findUniqueOrThrow({ where: { id: jSkip.id } })).familyId, joinerFamily, "skipped child stays in the archived family");
+
+  const m1 = await db.planItem.findUniqueOrThrow({ where: { id: p1.id } });
+  assert.equal(m1.familyId, ownerFamily);
+  assert.equal(m1.visibility, "PRIVATE");
+  assert.equal(m1.childId, same.id);
+  const m2 = await db.planItem.findUniqueOrThrow({ where: { id: p2.id } });
+  assert.equal(m2.childId, null, "skipped child link dropped");
+  assert.notEqual((await db.family.findUniqueOrThrow({ where: { id: joinerFamily } })).archivedAt, null);
 });
