@@ -16,9 +16,18 @@ on:
       - "docs/**"
       - "**/*.md"
 
+# Only the newest DEV image matters. A newer push cancels an older in-flight
+# build instead of burning a second runner and competing for the same GHA cache.
+concurrency:
+  group: docker-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    # Healthy builds are currently ~12–15 min. Fail closed if buildx genuinely
+    # hangs instead of leaving a runner stuck indefinitely.
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
