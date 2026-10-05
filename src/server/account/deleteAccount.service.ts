@@ -13,6 +13,31 @@ function tombstoneEmail(userId: string): string {
   return `deleted-${digest}@deleted.invalid`;
 }
 
+async function closeMembership(
+  tx: Prisma.TransactionClient,
+  membership: { id: string; familyId: string; role: FamilyRole },
+  deletedAt: Date,
+): Promise<void> {
+  await tx.familyMembership.update({ where: { id: membership.id }, data: { leftAt: deletedAt } });
+
+  const successor = await tx.familyMembership.findFirst({
+    where: { familyId: membership.familyId, leftAt: null },
+    orderBy: [{ joinedAt: "asc" }, { id: "asc" }],
+    select: { id: true },
+  });
+
+  if (successor) {
+    if (membership.role === FamilyRole.OWNER) {
+      await tx.familyMembership.update({ where: { id: successor.id }, data: { role: FamilyRole.OWNER } });
+    }
+  } else {
+    await tx.family.update({ where: { id: membership.familyId }, data: { archivedAt: deletedAt } });
+    // Child interests / custom interests cascade; PlanItem.childId is SET NULL.
+    await tx.planItem.deleteMany({ where: { familyId: membership.familyId } });
+    await tx.child.deleteMany({ where: { familyId: membership.familyId } });
+  }
+}
+
 /**
  * Family Core B3: detaches the deleted user from their family and erases the
  * family data that must not outlive them. Always family-aware (independent of
@@ -31,33 +56,21 @@ async function detachFromFamily(
   userId: string,
   deletedAt: Date,
 ): Promise<void> {
-  const membership = await tx.familyMembership.findFirst({
+  const located = await tx.familyMembership.findFirst({
     where: { userId, leftAt: null },
-    select: { id: true, familyId: true, role: true },
+    select: { familyId: true },
   });
 
-  if (membership) {
-    // Serialise concurrent deletions of two adults of one family, so that
-    // each sees the other as still active (or already gone) consistently.
-    await tx.$queryRaw`SELECT id FROM "Family" WHERE id = ${membership.familyId} FOR UPDATE`;
-    await tx.familyMembership.update({ where: { id: membership.id }, data: { leftAt: deletedAt } });
-
-    const successor = await tx.familyMembership.findFirst({
-      where: { familyId: membership.familyId, leftAt: null },
-      orderBy: [{ joinedAt: "asc" }, { id: "asc" }],
-      select: { id: true },
+  if (located) {
+    // Serialise concurrent deletions of adults of one family. The role is read
+    // only AFTER the lock: a concurrent deletion may have promoted this user to
+    // OWNER while we waited, and a pre-lock read would then be stale.
+    await tx.$queryRaw`SELECT id FROM "Family" WHERE id = ${located.familyId} FOR UPDATE`;
+    const membership = await tx.familyMembership.findFirst({
+      where: { userId, familyId: located.familyId, leftAt: null },
+      select: { id: true, familyId: true, role: true },
     });
-
-    if (successor) {
-      if (membership.role === FamilyRole.OWNER) {
-        await tx.familyMembership.update({ where: { id: successor.id }, data: { role: FamilyRole.OWNER } });
-      }
-    } else {
-      await tx.family.update({ where: { id: membership.familyId }, data: { archivedAt: deletedAt } });
-      // Child interests / custom interests cascade; PlanItem.childId is SET NULL.
-      await tx.planItem.deleteMany({ where: { familyId: membership.familyId } });
-      await tx.child.deleteMany({ where: { familyId: membership.familyId } });
-    }
+    if (membership) await closeMembership(tx, membership, deletedAt);
   }
 
   // Private entries of the deleted user and legacy (family-less) rows are theirs alone.

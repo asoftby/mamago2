@@ -184,6 +184,26 @@ test("UserEvent is detached from user, session and family", async () => {
   assert.equal(after.familyId, null);
 });
 
+test("concurrent deletion of OWNER and the chosen successor never leaves members without an OWNER", async () => {
+  for (let round = 0; round < 6; round += 1) {
+    const owner = await mkUser(`race-own-${round}`);
+    const successor = await mkUser(`race-succ-${round}`);
+    const survivor = await mkUser(`race-surv-${round}`);
+    const familyId = await mkFamily([
+      { userId: owner, role: "OWNER", joinedAt: t(1) },
+      { userId: successor, role: "ADULT", joinedAt: t(2) },
+      { userId: survivor, role: "ADULT", joinedAt: t(3) },
+    ]);
+    const results = await Promise.all([deleteAccount(owner, db), deleteAccount(successor, db)]);
+    assert.deepEqual(results, [{ ok: true }, { ok: true }]);
+
+    const members = await db.familyMembership.findMany({ where: { familyId, leftAt: null } });
+    assert.deepEqual(members.map((m) => m.userId), [survivor], `round ${round}: only the survivor stays active`);
+    assert.equal(members[0].role, "OWNER", `round ${round}: survivor must be promoted to OWNER`);
+    assert.equal((await db.family.findUniqueOrThrow({ where: { id: familyId } })).archivedAt, null);
+  }
+});
+
 test("failure rolls back membership, ownership and family archive", async () => {
   const owner = await mkUser("rb-own");
   const adult = await mkUser("rb-adult");
