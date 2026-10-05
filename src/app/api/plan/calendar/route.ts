@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   try {
     const from = request.nextUrl.searchParams.get("from");
     const to = request.nextUrl.searchParams.get("to");
-    const payload = await loadFamilyCalendarRange({ owner: resolvePlanOwner(user.id), from: from ?? "", to: to ?? "" });
+    const payload = await loadFamilyCalendarRange({ owner: await resolvePlanOwner(user.id), from: from ?? "", to: to ?? "" });
     return NextResponse.json(payload);
   } catch (error) {
     if (error instanceof ManualPlanEntryError) {

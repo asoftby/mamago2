@@ -36,7 +36,7 @@ export async function DELETE(_request: NextRequest, context: { params: Promise<{
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { id } = await context.params;
-    await cancelManualPlanEntry(resolvePlanOwner(user.id), id);
+    await cancelManualPlanEntry(await resolvePlanOwner(user.id), id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return errorResponse(error, user.id);

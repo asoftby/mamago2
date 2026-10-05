@@ -33,8 +33,8 @@ async function main() {
   const stranger = await prisma.user.create({ data: { email: `calendar-stranger-${marker}@example.invalid` } });
   const child = await prisma.child.create({ data: { parentId: owner.id, name: "Аня" } });
   const foreignChild = await prisma.child.create({ data: { parentId: stranger.id, name: "Чужой ребёнок" } });
-  const ownerScope = resolvePlanOwner(owner.id);
-  const strangerScope = resolvePlanOwner(stranger.id);
+  const ownerScope = await resolvePlanOwner(owner.id);
+  const strangerScope = await resolvePlanOwner(stranger.id);
 
   try {
     const created: Awaited<ReturnType<typeof createManualPlanEntry>>[] = [];
