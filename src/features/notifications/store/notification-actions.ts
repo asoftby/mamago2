@@ -31,9 +31,15 @@ export async function fetchNotificationsPageApi(
   const params = new URLSearchParams({
     limit: String(limit),
     offset: String(offset),
-    stream,
     tab,
   });
+  // The "user" header/feed is the unified feed: USER plus every audience
+  // the current account may access (e.g. ADMIN for staff). This must match
+  // the unified unread badge, which intentionally calls unread-count without
+  // a stream filter. The business cabinet remains an explicitly filtered feed.
+  if (stream === "business") {
+    params.set("stream", "business");
+  }
   const res = await fetch(`/api/notifications?${params.toString()}`, {
     credentials: "include",
     cache: "no-store",
@@ -68,8 +74,12 @@ export async function postMarkNotificationsOpenApi(
 ): Promise<{
   showTelegramPrompt?: boolean;
 }> {
-  const params = new URLSearchParams({ stream });
-  const res = await fetch(`/api/notifications/mark-open?${params.toString()}`, {
+  const params = new URLSearchParams();
+  if (stream === "business") {
+    params.set("stream", "business");
+  }
+  const query = params.toString();
+  const res = await fetch(`/api/notifications/mark-open${query ? `?${query}` : ""}`, {
     method: "POST",
     credentials: "include",
     headers: JSON_HEADERS,
