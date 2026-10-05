@@ -72,6 +72,7 @@ jobs:
           pnpm exec tsx src/server/discovery/discoveryHubExpandCacheWiring.test.ts
           pnpm exec tsx src/server/discovery/discoveryPerf.test.ts
           pnpm exec tsx src/lib/discovery/partitionDiscoveryFeed.agePolicy.test.ts
+          pnpm exec tsx src/server/discovery/classesDiscoveryFeed.agePolicy.test.ts
           pnpm exec tsx src/features/city-home/lib/personaRanking.test.ts
           pnpm exec tsx src/server/place/placeDetailPerf.test.ts
 
