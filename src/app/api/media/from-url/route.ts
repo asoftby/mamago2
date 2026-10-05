@@ -12,6 +12,7 @@ import {
 import { MediaSourceType } from "@prisma/client";
 import { registerUploadedMedia } from "@/lib/media/mediaRegistry";
 import { processImage, DEFAULT_IMAGE_CONFIG } from "@/lib/media/imageProcessor";
+import { validateImageContent } from "@/lib/uploads/imageContentValidation";
 import { buildMasterFilename, buildMediaStem, buildResponsiveFilename } from "@/server/media/mediaNaming";
 import { assertSafeRemoteImageUrl } from "@/lib/media/safeRemoteImageUrl";
 import { buildNeutralImportedMediaIdentity } from "@/lib/media/importedMediaPrivacy";
@@ -60,14 +61,12 @@ export async function POST(req: NextRequest) {
     });
 
     const buf = remote.buffer;
-    let mime = mimeFromContentType(remote.headers["content-type"]);
-    if (mime === "application/octet-stream" || !mime.startsWith("image/")) {
-      if (buf[0] === 0xff && buf[1] === 0xd8) mime = "image/jpeg";
-      else if (buf[0] === 0x89 && buf[1] === 0x50) mime = "image/png";
-      else if (buf[0] === 0x52 && buf[1] === 0x49) mime = "image/webp";
-    }
-    if (!mime.startsWith("image/")) {
-      return NextResponse.json({ error: "Ответ не является изображением" }, { status: 400 });
+    const declaredMime = mimeFromContentType(remote.headers["content-type"]);
+    let mime: string;
+    try {
+      mime = validateImageContent(buf, declaredMime === "application/octet-stream" ? null : declaredMime);
+    } catch {
+      return NextResponse.json({ error: "Ответ не является изображением или формат не совпадает" }, { status: 400 });
     }
 
     const processedImageSet = await processImage(buf, mime, DEFAULT_IMAGE_CONFIG);
