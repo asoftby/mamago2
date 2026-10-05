@@ -358,6 +358,8 @@ function EventWizardInner({
   const [scheduleSourceState, setScheduleSourceState] = useState<ScheduleSourceState>(
     initialScheduleSourceState,
   );
+  const initialScheduleSourceReadOnly = initialScheduleSourceState.readOnly;
+  const initialScheduleSourceItemCount = initialScheduleSourceState.itemCount;
   const handleScheduleSourceStateChange = useCallback((state: ScheduleSourceState) => {
     setScheduleSourceState(state);
   }, []);
@@ -396,7 +398,10 @@ function EventWizardInner({
     }
 
     let cancelled = false;
-    applyScheduleSourceState(initialScheduleSourceState);
+    applyScheduleSourceState({
+      readOnly: initialScheduleSourceReadOnly,
+      itemCount: initialScheduleSourceItemCount,
+    });
 
     void (async () => {
       try {
@@ -421,7 +426,7 @@ function EventWizardInner({
     return () => {
       cancelled = true;
     };
-  }, [eventId, initialScheduleSourceState]);
+  }, [eventId, initialScheduleSourceReadOnly, initialScheduleSourceItemCount]);
 
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [leaveDialogBusy, setLeaveDialogBusy] = useState(false);
