@@ -9,7 +9,8 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useImageUpload } from "@/hooks/useImageUpload";
+import { isHeicFile } from "@/lib/uploads/heicConversion";
+import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   MAX_IMAGE_FILE_SIZE_MB,
+  MAX_IMAGE_FILES,
   getFileTooLargeMessage,
   validateUploadMimeType,
 } from "@/lib/uploads/uploadConfig";
@@ -90,6 +92,28 @@ type ImportedMedia = {
 
 type MediaStatus = "loading" | "loaded" | "empty";
 
+const EVENT_HEIC_UNSUPPORTED_MESSAGE =
+  "HEIC/HEIF временно нельзя загружать в событие. Выберите JPEG, PNG, WebP или AVIF — так фото загрузится без риска падения страницы.";
+
+/**
+ * Event photos must be sent to the server without any client-side decode,
+ * compression, canvas work, blurhash generation, data-URL creation or HEIC
+ * conversion. Large mobile photos can otherwise exhaust the renderer process
+ * before JavaScript gets a chance to catch an error.
+ *
+ * HEIC/HEIF is deliberately rejected here until it can be decoded server-side:
+ * the production sharp build has no HEVC decoder, while browser-side libheif
+ * conversion is exactly the memory-heavy path this hotfix removes.
+ */
+async function uploadEventMediaFile(file: File) {
+  const uploaded = await uploadMediaFile(file);
+  return {
+    ...uploaded,
+    url: `/api/media/${encodeURIComponent(uploaded.id)}?variant=sm`,
+    mediaId: uploaded.id,
+  };
+}
+
 /**
  * Get preview URL from media asset
  * Handles various URL formats and ensures proper path
@@ -105,6 +129,7 @@ function getMediaAssetPreviewUrl(asset: {
 }): string {
   const url =
     asset.thumbnailUrl ||
+    (asset.id ? `/api/media/${encodeURIComponent(asset.id)}?variant=sm` : "") ||
     asset.publicUrl ||
     asset.url ||
     asset.fileUrl ||
@@ -113,10 +138,6 @@ function getMediaAssetPreviewUrl(asset: {
     "";
 
   if (!url) {
-    // `/api/media/:id` is served by the file proxy and supports MediaAsset id lookup.
-    if (asset.id) {
-      return `/api/media/${encodeURIComponent(asset.id)}`;
-    }
     return "";
   }
 
@@ -320,12 +341,6 @@ export function Step3Media({
       );
     });
   }
-
-  const { uploadImage } = useImageUpload({
-    maxSizeMB: MAX_IMAGE_FILE_SIZE_MB,
-    maxWidthOrHeight: 1920,
-    quality: 0.9,
-  });
 
   useEffect(() => {
     if (hasInitialized.current) return;
@@ -697,6 +712,10 @@ export function Step3Media({
       toast.error("Пожалуйста, выберите изображение");
       return;
     }
+    if (isHeicFile(file)) {
+      toast.error(EVENT_HEIC_UNSUPPORTED_MESSAGE);
+      return;
+    }
     if (file.size > MAX_IMAGE_FILE_SIZE_MB * 1024 * 1024) {
       toast.error(getFileTooLargeMessage());
       return;
@@ -704,12 +723,12 @@ export function Step3Media({
 
     setIsUploadingCover(true);
     try {
-      const uploadedImage = await withUploadTimeout(uploadImage(file), "Обложка");
+      const uploadedImage = await withUploadTimeout(uploadEventMediaFile(file), "Обложка");
       if (!uploadedImage) throw new Error("Failed to upload image");
 
       setCoverPreview(uploadedImage.url);
       setCoverPreviewUnavailable(false);
-      onChange({ coverImage: uploadedImage.mediaId ?? uploadedImage.id });
+      onChange({ coverImage: uploadedImage.id });
       toast.success("Обложка загружена");
     } catch (error) {
       console.error("Cover upload error:", error);
@@ -721,9 +740,26 @@ export function Step3Media({
 
   const handleGalleryFilesSelect = async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
-    const validFiles = fileArray.filter((file) => {
+    const remainingSlots = Math.max(0, MAX_IMAGE_FILES - galleryItems.length);
+
+    if (remainingSlots === 0) {
+      toast.error(`Можно добавить не больше ${MAX_IMAGE_FILES} изображений`);
+      return;
+    }
+
+    if (fileArray.length > remainingSlots) {
+      toast.message(
+        `Будут загружены первые ${remainingSlots} из ${fileArray.length} изображений. Максимум — ${MAX_IMAGE_FILES}.`,
+      );
+    }
+
+    const validFiles = fileArray.slice(0, remainingSlots).filter((file) => {
       if (!validateUploadMimeType(file)) {
         toast.error(`${file.name} не является изображением`);
+        return false;
+      }
+      if (isHeicFile(file)) {
+        toast.error(`${file.name}: ${EVENT_HEIC_UNSUPPORTED_MESSAGE}`);
         return false;
       }
       if (file.size > MAX_IMAGE_FILE_SIZE_MB * 1024 * 1024) {
@@ -735,9 +771,9 @@ export function Step3Media({
 
     if (validFiles.length === 0) return;
 
-    const placeholders: GalleryItem[] = validFiles.map((file) => ({
+    const placeholders: GalleryItem[] = validFiles.map(() => ({
       id: `temp-${Date.now()}-${Math.random()}`,
-      url: URL.createObjectURL(file),
+      url: "",
       status: "uploading" as const,
     }));
     setGalleryItems((prev) => [...prev, ...placeholders]);
@@ -746,10 +782,10 @@ export function Step3Media({
       const file = validFiles[i];
       const placeholderId = placeholders[i].id;
       try {
-        const uploadedImage = await withUploadTimeout(uploadImage(file), file.name);
+        const uploadedImage = await withUploadTimeout(uploadEventMediaFile(file), file.name);
         if (!uploadedImage) throw new Error("Failed to upload image");
 
-        const mediaId = uploadedImage.mediaId ?? uploadedImage.id;
+        const mediaId = uploadedImage.id;
         setGalleryItems((prev) => {
           const next = prev.map((img) =>
             img.id === placeholderId ? { id: mediaId, url: uploadedImage.url, status: "done" as const } : img,
@@ -759,9 +795,7 @@ export function Step3Media({
         });
       } catch (error) {
         console.error("Gallery upload error:", error);
-        setGalleryItems((prev) =>
-          prev.map((img) => (img.id === placeholderId ? { ...img, status: "error" as const } : img)),
-        );
+        setGalleryItems((prev) => prev.filter((img) => img.id !== placeholderId));
         toast.error(`Ошибка загрузки ${file.name}`);
       }
     }

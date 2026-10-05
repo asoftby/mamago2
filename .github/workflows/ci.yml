@@ -71,6 +71,9 @@ jobs:
           pnpm exec tsx src/server/article/publicArticleListCacheWiring.test.ts
           pnpm exec tsx src/server/discovery/discoveryHubExpandCacheWiring.test.ts
           pnpm exec tsx src/server/discovery/discoveryPerf.test.ts
+          pnpm exec tsx src/lib/discovery/partitionDiscoveryFeed.agePolicy.test.ts
+          pnpm exec tsx src/server/discovery/classesDiscoveryFeed.agePolicy.test.ts
+          pnpm exec tsx src/features/city-home/lib/personaRanking.test.ts
           pnpm exec tsx src/server/place/placeDetailPerf.test.ts
 
       - name: Stories playback regressions
@@ -142,6 +145,9 @@ jobs:
         run: |
           pnpm exec tsx src/features/my-plan/lib/planItemMeta.test.ts
           pnpm exec tsx src/features/my-plan/lib/planPagePresentation.test.ts
+
+      - name: Account greeting regressions
+        run: pnpm exec tsx src/features/me/lib/accountGreeting.test.ts
 
       - name: Event public rendering regressions
         run: |

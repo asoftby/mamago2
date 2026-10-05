@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
     items: page.items.map((i) => ({
       id: i.id,
       publicUrl: i.publicUrl,
+      thumbnailUrl: i.thumbnailUrl,
       alt: i.alt,
       title: i.title,
       sourceType: i.sourceType,

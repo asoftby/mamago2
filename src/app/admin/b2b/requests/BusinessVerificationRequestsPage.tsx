@@ -6,6 +6,15 @@ import { BusinessVerificationSidePanel } from "./BusinessVerificationSidePanel";
 import { LoadingBlock, EmptyBlock, ErrorBlock } from "@/components/admin/ui/StateBlock";
 import { TableContainer } from "@/components/ui/table";
 import { AdminFilterTabs } from "@/components/admin/ui/AdminFilterTabs";
+import { Button } from "@/components/ui/button";
+import {
+  DataCardList,
+  DataCard,
+  DataCardHeader,
+  DataCardBody,
+  DataCardRow,
+  DataCardActions,
+} from "@/components/ui/data-card-list";
 
 type Business = {
   id: string;
@@ -154,99 +163,150 @@ export function BusinessVerificationRequestsPage({
 
         {/* Business list */}
         {!loading && !error && businesses.length > 0 && (
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <TableContainer
-              minWidthClassName="min-w-[720px]"
-              scrollLabel="Заявки на верификацию, прокручивается по горизонтали"
-            >
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left font-medium text-gray-700">
-                    Бизнес
-                  </th>
-                  <th className="px-6 py-3 text-left font-medium text-gray-700">
-                    Владелец
-                  </th>
-                  <th className="px-6 py-3 text-left font-medium text-gray-700">
-                    УНП
-                  </th>
-                  <th className="px-6 py-3 text-left font-medium text-gray-700">
-                    Статус
-                  </th>
-                  <th className="px-6 py-3 text-left font-medium text-gray-700">
-                    Дата подачи
-                  </th>
-                  <th className="px-6 py-3 text-left font-medium text-gray-700">
-                    Действия
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {businesses.map((business) => (
-                  <tr 
-                    key={business.id} 
-                    className={`hover:bg-gray-50 cursor-pointer ${
-                      openBusinessId === business.id ? 'bg-blue-50' : ''
-                    }`}
-                    onClick={() => handleOpenBusiness(business.id)}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">
-                        {business.name}
-                      </div>
-                      {business.legalName && (
-                        <div className="text-gray-500">
-                          {business.legalName}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-gray-900">
-                        {business.owner?.email || "—"}
-                      </div>
-                      {business.owner?.phoneE164 && (
-                        <div className="text-gray-500">
-                          {business.owner.phoneE164}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-900">
-                      {business.unp || "—"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+          <>
+            {/* Desktop: same responsive table pattern as /admin/b2b/partners.
+                Fixed layout + wrapping keeps all columns inside the viewport. */}
+            <div className="hidden md:block border border-gray-200 rounded-lg overflow-hidden">
+              <TableContainer
+                minWidthClassName="min-w-0"
+                scrollLabel="Заявки на верификацию"
+                hideScrollShadow
+              >
+                <table className="w-full table-fixed text-sm">
+                  <colgroup>
+                    <col className="w-[30%]" />
+                    <col className="w-[20%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[15%]" />
+                  </colgroup>
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700">
+                        Бизнес
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700">
+                        Владелец
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700">
+                        УНП
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700">
+                        Статус
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700">
+                        Дата подачи
+                      </th>
+                      <th className="px-4 py-3 text-right font-medium text-gray-700">
+                        Действия
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {businesses.map((business) => (
+                      <tr
+                        key={business.id}
+                        className={`hover:bg-gray-50 cursor-pointer ${
+                          openBusinessId === business.id ? "bg-blue-50" : ""
+                        }`}
+                        onClick={() => handleOpenBusiness(business.id)}
+                      >
+                        <td className="px-4 py-3 align-top">
+                          <div className="break-words font-medium text-gray-900">
+                            {business.legalName || business.name || "—"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <div className="break-all text-gray-900">
+                            {business.owner?.email || "—"}
+                          </div>
+                          {business.owner?.phoneE164 && (
+                            <div className="mt-0.5 text-gray-500">
+                              {business.owner.phoneE164}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 align-top text-gray-900">
+                          {business.unp || "—"}
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold leading-5 ${
+                              STATUS_COLORS[business.verificationStatus]
+                            }`}
+                          >
+                            {STATUS_LABELS[business.verificationStatus]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 align-top text-gray-500">
+                          {business.submittedAt
+                            ? new Date(business.submittedAt).toLocaleDateString("ru-RU")
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right align-top font-medium">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenBusiness(business.id);
+                            }}
+                            className="text-primary hover:text-primary/80"
+                          >
+                            Подробнее
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableContainer>
+            </div>
+
+            {/* Mobile: same card strategy as /admin/b2b/partners. */}
+            <DataCardList>
+              {businesses.map((business) => (
+                <DataCard key={business.id}>
+                  <DataCardHeader
+                    title={business.legalName || business.name || "—"}
+                    badge={
                       <span
-                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold leading-5 ${
                           STATUS_COLORS[business.verificationStatus]
                         }`}
                       >
                         {STATUS_LABELS[business.verificationStatus]}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-500">
-                      {business.submittedAt
-                        ? new Date(business.submittedAt).toLocaleDateString(
-                            "ru-RU"
-                          )
-                        : "—"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap font-medium">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenBusiness(business.id);
-                        }}
-                        className="text-primary hover:text-primary/80"
-                      >
-                        Подробнее
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </TableContainer>
-          </div>
+                    }
+                  />
+                  <DataCardBody>
+                    <DataCardRow label="Email" value={business.owner?.email} />
+                    <DataCardRow label="Телефон" value={business.owner?.phoneE164} />
+                    <DataCardRow label="УНП" value={business.unp} />
+                    <DataCardRow
+                      label="Дата подачи"
+                      value={
+                        business.submittedAt
+                          ? new Date(business.submittedAt).toLocaleDateString("ru-RU")
+                          : "—"
+                      }
+                    />
+                  </DataCardBody>
+                  <DataCardActions>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => handleOpenBusiness(business.id)}
+                    >
+                      Подробнее
+                    </Button>
+                  </DataCardActions>
+                </DataCard>
+              ))}
+            </DataCardList>
+          </>
         )}
       </div>
 

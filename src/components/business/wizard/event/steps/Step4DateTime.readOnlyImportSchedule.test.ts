@@ -151,7 +151,7 @@ assert.match(
 );
 assert.match(
   wizardSource,
-  /setScheduleSourceState\(initialScheduleSourceState\)/,
+  /applyScheduleSourceState\(\{\s*readOnly:\s*initialScheduleSourceReadOnly,\s*itemCount:\s*initialScheduleSourceItemCount,\s*\}\)/,
   "client preload must fall back to the server-derived schedule state instead of clearing it",
 );
 assert.match(
