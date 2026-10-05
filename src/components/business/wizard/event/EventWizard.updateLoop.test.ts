@@ -34,8 +34,14 @@ assert.match(
 
 assert.match(
   source,
-  /\[eventId, initialScheduleSourceReadOnly, initialScheduleSourceItemCount\]/,
+  /eventId,[\s\S]*initialScheduleSourceReadOnly,[\s\S]*initialScheduleSourceItemCount,[\s\S]*applyScheduleSourceState/,
   "schedule-source effect must depend on primitive values, not object identity",
+);
+
+assert.match(
+  source,
+  /handleScheduleSourceStateChange = useCallback\([\s\S]*applyScheduleSourceState\(state\)/,
+  "child schedule-source callbacks must use the guarded setter too",
 );
 
 assert.doesNotMatch(
