@@ -38,13 +38,16 @@ test("child context excludes ADULT_ONLY before fallback and keeps unrestricted",
   assert.equal(result.secondary.some((item) => item.id === "adult"), false);
 });
 
-test("adult self context treats unrestricted and adult content as compatible", () => {
+test("adult self context rejects child ranges ending at 18", () => {
   const result = partitionDiscoveryFeed(
     { ...defaultFilters, age: ["18+"] },
     [
       activity("unrestricted", "UNRESTRICTED", 0, 12),
       activity("specific-18", "SPECIFIC", 18, 99),
       activity("strict", "ADULT_ONLY", 18, 99),
+      activity("zero-to-18", "SPECIFIC", 0, 18),
+      activity("five-to-18", "SPECIFIC", 5, 18),
+      activity("sixteen-to-18", "SPECIFIC", 16, 18),
       activity("kids", "SPECIFIC", 3, 7),
     ],
   );
@@ -53,7 +56,8 @@ test("adult self context treats unrestricted and adult content as compatible", (
     result.primary.map((item) => item.id).sort(),
     ["specific-18", "strict", "unrestricted"],
   );
-  assert.deepEqual(result.secondary.map((item) => item.id), ["kids"]);
+  assert.deepEqual(result.secondary, []);
+  assert.equal(result.secondaryHeading, null);
 });
 
 test("explicit adult matches outrank unrestricted content even with lower engagement", () => {
@@ -78,7 +82,7 @@ test("UNKNOWN age does not become a child match through numeric fallback", () =>
   assert.deepEqual(result.secondary, []);
 });
 
-test("ordinary SPECIFIC 18+ remains an age bucket, not strict adult-only", () => {
+test("ordinary SPECIFIC 18+ remains adult-compatible without becoming strict ADULT_ONLY", () => {
   const result = partitionDiscoveryFeed(
     { ...defaultFilters, age: ["18+"] },
     [activity("specific-18", "SPECIFIC", 18, 99), activity("strict", "ADULT_ONLY", 18, 99)],
@@ -86,22 +90,58 @@ test("ordinary SPECIFIC 18+ remains an age bucket, not strict adult-only", () =>
   assert.deepEqual(result.primary.map((item) => item.id).sort(), ["specific-18", "strict"]);
 });
 
-test("no matching audience does not fall back to the unfiltered primary feed", () => {
+test("adult plus child context uses child eligibility and does not broaden to 18+", () => {
+  const result = partitionDiscoveryFeed(
+    { ...defaultFilters, age: ["5-7", "18+"] },
+    [
+      activity("strict-adult", "ADULT_ONLY", 18, 99),
+      activity("specific-adult", "SPECIFIC", 18, 99),
+      activity("kid", "SPECIFIC", 5, 7),
+      activity("family", "SPECIFIC", 5, 99),
+      activity("unrestricted", "UNRESTRICTED", 0, 12),
+    ],
+  );
+
+  assert.deepEqual(
+    result.primary.map((item) => item.id).sort(),
+    ["family", "kid", "unrestricted"],
+  );
+  assert.equal(result.primary.some((item) => item.id === "strict-adult"), false);
+  assert.equal(result.primary.some((item) => item.id === "specific-adult"), false);
+});
+
+test("multiple child buckets must all be compatible with the event", () => {
+  const result = partitionDiscoveryFeed(
+    { ...defaultFilters, age: ["3-5", "9-12"] },
+    [
+      activity("young-only", "SPECIFIC", 3, 5),
+      activity("both", "SPECIFIC", 3, 12),
+      activity("unrestricted", "UNRESTRICTED", 0, 12),
+    ],
+  );
+
+  assert.deepEqual(
+    result.primary.map((item) => item.id).sort(),
+    ["both", "unrestricted"],
+  );
+});
+
+test("no matching adult audience does not fall back to child content", () => {
   const result = partitionDiscoveryFeed(
     { ...defaultFilters, age: ["18+"] },
-    [activity("kids", "SPECIFIC", 3, 7, 3)],
+    [activity("kids", "SPECIFIC", 3, 7, 10)],
   );
 
   assert.deepEqual(result.primary, []);
   assert.deepEqual(result.secondary, []);
 });
 
-test("popular secondary requires meaningful engagement", () => {
+test("popular secondary remains available for child contexts", () => {
   const result = partitionDiscoveryFeed(
-    { ...defaultFilters, age: ["18+"] },
+    { ...defaultFilters, age: ["3-5"] },
     [
-      activity("one-detail-open", "SPECIFIC", 3, 7, 2),
-      activity("saved", "SPECIFIC", 5, 9, 4),
+      activity("one-detail-open", "SPECIFIC", 9, 12, 2),
+      activity("saved", "SPECIFIC", 9, 12, 4),
     ],
   );
 
