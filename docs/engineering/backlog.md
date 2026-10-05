@@ -5123,3 +5123,14 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Context: a contract test (`planAddVisibility.contract.test.ts`) forbids enabling the switch without forwarding the value, so a choice is never silently ignored. Also not built: "Предложить, а не добавлять" (PROPOSED flow), the "invite your partner" block for single-adult families, the activity strip.
 - Acceptance criteria: remaining entry points forward `visibility` and enable the switch; guest resume carries it through `saveFlowContext`.
 - Source: Family Core M4c.
+
+## [BACKLOG-170] Family Core M5: full "Управление семьёй" and archived-family restore
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Profile
+- Added: 2026-10-06
+- Reason deferred: M5 ships list of adults/children, invite (link + optional letter), ADULT leave (new solo family, own PRIVATE items and an optional copy of children go with him), OWNER → ADULT ownership transfer. Not built: OWNER excluding another adult, restoring an archived family, merging two families after leaving, per-adult `historyAccess` change, rename of the family.
+- Context: the leaver loses access to FAMILY items of the old family (they stay there, author kept). Invite email is used only to send the letter and is not stored; the link is accepted by any signed-in account holding it (one-time, 7 days, ≤3 active); letters limited to 5 per user per day.
+- Acceptance criteria: product decision on exclusion/restore semantics, then services + UI + integration tests.
+- Source: Family Core M5a.
