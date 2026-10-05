@@ -82,6 +82,14 @@ export async function GET(
       resolveLegacyPublicUploadPath(media.storageKey);
 
     if (!filepath || !existsSync(filepath)) {
+      const externalPublicUrl = media.publicUrl?.trim();
+      if (externalPublicUrl && /^https?:\/\//i.test(externalPublicUrl)) {
+        return NextResponse.redirect(externalPublicUrl, {
+          status: 307,
+          headers: { "Cache-Control": responsePolicy.cacheControl },
+        });
+      }
+
       console.warn(
         `[media-api] file missing on disk: mediaId="${media.id}" publicUrl="${media.publicUrl}" storageKey="${media.storageKey}" resolvedPath="${filepath}"`,
       );
