@@ -5078,3 +5078,14 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Context: `pnpm test:family-core-foundation` fails on the B1-era guard `assert.doesNotMatch(read("src/server/services/planOwner.ts"), /familyId/)` because B2 legitimately made `planOwner.ts` family-aware. B2 only ran the reads contract.
 - Acceptance criteria: drop or update that B1 guard; `test:family-core-foundation` is green on `dev`.
 - Source: Family Core B3 verification.
+
+## [BACKLOG-166] Family Core A2 part 2: `NOT NULL` + CHECKs on `Child.familyId`/`PlanItem.familyId`, drop `Child.parentId` ownership
+
+- Status: BLOCKED (needs PROD B1 migration + backfill `--events` results, and a decision on tombstone rows)
+- Priority: P2
+- Area: Family Core / Schema
+- Added: 2026-10-05
+- Reason deferred: A2 part 1 (events always write `familyId`; read-only preflight `scripts/sql/family-core-not-null-preflight.sql`) ships first. `NOT NULL` is only safe once every `must_be_zero` row of the preflight is 0 on PROD.
+- Context: tombstone users' `Child`/`PlanItem` without `familyId` (preflight `info` rows) decide whether `NOT NULL` is possible at all: either clean them or keep the column nullable with a CHECK for live users only. `Child.parentId` is still required and cascades on User delete; A2 part 2 removes it as owner.
+- Acceptance criteria: preflight output from PROD recorded; decision on tombstone rows recorded; hand-written migration (no `migrate dev`/`db push`) with rollback SQL proven on disposable PostgreSQL.
+- Source: Family Core A2 scope.
