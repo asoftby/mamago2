@@ -2,15 +2,17 @@ import type { DiscoveryFilters } from "@/features/filters/discovery/filters.stor
 import type { ActivityMock } from "@/types/activity";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import {
-  matchesAdultSelfAudience,
-  matchesChildAgeRanges,
+  matchesManualAgeRanges,
+  matchesSelectedPersonaAudience,
+  type AgeRange,
+  type AudienceSelection,
 } from "@/lib/discovery/audienceEligibility";
 
-function ageRangeFromGroupId(id: string): { min: number; max: number } | null {
+function ageRangeFromGroupId(id: string): (AgeRange & { id: string }) | null {
   const g = AGE_GROUPS.find((x) => x.value === id);
   if (!g) return null;
   /** 18+ и др. без верхней границы — как у карточек с ageTo 99 в ленте */
-  return { min: g.min, max: g.max ?? 99 };
+  return { id, min: g.min, max: g.max ?? 99 };
 }
 
 function sortByEngagementThenStable(list: ActivityMock[]): ActivityMock[] {
@@ -18,32 +20,6 @@ function sortByEngagementThenStable(list: ActivityMock[]): ActivityMock[] {
     const d = (b.engagementScore ?? 0) - (a.engagementScore ?? 0);
     if (d !== 0) return d;
     return 0;
-  });
-}
-
-/** Explicit audience matches outrank merely unrestricted content. */
-function sortByAudienceRelevance(
-  list: ActivityMock[],
-  ranges: Array<{ min: number; max: number }>,
-  adultSelfContext: boolean,
-): ActivityMock[] {
-  return [...list].sort((a, b) => {
-    const aExplicitMatch =
-      a.agePolicy !== "UNRESTRICTED" &&
-      (adultSelfContext
-        ? matchesAdultSelfAudience(a)
-        : matchesChildAgeRanges(a, ranges));
-    const bExplicitMatch =
-      b.agePolicy !== "UNRESTRICTED" &&
-      (adultSelfContext
-        ? matchesAdultSelfAudience(b)
-        : matchesChildAgeRanges(b, ranges));
-
-    const aRelevance = aExplicitMatch ? 2 : a.agePolicy === "UNRESTRICTED" ? 1 : 0;
-    const bRelevance = bExplicitMatch ? 2 : b.agePolicy === "UNRESTRICTED" ? 1 : 0;
-
-    if (aRelevance !== bRelevance) return bRelevance - aRelevance;
-    return (b.engagementScore ?? 0) - (a.engagementScore ?? 0);
   });
 }
 
@@ -57,8 +33,10 @@ function activityMatchesFormat(
 
 function buildAgeHintBadge(
   a: ActivityMock,
-  ranges: Array<{ min: number; max: number }>,
+  ranges: AgeRange[],
 ): string {
+  if (ranges.length === 0) return "Вне выбранного возраста";
+
   const actMin = a.ageFrom ?? 0;
   const actMax = a.ageTo ?? 99;
   const sorted = [...ranges].sort((x, y) => x.min - y.min);
@@ -84,48 +62,41 @@ export type DiscoveryFeedPartition = {
   secondaryHeading: string | null;
 };
 
+function hasResolvedPersonaSelection(
+  audience: AudienceSelection | undefined,
+): audience is AudienceSelection {
+  if (!audience || audience.selectedPersonaIds.length === 0) return false;
+  return audience.personas.some((persona) =>
+    audience.selectedPersonaIds.includes(persona.id),
+  );
+}
+
 /**
  * Глобальный контекст «Для кого» задаёт eligibility основного слоя выдачи.
  *
- * - только "Я" (age=["18+"]) = adult self-context, а не обычное пересечение
- *   диапазонов: детские/подростковые диапазоны, заканчивающиеся на 18, не
- *   проходят;
- * - если выбран хотя бы один ребёнок, 18+ взрослого-сопровождающего не
- *   расширяет выдачу, а событие должно подходить всем выбранным детским
- *   возрастным диапазонам;
- * - несовместимый детский контент не показываем вторым слоем в self-context.
+ * Если реально выбраны персоны, используем их как source of truth:
+ * - только "Я" = adult self-context;
+ * - "Я + ребёнок" = пригодность для ребёнка, взрослый сопровождает;
+ * - несколько детей = пригодность для каждого выбранного ребёнка.
+ *
+ * Если персон нет (свободный/ручной поиск), age chips сохраняют обычную OR
+ * семантику multi-select. Так ручной выбор 3–5 + 9–12 не превращается в AND.
  */
 export function partitionDiscoveryFeed(
   filters: DiscoveryFilters,
   activities: ActivityMock[],
+  audience?: AudienceSelection,
 ): DiscoveryFeedPartition {
-  const childAgeIds = filters.age.filter((age) => age !== "18+");
-  const hasChildAgeContext = childAgeIds.length > 0;
-  const adultSelfContext =
-    filters.age.length > 0 &&
-    !hasChildAgeContext &&
-    filters.age.every((age) => age === "18+");
-
-  const eligibleActivities = hasChildAgeContext
-    ? activities.filter((activity) => activity.agePolicy !== "ADULT_ONLY")
-    : activities;
-  const formatFiltered = eligibleActivities.filter((activity) =>
+  const formatFiltered = activities.filter((activity) =>
     activityMatchesFormat(activity, filters.format),
   );
 
-  if (!filters.age.length) {
-    return {
-      primary: sortByEngagementThenStable(formatFiltered),
-      secondary: [],
-      secondaryHeading: null,
-    };
-  }
-
-  const effectiveAgeIds = hasChildAgeContext ? childAgeIds : filters.age;
-  const ranges = effectiveAgeIds
+  const personaDriven = hasResolvedPersonaSelection(audience);
+  const ranges = filters.age
     .map(ageRangeFromGroupId)
-    .filter((r): r is { min: number; max: number } => r !== null);
-  if (!ranges.length) {
+    .filter((r): r is AgeRange & { id: string } => r !== null);
+
+  if (!personaDriven && ranges.length === 0) {
     return {
       primary: sortByEngagementThenStable(formatFiltered),
       secondary: [],
@@ -137,17 +108,27 @@ export function partitionDiscoveryFeed(
   const mismatched: ActivityMock[] = [];
 
   for (const activity of formatFiltered) {
-    const matches = adultSelfContext
-      ? matchesAdultSelfAudience(activity)
-      : matchesChildAgeRanges(activity, ranges);
+    const matches = personaDriven
+      ? matchesSelectedPersonaAudience(activity, audience)
+      : matchesManualAgeRanges(activity, ranges);
 
     if (matches) matched.push(activity);
     else mismatched.push(activity);
   }
 
-  const primary = sortByAudienceRelevance(matched, ranges, adultSelfContext);
+  const primary = sortByEngagementThenStable(matched);
 
-  if (adultSelfContext) {
+  const selectedPersonas = personaDriven
+    ? audience.personas.filter((persona) =>
+        audience.selectedPersonaIds.includes(persona.id),
+      )
+    : [];
+  const selfOnly =
+    selectedPersonas.length > 0 &&
+    selectedPersonas.every((persona) => persona.kind === "adult");
+
+  // В self-контексте детский контент не возвращаем вторичным блоком.
+  if (selfOnly) {
     return {
       primary,
       secondary: [],
