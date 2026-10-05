@@ -131,6 +131,7 @@
     "test:plan-item-nullable-date": "tsx src/lib/plan/ideaPlanStatus.test.ts && tsx src/lib/plan/planItemNullableDateMigration.contract.test.ts",
     "test:plan-item-nullable-date-integration": "NODE_OPTIONS=--conditions=react-server tsx src/server/services/planItemNullableDate.integration.test.ts",
     "test:family-core-foundation": "tsx src/server/family/familyCoreFoundation.contract.test.ts",
+    "test:family-core-delete-account": "NODE_OPTIONS=--conditions=react-server tsx src/server/account/deleteAccount.family.integration.test.ts",
     "test:family-core-foundation-integration": "NODE_OPTIONS=--conditions=react-server tsx src/server/family/familyCoreBackfill.integration.test.ts",
     "test:family-core-reads": "tsx src/server/family/familyScope.test.ts && tsx src/server/services/planOwner.test.ts && tsx src/server/family/familyCoreReads.contract.test.ts",
     "test:family-core-reads-integration": "NODE_OPTIONS=--conditions=react-server tsx src/server/family/familyCoreReads.integration.test.ts",

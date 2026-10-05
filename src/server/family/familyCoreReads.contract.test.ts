@@ -32,8 +32,9 @@ assert.equal((plan.match(/planItem\.create\(/g) ?? []).length, 4);
 assert.equal((plan.match(/familyId: await familyIdForWrite\(userId\)/g) ?? []).length, 4);
 assert.match(plan, /\.\.\.\(await planScopeFor\(userId\)\)/);
 
-// Not touched in B2: delete-account stays as is (B3) and reads default to legacy.
-assert.doesNotMatch(read("src/server/account/deleteAccount.service.ts"), /familyId|familyMembership|ensureFamily/);
+// Reads default to legacy. delete-account is family-aware since B3 but is
+// independent of the reads flag and never creates a family.
+assert.doesNotMatch(read("src/server/account/deleteAccount.service.ts"), /ensureFamily|FAMILY_CORE_READS|familyCoreReads/);
 assert.match(read("src/server/family/familyScope.ts"), /FAMILY_CORE_READS/);
 
 // Active-state lookups (planned / in plan / dedup) must exclude CANCELLED via
