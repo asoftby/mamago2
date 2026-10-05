@@ -36,6 +36,20 @@ assert.deepEqual(
   `client code must use uploadMediaFile instead of direct /api/upload fetches: ${offenders.join(", ")}`,
 );
 
+const eventWizardMedia = readFileSync(
+  join(process.cwd(), "src/components/business/wizard/event/steps/Step3Media.tsx"),
+  "utf8",
+);
+assert.ok(
+  eventWizardMedia.includes("await uploadMediaFile(file)"),
+  "event wizard media must upload through the shared transport boundary",
+);
+assert.ok(
+  !eventWizardMedia.includes("EVENT_HEIC_UNSUPPORTED_MESSAGE") &&
+    !eventWizardMedia.includes("isHeicFile(file)"),
+  "event wizard must not reject HEIC before the shared HEIC-to-JPEG transport normalization",
+);
+
 const compression = readFileSync(join(process.cwd(), "src/lib/image/compression.ts"), "utf8");
 assert.ok(
   compression.includes("replaceUploadFilenameExtension(file.name, outputMimeType)"),

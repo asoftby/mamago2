@@ -9,7 +9,6 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { isHeicFile } from "@/lib/uploads/heicConversion";
 import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/input";
@@ -92,18 +91,12 @@ type ImportedMedia = {
 
 type MediaStatus = "loading" | "loaded" | "empty";
 
-const EVENT_HEIC_UNSUPPORTED_MESSAGE =
-  "HEIC/HEIF временно нельзя загружать в событие. Выберите JPEG, PNG, WebP или AVIF — так фото загрузится без риска падения страницы.";
-
 /**
- * Event photos must be sent to the server without any client-side decode,
- * compression, canvas work, blurhash generation, data-URL creation or HEIC
- * conversion. Large mobile photos can otherwise exhaust the renderer process
- * before JavaScript gets a chance to catch an error.
- *
- * HEIC/HEIF is deliberately rejected here until it can be decoded server-side:
- * the production sharp build has no HEVC decoder, while browser-side libheif
- * conversion is exactly the memory-heavy path this hotfix removes.
+ * Event uploads use the shared transport boundary. It converts HEIC/HEIF to
+ * JPEG before the request, while ordinary JPEG/PNG/WebP/AVIF files pass
+ * through unchanged. Keep event-specific preview/state work after upload so
+ * raw HEIC bytes never reach sharp and the wizard has no format-specific
+ * bypass of the common pipeline.
  */
 async function uploadEventMediaFile(file: File) {
   const uploaded = await uploadMediaFile(file);
@@ -712,10 +705,6 @@ export function Step3Media({
       toast.error("Пожалуйста, выберите изображение");
       return;
     }
-    if (isHeicFile(file)) {
-      toast.error(EVENT_HEIC_UNSUPPORTED_MESSAGE);
-      return;
-    }
     if (file.size > MAX_IMAGE_FILE_SIZE_MB * 1024 * 1024) {
       toast.error(getFileTooLargeMessage());
       return;
@@ -756,10 +745,6 @@ export function Step3Media({
     const validFiles = fileArray.slice(0, remainingSlots).filter((file) => {
       if (!validateUploadMimeType(file)) {
         toast.error(`${file.name} не является изображением`);
-        return false;
-      }
-      if (isHeicFile(file)) {
-        toast.error(`${file.name}: ${EVENT_HEIC_UNSUPPORTED_MESSAGE}`);
         return false;
       }
       if (file.size > MAX_IMAGE_FILE_SIZE_MB * 1024 * 1024) {
