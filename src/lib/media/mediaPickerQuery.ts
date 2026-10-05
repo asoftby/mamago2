@@ -5,6 +5,7 @@ import { MEDIA_PICKER_MAX_LIMIT, MEDIA_PICKER_PAGE_SIZE } from "./mediaPickerCon
 export type MediaPickerAsset = {
   id: string;
   publicUrl: string | null;
+  thumbnailUrl: string;
   alt: string | null;
   title: string | null;
   sourceType: MediaSourceType;
@@ -62,7 +63,11 @@ export async function queryMediaPickerPage(params: {
   const usedIds = new Set(usedRows.map((row) => row.mediaId));
 
   return {
-    items: items.map((item) => ({ ...item, isUsed: usedIds.has(item.id) })),
+    items: items.map((item) => ({
+      ...item,
+      thumbnailUrl: `/api/media/${encodeURIComponent(item.id)}?variant=sm`,
+      isUsed: usedIds.has(item.id),
+    })),
     nextCursor: hasMore ? items[items.length - 1].id : null,
     hasMore,
   };
