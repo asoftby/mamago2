@@ -22,14 +22,17 @@ assert.equal((svc.match(/assertEnabled\(deps\)/g) ?? []).length, 3, "all three s
 assert.match(svc, /FOR UPDATE/);
 assert.match(svc, /consent_required/);
 
-// M2 has no UI/API surface yet.
+// M5a wires the services into /api/family/* only (routes below are the sole consumers).
 import { execSync } from "node:child_process";
 const users = execSync(
-  "grep -rl 'familyInvite.service' src --include=*.ts --include=*.tsx || true",
+  "grep -rlE 'familyInvite(Delivery)?\\.service' src --include=*.ts --include=*.tsx || true",
   { encoding: "utf8" },
 ).split("\n").filter(Boolean);
 for (const f of users) {
-  assert.ok(/familyInvite/.test(f), `${f}: familyInvite.service must not be wired into routes/pages in M2`);
+  assert.ok(
+    /familyInvite|familyMembers|src\/app\/api\/family\//.test(f),
+    `${f}: invite services may only be used by family code and /api/family routes`,
+  );
 }
 console.log("familyInvites.contract.test: ok");
 
