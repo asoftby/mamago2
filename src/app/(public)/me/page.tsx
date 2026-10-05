@@ -23,6 +23,11 @@ import {
   type AccountParty,
 } from "@/features/me/components/account/AccountDesign";
 import { childScopeFor } from "@/server/family/familyAccess";
+import { DEFAULT_TZ } from "@/server/geo/geoConstants";
+import {
+  getGreetingForHour,
+  getHourInTimeZone,
+} from "@/features/me/lib/accountGreeting";
 
 type PageProps = {
   searchParams: Promise<{ date?: string }>;
@@ -89,9 +94,9 @@ export default async function MePage({ searchParams }: PageProps) {
   const birthdayParties = await listUserBirthdayParties(user.id);
 
   // ── Greeting / identity ──
-  const hour = new Date().getHours();
-  const greeting =
-    hour < 6 ? "Доброй ночи" : hour < 12 ? "Доброе утро" : hour < 18 ? "Добрый день" : "Добрый вечер";
+  const greeting = getGreetingForHour(
+    getHourInTimeZone(new Date(), DEFAULT_TZ),
+  );
   const firstName = user.displayName ?? user.email?.split("@")[0] ?? "Пользователь";
 
   const preferenceDisplayLine = await buildAdultPreferenceDisplayLine({
@@ -157,14 +162,12 @@ export default async function MePage({ searchParams }: PageProps) {
     };
   });
 
-  // "Мои маршруты" / "Мои праздники" секции и счётчики скрыты до релиза разделов.
-  const stats = [{ n: family.length, label: "в семье" }];
+  // "Мои маршруты" / "Мои праздники" секции скрыты до релиза разделов.
 
   return (
     <AccountDesign
       userName={firstName}
       greeting={greeting}
-      stats={stats}
       settingsHref="/me/settings"
       homeHref="/"
       family={family}

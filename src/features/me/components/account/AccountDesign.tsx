@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AddParticipantModal } from "@/components/children/AddParticipantModal";
+import { getGreetingForHour } from "@/features/me/lib/accountGreeting";
 
 /* ============================================================
    1:1 port of the Claude Design "Мой аккаунт" page.
@@ -44,7 +45,6 @@ export type AccountParty = {
 export type AccountDesignProps = {
   userName: string;
   greeting: string;
-  stats: { n: number; label: string }[];
   settingsHref: string;
   homeHref: string;
   family: AccountFamilyMember[];
@@ -138,7 +138,6 @@ export function AccountDesign(props: AccountDesignProps) {
   const {
     userName,
     greeting,
-    stats,
     settingsHref,
     homeHref,
     family,
@@ -152,6 +151,16 @@ export function AccountDesign(props: AccountDesignProps) {
   } = props;
 
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [localGreeting, setLocalGreeting] = useState(greeting);
+
+  useEffect(() => {
+    const updateGreeting = () => {
+      setLocalGreeting(getGreetingForHour(new Date().getHours()));
+    };
+    updateGreeting();
+    const intervalId = window.setInterval(updateGreeting, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   return (
     <div className="mg-acc">
@@ -176,7 +185,7 @@ export function AccountDesign(props: AccountDesignProps) {
             <Reveal>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
                 <span className="caps" style={{ color: "var(--accent-deep)" }}>● Мой аккаунт</span>
-                <span className="caps">{greeting}</span>
+                <span className="caps">{localGreeting}</span>
               </div>
               <h1 className="serif" style={{ margin: 0, fontSize: "100px", lineHeight: 0.92, letterSpacing: "-.03em" }}>
                 {userName}
@@ -187,28 +196,8 @@ export function AccountDesign(props: AccountDesignProps) {
               </p>
             </Reveal>
 
-            <Reveal style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "stretch" }}>
-              <div
-                style={{
-                  padding: "16px 18px",
-                  background: "var(--paper)",
-                  border: "1px solid var(--line)",
-                  borderRadius: 14,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 8,
-                }}
-              >
-                {stats.map((s, i) => (
-                  <div key={i} style={{ textAlign: "center", flex: 1 }}>
-                    <div className="serif" style={{ fontSize: 30, lineHeight: 1, letterSpacing: "-.02em" }}>{s.n}</div>
-                    <div className="mono" style={{ fontSize: 9.5, color: "var(--ink-3)", letterSpacing: ".08em", textTransform: "uppercase", marginTop: 4 }}>
-                      {s.label}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <Link href={settingsHref} className="btn btn-ghost btn-sm" style={{ alignSelf: "flex-end" }}>
+            <Reveal style={{ display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
+              <Link href={settingsHref} className="btn btn-ghost btn-sm">
                 <Ic.Settings /> Настройки
               </Link>
             </Reveal>
@@ -495,7 +484,7 @@ const CSS = `
 .mg-acc .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
 .mg-acc .reveal{opacity:0;transform:translateY(14px);transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform .9s cubic-bezier(.2,.7,.2,1)}
 .mg-acc .reveal.in{opacity:1;transform:none}
-.mg-acc .hero-grid{display:grid;grid-template-columns:1fr 280px;gap:48px;align-items:flex-end}
+.mg-acc .hero-grid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:32px;align-items:flex-end}
 
 /* Kicker divider */
 .mg-acc .kicker{display:flex;align-items:center;gap:14px;color:var(--ink-3);margin-bottom:18px}

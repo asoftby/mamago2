@@ -53,7 +53,9 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Notification action regressions
-        run: pnpm exec tsx src/server/notifications/notification-action-resolver.test.ts
+        run: |
+          pnpm exec tsx src/server/notifications/notification-action-resolver.test.ts
+          pnpm exec tsx src/features/notifications/store/notification-actions.test.ts
 
       - name: Article performance analytics regressions
         run: |
@@ -140,6 +142,9 @@ jobs:
         run: |
           pnpm exec tsx src/features/my-plan/lib/planItemMeta.test.ts
           pnpm exec tsx src/features/my-plan/lib/planPagePresentation.test.ts
+
+      - name: Account greeting regressions
+        run: pnpm exec tsx src/features/me/lib/accountGreeting.test.ts
 
       - name: Event public rendering regressions
         run: |

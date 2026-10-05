@@ -41,7 +41,7 @@
     "dev:webpack": "next dev",
     "email:preview": "react-email dev --dir ./emails --port 3011",
     "build": "NODE_OPTIONS=--max-old-space-size=6144 next build --webpack && pnpm build:worker",
-    "build:ci": "NODE_OPTIONS=--max-old-space-size=4096 next build --webpack && pnpm build:worker",
+    "build:ci": "NODE_OPTIONS=--max-old-space-size=6144 next build --webpack && pnpm build:worker",
     "build:worker": "tsup --config tsup.worker.config.ts",
     "start": "next start",
     "lint": "eslint",
