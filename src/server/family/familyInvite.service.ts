@@ -137,14 +137,23 @@ export async function acceptFamilyInvite(
       });
       if ((mine?.familyId ?? null) !== (preMine?.familyId ?? null)) throw new FamilyInviteError("conflict");
       if (mine?.familyId === invite.familyId) throw new FamilyInviteError("already_member");
+      // Data check runs even without an active membership: a user with children or
+      // plan items but no family would otherwise join and leave them without familyId.
+      const mineFamilyId = mine?.familyId ?? null;
+      const dataOwners = (id: "familyId" | "userId") => [
+        ...(mineFamilyId ? [{ familyId: mineFamilyId }] : []),
+        id === "familyId" ? { parentId: input.userId } : { userId: input.userId },
+      ];
+      const [adults, children, planItems] = await Promise.all([
+        mineFamilyId
+          ? tx.familyMembership.count({ where: { familyId: mineFamilyId, leftAt: null } })
+          : Promise.resolve(0),
+        tx.child.count({ where: { OR: dataOwners("familyId") } }),
+        tx.planItem.count({ where: { OR: dataOwners("userId") } }),
+      ]);
+      if (adults > 1) throw new FamilyInviteError("has_other_adults");
+      if (children > 0 || planItems > 0) throw new FamilyInviteError("needs_merge");
       if (mine) {
-        const [adults, children, planItems] = await Promise.all([
-          tx.familyMembership.count({ where: { familyId: mine.familyId, leftAt: null } }),
-          tx.child.count({ where: { OR: [{ familyId: mine.familyId }, { parentId: input.userId }] } }),
-          tx.planItem.count({ where: { OR: [{ familyId: mine.familyId }, { userId: input.userId }] } }),
-        ]);
-        if (adults > 1) throw new FamilyInviteError("has_other_adults");
-        if (children > 0 || planItems > 0) throw new FamilyInviteError("needs_merge");
         await tx.familyMembership.update({ where: { id: mine.id }, data: { leftAt: now } });
         await tx.family.update({ where: { id: mine.familyId }, data: { archivedAt: now } });
       }

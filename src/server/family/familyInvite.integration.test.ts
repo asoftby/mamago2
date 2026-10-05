@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test, { after } from "node:test";
 import { PrismaClient } from "@prisma/client";
+import { ensureFamilyForUser } from "./ensureFamily";
 import {
   FamilyInviteError,
   acceptFamilyInvite,
@@ -35,10 +36,12 @@ after(async () => {
   await db.$disconnect();
 });
 
-async function mkUser(label: string) {
+async function mkUser(label: string, opts: { solo?: boolean } = { solo: true }) {
   const id = `m2-${run}-${label}`;
   await db.user.create({ data: { id, email: `${id}@example.test`, displayName: label } });
   userIds.push(id);
+  // Real users always have a (lazy) solo family.
+  if (opts.solo !== false) await ensureFamilyForUser(db, id);
   return id;
 }
 
@@ -85,7 +88,8 @@ test("accept: consent required, joins as ADULT FROM_JOIN, empty solo family arch
 
 test("accept refused: expired, revoked, joiner with data, joiner in family with other adults", async () => {
   const owner = await mkUser("owner3");
-  const t0 = new Date("2026-10-06T00:00:00Z");
+  // Created 8 days ago => already past the 7-day TTL regardless of today's date.
+  const t0 = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
   const exp = await createFamilyInvite(db, { userId: owner }, { env, now: () => t0 });
   const j1 = await mkUser("j3a");
   assert.equal(await code(acceptFamilyInvite(db, { userId: j1, token: exp.token, consentTextVersion: "v1" }, deps)), "invalid_invite");
@@ -98,6 +102,11 @@ test("accept refused: expired, revoked, joiner with data, joiner in family with 
   await db.child.create({ data: { parentId: withData, name: "kid" } });
   const ok = await createFamilyInvite(db, { userId: owner }, deps);
   assert.equal(await code(acceptFamilyInvite(db, { userId: withData, token: ok.token, consentTextVersion: "v1" }, deps)), "needs_merge");
+
+  // Data but no membership at all: still needs_merge (never joins with orphan data).
+  const orphan = await mkUser("j3d", { solo: false });
+  await db.child.create({ data: { parentId: orphan, name: "orphan-kid" } });
+  assert.equal(await code(acceptFamilyInvite(db, { userId: orphan, token: ok.token, consentTextVersion: "v1" }, deps)), "needs_merge");
 
   const otherOwner = await mkUser("o3c");
   const otherJoiner = await mkUser("j3c");
