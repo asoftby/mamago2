@@ -21,9 +21,6 @@ name: Promote DEV image to PROD
 #   release history. Promoting to a fresh, unused prod-<N> is always safe;
 #   fixing a mistake means choosing a new tag, not overwriting the old one.
 on:
-  push:
-    branches:
-      - ops/promote-dev-634-to-prod-634-20261005
   workflow_dispatch:
     inputs:
       dev_tag:
@@ -35,10 +32,6 @@ on:
         required: true
         type: string
 
-env:
-  PROMOTE_DEV_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.dev_tag || 'dev-634' }}
-  PROMOTE_PROD_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.prod_tag || 'prod-634' }}
-
 jobs:
   promote:
     runs-on: ubuntu-latest
@@ -49,15 +42,15 @@ jobs:
     steps:
       - name: Validate tag inputs
         run: |
-          if [[ ! "${{ env.PROMOTE_DEV_TAG }}" =~ ^dev-[0-9]+$ ]]; then
-            echo "::error::dev_tag must exactly match dev-<number> (e.g. dev-373). Got: '${{ env.PROMOTE_DEV_TAG }}'. Mutable aliases like 'dev' or 'latest' are not a valid promotion source — a promotion must name one specific, immutable build."
+          if [[ ! "${{ inputs.dev_tag }}" =~ ^dev-[0-9]+$ ]]; then
+            echo "::error::dev_tag must exactly match dev-<number> (e.g. dev-373). Got: '${{ inputs.dev_tag }}'. Mutable aliases like 'dev' or 'latest' are not a valid promotion source — a promotion must name one specific, immutable build."
             exit 1
           fi
-          if [[ ! "${{ env.PROMOTE_PROD_TAG }}" =~ ^prod-[0-9]+$ ]]; then
-            echo "::error::prod_tag must exactly match prod-<number> (e.g. prod-153). Got: '${{ env.PROMOTE_PROD_TAG }}'."
+          if [[ ! "${{ inputs.prod_tag }}" =~ ^prod-[0-9]+$ ]]; then
+            echo "::error::prod_tag must exactly match prod-<number> (e.g. prod-153). Got: '${{ inputs.prod_tag }}'."
             exit 1
           fi
-          echo "Inputs valid: dev_tag=${{ env.PROMOTE_DEV_TAG }} prod_tag=${{ env.PROMOTE_PROD_TAG }}"
+          echo "Inputs valid: dev_tag=${{ inputs.dev_tag }} prod_tag=${{ inputs.prod_tag }}"
 
       - name: Log in to the Container registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -72,18 +65,18 @@ jobs:
       - name: Inspect source digest
         id: source
         run: |
-          digest=$(docker buildx imagetools inspect "ghcr.io/${{ github.repository }}:${{ env.PROMOTE_DEV_TAG }}" --format '{{json .Manifest.Digest}}' | tr -d '"')
-          revision=$(docker buildx imagetools inspect "ghcr.io/${{ github.repository }}:${{ env.PROMOTE_DEV_TAG }}" --format '{{index .Image.Config.Labels "org.opencontainers.image.revision"}}' 2>/dev/null || echo "unknown")
+          digest=$(docker buildx imagetools inspect "ghcr.io/${{ github.repository }}:${{ inputs.dev_tag }}" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          revision=$(docker buildx imagetools inspect "ghcr.io/${{ github.repository }}:${{ inputs.dev_tag }}" --format '{{index .Image.Config.Labels "org.opencontainers.image.revision"}}' 2>/dev/null || echo "unknown")
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
-          echo "Source: ghcr.io/${{ github.repository }}:${{ env.PROMOTE_DEV_TAG }}"
+          echo "Source: ghcr.io/${{ github.repository }}:${{ inputs.dev_tag }}"
           echo "Source digest:   $digest"
           echo "Source revision: $revision"
 
       - name: Check destination immutability
         id: destcheck
         run: |
-          dest_ref="ghcr.io/${{ github.repository }}:${{ env.PROMOTE_PROD_TAG }}"
+          dest_ref="ghcr.io/${{ github.repository }}:${{ inputs.prod_tag }}"
           set +e
           existing_digest=$(docker buildx imagetools inspect "$dest_ref" --format '{{json .Manifest.Digest}}' 2>/dev/null | tr -d '"')
           inspect_exit=$?
@@ -104,15 +97,15 @@ jobs:
         if: steps.destcheck.outputs.idempotent != 'true'
         run: |
           docker buildx imagetools create \
-            --tag "ghcr.io/${{ github.repository }}:${{ env.PROMOTE_PROD_TAG }}" \
-            "ghcr.io/${{ github.repository }}:${{ env.PROMOTE_DEV_TAG }}"
+            --tag "ghcr.io/${{ github.repository }}:${{ inputs.prod_tag }}" \
+            "ghcr.io/${{ github.repository }}:${{ inputs.dev_tag }}"
 
       - name: Inspect destination digest
         id: dest
         run: |
-          digest=$(docker buildx imagetools inspect "ghcr.io/${{ github.repository }}:${{ env.PROMOTE_PROD_TAG }}" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          digest=$(docker buildx imagetools inspect "ghcr.io/${{ github.repository }}:${{ inputs.prod_tag }}" --format '{{json .Manifest.Digest}}' | tr -d '"')
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          echo "Destination: ghcr.io/${{ github.repository }}:${{ env.PROMOTE_PROD_TAG }}"
+          echo "Destination: ghcr.io/${{ github.repository }}:${{ inputs.prod_tag }}"
           echo "Destination digest: $digest"
 
       - name: Fail if digest changed (promotion must be an exact copy)
@@ -130,8 +123,8 @@ jobs:
             echo ""
             echo "| Field | Value |"
             echo "|---|---|"
-            echo "| Source tag | \`${{ env.PROMOTE_DEV_TAG }}\` |"
-            echo "| Destination tag | \`${{ env.PROMOTE_PROD_TAG }}\` |"
+            echo "| Source tag | \`${{ inputs.dev_tag }}\` |"
+            echo "| Destination tag | \`${{ inputs.prod_tag }}\` |"
             echo "| Git revision | \`${{ steps.source.outputs.revision }}\` |"
             echo "| Immutable digest | \`${{ steps.dest.outputs.digest }}\` |"
             echo "| Idempotent no-op | \`${{ steps.destcheck.outputs.idempotent == 'true' }}\` |"
