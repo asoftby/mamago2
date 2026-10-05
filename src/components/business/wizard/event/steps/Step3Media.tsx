@@ -797,9 +797,7 @@ export function Step3Media({
         });
       } catch (error) {
         console.error("Gallery upload error:", error);
-        setGalleryItems((prev) =>
-          prev.map((img) => (img.id === placeholderId ? { ...img, status: "error" as const } : img)),
-        );
+        setGalleryItems((prev) => prev.filter((img) => img.id !== placeholderId));
         toast.error(`Ошибка загрузки ${file.name}`);
       }
     }
