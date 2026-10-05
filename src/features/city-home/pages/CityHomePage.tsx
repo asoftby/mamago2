@@ -23,6 +23,8 @@ import type { PublicRouteCardModel } from "@/components/routes/types";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 import { getHomeSectionAvailability } from "@/features/city-home/config/homeSectionAvailability";
 
+const HOME_PERSONALIZATION_CANDIDATE_TAKE = 24;
+
 export type CityHomePageCity = {
   id: string;
   slug: string;
@@ -91,7 +93,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
     : Promise.resolve([]);
   const journalArticlesPromise = listCityHomeArticles(city);
   const localClassesPromise = sectionAvailability.classes
-    ? getClassesDiscoveryFeed(city.id, city.slug, { take: 8 }).catch(() => [])
+    ? getClassesDiscoveryFeed(city.id, city.slug, { take: HOME_PERSONALIZATION_CANDIDATE_TAKE }).catch(() => [])
     : Promise.resolve([]);
 
   const nearbyRoutesPromise = sectionAvailability.routes
@@ -103,7 +105,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
     ? nearbyCitiesPromise.then((nearby) =>
         Promise.all(
           nearby.map((nearbyCity) =>
-            getClassesDiscoveryFeed(nearbyCity.id, nearbyCity.slug, { take: 8 }).catch(() => []),
+            getClassesDiscoveryFeed(nearbyCity.id, nearbyCity.slug, { take: HOME_PERSONALIZATION_CANDIDATE_TAKE }).catch(() => []),
           ),
         ).then((groups) => groups.flat()),
       )
@@ -120,7 +122,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
       timezone: cityTimezone,
     });
     return getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
-      take: 8,
+      take: HOME_PERSONALIZATION_CANDIDATE_TAKE,
       weather: {
         scenario: rankingContext.weatherDayScenario,
         timeOfDay: rankingContext.timeOfDay,

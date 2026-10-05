@@ -1,37 +1,18 @@
 import type { DiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import type { ActivityMock } from "@/types/activity";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
+import {
+  matchesManualAgeRanges,
+  matchesSelectedPersonaAudience,
+  type AgeRange,
+  type AudienceSelection,
+} from "@/lib/discovery/audienceEligibility";
 
-function ageRangeFromGroupId(id: string): { min: number; max: number } | null {
+function ageRangeFromGroupId(id: string): (AgeRange & { id: string }) | null {
   const g = AGE_GROUPS.find((x) => x.value === id);
   if (!g) return null;
   /** 18+ и др. без верхней границы — как у карточек с ageTo 99 в ленте */
-  return { min: g.min, max: g.max ?? 99 };
-}
-
-function activityOverlapsAgeRanges(
-  a: ActivityMock,
-  ranges: Array<{ min: number; max: number }>,
-): boolean {
-  const actMin = a.ageFrom ?? 0;
-  const actMax = a.ageTo ?? 99;
-  return ranges.some((r) => r.min <= actMax && r.max >= actMin);
-}
-
-/**
- * AgePolicy is authoritative where it carries stronger semantics than the
- * card's numeric fallback. In particular UNRESTRICTED means “Любой возраст”
- * and must match both children and adults even when legacy card bounds fall
- * back to 0–12. UNKNOWN must not masquerade as a child match through that
- * fallback.
- */
-function activityMatchesAgeContext(
-  activity: ActivityMock,
-  ranges: Array<{ min: number; max: number }>,
-): boolean {
-  if (activity.agePolicy === "UNRESTRICTED") return true;
-  if (activity.agePolicy === "UNKNOWN") return false;
-  return activityOverlapsAgeRanges(activity, ranges);
+  return { id, min: g.min, max: g.max ?? 99 };
 }
 
 function sortByEngagementThenStable(list: ActivityMock[]): ActivityMock[] {
@@ -39,19 +20,6 @@ function sortByEngagementThenStable(list: ActivityMock[]): ActivityMock[] {
     const d = (b.engagementScore ?? 0) - (a.engagementScore ?? 0);
     if (d !== 0) return d;
     return 0;
-  });
-}
-
-/** Explicit audience matches outrank merely unrestricted content. */
-function sortByAudienceRelevance(
-  list: ActivityMock[],
-  ranges: Array<{ min: number; max: number }>,
-): ActivityMock[] {
-  return [...list].sort((a, b) => {
-    const aRelevance = a.agePolicy === "UNRESTRICTED" ? 1 : activityOverlapsAgeRanges(a, ranges) ? 2 : 0;
-    const bRelevance = b.agePolicy === "UNRESTRICTED" ? 1 : activityOverlapsAgeRanges(b, ranges) ? 2 : 0;
-    if (aRelevance !== bRelevance) return bRelevance - aRelevance;
-    return (b.engagementScore ?? 0) - (a.engagementScore ?? 0);
   });
 }
 
@@ -65,8 +33,10 @@ function activityMatchesFormat(
 
 function buildAgeHintBadge(
   a: ActivityMock,
-  ranges: Array<{ min: number; max: number }>,
+  ranges: AgeRange[],
 ): string {
+  if (ranges.length === 0) return "Вне выбранного возраста";
+
   const actMin = a.ageFrom ?? 0;
   const actMax = a.ageTo ?? 99;
   const sorted = [...ranges].sort((x, y) => x.min - y.min);
@@ -92,36 +62,58 @@ export type DiscoveryFeedPartition = {
   secondaryHeading: string | null;
 };
 
+function hasResolvedPersonaSelection(
+  audience: AudienceSelection | undefined,
+): audience is AudienceSelection {
+  if (!audience || audience.selectedPersonaIds.length === 0) return false;
+  return audience.personas.some((persona) =>
+    audience.selectedPersonaIds.includes(persona.id),
+  );
+}
+
 /**
- * Глобальный контекст «Для кого» задаёт основной слой выдачи.
- * Несовместимый по возрасту контент никогда не подмешивается обратно в
- * primary как fallback; если он действительно популярен, он может попасть
- * только в явно отделённый блок «Популярное у других семей».
+ * Глобальный контекст «Для кого» задаёт eligibility основного слоя выдачи.
+ *
+ * Если реально выбраны персоны, используем их как source of truth:
+ * - только "Я" = adult self-context;
+ * - "Я + ребёнок" = пригодность для ребёнка, взрослый сопровождает;
+ * - несколько детей = пригодность для каждого выбранного ребёнка.
+ *
+ * Если персон нет (свободный/ручной поиск), age chips сохраняют обычную OR
+ * семантику multi-select. Так ручной выбор 3–5 + 9–12 не превращается в AND.
  */
 export function partitionDiscoveryFeed(
   filters: DiscoveryFilters,
   activities: ActivityMock[],
+  audience?: AudienceSelection,
 ): DiscoveryFeedPartition {
-  const hasChildAgeContext = filters.age.some((age) => age !== "18+");
-  const eligibleActivities = hasChildAgeContext
-    ? activities.filter((activity) => activity.agePolicy !== "ADULT_ONLY")
-    : activities;
+  const personaDriven = hasResolvedPersonaSelection(audience);
+  const selectedPersonas = personaDriven
+    ? audience.personas.filter((persona) =>
+        audience.selectedPersonaIds.includes(persona.id),
+      )
+    : [];
+  const childPersonaContext = selectedPersonas.some(
+    (persona) => persona.kind === "child",
+  );
+  const manualChildOnlyContext =
+    !personaDriven &&
+    filters.age.some((age) => age !== "18+") &&
+    !filters.age.includes("18+");
+
+  const eligibleActivities =
+    childPersonaContext || manualChildOnlyContext
+      ? activities.filter((activity) => activity.agePolicy !== "ADULT_ONLY")
+      : activities;
   const formatFiltered = eligibleActivities.filter((activity) =>
     activityMatchesFormat(activity, filters.format),
   );
 
-  if (!filters.age.length) {
-    return {
-      primary: sortByEngagementThenStable(formatFiltered),
-      secondary: [],
-      secondaryHeading: null,
-    };
-  }
-
   const ranges = filters.age
     .map(ageRangeFromGroupId)
-    .filter((r): r is { min: number; max: number } => r !== null);
-  if (!ranges.length) {
+    .filter((r): r is AgeRange & { id: string } => r !== null);
+
+  if (!personaDriven && ranges.length === 0) {
     return {
       primary: sortByEngagementThenStable(formatFiltered),
       secondary: [],
@@ -133,11 +125,29 @@ export function partitionDiscoveryFeed(
   const mismatched: ActivityMock[] = [];
 
   for (const activity of formatFiltered) {
-    if (activityMatchesAgeContext(activity, ranges)) matched.push(activity);
+    const matches = personaDriven
+      ? matchesSelectedPersonaAudience(activity, audience)
+      : matchesManualAgeRanges(activity, ranges);
+
+    if (matches) matched.push(activity);
     else mismatched.push(activity);
   }
 
-  const primary = sortByAudienceRelevance(matched, ranges);
+  const primary = sortByEngagementThenStable(matched);
+
+  const selfOnly =
+    selectedPersonas.length > 0 &&
+    selectedPersonas.every((persona) => persona.kind === "adult");
+
+  // В self-контексте детский контент не возвращаем вторичным блоком.
+  if (selfOnly) {
+    return {
+      primary,
+      secondary: [],
+      secondaryHeading: null,
+    };
+  }
+
   const secondaryCandidates = sortByEngagementThenStable(mismatched).filter(
     (activity) => (activity.engagementScore ?? 0) >= MIN_ENGAGEMENT_FOR_SECONDARY,
   );
