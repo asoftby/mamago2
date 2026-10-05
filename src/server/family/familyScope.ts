@@ -42,3 +42,9 @@ export function childScopeWhere(
 
 /** Not-cancelled filter. Replaces `cancelledAt: null` (nothing ever wrote cancelledAt). */
 export const NOT_CANCELLED = { status: { not: "CANCELLED" } } as const satisfies Prisma.PlanItemWhereInput;
+
+/** Family invites (M2). Off by default; enabled only after FAMILY_CORE_READS is live on PROD. */
+export function familyInvitesEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  const v = env.FAMILY_INVITES?.trim().toLowerCase();
+  return v === "1" || v === "true";
+}

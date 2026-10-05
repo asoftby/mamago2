@@ -74,6 +74,9 @@ model User {
   reviewedBusinessVerifications     BusinessVerificationLog[]        @relation("ReviewedBy")
   children                          Child[]
   familyMemberships                 FamilyMembership[]
+  familyInvitesCreated              FamilyInvite[]                   @relation("FamilyInviteCreator")
+  familyInvitesAccepted             FamilyInvite[]                   @relation("FamilyInviteAcceptor")
+  consentRecords                    ConsentRecord[]
   contentEdits                      ContentEditLog[]                 @relation("ContentEditor")
   ideas                             Idea[]
   assignedImprovementRequests       ImprovementRequest[]             @relation("ImprovementRequestAssignee")
@@ -379,6 +382,8 @@ model Family {
   memberships FamilyMembership[]
   children    Child[]
   planItems   PlanItem[]
+  invites     FamilyInvite[]
+  consents    ConsentRecord[]
 }
 
 /// Членство взрослого в семье. Инварианты — partial unique индексы в миграции:
@@ -399,6 +404,51 @@ model FamilyMembership {
 
   @@index([familyId])
   @@index([userId])
+}
+
+/// Статус приглашения. Истечение (7 дней) вычисляется по expiresAt, отдельного статуса нет.
+enum FamilyInviteStatus {
+  ACTIVE
+  ACCEPTED
+  REVOKED
+}
+
+enum ConsentType {
+  FAMILY_SHARED_DATA
+}
+
+/// Приглашение взрослого в семью. Токен хранится только хешем (sha256).
+model FamilyInvite {
+  id           String             @id @default(cuid())
+  familyId     String
+  createdById  String
+  tokenHash    String             @unique
+  status       FamilyInviteStatus @default(ACTIVE)
+  expiresAt    DateTime
+  createdAt    DateTime           @default(now())
+  acceptedById String?
+  acceptedAt   DateTime?
+  revokedAt    DateTime?
+  family       Family             @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdBy    User               @relation("FamilyInviteCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  acceptedBy   User?              @relation("FamilyInviteAcceptor", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([familyId, status])
+}
+
+/// Согласие пользователя (версия текста фиксируется на момент принятия).
+model ConsentRecord {
+  id          String      @id @default(cuid())
+  userId      String
+  familyId    String?
+  type        ConsentType
+  textVersion String
+  acceptedAt  DateTime    @default(now())
+  revokedAt   DateTime?
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  family      Family?     @relation(fields: [familyId], references: [id], onDelete: SetNull)
+
+  @@index([userId, type])
 }
 
 model Child {
