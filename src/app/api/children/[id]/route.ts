@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
+import { childScopeFor } from "@/server/family/familyAccess";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
 import { normalizeChildName, ChildBirthValidationError } from "@/lib/child/birth";
 import { parseChildBirthPayload } from "@/lib/child/birthApi";
@@ -152,7 +153,7 @@ export async function PUT(
     let existingChild;
     try {
       existingChild = await prisma.child.findFirst({
-        where: { id: childId, parentId: user.id },
+        where: { id: childId, ...(await childScopeFor(user.id)) },
         select: { id: true },
       });
     } catch (dbError) {
@@ -226,7 +227,7 @@ export async function GET(
     const childId = params.id;
 
     const child = await prisma.child.findFirst({
-      where: { id: childId, parentId: user.id },
+      where: { id: childId, ...(await childScopeFor(user.id)) },
       include: {
         systemInterests: true,
         customInterests: true,
@@ -277,7 +278,7 @@ export async function DELETE(
     }
 
     const existingChild = await prisma.child.findFirst({
-      where: { id: childId, parentId: user.id },
+      where: { id: childId, ...(await childScopeFor(user.id)) },
       select: { id: true },
     });
 

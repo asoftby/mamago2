@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
+import { activePlanScopeFor } from "@/server/family/familyAccess";
 
 const activitySelect = {
   id: true,
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
     const planned = activityIds.length
       ? await prisma.planItem.findMany({
           where: {
-            userId: user.id,
+            ...(await activePlanScopeFor(user.id)),
             activityId: { in: activityIds },
             ...(date ? { date } : {}),
           },

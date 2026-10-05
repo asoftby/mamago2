@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { activePlanScopeFor } from "@/server/family/familyAccess";
 
 /**
  * Finds the mutable occurrence for an activity. Once a PlanItem has produced
@@ -14,7 +15,7 @@ export async function resolvePlanActivityOccurrence(input: {
   | { kind: "create" }
 > {
   const existing = await prisma.planItem.findMany({
-    where: { userId: input.userId, activityId: input.activityId },
+    where: { ...(await activePlanScopeFor(input.userId)), activityId: input.activityId },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: 25,
     select: { id: true, date: true },
