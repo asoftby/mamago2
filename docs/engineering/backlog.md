@@ -5034,7 +5034,7 @@ distributor_company_id=550) и хотели бы уточнить несколь
 
 ## [BACKLOG-162] `deleteAccount` leaves `Experience` rows (User row is kept as a tombstone, so the FK cascade never fires)
 
-- Status: OPEN
+- Status: DONE (2026-10-05, Family Core B3 PR — `deleteAccount` deletes `Experience` explicitly; covered by `deleteAccount.family.integration.test.ts`)
 - Priority: P2
 - Area: Account deletion / Privacy
 - Added: 2026-10-03
@@ -5067,3 +5067,14 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Dependencies: BACKLOG-163 / shared plan release.
 - Acceptance criteria: decision recorded; queries counting "families" use `familyId`; numbers reconcile with the old ones on single-adult data.
 - Source: Family Core B2 audit.
+
+## [BACKLOG-165] `familyCoreFoundation.contract.test.ts` is stale after B2 (asserts `planOwner.ts` has no `familyId`)
+
+- Status: DONE (2026-10-05, PR fix/family-core-contract-gate-20261005: stale guard removed; `test:family-core-foundation` and `test:family-core-reads` added to `check:push`)
+- Priority: P3
+- Area: Family Core / Tests
+- Added: 2026-10-05
+- Reason deferred: found during B3; failure is pre-existing on `dev` (`8a4124c6`) and unrelated to delete-account, so not fixed in the B3 PR.
+- Context: `pnpm test:family-core-foundation` fails on the B1-era guard `assert.doesNotMatch(read("src/server/services/planOwner.ts"), /familyId/)` because B2 legitimately made `planOwner.ts` family-aware. B2 only ran the reads contract.
+- Acceptance criteria: drop or update that B1 guard; `test:family-core-foundation` is green on `dev`.
+- Source: Family Core B3 verification.

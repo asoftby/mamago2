@@ -48,17 +48,10 @@ assert.match(schema, /model Child \{[\s\S]*?\n\s+parentId\s+String\n/);
 // Cache version must be bumped with every schema change.
 assert.match(read("src/lib/prisma.ts"), /PRISMA_CACHE_VERSION = "v14"/);
 
-// B1 does not switch production reads or touch delete-account (B3).
+// B1 does not switch production reads. delete-account became family-aware in
+// B3, but must never create a family or depend on the reads flag.
 const deleteFlow = read("src/server/account/deleteAccount.service.ts");
-assert.doesNotMatch(deleteFlow, /familyId|familyMembership|prisma\.family|ensureFamily/);
-for (const f of ["src/server/services/planOwner.ts"]) {
-  try {
-    assert.doesNotMatch(read(f), /familyId/);
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-  }
-}
-
+assert.doesNotMatch(deleteFlow, /ensureFamily|FAMILY_CORE_READS|familyCoreReads/);
 // Backfill script exposes the agreed modes and stops on cross-owner rows.
 const script = read("scripts/family-core-backfill.ts");
 assert.match(script, /--dry-run/);
