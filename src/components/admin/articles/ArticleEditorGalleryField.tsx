@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { MediaUploadField, type MediaUploadItem } from "@/components/media/MediaUploadField";
 import {
   invalidateMediaLibraryClientCache,
@@ -45,52 +45,6 @@ export function ArticleEditorGalleryField({
   /** «Фото этой статьи» — первая вкладка picker'а. Без него picker остаётся одноисточниковым. */
   articleMediaSource?: ReturnType<typeof useArticleMediaSource>;
 }) {
-  const [loadedPreviewById, setLoadedPreviewById] = useState<Record<string, string>>({});
-  const ids = useMemo(() => value.filter((id) => id.trim()), [value]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (ids.length === 0) {
-      return;
-    }
-
-    (async () => {
-      const entries = await Promise.all(
-        ids.map(async (id) => {
-          try {
-            const res = await fetch(`/api/admin/articles/media-preview?id=${encodeURIComponent(id)}`, {
-              credentials: "include",
-            });
-            if (!res.ok) return [id, ""] as const;
-            const data = (await res.json()) as { publicUrl: string | null };
-            return [id, data.publicUrl ?? ""] as const;
-          } catch {
-            return [id, ""] as const;
-          }
-        }),
-      );
-
-      if (cancelled) return;
-
-      setLoadedPreviewById(
-        entries.reduce<Record<string, string>>((acc, [id, url]) => {
-          if (url) acc[id] = url;
-          return acc;
-        }, {}),
-      );
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [ids]);
-
-  const previewById = useMemo(
-    () => (ids.length === 0 ? {} : loadedPreviewById),
-    [ids.length, loadedPreviewById],
-  );
-
   const galleryValue = useMemo(
     () =>
       value.map((id) => ({
@@ -99,7 +53,7 @@ export function ArticleEditorGalleryField({
         alt: null,
         title: "Изображение галереи",
       })),
-    [previewById, value],
+    [value],
   );
 
   const uploadFiles = async (files: File[]): Promise<MediaUploadItem[]> => {
@@ -163,12 +117,6 @@ export function ArticleEditorGalleryField({
       value={galleryValue}
       onChange={(next) => {
         const items = Array.isArray(next) ? next : [];
-        setLoadedPreviewById(
-          items.reduce<Record<string, string>>((acc, item) => {
-            acc[item.id] = item.url;
-            return acc;
-          }, {}),
-        );
         onChange(items.map((item) => item.id));
       }}
       maxFiles={24}
