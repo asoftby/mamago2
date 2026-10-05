@@ -1,6 +1,12 @@
+import type { FamilyPersona } from "@/lib/family/familyPersonaTypes";
 import type { ActivityMock } from "@/types/activity";
 
-type AgeRange = { min: number; max: number };
+export type AudienceSelection = {
+  personas: FamilyPersona[];
+  selectedPersonaIds: string[];
+};
+
+export type AgeRange = { min: number; max: number };
 
 function overlapsRange(
   activity: Pick<ActivityMock, "ageFrom" | "ageTo">,
@@ -9,6 +15,23 @@ function overlapsRange(
   const actMin = activity.ageFrom ?? 0;
   const actMax = activity.ageTo ?? 99;
   return range.min <= actMax && range.max >= actMin;
+}
+
+export function getAgeYearsFromBirthDate(
+  birthDate: string | null | undefined,
+  now: Date = new Date(),
+): number | null {
+  if (!birthDate) return null;
+  const date = new Date(birthDate);
+  if (Number.isNaN(date.getTime())) return null;
+
+  let age = now.getFullYear() - date.getFullYear();
+  const hasBirthdayPassed =
+    now.getMonth() > date.getMonth() ||
+    (now.getMonth() === date.getMonth() && now.getDate() >= date.getDate());
+  if (!hasBirthdayPassed) age -= 1;
+
+  return age >= 0 ? age : null;
 }
 
 /**
@@ -34,45 +57,67 @@ export function matchesAdultSelfAudience(
 }
 
 /**
- * Child audience eligibility. Adults accompanying selected children do not add
- * an independent 18+ constraint.
- *
- * Every known selected child age must fit. UNKNOWN and ADULT_ONLY are never
- * eligible for a child context; UNRESTRICTED always is.
+ * Child audience eligibility uses exact ages when all selected children have a
+ * valid birth date. If at least one selected child has no reliable age, we do
+ * not claim that a numeric SPECIFIC range is suitable; only UNRESTRICTED is a
+ * safe match.
  */
 export function matchesExactChildAges(
   activity: Pick<ActivityMock, "agePolicy" | "ageFrom" | "ageTo">,
   childAges: number[],
+  selectedChildCount: number = childAges.length,
 ): boolean {
   if (activity.agePolicy === "ADULT_ONLY") return false;
   if (activity.agePolicy === "UNRESTRICTED") return true;
   if (activity.agePolicy === "UNKNOWN") return false;
-  if (childAges.length === 0) return true;
+  if (selectedChildCount === 0) return true;
+  if (childAges.length !== selectedChildCount) return false;
 
   const actMin = activity.ageFrom ?? 0;
   const actMax = activity.ageTo ?? 99;
   return childAges.every((age) => age >= actMin && age <= actMax);
 }
 
-/**
- * Discovery currently transports child context as age buckets rather than
- * exact birth ages. Require compatibility with every selected child bucket.
- */
-export function matchesChildAgeRanges(
+/** Manual age chips keep OR semantics. 18+ uses adult suitability semantics. */
+export function matchesManualAgeRanges(
   activity: Pick<ActivityMock, "agePolicy" | "ageFrom" | "ageTo">,
-  ranges: AgeRange[],
+  ranges: Array<AgeRange & { id?: string }>,
 ): boolean {
-  if (activity.agePolicy === "ADULT_ONLY") return false;
   if (activity.agePolicy === "UNRESTRICTED") return true;
   if (activity.agePolicy === "UNKNOWN") return false;
-  if (ranges.length === 0) return true;
 
-  return ranges.every((range) => overlapsRange(activity, range));
+  return ranges.some((range) =>
+    range.id === "18+"
+      ? matchesAdultSelfAudience(activity)
+      : activity.agePolicy !== "ADULT_ONLY" && overlapsRange(activity, range),
+  );
 }
 
-export function overlapsAnyAgeRange(
-  activity: Pick<ActivityMock, "ageFrom" | "ageTo">,
-  ranges: AgeRange[],
+/**
+ * Canonical persona eligibility used by both city-home ranking and discovery.
+ * Children win over an accompanying adult: "Я + ребёнок" means find something
+ * suitable for the child, with the adult as companion, not an OR with 18+.
+ */
+export function matchesSelectedPersonaAudience(
+  activity: Pick<ActivityMock, "agePolicy" | "ageFrom" | "ageTo">,
+  selection: AudienceSelection,
 ): boolean {
-  return ranges.some((range) => overlapsRange(activity, range));
+  if (selection.selectedPersonaIds.length === 0) return true;
+
+  const selected = selection.personas.filter((persona) =>
+    selection.selectedPersonaIds.includes(persona.id),
+  );
+  if (selected.length === 0) return true;
+
+  const children = selected.filter((persona) => persona.kind === "child");
+  if (children.length > 0) {
+    const ages = children
+      .map((child) => getAgeYearsFromBirthDate(child.birthDate))
+      .filter((age): age is number => age !== null);
+    return matchesExactChildAges(activity, ages, children.length);
+  }
+
+  return selected.some((persona) => persona.kind === "adult")
+    ? matchesAdultSelfAudience(activity)
+    : true;
 }
