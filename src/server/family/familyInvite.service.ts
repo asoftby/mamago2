@@ -1,6 +1,8 @@
 import { Prisma, type FamilyHistoryAccess, type PrismaClient } from "@prisma/client";
 import { ensureFamilyForUser } from "./ensureFamily";
 import { familyInvitesEnabled } from "./familyScope";
+import { applyJoinerMerge } from "./familyMerge.service";
+import type { MergeDecision } from "./familyMergePure";
 import {
   FamilyInviteError,
   MAX_ACTIVE_INVITES_PER_FAMILY,
@@ -92,7 +94,14 @@ export async function revokeFamilyInvite(
  */
 export async function acceptFamilyInvite(
   prisma: PrismaClient,
-  input: { userId: string; token: string; consentTextVersion: string; historyAccess?: FamilyHistoryAccess },
+  input: {
+    userId: string;
+    token: string;
+    consentTextVersion: string;
+    historyAccess?: FamilyHistoryAccess;
+    /** Explicit merge decision (M3b). Required when the joiner has data. */
+    merge?: MergeDecision;
+  },
   deps: Deps = {},
 ): Promise<{ familyId: string }> {
   assertEnabled(deps);
@@ -152,7 +161,15 @@ export async function acceptFamilyInvite(
         tx.planItem.count({ where: { OR: dataOwners("userId") } }),
       ]);
       if (adults > 1) throw new FamilyInviteError("has_other_adults");
-      if (children > 0 || planItems > 0) throw new FamilyInviteError("needs_merge");
+      if ((children > 0 || planItems > 0) && !input.merge) throw new FamilyInviteError("needs_merge");
+      if (children > 0 || planItems > 0 || input.merge) {
+        await applyJoinerMerge(tx, {
+          userId: input.userId,
+          mineFamilyId,
+          targetFamilyId: invite.familyId,
+          decision: input.merge ?? { children: [], plan: "SKIP" },
+        });
+      }
       if (mine) {
         await tx.familyMembership.update({ where: { id: mine.id }, data: { leftAt: now } });
         await tx.family.update({ where: { id: mine.familyId }, data: { archivedAt: now } });

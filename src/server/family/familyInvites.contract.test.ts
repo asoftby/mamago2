@@ -32,3 +32,11 @@ for (const f of users) {
   assert.ok(/familyInvite/.test(f), `${f}: familyInvite.service must not be wired into routes/pages in M2`);
 }
 console.log("familyInvites.contract.test: ok");
+
+// M3b: merge is explicit, never automatic.
+const merge = read("src/server/family/familyMerge.service.ts");
+assert.match(merge, /validateMergeDecision/);
+assert.match(merge, /consent_required/);
+const invite = read("src/server/family/familyInvite.service.ts");
+assert.match(invite, /!input\.merge\) throw new FamilyInviteError\("needs_merge"\)/);
+console.log("familyInvites.contract (M3b): ok");

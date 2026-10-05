@@ -5090,3 +5090,14 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Context: tombstone users' `Child`/`PlanItem` without `familyId` (preflight `info` rows) decide whether `NOT NULL` is possible at all: either clean them or keep the column nullable with a CHECK for live users only. `Child.parentId` is still required and cascades on User delete; A2 part 2 removes it as owner.
 - Acceptance criteria: preflight output from PROD recorded; decision on tombstone rows recorded; hand-written migration (no `migrate dev`/`db push`) with rollback SQL proven on disposable PostgreSQL.
 - Source: Family Core A2 scope.
+
+## [BACKLOG-167] Family Core: archived joiner family — 30-day retention purge and restore
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Invites
+- Added: 2026-10-06
+- Reason deferred: M3b archives the joiner's previous family (`Family.archivedAt`, membership `leftAt`) and leaves data they chose not to transfer (SKIP) in it. The contract promises 30-day retention and a restore flow in the later "Управление семьёй" PR; neither a purge job nor restore exists yet.
+- Context: `applyJoinerMerge` / `acceptFamilyInvite` (`src/server/family/`). Archived families are invisible to all reads (no active membership).
+- Acceptance criteria: a scheduled purge deletes archived joiner families older than 30 days with their Child/PlanItem rows; restore within 30 days is possible; documented in the privacy text.
+- Source: Family Core M3b.

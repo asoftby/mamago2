@@ -12,6 +12,7 @@ export type FamilyInviteErrorCode =
   | "already_member"
   | "has_other_adults"
   | "needs_merge"
+  | "merge_invalid"
   | "conflict";
 
 export class FamilyInviteError extends Error {
