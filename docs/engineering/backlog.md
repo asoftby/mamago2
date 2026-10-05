@@ -5144,3 +5144,13 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Reason deferred: invites no longer expire, so an unused link occupies one of 3 slots until accepted or revoked (revoke is in the profile UI, M5b).
 - Acceptance criteria: decide whether to show "created N days ago" with a prompt to revoke old links or to auto-archive links older than a threshold.
 - Source: Family invite no-expiry change.
+
+## [BACKLOG-172] Family Core M6: booking UI entry points do not pass `planItemId`
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Bookings
+- Added: 2026-10-06
+- Reason deferred: `POST /api/public/bookings` accepts an optional `planItemId` (must be visible to the booker), and otherwise auto-links when exactly one not-yet-booked plan item of the same event/place (and date, if given) exists for the booker's family scope. Booking forms, offers (PlanItem has no `offerId`) and camp-shift bookings do not pass it, so ambiguous cases stay unlinked. There is no parent-side cancel flow at all today (status changes are business-only), so "only the booker can cancel" holds by construction; a future parent cancel must check `BookingRequest.userId`.
+- Acceptance criteria: plan card "Забронировать" passes `planItemId`; booking forms started from the plan forward it; offers/camp shifts decide how to map to plan items; a parent cancel action (if added) is limited to the booker and covered by a test.
+- Source: Family Core M6.
