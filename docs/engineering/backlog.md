@@ -5064,6 +5064,7 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Added: 2026-10-04
 - Reason deferred: product decision needed on the unit of measure (user vs family); identical numbers while every family has one adult.
 - Context: `analyticsQueryHelpers.ts` and `analyticsBehavior.service.ts` (youngest child band keyed by `Child.parentId`), `SegmentResolverService.ts` (`user._count.children`), `planningActivity.ts` and `weeklyPlanningFamilies.ts` (raw SQL on `PlanItem.userId`), `countPlanUsersByActivity` (`distinct` on `userId`).
+- Current state: M1b (2026-10-06) converted `countPlanUsersByActivity` (family unit when `FAMILY_CORE_READS` on), youngest-child band (`youngestChildBirthByUser`, both analytics services) and `fetchUserSegmentContext` children count. Still open: `planningActivity.ts` / `weeklyPlanningFamilies.ts` raw SQL on `PlanItem.userId` (stay per-user "active users"; a family unit needs a product decision before invites are enabled).
 - Dependencies: BACKLOG-163 / shared plan release.
 - Acceptance criteria: decision recorded; queries counting "families" use `familyId`; numbers reconcile with the old ones on single-adult data.
 - Source: Family Core B2 audit.

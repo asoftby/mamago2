@@ -1,4 +1,5 @@
 import type { UserBehaviorProfile } from "@prisma/client";
+import { childScopeFor, familyReadsEnabled } from "@/server/family/familyAccess";
 import { prisma } from "@/lib/prisma";
 import type { SegmentKey } from "@/lib/analytics/segmentCatalog";
 
@@ -226,7 +227,9 @@ export async function fetchUserSegmentContext(
   const idToSlug = Object.fromEntries(defs.map((d) => [d.id, d.slug]));
 
   return {
-    childrenCount: user._count.children,
+    childrenCount: familyReadsEnabled()
+      ? await prisma.child.count({ where: await childScopeFor(userId) })
+      : user._count.children,
     preferenceSignalSlugs: user.preferenceSignalIds
       .map((id) => idToSlug[id])
       .filter(Boolean),
