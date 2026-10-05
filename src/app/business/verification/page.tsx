@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/auth/server";
 import { redirect } from "next/navigation";
-import { getMyBusiness } from "@/server/business/getMyBusiness";
+import { getOwnedBusinessProfile } from "@/server/business/getMyBusiness";
 import Link from "next/link";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { VerificationPendingNextSteps } from "@/components/business/verification/VerificationPendingNextSteps";
@@ -25,7 +25,7 @@ export default async function BusinessVerificationPage() {
   }
 
   // Check business exists
-  const business = await getMyBusiness(user.id);
+  const business = await getOwnedBusinessProfile(user.id);
   
   if (!business) {
     redirect(
