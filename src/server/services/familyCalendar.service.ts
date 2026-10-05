@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { resolveMyPlanItemEffectiveTime } from "@/features/my-plan/lib/scenarioProjection";
 import {
-  computePlanFingerprint,
+  matchesScenarioPlanFingerprint,
   listActivitySessionsForPlanItems,
   listScenarioItemOverridesForScenarios,
 } from "./dayScenario.service";
@@ -9,6 +9,7 @@ import {
   listFamilyCalendarItems,
   validateFamilyCalendarRange,
   type FamilyCalendarItemDto,
+  ManualPlanEntryError,
 } from "./manualPlanEntry.service";
 import type { PlanOwner } from "./planOwner";
 
@@ -76,11 +77,12 @@ export async function loadFamilyCalendarRange(input: {
 
   const scenarioStatusByDate: Record<string, "ready" | "changed"> = {};
   for (const scenario of scenarios) {
-    scenarioStatusByDate[scenario.date] = computePlanFingerprint(
+    scenarioStatusByDate[scenario.date] = matchesScenarioPlanFingerprint(
+      scenario.planFingerprint,
       itemsByDate.get(scenario.date) ?? [],
       overrides,
       scenario.acceptedConflictKeys,
-    ) === scenario.planFingerprint ? "ready" : "changed";
+    ) ? "ready" : "changed";
   }
 
   return {
@@ -99,4 +101,19 @@ export async function loadFamilyCalendarRange(input: {
     }),
     scenarioStatusByDate,
   };
+}
+
+/** Mutation responses reuse the exact range projector, including Scenario
+ * override and recovered session time semantics. */
+export async function loadFamilyCalendarItem(input: {
+  owner: PlanOwner;
+  item: { id: string; date: string | null };
+}): Promise<FamilyCalendarItemDto> {
+  if (!input.item.date) throw new ManualPlanEntryError("NOT_FOUND", "calendar_item_has_no_date");
+  const range = await loadFamilyCalendarRange({
+    owner: input.owner, from: input.item.date, to: input.item.date,
+  });
+  const item = range.items.find((candidate) => candidate.id === input.item.id);
+  if (!item) throw new ManualPlanEntryError("NOT_FOUND", "calendar_item_not_found");
+  return item;
 }

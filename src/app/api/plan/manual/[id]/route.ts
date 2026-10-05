@@ -4,10 +4,10 @@ import { resolvePlanOwner } from "@/server/services/planOwner";
 import {
   cancelManualPlanEntry,
   ManualPlanEntryError,
-  toFamilyCalendarItemDto,
   updateManualPlanEntry,
   type ManualPlanEntryPatch,
 } from "@/server/services/manualPlanEntry.service";
+import { loadFamilyCalendarItem } from "@/server/services/familyCalendar.service";
 
 function errorResponse(error: unknown, userId: string) {
   if (error instanceof ManualPlanEntryError) {
@@ -23,8 +23,9 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   try {
     const { id } = await context.params;
     const body = await request.json() as ManualPlanEntryPatch;
-    const item = await updateManualPlanEntry(resolvePlanOwner(user.id), id, body);
-    return NextResponse.json({ item: toFamilyCalendarItemDto(item) });
+    const owner = await resolvePlanOwner(user.id);
+    const item = await updateManualPlanEntry(owner, id, body);
+    return NextResponse.json({ item: await loadFamilyCalendarItem({ owner, item }) });
   } catch (error) {
     return errorResponse(error, user.id);
   }

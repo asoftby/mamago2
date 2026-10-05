@@ -4,16 +4,17 @@ import { resolvePlanOwner } from "@/server/services/planOwner";
 import {
   createManualPlanEntry,
   ManualPlanEntryError,
-  toFamilyCalendarItemDto,
   type ManualPlanEntryInput,
 } from "@/server/services/manualPlanEntry.service";
+import { loadFamilyCalendarItem } from "@/server/services/familyCalendar.service";
 
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = await request.json() as Partial<ManualPlanEntryInput>;
-    const item = await createManualPlanEntry(resolvePlanOwner(user.id), {
+    const owner = await resolvePlanOwner(user.id);
+    const item = await createManualPlanEntry(owner, {
       entryType: body.entryType!,
       title: body.title!,
       date: body.date!,
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
       locationText: body.locationText,
       notes: body.notes,
     });
-    return NextResponse.json({ item: toFamilyCalendarItemDto(item) }, { status: 201 });
+    return NextResponse.json({ item: await loadFamilyCalendarItem({ owner, item }) }, { status: 201 });
   } catch (error) {
     if (error instanceof ManualPlanEntryError) {
       return NextResponse.json({ error: error.message }, { status: error.code === "NOT_FOUND" ? 404 : 400 });

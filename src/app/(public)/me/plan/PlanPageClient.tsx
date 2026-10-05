@@ -19,7 +19,12 @@ import {
 } from "./ExperienceCheckIn";
 import { ManualPlanEntryDialog } from "./ManualPlanEntryDialog";
 import { addDaysIso, getWeekStart } from "@/features/my-plan/lib/weekCalendar";
-import { shouldFetchCalendarWeek, upsertCalendarWeekItem } from "@/features/my-plan/lib/familyCalendarNavigation";
+import {
+  shouldFetchCalendarWeek,
+  upsertCalendarWeekItem,
+  scenarioStatusesAfterManualSave,
+  scenarioStatusesAfterManualCancel,
+} from "@/features/my-plan/lib/familyCalendarNavigation";
 import {
   filterFamilyCalendarItems,
   findFamilyCalendarConflictIds,
@@ -378,12 +383,7 @@ export function PlanPageClient({
 
   const replaceCachedItem = useCallback((saved: SerializedPlanItem) => {
     setItemsByWeek((current) => upsertCalendarWeekItem(current, saved));
-    setScenarioStatuses((current) => {
-      const next = { ...current };
-      if (next[saved.date]) next[saved.date] = "changed";
-      if (editingManualItem && next[editingManualItem.date]) next[editingManualItem.date] = "changed";
-      return next;
-    });
+    setScenarioStatuses((current) => scenarioStatusesAfterManualSave(current, editingManualItem, saved));
     selectDate(saved.date);
     toast(itemForCacheMessage(saved), { duration: 2000 });
   }, [editingManualItem, selectDate]);
@@ -391,9 +391,7 @@ export function PlanPageClient({
   const handleRemoveItem = (itemId: string) => {
     const removed = items.find((item) => item.id === itemId);
     if (removed) {
-      setScenarioStatuses((current) => current[removed.date]
-        ? { ...current, [removed.date]: "changed" }
-        : current);
+      setScenarioStatuses((current) => scenarioStatusesAfterManualCancel(current, removed));
     }
     setItemsByWeek((current) => Object.fromEntries(
       Object.entries(current).map(([week, weekItems]) => [week, weekItems.filter((item) => item.id !== itemId)]),

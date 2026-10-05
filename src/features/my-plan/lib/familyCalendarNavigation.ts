@@ -33,3 +33,47 @@ export function upsertCalendarWeekItem<T extends { id: string; date: string }>(
   next[targetWeek] = [...(next[targetWeek] ?? []), item];
   return next;
 }
+
+export type CalendarScenarioStatus = "ready" | "changed";
+export type CalendarScheduleSnapshot = {
+  date: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  childId: string | null;
+};
+
+function markExistingScenarioChanged(
+  statuses: Record<string, CalendarScenarioStatus>,
+  date: string,
+): void {
+  if (date in statuses) statuses[date] = "changed";
+}
+
+/** Mirrors the fields in computePlanFingerprint that manual edits can change. */
+export function scenarioStatusesAfterManualSave(
+  current: Readonly<Record<string, CalendarScenarioStatus>>,
+  previous: CalendarScheduleSnapshot | null,
+  saved: CalendarScheduleSnapshot,
+): Record<string, CalendarScenarioStatus> {
+  const next = { ...current };
+  if (!previous || previous.date !== saved.date) {
+    if (previous) markExistingScenarioChanged(next, previous.date);
+    markExistingScenarioChanged(next, saved.date);
+  } else if (
+    previous.startsAt !== saved.startsAt ||
+    previous.endsAt !== saved.endsAt ||
+    previous.childId !== saved.childId
+  ) {
+    markExistingScenarioChanged(next, saved.date);
+  }
+  return next;
+}
+
+export function scenarioStatusesAfterManualCancel(
+  current: Readonly<Record<string, CalendarScenarioStatus>>,
+  removed: Pick<CalendarScheduleSnapshot, "date">,
+): Record<string, CalendarScenarioStatus> {
+  const next = { ...current };
+  markExistingScenarioChanged(next, removed.date);
+  return next;
+}

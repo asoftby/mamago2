@@ -12,8 +12,8 @@ import {
 } from "./manualPlanEntry.service";
 import { resolvePlanOwner } from "./planOwner";
 import { listPendingExperienceCandidates } from "./experience/experience.service";
-import { computePlanFingerprint, listPlanItemsByDateForScenario } from "./dayScenario.service";
-import { loadFamilyCalendarRange } from "./familyCalendar.service";
+import { computeLegacyPlanFingerprint, computePlanFingerprint, listPlanItemsByDateForScenario } from "./dayScenario.service";
+import { loadFamilyCalendarItem, loadFamilyCalendarRange } from "./familyCalendar.service";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL must point at an isolated test database");
@@ -152,6 +152,34 @@ async function main() {
     assert.ok(scenarioItems.some((item) => item.id === created[0]!.id) === false, "moved item left the original day");
     const timedScenarioItems = await listPlanItemsByDateForScenario(owner.id, "2026-10-02");
     assert.ok(timedScenarioItems.some((item) => item.id === timed.id && item.startsAt != null && item.activity == null));
+
+    const legacyDate = "2026-10-01";
+    const legacyRows = await prisma.planItem.findMany({
+      where: { userId: owner.id, date: legacyDate, cancelledAt: null },
+      select: {
+        id: true, activityId: true, routeId: true, placeId: true, articleId: true,
+        date: true, startsAt: true, endsAt: true, childId: true,
+      },
+    });
+    const overrideTime = new Date("2026-10-01T11:00:00.000Z"); // 14:00 Minsk
+    const legacyScenario = await prisma.dayScenario.create({
+      data: { userId: owner.id, date: legacyDate, planFingerprint: "pending" },
+    });
+    await prisma.dayScenarioItemOverride.create({
+      data: { scenarioId: legacyScenario.id, planItemId: created[2]!.id, startTimeOverride: overrideTime },
+    });
+    await prisma.dayScenario.update({
+      where: { id: legacyScenario.id },
+      data: { planFingerprint: computeLegacyPlanFingerprint(legacyRows, new Map([[created[2]!.id, overrideTime]])) },
+    });
+    const legacyReady = await loadFamilyCalendarRange({ owner: ownerScope, from: legacyDate, to: legacyDate });
+    assert.equal(legacyReady.scenarioStatusByDate[legacyDate], "ready");
+    const renamedUntimed = await updateManualPlanEntry(ownerScope, created[2]!.id, { title: "Новое название" });
+    const mutationDto = await loadFamilyCalendarItem({ owner: ownerScope, item: renamedUntimed });
+    assert.equal(mutationDto.startsAt, null);
+    assert.equal(mutationDto.effectiveStartsAt, overrideTime.toISOString());
+    assert.equal((await loadFamilyCalendarRange({ owner: ownerScope, from: legacyDate, to: legacyDate })).scenarioStatusByDate[legacyDate], "ready");
+
     assert.equal(await prisma.experience.count({ where: { userId: owner.id } }), 0);
     assert.equal(await prisma.userEvent.count({ where: { userId: owner.id, eventType: "ATTENDED" } }), 0);
     assert.equal(await prisma.userEvent.count({ where: { userId: owner.id } }), 0, "manual writes emit no behavioral events");
