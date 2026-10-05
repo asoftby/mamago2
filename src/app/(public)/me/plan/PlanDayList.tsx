@@ -3,7 +3,8 @@
 import React from "react";
 import Link from "next/link";
 import type { SerializedPlanItem } from "./PlanPageClient";
-import { PlanItemCard } from "./PlanItemCard";
+import { PlanItemCard, type VisibilityChange } from "./PlanItemCard";
+import type { FamilyView } from "@/features/my-plan/lib/planVisibilityView";
 import { resolveScenarioCtaState, resolveScenarioCtaLabel } from "@/features/my-plan/lib/canOpenDayScenario";
 
 const MONTHS_RU_GENITIVE = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
@@ -25,6 +26,8 @@ type Props = {
   date: string;
   items: SerializedPlanItem[];
   onRemove: (id: string) => void;
+  familyView?: FamilyView | null;
+  onVisibilityChange?: VisibilityChange;
   /** undefined = no Scenario yet for this date. */
   scenarioStatus?: "ready" | "changed";
 };
@@ -65,7 +68,7 @@ function ScenarioCta({
   );
 }
 
-export function PlanDayList({ date, items, onRemove, scenarioStatus }: Props) {
+export function PlanDayList({ date, items, onRemove, familyView, onVisibilityChange, scenarioStatus }: Props) {
   const { weekday, day, month } = formatDayLabel(date);
 
   return (
@@ -114,7 +117,7 @@ export function PlanDayList({ date, items, onRemove, scenarioStatus }: Props) {
       {items.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {items.map((item) => (
-            <PlanItemCard key={item.id} item={item} onRemove={onRemove} />
+            <PlanItemCard key={item.id} item={item} onRemove={onRemove} familyView={familyView} onVisibilityChange={onVisibilityChange} />
           ))}
         </div>
       ) : (

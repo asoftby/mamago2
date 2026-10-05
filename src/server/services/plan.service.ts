@@ -1,3 +1,4 @@
+import type { PlanVisibility } from "@prisma/client";
 import { planCountUnit } from "@/server/family/familyAnalyticsPure";
 import { prisma } from "@/lib/prisma";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
@@ -83,6 +84,9 @@ export type PlanItemWithActivity = {
   title: string | null;
   coverImageUrl: string | null;
   createdAt: Date;
+  /** Family Core: audience + version for edit-conflict checks (persisted rows). */
+  visibility?: PlanVisibility;
+  updatedAt?: Date;
   activity: {
     id: string;
     slug: string | null;
