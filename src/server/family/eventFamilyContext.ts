@@ -10,6 +10,7 @@ export const FAMILY_EVENT_TYPES: ReadonlySet<UserEventType> = new Set<UserEventT
   "PLAN_REMOVE",
   "FIRST_PERSONALIZED_PLAN_ADD",
   "PLAN_AUDIENCE_SNAPSHOT",
+  "ATTENDED",
   "EXPERIENCE_FEEDBACK",
 ]);
 

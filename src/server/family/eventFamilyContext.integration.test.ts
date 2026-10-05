@@ -51,6 +51,7 @@ test("family events carry the active familyId; others and family-less users do n
   const familiesBefore = await db.family.count();
 
   await trackUserEvent({ eventType: "PLAN_ADD", userId: u, sessionId: `${sid}-1` });
+  await trackUserEvent({ eventType: "ATTENDED", userId: u, sessionId: `${sid}-6` });
   await trackUserEvent({ eventType: "PAGE_VIEW", userId: u, sessionId: `${sid}-2` });
   await trackUserEvent({ eventType: "PLAN_ADD", userId: u, familyId: null, sessionId: `${sid}-3` });
   await trackUserEvent({ eventType: "PLAN_ADD", userId: loner, sessionId: `${sid}-4` });
@@ -65,6 +66,7 @@ test("family events carry the active familyId; others and family-less users do n
   assert.equal(await fid(3), null);
   assert.equal(await fid(4), null);
   assert.equal(await fid(5), fam.id);
+  assert.equal(await fid(6), fam.id);
   assert.equal(await db.family.count(), familiesBefore);
 });
 

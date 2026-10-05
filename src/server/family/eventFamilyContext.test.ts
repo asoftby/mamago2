@@ -10,6 +10,11 @@ test("family events resolve the active family", async () => {
   }
 });
 
+test("check-in outcome events (ATTENDED, EXPERIENCE_FEEDBACK) are family events", () => {
+  assert.ok(FAMILY_EVENT_TYPES.has("ATTENDED"));
+  assert.ok(FAMILY_EVENT_TYPES.has("EXPERIENCE_FEEDBACK"));
+});
+
 test("explicit familyId (including null) wins and skips the lookup", async () => {
   const boom = async () => {
     throw new Error("lookup must not run");

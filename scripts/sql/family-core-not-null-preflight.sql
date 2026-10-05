@@ -57,6 +57,6 @@ UNION ALL
 SELECT 'family_events_with_user_but_null_family_and_active_membership', 'must_be_zero', count(*)
 FROM "UserEvent" e
 WHERE e."familyId" IS NULL AND e."userId" IS NOT NULL
-  AND e."eventType"::text IN ('PLAN_ADD','PLAN_REMOVE','FIRST_PERSONALIZED_PLAN_ADD','PLAN_AUDIENCE_SNAPSHOT','EXPERIENCE_FEEDBACK')
+  AND e."eventType"::text IN ('PLAN_ADD','PLAN_REMOVE','FIRST_PERSONALIZED_PLAN_ADD','PLAN_AUDIENCE_SNAPSHOT','ATTENDED','EXPERIENCE_FEEDBACK')
   AND EXISTS (SELECT 1 FROM "FamilyMembership" m WHERE m."userId" = e."userId" AND m."leftAt" IS NULL)
 ORDER BY kind DESC, check_name;
