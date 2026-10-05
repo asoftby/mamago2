@@ -61,4 +61,7 @@ assert.match(lib, /cross_owner_plan_child/);
 assert.match(lib, /EVENT_BATCH_SIZE = 10_000/);
 assert.doesNotMatch(lib, /planVisibility/);
 
+// The prod image has no scripts/ or tsx: the backfill must ship as dist/ops/*.
+assert.match(read("tsup.worker.config.ts"), /"ops\/family-core-backfill":\s*"scripts\/family-core-backfill\.ts"/);
+
 console.log("familyCoreFoundation.contract.test.ts: OK");

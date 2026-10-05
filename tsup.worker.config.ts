@@ -26,6 +26,7 @@ export default defineConfig({
       "scripts/legacy-routes-current-to-articles-cutover.ts",
     "ops/legacy-routes-article-media-backfill":
       "scripts/legacy-routes-article-media-backfill.ts",
+    "ops/family-core-backfill": "scripts/family-core-backfill.ts",
   },
   format: ["cjs"],
   platform: "node",
