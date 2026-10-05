@@ -9,7 +9,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { convertHeicFileToJpegIfNeeded } from "@/lib/uploads/heicConversion";
+import { isHeicFile } from "@/lib/uploads/heicConversion";
 import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/input";
@@ -91,22 +91,21 @@ type ImportedMedia = {
 
 type MediaStatus = "loading" | "loaded" | "empty";
 
+const EVENT_HEIC_UNSUPPORTED_MESSAGE =
+  "HEIC/HEIF временно нельзя загружать в событие. Выберите JPEG, PNG, WebP или AVIF — так фото загрузится без риска падения страницы.";
+
 /**
- * Event photos are processed by the server upload pipeline.
+ * Event photos must be sent to the server without any client-side decode,
+ * compression, canvas work, blurhash generation, data-URL creation or HEIC
+ * conversion. Large mobile photos can otherwise exhaust the renderer process
+ * before JavaScript gets a chance to catch an error.
  *
- * Do not run the regular browser compression/blurhash/data-URL pipeline here:
- * a modern phone photo can expand to tens of MB in decoded canvas memory and
- * the event step previously decoded it several times before the request was
- * even sent. On memory-constrained mobile browsers that can kill the whole tab
- * ("This page couldn't load") instead of producing a recoverable upload error.
- *
- * HEIC is the only exception: the production sharp build has no HEVC decoder,
- * so it is converted to JPEG once in the browser, then all resizing/WebP
- * conversion happens on the server.
+ * HEIC/HEIF is deliberately rejected here until it can be decoded server-side:
+ * the production sharp build has no HEVC decoder, while browser-side libheif
+ * conversion is exactly the memory-heavy path this hotfix removes.
  */
 async function uploadEventMediaFile(file: File) {
-  const fileToUpload = await convertHeicFileToJpegIfNeeded(file, 0.82);
-  const uploaded = await uploadMediaFile(fileToUpload);
+  const uploaded = await uploadMediaFile(file);
   return {
     ...uploaded,
     mediaId: uploaded.id,
@@ -714,6 +713,10 @@ export function Step3Media({
       toast.error("Пожалуйста, выберите изображение");
       return;
     }
+    if (isHeicFile(file)) {
+      toast.error(EVENT_HEIC_UNSUPPORTED_MESSAGE);
+      return;
+    }
     if (file.size > MAX_IMAGE_FILE_SIZE_MB * 1024 * 1024) {
       toast.error(getFileTooLargeMessage());
       return;
@@ -738,9 +741,26 @@ export function Step3Media({
 
   const handleGalleryFilesSelect = async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
-    const validFiles = fileArray.filter((file) => {
+    const remainingSlots = Math.max(0, MAX_IMAGE_FILES - galleryItems.length);
+
+    if (remainingSlots === 0) {
+      toast.error(`Можно добавить не больше ${MAX_IMAGE_FILES} изображений`);
+      return;
+    }
+
+    if (fileArray.length > remainingSlots) {
+      toast.message(
+        `Будут загружены первые ${remainingSlots} из ${fileArray.length} изображений. Максимум — ${MAX_IMAGE_FILES}.`,
+      );
+    }
+
+    const validFiles = fileArray.slice(0, remainingSlots).filter((file) => {
       if (!validateUploadMimeType(file)) {
         toast.error(`${file.name} не является изображением`);
+        return false;
+      }
+      if (isHeicFile(file)) {
+        toast.error(`${file.name}: ${EVENT_HEIC_UNSUPPORTED_MESSAGE}`);
         return false;
       }
       if (file.size > MAX_IMAGE_FILE_SIZE_MB * 1024 * 1024) {
@@ -752,9 +772,9 @@ export function Step3Media({
 
     if (validFiles.length === 0) return;
 
-    const placeholders: GalleryItem[] = validFiles.map((file) => ({
+    const placeholders: GalleryItem[] = validFiles.map(() => ({
       id: `temp-${Date.now()}-${Math.random()}`,
-      url: URL.createObjectURL(file),
+      url: "",
       status: "uploading" as const,
     }));
     setGalleryItems((prev) => [...prev, ...placeholders]);
