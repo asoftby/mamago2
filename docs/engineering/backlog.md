@@ -5070,7 +5070,7 @@ distributor_company_id=550) и хотели бы уточнить несколь
 
 ## [BACKLOG-165] `familyCoreFoundation.contract.test.ts` is stale after B2 (asserts `planOwner.ts` has no `familyId`)
 
-- Status: OPEN
+- Status: DONE (2026-10-05, PR fix/family-core-contract-gate-20261005: stale guard removed; `test:family-core-foundation` and `test:family-core-reads` added to `check:push`)
 - Priority: P3
 - Area: Family Core / Tests
 - Added: 2026-10-05
