@@ -31,4 +31,10 @@ assert.match(
   "missing responsive files must safely fall back to the master",
 );
 
+assert.match(
+  source,
+  /\^https\?:\\\/\\\//i,
+  "legacy external media must keep an authenticated redirect fallback",
+);
+
 console.log("media responsive preview route contract: OK");
