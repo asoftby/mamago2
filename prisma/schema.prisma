@@ -598,6 +598,8 @@ model PlanItem {
   venuePlaceId      String?
   /// Мягкая отмена; отменённые записи не удаляются
   cancelledAt       DateTime?
+  /// Family Core M4a: оптимистичная проверка конфликтов правок двух взрослых.
+  updatedAt         DateTime                  @default(now()) @updatedAt
   /// Family Core: семья-владелец записи (источник ACL с B2). null до backfill.
   familyId          String?
   /// Аудитория записи. Существующие строки — FAMILY (семья из одного = как раньше).
@@ -3655,6 +3657,10 @@ enum UserEventType {
   PLAN_AUDIENCE_SNAPSHOT
   ATTENDED
   EXPERIENCE_FEEDBACK
+  /// Family Core M4a (server-only): visibility/decision domain events of a plan item.
+  PLAN_ITEM_SHARED
+  PLAN_ITEM_MADE_PRIVATE
+  PLAN_ITEM_RESCHEDULED
 }
 
 enum ExperienceAttendance {

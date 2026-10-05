@@ -5101,3 +5101,14 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Context: `applyJoinerMerge` / `acceptFamilyInvite` (`src/server/family/`). Archived families are invisible to all reads (no active membership).
 - Acceptance criteria: a scheduled purge deletes archived joiner families older than 30 days with their Child/PlanItem rows; restore within 30 days is possible; documented in the privacy text.
 - Source: Family Core M3b.
+
+## [BACKLOG-168] Family Core M4: other sources of significant plan-item actions are not yet events
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Plan
+- Added: 2026-10-06
+- Reason deferred: M4a blocks FAMILY → PRIVATE after another adult's significant action, judged from events with `meta.planItemId` (`PLAN_ITEM_RESCHEDULED`, `PLAN_AUDIENCE_SNAPSHOT`, `BOOKING_CREATED`, `ATTENDED`) plus `Experience` rows. `PLAN_ITEM_RESCHEDULED` is emitted only by `addPlanItem` (re-adding an activity on another date/time).
+- Context: `/api/plan/scenario` replacements (activity/startsAt change) and any future edit/cancel/confirm endpoints (PROPOSED flow, cancel, M6 bookings with `planItemId`) must emit the same events, otherwise another adult's action does not block "make private".
+- Acceptance criteria: every write path that changes date/time/participants/status/booking of a shared item by a user emits a typed event with `meta.planItemId`; test per path.
+- Source: Family Core M4a.

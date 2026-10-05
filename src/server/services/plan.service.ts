@@ -1,5 +1,6 @@
 import { planCountUnit } from "@/server/family/familyAnalyticsPure";
 import { prisma } from "@/lib/prisma";
+import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { resolveRouteForUserSave } from "@/server/services/route.service";
 import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
 import { resolvePlanActivityOccurrence } from "@/server/services/planOccurrence.service";
@@ -179,11 +180,26 @@ export async function addPlanItem(
   if (activityId) {
     const occurrence = await resolvePlanActivityOccurrence({ userId, activityId, date });
     if (occurrence.kind === "update") {
+      const before = await prisma.planItem.findUnique({
+        where: { id: occurrence.planItemId },
+        select: { date: true, startsAt: true, familyId: true, visibility: true },
+      });
       const updated = await prisma.planItem.update({
         where: { id: occurrence.planItemId },
         data: { date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
         select: { id: true },
       });
+      if (before && (before.date !== date || (before.startsAt?.getTime() ?? null) !== (startsAt?.getTime() ?? null))) {
+        // Family Core M4a: a date/time change is a significant action (blocks FAMILY -> PRIVATE
+        // when made by another adult). Best-effort: trackUserEvent never throws.
+        await trackUserEvent({
+          userId,
+          eventType: "PLAN_ITEM_RESCHEDULED",
+          familyId: before.familyId,
+          planVisibility: before.visibility,
+          meta: { planItemId: updated.id },
+        });
+      }
       return { ...updated, created: false };
     }
     if (occurrence.kind === "completed_same_date") {
