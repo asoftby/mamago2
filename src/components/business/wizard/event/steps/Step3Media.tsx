@@ -109,6 +109,7 @@ async function uploadEventMediaFile(file: File) {
   const uploaded = await uploadMediaFile(file);
   return {
     ...uploaded,
+    url: `/api/media/${encodeURIComponent(uploaded.id)}?variant=sm`,
     mediaId: uploaded.id,
   };
 }
@@ -128,6 +129,7 @@ function getMediaAssetPreviewUrl(asset: {
 }): string {
   const url =
     asset.thumbnailUrl ||
+    (asset.id ? `/api/media/${encodeURIComponent(asset.id)}?variant=sm` : "") ||
     asset.publicUrl ||
     asset.url ||
     asset.fileUrl ||
@@ -136,10 +138,6 @@ function getMediaAssetPreviewUrl(asset: {
     "";
 
   if (!url) {
-    // `/api/media/:id` is served by the file proxy and supports MediaAsset id lookup.
-    if (asset.id) {
-      return `/api/media/${encodeURIComponent(asset.id)}`;
-    }
     return "";
   }
 
