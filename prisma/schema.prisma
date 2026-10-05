@@ -424,7 +424,8 @@ model FamilyInvite {
   createdById  String
   tokenHash    String             @unique
   status       FamilyInviteStatus @default(ACTIVE)
-  expiresAt    DateTime
+  /// null = бессрочное (до принятия или отзыва). Старые приглашения с датой честно истекают.
+  expiresAt    DateTime?
   createdAt    DateTime           @default(now())
   acceptedById String?
   acceptedAt   DateTime?

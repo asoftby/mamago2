@@ -3,7 +3,6 @@ import { emailService } from "@/features/email/server/email-service";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import { checkActivationRateLimit, activationRateLimitKey } from "@/server/auth/activationRateLimit";
 import { createFamilyInvite } from "./familyInvite.service";
-import { INVITE_TTL_DAYS } from "./familyInvitePure";
 import {
   FamilyMembersError,
   INVITE_EMAILS_PER_USER_PER_DAY,
@@ -26,7 +25,7 @@ export async function createInviteAndNotify(
   prisma: PrismaClient,
   input: { userId: string; email?: string | null },
   deps: { limiter?: typeof checkActivationRateLimit } = {},
-): Promise<{ inviteId: string; url: string; expiresAt: Date; emailSent: boolean }> {
+): Promise<{ inviteId: string; url: string; emailSent: boolean }> {
   const email = input.email?.trim() ? normalizeInviteEmail(input.email) : null;
   if (input.email?.trim() && !email) throw new FamilyMembersError("invalid_email");
   if (email) {
@@ -53,12 +52,11 @@ export async function createInviteAndNotify(
         to: email,
         inviterName: inviter?.displayName,
         acceptUrl: url,
-        expiresInDays: INVITE_TTL_DAYS,
       });
     } catch (error) {
       // The link is still valid and can be copied; never log the address.
       console.error("[familyInvite] letter failed", error instanceof Error ? error.message : "unknown");
     }
   }
-  return { inviteId: invite.inviteId, url, expiresAt: invite.expiresAt, emailSent };
+  return { inviteId: invite.inviteId, url, emailSent };
 }

@@ -8,7 +8,7 @@ import {
   MAX_ACTIVE_INVITES_PER_FAMILY,
   generateInviteToken,
   hashInviteToken,
-  inviteExpiresAt,
+  activeInviteWhere,
   isInviteUsable,
 } from "./familyInvitePure";
 
@@ -26,13 +26,13 @@ async function lockFamily(tx: Prisma.TransactionClient, familyId: string) {
 
 /**
  * Creates an invite for the user's family (lazy family). Returns the raw token
- * once; only its hash is stored. At most 3 active (not expired) invites per family.
+ * once; only its hash is stored. Invites do not expire (until accepted or revoked); at most 3 active per family.
  */
 export async function createFamilyInvite(
   prisma: PrismaClient,
   input: { userId: string },
   deps: Deps = {},
-): Promise<{ inviteId: string; token: string; expiresAt: Date }> {
+): Promise<{ inviteId: string; token: string }> {
   assertEnabled(deps);
   const now = (deps.now ?? (() => new Date()))();
   const familyId = await ensureFamilyForUser(prisma, input.userId);
@@ -44,16 +44,15 @@ export async function createFamilyInvite(
     });
     if (!member) throw new FamilyInviteError("not_member");
     const active = await tx.familyInvite.count({
-      where: { familyId, status: "ACTIVE", expiresAt: { gt: now } },
+      where: { familyId, ...activeInviteWhere(now) },
     });
     if (active >= MAX_ACTIVE_INVITES_PER_FAMILY) throw new FamilyInviteError("limit_reached");
     const token = generateInviteToken();
-    const expiresAt = inviteExpiresAt(now);
     const invite = await tx.familyInvite.create({
-      data: { familyId, createdById: input.userId, tokenHash: hashInviteToken(token), expiresAt },
+      data: { familyId, createdById: input.userId, tokenHash: hashInviteToken(token), expiresAt: null },
       select: { id: true },
     });
-    return { inviteId: invite.id, token, expiresAt };
+    return { inviteId: invite.id, token };
   });
 }
 
