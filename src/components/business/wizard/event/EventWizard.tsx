@@ -93,6 +93,11 @@ type AiSuggestedFields = {
   mainCategory: boolean;
 };
 
+const EMPTY_SCHEDULE_SOURCE_STATE: ScheduleSourceState = Object.freeze({
+  readOnly: false,
+  itemCount: 0,
+});
+
 interface EventWizardProps {
   mode: EventWizardMode;
   event?: Activity; // Event entity for edit mode
@@ -285,7 +290,7 @@ function EventWizardInner({
   importedRecordId,
   initialAiEnrichment,
   ctaStepEnabled,
-  initialScheduleSourceState = { readOnly: false, itemCount: 0 },
+  initialScheduleSourceState = EMPTY_SCHEDULE_SOURCE_STATE,
 }: EventWizardProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -377,13 +382,21 @@ function EventWizardInner({
   const isDirty = formSnapshot !== baselineJsonRef.current;
   const shouldInterceptLeave = unpublishedFlow && isDirty && !isSaving && !isSubmitting;
   useEffect(() => {
+    const applyScheduleSourceState = (next: ScheduleSourceState) => {
+      setScheduleSourceState((current) =>
+        current.readOnly === next.readOnly && current.itemCount === next.itemCount
+          ? current
+          : next,
+      );
+    };
+
     if (!eventId) {
-      setScheduleSourceState({ readOnly: false, itemCount: 0 });
+      applyScheduleSourceState(EMPTY_SCHEDULE_SOURCE_STATE);
       return;
     }
 
     let cancelled = false;
-    setScheduleSourceState(initialScheduleSourceState);
+    applyScheduleSourceState(initialScheduleSourceState);
 
     void (async () => {
       try {
@@ -395,7 +408,7 @@ function EventWizardInner({
         if (cancelled) return;
 
         const items = Array.isArray(payload.items) ? payload.items : [];
-        setScheduleSourceState({
+        applyScheduleSourceState({
           readOnly: payload.readOnly === true,
           itemCount: items.length,
         });
