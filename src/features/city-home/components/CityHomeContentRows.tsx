@@ -33,6 +33,7 @@ import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 
 const cardShell = EVENT_CARD_SHELL;
 const kudaCardShell = EVENT_CARD_SHELL;
+const HOME_PERSONALIZED_PREVIEW_TAKE = 8;
 /** Оболочка ширины карточки статьи — тот же ритм, что у ленты «Куда», но 5 карточек в ряду на desktop. */
 const ARTICLE_CARD_SHELL =
   "shrink-0 snap-start w-[44vw] min-w-[160px] max-w-[230px] sm:max-w-[250px] " +
@@ -97,7 +98,7 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
       applyPersonaRanking(activities, {
         personas: family?.personas ?? [],
         selectedPersonaIds: family?.selectedPersonaIds ?? [],
-      }),
+      }).slice(0, HOME_PERSONALIZED_PREVIEW_TAKE),
     [activities, family?.personas, family?.selectedPersonaIds],
   );
 
