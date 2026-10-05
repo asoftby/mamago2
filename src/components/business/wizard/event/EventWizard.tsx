@@ -360,9 +360,19 @@ function EventWizardInner({
   );
   const initialScheduleSourceReadOnly = initialScheduleSourceState.readOnly;
   const initialScheduleSourceItemCount = initialScheduleSourceState.itemCount;
-  const handleScheduleSourceStateChange = useCallback((state: ScheduleSourceState) => {
-    setScheduleSourceState(state);
+  const applyScheduleSourceState = useCallback((next: ScheduleSourceState) => {
+    setScheduleSourceState((current) =>
+      current.readOnly === next.readOnly && current.itemCount === next.itemCount
+        ? current
+        : next,
+    );
   }, []);
+  const handleScheduleSourceStateChange = useCallback(
+    (state: ScheduleSourceState) => {
+      applyScheduleSourceState(state);
+    },
+    [applyScheduleSourceState],
+  );
   const validationContext = useMemo<EventValidationContext>(
     () => ({
       hasAuthoritativeSchedule:
@@ -384,14 +394,6 @@ function EventWizardInner({
   const isDirty = formSnapshot !== baselineJsonRef.current;
   const shouldInterceptLeave = unpublishedFlow && isDirty && !isSaving && !isSubmitting;
   useEffect(() => {
-    const applyScheduleSourceState = (next: ScheduleSourceState) => {
-      setScheduleSourceState((current) =>
-        current.readOnly === next.readOnly && current.itemCount === next.itemCount
-          ? current
-          : next,
-      );
-    };
-
     if (!eventId) {
       applyScheduleSourceState(EMPTY_SCHEDULE_SOURCE_STATE);
       return;
@@ -426,7 +428,12 @@ function EventWizardInner({
     return () => {
       cancelled = true;
     };
-  }, [eventId, initialScheduleSourceReadOnly, initialScheduleSourceItemCount]);
+  }, [
+    eventId,
+    initialScheduleSourceReadOnly,
+    initialScheduleSourceItemCount,
+    applyScheduleSourceState,
+  ]);
 
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [leaveDialogBusy, setLeaveDialogBusy] = useState(false);
