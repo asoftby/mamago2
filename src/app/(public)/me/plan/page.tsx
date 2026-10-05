@@ -16,7 +16,8 @@ import {
   listPendingExperienceCandidates,
   listRecentExperienceSummaries,
 } from "@/server/services/experience/experience.service";
-import { childScopeFor } from "@/server/family/familyAccess";
+import { childScopeFor, activeFamilyUserIds } from "@/server/family/familyAccess";
+import { familyReadsEnabled } from "@/server/family/familyScope";
 
 export default async function PlanPage() {
   const user = await getCurrentUser();
@@ -24,6 +25,16 @@ export default async function PlanPage() {
 
   // Load all plan items
   const planItems = await listAllPlanItems(user.id);
+  // Family Core M4b: shared-plan UI exists only for a family with 2+ active adults.
+  const adultIds = familyReadsEnabled() ? await activeFamilyUserIds(user.id) : [user.id];
+  const familyView = adultIds.length > 1 ? { currentUserId: user.id, adultsCount: adultIds.length } : null;
+  const authors = familyView
+    ? await prisma.user.findMany({
+        where: { id: { in: [...new Set(planItems.map((i) => i.userId))] } },
+        select: { id: true, displayName: true },
+      })
+    : [];
+  const authorNameById = new Map(authors.map((a) => [a.id, a.displayName]));
   const [experienceCandidates, recentExperiences] = await Promise.all([
     listPendingExperienceCandidates({ userId: user.id, lookbackDays: 14, take: 3 }),
     listRecentExperienceSummaries({ userId: user.id, take: 1 }),
@@ -137,6 +148,10 @@ export default async function PlanPage() {
       activityId: item.activityId,
       title: item.title,
       coverImageUrl: item.coverImageUrl,
+      visibility: item.visibility ?? ("FAMILY" as const),
+      authorId: item.userId,
+      authorName: authorNameById.get(item.userId) ?? null,
+      updatedAt: (item.updatedAt ?? item.createdAt).toISOString(),
       planAvailability: getPlanActivityPublicAvailability(item.activity),
       activity: item.activity
         ? {
@@ -170,6 +185,7 @@ export default async function PlanPage() {
   return (
     <PlanPageClient
       initialItems={serializedItems}
+      familyView={familyView}
       ideaActivityIds={ideaActivityIds}
       initialIdeas={serializedIdeas}
       childrenAges={childrenAges}
