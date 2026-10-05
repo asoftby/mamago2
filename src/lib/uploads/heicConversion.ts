@@ -1,13 +1,17 @@
 import { normalizeUploadMimeType, resolveUploadMimeType } from "./uploadConfig";
 
 /**
- * The one place client-side HEIC/HEIF handling lives. Every upload path
- * (both shared hooks, and any bypass that talks to `/api/upload` directly)
- * should call `convertHeicFileToJpegIfNeeded` before sending a file to the
- * server — prebuilt `sharp` (see `src/lib/media/imageProcessor.ts`) has no
- * HEVC decoder, and that's what almost every real iPhone HEIC photo is
- * compressed with, so an unconverted HEIC upload fails server-side no
- * matter what the client does otherwise.
+ * The one place client-side HEIC/HEIF conversion lives.
+ *
+ * `uploadMediaFile` is the mandatory transport boundary and always calls
+ * `convertHeicFileToJpegIfNeeded` before sending bytes to the server. Higher-
+ * level hooks may call the converter earlier because browser compression and
+ * preview generation cannot consume HEIC reliably. Keeping the transport
+ * boundary defensive means a new upload UI cannot accidentally send raw HEIC
+ * just because it bypasses those higher-level hooks.
+ *
+ * Prebuilt `sharp` (see `src/lib/media/imageProcessor.ts`) has no HEVC
+ * decoder, so an unconverted iPhone HEIC upload cannot be processed server-side.
  */
 
 /** iPhones sometimes report an empty/generic MIME type for HEIC files, so the extension is checked too. */
