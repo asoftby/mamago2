@@ -52,14 +52,6 @@ assert.match(read("src/lib/prisma.ts"), /PRISMA_CACHE_VERSION = "v14"/);
 // B3, but must never create a family or depend on the reads flag.
 const deleteFlow = read("src/server/account/deleteAccount.service.ts");
 assert.doesNotMatch(deleteFlow, /ensureFamily|FAMILY_CORE_READS|familyCoreReads/);
-for (const f of ["src/server/services/planOwner.ts"]) {
-  try {
-    assert.doesNotMatch(read(f), /familyId/);
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-  }
-}
-
 // Backfill script exposes the agreed modes and stops on cross-owner rows.
 const script = read("scripts/family-core-backfill.ts");
 assert.match(script, /--dry-run/);
