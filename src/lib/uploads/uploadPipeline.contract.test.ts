@@ -25,7 +25,7 @@ const appendIndex = uploadClient.indexOf('formData.append("file", fileToUpload)'
 assert.ok(convertIndex >= 0, "uploadMediaFile must normalize HEIC/HEIF before transport");
 assert.ok(appendIndex > convertIndex, "the normalized file must be appended after HEIC conversion");
 
-const directUploadFetch = /fetch\\s*\\(\\s*[\"'`]\\/api\\/upload(?:\\/|\\?|[\"'`])/;
+const directUploadFetch = /fetch\s*\(\s*[\"'`]\/api\/upload(?:\/|\?|[\"'`])/;
 const offenders = walkSourceFiles(join(process.cwd(), "src"))
   .filter((path) => path !== uploadClientPath)
   .filter((path) => directUploadFetch.test(readFileSync(path, "utf8")));
