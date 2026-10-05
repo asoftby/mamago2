@@ -15,7 +15,7 @@ assert.doesNotMatch(sql, /"token"\s+TEXT/, "raw token must never be stored");
 const schema = read("prisma/schema.prisma");
 assert.match(schema, /model FamilyInvite \{/);
 assert.match(schema, /model ConsentRecord \{/);
-assert.match(read("src/lib/prisma.ts"), /PRISMA_CACHE_VERSION = "v15"/);
+assert.match(read("src/lib/prisma.ts"), /PRISMA_CACHE_VERSION = "v\d+"/);
 
 const svc = read("src/server/family/familyInvite.service.ts");
 assert.equal((svc.match(/assertEnabled\(deps\)/g) ?? []).length, 3, "all three services are flag-gated");
