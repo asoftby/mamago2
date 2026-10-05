@@ -469,6 +469,7 @@ export function EventPageView({
               activityId: data.id,
               date: result.dateISO,
               activitySessionId: result.timeSlotId ?? null,
+              ...(result.visibility ? { visibility: result.visibility } : {}),
               title: data.title,
               coverImageUrl: data.media.posterUrl,
             }),
@@ -757,6 +758,7 @@ export function EventPageView({
         isAuthenticated={isAuthenticated}
         scenario={saveQuickdateScenario}
         onPersist={handleSaveToPlanConfirm}
+        showVisibilityToggle
         isIdea={saveStatus.isIdea}
         inPlan={saveStatus.inPlan}
         planDate={saveStatus.planDate}

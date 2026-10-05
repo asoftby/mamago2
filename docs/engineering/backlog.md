@@ -5112,3 +5112,14 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Context: `/api/plan/scenario` replacements (activity/startsAt change) and any future edit/cancel/confirm endpoints (PROPOSED flow, cancel, M6 bookings with `planItemId`) must emit the same events, otherwise another adult's action does not block "make private".
 - Acceptance criteria: every write path that changes date/time/participants/status/booking of a shared item by a user emits a typed event with `meta.planItemId`; test per path.
 - Source: Family Core M4a.
+
+## [BACKLOG-169] Family Core M4c: "Видно семье" switch only on event/place save flows
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Plan UI
+- Added: 2026-10-06
+- Reason deferred: the switch (new items only) is shown where `SaveToPlanResult.visibility` actually reaches `/api/save/plan`: event page, `SaveHeart`, `PlaceSaveHeart` (`showVisibilityToggle`). Other add-to-plan entry points (offers, route cards/pages, onboarding flows, recommendations, ideas, `useMyPlan`, guest-after-auth resume, `/api/save/plan/day`) still create FAMILY items; a private item there is made with "Сделать личным" on the card.
+- Context: a contract test (`planAddVisibility.contract.test.ts`) forbids enabling the switch without forwarding the value, so a choice is never silently ignored. Also not built: "Предложить, а не добавлять" (PROPOSED flow), the "invite your partner" block for single-adult families, the activity strip.
+- Acceptance criteria: remaining entry points forward `visibility` and enable the switch; guest resume carries it through `saveFlowContext`.
+- Source: Family Core M4c.

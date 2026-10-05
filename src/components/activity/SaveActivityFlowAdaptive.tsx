@@ -48,6 +48,8 @@ export type SaveActivityFlowAdaptiveProps = {
   source?: string;
   onPersist: (result: SaveToPlanResult) => Promise<void>;
   nextHref?: string;
+  /** Show "Видно семье"; enable only when onPersist forwards `result.visibility` to the server. */
+  showVisibilityToggle?: boolean;
 };
 
 type Phase = "select" | "auth" | "completion" | "success";
@@ -108,6 +110,7 @@ export function SaveActivityFlowAdaptive({
   source,
   onPersist,
   nextHref,
+  showVisibilityToggle = false,
 }: SaveActivityFlowAdaptiveProps) {
   const router = useRouter();
   const isMobile = !useMediaQuery("(min-width: 640px)");
@@ -266,6 +269,7 @@ export function SaveActivityFlowAdaptive({
           source={source}
           onCommit={handleCommit}
           onClose={() => onOpenChange(false)}
+          showVisibilityToggle={showVisibilityToggle}
         />
       )}
       {phase === "auth" && pending && (
