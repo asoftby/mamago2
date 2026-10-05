@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MediaUploadField, type MediaUploadItem } from "@/components/media/MediaUploadField";
 import type { MediaLibraryPage } from "@/components/media/useMediaLibraryPager";
-import { convertHeicFileToJpegIfNeeded } from "@/lib/uploads/heicConversion";
 import { MAX_IMAGE_FILES } from "@/lib/uploads/uploadConfig";
+import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 import type { OfferFormData } from "../types";
 import { isValidVideoUrl } from "../mappers";
 import { mergePrimaryWithGallery, splitPrimaryFromGallery } from "@/lib/media/publicationMediaOrder";
@@ -34,51 +34,10 @@ async function uploadFilesToPublicMedia(files: File[]): Promise<MediaUploadItem[
   const uploaded: MediaUploadItem[] = [];
 
   for (const file of files) {
-    // Prebuilt sharp has no HEVC decoder (see imageProcessor.ts) — this
-    // bypasses the shared upload hooks (its own inline fetch, not
-    // useImageUpload/useWizardImageUpload), so it needs its own HEIC
-    // conversion rather than inheriting it for free.
-    let fileToUpload: File;
-    try {
-      fileToUpload = await convertHeicFileToJpegIfNeeded(file);
-    } catch (error) {
-      throw new Error(error instanceof Error ? error.message : `Не удалось обработать файл «${file.name}»`);
-    }
-
-    const formData = new FormData();
-    formData.append("file", fileToUpload);
-
-    const response = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-      credentials: "include",
-    });
-
-    const payload = (await response.json().catch(() => ({}))) as {
-      error?: string;
-      message?: string;
-      url?: string;
-      mediaId?: string | null;
-    };
-
-    if (!response.ok) {
-      throw new Error(
-        typeof payload.message === "string"
-          ? payload.message
-          : typeof payload.error === "string"
-            ? payload.error
-            : `Ошибка загрузки файла «${file.name}»`,
-      );
-    }
-
-    const url = typeof payload.url === "string" ? payload.url.trim() : "";
-    if (!url) {
-      throw new Error(`Файл «${file.name}» загружен без публичного URL`);
-    }
-
+    const media = await uploadMediaFile(file);
     uploaded.push({
-      id: typeof payload.mediaId === "string" && payload.mediaId ? payload.mediaId : url,
-      url,
+      id: media.id,
+      url: media.url,
       title: file.name,
       alt: null,
     });
