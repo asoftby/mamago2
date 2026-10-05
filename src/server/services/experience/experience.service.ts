@@ -10,7 +10,7 @@ import { SubjectSchema, type Subject } from "@/lib/decision/decisionContext";
 import { findMostRecentSubjectsSnapshot } from "@/lib/decision/subjects";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
-import { NOT_CANCELLED } from "@/server/family/familyScope";
+import { activeFamilyUserIds, activePlanScopeFor, planScopeFor } from "@/server/family/familyAccess";
 
 export class ExperienceDomainError extends Error {
   constructor(
@@ -45,16 +45,28 @@ export async function listRecentExperienceSummaries(input: {
   userId: string;
   take?: number;
 }): Promise<ExperienceSummary[]> {
-  const rows = await prisma.experience.findMany({
-    where: { userId: input.userId, entityType: "EVENT" },
+  const take = Math.min(3, Math.max(1, input.take ?? 1));
+  const [memberIds, scope] = await Promise.all([
+    activeFamilyUserIds(input.userId),
+    planScopeFor(input.userId),
+  ]);
+  // Family Core M1a: an Experience is keyed by the adult who recorded it but is
+  // visible to every adult who can see its plan item (PRIVATE items stay hidden).
+  const candidates = await prisma.experience.findMany({
+    where: { userId: { in: memberIds }, entityType: "EVENT" },
     orderBy: { attendanceConfirmedAt: "desc" },
-    take: Math.min(3, Math.max(1, input.take ?? 1)),
+    take: memberIds.length > 1 ? take * 5 : take,
   });
-  if (rows.length === 0) return [];
+  if (candidates.length === 0) return [];
   const planItems = await prisma.planItem.findMany({
-    where: { id: { in: rows.map((row) => row.sourcePlanItemId) }, userId: input.userId },
+    where: { id: { in: candidates.map((row) => row.sourcePlanItemId) }, ...scope },
     select: { id: true, title: true, activity: { select: { title: true } } },
   });
+  const visibleIds = new Set(planItems.map((item) => item.id));
+  const rows = candidates
+    .filter((row) => visibleIds.has(row.sourcePlanItemId))
+    .slice(0, take);
+  if (rows.length === 0) return [];
   const titleByPlanItemId = new Map(
     planItems.map((item) => [item.id, item.activity?.title || item.title || "Событие"]),
   );
@@ -100,12 +112,12 @@ export async function listPendingExperienceCandidates(input: {
   // The date range is the hard bound. Page through it until `take` PENDING
   // rows are found; never truncate the raw PlanItem pool before excluding
   // completed occurrences.
+  const poolScope = await activePlanScopeFor(input.userId);
   while (candidates.length < take) {
     const pool = await prisma.planItem.findMany({
       where: {
-        userId: input.userId,
+        ...poolScope,
         activityId: { not: null },
-        ...NOT_CANCELLED,
         date: { gte: oldestDate, lt: today },
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }],
@@ -297,9 +309,15 @@ export async function confirmPlanExperience(input: {
   const existing = await prisma.experience.findUnique({
     where: { sourcePlanItemId: input.planItemId },
   });
+  const scope = await planScopeFor(input.userId);
   if (existing) {
     if (existing.userId !== input.userId) {
-      throw new ExperienceDomainError("not_found", "Plan item not found");
+      // Another adult recorded it: accessible only if the plan item is visible to us.
+      const visible = await prisma.planItem.findFirst({
+        where: { id: input.planItemId, ...scope },
+        select: { id: true },
+      });
+      if (!visible) throw new ExperienceDomainError("not_found", "Plan item not found");
     }
     assertSameAttendance(existing, input.attendance);
     if (existing.attendance === "ATTENDED") {
@@ -309,7 +327,7 @@ export async function confirmPlanExperience(input: {
   }
 
   const planItem = await prisma.planItem.findFirst({
-    where: { id: input.planItemId, userId: input.userId },
+    where: { id: input.planItemId, ...scope },
     select: { id: true, userId: true, activityId: true, date: true, startsAt: true },
   });
   if (!planItem) throw new ExperienceDomainError("not_found", "Plan item not found");
@@ -365,7 +383,14 @@ export async function confirmPlanExperience(input: {
     const concurrent = await prisma.experience.findUnique({
       where: { sourcePlanItemId: planItem.id },
     });
-    if (!concurrent || concurrent.userId !== input.userId) throw error;
+    if (!concurrent) throw error;
+    if (concurrent.userId !== input.userId) {
+      const visible = await prisma.planItem.findFirst({
+        where: { id: planItem.id, ...scope },
+        select: { id: true },
+      });
+      if (!visible) throw error;
+    }
     experience = assertSameAttendance(concurrent, input.attendance);
   }
 
@@ -381,9 +406,15 @@ export async function submitExperienceFeedback(input: {
   sentiment: ExperienceSentiment;
   sessionId?: string | null;
 }): Promise<Experience> {
-  const existing = await prisma.experience.findFirst({
-    where: { id: input.experienceId, userId: input.userId },
-  });
+  const found = await prisma.experience.findUnique({ where: { id: input.experienceId } });
+  let existing = found && found.userId === input.userId ? found : null;
+  if (found && !existing) {
+    const visible = await prisma.planItem.findFirst({
+      where: { id: found.sourcePlanItemId, ...(await planScopeFor(input.userId)) },
+      select: { id: true },
+    });
+    if (visible) existing = found;
+  }
   if (!existing) throw new ExperienceDomainError("not_found", "Experience not found");
   if (existing.attendance !== "ATTENDED") {
     throw new ExperienceDomainError("feedback_not_allowed", "Feedback requires attended experience");
@@ -395,7 +426,7 @@ export async function submitExperienceFeedback(input: {
   let experience = existing;
   if (!existing.feedbackSentiment) {
     const updated = await prisma.experience.updateMany({
-      where: { id: existing.id, userId: input.userId, feedbackSentiment: null },
+      where: { id: existing.id, feedbackSentiment: null },
       data: { feedbackSentiment: input.sentiment, feedbackAt: new Date() },
     });
     experience = await prisma.experience.findUniqueOrThrow({ where: { id: existing.id } });
