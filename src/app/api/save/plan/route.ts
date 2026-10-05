@@ -20,6 +20,7 @@ import {
   recordPlanAudienceSnapshot,
 } from "@/lib/decision/subjects";
 import { readOptionalSafeOpaqueId } from "@/lib/decision/identifiers";
+import { planScopeFor } from "@/server/family/familyAccess";
 
 function planningTimingForDate(dateKey: string): "same_day" | "weekend" | "advance" {
   if (dateKey === getLocalDateKey()) return "same_day";
@@ -301,7 +302,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const existing = await prisma.planItem.findFirst({
-      where: { id: planItemId, userId: user.id },
+      where: { id: planItemId, ...(await planScopeFor(user.id)) },
       select: { activityId: true, placeId: true, routeId: true, date: true },
     });
 

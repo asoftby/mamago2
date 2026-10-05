@@ -5042,3 +5042,28 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Context: `src/server/account/deleteAccount.service.ts` anonymizes `User` instead of deleting it and erases data via an explicit `deleteMany` list; `Experience` (`schema.prisma`, `onDelete: Cascade` from `User`) is not in that list.
 - Acceptance criteria: `Experience` rows of the deleted user are removed (or consciously anonymized) in `deleteAccount`, with an integration test like `deleteAccount.inbox.integration.test.ts`.
 - Source: forward-to-plan PR2 account-deletion audit.
+
+## [BACKLOG-163] Family Core: per-user plan consumers still keyed by `userId` (notifications, DayScenario, Experience)
+
+- Status: OPEN
+- Priority: P1
+- Area: Family Core / Plan
+- Added: 2026-10-04
+- Reason deferred: Family Core B2 switches only Child/PlanItem reads and writes (`plan.service`, `/api/children*`, profile pages, persona context) to `familyId`. Until family invites exist every family has one adult, so per-user consumers behave identically. They become wrong only once a family has two adults, i.e. they must land before the "MVP shared plan" PR enables invites.
+- Context: reminder and digest jobs (`run-plan-event-reminders-core.ts`, `run-plan-tomorrow-digests-core.ts`, `listPlanItemsDueForReminder`, `listPlanItemsForUserDates`) map one PlanItem to one recipient via `userId` and need a fan-out to all active adult members (respecting PRIVATE items); `DayScenario` (`userId_date` unique), `setScenarioItemOverride`, `/api/plan/scenario` writes and `Experience` (`userId`, ownership checks in `confirmPlanExperience`) are per user while two adults would share one PlanItem; `computePlanFingerprint` depends on the item set.
+- Current state: `plan.service` list/dedup/remove and the read-only plan queries listed in the B2 PR use `planScopeFor`; the consumers above still use `userId`.
+- Dependencies: Family Core B2 merged and `FAMILY_CORE_READS` enabled.
+- Acceptance criteria: with a two-adult family, a FAMILY item reminds/digests every adult exactly once, a PRIVATE item only its owner; scenarios and experiences have a documented per-user or per-family model with tests.
+- Source: Family Core B2 audit.
+
+## [BACKLOG-164] Family Core: analytics keyed by `parentId`/`userId` and `countPlanUsersByActivity` count users, not families
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Analytics
+- Added: 2026-10-04
+- Reason deferred: product decision needed on the unit of measure (user vs family); identical numbers while every family has one adult.
+- Context: `analyticsQueryHelpers.ts` and `analyticsBehavior.service.ts` (youngest child band keyed by `Child.parentId`), `SegmentResolverService.ts` (`user._count.children`), `planningActivity.ts` and `weeklyPlanningFamilies.ts` (raw SQL on `PlanItem.userId`), `countPlanUsersByActivity` (`distinct` on `userId`).
+- Dependencies: BACKLOG-163 / shared plan release.
+- Acceptance criteria: decision recorded; queries counting "families" use `familyId`; numbers reconcile with the old ones on single-adult data.
+- Source: Family Core B2 audit.

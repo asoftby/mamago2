@@ -5,13 +5,14 @@ import { prisma } from "@/lib/prisma";
 import { mapFamilyRoleToLabel } from "@/lib/account/mapFamilyRoleToLabel";
 import { buildAdultPreferenceDisplayLine } from "@/lib/adultPersonaSignals/buildAdultPreferenceLine";
 import { ChildrenCard } from "@/features/me/components/ChildrenCard";
+import { childScopeFor } from "@/server/family/familyAccess";
 
 export default async function FamilyProfilePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?redirectTo=/me/profile");
 
   const children = await prisma.child.findMany({
-    where: { parentId: user.id },
+    where: await childScopeFor(user.id),
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     include: { systemInterests: true, customInterests: true },
   });

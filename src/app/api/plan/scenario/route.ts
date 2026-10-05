@@ -13,6 +13,7 @@ import {
   conflictsForScenarioItems,
   type ScenarioClientItem,
 } from "@/features/my-plan/lib/scenarioDraft";
+import { NOT_CANCELLED } from "@/server/family/familyScope";
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -82,7 +83,7 @@ const activitySelect = {
 async function loadCanonical(tx: Tx, userId: string, date: string, scenarioId: string) {
   const [items, overrideRows] = await Promise.all([
     tx.planItem.findMany({
-      where: { userId, date, cancelledAt: null },
+      where: { userId, date, ...NOT_CANCELLED },
       include: { activity: { select: activitySelect } },
       orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
     }),
@@ -168,7 +169,7 @@ export async function saveScenarioDraftForUser(
       const activity = await tx.activity.findUnique({ where: { id: replacement.newActivityId }, select: activitySelect });
       if (!activity || activity.status !== "PUBLISHED") throw new ScenarioSaveError(422, "INVALID_REPLACEMENT", replacement.newActivityId);
       const duplicate = await tx.planItem.findFirst({
-        where: { userId, activityId: activity.id, id: { not: replacement.planItemId } },
+        where: { userId, activityId: activity.id, id: { not: replacement.planItemId }, ...NOT_CANCELLED },
         select: { id: true },
       });
       if (duplicate) throw new ScenarioSaveError(422, "DUPLICATE_ACTIVITY", activity.id);

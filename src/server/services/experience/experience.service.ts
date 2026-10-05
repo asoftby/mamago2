@@ -10,6 +10,7 @@ import { SubjectSchema, type Subject } from "@/lib/decision/decisionContext";
 import { findMostRecentSubjectsSnapshot } from "@/lib/decision/subjects";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
+import { NOT_CANCELLED } from "@/server/family/familyScope";
 
 export class ExperienceDomainError extends Error {
   constructor(
@@ -104,7 +105,7 @@ export async function listPendingExperienceCandidates(input: {
       where: {
         userId: input.userId,
         activityId: { not: null },
-        cancelledAt: null,
+        ...NOT_CANCELLED,
         date: { gte: oldestDate, lt: today },
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }],
