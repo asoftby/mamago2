@@ -1,9 +1,6 @@
 import type { FamilyPersona } from "@/lib/family/familyPersonaTypes";
 import type { ActivityMock } from "@/types/activity";
-import {
-  matchesAdultSelfAudience,
-  matchesExactChildAges,
-} from "@/lib/discovery/audienceEligibility";
+import { matchesSelectedPersonaAudience } from "@/lib/discovery/audienceEligibility";
 
 type PersonaRankingInput = {
   personas: FamilyPersona[];
@@ -200,16 +197,9 @@ export function applyPersonaRanking(
     return activities;
   }
 
-  const knownChildAges = personaSummary.children
-    .map((child) => getAgeFromBirthDate(child.birthDate))
-    .filter((age): age is number => age !== null);
-
-  const eligibleActivities =
-    personaSummary.children.length > 0
-      ? activities.filter((activity) =>
-          matchesExactChildAges(activity, knownChildAges),
-        )
-      : activities.filter((activity) => matchesAdultSelfAudience(activity));
+  const eligibleActivities = activities.filter((activity) =>
+    matchesSelectedPersonaAudience(activity, input),
+  );
 
   return eligibleActivities
     .map((activity, index) => {
