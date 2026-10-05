@@ -13,7 +13,7 @@ import {
   conflictsForScenarioItems,
   type ScenarioClientItem,
 } from "@/features/my-plan/lib/scenarioDraft";
-import { NOT_CANCELLED } from "@/server/family/familyScope";
+import { activePlanScopeFor, planScopeFor } from "@/server/family/familyAccess";
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -80,10 +80,15 @@ const activitySelect = {
   sessions: { select: { id: true, startsAt: true }, orderBy: { startsAt: "asc" as const } },
 } satisfies Prisma.ActivitySelect;
 
-async function loadCanonical(tx: Tx, userId: string, date: string, scenarioId: string) {
+async function loadCanonical(
+  tx: Tx,
+  scope: Prisma.PlanItemWhereInput,
+  date: string,
+  scenarioId: string,
+) {
   const [items, overrideRows] = await Promise.all([
     tx.planItem.findMany({
-      where: { userId, date, ...NOT_CANCELLED },
+      where: { ...scope, date },
       include: { activity: { select: activitySelect } },
       orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
     }),
@@ -143,6 +148,9 @@ export async function saveScenarioDraftForUser(
     removals: [...intent.removals].sort(),
     acceptedConflictKeys: [...new Set(intent.acceptedConflictKeys)].sort(),
   })).digest("hex");
+  // Family Core M1a: the scenario row stays per-user, but its items are the
+  // plan items this user can see (family scope; flag off = own items).
+  const [activeScope, aclScope] = await Promise.all([activePlanScopeFor(userId), planScopeFor(userId)]);
   return prisma.$transaction(async (tx) => {
     const scenario = await tx.dayScenario.findUnique({ where: { userId_date: { userId, date: intent.date } } });
     if (!scenario) throw new ScenarioSaveError(404, "SCENARIO_NOT_FOUND");
@@ -156,7 +164,7 @@ export async function saveScenarioDraftForUser(
       return locked.lastSaveResponse;
     }
 
-    const current = await loadCanonical(tx as Tx, userId, intent.date, scenario.id);
+    const current = await loadCanonical(tx as Tx, activeScope, intent.date, scenario.id);
     if (fingerprint(current, locked.acceptedConflictKeys) !== intent.baseFingerprint) {
       throw new ScenarioSaveError(409, "PLAN_CHANGED");
     }
@@ -169,7 +177,7 @@ export async function saveScenarioDraftForUser(
       const activity = await tx.activity.findUnique({ where: { id: replacement.newActivityId }, select: activitySelect });
       if (!activity || activity.status !== "PUBLISHED") throw new ScenarioSaveError(422, "INVALID_REPLACEMENT", replacement.newActivityId);
       const duplicate = await tx.planItem.findFirst({
-        where: { userId, activityId: activity.id, id: { not: replacement.planItemId }, ...NOT_CANCELLED },
+        where: { ...activeScope, activityId: activity.id, id: { not: replacement.planItemId } },
         select: { id: true },
       });
       if (duplicate) throw new ScenarioSaveError(422, "DUPLICATE_ACTIVITY", activity.id);
@@ -192,10 +200,10 @@ export async function saveScenarioDraftForUser(
 
     if (intent.removals.length > 0) {
       await tx.dayScenarioItemOverride.deleteMany({ where: { scenarioId: scenario.id, planItemId: { in: intent.removals } } });
-      await tx.planItem.deleteMany({ where: { userId, date: intent.date, id: { in: intent.removals } } });
+      await tx.planItem.deleteMany({ where: { ...aclScope, date: intent.date, id: { in: intent.removals } } });
     }
 
-    const finalLoaded = await loadCanonical(tx as Tx, userId, intent.date, scenario.id);
+    const finalLoaded = await loadCanonical(tx as Tx, activeScope, intent.date, scenario.id);
     const finalActivityIds = finalLoaded.items
       .map((item) => item.activityId)
       .filter((id): id is string => id != null);

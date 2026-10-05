@@ -5051,7 +5051,7 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Added: 2026-10-04
 - Reason deferred: Family Core B2 switches only Child/PlanItem reads and writes (`plan.service`, `/api/children*`, profile pages, persona context) to `familyId`. Until family invites exist every family has one adult, so per-user consumers behave identically. They become wrong only once a family has two adults, i.e. they must land before the "MVP shared plan" PR enables invites.
 - Context: reminder and digest jobs (`run-plan-event-reminders-core.ts`, `run-plan-tomorrow-digests-core.ts`, `listPlanItemsDueForReminder`, `listPlanItemsForUserDates`) map one PlanItem to one recipient via `userId` and need a fan-out to all active adult members (respecting PRIVATE items); `DayScenario` (`userId_date` unique), `setScenarioItemOverride`, `/api/plan/scenario` writes and `Experience` (`userId`, ownership checks in `confirmPlanExperience`) are per user while two adults would share one PlanItem; `computePlanFingerprint` depends on the item set.
-- Current state: `plan.service` list/dedup/remove and the read-only plan queries listed in the B2 PR use `planScopeFor`; the consumers above still use `userId`.
+- Current state: `plan.service` list/dedup/remove and the read-only plan queries listed in the B2 PR use `planScopeFor`. M1a (2026-10-06) converted reminders/digests (fan-out to active adults, PRIVATE stays with owner), Experience (one per plan item, any adult who sees the item may record/feedback; `Experience.userId` = recorder) and DayScenario/`/api/plan/scenario` (scenario row stays per user, items come from family scope). Remaining: analytics (BACKLOG-164 / M1b).
 - Dependencies: Family Core B2 merged and `FAMILY_CORE_READS` enabled.
 - Acceptance criteria: with a two-adult family, a FAMILY item reminds/digests every adult exactly once, a PRIVATE item only its owner; scenarios and experiences have a documented per-user or per-family model with tests.
 - Source: Family Core B2 audit.
@@ -5078,3 +5078,14 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Context: `pnpm test:family-core-foundation` fails on the B1-era guard `assert.doesNotMatch(read("src/server/services/planOwner.ts"), /familyId/)` because B2 legitimately made `planOwner.ts` family-aware. B2 only ran the reads contract.
 - Acceptance criteria: drop or update that B1 guard; `test:family-core-foundation` is green on `dev`.
 - Source: Family Core B3 verification.
+
+## [BACKLOG-166] Family Core A2 part 2: `NOT NULL` + CHECKs on `Child.familyId`/`PlanItem.familyId`, drop `Child.parentId` ownership
+
+- Status: BLOCKED (needs PROD B1 migration + backfill `--events` results, and a decision on tombstone rows)
+- Priority: P2
+- Area: Family Core / Schema
+- Added: 2026-10-05
+- Reason deferred: A2 part 1 (events always write `familyId`; read-only preflight `scripts/sql/family-core-not-null-preflight.sql`) ships first. `NOT NULL` is only safe once every `must_be_zero` row of the preflight is 0 on PROD.
+- Context: tombstone users' `Child`/`PlanItem` without `familyId` (preflight `info` rows) decide whether `NOT NULL` is possible at all: either clean them or keep the column nullable with a CHECK for live users only. `Child.parentId` is still required and cascades on User delete; A2 part 2 removes it as owner.
+- Acceptance criteria: preflight output from PROD recorded; decision on tombstone rows recorded; hand-written migration (no `migrate dev`/`db push`) with rollback SQL proven on disposable PostgreSQL.
+- Source: Family Core A2 scope.

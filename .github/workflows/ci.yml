@@ -52,6 +52,9 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
+      - name: Upload pipeline regressions
+        run: pnpm test:upload-pipeline
+
       - name: Notification action regressions
         run: |
           pnpm exec tsx src/server/notifications/notification-action-resolver.test.ts

@@ -2,7 +2,14 @@ import { prisma } from "@/lib/prisma";
 import { resolveRouteForUserSave } from "@/server/services/route.service";
 import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
 import { resolvePlanActivityOccurrence } from "@/server/services/planOccurrence.service";
-import { NOT_CANCELLED, activePlanScopeFor, familyIdForWrite, planScopeFor } from "@/server/family/familyAccess";
+import {
+  NOT_CANCELLED,
+  activePlanScopeFor,
+  familyIdForWrite,
+  familyReadsEnabled,
+  planScopeFor,
+} from "@/server/family/familyAccess";
+import { fanOutItemsToDigestTargets, fanOutItemsToFamilyMembers } from "@/server/family/planRecipients";
 
 const planActivitySelect = {
   id: true,
@@ -537,11 +544,28 @@ export async function listPlanItemsByDate(
   })) as PlanItemWithActivity[];
 }
 
+/** Active adults per family (leftAt = null). */
+async function listActiveMembersByFamily(familyIds: string[]): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (familyIds.length === 0) return map;
+  const rows = await prisma.familyMembership.findMany({
+    where: { familyId: { in: familyIds }, leftAt: null },
+    select: { familyId: true, userId: true },
+  });
+  for (const row of rows) map.set(row.familyId, [...(map.get(row.familyId) ?? []), row.userId]);
+  return map;
+}
+
+/**
+ * Reminder candidates. With family reads on, a FAMILY item is returned once per
+ * active adult (the copy carries the RECIPIENT in `userId`), a PRIVATE item only
+ * for its author; with reads off, one candidate per item for its author as before.
+ */
 export async function listPlanItemsDueForReminder(args: {
   windowStart: Date;
   windowEnd: Date;
 }): Promise<PlanReminderCandidate[]> {
-  return (await prisma.planItem.findMany({
+  const rows = (await prisma.planItem.findMany({
     where: {
       activityId: { not: null },
       ...NOT_CANCELLED,
@@ -556,6 +580,11 @@ export async function listPlanItemsDueForReminder(args: {
     },
     orderBy: { startsAt: "asc" },
   })) as PlanReminderCandidate[];
+  if (!familyReadsEnabled()) return rows;
+
+  const withFamily = rows as Array<PlanReminderCandidate & { familyId?: string | null }>;
+  const familyIds = [...new Set(withFamily.map((r) => r.familyId).filter((id): id is string => !!id))];
+  return fanOutItemsToFamilyMembers(withFamily, await listActiveMembersByFamily(familyIds));
 }
 
 /**
@@ -614,12 +643,35 @@ export async function listPlanItemsForUserDates(
 ): Promise<PlanTomorrowDigestCandidate[]> {
   if (targets.length === 0) return [];
 
-  return (await prisma.planItem.findMany({
+  if (!familyReadsEnabled()) {
+    return (await prisma.planItem.findMany({
+      where: {
+        ...NOT_CANCELLED,
+        OR: targets.map((target) => ({ userId: target.userId, date: target.date })),
+      },
+      include: { activity: { select: planActivitySelect } },
+      orderBy: [{ userId: "asc" }, { startsAt: "asc" }, { createdAt: "asc" }],
+    })) as PlanTomorrowDigestCandidate[];
+  }
+
+  const memberships = await prisma.familyMembership.findMany({
+    where: { userId: { in: [...new Set(targets.map((t) => t.userId))] }, leftAt: null },
+    select: { userId: true, familyId: true },
+  });
+  const familyByUser = new Map(memberships.map((m) => [m.userId, m.familyId]));
+  const familyTargets = targets.map((t) => ({ ...t, familyId: familyByUser.get(t.userId) ?? null }));
+
+  const rows = (await prisma.planItem.findMany({
     where: {
       ...NOT_CANCELLED,
-      OR: targets.map((target) => ({ userId: target.userId, date: target.date })),
+      OR: familyTargets.map((t) =>
+        t.familyId
+          ? { familyId: t.familyId, date: t.date, OR: [{ visibility: "FAMILY" as const }, { userId: t.userId }] }
+          : { userId: t.userId, date: t.date },
+      ),
     },
     include: { activity: { select: planActivitySelect } },
-    orderBy: [{ userId: "asc" }, { startsAt: "asc" }, { createdAt: "asc" }],
-  })) as PlanTomorrowDigestCandidate[];
+    orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
+  })) as Array<PlanTomorrowDigestCandidate & { familyId?: string | null; visibility?: "PRIVATE" | "FAMILY" }>;
+  return fanOutItemsToDigestTargets(rows, familyTargets);
 }
