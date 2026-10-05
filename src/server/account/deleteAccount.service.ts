@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import { BusinessMemberRole, Role, UserStatus, type PrismaClient } from "@prisma/client";
+import { BusinessMemberRole, FamilyRole, PlanVisibility, Role, UserStatus, type Prisma, type PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export type DeleteAccountResult =
@@ -11,6 +11,62 @@ export type DeleteAccountResult =
 function tombstoneEmail(userId: string): string {
   const digest = createHash("sha256").update(`mamago-deleted-user:${userId}`).digest("hex");
   return `deleted-${digest}@deleted.invalid`;
+}
+
+/**
+ * Family Core B3: detaches the deleted user from their family and erases the
+ * family data that must not outlive them. Always family-aware (independent of
+ * the family-reads rollout flag) and never creates a family.
+ *
+ * - active membership is closed (`leftAt = deletedAt`), history is kept;
+ * - an OWNER leaving a family with other adults hands ownership to the
+ *   earliest joiner (joinedAt, id); the old owner is closed first so the
+ *   `FamilyMembership_active_owner` partial unique index holds;
+ * - the last adult archives the family and erases its Child/PlanItem rows;
+ * - otherwise FAMILY plan items and shared children survive (ACL is familyId;
+ *   `parentId`/`userId` on them stay as tombstone provenance).
+ */
+async function detachFromFamily(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  deletedAt: Date,
+): Promise<void> {
+  const membership = await tx.familyMembership.findFirst({
+    where: { userId, leftAt: null },
+    select: { id: true, familyId: true, role: true },
+  });
+
+  if (membership) {
+    // Serialise concurrent deletions of two adults of one family, so that
+    // each sees the other as still active (or already gone) consistently.
+    await tx.$queryRaw`SELECT id FROM "Family" WHERE id = ${membership.familyId} FOR UPDATE`;
+    await tx.familyMembership.update({ where: { id: membership.id }, data: { leftAt: deletedAt } });
+
+    const successor = await tx.familyMembership.findFirst({
+      where: { familyId: membership.familyId, leftAt: null },
+      orderBy: [{ joinedAt: "asc" }, { id: "asc" }],
+      select: { id: true },
+    });
+
+    if (successor) {
+      if (membership.role === FamilyRole.OWNER) {
+        await tx.familyMembership.update({ where: { id: successor.id }, data: { role: FamilyRole.OWNER } });
+      }
+    } else {
+      await tx.family.update({ where: { id: membership.familyId }, data: { archivedAt: deletedAt } });
+      // Child interests / custom interests cascade; PlanItem.childId is SET NULL.
+      await tx.planItem.deleteMany({ where: { familyId: membership.familyId } });
+      await tx.child.deleteMany({ where: { familyId: membership.familyId } });
+    }
+  }
+
+  // Private entries of the deleted user and legacy (family-less) rows are theirs alone.
+  await tx.planItem.deleteMany({
+    where: { userId, OR: [{ familyId: null }, { visibility: PlanVisibility.PRIVATE }] },
+  });
+  await tx.child.deleteMany({ where: { parentId: userId, familyId: null } });
+  // createdById has no FK: scrub the deleted user from surviving family children.
+  await tx.child.updateMany({ where: { createdById: userId }, data: { createdById: null } });
 }
 
 /**
@@ -50,7 +106,10 @@ export async function deleteAccount(
     const deletedAt = new Date();
     const anonymousEmail = tombstoneEmail(userId);
 
-    await tx.userEvent.updateMany({ where: { userId }, data: { userId: null, sessionId: null } });
+    await tx.userEvent.updateMany({
+      where: { userId },
+      data: { userId: null, sessionId: null, familyId: null },
+    });
     await tx.recommendationRun.updateMany({ where: { userId }, data: { userId: null, sessionId: null } });
     await tx.searchQueryLog.updateMany({ where: { userId }, data: { userId: null, sessionId: null } });
 
@@ -92,7 +151,9 @@ export async function deleteAccount(
     await tx.userNotificationPreference.deleteMany({ where: { userId } });
     await tx.userNotificationSchedule.deleteMany({ where: { userId } });
     await tx.dayScenario.deleteMany({ where: { userId } });
-    await tx.planItem.deleteMany({ where: { userId } });
+    await detachFromFamily(tx, userId, deletedAt);
+    // The User row stays as a tombstone, so the FK cascade never fires (BACKLOG-162).
+    await tx.experience.deleteMany({ where: { userId } });
     // Inbox rows hold forwarded message text; the User row is retained as a tombstone,
     // so the FK cascade never fires. InboxItemPart is removed by cascade from InboxItem.
     await tx.inboxItem.deleteMany({ where: { userId } });
@@ -103,7 +164,6 @@ export async function deleteAccount(
     await tx.articleIdea.deleteMany({ where: { userId } });
     await tx.routeRating.deleteMany({ where: { userId } });
     await tx.articleRating.deleteMany({ where: { userId } });
-    await tx.child.deleteMany({ where: { parentId: userId } });
     await tx.tempMedia.deleteMany({ where: { ownerUserId: userId } });
     await tx.userBehaviorProfile.deleteMany({ where: { userId } });
     await tx.unsubscribeToken.deleteMany({ where: { userId } });
