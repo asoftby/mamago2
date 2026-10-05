@@ -18,6 +18,10 @@ type PickerItem = {
   isUsed: boolean;
 };
 
+function mediaThumbnailUrl(mediaId: string): string {
+  return `/api/media/${encodeURIComponent(mediaId)}?variant=sm`;
+}
+
 export function ArticleEditorGalleryField({
   value,
   onChange,
@@ -91,7 +95,7 @@ export function ArticleEditorGalleryField({
     () =>
       value.map((id) => ({
         id,
-        url: previewById[id] ?? `/api/media/${encodeURIComponent(id)}`,
+        url: mediaThumbnailUrl(id),
         alt: null,
         title: "Изображение галереи",
       })),
@@ -108,7 +112,7 @@ export function ArticleEditorGalleryField({
       );
       uploaded.push({
         id: media.id,
-        url: media.url,
+        url: mediaThumbnailUrl(media.id),
         title: file.name,
         alt: null,
       });
