@@ -47,6 +47,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   MAX_IMAGE_FILE_SIZE_MB,
+  MAX_IMAGE_FILES,
   getFileTooLargeMessage,
   validateUploadMimeType,
 } from "@/lib/uploads/uploadConfig";
