@@ -1,3 +1,4 @@
+import { youngestChildBirthByUser } from "@/server/family/familyAnalytics";
 import {
   Prisma,
   type AnalyticsEntityType,
@@ -44,16 +45,10 @@ function bandFromAgeYears(age: number): string {
 }
 
 async function youngestChildBandByUser(): Promise<Map<string, string>> {
-  const rows = await prisma.$queryRaw<Array<{ parentId: string; youngest: Date }>>`
-    SELECT c."parentId", MAX(c."birthDate") AS youngest
-    FROM "Child" c
-    WHERE c."birthDate" IS NOT NULL
-    GROUP BY c."parentId"
-  `;
+  const births = await youngestChildBirthByUser();
   const map = new Map<string, string>();
-  for (const r of rows) {
-    const age = ageYearsFromBirth(r.youngest);
-    map.set(r.parentId, bandFromAgeYears(age));
+  for (const [userId, youngest] of births) {
+    map.set(userId, bandFromAgeYears(ageYearsFromBirth(youngest)));
   }
   return map;
 }
