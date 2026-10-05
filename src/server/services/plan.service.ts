@@ -178,7 +178,9 @@ export async function addPlanItem(
   date: string,
   startsAt?: Date,
   title?: string,
-  coverImageUrl?: string
+  coverImageUrl?: string,
+  /** Family Core M4c: audience of a NEW item (existing items keep theirs). Default FAMILY. */
+  visibility?: PlanVisibility,
 ): Promise<{ id: string; created: boolean }> {
   // Only deduplicate when activityId is present
   if (activityId) {
@@ -212,7 +214,7 @@ export async function addPlanItem(
   }
 
   const created = await prisma.planItem.create({
-    data: { userId, familyId: await familyIdForWrite(userId), activityId: activityId ?? null, date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
+    data: { userId, familyId: await familyIdForWrite(userId), ...(visibility ? { visibility } : {}), activityId: activityId ?? null, date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
     select: { id: true },
   });
   return { ...created, created: true };
@@ -226,7 +228,7 @@ export async function addRoutePlanItem(
   routeId: string,
   date: string,
   routeSlug?: string | null,
-  options?: { title?: string | null; coverImageUrl?: string | null }
+  options?: { title?: string | null; coverImageUrl?: string | null; visibility?: PlanVisibility }
 ): Promise<{ id: string }> {
   const resolved = await resolveRouteForUserSave(routeId, routeSlug);
   if (resolved) {
@@ -252,6 +254,7 @@ export async function addRoutePlanItem(
       data: {
         userId,
         familyId: await familyIdForWrite(userId),
+        ...(options?.visibility ? { visibility: options.visibility } : {}),
         routeId: resolved.id,
         planRouteSlug: null,
         activityId: null,
@@ -328,7 +331,7 @@ export async function addPlacePlanItem(
   placeId: string,
   date: string,
   placeSlug?: string | null,
-  options?: { title?: string | null; coverImageUrl?: string | null },
+  options?: { title?: string | null; coverImageUrl?: string | null; visibility?: PlanVisibility },
 ): Promise<{ id: string }> {
   const resolved = await resolvePlaceForUserSave(placeId, placeSlug);
   if (!resolved) {
@@ -363,6 +366,7 @@ export async function addPlacePlanItem(
     data: {
       userId,
       familyId: await familyIdForWrite(userId),
+      ...(options?.visibility ? { visibility: options.visibility } : {}),
       placeId: resolved.id,
       planPlaceSlug: resolved.slug,
       activityId: null,
