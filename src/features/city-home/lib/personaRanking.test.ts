@@ -133,3 +133,27 @@ test("no selected personas preserves the unfiltered list", () => {
     activities,
   );
 });
+
+
+test("selected child without birth date does not admit numeric specific ranges", () => {
+  const kid: FamilyPersona = {
+    id: "unknown-age",
+    kind: "child",
+    displayName: "Ребёнок",
+    birthDate: null,
+  };
+
+  const result = applyPersonaRanking(
+    [
+      activity("adult-range", "SPECIFIC", 18, 99),
+      activity("child-range", "SPECIFIC", 3, 7),
+      activity("unrestricted", "UNRESTRICTED", 0, 12),
+    ],
+    {
+      personas: [kid],
+      selectedPersonaIds: [kid.id],
+    },
+  );
+
+  assert.deepEqual(result.map((item) => item.id), ["unrestricted"]);
+});
