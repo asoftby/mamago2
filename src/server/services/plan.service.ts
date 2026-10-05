@@ -1,3 +1,4 @@
+import { planCountUnit } from "@/server/family/familyAnalyticsPure";
 import { prisma } from "@/lib/prisma";
 import { resolveRouteForUserSave } from "@/server/services/route.service";
 import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
@@ -124,24 +125,30 @@ export type PlanItemWithActivity = {
 export type PlanReminderCandidate = PlanItemWithActivity;
 
 /**
- * Current number of users who have each activity in My Plan.
- * PlanItem is the source of truth: removing an item lowers the count, while
- * moving/re-adding the same activity for another date still counts one user.
+ * Current number of users (families, with FAMILY_CORE_READS on) who have each
+ * activity in My Plan. PlanItem is the source of truth: removing an item lowers
+ * the count, while moving/re-adding the same activity for another date still
+ * counts one. With the flag on, two adults sharing a family count once.
  */
 export async function countPlanUsersByActivity(
   activityIds: string[],
 ): Promise<Map<string, number>> {
   if (activityIds.length === 0) return new Map();
 
+  const familyUnit = familyReadsEnabled();
   const rows = await prisma.planItem.findMany({
-    where: { activityId: { in: activityIds } },
-    select: { activityId: true, userId: true },
-    distinct: ["activityId", "userId"],
+    where: { activityId: { in: activityIds }, ...(familyUnit ? NOT_CANCELLED : {}) },
+    select: { activityId: true, userId: true, familyId: true },
+    distinct: ["activityId", "userId", "familyId"],
   });
 
+  const seen = new Set<string>();
   const counts = new Map<string, number>();
   for (const row of rows) {
     if (!row.activityId) continue;
+    const key = `${row.activityId}|${familyUnit ? planCountUnit(row) : row.userId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     counts.set(row.activityId, (counts.get(row.activityId) ?? 0) + 1);
   }
   return counts;
