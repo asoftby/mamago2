@@ -87,11 +87,28 @@ export function partitionDiscoveryFeed(
   activities: ActivityMock[],
   audience?: AudienceSelection,
 ): DiscoveryFeedPartition {
-  const formatFiltered = activities.filter((activity) =>
+  const personaDriven = hasResolvedPersonaSelection(audience);
+  const selectedPersonas = personaDriven
+    ? audience.personas.filter((persona) =>
+        audience.selectedPersonaIds.includes(persona.id),
+      )
+    : [];
+  const childPersonaContext = selectedPersonas.some(
+    (persona) => persona.kind === "child",
+  );
+  const manualChildOnlyContext =
+    !personaDriven &&
+    filters.age.some((age) => age !== "18+") &&
+    !filters.age.includes("18+");
+
+  const eligibleActivities =
+    childPersonaContext || manualChildOnlyContext
+      ? activities.filter((activity) => activity.agePolicy !== "ADULT_ONLY")
+      : activities;
+  const formatFiltered = eligibleActivities.filter((activity) =>
     activityMatchesFormat(activity, filters.format),
   );
 
-  const personaDriven = hasResolvedPersonaSelection(audience);
   const ranges = filters.age
     .map(ageRangeFromGroupId)
     .filter((r): r is AgeRange & { id: string } => r !== null);
@@ -118,11 +135,6 @@ export function partitionDiscoveryFeed(
 
   const primary = sortByEngagementThenStable(matched);
 
-  const selectedPersonas = personaDriven
-    ? audience.personas.filter((persona) =>
-        audience.selectedPersonaIds.includes(persona.id),
-      )
-    : [];
   const selfOnly =
     selectedPersonas.length > 0 &&
     selectedPersonas.every((persona) => persona.kind === "adult");
