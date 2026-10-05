@@ -12,6 +12,7 @@ import type { useArticleMediaSource } from "@/components/admin/articles/useArtic
 type PickerItem = {
   id: string;
   publicUrl: string | null;
+  thumbnailUrl?: string | null;
   alt: string | null;
   title: string | null;
   isUsed: boolean;
@@ -139,7 +140,7 @@ export function ArticleEditorGalleryField({
         .filter((item): item is PickerItem & { publicUrl: string } => Boolean(item.publicUrl))
         .map((item) => ({
           id: item.id,
-          url: item.publicUrl,
+          url: item.thumbnailUrl ?? item.publicUrl,
           alt: item.alt,
           title: item.title,
           isUsed: item.isUsed,
