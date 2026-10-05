@@ -7,6 +7,7 @@ import {
   type Subject,
 } from "@/lib/decision/decisionContext";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
+import { childScopeFor } from "@/server/family/familyAccess";
 
 export type BuildSubjectsSnapshotInput = {
   userId: string;
@@ -49,7 +50,7 @@ export async function buildSelectedProfileContext(
   const childIds = personaIds.filter((id) => id !== input.userId);
   if (childIds.length > 0) {
     const children = await prisma.child.findMany({
-      where: { id: { in: childIds }, parentId: input.userId },
+      where: { id: { in: childIds }, ...(await childScopeFor(input.userId)) },
       select: {
         id: true,
         birthDate: true,

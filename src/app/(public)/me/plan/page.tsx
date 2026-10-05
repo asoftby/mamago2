@@ -16,6 +16,7 @@ import {
   listPendingExperienceCandidates,
   listRecentExperienceSummaries,
 } from "@/server/services/experience/experience.service";
+import { childScopeFor } from "@/server/family/familyAccess";
 
 export default async function PlanPage() {
   const user = await getCurrentUser();
@@ -48,7 +49,7 @@ export default async function PlanPage() {
 
   // Load children for family recommendations
   const children = await prisma.child.findMany({
-    where: { parentId: user.id },
+    where: await childScopeFor(user.id),
     select: { birthDate: true },
   });
 

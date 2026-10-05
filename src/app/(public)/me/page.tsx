@@ -22,6 +22,7 @@ import {
   type AccountRoute,
   type AccountParty,
 } from "@/features/me/components/account/AccountDesign";
+import { childScopeFor } from "@/server/family/familyAccess";
 
 type PageProps = {
   searchParams: Promise<{ date?: string }>;
@@ -56,7 +57,7 @@ export default async function MePage({ searchParams }: PageProps) {
 
   // ── Children (with interests, raw queries to dodge TS issues) ──
   const childrenRaw = await prisma.child.findMany({
-    where: { parentId: user.id },
+    where: await childScopeFor(user.id),
     orderBy: { createdAt: "desc" },
   });
   const childIds = childrenRaw.map((c) => c.id);
