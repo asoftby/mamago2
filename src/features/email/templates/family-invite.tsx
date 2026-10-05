@@ -8,14 +8,12 @@ import { EmailLayout } from "../components/email-layout";
 export interface FamilyInviteTemplateProps {
   inviterName?: string | null;
   acceptUrl: string;
-  expiresInDays: number;
 }
 
 /** Neutral by design: no child data, no plan content. */
 export default function FamilyInviteTemplate({
   inviterName,
   acceptUrl,
-  expiresInDays,
 }: FamilyInviteTemplateProps) {
   return (
     <EmailLayout preview="Вас пригласили в семейный план mamaGo">
@@ -33,7 +31,7 @@ export default function FamilyInviteTemplate({
         <span style={{ color: "#1a1a1a", wordBreak: "break-all" as const }}>{acceptUrl}</span>
       </Text>
       <Text style={{ color: "#5c5c5c", fontSize: 14, lineHeight: 1.5, margin: "0 0 16px" }}>
-        Приглашение действует {expiresInDays} дней. Ссылка одноразовая: не пересылайте её посторонним.
+        Ссылка одноразовая и без срока действия: не пересылайте её посторонним. Отозвать её можно в профиле, в разделе «Семья».
       </Text>
       <Text style={{ fontSize: 14, lineHeight: 1.5, margin: 0 }}>
         Если вы не ожидали это письмо, просто проигнорируйте его.

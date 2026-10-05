@@ -91,9 +91,10 @@ test("accept: consent required, joins as ADULT FROM_JOIN, empty solo family arch
 
 test("accept refused: expired, revoked, joiner with data, joiner in family with other adults", async () => {
   const owner = await mkUser("owner3");
-  // Created 8 days ago => already past the 7-day TTL regardless of today's date.
-  const t0 = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
-  const exp = await createFamilyInvite(db, { userId: owner }, { env, now: () => t0 });
+  // New invites never expire; a legacy dated invite (pre-M5) must still expire.
+  const exp = await createFamilyInvite(db, { userId: owner }, deps);
+  assert.equal((await db.familyInvite.findUniqueOrThrow({ where: { id: exp.inviteId } })).expiresAt, null);
+  await db.familyInvite.update({ where: { id: exp.inviteId }, data: { expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000) } });
   const j1 = await mkUser("j3a");
   assert.equal(await code(acceptFamilyInvite(db, { userId: j1, token: exp.token, consentTextVersion: "v1" }, deps)), "invalid_invite");
 

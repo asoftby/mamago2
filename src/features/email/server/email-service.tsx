@@ -451,7 +451,6 @@ export class EmailService {
     to: string;
     inviterName?: string | null;
     acceptUrl: string;
-    expiresInDays: number;
   }): Promise<boolean> {
     const debugTo = getDebugRedirectTo();
     if (!isEmailEnabled()) {
@@ -469,7 +468,6 @@ export class EmailService {
         <FamilyInviteTemplate
           inviterName={params.inviterName}
           acceptUrl={params.acceptUrl}
-          expiresInDays={params.expiresInDays}
         />
       ),
     });

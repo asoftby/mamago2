@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   try {
     const res = await createInviteAndNotify(prisma, { userId: user.id, email: parsed.data.email });
     return NextResponse.json({
-      invite: { id: res.inviteId, url: res.url, expiresAt: res.expiresAt.toISOString(), emailSent: res.emailSent },
+      invite: { id: res.inviteId, url: res.url, emailSent: res.emailSent },
     });
   } catch (error) {
     if (error instanceof FamilyInviteError) {

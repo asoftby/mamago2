@@ -1,5 +1,6 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { familyReadsEnabled } from "./familyScope";
+import { activeInviteWhere } from "./familyInvitePure";
 import {
   FamilyMembersError,
   checkLeave,
@@ -24,7 +25,7 @@ export type FamilyOverview = {
   myRole: "OWNER" | "ADULT";
   adults: Array<{ userId: string; displayName: string | null; role: "OWNER" | "ADULT"; joinedAt: Date; isMe: boolean }>;
   children: Array<{ id: string; name: string | null; birthDate: Date | null }>;
-  invites: Array<{ id: string; expiresAt: Date; createdAt: Date }>;
+  invites: Array<{ id: string; createdAt: Date }>;
 };
 
 /** Members and children of the user's active family; null when the user has none yet (lazy family). */
@@ -52,9 +53,9 @@ export async function listFamilyForUser(
       select: { id: true, name: true, birthDate: true },
     }),
     prisma.familyInvite.findMany({
-      where: { familyId: mine.familyId, status: "ACTIVE", expiresAt: { gt: now } },
+      where: { familyId: mine.familyId, ...activeInviteWhere(now) },
       orderBy: { createdAt: "desc" },
-      select: { id: true, expiresAt: true, createdAt: true },
+      select: { id: true, createdAt: true },
     }),
   ]);
   return {

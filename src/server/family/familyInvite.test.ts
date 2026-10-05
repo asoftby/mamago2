@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import {
-  INVITE_TTL_DAYS,
   generateInviteToken,
   hashInviteToken,
-  inviteExpiresAt,
   isInviteUsable,
 } from "./familyInvitePure";
 import { familyInvitesEnabled } from "./familyScope";
@@ -17,12 +15,14 @@ assert.notEqual(hashInviteToken(a), a);
 assert.match(hashInviteToken(a), /^[0-9a-f]{64}$/);
 
 const now = new Date("2026-10-06T00:00:00Z");
-const exp = inviteExpiresAt(now);
-assert.equal((exp.getTime() - now.getTime()) / 86_400_000, INVITE_TTL_DAYS);
-assert.equal(isInviteUsable({ status: "ACTIVE", expiresAt: exp }, now), true);
-assert.equal(isInviteUsable({ status: "ACTIVE", expiresAt: exp }, exp), false);
-assert.equal(isInviteUsable({ status: "REVOKED", expiresAt: exp }, now), false);
-assert.equal(isInviteUsable({ status: "ACCEPTED", expiresAt: exp }, now), false);
+const past = new Date("2026-10-05T00:00:00Z");
+const future = new Date("2026-10-07T00:00:00Z");
+assert.equal(isInviteUsable({ status: "ACTIVE", expiresAt: null }, now), true, "no expiry");
+assert.equal(isInviteUsable({ status: "ACTIVE", expiresAt: future }, now), true);
+assert.equal(isInviteUsable({ status: "ACTIVE", expiresAt: past }, now), false, "legacy dated invite expires");
+assert.equal(isInviteUsable({ status: "ACTIVE", expiresAt: now }, now), false);
+assert.equal(isInviteUsable({ status: "REVOKED", expiresAt: null }, now), false);
+assert.equal(isInviteUsable({ status: "ACCEPTED", expiresAt: null }, now), false);
 
 assert.equal(familyInvitesEnabled({}), false);
 assert.equal(familyInvitesEnabled({ FAMILY_INVITES: "1" }), true);

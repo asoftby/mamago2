@@ -5131,6 +5131,16 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Area: Family Core / Profile
 - Added: 2026-10-06
 - Reason deferred: M5 ships list of adults/children, invite (link + optional letter), ADULT leave (new solo family, own PRIVATE items and an optional copy of children go with him), OWNER → ADULT ownership transfer. Not built: OWNER excluding another adult, restoring an archived family, merging two families after leaving, per-adult `historyAccess` change, rename of the family.
-- Context: the leaver loses access to FAMILY items of the old family (they stay there, author kept). Invite email is used only to send the letter and is not stored; the link is accepted by any signed-in account holding it (one-time, 7 days, ≤3 active); letters limited to 5 per user per day.
+- Context: the leaver loses access to FAMILY items of the old family (they stay there, author kept). Invite email is used only to send the letter and is not stored; the link is accepted by any signed-in account holding it (one-time, no expiry (until accepted or revoked), ≤3 active); letters limited to 5 per user per day.
 - Acceptance criteria: product decision on exclusion/restore semantics, then services + UI + integration tests.
 - Source: Family Core M5a.
+
+## [BACKLOG-171] Family invites: stale unused links count toward the 3-active cap
+
+- Status: OPEN
+- Priority: P3
+- Area: Family Core / Invites
+- Added: 2026-10-06
+- Reason deferred: invites no longer expire, so an unused link occupies one of 3 slots until accepted or revoked (revoke is in the profile UI, M5b).
+- Acceptance criteria: decide whether to show "created N days ago" with a prompt to revoke old links or to auto-archive links older than a threshold.
+- Source: Family invite no-expiry change.

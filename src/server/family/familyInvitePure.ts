@@ -1,6 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
 
-export const INVITE_TTL_DAYS = 7;
 export const MAX_ACTIVE_INVITES_PER_FAMILY = 3;
 
 export type FamilyInviteErrorCode =
@@ -30,13 +29,18 @@ export function hashInviteToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export function inviteExpiresAt(now: Date): Date {
-  return new Date(now.getTime() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000);
-}
-
 export function isInviteUsable(
-  invite: { status: string; expiresAt: Date },
+  invite: { status: string; expiresAt: Date | null },
   now: Date,
 ): boolean {
-  return invite.status === "ACTIVE" && invite.expiresAt.getTime() > now.getTime();
+  // expiresAt null = no expiry (only legacy rows carry a date).
+  return invite.status === "ACTIVE" && (invite.expiresAt === null || invite.expiresAt.getTime() > now.getTime());
+}
+
+/** Prisma where-fragment: ACTIVE invites that are still usable at `now`. */
+export function activeInviteWhere(now: Date) {
+  return {
+    status: "ACTIVE" as const,
+    OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+  };
 }
