@@ -143,6 +143,9 @@ jobs:
           pnpm exec tsx src/features/my-plan/lib/planItemMeta.test.ts
           pnpm exec tsx src/features/my-plan/lib/planPagePresentation.test.ts
 
+      - name: Account greeting regressions
+        run: pnpm exec tsx src/features/me/lib/accountGreeting.test.ts
+
       - name: Event public rendering regressions
         run: |
           pnpm exec tsx src/components/content/RichContentRenderer.test.ts
