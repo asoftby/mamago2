@@ -45,4 +45,9 @@ assert.ok(
   "Gallery uploads must cap the number of selected images before upload work starts",
 );
 
+assert.ok(
+  source.includes("prev.filter((img) => img.id !== placeholderId)"),
+  "Failed uploads must remove their placeholder so retries do not consume gallery capacity",
+);
+
 console.log("Step3Media.uploadSafety.test.ts: OK");
