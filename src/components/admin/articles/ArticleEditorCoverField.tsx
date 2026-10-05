@@ -18,6 +18,10 @@ type PickerItem = {
   isUsed: boolean;
 };
 
+function mediaThumbnailUrl(mediaId: string): string {
+  return `/api/media/${encodeURIComponent(mediaId)}?variant=sm`;
+}
+
 export function ArticleEditorCoverField({
   value,
   onChange,
@@ -79,7 +83,7 @@ export function ArticleEditorCoverField({
     if (!mediaId) return null;
     return {
       id: mediaId,
-      url: previewUrl ?? `/api/media/${encodeURIComponent(mediaId)}`,
+      url: mediaThumbnailUrl(mediaId),
       alt: null,
       title: "Обложка статьи",
     };
@@ -95,7 +99,7 @@ export function ArticleEditorCoverField({
       );
       uploaded.push({
         id: media.id,
-        url: media.url,
+        url: mediaThumbnailUrl(media.id),
         title: file.name,
         alt: null,
       });
