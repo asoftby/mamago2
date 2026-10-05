@@ -214,13 +214,8 @@ export function BusinessVerificationRequestsPage({
                       >
                         <td className="px-4 py-3 align-top">
                           <div className="break-words font-medium text-gray-900">
-                            {business.name}
+                            {business.legalName || business.name || "—"}
                           </div>
-                          {business.legalName && (
-                            <div className="mt-0.5 break-words text-gray-500">
-                              {business.legalName}
-                            </div>
-                          )}
                         </td>
                         <td className="px-4 py-3 align-top">
                           <div className="break-all text-gray-900">
@@ -273,8 +268,7 @@ export function BusinessVerificationRequestsPage({
               {businesses.map((business) => (
                 <DataCard key={business.id}>
                   <DataCardHeader
-                    title={business.name}
-                    subtitle={business.legalName}
+                    title={business.legalName || business.name || "—"}
                     badge={
                       <span
                         className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold leading-5 ${
