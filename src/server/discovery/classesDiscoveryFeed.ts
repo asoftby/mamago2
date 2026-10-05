@@ -1,4 +1,4 @@
-import { ActivityFormat, type Prisma, type PublicationPriceMode } from "@prisma/client";
+import { ActivityFormat, type AgePolicy, type Prisma, type PublicationPriceMode } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import type { ActivityMock } from "@/types/activity";
@@ -20,6 +20,18 @@ function ageBoundsFromOffer(offer: {
   }
 
   return { ageFrom: 0, ageTo: 18 };
+}
+
+export function projectOfferAudience(offer: {
+  ageMinMonths: number | null;
+  ageMaxMonths: number | null;
+  agePolicy: AgePolicy;
+}): Pick<ActivityMock, "ageFrom" | "ageTo" | "agePolicy"> {
+  const bounds =
+    offer.agePolicy === "ADULT_ONLY"
+      ? { ageFrom: 18, ageTo: 99 }
+      : ageBoundsFromOffer(offer);
+  return { ...bounds, agePolicy: offer.agePolicy };
 }
 
 function extractOfferDateRange(input: {
@@ -167,7 +179,7 @@ export async function getClassesDiscoveryFeed(
   const qualityBoostMap = await getBusinessQualityBoostMap(offerBusinessIds);
 
   const cards = rows.map<ActivityMock>((offer) => {
-    const { ageFrom, ageTo } = ageBoundsFromOffer(offer);
+    const audience = projectOfferAudience(offer);
     const cityForPath = (offer.place as { city?: { slug: string } | null }).city?.slug ?? citySlug;
     const chipSlugs: string[] = classChipSlugsAvailable
       ? ((offer as { classChipSlugs?: string[] }).classChipSlugs ?? [])
@@ -205,9 +217,7 @@ export async function getClassesDiscoveryFeed(
       title: offer.title,
       description: offer.description ?? "",
       image: offer.coverImage ?? "",
-      ageFrom,
-      ageTo,
-      agePolicy: offer.agePolicy,
+      ...audience,
       ...projectCanonicalOfferPrice(offer),
       dateStart,
       dateEnd,
