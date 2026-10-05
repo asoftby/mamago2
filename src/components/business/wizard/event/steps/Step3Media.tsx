@@ -9,7 +9,8 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useImageUpload } from "@/hooks/useImageUpload";
+import { convertHeicFileToJpegIfNeeded } from "@/lib/uploads/heicConversion";
+import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -89,6 +90,28 @@ type ImportedMedia = {
 };
 
 type MediaStatus = "loading" | "loaded" | "empty";
+
+/**
+ * Event photos are processed by the server upload pipeline.
+ *
+ * Do not run the regular browser compression/blurhash/data-URL pipeline here:
+ * a modern phone photo can expand to tens of MB in decoded canvas memory and
+ * the event step previously decoded it several times before the request was
+ * even sent. On memory-constrained mobile browsers that can kill the whole tab
+ * ("This page couldn't load") instead of producing a recoverable upload error.
+ *
+ * HEIC is the only exception: the production sharp build has no HEVC decoder,
+ * so it is converted to JPEG once in the browser, then all resizing/WebP
+ * conversion happens on the server.
+ */
+async function uploadEventMediaFile(file: File) {
+  const fileToUpload = await convertHeicFileToJpegIfNeeded(file, 0.82);
+  const uploaded = await uploadMediaFile(fileToUpload);
+  return {
+    ...uploaded,
+    mediaId: uploaded.id,
+  };
+}
 
 /**
  * Get preview URL from media asset
@@ -320,12 +343,6 @@ export function Step3Media({
       );
     });
   }
-
-  const { uploadImage } = useImageUpload({
-    maxSizeMB: MAX_IMAGE_FILE_SIZE_MB,
-    maxWidthOrHeight: 1920,
-    quality: 0.9,
-  });
 
   useEffect(() => {
     if (hasInitialized.current) return;
@@ -704,12 +721,12 @@ export function Step3Media({
 
     setIsUploadingCover(true);
     try {
-      const uploadedImage = await withUploadTimeout(uploadImage(file), "Обложка");
+      const uploadedImage = await withUploadTimeout(uploadEventMediaFile(file), "Обложка");
       if (!uploadedImage) throw new Error("Failed to upload image");
 
       setCoverPreview(uploadedImage.url);
       setCoverPreviewUnavailable(false);
-      onChange({ coverImage: uploadedImage.mediaId ?? uploadedImage.id });
+      onChange({ coverImage: uploadedImage.id });
       toast.success("Обложка загружена");
     } catch (error) {
       console.error("Cover upload error:", error);
@@ -746,10 +763,10 @@ export function Step3Media({
       const file = validFiles[i];
       const placeholderId = placeholders[i].id;
       try {
-        const uploadedImage = await withUploadTimeout(uploadImage(file), file.name);
+        const uploadedImage = await withUploadTimeout(uploadEventMediaFile(file), file.name);
         if (!uploadedImage) throw new Error("Failed to upload image");
 
-        const mediaId = uploadedImage.mediaId ?? uploadedImage.id;
+        const mediaId = uploadedImage.id;
         setGalleryItems((prev) => {
           const next = prev.map((img) =>
             img.id === placeholderId ? { id: mediaId, url: uploadedImage.url, status: "done" as const } : img,
