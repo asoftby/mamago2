@@ -53,8 +53,9 @@ for (const f of activeStateFiles) {
   const src = read(f);
   assert.match(src, /activePlanScopeFor/, `${f} must use activePlanScopeFor`);
   const plainUses = (src.match(/\bplanScopeFor\(/g) ?? []).length;
-  // plan.service keeps exactly one ACL-only use: removePlanItem.
-  assert.equal(plainUses, f.endsWith("plan.service.ts") ? 1 : 0, `${f}: unexpected plain planScopeFor`);
+  // plan.service keeps one ACL-only use (removePlanItem); dayScenario.service one
+  // (setScenarioItemOverride ACL check).
+  assert.equal(plainUses, f.endsWith("plan.service.ts") || f.endsWith("dayScenario.service.ts") ? 1 : 0, `${f}: unexpected plain planScopeFor`);
 }
 const planSvc = read("src/server/services/plan.service.ts");
 const removeBody = planSvc.slice(planSvc.indexOf("export async function removePlanItem"));
@@ -64,6 +65,6 @@ for (const m of planSvc.matchAll(/planItem\.findFirst\(\{\s*where: \{([^}]*)\}/g
   assert.match(m[1], /activePlanScopeFor/, "dedup findFirst must use activePlanScopeFor");
 }
 // The scenario duplicate check also ignores cancelled rows.
-assert.match(read("src/app/api/plan/scenario/route.ts"), /id: \{ not: replacement\.planItemId \}, \.\.\.NOT_CANCELLED/);
+assert.match(read("src/app/api/plan/scenario/route.ts"), /\.\.\.activeScope, activityId: activity\.id, id: \{ not: replacement\.planItemId \}/);
 
 console.log("familyCoreReads.contract.test.ts: OK");
