@@ -138,16 +138,21 @@ export async function getUserWithDetails(userId: string) {
     }),
   ]);
 
-  const businessRelations: BusinessRelationSummary[] = memberships.map((membership) => ({
-    ...membership.business,
-    membershipRole: membership.role,
-    membershipActive: membership.isActive,
-    memberTitle: membership.title,
-    relation:
-      ownedBusiness?.id === membership.business.id
-        ? ("OWNER" as const)
-        : ("MEMBER" as const),
-  }));
+  const businessRelations: BusinessRelationSummary[] = memberships.map((membership) => {
+    const isOwnedBusiness = ownedBusiness?.id === membership.business.id;
+    return {
+      ...membership.business,
+      membershipRole: membership.role,
+      membershipActive: membership.isActive,
+      memberTitle: membership.title,
+      relation:
+        isOwnedBusiness && !membership.isActive
+          ? ("OWNER_WITHOUT_MEMBERSHIP" as const)
+          : isOwnedBusiness
+            ? ("OWNER" as const)
+            : ("MEMBER" as const),
+    };
+  });
 
   if (
     ownedBusiness &&
@@ -208,6 +213,7 @@ export async function getUserWithDetails(userId: string) {
         status: true,
         createdAt: true,
         updatedAt: true,
+        archivedAt: true,
         createdByUserId: true,
         ownerBusinessId: true,
         city: { select: { name: true } },
@@ -237,6 +243,7 @@ export async function getUserWithDetails(userId: string) {
         status: true,
         createdAt: true,
         updatedAt: true,
+        archivedAt: true,
         place: { select: { title: true } },
         business: { select: { id: true, name: true, legalName: true } },
       },
