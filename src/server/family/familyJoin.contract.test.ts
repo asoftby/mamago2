@@ -43,4 +43,13 @@ const prev = merge.slice(merge.indexOf("export async function previewFamilyInvit
 assert.match(prev, /archivedAt/);
 assert.match(prev, /createdById/);
 assert.ok(prev.indexOf("leftAt: null") < prev.indexOf("prisma.child.findMany"), "validity is checked before any family data is read");
+// Consent is persisted before the family's children are disclosed (not just the version echoed).
+const recordAt = prev.indexOf("await recordFamilySharedDataConsent(");
+assert.ok(recordAt > 0, "preview persists the consent record");
+assert.ok(recordAt < prev.indexOf("prisma.child.findMany"), "consent is recorded before any child data is read");
+// FROM_JOIN is enforced by the read scope.
+const access = read("src/server/family/familyAccess.ts");
+const resolve_ = access.slice(access.indexOf("export async function resolveFamilyScope"), access.indexOf("export async function planScopeFor"));
+assert.match(resolve_, /historyAccess: true/);
+assert.match(resolve_, /sharedHistoryFromMembership\(/);
 console.log("familyJoin.contract.test: ok");

@@ -14,6 +14,7 @@ import {
   createFamilyInvite,
   revokeFamilyInvite,
 } from "./familyInvite.service";
+import { planItemScopeWhere, sharedHistoryFromMembership } from "./familyScope";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL must point at a disposable test database");
@@ -184,4 +185,53 @@ test("M3b merge: explicit decisions, SAME/ADD/SKIP, plan PRIVATE by default", as
   const m2 = await db.planItem.findUniqueOrThrow({ where: { id: p2.id } });
   assert.equal(m2.childId, null, "skipped child link dropped");
   assert.notEqual((await db.family.findUniqueOrThrow({ where: { id: joinerFamily } })).archivedAt, null);
+});
+
+test("preview persists consent before disclosing children; accept reuses it", async () => {
+  const owner = await mkUser("cons-owner");
+  const joiner = await mkUser("cons-joiner");
+  const ownerFamily = await ensureFamilyForUser(db, owner);
+  await db.child.create({ data: { parentId: owner, familyId: ownerFamily, createdById: owner, name: "Аня" } });
+  const joinerFamily = await ensureFamilyForUser(db, joiner);
+  await db.child.create({ data: { parentId: joiner, familyId: joinerFamily, createdById: joiner, name: "Петя" } });
+  const { token } = await createFamilyInvite(db, { userId: owner }, deps);
+
+  const preview = await previewFamilyInviteMerge(db, { userId: joiner, token, consentTextVersion: "v1" });
+  assert.equal(preview.targetChildren.length, 1);
+  const afterPreview = await db.consentRecord.findMany({ where: { userId: joiner, familyId: ownerFamily } });
+  assert.equal(afterPreview.length, 1, "consent is recorded at the first disclosure");
+  assert.equal(afterPreview[0].type, "FAMILY_SHARED_DATA");
+  assert.equal(afterPreview[0].textVersion, "v1");
+
+  await previewFamilyInviteMerge(db, { userId: joiner, token, consentTextVersion: "v1" });
+  await acceptFamilyInvite(db, { userId: joiner, token, consentTextVersion: "v1", merge: {
+    plan: "SKIP",
+    children: [{ childId: (await db.child.findFirstOrThrow({ where: { parentId: joiner } })).id, action: "ADD" }],
+  } }, deps);
+  assert.equal(await db.consentRecord.count({ where: { userId: joiner, familyId: ownerFamily } }), 1, "no duplicate record");
+});
+
+test("FROM_JOIN: joiner does not see shared plan items created before joining", async () => {
+  const owner = await mkUser("hist-owner");
+  const joiner = await mkUser("hist-joiner");
+  const ownerFamily = await ensureFamilyForUser(db, owner);
+  const before = await db.planItem.create({
+    data: { userId: owner, familyId: ownerFamily, date: "2026-11-01", title: "before", visibility: "FAMILY", createdAt: new Date(Date.now() - 60_000) },
+  });
+  const { token } = await createFamilyInvite(db, { userId: owner }, deps);
+  await acceptFamilyInvite(db, { userId: joiner, token, consentTextVersion: "v1" }, deps);
+  const after_ = await db.planItem.create({
+    data: { userId: owner, familyId: ownerFamily, date: "2026-11-02", title: "after", visibility: "FAMILY", createdAt: new Date(Date.now() + 60_000) },
+  });
+
+  const scopeOf = async (userId: string) => {
+    const m = await db.familyMembership.findFirstOrThrow({ where: { userId, leftAt: null } });
+    return planItemScopeWhere({ userId, familyId: m.familyId, sharedHistoryFrom: sharedHistoryFromMembership(m) }, true);
+  };
+  const ids = async (userId: string) =>
+    (await db.planItem.findMany({ where: { ...(await scopeOf(userId)), id: { in: [before.id, after_.id] } }, select: { id: true } }))
+      .map((r) => r.id).sort();
+
+  assert.deepEqual(await ids(joiner), [after_.id], "joiner sees only shared items from joinedAt");
+  assert.deepEqual(await ids(owner), [before.id, after_.id].sort(), "owner (ALL) sees full history");
 });
