@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
 import { notifyFamilyPersonasChanged } from "@/lib/family/familyPersonaEvents";
 import { convertHeicFileToJpegIfNeeded } from "@/lib/uploads/heicConversion";
+import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 
 export interface ProfileSaveInput {
   displayName?: string;
@@ -41,14 +42,8 @@ export function useProfileSave() {
           setConverting(false);
         }
 
-        const form = new FormData();
-        form.append("file", avatarFile);
-        const uploadRes = await fetch("/api/upload", { method: "POST", body: form });
-        if (!uploadRes.ok) {
-          const err = await uploadRes.json().catch(() => ({}));
-          throw new Error(err.error ?? "Ошибка загрузки фото");
-        }
-        avatarUrl = (await uploadRes.json()).url;
+        const uploaded = await uploadMediaFile(avatarFile);
+        avatarUrl = uploaded.url;
       }
 
       const patch: Record<string, unknown> = {};

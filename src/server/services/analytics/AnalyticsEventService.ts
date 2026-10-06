@@ -8,6 +8,8 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
+import { findActiveFamilyId } from "@/server/family/ensureFamily";
+import { resolveEventFamilyId } from "@/server/family/eventFamilyContext";
 import type { TrackUserEventInput, TrackUserEventResult } from "@/lib/analytics/types";
 import { applyUserBehaviorEvent } from "@/server/services/analytics/UserBehaviorAggregationService";
 import { enrichSemanticEventMeta } from "@/server/services/analytics/SemanticEventContextService";
@@ -120,6 +122,11 @@ export async function trackUserEvent(
     // hard FK — see UserEvent.decisionId.
     const decisionId = attribution?.runId;
 
+    // Family Core A2: plan/family events always carry the actor's active family
+    // (read-only lookup, never creates a family). An explicit null/id from the
+    // caller wins.
+    const familyId = await resolveEventFamilyId(input, (userId) => findActiveFamilyId(prisma, userId));
+
     let userEvent;
     try {
       userEvent = await prisma.userEvent.create({
@@ -128,7 +135,7 @@ export async function trackUserEvent(
           userId: input.userId ?? undefined,
           sessionId: input.sessionId ?? undefined,
           anonymousId: input.anonymousId ?? undefined,
-          familyId: input.familyId ?? undefined,
+          familyId: familyId ?? undefined,
           planVisibility: input.planVisibility ?? undefined,
           decisionId,
           eventType: input.eventType,

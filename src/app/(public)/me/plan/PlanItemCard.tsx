@@ -2,11 +2,24 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { formatHHMM } from "@/lib/formatters/date";
 import { resolvePlanItemCategoryLabel } from "@/features/my-plan/lib/planItemMeta";
+import {
+  authorCaption,
+  shouldRefreshAfter,
+  showFamilyUi,
+  visibilityErrorMessage,
+  type FamilyView,
+} from "@/features/my-plan/lib/planVisibilityView";
 import type { SerializedPlanItem } from "./PlanPageClient";
+
+export type VisibilityChange = (
+  itemId: string,
+  next: { visibility: "PRIVATE" | "FAMILY"; updatedAt: string },
+) => void;
 
 function formatTime(iso: string | null): string | null {
   return formatHHMM(iso) || null;
@@ -15,11 +28,23 @@ function formatTime(iso: string | null): string | null {
 export function PlanItemCard({
   item,
   onRemove,
+  familyView = null,
+  onVisibilityChange,
 }: {
   item: SerializedPlanItem;
   onRemove: (id: string) => void;
+  /** Non-null only for a family with 2+ adults; otherwise the card looks as before. */
+  familyView?: FamilyView | null;
+  onVisibilityChange?: VisibilityChange;
 }) {
+  const router = useRouter();
   const [removing, setRemoving] = useState(false);
+  const [changingVisibility, setChangingVisibility] = useState(false);
+  const familyUi = showFamilyUi(familyView);
+  const currentUserId = familyView?.currentUserId ?? "";
+  const isPrivate = familyUi && item.visibility === "PRIVATE";
+  const isOwn = !item.authorId || item.authorId === currentUserId;
+  const caption = familyUi ? authorCaption(item, currentUserId) : null;
   const title = item.activity?.title ?? item.title ?? "Активность";
   const image = item.activity?.coverImageUrl ?? item.coverImageUrl;
   const category = resolvePlanItemCategoryLabel(item.activity);
@@ -54,6 +79,36 @@ export function PlanItemCard({
     }
   };
 
+  const handleVisibility = async () => {
+    if (changingVisibility) return;
+    const next = isPrivate ? "FAMILY" : "PRIVATE";
+    setChangingVisibility(true);
+    try {
+      const res = await fetch(`/api/plan/items/${item.id}/visibility`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          visibility: next,
+          ...(item.updatedAt ? { expectedUpdatedAt: item.updatedAt } : {}),
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { error?: string; item?: { visibility: "PRIVATE" | "FAMILY"; updatedAt: string } }
+        | null;
+      if (!res.ok || !data?.item) {
+        toast.error(visibilityErrorMessage(data?.error));
+        if (shouldRefreshAfter(data?.error)) router.refresh();
+        return;
+      }
+      onVisibilityChange?.(item.id, { visibility: data.item.visibility, updatedAt: data.item.updatedAt });
+      toast(next === "FAMILY" ? "Теперь видно семье" : "Теперь видите только вы", { duration: 2000 });
+    } catch {
+      toast.error(visibilityErrorMessage(null));
+    } finally {
+      setChangingVisibility(false);
+    }
+  };
+
   const imageNode = (
     <div
       className="h-[118px] w-[176px] shrink-0 overflow-hidden rounded-[14px] max-sm:h-[84px] max-sm:w-[112px] max-sm:rounded-[12px]"
@@ -83,7 +138,7 @@ export function PlanItemCard({
     <article
       className="group grid grid-cols-[176px_minmax(0,1fr)_auto] items-center gap-5 rounded-[18px] border p-[14px] transition-[border-color,transform] duration-200 max-sm:grid-cols-[112px_minmax(0,1fr)_auto] max-sm:gap-3 max-sm:p-3"
       style={{
-        background: "#FAF7F1",
+        background: isPrivate ? "#F3EFE7" : "#FAF7F1",
         borderColor: "rgba(20,18,16,.10)",
       }}
       onMouseEnter={(event) => {
@@ -107,6 +162,23 @@ export function PlanItemCard({
               style={{ color: "var(--primary)" }}
             >
               {category}
+            </span>
+          )}
+          {isPrivate && (
+            <span
+              className="inline-flex items-center gap-1 text-[11px]"
+              style={{ color: "rgba(20,18,16,.62)" }}
+            >
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="4" y="11" width="16" height="10" rx="2" />
+                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+              </svg>
+              Видите только вы
+            </span>
+          )}
+          {caption && (
+            <span className="text-[11px]" style={{ color: "rgba(20,18,16,.62)" }}>
+              {caption}
             </span>
           )}
           {unavailable && (
@@ -180,6 +252,21 @@ export function PlanItemCard({
           </Link>
         ) : (
           <span className="h-9 w-9 max-sm:h-8 max-sm:w-8" />
+        )}
+
+        {familyUi && isOwn && (
+          <button
+            type="button"
+            onClick={handleVisibility}
+            disabled={changingVisibility}
+            className="text-[11px]"
+            style={{
+              color: "var(--primary)",
+              cursor: changingVisibility ? "default" : "pointer",
+            }}
+          >
+            {changingVisibility ? "…" : isPrivate ? "Поделиться с семьёй" : "Сделать личным"}
+          </button>
         )}
 
         <button

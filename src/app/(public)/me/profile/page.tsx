@@ -6,6 +6,9 @@ import { mapFamilyRoleToLabel } from "@/lib/account/mapFamilyRoleToLabel";
 import { buildAdultPreferenceDisplayLine } from "@/lib/adultPersonaSignals/buildAdultPreferenceLine";
 import { ChildrenCard } from "@/features/me/components/ChildrenCard";
 import { childScopeFor } from "@/server/family/familyAccess";
+import { familyInvitesEnabled, familyReadsEnabled } from "@/server/family/familyScope";
+import { listFamilyForUser } from "@/server/family/familyMembers.service";
+import { FamilyMembersCard } from "@/features/family/components/FamilyMembersCard";
 
 export default async function FamilyProfilePage() {
   const user = await getCurrentUser();
@@ -22,6 +25,15 @@ export default async function FamilyProfilePage() {
     preferenceSummary: user.preferenceSummary,
     leisureFormatSummary: user.leisureFormatSummary,
   });
+  const reads = familyReadsEnabled();
+  const invitesEnabled = familyInvitesEnabled();
+  const family = reads ? await listFamilyForUser(prisma, user.id) : null;
+  // Lazy family: a user without a family row can still invite (the family is created on first invite).
+  const soloFallback =
+    reads && invitesEnabled && !family
+      ? { myRole: "OWNER" as const, adults: [{ userId: user.id, displayName: user.displayName ?? null, role: "OWNER" as const, isMe: true }], invites: [] as Array<{ id: string; createdAt: Date }> }
+      : null;
+  const familyView = family ?? soloFallback;
   const displayName = user.displayName?.trim() || user.email?.split("@")[0] || "Я";
 
   return (
@@ -47,6 +59,20 @@ export default async function FamilyProfilePage() {
         }}
         familyChildren={children}
       />
+      {familyView ? (
+        <FamilyMembersCard
+          myRole={familyView.myRole}
+          adults={familyView.adults.map((a) => ({
+            userId: a.userId,
+            displayName: a.displayName,
+            role: a.role,
+            isMe: a.isMe,
+          }))}
+          invites={familyView.invites.map((i) => ({ id: i.id, createdAt: i.createdAt.toISOString() }))}
+          invitesEnabled={invitesEnabled}
+          hasChildren={children.length > 0}
+        />
+      ) : null}
     </main>
   );
 }

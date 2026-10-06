@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { convertHeicFileToJpegIfNeeded, isHeicFile } from "./heicConversion";
+import { convertHeicFileToJpegIfNeeded, hasJpegSignature, isHeicFile } from "./heicConversion";
 
 function file(name: string, type: string): File {
   return new File(["fake-bytes"], name, { type });
@@ -20,6 +20,18 @@ function testDetectsByExtensionWhenMimeTypeIsEmpty() {
   assert.equal(isHeicFile(file("IMG_1234.jpg", "")), false);
 }
 
+
+async function testJpegSignatureVerification() {
+  assert.equal(
+    await hasJpegSignature(new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])])),
+    true,
+  );
+  assert.equal(
+    await hasJpegSignature(new Blob([new Uint8Array([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70])])),
+    false,
+  );
+}
+
 async function testNonHeicFileIsReturnedUnchanged() {
   const original = file("photo.jpg", "image/jpeg");
   const result = await convertHeicFileToJpegIfNeeded(original);
@@ -29,6 +41,7 @@ async function testNonHeicFileIsReturnedUnchanged() {
 async function main() {
   testDetectsByMimeType();
   testDetectsByExtensionWhenMimeTypeIsEmpty();
+  await testJpegSignatureVerification();
   await testNonHeicFileIsReturnedUnchanged();
 }
 

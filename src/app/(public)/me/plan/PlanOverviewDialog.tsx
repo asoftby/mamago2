@@ -6,7 +6,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PlanItemCard } from "./PlanItemCard";
+import { PlanItemCard, type VisibilityChange } from "./PlanItemCard";
+import type { FamilyView } from "@/features/my-plan/lib/planVisibilityView";
 import type { SerializedPlanItem } from "./PlanPageClient";
 
 const MONTHS_RU_GENITIVE = [
@@ -55,6 +56,8 @@ export function PlanOverviewDialog({
   totalItems,
   totalDays,
   onRemove,
+  familyView,
+  onVisibilityChange,
   onOpenDay,
 }: {
   open: boolean;
@@ -63,6 +66,8 @@ export function PlanOverviewDialog({
   totalItems: number;
   totalDays: number;
   onRemove: (id: string) => void;
+  familyView?: FamilyView | null;
+  onVisibilityChange?: VisibilityChange;
   onOpenDay: (date: string) => void;
 }) {
   const dates = Object.keys(itemsByDate)
@@ -125,7 +130,7 @@ export function PlanOverviewDialog({
 
                     <div className="flex flex-col gap-2.5">
                       {dateItems.map((item) => (
-                        <PlanItemCard key={item.id} item={item} onRemove={onRemove} />
+                        <PlanItemCard key={item.id} item={item} onRemove={onRemove} familyView={familyView} onVisibilityChange={onVisibilityChange} />
                       ))}
                     </div>
                   </section>

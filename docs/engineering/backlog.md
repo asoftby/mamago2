@@ -5051,7 +5051,7 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Added: 2026-10-04
 - Reason deferred: Family Core B2 switches only Child/PlanItem reads and writes (`plan.service`, `/api/children*`, profile pages, persona context) to `familyId`. Until family invites exist every family has one adult, so per-user consumers behave identically. They become wrong only once a family has two adults, i.e. they must land before the "MVP shared plan" PR enables invites.
 - Context: reminder and digest jobs (`run-plan-event-reminders-core.ts`, `run-plan-tomorrow-digests-core.ts`, `listPlanItemsDueForReminder`, `listPlanItemsForUserDates`) map one PlanItem to one recipient via `userId` and need a fan-out to all active adult members (respecting PRIVATE items); `DayScenario` (`userId_date` unique), `setScenarioItemOverride`, `/api/plan/scenario` writes and `Experience` (`userId`, ownership checks in `confirmPlanExperience`) are per user while two adults would share one PlanItem; `computePlanFingerprint` depends on the item set.
-- Current state: `plan.service` list/dedup/remove and the read-only plan queries listed in the B2 PR use `planScopeFor`; the consumers above still use `userId`.
+- Current state: `plan.service` list/dedup/remove and the read-only plan queries listed in the B2 PR use `planScopeFor`. M1a (2026-10-06) converted reminders/digests (fan-out to active adults, PRIVATE stays with owner), Experience (one per plan item, any adult who sees the item may record/feedback; `Experience.userId` = recorder) and DayScenario/`/api/plan/scenario` (scenario row stays per user, items come from family scope). Remaining: analytics (BACKLOG-164 / M1b).
 - Dependencies: Family Core B2 merged and `FAMILY_CORE_READS` enabled.
 - Acceptance criteria: with a two-adult family, a FAMILY item reminds/digests every adult exactly once, a PRIVATE item only its owner; scenarios and experiences have a documented per-user or per-family model with tests.
 - Source: Family Core B2 audit.
@@ -5064,6 +5064,7 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Added: 2026-10-04
 - Reason deferred: product decision needed on the unit of measure (user vs family); identical numbers while every family has one adult.
 - Context: `analyticsQueryHelpers.ts` and `analyticsBehavior.service.ts` (youngest child band keyed by `Child.parentId`), `SegmentResolverService.ts` (`user._count.children`), `planningActivity.ts` and `weeklyPlanningFamilies.ts` (raw SQL on `PlanItem.userId`), `countPlanUsersByActivity` (`distinct` on `userId`).
+- Current state: M1b (2026-10-06) converted `countPlanUsersByActivity` (family unit when `FAMILY_CORE_READS` on), youngest-child band (`youngestChildBirthByUser`, both analytics services) and `fetchUserSegmentContext` children count. Still open: `planningActivity.ts` / `weeklyPlanningFamilies.ts` raw SQL on `PlanItem.userId` (stay per-user "active users"; a family unit needs a product decision before invites are enabled).
 - Dependencies: BACKLOG-163 / shared plan release.
 - Acceptance criteria: decision recorded; queries counting "families" use `familyId`; numbers reconcile with the old ones on single-adult data.
 - Source: Family Core B2 audit.
@@ -5078,3 +5079,88 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Context: `pnpm test:family-core-foundation` fails on the B1-era guard `assert.doesNotMatch(read("src/server/services/planOwner.ts"), /familyId/)` because B2 legitimately made `planOwner.ts` family-aware. B2 only ran the reads contract.
 - Acceptance criteria: drop or update that B1 guard; `test:family-core-foundation` is green on `dev`.
 - Source: Family Core B3 verification.
+
+## [BACKLOG-166] Family Core A2 part 2: `NOT NULL` + CHECKs on `Child.familyId`/`PlanItem.familyId`, drop `Child.parentId` ownership
+
+- Status: BLOCKED (needs PROD B1 migration + backfill `--events` results, and a decision on tombstone rows)
+- Priority: P2
+- Area: Family Core / Schema
+- Added: 2026-10-05
+- Reason deferred: A2 part 1 (events always write `familyId`; read-only preflight `scripts/sql/family-core-not-null-preflight.sql`) ships first. `NOT NULL` is only safe once every `must_be_zero` row of the preflight is 0 on PROD.
+- Context: tombstone users' `Child`/`PlanItem` without `familyId` (preflight `info` rows) decide whether `NOT NULL` is possible at all: either clean them or keep the column nullable with a CHECK for live users only. `Child.parentId` is still required and cascades on User delete; A2 part 2 removes it as owner.
+- Acceptance criteria: preflight output from PROD recorded; decision on tombstone rows recorded; hand-written migration (no `migrate dev`/`db push`) with rollback SQL proven on disposable PostgreSQL.
+- Source: Family Core A2 scope.
+
+## [BACKLOG-167] Family Core: archived joiner family — 30-day retention purge and restore
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Invites
+- Added: 2026-10-06
+- Reason deferred: M3b archives the joiner's previous family (`Family.archivedAt`, membership `leftAt`) and leaves data they chose not to transfer (SKIP) in it. The contract promises 30-day retention and a restore flow in the later "Управление семьёй" PR; neither a purge job nor restore exists yet.
+- Context: `applyJoinerMerge` / `acceptFamilyInvite` (`src/server/family/`). Archived families are invisible to all reads (no active membership).
+- Acceptance criteria: a scheduled purge deletes archived joiner families older than 30 days with their Child/PlanItem rows; restore within 30 days is possible; documented in the privacy text.
+- Source: Family Core M3b.
+
+## [BACKLOG-168] Family Core M4: other sources of significant plan-item actions are not yet events
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Plan
+- Added: 2026-10-06
+- Reason deferred: M4a blocks FAMILY → PRIVATE after another adult's significant action, judged from events with `meta.planItemId` (`PLAN_ITEM_RESCHEDULED`, `PLAN_AUDIENCE_SNAPSHOT`, `BOOKING_CREATED`, `ATTENDED`) plus `Experience` rows. `PLAN_ITEM_RESCHEDULED` is emitted only by `addPlanItem` (re-adding an activity on another date/time).
+- Context: `/api/plan/scenario` replacements (activity/startsAt change) and any future edit/cancel/confirm endpoints (PROPOSED flow, cancel, M6 bookings with `planItemId`) must emit the same events, otherwise another adult's action does not block "make private".
+- Acceptance criteria: every write path that changes date/time/participants/status/booking of a shared item by a user emits a typed event with `meta.planItemId`; test per path.
+- Source: Family Core M4a.
+
+## [BACKLOG-169] Family Core M4c: "Видно семье" switch only on event/place save flows
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Plan UI
+- Added: 2026-10-06
+- Reason deferred: the switch (new items only) is shown where `SaveToPlanResult.visibility` actually reaches `/api/save/plan`: event page, `SaveHeart`, `PlaceSaveHeart` (`showVisibilityToggle`). Other add-to-plan entry points (offers, route cards/pages, onboarding flows, recommendations, ideas, `useMyPlan`, guest-after-auth resume, `/api/save/plan/day`) still create FAMILY items; a private item there is made with "Сделать личным" on the card.
+- Context: a contract test (`planAddVisibility.contract.test.ts`) forbids enabling the switch without forwarding the value, so a choice is never silently ignored. Also not built: "Предложить, а не добавлять" (PROPOSED flow), the "invite your partner" block for single-adult families, the activity strip.
+- Acceptance criteria: remaining entry points forward `visibility` and enable the switch; guest resume carries it through `saveFlowContext`.
+- Source: Family Core M4c.
+
+## [BACKLOG-170] Family Core M5: full "Управление семьёй" and archived-family restore
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Profile
+- Added: 2026-10-06
+- Reason deferred: M5 ships list of adults/children, invite (link + optional letter), ADULT leave (new solo family, own PRIVATE items and an optional copy of children go with him), OWNER → ADULT ownership transfer. Not built: OWNER excluding another adult, restoring an archived family, merging two families after leaving, per-adult `historyAccess` change, rename of the family.
+- Context: the leaver loses access to FAMILY items of the old family (they stay there, author kept). Invite email is used only to send the letter and is not stored; the link is accepted by any signed-in account holding it (one-time, no expiry (until accepted or revoked), ≤3 active); letters limited to 5 per user per day.
+- Acceptance criteria: product decision on exclusion/restore semantics, then services + UI + integration tests.
+- Source: Family Core M5a.
+
+## [BACKLOG-171] Family invites: stale unused links count toward the 3-active cap
+
+- Status: OPEN
+- Priority: P3
+- Area: Family Core / Invites
+- Added: 2026-10-06
+- Reason deferred: invites no longer expire, so an unused link occupies one of 3 slots until accepted or revoked (revoke is in the profile UI, M5b).
+- Acceptance criteria: decide whether to show "created N days ago" with a prompt to revoke old links or to auto-archive links older than a threshold.
+- Source: Family invite no-expiry change.
+
+## [BACKLOG-172] Media pipeline: native server-side HEIC/HEIF decoding and removal of mandatory browser conversion
+
+- Status: OPEN
+- Priority: P2
+- Area: Media / Upload pipeline
+- Added: 2026-10-06
+- Reason deferred: current production-safe architecture normalizes browser HEIC/HEIF to JPEG in `uploadMediaFile()` before upload because the deployed `sharp/libvips` image has no HEVC decoder. The boundary is centralized and guarded against raw HEIC pass-through, but server-to-server paths and direct API clients cannot rely on a browser/WASM converter.
+- Context: the final architecture should accept real HEIC/HEIF as a first-class input on the backend, detect the actual format from bytes, decode it in the canonical media pipeline, and then generate the same WebP/responsive derivatives as JPEG/PNG/WebP/GIF/AVIF. This must cover browser uploads, direct API clients, remote-image imports, Telegram ingestion and a future native app without format-specific UI workarounds.
+- Acceptance criteria:
+  - the production media runtime has a supported HEIC/HEIF decoder (HEVC-capable `libvips/sharp` build or a dedicated media-decoding service) and its capability is verified during build/startup;
+  - `/api/upload`, `/api/upload/wizard`, `/api/upload/v2` and server-side/import upload paths accept raw HEIC/HEIF through one byte-sniffed validation/processing contract;
+  - raw file bytes, declared MIME and filename cannot disagree silently; spoofed metadata/byte mismatches fail before decode, while corrupt or unsupported image payloads may fail during decode but always fail before storage with a stable user-facing error;
+  - real iPhone HEIC fixtures (including modern HDR/variant files that previously reached the missing-HEVC path) are covered by an automated integration/smoke test;
+  - JPEG/PNG/WebP/GIF/AVIF behavior, deduplication, EXIF orientation, size limits and responsive derivative generation remain regression-tested;
+  - browser-side HEIC→JPEG conversion becomes optional compatibility fallback or is removed entirely once server support is proven; no page/wizard contains its own HEIC allow/deny logic;
+  - API/docs MIME contract matches reality: HEIC/HEIF is advertised as accepted only while the deployed backend can actually decode it;
+  - logs/metrics distinguish decode failures, unsupported/corrupt files and resource-limit failures without exposing `sharp/libheif` internals to users.
+- Exit criterion: one raw HEIC file can be uploaded successfully through browser UI, direct API and one server-side ingestion path, all producing the same canonical MediaAsset/derivatives without any client-side conversion requirement.
+- Source: HEIC incidents and fixes #441, #448, #455.

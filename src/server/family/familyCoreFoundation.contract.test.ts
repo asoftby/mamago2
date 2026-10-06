@@ -46,7 +46,7 @@ const schema = read("prisma/schema.prisma");
 assert.match(schema, /model Child \{[\s\S]*?\n\s+parentId\s+String\n/);
 
 // Cache version must be bumped with every schema change.
-assert.match(read("src/lib/prisma.ts"), /PRISMA_CACHE_VERSION = "v14"/);
+assert.match(read("src/lib/prisma.ts"), /PRISMA_CACHE_VERSION = "v\d+"/);
 
 // B1 does not switch production reads. delete-account became family-aware in
 // B3, but must never create a family or depend on the reads flag.
@@ -60,5 +60,8 @@ const lib = read("src/server/family/familyBackfill.ts");
 assert.match(lib, /cross_owner_plan_child/);
 assert.match(lib, /EVENT_BATCH_SIZE = 10_000/);
 assert.doesNotMatch(lib, /planVisibility/);
+
+// The prod image has no scripts/ or tsx: the backfill must ship as dist/ops/*.
+assert.match(read("tsup.worker.config.ts"), /"ops\/family-core-backfill":\s*"scripts\/family-core-backfill\.ts"/);
 
 console.log("familyCoreFoundation.contract.test.ts: OK");

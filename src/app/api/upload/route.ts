@@ -154,7 +154,11 @@ export async function POST(req: NextRequest) {
         fileType: file.type,
         fileName: file.name,
       });
-      return jsonUploadError("IMAGE_PROCESSING_FAILED", message, 400);
+      const userMessage =
+        actualMimeType === "image/heic" || actualMimeType === "image/heif"
+          ? "Не удалось преобразовать HEIC/HEIF в JPEG перед загрузкой. Обновите страницу и попробуйте загрузить фото ещё раз."
+          : message;
+      return jsonUploadError("IMAGE_PROCESSING_FAILED", userMessage, 400);
     }
 
     let masterFilename = "";

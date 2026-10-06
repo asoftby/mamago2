@@ -1,8 +1,18 @@
+import type { PlanVisibility } from "@prisma/client";
+import { planCountUnit } from "@/server/family/familyAnalyticsPure";
 import { prisma } from "@/lib/prisma";
+import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { resolveRouteForUserSave } from "@/server/services/route.service";
 import type { PublicationPriceMode } from "@/domain/pricing/normalizedPrice";
 import { resolvePlanActivityOccurrence } from "@/server/services/planOccurrence.service";
-import { NOT_CANCELLED, activePlanScopeFor, familyIdForWrite, planScopeFor } from "@/server/family/familyAccess";
+import {
+  NOT_CANCELLED,
+  activePlanScopeFor,
+  familyIdForWrite,
+  familyReadsEnabled,
+  planScopeFor,
+} from "@/server/family/familyAccess";
+import { fanOutItemsToDigestTargets, fanOutItemsToFamilyMembers } from "@/server/family/planRecipients";
 
 const planActivitySelect = {
   id: true,
@@ -74,6 +84,9 @@ export type PlanItemWithActivity = {
   title: string | null;
   coverImageUrl: string | null;
   createdAt: Date;
+  /** Family Core: audience + version for edit-conflict checks (persisted rows). */
+  visibility?: PlanVisibility;
+  updatedAt?: Date;
   activity: {
     id: string;
     slug: string | null;
@@ -117,24 +130,30 @@ export type PlanItemWithActivity = {
 export type PlanReminderCandidate = PlanItemWithActivity;
 
 /**
- * Current number of users who have each activity in My Plan.
- * PlanItem is the source of truth: removing an item lowers the count, while
- * moving/re-adding the same activity for another date still counts one user.
+ * Current number of users (families, with FAMILY_CORE_READS on) who have each
+ * activity in My Plan. PlanItem is the source of truth: removing an item lowers
+ * the count, while moving/re-adding the same activity for another date still
+ * counts one. With the flag on, two adults sharing a family count once.
  */
 export async function countPlanUsersByActivity(
   activityIds: string[],
 ): Promise<Map<string, number>> {
   if (activityIds.length === 0) return new Map();
 
+  const familyUnit = familyReadsEnabled();
   const rows = await prisma.planItem.findMany({
-    where: { activityId: { in: activityIds } },
-    select: { activityId: true, userId: true },
-    distinct: ["activityId", "userId"],
+    where: { activityId: { in: activityIds }, ...(familyUnit ? NOT_CANCELLED : {}) },
+    select: { activityId: true, userId: true, familyId: true },
+    distinct: ["activityId", "userId", "familyId"],
   });
 
+  const seen = new Set<string>();
   const counts = new Map<string, number>();
   for (const row of rows) {
     if (!row.activityId) continue;
+    const key = `${row.activityId}|${familyUnit ? planCountUnit(row) : row.userId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     counts.set(row.activityId, (counts.get(row.activityId) ?? 0) + 1);
   }
   return counts;
@@ -159,17 +178,34 @@ export async function addPlanItem(
   date: string,
   startsAt?: Date,
   title?: string,
-  coverImageUrl?: string
+  coverImageUrl?: string,
+  /** Family Core M4c: audience of a NEW item (existing items keep theirs). Default FAMILY. */
+  visibility?: PlanVisibility,
 ): Promise<{ id: string; created: boolean }> {
   // Only deduplicate when activityId is present
   if (activityId) {
     const occurrence = await resolvePlanActivityOccurrence({ userId, activityId, date });
     if (occurrence.kind === "update") {
+      const before = await prisma.planItem.findUnique({
+        where: { id: occurrence.planItemId },
+        select: { date: true, startsAt: true, familyId: true, visibility: true },
+      });
       const updated = await prisma.planItem.update({
         where: { id: occurrence.planItemId },
         data: { date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
         select: { id: true },
       });
+      if (before && (before.date !== date || (before.startsAt?.getTime() ?? null) !== (startsAt?.getTime() ?? null))) {
+        // Family Core M4a: a date/time change is a significant action (blocks FAMILY -> PRIVATE
+        // when made by another adult). Best-effort: trackUserEvent never throws.
+        await trackUserEvent({
+          userId,
+          eventType: "PLAN_ITEM_RESCHEDULED",
+          familyId: before.familyId,
+          planVisibility: before.visibility,
+          meta: { planItemId: updated.id },
+        });
+      }
       return { ...updated, created: false };
     }
     if (occurrence.kind === "completed_same_date") {
@@ -178,7 +214,7 @@ export async function addPlanItem(
   }
 
   const created = await prisma.planItem.create({
-    data: { userId, familyId: await familyIdForWrite(userId), activityId: activityId ?? null, date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
+    data: { userId, familyId: await familyIdForWrite(userId), ...(visibility ? { visibility } : {}), activityId: activityId ?? null, date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
     select: { id: true },
   });
   return { ...created, created: true };
@@ -192,7 +228,7 @@ export async function addRoutePlanItem(
   routeId: string,
   date: string,
   routeSlug?: string | null,
-  options?: { title?: string | null; coverImageUrl?: string | null }
+  options?: { title?: string | null; coverImageUrl?: string | null; visibility?: PlanVisibility }
 ): Promise<{ id: string }> {
   const resolved = await resolveRouteForUserSave(routeId, routeSlug);
   if (resolved) {
@@ -218,6 +254,7 @@ export async function addRoutePlanItem(
       data: {
         userId,
         familyId: await familyIdForWrite(userId),
+        ...(options?.visibility ? { visibility: options.visibility } : {}),
         routeId: resolved.id,
         planRouteSlug: null,
         activityId: null,
@@ -294,7 +331,7 @@ export async function addPlacePlanItem(
   placeId: string,
   date: string,
   placeSlug?: string | null,
-  options?: { title?: string | null; coverImageUrl?: string | null },
+  options?: { title?: string | null; coverImageUrl?: string | null; visibility?: PlanVisibility },
 ): Promise<{ id: string }> {
   const resolved = await resolvePlaceForUserSave(placeId, placeSlug);
   if (!resolved) {
@@ -329,6 +366,7 @@ export async function addPlacePlanItem(
     data: {
       userId,
       familyId: await familyIdForWrite(userId),
+      ...(options?.visibility ? { visibility: options.visibility } : {}),
       placeId: resolved.id,
       planPlaceSlug: resolved.slug,
       activityId: null,
@@ -537,11 +575,28 @@ export async function listPlanItemsByDate(
   })) as PlanItemWithActivity[];
 }
 
+/** Active adults per family (leftAt = null). */
+async function listActiveMembersByFamily(familyIds: string[]): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (familyIds.length === 0) return map;
+  const rows = await prisma.familyMembership.findMany({
+    where: { familyId: { in: familyIds }, leftAt: null },
+    select: { familyId: true, userId: true },
+  });
+  for (const row of rows) map.set(row.familyId, [...(map.get(row.familyId) ?? []), row.userId]);
+  return map;
+}
+
+/**
+ * Reminder candidates. With family reads on, a FAMILY item is returned once per
+ * active adult (the copy carries the RECIPIENT in `userId`), a PRIVATE item only
+ * for its author; with reads off, one candidate per item for its author as before.
+ */
 export async function listPlanItemsDueForReminder(args: {
   windowStart: Date;
   windowEnd: Date;
 }): Promise<PlanReminderCandidate[]> {
-  return (await prisma.planItem.findMany({
+  const rows = (await prisma.planItem.findMany({
     where: {
       activityId: { not: null },
       ...NOT_CANCELLED,
@@ -556,6 +611,11 @@ export async function listPlanItemsDueForReminder(args: {
     },
     orderBy: { startsAt: "asc" },
   })) as PlanReminderCandidate[];
+  if (!familyReadsEnabled()) return rows;
+
+  const withFamily = rows as Array<PlanReminderCandidate & { familyId?: string | null }>;
+  const familyIds = [...new Set(withFamily.map((r) => r.familyId).filter((id): id is string => !!id))];
+  return fanOutItemsToFamilyMembers(withFamily, await listActiveMembersByFamily(familyIds));
 }
 
 /**
@@ -614,12 +674,35 @@ export async function listPlanItemsForUserDates(
 ): Promise<PlanTomorrowDigestCandidate[]> {
   if (targets.length === 0) return [];
 
-  return (await prisma.planItem.findMany({
+  if (!familyReadsEnabled()) {
+    return (await prisma.planItem.findMany({
+      where: {
+        ...NOT_CANCELLED,
+        OR: targets.map((target) => ({ userId: target.userId, date: target.date })),
+      },
+      include: { activity: { select: planActivitySelect } },
+      orderBy: [{ userId: "asc" }, { startsAt: "asc" }, { createdAt: "asc" }],
+    })) as PlanTomorrowDigestCandidate[];
+  }
+
+  const memberships = await prisma.familyMembership.findMany({
+    where: { userId: { in: [...new Set(targets.map((t) => t.userId))] }, leftAt: null },
+    select: { userId: true, familyId: true },
+  });
+  const familyByUser = new Map(memberships.map((m) => [m.userId, m.familyId]));
+  const familyTargets = targets.map((t) => ({ ...t, familyId: familyByUser.get(t.userId) ?? null }));
+
+  const rows = (await prisma.planItem.findMany({
     where: {
       ...NOT_CANCELLED,
-      OR: targets.map((target) => ({ userId: target.userId, date: target.date })),
+      OR: familyTargets.map((t) =>
+        t.familyId
+          ? { familyId: t.familyId, date: t.date, OR: [{ visibility: "FAMILY" as const }, { userId: t.userId }] }
+          : { userId: t.userId, date: t.date },
+      ),
     },
     include: { activity: { select: planActivitySelect } },
-    orderBy: [{ userId: "asc" }, { startsAt: "asc" }, { createdAt: "asc" }],
-  })) as PlanTomorrowDigestCandidate[];
+    orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
+  })) as Array<PlanTomorrowDigestCandidate & { familyId?: string | null; visibility?: "PRIVATE" | "FAMILY" }>;
+  return fanOutItemsToDigestTargets(rows, familyTargets);
 }

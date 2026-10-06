@@ -1,8 +1,16 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import {
+  PLAN_SCOPE_STORAGE_KEY,
+  filterByScope,
+  parsePlanScopeFilter,
+  showFamilyUi,
+  type FamilyView,
+  type PlanScopeFilter,
+} from "@/features/my-plan/lib/planVisibilityView";
 import { Container } from "@/components/ui/Container";
 import { WeekCalendar } from "./WeekCalendar";
 import { PlanDayList } from "./PlanDayList";
@@ -28,6 +36,12 @@ export type SerializedPlanItem = {
   activityId: string | null;
   title: string | null;
   coverImageUrl: string | null;
+  /** Family Core M4b. Absent on items added client-side before a reload (= own, shared). */
+  visibility?: "PRIVATE" | "FAMILY";
+  authorId?: string;
+  authorName?: string | null;
+  /** Version for edit-conflict checks (ISO). */
+  updatedAt?: string;
   planAvailability?: PlanActivityPublicAvailability;
   activity: {
     id: string;
@@ -59,6 +73,8 @@ export type SerializedIdea = {
 
 type Props = {
   initialItems: SerializedPlanItem[];
+  /** Non-null only for a family with 2+ active adults (flag FAMILY_CORE_READS on). */
+  familyView?: FamilyView | null;
   ideaActivityIds: string[];
   childrenAges: number[];
   initialIdeas?: SerializedIdea[];
@@ -242,6 +258,7 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export function PlanPageClient({
   initialItems,
+  familyView = null,
   ideaActivityIds,
   initialIdeas = [],
   scenarioStatusByDate = {},
@@ -256,21 +273,57 @@ export function PlanPageClient({
   );
   const [items, setItems] = useState(initialItems);
   const [overviewOpen, setOverviewOpen] = useState(false);
+  const familyUi = showFamilyUi(familyView);
+  const [scope, setScope] = useState<PlanScopeFilter>("all");
+
+  // The chosen chip is remembered per browser; read after mount to keep SSR markup stable.
+  useEffect(() => {
+    try {
+      setScope(parsePlanScopeFilter(window.localStorage.getItem(PLAN_SCOPE_STORAGE_KEY)));
+    } catch {
+      /* storage unavailable: keep "all" */
+    }
+  }, []);
+  // Server data is the source of truth after a refresh (e.g. after a conflict).
+  useEffect(() => {
+    setItems(initialItems);
+  }, [initialItems]);
+
+  const changeScope = (next: PlanScopeFilter) => {
+    setScope(next);
+    try {
+      window.localStorage.setItem(PLAN_SCOPE_STORAGE_KEY, next);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const visibleItems = useMemo(
+    () => (familyUi ? filterByScope(items, scope, familyView?.currentUserId ?? "") : items),
+    [items, scope, familyUi, familyView],
+  );
 
   const itemsByDate = useMemo(() => {
-    return items.reduce<Record<string, SerializedPlanItem[]>>((acc, item) => {
+    return visibleItems.reduce<Record<string, SerializedPlanItem[]>>((acc, item) => {
       if (!acc[item.date]) acc[item.date] = [];
       acc[item.date].push(item);
       return acc;
     }, {});
-  }, [items]);
+  }, [visibleItems]);
 
   const dayItems = itemsByDate[selectedDate] ?? [];
-  const totalItems = items.length;
+  const totalItems = visibleItems.length;
   const totalDays = Object.keys(itemsByDate).length;
 
   const handleRemoveItem = (itemId: string) => {
     setItems((prev) => prev.filter((i) => i.id !== itemId));
+  };
+
+  const handleVisibilityChange = (
+    itemId: string,
+    next: { visibility: "PRIVATE" | "FAMILY"; updatedAt: string },
+  ) => {
+    setItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, ...next } : i)));
   };
 
   const hasIdeas = initialIdeas.length > 0;
@@ -416,6 +469,36 @@ export function PlanPageClient({
         />
       </Container>
 
+      {familyUi && (
+        <Container>
+          <div role="tablist" aria-label="Что показывать в плане" className="flex gap-2 pb-6">
+            {(
+              [
+                ["all", "Всё"],
+                ["family", "Семья"],
+                ["mine", "Моё"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={scope === value}
+                onClick={() => changeScope(value)}
+                className="rounded-full border px-4 py-1.5 text-[13px] font-semibold"
+                style={{
+                  borderColor: scope === value ? "#141210" : "rgba(20,18,16,.18)",
+                  background: scope === value ? "#141210" : "transparent",
+                  color: scope === value ? "#fff" : "#3A332B",
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </Container>
+      )}
+
       {/* Week Calendar */}
       <Container className="pb-12">
         <WeekCalendar
@@ -440,6 +523,8 @@ export function PlanPageClient({
             date={selectedDate}
             items={dayItems}
             onRemove={handleRemoveItem}
+            familyView={familyUi ? familyView : null}
+            onVisibilityChange={handleVisibilityChange}
             scenarioStatus={scenarioStatusByDate[selectedDate]}
           />
           {hasIdeas && <IdeasSidebar ideas={initialIdeas} />}
@@ -453,6 +538,8 @@ export function PlanPageClient({
         totalItems={totalItems}
         totalDays={totalDays}
         onRemove={handleRemoveItem}
+        familyView={familyUi ? familyView : null}
+        onVisibilityChange={handleVisibilityChange}
         onOpenDay={(date) => {
           setSelectedDate(date);
           setOverviewOpen(false);

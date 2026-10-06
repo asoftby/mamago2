@@ -46,3 +46,21 @@ export async function childScopeFor(userId: string): Promise<Prisma.ChildWhereIn
 export async function familyIdForWrite(userId: string): Promise<string> {
   return ensureFamilyForUser(prisma, userId);
 }
+
+/**
+ * User ids of all active adults in the user's family (the user included).
+ * Flag off or family-less user: just the user. Used by consumers that key a row
+ * by the recorder (Experience.userId) but expose it family-wide.
+ */
+export async function activeFamilyUserIds(userId: string): Promise<string[]> {
+  if (!familyReadsEnabled()) return [userId];
+  const familyId = await findActiveFamilyId(prisma, userId);
+  if (!familyId) return [userId];
+  const rows = await prisma.familyMembership.findMany({
+    where: { familyId, leftAt: null },
+    select: { userId: true },
+  });
+  const ids = new Set(rows.map((row) => row.userId));
+  ids.add(userId);
+  return [...ids];
+}

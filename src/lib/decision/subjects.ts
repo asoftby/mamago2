@@ -8,6 +8,7 @@ import {
 } from "@/lib/decision/decisionContext";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
 import { childScopeFor } from "@/server/family/familyAccess";
+import { findActiveFamilyId } from "@/server/family/ensureFamily";
 
 export type BuildSubjectsSnapshotInput = {
   userId: string;
@@ -169,6 +170,7 @@ export async function recordPlanAudienceSnapshot(input: {
     await prisma.userEvent.create({
       data: {
         userId: input.userId,
+        familyId: (await findActiveFamilyId(prisma, input.userId)) ?? undefined,
         sessionId: input.sessionId ?? undefined,
         anonymousId: input.anonymousId ?? undefined,
         eventType: "PLAN_AUDIENCE_SNAPSHOT",

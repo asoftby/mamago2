@@ -30,7 +30,10 @@ const bodySchema = z.object({
     (type) =>
       type !== UserEventType.PLAN_AUDIENCE_SNAPSHOT &&
       type !== UserEventType.ATTENDED &&
-      type !== UserEventType.EXPERIENCE_FEEDBACK,
+      type !== UserEventType.EXPERIENCE_FEEDBACK &&
+      type !== UserEventType.PLAN_ITEM_SHARED &&
+      type !== UserEventType.PLAN_ITEM_MADE_PRIVATE &&
+      type !== UserEventType.PLAN_ITEM_RESCHEDULED,
     "server_only_event_type",
   ),
   entityType: z.nativeEnum(AnalyticsEntityType).optional().nullable(),

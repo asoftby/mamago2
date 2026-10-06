@@ -21,6 +21,8 @@ import {
 } from "@/lib/decision/subjects";
 import { readOptionalSafeOpaqueId } from "@/lib/decision/identifiers";
 import { planScopeFor } from "@/server/family/familyAccess";
+import { familyReadsEnabled } from "@/server/family/familyScope";
+import type { PlanVisibility } from "@prisma/client";
 
 function planningTimingForDate(dateKey: string): "same_day" | "weekend" | "advance" {
   if (dateKey === getLocalDateKey()) return "same_day";
@@ -62,6 +64,7 @@ export async function POST(request: NextRequest) {
       planAddSource,
       anonymousId,
       recommendationExposureId,
+      visibility: visibilityRaw,
     } = body as {
       activityId?: string;
       routeId?: string;
@@ -83,7 +86,15 @@ export async function POST(request: NextRequest) {
        * re-checks it server-side. */
       anonymousId?: unknown;
       recommendationExposureId?: unknown;
+      /** Family Core M4c: audience of a NEW item. Honored only with FAMILY_CORE_READS. */
+      visibility?: unknown;
     };
+
+    // Family Core M4c: "PRIVATE" | "FAMILY"; anything else (or flag off) = default.
+    const visibility: PlanVisibility | undefined =
+      familyReadsEnabled() && (visibilityRaw === "PRIVATE" || visibilityRaw === "FAMILY")
+        ? visibilityRaw
+        : undefined;
 
     const anonymousIdParsed = readOptionalSafeOpaqueId(anonymousId);
     const exposureIdParsed = readOptionalSafeOpaqueId(recommendationExposureId);
@@ -132,6 +143,7 @@ export async function POST(request: NextRequest) {
       planItem = await addPlacePlanItem(user.id, placeId, date, planPlaceSlug ?? null, {
         title: title ?? null,
         coverImageUrl: coverImageUrl ?? null,
+        visibility,
       });
 
       const place = await prisma.place.findUnique({
@@ -144,6 +156,7 @@ export async function POST(request: NextRequest) {
         sessionId: sessionRowId,
         anonymousId: validAnonymousId,
         eventType: "PLAN_ADD",
+        planVisibility: visibility,
         entityType: "PLACE",
         entityId: placeId,
         vertical: "CITY",
@@ -163,7 +176,7 @@ export async function POST(request: NextRequest) {
         routeId,
         date,
         planRouteSlug ?? null,
-        { title: title ?? null, coverImageUrl: coverImageUrl ?? null },
+        { title: title ?? null, coverImageUrl: coverImageUrl ?? null, visibility },
       );
       const sessionRowId = await getSessionRowIdFromCookies();
       void trackUserEvent({
@@ -171,6 +184,7 @@ export async function POST(request: NextRequest) {
         sessionId: sessionRowId,
         anonymousId: validAnonymousId,
         eventType: "PLAN_ADD",
+        planVisibility: visibility,
         entityType: "ROUTE",
         entityId: routeId,
         vertical: "CITY",
@@ -212,6 +226,7 @@ export async function POST(request: NextRequest) {
         resolvedStartsAt,
         title ?? undefined,
         coverImageUrl ?? undefined,
+        visibility,
       );
 
       if (planItem.created) {
@@ -228,6 +243,7 @@ export async function POST(request: NextRequest) {
           sessionId: sessionRowId,
           anonymousId: validAnonymousId,
           eventType: "PLAN_ADD",
+        planVisibility: visibility,
           entityType: "EVENT",
           entityId: activityId,
           vertical: "CITY",

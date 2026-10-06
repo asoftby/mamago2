@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { BookingStatus, Prisma, type DayScenario, type DayScenarioItemOverride } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
-import { activePlanScopeFor } from "@/server/family/familyAccess";
+import { activePlanScopeFor, planScopeFor } from "@/server/family/familyAccess";
 
 export type FingerprintSource = {
   id: string;
@@ -291,7 +291,7 @@ export async function setScenarioItemOverride(
   }
 
   const planItem = await prisma.planItem.findFirst({
-    where: { id: planItemId, userId, date },
+    where: { id: planItemId, ...(await planScopeFor(userId)), date },
     select: { id: true },
   });
   if (!planItem) {
