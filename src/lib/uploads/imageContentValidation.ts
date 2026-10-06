@@ -1,4 +1,4 @@
-import { ALLOWED_UPLOAD_MIME_TYPE_SET, inferUploadMimeTypeFromFilename, normalizeUploadMimeType } from "./uploadConfig";
+import { ALLOWED_UPLOAD_MIME_TYPE_SET, normalizeUploadMimeType } from "./uploadConfig";
 
 /** Identify only supported raster containers before passing untrusted bytes to sharp. */
 export function detectImageMimeType(buffer: Buffer): string | null {
@@ -33,10 +33,7 @@ export function validateImageContent(buffer: Buffer, declaredMimeType: string | 
 }
 
 export function validateUploadFileContent(buffer: Buffer, file: Pick<File, "name" | "type">): string {
-  const actual = validateImageContent(buffer, file.type);
-  const filenameType = inferUploadMimeTypeFromFilename(file.name);
-  if (!filenameType || filenameType !== actual) {
-    throw new Error(`Image filename/content mismatch: ${file.name}`);
-  }
-  return actual;
+  // Client-side compression can preserve photo.jpg while replacing its bytes and MIME with WebP.
+  // The filename is metadata, not the format/security boundary.
+  return validateImageContent(buffer, file.type);
 }
