@@ -1218,12 +1218,13 @@ export async function notifyAdminModerationItemCreated(params: {
   itemTitle: string;
   itemId?: string;
   actionUrl?: string;
+  notificationTitle?: string;
 }) {
   return createNotification({
     userId: params.userId,
     audience: "ADMIN",
     type: "ADMIN_MODERATION_ITEM_CREATED",
-    title: "Новый объект на модерации",
+    title: params.notificationTitle ?? "Новый объект на модерации",
     body: params.itemTitle,
     entityType: "MODERATION_ITEM",
     entityId: params.itemId ?? undefined,
@@ -1280,7 +1281,8 @@ export async function notifyAdminsPublicationSubmitted(params: {
       notifyAdminModerationItemCreated({
         userId: admin.id,
         itemId: moderationItemId,
-        itemTitle: `${label} «${params.publicationTitle}» отправлено бизнес-пользователем на модерацию.`,
+        notificationTitle: "Новая публикация на модерации",
+        itemTitle: `${label}: «${params.publicationTitle}»`,
         actionUrl: "/admin/moderation/queue",
       }),
     ),
