@@ -5164,3 +5164,34 @@ distributor_company_id=550) и хотели бы уточнить несколь
   - logs/metrics distinguish decode failures, unsupported/corrupt files and resource-limit failures without exposing `sharp/libheif` internals to users.
 - Exit criterion: one raw HEIC file can be uploaded successfully through browser UI, direct API and one server-side ingestion path, all producing the same canonical MediaAsset/derivatives without any client-side conversion requirement.
 - Source: HEIC incidents and fixes #441, #448, #455.
+
+## [BACKLOG-174] Family Core M6: booking UI entry points do not pass `planItemId`
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Bookings
+- Added: 2026-10-06
+- Reason deferred: `POST /api/public/bookings` accepts an optional `planItemId` (must be visible to the booker), and otherwise auto-links when exactly one not-yet-booked plan item of the same event/place (and date, if given) exists for the booker's family scope. Booking forms, offers (PlanItem has no `offerId`) and camp-shift bookings do not pass it, so ambiguous cases stay unlinked. There is no parent-side cancel flow at all today (status changes are business-only), so "only the booker can cancel" holds by construction; a future parent cancel must check `BookingRequest.userId`.
+- Acceptance criteria: plan card "Забронировать" passes `planItemId`; booking forms started from the plan forward it; offers/camp shifts decide how to map to plan items; a parent cancel action (if added) is limited to the booker and covered by a test.
+- Source: Family Core M6.
+
+## [BACKLOG-173] Family Core M3a: consent text, owner question about history access, simplified onboarding
+
+- Status: OPEN
+- Priority: P1 (blocks enabling FAMILY_INVITES)
+- Area: Family Core / Join
+- Added: 2026-10-06
+- Reason deferred: `/invite/family` is built (auth with `redirectTo`, consent, merge step, notification to the inviter) but stays closed until the product owner fills `FAMILY_CONSENT_TEXT` and `FAMILY_CONSENT_TEXT_VERSION` in `src/server/family/familyConsent.ts` (law № 99-З wording is not invented by the agent). Not built: the owner's question "show the new adult past plans?" (a joiner always starts with `historyAccess = FROM_JOIN`; changing it later needs a UI + service), and the simplified onboarding for a joiner without data.
+- Acceptance criteria: consent text + version published; owner question (notification with a choice) and a service changing `FamilyMembership.historyAccess` with tests; short onboarding after joining.
+- Source: Family Core M3a.
+
+## [BACKLOG-175] HEIC: browser conversion (heic-to/WASM) returned by #441; verify the OOM risk from hotfix 15169fb1 on a phone
+
+- Status: OPEN
+- Priority: P2
+- Area: Media / Event wizard
+- Added: 2026-10-06
+- Reason deferred: #441 deliberately moved HEIC->JPEG conversion into the shared upload transport (`uploadMediaFile`), which decodes HEIC in the browser; hotfix 15169fb1 had removed browser-side decoding from the event wizard because large phone photos exhausted the renderer. The guard test (`Step3Media.uploadSafety.test.ts`) was aligned with the new design in #458 and now pins the effective path (size check before upload, conditional lazy conversion, single decoder entry point), but nothing measures the memory risk.
+- Context: related to BACKLOG-172 (native server-side HEIC decoding, which would remove the browser conversion). Contract test: `src/lib/uploads/uploadPipeline.contract.test.ts`.
+- Acceptance criteria: upload a large HEIC (near `MAX_IMAGE_FILE_SIZE_MB`) from a real phone through the event wizard; the tab survives and the photo is accepted. If the tab crashes or runs out of memory, return server-side conversion or the event-level HEIC rejection (and update both guard tests accordingly).
+- Source: review of #458 (P1).
