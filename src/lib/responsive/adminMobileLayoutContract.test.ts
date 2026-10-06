@@ -244,6 +244,27 @@ assert.deepEqual(
   `Legacy inverted page-gutter pattern (p-6 md:p-4 — 24px phone / 16px md+) found outside nested cards:\n${legacyPageGutterOffenders.join("\n")}`,
 );
 
+// --- Admin navigation contract: no page-level back buttons -----------------
+
+const adminBackControlOffenders: string[] = [];
+for (const root of ["src/app/admin", "src/components/admin"]) {
+  for (const file of collectSourceFiles(root)) {
+    const source = read(file);
+    if (
+      source.includes("ArrowLeft") ||
+      source.includes("<BackButton") ||
+      source.includes("← Назад")
+    ) {
+      adminBackControlOffenders.push(file);
+    }
+  }
+}
+assert.deepEqual(
+  adminBackControlOffenders,
+  [],
+  `Admin pages/components must not render page-level back buttons with left arrows. Use section navigation, tabs, breadcrumbs, or explicit entity links instead:\n${adminBackControlOffenders.join("\n")}`,
+);
+
 const representativeAdminPages = [
   "src/app/admin/orders/page.tsx",
   "src/app/admin/users/page.tsx",
