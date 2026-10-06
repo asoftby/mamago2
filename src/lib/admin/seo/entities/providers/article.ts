@@ -37,7 +37,10 @@ export const articleProvider: SeoEntityProvider = {
         status: true,
         updatedAt: true,
         geoScope: true,
-        city: { select: { slug: true } },
+        cityId: true,
+        regionId: true,
+        city: { select: { id: true, slug: true, name: true } },
+        region: { select: { id: true, name: true } },
         seoH1: true,
         seoTitle: true,
         seoDescription: true,
@@ -55,21 +58,33 @@ export const articleProvider: SeoEntityProvider = {
           ? buildCityPublicPath({ citySlug: a.city.slug, type: "article", slug: seg })
           : buildNationalArticlePath(seg);
       const canonical = a.seoCanonicalUrl?.trim() || path;
-      const entityDiagnostics = buildSegmentEntityDiagnostics("article", {
-        entityId: a.id,
-        title: a.title,
-        slug: a.slug,
-        seoCanonicalUrl: a.seoCanonicalUrl,
-        seoCanonicalSource: a.seoCanonicalSource,
-        seoRobots: a.seoRobots,
-        contentStatus: a.status,
-      });
+      const entityDiagnostics = {
+        ...buildSegmentEntityDiagnostics("article", {
+          entityId: a.id,
+          title: a.title,
+          slug: a.slug,
+          seoCanonicalUrl: a.seoCanonicalUrl,
+          seoCanonicalSource: a.seoCanonicalSource,
+          seoRobots: a.seoRobots,
+          contentStatus: a.status,
+        }),
+        citySlug: a.city?.slug ?? null,
+      };
       return {
         id: `entity:article:${a.id}`,
         path,
         section: "journal",
         type: "article",
-        filtersSnapshot: { entity: "article", entityId: a.id },
+        filtersSnapshot: {
+          entity: "article",
+          entityId: a.id,
+          cityId: a.cityId,
+          citySlug: a.city?.slug ?? null,
+          cityName: a.city?.name ?? null,
+          regionId: a.regionId,
+          regionName: a.region?.name ?? null,
+          geoScope: a.geoScope,
+        },
         title: a.seoTitle?.trim() || a.title,
         h1: a.seoH1?.trim() || a.title,
         description: a.seoDescription?.trim() || a.excerpt || "",

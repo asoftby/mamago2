@@ -5195,3 +5195,55 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Context: related to BACKLOG-172 (native server-side HEIC decoding, which would remove the browser conversion). Contract test: `src/lib/uploads/uploadPipeline.contract.test.ts`.
 - Acceptance criteria: upload a large HEIC (near `MAX_IMAGE_FILE_SIZE_MB`) from a real phone through the event wizard; the tab survives and the photo is accepted. If the tab crashes or runs out of memory, return server-side conversion or the event-level HEIC rejection (and update both guard tests accordingly).
 - Source: review of #458 (P1).
+
+## [BACKLOG-176] SEO Content Plan persistence (P1)
+
+- Status: OPEN
+- Priority: P1
+- Area: Admin / SEO
+- Added: 2026-10-06
+- Reason deferred: P0 SEO admin reorg заложил UI «Контент» (План / Темы / Опубликовано) и `GeoContentMix` (cityShare/regionShare/nationalShare), но без DB-моделей content plan — честные empty states.
+- Context: foundation в `src/lib/admin/seo/geo/*`, UI `src/app/admin/seo/content`. Geo scope должен переиспользовать `Article.geoScope` (CITY|REGION|COUNTRY) и SEO-контекст, без второй geo-модели.
+- Acceptance criteria: persistence идей/тем/плановых публикаций с geo context; actual mix vs target mix в UI; без fake analytics.
+- Source: feat/seo-admin-geo-context-20261006-2 (P0 SEO admin + Geo SEO Context).
+
+## [BACKLOG-177] SEO Analyzer статьи 0–100 (P2)
+
+- Status: OPEN
+- Priority: P2
+- Area: Admin / SEO
+- Added: 2026-10-06
+- Reason deferred: вне scope P0 reorg; нужен отдельный scoring engine.
+- Acceptance criteria: оценка SEO статьи 0–100 с привязкой к geo context и существующим SEO fields.
+- Source: feat/seo-admin-geo-context-20261006-2.
+
+## [BACKLOG-178] Search Intelligence: GSC / Яндекс.Вебмастер / Wordstat (P3)
+
+- Status: OPEN
+- Priority: P2
+- Area: Admin / SEO
+- Added: 2026-10-06
+- Reason deferred: P0 только UX-фундамент `/admin/seo/search` без внешних API и без fake data.
+- Context: будущие `SearchKeyword` / `SearchPerformance` обязаны нести geo context (город/регион/страна).
+- Acceptance criteria: подключены источники; данные фильтруются активным SEO-контекстом; нет смешения гео в одной аналитической массе.
+- Source: feat/seo-admin-geo-context-20261006-2.
+
+## [BACKLOG-179] SEO Opportunity Engine (P4)
+
+- Status: OPEN
+- Priority: P2
+- Area: Admin / SEO
+- Added: 2026-10-06
+- Reason deferred: зависит от Content Plan persistence и Search Intelligence.
+- Acceptance criteria: opportunities с geo scope; ранжирование внутри CITY/REGION/NATIONAL; без насильной квоты плохих тем.
+- Source: feat/seo-admin-geo-context-20261006-2.
+
+## [BACKLOG-180] Автоматический недельный медиаплан с Geo Mix (P5)
+
+- Status: OPEN
+- Priority: P2
+- Area: Admin / SEO
+- Added: 2026-10-06
+- Reason deferred: зависит от Opportunity Engine и configurable `GeoContentMix`.
+- Acceptance criteria: weekly plan с target/actual mix; warning при нехватке качественных региональных тем; editable cityShare/regionShare/nationalShare (сумма 100%).
+- Source: feat/seo-admin-geo-context-20261006-2.

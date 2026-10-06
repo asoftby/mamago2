@@ -42,7 +42,8 @@ export const placeProvider: SeoEntityProvider = {
         seoCanonicalUrl: true,
         seoCanonicalSource: true,
         seoRobots: true,
-        city: { select: { slug: true } },
+        cityId: true,
+        city: { select: { id: true, slug: true, name: true } },
       },
     });
 
@@ -53,21 +54,31 @@ export const placeProvider: SeoEntityProvider = {
       // docs/migration/seo/final-url-architecture-2026-08-15.md §2.
       const path = p.city?.slug ? buildCityPublicPath({ citySlug: p.city.slug, type: "place", slug: seg }) : `/places/${seg}`;
       const canonical = p.seoCanonicalUrl?.trim() || path;
-      const entityDiagnostics = buildSegmentEntityDiagnostics("place", {
-        entityId: p.id,
-        title: p.title,
-        slug: p.slug,
-        seoCanonicalUrl: p.seoCanonicalUrl,
-        seoCanonicalSource: p.seoCanonicalSource,
-        seoRobots: p.seoRobots,
-        contentStatus: p.status,
-      });
+      const entityDiagnostics = {
+        ...buildSegmentEntityDiagnostics("place", {
+          entityId: p.id,
+          title: p.title,
+          slug: p.slug,
+          seoCanonicalUrl: p.seoCanonicalUrl,
+          seoCanonicalSource: p.seoCanonicalSource,
+          seoRobots: p.seoRobots,
+          contentStatus: p.status,
+        }),
+        citySlug: p.city?.slug ?? null,
+      };
       return {
         id: `entity:place:${p.id}`,
         path,
         section: "kuda",
         type: "place",
-        filtersSnapshot: { entity: "place", entityId: p.id },
+        filtersSnapshot: {
+          entity: "place",
+          entityId: p.id,
+          cityId: p.cityId,
+          citySlug: p.city?.slug ?? null,
+          cityName: p.city?.name ?? null,
+          geoScope: p.cityId ? "CITY" : null,
+        },
         title: p.seoTitle?.trim() || p.title,
         h1: p.seoH1?.trim() || p.title,
         description: p.seoDescription?.trim() || p.shortDesc || "",

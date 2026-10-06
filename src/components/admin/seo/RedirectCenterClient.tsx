@@ -18,7 +18,7 @@ import type {
   RedirectRule,
 } from "@/lib/admin/seo/redirectCenterTypes";
 
-const BASE_PATH = "/admin/seo/redirects";
+const BASE_PATH = "/admin/seo/settings/redirects";
 
 const DISPOSITION_LABEL: Record<RedirectDisposition, string> = {
   EXACT_REDIRECT: "Exact",
@@ -70,7 +70,7 @@ interface RedirectCenterClientProps {
 export function RedirectCenterClient({
   automatic,
   automaticPagination,
-  manual: initialManual,
+  manual: _manual,
   summary,
   currentSearch,
   currentFilter,
@@ -78,6 +78,7 @@ export function RedirectCenterClient({
 }: RedirectCenterClientProps) {
   const [tab, setTab] = useState("automatic");
   const [searchDraft, setSearchDraft] = useState(currentSearch);
+  void _manual;
 
   const filterHref = (value: RedirectDisposition | "ALL") => {
     const params = { ...currentParams, filter: value === "ALL" ? undefined : value, page: undefined };
@@ -90,31 +91,26 @@ export function RedirectCenterClient({
   return (
     <div className="space-y-6">
       <SeoPageHeader
-        title="Redirects"
-        subtitle="Системные (миграционные) редиректы — read-only; ручные редиректы — в отдельной вкладке"
+        title="Редиректы"
+        subtitle="Миграционные редиректы WordPress → mamaGo (только чтение)"
       />
 
       {/* Summary */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
-        <SummaryCard label="System / Migration" value={summary.systemTotal} />
-        <SummaryCard label="Manual" value={summary.manualCount} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+        <SummaryCard label="Миграция" value={summary.systemTotal} />
         <SummaryCard label="Exact" value={summary.counts.EXACT_REDIRECT} tone="emerald" />
         <SummaryCard label="Hub" value={summary.counts.VALID_HUB_REMAP} tone="blue" />
         <SummaryCard label="P1 (contains)" value={summary.counts.P1_START_OR_CONTAINS} tone="amber" />
-        <SummaryCard label="Needs review" value={summary.counts.INVALID_TARGET} tone="rose" />
-        <SummaryCard label="Collisions" value={summary.counts.COLLISION} tone="rose" />
+        <SummaryCard label="На проверку" value={summary.counts.INVALID_TARGET} tone="rose" />
+        <SummaryCard label="Коллизии" value={summary.counts.COLLISION} tone="rose" />
         <SummaryCard label="Loops / chains" value={collisionsChainsLoops - summary.counts.COLLISION} tone="rose" />
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid h-auto w-full grid-cols-1 gap-1 p-1 sm:grid-cols-2">
+        <TabsList className="grid h-auto w-full grid-cols-1 gap-1 p-1">
           <TabsTrigger value="automatic" className="justify-center py-2.5">
-            System / Migration
+            Миграционные
             <span className="ml-1.5 text-xs text-muted-foreground">({summary.systemTotal})</span>
-          </TabsTrigger>
-          <TabsTrigger value="manual" className="justify-center py-2.5">
-            Manual
-            <span className="ml-1.5 text-xs text-muted-foreground">({initialManual.length})</span>
           </TabsTrigger>
         </TabsList>
 
@@ -235,52 +231,6 @@ export function RedirectCenterClient({
             basePath={BASE_PATH}
             params={currentParams}
           />
-        </TabsContent>
-
-        <TabsContent value="manual" className="mt-6 space-y-6">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950">
-            Создание и изменение ручных правил пока недоступно: постоянное
-            backend-хранилище и create/update flow не подключены. Это P1, а не
-            фиктивное сохранение в браузере.
-          </div>
-
-          <div>
-            <h2 className="mb-3 text-base font-semibold text-gray-900">Ручные правила</h2>
-            {initialManual.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/60 px-4 py-8 text-center text-sm text-gray-500">
-                Ручных редиректов пока нет
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-                <TableContainer minWidthClassName="min-w-[800px]" scrollLabel="Таблица ручных редиректов, прокручивается по горизонтали">
-                  <table className="w-full border-collapse text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200 bg-slate-50/90">
-                        <th className="px-4 py-3 font-semibold text-gray-800">From</th>
-                        <th className="px-4 py-3 font-semibold text-gray-800">To</th>
-                        <th className="px-4 py-3 font-semibold text-gray-800">Type</th>
-                        <th className="px-4 py-3 font-semibold text-gray-800">Note</th>
-                        <th className="px-4 py-3 font-semibold text-gray-800">Status</th>
-                        <th className="px-4 py-3 font-semibold text-gray-800">Updated</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {initialManual.map((row) => (
-                        <tr key={row.id} className="hover:bg-gray-50/80">
-                          <td className="px-4 py-3 font-mono text-xs text-gray-900">{row.from}</td>
-                          <td className="px-4 py-3 font-mono text-xs text-gray-900">{row.to}</td>
-                          <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">{row.redirectType}</td>
-                          <td className="max-w-[200px] px-4 py-3 text-xs text-gray-600">{row.note ?? "—"}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-gray-700">{row.status}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-gray-600">{row.updatedAt}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </TableContainer>
-              </div>
-            )}
-          </div>
         </TabsContent>
       </Tabs>
     </div>

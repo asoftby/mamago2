@@ -53,14 +53,14 @@ export const eventProvider: SeoEntityProvider = {
         seoCanonicalSource: true,
         seoRobots: true,
         venue: { select: { cityId: true } },
-        place: { select: { city: { select: { slug: true } } } },
+        place: { select: { city: { select: { id: true, slug: true, name: true } } } },
       },
     });
 
     const cityIds = Array.from(
       new Set(
         activities
-          .flatMap((a) => [a.cityId, a.venue?.cityId])
+          .flatMap((a) => [a.cityId, a.venue?.cityId, a.place?.city?.id ?? null])
           .filter((value): value is string => typeof value === "string" && value.length > 0),
       ),
     );
@@ -68,10 +68,11 @@ export const eventProvider: SeoEntityProvider = {
       cityIds.length > 0
         ? await prisma.city.findMany({
             where: { id: { in: cityIds } },
-            select: { id: true, slug: true },
+            select: { id: true, slug: true, name: true },
           })
         : [];
     const citySlugById = new Map(cityRows.map((row) => [row.id, row.slug]));
+    const cityNameById = new Map(cityRows.map((row) => [row.id, row.name]));
 
     return activities.map((a) => {
       const citySlug = resolveCanonicalCitySlugForEvent({
@@ -82,6 +83,8 @@ export const eventProvider: SeoEntityProvider = {
       const published = a.status === ContentStatus.PUBLISHED;
       const path = publicActivityPath(a.id, citySlug, a.slug);
       const canonical = a.seoCanonicalUrl?.trim() || path;
+      const resolvedCityId =
+        a.cityId ?? a.venue?.cityId ?? a.place?.city?.id ?? null;
       const entityDiagnostics = buildEventEntityDiagnostics({
         activityId: a.id,
         title: a.title,
@@ -97,7 +100,17 @@ export const eventProvider: SeoEntityProvider = {
         path,
         section: "events",
         type: "event",
-        filtersSnapshot: { entity: "event", entityId: a.id, city: citySlug },
+        filtersSnapshot: {
+          entity: "event",
+          entityId: a.id,
+          city: citySlug,
+          cityId: resolvedCityId,
+          citySlug,
+          cityName: resolvedCityId
+            ? cityNameById.get(resolvedCityId) ?? a.place?.city?.name ?? null
+            : a.place?.city?.name ?? null,
+          geoScope: citySlug ? "CITY" : null,
+        },
         title: a.seoTitle?.trim() || a.title,
         h1: a.seoH1?.trim() || a.title,
         description: a.seoDescription?.trim() || a.shortDesc || "",
