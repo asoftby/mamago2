@@ -107,6 +107,11 @@ export async function leaveFamily(
 
     // Close the old membership first: the partial unique index allows one active membership per user.
     await tx.familyMembership.update({ where: { id: mine.id }, data: { leftAt: now } });
+    // Leaving is a withdrawal of the shared-data consent for this family.
+    await tx.consentRecord.updateMany({
+      where: { userId: input.userId, familyId: oldFamilyId, type: "FAMILY_SHARED_DATA", revokedAt: null },
+      data: { revokedAt: now },
+    });
     const family = await tx.family.create({ data: {} });
     await tx.familyMembership.create({
       data: { familyId: family.id, userId: input.userId, role: "OWNER", historyAccess: "ALL", joinedAt: now },

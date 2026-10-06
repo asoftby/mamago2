@@ -119,6 +119,27 @@ test("leave without copying children drops the child link of moved items", async
   assert.equal(await db.child.count({ where: { familyId: nf } }), 0);
 });
 
+test("leaving revokes the FAMILY_SHARED_DATA consent for that family", async () => {
+  const { adult, familyId } = await mkPair("revoke");
+  const active = await db.consentRecord.findFirstOrThrow({ where: { userId: adult, familyId, type: "FAMILY_SHARED_DATA" } });
+  assert.equal(active.revokedAt, null);
+  await leaveFamily(db, { userId: adult }, deps);
+  const revoked = await db.consentRecord.findUniqueOrThrow({ where: { id: active.id } });
+  assert.notEqual(revoked.revokedAt, null, "consent is revoked on leave");
+});
+
+test("joining another family revokes the consent for the previous one", async () => {
+  const { adult, owner, familyId } = await mkPair("move-from");
+  // The adult must be alone to join elsewhere: the owner leaves after a transfer.
+  await transferFamilyOwnership(db, { userId: owner, targetUserId: adult }, deps);
+  await leaveFamily(db, { userId: owner }, deps);
+  const other = await mkUser("move-to-o");
+  const { token } = await createFamilyInvite(db, { userId: other }, deps);
+  await acceptFamilyInvite(db, { userId: adult, token, consentTextVersion: "v1" }, deps);
+  const old = await db.consentRecord.findFirstOrThrow({ where: { userId: adult, familyId } });
+  assert.notEqual(old.revokedAt, null, "consent for the previous family is revoked");
+});
+
 test("transfer ownership then the old owner can leave", async () => {
   const { owner, adult, familyId } = await mkPair("transfer");
   assert.equal(await code(transferFamilyOwnership(db, { userId: adult, targetUserId: owner }, deps)), "not_owner");
