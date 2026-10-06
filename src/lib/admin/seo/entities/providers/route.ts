@@ -13,7 +13,6 @@ import {
   SEO_ROBOTS_NOINDEX_FOLLOW,
 } from "@/lib/admin/seo/entities/robotsConstants";
 
-const ROUTE_LIST_LIMIT = 300;
 
 export const routeProvider: SeoEntityProvider = {
   entityType: "route",
@@ -24,7 +23,6 @@ export const routeProvider: SeoEntityProvider = {
     const routes = await prisma.route.findMany({
       where: { status: { not: RouteStatus.ARCHIVED } },
       orderBy: { updatedAt: "desc" },
-      take: ROUTE_LIST_LIMIT,
       select: {
         id: true,
         slug: true,

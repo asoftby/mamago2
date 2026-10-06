@@ -15,7 +15,6 @@ import {
 import { resolveOfferStructuredDataType } from "@/lib/seo/schema/buildOfferJsonLd";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 
-const OFFER_LIST_LIMIT = 300;
 
 export const offerProvider: SeoEntityProvider = {
   entityType: "offer",
@@ -26,7 +25,6 @@ export const offerProvider: SeoEntityProvider = {
     const offers = await prisma.offer.findMany({
       where: { status: { not: OfferStatus.REJECTED } },
       orderBy: { updatedAt: "desc" },
-      take: OFFER_LIST_LIMIT,
       select: {
         id: true,
         slug: true,

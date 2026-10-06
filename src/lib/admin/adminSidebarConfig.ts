@@ -495,22 +495,10 @@ export const GROUP_SEO: AdminSidebarGroup = {
       matchers: [{ type: "exact", value: adminPath("/seo") }],
     },
     {
-      id: "seo-content",
-      label: "Контент",
-      href: adminPath("/seo/content"),
-      matchers: [{ type: "prefix", value: adminPath("/seo/content") }],
-    },
-    {
       id: "seo-pages",
       label: "Страницы",
       href: adminPath("/seo/pages"),
       matchers: [{ type: "prefix", value: adminPath("/seo/pages") }],
-    },
-    {
-      id: "seo-search",
-      label: "Поиск",
-      href: adminPath("/seo/search"),
-      matchers: [{ type: "prefix", value: adminPath("/seo/search") }],
     },
     {
       id: "seo-settings",

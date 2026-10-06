@@ -1,14 +1,7 @@
-import { SeoContentFoundationClient } from "@/components/admin/seo/SeoContentFoundationClient";
-import {
-  formatSeoGeoContextBreadcrumb,
-} from "@/lib/admin/seo/geo";
-import { resolveSeoGeoSession } from "@/lib/admin/seo/geo/resolveSeoGeoSession";
+import { redirect } from "next/navigation";
+import { buildAdminPath } from "@/lib/routing/surface";
 
-export default async function AdminSeoContentPage() {
-  const { context } = await resolveSeoGeoSession();
-  return (
-    <SeoContentFoundationClient
-      breadcrumb={formatSeoGeoContextBreadcrumb(context)}
-    />
-  );
+/** Foundation route — not a user product until Content Plan persistence. */
+export default function AdminSeoContentRedirectPage() {
+  redirect(buildAdminPath("/seo"));
 }

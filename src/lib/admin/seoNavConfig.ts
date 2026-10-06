@@ -9,7 +9,10 @@ export type SeoNavItem = {
 const SEO_ROOT = buildAdminPath("/seo");
 const SEO_SETTINGS = `${SEO_ROOT}/settings`;
 
-/** Ежедневные рабочие разделы SEO */
+/**
+ * User-facing SEO navigation (daily work).
+ * Foundation routes (content/search) are intentionally omitted until P1/P3.
+ */
 export const SEO_PRIMARY_NAV: SeoNavItem[] = [
   {
     href: SEO_ROOT,
@@ -17,14 +20,21 @@ export const SEO_PRIMARY_NAV: SeoNavItem[] = [
     description: "Состояние SEO и что требует внимания",
   },
   {
-    href: `${SEO_ROOT}/content`,
-    label: "Контент",
-    description: "План, темы и опубликованные материалы",
-  },
-  {
     href: `${SEO_ROOT}/pages`,
     label: "Страницы",
     description: "SEO существующих страниц по геоконтексту",
+  },
+];
+
+/**
+ * Foundation routes kept for next phases — not linked in product nav.
+ * Manual visits redirect to overview.
+ */
+export const SEO_FOUNDATION_NAV: SeoNavItem[] = [
+  {
+    href: `${SEO_ROOT}/content`,
+    label: "Контент",
+    description: "План, темы и опубликованные материалы",
   },
   {
     href: `${SEO_ROOT}/search`,
@@ -69,6 +79,8 @@ export const SEO_LEGACY_REDIRECTS: Record<string, string> = {
   [`${SEO_ROOT}/schema`]: `${SEO_SETTINGS}/schema`,
   [`${SEO_ROOT}/llms-txt`]: `${SEO_SETTINGS}/ai-search`,
   [`${SEO_ROOT}/templates`]: SEO_ROOT,
+  [`${SEO_ROOT}/content`]: SEO_ROOT,
+  [`${SEO_ROOT}/search`]: SEO_ROOT,
 };
 
 export function isSeoNavActive(pathname: string, itemHref: string): boolean {
@@ -100,7 +112,27 @@ export function getSeoAdminSidebarItems(): Array<{ label: string; href: string }
   ];
 }
 
-/** Geo context is product-scoped; global SEO settings must not imply city filtering. */
+/**
+ * Geo context only on working geo-aware product pages.
+ * Whitelist (not blacklist) so Settings and foundation routes never imply city filtering.
+ */
 export function shouldShowSeoGeoContextSelector(pathname: string): boolean {
-  return !isSeoSettingsPath(pathname);
+  if (pathname === SEO_ROOT || pathname === `${SEO_ROOT}/`) return true;
+  if (pathname === `${SEO_ROOT}/pages` || pathname.startsWith(`${SEO_ROOT}/pages/`)) {
+    return true;
+  }
+  return false;
+}
+
+export const SEO_PAGES_PAGE_SIZES = [25, 50, 100] as const;
+export type SeoPagesPageSize = (typeof SEO_PAGES_PAGE_SIZES)[number];
+export const SEO_PAGES_DEFAULT_PAGE_SIZE: SeoPagesPageSize = 25;
+
+export function parseSeoPagesPageSize(raw: string | undefined | null): SeoPagesPageSize {
+  if (!raw) return SEO_PAGES_DEFAULT_PAGE_SIZE;
+  const n = Number(raw);
+  if ((SEO_PAGES_PAGE_SIZES as readonly number[]).includes(n)) {
+    return n as SeoPagesPageSize;
+  }
+  return SEO_PAGES_DEFAULT_PAGE_SIZE;
 }

@@ -23,7 +23,6 @@ import {
 } from "@/lib/business/eventPublicLink";
 import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
 
-const EVENT_LIST_LIMIT = 500;
 
 export const eventProvider: SeoEntityProvider = {
   entityType: "event",
@@ -37,7 +36,6 @@ export const eventProvider: SeoEntityProvider = {
         status: { not: ContentStatus.DELETED },
       },
       orderBy: { updatedAt: "desc" },
-      take: EVENT_LIST_LIMIT,
       select: {
         id: true,
         slug: true,

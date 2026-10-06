@@ -17,7 +17,6 @@ import {
   buildNationalArticlePath,
 } from "@/lib/routing/cityPaths";
 
-const ARTICLE_LIST_LIMIT = 400;
 
 export const articleProvider: SeoEntityProvider = {
   entityType: "article",
@@ -28,7 +27,6 @@ export const articleProvider: SeoEntityProvider = {
     const articles = await prisma.article.findMany({
       where: { status: { not: ContentStatus.DELETED } },
       orderBy: { updatedAt: "desc" },
-      take: ARTICLE_LIST_LIMIT,
       select: {
         id: true,
         slug: true,

@@ -14,7 +14,6 @@ import {
   SEO_ROBOTS_NOINDEX_FOLLOW,
 } from "@/lib/admin/seo/entities/robotsConstants";
 
-const PLACE_LIST_LIMIT = 400;
 
 export const placeProvider: SeoEntityProvider = {
   entityType: "place",
@@ -28,7 +27,6 @@ export const placeProvider: SeoEntityProvider = {
         status: { not: ContentStatus.DELETED },
       },
       orderBy: { updatedAt: "desc" },
-      take: PLACE_LIST_LIMIT,
       select: {
         id: true,
         slug: true,
