@@ -8,7 +8,7 @@ import { SaveToPlanModal } from "@/components/activity/SaveToPlanModal";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import type { SerializedPlanItem } from "./PlanPageClient";
 import type { ActivityMock } from "@/types/activity";
-import { formatPrice as formatPriceAmount, formatPriceFrom } from "@/lib/formatters/format-price";
+import { formatPriceFrom } from "@/lib/formatters/format-price";
 
 type RecommendationCardProps = {
   activity: ActivityMock;
@@ -53,11 +53,20 @@ function RecommendationCard({
         const data = await res.json();
         onAdded({
           id: data.planItem.id,
+          source: "CATALOG",
+          entryType: null,
           date: result.dateISO,
           startsAt: null,
+          endsAt: null,
+          dueAt: null,
+          dueHasTime: false,
           effectiveStartsAt: null,
           activityId: activity.id,
           title: activity.title,
+          childId: null,
+          childName: null,
+          locationText: null,
+          notes: null,
           coverImageUrl: activity.image,
           planAvailability: "missing_activity",
           activity: null,
@@ -93,6 +102,7 @@ function RecommendationCard({
     >
       <>
         <div className="flex items-center gap-3.5 px-4 py-3.5 rounded-2xl border border-neutral-200 bg-white hover:border-neutral-300 transition-colors">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={activity.image}
             alt={activity.title}

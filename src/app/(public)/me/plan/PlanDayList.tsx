@@ -14,11 +14,11 @@ const DAYS_RU_FULL: Record<number, string> = {
 };
 
 function formatDayLabel(dateStr: string): { weekday: string; day: number; month: string } {
-  const date = new Date(dateStr + "T12:00:00");
+  const date = new Date(`${dateStr}T00:00:00.000Z`);
   return {
-    weekday: DAYS_RU_FULL[date.getDay()],
-    day: date.getDate(),
-    month: MONTHS_RU_GENITIVE[date.getMonth()],
+    weekday: DAYS_RU_FULL[date.getUTCDay()],
+    day: date.getUTCDate(),
+    month: MONTHS_RU_GENITIVE[date.getUTCMonth()],
   };
 }
 
@@ -28,6 +28,9 @@ type Props = {
   onRemove: (id: string) => void;
   familyView?: FamilyView | null;
   onVisibilityChange?: VisibilityChange;
+  onAddManual: () => void;
+  onEditManual: (item: SerializedPlanItem) => void;
+  conflictIds: ReadonlySet<string>;
   /** undefined = no Scenario yet for this date. */
   scenarioStatus?: "ready" | "changed";
 };
@@ -68,7 +71,7 @@ function ScenarioCta({
   );
 }
 
-export function PlanDayList({ date, items, onRemove, familyView, onVisibilityChange, scenarioStatus }: Props) {
+export function PlanDayList({ date, items, onRemove, familyView, onVisibilityChange, onAddManual, onEditManual, conflictIds, scenarioStatus }: Props) {
   const { weekday, day, month } = formatDayLabel(date);
 
   return (
@@ -108,6 +111,13 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
                 {items.length} {items.length === 1 ? "событие" : items.length <= 4 ? "события" : "событий"}
               </span>
             )}
+            <button
+              type="button"
+              onClick={onAddManual}
+              className="min-h-11 rounded-full bg-primary px-4 text-sm font-semibold text-white"
+            >
+              + Добавить своё
+            </button>
           </div>
         </div>
         <ScenarioCta date={date} itemCount={items.length} scenarioStatus={scenarioStatus} />
@@ -117,7 +127,15 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
       {items.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {items.map((item) => (
-            <PlanItemCard key={item.id} item={item} onRemove={onRemove} familyView={familyView} onVisibilityChange={onVisibilityChange} />
+            <PlanItemCard
+              key={item.id}
+              item={item}
+              onRemove={onRemove}
+              onEdit={onEditManual}
+              hasConflict={conflictIds.has(item.id)}
+              familyView={familyView}
+              onVisibilityChange={onVisibilityChange}
+            />
           ))}
         </div>
       ) : (
@@ -161,6 +179,13 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
             {weekday.toLowerCase()}.
           </p>
           <div style={{ display: "inline-flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+            <button
+              type="button"
+              onClick={onAddManual}
+              className="min-h-[50px] rounded-full bg-primary px-5 text-sm font-semibold text-white"
+            >
+              + Добавить своё
+            </button>
             <Link
               href="/minsk"
               style={{

@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { computePlanFingerprint, listConfirmedBookingActivityIds } from "@/server/services/dayScenario.service";
 import { resolveScenarioItemTime } from "@/features/my-plan/lib/scenarioProjection";
-import { resolveScenarioScheduling } from "@/features/my-plan/lib/scenarioScheduling";
+import { resolvePlanItemScenarioScheduling } from "@/features/my-plan/lib/scenarioScheduling";
 import { formatScenarioPriceLabel } from "@/features/my-plan/lib/scenarioPricing";
 import { formatActivityAddressLine } from "@/features/my-plan/lib/formatActivityAddress";
 import {
@@ -109,7 +109,9 @@ function projectItems(
       { startsAt: row.startsAt, activity: row.activity ? { sessions } : null },
       overrides.get(row.id) ?? null,
     );
-    const scheduling = resolveScenarioScheduling({ activity: row.activity, timing });
+    const scheduling = resolvePlanItemScenarioScheduling({
+      source: row.source, endsAt: row.endsAt, activity: row.activity, timing,
+    });
     const matchedSession = sessions.find((session) => session.startsAt.getTime() === scheduling.startsAt?.getTime());
     return {
       planItemId: row.id,

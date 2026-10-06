@@ -36,6 +36,7 @@ assert.match(parent, /where: \{[\s\S]{0,80}userId/, "parent bookings are filtere
 assert.doesNotMatch(parent, /planScopeFor|planItemId/, "family scope must not widen parent bookings");
 
 // The plan card gets the safe state only.
-const page = read("src/app/(public)/me/plan/page.tsx");
-assert.match(page, /getPlanBookingStates\(/);
+const calendar = read("src/server/services/familyCalendar.service.ts");
+assert.match(calendar, /getPlanBookingStates\(input\.owner\.userId, items\.map/);
+assert.match(read("src/app/(public)/me/plan/page.tsx"), /loadFamilyCalendarRange\(/);
 console.log("planBooking.contract.test: ok");

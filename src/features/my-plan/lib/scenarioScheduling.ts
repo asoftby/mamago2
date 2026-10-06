@@ -151,3 +151,28 @@ export function resolveScenarioScheduling(input: {
     canReschedule: kind !== "UNKNOWN" && input.timing.isFlexible,
   };
 }
+
+/** Manual PlanItems already carry their exact interval; Activity scheduling
+ * metadata must never erase it or supply a guessed duration. */
+export function resolvePlanItemScenarioScheduling(input: {
+  source: string;
+  endsAt: Date | null;
+  activity: SchedulingActivity;
+  timing: ScenarioItemTiming;
+}): ScenarioScheduling {
+  if (input.source !== "MANUAL") {
+    return resolveScenarioScheduling({ activity: input.activity, timing: input.timing });
+  }
+
+  const startsAt = input.timing.effectiveStartsAt;
+  const endsAt = startsAt && input.endsAt && input.endsAt.getTime() > startsAt.getTime()
+    ? input.endsAt
+    : null;
+  return {
+    kind: endsAt ? "SLOT" : "UNKNOWN",
+    startsAt,
+    endsAt,
+    durationMinutes: endsAt && startsAt ? (endsAt.getTime() - startsAt.getTime()) / 60_000 : null,
+    canReschedule: endsAt != null && input.timing.isFlexible,
+  };
+}
