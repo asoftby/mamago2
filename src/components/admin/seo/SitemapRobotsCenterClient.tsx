@@ -24,9 +24,7 @@ import type {
 import { cn } from "@/lib/utils";
 import {
   ExternalLink,
-  FileSearch,
   Globe2,
-  RefreshCw,
   Shield,
   AlertTriangle,
 } from "lucide-react";
@@ -81,41 +79,19 @@ export function SitemapRobotsCenterClient({
   return (
     <div className="space-y-10">
       <SeoPageHeader
-        title="Sitemap & Robots"
-        subtitle="Управление sitemap, robots directives и индексируемостью системных разделов"
+        title="Индексация"
+        subtitle="Sitemap, robots.txt и глобальная индексация"
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="default"
-              className="gap-2"
-              disabled
-              title="Подключение к генератору sitemap — в следующей итерации"
+          <Button type="button" variant="outline" className="gap-2" asChild>
+            <Link
+              href={initialStatus.sitemapUrl}
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              <RefreshCw className="h-4 w-4" aria-hidden />
-              Regenerate sitemap
-            </Button>
-            <Button type="button" variant="outline" className="gap-2" asChild>
-              <Link
-                href={initialStatus.sitemapUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLink className="h-4 w-4" aria-hidden />
-                View sitemap
-              </Link>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2"
-              disabled
-              title="Валидация XML и отчёты — в следующей итерации"
-            >
-              <FileSearch className="h-4 w-4" aria-hidden />
-              Validate sitemap
-            </Button>
-          </div>
+              <ExternalLink className="h-4 w-4" aria-hidden />
+              Открыть sitemap.xml
+            </Link>
+          </Button>
         }
       />
 
@@ -124,12 +100,12 @@ export function SitemapRobotsCenterClient({
         <div className="flex items-center gap-2">
           <Globe2 className="h-5 w-5 text-slate-600" aria-hidden />
           <h2 className="text-base font-semibold text-gray-900">
-            Sitemap status
+            Состояние sitemap
           </h2>
         </div>
         <p className="max-w-3xl text-sm text-gray-600">
-          Текущее состояние индекса URL: где лежит sitemap, когда собирался и
-          какие секции вошли в выгрузку.
+          Текущее состояние индекса URL: где лежит sitemap и какие секции
+          входят в выгрузку.
         </p>
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
@@ -299,8 +275,9 @@ export function SitemapRobotsCenterClient({
                   Запретить индексацию всего сервиса
                 </p>
                 <p className="text-xs text-gray-500">
-                  На текущем этапе настройка управляется через env. Полноценное управление из
-                  админки будет добавлено после появления глобальной SEO settings модели.
+                  Управляется через переменные окружения
+                  (SITE_INDEXING_ENABLED / SITE_NOINDEX_*). Изменение из UI
+                  недоступно.
                 </p>
               </div>
               <Switch

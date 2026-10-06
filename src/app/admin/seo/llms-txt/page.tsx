@@ -1,14 +1,7 @@
-import { LlmsTxtEditorClient } from "@/components/admin/seo/LlmsTxtEditorClient";
-import { getLlmsTxtSnapshot } from "@/lib/seo/llms";
-import { getDefaultLlmsTxtContent } from "@/lib/seo/llms-default";
+import { redirect } from "next/navigation";
+import { buildAdminPath } from "@/lib/routing/surface";
 
-export default async function AdminSeoLlmsTxtPage() {
-  const snapshot = await getLlmsTxtSnapshot();
-
-  return (
-    <LlmsTxtEditorClient
-      initialSnapshot={snapshot}
-      defaultContent={getDefaultLlmsTxtContent()}
-    />
-  );
+/** Legacy path → Настройки SEO → AI Search */
+export default function LegacySeoLlmsTxtRedirect() {
+  redirect(buildAdminPath("/seo/settings/ai-search"));
 }

@@ -1,5 +1,5 @@
 /**
- * Точки входа данных SEO Control Center.
+ * Точки входа данных SEO-раздела.
  * Возвращают реальные данные, а для неподключённых агрегатов — честные пустые состояния.
  */
 import type {
@@ -30,13 +30,119 @@ import {
   getAdminPagination,
   type AdminPaginationResult,
 } from "@/lib/admin/pagination";
+import { buildAdminPath } from "@/lib/routing/surface";
+import type { SeoGeoContext } from "@/lib/admin/seo/geo";
+import { filterPagesByGeoContext } from "@/lib/admin/seo/geo";
 
-export async function getSeoDashboardSummary(): Promise<SeoDashboardSummary> {
+function hasMissingSeoFields(row: SeoPage): boolean {
+  const titleEmpty = !row.title?.trim();
+  const descEmpty = !row.description?.trim();
+  const h1Empty = !row.h1?.trim();
+  return titleEmpty || descEmpty || h1Empty;
+}
+
+export function buildSeoDashboardSummaryFromPages(
+  pages: SeoPage[],
+): SeoDashboardSummary {
+  const pagesPath = buildAdminPath("/seo/pages");
+  const withIssues = pages.filter(
+    (p) => (p.entityDiagnostics?.issues.length ?? 0) > 0,
+  );
+  const noindex = pages.filter((p) => p.indexationStatus === "noindex");
+  const draft = pages.filter((p) => p.indexationStatus === "draft");
+  const missingSeo = pages.filter(hasMissingSeoFields);
+
+  const stats = [
+    {
+      id: "pagesTotal" as const,
+      label: "Страницы",
+      value: pages.length,
+      hint: "В выбран SEO-контексте",
+      href: pagesPath,
+    },
+    {
+      id: "pagesWithIssues" as const,
+      label: "С проблемами",
+      value: withIssues.length,
+      hint: "Диагностика URL / slug / canonical",
+      href: pagesPath,
+    },
+    {
+      id: "pagesNoindex" as const,
+      label: "noindex",
+      value: noindex.length,
+      hint: "Закрыты от индексации",
+      href: pagesPath,
+    },
+    {
+      id: "pagesMissingSeo" as const,
+      label: "Без SEO-полей",
+      value: missingSeo.length,
+      hint: "Пустые title, description или H1",
+      href: pagesPath,
+    },
+    {
+      id: "pagesDraft" as const,
+      label: "Черновики",
+      value: draft.length,
+      hint: "Ещё не опубликованы",
+      href: pagesPath,
+    },
+  ];
+
+  const attentionItems: SeoDashboardSummary["attentionItems"] = [];
+
+  if (withIssues.length > 0) {
+    attentionItems.push({
+      id: "diag-issues",
+      title: `${withIssues.length} страниц с проблемами диагностики`,
+      detail: "Проверьте slug, canonical и public URL",
+      severity: withIssues.some((p) =>
+        (p.entityDiagnostics?.issues ?? []).some((i) =>
+          i.toLowerCase().includes("критично"),
+        ),
+      )
+        ? "high"
+        : "medium",
+      href: pagesPath,
+    });
+  }
+
+  if (missingSeo.length > 0) {
+    attentionItems.push({
+      id: "missing-seo",
+      title: `${missingSeo.length} страниц с незаполненными SEO-полями`,
+      detail: "Добавьте title, description или H1",
+      severity: "medium",
+      href: pagesPath,
+    });
+  }
+
+  if (isGlobalNoindexEnabled()) {
+    attentionItems.push({
+      id: "global-noindex",
+      title: "Глобальный noindex включён",
+      detail: getGlobalNoindexReason() || "Сайт закрыт от индексации через env",
+      severity: "high",
+      href: buildAdminPath("/seo/settings/indexation"),
+    });
+  }
+
   return {
-    kpis: [],
-    systemStatuses: [],
-    attentionItems: [],
+    stats,
+    attentionItems,
+    externalSourcesConnected: false,
   };
+}
+
+export async function getSeoDashboardSummary(
+  geoContext?: SeoGeoContext,
+): Promise<SeoDashboardSummary> {
+  const allPages = await getSeoPages();
+  const pages = geoContext
+    ? filterPagesByGeoContext(allPages, geoContext)
+    : allPages;
+  return buildSeoDashboardSummaryFromPages(pages);
 }
 
 export async function getSeoPages(): Promise<SeoPage[]> {
@@ -180,7 +286,7 @@ export async function getSitemapRobotsData(): Promise<{
       noindexEnvironments,
       robotsStatus: "ok",
       futureControlsNote:
-        "На текущем этапе глобальная индексация управляется через env. UI в админке пока только отображает состояние.",
+        "Глобальная индексация управляется через env. UI в админке отображает текущее состояние.",
       globalNoindexEnabled,
       globalNoindexReason,
       controlsManagedBy: "env",

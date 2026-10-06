@@ -13,7 +13,7 @@ import {
   CONTENT_NAV_ITEMS,
   contentItemHref,
 } from "@/lib/admin/contentSidebarConfig";
-import { SEO_CONTROL_NAV } from "@/lib/admin/seoNavConfig";
+import { SEO_PRIMARY_NAV, SEO_SETTINGS_NAV } from "@/lib/admin/seoNavConfig";
 import { adminPath } from "@/lib/routing/surface";
 
 export { adminPath };
@@ -119,10 +119,16 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     title: "SEO",
-    items: SEO_CONTROL_NAV.map((item) => ({
-      label: item.label,
-      href: item.href,
-    })),
+    items: [
+      ...SEO_PRIMARY_NAV.map((item) => ({
+        label: item.label,
+        href: item.href,
+      })),
+      ...SEO_SETTINGS_NAV.map((item) => ({
+        label: item.label,
+        href: item.href,
+      })),
+    ],
   },
 ];
 

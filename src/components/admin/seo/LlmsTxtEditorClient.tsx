@@ -118,8 +118,8 @@ export function LlmsTxtEditorClient({
   return (
     <div className="space-y-8 pb-8">
       <SeoPageHeader
-        title="llms.txt"
-        subtitle="Файл для AI Search Readiness — помогает AI-поисковикам и ассистентам понимать структуру mamaGo."
+        title="AI Search"
+        subtitle="llms.txt — инструкции для AI-поисковиков и ассистентов о структуре mamaGo."
         leading={<Bot className="h-6 w-6 text-gray-700" aria-hidden />}
         actions={
           <>
