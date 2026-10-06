@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import {
+  ActivityType,
   BusinessMemberRole,
   UserStatus,
   UserModerationActionType,
@@ -76,6 +77,9 @@ export async function getUserWithDetails(userId: string) {
       id: true,
       email: true,
       phoneE164: true,
+      displayName: true,
+      telegramConnected: true,
+      telegramUsername: true,
       role: true,
       status: true,
       statusReason: true,
@@ -92,76 +96,336 @@ export async function getUserWithDetails(userId: string) {
     throw new Error("User not found");
   }
 
-  // Get activity stats and canonical business access separately.
-  // User.role is a platform role; partner authorization comes from BusinessMember.
-  const [
-    businessCount,
-    placesCount,
-    activitiesCount,
-    activeBusinessMembership,
-    ownedBusiness,
-  ] = await Promise.all([
-    prisma.business.count({ where: { ownerUserId: userId } }),
-    prisma.place.count({
-      where: {
-        OR: [
-          { createdByUserId: userId },
-          { ownerBusiness: { ownerUserId: userId } },
-        ],
-      },
-    }),
-    prisma.activity.count({ where: { ownerUserId: userId } }),
-    prisma.businessMember.findFirst({
-      where: {
-        userId,
-        isActive: true,
-        role: { in: [BusinessMemberRole.OWNER, BusinessMemberRole.MANAGER] },
-      },
+  const businessSelect = {
+    id: true,
+    name: true,
+    legalName: true,
+    verificationStatus: true,
+    operationalStatus: true,
+    createdAt: true,
+    updatedAt: true,
+  } satisfies Prisma.BusinessSelect;
+
+  const [memberships, ownedBusiness] = await Promise.all([
+    prisma.businessMember.findMany({
+      where: { userId },
       orderBy: { createdAt: "asc" },
       select: {
         role: true,
         isActive: true,
-        business: {
-          select: {
-            id: true,
-            name: true,
-            legalName: true,
-            verificationStatus: true,
-            operationalStatus: true,
-          },
-        },
+        title: true,
+        createdAt: true,
+        business: { select: businessSelect },
       },
     }),
     prisma.business.findUnique({
       where: { ownerUserId: userId },
-      select: {
-        id: true,
-        name: true,
-        legalName: true,
-        verificationStatus: true,
-        operationalStatus: true,
-      },
+      select: businessSelect,
     }),
   ]);
 
-  const accessBusiness = activeBusinessMembership?.business ?? ownedBusiness ?? null;
+  const businessRelations = memberships.map((membership) => ({
+    ...membership.business,
+    membershipRole: membership.role,
+    membershipActive: membership.isActive,
+    memberTitle: membership.title,
+    relation:
+      ownedBusiness?.id === membership.business.id
+        ? ("OWNER" as const)
+        : ("MEMBER" as const),
+  }));
+
+  if (
+    ownedBusiness &&
+    !businessRelations.some((business) => business.id === ownedBusiness.id)
+  ) {
+    businessRelations.unshift({
+      ...ownedBusiness,
+      membershipRole: BusinessMemberRole.OWNER,
+      membershipActive: false,
+      memberTitle: null,
+      relation: "OWNER_WITHOUT_MEMBERSHIP" as const,
+    });
+  }
+
+  const businessIds = Array.from(
+    new Set(businessRelations.map((business) => business.id)),
+  );
+
+  const placesWhere: Prisma.PlaceWhereInput = {
+    OR: [
+      { createdByUserId: userId },
+      ...(businessIds.length > 0
+        ? [{ ownerBusinessId: { in: businessIds } } satisfies Prisma.PlaceWhereInput]
+        : []),
+    ],
+  };
+
+  const offersWhere: Prisma.OfferWhereInput =
+    businessIds.length > 0
+      ? { place: { ownerBusinessId: { in: businessIds } } }
+      : { id: "__no_business__" };
+
+  const [
+    placeCount,
+    places,
+    eventCount,
+    events,
+    offerCount,
+    offers,
+    articleCount,
+    articles,
+    activePlanCount,
+    bookingCount,
+    directThreadCount,
+    complaintCount,
+    recentBookings,
+    recentThreads,
+    verificationLogs,
+  ] = await Promise.all([
+    prisma.place.count({ where: placesWhere }),
+    prisma.place.findMany({
+      where: placesWhere,
+      orderBy: { updatedAt: "desc" },
+      take: 12,
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        createdByUserId: true,
+        ownerBusinessId: true,
+        city: { select: { name: true } },
+        ownerBusiness: {
+          select: { id: true, name: true, legalName: true },
+        },
+      },
+    }),
+    prisma.activity.count({
+      where: {
+        ownerUserId: userId,
+        type: ActivityType.EVENT,
+        status: { not: "DELETED" },
+      },
+    }),
+    prisma.activity.findMany({
+      where: {
+        ownerUserId: userId,
+        type: ActivityType.EVENT,
+        status: { not: "DELETED" },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 12,
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        place: { select: { title: true } },
+        business: { select: { id: true, name: true, legalName: true } },
+      },
+    }),
+    prisma.offer.count({ where: offersWhere }),
+    prisma.offer.findMany({
+      where: offersWhere,
+      orderBy: { updatedAt: "desc" },
+      take: 12,
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        place: {
+          select: {
+            id: true,
+            title: true,
+            ownerBusiness: {
+              select: { id: true, name: true, legalName: true },
+            },
+          },
+        },
+      },
+    }),
+    prisma.article.count({ where: { authorUserId: userId } }),
+    prisma.article.findMany({
+      where: { authorUserId: userId },
+      orderBy: { updatedAt: "desc" },
+      take: 12,
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    }),
+    prisma.planItem.count({
+      where: { userId, cancelledAt: null },
+    }),
+    prisma.bookingRequest.count({ where: { userId } }),
+    prisma.directThread.count({ where: { customerUserId: userId } }),
+    prisma.directComplaint.count({ where: { reporterUserId: userId } }),
+    prisma.bookingRequest.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        activity: { select: { id: true, title: true } },
+        offer: { select: { id: true, title: true } },
+        place: { select: { id: true, title: true } },
+      },
+    }),
+    prisma.directThread.findMany({
+      where: { customerUserId: userId },
+      orderBy: { lastMessageAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        threadNumber: true,
+        status: true,
+        lastMessageAt: true,
+        business: { select: { name: true, legalName: true } },
+      },
+    }),
+    businessIds.length > 0
+      ? prisma.businessVerificationLog.findMany({
+          where: { businessId: { in: businessIds } },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          select: {
+            id: true,
+            businessId: true,
+            statusFrom: true,
+            statusTo: true,
+            createdAt: true,
+            business: { select: { name: true, legalName: true } },
+          },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const recentActions = [
+    ...(user.lastLoginAt
+      ? [
+          {
+            id: `login-${user.id}`,
+            kind: "LOGIN" as const,
+            title: "Вход в аккаунт",
+            detail: user.email,
+            href: null,
+            at: user.lastLoginAt,
+          },
+        ]
+      : []),
+    ...events.slice(0, 5).map((event) => ({
+      id: `event-${event.id}`,
+      kind: "EVENT" as const,
+      title: event.title,
+      detail: "Событие · последнее изменение",
+      href: `/editor/event/${event.id}/edit?returnTo=${encodeURIComponent(
+        `/admin/users/${userId}`,
+      )}`,
+      at: event.updatedAt,
+    })),
+    ...articles.slice(0, 5).map((article) => ({
+      id: `article-${article.id}`,
+      kind: "ARTICLE" as const,
+      title: article.title,
+      detail: "Статья · последнее изменение",
+      href: `/admin/content/articles/${article.id}/edit`,
+      at: article.updatedAt,
+    })),
+    ...recentBookings.map((booking) => ({
+      id: `booking-${booking.id}`,
+      kind: "BOOKING" as const,
+      title:
+        booking.activity?.title ??
+        booking.offer?.title ??
+        booking.place?.title ??
+        "Заявка",
+      detail: `Заявка · ${booking.status}`,
+      href: null,
+      at: booking.createdAt,
+    })),
+    ...recentThreads.map((thread) => ({
+      id: `direct-${thread.id}`,
+      kind: "DIRECT" as const,
+      title: `Диалог D-${thread.threadNumber}`,
+      detail: thread.business.legalName || thread.business.name,
+      href: null,
+      at: thread.lastMessageAt,
+    })),
+    ...verificationLogs.map((log) => ({
+      id: `verification-${log.id}`,
+      kind: "BUSINESS" as const,
+      title: log.business.legalName || log.business.name,
+      detail: `Верификация бизнеса: ${log.statusFrom} → ${log.statusTo}`,
+      href: `/admin/b2b/partners/${log.businessId}`,
+      at: log.createdAt,
+    })),
+  ]
+    .sort((a, b) => b.at.getTime() - a.at.getTime())
+    .slice(0, 12);
+
+  const activeBusinessMembership = businessRelations.find(
+    (business) =>
+      business.membershipActive &&
+      (business.membershipRole === BusinessMemberRole.OWNER ||
+        business.membershipRole === BusinessMemberRole.MANAGER),
+  );
+  const accessBusiness =
+    activeBusinessMembership ?? businessRelations[0] ?? null;
 
   return {
     user,
     stats: {
-      businessCount,
-      placesCount,
-      activitiesCount,
+      businessCount: businessRelations.length,
+      placesCount: placeCount,
+      activitiesCount: eventCount,
     },
     businessAccess: {
-      membershipRole: activeBusinessMembership?.role ?? null,
-      membershipActive: activeBusinessMembership?.isActive ?? false,
-      relation: activeBusinessMembership
-        ? "MEMBER"
-        : ownedBusiness
+      membershipRole: accessBusiness?.membershipRole ?? null,
+      membershipActive: accessBusiness?.membershipActive ?? false,
+      relation:
+        accessBusiness?.relation === "OWNER_WITHOUT_MEMBERSHIP"
           ? "OWNER_WITHOUT_MEMBERSHIP"
-          : "NONE",
-      business: accessBusiness,
+          : accessBusiness
+            ? "MEMBER"
+            : "NONE",
+      business: accessBusiness
+        ? {
+            id: accessBusiness.id,
+            name: accessBusiness.name,
+            legalName: accessBusiness.legalName,
+            verificationStatus: accessBusiness.verificationStatus,
+            operationalStatus: accessBusiness.operationalStatus,
+          }
+        : null,
+    },
+    overview: {
+      businesses: businessRelations,
+      places: {
+        total: placeCount,
+        items: places,
+      },
+      publications: {
+        events: { total: eventCount, items: events },
+        offers: { total: offerCount, items: offers },
+        articles: { total: articleCount, items: articles },
+      },
+      customerActivity: {
+        planItems: activePlanCount,
+        bookings: bookingCount,
+        directThreads: directThreadCount,
+        complaints: complaintCount,
+      },
+      recentActions,
     },
   };
 }
