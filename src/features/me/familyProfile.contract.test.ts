@@ -29,7 +29,7 @@ assert.match(planMain, /lastRequestSnapshotRef\.current/);
 assert.match(planMain, /onRegenerate=\{handleRegenerate\}/);
 assert.match(planMain, /personaIds: draft\?\.personaIds \?\? \[\]/);
 const subjectsSource = readFileSync("src/lib/decision/subjects.ts", "utf8");
-assert.match(subjectsSource, /parentId: input\.userId/);
+assert.match(subjectsSource, /childScopeFor\(input\.userId\)/);
 assert.match(subjectsSource, /systemInterestSlugs/);
 assert.equal(ProfileInterestsConstraintSchema.safeParse({ value: ["science"], source: "profile" }).success, true);
 assert.equal(ProfileInterestsConstraintSchema.safeParse({ value: ["child name"], source: "profile" }).success, false);

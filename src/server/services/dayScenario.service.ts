@@ -12,6 +12,8 @@ export type FingerprintSource = {
   articleId?: string | null;
   date?: string | null;
   startsAt: Date | null;
+  endsAt?: Date | null;
+  childId?: string | null;
 };
 
 const scenarioPlaceSelect = {
@@ -55,6 +57,8 @@ export type ScenarioPlanItem = {
   activityId: string | null;
   date: string;
   startsAt: Date | null;
+  endsAt: Date | null;
+  source: string;
   title: string | null;
   coverImageUrl: string | null;
   createdAt: Date;
@@ -162,14 +166,15 @@ export async function listActivitySessionsForPlanItems(
 
 /**
  * Cheap deterministic signature of a PlanItem set: detects added/removed
- * items and startsAt changes, order-independent. Not a general version
+ * items and schedule/person changes, order-independent. Not a general version
  * hash — just enough to answer "does My Plan still match what the
  * Scenario was built from".
  */
-export function computePlanFingerprint(
+function fingerprintForVersion(
   items: FingerprintSource[],
-  overrides: ReadonlyMap<string, Date> = new Map(),
-  acceptedConflictKeys: readonly string[] = [],
+  overrides: ReadonlyMap<string, Date>,
+  acceptedConflictKeys: readonly string[],
+  includeE1Fields: boolean,
 ): string {
   const parts = items
     .map((item) => JSON.stringify({
@@ -180,6 +185,10 @@ export function computePlanFingerprint(
       articleId: item.articleId ?? null,
       date: item.date ?? null,
       startsAt: item.startsAt?.toISOString() ?? null,
+      ...(includeE1Fields ? {
+        endsAt: item.endsAt?.toISOString() ?? null,
+        childId: item.childId ?? null,
+      } : {}),
       overrideStartsAt: overrides.get(item.id)?.toISOString() ?? null,
     }))
     .sort();
@@ -187,6 +196,34 @@ export function computePlanFingerprint(
     .update(JSON.stringify({ items: parts, acceptedConflictKeys: [...acceptedConflictKeys].sort() }))
     .digest("hex")
     .slice(0, 32);
+}
+
+export function computePlanFingerprint(
+  items: FingerprintSource[],
+  overrides: ReadonlyMap<string, Date> = new Map(),
+  acceptedConflictKeys: readonly string[] = [],
+): string {
+  return fingerprintForVersion(items, overrides, acceptedConflictKeys, true);
+}
+
+/** Exact pre-E1 serialization, used only to read existing DayScenarios. New
+ * writes always persist the current fingerprint. */
+export function computeLegacyPlanFingerprint(
+  items: FingerprintSource[],
+  overrides: ReadonlyMap<string, Date> = new Map(),
+  acceptedConflictKeys: readonly string[] = [],
+): string {
+  return fingerprintForVersion(items, overrides, acceptedConflictKeys, false);
+}
+
+export function matchesScenarioPlanFingerprint(
+  storedFingerprint: string,
+  items: FingerprintSource[],
+  overrides: ReadonlyMap<string, Date> = new Map(),
+  acceptedConflictKeys: readonly string[] = [],
+): boolean {
+  return storedFingerprint === computePlanFingerprint(items, overrides, acceptedConflictKeys) ||
+    storedFingerprint === computeLegacyPlanFingerprint(items, overrides, acceptedConflictKeys);
 }
 
 export function getDayScenario(userId: string, date: string): Promise<DayScenario | null> {

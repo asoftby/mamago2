@@ -5,6 +5,7 @@ import {
   ensureDayScenario,
   getDayScenario,
   computePlanFingerprint,
+  matchesScenarioPlanFingerprint,
   listPlanItemsByDateForScenario,
   listScenarioItemOverrides,
   listConfirmedBookingActivityIds,
@@ -22,7 +23,7 @@ import { formatActivityAddressLine } from "@/features/my-plan/lib/formatActivity
 import { formatScenarioPriceLabel } from "@/features/my-plan/lib/scenarioPricing";
 import { computeScenarioGap, type ScenarioCoordinates } from "@/features/my-plan/lib/scenarioTravel";
 import { detectScenarioConflicts } from "@/features/my-plan/lib/detectScenarioConflicts";
-import { resolveScenarioScheduling } from "@/features/my-plan/lib/scenarioScheduling";
+import { resolvePlanItemScenarioScheduling } from "@/features/my-plan/lib/scenarioScheduling";
 import { canOpenDayScenario } from "@/features/my-plan/lib/canOpenDayScenario";
 import { ScenarioDraftEditor } from "@/features/my-plan/components/ScenarioDraftEditor";
 import { IcBack, IcMapPin, IcClock, IcCalendar } from "@/features/my-plan/components/scenarioIcons";
@@ -124,7 +125,9 @@ export default async function DayScenarioPage({ params }: PageProps) {
     overrides,
     existingScenario.acceptedConflictKeys,
   );
-  const planChanged = currentFingerprint !== existingScenario.planFingerprint;
+  const planChanged = !matchesScenarioPlanFingerprint(
+    existingScenario.planFingerprint, items, overrides, existingScenario.acceptedConflictKeys,
+  );
 
   const bookedActivityIds = await listConfirmedBookingActivityIds(
     user.id,
@@ -133,7 +136,9 @@ export default async function DayScenarioPage({ params }: PageProps) {
 
   const withTiming = items.map((item) => {
     const timing = resolveScenarioItemTime(item, overrides.get(item.id) ?? null);
-    const scheduling = resolveScenarioScheduling({ activity: item.activity, timing });
+    const scheduling = resolvePlanItemScenarioScheduling({
+      source: item.source, endsAt: item.endsAt, activity: item.activity, timing,
+    });
     return {
       id: item.id,
       activityId: item.activityId,

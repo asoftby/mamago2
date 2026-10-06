@@ -78,6 +78,22 @@ const suitable = suitableReplacementCandidates({
 });
 assert.deepEqual(suitable.map((x) => x.activityId), ["F", "G"]);
 
+const manualState: ScenarioDraftState = {
+  original: [{ ...item("manual", "placeholder", 17, 18), activityId: null }],
+  originalAcceptedConflictKeys: [],
+  changes: {},
+  acceptedConflictKeys: [],
+};
+assert.deepEqual(
+  suitableReplacementCandidates({
+    state: manualState,
+    replacingPlanItemId: "manual",
+    candidates: [candidate("catalog", 18, 19)],
+  }),
+  [],
+  "manual calendar entries cannot be replaced with catalog content",
+);
+
 state = scenarioDraftReducer(state, { type: "replace", planItemId: "c", replacement: suitable[1]! });
 assert.ok(
   unresolvedScenarioConflicts(state).some((conflict) => conflict.itemIds.includes("c")),

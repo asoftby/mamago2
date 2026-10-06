@@ -11,7 +11,6 @@ const SEO_SETTINGS = `${SEO_ROOT}/settings`;
 
 /**
  * User-facing SEO navigation (daily work).
- * Foundation routes (content/search) are intentionally omitted until P1/P3.
  */
 export const SEO_PRIMARY_NAV: SeoNavItem[] = [
   {
@@ -22,13 +21,22 @@ export const SEO_PRIMARY_NAV: SeoNavItem[] = [
   {
     href: `${SEO_ROOT}/pages`,
     label: "Страницы",
-    description: "SEO существующих страниц по геоконтексту",
+    description: "SEO существующих страниц по георынку",
+  },
+  {
+    href: `${SEO_ROOT}/plan`,
+    label: "План контента",
+    description: "Темы к публикации по SEO-рынку",
+  },
+  {
+    href: `${SEO_ROOT}/topics`,
+    label: "Темы и тренды",
+    description: "Внутренний спрос mamaGo и идеи для плана",
   },
 ];
 
 /**
- * Foundation routes kept for next phases — not linked in product nav.
- * Manual visits redirect to overview.
+ * Legacy foundation routes — redirect to overview; kept for bookmarks.
  */
 export const SEO_FOUNDATION_NAV: SeoNavItem[] = [
   {
@@ -94,17 +102,12 @@ export function isSeoSettingsPath(pathname: string): boolean {
   return pathname.startsWith(SEO_SETTINGS);
 }
 
-/** Entry point for «Настройки SEO» in the main admin sidebar (not the technical sub-items). */
 export const SEO_SETTINGS_ENTRY = {
   href: `${SEO_SETTINGS}/indexation`,
   label: "Настройки SEO",
   description: "Индексация, редиректы, schema.org и AI Search",
 } as const;
 
-/**
- * Main admin sidebar SEO items: product sections + single settings entry.
- * Technical settings sub-items stay only in SeoSubNav secondary nav.
- */
 export function getSeoAdminSidebarItems(): Array<{ label: string; href: string }> {
   return [
     ...SEO_PRIMARY_NAV.map((item) => ({ label: item.label, href: item.href })),
@@ -113,12 +116,17 @@ export function getSeoAdminSidebarItems(): Array<{ label: string; href: string }
 }
 
 /**
- * Geo context only on working geo-aware product pages.
- * Whitelist (not blacklist) so Settings and foundation routes never imply city filtering.
+ * SEO Market selector on product geo-aware pages only (not Settings).
  */
 export function shouldShowSeoGeoContextSelector(pathname: string): boolean {
   if (pathname === SEO_ROOT || pathname === `${SEO_ROOT}/`) return true;
   if (pathname === `${SEO_ROOT}/pages` || pathname.startsWith(`${SEO_ROOT}/pages/`)) {
+    return true;
+  }
+  if (pathname === `${SEO_ROOT}/plan` || pathname.startsWith(`${SEO_ROOT}/plan/`)) {
+    return true;
+  }
+  if (pathname === `${SEO_ROOT}/topics` || pathname.startsWith(`${SEO_ROOT}/topics/`)) {
     return true;
   }
   return false;

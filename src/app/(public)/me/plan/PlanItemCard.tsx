@@ -16,6 +16,7 @@ import {
 } from "@/features/my-plan/lib/planVisibilityView";
 import { bookingCaption } from "@/server/family/planBookingPure";
 import type { SerializedPlanItem } from "./PlanPageClient";
+import { buildFamilyCalendarItemPresentation } from "@/features/my-plan/lib/familyCalendar";
 
 export type VisibilityChange = (
   itemId: string,
@@ -31,12 +32,15 @@ export function PlanItemCard({
   onRemove,
   familyView = null,
   onVisibilityChange,
+  onEdit,
+  hasConflict = false,
 }: {
   item: SerializedPlanItem;
   onRemove: (id: string) => void;
-  /** Non-null only for a family with 2+ adults; otherwise the card looks as before. */
   familyView?: FamilyView | null;
   onVisibilityChange?: VisibilityChange;
+  onEdit?: (item: SerializedPlanItem) => void;
+  hasConflict?: boolean;
 }) {
   const router = useRouter();
   const [removing, setRemoving] = useState(false);
@@ -46,30 +50,48 @@ export function PlanItemCard({
   const isPrivate = familyUi && item.visibility === "PRIVATE";
   const isOwn = !item.authorId || item.authorId === currentUserId;
   const caption = familyUi ? authorCaption(item, currentUserId) : null;
-  const title = item.activity?.title ?? item.title ?? "Активность";
+  const presentation = buildFamilyCalendarItemPresentation(item);
+  const title = presentation.title;
   const image = item.activity?.coverImageUrl ?? item.coverImageUrl;
-  const category = resolvePlanItemCategoryLabel(item.activity);
+  const category = presentation.isCatalog
+    ? resolvePlanItemCategoryLabel(item.activity)
+    : presentation.typeLabel;
   const time = formatTime(item.effectiveStartsAt);
+  const endTime = formatTime(item.endsAt);
   const age = item.activity?.ageLabel ?? null;
   const price = item.activity?.priceLabel ?? null;
-  const venueName = item.activity?.venueName ?? null;
-  const venueAddress = item.activity?.venueAddress ?? null;
-  const unavailable =
+  const venueName = presentation.isCatalog ? item.activity?.venueName ?? null : presentation.locationLabel;
+  const venueAddress = presentation.isCatalog ? item.activity?.venueAddress ?? null : null;
+  const unavailable = presentation.isCatalog && (
     item.planAvailability === "business_disabled" ||
-    item.planAvailability === "missing_activity";
+    item.planAvailability === "missing_activity"
+  );
 
   const href =
     item.activityId && !unavailable
       ? publicActivityPath(item.activityId, "minsk", item.activity?.slug)
       : null;
 
-  const metaLine = [age, time, price].filter(Boolean).join(" · ");
+  const timeLabel = time
+    ? `${time}${endTime ? `–${endTime}` : ""}`
+    : (!presentation.isCatalog ? "Весь день" : null);
+  const metaLine = [age, timeLabel, price].filter(Boolean).join(" · ");
 
   const handleRemove = async () => {
     if (removing) return;
     setRemoving(true);
     try {
-      const res = await fetch(`/api/save/plan?planItemId=${item.id}`, { method: "DELETE" });
+      const endpoint = item.source === "MANUAL"
+        ? `/api/plan/manual/${item.id}`
+        : `/api/save/plan?planItemId=${item.id}`;
+      const res = await fetch(endpoint, item.source === "MANUAL"
+        ? { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedUpdatedAt: item.updatedAt }) }
+        : { method: "DELETE" });
+      if (res.status === 409) {
+        toast.error(visibilityErrorMessage("conflict"));
+        router.refresh();
+        return;
+      }
       if (!res.ok) throw new Error("plan_remove_failed");
       onRemove(item.id);
       toast("Убрано из плана", { duration: 2000 });
@@ -135,9 +157,13 @@ export function PlanItemCard({
     </div>
   );
 
+  const showCatalogMedia = presentation.isCatalog;
+
   return (
     <article
-      className="group grid grid-cols-[176px_minmax(0,1fr)_auto] items-center gap-5 rounded-[18px] border p-[14px] transition-[border-color,transform] duration-200 max-sm:grid-cols-[112px_minmax(0,1fr)_auto] max-sm:gap-3 max-sm:p-3"
+      className={showCatalogMedia
+        ? "group grid grid-cols-[176px_minmax(0,1fr)_auto] items-center gap-5 rounded-[18px] border p-[14px] transition-[border-color,transform] duration-200 max-sm:grid-cols-[112px_minmax(0,1fr)_auto] max-sm:gap-3 max-sm:p-3"
+        : "group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-[18px] border p-4 transition-[border-color] duration-200"}
       style={{
         background: isPrivate ? "#F3EFE7" : "#FAF7F1",
         borderColor: "rgba(20,18,16,.10)",
@@ -149,11 +175,11 @@ export function PlanItemCard({
         event.currentTarget.style.borderColor = "rgba(20,18,16,.10)";
       }}
     >
-      {href ? (
+      {showCatalogMedia && href ? (
         <Link href={href} aria-label={`Открыть «${title}»`}>
           {imageNode}
         </Link>
-      ) : imageNode}
+      ) : showCatalogMedia ? imageNode : null}
 
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-2">
@@ -198,6 +224,11 @@ export function PlanItemCard({
               снято
             </span>
           )}
+          {!presentation.isCatalog ? (
+            <span className="rounded-full bg-white px-2 py-1 text-[11px] text-neutral-600">
+              {presentation.personLabel}
+            </span>
+          ) : null}
         </div>
 
         {href ? (
@@ -247,10 +278,21 @@ export function PlanItemCard({
             {metaLine}
           </span>
         )}
+        {hasConflict ? (
+          <span className="text-xs font-medium text-amber-700">Пересекается по времени</span>
+        ) : null}
       </div>
 
       <div className="flex h-full min-w-[54px] flex-col items-end justify-between py-1 max-sm:min-w-[34px]">
-        {href ? (
+        {presentation.canEdit && item.status !== "PROPOSED" && onEdit ? (
+          <button
+            type="button"
+            onClick={() => onEdit(item)}
+            className="min-h-9 rounded-full px-2 text-xs font-medium text-primary"
+          >
+            Изменить
+          </button>
+        ) : href ? (
           <Link
             href={href}
             aria-label={`Перейти к «${title}»`}
@@ -263,7 +305,7 @@ export function PlanItemCard({
           <span className="h-9 w-9 max-sm:h-8 max-sm:w-8" />
         )}
 
-        {familyUi && isOwn && (
+        {familyUi && isOwn && item.status !== "PROPOSED" && (
           <button
             type="button"
             onClick={handleVisibility}
@@ -278,18 +320,20 @@ export function PlanItemCard({
           </button>
         )}
 
-        <button
-          type="button"
-          onClick={handleRemove}
-          disabled={removing}
-          className="text-[11px] opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
-          style={{
-            color: "rgba(20,18,16,.48)",
-            cursor: removing ? "default" : "pointer",
-          }}
-        >
-          {removing ? "Удаляем…" : "Убрать"}
-        </button>
+        {item.source !== "TELEGRAM_FORWARD" && item.status !== "PROPOSED" ? (
+          <button
+            type="button"
+            onClick={handleRemove}
+            disabled={removing}
+            className="text-[11px] opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
+            style={{
+              color: "rgba(20,18,16,.48)",
+              cursor: removing ? "default" : "pointer",
+            }}
+          >
+            {removing ? "Удаляем…" : item.source === "MANUAL" ? "Отменить" : "Убрать"}
+          </button>
+        ) : null}
       </div>
     </article>
   );

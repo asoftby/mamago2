@@ -954,6 +954,7 @@ export function MobileSearchSheet({
           selectedIntent={selectedIntent}
           onIntentSelect={handleIntentSelect}
           onResultNavigate={handleSearchResultNavigate}
+          citySlug={pendingCitySlug}
           filtersSection={
             <>
               {renderAccordion(

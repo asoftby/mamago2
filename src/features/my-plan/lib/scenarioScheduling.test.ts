@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { localWallClockToUtc } from "@/lib/date/localDateKey";
-import { resolveScenarioScheduling } from "./scenarioScheduling";
+import { resolvePlanItemScenarioScheduling, resolveScenarioScheduling } from "./scenarioScheduling";
+import { detectScenarioConflicts } from "./detectScenarioConflicts";
 import type { ScenarioItemTiming } from "./scenarioProjection";
 
 function timing(startsAt: Date | null, isFlexible = false): ScenarioItemTiming {
@@ -13,6 +14,36 @@ function timing(startsAt: Date | null, isFlexible = false): ScenarioItemTiming {
 
 function at(date: string, time: string): Date {
   return localWallClockToUtc(date, time);
+}
+
+// Both Scenario projections use this shared PlanItem resolver. An exact
+// manual interval participates in duration and overlap detection.
+{
+  const manual = resolvePlanItemScenarioScheduling({
+    source: "MANUAL", activity: null,
+    timing: timing(at("2026-09-01", "10:00")),
+    endsAt: at("2026-09-01", "11:30"),
+  });
+  assert.equal(manual.kind, "SLOT");
+  assert.equal(manual.startsAt?.getTime(), at("2026-09-01", "10:00").getTime());
+  assert.equal(manual.endsAt?.getTime(), at("2026-09-01", "11:30").getTime());
+  assert.equal(manual.durationMinutes, 90);
+  assert.equal(manual.canReschedule, false);
+  const overlapping = resolvePlanItemScenarioScheduling({
+    source: "MANUAL", activity: null,
+    timing: timing(at("2026-09-01", "11:00")),
+    endsAt: at("2026-09-01", "12:00"),
+  });
+  assert.equal(detectScenarioConflicts([
+    { id: "manual-a", contentId: null, scheduling: manual },
+    { id: "manual-b", contentId: null, scheduling: overlapping },
+  ]).length, 1);
+  const withoutEnd = resolvePlanItemScenarioScheduling({
+    source: "MANUAL", activity: null,
+    timing: timing(at("2026-09-01", "10:00")), endsAt: null,
+  });
+  assert.equal(withoutEnd.durationMinutes, null);
+  assert.equal(withoutEnd.endsAt, null);
 }
 
 // No persisted kind and no schedule evidence remains UNKNOWN.
