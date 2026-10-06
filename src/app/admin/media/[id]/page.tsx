@@ -10,7 +10,6 @@ import { MediaMetadataEditor } from "@/components/admin/media/MediaMetadataEdito
 import { MediaMetadataEditorLayout } from "@/components/admin/media/MediaMetadataEditorLayout";
 import { MetadataSourceBadge } from "@/components/admin/media/MetadataSourceBadge";
 import { MediaActions } from "@/components/admin/media/MediaActions";
-import Link from "next/link";
 import { formatDistance } from "date-fns";
 import { ru } from "date-fns/locale";
 import { formatBytes } from "@/lib/media/formatBytes";
@@ -135,14 +134,6 @@ export default async function AdminMediaDetailPage({
           <MediaStatusBadge status={media.status} />
         </div>
       </div>
-
-      {/* Back Link */}
-      <Link
-        href="/admin/media"
-        className="text-sm text-blue-600 hover:text-blue-700 inline-block"
-      >
-        ← Назад к медиатеке
-      </Link>
 
       {/* Metadata Editor and Actions */}
       <div className="grid lg:grid-cols-3 gap-6">
