@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Pencil,
@@ -13,40 +13,46 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type {
   SeoAdminPage,
   SeoPageIndexationStatus,
-  SeoPageSection,
   SeoPageType,
 } from "@/lib/admin/seo/seoPageTypes";
 import {
   SEO_ROBOTS_INDEX_FOLLOW,
   SEO_ROBOTS_NOINDEX_FOLLOW,
 } from "@/lib/admin/seo/entities/robotsConstants";
+import { geographyLabelForPage } from "@/lib/admin/seo/geo";
 import { SeoPagesEmptyState } from "./SeoPagesEmptyState";
 import { SeoEntityDiagnosticsCard } from "./SeoEntityDiagnosticsCard";
 import { Toggle } from "@/components/ui/Toggle";
 import { TableContainer } from "@/components/ui/table";
+import { AdminPagination } from "@/components/admin/AdminPagination";
+import type { AdminPaginationResult } from "@/lib/admin/pagination";
+import { SEO_PAGES_PAGE_SIZES, type SeoPagesPageSize } from "@/lib/admin/seoNavConfig";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const TYPE_LABEL: Record<SeoPageType, string> = {
-  preset: "Preset",
-  category: "Category",
-  generated: "Generated",
-  landing: "Landing",
-  event: "Event",
-  place: "Place",
-  offer: "Offer",
-  route: "Route",
-  article: "Article",
+  preset: "Пресет",
+  category: "Категория",
+  generated: "Сгенерированная",
+  landing: "Лендинг",
+  event: "Событие",
+  place: "Место",
+  offer: "Оффер",
+  route: "Маршрут",
+  article: "Статья",
 };
 
 const STATUS_LABEL: Record<SeoPageIndexationStatus, string> = {
@@ -61,44 +67,15 @@ const STATUS_BADGE: Record<SeoPageIndexationStatus, string> = {
   draft: "bg-gray-100 text-gray-700 border-gray-200",
 };
 
-const SECTION_LABEL: Record<SeoPageSection, string> = {
-  kuda: "Куда",
-  zanyatiya: "Занятия",
-  events: "События",
-  journal: "Журнал",
-  routes: "Маршруты",
-  birthday: "Дни рождения",
-  other: "Прочее",
-};
+const BASE_PATH = "/admin/seo/pages";
 
-const SECTION_OPTIONS: { value: SeoPageSection | "all"; label: string }[] = [
-  { value: "all", label: "Все разделы" },
-  { value: "kuda", label: "Куда" },
-  { value: "zanyatiya", label: "Занятия" },
-  { value: "events", label: "События" },
-  { value: "journal", label: "Журнал" },
-  { value: "routes", label: "Маршруты" },
-  { value: "birthday", label: "Дни рождения" },
-  { value: "other", label: "Другое" },
-];
-
-function matchesSearch(row: SeoAdminPage, q: string) {
-  if (!q.trim()) return true;
-  const x = q.trim().toLowerCase();
-  const slug = row.path.split("/").filter(Boolean).pop() ?? "";
-  const d = row.entityDiagnostics;
-  return (
-    row.path.toLowerCase().includes(x) ||
-    row.h1.toLowerCase().includes(x) ||
-    row.title.toLowerCase().includes(x) ||
-    slug.toLowerCase().includes(x) ||
-    row.id.toLowerCase().includes(x) ||
-    (d &&
-      (d.entityId.toLowerCase().includes(x) ||
-        (d.slug ?? "").toLowerCase().includes(x) ||
-        d.entityTitle.toLowerCase().includes(x) ||
-        (d.citySlug ?? "").toLowerCase().includes(x)))
-  );
+function seoStateLabel(row: SeoAdminPage): string {
+  const issues = row.entityDiagnostics?.issues.length ?? 0;
+  if (issues > 0) return "Есть проблемы";
+  if (!row.title?.trim() || !row.description?.trim()) return "Нужно заполнить";
+  if (row.indexationStatus === "draft") return "Черновик";
+  if (row.indexationStatus === "noindex") return "Скрыта";
+  return "В порядке";
 }
 
 function isEntityRow(row: SeoAdminPage) {
@@ -107,6 +84,14 @@ function isEntityRow(row: SeoAdminPage) {
 
 interface SeoPagesClientProps {
   initialRows: SeoAdminPage[];
+  pagination: AdminPaginationResult;
+  filters: {
+    q: string;
+    type: SeoPageType | "all";
+    indexation: SeoPageIndexationStatus | "all";
+    pageSize: SeoPagesPageSize;
+  };
+  currentParams: Record<string, string | string[] | undefined>;
 }
 
 function getEntityId(row: SeoAdminPage): string | null {
@@ -187,7 +172,12 @@ function applyRobotsPatch(row: SeoAdminPage, index: boolean): SeoAdminPage {
   };
 }
 
-export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
+export function SeoPagesClient({
+  initialRows,
+  pagination,
+  filters,
+  currentParams,
+}: SeoPagesClientProps) {
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
   useEffect(() => {
@@ -195,29 +185,11 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
   }, [initialRows]);
 
   const [busyRowId, setBusyRowId] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<SeoPageType | "all">("all");
-  const [statusFilter, setStatusFilter] = useState<
-    SeoPageIndexationStatus | "all"
-  >("all");
-  const [sectionFilter, setSectionFilter] = useState<
-    SeoPageSection | "all"
-  >("all");
-  const [entitiesOnly, setEntitiesOnly] = useState(false);
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
-
-  const filtered = useMemo(() => {
-    return rows.filter((row) => {
-      if (!matchesSearch(row, query)) return false;
-      if (entitiesOnly && !isEntityRow(row)) return false;
-      if (typeFilter !== "all" && row.type !== typeFilter) return false;
-      if (statusFilter !== "all" && row.indexationStatus !== statusFilter)
-        return false;
-      if (sectionFilter !== "all" && row.section !== sectionFilter)
-        return false;
-      return true;
-    });
-  }, [rows, query, typeFilter, statusFilter, sectionFilter, entitiesOnly]);
+  const [pendingIndexation, setPendingIndexation] = useState<{
+    row: SeoAdminPage;
+    nextIndex: boolean;
+  } | null>(null);
 
   async function setIndexFollow(row: SeoAdminPage, index: boolean) {
     const endpoint = toggleIndexationEndpoint(row);
@@ -234,6 +206,7 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
         body: JSON.stringify({ index }),
       });
       if (!res.ok) throw new Error("Failed");
+      router.refresh();
     } catch {
       setRows((prev) =>
         prev.map((r) => (r.id === row.id ? snapshot : r)),
@@ -243,9 +216,16 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
     }
   }
 
+  const emptyBecauseFilters =
+    pagination.total === 0 &&
+    (Boolean(filters.q) || filters.type !== "all" || filters.indexation !== "all");
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:flex-row lg:flex-wrap lg:items-end">
+      <form
+        method="get"
+        className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:flex-row lg:flex-wrap lg:items-end"
+      >
         <div className="min-w-[200px] flex-1">
           <label className="mb-1.5 block text-xs font-medium text-gray-500">
             Поиск
@@ -253,9 +233,9 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="URL, slug, H1 или title"
+              name="q"
+              defaultValue={filters.q}
+              placeholder="Название, URL или slug"
               className="h-9 pl-9"
             />
           </div>
@@ -264,139 +244,96 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
           <label className="mb-1.5 block text-xs font-medium text-gray-500">
             Тип
           </label>
-          <Select
-            value={typeFilter}
-            onValueChange={(v) => setTypeFilter(v as SeoPageType | "all")}
+          <select
+            name="type"
+            defaultValue={filters.type}
+            className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
           >
-            <SelectTrigger className="h-9 bg-white">
-              <SelectValue placeholder="Тип" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все типы</SelectItem>
-              <SelectItem value="preset">preset</SelectItem>
-              <SelectItem value="category">category</SelectItem>
-              <SelectItem value="generated">generated</SelectItem>
-              <SelectItem value="landing">landing</SelectItem>
-              <SelectItem value="event">event</SelectItem>
-              <SelectItem value="place">place</SelectItem>
-              <SelectItem value="offer">offer</SelectItem>
-              <SelectItem value="route">route</SelectItem>
-              <SelectItem value="article">article</SelectItem>
-            </SelectContent>
-          </Select>
+            <option value="all">Все типы</option>
+            <option value="event">Событие</option>
+            <option value="place">Место</option>
+            <option value="offer">Оффер</option>
+            <option value="route">Маршрут</option>
+            <option value="article">Статья</option>
+          </select>
         </div>
         <div className="w-full min-w-[140px] sm:w-auto">
           <label className="mb-1.5 block text-xs font-medium text-gray-500">
-            Статус
+            Индексация
           </label>
-          <Select
-            value={statusFilter}
-            onValueChange={(v) =>
-              setStatusFilter(v as SeoPageIndexationStatus | "all")
-            }
+          <select
+            name="indexation"
+            defaultValue={filters.indexation}
+            className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
           >
-            <SelectTrigger className="h-9 bg-white">
-              <SelectValue placeholder="Статус" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все статусы</SelectItem>
-              <SelectItem value="indexed">indexed</SelectItem>
-              <SelectItem value="noindex">noindex</SelectItem>
-              <SelectItem value="draft">draft</SelectItem>
-            </SelectContent>
-          </Select>
+            <option value="all">Все</option>
+            <option value="indexed">В индексе</option>
+            <option value="noindex">noindex</option>
+            <option value="draft">Черновик</option>
+          </select>
         </div>
-        <div className="w-full min-w-[160px] sm:w-auto">
+        <div className="w-full min-w-[120px] sm:w-auto">
           <label className="mb-1.5 block text-xs font-medium text-gray-500">
-            Раздел
+            На странице
           </label>
-          <Select
-            value={sectionFilter}
-            onValueChange={(v) =>
-              setSectionFilter(v as SeoPageSection | "all")
-            }
+          <select
+            name="pageSize"
+            defaultValue={String(filters.pageSize)}
+            className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
           >
-            <SelectTrigger className="h-9 bg-white">
-              <SelectValue placeholder="Раздел" />
-            </SelectTrigger>
-            <SelectContent>
-              {SECTION_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {SEO_PAGES_PAGE_SIZES.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
         </div>
-        <div className="flex items-center gap-2 pb-0.5">
-          <label className="flex cursor-pointer items-center gap-2 text-xs text-gray-700">
-            <input
-              type="checkbox"
-              className="rounded border-gray-300"
-              checked={entitiesOnly}
-              onChange={(e) => setEntitiesOnly(e.target.checked)}
-            />
-            Только сущности (БД)
-          </label>
-        </div>
-      </div>
+        <Button type="submit" size="sm" className="h-9">
+          Применить
+        </Button>
+      </form>
 
-      {initialRows.length === 0 ? (
+      {pagination.total === 0 && !emptyBecauseFilters ? (
         <SeoPagesEmptyState />
-      ) : filtered.length === 0 ? (
+      ) : pagination.total === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-amber-50/50 px-6 py-10 text-center">
           <p className="text-sm font-medium text-gray-900">
-            Нет строк по текущим фильтрам
+            Нет страниц по текущим фильтрам
           </p>
           <p className="mt-1 text-xs text-gray-600">
-            Измените поиск или сбросьте фильтры
+            Измените поиск, фильтры или SEO-контекст
           </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="mt-4"
-            onClick={() => {
-              setQuery("");
-              setTypeFilter("all");
-              setStatusFilter("all");
-              setSectionFilter("all");
-              setEntitiesOnly(false);
-            }}
-          >
-            Сбросить фильтры
+          <Button type="button" variant="outline" size="sm" className="mt-4" asChild>
+            <a href={BASE_PATH}>Сбросить фильтры</a>
           </Button>
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <TableContainer
-            minWidthClassName="min-w-[920px]"
-            scrollLabel="Таблица SEO-страниц, прокручивается по горизонтали"
+            minWidthClassName="min-w-[720px]"
+            scrollLabel="Таблица страниц SEO, прокручивается по горизонтали"
           >
             <table className="w-full border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50/80">
                   <th className="w-8 px-1 py-3" aria-hidden />
                   <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">
-                    URL
+                    Страница
                   </th>
                   <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">
-                    Slug (БД)
+                    Тип
                   </th>
                   <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">
-                    H1
+                    География
                   </th>
                   <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">
-                    Type
+                    SEO-состояние
                   </th>
                   <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">
-                    Section
+                    Индексация
                   </th>
                   <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">
-                    Indexation
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">
-                    Диагностика
+                    Проблемы
                   </th>
                   <th className="whitespace-nowrap px-3 py-3 text-right font-semibold text-gray-700">
                     <span className="sr-only">Действия</span>
@@ -404,9 +341,10 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filtered.map((row) => {
+                {rows.map((row) => {
                   const settingsHref = seoSettingsHref(row);
                   const canSeoSettings = Boolean(settingsHref);
+                  const issues = row.entityDiagnostics?.issues.length ?? 0;
                   return (
                     <Fragment key={row.id}>
                       <tr className="hover:bg-gray-50/80">
@@ -421,7 +359,7 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
                               aria-label={
                                 expandedRowId === row.id
                                   ? "Свернуть детали"
-                                  : "Показать диагностику и доп. действия"
+                                  : "Показать детали"
                               }
                               onClick={() =>
                                 setExpandedRowId((id) =>
@@ -440,21 +378,13 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
                             <span className="inline-block w-8" />
                           )}
                         </td>
-                        <td className="max-w-[200px] px-4 py-3 font-mono text-xs text-gray-800">
-                          <span className="break-all">{row.path}</span>
-                        </td>
-                        <td className="max-w-[120px] px-4 py-3 font-mono text-xs text-gray-700">
-                          <span
-                            className="line-clamp-2 break-all"
-                            title={row.entityDiagnostics?.slug ?? ""}
-                          >
-                            {row.entityDiagnostics?.slug ?? "—"}
-                          </span>
-                        </td>
-                        <td className="max-w-[180px] px-4 py-3 text-gray-800">
-                          <span className="line-clamp-2" title={row.h1}>
-                            {row.h1}
-                          </span>
+                        <td className="max-w-[240px] px-4 py-3">
+                          <p className="line-clamp-2 font-medium text-gray-900" title={row.h1}>
+                            {row.h1 || row.title}
+                          </p>
+                          <p className="mt-0.5 truncate font-mono text-[11px] text-gray-500" title={row.path}>
+                            {row.path}
+                          </p>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3">
                           <Badge variant="outline" className="font-normal">
@@ -462,7 +392,10 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
                           </Badge>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-gray-700">
-                          {SECTION_LABEL[row.section] ?? row.section}
+                          {geographyLabelForPage(row)}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-gray-700">
+                          {seoStateLabel(row)}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3">
                           <span
@@ -476,13 +409,13 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
                         </td>
                         <td className="max-w-[140px] px-4 py-3 text-xs">
                           {row.entityDiagnostics ? (
-                            row.entityDiagnostics.issues.length > 0 ? (
+                            issues > 0 ? (
                               <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 font-medium text-amber-900">
                                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                                {row.entityDiagnostics.issues.length} проблем
+                                {issues}
                               </span>
                             ) : (
-                              <span className="text-emerald-700">OK</span>
+                              <span className="text-emerald-700">Нет</span>
                             )
                           ) : (
                             "—"
@@ -495,8 +428,8 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-gray-600 hover:text-gray-900"
-                              aria-label="Preview — открыть public страницу"
-                              title="Preview"
+                              aria-label="Открыть публичную страницу"
+                              title="Просмотр"
                               onClick={() => router.push(row.path)}
                             >
                               <Eye className="h-4 w-4" />
@@ -506,10 +439,10 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-gray-600 hover:text-gray-900 disabled:opacity-40"
-                              aria-label="SEO settings"
+                              aria-label="Редактировать SEO"
                               title={
                                 canSeoSettings
-                                  ? "SEO settings"
+                                  ? "Редактировать SEO"
                                   : "Только для сущностей из БД"
                               }
                               disabled={!canSeoSettings}
@@ -524,7 +457,7 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
                       </tr>
                       {expandedRowId === row.id && isEntityRow(row) ? (
                         <tr className="bg-slate-50/60">
-                          <td colSpan={9} className="px-4 py-4">
+                          <td colSpan={8} className="px-4 py-4">
                             <div className="space-y-4">
                               {row.entityDiagnostics ? (
                                 <SeoEntityDiagnosticsCard
@@ -547,7 +480,7 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
                                     }}
                                   >
                                     <Braces className="h-4 w-4" />
-                                    Schema
+                                    schema.org
                                   </Button>
                                   <Button
                                     type="button"
@@ -561,20 +494,28 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
                                     }}
                                   >
                                     <Link2 className="h-4 w-4" />
-                                    Redirects
+                                    Редиректы
                                   </Button>
                                 </div>
                                 {toggleIndexationEndpoint(row) ? (
                                   <div className="flex items-center gap-3 sm:justify-end">
-                                    <span className="text-sm text-gray-700">
-                                      Индексация
-                                    </span>
+                                    <div className="text-right">
+                                      <p className="text-sm font-medium text-gray-800">
+                                        Индексация
+                                      </p>
+                                      <p className="text-[11px] text-amber-800">
+                                        Опасное действие — требуется подтверждение
+                                      </p>
+                                    </div>
                                     <Toggle
                                       checked={isIndexFollowOn(row)}
                                       disabled={busyRowId === row.id}
                                       aria-label="Индексация: index или noindex"
                                       onChange={(next) =>
-                                        setIndexFollow(row, next)
+                                        setPendingIndexation({
+                                          row,
+                                          nextIndex: next,
+                                        })
                                       }
                                     />
                                   </div>
@@ -590,11 +531,53 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
               </tbody>
             </table>
           </TableContainer>
-          <div className="border-t border-gray-100 px-4 py-2 text-xs text-gray-500">
-            Показано {filtered.length} из {initialRows.length}
+          <div className="border-t border-gray-100 px-4 py-3">
+            <AdminPagination
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              total={pagination.total}
+              start={pagination.start}
+              end={pagination.end}
+              basePath={BASE_PATH}
+              params={currentParams}
+            />
           </div>
         </div>
       )}
+
+      <AlertDialog
+        open={Boolean(pendingIndexation)}
+        onOpenChange={(open) => {
+          if (!open) setPendingIndexation(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Изменить индексацию?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Изменение индексации может привести к исчезновению страницы из
+              Google и Яндекса.
+              {pendingIndexation
+                ? ` Страница: «${pendingIndexation.row.h1 || pendingIndexation.row.title}».`
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={() => {
+                if (!pendingIndexation) return;
+                const { row, nextIndex } = pendingIndexation;
+                setPendingIndexation(null);
+                void setIndexFollow(row, nextIndex);
+              }}
+            >
+              Изменить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

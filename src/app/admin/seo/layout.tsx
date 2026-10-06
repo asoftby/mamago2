@@ -1,19 +1,26 @@
-import { SeoSubNav } from "@/components/admin/seo/SeoSubNav";
+import { SeoLayoutHeader } from "@/components/admin/seo/SeoLayoutHeader";
+import {
+  formatSeoGeoContextBreadcrumb,
+} from "@/lib/admin/seo/geo";
+import { resolveSeoGeoSession } from "@/lib/admin/seo/geo/resolveSeoGeoSession";
 
 /**
- * Общий каркас SEO: только вторичная навигация.
- * Заголовок раздела — на странице дашборда и в подразделах.
+ * Каркас SEO: продуктовая навигация + Geo SEO Context (не на settings/**).
  */
-export default function SeoControlCenterLayout({
+export default async function SeoLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { catalog, context, token } = await resolveSeoGeoSession();
+
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <header className="border-b border-gray-200 pb-4">
-        <SeoSubNav />
-      </header>
+    <div className="space-y-6 p-4 sm:p-6">
+      <SeoLayoutHeader
+        token={token}
+        breadcrumb={formatSeoGeoContextBreadcrumb(context)}
+        options={catalog.options}
+      />
 
       <div className="min-w-0">{children}</div>
     </div>

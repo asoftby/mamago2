@@ -32,10 +32,12 @@ import type {
   ValidationIssueCategory,
 } from "@/lib/admin/seo/domain/types";
 import { SeoPageHeader } from "@/components/admin/seo/primitives/SeoPageHeader";
+import { SeoEmptyState } from "@/components/admin/seo/primitives/SeoEmptyState";
 import { TableContainer } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
+  Braces,
   CheckCircle2,
   Pencil,
   XCircle,
@@ -156,11 +158,27 @@ export function StructuredDataCenterClient({
     return t;
   }, []);
 
+  if (templates.length === 0 && initialOverviewCards.length === 0) {
+    return (
+      <div className="space-y-6">
+        <SeoPageHeader
+          title="Структурированные данные"
+          subtitle="Шаблоны schema.org и покрытие JSON-LD"
+        />
+        <SeoEmptyState
+          icon={<Braces className="h-6 w-6 text-gray-400" />}
+          title="Центр управления разметкой пуст"
+          description="Агрегированные шаблоны schema.org ещё не подключены к этому экрану. Редактирование JSON-LD отдельных сущностей доступно в разделе «Страницы» → schema.org."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <SeoPageHeader
-        title="Structured Data"
-        subtitle="Управление schema.org шаблонами и покрытием structured data"
+        title="Структурированные данные"
+        subtitle="Шаблоны schema.org и покрытие JSON-LD"
       />
 
       <Tabs defaultValue="overview" className="w-full">

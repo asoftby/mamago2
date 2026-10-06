@@ -32,6 +32,8 @@ for (const [name, text] of [
 assert.match(eventCreateRoute, /checkUserBusinessPermission/);
 assert.match(eventCreateRoute, /"content\.create"/);
 assert.match(eventCreateRoute, /BUSINESS_NOT_APPROVED/);
+assert.match(eventCreateRoute, /resolveActivityBusinessIdForCreate/);
+assert.match(eventCreateRoute, /getUserBusinessId/);
 assert.match(eventSubmitRoute, /resolveCanonicalActivityBusinessId/);
 assert.match(eventSubmitRoute, /"content\.publish"/);
 assert.match(eventSubmitRoute, /BUSINESS_NOT_APPROVED/);

@@ -13,10 +13,11 @@ import {
   CONTENT_NAV_ITEMS,
   contentItemHref,
 } from "@/lib/admin/contentSidebarConfig";
-import { SEO_CONTROL_NAV } from "@/lib/admin/seoNavConfig";
+import { SEO_PRIMARY_NAV, SEO_SETTINGS_ENTRY } from "@/lib/admin/seoNavConfig";
 import { adminPath } from "@/lib/routing/surface";
 
 export { adminPath };
+
 
 const MODERATION_NAV_EN: Record<ModerationNavItemId, string> = {
   queue: "Queue",
@@ -119,10 +120,16 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     title: "SEO",
-    items: SEO_CONTROL_NAV.map((item) => ({
-      label: item.label,
-      href: item.href,
-    })),
+    items: [
+      ...SEO_PRIMARY_NAV.map((item) => ({
+        label: item.label,
+        href: item.href,
+      })),
+      {
+        label: SEO_SETTINGS_ENTRY.label,
+        href: SEO_SETTINGS_ENTRY.href,
+      },
+    ],
   },
 ];
 
@@ -156,10 +163,14 @@ export function AdminNav() {
           </div>
           <div className="flex flex-col gap-1">
             {section.items.map((item) => {
-              const active =
-                pathname === item.href ||
-                (item.href !== adminPath("") &&
-                  pathname.startsWith(`${item.href}/`));
+              const settingsEntry = item.href === SEO_SETTINGS_ENTRY.href;
+              const active = settingsEntry
+                ? pathname === item.href ||
+                  pathname.startsWith(`${adminPath("/seo/settings")}/`) ||
+                  pathname === adminPath("/seo/settings")
+                : pathname === item.href ||
+                  (item.href !== adminPath("") &&
+                    pathname.startsWith(`${item.href}/`));
               return (
                 <Link
                   key={item.href}
