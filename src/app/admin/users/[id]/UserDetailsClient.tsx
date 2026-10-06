@@ -402,7 +402,7 @@ export function UserDetailsClient({ userId }: { userId: string }) {
     );
   }
 
-  const { user, stats, businessAccess, overview, moderationHistory, auditLog } = data;
+  const { user, businessAccess, overview, moderationHistory, auditLog } = data;
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
