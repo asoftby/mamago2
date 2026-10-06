@@ -9,6 +9,7 @@
 
 import { createHash } from "crypto";
 import sharp from "sharp";
+import { validateImageContent } from "@/lib/uploads/imageContentValidation";
 import { prisma } from "@/lib/prisma";
 import { MediaAssetKind, MediaAssetStatus, MediaSourceType } from "@prisma/client";
 import { writeRuntimeUpload } from "@/server/media/media-storage";
@@ -132,6 +133,11 @@ export async function optimizeImportedImage(
       error: `Unsupported content-type: ${contentType || "unknown"}`,
       originalUrl,
     };
+  }
+  try {
+    validateImageContent(buffer, contentType);
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Invalid image content", originalUrl };
   }
 
   // ── Dedup raw downloaded bytes before sharp/write ──────────────────────────

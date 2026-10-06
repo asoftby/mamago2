@@ -7,6 +7,7 @@
  */
 
 import sharp, { type Sharp } from "sharp";
+import { validateImageContent } from "@/lib/uploads/imageContentValidation";
 import {
   ALLOWED_UPLOAD_MIME_TYPES,
   ALLOWED_UPLOAD_MIME_TYPE_SET,
@@ -155,6 +156,7 @@ export async function processImage(
       console.error("❌ [PROCESSOR] Validation failed:", validation.error);
       throw new Error(validation.error);
     }
+    validateImageContent(buffer, originalMimeType);
     console.log("✅ [PROCESSOR] Validation passed");
 
     // Load image with sharp
