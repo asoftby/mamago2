@@ -5164,3 +5164,13 @@ distributor_company_id=550) и хотели бы уточнить несколь
   - logs/metrics distinguish decode failures, unsupported/corrupt files and resource-limit failures without exposing `sharp/libheif` internals to users.
 - Exit criterion: one raw HEIC file can be uploaded successfully through browser UI, direct API and one server-side ingestion path, all producing the same canonical MediaAsset/derivatives without any client-side conversion requirement.
 - Source: HEIC incidents and fixes #441, #448, #455.
+
+## [BACKLOG-173] Family Core M3a: consent text, owner question about history access, simplified onboarding
+
+- Status: OPEN
+- Priority: P1 (blocks enabling FAMILY_INVITES)
+- Area: Family Core / Join
+- Added: 2026-10-06
+- Reason deferred: `/invite/family` is built (auth with `redirectTo`, consent, merge step, notification to the inviter) but stays closed until the product owner fills `FAMILY_CONSENT_TEXT` and `FAMILY_CONSENT_TEXT_VERSION` in `src/server/family/familyConsent.ts` (law № 99-З wording is not invented by the agent). Not built: the owner's question "show the new adult past plans?" (a joiner always starts with `historyAccess = FROM_JOIN`; changing it later needs a UI + service), and the simplified onboarding for a joiner without data.
+- Acceptance criteria: consent text + version published; owner question (notification with a choice) and a service changing `FamilyMembership.historyAccess` with tests; short onboarding after joining.
+- Source: Family Core M3a.
