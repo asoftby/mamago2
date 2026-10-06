@@ -63,6 +63,21 @@ assert.ok(
 );
 
 assert.ok(
+  client.includes('ID пользователя'),
+  "user id must live inside the profile/access card",
+);
+
+assert.ok(
+  !client.includes('ID: {user.id}'),
+  "user id must not be duplicated in the page header",
+);
+
+assert.ok(
+  !client.includes('{user.displayName ? <p className="truncate text-sm text-gray-600">{user.email}</p> : null}'),
+  "email must not be duplicated in the page header",
+);
+
+assert.ok(
   client.includes("Тексты переписки и комментариев здесь намеренно не показываются"),
   "admin card must not surface private message/comment bodies by default",
 );
