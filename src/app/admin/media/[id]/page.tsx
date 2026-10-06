@@ -10,6 +10,7 @@ import { MediaMetadataEditor } from "@/components/admin/media/MediaMetadataEdito
 import { MediaMetadataEditorLayout } from "@/components/admin/media/MediaMetadataEditorLayout";
 import { MetadataSourceBadge } from "@/components/admin/media/MetadataSourceBadge";
 import { MediaActions } from "@/components/admin/media/MediaActions";
+import Link from "next/link";
 import { formatDistance } from "date-fns";
 import { ru } from "date-fns/locale";
 import { formatBytes } from "@/lib/media/formatBytes";
