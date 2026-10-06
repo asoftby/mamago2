@@ -1,8 +1,11 @@
 /**
  * Regression guard for business event media uploads.
  *
- * The event wizard must never decode/process phone photos in the browser:
- * renderer OOM kills the whole tab before an ordinary error can be handled.
+ * The event wizard must never decode/process phone photos in the browser
+ * itself: renderer OOM kills the whole tab before an ordinary error can be
+ * handled. HEIC/HEIF is no longer rejected here: the shared upload transport
+ * (`uploadMediaFile`) is the only place that converts it to JPEG (see
+ * src/lib/uploads/heicConversion.ts and uploadPipeline.contract.test.ts).
  *
  * Run: pnpm exec tsx src/components/business/wizard/event/steps/Step3Media.uploadSafety.test.ts
  */
@@ -21,18 +24,13 @@ assert.ok(
 );
 
 assert.ok(
-  source.includes("isHeicFile(file)"),
-  "Event media must detect HEIC/HEIF before starting an upload",
+  !source.includes("isHeicFile(file)") && !source.includes("EVENT_HEIC_UNSUPPORTED_MESSAGE"),
+  "Event media must not reject HEIC/HEIF itself: the shared upload transport converts it before the request",
 );
 
 assert.ok(
-  source.includes("EVENT_HEIC_UNSUPPORTED_MESSAGE"),
-  "HEIC/HEIF must fail with a recoverable user-facing message",
-);
-
-assert.ok(
-  !source.includes("convertHeicFileToJpegIfNeeded"),
-  "Event media must not run HEIC conversion in the browser",
+  !source.includes("convertHeicFileToJpegIfNeeded") && !source.includes("heicConversion"),
+  "Event media must not run or import HEIC conversion itself; only the shared upload transport owns it",
 );
 
 assert.ok(
