@@ -1217,6 +1217,7 @@ export async function notifyAdminModerationItemCreated(params: {
   userId: string;
   itemTitle: string;
   itemId?: string;
+  actionUrl?: string;
 }) {
   return createNotification({
     userId: params.userId,
@@ -1226,7 +1227,64 @@ export async function notifyAdminModerationItemCreated(params: {
     body: params.itemTitle,
     entityType: "MODERATION_ITEM",
     entityId: params.itemId ?? undefined,
+    ctaAction: params.actionUrl ?? "/admin/moderation/queue",
   });
+}
+
+type AdminModerationPublicationType = "EVENT" | "OFFER" | "PLACE";
+
+const ADMIN_MODERATION_PUBLICATION_LABELS: Record<
+  AdminModerationPublicationType,
+  string
+> = {
+  EVENT: "Событие",
+  OFFER: "Предложение",
+  PLACE: "Место",
+};
+
+/**
+ * Уведомляет администраторов о ручной публикации бизнес-пользователя,
+ * которая реально перешла в очередь модерации.
+ *
+ * Вызывается только из business submit/create routes. Импорт/парсинг намеренно
+ * не подключены к этому helper и поэтому не создают операционный шум.
+ */
+export async function notifyAdminsPublicationSubmitted(params: {
+  publicationType: AdminModerationPublicationType;
+  publicationId: string;
+  publicationTitle: string;
+  submittedAt?: Date;
+}) {
+  const admins = await prisma.user.findMany({
+    where: { role: "ADMIN" },
+    select: { id: true },
+  });
+
+  if (admins.length === 0) return [];
+
+  const submittedAt = params.submittedAt ?? new Date();
+  const label = ADMIN_MODERATION_PUBLICATION_LABELS[params.publicationType];
+  // MODERATION_ITEM is a submission, not the publication itself. Including
+  // submittedAt keeps a legitimate resubmission deliverable in Telegram while
+  // the route-level status transition prevents duplicate notifications for the
+  // same already-PENDING item.
+  const moderationItemId = [
+    "business-publication",
+    params.publicationType.toLowerCase(),
+    params.publicationId,
+    submittedAt.getTime(),
+  ].join(":");
+
+  return Promise.all(
+    admins.map((admin) =>
+      notifyAdminModerationItemCreated({
+        userId: admin.id,
+        itemId: moderationItemId,
+        itemTitle: `${label} «${params.publicationTitle}» отправлено бизнес-пользователем на модерацию.`,
+        actionUrl: "/admin/moderation/queue",
+      }),
+    ),
+  );
 }
 
 export async function notifyUserPlanReminder(params: {
