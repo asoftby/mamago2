@@ -25,6 +25,16 @@ const appendIndex = uploadClient.indexOf('formData.append("file", fileToUpload)'
 assert.ok(convertIndex >= 0, "uploadMediaFile must normalize HEIC/HEIF before transport");
 assert.ok(appendIndex > convertIndex, "the normalized file must be appended after HEIC conversion");
 
+const heicConversion = readFileSync(join(process.cwd(), "src/lib/uploads/heicConversion.ts"), "utf8");
+assert.ok(
+  !/await\s+isHeic\s*\(/.test(heicConversion),
+  "HEIC files already classified by name/MIME must not be silently passed through by a second isHeic gate",
+);
+assert.ok(
+  heicConversion.includes("await hasJpegSignature(blob)"),
+  "HEIC conversion must verify that the produced bytes are actually JPEG before upload",
+);
+
 const directUploadFetch = /fetch\s*\(\s*[\"'`]\/api\/upload(?:\/|\?|[\"'`])/;
 const offenders = walkSourceFiles(join(process.cwd(), "src"))
   .filter((path) => path !== uploadClientPath)
