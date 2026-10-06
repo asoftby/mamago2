@@ -243,7 +243,6 @@ export async function getUserWithDetails(userId: string) {
         status: true,
         createdAt: true,
         updatedAt: true,
-        archivedAt: true,
         place: { select: { title: true } },
         business: { select: { id: true, name: true, legalName: true } },
       },
@@ -259,6 +258,7 @@ export async function getUserWithDetails(userId: string) {
         status: true,
         createdAt: true,
         updatedAt: true,
+        archivedAt: true,
         place: {
           select: {
             id: true,
