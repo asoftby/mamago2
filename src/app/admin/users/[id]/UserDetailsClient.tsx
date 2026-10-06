@@ -667,6 +667,11 @@ export function UserDetailsClient({ userId }: { userId: string }) {
                 ))
               )}
             </div>
+            {overview.publications.events.total > overview.publications.events.items.length ? (
+              <div className="mt-2 text-xs text-gray-500">
+                Показаны последние {overview.publications.events.items.length} из {overview.publications.events.total}.
+              </div>
+            ) : null}
           </section>
 
           <section>
@@ -699,6 +704,11 @@ export function UserDetailsClient({ userId }: { userId: string }) {
                 ))
               )}
             </div>
+            {overview.publications.offers.total > overview.publications.offers.items.length ? (
+              <div className="mt-2 text-xs text-gray-500">
+                Показаны последние {overview.publications.offers.items.length} из {overview.publications.offers.total}.
+              </div>
+            ) : null}
           </section>
 
           <section>
@@ -725,6 +735,11 @@ export function UserDetailsClient({ userId }: { userId: string }) {
                 ))
               )}
             </div>
+            {overview.publications.articles.total > overview.publications.articles.items.length ? (
+              <div className="mt-2 text-xs text-gray-500">
+                Показаны последние {overview.publications.articles.items.length} из {overview.publications.articles.total}.
+              </div>
+            ) : null}
           </section>
         </CardContent>
       </Card>
