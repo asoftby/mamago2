@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { activePlanScopeFor } from "@/server/family/familyAccess";
+import { getPlanBookingStates } from "@/server/family/planBooking.service";
 import { resolveMyPlanItemEffectiveTime } from "@/features/my-plan/lib/scenarioProjection";
 import {
   matchesScenarioPlanFingerprint,
@@ -37,8 +39,7 @@ export async function loadFamilyCalendarRange(input: {
     }),
     prisma.planItem.findMany({
       where: {
-        userId: input.owner.userId,
-        cancelledAt: null,
+        ...(await activePlanScopeFor(input.owner.userId)),
         date: { gte: from, lte: to },
       },
       select: {
@@ -55,13 +56,14 @@ export async function loadFamilyCalendarRange(input: {
     }),
   ]);
 
-  const [overrides, sessionsByActivityDate] = await Promise.all([
+  const [overrides, sessionsByActivityDate, bookingStates] = await Promise.all([
     listScenarioItemOverridesForScenarios(scenarios.map((scenario) => scenario.id)),
     listActivitySessionsForPlanItems(
       items
         .filter((item) => item.startsAt == null)
         .map((item) => ({ activityId: item.activityId, date: item.date })),
     ),
+    getPlanBookingStates(input.owner.userId, items.map((item) => item.id)),
   ]);
 
   type DatedFingerprintRow = (typeof fingerprintRows)[number] & { date: string };
@@ -97,7 +99,7 @@ export async function loadFamilyCalendarRange(input: {
         },
         overrides.get(item.id) ?? null,
       );
-      return { ...item, effectiveStartsAt: effectiveStartsAt?.toISOString() ?? null };
+      return { ...item, booking: bookingStates.get(item.id) ?? null, effectiveStartsAt: effectiveStartsAt?.toISOString() ?? null };
     }),
     scenarioStatusByDate,
   };

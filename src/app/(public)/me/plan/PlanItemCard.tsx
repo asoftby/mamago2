@@ -84,7 +84,14 @@ export function PlanItemCard({
       const endpoint = item.source === "MANUAL"
         ? `/api/plan/manual/${item.id}`
         : `/api/save/plan?planItemId=${item.id}`;
-      const res = await fetch(endpoint, { method: "DELETE" });
+      const res = await fetch(endpoint, item.source === "MANUAL"
+        ? { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedUpdatedAt: item.updatedAt }) }
+        : { method: "DELETE" });
+      if (res.status === 409) {
+        toast.error(visibilityErrorMessage("conflict"));
+        router.refresh();
+        return;
+      }
       if (!res.ok) throw new Error("plan_remove_failed");
       onRemove(item.id);
       toast("Убрано из плана", { duration: 2000 });
@@ -277,7 +284,7 @@ export function PlanItemCard({
       </div>
 
       <div className="flex h-full min-w-[54px] flex-col items-end justify-between py-1 max-sm:min-w-[34px]">
-        {presentation.canEdit && onEdit ? (
+        {presentation.canEdit && item.status !== "PROPOSED" && onEdit ? (
           <button
             type="button"
             onClick={() => onEdit(item)}
@@ -298,7 +305,7 @@ export function PlanItemCard({
           <span className="h-9 w-9 max-sm:h-8 max-sm:w-8" />
         )}
 
-        {familyUi && isOwn && (
+        {familyUi && isOwn && item.status !== "PROPOSED" && (
           <button
             type="button"
             onClick={handleVisibility}
@@ -313,7 +320,7 @@ export function PlanItemCard({
           </button>
         )}
 
-        {item.source !== "TELEGRAM_FORWARD" ? (
+        {item.source !== "TELEGRAM_FORWARD" && item.status !== "PROPOSED" ? (
           <button
             type="button"
             onClick={handleRemove}

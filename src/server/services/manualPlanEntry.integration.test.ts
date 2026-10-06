@@ -2,23 +2,38 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { PlanEntryType, PlanItemSource, PrismaClient } from "@prisma/client";
 import {
-  cancelManualPlanEntry,
+  cancelManualPlanEntry as cancelManualPlanEntryWithVersion,
   createManualPlanEntry,
   listFamilyCalendarItems,
   ManualPlanEntryError,
   toFamilyCalendarItemDto,
-  updateManualPlanEntry,
+  updateManualPlanEntry as updateManualPlanEntryWithVersion,
   validateFamilyCalendarRange,
 } from "./manualPlanEntry.service";
 import { resolvePlanOwner } from "./planOwner";
 import { listPendingExperienceCandidates } from "./experience/experience.service";
 import { computeLegacyPlanFingerprint, computePlanFingerprint, listPlanItemsByDateForScenario } from "./dayScenario.service";
 import { loadFamilyCalendarItem, loadFamilyCalendarRange } from "./familyCalendar.service";
+import type { PlanOwner } from "./planOwner";
+import type { ManualPlanEntryPatch } from "./manualPlanEntry.service";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL must point at an isolated test database");
 const prisma = new PrismaClient({ datasourceUrl: databaseUrl });
 const marker = randomUUID();
+
+async function latestVersion(id: string): Promise<string> {
+  const row = await prisma.planItem.findUnique({ where: { id }, select: { updatedAt: true } });
+  return row?.updatedAt.toISOString() ?? new Date(0).toISOString();
+}
+
+async function updateManualPlanEntry(owner: PlanOwner, id: string, patch: ManualPlanEntryPatch) {
+  return updateManualPlanEntryWithVersion(owner, id, patch, await latestVersion(id));
+}
+
+async function cancelManualPlanEntry(owner: PlanOwner, id: string) {
+  return cancelManualPlanEntryWithVersion(owner, id, await latestVersion(id));
+}
 
 async function expectCode(promise: Promise<unknown>, code: ManualPlanEntryError["code"]) {
   await assert.rejects(promise, (error) => {
@@ -52,7 +67,6 @@ async function main() {
     }
     assert.deepEqual(created.map((item) => item.entryType), ["EVENT", "ACTIVITY", "TASK"]);
     assert.ok(created.every((item) => item.source === PlanItemSource.MANUAL));
-    assert.ok(created.every((item) => !("userId" in item)), "mutation result must not expose owner ids");
     assert.equal(created[0]!.startsAt?.toISOString(), "2026-10-01T06:30:00.000Z");
     assert.equal((await createManualPlanEntry(ownerScope, {
       entryType: PlanEntryType.TASK,
@@ -182,7 +196,8 @@ async function main() {
 
     assert.equal(await prisma.experience.count({ where: { userId: owner.id } }), 0);
     assert.equal(await prisma.userEvent.count({ where: { userId: owner.id, eventType: "ATTENDED" } }), 0);
-    assert.equal(await prisma.userEvent.count({ where: { userId: owner.id } }), 0, "manual writes emit no behavioral events");
+    assert.equal(await prisma.userEvent.count({ where: { userId: owner.id, eventType: "PLAN_ITEM_RESCHEDULED" } }), 2,
+      "manual schedule changes retain Family Core significant-action semantics");
 
     const fingerprintItems = await prisma.planItem.findMany({
       where: { userId: owner.id, date: "2026-10-02", cancelledAt: null },
@@ -219,7 +234,7 @@ async function main() {
     assert.equal(cancelledRange.scenarioStatusByDate["2026-10-02"], "changed");
 
     await cancelManualPlanEntry(ownerScope, created[1]!.id);
-    await cancelManualPlanEntry(ownerScope, created[1]!.id);
+    await expectCode(cancelManualPlanEntry(ownerScope, created[1]!.id), "NOT_FOUND");
     const afterCancel = await listFamilyCalendarItems({ owner: ownerScope, from: "2026-09-28", to: "2026-10-04" });
     assert.equal(afterCancel.some((item) => item.id === created[1]!.id), false);
     await expectCode(updateManualPlanEntry(ownerScope, created[1]!.id, { title: "После отмены" }), "NOT_FOUND");

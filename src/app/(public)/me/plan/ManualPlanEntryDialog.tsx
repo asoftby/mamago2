@@ -23,6 +23,7 @@ export function ManualPlanEntryDialog({
   familyChildren,
   item,
   onSaved,
+  onConflict,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,6 +31,7 @@ export function ManualPlanEntryDialog({
   familyChildren: ChildOption[];
   item: SerializedPlanItem | null;
   onSaved: (item: SerializedPlanItem) => void;
+  onConflict: () => void;
 }) {
   const [title, setTitle] = useState("");
   const [entryType, setEntryType] = useState<"EVENT" | "ACTIVITY" | "TASK">("ACTIVITY");
@@ -72,9 +74,14 @@ export function ManualPlanEntryDialog({
           endsAt: endsAt || null,
           locationText: locationText || null,
           notes: notes || null,
+          ...(item ? { expectedUpdatedAt: item.updatedAt } : {}),
         }),
       });
       const payload = await response.json() as { item?: SerializedPlanItem; error?: string };
+      if (response.status === 409) {
+        onConflict();
+        return;
+      }
       if (!response.ok || !payload.item) throw new Error(payload.error ?? "save_failed");
       onSaved(payload.item);
       onOpenChange(false);

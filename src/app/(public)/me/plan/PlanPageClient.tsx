@@ -56,6 +56,7 @@ export type SerializedPlanItem = {
   coverImageUrl: string | null;
   /** Family Core M4b. Absent on items added client-side before a reload (= own, shared). */
   visibility?: "PRIVATE" | "FAMILY";
+  status?: "PROPOSED" | "CONFIRMED" | "CANCELLED";
   authorId?: string;
   authorName?: string | null;
   /** Family Core M6: safe booking state (never contains contacts). */
@@ -322,7 +323,7 @@ export function PlanPageClient({
   // Server data is the source of truth after a refresh (e.g. after a conflict).
   useEffect(() => {
     setItemsByWeek({ [initialRange.from]: initialItems });
-  }, [initialItems]);
+  }, [initialItems, initialRange.from]);
 
   const changeScope = (next: PlanScopeFilter) => {
     setScope(next);
@@ -669,6 +670,12 @@ export function PlanPageClient({
         familyChildren={familyChildren}
         item={editingManualItem}
         onSaved={replaceCachedItem}
+        onConflict={() => {
+          setManualDialogOpen(false);
+          setEditingManualItem(null);
+          toast.error("Запись уже изменили. Показываем свежую версию — повторите действие.");
+          router.refresh();
+        }}
       />
 
       <style>{`

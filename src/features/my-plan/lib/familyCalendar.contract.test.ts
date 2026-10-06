@@ -45,3 +45,20 @@ test("manual actions stay manual-only and Telegram remains non-editable", () => 
   assert.match(card, /\/api\/plan\/manual\//);
   assert.match(card, /presentation\.canEdit/);
 });
+
+test("manual edit and cancel send version and refresh after a conflict", () => {
+  const dialog = read("src/app/(public)/me/plan/ManualPlanEntryDialog.tsx");
+  const card = read("src/app/(public)/me/plan/PlanItemCard.tsx");
+  const client = read("src/app/(public)/me/plan/PlanPageClient.tsx");
+  const route = read("src/app/api/plan/manual/[id]/route.ts");
+  const service = read("src/server/services/manualPlanEntry.service.ts");
+  assert.match(dialog, /expectedUpdatedAt: item\.updatedAt/);
+  assert.match(card, /expectedUpdatedAt: item\.updatedAt/);
+  assert.match(dialog, /response\.status === 409/);
+  assert.match(card, /res\.status === 409/);
+  assert.match(client, /onConflict=\{/);
+  assert.match(client, /router\.refresh\(\)/);
+  assert.match(route, /error\.code === "CONFLICT" \? 409/);
+  assert.match(service, /updatedAt: expected/);
+  assert.match(service, /activePlanScopeFor\(owner\.userId\)/);
+});

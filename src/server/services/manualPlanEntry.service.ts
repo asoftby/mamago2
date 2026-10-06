@@ -4,6 +4,9 @@ import { getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
 import type { PlanOwner } from "@/server/services/planOwner";
 import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 import { buildPlanCardPresentation } from "@/features/my-plan/lib/planPagePresentation";
+import { activePlanScopeFor, childScopeFor, familyIdForWrite } from "@/server/family/familyAccess";
+import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
+import type { PlanBookingState } from "@/server/family/planBookingPure";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -14,7 +17,7 @@ export const FAMILY_CALENDAR_MAX_RANGE_DAYS = 42;
 
 export class ManualPlanEntryError extends Error {
   constructor(
-    public readonly code: "INVALID_INPUT" | "NOT_FOUND",
+    public readonly code: "INVALID_INPUT" | "NOT_FOUND" | "CONFLICT",
     message: string,
   ) {
     super(message);
@@ -35,6 +38,17 @@ export type ManualPlanEntryInput = {
 };
 
 export type ManualPlanEntryPatch = Partial<ManualPlanEntryInput>;
+
+function expectedVersion(value: unknown): Date {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) {
+    throw new ManualPlanEntryError("INVALID_INPUT", "invalid_expected_updated_at");
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime()) || date.toISOString() !== value) {
+    throw new ManualPlanEntryError("INVALID_INPUT", "invalid_expected_updated_at");
+  }
+  return date;
+}
 
 const calendarActivitySelect = {
   id: true,
@@ -93,6 +107,11 @@ const calendarItemSelect = {
   activityId: true,
   coverImageUrl: true,
   createdAt: true,
+  userId: true,
+  familyId: true,
+  visibility: true,
+  status: true,
+  updatedAt: true,
   child: { select: { id: true, name: true } },
   activity: { select: calendarActivitySelect },
 } satisfies Prisma.PlanItemSelect;
@@ -116,6 +135,12 @@ export type FamilyCalendarItemDto = {
   notes: string | null;
   activityId: string | null;
   coverImageUrl: string | null;
+  visibility: "PRIVATE" | "FAMILY";
+  status: "PROPOSED" | "CONFIRMED" | "CANCELLED";
+  authorId: string;
+  authorName: string | null;
+  updatedAt: string;
+  booking?: PlanBookingState | null;
   planAvailability: ReturnType<typeof getPlanActivityPublicAvailability>;
   activity: null | {
     id: string;
@@ -194,7 +219,7 @@ function normalizeChildId(value: unknown): string | null {
 async function assertOwnedChild(owner: PlanOwner, childId: string | null): Promise<void> {
   if (!childId) return;
   const child = await prisma.child.findFirst({
-    where: { id: childId, parentId: owner.userId },
+    where: { id: childId, ...(await childScopeFor(owner.userId)) },
     select: { id: true },
   });
   if (!child) throw new ManualPlanEntryError("NOT_FOUND", "child_not_found");
@@ -221,6 +246,7 @@ export async function createManualPlanEntry(owner: PlanOwner, input: ManualPlanE
   return prisma.planItem.create({
     data: {
       userId: owner.userId,
+      familyId: await familyIdForWrite(owner.userId),
       source: PlanItemSource.MANUAL,
       entryType: input.entryType,
       title,
@@ -241,17 +267,22 @@ export async function updateManualPlanEntry(
   owner: PlanOwner,
   planItemId: string,
   patch: ManualPlanEntryPatch,
+  expectedUpdatedAt: string,
 ) {
+  const expected = expectedVersion(expectedUpdatedAt);
   const current = await prisma.planItem.findFirst({
     where: {
       id: planItemId,
-      userId: owner.userId,
+      ...(await activePlanScopeFor(owner.userId)),
       source: PlanItemSource.MANUAL,
-      cancelledAt: null,
+      status: "CONFIRMED",
     },
     select: calendarItemSelect,
   });
   if (!current) throw new ManualPlanEntryError("NOT_FOUND", "manual_item_not_found");
+  if (current.updatedAt.getTime() !== expected.getTime()) {
+    throw new ManualPlanEntryError("CONFLICT", "conflict");
+  }
 
   const date = patch.date === undefined ? current.date : patch.date;
   assertDate(date);
@@ -270,9 +301,10 @@ export async function updateManualPlanEntry(
     : parseWallClock(date, patch.dueAt, "due_at");
   assertTimeOrder(startsAt, endsAt);
 
-  return prisma.planItem.update({
-    where: { id: current.id },
+  const result = await prisma.planItem.updateMany({
+    where: { id: current.id, ...(await activePlanScopeFor(owner.userId)), source: PlanItemSource.MANUAL, status: "CONFIRMED", updatedAt: expected },
     data: {
+      updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)),
       ...(patch.entryType === undefined ? {} : { entryType: patch.entryType }),
       ...(patch.title === undefined ? {} : { title: normalizeTitle(patch.title) }),
       ...(patch.childId === undefined ? {} : { childId: childId ?? null }),
@@ -286,16 +318,37 @@ export async function updateManualPlanEntry(
       ...(patch.locationText === undefined ? {} : { locationText: normalizeText(patch.locationText, LOCATION_MAX, "location") }),
       ...(patch.notes === undefined ? {} : { notes: normalizeText(patch.notes, NOTES_MAX, "notes") }),
     },
-    select: calendarItemSelect,
   });
+  if (result.count === 0) throw new ManualPlanEntryError("CONFLICT", "conflict");
+  const changedTime = current.date !== date || current.startsAt?.getTime() !== startsAt?.getTime()
+    || current.endsAt?.getTime() !== endsAt?.getTime();
+  if (changedTime) {
+    await trackUserEvent({
+      userId: owner.userId,
+      eventType: "PLAN_ITEM_RESCHEDULED",
+      familyId: current.familyId,
+      planVisibility: current.visibility,
+      meta: { planItemId: current.id },
+    });
+  }
+  const updated = await prisma.planItem.findUnique({ where: { id: current.id }, select: calendarItemSelect });
+  if (!updated) throw new ManualPlanEntryError("NOT_FOUND", "manual_item_not_found");
+  return updated;
 }
 
-export async function cancelManualPlanEntry(owner: PlanOwner, planItemId: string): Promise<void> {
-  const result = await prisma.planItem.updateMany({
-    where: { id: planItemId, userId: owner.userId, source: PlanItemSource.MANUAL },
-    data: { cancelledAt: new Date() },
+export async function cancelManualPlanEntry(owner: PlanOwner, planItemId: string, expectedUpdatedAt: string): Promise<void> {
+  const expected = expectedVersion(expectedUpdatedAt);
+  const current = await prisma.planItem.findFirst({
+    where: { id: planItemId, ...(await activePlanScopeFor(owner.userId)), source: PlanItemSource.MANUAL, status: "CONFIRMED" },
+    select: { updatedAt: true },
   });
-  if (result.count === 0) throw new ManualPlanEntryError("NOT_FOUND", "manual_item_not_found");
+  if (!current) throw new ManualPlanEntryError("NOT_FOUND", "manual_item_not_found");
+  if (current.updatedAt.getTime() !== expected.getTime()) throw new ManualPlanEntryError("CONFLICT", "conflict");
+  const result = await prisma.planItem.updateMany({
+    where: { id: planItemId, ...(await activePlanScopeFor(owner.userId)), source: PlanItemSource.MANUAL, status: "CONFIRMED", updatedAt: expected },
+    data: { status: "CANCELLED", cancelledAt: new Date(), updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)) },
+  });
+  if (result.count === 0) throw new ManualPlanEntryError("CONFLICT", "conflict");
 }
 
 function inclusiveRangeDays(from: string, to: string): number {
@@ -319,7 +372,7 @@ export async function listFamilyCalendarItems(input: {
 }): Promise<FamilyCalendarItemDto[]> {
   const { from, to } = validateFamilyCalendarRange(input.from, input.to);
   const rows = await prisma.planItem.findMany({
-    where: { userId: input.owner.userId, cancelledAt: null, date: { gte: from, lte: to } },
+    where: { ...(await activePlanScopeFor(input.owner.userId)), date: { gte: from, lte: to } },
     select: calendarItemSelect,
     orderBy: [
       { date: "asc" },
@@ -327,16 +380,26 @@ export async function listFamilyCalendarItems(input: {
       { createdAt: "asc" },
     ],
   });
-  return rows.map(toFamilyCalendarItemDto);
+  const authors = await prisma.user.findMany({
+    where: { id: { in: [...new Set(rows.map((row) => row.userId))] } },
+    select: { id: true, displayName: true },
+  });
+  const names = new Map(authors.map((author) => [author.id, author.displayName]));
+  return rows.map((row) => toFamilyCalendarItemDto(row, names.get(row.userId) ?? null));
 }
 
-export function toFamilyCalendarItemDto(row: CalendarRow): FamilyCalendarItemDto {
+export function toFamilyCalendarItemDto(row: CalendarRow, authorName: string | null = null): FamilyCalendarItemDto {
   if (row.date == null) {
     throw new ManualPlanEntryError("NOT_FOUND", "calendar_item_has_no_date");
   }
   const presentation = row.activity ? buildPlanCardPresentation(row.activity) : null;
   return {
     id: row.id,
+    visibility: row.visibility,
+    status: row.status,
+    authorId: row.userId,
+    authorName,
+    updatedAt: row.updatedAt.toISOString(),
     source: row.source,
     entryType: row.entryType,
     date: row.date,
