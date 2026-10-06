@@ -340,9 +340,9 @@ export function PlanPageClient({
     [items, scope, familyUi, familyView],
   );
 
-  const loadWeek = useCallback(async (date: string) => {
+  const loadWeek = useCallback(async (date: string, options: { force?: boolean } = {}) => {
     const from = getWeekStart(date);
-    if (!shouldFetchCalendarWeek(itemsByWeek, date) || loadingWeek === from) return;
+    if ((!options.force && !shouldFetchCalendarWeek(itemsByWeek, date)) || loadingWeek === from) return;
     const to = addDaysIso(from, 6);
     setLoadingWeek(from);
     try {
@@ -366,8 +366,22 @@ export function PlanPageClient({
     const params = new URLSearchParams(searchParams.toString());
     params.set("date", date);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-    void loadWeek(date);
+    void loadWeek(date, { force: true });
   }, [loadWeek, pathname, router, searchParams]);
+
+  useEffect(() => {
+    const refreshCurrentWeek = () => {
+      if (document.visibilityState === "visible") {
+        void loadWeek(selectedDate, { force: true });
+      }
+    };
+    window.addEventListener("focus", refreshCurrentWeek);
+    document.addEventListener("visibilitychange", refreshCurrentWeek);
+    return () => {
+      window.removeEventListener("focus", refreshCurrentWeek);
+      document.removeEventListener("visibilitychange", refreshCurrentWeek);
+    };
+  }, [loadWeek, selectedDate]);
 
   const itemsByDate = useMemo(() => {
     return visibleItems.reduce<Record<string, SerializedPlanItem[]>>((acc, item) => {
