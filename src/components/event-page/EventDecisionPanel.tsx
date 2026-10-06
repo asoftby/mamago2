@@ -45,8 +45,6 @@ type EventDecisionPanelProps = {
   previewRegionClassName?: Partial<
     Record<"hero" | "venue" | "schedule" | "pricing", string | undefined>
   >;
-  /** Optional "Отправить заявку" CTA (Direct) — additive, rendered after the existing buttons. */
-  directSlot?: React.ReactNode;
 };
 
 /** Split title: first word roman, rest italic-accent. */
@@ -106,7 +104,6 @@ export function EventDecisionPanel({
   planDate,
   className,
   previewRegionClassName: pr,
-  directSlot,
 }: EventDecisionPanelProps) {
   const revealRef = useRef<HTMLDivElement>(null);
   const subtitleRef = useRef<HTMLDivElement>(null);
@@ -366,7 +363,6 @@ export function EventDecisionPanel({
           </button>
         </div>
 
-        {directSlot && <div className="mt-3">{directSlot}</div>}
 
         {data.cta.simpleBooking && (
           <EventSimpleBookingModal
