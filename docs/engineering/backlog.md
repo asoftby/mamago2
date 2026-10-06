@@ -5178,11 +5178,12 @@ distributor_company_id=550) и хотели бы уточнить несколь
 ## [BACKLOG-173] Family Core M3a: consent text, owner question about history access, simplified onboarding
 
 - Status: OPEN
-- Priority: P1 (blocks enabling FAMILY_INVITES)
+- Priority: P2 (the consent text blocker is resolved)
 - Area: Family Core / Join
 - Added: 2026-10-06
-- Reason deferred: `/invite/family` is built (auth with `redirectTo`, consent, merge step, notification to the inviter) but stays closed until the product owner fills `FAMILY_CONSENT_TEXT` and `FAMILY_CONSENT_TEXT_VERSION` in `src/server/family/familyConsent.ts` (law № 99-З wording is not invented by the agent). Not built: the owner's question "show the new adult past plans?" (a joiner always starts with `historyAccess = FROM_JOIN`; changing it later needs a UI + service), and the simplified onboarding for a joiner without data.
-- Acceptance criteria: consent text + version published; owner question (notification with a choice) and a service changing `FamilyMembership.historyAccess` with tests; short onboarding after joining.
+- Update 2026-10-07: the consent text (version `2026-10-07`, supplied by the product owner) is published in `src/server/family/familyConsent.ts`, so `/invite/family` is open wherever `FAMILY_INVITES` is on. Before enabling on PROD: `EMAIL_DEBUG_REDIRECT_TO` must be unset there (invites would otherwise go to the debug address).
+- Reason deferred: not built: the owner's question "show the new adult past plans?" (a joiner always starts with `historyAccess = FROM_JOIN`; changing it later needs a UI + service), and the simplified onboarding for a joiner without data.
+- Acceptance criteria: owner question (notification with a choice) and a service changing `FamilyMembership.historyAccess` with tests; short onboarding after joining.
 - Source: Family Core M3a.
 
 ## [BACKLOG-175] HEIC: browser conversion (heic-to/WASM) returned by #441; verify the OOM risk from hotfix 15169fb1 on a phone
