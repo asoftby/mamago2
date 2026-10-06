@@ -1111,6 +1111,7 @@ model City {
   routes                Route[]
   searchQuickTags       SearchQuickTag[]
   searchQueryLogs       SearchQueryLog[]
+  searchDocuments       SearchDocument[]
   offers                Offer[]               @relation("OfferCity")
   activitySlugHistories ActivitySlugHistory[]
   placeSlugHistories    PlaceSlugHistory[]
@@ -3285,11 +3286,15 @@ model SearchDocument {
   urlPath     String
   isPublished Boolean          @default(false)
   boost       Float            @default(1)
+  cityId      String?
   updatedAt   DateTime         @updatedAt
   createdAt   DateTime         @default(now())
 
+  city City? @relation(fields: [cityId], references: [id], onDelete: SetNull)
+
   @@unique([entityType, entityId])
   @@index([isPublished])
+  @@index([isPublished, cityId])
 }
 
 enum SearchEntityType {
@@ -5718,6 +5723,9 @@ model SearchQueryLog {
   cityId            String?
   userId            String?
   sessionId         String?
+  searchId          String?   @unique
+  clickedPosition   Int?
+  clickedAt         DateTime?
   createdAt         DateTime @default(now())
 
   city City? @relation(fields: [cityId], references: [id], onDelete: SetNull)
