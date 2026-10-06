@@ -1,5 +1,11 @@
 import prisma from "@/lib/prisma";
-import { UserStatus, UserModerationActionType, Role, Prisma } from "@prisma/client";
+import {
+  BusinessMemberRole,
+  UserStatus,
+  UserModerationActionType,
+  Role,
+  Prisma,
+} from "@prisma/client";
 import { logAudit } from "./auditLog.service";
 import { isSessionEligibleStatus } from "@/lib/auth/accountEligibility";
 
@@ -86,19 +92,59 @@ export async function getUserWithDetails(userId: string) {
     throw new Error("User not found");
   }
 
-  // Get activity stats
-  const [businessCount, placesCount, activitiesCount] = await Promise.all([
+  // Get activity stats and canonical business access separately.
+  // User.role is a platform role; partner authorization comes from BusinessMember.
+  const [
+    businessCount,
+    placesCount,
+    activitiesCount,
+    activeBusinessMembership,
+    ownedBusiness,
+  ] = await Promise.all([
     prisma.business.count({ where: { ownerUserId: userId } }),
-    prisma.place.count({ 
-      where: { 
+    prisma.place.count({
+      where: {
         OR: [
           { createdByUserId: userId },
-          { ownerBusiness: { ownerUserId: userId } }
-        ]
-      } 
+          { ownerBusiness: { ownerUserId: userId } },
+        ],
+      },
     }),
     prisma.activity.count({ where: { ownerUserId: userId } }),
+    prisma.businessMember.findFirst({
+      where: {
+        userId,
+        isActive: true,
+        role: { in: [BusinessMemberRole.OWNER, BusinessMemberRole.MANAGER] },
+      },
+      orderBy: { createdAt: "asc" },
+      select: {
+        role: true,
+        isActive: true,
+        business: {
+          select: {
+            id: true,
+            name: true,
+            legalName: true,
+            verificationStatus: true,
+            operationalStatus: true,
+          },
+        },
+      },
+    }),
+    prisma.business.findUnique({
+      where: { ownerUserId: userId },
+      select: {
+        id: true,
+        name: true,
+        legalName: true,
+        verificationStatus: true,
+        operationalStatus: true,
+      },
+    }),
   ]);
+
+  const accessBusiness = activeBusinessMembership?.business ?? ownedBusiness ?? null;
 
   return {
     user,
@@ -106,6 +152,16 @@ export async function getUserWithDetails(userId: string) {
       businessCount,
       placesCount,
       activitiesCount,
+    },
+    businessAccess: {
+      membershipRole: activeBusinessMembership?.role ?? null,
+      membershipActive: activeBusinessMembership?.isActive ?? false,
+      relation: activeBusinessMembership
+        ? "MEMBER"
+        : ownedBusiness
+          ? "OWNER_WITHOUT_MEMBERSHIP"
+          : "NONE",
+      business: accessBusiness,
     },
   };
 }

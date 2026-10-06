@@ -32,6 +32,19 @@ interface Stats {
   activitiesCount: number;
 }
 
+interface BusinessAccess {
+  membershipRole: "OWNER" | "MANAGER" | null;
+  membershipActive: boolean;
+  relation: "MEMBER" | "OWNER_WITHOUT_MEMBERSHIP" | "NONE";
+  business: {
+    id: string;
+    name: string;
+    legalName: string | null;
+    verificationStatus: "DRAFT" | "PENDING" | "NEEDS_INFO" | "APPROVED" | "REJECTED";
+    operationalStatus: "ACTIVE" | "DISABLED" | "ARCHIVED";
+  } | null;
+}
+
 interface ModerationAction {
   id: string;
   actionType: UserModerationActionType;
@@ -61,6 +74,7 @@ interface AuditLog {
 interface UserDetails {
   user: User;
   stats: Stats;
+  businessAccess: BusinessAccess;
   moderationHistory: ModerationAction[];
   auditLog: AuditLog[];
 }
@@ -93,6 +107,31 @@ const ROLE_LABELS: Record<Role, string> = {
   BUSINESS_OWNER: "Бизнес",
   MODERATOR: "Модератор",
   ADMIN: "Админ",
+};
+
+const BUSINESS_MEMBERSHIP_LABELS: Record<"OWNER" | "MANAGER", string> = {
+  OWNER: "Владелец",
+  MANAGER: "Менеджер",
+};
+
+const BUSINESS_VERIFICATION_LABELS: Record<
+  NonNullable<BusinessAccess["business"]>["verificationStatus"],
+  string
+> = {
+  DRAFT: "Черновик",
+  PENDING: "На проверке",
+  NEEDS_INFO: "Нужны данные",
+  APPROVED: "Одобрен",
+  REJECTED: "Отклонён",
+};
+
+const BUSINESS_OPERATIONAL_LABELS: Record<
+  NonNullable<BusinessAccess["business"]>["operationalStatus"],
+  string
+> = {
+  ACTIVE: "Активен",
+  DISABLED: "Отключён",
+  ARCHIVED: "Архив",
 };
 
 const ACTION_LABELS: Record<UserModerationActionType, string> = {
@@ -160,7 +199,7 @@ export function UserDetailsClient({ userId }: { userId: string }) {
     );
   }
 
-  const { user, stats, moderationHistory, auditLog } = data;
+  const { user, stats, businessAccess, moderationHistory, auditLog } = data;
 
   return (
     <div className="p-6 space-y-6">
@@ -206,7 +245,7 @@ export function UserDetailsClient({ userId }: { userId: string }) {
             </div>
 
             <div>
-              <div className="text-sm text-gray-500">Роль</div>
+              <div className="text-sm text-gray-500">Роль платформы</div>
               <Badge className={ROLE_COLORS[user.role]}>
                 {ROLE_LABELS[user.role]}
               </Badge>
@@ -218,6 +257,67 @@ export function UserDetailsClient({ userId }: { userId: string }) {
                 {STATUS_LABELS[user.status]}
               </Badge>
             </div>
+
+            <div>
+              <div className="text-sm text-gray-500">Бизнес-доступ</div>
+              {businessAccess.membershipActive && businessAccess.membershipRole ? (
+                <Badge className="bg-blue-100 text-blue-800">
+                  {BUSINESS_MEMBERSHIP_LABELS[businessAccess.membershipRole]}
+                </Badge>
+              ) : businessAccess.relation === "OWNER_WITHOUT_MEMBERSHIP" ? (
+                <Badge className="bg-red-100 text-red-800">
+                  Требует восстановления
+                </Badge>
+              ) : (
+                <span className="text-gray-400">Нет</span>
+              )}
+            </div>
+
+            <div>
+              <div className="text-sm text-gray-500">Бизнес-профиль</div>
+              {businessAccess.business ? (
+                <Link
+                  href={`/admin/b2b/partners/${businessAccess.business.id}`}
+                  className="font-medium hover:underline"
+                >
+                  {businessAccess.business.legalName || businessAccess.business.name}
+                </Link>
+              ) : (
+                <span className="text-gray-400">—</span>
+              )}
+            </div>
+
+            {businessAccess.business && (
+              <>
+                <div>
+                  <div className="text-sm text-gray-500">Верификация бизнеса</div>
+                  <Badge
+                    className={
+                      businessAccess.business.verificationStatus === "APPROVED"
+                        ? "bg-green-100 text-green-800"
+                        : businessAccess.business.verificationStatus === "REJECTED"
+                          ? "bg-red-100 text-red-800"
+                          : "bg-yellow-100 text-yellow-800"
+                    }
+                  >
+                    {BUSINESS_VERIFICATION_LABELS[businessAccess.business.verificationStatus]}
+                  </Badge>
+                </div>
+
+                <div>
+                  <div className="text-sm text-gray-500">Статус бизнеса</div>
+                  <Badge
+                    className={
+                      businessAccess.business.operationalStatus === "ACTIVE"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-gray-100 text-gray-800"
+                    }
+                  >
+                    {BUSINESS_OPERATIONAL_LABELS[businessAccess.business.operationalStatus]}
+                  </Badge>
+                </div>
+              </>
+            )}
 
             {user.statusReason && (
               <div className="col-span-2">
