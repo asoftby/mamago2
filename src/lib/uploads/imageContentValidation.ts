@@ -33,7 +33,7 @@ export function validateImageContent(buffer: Buffer, declaredMimeType: string | 
 }
 
 export function validateUploadFileContent(buffer: Buffer, file: Pick<File, "name" | "type">): string {
-  // Client-side compression can preserve photo.jpg while replacing its bytes and MIME with WebP.
+  // A client can preserve photo.jpg while replacing its bytes and MIME with WebP.
   // The filename is metadata, not the format/security boundary.
   return validateImageContent(buffer, file.type);
 }

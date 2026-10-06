@@ -22,7 +22,7 @@ for (const [mime, bytes] of fixtures) {
 const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
 const webp = Buffer.from("RIFF0000WEBP");
-// compressImage defaults to WebP but preserves the original filename; both upload hooks send that File.
+// Older or third-party clients may preserve the original filename after WebP conversion.
 assert.equal(validateUploadFileContent(webp, { name: "photo.jpg", type: "image/webp" }), "image/webp");
 assert.equal(validateUploadFileContent(webp, { name: "photo.png", type: "image/webp" }), "image/webp");
 assert.throws(() => validateImageContent(svg, "image/jpeg"), /Unsupported image content/);
