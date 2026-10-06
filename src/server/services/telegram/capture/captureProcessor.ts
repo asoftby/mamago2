@@ -21,8 +21,8 @@ import type { TelegramCaptureClient } from "./telegramCaptureClient.core";
 /**
  * The capture parsing pipeline (forward-to-plan spec v1.3, PR3):
  * PROCESSING -> context -> photos (memory only) -> model -> Zod -> rules ->
- * duplicates -> DRAFT_READY | FAILED. Creates no PlanItem and sends nothing
- * to the user (cards arrive in PR4).
+ * duplicates -> DRAFT_READY | FAILED. PlanItem writes still happen only from
+ * callback handlers; an optional presenter may publish the confirmation card.
  *
  * Logging: ids, model id, durations, token counts and machine codes only.
  * `InboxItem.error` is always a machine code, never exception or provider text.
@@ -40,6 +40,7 @@ export type CaptureProcessorDeps = {
   telegram: Pick<TelegramCaptureClient, "getFile" | "downloadFile">;
   models: () => CaptureModelConfig;
   context: CaptureContextDeps;
+  presenter?: { present(inboxItemId: string): Promise<void> };
   now?: () => Date;
 };
 
@@ -262,7 +263,7 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
 
       // Only a row that is still PROCESSING is updated: terminal states are never overwritten.
       if (result.ok) {
-        await db.inboxItem.updateMany({
+        const updated = await db.inboxItem.updateMany({
           where: { id: item.id, status: "PROCESSING" },
           data: {
             ...usageData,
@@ -276,6 +277,13 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
           },
         });
         logResult(item, "DRAFT_READY", null, result, startedAt);
+        if (updated.count === 1 && deps.presenter) {
+          try {
+            await deps.presenter.present(item.id);
+          } catch {
+            console.error(`[capture-processor] inboxItemId=${item.id} code=CARD_SEND_FAILED`);
+          }
+        }
         return;
       }
 

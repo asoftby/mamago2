@@ -2,6 +2,7 @@ import { Prisma, type FamilyHistoryAccess, type PrismaClient } from "@prisma/cli
 import { ensureFamilyForUser } from "./ensureFamily";
 import { familyInvitesEnabled } from "./familyScope";
 import { applyJoinerMerge } from "./familyMerge.service";
+import { recordFamilySharedDataConsent } from "./familyConsentRecord";
 import type { MergeDecision } from "./familyMergePure";
 import {
   FamilyInviteError,
@@ -172,6 +173,11 @@ export async function acceptFamilyInvite(
       if (mine) {
         await tx.familyMembership.update({ where: { id: mine.id }, data: { leftAt: now } });
         await tx.family.update({ where: { id: mine.familyId }, data: { archivedAt: now } });
+        // Moving to another family ends the shared-data consent for the old one.
+        await tx.consentRecord.updateMany({
+          where: { userId: input.userId, familyId: mine.familyId, type: "FAMILY_SHARED_DATA", revokedAt: null },
+          data: { revokedAt: now },
+        });
       }
 
       await tx.familyMembership.create({
@@ -183,14 +189,12 @@ export async function acceptFamilyInvite(
           joinedAt: now,
         },
       });
-      await tx.consentRecord.create({
-        data: {
-          userId: input.userId,
-          familyId: invite.familyId,
-          type: "FAMILY_SHARED_DATA",
-          textVersion: input.consentTextVersion.trim(),
-          acceptedAt: now,
-        },
+      // Reuses the record written at the preview step (same user, family, version).
+      await recordFamilySharedDataConsent(tx, {
+        userId: input.userId,
+        familyId: invite.familyId,
+        textVersion: input.consentTextVersion,
+        now,
       });
       await tx.familyInvite.update({
         where: { id: invite.id },

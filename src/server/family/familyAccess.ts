@@ -7,6 +7,7 @@ import {
   childScopeWhere,
   familyReadsEnabled,
   planItemScopeWhere,
+  sharedHistoryFromMembership,
   type FamilyScope,
 } from "./familyScope";
 
@@ -15,9 +16,22 @@ import { NOT_CANCELLED } from "./familyScope";
 export { NOT_CANCELLED, familyReadsEnabled } from "./familyScope";
 export type { FamilyScope } from "./familyScope";
 
-/** Family Core B2 DB-backed access helpers (pure fragments live in familyScope.ts). */
+/**
+ * Family Core B2 DB-backed access helpers (pure fragments live in familyScope.ts).
+ * Carries the member's history boundary: a FROM_JOIN joiner does not see shared
+ * plan items created before joinedAt.
+ */
 export async function resolveFamilyScope(userId: string): Promise<FamilyScope> {
-  return { userId, familyId: await findActiveFamilyId(prisma, userId) };
+  const membership = await prisma.familyMembership.findFirst({
+    where: { userId, leftAt: null },
+    select: { familyId: true, historyAccess: true, joinedAt: true },
+  });
+  if (!membership) return { userId, familyId: null };
+  return {
+    userId,
+    familyId: membership.familyId,
+    sharedHistoryFrom: sharedHistoryFromMembership(membership),
+  };
 }
 
 /** Where fragment for PlanItem reads/dedup/deletes of this user (no DB hit when reads are off). */
