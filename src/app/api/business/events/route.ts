@@ -6,8 +6,8 @@ import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import {
   buildActivityManageWhereForUser,
   getBusinessIdsUserCanAccess,
-  resolveActivityBusinessIdForCreate,
 } from "@/lib/auth/activityAccess";
+import { resolveActivityBusinessIdForCreate } from "@/lib/auth/activityBusinessResolution";
 import { getUserBusinessId } from "@/lib/auth/placeAccess";
 import { checkUserBusinessPermission } from "@/server/permissions/business-permissions";
 import { replaceActivitySessionsFromScheduleJson } from "@/lib/business/syncEventActivitySessions";
