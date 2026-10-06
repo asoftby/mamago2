@@ -106,7 +106,6 @@ interface EventSummary {
   status: ContentStatus;
   createdAt: Date;
   updatedAt: Date;
-  archivedAt: Date | null;
   place: { title: string } | null;
   business: {
     id: string;
@@ -121,6 +120,7 @@ interface OfferSummary {
   status: OfferStatus;
   createdAt: Date;
   updatedAt: Date;
+  archivedAt: Date | null;
   place: {
     id: string;
     title: string;
