@@ -417,10 +417,8 @@ export function UserDetailsClient({ userId }: { userId: string }) {
         </Link>
         <div className="min-w-0">
           <h1 className="truncate text-xl font-bold sm:text-2xl">
-            {user.displayName || user.email}
+            {user.displayName || "Пользователь"}
           </h1>
-          {user.displayName ? <p className="truncate text-sm text-gray-600">{user.email}</p> : null}
-          <p className="truncate text-xs text-gray-500 sm:text-sm">ID: {user.id}</p>
         </div>
       </div>
 
@@ -430,6 +428,11 @@ export function UserDetailsClient({ userId }: { userId: string }) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <div className="text-sm text-gray-500">ID пользователя</div>
+              <div className="break-all font-mono text-sm text-gray-700">{user.id}</div>
+            </div>
+
             <div>
               <div className="text-sm text-gray-500">Email</div>
               <div className="flex items-center gap-2 break-all">
