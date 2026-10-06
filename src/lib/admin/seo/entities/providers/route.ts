@@ -13,18 +13,23 @@ import {
   SEO_ROBOTS_NOINDEX_FOLLOW,
 } from "@/lib/admin/seo/entities/robotsConstants";
 
-const ROUTE_LIST_LIMIT = 300;
 
-export const routeProvider: SeoEntityProvider = {
-  entityType: "route",
-  badgeLabel: "Route",
-  section: "routes",
+import {
+  buildRouteListWhere,
+  type SeoEntityListFilters,
+  type SeoEntityPageWindow,
+} from "../listFilters";
 
-  async listRows() {
+async function listRouteRows(
+  filters: SeoEntityListFilters | null,
+  page: SeoEntityPageWindow | null,
+) {
     const routes = await prisma.route.findMany({
-      where: { status: { not: RouteStatus.ARCHIVED } },
-      orderBy: { updatedAt: "desc" },
-      take: ROUTE_LIST_LIMIT,
+      where: filters
+      ? buildRouteListWhere(filters)
+      : { status: { not: RouteStatus.ARCHIVED } },
+    orderBy: { updatedAt: "desc" },
+    ...(page ? { skip: page.skip, take: page.take } : {}),
       select: {
         id: true,
         slug: true,
@@ -60,9 +65,9 @@ export const routeProvider: SeoEntityProvider = {
       return {
         id: `entity:route:${r.id}`,
         path,
-        section: "routes",
-        type: "route",
-        filtersSnapshot: { entity: "route", entityId: r.id },
+        section: "routes" as const,
+        type: "route" as const,
+        filtersSnapshot: { entity: "route" as const, entityId: r.id },
         title: r.seoTitle?.trim() || r.title,
         h1: r.seoH1?.trim() || r.title,
         description: r.seoDescription?.trim() || "",
@@ -76,6 +81,23 @@ export const routeProvider: SeoEntityProvider = {
         entityDiagnostics,
       };
     });
+}
+
+export const routeProvider: SeoEntityProvider = {
+  entityType: "route",
+  badgeLabel: "Route",
+  section: "routes",
+
+  async countRows(filters) {
+    return prisma.route.count({ where: buildRouteListWhere(filters) });
+  },
+
+  async listRowsPage(filters, page) {
+    return listRouteRows(filters, page);
+  },
+
+  async listRows() {
+    return listRouteRows(null, null);
   },
 
   async loadEditorModel(entityId) {

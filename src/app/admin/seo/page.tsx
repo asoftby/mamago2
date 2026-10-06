@@ -1,14 +1,13 @@
 import Link from "next/link";
-import { AlertTriangle, ChevronRight, Search } from "lucide-react";
+import { AlertTriangle, ChevronRight } from "lucide-react";
 import { SeoDashboardSection } from "@/components/admin/seo/SeoDashboardSection";
 import { SeoPageHeader } from "@/components/admin/seo/primitives/SeoPageHeader";
 import { SeoEmptyState } from "@/components/admin/seo/primitives/SeoEmptyState";
 import { getSeoDashboardSummary } from "@/lib/admin/seo/data/seoAdminData";
-import {
-  formatSeoGeoContextBreadcrumb,
-} from "@/lib/admin/seo/geo";
+import { formatSeoGeoContextBreadcrumb } from "@/lib/admin/seo/geo";
 import { resolveSeoGeoSession } from "@/lib/admin/seo/geo/resolveSeoGeoSession";
-import { SEO_PRIMARY_NAV, SEO_SETTINGS_NAV } from "@/lib/admin/seoNavConfig";
+import { SEO_SETTINGS_NAV } from "@/lib/admin/seoNavConfig";
+import { buildAdminPath } from "@/lib/routing/surface";
 import { cn } from "@/lib/utils";
 
 const severityStyles = {
@@ -21,11 +20,18 @@ export default async function AdminSeoOverviewPage() {
   const { context } = await resolveSeoGeoSession();
   const summary = await getSeoDashboardSummary(context);
   const breadcrumb = formatSeoGeoContextBreadcrumb(context);
-  const overviewHref = SEO_PRIMARY_NAV[0]?.href;
 
   const quickLinks = [
-    ...SEO_PRIMARY_NAV.filter((item) => item.href !== overviewHref),
-    ...SEO_SETTINGS_NAV.slice(0, 2),
+    {
+      href: buildAdminPath("/seo/pages"),
+      label: "Страницы",
+      description: "SEO существующих страниц по геоконтексту",
+    },
+    ...SEO_SETTINGS_NAV.slice(0, 2).map((item) => ({
+      href: item.href,
+      label: item.label,
+      description: item.description,
+    })),
   ];
 
   return (
@@ -37,7 +43,7 @@ export default async function AdminSeoOverviewPage() {
 
       <SeoDashboardSection
         title="Состояние"
-        description="Реальные сигналы по страницам в выбран SEO-контексте"
+        description="Реальные сигналы по страницам в выбранном SEO-контексте"
       >
         {summary.stats.every((s) => s.value === 0) ? (
           <SeoEmptyState
@@ -49,7 +55,7 @@ export default async function AdminSeoOverviewPage() {
             {summary.stats.map((stat) => (
               <Link
                 key={stat.id}
-                href={stat.href ?? "/admin/seo/pages"}
+                href={stat.href ?? buildAdminPath("/seo/pages")}
                 className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-gray-300"
               >
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
@@ -123,22 +129,15 @@ export default async function AdminSeoOverviewPage() {
         )}
       </SeoDashboardSection>
 
-      <SeoDashboardSection
-        title="Поисковая эффективность"
-        description="Google Search Console, Яндекс.Вебмастер и Wordstat"
-      >
-        <SeoEmptyState
-          icon={<Search className="h-6 w-6 text-gray-400" />}
-          title="Источник данных не подключён"
-          description="После подключения Search Console / Вебмастера / Wordstat здесь появятся запросы, клики и возможности роста — в рамках выбран SEO-контекста."
-        />
-      </SeoDashboardSection>
+      <section className="rounded-xl border border-dashed border-gray-200 bg-gray-50/70 px-4 py-3">
+        <p className="text-sm font-medium text-gray-900">Поисковые данные</p>
+        <p className="mt-1 text-xs leading-relaxed text-gray-500">
+          Google Search Console, Яндекс.Вебмастер и Wordstat пока не подключены.
+        </p>
+      </section>
 
-      <SeoDashboardSection
-        title="Быстрый доступ"
-        description="Рабочие разделы и технические настройки"
-      >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <SeoDashboardSection title="Быстрый доступ" description="Рабочие разделы">
+        <div className="grid gap-3 sm:grid-cols-3">
           {quickLinks.map((item) => (
             <Link
               key={item.href}

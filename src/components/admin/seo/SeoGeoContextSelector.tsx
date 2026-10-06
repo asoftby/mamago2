@@ -46,23 +46,29 @@ export function SeoGeoContextSelector({
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <MapPin className="h-4 w-4 shrink-0 text-gray-500" aria-hidden />
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
             SEO-контекст
           </p>
-          <p className="truncate text-sm font-medium text-gray-900" title={breadcrumb}>
+          <p
+            className="truncate text-sm font-medium text-gray-900"
+            title={breadcrumb}
+          >
             {breadcrumb}
           </p>
         </div>
       </div>
-      <div className="w-full sm:w-[260px]">
+      <div className="w-full shrink-0 sm:ml-auto sm:w-auto sm:min-w-[200px] sm:max-w-[280px]">
         <Select value={token} onValueChange={onChange} disabled={pending}>
-          <SelectTrigger className="h-9 bg-white" aria-label="Выбор SEO-контекста">
+          <SelectTrigger
+            className="h-9 w-full bg-white sm:w-[240px]"
+            aria-label="Выбор SEO-контекста"
+          >
             <SelectValue placeholder="Выберите контекст" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent align="end">
             {special.length > 0 ? (
               <SelectGroup>
                 <SelectLabel>Обзор</SelectLabel>

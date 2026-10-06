@@ -17,18 +17,23 @@ import {
   buildNationalArticlePath,
 } from "@/lib/routing/cityPaths";
 
-const ARTICLE_LIST_LIMIT = 400;
 
-export const articleProvider: SeoEntityProvider = {
-  entityType: "article",
-  badgeLabel: "Article",
-  section: "journal",
+import {
+  buildArticleListWhere,
+  type SeoEntityListFilters,
+  type SeoEntityPageWindow,
+} from "../listFilters";
 
-  async listRows() {
+async function listArticleRows(
+  filters: SeoEntityListFilters | null,
+  page: SeoEntityPageWindow | null,
+) {
     const articles = await prisma.article.findMany({
-      where: { status: { not: ContentStatus.DELETED } },
-      orderBy: { updatedAt: "desc" },
-      take: ARTICLE_LIST_LIMIT,
+      where: filters
+      ? buildArticleListWhere(filters)
+      : { status: { not: ContentStatus.DELETED } },
+    orderBy: { updatedAt: "desc" },
+    ...(page ? { skip: page.skip, take: page.take } : {}),
       select: {
         id: true,
         slug: true,
@@ -55,7 +60,7 @@ export const articleProvider: SeoEntityProvider = {
       const seg = a.slug?.trim() || a.id;
       const path =
         a.geoScope === GeoScope.CITY && a.city?.slug
-          ? buildCityPublicPath({ citySlug: a.city.slug, type: "article", slug: seg })
+          ? buildCityPublicPath({ citySlug: a.city.slug, type: "article" as const, slug: seg })
           : buildNationalArticlePath(seg);
       const canonical = a.seoCanonicalUrl?.trim() || path;
       const entityDiagnostics = {
@@ -73,10 +78,10 @@ export const articleProvider: SeoEntityProvider = {
       return {
         id: `entity:article:${a.id}`,
         path,
-        section: "journal",
-        type: "article",
+        section: "journal" as const,
+        type: "article" as const,
         filtersSnapshot: {
-          entity: "article",
+          entity: "article" as const,
           entityId: a.id,
           cityId: a.cityId,
           citySlug: a.city?.slug ?? null,
@@ -98,6 +103,23 @@ export const articleProvider: SeoEntityProvider = {
         entityDiagnostics,
       };
     });
+}
+
+export const articleProvider: SeoEntityProvider = {
+  entityType: "article",
+  badgeLabel: "Article",
+  section: "journal",
+
+  async countRows(filters) {
+    return prisma.article.count({ where: buildArticleListWhere(filters) });
+  },
+
+  async listRowsPage(filters, page) {
+    return listArticleRows(filters, page);
+  },
+
+  async listRows() {
+    return listArticleRows(null, null);
   },
 
   async loadEditorModel(entityId) {

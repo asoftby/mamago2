@@ -22,108 +22,128 @@ import {
   resolveCanonicalCitySlugForEvent,
 } from "@/lib/business/eventPublicLink";
 import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
+import {
+  buildEventListWhere,
+  type SeoEntityListFilters,
+  type SeoEntityPageWindow,
+} from "../listFilters";
 
-const EVENT_LIST_LIMIT = 500;
+async function listEventRows(
+  filters: SeoEntityListFilters | null,
+  page: SeoEntityPageWindow | null,
+) {
+  const activities = await prisma.activity.findMany({
+    where: filters
+      ? buildEventListWhere(filters)
+      : {
+          type: ActivityType.EVENT,
+          status: { not: ContentStatus.DELETED },
+        },
+    orderBy: { updatedAt: "desc" },
+    ...(page ? { skip: page.skip, take: page.take } : {}),
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      shortDesc: true,
+      cityId: true,
+      status: true,
+      updatedAt: true,
+      seoH1: true,
+      seoTitle: true,
+      seoDescription: true,
+      seoCanonicalUrl: true,
+      seoCanonicalSource: true,
+      seoRobots: true,
+      venue: { select: { cityId: true } },
+      place: { select: { city: { select: { id: true, slug: true, name: true } } } },
+    },
+  });
+
+  const cityIds = Array.from(
+    new Set(
+      activities
+        .flatMap((a) => [a.cityId, a.venue?.cityId, a.place?.city?.id ?? null])
+        .filter((value): value is string => typeof value === "string" && value.length > 0),
+    ),
+  );
+  const cityRows =
+    cityIds.length > 0
+      ? await prisma.city.findMany({
+          where: { id: { in: cityIds } },
+          select: { id: true, slug: true, name: true },
+        })
+      : [];
+  const citySlugById = new Map(cityRows.map((row) => [row.id, row.slug]));
+  const cityNameById = new Map(cityRows.map((row) => [row.id, row.name]));
+
+  return activities.map((a) => {
+    const citySlug = resolveCanonicalCitySlugForEvent({
+      activityCitySlug: a.cityId ? citySlugById.get(a.cityId) ?? null : null,
+      placeCitySlug: a.place?.city?.slug ?? null,
+      venueCitySlug: a.venue?.cityId ? citySlugById.get(a.venue.cityId) ?? null : null,
+    });
+    const published = a.status === ContentStatus.PUBLISHED;
+    const path = publicActivityPath(a.id, citySlug, a.slug);
+    const canonical = a.seoCanonicalUrl?.trim() || path;
+    const resolvedCityId =
+      a.cityId ?? a.venue?.cityId ?? a.place?.city?.id ?? null;
+    const entityDiagnostics = buildEventEntityDiagnostics({
+      activityId: a.id,
+      title: a.title,
+      slug: a.slug,
+      citySlug,
+      seoCanonicalUrl: a.seoCanonicalUrl,
+      seoCanonicalSource: a.seoCanonicalSource,
+      seoRobots: a.seoRobots,
+      contentStatus: a.status,
+    });
+    return {
+      id: `entity:event:${a.id}`,
+      path,
+      section: "events" as const,
+      type: "event" as const,
+      filtersSnapshot: {
+        entity: "event" as const,
+        entityId: a.id,
+        city: citySlug,
+        cityId: resolvedCityId,
+        citySlug,
+        cityName: resolvedCityId
+          ? cityNameById.get(resolvedCityId) ?? a.place?.city?.name ?? null
+          : a.place?.city?.name ?? null,
+        geoScope: citySlug ? ("CITY" as const) : null,
+      },
+      title: a.seoTitle?.trim() || a.title,
+      h1: a.seoH1?.trim() || a.title,
+      description: a.seoDescription?.trim() || a.shortDesc || "",
+      canonical,
+      updatedAt: a.updatedAt.toISOString(),
+      indexationStatus: indexationStatusForPublishedEntity(
+        published,
+        a.seoRobots,
+      ),
+      isIndexable: isIndexableForPublishedEntity(published, a.seoRobots),
+      entityDiagnostics,
+    };
+  });
+}
 
 export const eventProvider: SeoEntityProvider = {
   entityType: "event",
   badgeLabel: "Event",
   section: "events",
 
+  async countRows(filters) {
+    return prisma.activity.count({ where: buildEventListWhere(filters) });
+  },
+
+  async listRowsPage(filters, page) {
+    return listEventRows(filters, page);
+  },
+
   async listRows() {
-    const activities = await prisma.activity.findMany({
-      where: {
-        type: ActivityType.EVENT,
-        status: { not: ContentStatus.DELETED },
-      },
-      orderBy: { updatedAt: "desc" },
-      take: EVENT_LIST_LIMIT,
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        shortDesc: true,
-        cityId: true,
-        status: true,
-        updatedAt: true,
-        seoH1: true,
-        seoTitle: true,
-        seoDescription: true,
-        seoCanonicalUrl: true,
-        seoCanonicalSource: true,
-        seoRobots: true,
-        venue: { select: { cityId: true } },
-        place: { select: { city: { select: { id: true, slug: true, name: true } } } },
-      },
-    });
-
-    const cityIds = Array.from(
-      new Set(
-        activities
-          .flatMap((a) => [a.cityId, a.venue?.cityId, a.place?.city?.id ?? null])
-          .filter((value): value is string => typeof value === "string" && value.length > 0),
-      ),
-    );
-    const cityRows =
-      cityIds.length > 0
-        ? await prisma.city.findMany({
-            where: { id: { in: cityIds } },
-            select: { id: true, slug: true, name: true },
-          })
-        : [];
-    const citySlugById = new Map(cityRows.map((row) => [row.id, row.slug]));
-    const cityNameById = new Map(cityRows.map((row) => [row.id, row.name]));
-
-    return activities.map((a) => {
-      const citySlug = resolveCanonicalCitySlugForEvent({
-        activityCitySlug: a.cityId ? citySlugById.get(a.cityId) ?? null : null,
-        placeCitySlug: a.place?.city?.slug ?? null,
-        venueCitySlug: a.venue?.cityId ? citySlugById.get(a.venue.cityId) ?? null : null,
-      });
-      const published = a.status === ContentStatus.PUBLISHED;
-      const path = publicActivityPath(a.id, citySlug, a.slug);
-      const canonical = a.seoCanonicalUrl?.trim() || path;
-      const resolvedCityId =
-        a.cityId ?? a.venue?.cityId ?? a.place?.city?.id ?? null;
-      const entityDiagnostics = buildEventEntityDiagnostics({
-        activityId: a.id,
-        title: a.title,
-        slug: a.slug,
-        citySlug,
-        seoCanonicalUrl: a.seoCanonicalUrl,
-        seoCanonicalSource: a.seoCanonicalSource,
-        seoRobots: a.seoRobots,
-        contentStatus: a.status,
-      });
-      return {
-        id: `entity:event:${a.id}`,
-        path,
-        section: "events",
-        type: "event",
-        filtersSnapshot: {
-          entity: "event",
-          entityId: a.id,
-          city: citySlug,
-          cityId: resolvedCityId,
-          citySlug,
-          cityName: resolvedCityId
-            ? cityNameById.get(resolvedCityId) ?? a.place?.city?.name ?? null
-            : a.place?.city?.name ?? null,
-          geoScope: citySlug ? "CITY" : null,
-        },
-        title: a.seoTitle?.trim() || a.title,
-        h1: a.seoH1?.trim() || a.title,
-        description: a.seoDescription?.trim() || a.shortDesc || "",
-        canonical,
-        updatedAt: a.updatedAt.toISOString(),
-        indexationStatus: indexationStatusForPublishedEntity(
-          published,
-          a.seoRobots,
-        ),
-        isIndexable: isIndexableForPublishedEntity(published, a.seoRobots),
-        entityDiagnostics,
-      };
-    });
+    return listEventRows(null, null);
   },
 
   async loadEditorModel(entityId) {

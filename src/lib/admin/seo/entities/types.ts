@@ -3,6 +3,10 @@ import type {
   SeoPageSection,
   SeoPageType,
 } from "@/lib/admin/seo/domain/types";
+import type {
+  SeoEntityListFilters,
+  SeoEntityPageWindow,
+} from "./listFilters";
 
 export type SeoEntityType = Extract<
   SeoPageType,
@@ -77,7 +81,15 @@ export type SeoEntityProvider = {
   badgeLabel: string;
   section: SeoPageSection;
 
+  /** Full listing for overview/dashboard (unbounded within entity type). */
   listRows(): Promise<SeoEntityListingRow[]>;
+  /** Honest filtered total for paginated SEO Pages. */
+  countRows(filters: SeoEntityListFilters): Promise<number>;
+  /** Bounded page slice for paginated SEO Pages (updatedAt desc within type). */
+  listRowsPage(
+    filters: SeoEntityListFilters,
+    page: SeoEntityPageWindow,
+  ): Promise<SeoEntityListingRow[]>;
   loadEditorModel(entityId: string): Promise<SeoEntityEditorModel | null>;
   updateSeo(entityId: string, input: SeoEntityUpdateInput): Promise<void>;
   toggleIndexation(entityId: string): Promise<void>;

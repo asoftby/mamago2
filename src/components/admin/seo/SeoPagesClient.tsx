@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Pencil,
@@ -13,13 +13,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type {
@@ -36,6 +29,9 @@ import { SeoPagesEmptyState } from "./SeoPagesEmptyState";
 import { SeoEntityDiagnosticsCard } from "./SeoEntityDiagnosticsCard";
 import { Toggle } from "@/components/ui/Toggle";
 import { TableContainer } from "@/components/ui/table";
+import { AdminPagination } from "@/components/admin/AdminPagination";
+import type { AdminPaginationResult } from "@/lib/admin/pagination";
+import { SEO_PAGES_PAGE_SIZES, type SeoPagesPageSize } from "@/lib/admin/seoNavConfig";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,6 +67,8 @@ const STATUS_BADGE: Record<SeoPageIndexationStatus, string> = {
   draft: "bg-gray-100 text-gray-700 border-gray-200",
 };
 
+const BASE_PATH = "/admin/seo/pages";
+
 function seoStateLabel(row: SeoAdminPage): string {
   const issues = row.entityDiagnostics?.issues.length ?? 0;
   if (issues > 0) return "Есть проблемы";
@@ -80,31 +78,20 @@ function seoStateLabel(row: SeoAdminPage): string {
   return "В порядке";
 }
 
-function matchesSearch(row: SeoAdminPage, q: string) {
-  if (!q.trim()) return true;
-  const x = q.trim().toLowerCase();
-  const slug = row.path.split("/").filter(Boolean).pop() ?? "";
-  const d = row.entityDiagnostics;
-  return (
-    row.path.toLowerCase().includes(x) ||
-    row.h1.toLowerCase().includes(x) ||
-    row.title.toLowerCase().includes(x) ||
-    slug.toLowerCase().includes(x) ||
-    row.id.toLowerCase().includes(x) ||
-    (d &&
-      (d.entityId.toLowerCase().includes(x) ||
-        (d.slug ?? "").toLowerCase().includes(x) ||
-        d.entityTitle.toLowerCase().includes(x) ||
-        (d.citySlug ?? "").toLowerCase().includes(x)))
-  );
-}
-
 function isEntityRow(row: SeoAdminPage) {
   return row.id.startsWith("entity:");
 }
 
 interface SeoPagesClientProps {
   initialRows: SeoAdminPage[];
+  pagination: AdminPaginationResult;
+  filters: {
+    q: string;
+    type: SeoPageType | "all";
+    indexation: SeoPageIndexationStatus | "all";
+    pageSize: SeoPagesPageSize;
+  };
+  currentParams: Record<string, string | string[] | undefined>;
 }
 
 function getEntityId(row: SeoAdminPage): string | null {
@@ -185,7 +172,12 @@ function applyRobotsPatch(row: SeoAdminPage, index: boolean): SeoAdminPage {
   };
 }
 
-export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
+export function SeoPagesClient({
+  initialRows,
+  pagination,
+  filters,
+  currentParams,
+}: SeoPagesClientProps) {
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
   useEffect(() => {
@@ -193,26 +185,11 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
   }, [initialRows]);
 
   const [busyRowId, setBusyRowId] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<SeoPageType | "all">("all");
-  const [statusFilter, setStatusFilter] = useState<
-    SeoPageIndexationStatus | "all"
-  >("all");
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
   const [pendingIndexation, setPendingIndexation] = useState<{
     row: SeoAdminPage;
     nextIndex: boolean;
   } | null>(null);
-
-  const filtered = useMemo(() => {
-    return rows.filter((row) => {
-      if (!matchesSearch(row, query)) return false;
-      if (typeFilter !== "all" && row.type !== typeFilter) return false;
-      if (statusFilter !== "all" && row.indexationStatus !== statusFilter)
-        return false;
-      return true;
-    });
-  }, [rows, query, typeFilter, statusFilter]);
 
   async function setIndexFollow(row: SeoAdminPage, index: boolean) {
     const endpoint = toggleIndexationEndpoint(row);
@@ -229,6 +206,7 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
         body: JSON.stringify({ index }),
       });
       if (!res.ok) throw new Error("Failed");
+      router.refresh();
     } catch {
       setRows((prev) =>
         prev.map((r) => (r.id === row.id ? snapshot : r)),
@@ -238,9 +216,16 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
     }
   }
 
+  const emptyBecauseFilters =
+    pagination.total === 0 &&
+    (Boolean(filters.q) || filters.type !== "all" || filters.indexation !== "all");
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:flex-row lg:flex-wrap lg:items-end">
+      <form
+        method="get"
+        className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:flex-row lg:flex-wrap lg:items-end"
+      >
         <div className="min-w-[200px] flex-1">
           <label className="mb-1.5 block text-xs font-medium text-gray-500">
             Поиск
@@ -248,8 +233,8 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              name="q"
+              defaultValue={filters.q}
               placeholder="Название, URL или slug"
               className="h-9 pl-9"
             />
@@ -259,49 +244,58 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
           <label className="mb-1.5 block text-xs font-medium text-gray-500">
             Тип
           </label>
-          <Select
-            value={typeFilter}
-            onValueChange={(v) => setTypeFilter(v as SeoPageType | "all")}
+          <select
+            name="type"
+            defaultValue={filters.type}
+            className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
           >
-            <SelectTrigger className="h-9 bg-white">
-              <SelectValue placeholder="Тип" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все типы</SelectItem>
-              <SelectItem value="event">Событие</SelectItem>
-              <SelectItem value="place">Место</SelectItem>
-              <SelectItem value="offer">Оффер</SelectItem>
-              <SelectItem value="route">Маршрут</SelectItem>
-              <SelectItem value="article">Статья</SelectItem>
-            </SelectContent>
-          </Select>
+            <option value="all">Все типы</option>
+            <option value="event">Событие</option>
+            <option value="place">Место</option>
+            <option value="offer">Оффер</option>
+            <option value="route">Маршрут</option>
+            <option value="article">Статья</option>
+          </select>
         </div>
         <div className="w-full min-w-[140px] sm:w-auto">
           <label className="mb-1.5 block text-xs font-medium text-gray-500">
             Индексация
           </label>
-          <Select
-            value={statusFilter}
-            onValueChange={(v) =>
-              setStatusFilter(v as SeoPageIndexationStatus | "all")
-            }
+          <select
+            name="indexation"
+            defaultValue={filters.indexation}
+            className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
           >
-            <SelectTrigger className="h-9 bg-white">
-              <SelectValue placeholder="Индексация" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все</SelectItem>
-              <SelectItem value="indexed">В индексе</SelectItem>
-              <SelectItem value="noindex">noindex</SelectItem>
-              <SelectItem value="draft">Черновик</SelectItem>
-            </SelectContent>
-          </Select>
+            <option value="all">Все</option>
+            <option value="indexed">В индексе</option>
+            <option value="noindex">noindex</option>
+            <option value="draft">Черновик</option>
+          </select>
         </div>
-      </div>
+        <div className="w-full min-w-[120px] sm:w-auto">
+          <label className="mb-1.5 block text-xs font-medium text-gray-500">
+            На странице
+          </label>
+          <select
+            name="pageSize"
+            defaultValue={String(filters.pageSize)}
+            className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
+          >
+            {SEO_PAGES_PAGE_SIZES.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+        </div>
+        <Button type="submit" size="sm" className="h-9">
+          Применить
+        </Button>
+      </form>
 
-      {initialRows.length === 0 ? (
+      {pagination.total === 0 && !emptyBecauseFilters ? (
         <SeoPagesEmptyState />
-      ) : filtered.length === 0 ? (
+      ) : pagination.total === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-amber-50/50 px-6 py-10 text-center">
           <p className="text-sm font-medium text-gray-900">
             Нет страниц по текущим фильтрам
@@ -309,18 +303,8 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
           <p className="mt-1 text-xs text-gray-600">
             Измените поиск, фильтры или SEO-контекст
           </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="mt-4"
-            onClick={() => {
-              setQuery("");
-              setTypeFilter("all");
-              setStatusFilter("all");
-            }}
-          >
-            Сбросить фильтры
+          <Button type="button" variant="outline" size="sm" className="mt-4" asChild>
+            <a href={BASE_PATH}>Сбросить фильтры</a>
           </Button>
         </div>
       ) : (
@@ -357,7 +341,7 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filtered.map((row) => {
+                {rows.map((row) => {
                   const settingsHref = seoSettingsHref(row);
                   const canSeoSettings = Boolean(settingsHref);
                   const issues = row.entityDiagnostics?.issues.length ?? 0;
@@ -547,8 +531,16 @@ export function SeoPagesClient({ initialRows }: SeoPagesClientProps) {
               </tbody>
             </table>
           </TableContainer>
-          <div className="border-t border-gray-100 px-4 py-2 text-xs text-gray-500">
-            Показано {filtered.length} из {initialRows.length}
+          <div className="border-t border-gray-100 px-4 py-3">
+            <AdminPagination
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              total={pagination.total}
+              start={pagination.start}
+              end={pagination.end}
+              basePath={BASE_PATH}
+              params={currentParams}
+            />
           </div>
         </div>
       )}
