@@ -18,7 +18,8 @@ import type { InboxProcessor } from "./inboxProcessor";
 export const RECOVER_STALE_AFTER_MS = 2 * 60 * 1000;
 export const RECOVER_MAX_ITEMS_PER_RUN = 5;
 export const RECOVER_MAX_ATTEMPTS = 3;
-export const RECOVER_DEADLINE_MS = 200_000;
+/** No new item is started after this; the runner's curl limit is 240 s and one item can take ~3 min worst case. */
+export const RECOVER_DEADLINE_MS = 45_000;
 export const RECOVER_ATTEMPT_CODE = "RECOVER_ATTEMPT";
 
 export type InboxRecoverResult = {
