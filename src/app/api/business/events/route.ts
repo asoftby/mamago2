@@ -7,6 +7,7 @@ import {
   buildActivityManageWhereForUser,
   coalesceActivityBusinessIdFromPlace,
   getBusinessIdsUserCanAccess,
+  resolveActivityBusinessIdForCreate,
 } from "@/lib/auth/activityAccess";
 import { getUserBusinessId } from "@/lib/auth/placeAccess";
 import { checkUserBusinessPermission } from "@/server/permissions/business-permissions";
@@ -169,8 +170,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let resolvedBusinessId: string | null =
+    const requestedBusinessId: string | null =
       typeof body.businessId === "string" ? body.businessId : null;
+    let placeOwnerBusinessId: string | null | undefined;
 
     if (typeof mergedPlaceId === "string" && mergedPlaceId.length > 0) {
       const placeRow = await prisma.place.findUnique({
@@ -183,13 +185,22 @@ export async function POST(request: NextRequest) {
           { status: 404 },
         );
       }
-      resolvedBusinessId = coalesceActivityBusinessIdFromPlace(
-        placeRow,
-        resolvedBusinessId,
-      );
-    } else if (!resolvedBusinessId) {
-      resolvedBusinessId = await getUserBusinessId(user.id);
+      placeOwnerBusinessId = placeRow.ownerBusinessId;
     }
+
+    const needsUserBusinessFallback =
+      !isPlatformContentStaff(user.role) &&
+      placeOwnerBusinessId == null &&
+      requestedBusinessId == null;
+    const userBusinessId = needsUserBusinessFallback
+      ? await getUserBusinessId(user.id)
+      : null;
+
+    const resolvedBusinessId = resolveActivityBusinessIdForCreate({
+      placeOwnerBusinessId,
+      requestedBusinessId,
+      userBusinessId,
+    });
 
     if (!isPlatformContentStaff(user.role)) {
       if (!resolvedBusinessId) {
