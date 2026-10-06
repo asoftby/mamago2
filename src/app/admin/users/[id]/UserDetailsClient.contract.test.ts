@@ -38,6 +38,26 @@ for (const label of [
 }
 
 assert.ok(
+  service.includes('isOwnedBusiness && !membership.isActive'),
+  "inactive owner membership must stay classified as requiring restoration",
+);
+
+assert.ok(
+  (service.match(/archivedAt: true/g) ?? []).length >= 2,
+  "user 360 service must include archive state for places and offers",
+);
+
+assert.ok(
+  client.includes('place.archivedAt ? "Архив"'),
+  "archived places must be visibly marked as archived",
+);
+
+assert.ok(
+  client.includes('offer.archivedAt ? "Архив"'),
+  "archived offers must be visibly marked as archived",
+);
+
+assert.ok(
   client.includes("Старый показатель «Активности» заменён на отдельные сущности"),
   "ambiguous legacy activity counter must be explained/replaced",
 );
