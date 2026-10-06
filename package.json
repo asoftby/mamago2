@@ -225,6 +225,7 @@
     "test:responsive-business": "tsx src/lib/responsive/businessMobileLayoutContract.test.ts",
     "test:responsive-content-editor": "tsx src/lib/responsive/contentEditorMobileLayoutContract.test.ts",
     "test:responsive-admin": "tsx src/lib/responsive/adminMobileLayoutContract.test.ts",
+    "test:admin-user-360": "tsx \"src/app/admin/users/[id]/UserDetailsClient.contract.test.ts\"",
     "test:publication-media": "tsx src/lib/media/publicationMediaOrder.test.ts && tsx src/components/media/MobileMediaCarousel.test.tsx && tsx src/lib/media/parseVideoUrl.test.ts && tsx src/lib/event/buildEventGalleryItems.test.ts",
     "test:upload-pipeline": "tsx src/lib/uploads/heicConversion.test.ts && tsx src/lib/uploads/uploadFilename.test.ts && tsx src/lib/uploads/uploadPipeline.contract.test.ts"
   },
