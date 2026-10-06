@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { resolveActivityBusinessIdForCreate } from "./activityAccess";
+import { resolveActivityBusinessIdForCreate } from "./activityBusinessResolution";
 
 assert.equal(
   resolveActivityBusinessIdForCreate({
