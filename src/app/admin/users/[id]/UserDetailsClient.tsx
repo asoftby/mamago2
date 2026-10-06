@@ -89,6 +89,7 @@ interface PlaceSummary {
   status: ContentStatus;
   createdAt: Date;
   updatedAt: Date;
+  archivedAt: Date | null;
   createdByUserId: string;
   ownerBusinessId: string | null;
   city: { name: string } | null;
@@ -105,6 +106,7 @@ interface EventSummary {
   status: ContentStatus;
   createdAt: Date;
   updatedAt: Date;
+  archivedAt: Date | null;
   place: { title: string } | null;
   business: {
     id: string;
@@ -616,8 +618,8 @@ export function UserDetailsClient({ userId }: { userId: string }) {
                   title={place.title}
                   subtitle={relations}
                   trailing={
-                    <Badge className={statusBadgeClass(place.status)}>
-                      {CONTENT_STATUS_LABELS[place.status]}
+                    <Badge className={statusBadgeClass(place.archivedAt ? "ARCHIVED" : place.status)}>
+                      {place.archivedAt ? "Архив" : CONTENT_STATUS_LABELS[place.status]}
                     </Badge>
                   }
                 />
@@ -696,8 +698,8 @@ export function UserDetailsClient({ userId }: { userId: string }) {
                       formatAgo(offer.updatedAt),
                     ].filter(Boolean).join(" · ")}
                     trailing={
-                      <Badge className={statusBadgeClass(offer.status)}>
-                        {OFFER_STATUS_LABELS[offer.status]}
+                      <Badge className={statusBadgeClass(offer.archivedAt ? "ARCHIVED" : offer.status)}>
+                        {offer.archivedAt ? "Архив" : OFFER_STATUS_LABELS[offer.status]}
                       </Badge>
                     }
                   />
