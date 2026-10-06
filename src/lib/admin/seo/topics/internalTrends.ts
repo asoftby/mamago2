@@ -44,6 +44,8 @@ export async function computeInternalSearchTrends(input: {
   risingCount: number;
   highPotentialCount: number;
   windowDays: number;
+  /** Recent SearchQueryLog rows with cityId=null exist while geo filter returned 0. */
+  showUnknownGeoHint: boolean;
 }> {
   const now = input.now ?? new Date();
   const currentFrom = new Date(now.getTime() - WINDOW_MS);
@@ -57,6 +59,7 @@ export async function computeInternalSearchTrends(input: {
       risingCount: 0,
       highPotentialCount: 0,
       windowDays: 7,
+      showUnknownGeoHint: false,
     };
   }
 
@@ -168,6 +171,19 @@ export async function computeInternalSearchTrends(input: {
     return b.searchesCurrent - a.searchesCurrent;
   });
 
+  let showUnknownGeoHint = false;
+  // Only when a geo-scoped market filter yields no attributed traffic, hint
+  // that older ungeotagged logs exist — never treat null as Minsk.
+  if (rows.length === 0 && cityIds !== null) {
+    const unknownCount = await prisma.searchQueryLog.count({
+      where: {
+        cityId: null,
+        createdAt: { gte: previousFrom, lt: now },
+      },
+    });
+    showUnknownGeoHint = unknownCount > 0;
+  }
+
   return {
     rows,
     risingCount: rows.filter(
@@ -176,5 +192,6 @@ export async function computeInternalSearchTrends(input: {
     highPotentialCount: rows.filter((r) => r.opportunityTier === "high")
       .length,
     windowDays: 7,
+    showUnknownGeoHint,
   };
 }

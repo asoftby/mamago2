@@ -19,6 +19,11 @@ import type {
   SeoContentPlanPriority,
   SeoContentPlanStatus,
 } from "@prisma/client";
+import type { SeoGeoContextKind } from "@/lib/admin/seo/geo/types";
+import {
+  planItemIdsForGeoScope,
+  resolvePlanCreateGeoConfig,
+} from "@/lib/admin/seo/plan/planCreateGeo";
 
 export type PlanItemRow = {
   id: string;
@@ -45,6 +50,7 @@ type Mix = {
 
 type Props = {
   marketLabel: string;
+  contextKind: SeoGeoContextKind;
   period: "week" | "month";
   periodLabel: string;
   prevHref: string;
@@ -57,6 +63,7 @@ type Props = {
   defaultRegionId: string | null;
   defaultCityName: string | null;
   defaultRegionName: string | null;
+  defaultCountryName: string | null;
 };
 
 const STATUS_LABEL: Record<SeoContentPlanStatus, string> = {
@@ -83,10 +90,35 @@ export function SeoContentPlanClient(props: Props) {
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [statusById, setStatusById] = useState<
+    Record<string, SeoContentPlanStatus>
+  >({});
+
+  const geoConfig = useMemo(
+    () =>
+      resolvePlanCreateGeoConfig({
+        contextKind: props.contextKind,
+        cityName: props.defaultCityName,
+        regionName: props.defaultRegionName,
+        countryName: props.defaultCountryName,
+        cityId: props.defaultCityId,
+        regionId: props.defaultRegionId,
+      }),
+    [
+      props.contextKind,
+      props.defaultCityName,
+      props.defaultRegionName,
+      props.defaultCountryName,
+      props.defaultCityId,
+      props.defaultRegionId,
+    ],
+  );
+
   const [form, setForm] = useState({
     title: "",
     targetQuery: "",
-    geo: "CITY" as "CITY" | "REGION",
+    geo: (geoConfig.defaultGeo ?? "CITY") as GeoScope,
     scheduledFor: "",
     priority: "HIGH" as SeoContentPlanPriority,
     notes: "",
@@ -94,18 +126,40 @@ export function SeoContentPlanClient(props: Props) {
 
   const statusCounts = useMemo(() => {
     const counts = { IDEA: 0, PLANNED: 0, IN_PROGRESS: 0, PUBLISHED: 0 };
-    for (const item of props.items) counts[item.status] += 1;
+    for (const item of props.items) {
+      const status = statusById[item.id] ?? item.status;
+      counts[status] += 1;
+    }
     return counts;
-  }, [props.items]);
+  }, [props.items, statusById]);
+
+  function openCreateDialog() {
+    if (!geoConfig.canCreate || !geoConfig.defaultGeo) return;
+    setError(null);
+    setForm({
+      title: "",
+      targetQuery: "",
+      geo: geoConfig.defaultGeo,
+      scheduledFor: "",
+      priority: "HIGH",
+      notes: "",
+    });
+    setOpen(true);
+  }
 
   async function createItem() {
+    if (!geoConfig.canCreate) return;
     setError(null);
+    const ids = planItemIdsForGeoScope(form.geo, {
+      cityId: props.defaultCityId,
+      regionId: props.defaultRegionId,
+    });
     const body = {
       title: form.title,
       targetQuery: form.targetQuery || null,
       geoScope: form.geo,
-      cityId: form.geo === "CITY" ? props.defaultCityId : null,
-      regionId: form.geo === "REGION" ? props.defaultRegionId : null,
+      cityId: ids.cityId,
+      regionId: ids.regionId,
       scheduledFor: form.scheduledFor || null,
       priority: form.priority,
       notes: form.notes || null,
@@ -123,24 +177,38 @@ export function SeoContentPlanClient(props: Props) {
       return;
     }
     setOpen(false);
-    setForm({
-      title: "",
-      targetQuery: "",
-      geo: "CITY",
-      scheduledFor: "",
-      priority: "HIGH",
-      notes: "",
-    });
     startTransition(() => router.refresh());
   }
 
-  async function setStatus(id: string, status: SeoContentPlanStatus) {
+  async function setStatus(id: string, next: SeoContentPlanStatus) {
+    const row = props.items.find((item) => item.id === id);
+    const previous = statusById[id] ?? row?.status ?? next;
+    setStatusError(null);
+    setStatusById((map) => ({ ...map, [id]: next }));
+
     const res = await fetch("/api/admin/seo/plan", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id, status }),
+      body: JSON.stringify({ id, status: next }),
     });
-    if (!res.ok) return;
+    const data = await res.json().catch(() => ({}));
+
+    if (res.status === 409) {
+      setStatusById((map) => ({ ...map, [id]: previous }));
+      setStatusError(
+        typeof data.error === "string"
+          ? data.error
+          : "Такая тема уже есть в активном плане",
+      );
+      return;
+    }
+    if (!res.ok) {
+      setStatusById((map) => ({ ...map, [id]: previous }));
+      setStatusError(
+        typeof data.error === "string" ? data.error : "Не удалось изменить статус",
+      );
+      return;
+    }
     startTransition(() => router.refresh());
   }
 
@@ -152,8 +220,22 @@ export function SeoContentPlanClient(props: Props) {
           <p className="mt-1 text-sm text-gray-500">
             SEO-рынок: {props.marketLabel}
           </p>
+          {!geoConfig.canCreate && geoConfig.helperText ? (
+            <p className="mt-1 text-xs text-amber-700">{geoConfig.helperText}</p>
+          ) : null}
         </div>
-        <Button type="button" size="sm" className="gap-1.5" onClick={() => setOpen(true)}>
+        <Button
+          type="button"
+          size="sm"
+          className="gap-1.5"
+          disabled={!geoConfig.canCreate}
+          title={
+            !geoConfig.canCreate
+              ? (geoConfig.helperText ?? undefined)
+              : undefined
+          }
+          onClick={openCreateDialog}
+        >
           <Plus className="h-4 w-4" />
           Добавить тему
         </Button>
@@ -215,6 +297,12 @@ export function SeoContentPlanClient(props: Props) {
         </p>
       </div>
 
+      {statusError ? (
+        <p className="text-sm text-red-600" role="alert">
+          {statusError}
+        </p>
+      ) : null}
+
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] text-left text-sm">
@@ -237,53 +325,61 @@ export function SeoContentPlanClient(props: Props) {
                   </td>
                 </tr>
               ) : (
-                props.items.map((row) => (
-                  <tr key={row.id}>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-xs text-gray-600">
-                      {row.scheduledFor
-                        ? new Date(row.scheduledFor).toLocaleDateString("ru-RU")
-                        : "—"}
-                    </td>
-                    <td className="px-3 py-2.5 font-medium text-gray-900">{row.title}</td>
-                    <td className="px-3 py-2.5 text-xs text-gray-600">{geoLabel(row)}</td>
-                    <td className="px-3 py-2.5 text-xs text-gray-600">
-                      {row.targetQuery ?? "—"}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <Badge variant="secondary">{PRIORITY_LABEL[row.priority]}</Badge>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <select
-                        className="h-8 rounded-md border border-input bg-white px-2 text-xs"
-                        value={row.status}
-                        disabled={pending}
-                        onChange={(e) =>
-                          void setStatus(row.id, e.target.value as SeoContentPlanStatus)
-                        }
-                      >
-                        {(Object.keys(STATUS_LABEL) as SeoContentPlanStatus[]).map((s) => (
-                          <option key={s} value={s}>
-                            {STATUS_LABEL[s]}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs">
-                      {row.article ? (
-                        <Link
-                          href={`/admin/content/publications/${row.article.id}`}
-                          className="text-primary hover:underline"
+                props.items.map((row) => {
+                  const displayStatus = statusById[row.id] ?? row.status;
+                  return (
+                    <tr key={row.id}>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-xs text-gray-600">
+                        {row.scheduledFor
+                          ? new Date(row.scheduledFor).toLocaleDateString("ru-RU")
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-2.5 font-medium text-gray-900">{row.title}</td>
+                      <td className="px-3 py-2.5 text-xs text-gray-600">{geoLabel(row)}</td>
+                      <td className="px-3 py-2.5 text-xs text-gray-600">
+                        {row.targetQuery ?? "—"}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <Badge variant="secondary">{PRIORITY_LABEL[row.priority]}</Badge>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <select
+                          className="h-8 rounded-md border border-input bg-white px-2 text-xs"
+                          value={displayStatus}
+                          disabled={pending}
+                          onChange={(e) =>
+                            void setStatus(
+                              row.id,
+                              e.target.value as SeoContentPlanStatus,
+                            )
+                          }
                         >
-                          Открыть статью
-                        </Link>
-                      ) : row.status === "PUBLISHED" ? (
-                        <span className="text-amber-700">Привяжите статью</span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                  </tr>
-                ))
+                          {(Object.keys(STATUS_LABEL) as SeoContentPlanStatus[]).map(
+                            (s) => (
+                              <option key={s} value={s}>
+                                {STATUS_LABEL[s]}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs">
+                        {row.article ? (
+                          <Link
+                            href={`/admin/content/publications/${row.article.id}`}
+                            className="text-primary hover:underline"
+                          >
+                            Открыть статью
+                          </Link>
+                        ) : displayStatus === "PUBLISHED" ? (
+                          <span className="text-amber-700">Привяжите статью</span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -318,15 +414,14 @@ export function SeoContentPlanClient(props: Props) {
                 className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm"
                 value={form.geo}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, geo: e.target.value as "CITY" | "REGION" }))
+                  setForm((f) => ({ ...f, geo: e.target.value as GeoScope }))
                 }
               >
-                <option value="CITY" disabled={!props.defaultCityId}>
-                  {props.defaultCityName ?? "Город"}
-                </option>
-                <option value="REGION" disabled={!props.defaultRegionId}>
-                  {props.defaultRegionName ?? "Регион"}
-                </option>
+                {geoConfig.options.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
@@ -369,7 +464,11 @@ export function SeoContentPlanClient(props: Props) {
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Отмена
             </Button>
-            <Button type="button" disabled={!form.title.trim() || pending} onClick={() => void createItem()}>
+            <Button
+              type="button"
+              disabled={!form.title.trim() || pending || !geoConfig.canCreate}
+              onClick={() => void createItem()}
+            >
               Сохранить
             </Button>
           </DialogFooter>

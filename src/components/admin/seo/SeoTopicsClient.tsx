@@ -13,6 +13,7 @@ type Props = {
   rows: InternalTrendRow[];
   risingCount: number;
   highPotentialCount: number;
+  showUnknownGeoHint: boolean;
   defaultCityId: string | null;
   defaultRegionId: string | null;
   defaultGeoScope: GeoScope;
@@ -89,6 +90,13 @@ export function SeoTopicsClient(props: Props) {
       </div>
 
       {error ? <p className="text-xs text-red-600">{error}</p> : null}
+
+      {props.showUnknownGeoHint ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          География поисковых запросов начала собираться с текущей версии; более
+          ранние запросы не привязаны к городу.
+        </p>
+      ) : null}
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">

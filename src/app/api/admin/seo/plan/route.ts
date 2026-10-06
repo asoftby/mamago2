@@ -128,6 +128,15 @@ export async function PATCH(req: NextRequest) {
     const item = await updateSeoContentPlanItemStatus(id, status);
     return NextResponse.json({ ok: true, item });
   } catch (e) {
+    if (e instanceof SeoContentPlanValidationError) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+    if (e instanceof SeoContentPlanDuplicateError) {
+      return NextResponse.json(
+        { error: e.message, code: "DUPLICATE" },
+        { status: 409 },
+      );
+    }
     console.error("[admin/seo/plan PATCH]", e);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }

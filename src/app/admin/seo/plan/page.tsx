@@ -72,10 +72,15 @@ export default async function AdminSeoPlanPage({ searchParams }: PageProps) {
       : session.context.kind === "region"
         ? session.context.regionId
         : null;
+  const defaultCountryName =
+    session.context.kind === "country"
+      ? session.context.countryName
+      : session.presentation.countryName;
 
   return (
     <SeoContentPlanClient
       marketLabel={session.presentation.marketLabel}
+      contextKind={session.context.kind}
       period={period}
       periodLabel={periodLabel}
       prevHref={qs(period, prevOffset)}
@@ -87,6 +92,7 @@ export default async function AdminSeoPlanPage({ searchParams }: PageProps) {
       defaultRegionId={defaultRegionId}
       defaultCityName={session.presentation.cityName}
       defaultRegionName={session.presentation.regionName}
+      defaultCountryName={defaultCountryName}
       items={items.map((item) => ({
         id: item.id,
         title: item.title,

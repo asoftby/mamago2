@@ -42,6 +42,7 @@ export default async function AdminSeoTopicsPage() {
       rows={trends.rows}
       risingCount={trends.risingCount}
       highPotentialCount={trends.highPotentialCount}
+      showUnknownGeoHint={trends.showUnknownGeoHint}
       defaultCityId={defaultCityId}
       defaultRegionId={defaultRegionId}
       defaultGeoScope={defaultGeoScope}

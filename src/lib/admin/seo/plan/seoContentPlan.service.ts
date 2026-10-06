@@ -4,6 +4,7 @@ import type {
   SeoContentPlanSource,
   SeoContentPlanStatus,
 } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import {
   allocateGeoMixTargets,
@@ -11,6 +12,31 @@ import {
 } from "@/lib/admin/seo/geo";
 import type { SeoMarketFilter } from "@/lib/admin/seo/geo/seoMarket";
 import { normalizeSearchQueryKey } from "@/lib/admin/seo/geo/seoMarket";
+
+const ACTIVE_PLAN_STATUSES: SeoContentPlanStatus[] = [
+  "IDEA",
+  "PLANNED",
+  "IN_PROGRESS",
+];
+
+export function isActivePlanStatus(status: SeoContentPlanStatus): boolean {
+  return ACTIVE_PLAN_STATUSES.includes(status);
+}
+
+/** PUBLISHED → IDEA|PLANNED|IN_PROGRESS may collide with the unique active index. */
+export function isPublishedToActiveTransition(
+  from: SeoContentPlanStatus,
+  to: SeoContentPlanStatus,
+): boolean {
+  return from === "PUBLISHED" && isActivePlanStatus(to);
+}
+
+function isPrismaUniqueConflict(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
 
 export type CreateSeoContentPlanItemInput = {
   title: string;
@@ -215,7 +241,7 @@ export async function createSeoContentPlanItem(
         geoScope: input.geoScope,
         cityId: input.cityId ?? null,
         regionId: input.regionId ?? null,
-        status: { in: ["IDEA", "PLANNED", "IN_PROGRESS"] },
+        status: { in: ACTIVE_PLAN_STATUSES },
       },
       select: { id: true },
     });
@@ -224,28 +250,60 @@ export async function createSeoContentPlanItem(
     }
   }
 
-  return prisma.seoContentPlanItem.create({
-    data: {
-      title: input.title.trim(),
-      targetQuery,
-      targetQueryKey,
+  try {
+    return await prisma.seoContentPlanItem.create({
+      data: {
+        title: input.title.trim(),
+        targetQuery,
+        targetQueryKey,
+        geoScope: input.geoScope,
+        cityId: input.cityId ?? null,
+        regionId: input.regionId ?? null,
+        scheduledFor: input.scheduledFor ?? null,
+        priority: input.priority ?? "MEDIUM",
+        source: input.source ?? "MANUAL",
+        sourceQuery: input.sourceQuery?.trim() || null,
+        notes: input.notes?.trim() || null,
+        articleId: input.articleId ?? null,
+        status: input.status ?? "IDEA",
+        createdByUserId: input.createdByUserId,
+      },
+      include: {
+        city: { select: { id: true, name: true, slug: true } },
+        region: { select: { id: true, name: true, slug: true } },
+        article: { select: { id: true, title: true, slug: true } },
+      },
+    });
+  } catch (error) {
+    if (isPrismaUniqueConflict(error)) {
+      throw new SeoContentPlanDuplicateError();
+    }
+    throw error;
+  }
+}
+
+/**
+ * True when reactivating a PUBLISHED item into an active status would collide
+ * with another active plan row for the same normalized query + geo.
+ */
+export async function findActivePlanDuplicate(input: {
+  excludeId: string;
+  targetQueryKey: string | null;
+  geoScope: GeoScope;
+  cityId: string | null;
+  regionId: string | null;
+}): Promise<{ id: string } | null> {
+  if (!input.targetQueryKey) return null;
+  return prisma.seoContentPlanItem.findFirst({
+    where: {
+      id: { not: input.excludeId },
+      targetQueryKey: input.targetQueryKey,
       geoScope: input.geoScope,
-      cityId: input.cityId ?? null,
-      regionId: input.regionId ?? null,
-      scheduledFor: input.scheduledFor ?? null,
-      priority: input.priority ?? "MEDIUM",
-      source: input.source ?? "MANUAL",
-      sourceQuery: input.sourceQuery?.trim() || null,
-      notes: input.notes?.trim() || null,
-      articleId: input.articleId ?? null,
-      status: input.status ?? "IDEA",
-      createdByUserId: input.createdByUserId,
+      cityId: input.cityId,
+      regionId: input.regionId,
+      status: { in: ACTIVE_PLAN_STATUSES },
     },
-    include: {
-      city: { select: { id: true, name: true, slug: true } },
-      region: { select: { id: true, name: true, slug: true } },
-      article: { select: { id: true, title: true, slug: true } },
-    },
+    select: { id: true },
   });
 }
 
@@ -253,15 +311,55 @@ export async function updateSeoContentPlanItemStatus(
   id: string,
   status: SeoContentPlanStatus,
 ) {
-  return prisma.seoContentPlanItem.update({
+  const current = await prisma.seoContentPlanItem.findUnique({
     where: { id },
-    data: { status },
-    include: {
-      city: { select: { id: true, name: true, slug: true } },
-      region: { select: { id: true, name: true, slug: true } },
-      article: { select: { id: true, title: true, slug: true } },
+    select: {
+      id: true,
+      status: true,
+      targetQueryKey: true,
+      geoScope: true,
+      cityId: true,
+      regionId: true,
     },
   });
+  if (!current) {
+    throw new SeoContentPlanValidationError("Тема плана не найдена");
+  }
+
+  const reactivatingFromPublished = isPublishedToActiveTransition(
+    current.status,
+    status,
+  );
+
+  if (reactivatingFromPublished) {
+    const duplicate = await findActivePlanDuplicate({
+      excludeId: current.id,
+      targetQueryKey: current.targetQueryKey,
+      geoScope: current.geoScope,
+      cityId: current.cityId,
+      regionId: current.regionId,
+    });
+    if (duplicate) {
+      throw new SeoContentPlanDuplicateError();
+    }
+  }
+
+  try {
+    return await prisma.seoContentPlanItem.update({
+      where: { id },
+      data: { status },
+      include: {
+        city: { select: { id: true, name: true, slug: true } },
+        region: { select: { id: true, name: true, slug: true } },
+        article: { select: { id: true, title: true, slug: true } },
+      },
+    });
+  } catch (error) {
+    if (isPrismaUniqueConflict(error)) {
+      throw new SeoContentPlanDuplicateError();
+    }
+    throw error;
+  }
 }
 
 export function startOfWeekMonday(d: Date): Date {

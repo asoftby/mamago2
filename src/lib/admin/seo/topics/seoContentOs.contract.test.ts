@@ -7,7 +7,12 @@ import {
   validatePlanItemGeo,
   SeoContentPlanValidationError,
   computePlanMix,
+  isPublishedToActiveTransition,
 } from "../plan/seoContentPlan.service";
+import {
+  planItemIdsForGeoScope,
+  resolvePlanCreateGeoConfig,
+} from "../plan/planCreateGeo";
 import {
   presentSeoMarket,
   resolveSeoMarketFilter,
@@ -55,6 +60,74 @@ assert.throws(
 assert.doesNotThrow(() =>
   validatePlanItemGeo({ geoScope: "CITY", cityId: "c1" }),
 );
+assert.doesNotThrow(() =>
+  validatePlanItemGeo({ geoScope: "COUNTRY", cityId: null, regionId: null }),
+);
+
+// plan create geo by context
+const cityCfg = resolvePlanCreateGeoConfig({
+  contextKind: "city",
+  cityName: "Минск",
+  regionName: "Минская область",
+  countryName: "Беларусь",
+  cityId: "c1",
+  regionId: "r1",
+});
+assert.equal(cityCfg.canCreate, true);
+assert.equal(cityCfg.defaultGeo, "CITY");
+assert.deepEqual(
+  cityCfg.options.map((o) => o.value),
+  ["CITY", "REGION"],
+);
+
+const regionCfg = resolvePlanCreateGeoConfig({
+  contextKind: "region",
+  cityName: null,
+  regionName: "Брестская область",
+  countryName: "Беларусь",
+  cityId: null,
+  regionId: "r2",
+});
+assert.equal(regionCfg.canCreate, true);
+assert.equal(regionCfg.defaultGeo, "REGION");
+assert.deepEqual(
+  regionCfg.options.map((o) => o.value),
+  ["REGION"],
+);
+
+const countryCfg = resolvePlanCreateGeoConfig({
+  contextKind: "country",
+  cityName: null,
+  regionName: null,
+  countryName: "Беларусь",
+  cityId: null,
+  regionId: null,
+});
+assert.equal(countryCfg.canCreate, true);
+assert.equal(countryCfg.defaultGeo, "COUNTRY");
+assert.deepEqual(planItemIdsForGeoScope("COUNTRY", { cityId: "x", regionId: "y" }), {
+  cityId: null,
+  regionId: null,
+});
+
+const allCfg = resolvePlanCreateGeoConfig({
+  contextKind: "all",
+  cityName: null,
+  regionName: null,
+  countryName: null,
+  cityId: null,
+  regionId: null,
+});
+assert.equal(allCfg.canCreate, false);
+assert.match(allCfg.helperText ?? "", /Выберите город/);
+
+// published → active reactivation gate (duplicate check required)
+assert.equal(isPublishedToActiveTransition("PUBLISHED", "IDEA"), true);
+assert.equal(isPublishedToActiveTransition("PUBLISHED", "PLANNED"), true);
+assert.equal(isPublishedToActiveTransition("PUBLISHED", "IN_PROGRESS"), true);
+assert.equal(isPublishedToActiveTransition("PUBLISHED", "PUBLISHED"), false);
+assert.equal(isPublishedToActiveTransition("IDEA", "PLANNED"), false);
+assert.equal(isPublishedToActiveTransition("PLANNED", "PUBLISHED"), false);
 
 const mix = computePlanMix([
   { geoScope: "CITY" },
