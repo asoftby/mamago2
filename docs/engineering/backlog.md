@@ -5174,3 +5174,13 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Reason deferred: `POST /api/public/bookings` accepts an optional `planItemId` (must be visible to the booker), and otherwise auto-links when exactly one not-yet-booked plan item of the same event/place (and date, if given) exists for the booker's family scope. Booking forms, offers (PlanItem has no `offerId`) and camp-shift bookings do not pass it, so ambiguous cases stay unlinked. There is no parent-side cancel flow at all today (status changes are business-only), so "only the booker can cancel" holds by construction; a future parent cancel must check `BookingRequest.userId`.
 - Acceptance criteria: plan card "Забронировать" passes `planItemId`; booking forms started from the plan forward it; offers/camp shifts decide how to map to plan items; a parent cancel action (if added) is limited to the booker and covered by a test.
 - Source: Family Core M6.
+
+## [BACKLOG-173] Family Core M3a: consent text, owner question about history access, simplified onboarding
+
+- Status: OPEN
+- Priority: P1 (blocks enabling FAMILY_INVITES)
+- Area: Family Core / Join
+- Added: 2026-10-06
+- Reason deferred: `/invite/family` is built (auth with `redirectTo`, consent, merge step, notification to the inviter) but stays closed until the product owner fills `FAMILY_CONSENT_TEXT` and `FAMILY_CONSENT_TEXT_VERSION` in `src/server/family/familyConsent.ts` (law № 99-З wording is not invented by the agent). Not built: the owner's question "show the new adult past plans?" (a joiner always starts with `historyAccess = FROM_JOIN`; changing it later needs a UI + service), and the simplified onboarding for a joiner without data.
+- Acceptance criteria: consent text + version published; owner question (notification with a choice) and a service changing `FamilyMembership.historyAccess` with tests; short onboarding after joining.
+- Source: Family Core M3a.

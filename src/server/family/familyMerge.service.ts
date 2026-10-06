@@ -38,9 +38,23 @@ export async function previewFamilyInviteMerge(
   if (!input.consentTextVersion?.trim()) throw new FamilyInviteError("consent_required");
   const invite = await prisma.familyInvite.findUnique({
     where: { tokenHash: hashInviteToken(input.token) },
-    select: { familyId: true, status: true, expiresAt: true },
+    select: {
+      familyId: true,
+      status: true,
+      expiresAt: true,
+      createdById: true,
+      family: { select: { archivedAt: true } },
+    },
   });
-  if (!invite || !isInviteUsable(invite, now)) throw new FamilyInviteError("invalid_invite");
+  if (!invite || !isInviteUsable(invite, now) || invite.family.archivedAt) {
+    throw new FamilyInviteError("invalid_invite");
+  }
+  // Same validity as accept: a link whose creator left the family is dead and must not leak children.
+  const creator = await prisma.familyMembership.findFirst({
+    where: { familyId: invite.familyId, userId: invite.createdById, leftAt: null },
+    select: { id: true },
+  });
+  if (!creator) throw new FamilyInviteError("invalid_invite");
   const mine = await prisma.familyMembership.findFirst({
     where: { userId: input.userId, leftAt: null },
     select: { familyId: true },
