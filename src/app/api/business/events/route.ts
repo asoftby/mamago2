@@ -5,7 +5,6 @@ import { AgePolicy, ContentStatus, ActivityType, ScheduleMode, Prisma } from "@p
 import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import {
   buildActivityManageWhereForUser,
-  coalesceActivityBusinessIdFromPlace,
   getBusinessIdsUserCanAccess,
   resolveActivityBusinessIdForCreate,
 } from "@/lib/auth/activityAccess";
