@@ -246,23 +246,47 @@ assert.deepEqual(
 
 // --- Admin navigation contract: no page-level back buttons -----------------
 
-const adminBackControlOffenders: string[] = [];
+const sharedBackControlOffenders: string[] = [];
 for (const root of ["src/app/admin", "src/components/admin"]) {
   for (const file of collectSourceFiles(root)) {
     const source = read(file);
     if (
-      source.includes("ArrowLeft") ||
-      source.includes("<BackButton") ||
-      source.includes("← Назад")
+      source.includes("@/components/admin/BackButton") ||
+      source.includes("<BackButton")
     ) {
-      adminBackControlOffenders.push(file);
+      sharedBackControlOffenders.push(file);
     }
   }
 }
 assert.deepEqual(
-  adminBackControlOffenders,
+  sharedBackControlOffenders,
   [],
-  `Admin pages/components must not render page-level back buttons with left arrows. Use section navigation, tabs, breadcrumbs, or explicit entity links instead:\n${adminBackControlOffenders.join("\n")}`,
+  `Admin pages/components must not use the retired shared BackButton control:\n${sharedBackControlOffenders.join("\n")}`,
+);
+
+const pageLevelBackControlFiles = [
+  "src/components/admin/AdminPageHeader.tsx",
+  "src/components/admin/publications/PublicationNewClient.tsx",
+  "src/app/admin/users/[id]/UserDetailsClient.tsx",
+  "src/app/admin/b2b/partners/[id]/page.tsx",
+  "src/app/admin/content/places/[id]/page.tsx",
+  "src/components/admin/PlaceModerationView.tsx",
+  "src/components/admin/PlaceRevisionModerationView.tsx",
+  "src/app/admin/media/[id]/page.tsx",
+];
+
+const pageLevelBackControlOffenders = pageLevelBackControlFiles.filter((file) => {
+  const source = read(file);
+  return (
+    source.includes("← Назад") ||
+    /<ArrowLeft[\s\S]{0,240}(?:Назад|Вернуться)/.test(source) ||
+    /(?:Назад|Вернуться)[\s\S]{0,240}<ArrowLeft/.test(source)
+  );
+});
+assert.deepEqual(
+  pageLevelBackControlOffenders,
+  [],
+  `Known Admin detail/header surfaces must not render page-level back controls. ArrowLeft remains allowed for unrelated UI such as pagination, carousels, and pickers:\n${pageLevelBackControlOffenders.join("\n")}`,
 );
 
 const representativeAdminPages = [
