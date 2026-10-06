@@ -23,6 +23,7 @@ import {
 import { stableJsonStringify } from "@/lib/json/stableJsonStringify";
 import { syncEventHomeStories } from "@/server/stories/homeStoryItems";
 import { collectEventScheduleTimeOrderErrors } from "@/lib/business/validateEventScheduleTimeOrder";
+import { notifyAdminsPublicationSubmitted } from "@/server/services/notification.service";
 
 function isPlatformContentStaff(role: string): boolean {
   return role === "ADMIN" || role === "MODERATOR";
@@ -290,6 +291,25 @@ export async function POST(
     } else {
       perf.mark("slug-ensure-published");
     }
+
+    // Operational alert only for manual business submissions that actually
+    // enter moderation. Import/parser pipelines do not use this business route.
+    if (
+      !isPlatformContentStaff(user.role) &&
+      event.status === ContentStatus.PENDING &&
+      existing.status !== ContentStatus.PENDING
+    ) {
+      try {
+        await notifyAdminsPublicationSubmitted({
+          publicationType: "EVENT",
+          publicationId: event.id,
+          publicationTitle: event.title,
+        });
+      } catch (error) {
+        console.error("[event-submit] admin moderation notification failed:", error);
+      }
+    }
+    perf.mark("notifications");
 
     await syncEventHomeStories(event.id);
     const { publicPath } = await revalidateEventMutationPaths(event.id, "publish");
