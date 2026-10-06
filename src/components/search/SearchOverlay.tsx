@@ -5,10 +5,8 @@ import { useRouter } from "next/navigation";
 import { Portal } from "@/components/ui/portal";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import {
-  PUBLIC_SEARCH_DEBOUNCE_MS,
-  PUBLIC_SEARCH_RESULTS_LIMIT,
-} from "@/lib/search/constants";
+import { PUBLIC_SEARCH_DEBOUNCE_MS } from "@/lib/search/constants";
+import { buildPublicSearchApiUrl } from "@/lib/search/buildPublicSearchApiUrl";
 import { rememberPublicSearchQuery } from "@/lib/search/recentPublicSearch";
 import type { SearchResultItem as SearchResultItemType } from "@/lib/search/types";
 import { SearchInput } from "./SearchInput";
@@ -17,9 +15,12 @@ import { SearchResults } from "./SearchResults";
 export function SearchOverlay({
   open,
   onOpenChange,
+  citySlug,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Active public city slug — attached to /api/search for SearchQueryLog geo. */
+  citySlug?: string | null;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -58,7 +59,7 @@ export function SearchOverlay({
     (async () => {
       try {
         const res = await fetch(
-          `/api/search?q=${encodeURIComponent(trimmed)}&limit=${PUBLIC_SEARCH_RESULTS_LIMIT}`,
+          buildPublicSearchApiUrl({ q: trimmed, citySlug }),
           { credentials: "include", cache: "no-store" },
         );
         if (!res.ok || cancelled) return;
@@ -74,7 +75,7 @@ export function SearchOverlay({
     return () => {
       cancelled = true;
     };
-  }, [open, trimmed]);
+  }, [open, trimmed, citySlug]);
 
   const close = useCallback(() => {
     onOpenChange(false);
