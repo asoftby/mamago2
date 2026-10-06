@@ -9,7 +9,7 @@
 
 | Джоб | Маршрут | Что делает |
 |---|---|---|
-| `inbox-recover` | `GET /api/cron/inbox-recover` | `InboxItem` в `RECEIVED`/`PROCESSING`, у которых `debounceUntil` старше 2 минут, перезапускает через обычный processor. Захват только compare-and-set (параллельные запуски не берут один элемент дважды), терминальные статусы не трогает. До 5 элементов и 45 секунд на запуск, до 3 повторов на элемент (считаются по `RECOVER_ATTEMPT` в `ruleCodes`); после этого `FAILED` с `error = RECOVER_EXHAUSTED`. Если processor бросил ошибку: `FAILED` с `PROCESSOR_ERROR`. |
+| `inbox-recover` | `GET /api/cron/inbox-recover` | `InboxItem` в `RECEIVED`, у которых `debounceUntil` (метка последней активности) старше 2 минут, и в `PROCESSING`, у которых она старше 5 минут (здоровая обработка может идти до ~3 минут, её нельзя перезапускать параллельно), перезапускает через обычный processor. Захват только compare-and-set (параллельные запуски не берут один элемент дважды), терминальные статусы не трогает. До 5 элементов и 45 секунд на запуск, до 3 повторов на элемент (считаются по `RECOVER_ATTEMPT` в `ruleCodes`); после этого `FAILED` с `error = RECOVER_EXHAUSTED`. Если processor бросил ошибку: `FAILED` с `PROCESSOR_ERROR`. |
 | `inbox-purge` | `GET /api/cron/inbox-purge` | Для всех `InboxItem` с `purgeAfter <= now()` (любой статус) обнуляет `InboxItemPart.text`, `InboxItemPart.telegramFileId` (Telegram отдаёт картинку по `file_id` ещё долго) и `InboxItem.draft`; удаляет `InboxItem` старше 30 дней (части уходят каскадом). Идемпотентно, батчами по 200 (до 50 батчей за запуск). |
 
 В ответах и логах только числа и коды: ни текстов сообщений, ни `draft`, ни `chatId`, ни `file_id`.

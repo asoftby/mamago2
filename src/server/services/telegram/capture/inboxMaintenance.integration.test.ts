@@ -8,7 +8,12 @@ import test, { after, before } from "node:test";
 import { PrismaClient, type InboxStatus } from "@prisma/client";
 import type { InboxProcessor } from "./inboxProcessor";
 import { purgeInbox } from "./inboxPurge";
-import { recoverInbox, RECOVER_ATTEMPT_CODE } from "./inboxRecover";
+import {
+  recoverInbox,
+  RECOVER_ATTEMPT_CODE,
+  RECOVER_STALE_AFTER_PROCESSING_MS,
+  RECOVER_STALE_AFTER_RECEIVED_MS,
+} from "./inboxRecover";
 
 const db = new PrismaClient();
 const run = randomUUID().slice(0, 8);
@@ -229,14 +234,16 @@ function fakeProcessor(over: { onProcess?: (id: string) => Promise<void> } = {})
 }
 
 const stale = () => new Date(Date.now() - 3 * MIN);
+const staleProcessing = () => new Date(Date.now() - 6 * MIN);
 const farFuture = new Date(Date.now() + 7 * DAY);
 
 test("recover: only old RECEIVED/PROCESSING items are picked up; fresh and terminal ones are untouched", async () => {
   const userId = await makeUser("rec-select");
   const oldReceived = await makeItem({ userId, status: "RECEIVED", purgeAfter: farFuture, debounceUntil: stale() });
-  const oldProcessing = await makeItem({ userId, status: "PROCESSING", purgeAfter: farFuture, debounceUntil: stale() });
+  const oldProcessing = await makeItem({ userId, status: "PROCESSING", purgeAfter: farFuture, debounceUntil: staleProcessing() });
   const freshReceived = await makeItem({ userId, status: "RECEIVED", purgeAfter: farFuture, debounceUntil: new Date(Date.now() - 30_000) });
   const freshProcessing = await makeItem({ userId, status: "PROCESSING", purgeAfter: farFuture, debounceUntil: new Date() });
+  const midProcessing = await makeItem({ userId, status: "PROCESSING", purgeAfter: farFuture, debounceUntil: stale() });
   const terminal = await Promise.all(
     (["DRAFT_READY", "FAILED", "CONFIRMED", "DISCARDED"] as const).map((status) =>
       makeItem({ userId, status, purgeAfter: farFuture, debounceUntil: stale() }),
@@ -251,11 +258,13 @@ test("recover: only old RECEIVED/PROCESSING items are picked up; fresh and termi
   assert.ok(calls.includes(oldProcessing.id));
   assert.ok(!calls.includes(freshReceived.id));
   assert.ok(!calls.includes(freshProcessing.id));
+  assert.ok(!calls.includes(midProcessing.id), "a PROCESSING item idle for only 3 minutes may still be running");
   for (const item of terminal) assert.ok(!calls.includes(item.id));
 
   assert.equal((await reload(oldReceived.id))!.status, "DRAFT_READY");
   assert.equal((await reload(freshReceived.id))!.status, "RECEIVED");
   assert.equal((await reload(freshProcessing.id))!.status, "PROCESSING");
+  assert.equal((await reload(midProcessing.id))!.status, "PROCESSING");
   for (const item of terminal) assert.equal((await reload(item.id))!.status, item.status);
 });
 
@@ -286,9 +295,9 @@ test("recover: concurrent runs never process the same item twice", async () => {
 
 test("recover: a stuck item is retried up to the cap, then FAILED with RECOVER_EXHAUSTED", async () => {
   const userId = await makeUser("rec-cap");
-  const item = await makeItem({ userId, status: "PROCESSING", purgeAfter: farFuture, debounceUntil: stale() });
+  const item = await makeItem({ userId, status: "PROCESSING", purgeAfter: farFuture, debounceUntil: staleProcessing() });
   const stuck = fakeProcessor({ onProcess: async () => undefined });
-  const age = async () => db.inboxItem.update({ where: { id: item.id }, data: { debounceUntil: stale() } });
+  const age = async () => db.inboxItem.update({ where: { id: item.id }, data: { debounceUntil: staleProcessing() } });
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     await age();
@@ -348,4 +357,41 @@ test("recover: respects the per-run item limit and the run deadline", async () =
   assert.equal(deadline.deadlineHit, true);
   assert.ok(rest.calls.length <= 2);
   void items;
+});
+
+test("recover thresholds are 2 minutes for RECEIVED and 5 minutes for PROCESSING", () => {
+  assert.equal(RECOVER_STALE_AFTER_RECEIVED_MS, 2 * MIN);
+  assert.equal(RECOVER_STALE_AFTER_PROCESSING_MS, 5 * MIN);
+});
+
+test("recover boundaries are inclusive: exactly at the threshold is recovered, one millisecond younger is not", async () => {
+  const userId = await makeUser("rec-bound");
+  const now = new Date();
+  const clock = () => now;
+  const at = (ms: number) => new Date(now.getTime() - ms);
+
+  const receivedAt = await makeItem({ userId, status: "RECEIVED", purgeAfter: farFuture, debounceUntil: at(2 * MIN) });
+  const receivedYounger = await makeItem({ userId, status: "RECEIVED", purgeAfter: farFuture, debounceUntil: at(2 * MIN - 1) });
+  const processingAt = await makeItem({ userId, status: "PROCESSING", purgeAfter: farFuture, debounceUntil: at(5 * MIN) });
+  const processingYounger = await makeItem({ userId, status: "PROCESSING", purgeAfter: farFuture, debounceUntil: at(5 * MIN - 1) });
+  const processingAtReceivedLimit = await makeItem({ userId, status: "PROCESSING", purgeAfter: farFuture, debounceUntil: at(2 * MIN) });
+
+  const { processor, calls } = fakeProcessor();
+  await recoverInbox({ db, processor, now: clock, maxItemsPerRun: 100 });
+
+  assert.ok(calls.includes(receivedAt.id), "RECEIVED at exactly 2 minutes");
+  assert.ok(!calls.includes(receivedYounger.id), "RECEIVED 1 ms younger than 2 minutes");
+  assert.ok(calls.includes(processingAt.id), "PROCESSING at exactly 5 minutes");
+  assert.ok(!calls.includes(processingYounger.id), "PROCESSING 1 ms younger than 5 minutes");
+  assert.ok(!calls.includes(processingAtReceivedLimit.id), "PROCESSING is not governed by the RECEIVED threshold");
+});
+
+test("recover thresholds can be overridden per status", async () => {
+  const userId = await makeUser("rec-override");
+  const received = await makeItem({ userId, status: "RECEIVED", purgeAfter: farFuture, debounceUntil: new Date(Date.now() - 20_000) });
+  const processing = await makeItem({ userId, status: "PROCESSING", purgeAfter: farFuture, debounceUntil: new Date(Date.now() - 20_000) });
+  const { processor, calls } = fakeProcessor();
+  await recoverInbox({ db, processor, staleAfterReceivedMs: 10_000, staleAfterProcessingMs: 60_000, maxItemsPerRun: 100 });
+  assert.ok(calls.includes(received.id));
+  assert.ok(!calls.includes(processing.id));
 });

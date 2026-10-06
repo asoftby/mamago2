@@ -4,8 +4,10 @@ import type { InboxProcessor } from "./inboxProcessor";
 
 /**
  * Safety net for the after-response processing (forward-to-plan spec v1.3,
- * section 11): picks up InboxItems stuck in RECEIVED/PROCESSING for more than
- * two minutes and runs the normal processor on them again.
+ * section 11): picks up InboxItems stuck in RECEIVED for more than two
+ * minutes, or in PROCESSING for more than five, and runs the normal processor
+ * on them again. A PROCESSING item gets the longer threshold because a healthy
+ * run (several model calls, up to ~3 minutes) must not be restarted in parallel.
  *
  *  - Only compare-and-set transitions: a recovery claims an item by moving its
  *    `debounceUntil` (last-activity marker) forward, so concurrent runs cannot
@@ -15,7 +17,8 @@ import type { InboxProcessor } from "./inboxProcessor";
  *    cannot be processed ends as FAILED with a machine code.
  *  - Reports counts only; never logs message content.
  */
-export const RECOVER_STALE_AFTER_MS = 2 * 60 * 1000;
+export const RECOVER_STALE_AFTER_RECEIVED_MS = 2 * 60 * 1000;
+export const RECOVER_STALE_AFTER_PROCESSING_MS = 5 * 60 * 1000;
 export const RECOVER_MAX_ITEMS_PER_RUN = 5;
 export const RECOVER_MAX_ATTEMPTS = 3;
 /** No new item is started after this; the runner's curl limit is 240 s and one item can take ~3 min worst case. */
@@ -34,7 +37,8 @@ export type InboxRecoverDeps = {
   db: Pick<PrismaClient, "inboxItem" | "inboxItemPart" | "$transaction">;
   processor: InboxProcessor;
   now?: () => Date;
-  staleAfterMs?: number;
+  staleAfterReceivedMs?: number;
+  staleAfterProcessingMs?: number;
   maxItemsPerRun?: number;
   maxAttempts?: number;
   deadlineMs?: number;
@@ -43,16 +47,25 @@ export type InboxRecoverDeps = {
 export async function recoverInbox(deps: InboxRecoverDeps): Promise<InboxRecoverResult> {
   const { db, processor } = deps;
   const now = deps.now ?? (() => new Date());
-  const staleAfterMs = deps.staleAfterMs ?? RECOVER_STALE_AFTER_MS;
+  const staleAfterReceivedMs = deps.staleAfterReceivedMs ?? RECOVER_STALE_AFTER_RECEIVED_MS;
+  const staleAfterProcessingMs = deps.staleAfterProcessingMs ?? RECOVER_STALE_AFTER_PROCESSING_MS;
   const maxItems = deps.maxItemsPerRun ?? RECOVER_MAX_ITEMS_PER_RUN;
   const maxAttempts = deps.maxAttempts ?? RECOVER_MAX_ATTEMPTS;
   const deadlineMs = deps.deadlineMs ?? RECOVER_DEADLINE_MS;
 
   const startedAt = now().getTime();
-  const staleBefore = new Date(startedAt - staleAfterMs);
+  const staleBefore = {
+    RECEIVED: new Date(startedAt - staleAfterReceivedMs),
+    PROCESSING: new Date(startedAt - staleAfterProcessingMs),
+  } as const;
 
   const candidates = await db.inboxItem.findMany({
-    where: { status: { in: ["RECEIVED", "PROCESSING"] }, debounceUntil: { lte: staleBefore } },
+    where: {
+      OR: [
+        { status: "RECEIVED", debounceUntil: { lte: staleBefore.RECEIVED } },
+        { status: "PROCESSING", debounceUntil: { lte: staleBefore.PROCESSING } },
+      ],
+    },
     select: { id: true, status: true, ruleCodes: true },
     orderBy: { createdAt: "asc" },
     take: maxItems,
@@ -77,10 +90,12 @@ export async function recoverInbox(deps: InboxRecoverDeps): Promise<InboxRecover
       continue;
     }
 
+    const threshold = candidate.status === "RECEIVED" ? staleBefore.RECEIVED : staleBefore.PROCESSING;
+
     // Claim: the stale predicate is re-checked, and moving debounceUntil makes
     // the same predicate false for any concurrent runner.
     const claimed = await db.inboxItem.updateMany({
-      where: { id: candidate.id, status: candidate.status, debounceUntil: { lte: staleBefore } },
+      where: { id: candidate.id, status: candidate.status, debounceUntil: { lte: threshold } },
       data: { status: "PROCESSING", debounceUntil: now(), ruleCodes: { push: RECOVER_ATTEMPT_CODE } },
     });
     if (claimed.count !== 1) {
