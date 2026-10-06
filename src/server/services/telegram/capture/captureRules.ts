@@ -33,6 +33,7 @@ export const RULE_CODES = {
   placeIdRejected: "PLACE_ID_REJECTED",
   placeAutoExact: "PLACE_AUTO_EXACT",
   escalateInvalidJson: "ESCALATE_INVALID_JSON",
+  escalateBadResponse: "ESCALATE_BAD_RESPONSE",
   escalateEventDate: "ESCALATE_EVENT_DATE",
   escalateMatch: "ESCALATE_MATCH",
   duplicateFound: "DUPLICATE_FOUND",
