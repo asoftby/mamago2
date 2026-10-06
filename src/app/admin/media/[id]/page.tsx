@@ -136,14 +136,6 @@ export default async function AdminMediaDetailPage({
         </div>
       </div>
 
-      {/* Back Link */}
-      <Link
-        href="/admin/media"
-        className="text-sm text-blue-600 hover:text-blue-700 inline-block"
-      >
-        ← Назад к медиатеке
-      </Link>
-
       {/* Metadata Editor and Actions */}
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Left Column - Preview and Usage (2 columns) */}

@@ -4,12 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Role, UserStatus, UserModerationActionType } from "@/types/admin";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDistanceToNow, format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { UserModerationForm } from "@/components/admin/users/UserModerationForm";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 type ContentStatus =
   | "DRAFT"
@@ -408,18 +407,10 @@ export function UserDetailsClient({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
-      <div className="flex items-start gap-3 sm:items-center sm:gap-4">
-        <Link href="/admin/users">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Назад
-          </Button>
-        </Link>
-        <div className="min-w-0">
-          <h1 className="truncate text-xl font-bold sm:text-2xl">
-            {user.displayName || "Пользователь"}
-          </h1>
-        </div>
+      <div className="min-w-0">
+        <h1 className="truncate text-xl font-bold sm:text-2xl">
+          {user.displayName || "Пользователь"}
+        </h1>
       </div>
 
       <Card>
