@@ -20,6 +20,7 @@ export function coalesceActivityBusinessIdFromPlace(
   return place?.ownerBusinessId ?? previousBusinessId ?? null;
 }
 
+
 export function isActivityBusinessIdAlignedWithPlace(
   place: { ownerBusinessId: string | null } | null | undefined,
   activityBusinessId: string | null,

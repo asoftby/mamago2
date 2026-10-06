@@ -46,6 +46,7 @@ jobs:
         run: |
           pnpm exec tsx src/lib/auth/businessEventAuthorizationWiring.test.ts
           pnpm exec tsx src/lib/auth/businessAuthorizationArchitecture.test.ts
+          pnpm test:business-event-access
 
       - name: Type check
         run: pnpm tsc --noEmit
@@ -141,6 +142,7 @@ jobs:
       - name: Admin responsive regressions
         run: |
           pnpm test:responsive-admin
+          pnpm test:admin-user-360
           pnpm exec tsx src/components/admin/ui/AdminFilterTabs.contract.test.ts
           pnpm exec tsx src/app/admin/commercial/contracts/contractWizard.contract.test.ts
 
