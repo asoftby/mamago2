@@ -206,6 +206,7 @@ export function SeoPagesClient({
         body: JSON.stringify({ index }),
       });
       if (!res.ok) throw new Error("Failed");
+      router.refresh();
     } catch {
       setRows((prev) =>
         prev.map((r) => (r.id === row.id ? snapshot : r)),

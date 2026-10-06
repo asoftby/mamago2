@@ -38,4 +38,22 @@ assert.match(searchPage, /redirect\(/);
 assert.doesNotMatch(contentPage, /SeoContentFoundationClient/);
 assert.doesNotMatch(searchPage, /SeoSearchFoundationClient/);
 
+const pagesClient = readFileSync(
+  join(root, "src/components/admin/seo/SeoPagesClient.tsx"),
+  "utf8",
+);
+assert.match(pagesClient, /router\.refresh\(\)/);
+assert.match(
+  readFileSync(join(root, "src/app/admin/seo/pages/page.tsx"), "utf8"),
+  /firstSearchParam/,
+);
+assert.match(
+  readFileSync(join(root, "src/lib/admin/seo/data/seoAdminData.ts"), "utf8"),
+  /countEntityRows/,
+);
+assert.match(
+  readFileSync(join(root, "src/lib/admin/seo/entities/service.ts"), "utf8"),
+  /planProviderPageWindows/,
+);
+
 console.log("seo indexation/foundation contract: PASS");

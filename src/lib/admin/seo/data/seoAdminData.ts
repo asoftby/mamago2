@@ -197,8 +197,8 @@ export function matchesSeoPageSearch(row: SeoPage, q: string): boolean {
 }
 
 /**
- * Aggregate entity SEO pages (no provider take-limit), apply geo + filters,
- * then paginate with shared admin pagination helpers.
+ * In-memory pagination helper for contract tests (and overview-style aggregates).
+ * Production SEO Pages list uses bounded provider count/list APIs instead.
  */
 export function buildSeoPagesListResult(
   allRows: SeoPage[],
@@ -237,12 +237,51 @@ export function buildSeoPagesListResult(
   };
 }
 
+/**
+ * Bounded SEO Pages listing: provider countRows + listRowsPage with
+ * registry-order concat windows (event→place→offer→route→article).
+ * Does not materialize the full catalog for a single page request.
+ */
 export async function getSeoPagesList(
   geoContext: SeoGeoContext,
   query: SeoPagesListQuery = {},
 ): Promise<SeoPagesListResult> {
-  const allRows = await getSeoPages();
-  return buildSeoPagesListResult(allRows, geoContext, query);
+  const { countEntityRows, listEntityRowsPage } = await import(
+    "@/lib/admin/seo/entities/service"
+  );
+  const q = query.q?.trim() ?? "";
+  const type = query.type ?? "all";
+  const indexation = query.indexation ?? "all";
+  const pageSize = parseSeoPagesPageSize(
+    query.pageSize != null ? String(query.pageSize) : null,
+  );
+  const filters = {
+    geoContext,
+    q: q || undefined,
+    indexation,
+  };
+
+  const counted = await countEntityRows({ filters, type });
+  const pagination = getAdminPagination({
+    page: query.page ?? 1,
+    total: counted.total,
+    pageSize,
+  });
+
+  const pagePass = await listEntityRowsPage({
+    filters,
+    type,
+    skip: pagination.skip,
+    take: pagination.take,
+    counts: counted.counts,
+    providers: counted.providers,
+  });
+
+  return {
+    items: pagePass.rows,
+    pagination,
+    filters: { q, type, indexation, pageSize },
+  };
 }
 
 export interface RedirectCenterQuery {

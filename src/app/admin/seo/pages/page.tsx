@@ -3,6 +3,7 @@ import { SeoPageHeader } from "@/components/admin/seo/primitives/SeoPageHeader";
 import { getSeoPagesList } from "@/lib/admin/seo/data/seoAdminData";
 import { formatSeoGeoContextBreadcrumb } from "@/lib/admin/seo/geo";
 import { resolveSeoGeoSession } from "@/lib/admin/seo/geo/resolveSeoGeoSession";
+import { firstSearchParam } from "@/lib/admin/firstSearchParam";
 import { parseAdminPage } from "@/lib/admin/pagination";
 import { parseSeoPagesPageSize } from "@/lib/admin/seoNavConfig";
 import type {
@@ -28,34 +29,47 @@ const INDEXATION = new Set<SeoPageIndexationStatus>([
 
 interface PageProps {
   searchParams: Promise<{
-    page?: string;
-    pageSize?: string;
-    q?: string;
-    type?: string;
-    indexation?: string;
+    page?: string | string[];
+    pageSize?: string | string[];
+    q?: string | string[];
+    type?: string | string[];
+    indexation?: string | string[];
   }>;
 }
 
 export default async function AdminSeoPagesPage({ searchParams }: PageProps) {
-  const params = await searchParams;
+  const raw = await searchParams;
   const { context } = await resolveSeoGeoSession();
 
+  const pageRaw = firstSearchParam(raw.page);
+  const pageSizeRaw = firstSearchParam(raw.pageSize);
+  const q = firstSearchParam(raw.q);
+  const typeRaw = firstSearchParam(raw.type);
+  const indexationRaw = firstSearchParam(raw.indexation);
+
   const type =
-    params.type && ENTITY_TYPES.has(params.type as SeoPageType)
-      ? (params.type as SeoPageType)
+    typeRaw && ENTITY_TYPES.has(typeRaw as SeoPageType)
+      ? (typeRaw as SeoPageType)
       : "all";
   const indexation =
-    params.indexation && INDEXATION.has(params.indexation as SeoPageIndexationStatus)
-      ? (params.indexation as SeoPageIndexationStatus)
+    indexationRaw && INDEXATION.has(indexationRaw as SeoPageIndexationStatus)
+      ? (indexationRaw as SeoPageIndexationStatus)
       : "all";
 
   const list = await getSeoPagesList(context, {
-    page: parseAdminPage(params.page),
-    pageSize: parseSeoPagesPageSize(params.pageSize),
-    q: params.q,
+    page: parseAdminPage(pageRaw),
+    pageSize: parseSeoPagesPageSize(pageSizeRaw),
+    q,
     type,
     indexation,
   });
+
+  const currentParams: Record<string, string | undefined> = {
+    ...(q ? { q } : {}),
+    ...(type !== "all" ? { type } : {}),
+    ...(indexation !== "all" ? { indexation } : {}),
+    pageSize: String(list.filters.pageSize),
+  };
 
   return (
     <div className="space-y-8">
@@ -67,7 +81,7 @@ export default async function AdminSeoPagesPage({ searchParams }: PageProps) {
         initialRows={list.items}
         pagination={list.pagination}
         filters={list.filters}
-        currentParams={params}
+        currentParams={currentParams}
       />
     </div>
   );
