@@ -5144,3 +5144,23 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Reason deferred: invites no longer expire, so an unused link occupies one of 3 slots until accepted or revoked (revoke is in the profile UI, M5b).
 - Acceptance criteria: decide whether to show "created N days ago" with a prompt to revoke old links or to auto-archive links older than a threshold.
 - Source: Family invite no-expiry change.
+
+## [BACKLOG-172] Media pipeline: native server-side HEIC/HEIF decoding and removal of mandatory browser conversion
+
+- Status: OPEN
+- Priority: P2
+- Area: Media / Upload pipeline
+- Added: 2026-10-06
+- Reason deferred: current production-safe architecture normalizes browser HEIC/HEIF to JPEG in `uploadMediaFile()` before upload because the deployed `sharp/libvips` image has no HEVC decoder. The boundary is centralized and guarded against raw HEIC pass-through, but server-to-server paths and direct API clients cannot rely on a browser/WASM converter.
+- Context: the final architecture should accept real HEIC/HEIF as a first-class input on the backend, detect the actual format from bytes, decode it in the canonical media pipeline, and then generate the same WebP/responsive derivatives as JPEG/PNG/WebP/GIF/AVIF. This must cover browser uploads, direct API clients, remote-image imports, Telegram ingestion and a future native app without format-specific UI workarounds.
+- Acceptance criteria:
+  - the production media runtime has a supported HEIC/HEIF decoder (HEVC-capable `libvips/sharp` build or a dedicated media-decoding service) and its capability is verified during build/startup;
+  - `/api/upload`, `/api/upload/wizard`, `/api/upload/v2` and server-side/import upload paths accept raw HEIC/HEIF through one byte-sniffed validation/processing contract;
+  - raw file bytes, declared MIME and filename cannot disagree silently; spoofed metadata/byte mismatches fail before decode, while corrupt or unsupported image payloads may fail during decode but always fail before storage with a stable user-facing error;
+  - real iPhone HEIC fixtures (including modern HDR/variant files that previously reached the missing-HEVC path) are covered by an automated integration/smoke test;
+  - JPEG/PNG/WebP/GIF/AVIF behavior, deduplication, EXIF orientation, size limits and responsive derivative generation remain regression-tested;
+  - browser-side HEIC→JPEG conversion becomes optional compatibility fallback or is removed entirely once server support is proven; no page/wizard contains its own HEIC allow/deny logic;
+  - API/docs MIME contract matches reality: HEIC/HEIF is advertised as accepted only while the deployed backend can actually decode it;
+  - logs/metrics distinguish decode failures, unsupported/corrupt files and resource-limit failures without exposing `sharp/libheif` internals to users.
+- Exit criterion: one raw HEIC file can be uploaded successfully through browser UI, direct API and one server-side ingestion path, all producing the same canonical MediaAsset/derivatives without any client-side conversion requirement.
+- Source: HEIC incidents and fixes #441, #448, #455.
