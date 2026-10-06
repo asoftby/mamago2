@@ -41,7 +41,7 @@ interface BusinessAccess {
     name: string;
     legalName: string | null;
     verificationStatus: "DRAFT" | "PENDING" | "NEEDS_INFO" | "APPROVED" | "REJECTED";
-    operationalStatus: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+    operationalStatus: "ACTIVE" | "DISABLED" | "ARCHIVED";
   } | null;
 }
 
@@ -91,7 +91,7 @@ const STATUS_LABELS: Record<UserStatus, string> = {
   PENDING_ACTIVATION: "Ожидает активации",
   ACTIVE: "Активен",
   LIMITED: "Ограничен",
-  SUSPENDED: "Приостановлен",
+  DISABLED: "Отключён",
   BANNED: "Заблокирован",
 };
 
