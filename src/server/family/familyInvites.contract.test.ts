@@ -21,6 +21,9 @@ const svc = read("src/server/family/familyInvite.service.ts");
 assert.equal((svc.match(/assertEnabled\(deps\)/g) ?? []).length, 3, "all three services are flag-gated");
 assert.match(svc, /FOR UPDATE/);
 assert.match(svc, /consent_required/);
+// Accept reuses the idempotent consent writer shared with preview (no duplicate ConsentRecord).
+assert.match(svc, /recordFamilySharedDataConsent\(tx,/);
+assert.doesNotMatch(svc, /consentRecord\.create\(/, "accept writes consent only through the shared helper");
 
 // M5a wires the services into /api/family/* only (routes below are the sole consumers).
 import { execSync } from "node:child_process";
