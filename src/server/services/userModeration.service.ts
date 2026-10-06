@@ -106,6 +106,20 @@ export async function getUserWithDetails(userId: string) {
     updatedAt: true,
   } satisfies Prisma.BusinessSelect;
 
+  type BusinessRelationSummary = {
+    id: string;
+    name: string;
+    legalName: string | null;
+    verificationStatus: "DRAFT" | "PENDING" | "APPROVED" | "REJECTED" | "NEEDS_INFO";
+    operationalStatus: "ACTIVE" | "DISABLED" | "ARCHIVED";
+    createdAt: Date;
+    updatedAt: Date;
+    membershipRole: BusinessMemberRole;
+    membershipActive: boolean;
+    memberTitle: string | null;
+    relation: "OWNER" | "MEMBER" | "OWNER_WITHOUT_MEMBERSHIP";
+  };
+
   const [memberships, ownedBusiness] = await Promise.all([
     prisma.businessMember.findMany({
       where: { userId },
@@ -124,7 +138,7 @@ export async function getUserWithDetails(userId: string) {
     }),
   ]);
 
-  const businessRelations = memberships.map((membership) => ({
+  const businessRelations: BusinessRelationSummary[] = memberships.map((membership) => ({
     ...membership.business,
     membershipRole: membership.role,
     membershipActive: membership.isActive,
@@ -310,6 +324,21 @@ export async function getUserWithDetails(userId: string) {
       : Promise.resolve([]),
   ]);
 
+  const bookingStatusLabel: Record<string, string> = {
+    NEW: "Новая",
+    CONFIRMED: "Подтверждена",
+    REJECTED: "Отклонена",
+    CANCELLED: "Отменена",
+    COMPLETED: "Завершена",
+  };
+  const verificationStatusLabel: Record<string, string> = {
+    DRAFT: "Черновик",
+    PENDING: "На проверке",
+    APPROVED: "Одобрен",
+    REJECTED: "Отклонён",
+    NEEDS_INFO: "Нужны данные",
+  };
+
   const recentActions = [
     ...(user.lastLoginAt
       ? [
@@ -349,7 +378,7 @@ export async function getUserWithDetails(userId: string) {
         booking.offer?.title ??
         booking.place?.title ??
         "Заявка",
-      detail: `Заявка · ${booking.status}`,
+      detail: `Заявка · ${bookingStatusLabel[booking.status] ?? booking.status}`,
       href: null,
       at: booking.createdAt,
     })),
@@ -365,7 +394,7 @@ export async function getUserWithDetails(userId: string) {
       id: `verification-${log.id}`,
       kind: "BUSINESS" as const,
       title: log.business.legalName || log.business.name,
-      detail: `Верификация бизнеса: ${log.statusFrom} → ${log.statusTo}`,
+      detail: `Верификация бизнеса: ${verificationStatusLabel[log.statusFrom] ?? log.statusFrom} → ${verificationStatusLabel[log.statusTo] ?? log.statusTo}`,
       href: `/admin/b2b/partners/${log.businessId}`,
       at: log.createdAt,
     })),
