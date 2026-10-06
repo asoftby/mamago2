@@ -18,6 +18,7 @@ import {
   PublicationType,
 } from "@prisma/client";
 import { notifyBookingCreated } from "@/server/services/notification.service";
+import { resolveBookingPlanItem } from "@/server/family/planBooking.service";
 import { trackBookingCreated } from "@/server/analytics/trackBookingEvent";
 import {
   getPublicActivityDetailWhere,
@@ -64,6 +65,8 @@ export interface CreatePublicBookingInput {
   adultsCount?: number;
   childrenCount?: number;
   userId?: string | null;
+  /** Family Core M6: plan item the booking is made for (must be visible to the user). */
+  planItemId?: string | null;
 }
 
 export interface CreateBookingResult {
@@ -73,6 +76,7 @@ export interface CreateBookingResult {
 
 interface BookingSideEffectsContext {
   bookingId: string;
+  planItemId?: string | null;
   userId: string | null;
   entityType: "EVENT" | "OFFER" | "PLACE";
   entityId: string;
@@ -196,6 +200,8 @@ function triggerBookingCreatedSideEffects(context: BookingSideEffectsContext): v
       shiftTitle: context.campShiftTitle ?? null,
       source: "detail",
       surface: "web",
+      // Family Core M6: lets the "make private" rule see another adult's booking.
+      ...(context.planItemId ? { planItemId: context.planItemId } : {}),
     },
   });
 
@@ -286,6 +292,17 @@ export async function createPublicBooking(
     throw new BookingValidationError("adultsCount", "Нужно указать хотя бы одного участника");
   }
 
+  const planLink = await resolveBookingPlanItem({
+    userId: input.userId,
+    planItemId: input.planItemId,
+    publicationType: input.publicationType,
+    publicationId: input.publicationId,
+    requestedDate: requestedDate ?? null,
+  });
+  if (planLink.invalid) {
+    throw new BookingValidationError("planItemId", "Запись плана недоступна");
+  }
+
   if (input.selectedSessionId && input.publicationType !== PublicationType.EVENT) {
     throw new BookingValidationError(
       "selectedSessionId",
@@ -343,6 +360,7 @@ export async function createPublicBooking(
     }
 
     const result = await createBookingWithInitialActivity({
+      planItemId: planLink.planItemId ?? undefined,
       businessId: activity.businessId,
       userId: input.userId ?? undefined,
       publicationType: PublicationType.EVENT,
@@ -361,6 +379,7 @@ export async function createPublicBooking(
     });
 
     triggerBookingCreatedSideEffects({
+      planItemId: planLink.planItemId,
       bookingId: result.bookingId,
       userId: input.userId ?? null,
       entityType: "EVENT",
@@ -443,6 +462,7 @@ export async function createPublicBooking(
     }
 
     const result = await createBookingWithInitialActivity({
+      planItemId: planLink.planItemId ?? undefined,
       businessId: offer.place.ownerBusinessId,
       userId: input.userId ?? undefined,
       publicationType: PublicationType.OFFER,
@@ -459,6 +479,7 @@ export async function createPublicBooking(
     });
 
     triggerBookingCreatedSideEffects({
+      planItemId: planLink.planItemId,
       bookingId: result.bookingId,
       userId: input.userId ?? null,
       entityType: "OFFER",
@@ -527,6 +548,7 @@ export async function createPublicBooking(
   }
 
   const result = await createBookingWithInitialActivity({
+    planItemId: planLink.planItemId ?? undefined,
     businessId: place.ownerBusinessId,
     userId: input.userId ?? undefined,
     publicationType: PublicationType.PLACE,
@@ -542,7 +564,8 @@ export async function createPublicBooking(
     status: BookingStatus.NEW,
   });
 
-    triggerBookingCreatedSideEffects({
+  triggerBookingCreatedSideEffects({
+    planItemId: planLink.planItemId,
     bookingId: result.bookingId,
     userId: input.userId ?? null,
     entityType: "PLACE",

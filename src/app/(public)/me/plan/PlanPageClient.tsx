@@ -11,6 +11,7 @@ import {
   type FamilyView,
   type PlanScopeFilter,
 } from "@/features/my-plan/lib/planVisibilityView";
+import type { PlanBookingState } from "@/server/family/planBookingPure";
 import { Container } from "@/components/ui/Container";
 import { WeekCalendar } from "./WeekCalendar";
 import { PlanDayList } from "./PlanDayList";
@@ -40,6 +41,8 @@ export type SerializedPlanItem = {
   visibility?: "PRIVATE" | "FAMILY";
   authorId?: string;
   authorName?: string | null;
+  /** Family Core M6: safe booking state (never contains contacts). */
+  booking?: PlanBookingState | null;
   /** Version for edit-conflict checks (ISO). */
   updatedAt?: string;
   planAvailability?: PlanActivityPublicAvailability;

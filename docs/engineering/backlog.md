@@ -5165,6 +5165,16 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Exit criterion: one raw HEIC file can be uploaded successfully through browser UI, direct API and one server-side ingestion path, all producing the same canonical MediaAsset/derivatives without any client-side conversion requirement.
 - Source: HEIC incidents and fixes #441, #448, #455.
 
+## [BACKLOG-174] Family Core M6: booking UI entry points do not pass `planItemId`
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Bookings
+- Added: 2026-10-06
+- Reason deferred: `POST /api/public/bookings` accepts an optional `planItemId` (must be visible to the booker), and otherwise auto-links when exactly one not-yet-booked plan item of the same event/place (and date, if given) exists for the booker's family scope. Booking forms, offers (PlanItem has no `offerId`) and camp-shift bookings do not pass it, so ambiguous cases stay unlinked. There is no parent-side cancel flow at all today (status changes are business-only), so "only the booker can cancel" holds by construction; a future parent cancel must check `BookingRequest.userId`.
+- Acceptance criteria: plan card "Забронировать" passes `planItemId`; booking forms started from the plan forward it; offers/camp shifts decide how to map to plan items; a parent cancel action (if added) is limited to the booker and covered by a test.
+- Source: Family Core M6.
+
 ## [BACKLOG-173] Family Core M3a: consent text, owner question about history access, simplified onboarding
 
 - Status: OPEN
