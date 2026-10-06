@@ -91,7 +91,7 @@ const STATUS_LABELS: Record<UserStatus, string> = {
   PENDING_ACTIVATION: "Ожидает активации",
   ACTIVE: "Активен",
   LIMITED: "Ограничен",
-  DISABLED: "Отключён",
+  SUSPENDED: "Приостановлен",
   BANNED: "Заблокирован",
 };
 
@@ -130,7 +130,7 @@ const BUSINESS_OPERATIONAL_LABELS: Record<
   string
 > = {
   ACTIVE: "Активен",
-  SUSPENDED: "Приостановлен",
+  DISABLED: "Отключён",
   ARCHIVED: "Архив",
 };
 
