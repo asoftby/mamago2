@@ -609,6 +609,7 @@ model PlanItem {
   /// CHECK: visibility=PRIVATE и status=PROPOSED одновременно запрещены (см. миграцию).
   status            PlanDecisionStatus        @default(CONFIRMED)
   family            Family?                   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  bookingRequests   BookingRequest[]
   activity          Activity?                 @relation(fields: [activityId], references: [id])
   route             Route?                    @relation(fields: [routeId], references: [id])
   place             Place?                    @relation("PlanItemToPlace", fields: [placeId], references: [id])
@@ -5307,9 +5308,13 @@ model BookingRequest {
   /// Время ответа в минутах (diff firstResponseAt − createdAt)
   responseTimeMinutes Int?
 
+  /// Family Core M6: запись плана, под которую оформлена бронь (видна семье только как безопасный статус).
+  planItemId String?
+
   // Relations
   business     Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
   user         User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  planItem     PlanItem?         @relation(fields: [planItemId], references: [id], onDelete: SetNull)
   activity     Activity?         @relation(fields: [activityId], references: [id], onDelete: SetNull)
   offer        Offer?            @relation(fields: [offerId], references: [id], onDelete: SetNull)
   place        Place?            @relation(fields: [placeId], references: [id], onDelete: SetNull)
@@ -5325,6 +5330,7 @@ model BookingRequest {
   @@index([placeId])
   @@index([selectedSessionId])
   @@index([campShiftId])
+  @@index([planItemId])
   @@index([status])
   @@index([requestedDate])
   @@index([createdAt])

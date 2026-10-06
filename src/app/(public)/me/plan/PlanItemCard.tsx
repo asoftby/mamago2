@@ -14,6 +14,7 @@ import {
   visibilityErrorMessage,
   type FamilyView,
 } from "@/features/my-plan/lib/planVisibilityView";
+import { bookingCaption } from "@/server/family/planBookingPure";
 import type { SerializedPlanItem } from "./PlanPageClient";
 
 export type VisibilityChange = (
@@ -179,6 +180,14 @@ export function PlanItemCard({
           {caption && (
             <span className="text-[11px]" style={{ color: "rgba(20,18,16,.62)" }}>
               {caption}
+            </span>
+          )}
+          {item.booking && (
+            <span
+              className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium"
+              style={{ background: "rgba(20,18,16,.06)", color: "rgba(20,18,16,.78)" }}
+            >
+              {bookingCaption(item.booking)}
             </span>
           )}
           {unavailable && (

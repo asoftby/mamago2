@@ -18,6 +18,7 @@ import {
 } from "@/server/services/experience/experience.service";
 import { childScopeFor, activeFamilyUserIds } from "@/server/family/familyAccess";
 import { familyReadsEnabled } from "@/server/family/familyScope";
+import { getPlanBookingStates } from "@/server/family/planBooking.service";
 
 export default async function PlanPage() {
   const user = await getCurrentUser();
@@ -127,6 +128,9 @@ export default async function PlanPage() {
       .map((item) => ({ activityId: item.activityId, date: item.date })),
   );
 
+  // Family Core M6: safe booking state (no contacts) for items with a linked booking.
+  const bookingStates = await getPlanBookingStates(user.id, planItems.map((i) => i.id));
+
   // Serialize plan items (dates need to be strings for client)
   const serializedItems = planItems.map((item) => {
     const sessions = item.activityId
@@ -151,6 +155,7 @@ export default async function PlanPage() {
       visibility: item.visibility ?? ("FAMILY" as const),
       authorId: item.userId,
       authorName: authorNameById.get(item.userId) ?? null,
+      booking: bookingStates.get(item.id) ?? null,
       updatedAt: (item.updatedAt ?? item.createdAt).toISOString(),
       planAvailability: getPlanActivityPublicAvailability(item.activity),
       activity: item.activity
