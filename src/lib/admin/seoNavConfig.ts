@@ -81,3 +81,26 @@ export function isSeoNavActive(pathname: string, itemHref: string): boolean {
 export function isSeoSettingsPath(pathname: string): boolean {
   return pathname.startsWith(SEO_SETTINGS);
 }
+
+/** Entry point for «Настройки SEO» in the main admin sidebar (not the technical sub-items). */
+export const SEO_SETTINGS_ENTRY = {
+  href: `${SEO_SETTINGS}/indexation`,
+  label: "Настройки SEO",
+  description: "Индексация, редиректы, schema.org и AI Search",
+} as const;
+
+/**
+ * Main admin sidebar SEO items: product sections + single settings entry.
+ * Technical settings sub-items stay only in SeoSubNav secondary nav.
+ */
+export function getSeoAdminSidebarItems(): Array<{ label: string; href: string }> {
+  return [
+    ...SEO_PRIMARY_NAV.map((item) => ({ label: item.label, href: item.href })),
+    { label: SEO_SETTINGS_ENTRY.label, href: SEO_SETTINGS_ENTRY.href },
+  ];
+}
+
+/** Geo context is product-scoped; global SEO settings must not imply city filtering. */
+export function shouldShowSeoGeoContextSelector(pathname: string): boolean {
+  return !isSeoSettingsPath(pathname);
+}

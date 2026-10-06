@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   SEO_PRIMARY_NAV,
+  SEO_SETTINGS_ENTRY,
   SEO_SETTINGS_NAV,
   isSeoNavActive,
   isSeoSettingsPath,
@@ -38,7 +39,7 @@ export function SeoSubNav() {
           );
         })}
         <Link
-          href={SEO_SETTINGS_NAV[0]?.href ?? "/admin/seo/settings/indexation"}
+          href={SEO_SETTINGS_ENTRY.href}
           className={cn(
             "relative -mb-px inline-flex items-center rounded-t-md px-3 py-2.5 text-sm font-medium transition-colors",
             settingsOpen
@@ -46,7 +47,7 @@ export function SeoSubNav() {
               : "border border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900",
           )}
         >
-          Настройки SEO
+          {SEO_SETTINGS_ENTRY.label}
         </Link>
       </nav>
 
