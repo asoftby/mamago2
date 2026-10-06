@@ -170,7 +170,9 @@ export async function POST(request: NextRequest) {
     }
 
     const requestedBusinessId: string | null =
-      typeof body.businessId === "string" ? body.businessId : null;
+      typeof body.businessId === "string" && body.businessId.trim().length > 0
+        ? body.businessId.trim()
+        : null;
     let placeOwnerBusinessId: string | null | undefined;
 
     if (typeof mergedPlaceId === "string" && mergedPlaceId.length > 0) {
