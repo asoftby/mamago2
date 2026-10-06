@@ -129,11 +129,15 @@ export class TelegramWebhookService {
     if (!connection || !allowlist.has(connection.userId)) return null;
 
     await this.capture.touchConnection(chatId);
-    const result = await this.capture.receive(
-      planOwnerWithoutFamily(connection.userId),
-      this.capture.getEnvironment(),
-      parsed,
-    );
+    const owner = planOwnerWithoutFamily(connection.userId);
+    const environment = this.capture.getEnvironment();
+
+    const edit = await this.capture.tryEdit(owner, environment, parsed);
+    if (edit) {
+      return edit.afterResponse ? { afterResponse: edit.afterResponse } : {};
+    }
+
+    const result = await this.capture.receive(owner, environment, parsed);
     return result.afterResponse ? { afterResponse: result.afterResponse } : {};
   }
 
