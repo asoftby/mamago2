@@ -127,6 +127,7 @@ model User {
   editedBroadcastRevisions          AdminBroadcastRevision[]         @relation("AdminBroadcastRevisionEditor")
   devTelegramBusinessApplications   DevTelegramBusinessApplication[]
   searchQueryLogs                   SearchQueryLog[]
+  seoContentPlanItems               SeoContentPlanItem[]            @relation("SeoContentPlanCreatedBy")
   createdPages                      Page[]                           @relation("PageCreatedBy")
   updatedPages                      Page[]                           @relation("PageUpdatedBy")
   requestedOfferPlacements          OfferPlacement[]                 @relation("OfferPlacementRequestedBy")
@@ -1069,6 +1070,7 @@ model Region {
   priority  Int        @default(0)
   cities    City[]
   articles  Article[]  @relation("ArticleRegion")
+  seoContentPlanItems SeoContentPlanItem[] @relation("SeoContentPlanRegion")
   articleGeographyTargets ArticleGeographyTarget[] @relation("ArticleAdditionalRegion")
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -1111,6 +1113,8 @@ model City {
   routes                Route[]
   searchQuickTags       SearchQuickTag[]
   searchQueryLogs       SearchQueryLog[]
+  searchDocuments       SearchDocument[]
+  seoContentPlanItems   SeoContentPlanItem[]  @relation("SeoContentPlanCity")
   offers                Offer[]               @relation("OfferCity")
   activitySlugHistories ActivitySlugHistory[]
   placeSlugHistories    PlaceSlugHistory[]
@@ -3187,6 +3191,7 @@ model Article {
 
   ideas     ArticleIdea[]
   planItems PlanItem[]
+  seoContentPlanItems SeoContentPlanItem[] @relation("SeoContentPlanArticle")
 
   /// Partial unique index created via raw SQL migration:
   /// CREATE UNIQUE INDEX ... WHERE "cityId" IS NOT NULL AND "slug" IS NOT NULL
@@ -3285,11 +3290,15 @@ model SearchDocument {
   urlPath     String
   isPublished Boolean          @default(false)
   boost       Float            @default(1)
+  cityId      String?
   updatedAt   DateTime         @updatedAt
   createdAt   DateTime         @default(now())
 
+  city City? @relation(fields: [cityId], references: [id], onDelete: SetNull)
+
   @@unique([entityType, entityId])
   @@index([isPublished])
+  @@index([isPublished, cityId])
 }
 
 enum SearchEntityType {
@@ -5708,6 +5717,65 @@ model SearchSynonym {
   @@index([source])
 }
 
+enum SeoContentPlanStatus {
+  IDEA
+  PLANNED
+  IN_PROGRESS
+  PUBLISHED
+}
+
+enum SeoContentPlanSource {
+  MANUAL
+  INTERNAL_SEARCH
+  SEO_OPPORTUNITY
+}
+
+enum SeoContentPlanPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+/// SEO Content OS plan item — weekly/monthly publication backlog for a geo market.
+model SeoContentPlanItem {
+  id               String                 @id @default(cuid())
+  title            String
+  targetQuery      String?
+  /// Normalized targetQuery for duplicate detection (lowercase trimmed).
+  targetQueryKey   String?
+  geoScope         GeoScope
+  cityId           String?
+  regionId         String?
+  scheduledFor     DateTime?
+  status           SeoContentPlanStatus   @default(IDEA)
+  priority         SeoContentPlanPriority @default(MEDIUM)
+  source           SeoContentPlanSource   @default(MANUAL)
+  sourceQuery      String?
+  articleId        String?
+  notes            String?
+  createdByUserId  String
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  city      City?    @relation("SeoContentPlanCity", fields: [cityId], references: [id], onDelete: SetNull)
+  region    Region?  @relation("SeoContentPlanRegion", fields: [regionId], references: [id], onDelete: SetNull)
+  article   Article? @relation("SeoContentPlanArticle", fields: [articleId], references: [id], onDelete: SetNull)
+  createdBy User     @relation("SeoContentPlanCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([geoScope])
+  @@index([cityId])
+  @@index([regionId])
+  @@index([scheduledFor])
+  @@index([status])
+  @@index([targetQuery])
+  @@index([targetQueryKey])
+  @@index([status, scheduledFor])
+  @@index([cityId, status, scheduledFor])
+  @@index([regionId, status, scheduledFor])
+  @@index([createdByUserId])
+  @@index([articleId])
+}
+
 /// Search query log для аналитики и zero-result tracking
 model SearchQueryLog {
   id                String   @id @default(cuid())
@@ -5718,6 +5786,9 @@ model SearchQueryLog {
   cityId            String?
   userId            String?
   sessionId         String?
+  searchId          String?   @unique
+  clickedPosition   Int?
+  clickedAt         DateTime?
   createdAt         DateTime @default(now())
 
   city City? @relation(fields: [cityId], references: [id], onDelete: SetNull)

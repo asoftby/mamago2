@@ -13,11 +13,12 @@ import {
   RouteStatus,
   RouteVisibility,
 } from "@prisma/client";
-import type { SeoGeoContext } from "@/lib/admin/seo/geo";
+import type { SeoMarketFilter } from "@/lib/admin/seo/geo/seoMarket";
 import type { SeoPageIndexationStatus } from "@/lib/admin/seo/domain/types";
 
 export type SeoEntityListFilters = {
-  geoContext: SeoGeoContext;
+  /** Resolved market/city/region/country filter (push-down into Prisma). */
+  geoFilter: SeoMarketFilter;
   q?: string;
   indexation?: SeoPageIndexationStatus | "all";
 };
@@ -113,7 +114,7 @@ export function buildEventListWhere(
     and.push({ status: ContentStatus.PUBLISHED }, robotsIndexedClause());
   }
 
-  const geo = filters.geoContext;
+  const geo = filters.geoFilter;
   if (geo.kind === "city") {
     and.push({
       OR: [
@@ -122,7 +123,7 @@ export function buildEventListWhere(
         { place: { cityId: geo.cityId } },
       ],
     });
-  } else if (geo.kind === "region") {
+  } else if (geo.kind === "region" || geo.kind === "market") {
     if (geo.cityIds.length === 0) {
       and.push(emptyIdFilter());
     } else {
@@ -182,12 +183,12 @@ export function buildPlaceListWhere(
   const idx = placeIndexation(filters.indexation);
   if (idx) and.push(idx);
 
-  const geo = filters.geoContext;
+  const geo = filters.geoFilter;
   if (geo.kind === "city") {
     and.push({
       OR: [{ cityId: geo.cityId }, { city: { slug: geo.citySlug } }],
     });
-  } else if (geo.kind === "region") {
+  } else if (geo.kind === "region" || geo.kind === "market") {
     if (geo.cityIds.length === 0) and.push(emptyIdFilter());
     else {
       and.push({
@@ -250,14 +251,14 @@ export function buildOfferListWhere(
   const idx = offerIndexation(filters.indexation);
   if (idx) and.push(idx);
 
-  const geo = filters.geoContext;
+  const geo = filters.geoFilter;
   if (geo.kind === "city") {
     and.push({
       place: {
         OR: [{ cityId: geo.cityId }, { city: { slug: geo.citySlug } }],
       },
     });
-  } else if (geo.kind === "region") {
+  } else if (geo.kind === "region" || geo.kind === "market") {
     if (geo.cityIds.length === 0) and.push(emptyIdFilter());
     else {
       and.push({
@@ -327,7 +328,7 @@ export function buildRouteListWhere(
   if (idx) and.push(idx);
 
   // Routes have no geo snapshot → only visible in "all" (same as filterPagesByGeoContext).
-  if (filters.geoContext.kind !== "all") {
+  if (filters.geoFilter.kind !== "all") {
     and.push(emptyIdFilter());
   }
 
@@ -371,7 +372,7 @@ export function buildArticleListWhere(
   const idx = articleIndexation(filters.indexation);
   if (idx) and.push(idx);
 
-  const geo = filters.geoContext;
+  const geo = filters.geoFilter;
   if (geo.kind === "city") {
     and.push({
       AND: [
@@ -400,9 +401,37 @@ export function buildArticleListWhere(
         ...cityMatch,
       ],
     });
+  } else if (geo.kind === "market") {
+    // CITY articles in market cities + REGION articles for linked region.
+    // COUNTRY excluded from market view.
+    const cityMatch =
+      geo.cityIds.length > 0
+        ? [
+            {
+              AND: [
+                {
+                  OR: [
+                    { cityId: { in: geo.cityIds } },
+                    { city: { slug: { in: geo.citySlugs } } },
+                  ],
+                },
+                {
+                  NOT: {
+                    geoScope: { in: [GeoScope.REGION, GeoScope.COUNTRY] },
+                  },
+                },
+              ],
+            },
+          ]
+        : [];
+    const regionMatch = geo.regionId
+      ? [
+          { regionId: geo.regionId },
+          { AND: [{ geoScope: GeoScope.REGION }, { regionId: geo.regionId }] },
+        ]
+      : [];
+    and.push({ OR: [...cityMatch, ...regionMatch] });
   } else if (geo.kind === "country") {
-    // Article has no countryId FK — country context matches geoScope COUNTRY only
-    // (same as filterPagesByGeoContext when snapshot.countryId is unset).
     and.push({ geoScope: GeoScope.COUNTRY });
   }
 

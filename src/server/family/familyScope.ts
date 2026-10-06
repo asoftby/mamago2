@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
+import { getLocalDateKey } from "@/lib/date/localDateKey";
+
 /**
  * Family Core B2: pure (no DB) ACL fragments. Ownership comes ONLY from
  * `familyId` (+ `visibility` for plan items). `Child.parentId`,
@@ -14,10 +16,28 @@ export function familyReadsEnabled(env: Record<string, string | undefined> = pro
   return v === "1" || v === "true";
 }
 
-export type FamilyScope = { userId: string; familyId: string | null };
+export type FamilyScope = {
+  userId: string;
+  familyId: string | null;
+  /**
+   * History boundary for shared (FAMILY) plan items: set for a member with
+   * historyAccess FROM_JOIN (= their joinedAt). Past shared events before the
+   * join day are hidden; future/undated ones and anything added after joining
+   * stay visible. null/undefined = full history. Own items are never bounded.
+   */
+  sharedHistoryFrom?: Date | null;
+};
 
 /** Matches no row: user has no active family while family reads are on. */
 const NONE = { id: { in: [] as string[] } };
+
+/** FROM_JOIN members see shared history only from the moment they joined. */
+export function sharedHistoryFromMembership(membership: {
+  historyAccess: "ALL" | "FROM_JOIN";
+  joinedAt: Date;
+}): Date | null {
+  return membership.historyAccess === "FROM_JOIN" ? membership.joinedAt : null;
+}
 
 export function planItemScopeWhere(
   scope: FamilyScope,
@@ -25,9 +45,19 @@ export function planItemScopeWhere(
 ): Prisma.PlanItemWhereInput {
   if (!familyReads) return { userId: scope.userId };
   if (!scope.familyId) return NONE;
+  const from = scope.sharedHistoryFrom;
+  // FROM_JOIN = "future visible, past hidden": a shared item is visible when its
+  // event is on/after the join day (local calendar date), when it has no date
+  // (a plan, not history), or when it was added after joining.
+  const shared: Prisma.PlanItemWhereInput = from
+    ? {
+        visibility: "FAMILY",
+        OR: [{ date: { gte: getLocalDateKey(from) } }, { date: null }, { createdAt: { gte: from } }],
+      }
+    : { visibility: "FAMILY" };
   return {
     familyId: scope.familyId,
-    OR: [{ visibility: "FAMILY" }, { userId: scope.userId }],
+    OR: [shared, { userId: scope.userId }],
   };
 }
 

@@ -4,9 +4,14 @@ import { SeoDashboardSection } from "@/components/admin/seo/SeoDashboardSection"
 import { SeoPageHeader } from "@/components/admin/seo/primitives/SeoPageHeader";
 import { SeoEmptyState } from "@/components/admin/seo/primitives/SeoEmptyState";
 import { getSeoDashboardSummary } from "@/lib/admin/seo/data/seoAdminData";
-import { formatSeoGeoContextBreadcrumb } from "@/lib/admin/seo/geo";
-import { resolveSeoGeoSession } from "@/lib/admin/seo/geo/resolveSeoGeoSession";
-import { SEO_SETTINGS_NAV } from "@/lib/admin/seoNavConfig";
+import { resolveSeoMarketSession } from "@/lib/admin/seo/geo/resolveSeoGeoSession";
+import {
+  addDays,
+  computePlanMix,
+  listSeoContentPlanItems,
+  startOfWeekMonday,
+} from "@/lib/admin/seo/plan/seoContentPlan.service";
+import { computeInternalSearchTrends } from "@/lib/admin/seo/topics/internalTrends";
 import { buildAdminPath } from "@/lib/routing/surface";
 import { cn } from "@/lib/utils";
 
@@ -17,38 +22,62 @@ const severityStyles = {
 };
 
 export default async function AdminSeoOverviewPage() {
-  const { context } = await resolveSeoGeoSession();
-  const summary = await getSeoDashboardSummary(context);
-  const breadcrumb = formatSeoGeoContextBreadcrumb(context);
+  const session = await resolveSeoMarketSession();
+  const summary = await getSeoDashboardSummary(session.filter);
+
+  const weekFrom = startOfWeekMonday(new Date());
+  const weekTo = addDays(weekFrom, 7);
+  const [planItems, trends] = await Promise.all([
+    listSeoContentPlanItems({
+      filter: session.filter,
+      from: weekFrom,
+      to: weekTo,
+    }),
+    computeInternalSearchTrends({
+      filter: session.filter,
+      geographyLabel: session.presentation.marketLabel,
+    }),
+  ]);
+  const mix = computePlanMix(planItems);
+  const statusCounts = {
+    planned: planItems.filter((i) => i.status === "PLANNED").length,
+    inProgress: planItems.filter((i) => i.status === "IN_PROGRESS").length,
+    published: planItems.filter((i) => i.status === "PUBLISHED").length,
+  };
 
   const quickLinks = [
     {
       href: buildAdminPath("/seo/pages"),
       label: "Страницы",
-      description: "SEO существующих страниц по геоконтексту",
+      description: "SEO существующих страниц по SEO-рынку",
     },
-    ...SEO_SETTINGS_NAV.slice(0, 2).map((item) => ({
-      href: item.href,
-      label: item.label,
-      description: item.description,
-    })),
+    {
+      href: buildAdminPath("/seo/plan"),
+      label: "План контента",
+      description: "Что запланировано к публикации",
+    },
+    {
+      href: buildAdminPath("/seo/topics"),
+      label: "Темы и тренды",
+      description: "Внутренний спрос mamaGo",
+    },
   ];
 
   return (
     <div className="space-y-10 pb-8">
       <SeoPageHeader
         title="SEO"
-        subtitle={`Обзор для контекста: ${breadcrumb}`}
+        subtitle={`Обзор · ${session.presentation.marketLabel}`}
       />
 
       <SeoDashboardSection
         title="Состояние"
-        description="Реальные сигналы по страницам в выбранном SEO-контексте"
+        description="Реальные сигналы по страницам в выбранном SEO-рынке"
       >
         {summary.stats.every((s) => s.value === 0) ? (
           <SeoEmptyState
-            title="Пока нет SEO-страниц в этом контексте"
-            description="Смените SEO-контекст или дождитесь появления сущностей в разделе «Страницы»."
+            title="Пока нет SEO-страниц в этом рынке"
+            description="Смените SEO-рынок или дождитесь появления сущностей в разделе «Страницы»."
           />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -70,6 +99,43 @@ export default async function AdminSeoOverviewPage() {
           </div>
         )}
       </SeoDashboardSection>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-900">План контента</h2>
+          <p className="mt-2 text-sm text-gray-600">
+            На этой неделе: {mix.plannedTotal}
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            Запланировано: {statusCounts.planned} · В работе:{" "}
+            {statusCounts.inProgress} · Опубликовано: {statusCounts.published}
+          </p>
+          <Link
+            href={buildAdminPath("/seo/plan")}
+            className="mt-3 inline-flex text-xs font-medium text-primary"
+          >
+            Открыть план →
+          </Link>
+        </section>
+        <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-900">Темы</h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Растущих запросов: {trends.risingCount}
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            Высокий потенциал: {trends.highPotentialCount}
+          </p>
+          <p className="mt-1 text-[11px] text-gray-400">
+            Источник: поиск внутри mamaGo
+          </p>
+          <Link
+            href={buildAdminPath("/seo/topics")}
+            className="mt-3 inline-flex text-xs font-medium text-primary"
+          >
+            Посмотреть темы →
+          </Link>
+        </section>
+      </div>
 
       <SeoDashboardSection
         title="Требует внимания"
@@ -97,9 +163,7 @@ export default async function AdminSeoOverviewPage() {
                       <p className="text-sm font-medium text-gray-900">
                         {item.title}
                       </p>
-                      <p className="mt-0.5 text-xs text-gray-500">
-                        {item.detail}
-                      </p>
+                      <p className="mt-0.5 text-xs text-gray-500">{item.detail}</p>
                     </div>
                     <ChevronRight
                       className="h-4 w-4 shrink-0 text-gray-300"
@@ -117,9 +181,7 @@ export default async function AdminSeoOverviewPage() {
                       <p className="text-sm font-medium text-gray-900">
                         {item.title}
                       </p>
-                      <p className="mt-0.5 text-xs text-gray-500">
-                        {item.detail}
-                      </p>
+                      <p className="mt-0.5 text-xs text-gray-500">{item.detail}</p>
                     </div>
                   </div>
                 )}
@@ -133,6 +195,7 @@ export default async function AdminSeoOverviewPage() {
         <p className="text-sm font-medium text-gray-900">Поисковые данные</p>
         <p className="mt-1 text-xs leading-relaxed text-gray-500">
           Google Search Console, Яндекс.Вебмастер и Wordstat пока не подключены.
+          Внутренний спрос mamaGo доступен в «Темы и тренды».
         </p>
       </section>
 

@@ -5,19 +5,25 @@ import { SeoSubNav } from "@/components/admin/seo/SeoSubNav";
 import { SeoGeoContextSelector } from "@/components/admin/seo/SeoGeoContextSelector";
 import { shouldShowSeoGeoContextSelector } from "@/lib/admin/seoNavConfig";
 import type { SeoGeoSelectorOption } from "@/lib/admin/seo/geo";
+import type { SeoMarketViewScope } from "@/lib/admin/seo/geo/seoMarket";
 
 type SeoLayoutHeaderProps = {
   token: string;
-  breadcrumb: string;
+  marketLabel: string;
+  cityName: string | null;
+  regionName: string | null;
+  viewScope: SeoMarketViewScope;
+  supportsMarketScopes: boolean;
   options: SeoGeoSelectorOption[];
 };
 
-/**
- * Product SEO pages show Geo Context; global settings must not imply city filtering.
- */
 export function SeoLayoutHeader({
   token,
-  breadcrumb,
+  marketLabel,
+  cityName,
+  regionName,
+  viewScope,
+  supportsMarketScopes,
   options,
 }: SeoLayoutHeaderProps) {
   const pathname = usePathname();
@@ -29,7 +35,11 @@ export function SeoLayoutHeader({
       {showGeo ? (
         <SeoGeoContextSelector
           token={token}
-          breadcrumb={breadcrumb}
+          marketLabel={marketLabel}
+          cityName={cityName}
+          regionName={regionName}
+          viewScope={viewScope}
+          supportsMarketScopes={supportsMarketScopes}
           options={options}
         />
       ) : null}

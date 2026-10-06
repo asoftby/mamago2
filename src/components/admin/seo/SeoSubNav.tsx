@@ -18,7 +18,7 @@ export function SeoSubNav() {
   return (
     <div className="space-y-3">
       <nav
-        className="flex flex-wrap gap-1 border-b border-gray-200"
+        className="-mx-1 flex flex-nowrap gap-1 overflow-x-auto border-b border-gray-200 px-1 scrollbar-none"
         aria-label="SEO"
       >
         {SEO_PRIMARY_NAV.map((item) => {
@@ -27,11 +27,12 @@ export function SeoSubNav() {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "relative -mb-px inline-flex items-center rounded-t-md px-3 py-2.5 text-sm font-medium transition-colors",
+                "relative -mb-px shrink-0 inline-flex items-center rounded-t-md border border-b-0 px-3 py-2.5 text-sm font-medium transition-colors",
                 active
-                  ? "border-b-2 border-b-primary bg-primary/5 text-primary"
-                  : "border-b-2 border-b-transparent text-gray-600 hover:text-gray-900",
+                  ? "border-gray-200 border-b-2 border-b-primary bg-white text-primary shadow-sm"
+                  : "border-transparent border-b-2 border-b-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-800",
               )}
             >
               {item.label}
@@ -40,11 +41,12 @@ export function SeoSubNav() {
         })}
         <Link
           href={SEO_SETTINGS_ENTRY.href}
+          aria-current={settingsOpen ? "page" : undefined}
           className={cn(
-            "relative -mb-px inline-flex items-center rounded-t-md px-3 py-2.5 text-sm font-medium transition-colors",
+            "relative -mb-px shrink-0 inline-flex items-center rounded-t-md border border-b-0 px-3 py-2.5 text-sm font-medium transition-colors",
             settingsOpen
-              ? "border-b-2 border-b-primary bg-primary/5 text-primary"
-              : "border-b-2 border-b-transparent text-gray-600 hover:text-gray-900",
+              ? "border-gray-200 border-b-2 border-b-primary bg-white text-primary shadow-sm"
+              : "border-transparent border-b-2 border-b-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-800",
           )}
         >
           {SEO_SETTINGS_ENTRY.label}
@@ -59,10 +61,11 @@ export function SeoSubNav() {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 className={cn(
-                  "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                  "inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
                   active
-                    ? "border-primary bg-primary text-primary-foreground"
+                    ? "border-primary bg-primary/10 text-primary"
                     : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900",
                 )}
               >

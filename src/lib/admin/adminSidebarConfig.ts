@@ -501,6 +501,18 @@ export const GROUP_SEO: AdminSidebarGroup = {
       matchers: [{ type: "prefix", value: adminPath("/seo/pages") }],
     },
     {
+      id: "seo-plan",
+      label: "План контента",
+      href: adminPath("/seo/plan"),
+      matchers: [{ type: "prefix", value: adminPath("/seo/plan") }],
+    },
+    {
+      id: "seo-topics",
+      label: "Темы и тренды",
+      href: adminPath("/seo/topics"),
+      matchers: [{ type: "prefix", value: adminPath("/seo/topics") }],
+    },
+    {
       id: "seo-settings",
       label: "Настройки SEO",
       href: adminPath("/seo/settings/indexation"),

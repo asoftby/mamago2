@@ -25,5 +25,20 @@ export {
 
 export {
   filterPagesByGeoContext,
+  filterPagesByMarketFilter,
   geographyLabelForPage,
 } from "./filterPagesByGeoContext";
+
+export {
+  SEO_MARKET_VIEW_COOKIE,
+  SEO_MARKET_VIEW_QUERY,
+  enrichMarketFilterWithRegionCities,
+  isSeoMarketViewScope,
+  normalizeSearchQueryKey,
+  parseSeoMarketViewScope,
+  presentSeoMarket,
+  resolveSeoMarketFilter,
+  type SeoMarketFilter,
+  type SeoMarketPresentation,
+  type SeoMarketViewScope,
+} from "./seoMarket";

@@ -7,6 +7,7 @@ import {
 import {
   type CaptureModelConfig,
   type OpenRouterClient,
+  type OpenRouterErrorCode,
   type OpenRouterResponseFormat,
 } from "@/lib/ai/openrouterClient";
 import { CAPTURE_LIMITS } from "./captureLimits";
@@ -20,8 +21,8 @@ import type { TelegramCaptureClient } from "./telegramCaptureClient.core";
 /**
  * The capture parsing pipeline (forward-to-plan spec v1.3, PR3):
  * PROCESSING -> context -> photos (memory only) -> model -> Zod -> rules ->
- * duplicates -> DRAFT_READY | FAILED. Creates no PlanItem and sends nothing
- * to the user (cards arrive in PR4).
+ * duplicates -> DRAFT_READY | FAILED. PlanItem writes still happen only from
+ * callback handlers; an optional presenter may publish the confirmation card.
  *
  * Logging: ids, model id, durations, token counts and machine codes only.
  * `InboxItem.error` is always a machine code, never exception or provider text.
@@ -39,6 +40,7 @@ export type CaptureProcessorDeps = {
   telegram: Pick<TelegramCaptureClient, "getFile" | "downloadFile">;
   models: () => CaptureModelConfig;
   context: CaptureContextDeps;
+  presenter?: { present(inboxItemId: string): Promise<void> };
   now?: () => Date;
 };
 
@@ -61,7 +63,7 @@ type Usage = { tokensIn: number | null; tokensOut: number | null; model: string 
 type Attempt =
   | { kind: "parsed"; draft: CaptureDraft }
   | { kind: "invalid" }
-  | { kind: "infra"; notConfigured: boolean; retryable: boolean };
+  | { kind: "infra"; code: OpenRouterErrorCode; notConfigured: boolean; retryable: boolean };
 
 function addUsage(total: Usage, tokensIn: number | null, tokensOut: number | null, model: string): void {
   if (tokensIn !== null) total.tokensIn = (total.tokensIn ?? 0) + tokensIn;
@@ -143,6 +145,7 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
         // A non-retryable failure (not configured, auth/4xx) is final; retryable ones are retried once.
         return {
           kind: "infra",
+          code: response.code,
           notConfigured: response.code === "OPENROUTER_NOT_CONFIGURED",
           retryable: response.retryable,
         };
@@ -156,12 +159,26 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
     let first = await attempt(models.fast);
     if (first.kind === "infra" && first.notConfigured) return fail("CAPTURE_MODEL_NOT_CONFIGURED");
     if (first.kind === "invalid" || (first.kind === "infra" && first.retryable)) first = await attempt(models.fast);
-    if (first.kind === "infra") return first.notConfigured ? fail("CAPTURE_MODEL_NOT_CONFIGURED") : fail("OPENROUTER_FAILED");
-
     const escalationCodes: string[] = [];
-    let current: CaptureDraft;
+    let current: CaptureDraft | null = null;
 
-    if (first.kind === "invalid") {
+    if (first.kind === "infra") {
+      if (first.notConfigured) return fail("CAPTURE_MODEL_NOT_CONFIGURED");
+      // A structurally bad provider response is model-specific rather than a
+      // transport outage. After the fast-model retry is exhausted, give the
+      // configured strong model one chance before failing the item.
+      if (first.code === "OPENROUTER_BAD_RESPONSE" && models.strong) {
+        escalated = true;
+        escalationCodes.push(RULE_CODES.escalateBadResponse);
+        const strong = await attempt(models.strong);
+        if (strong.kind === "infra") return fail("OPENROUTER_FAILED");
+        if (strong.kind === "invalid") return fail("INVALID_MODEL_OUTPUT");
+        current = strong.draft;
+      } else {
+        return fail("OPENROUTER_FAILED");
+      }
+    } else if (first.kind === "invalid") {
+
       // Escalation 1: invalid JSON / schema after the retry. Strong model, once.
       if (!models.strong) return fail("INVALID_MODEL_OUTPUT");
       escalated = true;
@@ -170,10 +187,11 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
       if (strong.kind === "infra") return fail("OPENROUTER_FAILED");
       if (strong.kind === "invalid") return fail("INVALID_MODEL_OUTPUT");
       current = strong.draft;
-    } else {
+    } else if (first.kind === "parsed") {
       current = first.draft;
     }
 
+    if (!current) return fail("PROCESSOR_ERROR");
     let rules: RuleResult = applyPostLlmRules(current, context);
 
     // Escalations 2 and 3, only if the strong model has not been used yet.
@@ -245,7 +263,7 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
 
       // Only a row that is still PROCESSING is updated: terminal states are never overwritten.
       if (result.ok) {
-        await db.inboxItem.updateMany({
+        const updated = await db.inboxItem.updateMany({
           where: { id: item.id, status: "PROCESSING" },
           data: {
             ...usageData,
@@ -259,6 +277,13 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
           },
         });
         logResult(item, "DRAFT_READY", null, result, startedAt);
+        if (updated.count === 1 && deps.presenter) {
+          try {
+            await deps.presenter.present(item.id);
+          } catch {
+            console.error(`[capture-processor] inboxItemId=${item.id} code=CARD_SEND_FAILED`);
+          }
+        }
         return;
       }
 

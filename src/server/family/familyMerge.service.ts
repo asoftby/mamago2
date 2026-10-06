@@ -9,6 +9,7 @@ import {
   type MergeDecision,
 } from "./familyMergePure";
 import { hashInviteToken, isInviteUsable } from "./familyInvitePure";
+import { recordFamilySharedDataConsent } from "./familyConsentRecord";
 
 type Tx = Prisma.TransactionClient;
 
@@ -55,6 +56,14 @@ export async function previewFamilyInviteMerge(
     select: { id: true },
   });
   if (!creator) throw new FamilyInviteError("invalid_invite");
+  // This is the first disclosure of the family's children: the consent must be
+  // persisted before any of their data is read (accept reuses this record).
+  await recordFamilySharedDataConsent(prisma, {
+    userId: input.userId,
+    familyId: invite.familyId,
+    textVersion: input.consentTextVersion,
+    now,
+  });
   const mine = await prisma.familyMembership.findFirst({
     where: { userId: input.userId, leftAt: null },
     select: { familyId: true },

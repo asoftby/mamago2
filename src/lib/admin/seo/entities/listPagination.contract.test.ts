@@ -119,11 +119,6 @@ const geoCity = {
   kind: "city" as const,
   cityId: "c1",
   citySlug: "minsk",
-  cityName: "Минск",
-  regionId: null,
-  regionName: null,
-  countryId: "by",
-  countryName: "Беларусь",
 };
 
 const allCtx = { kind: "all" as const };
