@@ -2,6 +2,7 @@ import { Prisma, type PrismaClient, type TelegramEnvironment } from "@prisma/cli
 import type { PlanOwner } from "@/server/services/planOwner";
 import { CAPTURE_LIMITS } from "./captureLimits";
 import { CAPTURE_REPLIES } from "./captureReplies";
+import { numberInboxParts } from "./inboxParts";
 import type { InboxProcessor } from "./inboxProcessor";
 import type { ParsedCapture } from "./telegramUpdateParser";
 
@@ -263,16 +264,6 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
     return result.count === 1;
   }
 
-  async function numberParts(inboxItemId: string): Promise<void> {
-    const parts = await db.inboxItemPart.findMany({
-      where: { inboxItemId },
-      orderBy: { telegramMessageId: "asc" },
-      select: { id: true },
-    });
-    await db.$transaction(
-      parts.map((part, index) => db.inboxItemPart.update({ where: { id: part.id }, data: { position: index } })),
-    );
-  }
 
   async function processWhenReady(
     owner: PlanOwner,
@@ -286,7 +277,7 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
       }
       if (!(await claim(stored.inboxItemId))) return;
 
-      await numberParts(stored.inboxItemId);
+      await numberInboxParts(db, stored.inboxItemId);
       await notifier.typing(capture.chatId);
       try {
         await processor.process(stored.inboxItemId);
