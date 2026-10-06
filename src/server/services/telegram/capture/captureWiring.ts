@@ -7,6 +7,10 @@ import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getPublicPublishedPlaceWhere } from "@/server/public/publicContentVisibility";
 import { getTelegramConfig } from "@/server/config/telegram.config";
 import type { PlanOwner } from "@/server/services/planOwner";
+import type { DecodedCallback } from "./callbackCodec";
+import type { ParsedCallback } from "./telegramUpdateParser";
+import { createCaptureCardPresenter } from "./captureCardPresenter";
+import { createCaptureCallbackService } from "./captureCallback.service";
 import {
   findTelegramConnectionByChatIdForCurrentEnvironment,
   touchTelegramConnectionByChatIdForCurrentEnvironment,
@@ -26,7 +30,7 @@ export type CaptureRoutingDeps = {
   touchConnection: (chatId: string) => Promise<void>;
   getEnvironment: () => TelegramEnvironment;
   receive: (owner: PlanOwner, environment: TelegramEnvironment, capture: ParsedCapture) => Promise<IntakeResult>;
-  /** Neutral acknowledgement for inb:/req: buttons until PR4 adds handlers. */
+  handleCallback: (owner: PlanOwner, callback: ParsedCallback, decoded: DecodedCallback) => Promise<void>;
   acknowledgeCallback: (callbackQueryId: string) => Promise<void>;
 };
 
@@ -47,11 +51,14 @@ function createNotifier(): IntakeNotifier {
 
 /** The real inbox processor with production wiring; shared by the webhook and the recover cron. */
 export function createDefaultCaptureProcessor(): InboxProcessor {
+  const channel = new TelegramChannel();
+  const presenter = createCaptureCardPresenter({ db: prismaBase, channel });
   return createCaptureInboxProcessor({
     db: prismaBase,
     openrouter: createOpenRouterClient(),
     telegram: getTelegramCaptureClient(),
     models: () => readCaptureModelConfig(),
+    presenter,
     context: {
       db: prismaBase,
       city: {
@@ -63,6 +70,9 @@ export function createDefaultCaptureProcessor(): InboxProcessor {
 }
 
 export function createDefaultCaptureRoutingDeps(): CaptureRoutingDeps {
+  const channel = new TelegramChannel();
+  const presenter = createCaptureCardPresenter({ db: prismaBase, channel });
+  const callbacks = createCaptureCallbackService({ db: prismaBase, channel, presenter });
   let intake: ReturnType<typeof createInboxIntake> | null = null;
   const getIntake = () => {
     intake ??= createInboxIntake({
@@ -82,6 +92,7 @@ export function createDefaultCaptureRoutingDeps(): CaptureRoutingDeps {
     touchConnection: (chatId) => touchTelegramConnectionByChatIdForCurrentEnvironment(chatId).then(() => undefined),
     getEnvironment: () => getTelegramConfig().environment,
     receive: (owner, environment, capture) => getIntake().receive(owner, environment, capture),
+    handleCallback: (owner, callback, decoded) => callbacks.handle(owner, callback, decoded),
     acknowledgeCallback: async (callbackQueryId) => {
       await getTelegramCaptureClient().answerCallbackQuery(callbackQueryId);
     },
