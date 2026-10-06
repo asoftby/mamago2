@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
+import { getLocalDateKey } from "@/lib/date/localDateKey";
+
 /**
  * Family Core B2: pure (no DB) ACL fragments. Ownership comes ONLY from
  * `familyId` (+ `visibility` for plan items). `Child.parentId`,
@@ -18,9 +20,10 @@ export type FamilyScope = {
   userId: string;
   familyId: string | null;
   /**
-   * Lower bound for shared (FAMILY) plan items: set for a member with
-   * historyAccess FROM_JOIN (= their joinedAt). null/undefined = full history.
-   * The member's own items are never bounded.
+   * History boundary for shared (FAMILY) plan items: set for a member with
+   * historyAccess FROM_JOIN (= their joinedAt). Past shared events before the
+   * join day are hidden; future/undated ones and anything added after joining
+   * stay visible. null/undefined = full history. Own items are never bounded.
    */
   sharedHistoryFrom?: Date | null;
 };
@@ -42,8 +45,15 @@ export function planItemScopeWhere(
 ): Prisma.PlanItemWhereInput {
   if (!familyReads) return { userId: scope.userId };
   if (!scope.familyId) return NONE;
-  const shared: Prisma.PlanItemWhereInput = scope.sharedHistoryFrom
-    ? { visibility: "FAMILY", createdAt: { gte: scope.sharedHistoryFrom } }
+  const from = scope.sharedHistoryFrom;
+  // FROM_JOIN = "future visible, past hidden": a shared item is visible when its
+  // event is on/after the join day (local calendar date), when it has no date
+  // (a plan, not history), or when it was added after joining.
+  const shared: Prisma.PlanItemWhereInput = from
+    ? {
+        visibility: "FAMILY",
+        OR: [{ date: { gte: getLocalDateKey(from) } }, { date: null }, { createdAt: { gte: from } }],
+      }
     : { visibility: "FAMILY" };
   return {
     familyId: scope.familyId,

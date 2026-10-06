@@ -211,27 +211,31 @@ test("preview persists consent before disclosing children; accept reuses it", as
   assert.equal(await db.consentRecord.count({ where: { userId: joiner, familyId: ownerFamily } }), 1, "no duplicate record");
 });
 
-test("FROM_JOIN: joiner does not see shared plan items created before joining", async () => {
+test("FROM_JOIN: past shared events hidden; future, undated and post-join items visible", async () => {
   const owner = await mkUser("hist-owner");
   const joiner = await mkUser("hist-joiner");
   const ownerFamily = await ensureFamilyForUser(db, owner);
-  const before = await db.planItem.create({
-    data: { userId: owner, familyId: ownerFamily, date: "2026-11-01", title: "before", visibility: "FAMILY", createdAt: new Date(Date.now() - 60_000) },
-  });
+  const earlier = new Date(Date.now() - 60_000);
+  const mk = (title: string, date: string | null, createdAt: Date) =>
+    db.planItem.create({ data: { userId: owner, familyId: ownerFamily, date, title, visibility: "FAMILY", createdAt } });
+  // Created before the join:
+  const pastEvent = await mk("past", "2020-01-01", earlier);
+  const futureEvent = await mk("future", "2099-01-01", earlier);
+  const undated = await mk("undated", null, earlier);
   const { token } = await createFamilyInvite(db, { userId: owner }, deps);
   await acceptFamilyInvite(db, { userId: joiner, token, consentTextVersion: "v1" }, deps);
-  const after_ = await db.planItem.create({
-    data: { userId: owner, familyId: ownerFamily, date: "2026-11-02", title: "after", visibility: "FAMILY", createdAt: new Date(Date.now() + 60_000) },
-  });
+  // Logged after the join, even though the event itself is in the past:
+  const loggedLater = await mk("logged-later", "2020-01-02", new Date(Date.now() + 60_000));
+  const all = [pastEvent, futureEvent, undated, loggedLater].map((r) => r.id);
 
   const scopeOf = async (userId: string) => {
     const m = await db.familyMembership.findFirstOrThrow({ where: { userId, leftAt: null } });
     return planItemScopeWhere({ userId, familyId: m.familyId, sharedHistoryFrom: sharedHistoryFromMembership(m) }, true);
   };
   const ids = async (userId: string) =>
-    (await db.planItem.findMany({ where: { ...(await scopeOf(userId)), id: { in: [before.id, after_.id] } }, select: { id: true } }))
+    (await db.planItem.findMany({ where: { ...(await scopeOf(userId)), id: { in: all } }, select: { id: true } }))
       .map((r) => r.id).sort();
 
-  assert.deepEqual(await ids(joiner), [after_.id], "joiner sees only shared items from joinedAt");
-  assert.deepEqual(await ids(owner), [before.id, after_.id].sort(), "owner (ALL) sees full history");
+  assert.deepEqual(await ids(joiner), [futureEvent.id, undated.id, loggedLater.id].sort(), "past hidden, the rest visible");
+  assert.deepEqual(await ids(owner), [...all].sort(), "owner (ALL) sees full history");
 });

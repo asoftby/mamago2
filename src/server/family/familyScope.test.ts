@@ -9,12 +9,19 @@ import {
   sharedHistoryFromMembership,
 } from "./familyScope";
 
-test("FROM_JOIN: shared plan items are bounded by joinedAt, own items are not", () => {
-  const joinedAt = new Date("2026-10-06T10:00:00Z");
+test("FROM_JOIN: past shared events hidden; future, undated and added-after-join visible; own unbounded", () => {
+  // 22:30 UTC = 01:30 next day in Minsk: the join day is the local calendar date.
+  const joinedAt = new Date("2026-10-06T22:30:00Z");
   const scope = { userId: "u1", familyId: "f1", sharedHistoryFrom: joinedAt };
   assert.deepEqual(planItemScopeWhere(scope, true), {
     familyId: "f1",
-    OR: [{ visibility: "FAMILY", createdAt: { gte: joinedAt } }, { userId: "u1" }],
+    OR: [
+      {
+        visibility: "FAMILY",
+        OR: [{ date: { gte: "2026-10-07" } }, { date: null }, { createdAt: { gte: joinedAt } }],
+      },
+      { userId: "u1" },
+    ],
   });
   // Children are not history-bounded: a child profile is current data, not history.
   assert.deepEqual(childScopeWhere(scope, true), { familyId: "f1" });
