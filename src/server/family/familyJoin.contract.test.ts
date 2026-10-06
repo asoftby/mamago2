@@ -37,4 +37,10 @@ assert.match(consent, /FAMILY_CONSENT_TEXT_VERSION = "[^"]*"/);
 const client = read("src/features/family/components/FamilyJoinClient.tsx");
 assert.doesNotMatch(client, /localStorage|sessionStorage/, "token is never persisted in the browser");
 assert.ok(client.indexOf("/api/family/invites/preview") < client.indexOf("preview.joinerChildren"), "merge data comes from the preview API only");
+// Preview applies the same validity as accept (unarchived family, creator still a member).
+const merge = read("src/server/family/familyMerge.service.ts");
+const prev = merge.slice(merge.indexOf("export async function previewFamilyInviteMerge"), merge.indexOf("export async function applyJoinerMerge"));
+assert.match(prev, /archivedAt/);
+assert.match(prev, /createdById/);
+assert.ok(prev.indexOf("leftAt: null") < prev.indexOf("prisma.child.findMany"), "validity is checked before any family data is read");
 console.log("familyJoin.contract.test: ok");
