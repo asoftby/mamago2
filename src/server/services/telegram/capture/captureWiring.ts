@@ -11,6 +11,7 @@ import type { DecodedCallback } from "./callbackCodec";
 import type { ParsedCallback } from "./telegramUpdateParser";
 import { createCaptureCardPresenter } from "./captureCardPresenter";
 import { createCaptureCallbackService } from "./captureCallback.service";
+import { createCaptureEditService, type CaptureEditIntakeResult } from "./captureEdit.service";
 import {
   findTelegramConnectionByChatIdForCurrentEnvironment,
   touchTelegramConnectionByChatIdForCurrentEnvironment,
@@ -29,6 +30,7 @@ export type CaptureRoutingDeps = {
   findActiveConnection: (chatId: string) => Promise<{ userId: string } | null>;
   touchConnection: (chatId: string) => Promise<void>;
   getEnvironment: () => TelegramEnvironment;
+  tryEdit: (owner: PlanOwner, environment: TelegramEnvironment, capture: ParsedCapture) => Promise<CaptureEditIntakeResult | null>;
   receive: (owner: PlanOwner, environment: TelegramEnvironment, capture: ParsedCapture) => Promise<IntakeResult>;
   handleCallback: (owner: PlanOwner, callback: ParsedCallback, decoded: DecodedCallback) => Promise<void>;
   acknowledgeCallback: (callbackQueryId: string) => Promise<void>;
@@ -73,11 +75,27 @@ export function createDefaultCaptureRoutingDeps(): CaptureRoutingDeps {
   const channel = new TelegramChannel();
   const presenter = createCaptureCardPresenter({ db: prismaBase, channel });
   const callbacks = createCaptureCallbackService({ db: prismaBase, channel, presenter });
+  const notifier = createNotifier();
+  const edits = createCaptureEditService({
+    db: prismaBase,
+    openrouter: createOpenRouterClient(),
+    models: () => readCaptureModelConfig(),
+    presenter,
+    notifier,
+    context: {
+      db: prismaBase,
+      city: {
+        findCityIdBySlug: async (slug) =>
+          (await findCityBySlug(slug, { select: { id: true } }))?.id ?? null,
+      },
+      places: { publicPlaceWhere: getPublicPublishedPlaceWhere() },
+    },
+  });
   let intake: ReturnType<typeof createInboxIntake> | null = null;
   const getIntake = () => {
     intake ??= createInboxIntake({
       db: prismaBase,
-      notifier: createNotifier(),
+      notifier,
       processor: createDefaultCaptureProcessor(),
     });
     return intake;
@@ -91,6 +109,7 @@ export function createDefaultCaptureRoutingDeps(): CaptureRoutingDeps {
     },
     touchConnection: (chatId) => touchTelegramConnectionByChatIdForCurrentEnvironment(chatId).then(() => undefined),
     getEnvironment: () => getTelegramConfig().environment,
+    tryEdit: (owner, environment, capture) => edits.tryReceive(owner, environment, capture),
     receive: (owner, environment, capture) => getIntake().receive(owner, environment, capture),
     handleCallback: (owner, callback, decoded) => callbacks.handle(owner, callback, decoded),
     acknowledgeCallback: async (callbackQueryId) => {
