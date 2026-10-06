@@ -6,7 +6,8 @@
  * purgeAfter in the past, plus one item older than 30 days and one unexpired
  * control), calls the purge exactly as cron does (GET /api/cron/inbox-purge
  * with the Bearer CRON_SECRET), then checks with SQL that:
- *   - every expired part has text IS NULL and every expired item draft IS NULL;
+ *   - every expired part has text IS NULL and telegramFileId IS NULL, and every
+ *     expired item draft IS NULL;
  *   - the item older than 30 days is gone;
  *   - the unexpired control item is untouched;
  *   - the marker is found in no column of the Inbox* tables or PlanItem.
@@ -100,6 +101,7 @@ async function main(): Promise<number> {
               telegramMessageId: options.ordinal,
               kind: "TEXT",
               text: options.text,
+              telegramFileId: `${options.text}_FILE`,
               position: 0,
             },
           },
@@ -141,6 +143,11 @@ async function main(): Promise<number> {
     const partsWithText = await db.inboxItemPart.count({ where: { inboxItemId: { in: expiredIds }, text: { not: null } } });
     checks.push({ name: "expired_parts_text_null", pass: partsWithText === 0, value: partsWithText });
 
+    const fileIdsLeft = await db.inboxItemPart.count({
+      where: { inboxItemId: { in: expiredIds }, telegramFileId: { not: null } },
+    });
+    checks.push({ name: "expired_file_ids_null", pass: fileIdsLeft === 0, value: fileIdsLeft });
+
     const draftRows = await db.$queryRaw<Array<{ n: bigint }>>`
       SELECT count(*) AS n FROM "InboxItem" WHERE id = ANY(${expiredIds}) AND draft IS NOT NULL`;
     const draftsLeft = Number(draftRows[0]?.n ?? 0);
@@ -152,7 +159,7 @@ async function main(): Promise<number> {
     const controlRows = await db.$queryRaw<Array<{ n: bigint }>>`
       SELECT count(*) AS n FROM "InboxItem" i
         JOIN "InboxItemPart" p ON p."inboxItemId" = i.id
-       WHERE i.id = ${controlId} AND i.draft IS NOT NULL AND p.text IS NOT NULL`;
+       WHERE i.id = ${controlId} AND i.draft IS NOT NULL AND p.text IS NOT NULL AND p."telegramFileId" IS NOT NULL`;
     const controlIntact = Number(controlRows[0]?.n ?? 0);
     checks.push({ name: "unexpired_control_untouched", pass: controlIntact === 1, value: controlIntact });
 

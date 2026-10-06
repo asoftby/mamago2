@@ -72,7 +72,7 @@ test("smoke PASSes against the real purge route and leaves nothing behind", asyn
   const { status, output } = await runSmoke([`--base-url=${baseUrl}`]);
   assert.equal(status, 0, output);
   assert.match(output, /PURGE_SMOKE PASS items_created=6 checks=\d+ failed=0/);
-  for (const name of ["purge_route_ok", "expired_parts_text_null", "expired_drafts_null", "old_item_deleted", "unexpired_control_untouched", "marker_not_found", "synthetic_rows_removed"]) {
+  for (const name of ["purge_route_ok", "expired_parts_text_null", "expired_file_ids_null", "expired_drafts_null", "old_item_deleted", "unexpired_control_untouched", "marker_not_found", "synthetic_rows_removed"]) {
     assert.match(output, new RegExp(`check ${name}: PASS`));
   }
   assert.ok(!output.includes("PURGE_SMOKE_"), "the marker is never printed");

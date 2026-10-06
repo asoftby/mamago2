@@ -10,7 +10,7 @@
 | Джоб | Маршрут | Что делает |
 |---|---|---|
 | `inbox-recover` | `GET /api/cron/inbox-recover` | `InboxItem` в `RECEIVED`/`PROCESSING`, у которых `debounceUntil` старше 2 минут, перезапускает через обычный processor. Захват только compare-and-set (параллельные запуски не берут один элемент дважды), терминальные статусы не трогает. До 5 элементов и 45 секунд на запуск, до 3 повторов на элемент (считаются по `RECOVER_ATTEMPT` в `ruleCodes`); после этого `FAILED` с `error = RECOVER_EXHAUSTED`. Если processor бросил ошибку: `FAILED` с `PROCESSOR_ERROR`. |
-| `inbox-purge` | `GET /api/cron/inbox-purge` | Для всех `InboxItem` с `purgeAfter <= now()` (любой статус) обнуляет `InboxItemPart.text` и `InboxItem.draft`; удаляет `InboxItem` старше 30 дней (части уходят каскадом). Идемпотентно, батчами по 200 (до 50 батчей за запуск). |
+| `inbox-purge` | `GET /api/cron/inbox-purge` | Для всех `InboxItem` с `purgeAfter <= now()` (любой статус) обнуляет `InboxItemPart.text`, `InboxItemPart.telegramFileId` (Telegram отдаёт картинку по `file_id` ещё долго) и `InboxItem.draft`; удаляет `InboxItem` старше 30 дней (части уходят каскадом). Идемпотентно, батчами по 200 (до 50 батчей за запуск). |
 
 В ответах и логах только числа и коды: ни текстов сообщений, ни `draft`, ни `chatId`, ни `file_id`.
 
@@ -44,6 +44,7 @@ docker exec <app-контейнер> node dist/ops/inbox-purge-smoke.js --confir
 |---|---|
 | `purge_route_ok` | маршрут ответил 200 |
 | `expired_parts_text_null` | у частей просроченных элементов `text IS NULL` |
+| `expired_file_ids_null` | у частей просроченных элементов `telegramFileId IS NULL` |
 | `expired_drafts_null` | у просроченных элементов `draft IS NULL` |
 | `old_item_deleted` | элемент старше 30 дней удалён |
 | `unexpired_control_untouched` | неистёкший элемент не тронут |
@@ -59,7 +60,7 @@ docker exec <app-контейнер> node dist/ops/inbox-purge-smoke.js --confir
 1. Не включать пилот: `TELEGRAM_CAPTURE_USER_IDS` на PROD остаётся пустым (production gate, спека раздел 15).
 2. По имени упавшей проверки:
    - `purge_route_ok` (значение 401/503/0): проверить `CRON_SECRET` в контейнере, что приложение отвечает на `127.0.0.1:3000`, версию деплоя;
-   - `expired_*`, `old_item_deleted`, `unexpired_control_untouched`, `marker_not_found`: ошибка в логике purge: передать разработчику имя проверки и числа, исправить и повторить smoke после любого изменения purge.
+   - `expired_*` (в том числе `expired_file_ids_null`), `old_item_deleted`, `unexpired_control_untouched`, `marker_not_found`: ошибка в логике purge: передать разработчику имя проверки и числа, исправить и повторить smoke после любого изменения purge.
 3. Если запуск оборвали (Ctrl+C, таймаут) и служебные строки остались, удалить их вручную (только служебные):
    ```sql
    DELETE FROM "InboxItem" WHERE "userId" LIKE 'purge-smoke-%';

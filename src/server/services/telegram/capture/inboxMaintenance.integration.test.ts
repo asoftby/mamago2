@@ -30,6 +30,7 @@ type ItemSpec = {
   createdAt?: Date;
   debounceUntil?: Date;
   text?: string | null;
+  fileId?: string | null;
   draft?: object | null;
   ruleCodes?: string[];
   parts?: number;
@@ -59,6 +60,7 @@ async function makeItem(spec: ItemSpec) {
           telegramMessageId: counter * 10 + index,
           kind: "TEXT" as const,
           text: spec.text === null ? null : (spec.text ?? `MAINT_TEXT_${run}_${counter}_${index}`),
+          telegramFileId: spec.fileId === undefined ? null : spec.fileId,
           position: index,
         })),
       },
@@ -162,6 +164,44 @@ test("purge handles a part with text on an item whose draft is already null (and
   await purgeInbox({ db });
   assert.equal((await reload(textOnly.id))!.parts[0]!.text, null);
   assert.equal((await reload(draftOnly.id))!.draft, null);
+});
+
+test("purge also clears telegramFileId of expired parts, but not of unexpired ones", async () => {
+  const userId = await makeUser("purge-fileid");
+  const past = new Date(Date.now() - 60_000);
+  const future = new Date(Date.now() + 3_600_000);
+  const expired = await Promise.all(
+    (["RECEIVED", "PROCESSING", "DRAFT_READY", "FAILED", "CONFIRMED"] as const).map((status) =>
+      makeItem({ userId, status, purgeAfter: past, fileId: `MAINT_FILE_${run}_${status}` }),
+    ),
+  );
+  const fresh = await makeItem({ userId, status: "DRAFT_READY", purgeAfter: future, fileId: `MAINT_FILE_${run}_FRESH` });
+
+  await purgeInbox({ db });
+  for (const item of expired) {
+    const saved = (await reload(item.id))!;
+    assert.ok(saved.parts.every((part) => part.telegramFileId === null), `file id kept for ${item.status}`);
+    assert.equal(saved.status, item.status);
+  }
+  assert.equal((await reload(fresh.id))!.parts[0]!.telegramFileId, `MAINT_FILE_${run}_FRESH`);
+
+  const second = await purgeInbox({ db });
+  assert.equal(second.itemsScrubbed, 0, "second run is a no-op");
+});
+
+test("purge scrubs an expired item whose only remaining content is a file reference", async () => {
+  const userId = await makeUser("purge-fileonly");
+  const item = await makeItem({
+    userId,
+    status: "FAILED",
+    purgeAfter: new Date(Date.now() - 1000),
+    text: null,
+    draft: null,
+    fileId: `MAINT_FILE_${run}_ONLY`,
+  });
+  const result = await purgeInbox({ db });
+  assert.ok(result.partsScrubbed >= 1);
+  assert.equal((await reload(item.id))!.parts[0]!.telegramFileId, null);
 });
 
 test("purge returns counts only: no content in the result", async () => {
