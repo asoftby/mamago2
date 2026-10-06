@@ -31,8 +31,11 @@ import {
   type AdminPaginationResult,
 } from "@/lib/admin/pagination";
 import { buildAdminPath } from "@/lib/routing/surface";
-import type { SeoGeoContext } from "@/lib/admin/seo/geo";
-import { filterPagesByGeoContext } from "@/lib/admin/seo/geo";
+import type { SeoGeoContext, SeoMarketFilter } from "@/lib/admin/seo/geo";
+import {
+  filterPagesByGeoContext,
+  filterPagesByMarketFilter,
+} from "@/lib/admin/seo/geo";
 import type { SeoPageIndexationStatus, SeoPageType } from "../domain/types";
 import {
   parseSeoPagesPageSize,
@@ -142,11 +145,11 @@ export function buildSeoDashboardSummaryFromPages(
 }
 
 export async function getSeoDashboardSummary(
-  geoContext?: SeoGeoContext,
+  geoFilter?: SeoMarketFilter,
 ): Promise<SeoDashboardSummary> {
   const allPages = await getSeoPages();
-  const pages = geoContext
-    ? filterPagesByGeoContext(allPages, geoContext)
+  const pages = geoFilter
+    ? filterPagesByMarketFilter(allPages, geoFilter)
     : allPages;
   return buildSeoDashboardSummaryFromPages(pages);
 }
@@ -197,12 +200,11 @@ export function matchesSeoPageSearch(row: SeoPage, q: string): boolean {
 }
 
 /**
- * In-memory pagination helper for contract tests (and overview-style aggregates).
- * Production SEO Pages list uses bounded provider count/list APIs instead.
+ * In-memory pagination helper for contract tests.
  */
 export function buildSeoPagesListResult(
   allRows: SeoPage[],
-  geoContext: SeoGeoContext,
+  geoFilter: SeoMarketFilter,
   query: SeoPagesListQuery = {},
 ): SeoPagesListResult {
   const q = query.q?.trim() ?? "";
@@ -212,7 +214,7 @@ export function buildSeoPagesListResult(
     query.pageSize != null ? String(query.pageSize) : null,
   );
 
-  let filtered = filterPagesByGeoContext(allRows, geoContext);
+  let filtered = filterPagesByMarketFilter(allRows, geoFilter);
   if (type !== "all") {
     filtered = filtered.filter((row) => row.type === type);
   }
@@ -237,13 +239,8 @@ export function buildSeoPagesListResult(
   };
 }
 
-/**
- * Bounded SEO Pages listing: provider countRows + listRowsPage with
- * registry-order concat windows (event→place→offer→route→article).
- * Does not materialize the full catalog for a single page request.
- */
 export async function getSeoPagesList(
-  geoContext: SeoGeoContext,
+  geoFilter: SeoMarketFilter,
   query: SeoPagesListQuery = {},
 ): Promise<SeoPagesListResult> {
   const { countEntityRows, listEntityRowsPage } = await import(
@@ -256,7 +253,7 @@ export async function getSeoPagesList(
     query.pageSize != null ? String(query.pageSize) : null,
   );
   const filters = {
-    geoContext,
+    geoFilter,
     q: q || undefined,
     indexation,
   };
