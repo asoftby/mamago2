@@ -201,7 +201,7 @@ export async function getUserWithDetails(userId: string) {
     prisma.place.findMany({
       where: placesWhere,
       orderBy: { updatedAt: "desc" },
-      take: 12,
+      take: 8,
       select: {
         id: true,
         title: true,
@@ -230,7 +230,7 @@ export async function getUserWithDetails(userId: string) {
         status: { not: "DELETED" },
       },
       orderBy: { updatedAt: "desc" },
-      take: 12,
+      take: 6,
       select: {
         id: true,
         title: true,
@@ -245,7 +245,7 @@ export async function getUserWithDetails(userId: string) {
     prisma.offer.findMany({
       where: offersWhere,
       orderBy: { updatedAt: "desc" },
-      take: 12,
+      take: 6,
       select: {
         id: true,
         title: true,
@@ -267,7 +267,7 @@ export async function getUserWithDetails(userId: string) {
     prisma.article.findMany({
       where: { authorUserId: userId },
       orderBy: { updatedAt: "desc" },
-      take: 12,
+      take: 6,
       select: {
         id: true,
         title: true,
