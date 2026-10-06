@@ -45,4 +45,10 @@ for (const f of [
 ]) {
   assert.match(read(f), /getCurrentUser\(\)/, `${f} requires auth`);
 }
+// Ending a membership withdraws the shared-data consent (leave and move to another family).
+const membersSvc = read("src/server/family/familyMembers.service.ts");
+const leave = membersSvc.slice(membersSvc.indexOf("export async function leaveFamily"), membersSvc.indexOf("export async function transferFamilyOwnership"));
+assert.match(leave, /consentRecord\.updateMany\([\s\S]*?FAMILY_SHARED_DATA[\s\S]*?revokedAt: now/, "leave revokes consent");
+const joinSvc = read("src/server/family/familyInvite.service.ts");
+assert.match(joinSvc, /archivedAt: now[\s\S]*?consentRecord\.updateMany\([\s\S]*?revokedAt: now/, "joining elsewhere revokes consent for the old family");
 console.log("familyMembers.contract.test: ok");
