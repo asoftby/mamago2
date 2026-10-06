@@ -1,8 +1,7 @@
 import { SeoPagesClient } from "@/components/admin/seo/SeoPagesClient";
 import { SeoPageHeader } from "@/components/admin/seo/primitives/SeoPageHeader";
 import { getSeoPagesList } from "@/lib/admin/seo/data/seoAdminData";
-import { formatSeoGeoContextBreadcrumb } from "@/lib/admin/seo/geo";
-import { resolveSeoGeoSession } from "@/lib/admin/seo/geo/resolveSeoGeoSession";
+import { resolveSeoMarketSession } from "@/lib/admin/seo/geo/resolveSeoGeoSession";
 import { firstSearchParam } from "@/lib/admin/firstSearchParam";
 import { parseAdminPage } from "@/lib/admin/pagination";
 import { parseSeoPagesPageSize } from "@/lib/admin/seoNavConfig";
@@ -39,7 +38,7 @@ interface PageProps {
 
 export default async function AdminSeoPagesPage({ searchParams }: PageProps) {
   const raw = await searchParams;
-  const { context } = await resolveSeoGeoSession();
+  const session = await resolveSeoMarketSession();
 
   const pageRaw = firstSearchParam(raw.page);
   const pageSizeRaw = firstSearchParam(raw.pageSize);
@@ -56,7 +55,7 @@ export default async function AdminSeoPagesPage({ searchParams }: PageProps) {
       ? (indexationRaw as SeoPageIndexationStatus)
       : "all";
 
-  const list = await getSeoPagesList(context, {
+  const list = await getSeoPagesList(session.filter, {
     page: parseAdminPage(pageRaw),
     pageSize: parseSeoPagesPageSize(pageSizeRaw),
     q,
@@ -75,7 +74,7 @@ export default async function AdminSeoPagesPage({ searchParams }: PageProps) {
     <div className="space-y-8">
       <SeoPageHeader
         title="Страницы"
-        subtitle={`SEO существующих страниц · ${formatSeoGeoContextBreadcrumb(context)}`}
+        subtitle={`SEO существующих страниц · ${session.presentation.marketLabel}`}
       />
       <SeoPagesClient
         initialRows={list.items}

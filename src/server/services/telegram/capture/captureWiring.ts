@@ -14,6 +14,7 @@ import {
 import { TelegramChannel } from "../TelegramChannel";
 import { CAPTURE_ALLOWLIST_ENV, parseCaptureAllowlist } from "./captureAllowlist";
 import { createCaptureInboxProcessor } from "./captureProcessor";
+import type { InboxProcessor } from "./inboxProcessor";
 import { createInboxIntake, type IntakeNotifier, type IntakeResult } from "./inboxIntake.service";
 import { getTelegramCaptureClient } from "./telegramCaptureClient";
 import type { ParsedCapture } from "./telegramUpdateParser";
@@ -44,25 +45,30 @@ function createNotifier(): IntakeNotifier {
   };
 }
 
+/** The real inbox processor with production wiring; shared by the webhook and the recover cron. */
+export function createDefaultCaptureProcessor(): InboxProcessor {
+  return createCaptureInboxProcessor({
+    db: prismaBase,
+    openrouter: createOpenRouterClient(),
+    telegram: getTelegramCaptureClient(),
+    models: () => readCaptureModelConfig(),
+    context: {
+      db: prismaBase,
+      city: {
+        findCityIdBySlug: async (slug) => (await findCityBySlug(slug, { select: { id: true } }))?.id ?? null,
+      },
+      places: { publicPlaceWhere: getPublicPublishedPlaceWhere() },
+    },
+  });
+}
+
 export function createDefaultCaptureRoutingDeps(): CaptureRoutingDeps {
   let intake: ReturnType<typeof createInboxIntake> | null = null;
   const getIntake = () => {
     intake ??= createInboxIntake({
       db: prismaBase,
       notifier: createNotifier(),
-      processor: createCaptureInboxProcessor({
-        db: prismaBase,
-        openrouter: createOpenRouterClient(),
-        telegram: getTelegramCaptureClient(),
-        models: () => readCaptureModelConfig(),
-        context: {
-          db: prismaBase,
-          city: {
-            findCityIdBySlug: async (slug) => (await findCityBySlug(slug, { select: { id: true } }))?.id ?? null,
-          },
-          places: { publicPlaceWhere: getPublicPublishedPlaceWhere() },
-        },
-      }),
+      processor: createDefaultCaptureProcessor(),
     });
     return intake;
   };

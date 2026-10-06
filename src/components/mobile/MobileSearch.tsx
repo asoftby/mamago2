@@ -17,10 +17,8 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { PRIMARY_NAVIGATION_ITEMS } from "@/lib/discovery/discoveryIntentConfig";
 import { SearchResults } from "@/components/search/SearchResults";
 import type { SearchResultItem as SearchResultItemType } from "@/lib/search/types";
-import {
-  PUBLIC_SEARCH_DEBOUNCE_MS,
-  PUBLIC_SEARCH_RESULTS_LIMIT,
-} from "@/lib/search/constants";
+import { PUBLIC_SEARCH_DEBOUNCE_MS } from "@/lib/search/constants";
+import { buildPublicSearchApiUrl } from "@/lib/search/buildPublicSearchApiUrl";
 import { resolveVisiblePopularTags } from "@/lib/search/popularSearchTags";
 import { rememberPublicSearchQuery } from "@/lib/search/recentPublicSearch";
 import { useLastPublicSearchQuery } from "@/hooks/useLastPublicSearchQuery";
@@ -35,6 +33,8 @@ export type MobileSearchProps = {
   /** Аккордеон «Где / Когда / С кем» — только когда выбран раздел и запрос короче 2 символов */
   filtersSection: ReactNode;
   onResultNavigate: (item: SearchResultItemType) => void;
+  /** Pending/active city slug for SearchQueryLog geo telemetry. */
+  citySlug?: string | null;
 };
 
 export function MobileSearch({
@@ -44,6 +44,7 @@ export function MobileSearch({
   onIntentSelect,
   filtersSection,
   onResultNavigate,
+  citySlug,
 }: MobileSearchProps) {
   const lastSearch = useLastPublicSearchQuery();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -120,7 +121,7 @@ export function MobileSearch({
     (async () => {
       try {
         const res = await fetch(
-          `/api/search?q=${encodeURIComponent(trimmed)}&limit=${PUBLIC_SEARCH_RESULTS_LIMIT}`,
+          buildPublicSearchApiUrl({ q: trimmed, citySlug }),
           { credentials: "include", cache: "no-store" },
         );
         if (!res.ok || cancelled) return;
@@ -137,7 +138,7 @@ export function MobileSearch({
     return () => {
       cancelled = true;
     };
-  }, [trimmed]);
+  }, [trimmed, citySlug]);
 
   const handlePopularPick = useCallback(
     (term: string) => {
