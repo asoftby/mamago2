@@ -51,8 +51,10 @@ const minskCtx = {
   cityId: "c1",
   citySlug: "minsk",
   cityName: "Минск",
-  regionId: "r1",
-  regionName: "Минская область",
+  regionId: null,
+  regionName: null,
+  seoMarketRegionId: "r1",
+  seoMarketRegionName: "Минская область",
   countryId: "by",
   countryName: "Беларусь",
 };
@@ -63,7 +65,6 @@ assert.equal(presented.supportsMarketScopes, true);
 const marketFilter = enrichMarketFilterWithRegionCities(
   resolveSeoMarketFilter(minskCtx, "market"),
   [
-    { id: "c1", slug: "minsk" },
     { id: "c2", slug: "zhodino" },
   ],
 );

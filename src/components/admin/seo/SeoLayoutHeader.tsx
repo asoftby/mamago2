@@ -30,7 +30,7 @@ export function SeoLayoutHeader({
   const showGeo = shouldShowSeoGeoContextSelector(pathname);
 
   return (
-    <header className="space-y-4 border-b border-gray-200 pb-4">
+    <header className="space-y-4 pb-4">
       <SeoSubNav />
       {showGeo ? (
         <SeoGeoContextSelector

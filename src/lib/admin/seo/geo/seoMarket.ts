@@ -1,6 +1,8 @@
 /**
  * SEO Market = product view over Geo SEO Context.
- * For a selected city: CITY + linked REGION (City.regionId).
+ * For a selected city: CITY + SEO market REGION (`seoMarketRegionId`),
+ * which may come from administrative City.regionId or an explicit slug map
+ * for administratively separate cities (e.g. Minsk → minskaya-oblast).
  * View scope filters which slice of that market (or country) is shown.
  */
 
@@ -79,7 +81,7 @@ export function presentSeoMarket(context: SeoGeoContext): SeoMarketPresentation 
     };
   }
   if (context.kind === "city") {
-    const regionName = context.regionName;
+    const regionName = context.seoMarketRegionName;
     const marketLabel = regionName
       ? `${context.cityName} + ${regionName}`
       : context.cityName;
@@ -157,8 +159,8 @@ export function resolveSeoMarketFilter(
   }
 
   if (viewScope === "region") {
-    if (!context.regionId) {
-      // No linked region — fall back to city-only rather than empty market.
+    if (!context.seoMarketRegionId) {
+      // No SEO market region — fall back to city-only rather than empty market.
       return {
         kind: "city",
         cityId: context.cityId,
@@ -167,7 +169,7 @@ export function resolveSeoMarketFilter(
     }
     return {
       kind: "region",
-      regionId: context.regionId,
+      regionId: context.seoMarketRegionId,
       cityIds: [], // filled by caller if needed — see resolve with catalog
       citySlugs: [],
     };
@@ -178,8 +180,8 @@ export function resolveSeoMarketFilter(
     kind: "market",
     cityId: context.cityId,
     citySlug: context.citySlug,
-    regionId: context.regionId,
-    regionName: context.regionName,
+    regionId: context.seoMarketRegionId,
+    regionName: context.seoMarketRegionName,
     cityIds: [context.cityId],
     citySlugs: [context.citySlug],
   };

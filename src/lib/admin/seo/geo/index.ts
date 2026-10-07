@@ -42,3 +42,8 @@ export {
   type SeoMarketPresentation,
   type SeoMarketViewScope,
 } from "./seoMarket";
+
+export {
+  SEO_MARKET_REGION_BY_CITY_SLUG,
+  resolveSeoMarketRegionForCity,
+} from "./resolveSeoMarketRegion";
