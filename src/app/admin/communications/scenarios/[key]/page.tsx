@@ -71,6 +71,16 @@ function buildPreviewContext(scenario: NotificationScenario): SendNotificationCo
         placeName: "Парк Горького",
         cityName: "Минск",
       };
+    case "PLAN_ITEM_REMINDER":
+      return {
+        planItemId: "preview-reminder",
+        activityId: null,
+        itemTitle: "Взять справку в школу",
+        planDate: "2026-10-09",
+        startsAt: null,
+        reminderAt: new Date(),
+        placeName: null,
+      };
     case "PLAN_TOMORROW_DIGEST":
       return {
         digestDate: "preview",
