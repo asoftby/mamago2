@@ -34,7 +34,6 @@ export function ManualPlanEntryDialog({
   onConflict: () => void;
 }) {
   const [title, setTitle] = useState("");
-  const [entryType, setEntryType] = useState<"EVENT" | "ACTIVITY" | "TASK">("ACTIVITY");
   const [childId, setChildId] = useState("");
   const [entryDate, setEntryDate] = useState(date);
   const [startsAt, setStartsAt] = useState("");
@@ -47,7 +46,6 @@ export function ManualPlanEntryDialog({
   useEffect(() => {
     if (!open) return;
     setTitle(item?.title ?? "");
-    setEntryType(item?.entryType ?? "ACTIVITY");
     setChildId(item?.childId ?? "");
     setEntryDate(item?.date ?? date);
     setStartsAt(timeValue(item?.startsAt ?? null));
@@ -67,7 +65,6 @@ export function ManualPlanEntryDialog({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           title,
-          entryType,
           childId: childId || null,
           date: entryDate,
           startsAt: startsAt || null,
@@ -99,21 +96,13 @@ export function ManualPlanEntryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] w-[calc(100vw-1.5rem)] max-w-lg overflow-y-auto rounded-2xl p-0 sm:w-full">
         <DialogHeader className="border-b px-5 py-4 text-left">
-          <DialogTitle>{item ? "Изменить запись" : "Добавить своё"}</DialogTitle>
-          <DialogDescription>Разовое событие семейного календаря</DialogDescription>
+          <DialogTitle>{item ? "Изменить заметку" : "Добавить в план"}</DialogTitle>
+          <DialogDescription>Запишите то, что нужно сделать или не забыть</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4 px-5 pb-5 pt-4">
           <label className={labelClass}>
             Что?
             <input autoFocus required maxLength={160} value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} aria-describedby={error ? "manual-entry-error" : undefined} />
-          </label>
-          <label className={labelClass}>
-            Тип
-            <select value={entryType} onChange={(e) => setEntryType(e.target.value as typeof entryType)} className={inputClass}>
-              <option value="EVENT">Событие</option>
-              <option value="ACTIVITY">Занятие</option>
-              <option value="TASK">Дело</option>
-            </select>
           </label>
           <label className={labelClass}>
             Для кого?
