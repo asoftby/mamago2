@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { MapPin, Search } from "lucide-react";
+import { ChevronDown, MapPin, Search } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
@@ -13,7 +13,7 @@ import {
   type PrimaryNavigationId,
 } from "@/lib/discovery/discoveryIntentConfig";
 import { IconBookOpen, IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/icons";
-import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
+import { getCityLocativePhrase, getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { formatWhoHeaderSummary } from "@/lib/family/formatWhoHeaderSummary";
@@ -54,6 +54,11 @@ interface MobileSearchEntryProps {
   showSectionIcon?: boolean;
   /** Подсказка «тапни, чтобы выбрать» — только на главной города (`/{city}`) */
   showTapToSelectHint?: boolean;
+  /**
+   * `chip` — компактный контекст-чип для однострочного хедера:
+   * «🧭 Минск · Я и Степан ▾». Единственная точка входа в поиск.
+   */
+  variant?: "field" | "chip";
 }
 
 export function MobileSearchEntry({
@@ -65,6 +70,7 @@ export function MobileSearchEntry({
   showSectionIcon = false,
   showTapToSelectHint = false,
   locationLabelOverride = null,
+  variant = "field",
 }: MobileSearchEntryProps) {
   const [isClient, setIsClient] = useState(false);
   const { applied } = useDiscoveryFilters();
@@ -286,6 +292,29 @@ export function MobileSearchEntry({
     onlyCitySelected && (showTapToSelectHint || !cityHubOnly);
 
   const TAP_HINT = "[ тапни, чтобы выбрать ]";
+
+  if (variant === "chip") {
+    const chipCity = locationLabelOverride ?? getCityNominativeName(citySlug);
+    const chipText = [chipCity, cityHubOnly ? null : ageText].filter(Boolean).join(" · ");
+    return (
+      <button
+        type="button"
+        onClick={onSearchClick}
+        aria-label="Изменить город и спутников"
+        className={cn(
+          "flex h-10 min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-full border border-gray-200 bg-white px-3 text-left shadow-sm",
+          "transition-colors duration-200 hover:border-gray-300 active:bg-gray-50",
+          className,
+        )}
+      >
+        <span aria-hidden className="shrink-0 text-base leading-none">🧭</span>
+        <span className="block min-w-0 flex-1 truncate text-sm font-normal text-gray-700">
+          {chipText}
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" aria-hidden />
+      </button>
+    );
+  }
 
   return (
     <button

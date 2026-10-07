@@ -13,6 +13,8 @@ type MamaGoLogoMarkProps = {
   ariaLabel?: string;
   /** Branding logo override; falls back to the static asset when unset. */
   src?: string | null;
+  /** Только значок, без подписи «2.0 beta» (компактный мобильный хедер). */
+  hideBetaLabel?: boolean;
 };
 
 /**
@@ -25,6 +27,7 @@ export function MamaGoLogoMark({
   priority,
   ariaLabel,
   src,
+  hideBetaLabel = false,
 }: MamaGoLogoMarkProps) {
   const mark = (
     <>
@@ -36,12 +39,14 @@ export function MamaGoLogoMark({
         priority={priority}
         className={imageClassName}
       />
+      {hideBetaLabel ? null : (
       <span
         className="font-mono text-[9px] font-normal lowercase leading-none text-[#737373] md:text-[10px]"
         aria-hidden
       >
         2.0 beta
       </span>
+      )}
     </>
   );
 
