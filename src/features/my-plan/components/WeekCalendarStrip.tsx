@@ -111,10 +111,6 @@ export function WeekCalendarStrip({
     selectDate(preservedDate);
   };
 
-  const shiftDay = (dir: 1 | -1) => {
-    selectDate(addDaysLocal(selectedDate, dir));
-  };
-
   const selectToday = () => {
     selectDate(todayIso);
   };
@@ -256,6 +252,7 @@ export function WeekCalendarStrip({
               overflowX: compact ? "auto" : "visible",
               scrollSnapType: compact ? "x mandatory" : undefined,
               WebkitOverflowScrolling: compact ? "touch" : undefined,
+              scrollbarWidth: compact ? "none" : undefined,
               touchAction: compact ? "pan-x pan-y" : "pan-y",
               paddingInline: compact ? 2 : 0,
             }}
