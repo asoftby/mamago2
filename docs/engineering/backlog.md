@@ -5282,7 +5282,7 @@ distributor_company_id=550) и хотели бы уточнить несколь
 
 ## [BACKLOG-184] Рекомендации и «Собрать сценарий» для прошедших дат в виджете
 
-- Status: OPEN
+- Status: DONE (2026-10-07, feat/plan-calendar-20261007: past day shows records only, empty state «В этот день записей не было»)
 - Priority: P3
 - Area: My Plan
 - Added: 2026-10-07

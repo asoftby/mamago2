@@ -1096,6 +1096,53 @@ export function PlanMainContent({
   ) : null;
   const dayContextLabel = relativeLabel(selectedDate, todayKey);
 
+  const renderDayPlanSection = (compact: boolean) => (
+    <section aria-label="В вашем плане">
+      <p
+        style={{
+          margin: compact ? "0 0 18px" : "0 0 14px",
+          fontSize: 13,
+          color: "rgba(20,18,16,.55)",
+        }}
+      >
+        <span style={{ color: "#141210", fontWeight: 600 }}>{dayContextLabel}</span>
+        {" · "}
+        {totalPlannedCount} {pluralRu(totalPlannedCount, ["запись", "записи", "записей"])}
+      </p>
+      <div className={compact ? "space-y-3" : "space-y-2"}>
+        {dayPartSections.map((section) =>
+          section.items.map((item) => (
+            <PlanItemRow
+              key={item.id}
+              item={item}
+              participantLabel={
+                item.childId
+                  ? childrenList.find((child) => child.id === item.childId)?.name ?? null
+                  : null
+              }
+              onRemove={() => handleRemoveFromPlan(item.id)}
+            />
+          )),
+        )}
+      </div>
+    </section>
+  );
+
+  const isPastDay = selectedDate < todayKey;
+
+  /** Past days: records only — no recommendations, decision fork or scenario CTA. */
+  const renderPastDay = (compact: boolean) =>
+    isPendingDateHydration ? null : dayPartSections.length > 0 ? (
+      renderDayPlanSection(compact)
+    ) : (
+      <p
+        role="status"
+        className="rounded-[24px] border border-dashed border-neutral-300 bg-neutral-50 p-4 text-center text-sm text-neutral-600"
+      >
+        В этот день записей не было
+      </p>
+    );
+
   const renderRecommendationArea = (compact: boolean) => {
     if (isPendingDateHydration) {
       return (
@@ -1117,37 +1164,7 @@ export function PlanMainContent({
         className="space-y-4 outline-none"
         {...PLAN_RECOMMENDATION_RESULTS_A11Y}
       >
-        {dayPartSections.length > 0 ? (
-          <section aria-label="В вашем плане">
-            <p
-              style={{
-                margin: compact ? "0 0 18px" : "0 0 14px",
-                fontSize: 13,
-                color: "rgba(20,18,16,.55)",
-              }}
-            >
-              <span style={{ color: "#141210", fontWeight: 600 }}>{dayContextLabel}</span>
-              {" · "}
-              {totalPlannedCount} {pluralRu(totalPlannedCount, ["запись", "записи", "записей"])}
-            </p>
-            <div className={compact ? "space-y-3" : "space-y-2"}>
-              {dayPartSections.map((section) =>
-                section.items.map((item) => (
-                  <PlanItemRow
-                    key={item.id}
-                    item={item}
-                    participantLabel={
-                      item.childId
-                        ? childrenList.find((child) => child.id === item.childId)?.name ?? null
-                        : null
-                    }
-                    onRemove={() => handleRemoveFromPlan(item.id)}
-                  />
-                )),
-              )}
-            </div>
-          </section>
-        ) : null}
+        {dayPartSections.length > 0 ? renderDayPlanSection(compact) : null}
 
         <section
           className={compact ? "space-y-3 px-1" : "space-y-3 px-1"}
@@ -1260,31 +1277,43 @@ export function PlanMainContent({
             />
           ) : null}
 
-          {renderRecommendationContext()}
+          {isPastDay ? (
+            renderPastDay(false)
+          ) : (
+            <>
+              {isPastDay ? (
+          renderPastDay(true)
+        ) : (
+          <>
+            {renderRecommendationContext()}
 
-          {awaitingAgeAnswer ? (
-            <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} />
-          ) : showDecisionFork ? (
-            <RecommendationDecisionBlock
-              onDecide={handleDecideClick}
-              isGenerating={isFetchingSuggestions}
-            />
-          ) : null}
+                  {awaitingAgeAnswer ? (
+                    <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} />
+                  ) : showDecisionFork ? (
+                    <RecommendationDecisionBlock
+                      onDecide={handleDecideClick}
+                      isGenerating={isFetchingSuggestions}
+                    />
+                  ) : null}
 
-          {renderRecommendationArea(false)}
+                  {renderRecommendationArea(false)}
 
-          {suggestionsGeneration > 0 ? (
-            <PlanRecommendationCta
-              onRegenerate={handleRegenerate}
-              onCatalog={handleOpenCatalog}
-              isRegenerating={isFetchingSuggestions}
-              batchNumber={suggestionsGeneration}
-              maxBatches={MAX_SUGGESTION_BATCHES}
-              isExhausted={suggestionsExhausted}
-            />
-          ) : null}
+                  {suggestionsGeneration > 0 ? (
+                    <PlanRecommendationCta
+                      onRegenerate={handleRegenerate}
+                      onCatalog={handleOpenCatalog}
+                      isRegenerating={isFetchingSuggestions}
+                      batchNumber={suggestionsGeneration}
+                      maxBatches={MAX_SUGGESTION_BATCHES}
+                      isExhausted={suggestionsExhausted}
+                    />
+                  ) : null}
 
-          {renderBottomActions()}
+                  {renderBottomActions()}
+          </>
+        )}
+            </>
+          )}
         </div>
 
         <PlanStickyCounter count={totalPlannedCount} onClick={handleOpenPlanPage} />
