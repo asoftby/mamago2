@@ -592,6 +592,8 @@ model PlanItem {
   dueHasTime        Boolean                   @default(false)
   locationText      String?
   notes             String?
+  /// Optional explicit reminder time for this saved plan row. When set, it overrides the generic event offset reminder.
+  reminderAt        DateTime?
   priceAmount       Decimal?                  @db.Decimal(10, 2)
   priceCurrency     String?                   @default("BYN")
   /// Простая ссылка без FK: входящие чистятся независимо от записей плана
@@ -630,6 +632,7 @@ model PlanItem {
   @@index([userId, planPlaceSlug])
   @@index([articleId])
   @@index([startsAt])
+  @@index([reminderAt])
   @@index([userId, source, startsAt])
   @@index([childId])
   @@index([venuePlaceId])
@@ -4385,6 +4388,7 @@ enum NotificationDeliveryStatus {
 
 enum NotificationScenario {
   PLAN_EVENT_2H_BEFORE
+  PLAN_ITEM_REMINDER
   PLAN_TOMORROW_DIGEST
 }
 
