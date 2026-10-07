@@ -115,7 +115,7 @@ export function MobileHeader() {
             isHomeLogo
             logoSrc={logoUrl ?? undefined}
             chrome="dark"
-            className="border-2 border-white bg-white shadow-[0_4px_14px_rgba(0,0,0,0.14)]"
+            className="border-2 border-white bg-white shadow-none"
           />
           <MobileSearchEntry
             variant="chip"
