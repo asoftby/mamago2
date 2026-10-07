@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PlanItemRow, decideRowClickCapture, getConcealedDeleteA11yProps } from "./PlanItemRow";
+import { PlanItemRow, decideRowClickCapture, getConcealedDeleteA11yProps, planItemVisualKind } from "./PlanItemRow";
 import type { PlanItemWithActivity } from "../types/event";
 
 function item(id: string, title = `Item ${id}`): PlanItemWithActivity {
@@ -17,6 +17,12 @@ function item(id: string, title = `Item ${id}`): PlanItemWithActivity {
     activity: null,
   };
 }
+
+// The product UI intentionally has only two visual kinds:
+assert.equal(planItemVisualKind({ source: "CATALOG" }), "event");
+assert.equal(planItemVisualKind({ source: "MANUAL" }), "note");
+assert.equal(planItemVisualKind({ source: "TELEGRAM_FORWARD" }), "note");
+assert.equal(planItemVisualKind({ source: undefined }), "event");
 
 // --- B. Concealed delete action must not be keyboard-reachable or exposed
 // to assistive tech while the swipe panel is closed, and must be normal and

@@ -39,8 +39,8 @@ function renderPlanEvent2hBefore(
   const ctaUrl = `/me/day/${formatDateKey(planContext.startsAt, timeZone)}`;
 
   return {
-    title: "Скоро событие",
-    body: `В ${startsAtLabel} у вас в плане: ${planContext.eventTitle}`,
+    title: "Скоро в плане",
+    body: `В ${startsAtLabel}: ${planContext.eventTitle}`,
     ctaLabel: "Открыть план",
     ctaUrl,
   };
