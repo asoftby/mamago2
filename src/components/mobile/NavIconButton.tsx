@@ -105,7 +105,7 @@ export function NavIconButton({
       aria-label={ariaLabel}
       className={cn(
         getNavIconButtonClassName({ isActive, size, className, chrome, variant }),
-        isHomeLogo && !bare && "p-[3px]",
+        isHomeLogo && !bare && "p-[2px]",
       )}
     >
       {avatarUrl ? (
