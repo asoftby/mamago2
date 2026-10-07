@@ -81,6 +81,7 @@ export type PlanItemWithActivity = {
   articleId?: string | null;
   date: string;
   startsAt: Date | null;
+  reminderAt: Date | null;
   title: string | null;
   coverImageUrl: string | null;
   createdAt: Date;
