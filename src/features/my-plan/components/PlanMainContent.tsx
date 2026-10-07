@@ -1234,6 +1234,7 @@ export function PlanMainContent({
               selectedDate={selectedDate}
               onChangeDate={onChangeDate}
               compact
+              showArrows={false}
               plannedCountByDate={plannedCountByDate}
             />
           </div>
