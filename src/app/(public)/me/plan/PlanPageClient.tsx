@@ -47,6 +47,7 @@ export type SerializedPlanItem = {
   endsAt: string | null;
   dueAt: string | null;
   dueHasTime: boolean;
+  reminderAt: string | null;
   activityId: string | null;
   title: string | null;
   childId: string | null;
