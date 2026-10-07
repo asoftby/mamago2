@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, CalendarDays, Clock3, Gift, GraduationCap, MapPin, Plus, UserRound, X } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -42,6 +42,10 @@ export function QuickAddPlanNoteSheet({
   const dateLabel = new Date(date + "T12:00:00")
     .toLocaleDateString("ru-RU", { day: "numeric", month: "short" })
     .replace(".", "");
+
+  useEffect(() => {
+    if (!open) setDate(selectedDate);
+  }, [open, selectedDate]);
 
   function reset() {
     setTitle("");
