@@ -44,8 +44,6 @@ import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { formatPlanTargetDateRu } from "@/lib/date/formatPlanTargetDateRu";
 import { useUpcomingSessions } from "./useUpcomingSessions";
 import { formatVenueAddressForPublicDisplay } from "@/lib/event/formatVenueAddressForDisplay";
-import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
-import { matchesSelectedPersonaAudience } from "@/lib/discovery/audienceEligibility";
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
@@ -324,7 +322,6 @@ export function EventPageView({
   data: EventPageData;
 }) {
   const { isAuthenticated } = useAuthMe();
-  const familyPersona = useFamilyPersona();
   const setPublicationIntent = useSetPublicationIntent();
   const ctaRef = useRef<HTMLDivElement>(null);
 
@@ -580,16 +577,7 @@ export function EventPageView({
   const hasSimpleBooking = Boolean(data.cta.simpleBooking);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const handleBook = useCallback(() => setBookingModalOpen(true), []);
-  const visibleSimilar = useMemo(() => {
-    const candidates = data.similar.filter((item) => {
-      if (!familyPersona || familyPersona.loading) return true;
-      return matchesSelectedPersonaAudience(item, {
-        personas: familyPersona.personas,
-        selectedPersonaIds: familyPersona.selectedPersonaIds,
-      });
-    });
-    return candidates.slice(0, 4);
-  }, [data.similar, familyPersona]);
+  const visibleSimilar = data.similar.slice(0, 4);
   const hasSimilar = visibleSimilar.length > 0;
   const hasWhyGo = data.whyGo.length > 0;
   const hasGoodFit = data.goodFit.length > 0;
