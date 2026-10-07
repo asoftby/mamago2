@@ -10,6 +10,18 @@ export function normalizePlanItemsFromApi(raw: unknown[]): PlanItemWithActivity[
         o.startsAt != null && o.startsAt !== ""
           ? new Date(o.startsAt as string)
           : null,
+      endsAt:
+        o.endsAt != null && o.endsAt !== ""
+          ? new Date(o.endsAt as string)
+          : null,
+      reminderAt:
+        o.reminderAt != null && o.reminderAt !== ""
+          ? new Date(o.reminderAt as string)
+          : null,
+      updatedAt:
+        o.updatedAt != null && o.updatedAt !== ""
+          ? new Date(o.updatedAt as string)
+          : undefined,
       createdAt: new Date(o.createdAt as string),
     } as PlanItemWithActivity;
   });
