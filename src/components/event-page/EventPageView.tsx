@@ -45,6 +45,8 @@ import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { formatPlanTargetDateRu } from "@/lib/date/formatPlanTargetDateRu";
 import { useUpcomingSessions } from "./useUpcomingSessions";
 import { formatVenueAddressForPublicDisplay } from "@/lib/event/formatVenueAddressForDisplay";
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
+import { matchesSelectedPersonaAudience } from "@/lib/discovery/audienceEligibility";
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
@@ -206,8 +208,29 @@ function EventLocationEditorial({ venue }: { venue: NonNullable<EventPageData["v
       mapUrl={venue.mapUrl}
       routeUrl={venue.routeUrl}
       placeHref={venue.placeHref}
-      className="border-b"
+      className="border-b !border-t-0"
     />
+  );
+}
+
+function EventOrganizerLegal({ organizer }: { organizer: NonNullable<EventPageData["organizer"]> }) {
+  return (
+    <section className="py-8 md:py-10">
+      <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
+          <span
+            className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.45)]"
+            style={{ fontFamily: "Menlo, monospace" }}
+          >
+            Организатор события
+          </span>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px] text-[rgba(20,18,16,0.60)]">
+            <span className="font-medium text-[#141210]">{organizer.name}</span>
+            {organizer.unp ? <span>УНП {organizer.unp}</span> : null}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -310,6 +333,7 @@ export function EventPageView({
   direct?: EventDirectCtaInfo;
 }) {
   const { isAuthenticated } = useAuthMe();
+  const familyPersona = useFamilyPersona();
   const setPublicationIntent = useSetPublicationIntent();
   const ctaRef = useRef<HTMLDivElement>(null);
 
@@ -565,7 +589,17 @@ export function EventPageView({
   const hasSimpleBooking = Boolean(data.cta.simpleBooking);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const handleBook = useCallback(() => setBookingModalOpen(true), []);
-  const hasSimilar = data.similar.length > 0;
+  const visibleSimilar = useMemo(() => {
+    const candidates = data.similar.filter((item) => {
+      if (!familyPersona || familyPersona.loading) return true;
+      return matchesSelectedPersonaAudience(item, {
+        personas: familyPersona.personas,
+        selectedPersonaIds: familyPersona.selectedPersonaIds,
+      });
+    });
+    return candidates.slice(0, 4);
+  }, [data.similar, familyPersona]);
+  const hasSimilar = visibleSimilar.length > 0;
   const hasWhyGo = data.whyGo.length > 0;
   const hasGoodFit = data.goodFit.length > 0;
 
@@ -715,10 +749,20 @@ export function EventPageView({
       {hasSimilar && (
         <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
-            <SimilarEventsSection items={data.similar} onPlan={handlePlanSimilar} />
+            <SimilarEventsSection
+              items={visibleSimilar}
+              onPlan={handlePlanSimilar}
+              allHref={
+                data.categorySlug
+                  ? `/${data.citySlug}/events/category/${data.categorySlug}`
+                  : `/${data.citySlug}/events`
+              }
+            />
           </div>
         </section>
       )}
+
+      {data.organizer && <EventOrganizerLegal organizer={data.organizer} />}
 
       {!data.hidePublicationStats && (
         <PublicationStatsPanel
