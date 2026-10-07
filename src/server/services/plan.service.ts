@@ -1,4 +1,4 @@
-import type { PlanVisibility } from "@prisma/client";
+import type { PlanEntryType, PlanItemSource, PlanVisibility } from "@prisma/client";
 import { planCountUnit } from "@/server/family/familyAnalyticsPure";
 import { prisma } from "@/lib/prisma";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
@@ -81,7 +81,14 @@ export type PlanItemWithActivity = {
   articleId?: string | null;
   date: string;
   startsAt: Date | null;
-  /** Explicit one-off reminder; synthetic plan rows may omit it. */
+  /** Manual/Telegram plan metadata is present on persisted rows and optional on synthetic recommendations. */
+  source?: PlanItemSource;
+  entryType?: PlanEntryType | null;
+  endsAt?: Date | null;
+  childId?: string | null;
+  locationText?: string | null;
+  notes?: string | null;
+  /** Explicit one-off reminder; synthetic UI items may omit it. */
   reminderAt?: Date | null;
   title: string | null;
   coverImageUrl: string | null;
