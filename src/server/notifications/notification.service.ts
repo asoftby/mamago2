@@ -17,6 +17,7 @@ import { sendNotificationCore } from "./notification-service-core";
 import { resolveNotificationTypeForScenario } from "./notification-scenario";
 import type {
   PlanEventReminderContext,
+  PlanItemReminderContext,
   PlanTomorrowDigestContext,
 } from "@/lib/notifications/domainContracts";
 export {
@@ -84,6 +85,10 @@ function resolveNotificationEventId(
     case "PLAN_EVENT_2H_BEFORE": {
       const context = input.context as PlanEventReminderContext;
       return context.activityId ?? context.planItemId;
+    }
+    case "PLAN_ITEM_REMINDER": {
+      const context = input.context as PlanItemReminderContext;
+      return `${context.planItemId}:${context.reminderAt.toISOString()}`;
     }
     case "PLAN_TOMORROW_DIGEST": {
       const context = input.context as PlanTomorrowDigestContext;
