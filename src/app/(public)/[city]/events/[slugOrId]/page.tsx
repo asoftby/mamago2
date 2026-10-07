@@ -211,7 +211,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
           cityId: fromDb.cityId,
           citySlug: city,
           eventCategoryId: fromDb.eventCategory.id,
-          limit: 16,
+          limit: 4,
           sameCategoryOnly: true,
           userId: user?.id ?? null,
         })
