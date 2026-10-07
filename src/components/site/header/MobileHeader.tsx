@@ -24,6 +24,7 @@ import {
   isNonStickyHeaderPath,
   isJournalPath,
 } from "@/lib/intent";
+import { getSiteHeaderVariant } from "@/lib/site/siteHeaderVariant";
 import { useCity } from "@/contexts/CityContext";
 import { usePublicationIntent } from "@/contexts/PublicationIntentContext";
 import { useArticleGeoLabel } from "@/contexts/ArticleGeoLabelContext";
@@ -68,7 +69,9 @@ export function MobileHeader() {
 
   const isDiscoveryPage = searchIntent !== null && currentCity !== null;
   const showFilterButton =
-    isDiscoveryPage && !!searchIntent && DISCOVERY_INTENT_CONFIG[searchIntent].hasFilters;
+    getSiteHeaderVariant(pathname) !== "landing" &&
+    isDiscoveryPage &&
+    !!searchIntent && DISCOVERY_INTENT_CONFIG[searchIntent].hasFilters;
 
   const cityHubOnly = isPublicationPage || isJournalRoute;
   const isSticky = !isNonStickyHeaderPath(pathname);

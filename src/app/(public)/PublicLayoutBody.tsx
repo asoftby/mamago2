@@ -4,7 +4,11 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { PublicFooter } from "@/components/shell/PublicFooter";
 import { BetaTipMobile } from "@/components/shared/BetaTip";
-import { shouldHideMobileBottomNav, shouldHideMyPlanWidget } from "@/lib/intent";
+import {
+  isPublicationDetailPath,
+  shouldHideMobileBottomNav,
+  shouldHideMyPlanWidget,
+} from "@/lib/intent";
 import { cn } from "@/lib/utils";
 import { useNavigationReloadDebug } from "@/hooks/useNavigationReloadDebug";
 import { NotificationSurfaceBootstrap } from "@/features/notifications/NotificationSurfaceBootstrap";
@@ -46,7 +50,9 @@ function isContentEditDestination(url: URL): boolean {
 export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const hideBottomBar = shouldHideMobileBottomNav(pathname);
-  const hasMobilePlanWidget = !shouldHideMyPlanWidget(pathname);
+  // На страницах деталей нижнюю панель не рендерим (там EventStickyActionBar) — отступ под неё не нужен.
+  const hasMobilePlanWidget =
+    !shouldHideMyPlanWidget(pathname) && !isPublicationDetailPath(pathname);
   useNavigationReloadDebug(process.env.NODE_ENV !== "production");
 
   useEffect(() => {

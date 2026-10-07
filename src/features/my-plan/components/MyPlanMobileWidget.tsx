@@ -65,7 +65,7 @@ export function MyPlanMobileWidget({ onOpen }: MyPlanMobileWidgetProps) {
         ? formatNearestLine({
             dateStr: planSummary.nearestDate,
             startsAt: nearestItem.startsAt ?? null,
-            title: nearestItem.activity?.title ?? null,
+            title: nearestItem.activity?.title ?? nearestItem.title ?? null,
           })
         : formatNearestLine({
             dateStr: nextPlanItem?.date ?? null,
