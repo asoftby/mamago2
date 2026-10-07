@@ -22,14 +22,14 @@ export default async function AdminSeoTopicsPage() {
       session.filter.kind === "region" || session.filter.kind === "market"
         ? session.filter.regionId
         : session.context.kind === "city"
-          ? session.context.regionId
+          ? session.context.seoMarketRegionId
           : session.context.kind === "region"
             ? session.context.regionId
             : null;
   } else if (session.context.kind === "city") {
     defaultGeoScope = "CITY";
     defaultCityId = session.context.cityId;
-    defaultRegionId = session.context.regionId;
+    defaultRegionId = session.context.seoMarketRegionId;
   } else if (session.context.kind === "region") {
     defaultGeoScope = "REGION";
     defaultRegionId = session.context.regionId;

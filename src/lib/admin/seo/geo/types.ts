@@ -56,8 +56,12 @@ export type SeoGeoContext =
       cityId: string;
       citySlug: string;
       cityName: string;
+      /** Administrative City.regionId (null for Minsk). */
       regionId: string | null;
       regionName: string | null;
+      /** Product SEO market region (may differ from administrative region). */
+      seoMarketRegionId: string | null;
+      seoMarketRegionName: string | null;
       countryId: string;
       countryName: string;
     }
@@ -86,7 +90,13 @@ export type SeoGeoSelectorOption =
       label: string;
       group: "city";
       cityId: string;
+      /** Administrative City.regionId (null for Minsk). */
+      regionId: string | null;
       regionName: string | null;
+      /** Product SEO market region for selectors / MARKET view. */
+      seoMarketRegionId: string | null;
+      seoMarketRegionName: string | null;
+      countryId: string;
       countryName: string;
     }
   | {
@@ -94,6 +104,7 @@ export type SeoGeoSelectorOption =
       label: string;
       group: "region";
       regionId: string;
+      countryId: string;
       countryName: string;
     }
   | {
@@ -126,7 +137,8 @@ export function formatSeoGeoContextBreadcrumb(ctx: SeoGeoContext): string {
   if (ctx.kind === "all") return "Все регионы";
   if (ctx.kind === "city") {
     const parts = [ctx.countryName];
-    if (ctx.regionName) parts.push(ctx.regionName);
+    const marketRegionName = ctx.seoMarketRegionName ?? ctx.regionName;
+    if (marketRegionName) parts.push(marketRegionName);
     parts.push(ctx.cityName);
     return parts.join(" / ");
   }

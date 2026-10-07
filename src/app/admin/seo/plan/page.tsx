@@ -68,7 +68,7 @@ export default async function AdminSeoPlanPage({ searchParams }: PageProps) {
     session.context.kind === "city" ? session.context.cityId : null;
   const defaultRegionId =
     session.context.kind === "city"
-      ? session.context.regionId
+      ? session.context.seoMarketRegionId
       : session.context.kind === "region"
         ? session.context.regionId
         : null;

@@ -4,12 +4,17 @@ import {
   buildGeoMixProgress,
   DEFAULT_GEO_CONTENT_MIX,
   filterPagesByGeoContext,
+  filterPagesByMarketFilter,
   formatSeoGeoContextBreadcrumb,
   isSeoGeoContextToken,
   prismaGeoScopeToSeoKind,
   seoScopeKindToPrisma,
 } from "./index";
 import { buildSeoGeoCatalog } from "./loadSeoGeoCatalog";
+import {
+  enrichMarketFilterWithRegionCities,
+  resolveSeoMarketFilter,
+} from "./seoMarket";
 import type { SeoPage } from "@/lib/admin/seo/domain/types";
 import { buildSeoDashboardSummaryFromPages } from "@/lib/admin/seo/data/seoAdminData";
 
@@ -40,9 +45,9 @@ const catalog = buildSeoGeoCatalog(
       id: "city-minsk",
       slug: "minsk",
       name: "Минск",
-      regionId: "reg-minsk",
+      regionId: null,
       countryId: "by",
-      region: { id: "reg-minsk", slug: "minskaya", name: "Минская область" },
+      region: null,
       country: { id: "by", slug: "belarus", name: "Беларусь" },
     },
     {
@@ -51,24 +56,23 @@ const catalog = buildSeoGeoCatalog(
       name: "Брест",
       regionId: "reg-brest",
       countryId: "by",
-      region: { id: "reg-brest", slug: "brestskaya", name: "Брестская область" },
+      region: { id: "reg-brest", slug: "brestskaya-oblast", name: "Брестская область" },
       country: { id: "by", slug: "belarus", name: "Беларусь" },
     },
   ],
   [
     {
-      id: "reg-minsk",
-      slug: "minskaya",
+      id: "region_minskaya_oblast",
+      slug: "minskaya-oblast",
       name: "Минская область",
       countryId: "by",
       country: { id: "by", slug: "belarus", name: "Беларусь" },
-      cities: [
-        { id: "city-minsk", slug: "minsk" },
-      ],
+      // Administrative membership only — Minsk is intentionally absent.
+      cities: [{ id: "city-zhodino", slug: "zhodino" }],
     },
     {
       id: "reg-brest",
-      slug: "brestskaya",
+      slug: "brestskaya-oblast",
       name: "Брестская область",
       countryId: "by",
       country: { id: "by", slug: "belarus", name: "Беларусь" },
@@ -81,13 +85,15 @@ assert.equal(catalog.defaultToken, "city:city-minsk");
 const minsk = catalog.resolve("city:city-minsk");
 assert.equal(minsk.kind, "city");
 if (minsk.kind === "city") {
+  assert.equal(minsk.regionId, null);
+  assert.equal(minsk.seoMarketRegionId, "region_minskaya_oblast");
   assert.equal(
     formatSeoGeoContextBreadcrumb(minsk),
     "Беларусь / Минская область / Минск",
   );
 }
 
-const region = catalog.resolve("region:reg-minsk");
+const region = catalog.resolve("region:region_minskaya_oblast");
 assert.equal(region.kind, "region");
 
 const pages: SeoPage[] = [
@@ -145,6 +151,25 @@ const pages: SeoPage[] = [
     indexationStatus: "indexed",
   },
   {
+    id: "entity:article:region",
+    path: "/blog/minsk-region",
+    section: "journal",
+    type: "article",
+    filtersSnapshot: {
+      entityId: "r1",
+      regionId: "region_minskaya_oblast",
+      regionName: "Минская область",
+      geoScope: "REGION",
+    },
+    title: "R",
+    h1: "R",
+    description: "d",
+    isIndexable: true,
+    canonical: null,
+    updatedAt: new Date().toISOString(),
+    indexationStatus: "indexed",
+  },
+  {
     id: "entity:article:3",
     path: "/blog/national",
     section: "journal",
@@ -168,9 +193,22 @@ const minskPages = filterPagesByGeoContext(pages, minsk);
 assert.equal(minskPages.length, 1);
 assert.equal(minskPages[0]?.id, "entity:place:1");
 
+// REGION context uses administrative membership — Minsk CITY pages are excluded.
 const regionPages = filterPagesByGeoContext(pages, region);
 assert.equal(regionPages.length, 1);
-assert.equal(regionPages[0]?.id, "entity:place:1");
+assert.equal(regionPages[0]?.id, "entity:article:region");
+
+// MARKET for city:minsk uses SEO market region and includes Minsk + region content.
+assert.ok(minsk.kind === "city");
+const market = enrichMarketFilterWithRegionCities(
+  resolveSeoMarketFilter(minsk, "market"),
+  [{ id: "city-zhodino", slug: "zhodino" }],
+);
+const marketPages = filterPagesByMarketFilter(pages, market);
+assert.deepEqual(
+  marketPages.map((p) => p.id).sort(),
+  ["entity:article:region", "entity:place:1"],
+);
 
 const country = catalog.resolve("country:by");
 const countryPages = filterPagesByGeoContext(pages, country);
