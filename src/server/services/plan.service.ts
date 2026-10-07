@@ -598,13 +598,24 @@ export async function listPlanItemsDueForReminder(args: {
 }): Promise<PlanReminderCandidate[]> {
   const rows = (await prisma.planItem.findMany({
     where: {
-      activityId: { not: null },
       ...NOT_CANCELLED,
       ...DATED,
-      startsAt: {
-        gte: args.windowStart,
-        lte: args.windowEnd,
-      },
+      OR: [
+        {
+          reminderAt: {
+            gte: args.windowStart,
+            lte: args.windowEnd,
+          },
+        },
+        {
+          reminderAt: null,
+          activityId: { not: null },
+          startsAt: {
+            gte: args.windowStart,
+            lte: args.windowEnd,
+          },
+        },
+      ],
     },
     include: {
       activity: { select: planActivitySelect },
