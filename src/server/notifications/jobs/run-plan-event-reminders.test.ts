@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import type { SendNotificationResult } from "@/lib/notifications/domainContracts";
+import type {
+  PlanItemReminderContext,
+  SendNotificationResult,
+} from "@/lib/notifications/domainContracts";
 import type { PlanReminderCandidate } from "@/server/services/plan.service";
 import { runPlanEventRemindersCore } from "./run-plan-event-reminders-core";
 
@@ -111,8 +114,9 @@ void (async () => {
           scenario = input.scenario;
           assert.equal(input.scenario, "PLAN_ITEM_REMINDER");
           if (input.scenario === "PLAN_ITEM_REMINDER") {
-            assert.equal(input.context.itemTitle, "Взять справку в школу");
-            assert.equal(input.context.reminderAt.toISOString(), reminderAt.toISOString());
+            const context = input.context as PlanItemReminderContext;
+            assert.equal(context.itemTitle, "Взять справку в школу");
+            assert.equal(context.reminderAt.toISOString(), reminderAt.toISOString());
           }
           return sentResult;
         },
