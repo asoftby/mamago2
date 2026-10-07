@@ -14,6 +14,7 @@ import { MobileSearchEntry } from "@/components/mobile/MobileSearchEntry";
 import { MobileSearchSheet } from "@/components/mobile/MobileSearchSheet";
 import { MobileFilterButton } from "@/components/mobile/MobileFilterButton";
 import { NavIconButton } from "@/components/mobile/NavIconButton";
+import { MOBILE_HEADER_ROW_HEIGHT } from "@/components/mobile/mobile-control-geometry";
 import {
   getIntentFromPath,
   getCityFromPath,
@@ -106,7 +107,7 @@ export function MobileHeader() {
           isScrolled && "shadow-[0_4px_20px_rgba(0,0,0,0.08)]",
         )}
       >
-        <div className="flex h-16 min-w-0 items-center gap-2 px-3">
+        <div className={cn("flex min-w-0 items-center gap-2 px-3", MOBILE_HEADER_ROW_HEIGHT)}>
           <NavIconButton
             href={`/${displayCity}`}
             isActive={false}
