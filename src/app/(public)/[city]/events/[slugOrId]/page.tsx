@@ -213,6 +213,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
           eventCategoryId: fromDb.eventCategory.id,
           limit: 16,
           sameCategoryOnly: true,
+          userId: user?.id ?? null,
         })
       : [];
 
