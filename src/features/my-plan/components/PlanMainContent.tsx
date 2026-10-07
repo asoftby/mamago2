@@ -418,7 +418,7 @@ export function PlanMainContent({
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [hiddenPlanItemIds, setHiddenPlanItemIds] = useState<Set<string>>(() => new Set());
-  const pendingRemovalTimersRef = useRef<Map<string, number>>(new Map());
+  const pendingRemovalIdsRef = useRef<Set<string>>(new Set());
   const [awaitingAgeAnswer, setAwaitingAgeAnswer] = useState(false);
   const [needsAgeAnswerValues, setNeedsAgeAnswerValues] = useState<string[] | null>(null);
   /** Реальные саджесты из /api/plan/suggestions (M2.4) — не клиентский demo-пул. */
@@ -437,11 +437,7 @@ export function PlanMainContent({
   const skipNextDraftPersistRef = useRef<string | null>(null);
 
   const restorePendingPlanItem = useCallback((itemId: string) => {
-    const timerId = pendingRemovalTimersRef.current.get(itemId);
-    if (timerId != null) {
-      window.clearTimeout(timerId);
-      pendingRemovalTimersRef.current.delete(itemId);
-    }
+    pendingRemovalIdsRef.current.delete(itemId);
     setHiddenPlanItemIds((current) => {
       if (!current.has(itemId)) return current;
       const next = new Set(current);
@@ -450,40 +446,51 @@ export function PlanMainContent({
     });
   }, []);
 
-  const handleRemoveFromPlan = useCallback((itemId: string) => {
-    if (!onRemoveItemFromPlan || pendingRemovalTimersRef.current.has(itemId)) return;
+  const commitPendingPlanItemRemoval = useCallback(async (itemId: string) => {
+    if (!onRemoveItemFromPlan || !pendingRemovalIdsRef.current.has(itemId)) return;
+    pendingRemovalIdsRef.current.delete(itemId);
+    try {
+      const result = onRemoveItemFromPlan(itemId);
+      const ok = result instanceof Promise ? await result : true;
+      if (!ok) {
+        restorePendingPlanItem(itemId);
+        toast.error("Не получилось убрать из плана");
+      }
+    } catch {
+      restorePendingPlanItem(itemId);
+      toast.error("Не получилось убрать из плана");
+    }
+  }, [onRemoveItemFromPlan, restorePendingPlanItem]);
 
+  const handleRemoveFromPlan = useCallback((itemId: string) => {
+    if (!onRemoveItemFromPlan || pendingRemovalIdsRef.current.has(itemId)) return;
+
+    pendingRemovalIdsRef.current.add(itemId);
     setHiddenPlanItemIds((current) => {
       const next = new Set(current);
       next.add(itemId);
       return next;
     });
 
-    const timerId = window.setTimeout(async () => {
-      pendingRemovalTimersRef.current.delete(itemId);
-      try {
-        const result = onRemoveItemFromPlan(itemId);
-        const ok = result instanceof Promise ? await result : true;
-        if (!ok) {
-          restorePendingPlanItem(itemId);
-          toast.error("Не получилось убрать из плана");
-        }
-      } catch {
-        restorePendingPlanItem(itemId);
-        toast.error("Не получилось убрать из плана");
-      }
-    }, 5000);
-
-    pendingRemovalTimersRef.current.set(itemId, timerId);
-
+    const toastId = `plan-delete-${itemId}`;
     toast("Удалено из плана", {
+      id: toastId,
       duration: 5000,
       action: {
         label: "Отменить",
-        onClick: () => restorePendingPlanItem(itemId),
+        onClick: () => {
+          restorePendingPlanItem(itemId);
+          toast.dismiss(toastId);
+        },
+      },
+      onAutoClose: () => {
+        void commitPendingPlanItemRemoval(itemId);
+      },
+      onDismiss: () => {
+        void commitPendingPlanItemRemoval(itemId);
       },
     });
-  }, [onRemoveItemFromPlan, restorePendingPlanItem]);
+  }, [commitPendingPlanItemRemoval, onRemoveItemFromPlan, restorePendingPlanItem]);
 
 
 
