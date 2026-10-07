@@ -85,13 +85,14 @@ export function WeekCalendarStrip({
   const weekDays = useMemo(() => getWeekDays(visibleWeekStart), [visibleWeekStart]);
   const compactDays = useMemo(() => {
     const today = getLocalDateKey();
-    const defaultFutureEnd = addDaysLocal(today, 59);
+    const defaultStart = addDaysLocal(today, -7);
+    const defaultFutureEnd = addDaysLocal(today, 67);
     const start = allowPastDates
       ? addDaysLocal(selectedDate, -14)
       : selectedDate > defaultFutureEnd
         ? addDaysLocal(selectedDate, -7)
-        : today;
-    return Array.from({ length: allowPastDates ? 45 : 60 }, (_, index) =>
+        : defaultStart;
+    return Array.from({ length: allowPastDates ? 45 : 75 }, (_, index) =>
       addDaysLocal(start, index),
     );
   }, [allowPastDates, selectedDate]);
