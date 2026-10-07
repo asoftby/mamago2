@@ -30,6 +30,11 @@ import {
   type RankedPlanSuggestion,
 } from "@/server/services/planSuggestions.service";
 import { recordRecommendationRun } from "@/server/services/recommendations/RecommendationTraceService";
+import { buildSelectedProfileContext } from "@/lib/decision/subjects";
+import { resolveSelectedExperienceAffinity } from "@/server/services/recommendations/experienceAffinity";
+import { childScopeFor } from "@/server/family/familyAccess";
+import { DEFAULT_TZ } from "@/server/geo/geoConstants";
+import { formatInTimeZone } from "date-fns-tz";
 
 const FALLBACK_IMAGE = "/og-default.jpg";
 
@@ -136,10 +141,39 @@ export async function loadSimilarActivities(opts: {
     userId = null,
   } = opts;
 
+  const targetDate = formatInTimeZone(new Date(), DEFAULT_TZ, "yyyy-MM-dd");
+  const selectedProfileContext = userId
+    ? await (async () => {
+        const children = await prisma.child.findMany({
+          where: await childScopeFor(userId),
+          select: { id: true },
+          take: 20,
+        });
+        return buildSelectedProfileContext({
+          userId,
+          personaIds: [userId, ...children.map((child) => child.id)],
+          targetDate,
+        });
+      })()
+    : { subjects: [], systemInterestSlugs: [] };
+  const experienceAffinity = userId
+    ? await resolveSelectedExperienceAffinity({
+        userId,
+        subjects: selectedProfileContext.subjects,
+      })
+    : undefined;
+  const ageRangeValues = selectedProfileContext.subjects
+    .map((subject) => subject.kind === "child" ? subject.ageRange : undefined)
+    .filter((value): value is string => Boolean(value));
+
   const rankedBatch = await rankPlanSuggestionsForCity({
     citySlug,
     excludeActivityIds: [activityId],
-    take: Math.max(limit * 8, 32),
+    take: Math.max(limit, 4),
+    exhaustiveCandidatePool: true,
+    ...(ageRangeValues.length > 0 ? { ageRangeValues } : {}),
+    profileInterestSlugs: selectedProfileContext.systemInterestSlugs,
+    ...(experienceAffinity ? { experienceAffinity } : {}),
   });
 
   const ranked = rankedBatch.suggestions.filter((item) =>
@@ -159,10 +193,20 @@ export async function loadSimilarActivities(opts: {
       items: [],
       decisionContext: {
         intent: "related_event_suggestions",
-        subjects: [],
-        constraints: eventCategoryId
-          ? { eventCategoryId: { value: eventCategoryId, source: "derived" } }
-          : undefined,
+        subjects: selectedProfileContext.subjects,
+        constraints: {
+          ...(eventCategoryId
+            ? { eventCategoryId: { value: eventCategoryId, source: "derived" as const } }
+            : {}),
+          ...(selectedProfileContext.systemInterestSlugs.length > 0
+            ? {
+                interests: {
+                  value: selectedProfileContext.systemInterestSlugs,
+                  source: "profile" as const,
+                },
+              }
+            : {}),
+        },
         actor: { kind: userId ? "user" : "guest", id: userId },
       },
     });
@@ -237,10 +281,20 @@ export async function loadSimilarActivities(opts: {
     }),
     decisionContext: {
       intent: "related_event_suggestions",
-      subjects: [],
-      constraints: eventCategoryId
-        ? { eventCategoryId: { value: eventCategoryId, source: "derived" } }
-        : undefined,
+      subjects: selectedProfileContext.subjects,
+      constraints: {
+        ...(eventCategoryId
+          ? { eventCategoryId: { value: eventCategoryId, source: "derived" as const } }
+          : {}),
+        ...(selectedProfileContext.systemInterestSlugs.length > 0
+          ? {
+              interests: {
+                value: selectedProfileContext.systemInterestSlugs,
+                source: "profile" as const,
+              },
+            }
+          : {}),
+      },
       actor: { kind: userId ? "user" : "guest", id: userId },
     },
   });
