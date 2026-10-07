@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Trash2, Calendar as CalendarIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -34,12 +34,22 @@ function debugScheduleLog(message: string, payload?: Record<string, unknown>) {
   console.debug(`[EventEditorSchedule] ${message}`);
 }
 
+function addDurationToTime(startTime: string, durationMinutes?: number): string | null {
+  if (!durationMinutes || durationMinutes < 1) return null;
+  const match = /^(\d{2}):(\d{2})$/.exec(startTime);
+  if (!match) return null;
+  const total =
+    (Number(match[1]) * 60 + Number(match[2]) + durationMinutes) % (24 * 60);
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
 export function EventScheduleCard({
   item,
   onChange,
   onRemove,
   canRemove,
   disabled = false,
+  durationMinutes,
 }: EventScheduleCardProps) {
   const [isCollapsed, setIsCollapsed] = useState(item.isCollapsed || false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -52,6 +62,18 @@ export function EventScheduleCard({
   const handleUpdate = (updates: Partial<EventScheduleItem>) => {
     onChange({ ...item, ...updates });
   };
+
+  const lastDurationInput = useRef<string | null>(null);
+  useEffect(() => {
+    const inputKey = `${durationMinutes ?? ""}|${item.startTime}|${item.allDay}`;
+    if (lastDurationInput.current === inputKey) return;
+    lastDurationInput.current = inputKey;
+    if (item.allDay) return;
+    const calculatedEnd = addDurationToTime(item.startTime, durationMinutes);
+    if (calculatedEnd && calculatedEnd !== item.endTime) {
+      onChange({ ...item, endTime: calculatedEnd });
+    }
+  }, [durationMinutes, item, onChange]);
 
   const timeOrder = resolveScheduleItemTimeOrder(item);
 
@@ -319,11 +341,13 @@ export function EventScheduleCard({
                 <div className="bg-white">
                   <div className={cn(
                     "bg-white",
-                    item.isMultiDay ? "flex" : ""
+                    item.isMultiDay ? "flex flex-col sm:flex-row" : ""
                   )}>
                     <div className={cn(
                       "bg-white p-3 sm:p-4",
-                      item.isMultiDay ? "flex-1 border-r border-gray-200" : "w-full"
+                      item.isMultiDay
+                        ? "flex-1 border-b border-gray-200 sm:border-b-0 sm:border-r"
+                        : "w-full"
                     )}>
                       <Calendar
                         size="compact"
@@ -408,7 +432,7 @@ export function EventScheduleCard({
 
           {/* Time Fields */}
           {!item.allDay && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor={`start-${item.id}`} className="text-sm font-medium text-gray-900">
                   Начало
@@ -417,7 +441,14 @@ export function EventScheduleCard({
                   id={`start-${item.id}`}
                   type="time"
                   value={item.startTime}
-                  onChange={(e) => handleUpdate({ startTime: e.target.value })}
+                  onChange={(e) => {
+                    const startTime = e.target.value;
+                    const calculatedEnd = addDurationToTime(startTime, durationMinutes);
+                    handleUpdate({
+                      startTime,
+                      ...(calculatedEnd ? { endTime: calculatedEnd } : {}),
+                    });
+                  }}
                 />
               </div>
               <div className="space-y-2">

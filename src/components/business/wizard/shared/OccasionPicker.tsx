@@ -15,17 +15,25 @@ interface OccasionPickerProps {
   value: string[];
   onChange: (ids: string[]) => void;
   disabled?: boolean;
+  /** Hide occasions that do not apply to the current editor surface. */
+  excludeSlugs?: readonly string[];
 }
 
 /** Максимум выбранных поводов на событие */
 const MAX_SELECTED_OCCASIONS = 2;
+const EMPTY_EXCLUDED_SLUGS: readonly string[] = [];
 
 /**
  * Compact pill-chip selector for currently active occasions.
  * Renders nothing if there are no active occasions.
  * Selection is optional — not a required field. 0..2 occasions.
  */
-export function OccasionPicker({ value, onChange, disabled }: OccasionPickerProps) {
+export function OccasionPicker({
+  value,
+  onChange,
+  disabled,
+  excludeSlugs = EMPTY_EXCLUDED_SLUGS,
+}: OccasionPickerProps) {
   const [occasions, setOccasions] = useState<OccasionOption[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,7 +44,10 @@ export function OccasionPicker({ value, onChange, disabled }: OccasionPickerProp
       .then((data: unknown) => {
         if (cancelled) return;
         if (Array.isArray(data)) {
-          setOccasions(data as OccasionOption[]);
+          const excluded = new Set(excludeSlugs);
+          setOccasions(
+            (data as OccasionOption[]).filter((occasion) => !excluded.has(occasion.slug)),
+          );
         }
       })
       .catch(() => {
@@ -48,7 +59,7 @@ export function OccasionPicker({ value, onChange, disabled }: OccasionPickerProp
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [excludeSlugs]);
 
   // Don't render anything while loading or if no active occasions
   if (loading || occasions.length === 0) return null;

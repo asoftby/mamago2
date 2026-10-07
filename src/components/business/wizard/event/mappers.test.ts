@@ -63,11 +63,14 @@ import { getDefaultFormData } from "./defaults";
   const form = getDefaultFormData();
   form.title = "Any age event";
   form.agePolicy = "UNRESTRICTED";
+  form.ageRangeIds = ["0-1", "1-3", "3-5", "5-7", "7-9", "9-12", "12-14", "14-16", "16-18", "18+"];
   const payload = buildEventPayload(form);
   assert.equal(payload.agePolicy, "UNRESTRICTED");
   assert.deepEqual(payload.ageTags, []);
   assert.equal(payload.ageMinMonths, null);
   assert.equal(payload.ageMaxMonths, null);
+  assert.ok(payload.scheduleJson);
+  assert.deepEqual(payload.scheduleJson.ageRangeIds, form.ageRangeIds);
 }
 
 {
