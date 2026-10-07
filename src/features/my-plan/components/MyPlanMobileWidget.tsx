@@ -6,7 +6,7 @@ import { ru } from "date-fns/locale";
 import { PlanCalendarIcon } from "@/components/icons/PlanCalendarIcon";
 import { cn } from "@/lib/utils";
 import {
-  MOBILE_DISCOVERY_FIELD_CHROME,
+  MOBILE_GLASS_CHROME,
   MOBILE_DISCOVERY_FIELD_GEOMETRY,
 } from "@/components/mobile/mobile-control-geometry";
 import { useMyPlan } from "../hooks/useMyPlan";
@@ -129,7 +129,7 @@ export function MyPlanMobileWidgetView({
         className={cn(
           "pointer-events-auto flex min-w-0 flex-1 items-center gap-3 text-left text-[#1A1A1A]",
           MOBILE_DISCOVERY_FIELD_GEOMETRY,
-          MOBILE_DISCOVERY_FIELD_CHROME,
+          MOBILE_GLASS_CHROME,
           "touch-manipulation transition-transform duration-150 ease-out active:scale-[0.98]",
           pulse ? "scale-105 motion-reduce:scale-100" : "scale-100",
         )}
@@ -140,8 +140,8 @@ export function MyPlanMobileWidgetView({
             <span
               key={count}
               className={cn(
-                "absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-white px-1",
-                "text-[11px] font-bold leading-none text-[#1A1A1A]",
+                "absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1",
+                "text-[11px] font-bold leading-none text-white",
                 pulse && "motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-300",
               )}
               aria-hidden

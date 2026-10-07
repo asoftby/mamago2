@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { MOBILE_GLASS_CHROME } from "@/components/mobile/mobile-control-geometry";
 
 export type NavIconSize = "default" | "compact";
 
@@ -64,8 +65,9 @@ export function getNavIconButtonClassName({
     "active:scale-[0.96] active:transition-transform",
     chrome === "dark"
       ? cn(
-          "border-gray-200 bg-white shadow-sm active:scale-[0.98]",
-          isActive && "border-[#EF8759]/40",
+          MOBILE_GLASS_CHROME,
+          "active:scale-[0.98]",
+          isActive && "border-[#EF8759]/50",
         )
       : isActive
         ? "border-[#EF8759]/35 bg-white/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_14px_rgba(239,135,89,0.18)]"
