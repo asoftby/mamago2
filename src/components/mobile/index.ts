@@ -5,3 +5,4 @@ export * from "./MobileIntentTabs";
 export * from "./MobileSearchSheet";
 export * from "./NavIconButton";
 export * from "./MobileFilterButton";
+export * from "./MobileBottomBar";

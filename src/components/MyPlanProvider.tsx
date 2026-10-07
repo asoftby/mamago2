@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
+import { MobileBottomBar } from "@/components/mobile/MobileBottomBar";
 import { MyPlanWidget, MyPlanMobileWidget, MyPlanOverlay } from "@/features/my-plan";
 import { MyPlanStateProvider } from "@/features/my-plan/hooks/useMyPlan";
 import { appendMyPlanOpenToHref, MY_PLAN_OPEN_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
@@ -73,7 +74,11 @@ function MyPlanOverlayHost({ pathname }: { pathname: string }) {
   return (
     <>
       {!hidePlanEntryEffective ? <MyPlanWidget onOpen={handleOpenMyPlan} /> : null}
-      {!hidePlanEntryEffective ? <MyPlanMobileWidget onOpen={handleOpenMyPlan} /> : null}
+      {!hidePlanEntryEffective ? (
+        <MobileBottomBar>
+          <MyPlanMobileWidget onOpen={handleOpenMyPlan} />
+        </MobileBottomBar>
+      ) : null}
       <MyPlanOverlay open={planOpen} onOpenChange={handlePlanOpenChange} />
     </>
   );
@@ -85,6 +90,10 @@ export function MyPlanProvider() {
     return null;
   }
   const isFullPageRoute = isMyPlanFullPageRoute(pathname);
+  if (isFullPageRoute && !shouldHideMyPlanWidget(pathname)) {
+    // Полноэкранный план: виджет не нужен, но 🔔/👤 внизу остаются.
+    return <MobileBottomBar />;
+  }
 
   return (
     <PlanOverlayProvider>

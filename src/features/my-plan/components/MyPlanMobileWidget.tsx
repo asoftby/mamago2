@@ -31,8 +31,7 @@ function formatNearestLine(input: {
 
 /**
  * Мобильный (< lg) плавающий виджет «Мой план» — единственный элемент низа экрана
- * и главный цветовой акцент. Фон — затемнённый brand-active (#AA4220): белый текст и вторая строка (opacity .85) ≥ 4.5:1;
- * сам --brand-active (#C85F35) даёт только ~4.1:1, поэтому оттенок темнее.
+ * и главный цветовой акцент. Фон --brand, текст #1A1A1A (≈6.9:1; вторая строка с opacity .85 ≥ 4.5:1).
  * Анимации — только реакция на добавление события (пульс + счётчик), с учётом reduced motion.
  */
 export function MyPlanMobileWidget({ onOpen }: MyPlanMobileWidgetProps) {
@@ -117,34 +116,31 @@ export function MyPlanMobileWidgetView({
     : "Мой план, пока нет событий";
 
   return (
-    <div
-      className="pointer-events-none fixed inset-x-3 z-40 lg:hidden"
-      style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
-    >
+    <>
       <button
         type="button"
         onClick={onOpen}
         aria-label={ariaLabel}
         data-my-plan-mobile-widget
         className={cn(
-          "pointer-events-auto flex h-16 w-full items-center gap-3 rounded-[22px] px-4 text-left text-white",
-          "bg-[#AA4220]",
+          "pointer-events-auto flex h-16 min-w-0 flex-1 items-center gap-3 rounded-[22px] px-4 text-left text-[#1A1A1A]",
+          "bg-brand",
           "touch-manipulation transition-transform duration-150 ease-out active:scale-[0.98]",
           pulse ? "scale-105 motion-reduce:scale-100" : "scale-100",
         )}
         style={{
           boxShadow:
-            "0 8px 24px rgba(170, 66, 32, 0.35)",
+            "0 8px 24px rgba(239, 135, 89, 0.35)",
                   }}
       >
         <span className="relative flex h-9 w-9 shrink-0 items-center justify-center">
-          <PlanCalendarIcon className="h-6 w-6 text-white" />
+          <PlanCalendarIcon className="h-6 w-6 text-[#1A1A1A]" />
           {hasEvents && (
             <span
               key={count}
               className={cn(
                 "absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-white px-1",
-                "text-[11px] font-bold leading-none text-[#AA4220]",
+                "text-[11px] font-bold leading-none text-[#1A1A1A]",
                 pulse && "motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-300",
               )}
               aria-hidden
@@ -174,6 +170,6 @@ export function MyPlanMobileWidgetView({
           <path d="M5 12h14M13 6l6 6-6 6" />
         </svg>
       </button>
-    </div>
+    </>
   );
 }

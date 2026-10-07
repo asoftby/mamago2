@@ -12,7 +12,7 @@ import { useUserNotificationBadgeCount } from "@/features/notifications/hooks/us
 import { cn } from "@/lib/utils";
 
 /**
- * Сервисные действия мобильного хедера: 🔔 уведомления + 👤 профиль.
+ * Сервисные действия нижней панели: 🔔 уведомления + 👤 профиль (белые круги 44px).
  * Колокольчик — только для авторизованных (у гостя нет уведомлений).
  */
 export function MobileHeaderActions() {
@@ -35,7 +35,7 @@ export function MobileHeaderActions() {
     pathname.startsWith("/admin");
 
   return (
-    <>
+    <div className="pointer-events-auto flex shrink-0 items-center gap-2">
       {isAuthenticated && (
         <button
           type="button"
@@ -46,7 +46,7 @@ export function MobileHeaderActions() {
             isActive: isNotificationsActive,
             size: "compact",
             chrome: "dark",
-            className: "h-10 w-10",
+            className: "h-11 w-11 shadow-md",
           })}
         >
           <NavBellIcon
@@ -90,6 +90,6 @@ export function MobileHeaderActions() {
         compact
         chrome="dark"
       />
-    </>
+    </div>
   );
 }
