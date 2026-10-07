@@ -21,9 +21,8 @@ import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { resolveEventCanonicalUrl } from "@/lib/seo/resolveEventCanonicalUrl";
 import { fetchReelsThumbnail } from "@/lib/instagram/fetchReelsThumbnail";
 import { parseVideoUrl } from "@/lib/media/parseVideoUrl";
-import { tryResolvePublicationForCta } from "@/server/services/direct/directThread.service";
 import { getCityDisplayName, getCityNominativeName } from "@/lib/city/cityDisplayNames";
-import { PublicationType } from "@prisma/client";
+import { loadSimilarActivities } from "@/lib/event/loadSimilarActivities";
 
 interface EventPublicPageProps {
   params: Promise<{ city: string; slugOrId: string }>;
@@ -206,29 +205,29 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
       ? await fetchReelsThumbnail(rawReelsUrl)
       : null;
 
+    const similar = fromDb.eventCategory?.id
+      ? await loadSimilarActivities({
+          activityId: fromDb.id,
+          cityId: fromDb.cityId,
+          citySlug: city,
+          eventCategoryId: fromDb.eventCategory.id,
+          limit: 16,
+          sameCategoryOnly: true,
+          userId: user?.id ?? null,
+        })
+      : [];
+
     const data = withEventPagePriceData(
       buildEventPageDataFromPrismaActivity(fromDb, {
         citySlug: city,
         ownerEditHref,
         previewBannerLabel,
         reelsThumbnailUrl: reelsThumbnailUrl ?? undefined,
+        similar,
       }),
       fromDb.priceItems,
     );
     const faqJsonLd = buildFaqJsonLd(data.faqItems);
-
-    // Direct CTA — omitted when the event has no resolvable owning Business (rule 5).
-    const directPublication = await tryResolvePublicationForCta({
-      publicationType: PublicationType.EVENT,
-      activityId: fromDb.id,
-    });
-    const directCta = directPublication
-      ? {
-          activityId: fromDb.id,
-          publicationTitle: fromDb.title,
-          brandName: fromDb.venue?.place?.title || fromDb.place?.title || directPublication.business.name,
-        }
-      : undefined;
 
     return (
       <>
@@ -242,7 +241,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
         <JsonLd
           data={[jsonLd, breadcrumbJsonLd, faqJsonLd].filter(Boolean) as Record<string, unknown>[]}
         />
-        <EventPageView data={data} direct={directCta} />
+        <EventPageView data={data} />
       </>
     );
   }
