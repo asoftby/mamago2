@@ -19,6 +19,7 @@ import { normalizeMyPlanProfileChildren, type MyPlanApiChild } from "../lib/norm
 import { MY_PLAN_REFETCH_DATE_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { reconcilePlanMarkerCounts } from "../lib/planDateMarkers";
+import { invalidatePlanDayMarkers } from "@/features/plan-calendar";
 import {
   loadPersistedPlanDate,
   persistSelectedPlanDate,
@@ -135,7 +136,8 @@ function useMyPlanStore() {
     if (!selectedPlanDateHydratedRef.current) {
       selectedPlanDateHydratedRef.current = true;
       const persistedDate = loadPersistedPlanDate();
-      if (persistedDate) {
+      // A day remembered from an earlier date is stale: fall back to the default (nearest day).
+      if (persistedDate && persistedDate >= todayISO()) {
         hasPersistedPlanDateRef.current = true;
         if (persistedDate !== selectedPlanDate) {
           setSelectedPlanDate(persistedDate);
@@ -495,6 +497,7 @@ function useMyPlanStore() {
       const date = (e as CustomEvent<{ date: string }>).detail?.date;
       if (date) void refetchPlanForDate(date);
       void refetchPlanSummary();
+      invalidatePlanDayMarkers();
     };
     window.addEventListener(MY_PLAN_REFETCH_DATE_EVENT, handler);
     return () => window.removeEventListener(MY_PLAN_REFETCH_DATE_EVENT, handler);
@@ -651,6 +654,7 @@ function useMyPlanStore() {
         removePlanItemLocal(planItemId);
         void refetchPlanForDate(selectedPlanDate);
         void refetchPlanSummary();
+        invalidatePlanDayMarkers();
         return true;
       } catch {
         return false;
@@ -872,6 +876,7 @@ function useMyPlanStore() {
         );
         void refetchPlanForDate(selectedPlanDate);
         void refetchPlanSummary();
+        invalidatePlanDayMarkers();
         return { ok: true };
       } catch {
         return { ok: false };
@@ -911,6 +916,7 @@ function useMyPlanStore() {
         addPlanItem(planItem);
         void refetchPlanForDate(selectedPlanDate);
         void refetchPlanSummary();
+        invalidatePlanDayMarkers();
         return { ok: true };
       } catch {
         return { ok: false };
@@ -1009,6 +1015,7 @@ function useMyPlanStore() {
         // Фоновый рефетч для синхронизации с сервером (без блокировки UI)
         void refetchPlanForDate(input.dateISO);
         void refetchPlanSummary();
+        invalidatePlanDayMarkers();
         return { ok: true };
       } catch {
         // Откатываем при ошибке сети

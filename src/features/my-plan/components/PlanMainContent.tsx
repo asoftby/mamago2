@@ -16,7 +16,8 @@ import {
   type AgeRangeSelection,
 } from "@/features/filters/discovery/childrenScope.store";
 import { toast } from "@/lib/toast";
-import { WeekCalendarStrip } from "./WeekCalendarStrip";
+import { PlanCalendar } from "@/features/plan-calendar";
+import { pluralRu, relativeLabel } from "@/lib/date/dateKey";
 import { UpcomingPlanBlock } from "./UpcomingPlanBlock";
 import { selectUpcomingPlanItems } from "../lib/upcomingPlanItems";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
@@ -68,7 +69,6 @@ interface PlanMainContentProps {
   nearestPlanDate?: string | null;
   nearestPlanCount?: number;
   nearestPlanItems?: PlanItemWithActivity[];
-  plannedCountByDate?: Record<string, number>;
   serverPlanSnapshotConfirmed?: boolean;
   todayIso?: string;
   layout?: "default" | "desktop";
@@ -293,23 +293,6 @@ function buildAutoPlanHint(input: {
 const RECOMMENDATIONS_BLOCK_SUBTITLE =
   "Подобрано на основании ваших интересов и предпочтений";
 
-function pluralizeActivities(count: number): string {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return "запись";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "записи";
-  return "записей";
-}
-
-/** Short day label for the compact "day context" line above the plan-item list. */
-function formatDayContextLabel(selectedDate: string, todayKey: string): string {
-  if (selectedDate === todayKey) return "Сегодня";
-  if (selectedDate === addDaysIso(todayKey, 1)) return "Завтра";
-  const d = new Date(selectedDate + "T12:00:00");
-  const label = d.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
 function formatRecommendationHeading(selectedDate: string, todayKey: string): string {
   const d = new Date(selectedDate + "T12:00:00");
   const dayMonth = d.toLocaleDateString("ru-RU", {
@@ -383,7 +366,6 @@ export function PlanMainContent({
   nearestPlanDate = null,
   nearestPlanCount = 0,
   nearestPlanItems = [],
-  plannedCountByDate = {},
   serverPlanSnapshotConfirmed = false,
   todayIso,
   layout = "default",
@@ -640,9 +622,9 @@ export function PlanMainContent({
   const handleOpenPlanPage = useCallback(() => {
     onRequestClose?.();
     window.setTimeout(() => {
-      router.push("/me/plan");
+      router.push(`/me/plan?date=${selectedDate}`);
     }, 0);
-  }, [onRequestClose, router]);
+  }, [onRequestClose, router, selectedDate]);
 
   /** «Собрать сценарий дня» — переход на отдельную страницу, а не модалка поверх модалки. */
   const handleOpenScenarioPage = useCallback(() => {
@@ -1050,7 +1032,16 @@ export function PlanMainContent({
    * дня и не пропадает навсегда для дня, который снова опустел.
    */
   const showDecisionFork = dayPartSections.length === 0 && !hasRequestedSuggestions;
-  const dayContextLabel = formatDayContextLabel(selectedDate, todayKey);
+  // One calendar for both layouts: strip vs week row is chosen by container width.
+  const planCalendar = onChangeDate ? (
+    <div
+      id="plan-week-calendar"
+      className="min-w-0 rounded-[18px] border border-[var(--plan-line)] bg-[var(--plan-surface)] p-3.5"
+    >
+      <PlanCalendar value={selectedDate} onChange={onChangeDate} variant="widget" />
+    </div>
+  ) : null;
+  const dayContextLabel = relativeLabel(selectedDate, todayKey);
 
   const renderRecommendationArea = (compact: boolean) => {
     if (isPendingDateHydration) {
@@ -1084,7 +1075,7 @@ export function PlanMainContent({
             >
               <span style={{ color: "#141210", fontWeight: 600 }}>{dayContextLabel}</span>
               {" · "}
-              {totalPlannedCount} {pluralizeActivities(totalPlannedCount)}
+              {totalPlannedCount} {pluralRu(totalPlannedCount, ["запись", "записи", "записей"])}
             </p>
             <div className={compact ? "space-y-3" : "space-y-2"}>
               {dayPartSections.map((section) =>
@@ -1206,16 +1197,7 @@ export function PlanMainContent({
           id="my-plan-recommendations"
           className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-8 pb-6 pt-1"
         >
-          {onChangeDate ? (
-            <div id="plan-week-calendar">
-              <WeekCalendarStrip
-                selectedDate={selectedDate}
-                onChangeDate={onChangeDate}
-                showArrows
-                plannedCountByDate={plannedCountByDate}
-              />
-            </div>
-          ) : null}
+          {planCalendar}
 
           {isDesktop && upcomingSelection ? (
             <UpcomingPlanBlock
@@ -1291,17 +1273,7 @@ export function PlanMainContent({
         id="my-plan-recommendations"
         className="flex-1 space-y-5 overflow-y-auto bg-white px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4"
       >
-        {onChangeDate ? (
-          <div id="plan-week-calendar">
-            <WeekCalendarStrip
-              selectedDate={selectedDate}
-              onChangeDate={onChangeDate}
-              compact
-              showArrows={false}
-              plannedCountByDate={plannedCountByDate}
-            />
-          </div>
-        ) : null}
+        {planCalendar}
 
         {isDesktop && upcomingSelection ? (
           <UpcomingPlanBlock

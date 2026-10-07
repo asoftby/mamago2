@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PLAN_SCOPE_STORAGE_KEY, filterByScope, parsePlanScopeFilter, showFamilyUi, type FamilyView, type PlanScopeFilter } from "@/features/my-plan/lib/planVisibilityView";
 import type { PlanBookingState } from "@/server/family/planBookingPure";
 import { Container } from "@/components/ui/Container";
-import { WeekCalendar } from "./WeekCalendar";
+import { PlanCalendar, invalidatePlanDayMarkers } from "@/features/plan-calendar";
 import { PlanDayList } from "./PlanDayList";
 import { PlanOverviewDialog } from "./PlanOverviewDialog";
 import { PlanProfileCompletionGate } from "./PlanProfileCompletionGate";
@@ -18,7 +18,7 @@ import {
   type ExperienceCheckInState,
 } from "./ExperienceCheckIn";
 import { ManualPlanEntryDialog } from "./ManualPlanEntryDialog";
-import { addDaysIso, getWeekStart } from "@/features/my-plan/lib/weekCalendar";
+import { addDays, monthName, startOfWeek } from "@/lib/date/dateKey";
 import {
   shouldFetchCalendarWeek,
   upsertCalendarWeekItem,
@@ -31,7 +31,6 @@ import {
   type FamilyCalendarFilter,
 } from "@/features/my-plan/lib/familyCalendar";
 import { toast } from "@/lib/toast";
-import { getLocalDateKey } from "@/lib/date/localDateKey";
 
 export type SerializedPlanItem = {
   id: string;
@@ -118,12 +117,6 @@ type Props = {
     isRead: boolean;
   } | null;
 };
-
-const MONTHS_RU = ["ЯНВАРЬ","ФЕВРАЛЬ","МАРТ","АПРЕЛЬ","МАЙ","ИЮНЬ","ИЮЛЬ","АВГУСТ","СЕНТЯБРЬ","ОКТЯБРЬ","НОЯБРЬ","ДЕКАБРЬ"];
-
-function getTodayISO() {
-  return getLocalDateKey();
-}
 
 function itemForCacheMessage(item: SerializedPlanItem): string {
   return item.source === "MANUAL" ? "Календарь обновлён" : "План обновлён";
@@ -297,11 +290,16 @@ export function PlanPageClient({
   experienceCandidates = [],
   recentExperiences = [],
 }: Props) {
-  const todayISO = getTodayISO();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
+  // The server resolved a different ?date= (e.g. «Открыть весь план» from the widget while already here).
+  const [seenInitialDate, setSeenInitialDate] = useState(initialSelectedDate);
+  if (seenInitialDate !== initialSelectedDate) {
+    setSeenInitialDate(initialSelectedDate);
+    setSelectedDate(initialSelectedDate);
+  }
   const [itemsByWeek, setItemsByWeek] = useState<Record<string, SerializedPlanItem[]>>({
     [initialRange.from]: initialItems,
   });
@@ -343,9 +341,9 @@ export function PlanPageClient({
   );
 
   const loadWeek = useCallback(async (date: string, options: { force?: boolean } = {}) => {
-    const from = getWeekStart(date);
+    const from = startOfWeek(date);
     if ((!options.force && !shouldFetchCalendarWeek(itemsByWeek, date)) || loadingWeek === from) return;
-    const to = addDaysIso(from, 6);
+    const to = addDays(from, 6);
     setLoadingWeek(from);
     try {
       const response = await fetch(`/api/plan/calendar?from=${from}&to=${to}`);
@@ -367,9 +365,10 @@ export function PlanPageClient({
     setSelectedDate(date);
     const params = new URLSearchParams(searchParams.toString());
     params.set("date", date);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    // Shallow update: keeps ?date= in the URL without re-running the server page.
+    window.history.replaceState(window.history.state, "", `${pathname}?${params.toString()}`);
     void loadWeek(date, { force: true });
-  }, [loadWeek, pathname, router, searchParams]);
+  }, [loadWeek, pathname, searchParams]);
 
   useEffect(() => {
     const refreshCurrentWeek = () => {
@@ -400,6 +399,7 @@ export function PlanPageClient({
 
   const replaceCachedItem = useCallback((saved: SerializedPlanItem) => {
     setItemsByWeek((current) => upsertCalendarWeekItem(current, saved));
+    invalidatePlanDayMarkers();
     setScenarioStatuses((current) => scenarioStatusesAfterManualSave(current, editingManualItem, saved));
     selectDate(saved.date);
     toast(itemForCacheMessage(saved), { duration: 2000 });
@@ -410,6 +410,7 @@ export function PlanPageClient({
     if (removed) {
       setScenarioStatuses((current) => scenarioStatusesAfterManualCancel(current, removed));
     }
+    invalidatePlanDayMarkers();
     setItemsByWeek((current) => Object.fromEntries(
       Object.entries(current).map(([week, weekItems]) => [week, weekItems.filter((item) => item.id !== itemId)]),
     ));
@@ -429,6 +430,7 @@ export function PlanPageClient({
     itemId: string,
     next: { visibility: "PRIVATE" | "FAMILY"; updatedAt: string },
   ) => {
+    invalidatePlanDayMarkers();
     setItemsByWeek((current) => Object.fromEntries(Object.entries(current).map(([week, weekItems]) => [week, weekItems.map((i) => i.id === itemId ? { ...i, ...next } : i)])));
   };
 
@@ -455,7 +457,7 @@ export function PlanPageClient({
           className="plan-hero-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr min(320px, 35%)",
+            gridTemplateColumns: "minmax(0, 1fr) min(320px, 35%)",
             gap: 48,
             alignItems: "flex-end",
           }}
@@ -473,7 +475,7 @@ export function PlanPageClient({
                 className="font-mono uppercase"
                 style={{ fontSize: 11, letterSpacing: ".14em", color: "rgba(20,18,16,.55)" }}
               >
-                {MONTHS_RU[Number(selectedDate.slice(5, 7)) - 1]}
+                {monthName(selectedDate).toUpperCase()}
               </span>
             </div>
             <h1
@@ -607,13 +609,8 @@ export function PlanPageClient({
 
       {/* Week Calendar */}
       <Container className="pb-12">
-        <WeekCalendar
-          selectedDate={selectedDate}
-          onSelect={selectDate}
-          itemsByDate={itemsByDate}
-          onToday={() => selectDate(todayISO)}
-          loading={loadingWeek != null}
-        />
+        <PlanCalendar value={selectedDate} onChange={selectDate} variant="page" />
+        {loadingWeek != null ? <span role="status" className="mt-2 block text-xs text-neutral-500">Загрузка…</span> : null}
         <div className="mt-4 flex flex-wrap gap-2" aria-label="Фильтр по члену семьи">
           {([
             ["all", "Все"],
@@ -644,7 +641,7 @@ export function PlanPageClient({
           className="plan-main-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: hasIdeas ? "1fr 300px" : "1fr",
+            gridTemplateColumns: hasIdeas ? "minmax(0, 1fr) 300px" : "minmax(0, 1fr)",
             gap: 48,
             alignItems: "flex-start",
           }}

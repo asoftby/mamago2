@@ -5,22 +5,13 @@ import Link from "next/link";
 import type { SerializedPlanItem } from "./PlanPageClient";
 import { PlanItemCard, type VisibilityChange } from "./PlanItemCard";
 import type { FamilyView } from "@/features/my-plan/lib/planVisibilityView";
+import { dayOfMonth, monthGenitive, weekdayFull } from "@/lib/date/dateKey";
 import { resolveScenarioCtaState, resolveScenarioCtaLabel } from "@/features/my-plan/lib/canOpenDayScenario";
 
-const MONTHS_RU_GENITIVE = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
-const DAYS_RU_FULL: Record<number, string> = {
-  1: "Понедельник", 2: "Вторник", 3: "Среда",
-  4: "Четверг", 5: "Пятница", 6: "Суббота", 0: "Воскресенье",
-};
-
 function formatDayLabel(dateStr: string): { weekday: string; day: number; month: string } {
-  const date = new Date(`${dateStr}T00:00:00.000Z`);
-  return {
-    weekday: DAYS_RU_FULL[date.getUTCDay()],
-    day: date.getUTCDate(),
-    month: MONTHS_RU_GENITIVE[date.getUTCMonth()],
-  };
+  return { weekday: weekdayFull(dateStr), day: dayOfMonth(dateStr), month: monthGenitive(dateStr) };
 }
+
 
 type Props = {
   date: string;
@@ -160,7 +151,7 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
           >
             На этот день{" "}
             <span className="font-display-italic" style={{ color: "var(--primary)" }}>
-              пока ничего нет
+              пока пусто
             </span>
           </h3>
           <p
@@ -175,8 +166,7 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
               marginRight: "auto",
             }}
           >
-            Добавьте заметку или выберите событие mamaGo для{" "}
-            {weekday.toLowerCase()}.
+            Добавьте запись или перешлите сообщение боту.
           </p>
           <div style={{ display: "inline-flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
             <button
