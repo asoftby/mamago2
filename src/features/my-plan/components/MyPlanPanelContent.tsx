@@ -78,6 +78,16 @@ export function MyPlanPanelContent({
     [setSelectedPlanDate, todayIso],
   );
 
+  const handleManualEntrySaved = useCallback(
+    async (date: string) => {
+      await Promise.all([
+        refetchPlanForDate(date),
+        refetchPlanSummary(),
+      ]);
+    },
+    [refetchPlanForDate, refetchPlanSummary],
+  );
+
   const visiblePlanItemsByDate = useMemo(() => {
     const nowMs = Date.now();
     const next: Record<string, PlanItemWithActivity[]> = {};
@@ -241,6 +251,7 @@ export function MyPlanPanelContent({
       onAddSuggestionToPlan={addActivityToPlanFromSuggestion}
       onRemoveItemFromPlan={clearSlotSaved}
       dateLoading={isDateLoading}
+      onManualEntrySaved={handleManualEntrySaved}
       onRequestClose={onRequestClose}
     />
   );
