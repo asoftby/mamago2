@@ -32,7 +32,9 @@ export function buildSeoGeoSelectorModel(
       option.group === "country" && option.value === token,
   );
 
-  const regionId = selectedCity?.regionId ?? selectedRegion?.regionId ?? null;
+  // Region dropdown follows SEO market region, not administrative City.regionId.
+  const marketRegionId =
+    selectedCity?.seoMarketRegionId ?? selectedRegion?.regionId ?? null;
   const countryId =
     selectedCity?.countryId ??
     selectedRegion?.countryId ??
@@ -41,8 +43,10 @@ export function buildSeoGeoSelectorModel(
 
   return {
     cityValue: selectedCity?.value ?? (selectedRegion ? SEO_GEO_ALL_CITIES_VALUE : SEO_GEO_EMPTY_VALUE),
-    regionValue: regionId ? `region:${regionId}` : SEO_GEO_EMPTY_VALUE,
+    regionValue: marketRegionId ? `region:${marketRegionId}` : SEO_GEO_EMPTY_VALUE,
     countryValue: countryId ? `country:${countryId}` : SEO_GEO_EMPTY_VALUE,
-    cities: regionId ? cities.filter((city) => city.regionId === regionId) : cities,
+    cities: marketRegionId
+      ? cities.filter((city) => city.seoMarketRegionId === marketRegionId)
+      : cities,
   };
 }

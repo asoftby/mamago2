@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { resolveSeoMarketRegionForCity } from "./resolveSeoMarketRegion";
 import type {
   SeoGeoContext,
   SeoGeoContextToken,
@@ -119,6 +120,7 @@ export function buildSeoGeoCatalog(
   });
 
   for (const city of sortedCities) {
+    const marketRegion = resolveSeoMarketRegionForCity(city, regions);
     options.push({
       value: `city:${city.id}`,
       label: city.name,
@@ -126,6 +128,8 @@ export function buildSeoGeoCatalog(
       cityId: city.id,
       regionId: city.regionId,
       regionName: city.region?.name ?? null,
+      seoMarketRegionId: marketRegion?.id ?? null,
+      seoMarketRegionName: marketRegion?.name ?? null,
       countryId: city.countryId,
       countryName: city.country.name,
     });
@@ -148,6 +152,7 @@ export function buildSeoGeoCatalog(
       const id = safe.slice("city:".length);
       const city = cityById.get(id);
       if (!city) return resolve(defaultToken === safe ? "all" : defaultToken);
+      const marketRegion = resolveSeoMarketRegionForCity(city, regions);
       return {
         kind: "city",
         cityId: city.id,
@@ -155,6 +160,8 @@ export function buildSeoGeoCatalog(
         cityName: city.name,
         regionId: city.regionId,
         regionName: city.region?.name ?? null,
+        seoMarketRegionId: marketRegion?.id ?? null,
+        seoMarketRegionName: marketRegion?.name ?? null,
         countryId: city.countryId,
         countryName: city.country.name,
       };
