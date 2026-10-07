@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { ChevronDown, MapPin, Search } from "lucide-react";
+import { MapPin, Search } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
@@ -24,6 +24,7 @@ import {
 import {
   MOBILE_DISCOVERY_FIELD_CHROME,
   MOBILE_DISCOVERY_FIELD_GEOMETRY,
+  MOBILE_GLASS_CHROME,
 } from "@/components/mobile/mobile-control-geometry";
 
 // Map intent IDs to fallback icons
@@ -302,8 +303,10 @@ export function MobileSearchEntry({
         onClick={onSearchClick}
         aria-label="Изменить город и спутников"
         className={cn(
-          "flex h-10 min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-full border border-gray-200 bg-white px-3 text-left shadow-sm",
-          "transition-colors duration-200 hover:border-gray-300 active:bg-gray-50",
+          "flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left",
+          MOBILE_DISCOVERY_FIELD_GEOMETRY,
+          MOBILE_GLASS_CHROME,
+          "transition-transform duration-150 ease-out active:scale-[0.98]",
           className,
         )}
       >
@@ -311,7 +314,6 @@ export function MobileSearchEntry({
         <span className="block min-w-0 flex-1 truncate text-sm font-normal text-gray-700">
           {chipText}
         </span>
-        <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" aria-hidden />
       </button>
     );
   }

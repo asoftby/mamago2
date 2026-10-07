@@ -13,7 +13,8 @@ import { cn } from "@/lib/utils";
 import { MobileSearchEntry } from "@/components/mobile/MobileSearchEntry";
 import { MobileSearchSheet } from "@/components/mobile/MobileSearchSheet";
 import { MobileFilterButton } from "@/components/mobile/MobileFilterButton";
-import { MamaGoLogoMark } from "@/components/brand/MamaGoLogoMark";
+import { NavIconButton } from "@/components/mobile/NavIconButton";
+import { MOBILE_HEADER_ROW_HEIGHT } from "@/components/mobile/mobile-control-geometry";
 import {
   getIntentFromPath,
   getCityFromPath,
@@ -106,14 +107,15 @@ export function MobileHeader() {
           isScrolled && "shadow-[0_4px_20px_rgba(0,0,0,0.08)]",
         )}
       >
-        <div className="flex h-14 min-w-0 items-center gap-2 px-3">
-          <MamaGoLogoMark
+        <div className={cn("flex min-w-0 items-center gap-2 px-3", MOBILE_HEADER_ROW_HEIGHT)}>
+          <NavIconButton
             href={`/${displayCity}`}
-            src={logoUrl}
+            isActive={false}
             ariaLabel="На главную"
-            className="p-0"
-            imageClassName="h-10 w-10 rounded-full object-contain"
-            hideBetaLabel
+            isHomeLogo
+            logoSrc={logoUrl ?? undefined}
+            chrome="dark"
+            className="border-2 border-white bg-white shadow-[0_4px_14px_rgba(0,0,0,0.14)] backdrop-blur-none"
           />
           <MobileSearchEntry
             variant="chip"
@@ -123,7 +125,7 @@ export function MobileHeader() {
             currentIntent={displayIntent}
             locationLabelOverride={articleGeoLabel}
           />
-          {showFilterButton && searchIntent ? <MobileFilterButton intent={searchIntent} /> : null}
+          {showFilterButton && searchIntent ? <MobileFilterButton intent={searchIntent} className="h-[52px] w-[52px]" /> : null}
         </div>
       </header>
 

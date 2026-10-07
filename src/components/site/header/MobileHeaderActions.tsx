@@ -55,7 +55,7 @@ export function MobileHeaderActions() {
           />
           {displayUnreadCount > 0 && (
             <span
-              className="absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EF8759] px-1 text-[10px] font-semibold leading-none text-white"
+              className="absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-white"
               aria-hidden
             >
               {displayUnreadCount > 9 ? "9+" : displayUnreadCount}
