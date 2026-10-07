@@ -135,11 +135,13 @@ export function WeekCalendarStrip({
         container.querySelectorAll<HTMLButtonElement>("[data-plan-date]"),
       );
       if (buttons.length === 0) return;
-      const center = container.scrollLeft + container.clientWidth / 2;
+      const containerRect = container.getBoundingClientRect();
+      const center = containerRect.left + containerRect.width / 2;
       let nearest = buttons[0]!;
       let nearestDistance = Number.POSITIVE_INFINITY;
       for (const button of buttons) {
-        const buttonCenter = button.offsetLeft + button.offsetWidth / 2;
+        const buttonRect = button.getBoundingClientRect();
+        const buttonCenter = buttonRect.left + buttonRect.width / 2;
         const distance = Math.abs(buttonCenter - center);
         if (distance < nearestDistance) {
           nearest = button;
