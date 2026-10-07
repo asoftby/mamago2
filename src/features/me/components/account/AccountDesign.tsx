@@ -187,7 +187,17 @@ export function AccountDesign(props: AccountDesignProps) {
                 <span className="caps" style={{ color: "var(--accent-deep)" }}>● Мой аккаунт</span>
                 <span className="caps">{localGreeting}</span>
               </div>
-              <h1 className="serif" style={{ margin: 0, fontSize: "100px", lineHeight: 0.92, letterSpacing: "-.03em" }}>
+              <h1
+                className="serif account-name"
+                style={{
+                  margin: 0,
+                  fontSize: "clamp(48px, 9vw, 100px)",
+                  lineHeight: 0.92,
+                  letterSpacing: "-.03em",
+                  maxWidth: "100%",
+                  overflowWrap: "anywhere",
+                }}
+              >
                 {userName}
                 <span style={{ fontStyle: "italic", color: "var(--accent-deep)" }}>.</span>
               </h1>
@@ -519,9 +529,8 @@ const CSS = `
 .mg-acc .member-card{
   display:flex;flex-direction:column;gap:6px;padding:14px;
   background:var(--paper);border:1px solid var(--line);border-radius:16px;
-  cursor:pointer;transition:all .18s;min-width:160px;
+  cursor:default;min-width:160px;
 }
-.mg-acc .member-card:hover{border-color:var(--ink);transform:translateY(-2px)}
 .mg-acc .member-add{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:8px;padding:14px;min-width:120px;

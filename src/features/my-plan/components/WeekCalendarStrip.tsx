@@ -80,8 +80,19 @@ export function WeekCalendarStrip({
     }
   }, [selectedDate]);
 
-  const weekDays = useMemo(() => getWeekDays(visibleWeekStart), [visibleWeekStart]);
-  const monthLabel = useMemo(() => buildWeekMonthLabel(weekDays, selectedDate), [weekDays, selectedDate]);
+  const currentWeekDays = useMemo(() => getWeekDays(visibleWeekStart), [visibleWeekStart]);
+  const weekDays = useMemo(() => {
+    if (showArrows) return currentWeekDays;
+    return [
+      ...getWeekDays(getPrevWeekStart(visibleWeekStart)),
+      ...currentWeekDays,
+      ...getWeekDays(getNextWeekStart(visibleWeekStart)),
+    ];
+  }, [currentWeekDays, showArrows, visibleWeekStart]);
+  const monthLabel = useMemo(
+    () => buildWeekMonthLabel(currentWeekDays, selectedDate),
+    [currentWeekDays, selectedDate],
+  );
   const yearLabel = useMemo(() => new Date(`${visibleWeekStart}T12:00:00`).getFullYear(), [visibleWeekStart]);
   const todayIso = getLocalDateKey();
   const todayWeekStart = getWeekStart(todayIso);
@@ -111,9 +122,16 @@ export function WeekCalendarStrip({
         borderRadius: 18,
       }}
     >
-      {/* Strip: arrows + days в одной строке */}
-      <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 28px", gap: 6, alignItems: "center" }}>
-        <button
+      {/* Strip: desktop arrows or a swipeable three-week rail. */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: showArrows ? "28px minmax(0, 1fr) 28px" : "minmax(0, 1fr)",
+          gap: showArrows ? 6 : 0,
+          alignItems: "center",
+        }}
+      >
+        {showArrows ? <button
           type="button"
           onClick={() => shiftWeek(-1)}
           disabled={!canShiftToPreviousWeek}
@@ -126,9 +144,9 @@ export function WeekCalendarStrip({
             flexShrink: 0,
             opacity: canShiftToPreviousWeek ? 1 : 0.35,
           }}
-        ><ChevronLeft /></button>
+        ><ChevronLeft /></button> : null}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ display: "flex", minWidth: 0, flexDirection: "column", gap: 8 }}>
           {/* Month + year label */}
           <div style={{ textAlign: "center" }}>
             <span
@@ -140,7 +158,20 @@ export function WeekCalendarStrip({
           </div>
 
           {/* Days row */}
-          <div ref={scrollRef} style={{ display: "flex", gap: 3 }}>
+          <div
+            ref={scrollRef}
+            style={{
+              display: "flex",
+              gap: showArrows ? 3 : 8,
+              overflowX: showArrows ? "visible" : "auto",
+              overscrollBehaviorX: "contain",
+              scrollSnapType: showArrows ? undefined : "x proximity",
+              scrollbarWidth: "none",
+              WebkitOverflowScrolling: "touch",
+              padding: showArrows ? undefined : "2px 14px 4px",
+              marginInline: showArrows ? undefined : -14,
+            }}
+          >
             {weekDays.map((iso) => {
               const d = new Date(`${iso}T12:00:00`);
               const selected = iso === selectedDate;
@@ -159,10 +190,10 @@ export function WeekCalendarStrip({
                   disabled={!allowPastDates && isPast && !selected}
                   onClick={() => (allowPastDates || !isPast) && onChangeDate?.(iso)}
                   style={{
-                    flex: "1 1 0",
-                    minWidth: 0,
-                    minHeight: countLabelByDate ? 70 : compact ? 52 : 56,
-                    padding: compact ? "6px 4px 10px" : "7px 4px 11px",
+                    flex: showArrows ? "1 1 0" : "0 0 64px",
+                    minWidth: showArrows ? 0 : 64,
+                    minHeight: countLabelByDate ? 76 : showArrows ? (compact ? 52 : 56) : 76,
+                    padding: showArrows ? (compact ? "6px 4px 10px" : "7px 4px 11px") : "10px 6px 13px",
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
@@ -175,6 +206,7 @@ export function WeekCalendarStrip({
                     transition: "all .15s",
                     position: "relative",
                     opacity: !allowPastDates && isPast && !selected ? 0.45 : 1,
+                    scrollSnapAlign: showArrows ? undefined : "center",
                   }}
                   onMouseEnter={(e) => {
                     if (!selected && !isPast) (e.currentTarget as HTMLButtonElement).style.background = "rgba(20,18,16,.04)";
@@ -194,7 +226,12 @@ export function WeekCalendarStrip({
                     {WEEKDAY_SHORT_RU[d.getDay()]}
                   </span>
                   <span
-                    style={{ fontFamily: "var(--font-display)", fontSize: 20, lineHeight: 1, letterSpacing: "-.02em" }}
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: showArrows ? 20 : compact ? 30 : 34,
+                      lineHeight: 1,
+                      letterSpacing: "-.03em",
+                    }}
                   >
                     {d.getDate()}
                   </span>
@@ -235,7 +272,7 @@ export function WeekCalendarStrip({
           </div>
         </div>
 
-        <button
+        {showArrows ? <button
           type="button"
           onClick={() => shiftWeek(1)}
           aria-label="Следующая неделя"
@@ -246,7 +283,7 @@ export function WeekCalendarStrip({
             display: "flex", alignItems: "center", justifyContent: "center",
             flexShrink: 0,
           }}
-        ><ChevronRight /></button>
+        ><ChevronRight /></button> : null}
       </div>
     </div>
   );

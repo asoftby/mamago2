@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type ExperienceCheckInCandidate = {
   planItemId: string;
@@ -34,20 +34,34 @@ const sentimentLabels = {
 
 export function ExperienceCheckIn({
   candidates,
-  recentExperiences,
 }: {
   candidates: ExperienceCheckInCandidate[];
   recentExperiences: ExperienceCheckInState[];
 }) {
   const candidate = candidates[0] ?? null;
-  const [submitted, setSubmitted] = useState<ExperienceCheckInState | null>(
-    candidate ? null : recentExperiences[0] ?? null,
-  );
+  const [submitted, setSubmitted] = useState<ExperienceCheckInState | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [feedbackSkipped, setFeedbackSkipped] = useState(false);
+  const [isDismissing, setIsDismissing] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
-  if (!candidate && !submitted) return null;
+  const isComplete =
+    submitted?.attendance === "NOT_ATTENDED" ||
+    submitted?.feedbackSentiment != null ||
+    feedbackSkipped;
+
+  useEffect(() => {
+    if (!isComplete) return;
+    const startDismiss = window.setTimeout(() => setIsDismissing(true), 3_000);
+    const remove = window.setTimeout(() => setDismissed(true), 3_400);
+    return () => {
+      window.clearTimeout(startDismiss);
+      window.clearTimeout(remove);
+    };
+  }, [isComplete]);
+
+  if (dismissed || (!candidate && !submitted)) return null;
 
   async function confirm(attendance: "ATTENDED" | "NOT_ATTENDED") {
     if (!candidate || busy) return;
@@ -97,6 +111,16 @@ export function ExperienceCheckIn({
     <section
       aria-labelledby="experience-check-in-title"
       className="mb-8 rounded-2xl border border-[rgba(20,18,16,.12)] bg-[#FAF7F1] p-5 sm:p-6"
+      style={{
+        opacity: isDismissing ? 0 : 1,
+        transform: isDismissing ? "translateY(-8px)" : "translateY(0)",
+        maxHeight: isDismissing ? 0 : 700,
+        marginBottom: isDismissing ? 0 : undefined,
+        paddingTop: isDismissing ? 0 : undefined,
+        paddingBottom: isDismissing ? 0 : undefined,
+        overflow: "hidden",
+        transition: "opacity .32s ease, transform .32s ease, max-height .4s ease, margin .4s ease, padding .4s ease",
+      }}
     >
       <p className="font-mono text-[11px] uppercase tracking-[.14em] text-[var(--primary)]">
         Как прошло?

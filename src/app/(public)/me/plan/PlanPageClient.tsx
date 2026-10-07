@@ -31,7 +31,6 @@ import {
   type FamilyCalendarFilter,
 } from "@/features/my-plan/lib/familyCalendar";
 import { toast } from "@/lib/toast";
-import { getLocalDateKey } from "@/lib/date/localDateKey";
 
 export type SerializedPlanItem = {
   id: string;
@@ -118,10 +117,6 @@ type Props = {
 };
 
 const MONTHS_RU = ["ЯНВАРЬ","ФЕВРАЛЬ","МАРТ","АПРЕЛЬ","МАЙ","ИЮНЬ","ИЮЛЬ","АВГУСТ","СЕНТЯБРЬ","ОКТЯБРЬ","НОЯБРЬ","ДЕКАБРЬ"];
-
-function getTodayISO() {
-  return getLocalDateKey();
-}
 
 function itemForCacheMessage(item: SerializedPlanItem): string {
   return item.source === "MANUAL" ? "Календарь обновлён" : "План обновлён";
@@ -295,7 +290,6 @@ export function PlanPageClient({
   experienceCandidates = [],
   recentExperiences = [],
 }: Props) {
-  const todayISO = getTodayISO();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
@@ -609,7 +603,6 @@ export function PlanPageClient({
           selectedDate={selectedDate}
           onSelect={selectDate}
           itemsByDate={itemsByDate}
-          onToday={() => selectDate(todayISO)}
           loading={loadingWeek != null}
         />
         <div className="mt-4 flex flex-wrap gap-2" aria-label="Фильтр по члену семьи">
