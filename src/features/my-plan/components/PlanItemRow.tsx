@@ -45,10 +45,10 @@ const ctaStyle = {
   color: "#3A332B",
   display: "inline-flex",
   alignItems: "center",
-  whiteSpace: "nowrap" as const,
+  whiteSpace: "nowrap",
   textDecoration: "none",
   background: "#fff",
-};
+} as const;
 
 export function PlanItemRow({ item, onRemove, participantLabel }: PlanItemRowProps) {
   const cityCtx = useOptionalCity();
