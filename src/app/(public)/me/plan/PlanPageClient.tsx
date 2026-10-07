@@ -53,6 +53,8 @@ export type SerializedPlanItem = {
   childName: string | null;
   locationText: string | null;
   notes: string | null;
+  tags: string[];
+  reminderEnabled: boolean | null;
   coverImageUrl: string | null;
   /** Family Core M4b. Absent on items added client-side before a reload (= own, shared). */
   visibility?: "PRIVATE" | "FAMILY";
