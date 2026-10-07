@@ -84,10 +84,11 @@ export function WeekCalendarStrip({
 
   const weekDays = useMemo(() => getWeekDays(visibleWeekStart), [visibleWeekStart]);
   const compactDays = useMemo(() => {
-    let start = addDaysLocal(selectedDate, -4);
-    if (!allowPastDates && start < getLocalDateKey()) start = getLocalDateKey();
+    let start = visibleWeekStart;
+    const today = getLocalDateKey();
+    if (!allowPastDates && start < today) start = today;
     return Array.from({ length: 18 }, (_, index) => addDaysLocal(start, index));
-  }, [allowPastDates, selectedDate]);
+  }, [allowPastDates, visibleWeekStart]);
   const renderedDays = compact ? compactDays : weekDays;
   const monthLabel = useMemo(() => buildWeekMonthLabel(weekDays, selectedDate), [weekDays, selectedDate]);
   const yearLabel = useMemo(() => new Date(`${visibleWeekStart}T12:00:00`).getFullYear(), [visibleWeekStart]);
