@@ -123,6 +123,11 @@ export type ActivityForEventPageInput = {
     name: string;
     unp: string | null;
   } | null;
+  business?: {
+    name: string;
+    legalName: string | null;
+    unp: string | null;
+  } | null;
 };
 
 function discoveryIntentForActivity(): Intent {
@@ -540,10 +545,15 @@ export function buildEventPageDataFromPrismaActivity(
       : null;
   const organizerName =
     activity.organizer?.name?.trim() ||
-    (typeof organizerSnapshot?.name === "string" ? organizerSnapshot.name.trim() : "");
+    (typeof organizerSnapshot?.name === "string" ? organizerSnapshot.name.trim() : "") ||
+    activity.business?.legalName?.trim() ||
+    activity.business?.name?.trim() ||
+    "";
   const organizerUnp =
     activity.organizer?.unp?.trim() ||
-    (typeof organizerSnapshot?.unp === "string" ? organizerSnapshot.unp.trim() : "");
+    (typeof organizerSnapshot?.unp === "string" ? organizerSnapshot.unp.trim() : "") ||
+    activity.business?.unp?.trim() ||
+    "";
 
   const data: EventPageData = {
     id: activity.id,
