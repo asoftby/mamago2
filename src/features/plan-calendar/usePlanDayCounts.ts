@@ -1,13 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { addDays, diffDays, type DateKey } from "@/lib/date/dateKey";
+import type { DateKey } from "@/lib/date/dateKey";
+import { chunkEnd, chunkStartsFor } from "./lib/dayChunks";
 
 export type PlanDayMarkers = Record<DateKey, string[]>;
-
-// The endpoint caps a range at 42 days; fixed 35-day chunks (Monday-aligned) give cache hits across ranges.
-const CHUNK_DAYS = 35;
-const EPOCH: DateKey = "2020-01-06";
 
 type Entry = { markers: PlanDayMarkers; stale: boolean };
 
@@ -19,16 +16,6 @@ function notify(): void {
   listeners.forEach((listener) => listener());
 }
 
-function chunkStart(key: DateKey): DateKey {
-  return addDays(EPOCH, Math.floor(diffDays(EPOCH, key) / CHUNK_DAYS) * CHUNK_DAYS);
-}
-
-export function chunkStartsFor(from: DateKey, to: DateKey): DateKey[] {
-  const starts: DateKey[] = [];
-  for (let s = chunkStart(from); s <= to; s = addDays(s, CHUNK_DAYS)) starts.push(s);
-  return starts;
-}
-
 /** Call after a plan entry was added/changed/removed: cached ranges refetch in the background. */
 export function invalidatePlanDayMarkers(): void {
   for (const entry of cache.values()) entry.stale = true;
@@ -38,7 +25,7 @@ export function invalidatePlanDayMarkers(): void {
 function loadChunk(start: DateKey): Promise<void> {
   const running = inflight.get(start);
   if (running) return running;
-  const to = addDays(start, CHUNK_DAYS - 1);
+  const to = chunkEnd(start);
   const request = fetch(`/api/plan/day-markers?from=${start}&to=${to}`, { credentials: "include" })
     .then(async (res) => {
       const body = res.ok ? ((await res.json()) as { markers?: PlanDayMarkers }) : null;
