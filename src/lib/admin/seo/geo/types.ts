@@ -86,7 +86,9 @@ export type SeoGeoSelectorOption =
       label: string;
       group: "city";
       cityId: string;
+      regionId: string | null;
       regionName: string | null;
+      countryId: string;
       countryName: string;
     }
   | {
@@ -94,6 +96,7 @@ export type SeoGeoSelectorOption =
       label: string;
       group: "region";
       regionId: string;
+      countryId: string;
       countryName: string;
     }
   | {

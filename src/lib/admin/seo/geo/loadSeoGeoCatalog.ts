@@ -107,6 +107,7 @@ export function buildSeoGeoCatalog(
       label: region.name,
       group: "region",
       regionId: region.id,
+      countryId: region.countryId,
       countryName: region.country.name,
     });
   }
@@ -123,7 +124,9 @@ export function buildSeoGeoCatalog(
       label: city.name,
       group: "city",
       cityId: city.id,
+      regionId: city.regionId,
       regionName: city.region?.name ?? null,
+      countryId: city.countryId,
       countryName: city.country.name,
     });
   }
