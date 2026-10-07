@@ -72,6 +72,7 @@ export default async function MeEventPreviewPage({ params }: PageProps) {
       },
       eventCategory: { select: { id: true, nameRu: true, slug: true } },
       organizer: { select: { name: true, unp: true } },
+      business: { select: { name: true, legalName: true, unp: true } },
     },
   });
 
