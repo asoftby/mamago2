@@ -12,7 +12,7 @@ import { useUserNotificationBadgeCount } from "@/features/notifications/hooks/us
 import { cn } from "@/lib/utils";
 
 /**
- * Сервисные действия нижней панели: 🔔 уведомления + 👤 профиль (белые круги 44px).
+ * Сервисные действия нижней панели: 🔔 уведомления + 👤 профиль (белые круги 52px, как плашка поиска).
  * Колокольчик — только для авторизованных (у гостя нет уведомлений).
  */
 export function MobileHeaderActions() {
@@ -44,9 +44,7 @@ export function MobileHeaderActions() {
           onClick={() => setActiveSheet("notifications")}
           className={getNavIconButtonClassName({
             isActive: isNotificationsActive,
-            size: "compact",
             chrome: "dark",
-            className: "h-11 w-11 shadow-md",
           })}
         >
           <NavBellIcon
@@ -87,7 +85,6 @@ export function MobileHeaderActions() {
         open={activeSheet === "profile"}
         onOpenChange={(open) => setActiveSheet(open ? "profile" : null)}
         isProfileActive={isProfileActive}
-        compact
         chrome="dark"
       />
     </div>

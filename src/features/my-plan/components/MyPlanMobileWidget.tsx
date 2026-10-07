@@ -5,6 +5,10 @@ import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 import { PlanCalendarIcon } from "@/components/icons/PlanCalendarIcon";
 import { cn } from "@/lib/utils";
+import {
+  MOBILE_DISCOVERY_FIELD_CHROME,
+  MOBILE_DISCOVERY_FIELD_GEOMETRY,
+} from "@/components/mobile/mobile-control-geometry";
 import { useMyPlan } from "../hooks/useMyPlan";
 
 interface MyPlanMobileWidgetProps {
@@ -123,15 +127,12 @@ export function MyPlanMobileWidgetView({
         aria-label={ariaLabel}
         data-my-plan-mobile-widget
         className={cn(
-          "pointer-events-auto flex h-16 min-w-0 flex-1 items-center gap-3 rounded-[22px] px-4 text-left text-[#1A1A1A]",
-          "bg-brand",
+          "pointer-events-auto flex min-w-0 flex-1 items-center gap-3 text-left text-[#1A1A1A]",
+          MOBILE_DISCOVERY_FIELD_GEOMETRY,
+          MOBILE_DISCOVERY_FIELD_CHROME,
           "touch-manipulation transition-transform duration-150 ease-out active:scale-[0.98]",
           pulse ? "scale-105 motion-reduce:scale-100" : "scale-100",
         )}
-        style={{
-          boxShadow:
-            "0 8px 24px rgba(239, 135, 89, 0.35)",
-                  }}
       >
         <span className="relative flex h-9 w-9 shrink-0 items-center justify-center">
           <PlanCalendarIcon className="h-6 w-6 text-[#1A1A1A]" />
