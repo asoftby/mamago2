@@ -24,6 +24,7 @@ import { parseVideoUrl } from "@/lib/media/parseVideoUrl";
 import { tryResolvePublicationForCta } from "@/server/services/direct/directThread.service";
 import { getCityDisplayName, getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { PublicationType } from "@prisma/client";
+import { loadSimilarActivities } from "@/lib/event/loadSimilarActivities";
 
 interface EventPublicPageProps {
   params: Promise<{ city: string; slugOrId: string }>;
@@ -206,12 +207,24 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
       ? await fetchReelsThumbnail(rawReelsUrl)
       : null;
 
+    const similar = fromDb.eventCategory?.id
+      ? await loadSimilarActivities({
+          activityId: fromDb.id,
+          cityId: fromDb.cityId,
+          citySlug: city,
+          eventCategoryId: fromDb.eventCategory.id,
+          limit: 16,
+          sameCategoryOnly: true,
+        })
+      : [];
+
     const data = withEventPagePriceData(
       buildEventPageDataFromPrismaActivity(fromDb, {
         citySlug: city,
         ownerEditHref,
         previewBannerLabel,
         reelsThumbnailUrl: reelsThumbnailUrl ?? undefined,
+        similar,
       }),
       fromDb.priceItems,
     );
