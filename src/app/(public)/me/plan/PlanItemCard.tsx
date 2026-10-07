@@ -27,7 +27,7 @@ function formatTime(iso: string | null): string | null {
   return formatHHMM(iso) || null;
 }
 
-function formatReminder(iso: string | null): string | null {
+function formatReminder(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
