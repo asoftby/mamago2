@@ -18,10 +18,14 @@ function parseLocalDateKey(dateKey: string): Date {
 }
 
 export function addDaysLocal(input: string | Date, days: number): string {
-  const base = typeof input === "string" ? parseLocalDateKey(input) : new Date(input);
-  const next = new Date(base.getFullYear(), base.getMonth(), base.getDate());
-  next.setDate(next.getDate() + days);
-  return getLocalDateKey(next);
+  const dateKey = typeof input === "string" ? input : getLocalDateKey(input);
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const next = new Date(Date.UTC(year!, (month ?? 1) - 1, day ?? 1));
+  next.setUTCDate(next.getUTCDate() + days);
+  const yyyy = next.getUTCFullYear();
+  const mm = String(next.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(next.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 export function formatLocalPlanDate(

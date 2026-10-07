@@ -296,9 +296,9 @@ const RECOMMENDATIONS_BLOCK_SUBTITLE =
 function pluralizeActivities(count: number): string {
   const mod10 = count % 10;
   const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return "пункт";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "пункта";
-  return "пунктов";
+  if (mod10 === 1 && mod100 !== 11) return "запись";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "записи";
+  return "записей";
 }
 
 /** Short day label for the compact "day context" line above the plan-item list. */
@@ -417,6 +417,8 @@ export function PlanMainContent({
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [hiddenPlanItemIds, setHiddenPlanItemIds] = useState<Set<string>>(() => new Set());
+  const pendingRemovalIdsRef = useRef<Set<string>>(new Set());
   const [awaitingAgeAnswer, setAwaitingAgeAnswer] = useState(false);
   const [needsAgeAnswerValues, setNeedsAgeAnswerValues] = useState<string[] | null>(null);
   /** Реальные саджесты из /api/plan/suggestions (M2.4) — не клиентский demo-пул. */
@@ -434,16 +436,61 @@ export function PlanMainContent({
   const hydratedDraftKeyRef = useRef<string | null>(null);
   const skipNextDraftPersistRef = useRef<string | null>(null);
 
-  const handleRemoveFromPlan = async (itemId: string) => {
-    if (!onRemoveItemFromPlan) return;
+  const restorePendingPlanItem = useCallback((itemId: string) => {
+    pendingRemovalIdsRef.current.delete(itemId);
+    setHiddenPlanItemIds((current) => {
+      if (!current.has(itemId)) return current;
+      const next = new Set(current);
+      next.delete(itemId);
+      return next;
+    });
+  }, []);
+
+  const commitPendingPlanItemRemoval = useCallback(async (itemId: string) => {
+    if (!onRemoveItemFromPlan || !pendingRemovalIdsRef.current.has(itemId)) return;
+    pendingRemovalIdsRef.current.delete(itemId);
     try {
       const result = onRemoveItemFromPlan(itemId);
       const ok = result instanceof Promise ? await result : true;
-      if (!ok) toast.error("Не получилось убрать событие из плана");
+      if (!ok) {
+        restorePendingPlanItem(itemId);
+        toast.error("Не получилось убрать из плана");
+      }
     } catch {
-      toast.error("Не получилось убрать событие из плана");
+      restorePendingPlanItem(itemId);
+      toast.error("Не получилось убрать из плана");
     }
-  };
+  }, [onRemoveItemFromPlan, restorePendingPlanItem]);
+
+  const handleRemoveFromPlan = useCallback((itemId: string) => {
+    if (!onRemoveItemFromPlan || pendingRemovalIdsRef.current.has(itemId)) return;
+
+    pendingRemovalIdsRef.current.add(itemId);
+    setHiddenPlanItemIds((current) => {
+      const next = new Set(current);
+      next.add(itemId);
+      return next;
+    });
+
+    const toastId = `plan-delete-${itemId}`;
+    toast("Удалено из плана", {
+      id: toastId,
+      duration: 5000,
+      action: {
+        label: "Отменить",
+        onClick: () => {
+          restorePendingPlanItem(itemId);
+          toast.dismiss(toastId);
+        },
+      },
+      onAutoClose: () => {
+        void commitPendingPlanItemRemoval(itemId);
+      },
+      onDismiss: () => {
+        void commitPendingPlanItemRemoval(itemId);
+      },
+    });
+  }, [commitPendingPlanItemRemoval, onRemoveItemFromPlan, restorePendingPlanItem]);
 
 
 
@@ -589,13 +636,6 @@ export function PlanMainContent({
     }, 0);
   }, [buildFindAndAddHref, onRequestClose, router]);
 
-  /** M-B: узкий пул — частый случай, пустая выдача сразу предлагает сменить дату. */
-  const handleScrollToCalendar = useCallback(() => {
-    document
-      .getElementById("plan-week-calendar")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
-
   /** M3.5: тап по sticky-счётчику «В плане: N» — на страницу плана целиком, не в саму модалку. */
   const handleOpenPlanPage = useCallback(() => {
     onRequestClose?.();
@@ -612,7 +652,27 @@ export function PlanMainContent({
     }, 0);
   }, [city, onRequestClose, router, selectedDate]);
 
-  const dayItems = useMemo(() => planItemsByDate?.[selectedDate] ?? [], [planItemsByDate, selectedDate]);
+  const dayItems = useMemo(
+    () => (planItemsByDate?.[selectedDate] ?? []).filter((item) => !hiddenPlanItemIds.has(item.id)),
+    [hiddenPlanItemIds, planItemsByDate, selectedDate],
+  );
+
+  useEffect(() => {
+    const existingIds = new Set(
+      Object.values(planItemsByDate ?? {})
+        .flat()
+        .map((item) => item.id),
+    );
+    setHiddenPlanItemIds((current) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of current) {
+        if (existingIds.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [planItemsByDate]);
   const upcomingSelection = useMemo(
     () => selectUpcomingPlanItems({
       selectedDate,
@@ -1014,7 +1074,7 @@ export function PlanMainContent({
         {...PLAN_RECOMMENDATION_RESULTS_A11Y}
       >
         {dayPartSections.length > 0 ? (
-          <section className="space-y-2" aria-label="В вашем плане">
+          <section className={compact ? "space-y-4" : "space-y-3"} aria-label="В вашем плане">
             <p
               style={{
                 margin: 0,
@@ -1026,7 +1086,7 @@ export function PlanMainContent({
               {" · "}
               {totalPlannedCount} {pluralizeActivities(totalPlannedCount)}
             </p>
-            <div className="space-y-2">
+            <div className={compact ? "space-y-3" : "space-y-2"}>
               {dayPartSections.map((section) =>
                 section.items.map((item) => (
                   <PlanItemRow
@@ -1082,13 +1142,6 @@ export function PlanMainContent({
             <p className="text-sm text-neutral-600">
               {buildEmptySuggestionsMessage(selectedDate, todayKey, lastRequestSnapshotRef.current.ageRangeValues)}
             </p>
-            <button
-              type="button"
-              onClick={handleScrollToCalendar}
-              className="mt-2 text-sm font-medium text-primary underline-offset-2 hover:underline"
-            >
-              Выбрать другой день
-            </button>
           </div>
         ) : (
           <section className={compact ? "space-y-3" : "space-y-3"}>
@@ -1179,7 +1232,6 @@ export function PlanMainContent({
           ) : showDecisionFork ? (
             <RecommendationDecisionBlock
               onDecide={handleDecideClick}
-              onCatalog={handleOpenCatalog}
               isGenerating={isFetchingSuggestions}
             />
           ) : null}
@@ -1266,7 +1318,6 @@ export function PlanMainContent({
         ) : showDecisionFork ? (
           <RecommendationDecisionBlock
             onDecide={handleDecideClick}
-            onCatalog={handleOpenCatalog}
             isGenerating={isFetchingSuggestions}
             compact
           />
