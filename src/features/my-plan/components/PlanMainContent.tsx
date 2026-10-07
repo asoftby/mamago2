@@ -27,6 +27,10 @@ import { MyPlanHeader } from "./MyPlanHeader";
 import { RecommendationDecisionBlock } from "./RecommendationDecisionBlock";
 import { PlanRecommendationCta } from "./PlanRecommendationCta";
 import { PlanStickyCounter } from "./PlanStickyCounter";
+import {
+  ManualPlanEntryForm,
+  type ManualPlanEntryEditableItem,
+} from "./ManualPlanEntryForm";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
@@ -94,6 +98,8 @@ interface PlanMainContentProps {
   ) => Promise<{ ok: boolean }>;
   /** Фоновая подгрузка выбранной даты (для smooth-перехода без резкого прыжка блока). */
   dateLoading?: boolean;
+  /** Обновить plan/day + summary после ручной записи из inline-формы. */
+  onManualEntrySaved?: (date: string) => void | Promise<void>;
   onRequestClose?: () => void;
 }
 
@@ -400,6 +406,7 @@ export function PlanMainContent({
   suggestionsLoading = false,
   onAddSuggestionToPlan,
   dateLoading = false,
+  onManualEntrySaved,
   onRequestClose,
 }: PlanMainContentProps) {
   const pathname = usePathname();
@@ -415,6 +422,7 @@ export function PlanMainContent({
   const [showAddPersonaTypeModal, setShowAddPersonaTypeModal] = useState(false);
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
+  const [showManualEntryForm, setShowManualEntryForm] = useState(false);
   const [awaitingAgeAnswer, setAwaitingAgeAnswer] = useState(false);
   const [needsAgeAnswerValues, setNeedsAgeAnswerValues] = useState<string[] | null>(null);
   /** Реальные саджесты из /api/plan/suggestions (M2.4) — не клиентский demo-пул. */
@@ -1096,6 +1104,43 @@ export function PlanMainContent({
 
   const renderBottomActions = () => (
     <div className="space-y-3">
+      {showManualEntryForm ? (
+        <section className="rounded-[24px] border border-neutral-200 bg-[#FAF7F1] p-4">
+          <div className="mb-4">
+            <h3 className="m-0 text-lg font-semibold text-neutral-950">Добавить в план</h3>
+            <p className="mt-1 text-sm text-neutral-500">
+              Событие, дело или заметка для семьи. Время и напоминание — необязательны.
+            </p>
+          </div>
+          <ManualPlanEntryForm<ManualPlanEntryEditableItem>
+            date={selectedDate}
+            familyChildren={childrenList}
+            item={null}
+            defaultEntryType="TASK"
+            compact={!isDesktop}
+            onCancel={() => setShowManualEntryForm(false)}
+            onConflict={() => {
+              toast.error("План изменился. Обновили данные — попробуйте ещё раз.");
+              void onManualEntrySaved?.(selectedDate);
+            }}
+            onSaved={async (saved) => {
+              setShowManualEntryForm(false);
+              if (saved.date !== selectedDate) onChangeDate?.(saved.date);
+              await onManualEntrySaved?.(saved.date);
+              toast.success("Добавлено в план");
+            }}
+          />
+        </section>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShowManualEntryForm(true)}
+          className="min-h-11 w-full rounded-full border border-neutral-300 bg-white px-5 text-sm font-semibold text-neutral-800 transition-colors hover:border-neutral-500 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          + Добавить своё
+        </button>
+      )}
+
       {scenarioCtaLabel ? (
         <BuildScenarioButton
           onClick={handleOpenScenarioPage}
