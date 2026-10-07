@@ -25,11 +25,11 @@ export function MyPlanHeader({ onClose, compact = false }: MyPlanHeaderProps) {
           fontSize: 24,
           fontWeight: 400,
           lineHeight: 1,
-          letterSpacing: "-.05em",
+          letterSpacing: "-.02em",
           color: "#141210",
         }}
       >
-        Мой <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "#C24E22" }}>план</em>
+        Мой план
       </h2>
 
       <button
