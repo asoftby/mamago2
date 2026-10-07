@@ -32,17 +32,15 @@ export function MobileFilterButton({ intent, className }: MobileFilterButtonProp
       onClick={handleClick}
       className={cn(
         "relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border shadow-sm transition-all duration-200 active:scale-[0.98]",
-        activeCount > 0
-          ? "border-brand bg-brand"
-          : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50",
+        "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50",
         className,
       )}
       aria-label={activeCount > 0 ? `Фильтры, активно: ${activeCount}` : "Открыть фильтры"}
     >
-      <SlidersHorizontal className={cn("h-5 w-5", activeCount > 0 ? "text-[#1A1A1A]" : "text-gray-600")} />
+      <SlidersHorizontal className="h-5 w-5 text-gray-600" />
 
       {activeCount > 0 && (
-        <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#1A1A1A] text-xs font-bold text-white">
+        <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
           {activeCount}
         </div>
       )}

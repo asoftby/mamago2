@@ -135,7 +135,7 @@ export function MyPlanMobileWidgetView({
         )}
       >
         <span className="relative flex h-9 w-9 shrink-0 items-center justify-center">
-          <PlanCalendarIcon className="h-6 w-6 text-[#1A1A1A]" />
+          <PlanCalendarIcon className="h-5 w-5 text-gray-400" />
           {hasEvents && (
             <span
               key={count}
@@ -151,7 +151,7 @@ export function MyPlanMobileWidgetView({
           )}
         </span>
         <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-          <span className="block truncate text-[15px] font-semibold leading-none">Мой план</span>
+          <span className="block truncate text-sm font-normal leading-none text-gray-700">Мой план</span>
           <span className="block truncate text-xs italic leading-tight opacity-85 font-pt-serif">
             {hasEvents && nearestLine ? nearestLine : "Нет событий — соберём за 10 секунд"}
           </span>
