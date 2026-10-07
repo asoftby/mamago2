@@ -101,11 +101,6 @@ export function WizardProgress({
               )}
             >
               {step.label}
-              {isOptionalEmpty ? (
-                <span className="text-[9px] font-normal italic text-gray-300">
-                  необяз.
-                </span>
-              ) : null}
             </span>
 
             <span
