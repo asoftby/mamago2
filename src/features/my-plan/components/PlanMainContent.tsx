@@ -1311,7 +1311,6 @@ export function PlanMainContent({
         ) : showDecisionFork ? (
           <RecommendationDecisionBlock
             onDecide={handleDecideClick}
-            onCatalog={handleOpenCatalog}
             isGenerating={isFetchingSuggestions}
             compact
           />
