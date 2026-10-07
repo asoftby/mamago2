@@ -27,6 +27,7 @@ import { MyPlanHeader } from "./MyPlanHeader";
 import { RecommendationDecisionBlock } from "./RecommendationDecisionBlock";
 import { PlanRecommendationCta } from "./PlanRecommendationCta";
 import { PlanStickyCounter } from "./PlanStickyCounter";
+import { QuickAddPlanNoteSheet } from "./QuickAddPlanNoteSheet";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
@@ -295,9 +296,9 @@ const RECOMMENDATIONS_BLOCK_SUBTITLE =
 function pluralizeActivities(count: number): string {
   const mod10 = count % 10;
   const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return "активность";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "активности";
-  return "активностей";
+  if (mod10 === 1 && mod100 !== 11) return "пункт";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "пункта";
+  return "пунктов";
 }
 
 /** Short day label for the compact "day context" line above the plan-item list. */
@@ -415,6 +416,7 @@ export function PlanMainContent({
   const [showAddPersonaTypeModal, setShowAddPersonaTypeModal] = useState(false);
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [awaitingAgeAnswer, setAwaitingAgeAnswer] = useState(false);
   const [needsAgeAnswerValues, setNeedsAgeAnswerValues] = useState<string[] | null>(null);
   /** Реальные саджесты из /api/plan/suggestions (M2.4) — не клиентский demo-пул. */
@@ -1027,7 +1029,16 @@ export function PlanMainContent({
             <div className="space-y-2">
               {dayPartSections.map((section) =>
                 section.items.map((item) => (
-                  <PlanItemRow key={item.id} item={item} onRemove={() => handleRemoveFromPlan(item.id)} />
+                  <PlanItemRow
+                    key={item.id}
+                    item={item}
+                    participantLabel={
+                      item.childId
+                        ? childrenList.find((child) => child.id === item.childId)?.name ?? null
+                        : null
+                    }
+                    onRemove={() => handleRemoveFromPlan(item.id)}
+                  />
                 )),
               )}
             </div>
@@ -1036,11 +1047,11 @@ export function PlanMainContent({
 
         <section
           className={compact ? "space-y-3 px-1" : "space-y-3 px-1"}
-          aria-label="Подходит вашим детям"
+          aria-label="Можно добавить в этот день"
         >
           <div>
             <h3 style={{ fontFamily: "var(--font-sans)", fontSize: compact ? 18 : 22, fontWeight: 600, lineHeight: 1.1, color: "#141210" }}>
-              Подходит вашим детям
+              Можно добавить в этот день
             </h3>
             <p className="mt-1 text-sm text-neutral-500">Подобрано по возрасту и интересам</p>
           </div>
@@ -1153,7 +1164,7 @@ export function PlanMainContent({
             </div>
           ) : null}
 
-          {upcomingSelection ? (
+          {isDesktop && upcomingSelection ? (
             <UpcomingPlanBlock
               items={upcomingSelection.items}
               totalCount={upcomingSelection.count}
@@ -1226,7 +1237,7 @@ export function PlanMainContent({
 
       <div
         id="my-plan-recommendations"
-        className="flex-1 space-y-4 overflow-y-auto bg-white px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3"
+        className="flex-1 space-y-5 overflow-y-auto bg-white px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4"
       >
         {onChangeDate ? (
           <div id="plan-week-calendar">
@@ -1234,12 +1245,13 @@ export function PlanMainContent({
               selectedDate={selectedDate}
               onChangeDate={onChangeDate}
               compact
+              showArrows={false}
               plannedCountByDate={plannedCountByDate}
             />
           </div>
         ) : null}
 
-        {upcomingSelection ? (
+        {isDesktop && upcomingSelection ? (
           <UpcomingPlanBlock
             items={upcomingSelection.items}
             totalCount={upcomingSelection.count}
@@ -1277,7 +1289,21 @@ export function PlanMainContent({
         {renderBottomActions()}
       </div>
 
-      <PlanStickyCounter count={totalPlannedCount} onClick={handleOpenPlanPage} compact />
+      <PlanStickyCounter
+        count={totalPlannedCount}
+        onClick={handleOpenPlanPage}
+        onAdd={() => setQuickAddOpen(true)}
+        compact
+      />
+
+      <QuickAddPlanNoteSheet
+        open={quickAddOpen}
+        onOpenChange={setQuickAddOpen}
+        selectedDate={selectedDate}
+        childrenList={childrenList.map((child) => ({ id: child.id, name: child.name }))}
+        city={city}
+        onRequestClose={onRequestClose}
+      />
 
       <AddPersonaTypeModal
         open={showAddPersonaTypeModal}
