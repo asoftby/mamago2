@@ -40,6 +40,8 @@ export function ManualPlanEntryDialog({
   const [endsAt, setEndsAt] = useState("");
   const [locationText, setLocationText] = useState("");
   const [notes, setNotes] = useState("");
+  const [tagsText, setTagsText] = useState("");
+  const [reminderEnabled, setReminderEnabled] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -52,6 +54,8 @@ export function ManualPlanEntryDialog({
     setEndsAt(timeValue(item?.endsAt ?? null));
     setLocationText(item?.locationText ?? "");
     setNotes(item?.notes ?? "");
+    setTagsText((item?.tags ?? []).join(", "));
+    setReminderEnabled(item?.reminderEnabled === true);
     setError("");
   }, [date, item, open]);
 
@@ -71,6 +75,11 @@ export function ManualPlanEntryDialog({
           endsAt: endsAt || null,
           locationText: locationText || null,
           notes: notes || null,
+          tags: tagsText
+            .split(",")
+            .map((tag) => tag.trim().replace(/^#+/, "").trim())
+            .filter(Boolean),
+          reminderEnabled: reminderEnabled && Boolean(startsAt),
           ...(item ? { expectedUpdatedAt: item.updatedAt } : {}),
         }),
       });
@@ -132,6 +141,25 @@ export function ManualPlanEntryDialog({
           <label className={labelClass}>
             Заметка
             <textarea maxLength={2000} rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full rounded-xl border border-neutral-300 bg-white px-3 py-2 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" />
+          </label>
+          <label className={labelClass}>
+            Теги
+            <input
+              value={tagsText}
+              onChange={(e) => setTagsText(e.target.value)}
+              placeholder="школа, Тая"
+              className={inputClass}
+            />
+          </label>
+          <label className="flex min-h-11 items-center gap-3 text-sm font-medium text-neutral-800">
+            <input
+              type="checkbox"
+              checked={reminderEnabled}
+              disabled={!startsAt}
+              onChange={(e) => setReminderEnabled(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Напомнить по моим настройкам уведомлений
           </label>
           {error ? <p id="manual-entry-error" role="alert" className="text-sm text-red-600">{error}</p> : null}
           <button type="submit" disabled={saving} className="min-h-11 rounded-full bg-primary px-5 font-semibold text-white disabled:opacity-60">
