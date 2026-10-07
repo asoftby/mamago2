@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { useHideOnScrollDirection } from "@/hooks/useHideOnScrollDirection";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "beta-tip-dismissed";
@@ -82,7 +81,6 @@ function BetaTipContent({
  */
 export function BetaTipMobile() {
   const { visible, dismiss } = useBetaTipVisible();
-  const navHidden = useHideOnScrollDirection({ threshold: 8, topOffset: 24 });
 
   if (!visible) return null;
 
@@ -90,10 +88,9 @@ export function BetaTipMobile() {
     <div
       className={cn(
         "lg:hidden fixed z-50 left-3 right-3 pointer-events-none",
-        "transition-transform duration-200 ease-in-out will-change-transform",
-        navHidden ? "translate-y-0" : "-translate-y-[4.75rem]",
       )}
-      style={{ bottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
+      /* над виджетом «Мой план» (всегда виден): 12px + 64px + 8px */
+      style={{ bottom: "calc(5.25rem + env(safe-area-inset-bottom, 0px))" }}
     >
       <BetaTipContent variant="mobile" onDismiss={dismiss} />
     </div>

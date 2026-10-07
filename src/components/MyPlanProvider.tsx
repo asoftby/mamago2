@@ -3,10 +3,15 @@
 import { useCallback, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
-import { MyPlanWidget, MyPlanOverlay } from "@/features/my-plan";
+import { MobileBottomBar } from "@/components/mobile/MobileBottomBar";
+import { MyPlanWidget, MyPlanMobileWidget, MyPlanOverlay } from "@/features/my-plan";
 import { MyPlanStateProvider } from "@/features/my-plan/hooks/useMyPlan";
 import { appendMyPlanOpenToHref, MY_PLAN_OPEN_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
-import { isMyPlanShellExcludedPath, shouldHideMyPlanWidget } from "@/lib/intent";
+import {
+  isMyPlanShellExcludedPath,
+  isPublicationDetailPath,
+  shouldHideMyPlanWidget,
+} from "@/lib/intent";
 import { PlanOverlayProvider, usePlanOverlay } from "@/lib/my-plan/usePlanOverlay";
 
 function isMyPlanFullPageRoute(pathname: string | null): boolean {
@@ -36,6 +41,9 @@ function MyPlanOverlayHost({ pathname }: { pathname: string }) {
   const { isLoading: authLoading } = useAuthMe();
   const { isOpen: planOpen, open: openPlan, close: closePlan } = usePlanOverlay();
   const hidePlanEntryEffective = hidePlanEntry;
+  // На страницах деталей (events/activity/offers) внизу EventStickyActionBar —
+  // у него приоритет, мобильную нижнюю панель (план + 🔔/👤) не рендерим.
+  const hideMobileBottomBar = hidePlanEntryEffective || isPublicationDetailPath(pathname);
 
   // Открытие по URL param ?myPlan=open (гость или пользователь)
   useEffect(() => {
@@ -73,6 +81,11 @@ function MyPlanOverlayHost({ pathname }: { pathname: string }) {
   return (
     <>
       {!hidePlanEntryEffective ? <MyPlanWidget onOpen={handleOpenMyPlan} /> : null}
+      {!hideMobileBottomBar ? (
+        <MobileBottomBar>
+          <MyPlanMobileWidget onOpen={handleOpenMyPlan} />
+        </MobileBottomBar>
+      ) : null}
       <MyPlanOverlay open={planOpen} onOpenChange={handlePlanOpenChange} />
     </>
   );
@@ -84,6 +97,10 @@ export function MyPlanProvider() {
     return null;
   }
   const isFullPageRoute = isMyPlanFullPageRoute(pathname);
+  if (isFullPageRoute && !shouldHideMyPlanWidget(pathname) && !isPublicationDetailPath(pathname)) {
+    // Полноэкранный план: виджет не нужен, но 🔔/👤 внизу остаются.
+    return <MobileBottomBar />;
+  }
 
   return (
     <PlanOverlayProvider>

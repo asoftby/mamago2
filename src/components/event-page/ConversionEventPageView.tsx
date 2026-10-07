@@ -221,9 +221,9 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
             }),
           });
           if (!res.ok) throw new Error("plan_save_failed");
-          toast.success(
-            `Событие добавлено на ${formatPlanTargetDateRu(result.dateISO)}`,
-          );
+          toast.success("Добавлено в план", {
+            description: `На ${formatPlanTargetDateRu(result.dateISO)}`,
+          });
         } else if (result.action === "ideas") {
           const res = await fetch("/api/save/idea", {
             method: "POST",
@@ -273,9 +273,9 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
         });
         if (!res.ok) throw new Error("plan_save_failed");
         await loadSaveStatus();
-        toast.success(
-          `Событие добавлено на ${formatPlanTargetDateRu(dateISO)}`,
-        );
+        toast.success("Добавлено в план", {
+            description: `На ${formatPlanTargetDateRu(dateISO)}`,
+          });
       } catch {
         toast.error("Не получилось выполнить действие", {
           description: "Попробуйте еще раз",
