@@ -609,7 +609,6 @@ export function PlanPageClient({
           selectedDate={selectedDate}
           onSelect={selectDate}
           itemsByDate={itemsByDate}
-          onToday={() => selectDate(todayISO)}
           loading={loadingWeek != null}
         />
         <div className="mt-4 flex flex-wrap gap-2" aria-label="Фильтр по члену семьи">
