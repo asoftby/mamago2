@@ -643,11 +643,24 @@ function useMyPlanStore() {
   const removePlanItemFromDay = useCallback(
     async (planItemId: string): Promise<boolean> => {
       try {
-        const res = await fetch(
-          `/api/save/plan?planItemId=${encodeURIComponent(planItemId)}`,
-          { method: "DELETE", credentials: "include" },
+        const currentItem = planItemsByDateMapRef.current[selectedPlanDate]?.find(
+          (item) => item.id === planItemId,
         );
-        if (!res.ok) return false;
+        const isManual = currentItem?.source === "MANUAL";
+        const response = isManual
+          ? await fetch(`/api/plan/manual/${encodeURIComponent(planItemId)}`, {
+              method: "DELETE",
+              credentials: "include",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                expectedUpdatedAt: currentItem.updatedAt?.toISOString(),
+              }),
+            })
+          : await fetch(
+              `/api/save/plan?planItemId=${encodeURIComponent(planItemId)}`,
+              { method: "DELETE", credentials: "include" },
+            );
+        if (!response.ok) return false;
         removePlanItemLocal(planItemId);
         void refetchPlanForDate(selectedPlanDate);
         void refetchPlanSummary();
