@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as Partial<ManualPlanEntryInput>;
     const owner = await resolvePlanOwner(user.id);
     const item = await createManualPlanEntry(owner, {
-      entryType: body.entryType!,
+      entryType: body.entryType,
       title: body.title!,
       date: body.date!,
       childId: body.childId,
@@ -25,6 +25,8 @@ export async function POST(request: NextRequest) {
       dueHasTime: body.dueHasTime,
       locationText: body.locationText,
       notes: body.notes,
+      tags: body.tags,
+      reminderEnabled: body.reminderEnabled,
     });
     return NextResponse.json({ item: await loadFamilyCalendarItem({ owner, item }) }, { status: 201 });
   } catch (error) {
