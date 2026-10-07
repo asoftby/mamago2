@@ -12,13 +12,16 @@
  */
 
 import prisma from "@/lib/prisma";
-import { ActivityType, ContentStatus } from "@prisma/client";
+import { ActivityType } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
 import { BYN_SYMBOL, formatPriceFrom } from "@/lib/formatters/format-price";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import type { EventPageSimilar } from "@/lib/event/eventPageTypes";
+import { ageBoundsFromActivityFields } from "@/lib/event/activityAgeBounds";
+import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
+import { activityInCityWhere } from "@/server/discovery/activityInCityWhere";
 
 const FALLBACK_IMAGE = "/og-default.jpg";
 
@@ -41,6 +44,8 @@ type SimilarRow = {
   priceFrom: number | null;
   ageMinMonths: number | null;
   ageMaxMonths: number | null;
+  ageTags: string[];
+  agePolicy: import("@prisma/client").AgePolicy;
   images: Array<{ id: string; url: string; mediaAssetId: string | null }>;
   sessions: Array<{ id: string; startsAt: Date }>;
   place: { city: { slug: string } | null } | null;
@@ -57,6 +62,8 @@ const SIMILAR_SELECT = {
   priceFrom: true,
   ageMinMonths: true,
   ageMaxMonths: true,
+  ageTags: true,
+  agePolicy: true,
   images: {
     select: { id: true, url: true, mediaAssetId: true },
     orderBy: { sortOrder: "asc" as const },
@@ -97,12 +104,8 @@ function rowToSimilar(row: SimilarRow, citySlug: string): EventPageSimilar {
 
   const activityCitySlug = row.place?.city?.slug ?? citySlug;
 
-  const ageLabel =
-    row.ageMinMonths != null
-      ? row.ageMaxMonths != null
-        ? `${row.ageMinMonths}–${row.ageMaxMonths}+`
-        : `${row.ageMinMonths}+`
-      : undefined;
+  const { ageFrom, ageTo } = ageBoundsFromActivityFields(row);
+  const ageLabel = ageTo >= 99 ? `${ageFrom}+` : `${ageFrom}–${ageTo}`;
 
   return {
     id: row.id,
@@ -113,6 +116,9 @@ function rowToSimilar(row: SimilarRow, citySlug: string): EventPageSimilar {
     categoryLabel: row.eventCategory?.nameRu,
     ageLabel,
     href: publicActivityPath(row.id, activityCitySlug, row.slug),
+    ageFrom,
+    ageTo,
+    agePolicy: row.agePolicy,
   };
 }
 
@@ -123,18 +129,20 @@ export async function loadSimilarActivities(opts: {
   eventCategoryId?: string | null;
   ageTags?: string[];
   limit?: number;
+  sameCategoryOnly?: boolean;
 }): Promise<EventPageSimilar[]> {
-  const { activityId, cityId, citySlug, eventCategoryId, limit = 3 } = opts;
+  const { activityId, cityId, citySlug, eventCategoryId, limit = 3, sameCategoryOnly = false } = opts;
   const now = new Date();
 
+  const publicWhere = getPublicListingActivityWhere(now);
+  const publicParts = (publicWhere.AND ?? []) as Prisma.ActivityWhereInput[];
   const baseWhere: Prisma.ActivityWhereInput = {
-    id: { not: activityId },
-    type: ActivityType.EVENT,
-    status: ContentStatus.PUBLISHED,
-    cityId,
-    sessions: {
-      some: { startsAt: { gte: now }, withdrawnAt: null },
-    },
+    AND: [
+      { id: { not: activityId } },
+      { type: ActivityType.EVENT },
+      activityInCityWhere(cityId),
+      ...publicParts,
+    ],
   };
 
   const results: SimilarRow[] = [];
@@ -157,7 +165,7 @@ export async function loadSimilarActivities(opts: {
   }
 
   // ── Pass 2: добор по городу если не хватает ───────────────────────────────
-  if (results.length < limit) {
+  if (!sameCategoryOnly && results.length < limit) {
     const byCity = await prisma.activity.findMany({
       where: {
         ...baseWhere,
