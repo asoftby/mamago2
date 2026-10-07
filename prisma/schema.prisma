@@ -592,6 +592,10 @@ model PlanItem {
   dueHasTime        Boolean                   @default(false)
   locationText      String?
   notes             String?
+  /// Пользовательские теги заметки. В UI не являются типом/категорией.
+  tags              String[]                  @default([])
+  /// null = legacy/catalog default; true/false = явный выбор для пользовательской заметки.
+  reminderEnabled   Boolean?
   priceAmount       Decimal?                  @db.Decimal(10, 2)
   priceCurrency     String?                   @default("BYN")
   /// Простая ссылка без FK: входящие чистятся независимо от записей плана

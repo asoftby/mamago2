@@ -74,6 +74,17 @@ async function main() {
       date: "2026-09-30",
     })).childId, null);
 
+    const universalNote = await createManualPlanEntry(ownerScope, {
+      title: "Купить картон",
+      date: "2026-09-30",
+      startsAt: "16:00",
+      tags: ["#школа", "школа", " Тая "],
+      reminderEnabled: true,
+    });
+    assert.equal(universalNote.entryType, PlanEntryType.TASK);
+    assert.deepEqual(universalNote.tags, ["школа", "Тая"]);
+    assert.equal(universalNote.reminderEnabled, true);
+
     await expectCode(createManualPlanEntry(ownerScope, {
       entryType: PlanEntryType.EVENT,
       title: "Чужая привязка",

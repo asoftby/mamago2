@@ -5,6 +5,7 @@ import type { ContentStatus } from "@prisma/client";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { MOBILE_HEADER_STICKY_TOP } from "@/components/mobile/mobile-control-geometry";
 
 const STATUS_LABEL: Record<ContentStatus, string> = {
   DRAFT: "DRAFT",
@@ -34,8 +35,9 @@ export function ArticlePreviewBar({ status, publicSlug }: ArticlePreviewBarProps
       className={cn(
         "sticky z-40 w-full border-b border-amber-300/60 bg-amber-50/95 backdrop-blur-sm",
         "supports-[backdrop-filter]:bg-amber-50/90",
-        // Под приблизительную высоту site header (mobile fixed / desktop sticky)
-        "top-14 lg:top-16",
+        // Под высоту site header (mobile — общая константа, desktop sticky)
+        MOBILE_HEADER_STICKY_TOP,
+        "lg:top-16",
       )}
       role="region"
       aria-label="Режим предпросмотра статьи"

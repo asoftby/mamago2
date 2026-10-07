@@ -61,6 +61,7 @@ export function WeekCalendarStrip({
 }: WeekCalendarStripProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const [visibleWeekStart, setVisibleWeekStart] = useState(() =>
     getWeekStart(selectedDate),
@@ -105,15 +106,15 @@ export function WeekCalendarStrip({
     <div
       className={cn(className)}
       style={{
-        padding: "14px 14px 12px",
+        padding: compact ? "18px 14px 16px" : "14px 14px 12px",
         background: "#FAF7F1",
         border: "1px solid rgba(20,18,16,.10)",
         borderRadius: 18,
       }}
     >
       {/* Strip: arrows + days в одной строке */}
-      <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 28px", gap: 6, alignItems: "center" }}>
-        <button
+      <div style={{ display: "grid", gridTemplateColumns: showArrows ? "28px 1fr 28px" : "1fr", gap: 8, alignItems: "center" }}>
+        {showArrows ? <button
           type="button"
           onClick={() => shiftWeek(-1)}
           disabled={!canShiftToPreviousWeek}
@@ -126,9 +127,9 @@ export function WeekCalendarStrip({
             flexShrink: 0,
             opacity: canShiftToPreviousWeek ? 1 : 0.35,
           }}
-        ><ChevronLeft /></button>
+        ><ChevronLeft /></button> : null}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: compact ? 10 : 6 }}>
           {/* Month + year label */}
           <div style={{ textAlign: "center" }}>
             <span
@@ -140,7 +141,24 @@ export function WeekCalendarStrip({
           </div>
 
           {/* Days row */}
-          <div ref={scrollRef} style={{ display: "flex", gap: 3 }}>
+          <div
+            ref={scrollRef}
+            onTouchStart={(event) => {
+              const touch = event.touches[0];
+              if (touch) touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+            }}
+            onTouchEnd={(event) => {
+              const start = touchStartRef.current;
+              const touch = event.changedTouches[0];
+              touchStartRef.current = null;
+              if (!start || !touch) return;
+              const dx = touch.clientX - start.x;
+              const dy = touch.clientY - start.y;
+              if (Math.abs(dx) < 44 || Math.abs(dx) <= Math.abs(dy)) return;
+              shiftWeek(dx < 0 ? 1 : -1);
+            }}
+            style={{ display: "flex", gap: compact ? 5 : 3, touchAction: "pan-y" }}
+          >
             {weekDays.map((iso) => {
               const d = new Date(`${iso}T12:00:00`);
               const selected = iso === selectedDate;
@@ -161,8 +179,8 @@ export function WeekCalendarStrip({
                   style={{
                     flex: "1 1 0",
                     minWidth: 0,
-                    minHeight: countLabelByDate ? 70 : compact ? 52 : 56,
-                    padding: compact ? "6px 4px 10px" : "7px 4px 11px",
+                    minHeight: countLabelByDate ? 70 : compact ? 62 : 56,
+                    padding: compact ? "8px 4px 12px" : "7px 4px 11px",
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
@@ -235,7 +253,7 @@ export function WeekCalendarStrip({
           </div>
         </div>
 
-        <button
+        {showArrows ? <button
           type="button"
           onClick={() => shiftWeek(1)}
           aria-label="Следующая неделя"
@@ -246,7 +264,7 @@ export function WeekCalendarStrip({
             display: "flex", alignItems: "center", justifyContent: "center",
             flexShrink: 0,
           }}
-        ><ChevronRight /></button>
+        ><ChevronRight /></button> : null}
       </div>
     </div>
   );

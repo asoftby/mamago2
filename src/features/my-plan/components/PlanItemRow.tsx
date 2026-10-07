@@ -2,7 +2,7 @@
 
 import { useRef, useState, type TouchEvent } from "react";
 import Link from "next/link";
-import { X, Trash2 } from "lucide-react";
+import { CalendarDays, StickyNote, X, Trash2 } from "lucide-react";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
@@ -18,6 +18,17 @@ const MOVE_INTENT_PX = 6;
 interface PlanItemRowProps {
   item: PlanItemWithActivity;
   onRemove: () => void;
+  participantLabel?: string | null;
+}
+
+export type PlanItemVisualKind = "event" | "note";
+
+export function planItemVisualKind(
+  item: Pick<PlanItemWithActivity, "source">,
+): PlanItemVisualKind {
+  return item.source === "MANUAL" || item.source === "TELEGRAM_FORWARD"
+    ? "note"
+    : "event";
 }
 
 /**
@@ -56,7 +67,7 @@ export function decideRowClickCapture(
  * always in the DOM, just invisible until hovered/focused, so keyboard and
  * screen-reader users can still reach it by tabbing).
  */
-export function PlanItemRow({ item, onRemove }: PlanItemRowProps) {
+export function PlanItemRow({ item, onRemove, participantLabel }: PlanItemRowProps) {
   const cityCtx = useOptionalCity();
   const city = cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
 
@@ -69,6 +80,8 @@ export function PlanItemRow({ item, onRemove }: PlanItemRowProps) {
   const timeStr = item.startsAt
     ? new Date(item.startsAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
     : null;
+  const visualKind = planItemVisualKind(item);
+  const VisualIcon = visualKind === "event" ? CalendarDays : StickyNote;
 
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -209,11 +222,11 @@ export function PlanItemRow({ item, onRemove }: PlanItemRowProps) {
           position: "relative",
           zIndex: 1,
           display: "grid",
-          gridTemplateColumns: "46px 1fr auto",
-          gap: 11,
+          gridTemplateColumns: "54px 38px minmax(0,1fr) auto",
+          gap: 8,
           alignItems: "center",
-          minHeight: 72,
-          padding: "11px 12px",
+          minHeight: 86,
+          padding: "14px 12px",
           background: "#FAF7F1",
           transform: `translateX(${dragX}px)`,
           transition: isDragging ? "none" : "transform .28s cubic-bezier(.2,.7,.2,1)",
@@ -230,7 +243,24 @@ export function PlanItemRow({ item, onRemove }: PlanItemRowProps) {
             lineHeight: 1.2,
           }}
         >
-          {timeStr ?? "весь день"}
+          {timeStr ?? "В течение дня"}
+        </span>
+
+        <span
+          aria-label={visualKind === "event" ? "Событие" : "Заметка"}
+          title={visualKind === "event" ? "Событие" : "Заметка"}
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 12,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: visualKind === "event" ? "#C24E22" : "#C98A19",
+            background: visualKind === "event" ? "#FFF0EA" : "#FFF4D9",
+          }}
+        >
+          <VisualIcon size={19} />
         </span>
 
         <span style={{ minWidth: 0 }}>
@@ -275,13 +305,25 @@ export function PlanItemRow({ item, onRemove }: PlanItemRowProps) {
                 display: "block",
                 fontSize: 13,
                 color: "rgba(20,18,16,.55)",
-                marginTop: 2,
+                marginTop: 3,
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
               }}
             >
               {location}
+            </span>
+          ) : null}
+          {participantLabel ? (
+            <span
+              style={{
+                display: "block",
+                fontSize: 12.5,
+                color: "rgba(20,18,16,.48)",
+                marginTop: 3,
+              }}
+            >
+              {participantLabel}
             </span>
           ) : null}
         </span>
