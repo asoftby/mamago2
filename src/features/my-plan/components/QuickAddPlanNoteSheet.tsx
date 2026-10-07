@@ -103,8 +103,13 @@ export function QuickAddPlanNoteSheet({
     }
   }
 
-  function navigate(href: string) {
+  function closeDraft() {
     onOpenChange(false);
+    reset();
+  }
+
+  function navigate(href: string) {
+    closeDraft();
     onRequestClose?.();
     window.setTimeout(() => router.push(href), 0);
   }
@@ -142,7 +147,7 @@ export function QuickAddPlanNoteSheet({
           </div>
           <button
             type="button"
-            onClick={() => onOpenChange(false)}
+            onClick={closeDraft}
             aria-label="Закрыть"
             className="flex h-11 w-11 items-center justify-center rounded-full border border-neutral-200"
           >
