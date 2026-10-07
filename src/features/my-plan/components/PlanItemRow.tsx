@@ -64,8 +64,22 @@ export function PlanItemRow({ item, onRemove }: PlanItemRowProps) {
     ? publicActivityPath(item.activity.id, city, item.activity.slug)
     : null;
   const participationCta = item.activity ? resolveActivityParticipationCta(item.activity, city) : null;
-  const location = item.activity ? formatActivityAddressLine(item.activity) : null;
+  const location = item.activity ? formatActivityAddressLine(item.activity) : item.locationText ?? null;
   const title = item.title || item.activity?.title || "Активность";
+  const reminderLabel = item.reminderAt
+    ? new Intl.DateTimeFormat("ru-RU", {
+        timeZone: "Europe/Minsk",
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date(item.reminderAt))
+    : null;
+  const secondaryLine = [
+    location,
+    !item.activity ? item.notes : null,
+    reminderLabel ? `напоминание ${reminderLabel}` : null,
+  ].filter((value): value is string => Boolean(value)).join(" · ");
   const timeStr = item.startsAt
     ? new Date(item.startsAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
     : null;
@@ -269,7 +283,7 @@ export function PlanItemRow({ item, onRemove }: PlanItemRowProps) {
               {title}
             </span>
           )}
-          {location ? (
+          {secondaryLine ? (
             <span
               style={{
                 display: "block",
@@ -281,7 +295,7 @@ export function PlanItemRow({ item, onRemove }: PlanItemRowProps) {
                 textOverflow: "ellipsis",
               }}
             >
-              {location}
+              {secondaryLine}
             </span>
           ) : null}
         </span>
