@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
-import { buildGalleryItems, type ActivityForEventPageInput } from "./buildEventPageDataFromPrisma";
+import {
+  buildEventPageDataFromPrismaActivity,
+  buildGalleryItems,
+  type ActivityForEventPageInput,
+} from "./buildEventPageDataFromPrisma";
 
 const activity = {
   title: "Событие",
@@ -24,4 +28,33 @@ assert.equal(items?.[2]?.type === "youtube" && items[2].posterSrc, "https://img.
 const broken = { ...activity, scheduleJson: { reelsUrl: "broken" } } as ActivityForEventPageInput;
 assert.deepEqual(buildGalleryItems(broken, "/cover.jpg")?.map((item) => item.type), ["image", "image"]);
 
-console.log("event gallery sequence tests: OK");
+const pageData = buildEventPageDataFromPrismaActivity({
+  id: "event-1",
+  slug: "event-1",
+  title: "Событие",
+  shortDesc: "Короткое описание",
+  description: null,
+  format: "OFFLINE",
+  ageTags: [],
+  agePolicy: "UNKNOWN",
+  priceText: null,
+  priceFrom: null,
+  currency: "BYN",
+  priceDetails: null,
+  scheduleJson: {
+    priceDetails: "<p>Детали стоимости из расписания</p>",
+    organizer: { name: "ООО Тест", unp: "123456789" },
+  },
+  coverImageUrl: null,
+  images: [],
+  sessions: [],
+  place: null,
+  venue: null,
+  eventCategory: null,
+  organizer: null,
+} as unknown as ActivityForEventPageInput);
+
+assert.equal(pageData.priceDetails, "<p>Детали стоимости из расписания</p>");
+assert.deepEqual(pageData.organizer, { name: "ООО Тест", unp: "123456789" });
+
+console.log("event gallery/page-data tests: OK");
