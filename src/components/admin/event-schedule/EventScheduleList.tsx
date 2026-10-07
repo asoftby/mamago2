@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EventScheduleCard } from "./EventScheduleCard";
@@ -36,6 +37,28 @@ export function EventScheduleList({
   disabled = false,
   durationMinutes,
 }: EventScheduleListProps) {
+  const lastDurationInput = useRef<string | null>(null);
+
+  useEffect(() => {
+    const inputKey = `${durationMinutes ?? ""}|${items
+      .map((item) => `${item.id}:${item.startTime}:${item.allDay}`)
+      .join("|")}`;
+    if (lastDurationInput.current === inputKey) return;
+    lastDurationInput.current = inputKey;
+    if (!durationMinutes || durationMinutes < 1) return;
+
+    let changed = false;
+    const nextItems = items.map((item) => {
+      if (item.allDay) return item;
+      const endTime = addMinutesToTime(item.startTime, durationMinutes);
+      if (endTime === item.endTime) return item;
+      changed = true;
+      return { ...item, endTime };
+    });
+
+    if (changed) onChange(nextItems);
+  }, [durationMinutes, items, onChange]);
+
   const handleItemChange = (index: number, updatedItem: EventScheduleItem) => {
     const newItems = [...items];
     newItems[index] = updatedItem;

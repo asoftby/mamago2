@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { ChevronDown, ChevronUp, Trash2, Calendar as CalendarIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -62,18 +62,6 @@ export function EventScheduleCard({
   const handleUpdate = (updates: Partial<EventScheduleItem>) => {
     onChange({ ...item, ...updates });
   };
-
-  const lastDurationInput = useRef<string | null>(null);
-  useEffect(() => {
-    const inputKey = `${durationMinutes ?? ""}|${item.startTime}|${item.allDay}`;
-    if (lastDurationInput.current === inputKey) return;
-    lastDurationInput.current = inputKey;
-    if (item.allDay) return;
-    const calculatedEnd = addDurationToTime(item.startTime, durationMinutes);
-    if (calculatedEnd && calculatedEnd !== item.endTime) {
-      onChange({ ...item, endTime: calculatedEnd });
-    }
-  }, [durationMinutes, item, onChange]);
 
   const timeOrder = resolveScheduleItemTimeOrder(item);
 

@@ -44,10 +44,7 @@ export function OccasionPicker({
       .then((data: unknown) => {
         if (cancelled) return;
         if (Array.isArray(data)) {
-          const excluded = new Set(excludeSlugs);
-          setOccasions(
-            (data as OccasionOption[]).filter((occasion) => !excluded.has(occasion.slug)),
-          );
+          setOccasions(data as OccasionOption[]);
         }
       })
       .catch(() => {
@@ -59,10 +56,27 @@ export function OccasionPicker({
     return () => {
       cancelled = true;
     };
-  }, [excludeSlugs]);
+  }, []);
+
+  const visibleOccasions = occasions.filter(
+    (occasion) => !excludeSlugs.includes(occasion.slug),
+  );
+
+  useEffect(() => {
+    if (occasions.length === 0 || excludeSlugs.length === 0) return;
+    const excludedIds = new Set(
+      occasions
+        .filter((occasion) => excludeSlugs.includes(occasion.slug))
+        .map((occasion) => occasion.id),
+    );
+    const sanitizedValue = value.filter((id) => !excludedIds.has(id));
+    if (sanitizedValue.length !== value.length) {
+      onChange(sanitizedValue);
+    }
+  }, [excludeSlugs, occasions, onChange, value]);
 
   // Don't render anything while loading or if no active occasions
-  if (loading || occasions.length === 0) return null;
+  if (loading || visibleOccasions.length === 0) return null;
 
   const limitReached = value.length >= MAX_SELECTED_OCCASIONS;
 
@@ -80,7 +94,7 @@ export function OccasionPicker({
     <div className="space-y-2">
       <p className="text-sm font-medium text-gray-700">Актуальные поводы</p>
       <div className="flex flex-wrap gap-2">
-        {occasions.map((o) => {
+        {visibleOccasions.map((o) => {
           const selected = value.includes(o.id);
           const chipDisabled = disabled || (!selected && limitReached);
           return (
