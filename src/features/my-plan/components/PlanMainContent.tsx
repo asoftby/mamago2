@@ -296,9 +296,9 @@ const RECOMMENDATIONS_BLOCK_SUBTITLE =
 function pluralizeActivities(count: number): string {
   const mod10 = count % 10;
   const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return "пункт";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "пункта";
-  return "пунктов";
+  if (mod10 === 1 && mod100 !== 11) return "запись";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "записи";
+  return "записей";
 }
 
 /** Short day label for the compact "day context" line above the plan-item list. */
