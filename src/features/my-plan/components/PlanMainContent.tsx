@@ -513,19 +513,32 @@ export function PlanMainContent({
     });
 
     const toastId = `plan-delete-${itemId}`;
+    let resolved = false;
+
+    const undo = () => {
+      if (resolved) return;
+      resolved = true;
+      restorePendingPlanItem(itemId);
+    };
+
+    const expire = () => {
+      if (resolved) return;
+      resolved = true;
+      void commitPendingPlanItemRemoval(itemId);
+    };
+
     toast.custom(
       () => (
         <PlanDeleteCountdownToast
           toastId={toastId}
-          onUndo={() => restorePendingPlanItem(itemId)}
-          onExpire={() => {
-            void commitPendingPlanItemRemoval(itemId);
-          }}
+          onUndo={undo}
+          onExpire={expire}
         />
       ),
       {
         id: toastId,
         duration: Infinity,
+        onDismiss: undo,
         className:
           "!w-auto !max-w-none !border-0 !bg-transparent !p-0 !shadow-none pointer-events-auto",
       },
