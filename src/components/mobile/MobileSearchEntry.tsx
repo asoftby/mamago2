@@ -24,7 +24,7 @@ import {
 import {
   MOBILE_DISCOVERY_FIELD_CHROME,
   MOBILE_DISCOVERY_FIELD_GEOMETRY,
-  MOBILE_GLASS_CHROME,
+  MOBILE_FLOATING_CHROME,
 } from "@/components/mobile/mobile-control-geometry";
 
 // Map intent IDs to fallback icons
@@ -305,7 +305,7 @@ export function MobileSearchEntry({
         className={cn(
           "flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left",
           MOBILE_DISCOVERY_FIELD_GEOMETRY,
-          MOBILE_GLASS_CHROME,
+          MOBILE_FLOATING_CHROME,
           "transition-transform duration-150 ease-out active:scale-[0.98]",
           className,
         )}

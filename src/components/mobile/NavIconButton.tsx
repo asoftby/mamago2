@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { MOBILE_GLASS_CHROME } from "@/components/mobile/mobile-control-geometry";
+import { MOBILE_FLOATING_CHROME } from "@/components/mobile/mobile-control-geometry";
 
 export type NavIconSize = "default" | "compact";
 
@@ -65,7 +65,7 @@ export function getNavIconButtonClassName({
     "active:scale-[0.96] active:transition-transform",
     chrome === "dark"
       ? cn(
-          MOBILE_GLASS_CHROME,
+          MOBILE_FLOATING_CHROME,
           "active:scale-[0.98]",
           isActive && "border-[#EF8759]/50",
         )
