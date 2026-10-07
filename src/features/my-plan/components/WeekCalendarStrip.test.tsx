@@ -8,6 +8,7 @@ test("calendar keeps desktop week navigation bounded by today", () => {
   assert.match(source, /const canShiftToPreviousWeek = allowPastDates \|\| visibleWeekStart > todayWeekStart;/);
   assert.match(source, /if \(dir === -1 && !canShiftToPreviousWeek\) return;/);
   assert.match(source, /disabled=\{!canShiftToPreviousWeek\}/);
+  assert.match(source, /gridTemplateColumns: showArrows \? "36px 1fr 36px" : "1fr"/);
 });
 
 test("calendar exposes a Today action on all layouts", () => {
@@ -16,9 +17,11 @@ test("calendar exposes a Today action on all layouts", () => {
   assert.match(source, /selectDate\(todayIso\)/);
 });
 
-test("compact mobile swipe moves one date at a time", () => {
-  assert.match(source, /const shiftDay = \(dir: 1 \| -1\) => \{/);
-  assert.match(source, /selectDate\(addDaysLocal\(selectedDate, dir\)\)/);
-  assert.match(source, /if \(compact\) shiftDay\(dx < 0 \? 1 : -1\);/);
-  assert.match(source, /else shiftWeek\(dx < 0 \? 1 : -1\);/);
+test("compact mobile calendar uses native horizontal scrolling and date snapping", () => {
+  assert.match(source, /const compactDays = useMemo/);
+  assert.match(source, /onScroll=\{compact \? handleCompactScroll : undefined\}/);
+  assert.match(source, /scrollSnapType: compact \? "x mandatory" : undefined/);
+  assert.match(source, /scrollSnapAlign: compact \? "center" : undefined/);
+  assert.match(source, /overflowX: compact \? "auto" : "visible"/);
+  assert.match(source, /data-plan-date=\{iso\}/);
 });
