@@ -6,6 +6,24 @@ import type { SerializedPlanItem } from "./PlanPageClient";
 
 type ChildOption = { id: string; name: string };
 
+function dateTimeValue(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  const datePart = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Minsk",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+  const timePart = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Minsk",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+  return `${datePart}T${timePart}`;
+}
+
 function timeValue(value: string | null): string {
   if (!value) return "";
   return new Intl.DateTimeFormat("en-GB", {
@@ -39,6 +57,7 @@ export function ManualPlanEntryDialog({
   const [entryDate, setEntryDate] = useState(date);
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
+  const [reminderAt, setReminderAt] = useState("");
   const [locationText, setLocationText] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
@@ -52,6 +71,7 @@ export function ManualPlanEntryDialog({
     setEntryDate(item?.date ?? date);
     setStartsAt(timeValue(item?.startsAt ?? null));
     setEndsAt(timeValue(item?.endsAt ?? null));
+    setReminderAt(dateTimeValue(item?.reminderAt ?? null));
     setLocationText(item?.locationText ?? "");
     setNotes(item?.notes ?? "");
     setError("");
@@ -72,6 +92,7 @@ export function ManualPlanEntryDialog({
           date: entryDate,
           startsAt: startsAt || null,
           endsAt: endsAt || null,
+          reminderAt: reminderAt || null,
           locationText: locationText || null,
           notes: notes || null,
           ...(item ? { expectedUpdatedAt: item.updatedAt } : {}),
@@ -136,6 +157,18 @@ export function ManualPlanEntryDialog({
               <input type="time" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} className={inputClass} />
             </label>
           </div>
+          <label className={labelClass}>
+            Напомнить
+            <input
+              type="datetime-local"
+              value={reminderAt}
+              onChange={(e) => setReminderAt(e.target.value)}
+              className={inputClass}
+            />
+            <span className="text-xs font-normal text-neutral-500">
+              Необязательно. Если указать время, mamaGo напомнит об этой записи.
+            </span>
+          </label>
           <label className={labelClass}>
             Место
             <input maxLength={240} value={locationText} onChange={(e) => setLocationText(e.target.value)} className={inputClass} />
