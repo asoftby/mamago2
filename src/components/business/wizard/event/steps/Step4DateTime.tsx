@@ -293,6 +293,7 @@ export function Step4DateTime({
             items={scheduleItems}
             onChange={handleScheduleItemsChange}
             disabled={!isEditable}
+            durationMinutes={data.durationMinutes}
           />
         </>
       )}
