@@ -16,6 +16,7 @@ import {
   type AgeRangeSelection,
 } from "@/features/filters/discovery/childrenScope.store";
 import { toast } from "@/lib/toast";
+import { LiquidNotification } from "@/components/ui/liquid-notification";
 import { WeekCalendarStrip } from "./WeekCalendarStrip";
 import { UpcomingPlanBlock } from "./UpcomingPlanBlock";
 import { selectUpcomingPlanItems } from "../lib/upcomingPlanItems";
@@ -375,6 +376,45 @@ function weekdayForNa(date: Date): string {
   return accusativeByNa[weekday] ?? weekday;
 }
 
+function PlanDeleteCountdownToast({
+  toastId,
+  onUndo,
+  onExpire,
+}: {
+  toastId: string;
+  onUndo: () => void;
+  onExpire: () => void;
+}) {
+  const [seconds, setSeconds] = useState(5);
+
+  useEffect(() => {
+    const timers = [1, 2, 3, 4].map((elapsedSeconds) =>
+      window.setTimeout(() => setSeconds(5 - elapsedSeconds), elapsedSeconds * 1000),
+    );
+    const expireTimer = window.setTimeout(() => {
+      onExpire();
+      toast.dismiss(toastId);
+    }, 5000);
+
+    return () => {
+      for (const timer of timers) window.clearTimeout(timer);
+      window.clearTimeout(expireTimer);
+    };
+  }, [onExpire, toastId]);
+
+  return (
+    <LiquidNotification
+      variant="brand"
+      title={`Удаление через ${seconds} сек.`}
+      actionLabel="Отменить"
+      onAction={() => {
+        onUndo();
+        toast.dismiss(toastId);
+      }}
+    />
+  );
+}
+
 export function PlanMainContent({
   selectedDate,
   onChangeDate,
@@ -473,23 +513,36 @@ export function PlanMainContent({
     });
 
     const toastId = `plan-delete-${itemId}`;
-    toast("Удалено из плана", {
-      id: toastId,
-      duration: 5000,
-      action: {
-        label: "Отменить",
-        onClick: () => {
-          restorePendingPlanItem(itemId);
-          toast.dismiss(toastId);
-        },
+    let resolved = false;
+
+    const undo = () => {
+      if (resolved) return;
+      resolved = true;
+      restorePendingPlanItem(itemId);
+    };
+
+    const expire = () => {
+      if (resolved) return;
+      resolved = true;
+      void commitPendingPlanItemRemoval(itemId);
+    };
+
+    toast.custom(
+      () => (
+        <PlanDeleteCountdownToast
+          toastId={toastId}
+          onUndo={undo}
+          onExpire={expire}
+        />
+      ),
+      {
+        id: toastId,
+        duration: Infinity,
+        onDismiss: undo,
+        className:
+          "!w-auto !max-w-none !border-0 !bg-transparent !p-0 !shadow-none pointer-events-auto",
       },
-      onAutoClose: () => {
-        void commitPendingPlanItemRemoval(itemId);
-      },
-      onDismiss: () => {
-        void commitPendingPlanItemRemoval(itemId);
-      },
-    });
+    );
   }, [commitPendingPlanItemRemoval, onRemoveItemFromPlan, restorePendingPlanItem]);
 
 
@@ -1074,10 +1127,10 @@ export function PlanMainContent({
         {...PLAN_RECOMMENDATION_RESULTS_A11Y}
       >
         {dayPartSections.length > 0 ? (
-          <section className={compact ? "space-y-4" : "space-y-3"} aria-label="В вашем плане">
+          <section aria-label="В вашем плане">
             <p
               style={{
-                margin: 0,
+                margin: compact ? "0 0 18px" : "0 0 14px",
                 fontSize: 13,
                 color: "rgba(20,18,16,.55)",
               }}
