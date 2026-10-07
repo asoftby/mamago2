@@ -118,7 +118,11 @@ export type ActivityForEventPageInput = {
       phone3Label?: string | null;
     } | null;
   } | null;
-  eventCategory: { nameRu: string } | null;
+  eventCategory: { id?: string; nameRu: string; slug?: string } | null;
+  organizer?: {
+    name: string;
+    unp: string | null;
+  } | null;
 };
 
 function discoveryIntentForActivity(): Intent {
@@ -488,6 +492,8 @@ export function buildEventPageDataFromPrismaActivity(
     ownerEditHref?: string;
     /** Pre-fetched Instagram Reels thumbnail URL (og:image from the Reel page). */
     reelsThumbnailUrl?: string;
+    /** Same-category discovery candidates prepared by the route. */
+    similar?: EventPageData["similar"];
   }
 ): EventPageData {
   const citySlug =
@@ -527,6 +533,18 @@ export function buildEventPageDataFromPrismaActivity(
   const isPastEvent =
     sessions.length > 0 && sessions.every((s) => new Date(s.startsAt) < now);
 
+  const organizerSnapshotRaw = getScheduleJsonRecord(activity)?.organizer;
+  const organizerSnapshot =
+    organizerSnapshotRaw && typeof organizerSnapshotRaw === "object"
+      ? (organizerSnapshotRaw as Record<string, unknown>)
+      : null;
+  const organizerName =
+    activity.organizer?.name?.trim() ||
+    (typeof organizerSnapshot?.name === "string" ? organizerSnapshot.name.trim() : "");
+  const organizerUnp =
+    activity.organizer?.unp?.trim() ||
+    (typeof organizerSnapshot?.unp === "string" ? organizerSnapshot.unp.trim() : "");
+
   const data: EventPageData = {
     id: activity.id,
     slug: activity.slug ?? null,
@@ -535,6 +553,7 @@ export function buildEventPageDataFromPrismaActivity(
     discoveryIntent: discoveryIntentForActivity(),
     ageFromBadge: activity.agePolicy === "ADULT_ONLY" ? "18+" : formatAgeTagsCompact(activity.ageTags) ?? ageFromPlusBadgeFromAgeTags(activity.ageTags),
     categoryLabel: activity.eventCategory?.nameRu,
+    categorySlug: activity.eventCategory?.slug,
     title: activity.title,
     subtitle: activity.shortDesc,
     factChips: factChipsFromActivity(activity),
@@ -555,14 +574,23 @@ export function buildEventPageDataFromPrismaActivity(
     ],
     about: aboutFromActivity(activity),
     planDayLinks: {},
-    similar: [],
+    organizer: organizerName
+      ? {
+          name: organizerName,
+          ...(organizerUnp ? { unp: organizerUnp } : {}),
+        }
+      : undefined,
+    similar: options?.similar ?? [],
     breadcrumbs: [
       { label: "Главная", href: `/${citySlug}` },
       { label: "События", href: `/${citySlug}/kuda` },
       { label: activity.title, href: "#" },
     ],
     priceLabel: priceLabel(activity),
-    priceDetails: activity.priceDetails ?? undefined,
+    priceDetails:
+      activity.priceDetails?.trim() ||
+      getScheduleJsonString(activity, "priceDetails")?.trim() ||
+      undefined,
     faqItems: normalizeFaqItems(activity.faqItems),
     cta: {
       planLabel: "В план",
