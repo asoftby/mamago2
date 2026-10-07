@@ -6,7 +6,7 @@ import { ru } from "date-fns/locale";
 import { PlanCalendarIcon } from "@/components/icons/PlanCalendarIcon";
 import { cn } from "@/lib/utils";
 import {
-  MOBILE_GLASS_CHROME,
+  MOBILE_FLOATING_CHROME,
   MOBILE_DISCOVERY_FIELD_GEOMETRY,
 } from "@/components/mobile/mobile-control-geometry";
 import { useMyPlan } from "../hooks/useMyPlan";
@@ -129,7 +129,7 @@ export function MyPlanMobileWidgetView({
         className={cn(
           "pointer-events-auto flex min-w-0 flex-1 items-center gap-3 text-left text-[#1A1A1A]",
           MOBILE_DISCOVERY_FIELD_GEOMETRY,
-          MOBILE_GLASS_CHROME,
+          MOBILE_FLOATING_CHROME,
           "touch-manipulation transition-transform duration-150 ease-out active:scale-[0.98]",
           pulse ? "scale-105 motion-reduce:scale-100" : "scale-100",
         )}

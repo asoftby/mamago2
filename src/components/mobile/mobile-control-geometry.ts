@@ -14,9 +14,8 @@ export const MOBILE_DISCOVERY_FIELD_CHROME =
 export const MOBILE_HEADER_ROW_HEIGHT = "h-16";
 export const MOBILE_HEADER_STICKY_TOP = "top-16";
 
-/** Liquid glass для плавающих контролов: полупрозрачная заливка, blur, светлая кромка и внутренний блик. */
-export const MOBILE_GLASS_CHROME =
-  "border border-white/60 bg-white/55 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]";
+/** Белые непрозрачные плавающие контролы (виджет, 🔔, 👤, чип хедера): тонкая серая граница, без тени. */
+export const MOBILE_FLOATING_CHROME = "border border-gray-200 bg-white";
 
 /** 26px field radius + the shell's 8px padding keeps the two pills concentric. */
 export const MOBILE_DISCOVERY_SHELL_RADIUS = "rounded-[34px]";

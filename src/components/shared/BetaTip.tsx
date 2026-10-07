@@ -90,7 +90,7 @@ export function BetaTipMobile() {
         "lg:hidden fixed z-50 left-3 right-3 pointer-events-none",
       )}
       /* над виджетом «Мой план» (всегда виден): 12px + 64px + 8px */
-      style={{ bottom: "calc(5.25rem + env(safe-area-inset-bottom, 0px))" }}
+      style={{ bottom: "calc(5.75rem + env(safe-area-inset-bottom, 0px))" }}
     >
       <BetaTipContent variant="mobile" onDismiss={dismiss} />
     </div>
