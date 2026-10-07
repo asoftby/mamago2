@@ -7,6 +7,7 @@
 import type {
   NotificationScenario,
   PlanEventReminderContext,
+  PlanItemReminderContext,
   PlanTomorrowDigestContext,
   SendNotificationContext,
 } from "@/lib/notifications/domainContracts";
@@ -29,6 +30,15 @@ export function buildScenarioTemplatePayloadCore(
         startsAtDate: formatDateKey(planContext.startsAt),
         ...(planContext.placeName ? { placeName: planContext.placeName } : {}),
         ...(planContext.cityName ? { cityName: planContext.cityName } : {}),
+      };
+    }
+    case "PLAN_ITEM_REMINDER": {
+      const planContext = context as PlanItemReminderContext;
+      return {
+        itemTitle: planContext.itemTitle,
+        planDate: planContext.planDate,
+        ...(planContext.startsAt ? { startsAtTime: formatTime(planContext.startsAt) } : {}),
+        ...(planContext.placeName ? { placeName: planContext.placeName } : {}),
       };
     }
     case "PLAN_TOMORROW_DIGEST": {

@@ -901,6 +901,29 @@ const EXPLICIT_SCENARIO_DEFINITIONS: Record<string, NotificationScenarioDefiniti
     isLegacyGeneric: false,
   },
 
+  PLAN_ITEM_REMINDER: {
+    key: "PLAN_ITEM_REMINDER",
+    audience: "USER",
+    description: "Явное напоминание, заданное пользователем для записи в Моем плане.",
+    payloadSchema: z.object({
+      itemTitle: z.string(),
+      planDate: z.string(),
+      startsAtTime: z.string().optional(),
+      placeName: z.string().optional(),
+    }),
+    samplePayload: {
+      itemTitle: "Взять справку в школу",
+      planDate: "2026-10-09",
+      startsAtTime: "09:00",
+    },
+    defaults: {
+      IN_APP: { kind: "template", subject: "Напоминание", body: "Не забудьте: {{itemTitle}}" },
+      EMAIL: { kind: "template", subject: "Напоминание", body: "Не забудьте: {{itemTitle}}" },
+      TELEGRAM: { kind: "template", subject: "Напоминание", body: "Не забудьте: {{itemTitle}}" },
+    },
+    isLegacyGeneric: false,
+  },
+
   PLAN_TOMORROW_DIGEST: {
     key: "PLAN_TOMORROW_DIGEST",
     audience: "USER",

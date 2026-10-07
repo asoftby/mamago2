@@ -27,6 +27,19 @@ function formatTime(iso: string | null): string | null {
   return formatHHMM(iso) || null;
 }
 
+function formatReminder(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Europe/Minsk",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export function PlanItemCard({
   item,
   onRemove,
@@ -76,6 +89,7 @@ export function PlanItemCard({
     ? `${time}${endTime ? `–${endTime}` : ""}`
     : (!presentation.isCatalog ? "Весь день" : null);
   const metaLine = [age, timeLabel, price].filter(Boolean).join(" · ");
+  const reminderLabel = formatReminder(item.reminderAt);
 
   const handleRemove = async () => {
     if (removing) return;
@@ -278,6 +292,9 @@ export function PlanItemCard({
             {metaLine}
           </span>
         )}
+        {reminderLabel ? (
+          <span className="text-xs text-neutral-500">Напомним {reminderLabel}</span>
+        ) : null}
         {hasConflict ? (
           <span className="text-xs font-medium text-amber-700">Пересекается по времени</span>
         ) : null}

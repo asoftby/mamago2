@@ -1,6 +1,7 @@
 import type {
   NotificationScenario,
   PlanEventReminderContext,
+  PlanItemReminderContext,
   PlanTomorrowDigestContext,
   RenderedNotificationContent,
   SendNotificationContext,
@@ -43,6 +44,17 @@ function renderPlanEvent2hBefore(
     body: `В ${startsAtLabel} у вас в плане: ${planContext.eventTitle}`,
     ctaLabel: "Открыть план",
     ctaUrl,
+  };
+}
+
+function renderPlanItemReminder(
+  context: PlanItemReminderContext,
+): RenderedNotificationContent {
+  return {
+    title: "Напоминание",
+    body: `Не забудьте: ${context.itemTitle}`,
+    ctaLabel: "Открыть план",
+    ctaUrl: `/me/plan?date=${context.planDate}`,
   };
 }
 
@@ -95,6 +107,8 @@ export function renderNotificationContentCore(
   switch (scenario) {
     case "PLAN_EVENT_2H_BEFORE":
       return renderPlanEvent2hBefore(context);
+    case "PLAN_ITEM_REMINDER":
+      return renderPlanItemReminder(context as PlanItemReminderContext);
     case "PLAN_TOMORROW_DIGEST":
       return renderPlanTomorrowDigest(context as PlanTomorrowDigestContext);
     default: {

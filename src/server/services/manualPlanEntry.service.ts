@@ -33,6 +33,8 @@ export type ManualPlanEntryInput = {
   endsAt?: string | null;
   dueAt?: string | null;
   dueHasTime?: boolean;
+  /** Local wall-clock value (YYYY-MM-DDTHH:mm) or ISO timestamp. */
+  reminderAt?: string | null;
   locationText?: string | null;
   notes?: string | null;
 };
@@ -100,6 +102,7 @@ const calendarItemSelect = {
   endsAt: true,
   dueAt: true,
   dueHasTime: true,
+  reminderAt: true,
   title: true,
   childId: true,
   locationText: true,
@@ -127,6 +130,7 @@ export type FamilyCalendarItemDto = {
   endsAt: string | null;
   dueAt: string | null;
   dueHasTime: boolean;
+  reminderAt: string | null;
   effectiveStartsAt: string | null;
   title: string | null;
   childId: string | null;
@@ -192,6 +196,28 @@ function parseWallClock(date: string, value: unknown, field: string): Date | nul
   return parsed;
 }
 
+function parseReminderAt(value: unknown): Date | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string") {
+    throw new ManualPlanEntryError("INVALID_INPUT", "invalid_reminder_at");
+  }
+  const localMatch = value.match(/^(\\d{4}-\\d{2}-\\d{2})T((?:[01]\\d|2[0-3]):[0-5]\\d)$/);
+  if (localMatch) {
+    const reminderDate = localMatch[1];
+    const reminderTime = localMatch[2];
+    assertDate(reminderDate);
+    if (!reminderTime || !TIME_RE.test(reminderTime)) {
+      throw new ManualPlanEntryError("INVALID_INPUT", "invalid_reminder_at");
+    }
+    return localWallClockToUtc(reminderDate, reminderTime);
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new ManualPlanEntryError("INVALID_INPUT", "invalid_reminder_at");
+  }
+  return parsed;
+}
+
 function wallClock(date: Date | null): string | null {
   if (!date) return null;
   return new Intl.DateTimeFormat("en-GB", {
@@ -241,6 +267,7 @@ export async function createManualPlanEntry(owner: PlanOwner, input: ManualPlanE
   const startsAt = parseWallClock(input.date, input.startsAt, "starts_at");
   const endsAt = parseWallClock(input.date, input.endsAt, "ends_at");
   const dueAt = parseWallClock(input.date, input.dueAt, "due_at");
+  const reminderAt = parseReminderAt(input.reminderAt);
   assertTimeOrder(startsAt, endsAt);
 
   return prisma.planItem.create({
@@ -256,6 +283,7 @@ export async function createManualPlanEntry(owner: PlanOwner, input: ManualPlanE
       endsAt,
       dueAt,
       dueHasTime: input.dueHasTime === true && dueAt != null,
+      reminderAt,
       locationText: normalizeText(input.locationText, LOCATION_MAX, "location"),
       notes: normalizeText(input.notes, NOTES_MAX, "notes"),
     },
@@ -299,6 +327,7 @@ export async function updateManualPlanEntry(
   const dueAt = patch.dueAt === undefined
     ? (date === current.date ? current.dueAt : parseWallClock(date, wallClock(current.dueAt), "due_at"))
     : parseWallClock(date, patch.dueAt, "due_at");
+  const reminderAt = patch.reminderAt === undefined ? current.reminderAt : parseReminderAt(patch.reminderAt);
   assertTimeOrder(startsAt, endsAt);
 
   const result = await prisma.planItem.updateMany({
@@ -315,6 +344,7 @@ export async function updateManualPlanEntry(
       ...(patch.dueHasTime === undefined && patch.dueAt === undefined
         ? {}
         : { dueHasTime: (patch.dueHasTime ?? current.dueHasTime) === true && dueAt != null }),
+      ...(patch.reminderAt === undefined ? {} : { reminderAt }),
       ...(patch.locationText === undefined ? {} : { locationText: normalizeText(patch.locationText, LOCATION_MAX, "location") }),
       ...(patch.notes === undefined ? {} : { notes: normalizeText(patch.notes, NOTES_MAX, "notes") }),
     },
@@ -407,6 +437,7 @@ export function toFamilyCalendarItemDto(row: CalendarRow, authorName: string | n
     endsAt: row.endsAt?.toISOString() ?? null,
     dueAt: row.dueAt?.toISOString() ?? null,
     dueHasTime: row.dueHasTime,
+    reminderAt: row.reminderAt?.toISOString() ?? null,
     effectiveStartsAt: row.startsAt?.toISOString() ?? null,
     title: row.title,
     childId: row.childId,

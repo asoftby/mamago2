@@ -22,6 +22,12 @@ export const SCENARIO_META: Record<string, ScenarioMeta> = {
     icon: Clock3,
     triggerKind: "REMINDER",
   },
+  PLAN_ITEM_REMINDER: {
+    title: "Напоминание записи в плане",
+    subtitle: "Индивидуальное время, которое пользователь задал для записи.",
+    icon: Clock3,
+    triggerKind: "REMINDER",
+  },
   PLAN_TOMORROW_DIGEST: {
     title: "Завтра в плане",
     subtitle: "Вечерняя сводка по завтрашним планам пользователя.",

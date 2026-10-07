@@ -8,6 +8,7 @@ export type NotificationScenario = PrismaNotificationScenario;
 
 export const NOTIFICATION_SCENARIOS = {
   PLAN_EVENT_2H_BEFORE: "PLAN_EVENT_2H_BEFORE",
+  PLAN_ITEM_REMINDER: "PLAN_ITEM_REMINDER",
   PLAN_TOMORROW_DIGEST: "PLAN_TOMORROW_DIGEST",
 } as const satisfies Record<string, NotificationScenario>;
 
@@ -48,6 +49,17 @@ export type PlanEventReminderContext = {
   timeZone?: string;
 };
 
+export type PlanItemReminderContext = {
+  planItemId: string;
+  activityId?: string | null;
+  itemTitle: string;
+  planDate: string;
+  startsAt?: Date | null;
+  reminderAt: Date;
+  placeName?: string | null;
+  timeZone?: string;
+};
+
 export type PlanTomorrowDigestItem = {
   planItemId: string;
   activityId?: string | null;
@@ -67,6 +79,7 @@ export type PlanTomorrowDigestContext = {
 
 export type SendNotificationContext =
   | PlanEventReminderContext
+  | PlanItemReminderContext
   | PlanTomorrowDigestContext;
 
 export type SendNotificationInput = {

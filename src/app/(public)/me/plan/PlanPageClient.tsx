@@ -47,6 +47,8 @@ export type SerializedPlanItem = {
   endsAt: string | null;
   dueAt: string | null;
   dueHasTime: boolean;
+  /** Optional for synthetic/client-side rows created before server refresh. */
+  reminderAt?: string | null;
   activityId: string | null;
   title: string | null;
   childId: string | null;

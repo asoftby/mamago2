@@ -21,6 +21,11 @@ const POLICY_META: Record<
     subtitle: "Точечный reminder перед стартом события.",
     icon: Clock3,
   },
+  PLAN_ITEM_REMINDER: {
+    title: "Напоминание записи в плане",
+    subtitle: "Индивидуальное время напоминания пользователя.",
+    icon: Clock3,
+  },
   PLAN_TOMORROW_DIGEST: {
     title: "Завтра в плане",
     subtitle: "Вечерняя сводка по завтрашним планам пользователя.",

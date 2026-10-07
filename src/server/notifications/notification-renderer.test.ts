@@ -33,6 +33,23 @@ import { renderNotificationContentCore } from "./notification-renderer-core";
 }
 
 {
+  const rendered = renderNotificationContentCore("PLAN_ITEM_REMINDER", {
+    planItemId: "plan_manual",
+    activityId: null,
+    itemTitle: "Взять справку в школу",
+    planDate: "2026-10-09",
+    startsAt: null,
+    reminderAt: new Date("2026-10-08T16:00:00.000Z"),
+    timeZone: "Europe/Minsk",
+  });
+
+  assert.equal(rendered.title, "Напоминание");
+  assert.equal(rendered.body, "Не забудьте: Взять справку в школу");
+  assert.equal(rendered.ctaLabel, "Открыть план");
+  assert.equal(rendered.ctaUrl, "/me/plan?date=2026-10-09");
+}
+
+{
   const rendered = renderNotificationContentCore("PLAN_TOMORROW_DIGEST", {
     digestDate: "2026-05-15",
     citySlug: "minsk",

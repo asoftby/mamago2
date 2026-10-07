@@ -6,6 +6,7 @@ export function resolveNotificationTypeForScenario(
 ): NotificationType {
   switch (scenario) {
     case "PLAN_EVENT_2H_BEFORE":
+    case "PLAN_ITEM_REMINDER":
     case "PLAN_TOMORROW_DIGEST":
       return "REMINDER";
     default: {

@@ -38,6 +38,16 @@ function buildTestContext(scenario: NotificationScenario): SendNotificationConte
         placeName: "Тестовая площадка",
         cityName: null,
       };
+    case "PLAN_ITEM_REMINDER":
+      return {
+        planItemId: `test:${stamp}`,
+        activityId: null,
+        itemTitle: "Тестовое напоминание mamaGo",
+        planDate: new Date(stamp).toISOString().slice(0, 10),
+        startsAt: null,
+        reminderAt: new Date(stamp),
+        placeName: null,
+      };
     case "PLAN_TOMORROW_DIGEST": {
       const tomorrowMorning = new Date(stamp + 24 * 60 * 60 * 1000);
       return {

@@ -22,4 +22,16 @@ import { buildNotificationDedupeKeyCore } from "./notification-dedupe-core";
   assert.equal(key, "PLAN_TOMORROW_DIGEST:user_42:2026-05-15");
 }
 
+{
+  const key = buildNotificationDedupeKeyCore({
+    scenario: "PLAN_ITEM_REMINDER",
+    userId: "user_42",
+    eventId: "plan_1:2026-10-08T16:00:00.000Z",
+  });
+  assert.equal(
+    key,
+    "PLAN_ITEM_REMINDER:user_42:plan_1:2026-10-08T16:00:00.000Z",
+  );
+}
+
 console.log("notification-dedupe tests: OK");

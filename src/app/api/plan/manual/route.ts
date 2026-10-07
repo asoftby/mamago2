@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
       endsAt: body.endsAt,
       dueAt: body.dueAt,
       dueHasTime: body.dueHasTime,
+      reminderAt: body.reminderAt,
       locationText: body.locationText,
       notes: body.notes,
     });

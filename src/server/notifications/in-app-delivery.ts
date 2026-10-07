@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import type {
   NotificationDeliveryOutcome,
   PlanEventReminderContext,
+  PlanItemReminderContext,
   PlanTomorrowDigestContext,
   PreparedNotificationPayload,
 } from "@/lib/notifications/domainContracts";
@@ -25,6 +26,7 @@ function resolveNotificationAudience(
 ): NotificationAudience {
   switch (scenario) {
     case "PLAN_EVENT_2H_BEFORE":
+    case "PLAN_ITEM_REMINDER":
     case "PLAN_TOMORROW_DIGEST":
       return "USER";
     default: {
@@ -49,6 +51,22 @@ function buildInAppPayloadJson(
           startsAt: context.startsAt.toISOString(),
           placeName: context.placeName ?? null,
           cityName: context.cityName ?? null,
+        },
+        content: prepared.content,
+      };
+    }
+    case "PLAN_ITEM_REMINDER": {
+      const context = prepared.context as PlanItemReminderContext;
+      return {
+        scenario: prepared.scenario,
+        context: {
+          planItemId: context.planItemId,
+          activityId: context.activityId ?? null,
+          itemTitle: context.itemTitle,
+          planDate: context.planDate,
+          startsAt: context.startsAt?.toISOString() ?? null,
+          reminderAt: context.reminderAt.toISOString(),
+          placeName: context.placeName ?? null,
         },
         content: prepared.content,
       };
@@ -86,6 +104,13 @@ function resolveNotificationEntity(
   switch (prepared.scenario) {
     case "PLAN_EVENT_2H_BEFORE": {
       const context = prepared.context as PlanEventReminderContext;
+      return {
+        entityType: "PLAN_ITEM",
+        entityId: context.planItemId,
+      };
+    }
+    case "PLAN_ITEM_REMINDER": {
+      const context = prepared.context as PlanItemReminderContext;
       return {
         entityType: "PLAN_ITEM",
         entityId: context.planItemId,
@@ -200,22 +225,38 @@ export async function sendInAppNotification(
 export async function skipInAppNotification(
   prepared: PreparedNotificationPayload,
 ): Promise<NotificationDeliveryOutcome> {
-  const payloadJson =
-    prepared.scenario === "PLAN_EVENT_2H_BEFORE"
-      ? {
+  const payloadJson: Prisma.InputJsonValue = (() => {
+    switch (prepared.scenario) {
+      case "PLAN_EVENT_2H_BEFORE":
+        return {
           scenario: prepared.scenario,
           context: {
             planItemId: (prepared.context as PlanEventReminderContext).planItemId,
             activityId: (prepared.context as PlanEventReminderContext).activityId ?? null,
           },
-        }
-      : {
+        };
+      case "PLAN_ITEM_REMINDER":
+        return {
+          scenario: prepared.scenario,
+          context: {
+            planItemId: (prepared.context as PlanItemReminderContext).planItemId,
+            reminderAt: (prepared.context as PlanItemReminderContext).reminderAt.toISOString(),
+          },
+        };
+      case "PLAN_TOMORROW_DIGEST":
+        return {
           scenario: prepared.scenario,
           context: {
             digestDate: (prepared.context as PlanTomorrowDigestContext).digestDate,
             planItemIds: (prepared.context as PlanTomorrowDigestContext).planItemIds,
           },
         };
+      default: {
+        const exhaustiveCheck: never = prepared.scenario;
+        return exhaustiveCheck;
+      }
+    }
+  })();
 
   return recordSkippedNotificationDelivery({
     userId: prepared.userId,
