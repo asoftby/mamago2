@@ -52,9 +52,36 @@ const pageData = buildEventPageDataFromPrismaActivity({
   venue: null,
   eventCategory: null,
   organizer: null,
+  business: { name: "Тест", legalName: "ООО Тест Бизнес", unp: "987654321" },
 } as unknown as ActivityForEventPageInput);
 
 assert.equal(pageData.priceDetails, "<p>Детали стоимости из расписания</p>");
 assert.deepEqual(pageData.organizer, { name: "ООО Тест", unp: "123456789" });
+
+const businessFallback = buildEventPageDataFromPrismaActivity({
+  id: "event-2",
+  slug: "event-2",
+  title: "Событие 2",
+  shortDesc: "Описание",
+  description: null,
+  format: "OFFLINE",
+  ageTags: [],
+  agePolicy: "UNKNOWN",
+  priceText: null,
+  priceFrom: null,
+  currency: "BYN",
+  priceDetails: null,
+  scheduleJson: {},
+  coverImageUrl: null,
+  images: [],
+  sessions: [],
+  place: null,
+  venue: null,
+  eventCategory: null,
+  organizer: null,
+  business: { name: "Бренд", legalName: "ООО Юрлицо", unp: "987654321" },
+} as unknown as ActivityForEventPageInput);
+
+assert.deepEqual(businessFallback.organizer, { name: "ООО Юрлицо", unp: "987654321" });
 
 console.log("event gallery/page-data tests: OK");
