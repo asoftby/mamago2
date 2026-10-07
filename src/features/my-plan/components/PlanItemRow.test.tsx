@@ -37,5 +37,8 @@ assert.doesNotMatch(rowSource, /onTouchStart=/, "mobile row must not use swipe-t
 assert.doesNotMatch(rowSource, /onTouchMove=/, "mobile row must not use swipe-to-delete");
 assert.doesNotMatch(rowSource, /longPressTimerRef/, "mobile row must not use long-press delete");
 assert.match(rowSource, /WebkitLineClamp: 2/, "titles must render up to two lines");
+assert.match(rowSource, /<MapPin size=\{13\}/, "record card must render an address icon");
+assert.match(rowSource, /<Clock3 size=\{13\}/, "record card must render time in metadata");
+assert.match(rowSource, /gridTemplateColumns: "44px minmax\(0,1fr\) 32px"/, "record card must prioritize icon and two-line content");
 
-console.log("PlanItemRow explicit-delete + two-line-title tests: OK");
+console.log("PlanItemRow explicit-delete + redesigned record-card tests: OK");
