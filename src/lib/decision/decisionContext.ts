@@ -71,6 +71,7 @@ export type Subject = z.infer<typeof SubjectSchema>;
 export const DECISION_INTENTS = [
   "my_plan_suggestions",
   "guest_plan_generate",
+  "related_event_suggestions",
 ] as const;
 export type DecisionIntent = (typeof DECISION_INTENTS)[number];
 
