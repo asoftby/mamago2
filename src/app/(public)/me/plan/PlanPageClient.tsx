@@ -295,7 +295,6 @@ export function PlanPageClient({
   experienceCandidates = [],
   recentExperiences = [],
 }: Props) {
-  const todayISO = getTodayISO();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
