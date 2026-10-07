@@ -222,8 +222,8 @@ export function PlanItemRow({ item, onRemove, participantLabel }: PlanItemRowPro
           position: "relative",
           zIndex: 1,
           display: "grid",
-          gridTemplateColumns: "64px 42px 1fr auto",
-          gap: 12,
+          gridTemplateColumns: "54px 38px minmax(0,1fr) auto",
+          gap: 8,
           alignItems: "center",
           minHeight: 86,
           padding: "14px 12px",
@@ -250,9 +250,9 @@ export function PlanItemRow({ item, onRemove, participantLabel }: PlanItemRowPro
           aria-label={visualKind === "event" ? "Событие" : "Заметка"}
           title={visualKind === "event" ? "Событие" : "Заметка"}
           style={{
-            width: 42,
-            height: 42,
-            borderRadius: 13,
+            width: 38,
+            height: 38,
+            borderRadius: 12,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
