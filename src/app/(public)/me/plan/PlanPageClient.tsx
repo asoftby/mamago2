@@ -119,10 +119,6 @@ type Props = {
 
 const MONTHS_RU = ["ЯНВАРЬ","ФЕВРАЛЬ","МАРТ","АПРЕЛЬ","МАЙ","ИЮНЬ","ИЮЛЬ","АВГУСТ","СЕНТЯБРЬ","ОКТЯБРЬ","НОЯБРЬ","ДЕКАБРЬ"];
 
-function getTodayISO() {
-  return getLocalDateKey();
-}
-
 function itemForCacheMessage(item: SerializedPlanItem): string {
   return item.source === "MANUAL" ? "Календарь обновлён" : "План обновлён";
 }
