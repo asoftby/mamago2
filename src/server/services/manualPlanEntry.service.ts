@@ -203,8 +203,13 @@ function parseReminderAt(value: unknown): Date | null {
   }
   const localMatch = value.match(/^(\\d{4}-\\d{2}-\\d{2})T((?:[01]\\d|2[0-3]):[0-5]\\d)$/);
   if (localMatch) {
-    assertDate(localMatch[1]);
-    return localWallClockToUtc(localMatch[1], localMatch[2]);
+    const reminderDate = localMatch[1];
+    const reminderTime = localMatch[2];
+    assertDate(reminderDate);
+    if (!reminderTime || !TIME_RE.test(reminderTime)) {
+      throw new ManualPlanEntryError("INVALID_INPUT", "invalid_reminder_at");
+    }
+    return localWallClockToUtc(reminderDate, reminderTime);
   }
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
