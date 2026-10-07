@@ -1,4 +1,7 @@
-import type { SendNotificationResult } from "@/lib/notifications/domainContracts";
+import type {
+  SendNotificationInput,
+  SendNotificationResult,
+} from "@/lib/notifications/domainContracts";
 import { DEFAULT_NOTIFICATION_TIME_ZONE } from "@/lib/notifications/userNotificationSchedule";
 import type { PlanReminderCandidate } from "@/server/services/plan.service";
 import type { UserReminderSchedule } from "@/server/services/userNotificationSchedule.service";
@@ -20,20 +23,10 @@ type RunPlanEventRemindersDeps = {
   getReminderSettingsForUsersFn: (
     userIds: string[],
   ) => Promise<Map<string, UserReminderSchedule>>;
-  sendNotificationFn: (input: {
-    scenario: "PLAN_EVENT_2H_BEFORE";
-    userId: string;
-    context: {
-      planItemId: string;
-      activityId: string | null;
-      eventTitle: string;
-      startsAt: Date;
-      placeName?: string | null;
-      cityName?: string | null;
-      timeZone?: string;
-    };
-  }) => Promise<SendNotificationResult>;
+  sendNotificationFn: (input: SendNotificationInput) => Promise<SendNotificationResult>;
 };
+
+type ReminderScenario = "PLAN_EVENT_2H_BEFORE" | "PLAN_ITEM_REMINDER";
 
 export type RunPlanEventRemindersResult = {
   nowIso: string;
@@ -51,7 +44,9 @@ export type RunPlanEventRemindersResult = {
     activityId: string | null;
     eventTitle: string;
     startsAt: string | null;
-    offsetMinutes: number;
+    reminderAt: string | null;
+    offsetMinutes: number | null;
+    scenario: ReminderScenario;
     result: SendNotificationResult | { status: "FAILED"; errorMessage: string };
   }>;
 };
@@ -109,35 +104,79 @@ export async function runPlanEventRemindersCore(
       offsetMinutes: 120,
       timeZone: DEFAULT_NOTIFICATION_TIME_ZONE,
     };
-    const startsAt = candidate.startsAt;
-    if (!settings.enabled || !startsAt || startsAt.getTime() <= now.getTime()) {
+    if (!settings.enabled) {
       skippedSchedule += 1;
       continue;
     }
 
-    const dueAt = addMinutes(startsAt, -settings.offsetMinutes);
+    const explicitReminderAt = candidate.reminderAt;
     const oldestAllowedDueAt = addMinutes(now, -dueGraceMinutes);
-    if (dueAt.getTime() > now.getTime() || dueAt.getTime() < oldestAllowedDueAt.getTime()) {
-      skippedSchedule += 1;
-      continue;
-    }
+    const eventTitle = candidate.activity?.title ?? candidate.title ?? "Запись в плане";
+    let scenario: ReminderScenario;
+    let offsetMinutes: number | null;
+    let input: SendNotificationInput;
 
-    dueCandidates += 1;
-    try {
-      const result = await deps.sendNotificationFn({
-        scenario: "PLAN_EVENT_2H_BEFORE",
+    if (explicitReminderAt) {
+      if (
+        explicitReminderAt.getTime() > now.getTime() ||
+        explicitReminderAt.getTime() < oldestAllowedDueAt.getTime()
+      ) {
+        skippedSchedule += 1;
+        continue;
+      }
+
+      scenario = "PLAN_ITEM_REMINDER";
+      offsetMinutes = null;
+      input = {
+        scenario,
         userId: candidate.userId,
         context: {
           planItemId: candidate.id,
           activityId: candidate.activityId,
-          eventTitle: candidate.activity?.title ?? candidate.title ?? "Событие",
+          itemTitle: eventTitle,
+          planDate: candidate.date,
+          startsAt: candidate.startsAt,
+          reminderAt: explicitReminderAt,
+          placeName: resolvePlaceName(candidate),
+          timeZone: settings.timeZone,
+        },
+      };
+    } else {
+      const startsAt = candidate.startsAt;
+      if (!startsAt || startsAt.getTime() <= now.getTime()) {
+        skippedSchedule += 1;
+        continue;
+      }
+
+      const dueAt = addMinutes(startsAt, -settings.offsetMinutes);
+      if (
+        dueAt.getTime() > now.getTime() ||
+        dueAt.getTime() < oldestAllowedDueAt.getTime()
+      ) {
+        skippedSchedule += 1;
+        continue;
+      }
+
+      scenario = "PLAN_EVENT_2H_BEFORE";
+      offsetMinutes = settings.offsetMinutes;
+      input = {
+        scenario,
+        userId: candidate.userId,
+        context: {
+          planItemId: candidate.id,
+          activityId: candidate.activityId,
+          eventTitle,
           startsAt,
           placeName: resolvePlaceName(candidate),
           cityName: resolveCityName(candidate),
           timeZone: settings.timeZone,
         },
-      });
+      };
+    }
 
+    dueCandidates += 1;
+    try {
+      const result = await deps.sendNotificationFn(input);
       if (result.status === "SENT") sent += 1;
       if (result.status === "SKIPPED") skipped += 1;
 
@@ -145,9 +184,11 @@ export async function runPlanEventRemindersCore(
         planItemId: candidate.id,
         userId: candidate.userId,
         activityId: candidate.activityId,
-        eventTitle: candidate.activity?.title ?? candidate.title ?? "Событие",
-        startsAt: startsAt.toISOString(),
-        offsetMinutes: settings.offsetMinutes,
+        eventTitle,
+        startsAt: candidate.startsAt?.toISOString() ?? null,
+        reminderAt: explicitReminderAt?.toISOString() ?? null,
+        offsetMinutes,
+        scenario,
         result,
       });
     } catch (error) {
@@ -156,9 +197,11 @@ export async function runPlanEventRemindersCore(
         planItemId: candidate.id,
         userId: candidate.userId,
         activityId: candidate.activityId,
-        eventTitle: candidate.activity?.title ?? candidate.title ?? "Событие",
-        startsAt: startsAt.toISOString(),
-        offsetMinutes: settings.offsetMinutes,
+        eventTitle,
+        startsAt: candidate.startsAt?.toISOString() ?? null,
+        reminderAt: explicitReminderAt?.toISOString() ?? null,
+        offsetMinutes,
+        scenario,
         result: {
           status: "FAILED",
           errorMessage: error instanceof Error ? error.message : "REMINDER_JOB_FAILED",
