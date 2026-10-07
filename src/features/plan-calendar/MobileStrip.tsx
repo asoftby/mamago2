@@ -67,6 +67,7 @@ export function MobileStrip({ value, markers, minDate, maxDate, calendar, onVisi
   useIsoLayoutEffect(() => {
     rangeRef.current = range;
   });
+  const anchorRef = useRef<{ day: DateKey; frac: number } | null>(null);
   const prevStart = useRef(range.start);
   const prevToken = useRef(range.token);
   const mounted = useRef(false);
@@ -76,13 +77,15 @@ export function MobileStrip({ value, markers, minDate, maxDate, calendar, onVisi
     return Array.from({ length: n }, (_, i) => addDays(range.start, i));
   }, [range.start, range.end]);
 
-  // Prepending days shifts content right: compensate scrollLeft so nothing jumps.
+  // Prepending days: restore the exact position of the day that was at the left edge.
+  // Absolute (not a delta) because browsers may re-snap/anchor on their own after the DOM grows.
   useIsoLayoutEffect(() => {
     const el = stripRef.current;
-    if (el && prevToken.current === range.token && prevStart.current !== range.start) {
-      const added = diffDays(range.start, prevStart.current);
-      if (added > 0) el.scrollLeft += (added * el.clientWidth) / 7;
+    const anchor = anchorRef.current;
+    if (el && anchor && prevToken.current === range.token && prevStart.current !== range.start) {
+      el.scrollLeft = ((diffDays(range.start, anchor.day) + anchor.frac) * el.clientWidth) / 7;
     }
+    anchorRef.current = null;
     prevStart.current = range.start;
   }, [range.start, range.token]);
 
@@ -120,6 +123,12 @@ export function MobileStrip({ value, markers, minDate, maxDate, calendar, onVisi
       const nearStart = el.scrollLeft < EDGE_DAYS * itemW;
       const nearEnd = el.scrollWidth - el.scrollLeft - el.clientWidth < EDGE_DAYS * itemW;
       if (!nearStart && !nearEnd) return;
+      if (nearStart) {
+        anchorRef.current = {
+          day: addDays(rangeRef.current.start, index),
+          frac: el.scrollLeft / itemW - index,
+        };
+      }
       setRange((r) => {
         let next = r;
         if (nearStart && r.start > lower) {
@@ -176,6 +185,8 @@ export function MobileStrip({ value, markers, minDate, maxDate, calendar, onVisi
         role="tablist"
         aria-label="Дни"
         className={styles.strip}
+        // Prepending days is compensated manually; browser scroll anchoring would double it.
+        style={{ overflowAnchor: "none" }}
         onScroll={onScroll}
         onKeyDown={onKeyDown}
       >
