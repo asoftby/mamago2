@@ -18,7 +18,7 @@ export function SeoSubNav() {
   return (
     <div className="space-y-3">
       <nav
-        className="-mx-1 flex flex-nowrap gap-1 overflow-x-auto border-b border-gray-200 px-1 scrollbar-none"
+        className="-mx-1 flex flex-nowrap gap-1 overflow-x-auto px-1 scrollbar-none"
         aria-label="SEO"
       >
         {SEO_PRIMARY_NAV.map((item) => {
@@ -29,10 +29,10 @@ export function SeoSubNav() {
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "relative -mb-px shrink-0 inline-flex items-center rounded-t-md border border-b-0 px-3 py-2.5 text-sm font-medium transition-colors",
+                "relative shrink-0 inline-flex items-center border-b-[3px] px-3 py-2.5 text-sm transition-colors",
                 active
-                  ? "border-gray-200 border-b-2 border-b-primary bg-white text-primary shadow-sm"
-                  : "border-transparent border-b-2 border-b-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-800",
+                  ? "border-primary font-semibold text-primary"
+                  : "border-transparent font-medium text-gray-500 hover:text-gray-900",
               )}
             >
               {item.label}
@@ -43,10 +43,10 @@ export function SeoSubNav() {
           href={SEO_SETTINGS_ENTRY.href}
           aria-current={settingsOpen ? "page" : undefined}
           className={cn(
-            "relative -mb-px shrink-0 inline-flex items-center rounded-t-md border border-b-0 px-3 py-2.5 text-sm font-medium transition-colors",
+            "relative shrink-0 inline-flex items-center border-b-[3px] px-3 py-2.5 text-sm transition-colors",
             settingsOpen
-              ? "border-gray-200 border-b-2 border-b-primary bg-white text-primary shadow-sm"
-              : "border-transparent border-b-2 border-b-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-800",
+              ? "border-primary font-semibold text-primary"
+              : "border-transparent font-medium text-gray-500 hover:text-gray-900",
           )}
         >
           {SEO_SETTINGS_ENTRY.label}
