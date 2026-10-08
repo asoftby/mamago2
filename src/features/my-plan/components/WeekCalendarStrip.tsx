@@ -37,6 +37,7 @@ type WeekCalendarStripProps = {
   allowPastDates?: boolean;
   /** Бренд-стиль: выбранный день — коралловый кружок с белым числом (вместо чёрной плашки). */
   accent?: boolean;
+  bare?: boolean;
 };
 
 function pluralizePlanEvents(count: number): string {
@@ -61,6 +62,7 @@ export function WeekCalendarStrip({
   countLabelByDate,
   allowPastDates = false,
   accent = false,
+  bare = false,
 }: WeekCalendarStripProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
@@ -160,14 +162,14 @@ export function WeekCalendarStrip({
     <div
       className={cn(className)}
       style={{
-        padding: compact ? "18px 14px 16px" : "14px 14px 12px",
-        background: "#FAF7F1",
-        border: "1px solid rgba(20,18,16,.10)",
-        borderRadius: 18,
+        padding: bare ? "12px 0 16px" : compact ? "18px 14px 16px" : "14px 14px 12px",
+        background: bare ? "transparent" : "#FAF7F1",
+        border: bare ? "none" : "1px solid rgba(20,18,16,.10)",
+        borderRadius: bare ? 0 : 18,
       }}
     >
       {/* Strip: arrows + days в одной строке */}
-      <div style={{ display: "grid", gridTemplateColumns: showArrows ? "36px 1fr 36px" : "1fr", gap: 10, alignItems: "center" }}>
+      <div style={{ display: "grid", gridTemplateColumns: showArrows ? "36px minmax(0,1fr) 36px" : "1fr", gap: bare ? 16 : 10, alignItems: "center" }}>
         {showArrows ? <button
           type="button"
           onClick={() => shiftWeek(-1)}
