@@ -41,13 +41,15 @@ test("one presentation adapter renders manual, catalog, and Telegram sources saf
   assert.equal(catalog.title, "Музей");
   assert.equal(catalog.locationLabel, "Галерея");
   assert.equal(catalog.canEdit, false);
-  assert.equal(buildFamilyCalendarItemPresentation({
+  const adultEntry = buildFamilyCalendarItemPresentation({
     ...base,
     source: PlanItemSource.TELEGRAM_FORWARD,
     entryType: null,
     childId: null,
     childName: null,
-  }).typeLabel, "Из Telegram");
+  });
+  assert.equal(adultEntry.typeLabel, "Из Telegram");
+  assert.equal(adultEntry.personLabel, "Взрослые");
 });
 
 test("family filters distinguish all, family, and each child", () => {
