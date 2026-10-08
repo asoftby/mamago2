@@ -110,7 +110,7 @@ export function MyPlanCapsuleView({
               Мой <em className="font-display italic text-primary">план</em>
             </span>
             <span className="block text-[13px] font-medium leading-[1.2] text-text-main lg:line-clamp-2">
-              {loading ? "Загружаем…" : "Давай добавим что-нибудь..."}
+              {loading ? "Загружаем…" : "Добавим что-нибудь?"}
             </span>
           </span>
           <ArrowRight className="hidden h-4 w-4 shrink-0 text-text-main/65 lg:block" aria-hidden />
