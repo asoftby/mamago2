@@ -166,6 +166,7 @@ function priceTextWithCurrencyIfNeeded(text: string): string {
   if (
     lower.includes("бесплатно") ||
     lower.includes("уточняйте") ||
+    lower === "по запросу" ||
     /€|\$|£|₽/.test(text)
   ) {
     return text;
@@ -190,7 +191,9 @@ function priceLabel(
 ): string {
   const pricingMode = getScheduleJsonString(activity, "pricingMode")?.trim().toLowerCase();
   const explicitFrom = pricingMode === "from";
+  if (pricingMode === "on_request") return "По запросу";
   const t = activity.priceText?.trim();
+  if (t?.toLowerCase() === "по запросу") return "По запросу";
 
   if (t) {
     const label = priceTextWithCurrencyIfNeeded(t);
