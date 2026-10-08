@@ -13,6 +13,7 @@ interface PhoneVerificationModalProps {
   open: boolean;
   onClose: () => void;
   onVerified: () => void;
+  reason?: "place-review" | "plan-feedback";
 }
 
 type Step = "entry" | "confirm";
@@ -25,6 +26,7 @@ export function PhoneVerificationModal({
   open,
   onClose,
   onVerified,
+  reason = "place-review",
 }: PhoneVerificationModalProps) {
   const [step, setStep] = useState<Step>("entry");
   const [phoneE164, setPhoneE164] = useState("");
@@ -222,13 +224,15 @@ export function PhoneVerificationModal({
               Подтвердите номер телефона
             </h2>
             <p className="mt-2 text-sm text-gray-600">
-              Это необходимо чтобы оставлять отзывы о местах
+              {reason === "plan-feedback"
+                ? "Подтвердите номер, чтобы поделиться впечатлениями о событии."
+                : "Это необходимо, чтобы оставлять отзывы о местах."}
             </p>
           </div>
 
           <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
             <p className="text-sm text-gray-700">
-              Номер телефона используется для подтверждения что вы реальный посетитель
+              Номер подтверждается по SMS только один раз. В дальнейшем код не потребуется, пока вы не измените номер телефона.
             </p>
           </div>
 
