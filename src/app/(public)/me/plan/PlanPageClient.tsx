@@ -397,8 +397,6 @@ export function PlanPageClient({
 
   const dayItems = filterFamilyCalendarItems(itemsByDate[selectedDate] ?? [], calendarFilter);
   const conflictIds = useMemo(() => findFamilyCalendarConflictIds(dayItems), [dayItems]);
-  const totalItems = visibleItems.length;
-  const totalDays = Object.keys(itemsByDate).length;
   const selectedWeekStart = getWeekStart(selectedDate);
   const selectedWeekEnd = addDaysIso(selectedWeekStart, 6);
   const weekItems = visibleItems
@@ -410,6 +408,10 @@ export function PlanPageClient({
         b.effectiveStartsAt ?? b.startsAt ?? "",
       );
     });
+  const selectedWeekByDate = weekItems.reduce<Record<string, SerializedPlanItem[]>>((acc, item) => {
+    (acc[item.date] ??= []).push(item);
+    return acc;
+  }, {});
   const nearestWeekItem =
     weekItems.find((item) => item.date >= todayISO) ?? weekItems[0] ?? null;
 
@@ -616,7 +618,7 @@ export function PlanPageClient({
         <div className="mt-4 flex flex-wrap gap-2" aria-label="Фильтр по члену семьи">
           {([
             ["all", "Все"],
-            ["family", "Я"],
+            ["family", "Взрослые"],
             ...familyChildren.map((child) => [`child:${child.id}`, child.name]),
           ] as Array<[FamilyCalendarFilter, string]>).map(([value, label]) => (
             <button
@@ -666,9 +668,9 @@ export function PlanPageClient({
       <PlanOverviewDialog
         open={overviewOpen}
         onOpenChange={setOverviewOpen}
-        itemsByDate={itemsByDate}
-        totalItems={totalItems}
-        totalDays={totalDays}
+        itemsByDate={selectedWeekByDate}
+        totalItems={weekItems.length}
+        totalDays={Object.keys(selectedWeekByDate).length}
         onRemove={handleRemoveItem}
         familyView={familyUi ? familyView : null}
         onVisibilityChange={handleVisibilityChange}
