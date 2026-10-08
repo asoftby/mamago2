@@ -28,7 +28,7 @@ import { MyPlanHeader } from "./MyPlanHeader";
 import { RecommendationDecisionBlock } from "./RecommendationDecisionBlock";
 import { PlanRecommendationCta } from "./PlanRecommendationCta";
 import { PlanStickyCounter } from "./PlanStickyCounter";
-import { QuickAddPlanNoteSheet } from "./QuickAddPlanNoteSheet";
+import { requestOpenQuickAdd } from "@/lib/my-plan/myPlanOpenIntent";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
@@ -456,7 +456,6 @@ export function PlanMainContent({
   const [showAddPersonaTypeModal, setShowAddPersonaTypeModal] = useState(false);
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [hiddenPlanItemIds, setHiddenPlanItemIds] = useState<Set<string>>(() => new Set());
   const pendingRemovalIdsRef = useRef<Set<string>>(new Set());
   const [awaitingAgeAnswer, setAwaitingAgeAnswer] = useState(false);
@@ -1262,6 +1261,7 @@ export function PlanMainContent({
           {onChangeDate ? (
             <div id="plan-week-calendar">
               <WeekCalendarStrip
+                accent
                 selectedDate={selectedDate}
                 onChangeDate={onChangeDate}
                 showArrows
@@ -1347,6 +1347,7 @@ export function PlanMainContent({
         {onChangeDate ? (
           <div id="plan-week-calendar">
             <WeekCalendarStrip
+              accent
               selectedDate={selectedDate}
               onChangeDate={onChangeDate}
               compact
@@ -1396,17 +1397,8 @@ export function PlanMainContent({
       <PlanStickyCounter
         count={totalPlannedCount}
         onClick={handleOpenPlanPage}
-        onAdd={() => setQuickAddOpen(true)}
+        onAdd={() => requestOpenQuickAdd(selectedDate)}
         compact
-      />
-
-      <QuickAddPlanNoteSheet
-        open={quickAddOpen}
-        onOpenChange={setQuickAddOpen}
-        selectedDate={selectedDate}
-        childrenList={childrenList.map((child) => ({ id: child.id, name: child.name }))}
-        city={city}
-        onRequestClose={onRequestClose}
       />
 
       <AddPersonaTypeModal

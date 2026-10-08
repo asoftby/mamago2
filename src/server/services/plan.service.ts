@@ -94,6 +94,8 @@ export type PlanItemWithActivity = {
   locationText?: string | null;
   notes?: string | null;
   tags?: string[];
+  /** Ключ категории ручного пункта (planItemCategory); null у каталожных. */
+  category?: string | null;
   reminderEnabled?: boolean | null;
   /** Family Core: audience + version for edit-conflict checks (persisted rows). */
   visibility?: PlanVisibility;
