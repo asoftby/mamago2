@@ -200,11 +200,12 @@ export function Step5PricingParticipation({
 
       <div className="space-y-4">
         <h3 className="text-base font-semibold text-gray-900">Стоимость</h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
           {[
             { value: "free", label: "Бесплатно" },
             { value: "fixed", label: "Фиксированная цена" },
             { value: "from", label: "Цена от" },
+            { value: "on_request", label: "По запросу" },
           ].map((mode) => (
             <button
               key={mode.value}
@@ -213,6 +214,7 @@ export function Step5PricingParticipation({
                 const pricingMode = mode.value as EventFormData["pricingMode"];
                 onChange({
                   pricingMode,
+                  ...(pricingMode === "on_request" ? { price: "", priceItems: { items: [], note: "" } } : {}),
                   ...(pricingMode !== "from" ? { priceDetails: "" } : {}),
                 });
               }}
