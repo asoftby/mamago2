@@ -42,6 +42,7 @@ export function PlanQuickAddHost() {
     <QuickAddPlanNoteSheet
       open={open}
       onOpenChange={handleOpenChange}
+      onNavigateCatalog={() => setOpen(false)}
       selectedDate={date}
       childrenList={children.map((child) => ({ id: child.id, name: child.name }))}
       city={city}

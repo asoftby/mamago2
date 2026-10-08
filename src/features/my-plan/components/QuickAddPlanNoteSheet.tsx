@@ -12,9 +12,6 @@ import { PlanItemCategoryPicker } from "./PlanItemCategoryIcon";
 
 type ChildOption = { id: string; name: string };
 
-/** Текст reminder-чипа: смещение напоминания задаётся в настройках уведомлений, по умолчанию — за час. */
-const REMINDER_VALUE_LABEL = "за 1 ч";
-
 const CHIP_BASE =
   "inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-medium outline-none transition-colors " +
   "focus-within:ring-[3px] focus-within:ring-ring/50";
@@ -31,12 +28,14 @@ function formatDateChip(iso: string): string {
 export function QuickAddPlanNoteSheet({
   open,
   onOpenChange,
+  onNavigateCatalog,
   selectedDate,
   childrenList,
   city,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onNavigateCatalog: () => void;
   selectedDate: string;
   childrenList: ChildOption[];
   city: string;
@@ -148,7 +147,8 @@ export function QuickAddPlanNoteSheet({
       planDate: date,
       returnTo: window.location.pathname + window.location.search,
     });
-    closeDraft();
+    onNavigateCatalog();
+    reset();
     window.setTimeout(() => router.push(`/${city}/events?${qp.toString()}`), 0);
   }
 
@@ -258,7 +258,7 @@ export function QuickAddPlanNoteSheet({
               className={cn(CHIP_BASE, reminderEnabled && time ? CHIP_FILLED : CHIP_EMPTY, "disabled:opacity-40")}
             >
               <Bell className="h-4 w-4" />
-              {reminderEnabled && time ? REMINDER_VALUE_LABEL : "Напомнить"}
+              {reminderEnabled && time ? "Напоминание включено" : "Напомнить"}
             </button>
 
             {tags.map((tag) => (

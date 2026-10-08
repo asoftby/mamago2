@@ -53,8 +53,14 @@ const timedHtml = renderToStaticMarkup(
 );
 assert.match(timedHtml, /07:30/);
 assert.match(timedHtml, />Тая</);
-assert.match(timedHtml, /за 1 ч/);
+assert.match(timedHtml, /Напоминание/);
+assert.doesNotMatch(timedHtml, /за 1 ч/);
 assert.match(timedHtml, /aria-label="Значок: Здоровье\. Изменить"/, "ручной пункт: категория из названия, иконку можно сменить");
+
+const telegramHtml = renderToStaticMarkup(
+  <PlanItemRow item={{ ...item("telegram", "Врач"), source: "TELEGRAM_FORWARD" }} onRemove={() => undefined} />,
+);
+assert.doesNotMatch(telegramHtml, /Значок: .*Изменить/, "Telegram item must not offer unsaved category editing");
 
 const rowSource = readFileSync(new URL("./PlanItemRow.tsx", import.meta.url), "utf8");
 assert.doesNotMatch(rowSource, /onTouchStart=/, "mobile row must not use swipe-to-delete");

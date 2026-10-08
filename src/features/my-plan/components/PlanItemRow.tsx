@@ -30,9 +30,6 @@ export function planItemVisualKind(
     : "event";
 }
 
-/** Время напоминания в мета-строке: смещение задаётся в настройках уведомлений, по умолчанию — за час. */
-const REMINDER_LABEL = "за 1 ч";
-
 const twoLineTitleStyle = {
   display: "-webkit-box",
   WebkitLineClamp: 2,
@@ -120,6 +117,8 @@ export function PlanItemRow({ item, onRemove, participantLabel }: PlanItemRowPro
           />
         ) : isCatalogEvent ? (
           <PlanItemCategoryTile category={category} />
+        ) : !isManual ? (
+          <PlanItemCategoryTile category={category} />
         ) : (
           <PlanItemCategoryPicker value={category} onChange={(next) => void changeCategory(next)} className="relative z-10" />
         )}
@@ -146,7 +145,7 @@ export function PlanItemRow({ item, onRemove, participantLabel }: PlanItemRowPro
               <span className="inline-flex shrink-0 items-center gap-1">
                 <span aria-hidden>·</span>
                 <Bell className="h-3 w-3" aria-hidden />
-                <span>{REMINDER_LABEL}</span>
+                <span>Напоминание</span>
               </span>
             ) : null}
           </div>
