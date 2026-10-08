@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMyPlan } from "../hooks/useMyPlan";
 import {
@@ -102,14 +102,18 @@ export function MyPlanCapsuleView({
         </>
       ) : (
         <>
-          <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-            <span className="block truncate text-[12px] leading-tight text-brand-active">
+          <span className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft/65 text-primary lg:flex" aria-hidden>
+            <CalendarDays className="h-[19px] w-[19px]" strokeWidth={1.8} />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+            <span className="block text-[12px] leading-tight text-text-main">
               Мой <em className="font-display italic text-primary">план</em>
             </span>
-            <span className="block truncate text-[15px] font-medium leading-tight text-text-main">
+            <span className="block text-[13px] font-medium leading-[1.2] text-text-main lg:line-clamp-2">
               {loading ? "Загружаем…" : "Добавить интересненькое..."}
             </span>
           </span>
+          <ArrowRight className="hidden h-4 w-4 shrink-0 text-text-main/65 lg:block" aria-hidden />
         </>
       )}
     </Link>
