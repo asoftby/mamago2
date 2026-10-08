@@ -1262,6 +1262,7 @@ export function PlanMainContent({
             <div id="plan-week-calendar">
               <WeekCalendarStrip
                 accent
+                bare
                 selectedDate={selectedDate}
                 onChangeDate={onChangeDate}
                 showArrows
