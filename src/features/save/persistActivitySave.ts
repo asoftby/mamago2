@@ -24,6 +24,7 @@ export async function persistActivitySave(
       body: JSON.stringify({
         activityId: meta.activityId,
         date: result.dateISO,
+        ...(result.visibility ? { visibility: result.visibility } : {}),
         title: meta.title,
         coverImageUrl: meta.coverImageUrl,
       }),

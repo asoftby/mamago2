@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { toast } from "@/lib/toast";
+import { useFamilySharedPlan } from "@/features/my-plan/hooks/useFamilySharedPlan";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   addDaysLocal,
@@ -58,7 +59,13 @@ export type SaveScenario =
     };
 
 export type SaveToPlanResult =
-  | { action: "plan"; dateISO: string; timeSlotId?: string | null }
+  | {
+      action: "plan";
+      dateISO: string;
+      timeSlotId?: string | null;
+      /** Family Core M4c: set only when the "Видно семье" switch was shown; absent = default (shared). */
+      visibility?: "PRIVATE" | "FAMILY";
+    }
   | { action: "ideas" }
   | { action: "remove-idea" }
   | { action: "remove-plan"; planItemId: string }
@@ -87,6 +94,11 @@ export interface SaveToPlanPickerBodyProps {
   source?: string;
   /** Закрыть контейнер */
   onClose?: () => void;
+  /**
+   * Показать переключатель «Видно семье» (только если семья делит план). Включать ТОЛЬКО там,
+   * где `result.visibility` реально передаётся на сервер, иначе выбор будет молча проигнорирован.
+   */
+  showVisibilityToggle?: boolean;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1563,7 +1575,53 @@ function IdeaOnlyView({ title, isIdea, onIdea, onRemoveIdea }: {
 }
 
 // ─── SaveToPlanPickerBody ─────────────────────────────────────────────────────
-export function SaveToPlanPickerBody({
+/** Wraps the picker with the optional "Видно семье" switch (new items only). */
+export function SaveToPlanPickerBody(props: SaveToPlanPickerBodyProps) {
+  const { showVisibilityToggle = false, onCommit, inPlan = false, planDate = null } = props;
+  const sharedPlan = useFamilySharedPlan(showVisibilityToggle);
+  const [visibleToFamily, setVisibleToFamily] = React.useState(true);
+  // The switch applies to NEW plan items; an item already in the plan keeps its audience.
+  const toggleActive = sharedPlan && !(inPlan && planDate);
+  return (
+    <>
+      <PickerBodyInner
+        {...props}
+        onCommit={(result) =>
+          onCommit(
+            toggleActive && result.action === "plan"
+              ? { ...result, visibility: visibleToFamily ? "FAMILY" : "PRIVATE" }
+              : result,
+          )
+        }
+      />
+      {toggleActive && (
+        <label
+          className="flex items-center justify-between gap-3 px-6 pb-5 pt-1 text-[14px]"
+          style={{ color: C.ink2 }}
+        >
+          <span>
+            Видно семье
+            {!visibleToFamily && (
+              <span className="block text-[12px]" style={{ color: C.ink3 }}>
+                Увидите только вы
+              </span>
+            )}
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            aria-checked={visibleToFamily}
+            checked={visibleToFamily}
+            onChange={(e) => setVisibleToFamily(e.target.checked)}
+            className="h-5 w-9 cursor-pointer"
+          />
+        </label>
+      )}
+    </>
+  );
+}
+
+function PickerBodyInner({
   scenario, onCommit, isIdea = false, inPlan = false,
   planDate = null, planStartsAt = null, planItemId = null,
   source, onClose,

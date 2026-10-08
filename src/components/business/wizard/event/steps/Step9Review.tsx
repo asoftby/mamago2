@@ -104,11 +104,19 @@ export function Step9Review({
         {reviewSections.map((section) => (
           <div
             key={section.stepId}
-            className={`border rounded-lg p-4 ${
+            className={`relative border rounded-lg p-4 ${
               section.isComplete ? "bg-white" : "bg-yellow-50 border-yellow-200"
             }`}
           >
-            <div className="flex items-start justify-between">
+            {onGoToStep && submitStatus !== "success" ? (
+              <button
+                type="button"
+                onClick={() => onGoToStep(section.stepId)}
+                className="absolute inset-0 z-10 rounded-lg md:hidden"
+                aria-label={`Перейти к шагу ${section.stepId}: ${section.title}`}
+              />
+            ) : null}
+            <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   {section.isComplete ? (
@@ -147,16 +155,16 @@ export function Step9Review({
                 )}
               </div>
               
-              {onGoToStep && !section.isComplete && submitStatus !== "success" && (
+              {onGoToStep && submitStatus !== "success" ? (
                 <button
                   type="button"
                   onClick={() => onGoToStep(section.stepId)}
-                  className="text-primary hover:text-primary/80 flex items-center gap-1 text-sm"
+                  className="hidden shrink-0 items-center justify-center rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:flex"
+                  aria-label={`Перейти к шагу ${section.stepId}: ${section.title}`}
                 >
-                  Перейти
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="h-5 w-5" />
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
         ))}

@@ -12,6 +12,7 @@
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { formatVenueAddressForPublicDisplay } from "@/lib/event/formatVenueAddressForDisplay";
 
 function read(path: string): string {
   return readFileSync(path, "utf8");
@@ -29,6 +30,8 @@ const placeOffers = read("src/components/place/marketplace/PlaceOffersSection.ts
 const placeEvents = read("src/components/place/marketplace/PlaceEventsSection.tsx");
 const placeReviews = read("src/components/place/marketplace/PlaceReviewsSection.tsx");
 const placeStickyActionBar = read("src/components/place/marketplace/PlaceStickyActionBar.tsx");
+const locationBlock = read("src/components/shared/LocationBlock.tsx");
+const eventRichDescription = read("src/components/event-page/EventRichDescription.tsx");
 
 const discoveryGridContract =
   /grid grid-cols-1 gap-5 min-\[360px\]:grid-cols-2 lg:grid-cols-4/g;
@@ -151,6 +154,34 @@ assert.match(
   placeStickyActionBar,
   /hasThreeActions && "sr-only sm:not-sr-only"/,
   "Place sticky call label must remain accessible while visually compact on phones",
+);
+
+assert.match(
+  locationBlock,
+  /mt-auto hidden flex-wrap gap-3 md:flex/,
+  "Location actions must stay in the desktop text column",
+);
+assert.match(
+  locationBlock,
+  /flex flex-wrap gap-3 md:hidden/,
+  "Location actions must render below the map on mobile",
+);
+
+assert.equal(
+  formatVenueAddressForPublicDisplay("просп. Машерова 15, Минск, Минская область"),
+  "Минск, пр-т Машерова, 15",
+  "Public venue address must use city-first compact formatting",
+);
+
+assert.match(
+  eventRichDescription,
+  /\[&_ul\]:my-5 \[&_ul\]:list-disc/,
+  "Event rich text must style lists without relying on the optional typography plugin",
+);
+assert.doesNotMatch(
+  eventRichDescription,
+  /prose-ul:list-disc/,
+  "Event rich text must not rely on @tailwindcss/typography for list markers",
 );
 
 console.log("publicDetailMobileContract.test.ts: OK");

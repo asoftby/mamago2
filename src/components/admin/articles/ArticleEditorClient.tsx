@@ -72,6 +72,7 @@ import {
   fromLocalDatetimeValue,
   toLocalDatetimeValue,
 } from "@/lib/article/articleEditorComparable";
+import { detachLegacyArticleMainGallery } from "@/lib/article/articleMainGallery";
 
 function applySnapshot(setters: {
   setTitle: (v: string) => void;
@@ -129,6 +130,10 @@ export function ArticleEditorClient({
   /** Только ADMIN/MODERATOR видят решения по статье в статусе PENDING. */
   canModerate?: boolean;
 }) {
+  const initialArticleMedia = useMemo(
+    () => detachLegacyArticleMainGallery({ coverImageId: initial.coverImageId, content: initial.content }),
+    [initial.coverImageId, initial.content],
+  );
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -149,7 +154,7 @@ export function ArticleEditorClient({
   const [title, setTitle] = useState(initial.title);
   const [slug, setSlug] = useState(initial.slug ?? "");
   const [pinnedSlug, setPinnedSlug] = useState<string | null>(initial.slug?.trim() || null);
-  const [coverImageId, setCoverImageId] = useState(initial.coverImageId ?? "");
+  const [coverImageId, setCoverImageId] = useState(initialArticleMedia.coverImageId ?? "");
   const [coverImagePreviewUrl, setCoverImagePreviewUrl] = useState(initial.coverImageUrl ?? "");
   const [authorUserId, setAuthorUserId] = useState<string | null>(initial.authorUserId ?? null);
   const [authorLabel, setAuthorLabel] = useState(initial.authorLabel ?? "");
@@ -168,7 +173,7 @@ export function ArticleEditorClient({
     { id: string; title: string; description: string | null; isActive: boolean }[]
   >([]);
   const [geoScopeError, setGeoScopeError] = useState<string | null>(null);
-  const [content, setContent] = useState<ArticleContentPayload>(initial.content);
+  const [content, setContent] = useState<ArticleContentPayload>(initialArticleMedia.content);
   const [status, setStatus] = useState<ContentStatus>(initial.status);
   const [publishedAtLocal, setPublishedAtLocal] = useState(toLocalDatetimeValue(initial.publishedAt));
   const [scheduledAtLocal, setScheduledAtLocal] = useState(toLocalDatetimeValue(initial.scheduledAt));
@@ -195,7 +200,11 @@ export function ArticleEditorClient({
     blocks: content.blocks,
   });
 
-  const savedComparableRef = useRef(buildSavedComparable(initial));
+  const savedComparableRef = useRef(buildSavedComparable({
+    ...initial,
+    coverImageId: initialArticleMedia.coverImageId,
+    content: initialArticleMedia.content,
+  }));
 
   const currentComparable = useMemo(
     () =>
@@ -372,11 +381,29 @@ export function ArticleEditorClient({
   const applyEditorSnapshot = useCallback(
     (snap: ArticleEditorSnapshot) => {
       applySnapshot(editorSetters, snap);
+      const articleMedia = detachLegacyArticleMainGallery({ coverImageId: snap.coverImageId, content: snap.content });
+      setCoverImageId(articleMedia.coverImageId ?? "");
+      setContent(articleMedia.content);
       setPinnedSlug(snap.slug?.trim() || null);
       hydrateSlug(snap.slug);
     },
     [editorSetters, hydrateSlug],
   );
+
+  useEffect(() => {
+    if (!coverImageId) {
+      setCoverImagePreviewUrl("");
+      return;
+    }
+    let cancelled = false;
+    void fetch(`/api/admin/articles/media-preview?id=${encodeURIComponent(coverImageId)}`, { credentials: "include" })
+      .then((response) => response.ok ? response.json() as Promise<{ publicUrl: string | null }> : null)
+      .then((data) => {
+        if (!cancelled) setCoverImagePreviewUrl(data?.publicUrl ?? "");
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [coverImageId]);
 
   const showSuccessModal = useCallback(
     (payload: Omit<ContentSuccessPayload, "surface" | "returnTo">) => {
@@ -953,6 +980,8 @@ export function ArticleEditorClient({
           <ArticleEditorCoverField
             value={coverImageId}
             initialPreviewUrl={initial.coverImageUrl}
+            label="Обложка статьи"
+            description="Используется только как обложка статьи и не выводится в тексте."
             authorUserId={authorUserId}
             articleId={hasPersistedId ? initial.id : null}
             onChange={(id, previewUrl) => {

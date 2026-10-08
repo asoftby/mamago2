@@ -204,11 +204,11 @@ function validateStep3(data: OfferFormData): ValidationResult {
   const warnings: string[] = [];
 
   if (!data.coverImage) {
-    errors.push("Загрузите главное изображение");
+    errors.push("Добавьте хотя бы одно фото");
   }
 
   if (data.gallery.length === 0) {
-    warnings.push("Рекомендуется добавить фотографии в галерею");
+    warnings.push("Рекомендуется добавить ещё фотографии");
   }
 
   const isComplete = !!data.coverImage;

@@ -9,6 +9,7 @@ export interface PlanRecommendationDraft {
   addedActivityIds: string[];
   shownActivityIds: string[];
   ageRangeValues: string[];
+  personaIds: string[];
   lastSuccessfulFetchAt: string | null;
 }
 
@@ -53,6 +54,8 @@ function isDraft(value: unknown): value is PlanRecommendationDraft {
     draft.shownActivityIds.every((id) => typeof id === "string") &&
     Array.isArray(draft.ageRangeValues) &&
     draft.ageRangeValues.every((id) => typeof id === "string") &&
+    Array.isArray(draft.personaIds) &&
+    draft.personaIds.every((id) => typeof id === "string") &&
     (draft.lastSuccessfulFetchAt === null || typeof draft.lastSuccessfulFetchAt === "string")
   );
 }

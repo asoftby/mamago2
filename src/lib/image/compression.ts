@@ -5,6 +5,7 @@
 
 import imageCompression from "browser-image-compression";
 import { encode } from "blurhash";
+import { replaceUploadFilenameExtension } from "@/lib/uploads/uploadFilename";
 import {
   ALLOWED_UPLOAD_MIME_TYPES,
   MAX_UPLOAD_SIZE_MB,
@@ -52,11 +53,18 @@ export async function compressImage(
       initialQuality: quality,
     });
 
-    // Preserve original filename (browser-image-compression creates "blob" name)
-    const finalFile = new File([compressedFile], file.name, {
-      type: compressedFile.type,
-      lastModified: Date.now(),
-    });
+    // Preserve the human-readable basename, but make the extension agree with
+    // the actual encoded bytes/MIME. Strict server-side content validation
+    // must never receive WebP bytes named photo.jpg (or AVIF bytes named .png).
+    const outputMimeType = compressedFile.type || fileType;
+    const finalFile = new File(
+      [compressedFile],
+      replaceUploadFilenameExtension(file.name, outputMimeType),
+      {
+        type: outputMimeType,
+        lastModified: Date.now(),
+      },
+    );
 
     // Get image dimensions
     const dimensions = await getImageDimensions(finalFile);

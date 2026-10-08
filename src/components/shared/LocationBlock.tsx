@@ -4,6 +4,7 @@ import { Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { resolveLocationMapUrl } from "@/lib/maps/locationMapUrl";
+import { LocationMetaList } from "@/components/shared/LocationMetaList";
 
 /** Строит HTML-страницу для srcDoc-iframe: OpenStreetMap + кастомный pulsing-пин */
 function buildMapHtml(lat: number, lng: number): string {
@@ -153,12 +154,6 @@ export function LocationBlock({
 
   const mapDoc = hasCoords ? buildMapHtml(lat!, lng!) : null;
 
-  const chips = [
-    ...(district ? [`${district} р-н`] : []),
-    ...(metro ? [`ст. м. «${metro}»`] : []),
-    ...tags,
-  ];
-
   const hasMap = mapDoc || mapImageUrl;
 
   return (
@@ -249,23 +244,11 @@ export function LocationBlock({
               </button>
             )}
 
-            {/* Chips */}
-            {chips.length > 0 && (
-              <div className="mb-5 flex flex-wrap gap-2">
-                {chips.map((chip, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(20,18,16,0.18)] bg-[#FAF7F1] px-3.5 py-1.5 text-[13px] font-medium text-[#141210]"
-                  >
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#E86A3A]" />
-                    {chip}
-                  </span>
-                ))}
-              </div>
-            )}
+            {/* District / metro / tags — shared with compact venue rows. */}
+            <LocationMetaList district={district} metro={metro} tags={tags} />
 
-            {/* Buttons — прижаты к низу карты */}
-            <div className="mt-auto flex flex-wrap gap-3">
+            {/* Desktop actions stay aligned to the bottom of the text column. */}
+            <div className="mt-auto hidden flex-wrap gap-3 md:flex">
               {mapsHref && (
                 <a
                   href={mapsHref}
@@ -311,6 +294,30 @@ export function LocationBlock({
                   />
                 ) : null}
               </div>
+            </div>
+          )}
+
+          {/* On mobile, actions follow the map instead of appearing above it. */}
+          {(mapsHref || placeHref) && (
+            <div className="flex flex-wrap gap-3 md:hidden">
+              {mapsHref && (
+                <a
+                  href={mapsHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full bg-[#141210] px-5 py-2.5 text-[14px] font-semibold text-[#FAF7F1] transition-colors hover:bg-black"
+                >
+                  Маршрут <span aria-hidden>→</span>
+                </a>
+              )}
+              {placeHref && (
+                <a
+                  href={placeHref}
+                  className="inline-flex items-center gap-2 rounded-full border border-[rgba(20,18,16,0.18)] bg-[#FAF7F1] px-5 py-2.5 text-[14px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
+                >
+                  Подробнее о месте
+                </a>
+              )}
             </div>
           )}
         </div>

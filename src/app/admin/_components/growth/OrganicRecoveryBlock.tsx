@@ -1,7 +1,11 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import { AdminDashboardBlock } from "../AdminDashboardBlock";
 import { getDashboardBlock } from "@/lib/admin/dashboardBlocks";
 import type { OrganicRecoveryViewModel, OrganicWeekPoint } from "@/lib/admin/growthDashboardViewModel";
 import { DeltaPercent, fmtInt, fmtPct } from "./growthFormat";
+import { organicRecoveryTooltipRows } from "@/lib/admin/organicRecoveryTooltip";
 
 function weekLabel(isoWeek: string): string {
   return isoWeek.slice(5);
@@ -17,6 +21,15 @@ function formatGateDate(ymd: string): string {
  * (dashed). Future weeks show only the path, so the gap is visible at a glance.
  */
 function RecoveryChart({ series, latestWeek }: { series: OrganicWeekPoint[]; latestWeek: string | null }) {
+  const [selectedWeek, setSelectedWeek] = useState<string | null>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function closeOnOutsidePointer(event: PointerEvent) {
+      if (!chartRef.current?.contains(event.target as Node)) setSelectedWeek(null);
+    }
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, []);
   if (series.length === 0) return null;
   const width = 560;
   const height = 150;
@@ -33,9 +46,12 @@ function RecoveryChart({ series, latestWeek }: { series: OrganicWeekPoint[]; lat
     .filter((pt): pt is string => pt !== null)
     .join(" ");
 
+  const selectedIndex = series.findIndex((point) => point.isoWeek === selectedWeek);
+  const selectedPoint = selectedIndex >= 0 ? series[selectedIndex] : null;
+
   return (
-    <div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto" role="img" aria-label="Евергрин-клики по неделям и траектория к цели">
+    <div ref={chartRef} className="relative" onMouseLeave={() => setSelectedWeek(null)}>
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full overflow-visible" role="img" aria-label="Евергрин-клики по неделям и траектория к цели">
         <line x1={0} x2={width} y1={top + plotH} y2={top + plotH} className="stroke-gray-200" strokeWidth={1} />
         {series.map((p, i) =>
           p.actual === null ? null : (
@@ -56,11 +72,49 @@ function RecoveryChart({ series, latestWeek }: { series: OrganicWeekPoint[]; lat
           <polyline points={path} fill="none" className="stroke-gray-400" strokeWidth={1.5} strokeDasharray="4 3" />
         )}
         {series.map((p, i) => (
+          <rect
+            key={`hit-${p.isoWeek}`}
+            x={slot * i}
+            y={top}
+            width={slot}
+            height={plotH}
+            fill="transparent"
+            role="button"
+            tabIndex={0}
+            aria-label={`Данные за ${p.isoWeek}`}
+            data-recovery-week={p.isoWeek}
+            className="cursor-pointer outline-none focus-visible:stroke-indigo-500"
+            onMouseEnter={() => setSelectedWeek(p.isoWeek)}
+            onFocus={() => setSelectedWeek(p.isoWeek)}
+            onClick={(event) => {
+              event.stopPropagation();
+              setSelectedWeek((current) => current === p.isoWeek ? null : p.isoWeek);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setSelectedWeek(null);
+            }}
+          />
+        ))}
+        {series.map((p, i) => (
           <text key={p.isoWeek} x={cx(i)} y={height - 5} textAnchor="middle" className="fill-gray-400" fontSize={10}>
             {weekLabel(p.isoWeek)}
           </text>
         ))}
       </svg>
+      {selectedPoint ? (
+        <div
+          role="tooltip"
+          className="pointer-events-none absolute top-2 z-20 w-40 -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 shadow-lg"
+          style={{ left: `clamp(5rem, ${((selectedIndex + 0.5) / series.length) * 100}%, calc(100% - 5rem))` }}
+        >
+          <div className="mb-1 font-semibold text-gray-900">{selectedPoint.isoWeek}</div>
+          {organicRecoveryTooltipRows(selectedPoint).map((row) => (
+            <div key={row.label} className="flex justify-between gap-2">
+              <span>{row.label}:</span><span className="font-medium text-gray-900">{row.value}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-block h-2.5 w-2.5 rounded-sm bg-indigo-600" aria-hidden="true" />

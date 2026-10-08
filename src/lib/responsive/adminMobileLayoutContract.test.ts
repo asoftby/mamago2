@@ -84,6 +84,9 @@ const dashboardBlocks = [
 ].map(read);
 const growthKpiTiles = read("src/app/admin/_components/growth/GrowthKpiTiles.tsx");
 const searchLayout = read("src/components/admin/search/SearchLayout.tsx");
+const billingBusinesses = read("src/app/admin/billing/businesses/BillingBusinessesClient.tsx");
+const contractsPage = read("src/app/admin/commercial/contracts/page.tsx");
+const contractWizard = read("src/app/admin/commercial/contracts/CreateContractWizard.tsx");
 
 // --- Admin shell breakpoint contract -------------------------------------
 
@@ -239,6 +242,31 @@ assert.doesNotMatch(
   /max-w-7xl mx-auto px-8/,
   "Search layout must not restore the old fixed 32px gutter on phones",
 );
+// --- Admin page header actions: stack below title on mobile -----------------
+
+assert.match(
+  billingBusinesses,
+  /flex flex-col gap-4 md:flex-row md:items-start md:justify-between/,
+  "billing businesses header action must stack below the title on mobile and return to the right at md+",
+);
+assert.match(
+  billingBusinesses,
+  /w-full[^"]*bg-primary[^"]*text-primary-foreground[^"]*md:w-auto/,
+  "billing businesses primary action must be full-width on mobile and compact at md+",
+);
+assert.equal(billingBusinesses.includes("Пополнить баланс"), true);
+
+assert.match(
+  contractsPage,
+  /flex flex-col gap-4 md:flex-row md:items-start md:justify-between/,
+  "contracts header action must stack below the title on mobile and return to the right at md+",
+);
+assert.match(
+  contractWizard,
+  /className="h-10 w-full md:w-auto"/,
+  "contract create trigger must be full-width on mobile and compact at md+",
+);
+assert.equal(contractWizard.includes("Создать договор"), true);
 
 // --- Page-level spacing contract: mobile-first, legacy pattern must not return ---
 
@@ -250,6 +278,51 @@ assert.deepEqual(
   legacyPageGutterOffenders,
   [],
   `Legacy inverted page-gutter pattern (p-6 md:p-4 — 24px phone / 16px md+) found outside nested cards:\n${legacyPageGutterOffenders.join("\n")}`,
+);
+
+// --- Admin navigation contract: no page-level back buttons -----------------
+
+const sharedBackControlOffenders: string[] = [];
+for (const root of ["src/app/admin", "src/components/admin"]) {
+  for (const file of collectSourceFiles(root)) {
+    const source = read(file);
+    if (
+      source.includes("@/components/admin/BackButton") ||
+      source.includes("<BackButton")
+    ) {
+      sharedBackControlOffenders.push(file);
+    }
+  }
+}
+assert.deepEqual(
+  sharedBackControlOffenders,
+  [],
+  `Admin pages/components must not use the retired shared BackButton control:\n${sharedBackControlOffenders.join("\n")}`,
+);
+
+const pageLevelBackControlFiles = [
+  "src/components/admin/AdminPageHeader.tsx",
+  "src/components/admin/publications/PublicationNewClient.tsx",
+  "src/app/admin/users/[id]/UserDetailsClient.tsx",
+  "src/app/admin/b2b/partners/[id]/page.tsx",
+  "src/app/admin/content/places/[id]/page.tsx",
+  "src/components/admin/PlaceModerationView.tsx",
+  "src/components/admin/PlaceRevisionModerationView.tsx",
+  "src/app/admin/media/[id]/page.tsx",
+];
+
+const pageLevelBackControlOffenders = pageLevelBackControlFiles.filter((file) => {
+  const source = read(file);
+  return (
+    source.includes("← Назад") ||
+    /<ArrowLeft[\s\S]{0,240}(?:Назад|Вернуться)/.test(source) ||
+    /(?:Назад|Вернуться)[\s\S]{0,240}<ArrowLeft/.test(source)
+  );
+});
+assert.deepEqual(
+  pageLevelBackControlOffenders,
+  [],
+  `Known Admin detail/header surfaces must not render page-level back controls. ArrowLeft remains allowed for unrelated UI such as pagination, carousels, and pickers:\n${pageLevelBackControlOffenders.join("\n")}`,
 );
 
 const representativeAdminPages = [

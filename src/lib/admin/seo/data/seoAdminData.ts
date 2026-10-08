@@ -1,5 +1,5 @@
 /**
- * Точки входа данных SEO Control Center.
+ * Точки входа данных SEO-раздела.
  * Возвращают реальные данные, а для неподключённых агрегатов — честные пустые состояния.
  */
 import type {
@@ -30,18 +30,255 @@ import {
   getAdminPagination,
   type AdminPaginationResult,
 } from "@/lib/admin/pagination";
+import { buildAdminPath } from "@/lib/routing/surface";
+import type { SeoGeoContext, SeoMarketFilter } from "@/lib/admin/seo/geo";
+import {
+  filterPagesByGeoContext,
+  filterPagesByMarketFilter,
+} from "@/lib/admin/seo/geo";
+import type { SeoPageIndexationStatus, SeoPageType } from "../domain/types";
+import {
+  parseSeoPagesPageSize,
+  SEO_PAGES_DEFAULT_PAGE_SIZE,
+  type SeoPagesPageSize,
+} from "@/lib/admin/seoNavConfig";
 
-export async function getSeoDashboardSummary(): Promise<SeoDashboardSummary> {
+function hasMissingSeoFields(row: SeoPage): boolean {
+  const titleEmpty = !row.title?.trim();
+  const descEmpty = !row.description?.trim();
+  const h1Empty = !row.h1?.trim();
+  return titleEmpty || descEmpty || h1Empty;
+}
+
+export function buildSeoDashboardSummaryFromPages(
+  pages: SeoPage[],
+): SeoDashboardSummary {
+  const pagesPath = buildAdminPath("/seo/pages");
+  const withIssues = pages.filter(
+    (p) => (p.entityDiagnostics?.issues.length ?? 0) > 0,
+  );
+  const noindex = pages.filter((p) => p.indexationStatus === "noindex");
+  const draft = pages.filter((p) => p.indexationStatus === "draft");
+  const missingSeo = pages.filter(hasMissingSeoFields);
+
+  const stats = [
+    {
+      id: "pagesTotal" as const,
+      label: "Страницы",
+      value: pages.length,
+      hint: "В выбранном SEO-контексте",
+      href: pagesPath,
+    },
+    {
+      id: "pagesWithIssues" as const,
+      label: "С проблемами",
+      value: withIssues.length,
+      hint: "Диагностика URL / slug / canonical",
+      href: pagesPath,
+    },
+    {
+      id: "pagesNoindex" as const,
+      label: "noindex",
+      value: noindex.length,
+      hint: "Закрыты от индексации",
+      href: pagesPath,
+    },
+    {
+      id: "pagesMissingSeo" as const,
+      label: "Без SEO-полей",
+      value: missingSeo.length,
+      hint: "Пустые title, description или H1",
+      href: pagesPath,
+    },
+    {
+      id: "pagesDraft" as const,
+      label: "Черновики",
+      value: draft.length,
+      hint: "Ещё не опубликованы",
+      href: pagesPath,
+    },
+  ];
+
+  const attentionItems: SeoDashboardSummary["attentionItems"] = [];
+
+  if (withIssues.length > 0) {
+    attentionItems.push({
+      id: "diag-issues",
+      title: `${withIssues.length} страниц с проблемами диагностики`,
+      detail: "Проверьте slug, canonical и public URL",
+      severity: withIssues.some((p) =>
+        (p.entityDiagnostics?.issues ?? []).some((i) =>
+          i.toLowerCase().includes("критично"),
+        ),
+      )
+        ? "high"
+        : "medium",
+      href: pagesPath,
+    });
+  }
+
+  if (missingSeo.length > 0) {
+    attentionItems.push({
+      id: "missing-seo",
+      title: `${missingSeo.length} страниц с незаполненными SEO-полями`,
+      detail: "Добавьте title, description или H1",
+      severity: "medium",
+      href: pagesPath,
+    });
+  }
+
+  if (isGlobalNoindexEnabled()) {
+    attentionItems.push({
+      id: "global-noindex",
+      title: "Глобальный noindex включён",
+      detail: getGlobalNoindexReason() || "Сайт закрыт от индексации через env",
+      severity: "high",
+      href: buildAdminPath("/seo/settings/indexation"),
+    });
+  }
+
   return {
-    kpis: [],
-    systemStatuses: [],
-    attentionItems: [],
+    stats,
+    attentionItems,
+    externalSourcesConnected: false,
   };
+}
+
+export async function getSeoDashboardSummary(
+  geoFilter?: SeoMarketFilter,
+): Promise<SeoDashboardSummary> {
+  const allPages = await getSeoPages();
+  const pages = geoFilter
+    ? filterPagesByMarketFilter(allPages, geoFilter)
+    : allPages;
+  return buildSeoDashboardSummaryFromPages(pages);
 }
 
 export async function getSeoPages(): Promise<SeoPage[]> {
   const { getAllEntitySeoPages } = await import("./getEntitySeoPages");
   return getAllEntitySeoPages();
+}
+
+export type SeoPagesListQuery = {
+  page?: number;
+  pageSize?: number;
+  q?: string;
+  type?: SeoPageType | "all";
+  indexation?: SeoPageIndexationStatus | "all";
+};
+
+export type SeoPagesListResult = {
+  items: SeoPage[];
+  pagination: AdminPaginationResult;
+  filters: {
+    q: string;
+    type: SeoPageType | "all";
+    indexation: SeoPageIndexationStatus | "all";
+    pageSize: SeoPagesPageSize;
+  };
+};
+
+export function matchesSeoPageSearch(row: SeoPage, q: string): boolean {
+  if (!q.trim()) return true;
+  const x = q.trim().toLowerCase();
+  const slug = row.path.split("/").filter(Boolean).pop() ?? "";
+  const d = row.entityDiagnostics;
+  return (
+    row.path.toLowerCase().includes(x) ||
+    row.h1.toLowerCase().includes(x) ||
+    row.title.toLowerCase().includes(x) ||
+    slug.toLowerCase().includes(x) ||
+    row.id.toLowerCase().includes(x) ||
+    Boolean(
+      d &&
+        (d.entityId.toLowerCase().includes(x) ||
+          (d.slug ?? "").toLowerCase().includes(x) ||
+          d.entityTitle.toLowerCase().includes(x) ||
+          (d.citySlug ?? "").toLowerCase().includes(x)),
+    )
+  );
+}
+
+/**
+ * In-memory pagination helper for contract tests.
+ */
+export function buildSeoPagesListResult(
+  allRows: SeoPage[],
+  geoFilter: SeoMarketFilter,
+  query: SeoPagesListQuery = {},
+): SeoPagesListResult {
+  const q = query.q?.trim() ?? "";
+  const type = query.type ?? "all";
+  const indexation = query.indexation ?? "all";
+  const pageSize = parseSeoPagesPageSize(
+    query.pageSize != null ? String(query.pageSize) : null,
+  );
+
+  let filtered = filterPagesByMarketFilter(allRows, geoFilter);
+  if (type !== "all") {
+    filtered = filtered.filter((row) => row.type === type);
+  }
+  if (indexation !== "all") {
+    filtered = filtered.filter((row) => row.indexationStatus === indexation);
+  }
+  if (q) {
+    filtered = filtered.filter((row) => matchesSeoPageSearch(row, q));
+  }
+
+  const pagination = getAdminPagination({
+    page: query.page ?? 1,
+    total: filtered.length,
+    pageSize,
+  });
+  const items = filtered.slice(pagination.skip, pagination.skip + pagination.take);
+
+  return {
+    items,
+    pagination,
+    filters: { q, type, indexation, pageSize },
+  };
+}
+
+export async function getSeoPagesList(
+  geoFilter: SeoMarketFilter,
+  query: SeoPagesListQuery = {},
+): Promise<SeoPagesListResult> {
+  const { countEntityRows, listEntityRowsPage } = await import(
+    "@/lib/admin/seo/entities/service"
+  );
+  const q = query.q?.trim() ?? "";
+  const type = query.type ?? "all";
+  const indexation = query.indexation ?? "all";
+  const pageSize = parseSeoPagesPageSize(
+    query.pageSize != null ? String(query.pageSize) : null,
+  );
+  const filters = {
+    geoFilter,
+    q: q || undefined,
+    indexation,
+  };
+
+  const counted = await countEntityRows({ filters, type });
+  const pagination = getAdminPagination({
+    page: query.page ?? 1,
+    total: counted.total,
+    pageSize,
+  });
+
+  const pagePass = await listEntityRowsPage({
+    filters,
+    type,
+    skip: pagination.skip,
+    take: pagination.take,
+    counts: counted.counts,
+    providers: counted.providers,
+  });
+
+  return {
+    items: pagePass.rows,
+    pagination,
+    filters: { q, type, indexation, pageSize },
+  };
 }
 
 export interface RedirectCenterQuery {
@@ -180,7 +417,7 @@ export async function getSitemapRobotsData(): Promise<{
       noindexEnvironments,
       robotsStatus: "ok",
       futureControlsNote:
-        "На текущем этапе глобальная индексация управляется через env. UI в админке пока только отображает состояние.",
+        "Глобальная индексация управляется через env. UI в админке отображает текущее состояние.",
       globalNoindexEnabled,
       globalNoindexReason,
       controlsManagedBy: "env",

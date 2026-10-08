@@ -2,6 +2,7 @@ import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { adminPath } from "@/lib/routing/surface";
 import { TableContainer } from "@/components/ui/table";
+import { AdminFilterTabs } from "@/components/admin/ui/AdminFilterTabs";
 import type { BusinessAccessRequestStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -44,23 +45,18 @@ export default async function BusinessAccessRequestsPage({
         <h1 className="text-2xl md:text-xl font-bold">Заявки на доступ к бизнесу</h1>
       </div>
 
-      <div className="border-b border-gray-200 -mx-6 md:mx-0 px-6 md:px-0">
-        <div className="flex gap-2 overflow-x-auto">
-          {FILTER_TABS.map((status) => (
-            <Link
-              key={status}
-              href={`${adminPath("/b2b/access-requests")}?status=${status}`}
-              className={`px-4 py-2 font-medium border-b-2 transition-colors whitespace-nowrap text-sm ${
-                activeStatus === status
-                  ? "border-primary text-primary"
-                  : "border-transparent text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              {status === "ALL" ? "Все" : STATUS_LABELS[status as BusinessAccessRequestStatus]}
-            </Link>
-          ))}
-        </div>
-      </div>
+      <AdminFilterTabs
+        items={FILTER_TABS.map((status) => ({
+          value: status,
+          label:
+            status === "ALL"
+              ? "Все"
+              : STATUS_LABELS[status as BusinessAccessRequestStatus],
+          href: `${adminPath("/b2b/access-requests")}?status=${status}`,
+        }))}
+        value={activeStatus}
+        ariaLabel="Статус заявки на доступ к бизнесу"
+      />
 
       {requests.length === 0 ? (
         <p className="text-gray-500">Заявок не найдено.</p>

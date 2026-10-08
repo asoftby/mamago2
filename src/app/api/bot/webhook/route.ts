@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTelegramConfig, requiresTelegramWebhookSecret } from "@/server/config/telegram.config";
 import { TelegramWebhookService, type TelegramUpdate } from "@/server/services/telegram/TelegramWebhookService";
+import { runAfterResponse } from "@/server/services/telegram/capture/runAfterResponse";
 
 export const runtime = "nodejs";
 
@@ -45,16 +46,18 @@ export async function POST(request: NextRequest) {
     const msg = update.message;
     const updateId = (rawBody as Record<string, unknown>).update_id ?? "?";
     const updateType = msg ? "message" : update.callback_query ? "callback_query" : "unknown";
-    const text = msg?.text ?? "(none)";
-    const chatId = msg?.chat?.id ?? "?";
-    
-    console.log("[telegram:webhook] Received update_id=%s type=%s text=%s chatId=%s",
-      updateId, updateType, text, chatId);
+
+    // Message text and chat ids are deliberately not logged: forwarded
+    // messages are user content (forward-to-plan spec v1.3, section 13).
+    console.log("[telegram:webhook] Received update_id=%s type=%s", updateId, updateType);
   }
 
   try {
     const service = new TelegramWebhookService();
-    await service.handleUpdate(update);
+    const result = await service.handleUpdate(update);
+
+    // Parsing/debounce work runs after the 200; the DB write above already happened.
+    if (result.afterResponse) runAfterResponse(result.afterResponse);
     
     if (process.env.NODE_ENV !== "production") {
       console.log("[telegram:webhook] Update processed successfully");

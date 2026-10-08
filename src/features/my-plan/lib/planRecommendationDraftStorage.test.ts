@@ -29,6 +29,7 @@ test("valid drafts survive parsing while malformed entries are ignored", () => {
         addedActivityIds: ["activity-2"],
         shownActivityIds: ["activity-1", "activity-2"],
         ageRangeValues: ["6-9"],
+        personaIds: ["adult-1", "child-1"],
         lastSuccessfulFetchAt: "2026-08-04T12:00:00.000Z",
       },
       bad: { suggestions: [], batchNumber: "2" },

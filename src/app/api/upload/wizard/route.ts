@@ -19,10 +19,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 import { getCurrentUser } from "@/lib/auth/server";
-import {
-  detectUploadMimeTypeFromBuffer,
-  resolveUploadMimeType,
-} from "@/lib/uploads/uploadConfig";
+import { validateUploadFileContent } from "@/lib/uploads/imageContentValidation";
 import { jsonUploadError } from "@/lib/uploads/uploadErrors";
 import type { UploadSuccessResponse } from "@/lib/uploads/uploadTypes";
 import { validateUploadPreflight } from "@/lib/uploads/validateUploadPreflight";
@@ -90,6 +87,12 @@ export async function POST(req: NextRequest) {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
+    let actualMimeType: string;
+    try {
+      actualMimeType = validateUploadFileContent(buffer, file);
+    } catch (error) {
+      return jsonUploadError("INVALID_FILE_TYPE", error instanceof Error ? error.message : "Invalid image content", 415);
+    }
 
     // Dedup (Phase A): hash the raw original bytes and reuse an owner's existing
     // asset before doing any processing or storage writes. A hit may resolve to
@@ -109,11 +112,6 @@ export async function POST(req: NextRequest) {
         wizardSessionId,
       });
     }
-
-    const actualMimeType =
-      detectUploadMimeTypeFromBuffer(buffer) ??
-      resolveUploadMimeType(file) ??
-      file.type;
 
     console.log("[WIZARD UPLOAD] Starting image processing", {
       userId: user.id,

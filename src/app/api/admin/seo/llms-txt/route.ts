@@ -51,6 +51,7 @@ export async function PUT(req: NextRequest) {
     revalidatePath("/llms.txt");
     revalidatePath(buildAdminPath("/seo"));
     revalidatePath(buildAdminPath("/seo/llms-txt"));
+    revalidatePath(buildAdminPath("/seo/settings/ai-search"));
 
     return NextResponse.json({ item });
   } catch (error) {

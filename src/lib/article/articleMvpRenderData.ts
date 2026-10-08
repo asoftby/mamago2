@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findArticleBySlug } from "@/lib/slug/articleSlugService";
 import { parseArticleContentJson, type ArticleBlockMvp } from "@/lib/publications/articleMvp";
+import { MAIN_ARTICLE_GALLERY_BLOCK_ID } from "@/lib/article/articleMainGallery";
 import { collectArticlePlaceIds, resolveArticlePlaceCard } from "@/lib/article/articlePlaceResolution";
 import { resolveUniqueConcurrently } from "@/lib/article/resolveUniqueConcurrently";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
@@ -420,9 +421,12 @@ export async function buildArticleMvpResolvedBlocks(
     loadBasicCards?: (blocks: ArticleBlockMvp[]) => Promise<Map<string, ResolvedActivityCard>>;
   } = {},
 ): Promise<ArticleMvpResolvedBlock[]> {
+  const renderableBlocks = blocks.filter(
+    (block) => block.id !== MAIN_ARTICLE_GALLERY_BLOCK_ID,
+  );
   const out: ArticleMvpResolvedBlock[] = [];
   const mediaIds = new Set<string>();
-  for (const b of blocks) {
+  for (const b of renderableBlocks) {
     if (b.type === "image" && b.mediaId) mediaIds.add(b.mediaId);
     if (b.type === "gallery") b.mediaIds.forEach((id) => mediaIds.add(id));
   }
@@ -435,10 +439,10 @@ export async function buildArticleMvpResolvedBlocks(
       : [];
   const assetById = new Map(assets.map((asset) => [asset.id, asset]));
   const [placesById, basicCards] = await Promise.all([
-    (dependencies.loadPlaces ?? loadArticlePlacesByIds)(collectArticlePlaceIds(blocks)),
-    (dependencies.loadBasicCards ?? loadBasicActivityCards)(blocks),
+    (dependencies.loadPlaces ?? loadArticlePlacesByIds)(collectArticlePlaceIds(renderableBlocks)),
+    (dependencies.loadBasicCards ?? loadBasicActivityCards)(renderableBlocks),
   ]);
-  const offerBlocks = blocks.filter(
+  const offerBlocks = renderableBlocks.filter(
     (block): block is Extract<ArticleBlockMvp, { type: "activityCard" }> =>
       block.type === "activityCard" && block.entityType === "OFFER",
   );
@@ -448,7 +452,7 @@ export async function buildArticleMvpResolvedBlocks(
     resolveActivityCard,
   );
 
-  for (const b of blocks) {
+  for (const b of renderableBlocks) {
     if (b.type === "intro" || b.type === "text" || b.type === "quote" || b.type === "heading" || b.type === "callout") {
       out.push(b);
       continue;

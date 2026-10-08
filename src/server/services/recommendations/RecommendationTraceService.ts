@@ -5,6 +5,12 @@ import type {
   UserEventType,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {
+  buildDecisionContextV1,
+  type DecisionIntent,
+  type Subject,
+  type SubjectSource,
+} from "@/lib/decision/decisionContext";
 
 export type RecommendationTraceItem = {
   entityType: AnalyticsEntityType;
@@ -18,6 +24,8 @@ export type RecommendationTraceItem = {
 export type RecommendationRunTraceInput = {
   userId?: string | null;
   sessionId?: string | null;
+  /** Guest product identity (client-generated UUID) when userId is absent. */
+  anonymousId?: string | null;
   surface: RecommendationSurface;
   cityId?: string | null;
   citySlug?: string | null;
@@ -27,9 +35,20 @@ export type RecommendationRunTraceInput = {
   /** Surface policy actually applied by the caller, not merely the latest policy. */
   policyId?: string | null;
   policyVersion?: number | null;
-  context?: Prisma.InputJsonValue | null;
   candidateCount: number;
   items: RecommendationTraceItem[];
+  /**
+   * Ingredients for the persisted decisionContext.v1 — never a raw JSON
+   * blob. `decisionId`/`surface`/`cityId`/`citySlug`/`targetDate` are filled
+   * in automatically from the run once it's known; callers only supply the
+   * parts that aren't already implied by the fields above.
+   */
+  decisionContext: {
+    intent: DecisionIntent;
+    subjects: Subject[];
+    constraints?: Record<string, { value: unknown; source: SubjectSource }>;
+    actor: { kind: "user" | "guest"; id: string | null };
+  };
 };
 
 export type RecommendationRunTraceResult = {
@@ -56,42 +75,70 @@ export async function recordRecommendationRun(
       .filter((item) => item.entityId.trim().length > 0 && item.position > 0)
       .sort((a, b) => a.position - b.position);
 
-    const run = await prisma.recommendationRun.create({
-      data: {
-        userId: input.userId ?? undefined,
-        sessionId: input.sessionId ?? undefined,
-        surface: input.surface,
-        cityId: input.cityId ?? undefined,
-        citySlug: input.citySlug ?? undefined,
-        targetDateFrom: input.targetDateFrom ?? undefined,
-        targetDateTo: input.targetDateTo ?? undefined,
-        algorithmVersion: input.algorithmVersion,
-        policyId: input.policyId ?? undefined,
-        policyVersion: input.policyVersion ?? undefined,
-        context: input.context ?? undefined,
-        candidateCount: Math.max(0, input.candidateCount),
-        selectedCount: items.length,
-        exposures: {
-          create: items.map((item) => ({
-            entityType: item.entityType,
-            entityId: item.entityId,
-            position: item.position,
-            score: item.score ?? undefined,
-            scoreBreakdown: item.scoreBreakdown ?? undefined,
-            reasonCodes: item.reasonCodes ?? [],
-          })),
-        },
-      },
-      select: {
-        id: true,
-        exposures: {
-          select: {
-            id: true,
-            entityType: true,
-            entityId: true,
+    // Single-value date/range: only produce a dateRange when the two edges
+    // differ; otherwise targetDate alone already says it.
+    const dateRange =
+      input.targetDateFrom && input.targetDateTo && input.targetDateFrom !== input.targetDateTo
+        ? { from: input.targetDateFrom, to: input.targetDateTo }
+        : null;
+
+    // decisionId = RecommendationRun.id, only known once the row exists.
+    // create + build-validated-context + update all happen in one
+    // transaction so a schema-validation failure never leaves a run row
+    // behind with a missing/invalid decisionContext.
+    const run = await prisma.$transaction(async (tx) => {
+      const created = await tx.recommendationRun.create({
+        data: {
+          userId: input.userId ?? undefined,
+          sessionId: input.sessionId ?? undefined,
+          anonymousId: input.anonymousId ?? undefined,
+          surface: input.surface,
+          cityId: input.cityId ?? undefined,
+          citySlug: input.citySlug ?? undefined,
+          targetDateFrom: input.targetDateFrom ?? undefined,
+          targetDateTo: input.targetDateTo ?? undefined,
+          algorithmVersion: input.algorithmVersion,
+          policyId: input.policyId ?? undefined,
+          policyVersion: input.policyVersion ?? undefined,
+          candidateCount: Math.max(0, input.candidateCount),
+          selectedCount: items.length,
+          exposures: {
+            create: items.map((item) => ({
+              entityType: item.entityType,
+              entityId: item.entityId,
+              position: item.position,
+              score: item.score ?? undefined,
+              scoreBreakdown: item.scoreBreakdown ?? undefined,
+              reasonCodes: item.reasonCodes ?? [],
+            })),
           },
         },
-      },
+        select: {
+          id: true,
+          exposures: { select: { id: true, entityType: true, entityId: true } },
+        },
+      });
+
+      const decisionContext = buildDecisionContextV1({
+        decisionId: created.id,
+        intent: input.decisionContext.intent,
+        surface: input.surface,
+        cityId: input.cityId ?? null,
+        citySlug: input.citySlug ?? null,
+        targetDate: input.targetDateFrom ?? null,
+        dateRange,
+        subjects: input.decisionContext.subjects,
+        constraints: input.decisionContext.constraints,
+        actor: input.decisionContext.actor,
+        source: "server",
+      });
+
+      await tx.recommendationRun.update({
+        where: { id: created.id },
+        data: { context: decisionContext as unknown as Prisma.InputJsonValue },
+      });
+
+      return created;
     });
 
     return {
@@ -110,7 +157,15 @@ export async function recordRecommendationRun(
 }
 
 export type RecentRecommendationAttributionInput = {
-  userId: string;
+  /** At least one of userId/anonymousId must be present. */
+  userId?: string | null;
+  /**
+   * Guest product identity. Lets a run generated pre-auth (userId=null on
+   * the run) still be found once the user has registered, WITHOUT rewriting
+   * the run's own ownership — old guest history is never mutated to carry a
+   * userId; we just also match on anonymousId at lookup time.
+   */
+  anonymousId?: string | null;
   entityType: AnalyticsEntityType;
   entityId: string;
   surface?: RecommendationSurface;
@@ -127,6 +182,11 @@ export async function findRecentRecommendationAttribution(
   input: RecentRecommendationAttributionInput,
 ): Promise<{ exposureId: string; runId: string } | null> {
   try {
+    const ownershipOr: Prisma.RecommendationRunWhereInput[] = [];
+    if (input.userId) ownershipOr.push({ userId: input.userId });
+    if (input.anonymousId) ownershipOr.push({ anonymousId: input.anonymousId });
+    if (ownershipOr.length === 0) return null;
+
     const maxAgeMinutes = Math.min(24 * 60, Math.max(1, input.maxAgeMinutes ?? 120));
     const since = new Date(Date.now() - maxAgeMinutes * 60_000);
     const exposure = await prisma.recommendationExposure.findFirst({
@@ -135,7 +195,7 @@ export async function findRecentRecommendationAttribution(
         entityId: input.entityId,
         exposedAt: { gte: since },
         run: {
-          userId: input.userId,
+          OR: ownershipOr,
           ...(input.surface ? { surface: input.surface } : {}),
         },
       },
@@ -149,18 +209,66 @@ export async function findRecentRecommendationAttribution(
   }
 }
 
+export type RecommendationAttributionVerifyInput = {
+  exposureId: string;
+  entityType: AnalyticsEntityType;
+  entityId: string;
+  userId?: string | null;
+  sessionId?: string | null;
+  anonymousId?: string | null;
+};
+
+/**
+ * Verifies a CLIENT-SUPPLIED (explicit) exposure id before trusting it for
+ * anything — decisionId, RecommendationOutcome, etc. Trust requires both:
+ * (1) the exposure's entityType/entityId actually match the entity this
+ * action is about, and (2) the exposure's run belongs to the same actor
+ * (user, session, or guest anonymousId). Never trust an unverified id.
+ */
+export async function verifyRecommendationAttribution(
+  input: RecommendationAttributionVerifyInput,
+): Promise<{ exposureId: string; runId: string } | null> {
+  try {
+    if (!input.exposureId) return null;
+
+    const ownershipOr: Prisma.RecommendationRunWhereInput[] = [];
+    if (input.userId) ownershipOr.push({ userId: input.userId });
+    if (input.sessionId) ownershipOr.push({ sessionId: input.sessionId });
+    if (input.anonymousId) ownershipOr.push({ anonymousId: input.anonymousId });
+    if (ownershipOr.length === 0) return null;
+
+    const exposure = await prisma.recommendationExposure.findFirst({
+      where: {
+        id: input.exposureId,
+        entityType: input.entityType,
+        entityId: input.entityId,
+        run: { OR: ownershipOr },
+      },
+      select: { id: true, runId: true },
+    });
+    return exposure ? { exposureId: exposure.id, runId: exposure.runId } : null;
+  } catch (error) {
+    console.error("[recommendation-trace] attribution verification failed", error);
+    return null;
+  }
+}
+
 export type RecommendationOutcomeLinkInput = {
   exposureId: string;
+  entityType: AnalyticsEntityType;
+  entityId: string;
   userEventId: string;
   eventType: UserEventType;
   userId?: string | null;
   sessionId?: string | null;
+  anonymousId?: string | null;
 };
 
 /**
  * Attribute an existing first-party UserEvent to a recommendation exposure.
- * The ownership check prevents a client-supplied exposure id from linking an
- * event to another user's recommendation history.
+ * Delegates to verifyRecommendationAttribution so a client-supplied exposure
+ * id can never link an event to another actor's (or another entity's)
+ * recommendation history.
  */
 export async function linkRecommendationOutcome(
   input: RecommendationOutcomeLinkInput,
@@ -168,29 +276,18 @@ export async function linkRecommendationOutcome(
   try {
     if (!input.exposureId || !input.userEventId) return false;
 
-    const ownershipOr: Prisma.RecommendationRunWhereInput[] = [];
-    if (input.userId) ownershipOr.push({ userId: input.userId });
-    if (input.sessionId) ownershipOr.push({ sessionId: input.sessionId });
-    if (ownershipOr.length === 0) return false;
-
-    const exposure = await prisma.recommendationExposure.findFirst({
-      where: {
-        id: input.exposureId,
-        run: { OR: ownershipOr },
-      },
-      select: { id: true },
-    });
-    if (!exposure) return false;
+    const verified = await verifyRecommendationAttribution(input);
+    if (!verified) return false;
 
     await prisma.recommendationOutcome.upsert({
       where: { userEventId: input.userEventId },
       create: {
-        exposureId: exposure.id,
+        exposureId: verified.exposureId,
         userEventId: input.userEventId,
         eventType: input.eventType,
       },
       update: {
-        exposureId: exposure.id,
+        exposureId: verified.exposureId,
         eventType: input.eventType,
       },
     });
@@ -213,6 +310,7 @@ export async function getPublishedRecommendationSurfacePolicy(
 export const RecommendationTraceService = {
   recordRecommendationRun,
   findRecentRecommendationAttribution,
+  verifyRecommendationAttribution,
   linkRecommendationOutcome,
   getPublishedRecommendationSurfacePolicy,
 };

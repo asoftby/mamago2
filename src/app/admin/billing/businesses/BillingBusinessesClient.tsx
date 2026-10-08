@@ -74,14 +74,14 @@ export function BillingBusinessesClient({ accounts: initialAccounts }: Props) {
     <>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <h1 className="text-2xl md:text-xl font-bold text-gray-900">Балансы бизнесов</h1>
             <p className="text-sm text-gray-600 mt-1">Обзор billing-аккаунтов и проблемных состояний</p>
           </div>
           <button
             onClick={() => setShowFirstTopUpModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#EF8759] text-white rounded-md hover:bg-[#EF8759]/90 transition-colors shadow-sm"
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 md:w-auto"
           >
             <Wallet className="w-4 h-4" />
             Пополнить баланс

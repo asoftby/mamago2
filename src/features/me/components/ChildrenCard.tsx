@@ -6,12 +6,14 @@ import { Surface } from "@/components/ui/surface";
 import { H2, BodyMuted } from "@/components/ui/typography";
 import { AddChildModal } from "@/components/children/AddChildModal";
 import { getSystemInterestLabel } from "@/lib/config/interests";
+import { ageYearsAt, childDisplayName } from "@/lib/child/birth";
 import { cn } from "@/lib/utils";
 
 export interface ChildData {
   id: string;
-  name: string;
+  name: string | null;
   birthDate: Date | null;
+  birthPrecision: "DAY" | "MONTH" | null;
   systemInterests?: { interestSlug: string }[];
   customInterests?: { label: string }[];
 }
@@ -24,8 +26,6 @@ export type AdultPersonaProps = {
   initialChar: string;
   /** например «Мама», «Папа» */
   roleLabel?: string | null;
-  /** например «25–34» */
-  ageBandLabel?: string | null;
   /** Legacy свободный текст (если нет signal-полей) */
   preferenceSummary?: string | null;
   leisureFormatSummary?: string | null;
@@ -60,14 +60,10 @@ const GLASS_ADD_CARD = cn(
   "active:scale-[0.99] cursor-pointer snap-start",
 );
 
-function getAgeLine(birthDate: Date | null): string {
-  if (!birthDate || Number.isNaN(birthDate.getTime())) return "Возраст не указан";
-  const now = new Date();
-  const months =
-    (now.getFullYear() - birthDate.getFullYear()) * 12 +
-    (now.getMonth() - birthDate.getMonth());
-  if (months < 12) return `${months} мес.`;
-  const years = Math.floor(months / 12);
+function getAgeLine(child: ChildData): string {
+  const years = ageYearsAt(child, new Date());
+  if (years == null) return "Возраст не указан";
+  if (years === 0) return "До года";
   return `${years} ${years === 1 ? "год" : years < 5 ? "года" : "лет"}`;
 }
 
@@ -90,10 +86,7 @@ function adultTitle(adult: AdultPersonaProps): string {
 
 function adultSubtitle(adult: AdultPersonaProps): string {
   const role = adult.roleLabel?.trim();
-  const age = adult.ageBandLabel?.trim();
-  if (role && age) return `${role} · ${age}`;
   if (role) return role;
-  if (age) return age;
   return "Родитель";
 }
 
@@ -110,10 +103,10 @@ function adultPreferenceLine(adult: AdultPersonaProps): string {
 
 export function ChildrenCard({
   adult,
-  children: childrenList,
+  familyChildren: childrenList,
 }: {
   adult: AdultPersonaProps;
-  children: ChildData[];
+  familyChildren: ChildData[];
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingChild, setEditingChild] = useState<ChildData | undefined>();
@@ -227,8 +220,9 @@ export function ChildrenCard({
           </button>
 
           {/* 2. Дети */}
-          {childrenList.map((child) => {
+          {childrenList.map((child, index) => {
             const interests = formatChildInterests(child);
+            const displayName = childDisplayName(child.name, index + 1);
             return (
               <button
                 key={child.id}
@@ -240,7 +234,7 @@ export function ChildrenCard({
                   highlightChildId === child.id &&
                     "animate-in fade-in zoom-in-95 duration-300",
                 )}
-                aria-label={`Редактировать ${child.name}`}
+                aria-label={`Редактировать ${displayName}`}
               >
                 <span
                   className={cn(
@@ -260,12 +254,12 @@ export function ChildrenCard({
                     )}
                   >
                     <span className="flex h-full w-full items-center justify-center">
-                      {child.name.charAt(0).toUpperCase()}
+                      {displayName.charAt(0).toUpperCase()}
                     </span>
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-neutral-900 truncate whitespace-nowrap">
-                      {child.name} · {getAgeLine(child.birthDate ? new Date(child.birthDate) : null)}
+                      {displayName} · {getAgeLine(child)}
                     </p>
                     <p className="text-xs text-neutral-400 truncate whitespace-nowrap mt-1">
                       {interests}
@@ -276,12 +270,12 @@ export function ChildrenCard({
             );
           })}
 
-          {/* 3. Добавить участника */}
+          {/* 3. Добавить ребёнка */}
           <button
             type="button"
             onClick={openAdd}
             className={cn(CARD_W, GLASS_ADD_CARD)}
-            aria-label="Добавить участника"
+            aria-label="Добавить ребёнка"
           >
             <div
               className={cn(
@@ -291,13 +285,13 @@ export function ChildrenCard({
             >
               <Plus className="h-5 w-5 stroke-[2.5]" />
             </div>
-            <span className="text-sm font-medium leading-tight">Добавить участника</span>
+            <span className="text-sm font-medium leading-tight">Добавить ребёнка</span>
           </button>
         </div>
 
         {!hasChildren ? (
           <p className="mt-4 text-xs text-neutral-400 text-center sm:text-left">
-            Пока нет детей в профиле — нажмите «Добавить участника», чтобы добавить ребёнка.
+            Пока нет детей в профиле — нажмите «Добавить ребёнка».
           </p>
         ) : null}
       </Surface>
@@ -307,6 +301,7 @@ export function ChildrenCard({
         onClose={closeModal}
         childData={editingChild}
         editAdult={editingAdult}
+        childOnly={!editingAdult}
         onSaved={(p) => {
           if (p.kind === "child" && p.childId) setHighlightChildId(p.childId);
           if (p.kind === "adult") setHighlightAdult(true);

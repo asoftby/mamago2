@@ -15,6 +15,7 @@ import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { useChildrenScope } from "@/features/filters/discovery/childrenScope.store";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
+import { normalizeMyPlanProfileChildren, type MyPlanApiChild } from "../lib/normalizeProfileChildren";
 import { MY_PLAN_REFETCH_DATE_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { reconcilePlanMarkerCounts } from "../lib/planDateMarkers";
@@ -222,25 +223,10 @@ function useMyPlanStore() {
         return [];
       }
       const data = (await res.json()) as {
-        children?: Array<{
-          id: string;
-          name: string;
-          birthDate: string;
-          systemInterests?: Array<{ interestSlug: string }>;
-        }>;
+        children?: MyPlanApiChild[];
       };
       const raw = Array.isArray(data.children) ? data.children : [];
-      const list: ProfileChild[] = raw.map((c) => ({
-        id: c.id,
-        name: c.name,
-        birthDate:
-          typeof c.birthDate === "string"
-            ? c.birthDate
-            : new Date(c.birthDate as unknown as string).toISOString(),
-        systemInterests: Array.isArray(c.systemInterests)
-          ? c.systemInterests.map((x) => x.interestSlug)
-          : [],
-      }));
+      const list: ProfileChild[] = normalizeMyPlanProfileChildren(raw);
       setChildren(list);
       return list;
     } catch {
@@ -329,6 +315,9 @@ function useMyPlanStore() {
       if (selectedAgeRangesKey.length > 0) {
         qs.set("ageRanges", selectedAgeRangesKey);
       }
+      if (family?.selectedPersonaIds && family.selectedPersonaIds.length > 0) {
+        qs.set("personaIds", family.selectedPersonaIds.join(","));
+      }
       const res = await fetch(`/api/plan/suggestions?${qs.toString()}`, {
         credentials: "include",
       });
@@ -352,6 +341,7 @@ function useMyPlanStore() {
     selectedPlanDate,
     planSuggestionExcludeSignature,
     selectedAgeRangesKey,
+    family?.selectedPersonaIds,
   ]);
 
   useEffect(() => {
@@ -770,14 +760,15 @@ function useMyPlanStore() {
     }): Promise<{ ok: boolean; error?: string }> => {
       setSubmittingChild(true);
       try {
-        const birthDate = new Date(input.birthYear, input.birthMonth - 1, 15);
         const res = await fetch("/api/children", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
             name: input.name.trim(),
-            birthDate: birthDate.toISOString(),
+            birthPrecision: "MONTH",
+            birthYear: input.birthYear,
+            birthMonth: input.birthMonth,
             systemInterests: input.systemInterests,
             customInterests: [],
           }),

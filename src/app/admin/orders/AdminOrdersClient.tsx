@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FilterSelect } from "@/components/ui/filter-select";
 import { TableContainer } from "@/components/ui/table";
+import { AdminFilterTabs } from "@/components/admin/ui/AdminFilterTabs";
 import {
   DataCardList,
   DataCard,
@@ -279,34 +280,15 @@ export function AdminOrdersClient() {
         </div>
       )}
 
-      <div className="flex items-center gap-2 overflow-x-auto rounded-xl border border-stone-200 bg-white p-1">
-        {statusTabs.map((tab) => (
-          <button
-            key={tab.value}
-            type="button"
-            onClick={() => {
-              setStatus(tab.value);
-              setPage(1);
-            }}
-            className={[
-              "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors",
-              status === tab.value
-                ? "bg-stone-900 text-white"
-                : "text-stone-600 hover:bg-stone-100",
-            ].join(" ")}
-          >
-            {tab.label}
-            <span
-              className={[
-                "rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none",
-                status === tab.value ? "bg-white/20 text-white" : "bg-stone-100 text-stone-600",
-              ].join(" ")}
-            >
-              {tab.count}
-            </span>
-          </button>
-        ))}
-      </div>
+      <AdminFilterTabs
+        items={statusTabs}
+        value={status}
+        onValueChange={(value) => {
+          setStatus(value as "all" | BookingStatus);
+          setPage(1);
+        }}
+        ariaLabel="Статус заказа"
+      />
 
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -372,22 +354,6 @@ export function AdminOrdersClient() {
                 setDateTo(event.target.value);
                 setPage(1);
               }}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-gray-600">Статус</label>
-            <FilterSelect
-              value={status}
-              placeholder="Все статусы"
-              onChange={(value) => resetPageAndSet(setStatus, value as "all" | BookingStatus)}
-              options={[
-                { value: "NEW", label: STATUS_LABELS.NEW },
-                { value: "CONFIRMED", label: STATUS_LABELS.CONFIRMED },
-                { value: "COMPLETED", label: STATUS_LABELS.COMPLETED },
-                { value: "REJECTED", label: STATUS_LABELS.REJECTED },
-                { value: "CANCELLED", label: STATUS_LABELS.CANCELLED },
-              ]}
             />
           </div>
 

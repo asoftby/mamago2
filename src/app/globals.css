@@ -1,6 +1,18 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+
+/* vanilla-cookieconsent is initialized for state only; its generated root must
+   never leak as unstyled document text. The first-visit consent UI is the
+   mamaGo shell, and #cc-main is visible only for the explicit Preferences modal. */
+#cc-main {
+  display: none !important;
+}
+
+html.show--preferences #cc-main {
+  display: block !important;
+}
+
 @font-face {
   font-family: "nbrb";
   src:

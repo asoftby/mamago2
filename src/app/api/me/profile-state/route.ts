@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { buildProfileStatePayload } from "@/lib/post-auth/profileCompletion";
+import { childScopeFor } from "@/server/family/familyAccess";
 
 /**
  * GET /api/me/profile-state
@@ -21,7 +22,7 @@ export async function GET() {
 
     const dbStart = performance.now();
     const children = await prisma.child.findMany({
-      where: { parentId: user.id },
+      where: await childScopeFor(user.id),
       include: { systemInterests: true },
       orderBy: { createdAt: "asc" },
     });

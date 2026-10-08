@@ -7,6 +7,7 @@ import { DRAFT_REQUIRED, SUBMIT_REQUIRED } from "./types";
 import { isCinemaEventCategorySlug } from "@/lib/business/eventCategoryCinema";
 import { supportsDurationForCategorySlug } from "@/lib/business/eventCategoryDuration";
 import { resolveScheduleItemTimeOrder } from "@/lib/event/scheduleItemTimeOrder";
+import { parseVideoUrl } from "@/lib/media/parseVideoUrl";
 
 export interface ValidationResult {
   isValid: boolean;
@@ -234,15 +235,15 @@ function validateStep4(data: EventFormData): ValidationResult {
   const warnings: string[] = [];
 
   if (!data.coverImage) {
-    errors.push("Загрузите главное изображение");
+    errors.push("Добавьте хотя бы одно фото");
   }
 
-  if (data.reelsUrl && !isValidUrl(data.reelsUrl)) {
-    errors.push("Некорректная ссылка на видео");
+  if (data.reelsUrl && !parseVideoUrl(data.reelsUrl)) {
+    errors.push("Добавьте ссылку на Instagram Reel/Post или YouTube");
   }
 
   if (data.gallery.length === 0) {
-    warnings.push("Рекомендуется добавить фотографии в галерею");
+    warnings.push("Рекомендуется добавить ещё фотографии");
   }
 
   const isComplete = !!data.coverImage;

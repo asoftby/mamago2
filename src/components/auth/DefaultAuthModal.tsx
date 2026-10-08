@@ -11,11 +11,11 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
   savePostAuthContext,
   clearPostAuthContext,
+  finishPostAuthOnboarding,
   type AuthEntryPoint,
 } from "@/lib/post-auth";
 import { runPostAuthPipeline } from "@/lib/post-auth/pipeline";
-import { trackAuthCompleted, applyPostAuthCompletionOutcome } from "@/lib/post-auth/resolver";
-import { trackPostAuthEvent } from "@/lib/post-auth/analytics";
+import { trackAuthCompleted } from "@/lib/post-auth/resolver";
 import { getPostAuthRedirect } from "@/lib/auth/postAuthRedirect";
 import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import { getSafeRedirectPath } from "@/lib/auth/redirectTo";
@@ -86,17 +86,14 @@ export function DefaultAuthModal({
 
   const handleCompletionFinished = useCallback(
     (opts?: { alreadyComplete?: boolean }) => {
-      trackPostAuthEvent("completion_finished", { source: authEntryPoint });
-      clearPostAuthContext();
-      if (opts?.alreadyComplete !== true) {
-        applyPostAuthCompletionOutcome(authEntryPoint, {
-          isMobile,
-          router,
-          returnTo: nextHref,
-          toast,
-          profileJustCompleted: true,
-        });
-      } else if (authEntryPoint === "profile") {
+      finishPostAuthOnboarding(authEntryPoint, {
+        alreadyComplete: opts?.alreadyComplete,
+        isMobile,
+        router,
+        returnTo: nextHref,
+        toast,
+      });
+      if (opts?.alreadyComplete === true && authEntryPoint === "profile") {
         const target = getSafeRedirectPath(nextHref, "/me");
         navigateToCompatibleHref(router, target, { replace: true });
       }

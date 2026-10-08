@@ -1,5 +1,5 @@
 /**
- * Regression test for word-order-sensitive search matching.
+ * Regression test for word-order-sensitive search matching + citySlug telemetry.
  *
  * `/api/search` used a single `searchText: { contains: q }` substring match,
  * so a multi-word query only matched when the words appeared in that exact
@@ -12,6 +12,9 @@
  * (AND), so word order no longer matters. Single-token queries keep the
  * exact prior behavior (no regression).
  *
+ * Also covers SearchQueryLog city telemetry via citySlug (public contract):
+ * valid slug → cityId populated; unknown slug → cityId null; search still 200.
+ *
  * Self-generated temporary fixture (created and torn down within this
  * file), per project convention — no committed snapshot or /tmp dependency.
  * Exercises the real exported GET() against the local dev DB.
@@ -22,8 +25,10 @@ import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { GET } from "./route";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
 
 const FIXTURE_ENTITY_ID = "test-fixture-search-word-order-activity";
+const TELEMETRY_QUERY_PREFIX = "__seo_cityslug_telemetry__";
 
 async function withFixtureDocument<T>(fn: () => Promise<T>): Promise<T> {
   await prisma.searchDocument.upsert({
@@ -47,8 +52,9 @@ async function withFixtureDocument<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-async function search(q: string) {
-  const req = new NextRequest(`http://localhost:3000/api/search?q=${encodeURIComponent(q)}`);
+async function search(q: string, extraParams?: Record<string, string>) {
+  const params = new URLSearchParams({ q, ...(extraParams ?? {}) });
+  const req = new NextRequest(`http://localhost:3000/api/search?${params}`);
   const res = await GET(req);
   assert.equal(res.status, 200, `expected 200, got ${res.status}`);
   const body = await res.json();
@@ -103,13 +109,61 @@ async function testManyTokenQueryDoesNotCrash() {
   assert.ok(Array.isArray(results), "query with many tokens must be handled gracefully, not throw");
 }
 
+async function waitForLog(query: string) {
+  const normalized = query.trim().toLowerCase();
+  for (let i = 0; i < 20; i += 1) {
+    const row = await prisma.searchQueryLog.findFirst({
+      where: { query: normalized },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, cityId: true },
+    });
+    if (row) return row;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return null;
+}
+
+async function testValidCitySlugPopulatesSearchQueryLog() {
+  const minsk = await findCityBySlug("minsk", {
+    onlyRealCities: true,
+    select: { id: true },
+  });
+  assert.ok(minsk?.id, "fixture city minsk must exist");
+
+  const q = `${TELEMETRY_QUERY_PREFIX} valid ${Date.now()}`;
+  await search(q, { citySlug: "minsk", limit: "8" });
+  const log = await waitForLog(q);
+  assert.ok(log, "SearchQueryLog row must be written");
+  assert.equal(log.cityId, minsk.id, "valid citySlug must populate cityId");
+  await prisma.searchQueryLog.deleteMany({ where: { id: log.id } });
+}
+
+async function testUnknownCitySlugLeavesCityIdNull() {
+  const q = `${TELEMETRY_QUERY_PREFIX} unknown ${Date.now()}`;
+  const results = await search(q, {
+    citySlug: "no-such-city-slug-xyz",
+    limit: "8",
+  });
+  assert.ok(Array.isArray(results), "unknown slug must not break search");
+  const log = await waitForLog(q);
+  assert.ok(log, "SearchQueryLog row must still be written");
+  assert.equal(log.cityId, null, "unknown citySlug must log cityId=null");
+  await prisma.searchQueryLog.deleteMany({ where: { id: log.id } });
+}
+
 async function main() {
+  if (!process.env.DATABASE_URL) {
+    console.log("/api/search route.test.ts: SKIP (DATABASE_URL not set)");
+    process.exit(0);
+  }
   await testOutOfOrderMultiWordQueryMatches();
   await testSingleTokenQueryUnaffected();
   await testMultiWordQueryRequiresAllTokens();
   await testOversizedQueryDoesNotCrash();
   await testManyTokenQueryDoesNotCrash();
-  console.log("/api/search word-order tests: OK");
+  await testValidCitySlugPopulatesSearchQueryLog();
+  await testUnknownCitySlugLeavesCityIdNull();
+  console.log("/api/search word-order + citySlug telemetry tests: OK");
   process.exit(0);
 }
 

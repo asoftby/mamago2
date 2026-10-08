@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { ResponsiveOverlay } from "@/components/ui/responsive-overlay";
 import { MyPlanPanelContent } from "./MyPlanPanelContent";
 import { cn } from "@/lib/utils";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 export interface MyPlanOverlayProps {
   open: boolean;
@@ -17,6 +18,7 @@ export interface MyPlanOverlayProps {
  * Контент: MyPlanPanelContent → PlanMainContent (авторизованные) или GuestMyPlanPanel (гость).
  */
 export function MyPlanOverlay({ open, onOpenChange }: MyPlanOverlayProps) {
+  const isDesktop = useMediaQuery("(min-width: 768px)");
   const touchStartY = useRef<number | null>(null);
   const touchCurrentY = useRef<number | null>(null);
 
@@ -69,7 +71,7 @@ export function MyPlanOverlay({ open, onOpenChange }: MyPlanOverlayProps) {
       >
         <MyPlanPanelContent
           open={open}
-          layout="default"
+          layout={isDesktop ? "desktop" : "default"}
           onRequestClose={() => onOpenChange(false)}
         />
       </div>
