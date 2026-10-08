@@ -27,6 +27,27 @@ const DESKTOP_GROUP_SIZE = 3;
 export function desktopGroupStartForIndex(index: number, groupSize: number = DESKTOP_GROUP_SIZE): number {
   return Math.floor(index / groupSize) * groupSize;
 }
+
+export function mergeGalleryWarmIndexes(
+  current: readonly number[],
+  candidates: readonly number[],
+  total: number,
+): number[] {
+  const next = new Set(
+    current.filter((index) => Number.isInteger(index) && index >= 0 && index < total),
+  );
+  for (const index of candidates) {
+    if (Number.isInteger(index) && index >= 0 && index < total) next.add(index);
+  }
+  const sorted = [...next].sort((a, b) => a - b);
+  if (
+    sorted.length === current.length &&
+    sorted.every((index, position) => index === current[position])
+  ) {
+    return current as number[];
+  }
+  return sorted;
+}
 /** Article body width used elsewhere in this renderer to calibrate `sizes`. */
 const ARTICLE_WIDTH_PX = 720;
 
@@ -37,15 +58,83 @@ const ARTICLE_WIDTH_PX = 720;
  */
 const RESET_ARTICLE_BODY_IMG_STYLE = { margin: 0, borderRadius: 0 } as const;
 
+const lightboxImageReadyCache = new Map<string, Promise<void>>();
+
+function ensureLightboxImageReady(url: string): Promise<void> {
+  const cached = lightboxImageReadyCache.get(url);
+  if (cached) return cached;
+
+  const promise = new Promise<void>((resolve) => {
+    const image = new window.Image();
+    image.decoding = "async";
+    let finished = false;
+
+    const finish = async () => {
+      if (finished) return;
+      finished = true;
+      try {
+        if (typeof image.decode === "function") {
+          await image.decode();
+        }
+      } catch {
+        // A decoded frame is an optimization only; onload is still enough to render.
+      }
+      resolve();
+    };
+
+    image.onload = () => {
+      void finish();
+    };
+    image.onerror = () => {
+      if (!finished) {
+        finished = true;
+        resolve();
+      }
+    };
+    image.src = url;
+
+    if (image.complete) {
+      void finish();
+    }
+  });
+
+  lightboxImageReadyCache.set(url, promise);
+  return promise;
+}
+
+async function waitForLightboxImageReady(
+  url: string,
+  timeoutMs = 1500,
+): Promise<boolean> {
+  let timeoutId = 0;
+  const ready = await Promise.race([
+    ensureLightboxImageReady(url).then(() => true),
+    new Promise<boolean>((resolve) => {
+      timeoutId = window.setTimeout(() => resolve(false), timeoutMs);
+    }),
+  ]);
+
+  if (timeoutId) window.clearTimeout(timeoutId);
+  if (!ready) {
+    // A stalled request must not poison the cache or lock all navigation.
+    lightboxImageReadyCache.delete(url);
+  }
+  return ready;
+}
+
 function GalleryImg({
   image,
   sizes,
   className,
+  loading,
 }: {
   image: ArticleGalleryImage;
   sizes: string;
   className?: string;
+  loading?: "eager" | "lazy";
 }) {
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const loaded = Boolean(image.url && loadedUrl === image.url);
   if (!image.url) {
     return (
       <div className={cn("absolute inset-0 flex items-center justify-center bg-muted/30 text-xs text-muted-foreground", className)} aria-hidden>
@@ -54,15 +143,24 @@ function GalleryImg({
     );
   }
   return (
-    <Image
-      src={image.url}
-      alt={image.alt ?? ""}
-      fill
-      sizes={sizes}
-      className={cn("object-cover", className)}
-      style={RESET_ARTICLE_BODY_IMG_STYLE}
-      unoptimized={isAppMediaUrl(image.url)}
-    />
+    <>
+      <div
+        data-gallery-skeleton={image.id}
+        className={cn("absolute inset-0 bg-muted/60 transition-opacity duration-300", loaded ? "opacity-0" : "animate-pulse opacity-100")}
+        aria-hidden
+      />
+      <Image
+        src={image.url}
+        alt={image.alt ?? ""}
+        fill
+        sizes={sizes}
+        className={cn("object-cover transition-opacity duration-300", loaded ? "opacity-100" : "opacity-0", className)}
+        style={RESET_ARTICLE_BODY_IMG_STYLE}
+        unoptimized={isAppMediaUrl(image.url)}
+        loading={loading}
+        onLoad={() => setLoadedUrl(image.url)}
+      />
+    </>
   );
 }
 
@@ -77,17 +175,89 @@ function ArticleGalleryLightbox({
   onIndexChange: (index: number) => void;
   onClose: () => void;
 }) {
+  type SlideDirection = -1 | 1;
+
   const total = images.length;
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const touchStartXRef = useRef<number | null>(null);
+  const navigationTokenRef = useRef(0);
+  const preparingNavigationRef = useRef(false);
+  const [transition, setTransition] = useState<{
+    from: number;
+    to: number;
+    direction: SlideDirection;
+    moving: boolean;
+    settling: boolean;
+  } | null>(null);
 
-  const goPrev = useCallback(() => {
-    onIndexChange(Math.max(0, index - 1));
-  }, [index, onIndexChange]);
+  const navigate = useCallback(
+    (direction: SlideDirection) => {
+      if (transition || preparingNavigationRef.current) return;
+      const to = Math.max(0, Math.min(index + direction, total - 1));
+      if (to === index) return;
 
-  const goNext = useCallback(() => {
-    onIndexChange(Math.min(total - 1, index + 1));
-  }, [index, onIndexChange, total]);
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        onIndexChange(to);
+        return;
+      }
+
+      const token = ++navigationTokenRef.current;
+      const targetUrl = images[to]?.url;
+      preparingNavigationRef.current = true;
+
+      void (targetUrl ? waitForLightboxImageReady(targetUrl) : Promise.resolve(true)).then(
+        (ready) => {
+          if (navigationTokenRef.current !== token) return;
+          preparingNavigationRef.current = false;
+          if (!ready) return;
+          setTransition({ from: index, to, direction, moving: false, settling: false });
+        },
+      );
+    },
+    [images, index, onIndexChange, total, transition],
+  );
+
+  const goPrev = useCallback(() => navigate(-1), [navigate]);
+  const goNext = useCallback(() => navigate(1), [navigate]);
+
+  useEffect(() => {
+    if (!transition || transition.moving) return;
+    const frame = requestAnimationFrame(() => {
+      setTransition((value) => (value ? { ...value, moving: true } : null));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [transition]);
+
+  useEffect(() => {
+    if (!transition?.moving || transition.settling) return;
+    const timer = window.setTimeout(() => {
+      onIndexChange(transition.to);
+      setTransition((value) => (value ? { ...value, settling: true } : null));
+    }, 260);
+    return () => window.clearTimeout(timer);
+  }, [onIndexChange, transition]);
+
+  useEffect(() => {
+    if (!transition?.settling) return;
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        setTransition(null);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      if (secondFrame) cancelAnimationFrame(secondFrame);
+    };
+  }, [transition?.settling]);
+
+  useEffect(
+    () => () => {
+      navigationTokenRef.current += 1;
+      preparingNavigationRef.current = false;
+    },
+    [],
+  );
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -107,13 +277,13 @@ function ArticleGalleryLightbox({
     };
   }, [onClose, goPrev, goNext]);
 
-  // Prepare only the current + immediate neighbours — never the whole set.
+  // Decode only the current + immediate neighbours. Navigation also waits for
+  // the target decode, so the first swipe never animates into an empty frame.
   useEffect(() => {
-    for (const neighbourIndex of [index - 1, index + 1]) {
+    for (const neighbourIndex of [index - 1, index, index + 1]) {
       const url = images[neighbourIndex]?.url;
       if (!url) continue;
-      const preload = new window.Image();
-      preload.src = url;
+      void ensureLightboxImageReady(url);
     }
   }, [index, images]);
 
@@ -123,6 +293,7 @@ function ArticleGalleryLightbox({
   function handleTouchStart(e: React.TouchEvent) {
     touchStartXRef.current = e.touches[0].clientX;
   }
+
   function handleTouchEnd(e: React.TouchEvent) {
     const startX = touchStartXRef.current;
     touchStartXRef.current = null;
@@ -131,6 +302,32 @@ function ArticleGalleryLightbox({
     if (Math.abs(dx) < 40) return;
     if (dx < 0) goNext();
     else goPrev();
+  }
+
+  function renderSlide(image: ArticleGalleryImage) {
+    return (
+      <div className="flex max-h-[90dvh] max-w-[94vw] flex-col items-center justify-center gap-2 sm:max-w-[92vw]" onClick={(e) => e.stopPropagation()}>
+        {image.url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={image.url}
+            alt={image.alt ?? ""}
+            aria-describedby={image.caption ? "article-gallery-lightbox-caption" : undefined}
+            className="max-h-[80dvh] w-auto max-w-[94vw] object-contain sm:max-w-[92vw]"
+            style={{ ...RESET_ARTICLE_BODY_IMG_STYLE, width: "auto" }}
+          />
+        ) : (
+          <div className="flex h-64 w-64 items-center justify-center rounded-xl bg-white/10 text-sm text-white/70">
+            Изображение недоступно
+          </div>
+        )}
+        {image.caption ? (
+          <p id="article-gallery-lightbox-caption" className="max-w-[92vw] px-2 text-center text-sm text-white/80">
+            {image.caption}
+          </p>
+        ) : null}
+      </div>
+    );
   }
 
   return (
@@ -168,7 +365,7 @@ function ArticleGalleryLightbox({
             goPrev();
           }}
           aria-label="Предыдущее изображение"
-          className="absolute left-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:left-3 sm:h-10 sm:w-10"
+          className="absolute left-2 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:left-3 sm:h-10 sm:w-10"
         >
           <ChevronLeft className="h-6 w-6" />
         </button>
@@ -182,34 +379,48 @@ function ArticleGalleryLightbox({
             goNext();
           }}
           aria-label="Следующее изображение"
-          className="absolute right-2 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:right-3 sm:h-10 sm:w-10"
+          className="absolute right-2 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:right-3 sm:h-10 sm:w-10"
         >
           <ChevronRight className="h-6 w-6" />
         </button>
       ) : null}
 
       <div
-        className="flex max-h-[90dvh] max-w-[94vw] flex-col items-center justify-center gap-2 sm:max-w-[92vw]"
-        onClick={(e) => e.stopPropagation()}
+        className="relative flex h-[90dvh] w-[94vw] items-center justify-center overflow-hidden sm:w-[92vw]"
+        data-article-lightbox-slide-viewport
       >
-        {current.url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={current.url}
-            alt={current.alt ?? ""}
-            aria-describedby={current.caption ? "article-gallery-lightbox-caption" : undefined}
-            className="max-h-[80dvh] w-auto max-w-[94vw] object-contain sm:max-w-[92vw]"
-            style={{ ...RESET_ARTICLE_BODY_IMG_STYLE, width: "auto" }}
-          />
-        ) : (
-          <div className="flex h-64 w-64 items-center justify-center rounded-xl bg-white/10 text-sm text-white/70">
-            Изображение недоступно
-          </div>
-        )}
-        {current.caption ? (
-          <p id="article-gallery-lightbox-caption" className="max-w-[92vw] px-2 text-center text-sm text-white/80">
-            {current.caption}
-          </p>
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          data-article-lightbox-slide="current"
+        >
+          {renderSlide(current)}
+        </div>
+
+        {transition ? (
+          <>
+            <div
+              data-article-lightbox-slide="outgoing"
+              className="absolute inset-0 z-10 flex items-center justify-center transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
+              style={{
+                transform: transition.moving
+                  ? `translateX(${-transition.direction * 100}%)`
+                  : "translateX(0)",
+              }}
+            >
+              {renderSlide(images[transition.from])}
+            </div>
+            <div
+              data-article-lightbox-slide="incoming"
+              className="absolute inset-0 z-10 flex items-center justify-center transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
+              style={{
+                transform: transition.moving
+                  ? "translateX(0)"
+                  : `translateX(${transition.direction * 100}%)`,
+              }}
+            >
+              {renderSlide(images[transition.to])}
+            </div>
+          </>
         ) : null}
       </div>
     </div>
@@ -236,12 +447,22 @@ export function ArticleGallery({
   // - lightboxIndex: null when closed; otherwise the absolute index the lightbox is showing.
   const [desktopGroupStart, setDesktopGroupStart] = useState(0);
   const [mobileIndex, setMobileIndex] = useState(0);
+  const [mobilePreloadReady, setMobilePreloadReady] = useState(false);
+  const [mobileWarmIndexes, setMobileWarmIndexes] = useState<number[]>(() =>
+    total > 0 ? [0] : [],
+  );
+  const [mobileTransition, setMobileTransition] = useState<{
+    from: number;
+    to: number;
+    direction: -1 | 1;
+    moving: boolean;
+  } | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const lastTriggerRef = useRef<HTMLElement | null>(null);
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
-
-  if (total === 0) return null;
+  const didMobileSwipeRef = useRef(false);
+  const mobileViewportRef = useRef<HTMLDivElement | null>(null);
 
   // Lightbox always browses the full collection; opening it from either breakpoint also parks
   // the mobile slider at that photo, matching the mobile slider's own pre-existing behavior of
@@ -257,12 +478,99 @@ export function ArticleGallery({
   };
   const handleLightboxIndexChange = (index: number) => {
     setLightboxIndex(index);
+    setMobileTransition(null);
     setMobileIndex(index);
   };
-  const goMobilePrev = () => setMobileIndex((i) => Math.max(0, i - 1));
-  const goMobileNext = () => setMobileIndex((i) => Math.min(total - 1, i + 1));
+
+  const navigateMobile = useCallback(
+    (direction: -1 | 1) => {
+      if (mobileTransition) return;
+      const to = Math.max(0, Math.min(mobileIndex + direction, total - 1));
+      if (to === mobileIndex) return;
+
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        setMobileIndex(to);
+        return;
+      }
+
+      setMobileTransition({ from: mobileIndex, to, direction, moving: false });
+    },
+    [mobileIndex, mobileTransition, total],
+  );
+  const goMobilePrev = useCallback(() => navigateMobile(-1), [navigateMobile]);
+  const goMobileNext = useCallback(() => navigateMobile(1), [navigateMobile]);
+
+  useEffect(() => {
+    const query = window.matchMedia(DESKTOP_MEDIA_QUERY);
+    let observer: IntersectionObserver | null = null;
+
+    const stopObserver = () => {
+      observer?.disconnect();
+      observer = null;
+    };
+
+    const syncPreloadMode = () => {
+      stopObserver();
+
+      if (query.matches) {
+        setMobilePreloadReady(false);
+        return;
+      }
+
+      const viewport = mobileViewportRef.current;
+      if (!viewport || typeof IntersectionObserver === "undefined") {
+        return;
+      }
+
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (!entries.some((entry) => entry.isIntersecting)) return;
+          setMobilePreloadReady(true);
+          stopObserver();
+        },
+        { rootMargin: "320px 0px", threshold: 0.01 },
+      );
+      observer.observe(viewport);
+    };
+
+    syncPreloadMode();
+    query.addEventListener("change", syncPreloadMode);
+    return () => {
+      query.removeEventListener("change", syncPreloadMode);
+      stopObserver();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!mobilePreloadReady) return;
+    setMobileWarmIndexes((current) =>
+      mergeGalleryWarmIndexes(
+        current,
+        [mobileIndex - 1, mobileIndex, mobileIndex + 1],
+        total,
+      ),
+    );
+  }, [mobileIndex, mobilePreloadReady, total]);
+
+  useEffect(() => {
+    if (!mobileTransition || mobileTransition.moving) return;
+    const frame = requestAnimationFrame(() => {
+      setMobileTransition((value) => (value ? { ...value, moving: true } : null));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [mobileTransition]);
+
+  useEffect(() => {
+    if (!mobileTransition?.moving) return;
+    const timer = window.setTimeout(() => {
+      setMobileIndex(mobileTransition.to);
+      setMobileTransition(null);
+    }, 260);
+    return () => window.clearTimeout(timer);
+  }, [mobileTransition]);
 
   function handleMobileTouchStart(e: React.TouchEvent) {
+    setMobilePreloadReady(true);
     touchStartXRef.current = e.touches[0].clientX;
     touchStartYRef.current = e.touches[0].clientY;
   }
@@ -275,14 +583,62 @@ export function ArticleGallery({
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
     if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
-    if (dx < 0) goMobileNext();
-    else goMobilePrev();
+    const direction: -1 | 1 = dx < 0 ? 1 : -1;
+    const to = Math.max(0, Math.min(mobileIndex + direction, total - 1));
+    if (to === mobileIndex) return;
+    didMobileSwipeRef.current = true;
+    navigateMobile(direction);
   }
+
+  if (total === 0) return null;
 
   const groupImages = images.slice(desktopGroupStart, desktopGroupStart + DESKTOP_GROUP_SIZE);
   const groupSize = groupImages.length;
   const desktopImageWidthPx = Math.floor(ARTICLE_WIDTH_PX / groupSize);
   const mobileImage = images[mobileIndex];
+  const mobileTrackIndexes = mergeGalleryWarmIndexes(
+    mobileWarmIndexes,
+    [
+      mobileIndex,
+      ...(mobilePreloadReady ? [mobileIndex - 1, mobileIndex + 1] : []),
+      ...(mobileTransition ? [mobileTransition.from, mobileTransition.to] : []),
+    ],
+    total,
+  );
+  const mobileTrackBaseIndex = mobileTransition?.from ?? mobileIndex;
+  const mobileTrackShift = mobileTransition?.moving ? mobileTransition.direction : 0;
+
+  const renderMobileSlide = (
+    image: ArticleGalleryImage,
+    index: number,
+    interactive: boolean,
+  ) => (
+    <button
+      type="button"
+      tabIndex={interactive ? 0 : -1}
+      onClick={(e) => {
+        if (didMobileSwipeRef.current) {
+          didMobileSwipeRef.current = false;
+          return;
+        }
+        openLightbox(index, e.currentTarget);
+      }}
+      aria-label={`Открыть фото ${index + 1} из ${total}`}
+      className="absolute inset-0"
+    >
+      {!isDesktop ? (
+        <GalleryImg
+          image={image}
+          sizes="100vw"
+          loading={
+            mobilePreloadReady && Math.abs(index - mobileIndex) <= 1
+              ? "eager"
+              : "lazy"
+          }
+        />
+      ) : null}
+    </button>
+  );
 
   return (
     <div className="not-prose my-8 min-w-0 md:my-10">
@@ -351,25 +707,43 @@ export function ArticleGallery({
       {mobileImage ? (
         <div className="md:hidden">
           <div
+            ref={mobileViewportRef}
             className="relative aspect-[9/12] w-full overflow-hidden rounded-xl bg-muted/20"
+            data-article-mobile-gallery-slide-viewport
             onTouchStart={handleMobileTouchStart}
             onTouchEnd={handleMobileTouchEnd}
           >
-            <button
-              type="button"
-              onClick={(e) => openLightbox(mobileIndex, e.currentTarget)}
-              aria-label={`Открыть фото ${mobileIndex + 1} из ${total}`}
-              className="absolute inset-0"
-            >
-              {!isDesktop ? <GalleryImg image={mobileImage} sizes="100vw" /> : null}
-            </button>
+            {mobileTrackIndexes.map((index) => {
+              const offset =
+                (index - mobileTrackBaseIndex - mobileTrackShift) * 100;
+              const state =
+                mobileTransition?.moving && index === mobileTransition.to
+                  ? "incoming"
+                  : mobileTransition?.moving && index === mobileTransition.from
+                    ? "outgoing"
+                    : index === mobileIndex
+                      ? "current"
+                      : "preloaded";
+
+              return (
+                <div
+                  key={images[index].id}
+                  data-article-mobile-gallery-slide={state}
+                  aria-hidden={index !== mobileIndex}
+                  className="absolute inset-0 transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
+                  style={{ transform: `translateX(${offset}%)` }}
+                >
+                  {renderMobileSlide(images[index], index, index === mobileIndex)}
+                </div>
+              );
+            })}
 
             {total > 1 && mobileIndex > 0 ? (
               <button
                 type="button"
                 onClick={goMobilePrev}
                 aria-label="Предыдущее изображение"
-                className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="absolute left-2 top-1/2 flex h-11 w-11 z-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
@@ -380,15 +754,15 @@ export function ArticleGallery({
                 type="button"
                 onClick={goMobileNext}
                 aria-label="Следующее изображение"
-                className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                className="absolute right-2 top-1/2 flex h-11 w-11 z-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <ChevronRight className="h-5 w-5" />
               </button>
             ) : null}
 
             {total > 1 ? (
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/45 px-2.5 py-1 text-xs text-white">
-                {mobileIndex + 1} / {total}
+              <div className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/45 px-2.5 py-1 text-xs text-white">
+                {(mobileTransition?.to ?? mobileIndex) + 1} / {total}
               </div>
             ) : null}
           </div>

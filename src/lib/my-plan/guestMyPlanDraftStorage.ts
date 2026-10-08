@@ -1,6 +1,10 @@
 import type { MyPlanGuestPanelPhase } from "@/features/my-plan/components/guestMyPlanTypes";
 import type { MyPlanIdea } from "@/features/my-plan/hooks/useMyPlan";
 import type { PlanItemWithActivity } from "@/features/my-plan/types/event";
+import {
+  extractGuestRecommendationTrace,
+  type GuestRecommendationTrace,
+} from "./guestRecommendationTrace";
 
 export const GUEST_MY_PLAN_DRAFT_STORAGE_KEY = "mamago:guestMyPlanDraft:v1";
 
@@ -12,6 +16,8 @@ export type SerializedGuestCommittedItem = Omit<
 > & {
   startsAt: string | null;
   createdAt: string;
+  /** Exposure this card was recommended under (explicit, typed; see GuestRecommendationTrace). */
+  recommendationTrace?: GuestRecommendationTrace | null;
 };
 
 export type GuestMyPlanDraftV1 = {
@@ -71,6 +77,7 @@ function serializeCommitted(
       ...it,
       startsAt: it.startsAt?.toISOString() ?? null,
       createdAt: it.createdAt.toISOString(),
+      recommendationTrace: extractGuestRecommendationTrace(it.activity),
     };
   }
   return out;

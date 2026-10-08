@@ -151,7 +151,9 @@ export function Step7Contacts({ data, onChange, isEditable, eventId }: Step7Cont
       data.phone2 === (placeContacts.phone2 || null) &&
       data.phone2Label === (placeContacts.phone2Label || null) &&
       data.phone3 === (placeContacts.phone3 || null) &&
-      data.phone3Label === (placeContacts.phone3Label || null)
+      data.phone3Label === (placeContacts.phone3Label || null) &&
+      data.website === placeContacts.website &&
+      JSON.stringify(data.socialLinks) === JSON.stringify(placeContacts.socialLinks)
     ) {
       return;
     }
@@ -163,6 +165,8 @@ export function Step7Contacts({ data, onChange, isEditable, eventId }: Step7Cont
       phone2Label: placeContacts.phone2Label || null,
       phone3: placeContacts.phone3 || null,
       phone3Label: placeContacts.phone3Label || null,
+      website: placeContacts.website,
+      socialLinks: placeContacts.socialLinks,
     });
   }, [
     effectiveContactMode,
@@ -173,6 +177,8 @@ export function Step7Contacts({ data, onChange, isEditable, eventId }: Step7Cont
     data.phone2Label,
     data.phone3,
     data.phone3Label,
+    data.website,
+    data.socialLinks,
     onChange,
   ]);
 

@@ -25,7 +25,6 @@ import {
   Sheet,
   SheetContent,
   SheetDescription,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -54,6 +53,12 @@ import { SavedProfileChildCard } from "./SavedProfileChildCard";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { buildAuthUrl } from "@/lib/auth/redirectTo";
+import { persistBirthdayProfileChild } from "../lib/persistProfileChild";
+import {
+  exactProfileChildToParty,
+  profileChildLabel,
+  type ProfileChildPayload,
+} from "../lib/profileChildSelection";
 
 type BuilderHook = BirthdayBuilderWithGate;
 
@@ -113,7 +118,7 @@ function ChildPickerPanelSections({
         ) : (
           <ul className="flex flex-col gap-1.5" aria-label="Список детей">
             {profileChildren.map((c) => {
-              const rowLabel = `${c.name} · ${formatYearsRu(ageYearsFromBirthDate(birthIsoFromApi(c.birthDate)))}`;
+              const rowLabel = profileChildLabel(c).replace(" — ", " · ");
               const selected = isProfileChildRowSelected(partyForChild, c);
               return (
                 <li key={c.id}>
@@ -186,12 +191,7 @@ function ChildPickerPanelSections({
   );
 }
 
-type ApiChild = {
-  id: string;
-  name: string;
-  birthDate: string;
-  systemInterests?: { interestSlug: string }[];
-};
+type ApiChild = ProfileChildPayload;
 
 function birthIsoFromApi(d: string): string {
   if (!d) return "";
@@ -199,16 +199,7 @@ function birthIsoFromApi(d: string): string {
 }
 
 function childToParty(c: ApiChild): PartyForChild {
-  const iso = birthIsoFromApi(c.birthDate);
-  const years = ageYearsFromBirthDate(iso);
-  return {
-    profileChildId: c.id,
-    name: c.name.trim(),
-    ageLabel: formatYearsRu(years),
-    birthDateIso: iso,
-    interestSlugs:
-      c.systemInterests?.map((x) => x.interestSlug).filter(Boolean) ?? [],
-  };
+  return exactProfileChildToParty(c);
 }
 
 function applyAgeFromBirthDate(
@@ -247,7 +238,13 @@ function PartyForChildSectionInner({
   const pathname = usePathname();
   const router = useRouter();
 
-  const { state, setPartyForChild, setBasics } = builder;
+  const {
+    state,
+    setPartyForChild,
+    setBasics,
+    postLoginRefinementChild,
+    clearPostLoginRefinementChild,
+  } = builder;
   const partyForChild = state.quiz.partyForChild;
 
   const { options: rawAgeOptions, loading: ageLoading } = ageSignals;
@@ -262,6 +259,7 @@ function PartyForChildSectionInner({
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
+  const [editingProfileChild, setEditingProfileChild] = useState<ApiChild | null>(null);
   const [addModalLead, setAddModalLead] = useState<"default" | "postLogin">(
     "default",
   );
@@ -328,10 +326,21 @@ function PartyForChildSectionInner({
     setName("");
     setBirthDate("");
     setInterestPick(new Set());
+    setEditingProfileChild(null);
   }, []);
 
   const handleSelectChild = useCallback(
     (c: ApiChild) => {
+      if (c.birthPrecision !== "DAY") {
+        setModalMode("edit");
+        setEditingProfileChild(c);
+        setName(c.name?.trim() ?? "");
+        setBirthDate("");
+        setInterestPick(new Set(c.systemInterests?.map((x) => x.interestSlug).filter(Boolean) ?? []));
+        setModalOpen(true);
+        toast.message("Уточните полную дату рождения для праздника");
+        return;
+      }
       const party = childToParty(c);
       setPartyForChild(party);
     },
@@ -341,11 +350,10 @@ function PartyForChildSectionInner({
   /** Редактирование из карточки: не смешиваем с выбором — отдельная кнопка с stopPropagation */
   const handleEditChildCard = useCallback(
     (c: ApiChild) => {
-      const party = childToParty(c);
-      setPartyForChild(party);
       setModalMode("edit");
-      setName(c.name.trim());
-      setBirthDate(birthIsoFromApi(c.birthDate));
+      setEditingProfileChild(c);
+      setName(c.name?.trim() ?? "");
+      setBirthDate(c.birthPrecision === "DAY" ? birthIsoFromApi(c.birthDate) : "");
       setInterestPick(
         new Set(
           c.systemInterests?.map((x) => x.interestSlug).filter(Boolean) ?? [],
@@ -353,7 +361,7 @@ function PartyForChildSectionInner({
       );
       setModalOpen(true);
     },
-    [setPartyForChild],
+    [],
   );
 
   /** Один ребёнок в профиле — сразу в сценарии и в selected-state карточки */
@@ -407,11 +415,27 @@ function PartyForChildSectionInner({
     const p = state.quiz.partyForChild;
     if (!p) return;
     setModalMode("edit");
+    setEditingProfileChild(
+      p.profileChildId ? children.find((child) => child.id === p.profileChildId) ?? null : null,
+    );
     setName(p.name);
     setBirthDate(p.birthDateIso);
     setInterestPick(new Set(p.interestSlugs));
     setModalOpen(true);
-  }, [state.quiz.partyForChild]);
+  }, [state.quiz.partyForChild, children]);
+
+  useEffect(() => {
+    const child = postLoginRefinementChild;
+    if (!child) return;
+    setModalMode("edit");
+    setEditingProfileChild(child);
+    setName(child.name?.trim() ?? "");
+    setBirthDate("");
+    setInterestPick(new Set(child.systemInterests?.map((item) => item.interestSlug).filter(Boolean) ?? []));
+    setModalOpen(true);
+    clearPostLoginRefinementChild();
+    toast.message("Уточните полную дату рождения для праздника");
+  }, [postLoginRefinementChild, clearPostLoginRefinementChild]);
 
   const handleAddFromPicker = useCallback(() => {
     setPickerOpen(false);
@@ -502,12 +526,8 @@ function PartyForChildSectionInner({
     applyAgeFromBirthDate(p.birthDateIso, ageOptions, setBasics);
   }, [state.quiz.partyForChild, ageOptions, setBasics]);
 
-  const handleModalDone = useCallback(() => {
+  const handleModalDone = useCallback(async () => {
     const trimmed = name.trim();
-    if (trimmed.length < 2) {
-      toast.error("Введите имя (от 2 символов)");
-      return;
-    }
     if (!birthDate || birthDate.length < 10) {
       toast.error("Укажите дату рождения");
       return;
@@ -527,26 +547,46 @@ function PartyForChildSectionInner({
 
     if (modalMode === "edit") {
       const current = state.quiz.partyForChild;
-      if (!current) return;
-      const party: PartyForChild = {
-        ...current,
-        name: trimmed,
-        ageLabel: formatYearsRu(years),
-        birthDateIso: birthDate,
-        interestSlugs: slugs,
-      };
+      if (editingProfileChild) {
+        setSavingProfile(true);
+        try {
+          await persistBirthdayProfileChild(fetch, {
+            id: editingProfileChild.id,
+            name: trimmed,
+            birthDate,
+            systemInterests: slugs,
+          });
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "Ошибка сети");
+          return;
+        } finally {
+          setSavingProfile(false);
+        }
+      }
+      if (!editingProfileChild && !current) return;
+      const updatedChild: ApiChild | null = editingProfileChild
+        ? {
+            ...editingProfileChild,
+            name: trimmed || null,
+            birthDate: `${birthDate}T00:00:00.000Z`,
+            birthPrecision: "DAY",
+            systemInterests: slugs.map((interestSlug) => ({ interestSlug })),
+          }
+        : null;
+      const party: PartyForChild = updatedChild
+        ? childToParty(updatedChild)
+        : {
+            ...current!,
+            name: trimmed,
+            ageLabel: formatYearsRu(years),
+            birthDateIso: birthDate,
+            interestSlugs: slugs,
+          };
       setPartyForChild(party);
-      if (current.profileChildId) {
+      if (updatedChild) {
         setChildren((prev) =>
           prev.map((ch) =>
-            ch.id === current.profileChildId
-              ? {
-                  ...ch,
-                  name: trimmed,
-                  birthDate: `${birthDate}T00:00:00.000Z`,
-                  systemInterests: slugs.map((interestSlug) => ({ interestSlug })),
-                }
-              : ch,
+            ch.id === updatedChild.id ? updatedChild : ch,
           ),
         );
       }
@@ -581,6 +621,7 @@ function PartyForChildSectionInner({
     birthDate,
     interestPick,
     modalMode,
+    editingProfileChild,
     state.quiz.partyForChild,
     setPartyForChild,
     resetModal,
@@ -602,6 +643,7 @@ function PartyForChildSectionInner({
         body: JSON.stringify({
           name: p.name,
           birthDate: p.birthDateIso,
+          birthPrecision: "DAY",
           systemInterests: p.interestSlugs,
           customInterests: [],
         }),
@@ -620,6 +662,7 @@ function PartyForChildSectionInner({
               name: p.name,
               birthDate:
                 data.child.birthDate ?? `${p.birthDateIso}T00:00:00.000Z`,
+              birthPrecision: "DAY",
               systemInterests: p.interestSlugs.map((interestSlug: string) => ({
                 interestSlug,
               })),
@@ -907,7 +950,11 @@ function PartyForChildSectionInner({
           <DialogFooter className="gap-2 sm:gap-0 flex-col sm:flex-row sm:justify-end">
             <button
               type="button"
-              onClick={() => setModalOpen(false)}
+              onClick={() => {
+                setModalOpen(false);
+                resetModal();
+                setModalMode("add");
+              }}
               className="text-sm text-muted-foreground hover:text-foreground px-3 py-2 order-2 sm:order-1"
             >
               Отмена

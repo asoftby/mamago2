@@ -331,7 +331,11 @@ export function SiteHeaderShell() {
           )}
         </div>
       </header>
-      <SearchOverlay open={searchOverlayOpen} onOpenChange={setSearchOverlayOpen} />
+      <SearchOverlay
+        open={searchOverlayOpen}
+        onOpenChange={setSearchOverlayOpen}
+        citySlug={citySlug}
+      />
     </>
   );
 }

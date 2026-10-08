@@ -1,8 +1,10 @@
-import { SeoTemplatesClient } from "@/components/admin/seo/SeoTemplatesClient";
-import { getSeoTemplates } from "@/lib/admin/seo/data/seoAdminData";
+import { redirect } from "next/navigation";
+import { buildAdminPath } from "@/lib/routing/surface";
 
-export default async function AdminSeoTemplatesPage() {
-  const templates = await getSeoTemplates();
-  console.log("[API] real data used", { endpoint: "admin-seo-templates", count: templates.length });
-  return <SeoTemplatesClient initialTemplates={templates} />;
+/**
+ * Templates UI was session/mock with empty getSeoTemplates().
+ * Route kept so bookmarks don't 404; product nav no longer links here.
+ */
+export default function LegacySeoTemplatesRedirect() {
+  redirect(buildAdminPath("/seo"));
 }

@@ -6,7 +6,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PlanItemCard } from "./PlanItemCard";
+import { PlanItemCard, type VisibilityChange } from "./PlanItemCard";
+import type { FamilyView } from "@/features/my-plan/lib/planVisibilityView";
 import type { SerializedPlanItem } from "./PlanPageClient";
 
 const MONTHS_RU_GENITIVE = [
@@ -44,8 +45,8 @@ function pluralizeEvents(count: number): string {
 }
 
 function formatGroupDate(dateISO: string): string {
-  const date = new Date(`${dateISO}T12:00:00`);
-  return `${DAYS_RU_FULL[date.getDay()]}, ${date.getDate()} ${MONTHS_RU_GENITIVE[date.getMonth()]}`;
+  const date = new Date(`${dateISO}T00:00:00.000Z`);
+  return `${DAYS_RU_FULL[date.getUTCDay()]}, ${date.getUTCDate()} ${MONTHS_RU_GENITIVE[date.getUTCMonth()]}`;
 }
 
 export function PlanOverviewDialog({
@@ -55,6 +56,8 @@ export function PlanOverviewDialog({
   totalItems,
   totalDays,
   onRemove,
+  familyView,
+  onVisibilityChange,
   onOpenDay,
 }: {
   open: boolean;
@@ -63,6 +66,8 @@ export function PlanOverviewDialog({
   totalItems: number;
   totalDays: number;
   onRemove: (id: string) => void;
+  familyView?: FamilyView | null;
+  onVisibilityChange?: VisibilityChange;
   onOpenDay: (date: string) => void;
 }) {
   const dates = Object.keys(itemsByDate)
@@ -77,7 +82,7 @@ export function PlanOverviewDialog({
             className="font-mono text-[10px] uppercase tracking-[0.14em]"
             style={{ color: "var(--primary)" }}
           >
-            ● весь план
+            ● загруженные недели
           </div>
           <DialogTitle
             className="font-sans text-[38px] font-normal leading-none tracking-[-0.025em] sm:text-[48px]"
@@ -86,7 +91,7 @@ export function PlanOverviewDialog({
             {totalItems} {pluralizeEvents(totalItems)}
           </DialogTitle>
           <p className="m-0 text-[14px]" style={{ color: "rgba(20,18,16,.55)" }}>
-            Разложены по {totalDays} {totalDays === 1 ? "дню" : totalDays >= 2 && totalDays <= 4 ? "дням" : "дням"}.
+            Разложены по {totalDays} {totalDays === 1 ? "дню" : "дням"} в уже открытых неделях.
             Выберите дату или откройте событие.
           </p>
         </DialogHeader>
@@ -125,7 +130,7 @@ export function PlanOverviewDialog({
 
                     <div className="flex flex-col gap-2.5">
                       {dateItems.map((item) => (
-                        <PlanItemCard key={item.id} item={item} onRemove={onRemove} />
+                        <PlanItemCard key={item.id} item={item} onRemove={onRemove} familyView={familyView} onVisibilityChange={onVisibilityChange} />
                       ))}
                     </div>
                   </section>

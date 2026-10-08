@@ -138,6 +138,11 @@ export function suitableReplacementCandidates(input: {
   candidates: ScenarioReplacementCandidate[];
 }): ScenarioReplacementCandidate[] {
   const current = effectiveScenarioItems(input.state);
+  const replacedItem = current.find((item) => item.planItemId === input.replacingPlanItemId);
+  // Manual calendar entries have no catalog Activity identity. Scenario may
+  // schedule or remove them, but must never silently turn one into catalog
+  // content through the replacement action.
+  if (!replacedItem?.activityId) return [];
   const usedActivityIds = new Set(
     current
       .filter((item) => item.planItemId !== input.replacingPlanItemId)

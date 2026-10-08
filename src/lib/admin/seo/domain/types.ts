@@ -299,28 +299,19 @@ export interface RobotsIndexationSettings {
 // Dashboard
 // -----------------------------------------------------------------------------
 
-export type SeoKpiId =
-  | "seoPages"
-  | "redirects"
-  | "schemaTemplates"
-  | "unmatchedUrls"
-  | "sitemapUrls"
-  | "errorsWarnings";
+export type SeoOverviewStatId =
+  | "pagesTotal"
+  | "pagesWithIssues"
+  | "pagesNoindex"
+  | "pagesMissingSeo"
+  | "pagesDraft";
 
-export interface SeoDashboardKpi {
-  id: SeoKpiId;
+export interface SeoOverviewStat {
+  id: SeoOverviewStatId;
   label: string;
-  value: string;
+  value: number;
   hint: string;
-}
-
-export type SeoSystemStatusLevel = "ok" | "warning" | "empty";
-
-export interface SeoDashboardSystemStatus {
-  id: string;
-  title: string;
-  level: SeoSystemStatusLevel;
-  description: string;
+  href?: string;
 }
 
 export type SeoAttentionSeverity = "high" | "medium" | "low";
@@ -330,13 +321,43 @@ export interface SeoDashboardAttentionItem {
   title: string;
   detail: string;
   severity: SeoAttentionSeverity;
+  href?: string;
 }
 
-/** Агрегат для главной SEO Control Center (замена разрозненных массивов) */
+/** Агрегат для продуктового SEO Overview — только реальные локальные сигналы */
 export interface SeoDashboardSummary {
-  kpis: SeoDashboardKpi[];
-  systemStatuses: SeoDashboardSystemStatus[];
+  stats: SeoOverviewStat[];
   attentionItems: SeoDashboardAttentionItem[];
+  /** Reserved for future GSC / Webmaster / Wordstat blocks */
+  externalSourcesConnected: false;
+}
+
+/** @deprecated Legacy KPI shape — use SeoOverviewStat */
+export type SeoKpiId =
+  | "seoPages"
+  | "redirects"
+  | "schemaTemplates"
+  | "unmatchedUrls"
+  | "sitemapUrls"
+  | "errorsWarnings";
+
+/** @deprecated */
+export interface SeoDashboardKpi {
+  id: SeoKpiId;
+  label: string;
+  value: string;
+  hint: string;
+}
+
+/** @deprecated */
+export type SeoSystemStatusLevel = "ok" | "warning" | "empty";
+
+/** @deprecated */
+export interface SeoDashboardSystemStatus {
+  id: string;
+  title: string;
+  level: SeoSystemStatusLevel;
+  description: string;
 }
 
 /** @deprecated Используйте `SeoSystemStatusLevel` */

@@ -142,9 +142,9 @@ export function SaveHeart({
         });
 
         if (result.action === "plan") {
-          toast.success(
-            `Событие добавлено на ${formatPlanTargetDateRu(result.dateISO)}`,
-          );
+          toast.success("Добавлено в план", {
+            description: `На ${formatPlanTargetDateRu(result.dateISO)}`,
+          });
         } else if (result.action === "ideas") {
           toast.success("Сохранено в идеи", {
             description: "Вы сможете вернуться к этому позже",
@@ -220,6 +220,7 @@ export function SaveHeart({
         }}
         source={source}
         onPersist={handlePersist}
+        showVisibilityToggle
         isIdea={saveStatus.isIdea}
         inPlan={saveStatus.inPlan}
         planDate={saveStatus.planDate}

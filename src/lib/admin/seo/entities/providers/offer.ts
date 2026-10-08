@@ -15,18 +15,23 @@ import {
 import { resolveOfferStructuredDataType } from "@/lib/seo/schema/buildOfferJsonLd";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 
-const OFFER_LIST_LIMIT = 300;
 
-export const offerProvider: SeoEntityProvider = {
-  entityType: "offer",
-  badgeLabel: "Offer",
-  section: "birthday",
+import {
+  buildOfferListWhere,
+  type SeoEntityListFilters,
+  type SeoEntityPageWindow,
+} from "../listFilters";
 
-  async listRows() {
+async function listOfferRows(
+  filters: SeoEntityListFilters | null,
+  page: SeoEntityPageWindow | null,
+) {
     const offers = await prisma.offer.findMany({
-      where: { status: { not: OfferStatus.REJECTED } },
-      orderBy: { updatedAt: "desc" },
-      take: OFFER_LIST_LIMIT,
+      where: filters
+      ? buildOfferListWhere(filters)
+      : { status: { not: OfferStatus.REJECTED } },
+    orderBy: { updatedAt: "desc" },
+    ...(page ? { skip: page.skip, take: page.take } : {}),
       select: {
         id: true,
         slug: true,
@@ -41,7 +46,11 @@ export const offerProvider: SeoEntityProvider = {
         seoCanonicalUrl: true,
         seoCanonicalSource: true,
         seoRobots: true,
-        place: { select: { city: { select: { slug: true } } } },
+        place: {
+          select: {
+            city: { select: { id: true, slug: true, name: true } },
+          },
+        },
       },
     });
 
@@ -52,21 +61,32 @@ export const offerProvider: SeoEntityProvider = {
       // docs/migration/seo/final-url-architecture-2026-08-15.md §3.
       const path = o.place?.city?.slug ? getOfferPublicPath({ slug: seg }, o.place.city.slug) : `/offers/${seg}`;
       const canonical = o.seoCanonicalUrl?.trim() || path;
-      const entityDiagnostics = buildSegmentEntityDiagnostics("offer", {
-        entityId: o.id,
-        title: o.title,
-        slug: o.slug,
-        seoCanonicalUrl: o.seoCanonicalUrl,
-        seoCanonicalSource: o.seoCanonicalSource,
-        seoRobots: o.seoRobots,
-        contentStatus: o.status,
-      });
+      const city = o.place?.city ?? null;
+      const entityDiagnostics = {
+        ...buildSegmentEntityDiagnostics("offer", {
+          entityId: o.id,
+          title: o.title,
+          slug: o.slug,
+          seoCanonicalUrl: o.seoCanonicalUrl,
+          seoCanonicalSource: o.seoCanonicalSource,
+          seoRobots: o.seoRobots,
+          contentStatus: o.status,
+        }),
+        citySlug: city?.slug ?? null,
+      };
       return {
         id: `entity:offer:${o.id}`,
         path,
-        section: "birthday",
-        type: "offer",
-        filtersSnapshot: { entity: "offer", entityId: o.id },
+        section: "birthday" as const,
+        type: "offer" as const,
+        filtersSnapshot: {
+          entity: "offer" as const,
+          entityId: o.id,
+          cityId: city?.id ?? null,
+          citySlug: city?.slug ?? null,
+          cityName: city?.name ?? null,
+          geoScope: city ? ("CITY" as const) : null,
+        },
         title: o.seoTitle?.trim() || o.title,
         h1: o.seoH1?.trim() || o.title,
         description: o.seoDescription?.trim() || o.description || "",
@@ -80,6 +100,23 @@ export const offerProvider: SeoEntityProvider = {
         entityDiagnostics,
       };
     });
+}
+
+export const offerProvider: SeoEntityProvider = {
+  entityType: "offer",
+  badgeLabel: "Offer",
+  section: "birthday",
+
+  async countRows(filters) {
+    return prisma.offer.count({ where: buildOfferListWhere(filters) });
+  },
+
+  async listRowsPage(filters, page) {
+    return listOfferRows(filters, page);
+  },
+
+  async listRows() {
+    return listOfferRows(null, null);
   },
 
   async loadEditorModel(entityId) {

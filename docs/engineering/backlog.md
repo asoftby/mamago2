@@ -4977,3 +4977,273 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Acceptance criteria: collector writes nothing (not 0) when the token is
   absent or the API fails; source split shown only for completed weeks.
 - Source: /admin dashboard rework, 2026-09-26.
+
+## [BACKLOG-160] Remove planningActivity.ts raw-SQL RouteIdea.createdAt workaround
+
+- Status: OPEN
+- Priority: P3
+- Area: Analytics / Family Core instrumentation (PR A)
+- Added: 2026-09-29
+- Reason deferred: `addRouteIdea` (`src/server/services/idea.service.ts`) now
+  fires a real `SAVE`/ROUTE `UserEvent` on first save (PR A, FAM-005), but
+  existing `RouteIdea` rows created before this change have no matching
+  event, so the raw-SQL read cannot simply be swapped for a `UserEvent`
+  query without losing historical data. Needs either a backfill or a
+  documented cutover date.
+- Context: `src/server/services/analytics/planningActivity.ts` reads
+  `RouteIdea.createdAt` directly via raw SQL, with a comment noting the
+  write path fired no `UserEvent`. That comment is now only true for rows
+  created before this PR.
+- Dependencies: none blocking; safe to leave as-is indefinitely.
+- Acceptance criteria: `planningActivity.ts` reads from `UserEvent`
+  (SAVE/ROUTE) instead of `RouteIdea.createdAt`, either after a backfill
+  migration or once historical accuracy before the cutover date is judged
+  unnecessary.
+- Source: PR A implementation (decisionContext.v1 + event vocabulary).
+
+## [BACKLOG-161] `db:generate`/`db:validate`/`db:migrate:*` scripts' explicit `--schema prisma/schema.prisma` silently drops the domain-split schema files
+
+- Status: OPEN
+- Priority: P2
+- Area: Tooling / Prisma
+- Added: 2026-09-29
+- Reason deferred: discovered incidentally while implementing PR A; fixing it
+  is a one-line, low-risk change but touches a shared tooling script and
+  deserves its own isolated task/PR rather than riding along.
+- Context: `package.json`'s `db:generate`/`db:validate`/`db:migrate:status`/
+  `db:migrate:deploy` scripts all pass `--schema prisma/schema.prisma`
+  explicitly. On this Prisma version, an explicit single-file `--schema` does
+  NOT auto-discover sibling `*.prisma` files the way passing the directory
+  (or `prisma.config.ts`'s `schema: 'prisma'`) does — running `pnpm
+  db:generate` regenerates `@prisma/client` WITHOUT any model from
+  `prisma/recommendations.prisma` (`RecommendationRun`, `RecommendationExposure`,
+  `RecommendationOutcome`, `RecommendationSurfacePolicy`, `RecommendationSurface`
+  enum, etc.), breaking every caller of those models with `tsc` errors until
+  a bare `prisma generate` (or `prisma generate --schema prisma`) is run
+  again. `postinstall: "prisma generate"` (no `--schema` flag) is unaffected
+  and correctly picks up the whole directory via `prisma.config.ts` — so
+  normal installs/deploys are safe; only the manual `db:*` scripts are a trap.
+- Dependencies: none.
+- Acceptance criteria: the four scripts drop the `--schema prisma/schema.prisma`
+  flag (letting `prisma.config.ts` resolve the schema directory) or switch it
+  to `--schema prisma`; a regression check (e.g. grep the generated client's
+  `.prisma/client/schema.prisma` for `RecommendationSurface`) confirms the
+  fix.
+- Source: PR A implementation — hit while running `pnpm db:generate` after
+  editing `prisma/schema.prisma`.
+
+## [BACKLOG-162] `deleteAccount` leaves `Experience` rows (User row is kept as a tombstone, so the FK cascade never fires)
+
+- Status: DONE (2026-10-05, Family Core B3 PR — `deleteAccount` deletes `Experience` explicitly; covered by `deleteAccount.family.integration.test.ts`)
+- Priority: P2
+- Area: Account deletion / Privacy
+- Added: 2026-10-03
+- Reason deferred: found while fixing `InboxItem` cleanup in forward-to-plan PR2; separate task by decision.
+- Context: `src/server/account/deleteAccount.service.ts` anonymizes `User` instead of deleting it and erases data via an explicit `deleteMany` list; `Experience` (`schema.prisma`, `onDelete: Cascade` from `User`) is not in that list.
+- Acceptance criteria: `Experience` rows of the deleted user are removed (or consciously anonymized) in `deleteAccount`, with an integration test like `deleteAccount.inbox.integration.test.ts`.
+- Source: forward-to-plan PR2 account-deletion audit.
+
+## [BACKLOG-163] Family Core: per-user plan consumers still keyed by `userId` (notifications, DayScenario, Experience)
+
+- Status: OPEN
+- Priority: P1
+- Area: Family Core / Plan
+- Added: 2026-10-04
+- Reason deferred: Family Core B2 switches only Child/PlanItem reads and writes (`plan.service`, `/api/children*`, profile pages, persona context) to `familyId`. Until family invites exist every family has one adult, so per-user consumers behave identically. They become wrong only once a family has two adults, i.e. they must land before the "MVP shared plan" PR enables invites.
+- Context: reminder and digest jobs (`run-plan-event-reminders-core.ts`, `run-plan-tomorrow-digests-core.ts`, `listPlanItemsDueForReminder`, `listPlanItemsForUserDates`) map one PlanItem to one recipient via `userId` and need a fan-out to all active adult members (respecting PRIVATE items); `DayScenario` (`userId_date` unique), `setScenarioItemOverride`, `/api/plan/scenario` writes and `Experience` (`userId`, ownership checks in `confirmPlanExperience`) are per user while two adults would share one PlanItem; `computePlanFingerprint` depends on the item set.
+- Current state: `plan.service` list/dedup/remove and the read-only plan queries listed in the B2 PR use `planScopeFor`. M1a (2026-10-06) converted reminders/digests (fan-out to active adults, PRIVATE stays with owner), Experience (one per plan item, any adult who sees the item may record/feedback; `Experience.userId` = recorder) and DayScenario/`/api/plan/scenario` (scenario row stays per user, items come from family scope). Remaining: analytics (BACKLOG-164 / M1b).
+- Dependencies: Family Core B2 merged and `FAMILY_CORE_READS` enabled.
+- Acceptance criteria: with a two-adult family, a FAMILY item reminds/digests every adult exactly once, a PRIVATE item only its owner; scenarios and experiences have a documented per-user or per-family model with tests.
+- Source: Family Core B2 audit.
+
+## [BACKLOG-164] Family Core: analytics keyed by `parentId`/`userId` and `countPlanUsersByActivity` count users, not families
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Analytics
+- Added: 2026-10-04
+- Reason deferred: product decision needed on the unit of measure (user vs family); identical numbers while every family has one adult.
+- Context: `analyticsQueryHelpers.ts` and `analyticsBehavior.service.ts` (youngest child band keyed by `Child.parentId`), `SegmentResolverService.ts` (`user._count.children`), `planningActivity.ts` and `weeklyPlanningFamilies.ts` (raw SQL on `PlanItem.userId`), `countPlanUsersByActivity` (`distinct` on `userId`).
+- Current state: M1b (2026-10-06) converted `countPlanUsersByActivity` (family unit when `FAMILY_CORE_READS` on), youngest-child band (`youngestChildBirthByUser`, both analytics services) and `fetchUserSegmentContext` children count. Still open: `planningActivity.ts` / `weeklyPlanningFamilies.ts` raw SQL on `PlanItem.userId` (stay per-user "active users"; a family unit needs a product decision before invites are enabled).
+- Dependencies: BACKLOG-163 / shared plan release.
+- Acceptance criteria: decision recorded; queries counting "families" use `familyId`; numbers reconcile with the old ones on single-adult data.
+- Source: Family Core B2 audit.
+
+## [BACKLOG-165] `familyCoreFoundation.contract.test.ts` is stale after B2 (asserts `planOwner.ts` has no `familyId`)
+
+- Status: DONE (2026-10-05, PR fix/family-core-contract-gate-20261005: stale guard removed; `test:family-core-foundation` and `test:family-core-reads` added to `check:push`)
+- Priority: P3
+- Area: Family Core / Tests
+- Added: 2026-10-05
+- Reason deferred: found during B3; failure is pre-existing on `dev` (`8a4124c6`) and unrelated to delete-account, so not fixed in the B3 PR.
+- Context: `pnpm test:family-core-foundation` fails on the B1-era guard `assert.doesNotMatch(read("src/server/services/planOwner.ts"), /familyId/)` because B2 legitimately made `planOwner.ts` family-aware. B2 only ran the reads contract.
+- Acceptance criteria: drop or update that B1 guard; `test:family-core-foundation` is green on `dev`.
+- Source: Family Core B3 verification.
+
+## [BACKLOG-166] Family Core A2 part 2: `NOT NULL` + CHECKs on `Child.familyId`/`PlanItem.familyId`, drop `Child.parentId` ownership
+
+- Status: BLOCKED (needs PROD B1 migration + backfill `--events` results, and a decision on tombstone rows)
+- Priority: P2
+- Area: Family Core / Schema
+- Added: 2026-10-05
+- Reason deferred: A2 part 1 (events always write `familyId`; read-only preflight `scripts/sql/family-core-not-null-preflight.sql`) ships first. `NOT NULL` is only safe once every `must_be_zero` row of the preflight is 0 on PROD.
+- Context: tombstone users' `Child`/`PlanItem` without `familyId` (preflight `info` rows) decide whether `NOT NULL` is possible at all: either clean them or keep the column nullable with a CHECK for live users only. `Child.parentId` is still required and cascades on User delete; A2 part 2 removes it as owner.
+- Acceptance criteria: preflight output from PROD recorded; decision on tombstone rows recorded; hand-written migration (no `migrate dev`/`db push`) with rollback SQL proven on disposable PostgreSQL.
+- Source: Family Core A2 scope.
+
+## [BACKLOG-167] Family Core: archived joiner family — 30-day retention purge and restore
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Invites
+- Added: 2026-10-06
+- Reason deferred: M3b archives the joiner's previous family (`Family.archivedAt`, membership `leftAt`) and leaves data they chose not to transfer (SKIP) in it. The contract promises 30-day retention and a restore flow in the later "Управление семьёй" PR; neither a purge job nor restore exists yet.
+- Context: `applyJoinerMerge` / `acceptFamilyInvite` (`src/server/family/`). Archived families are invisible to all reads (no active membership).
+- Acceptance criteria: a scheduled purge deletes archived joiner families older than 30 days with their Child/PlanItem rows; restore within 30 days is possible; documented in the privacy text.
+- Source: Family Core M3b.
+
+## [BACKLOG-168] Family Core M4: other sources of significant plan-item actions are not yet events
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Plan
+- Added: 2026-10-06
+- Reason deferred: M4a blocks FAMILY → PRIVATE after another adult's significant action, judged from events with `meta.planItemId` (`PLAN_ITEM_RESCHEDULED`, `PLAN_AUDIENCE_SNAPSHOT`, `BOOKING_CREATED`, `ATTENDED`) plus `Experience` rows. `PLAN_ITEM_RESCHEDULED` is emitted only by `addPlanItem` (re-adding an activity on another date/time).
+- Context: `/api/plan/scenario` replacements (activity/startsAt change) and any future edit/cancel/confirm endpoints (PROPOSED flow, cancel, M6 bookings with `planItemId`) must emit the same events, otherwise another adult's action does not block "make private".
+- Acceptance criteria: every write path that changes date/time/participants/status/booking of a shared item by a user emits a typed event with `meta.planItemId`; test per path.
+- Source: Family Core M4a.
+
+## [BACKLOG-169] Family Core M4c: "Видно семье" switch only on event/place save flows
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Plan UI
+- Added: 2026-10-06
+- Reason deferred: the switch (new items only) is shown where `SaveToPlanResult.visibility` actually reaches `/api/save/plan`: event page, `SaveHeart`, `PlaceSaveHeart` (`showVisibilityToggle`). Other add-to-plan entry points (offers, route cards/pages, onboarding flows, recommendations, ideas, `useMyPlan`, guest-after-auth resume, `/api/save/plan/day`) still create FAMILY items; a private item there is made with "Сделать личным" on the card.
+- Context: a contract test (`planAddVisibility.contract.test.ts`) forbids enabling the switch without forwarding the value, so a choice is never silently ignored. Also not built: "Предложить, а не добавлять" (PROPOSED flow), the "invite your partner" block for single-adult families, the activity strip.
+- Acceptance criteria: remaining entry points forward `visibility` and enable the switch; guest resume carries it through `saveFlowContext`.
+- Source: Family Core M4c.
+
+## [BACKLOG-170] Family Core M5: full "Управление семьёй" and archived-family restore
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Profile
+- Added: 2026-10-06
+- Reason deferred: M5 ships list of adults/children, invite (link + optional letter), ADULT leave (new solo family, own PRIVATE items and an optional copy of children go with him), OWNER → ADULT ownership transfer. Not built: OWNER excluding another adult, restoring an archived family, merging two families after leaving, per-adult `historyAccess` change, rename of the family.
+- Context: the leaver loses access to FAMILY items of the old family (they stay there, author kept). Invite email is used only to send the letter and is not stored; the link is accepted by any signed-in account holding it (one-time, no expiry (until accepted or revoked), ≤3 active); letters limited to 5 per user per day.
+- Acceptance criteria: product decision on exclusion/restore semantics, then services + UI + integration tests.
+- Source: Family Core M5a.
+
+## [BACKLOG-171] Family invites: stale unused links count toward the 3-active cap
+
+- Status: OPEN
+- Priority: P3
+- Area: Family Core / Invites
+- Added: 2026-10-06
+- Reason deferred: invites no longer expire, so an unused link occupies one of 3 slots until accepted or revoked (revoke is in the profile UI, M5b).
+- Acceptance criteria: decide whether to show "created N days ago" with a prompt to revoke old links or to auto-archive links older than a threshold.
+- Source: Family invite no-expiry change.
+
+## [BACKLOG-172] Media pipeline: native server-side HEIC/HEIF decoding and removal of mandatory browser conversion
+
+- Status: OPEN
+- Priority: P2
+- Area: Media / Upload pipeline
+- Added: 2026-10-06
+- Reason deferred: current production-safe architecture normalizes browser HEIC/HEIF to JPEG in `uploadMediaFile()` before upload because the deployed `sharp/libvips` image has no HEVC decoder. The boundary is centralized and guarded against raw HEIC pass-through, but server-to-server paths and direct API clients cannot rely on a browser/WASM converter.
+- Context: the final architecture should accept real HEIC/HEIF as a first-class input on the backend, detect the actual format from bytes, decode it in the canonical media pipeline, and then generate the same WebP/responsive derivatives as JPEG/PNG/WebP/GIF/AVIF. This must cover browser uploads, direct API clients, remote-image imports, Telegram ingestion and a future native app without format-specific UI workarounds.
+- Acceptance criteria:
+  - the production media runtime has a supported HEIC/HEIF decoder (HEVC-capable `libvips/sharp` build or a dedicated media-decoding service) and its capability is verified during build/startup;
+  - `/api/upload`, `/api/upload/wizard`, `/api/upload/v2` and server-side/import upload paths accept raw HEIC/HEIF through one byte-sniffed validation/processing contract;
+  - raw file bytes, declared MIME and filename cannot disagree silently; spoofed metadata/byte mismatches fail before decode, while corrupt or unsupported image payloads may fail during decode but always fail before storage with a stable user-facing error;
+  - real iPhone HEIC fixtures (including modern HDR/variant files that previously reached the missing-HEVC path) are covered by an automated integration/smoke test;
+  - JPEG/PNG/WebP/GIF/AVIF behavior, deduplication, EXIF orientation, size limits and responsive derivative generation remain regression-tested;
+  - browser-side HEIC→JPEG conversion becomes optional compatibility fallback or is removed entirely once server support is proven; no page/wizard contains its own HEIC allow/deny logic;
+  - API/docs MIME contract matches reality: HEIC/HEIF is advertised as accepted only while the deployed backend can actually decode it;
+  - logs/metrics distinguish decode failures, unsupported/corrupt files and resource-limit failures without exposing `sharp/libheif` internals to users.
+- Exit criterion: one raw HEIC file can be uploaded successfully through browser UI, direct API and one server-side ingestion path, all producing the same canonical MediaAsset/derivatives without any client-side conversion requirement.
+- Source: HEIC incidents and fixes #441, #448, #455.
+
+## [BACKLOG-174] Family Core M6: booking UI entry points do not pass `planItemId`
+
+- Status: OPEN
+- Priority: P2
+- Area: Family Core / Bookings
+- Added: 2026-10-06
+- Reason deferred: `POST /api/public/bookings` accepts an optional `planItemId` (must be visible to the booker), and otherwise auto-links when exactly one not-yet-booked plan item of the same event/place (and date, if given) exists for the booker's family scope. Booking forms, offers (PlanItem has no `offerId`) and camp-shift bookings do not pass it, so ambiguous cases stay unlinked. There is no parent-side cancel flow at all today (status changes are business-only), so "only the booker can cancel" holds by construction; a future parent cancel must check `BookingRequest.userId`.
+- Acceptance criteria: plan card "Забронировать" passes `planItemId`; booking forms started from the plan forward it; offers/camp shifts decide how to map to plan items; a parent cancel action (if added) is limited to the booker and covered by a test.
+- Source: Family Core M6.
+
+## [BACKLOG-173] Family Core M3a: consent text, owner question about history access, simplified onboarding
+
+- Status: OPEN
+- Priority: P1 (blocks enabling FAMILY_INVITES)
+- Area: Family Core / Join
+- Added: 2026-10-06
+- Reason deferred: `/invite/family` is built (auth with `redirectTo`, consent, merge step, notification to the inviter) but stays closed until the product owner fills `FAMILY_CONSENT_TEXT` and `FAMILY_CONSENT_TEXT_VERSION` in `src/server/family/familyConsent.ts` (law № 99-З wording is not invented by the agent). Not built: the owner's question "show the new adult past plans?" (a joiner always starts with `historyAccess = FROM_JOIN`; changing it later needs a UI + service), and the simplified onboarding for a joiner without data.
+- Acceptance criteria: consent text + version published; owner question (notification with a choice) and a service changing `FamilyMembership.historyAccess` with tests; short onboarding after joining.
+- Source: Family Core M3a.
+
+## [BACKLOG-175] HEIC: browser conversion (heic-to/WASM) returned by #441; verify the OOM risk from hotfix 15169fb1 on a phone
+
+- Status: OPEN
+- Priority: P2
+- Area: Media / Event wizard
+- Added: 2026-10-06
+- Reason deferred: #441 deliberately moved HEIC->JPEG conversion into the shared upload transport (`uploadMediaFile`), which decodes HEIC in the browser; hotfix 15169fb1 had removed browser-side decoding from the event wizard because large phone photos exhausted the renderer. The guard test (`Step3Media.uploadSafety.test.ts`) was aligned with the new design in #458 and now pins the effective path (size check before upload, conditional lazy conversion, single decoder entry point), but nothing measures the memory risk.
+- Context: related to BACKLOG-172 (native server-side HEIC decoding, which would remove the browser conversion). Contract test: `src/lib/uploads/uploadPipeline.contract.test.ts`.
+- Acceptance criteria: upload a large HEIC (near `MAX_IMAGE_FILE_SIZE_MB`) from a real phone through the event wizard; the tab survives and the photo is accepted. If the tab crashes or runs out of memory, return server-side conversion or the event-level HEIC rejection (and update both guard tests accordingly).
+- Source: review of #458 (P1).
+
+## [BACKLOG-176] SEO Content Plan persistence (P1)
+
+- Status: OPEN
+- Priority: P1
+- Area: Admin / SEO
+- Added: 2026-10-06
+- Reason deferred: P0 SEO admin reorg заложил UI «Контент» (План / Темы / Опубликовано) и `GeoContentMix` (cityShare/regionShare/nationalShare), но без DB-моделей content plan — честные empty states.
+- Context: foundation в `src/lib/admin/seo/geo/*`, UI `src/app/admin/seo/content`. Geo scope должен переиспользовать `Article.geoScope` (CITY|REGION|COUNTRY) и SEO-контекст, без второй geo-модели.
+- Acceptance criteria: persistence идей/тем/плановых публикаций с geo context; actual mix vs target mix в UI; без fake analytics.
+- Source: feat/seo-admin-geo-context-20261006-2 (P0 SEO admin + Geo SEO Context).
+
+## [BACKLOG-177] SEO Analyzer статьи 0–100 (P2)
+
+- Status: OPEN
+- Priority: P2
+- Area: Admin / SEO
+- Added: 2026-10-06
+- Reason deferred: вне scope P0 reorg; нужен отдельный scoring engine.
+- Acceptance criteria: оценка SEO статьи 0–100 с привязкой к geo context и существующим SEO fields.
+- Source: feat/seo-admin-geo-context-20261006-2.
+
+## [BACKLOG-178] Search Intelligence: GSC / Яндекс.Вебмастер / Wordstat (P3)
+
+- Status: OPEN
+- Priority: P2
+- Area: Admin / SEO
+- Added: 2026-10-06
+- Reason deferred: P0 только UX-фундамент `/admin/seo/search` без внешних API и без fake data.
+- Context: будущие `SearchKeyword` / `SearchPerformance` обязаны нести geo context (город/регион/страна).
+- Acceptance criteria: подключены источники; данные фильтруются активным SEO-контекстом; нет смешения гео в одной аналитической массе.
+- Source: feat/seo-admin-geo-context-20261006-2.
+
+## [BACKLOG-179] SEO Opportunity Engine (P4)
+
+- Status: OPEN
+- Priority: P2
+- Area: Admin / SEO
+- Added: 2026-10-06
+- Reason deferred: зависит от Content Plan persistence и Search Intelligence.
+- Acceptance criteria: opportunities с geo scope; ранжирование внутри CITY/REGION/NATIONAL; без насильной квоты плохих тем.
+- Source: feat/seo-admin-geo-context-20261006-2.
+
+## [BACKLOG-180] Автоматический недельный медиаплан с Geo Mix (P5)
+
+- Status: OPEN
+- Priority: P2
+- Area: Admin / SEO
+- Added: 2026-10-06
+- Reason deferred: зависит от Opportunity Engine и configurable `GeoContentMix`.
+- Acceptance criteria: weekly plan с target/actual mix; warning при нехватке качественных региональных тем; editable cityShare/regionShare/nationalShare (сумма 100%).
+- Source: feat/seo-admin-geo-context-20261006-2.

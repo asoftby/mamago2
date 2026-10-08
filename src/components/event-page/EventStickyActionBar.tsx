@@ -124,7 +124,7 @@ export function EventStickyActionBar({
                 {isPrimaryLoading ? (
                   <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                 ) : (
-                  <>{primaryLabel} <span aria-hidden>→</span></>
+                  <>{primaryLabel}</>
                 )}
               </a>
             ) : (
@@ -178,17 +178,36 @@ export function EventStickyActionBar({
     >
       <div className="flex-1 min-w-0">
         {sessionLine && (
-          <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#E86A3A]">
+          <div className="truncate whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.1em] text-[#E86A3A]">
             {sessionLine}
           </div>
         )}
         <div className="mt-0.5 flex items-baseline gap-1">
           {(() => {
             const { amount, suffix } = splitUiPriceLabel(priceLabel);
+            const fromMatch = amount.match(/^(от)\s+/i);
+            const fromPrefix = fromMatch?.[1] ?? "";
+            const amountWithoutPrefix = fromMatch
+              ? amount.slice(fromMatch[0].length)
+              : amount;
             return (
               <>
+                {fromPrefix ? (
+                  <span
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: 16,
+                      fontWeight: 400,
+                      lineHeight: 1,
+                      letterSpacing: "-0.02em",
+                      color: "#141210",
+                    }}
+                  >
+                    {fromPrefix}
+                  </span>
+                ) : null}
                 <span style={{ fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", color: "#141210" }}>
-                  {amount}
+                  {amountWithoutPrefix}
                 </span>
                 {suffix ? (
                   <span className="text-[11px] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
@@ -212,7 +231,7 @@ export function EventStickyActionBar({
           {isPrimaryLoading ? (
             <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
           ) : (
-            <>{primaryLabel} <span aria-hidden>→</span></>
+            <>{primaryLabel}</>
           )}
         </a>
       ) : onBook ? (

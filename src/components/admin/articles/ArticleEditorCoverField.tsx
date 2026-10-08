@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { MediaUploadField, type MediaUploadItem } from "@/components/media/MediaUploadField";
 import {
   invalidateMediaLibraryClientCache,
@@ -12,18 +12,24 @@ import type { useArticleMediaSource } from "@/components/admin/articles/useArtic
 type PickerItem = {
   id: string;
   publicUrl: string | null;
+  thumbnailUrl?: string | null;
   alt: string | null;
   title: string | null;
   isUsed: boolean;
 };
 
+function mediaThumbnailUrl(mediaId: string): string {
+  return `/api/media/${encodeURIComponent(mediaId)}?variant=sm`;
+}
+
 export function ArticleEditorCoverField({
   value,
   onChange,
-  initialPreviewUrl,
   authorUserId,
   articleId,
   showHeading = true,
+  label = "Обложка",
+  description,
   uploadButtonLabel = "Загрузить обложку",
   successUploadMessage = "Обложка загружена",
   successPickMessage = "Обложка выбрана",
@@ -36,6 +42,8 @@ export function ArticleEditorCoverField({
   authorUserId?: string | null;
   articleId?: string | null;
   showHeading?: boolean;
+  label?: string;
+  description?: string;
   uploadButtonLabel?: string;
   successUploadMessage?: string;
   successPickMessage?: string;
@@ -43,42 +51,16 @@ export function ArticleEditorCoverField({
   articleMediaSource?: ReturnType<typeof useArticleMediaSource>;
 }) {
   const mediaId = value.trim();
-  const [resolvedPreviewUrl, setResolvedPreviewUrl] = useState<string | null>(initialPreviewUrl ?? null);
-
-  useEffect(() => {
-    if (!mediaId) {
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/admin/articles/media-preview?id=${encodeURIComponent(mediaId)}`);
-        if (!res.ok) {
-          if (!cancelled) setResolvedPreviewUrl(initialPreviewUrl ?? null);
-          return;
-        }
-        const data = (await res.json()) as { publicUrl: string | null };
-        if (!cancelled) setResolvedPreviewUrl(data.publicUrl ?? initialPreviewUrl ?? null);
-      } catch {
-        if (!cancelled) setResolvedPreviewUrl(initialPreviewUrl ?? null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [initialPreviewUrl, mediaId]);
-
-  const previewUrl = mediaId ? resolvedPreviewUrl ?? initialPreviewUrl ?? null : null;
 
   const currentValue = useMemo<MediaUploadItem | null>(() => {
     if (!mediaId) return null;
     return {
       id: mediaId,
-      url: previewUrl ?? `/api/media/${encodeURIComponent(mediaId)}`,
+      url: mediaThumbnailUrl(mediaId),
       alt: null,
       title: "Обложка статьи",
     };
-  }, [mediaId, previewUrl]);
+  }, [mediaId]);
 
   const uploadFiles = async (files: File[]): Promise<MediaUploadItem[]> => {
     const uploaded: MediaUploadItem[] = [];
@@ -90,7 +72,7 @@ export function ArticleEditorCoverField({
       );
       uploaded.push({
         id: media.id,
-        url: media.url,
+        url: mediaThumbnailUrl(media.id),
         title: file.name,
         alt: null,
       });
@@ -122,7 +104,7 @@ export function ArticleEditorCoverField({
         .filter((item): item is PickerItem & { publicUrl: string } => Boolean(item.publicUrl))
         .map((item) => ({
           id: item.id,
-          url: item.publicUrl,
+          url: item.thumbnailUrl ?? item.publicUrl,
           alt: item.alt,
           title: item.title,
           isUsed: item.isUsed,
@@ -134,12 +116,12 @@ export function ArticleEditorCoverField({
 
   return (
     <MediaUploadField
-      label={showHeading ? "Обложка" : undefined}
+      label={showHeading ? label : undefined}
+      description={description}
       mode="single"
       value={currentValue}
       onChange={(next) => {
         const item = next && !Array.isArray(next) ? next : null;
-        setResolvedPreviewUrl(item?.url ?? null);
         onChange(item?.id ?? "", item?.url ?? null);
       }}
       allowMediaLibrary

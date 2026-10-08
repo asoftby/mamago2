@@ -10,6 +10,7 @@
  */
 
 import type { TrackUserEventInput } from "@/lib/analytics/types";
+import { getOrCreateAnonymousId } from "@/lib/anonymous/clientAnonymousId";
 
 const STORAGE_KEY = "mg_analytics_sid";
 
@@ -39,6 +40,11 @@ export async function postAnalyticsEvent(
 ): Promise<void> {
   try {
     const clientSid = getOrCreateClientSessionId();
+    // The product identity (distinct from mg_analytics_sid above) — sent on
+    // every event, authenticated or not, so a guest-owned RecommendationRun
+    // stays attributable after the visitor registers, without rewriting its
+    // ownership. See RecommendationTraceService.findRecentRecommendationAttribution.
+    const anonymousId = getOrCreateAnonymousId();
     const res = await fetch("/api/analytics/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -46,6 +52,7 @@ export async function postAnalyticsEvent(
       body: JSON.stringify({
         ...input,
         sessionId: input.sessionId ?? (clientSid || undefined),
+        anonymousId: input.anonymousId ?? (anonymousId || undefined),
       }),
     });
     if (!res.ok) {

@@ -3,4 +3,5 @@ export const EMAIL_SUBJECTS = {
   passwordReset: "Сброс пароля в mamaGo",
   welcome: "Добро пожаловать в mamaGo 💛",
   businessInvite: "Приглашение в команду бизнеса",
+  familyInvite: "Приглашение в семью на mamaGo",
 } as const;

@@ -1,3 +1,4 @@
+import { convertHeicFileToJpegIfNeeded } from "./heicConversion";
 import { normalizeUploadResponse } from "./normalizeUploadResponse";
 import type { UploadErrorResponse, UploadedMedia } from "./uploadTypes";
 import type { UploadContext } from "./resolveUploadOwner";
@@ -24,8 +25,13 @@ export async function uploadMediaFile(
   options?: UploadMediaFileOptions,
 ): Promise<UploadedMedia> {
   const endpoint = options?.endpoint ?? (options?.wizardSessionId ? "/api/upload/wizard" : "/api/upload");
+  // Transport boundary: every browser upload is normalized here, even when a
+  // caller bypasses the higher-level image hooks. The hooks may convert HEIC
+  // earlier when they need to compress/preview it, but raw HEIC must never
+  // reach the server because the deployed sharp build has no HEVC decoder.
+  const fileToUpload = await convertHeicFileToJpegIfNeeded(file);
   const formData = new FormData();
-  formData.append("file", file);
+  formData.append("file", fileToUpload);
 
   if (options?.wizardSessionId) {
     formData.append("wizardSessionId", options.wizardSessionId);

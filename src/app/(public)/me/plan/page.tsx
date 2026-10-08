@@ -1,24 +1,41 @@
 import { getCurrentUser } from "@/lib/auth/server";
-import { listAllPlanItems } from "@/server/services/plan.service";
 import { prisma } from "@/lib/prisma";
 import { PlanPageClient } from "./PlanPageClient";
 import { PlanGuestFlow } from "./PlanGuestFlow";
-import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 import { getLatestActivePlanReminderNotification } from "@/server/services/notification.service";
 import {
-  computePlanFingerprint,
-  listScenarioItemOverridesForScenarios,
-  listActivitySessionsForPlanItems,
-} from "@/server/services/dayScenario.service";
-import { resolveMyPlanItemEffectiveTime } from "@/features/my-plan/lib/scenarioProjection";
-import { buildPlanCardPresentation } from "@/features/my-plan/lib/planPagePresentation";
+  listPendingExperienceCandidates,
+  listRecentExperienceSummaries,
+} from "@/server/services/experience/experience.service";
+import { childScopeFor, activeFamilyUserIds } from "@/server/family/familyAccess";
+import { familyReadsEnabled } from "@/server/family/familyScope";
+import { loadFamilyCalendarRange } from "@/server/services/familyCalendar.service";
+import { resolvePlanOwner } from "@/server/services/planOwner";
+import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { calendarWeekRange, resolveCalendarDateParam } from "@/features/my-plan/lib/familyCalendarNavigation";
 
-export default async function PlanPage() {
+export default async function PlanPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ date?: string | string[] }>;
+}) {
   const user = await getCurrentUser();
   if (!user) return <PlanGuestFlow />;
 
-  // Load all plan items
-  const planItems = await listAllPlanItems(user.id);
+  const params = await searchParams;
+  const selectedDate = resolveCalendarDateParam(params?.date, getLocalDateKey());
+  const { from: initialFrom, to: initialTo } = calendarWeekRange(selectedDate);
+  const calendar = await loadFamilyCalendarRange({
+    owner: await resolvePlanOwner(user.id),
+    from: initialFrom,
+    to: initialTo,
+  });
+  const adultIds = familyReadsEnabled() ? await activeFamilyUserIds(user.id) : [user.id];
+  const familyView = adultIds.length > 1 ? { currentUserId: user.id, adultsCount: adultIds.length } : null;
+  const [experienceCandidates, recentExperiences] = await Promise.all([
+    listPendingExperienceCandidates({ userId: user.id, lookbackDays: 14, take: 3 }),
+    listRecentExperienceSummaries({ userId: user.id, take: 1 }),
+  ]);
 
   // Load saved ideas for the sidebar
   const ideas = await prisma.idea.findMany({
@@ -40,8 +57,9 @@ export default async function PlanPage() {
 
   // Load children for family recommendations
   const children = await prisma.child.findMany({
-    where: { parentId: user.id },
-    select: { birthDate: true },
+    where: await childScopeFor(user.id),
+    select: { id: true, name: true, birthDate: true },
+    orderBy: { createdAt: "asc" },
   });
 
   // Compute children ages
@@ -54,97 +72,6 @@ export default async function PlanPage() {
     });
 
   const activeReminder = await getLatestActivePlanReminderNotification(user.id);
-
-  // Scenario status per date, so the day header can show "Собрать
-  // сценарий дня" / "Открыть сценарий дня" / "...· План изменился" without
-  // Scenario owning any item-selection UI here (that stays in Scenario's
-  // own "План изменился" reconciliation).
-  const dayScenarios = await prisma.dayScenario.findMany({
-    where: { userId: user.id },
-    select: { id: true, date: true, planFingerprint: true, acceptedConflictKeys: true },
-  });
-  const scenarioOverridesByPlanItemId = await listScenarioItemOverridesForScenarios(
-    dayScenarios.map((s) => s.id),
-  );
-  const itemsByDateForFingerprint = new Map<string, Array<{
-    id: string;
-    activityId: string | null;
-    routeId?: string | null;
-    placeId?: string | null;
-    articleId?: string | null;
-    date: string;
-    startsAt: Date | null;
-  }>>();
-  for (const item of planItems) {
-    const list = itemsByDateForFingerprint.get(item.date) ?? [];
-    list.push({
-      id: item.id,
-      activityId: item.activityId,
-      routeId: item.routeId,
-      placeId: item.placeId,
-      articleId: item.articleId,
-      date: item.date,
-      startsAt: item.startsAt,
-    });
-    itemsByDateForFingerprint.set(item.date, list);
-  }
-  const scenarioStatusByDate: Record<string, "ready" | "changed"> = {};
-  for (const scenario of dayScenarios) {
-    const currentItems = itemsByDateForFingerprint.get(scenario.date) ?? [];
-    scenarioStatusByDate[scenario.date] =
-      computePlanFingerprint(currentItems, scenarioOverridesByPlanItemId, scenario.acceptedConflictKeys) === scenario.planFingerprint ? "ready" : "changed";
-  }
-
-  // Bounded, single-query lookup of Scenario-assigned times across every
-  // date this user has a Scenario for — lets My Plan show the same
-  // effective time as the Scenario without mutating PlanItem.startsAt.
-  // Only items without an authoritative startsAt can possibly need session
-  // recovery (priority 1 already resolves the rest) — batch-loaded in one
-  // query, grouped by activityId + local date, same tier Scenario uses.
-  const sessionsByActivityDate = await listActivitySessionsForPlanItems(
-    planItems
-      .filter((item) => item.startsAt == null)
-      .map((item) => ({ activityId: item.activityId, date: item.date })),
-  );
-
-  // Serialize plan items (dates need to be strings for client)
-  const serializedItems = planItems.map((item) => {
-    const sessions = item.activityId
-      ? (sessionsByActivityDate.get(`${item.activityId}|${item.date}`) ?? [])
-      : [];
-    const effectiveStartsAt = resolveMyPlanItemEffectiveTime(
-      { startsAt: item.startsAt, sessions: sessions.map((startsAt) => ({ startsAt })) },
-      scenarioOverridesByPlanItemId.get(item.id) ?? null,
-    );
-    const presentation = item.activity
-      ? buildPlanCardPresentation(item.activity)
-      : { ageLabel: null, priceLabel: null, venueName: null, venueAddress: null };
-
-    return {
-      id: item.id,
-      date: item.date,
-      startsAt: item.startsAt ? item.startsAt.toISOString() : null,
-      effectiveStartsAt: effectiveStartsAt ? effectiveStartsAt.toISOString() : null,
-      activityId: item.activityId,
-      title: item.title,
-      coverImageUrl: item.coverImageUrl,
-      planAvailability: getPlanActivityPublicAvailability(item.activity),
-      activity: item.activity
-        ? {
-            id: item.activity.id,
-            slug: item.activity.slug,
-            title: item.activity.title,
-            type: item.activity.type,
-            coverImageUrl: item.activity.coverImageUrl,
-            ageLabel: presentation.ageLabel,
-            categoryLabel: item.activity.eventCategory?.nameRu ?? null,
-            priceLabel: presentation.priceLabel,
-            venueName: presentation.venueName,
-            venueAddress: presentation.venueAddress,
-          }
-        : null,
-    };
-  });
 
   const serializedIdeas = ideas.map((idea) => {
     const act = ideaActivityMap.get(idea.activityId) ?? null;
@@ -160,11 +87,20 @@ export default async function PlanPage() {
 
   return (
     <PlanPageClient
-      initialItems={serializedItems}
+      initialItems={calendar.items}
+      initialSelectedDate={selectedDate}
+      initialRange={{ from: initialFrom, to: initialTo }}
+      familyChildren={children.map((child) => ({ id: child.id, name: child.name?.trim() || "Ребёнок" }))}
+      familyView={familyView}
       ideaActivityIds={ideaActivityIds}
       initialIdeas={serializedIdeas}
       childrenAges={childrenAges}
-      scenarioStatusByDate={scenarioStatusByDate}
+      scenarioStatusByDate={calendar.scenarioStatusByDate}
+      experienceCandidates={experienceCandidates.map((candidate) => ({
+        ...candidate,
+        plannedStartsAt: candidate.plannedStartsAt?.toISOString() ?? null,
+      }))}
+      recentExperiences={recentExperiences}
       activeReminder={
         activeReminder
           ? {

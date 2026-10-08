@@ -9,10 +9,12 @@ import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 export function SimilarEventsSection({
   items,
   className,
+  allHref,
 }: {
   items: EventPageSimilar[];
   onPlan?: (id: string) => void;
   className?: string;
+  allHref?: string;
 }) {
   if (!items.length) return null;
 
@@ -26,12 +28,14 @@ export function SimilarEventsSection({
           </span>
           <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
         </div>
-        <a
-          href="#"
-          className="shrink-0 text-[14px] text-[#3A332B] underline underline-offset-4 hover:text-[#141210]"
-        >
-          Все события →
-        </a>
+        {allHref ? (
+          <Link
+            href={allHref}
+            className="shrink-0 text-[14px] text-[#3A332B] underline underline-offset-4 hover:text-[#141210]"
+          >
+            Все события →
+          </Link>
+        ) : null}
       </div>
 
       {/* 4-column grid */}
@@ -44,7 +48,7 @@ export function SimilarEventsSection({
           >
             {/* Image */}
             <div className="group relative overflow-hidden rounded-[14px] bg-[#E8E0D4]" style={{ aspectRatio: "4/5" }}>
-              {ev.imageUrl.startsWith("http") ? (
+              {ev.imageUrl ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={ev.imageUrl}
@@ -76,7 +80,7 @@ export function SimilarEventsSection({
               </Link>
               {ev.priceLabel && (
                 <div className="mt-1 font-mono text-[12px] text-[rgba(20,18,16,0.55)]">
-                  {renderCurrencyText(normalizeUiCurrencyText(`от ${ev.priceLabel}`), { iconSize: "sm" })}
+                  {renderCurrencyText(normalizeUiCurrencyText(ev.priceLabel), { iconSize: "sm" })}
                 </div>
               )}
             </div>

@@ -17,12 +17,13 @@ import { ProfileCompletionFlow } from "@/components/post-auth/ProfileCompletionF
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
   savePostAuthContext,
-  clearPostAuthContext,
-  applyPostAuthCompletionOutcome,
+  finishPostAuthOnboarding,
+  runPostAuthPipeline,
   trackAuthCompleted,
 } from "@/lib/post-auth";
 import { trackPostAuthEvent } from "@/lib/post-auth/analytics";
-import type { PendingEntityType, ProfileStatePayload } from "@/lib/post-auth/types";
+import type { PendingEntityType } from "@/lib/post-auth/types";
+import { buildSavePostAuthContext } from "@/lib/post-auth/saveFlowContext";
 
 export type SaveActivityFlowAdaptiveProps = {
   open: boolean;
@@ -47,6 +48,8 @@ export type SaveActivityFlowAdaptiveProps = {
   source?: string;
   onPersist: (result: SaveToPlanResult) => Promise<void>;
   nextHref?: string;
+  /** Show "Видно семье"; enable only when onPersist forwards `result.visibility` to the server. */
+  showVisibilityToggle?: boolean;
 };
 
 type Phase = "select" | "auth" | "completion" | "success";
@@ -107,6 +110,7 @@ export function SaveActivityFlowAdaptive({
   source,
   onPersist,
   nextHref,
+  showVisibilityToggle = false,
 }: SaveActivityFlowAdaptiveProps) {
   const router = useRouter();
   const isMobile = !useMediaQuery("(min-width: 640px)");
@@ -152,35 +156,23 @@ export function SaveActivityFlowAdaptive({
       // Сохраняем pending action и переходим на auth
       setPending(result);
 
-      // Build pending action for automatic execution after auth
+      // Always replace any stale auth context. Callback-backed hosts have no
+      // serializable entity id, but still need the current source/returnTo.
       const entityId = pendingEntityId ?? activityId;
-      if (typeof window !== "undefined" && entityId) {
-        const pendingAction =
-          result.action === "ideas"
-            ? {
-                kind: "save_idea" as const,
-                entityType: pendingEntityType,
-                entityId,
-                title: activityTitle,
-                coverImageUrl: coverImageUrl,
-              }
-            : result.action === "plan"
-              ? {
-                  kind: "save_plan" as const,
-                  entityType: pendingEntityType,
-                  entityId,
-                  plannedDate: result.dateISO,
-                  timeSlotId: result.timeSlotId,
-                  title: activityTitle,
-                  coverImageUrl: coverImageUrl,
-                }
-              : null;
-
-        savePostAuthContext({
-          source: result.action === "ideas" ? "save_idea" : "save_plan",
-          pendingAction,
-          returnTo: `${window.location.pathname}${window.location.search}`,
-        });
+      if (
+        typeof window !== "undefined" &&
+        (result.action === "ideas" || result.action === "plan")
+      ) {
+        savePostAuthContext(
+          buildSavePostAuthContext({
+            result,
+            returnTo: resolvedNext,
+            entityId,
+            entityType: pendingEntityType,
+            title: activityTitle,
+            coverImageUrl,
+          }),
+        );
       }
       setPhase("auth");
     },
@@ -193,6 +185,7 @@ export function SaveActivityFlowAdaptive({
       coverImageUrl,
       pendingEntityType,
       pendingEntityId,
+      resolvedNext,
     ],
   );
 
@@ -212,36 +205,16 @@ export function SaveActivityFlowAdaptive({
       trackAuthCompleted(
         pending.action === "ideas" ? "save_idea" : "save_plan",
       );
-      await runPersist(pending);
-      trackPostAuthEvent("pending_action_executed", {
-        kind: pending.action,
+      const result = await runPostAuthPipeline({
+        defaultSource: pending.action === "ideas" ? "save_idea" : "save_plan",
+        isMobile,
+        router,
+        pendingActionExecutor: () => runPersist(pending),
       });
-      clearPostAuthContext();
-
-      const res = await fetch("/api/me/profile-state", { credentials: "include" });
-      const profile = (await res.json()) as ProfileStatePayload;
-      if (!res.ok) {
-        finishSuccess();
-        return;
-      }
-
-      if (!profile.isProfileComplete) {
+      if (result.kind === "completion") {
         setPhase("completion");
         return;
       }
-
-      applyPostAuthCompletionOutcome(
-        pending.action === "ideas" ? "save_idea" : "save_plan",
-        {
-          isMobile,
-          router,
-          returnTo:
-            typeof window !== "undefined"
-              ? `${window.location.pathname}${window.location.search}`
-              : null,
-          toast,
-        },
-      );
       finishSuccess();
     } catch {
       // тост у onPersist; остаёмся на шаге входа
@@ -254,20 +227,19 @@ export function SaveActivityFlowAdaptive({
         finishSuccess();
         return;
       }
-      if (opts?.alreadyComplete !== true) {
-        applyPostAuthCompletionOutcome(
-          pending.action === "ideas" ? "save_idea" : "save_plan",
-          {
-            isMobile,
-            router,
-            returnTo:
-              typeof window !== "undefined"
-                ? `${window.location.pathname}${window.location.search}`
-                : null,
-            toast,
-          },
-        );
-      }
+      finishPostAuthOnboarding(
+        pending.action === "ideas" ? "save_idea" : "save_plan",
+        {
+          alreadyComplete: opts?.alreadyComplete,
+          isMobile,
+          router,
+          returnTo:
+            typeof window !== "undefined"
+              ? `${window.location.pathname}${window.location.search}`
+              : null,
+          toast,
+        },
+      );
       router.refresh();
       finishSuccess();
     },
@@ -297,6 +269,7 @@ export function SaveActivityFlowAdaptive({
           source={source}
           onCommit={handleCommit}
           onClose={() => onOpenChange(false)}
+          showVisibilityToggle={showVisibilityToggle}
         />
       )}
       {phase === "auth" && pending && (

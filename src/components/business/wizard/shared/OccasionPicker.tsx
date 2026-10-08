@@ -15,17 +15,25 @@ interface OccasionPickerProps {
   value: string[];
   onChange: (ids: string[]) => void;
   disabled?: boolean;
+  /** Hide occasions that do not apply to the current editor surface. */
+  excludeSlugs?: readonly string[];
 }
 
 /** Максимум выбранных поводов на событие */
 const MAX_SELECTED_OCCASIONS = 2;
+const EMPTY_EXCLUDED_SLUGS: readonly string[] = [];
 
 /**
  * Compact pill-chip selector for currently active occasions.
  * Renders nothing if there are no active occasions.
  * Selection is optional — not a required field. 0..2 occasions.
  */
-export function OccasionPicker({ value, onChange, disabled }: OccasionPickerProps) {
+export function OccasionPicker({
+  value,
+  onChange,
+  disabled,
+  excludeSlugs = EMPTY_EXCLUDED_SLUGS,
+}: OccasionPickerProps) {
   const [occasions, setOccasions] = useState<OccasionOption[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -50,8 +58,25 @@ export function OccasionPicker({ value, onChange, disabled }: OccasionPickerProp
     };
   }, []);
 
+  const visibleOccasions = occasions.filter(
+    (occasion) => !excludeSlugs.includes(occasion.slug),
+  );
+
+  useEffect(() => {
+    if (occasions.length === 0 || excludeSlugs.length === 0) return;
+    const excludedIds = new Set(
+      occasions
+        .filter((occasion) => excludeSlugs.includes(occasion.slug))
+        .map((occasion) => occasion.id),
+    );
+    const sanitizedValue = value.filter((id) => !excludedIds.has(id));
+    if (sanitizedValue.length !== value.length) {
+      onChange(sanitizedValue);
+    }
+  }, [excludeSlugs, occasions, onChange, value]);
+
   // Don't render anything while loading or if no active occasions
-  if (loading || occasions.length === 0) return null;
+  if (loading || visibleOccasions.length === 0) return null;
 
   const limitReached = value.length >= MAX_SELECTED_OCCASIONS;
 
@@ -69,7 +94,7 @@ export function OccasionPicker({ value, onChange, disabled }: OccasionPickerProp
     <div className="space-y-2">
       <p className="text-sm font-medium text-gray-700">Актуальные поводы</p>
       <div className="flex flex-wrap gap-2">
-        {occasions.map((o) => {
+        {visibleOccasions.map((o) => {
           const selected = value.includes(o.id);
           const chipDisabled = disabled || (!selected && limitReached);
           return (

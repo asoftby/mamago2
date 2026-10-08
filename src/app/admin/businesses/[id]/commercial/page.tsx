@@ -57,7 +57,7 @@ export default async function AdminBusinessCommercialPage({
 
   // Calculate warnings
   const warnings: string[] = [];
-  if (activeContract?.status === "EXPIRING") {
+  if (activeContract?.status === "EXPIRING" && activeContract.endsAt) {
     const daysUntilEnd = Math.ceil(
       (activeContract.endsAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
     );
@@ -130,7 +130,7 @@ export default async function AdminBusinessCommercialPage({
             <Clock className="w-5 h-5 text-gray-600" />
             <p className="text-sm text-gray-600">Действует до</p>
           </div>
-          {activeContract ? (
+          {activeContract?.endsAt ? (
             <>
               <p className="text-lg font-bold text-gray-900">
                 {format(activeContract.endsAt, "dd MMM yyyy", { locale: ru })}
@@ -142,6 +142,8 @@ export default async function AdminBusinessCommercialPage({
                 })}
               </p>
             </>
+          ) : activeContract ? (
+            <p className="text-lg text-gray-700">Без срока</p>
           ) : (
             <p className="text-lg text-gray-400">—</p>
           )}
@@ -196,7 +198,13 @@ export default async function AdminBusinessCommercialPage({
                     <ContractStatusBadge status={contract.status} />
                   </div>
                   <p className="text-sm text-gray-600 mt-1">
-                    {format(contract.startsAt, "dd MMM yyyy", { locale: ru })} — {format(contract.endsAt, "dd MMM yyyy", { locale: ru })}
+                    {contract.startsAt
+                      ? format(contract.startsAt, "dd MMM yyyy", { locale: ru })
+                      : "—"}{" "}
+                    —{" "}
+                    {contract.endsAt
+                      ? format(contract.endsAt, "dd MMM yyyy", { locale: ru })
+                      : "без срока"}
                   </p>
                 </div>
                 {contract.documentUrl && (
@@ -330,10 +338,18 @@ export default async function AdminBusinessCommercialPage({
         <h3 className="text-lg font-semibold text-blue-900 mb-3">Текущий статус доступа</h3>
         <div className="space-y-2 text-sm text-blue-800">
           {activeContract?.status === "ACTIVE" && (
-            <p>✓ Договор активен до {format(activeContract.endsAt, "dd MMMM yyyy", { locale: ru })}</p>
+            <p>
+              {activeContract.endsAt
+                ? `✓ Договор активен до ${format(activeContract.endsAt, "dd MMMM yyyy", { locale: ru })}`
+                : "✓ Договор активен без срока окончания"}
+            </p>
           )}
           {activeContract?.status === "EXPIRED" && (
-            <p>✗ Договор истек {format(activeContract.endsAt, "dd MMMM yyyy", { locale: ru })}</p>
+            <p>
+              {activeContract.endsAt
+                ? `✗ Договор истек ${format(activeContract.endsAt, "dd MMMM yyyy", { locale: ru })}`
+                : "✗ Договор истек"}
+            </p>
           )}
           {activePlacement?.status === "ACTIVE" && (
             <p>✓ Размещение активно до {format(activePlacement.endsAt, "dd MMMM yyyy", { locale: ru })}</p>

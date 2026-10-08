@@ -30,7 +30,6 @@ import { EventDecisionPanel } from "./EventDecisionPanel";
 import { EventSessionSelector } from "./EventSessionSelector";
 import { EventStickyActionBar } from "./EventStickyActionBar";
 import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
-import { DirectRequestCta } from "@/components/direct/DirectRequestCta";
 import { SimilarEventsSection } from "./SimilarEventsSection";
 import { FaqSection } from "@/components/public/FaqSection";
 import { EventWhyGo } from "./EventWhyGo";
@@ -44,6 +43,7 @@ import { cn } from "@/lib/utils";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { formatPlanTargetDateRu } from "@/lib/date/formatPlanTargetDateRu";
 import { useUpcomingSessions } from "./useUpcomingSessions";
+import { formatVenueAddressForPublicDisplay } from "@/lib/event/formatVenueAddressForDisplay";
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
@@ -67,10 +67,6 @@ function pluralizeRu(count: number, forms: [string, string, string]): string {
 
 function formatSessionCount(count: number): string {
   return `${count} ${pluralizeRu(count, ["сеанс", "сеанса", "сеансов"])}`;
-}
-
-function formatPriceItemCount(count: number): string {
-  return `${count} ${pluralizeRu(count, ["позиция", "позиции", "позиций"])}`;
 }
 
 /* ── Marquee ticker ───────────────────────────────────────── */
@@ -100,7 +96,7 @@ function EventMarquee({ items }: { items: string[] }) {
 function EventMetaStrip({ facts }: { facts: EventPageData["importantFacts"] }) {
   if (!facts.length) return null;
   return (
-    <section className="border-y border-[rgba(20,18,16,0.10)]">
+    <section>
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <div
           className="grid grid-cols-2 md:grid-cols-4"
@@ -145,7 +141,7 @@ function EventAboutEditorial({
   descriptionHtml?: string;
 }) {
   return (
-    <section className="border-b border-[rgba(20,18,16,0.10)] py-16 md:py-20">
+    <section className="py-16 md:py-20">
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-[320px_1fr] md:gap-14">
           <div>
@@ -201,7 +197,7 @@ function EventLocationEditorial({ venue }: { venue: NonNullable<EventPageData["v
       name={venue.name}
       logoUrl={venue.logoUrl}
       tagline={venue.landmark}
-      address={venue.address}
+      address={formatVenueAddressForPublicDisplay(venue.address) || undefined}
       district={venue.district}
       metro={venue.metro}
       lat={venue.lat}
@@ -209,8 +205,29 @@ function EventLocationEditorial({ venue }: { venue: NonNullable<EventPageData["v
       mapUrl={venue.mapUrl}
       routeUrl={venue.routeUrl}
       placeHref={venue.placeHref}
-      className="border-b"
+      className="!border-0"
     />
+  );
+}
+
+function EventOrganizerLegal({ organizer }: { organizer: NonNullable<EventPageData["organizer"]> }) {
+  return (
+    <section className="py-8 md:py-10">
+      <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
+          <span
+            className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.45)]"
+            style={{ fontFamily: "Menlo, monospace" }}
+          >
+            Организатор события
+          </span>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px] text-[rgba(20,18,16,0.60)]">
+            <span className="font-medium text-[#141210]">{organizer.name}</span>
+            {organizer.unp ? <span>УНП {organizer.unp}</span> : null}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -279,7 +296,7 @@ function EventFinalCta({
                 onClick={onBuy}
                 className="inline-flex h-16 items-center gap-2 rounded-full bg-[#E86A3A] px-7 text-[17px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px"
               >
-                {buyLabel}&nbsp;{renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })} <span aria-hidden>→</span>
+                {buyLabel}&nbsp;{renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })}
               </a>
             )}
             <button
@@ -299,18 +316,10 @@ function EventFinalCta({
   );
 }
 
-export interface EventDirectCtaInfo {
-  activityId: string;
-  publicationTitle: string;
-  brandName: string;
-}
-
 export function EventPageView({
   data,
-  direct,
 }: {
   data: EventPageData;
-  direct?: EventDirectCtaInfo;
 }) {
   const { isAuthenticated } = useAuthMe();
   const setPublicationIntent = useSetPublicationIntent();
@@ -472,14 +481,15 @@ export function EventPageView({
               activityId: data.id,
               date: result.dateISO,
               activitySessionId: result.timeSlotId ?? null,
+              ...(result.visibility ? { visibility: result.visibility } : {}),
               title: data.title,
               coverImageUrl: data.media.posterUrl,
             }),
           });
           if (!res.ok) throw new Error("plan_save_failed");
-          toast.success(
-            `Событие добавлено на ${formatPlanTargetDateRu(result.dateISO)}`,
-          );
+          toast.success("Добавлено в план", {
+            description: `На ${formatPlanTargetDateRu(result.dateISO)}`,
+          });
           requestPlanRefetchForDate(result.dateISO);
         } else if (result.action === "ideas") {
           const res = await fetch("/api/save/idea", {
@@ -523,9 +533,9 @@ export function EventPageView({
         if (!res.ok) throw new Error("plan_save_failed");
         await loadSaveStatus();
         requestPlanRefetchForDate(dateISO);
-        toast.success(
-          `Событие добавлено на ${formatPlanTargetDateRu(dateISO)}`,
-        );
+        toast.success("Добавлено в план", {
+            description: `На ${formatPlanTargetDateRu(dateISO)}`,
+          });
       } catch {
         toast.error("Не получилось выполнить действие", { description: "Попробуйте еще раз" });
       }
@@ -567,7 +577,8 @@ export function EventPageView({
   const hasSimpleBooking = Boolean(data.cta.simpleBooking);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const handleBook = useCallback(() => setBookingModalOpen(true), []);
-  const hasSimilar = data.similar.length > 0;
+  const visibleSimilar = data.similar.slice(0, 4);
+  const hasSimilar = visibleSimilar.length > 0;
   const hasWhyGo = data.whyGo.length > 0;
   const hasGoodFit = data.goodFit.length > 0;
 
@@ -594,21 +605,14 @@ export function EventPageView({
         </div>
       )}
 
-      <section className="pt-12 pb-14">
+      <section className="pt-4 pb-14 lg:pt-12">
         <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
           <div className="mb-4 md:mb-0">
             <MobileSmartBackButton fallbackHref={getCityHomeHref(data.citySlug)} />
           </div>
 
-          <div className="lg:hidden mb-8">
-            <PublicationMediaColumn
-              media={data.media}
-              galleryItems={data.galleryItems}
-            />
-          </div>
-
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-[440px_1fr] lg:gap-14 lg:items-start">
-            <div className="hidden lg:block">
+            <div>
               <PublicationMediaColumn
                 media={data.media}
                 galleryItems={data.galleryItems}
@@ -626,18 +630,7 @@ export function EventPageView({
                 onSave={handleSave}
                 isPlanned={saveStatus.inPlan}
                 planDate={saveStatus.planDate}
-                directSlot={
-                  direct && (
-                    <DirectRequestCta
-                      publicationRef={{ publicationType: "EVENT", activityId: direct.activityId }}
-                      publicationTitle={direct.publicationTitle}
-                      brandName={direct.brandName}
-                      className="flex h-14 w-full items-center justify-center gap-2 rounded-full border border-[rgba(20,18,16,0.18)] bg-transparent text-[15px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
-                    >
-                      Отправить заявку
-                    </DirectRequestCta>
-                  )
-                }
+
               />
             </div>
           </div>
@@ -654,7 +647,7 @@ export function EventPageView({
       />
 
       {(Boolean(data.priceDetails?.trim()) || (data.priceItems?.length ?? 0) > 0 || Boolean(data.priceNote?.trim())) && (
-        <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
+        <section className="py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -670,11 +663,6 @@ export function EventPageView({
                   <span style={{ fontFamily: "var(--font-sans)" }}>Сколько это </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>стоит</span>
                 </h2>
               </div>
-              {(data.priceItems?.length ?? 0) > 0 && (
-                <span className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] px-3 text-[13px] text-[#141210]" style={{ fontFamily: "Menlo, monospace" }}>
-                  {formatPriceItemCount(data.priceItems!.length)}
-                </span>
-              )}
             </div>
             <PriceListBlock
               items={data.priceItems ?? []}
@@ -686,10 +674,10 @@ export function EventPageView({
         </section>
       )}
 
-      <FaqSection items={data.faqItems} />
+      <FaqSection items={data.faqItems} className="!border-t-0" />
 
       {sessions.length > 0 && (
-        <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
+        <section className="py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -726,10 +714,20 @@ export function EventPageView({
 
       {data.venue && <EventLocationEditorial venue={data.venue} />}
 
+      {data.organizer && <EventOrganizerLegal organizer={data.organizer} />}
+
       {hasSimilar && (
-        <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
+        <section className="py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
-            <SimilarEventsSection items={data.similar} onPlan={handlePlanSimilar} />
+            <SimilarEventsSection
+              items={visibleSimilar}
+              onPlan={handlePlanSimilar}
+              allHref={
+                data.categorySlug
+                  ? `/${data.citySlug}/events/category/${data.categorySlug}`
+                  : `/${data.citySlug}/events`
+              }
+            />
           </div>
         </section>
       )}
@@ -772,6 +770,7 @@ export function EventPageView({
         isAuthenticated={isAuthenticated}
         scenario={saveQuickdateScenario}
         onPersist={handleSaveToPlanConfirm}
+        showVisibilityToggle
         isIdea={saveStatus.isIdea}
         inPlan={saveStatus.inPlan}
         planDate={saveStatus.planDate}

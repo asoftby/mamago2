@@ -21,6 +21,7 @@ export async function loadPublicActivityForCityPage(
   slugOrId: string,
 ): Promise<
   | (ActivityForEventPageInput & {
+      cityId: string;
       status: ContentStatus;
       slug: string | null;
       seoTitle: string | null;
@@ -128,7 +129,9 @@ export async function loadPublicActivityForCityPage(
           },
         },
       },
-      eventCategory: { select: { nameRu: true } },
+      eventCategory: { select: { id: true, nameRu: true, slug: true } },
+      organizer: { select: { name: true, unp: true } },
+      business: { select: { name: true, legalName: true, unp: true } },
     },
   });
 
@@ -149,9 +152,15 @@ export async function loadPublicActivityForCityPage(
     )?.startsAt ??
     null;
 
-  const [place, venuePlace] = await Promise.all([
+  const [place, venuePlace, venueCity] = await Promise.all([
     enrichPlaceWithResolvedLogo(activity.place),
     enrichPlaceWithResolvedLogo(activity.venue?.place ?? null),
+    activity.venue?.cityId
+      ? prisma.city.findUnique({
+          where: { id: activity.venue.cityId },
+          select: { slug: true },
+        })
+      : Promise.resolve(null),
   ]);
 
   const redirectToSlug =
@@ -206,7 +215,11 @@ export async function loadPublicActivityForCityPage(
       width: img.width,
       height: img.height,
     })),
-    sessions: activity.sessions.map((s) => ({ id: s.id, startsAt: s.startsAt })),
+    sessions: activity.sessions.map((s) => ({
+      id: s.id,
+      startsAt: s.startsAt,
+      isSaleOpen: s.isSaleOpen,
+    })),
     schemaStartDate,
     place: place
       ? {
@@ -232,6 +245,7 @@ export async function loadPublicActivityForCityPage(
           kind: activity.venue.kind,
           title: activity.venue.title,
           addressLine: activity.venue.addressLine,
+          city: venueCity,
           place: venuePlace
             ? {
                 id: venuePlace.id,
@@ -254,6 +268,8 @@ export async function loadPublicActivityForCityPage(
         }
       : null,
     eventCategory: activity.eventCategory,
+    organizer: activity.organizer,
+    business: activity.business,
     ownerUserId: activity.ownerUserId,
     ...(redirectToSlug ? { _redirectToSlug: redirectToSlug } : {}),
   };

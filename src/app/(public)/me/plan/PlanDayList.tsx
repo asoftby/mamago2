@@ -3,7 +3,8 @@
 import React from "react";
 import Link from "next/link";
 import type { SerializedPlanItem } from "./PlanPageClient";
-import { PlanItemCard } from "./PlanItemCard";
+import { PlanItemCard, type VisibilityChange } from "./PlanItemCard";
+import type { FamilyView } from "@/features/my-plan/lib/planVisibilityView";
 import { resolveScenarioCtaState, resolveScenarioCtaLabel } from "@/features/my-plan/lib/canOpenDayScenario";
 
 const MONTHS_RU_GENITIVE = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
@@ -13,11 +14,11 @@ const DAYS_RU_FULL: Record<number, string> = {
 };
 
 function formatDayLabel(dateStr: string): { weekday: string; day: number; month: string } {
-  const date = new Date(dateStr + "T12:00:00");
+  const date = new Date(`${dateStr}T00:00:00.000Z`);
   return {
-    weekday: DAYS_RU_FULL[date.getDay()],
-    day: date.getDate(),
-    month: MONTHS_RU_GENITIVE[date.getMonth()],
+    weekday: DAYS_RU_FULL[date.getUTCDay()],
+    day: date.getUTCDate(),
+    month: MONTHS_RU_GENITIVE[date.getUTCMonth()],
   };
 }
 
@@ -25,6 +26,11 @@ type Props = {
   date: string;
   items: SerializedPlanItem[];
   onRemove: (id: string) => void;
+  familyView?: FamilyView | null;
+  onVisibilityChange?: VisibilityChange;
+  onAddManual: () => void;
+  onEditManual: (item: SerializedPlanItem) => void;
+  conflictIds: ReadonlySet<string>;
   /** undefined = no Scenario yet for this date. */
   scenarioStatus?: "ready" | "changed";
 };
@@ -65,7 +71,7 @@ function ScenarioCta({
   );
 }
 
-export function PlanDayList({ date, items, onRemove, scenarioStatus }: Props) {
+export function PlanDayList({ date, items, onRemove, familyView, onVisibilityChange, onAddManual, onEditManual, conflictIds, scenarioStatus }: Props) {
   const { weekday, day, month } = formatDayLabel(date);
 
   return (
@@ -102,9 +108,16 @@ export function PlanDayList({ date, items, onRemove, scenarioStatus }: Props) {
                 className="font-mono uppercase"
                 style={{ fontSize: 11, letterSpacing: ".12em", color: "rgba(20,18,16,.55)" }}
               >
-                {items.length} {items.length === 1 ? "событие" : items.length <= 4 ? "события" : "событий"}
+                {items.length} {items.length === 1 ? "пункт" : items.length <= 4 ? "пункта" : "пунктов"}
               </span>
             )}
+            <button
+              type="button"
+              onClick={onAddManual}
+              className="min-h-11 rounded-full bg-primary px-4 text-sm font-semibold text-white"
+            >
+              + Добавить
+            </button>
           </div>
         </div>
         <ScenarioCta date={date} itemCount={items.length} scenarioStatus={scenarioStatus} />
@@ -114,7 +127,15 @@ export function PlanDayList({ date, items, onRemove, scenarioStatus }: Props) {
       {items.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {items.map((item) => (
-            <PlanItemCard key={item.id} item={item} onRemove={onRemove} />
+            <PlanItemCard
+              key={item.id}
+              item={item}
+              onRemove={onRemove}
+              onEdit={onEditManual}
+              hasConflict={conflictIds.has(item.id)}
+              familyView={familyView}
+              onVisibilityChange={onVisibilityChange}
+            />
           ))}
         </div>
       ) : (
@@ -137,9 +158,9 @@ export function PlanDayList({ date, items, onRemove, scenarioStatus }: Props) {
               color: "#141210",
             }}
           >
-            Нет событий{" "}
+            На этот день{" "}
             <span className="font-display-italic" style={{ color: "var(--primary)" }}>
-              на этот день
+              пока ничего нет
             </span>
           </h3>
           <p
@@ -154,10 +175,17 @@ export function PlanDayList({ date, items, onRemove, scenarioStatus }: Props) {
               marginRight: "auto",
             }}
           >
-            Добавьте событие, место или идею, чтобы собрать план на{" "}
+            Добавьте заметку или выберите событие mamaGo для{" "}
             {weekday.toLowerCase()}.
           </p>
           <div style={{ display: "inline-flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+            <button
+              type="button"
+              onClick={onAddManual}
+              className="min-h-[50px] rounded-full bg-primary px-5 text-sm font-semibold text-white"
+            >
+              + Добавить
+            </button>
             <Link
               href="/minsk"
               style={{

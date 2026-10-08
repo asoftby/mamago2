@@ -1,4 +1,5 @@
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
+import { parseVideoUrl } from "@/lib/media/parseVideoUrl";
 
 export type PlacePageMediaModel = {
   /** Первое GALLERY-фото — для og/JSON-LD. Лого сюда не попадает. */
@@ -37,18 +38,19 @@ export function mapPlacePageMedia(
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const posterUrl = photos[0]?.url?.trim() || undefined;
-  const reelsUrl = options.reelsUrl?.trim() || undefined;
+  const video = parseVideoUrl(options.reelsUrl);
 
   const galleryItems: MediaGalleryItem[] = [];
 
   // Reels — отдельная плитка с СОБСТВЕННОЙ обложкой (og:image самого рилса).
   // Фото к рилсу не привязаны и не «съедаются» им.
-  if (reelsUrl) {
+  if (video?.type === "instagram") {
     galleryItems.push({
-      type: "reels",
+      type: "instagram",
       id: "place-reels",
-      url: reelsUrl,
-      thumbnailSrc: options.reelsThumbnailUrl?.trim() || undefined,
+      url: video.url,
+      embedId: video.embedId,
+      posterSrc: options.reelsThumbnailUrl?.trim() || null,
       title: options.title,
     });
   }

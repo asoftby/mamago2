@@ -19,6 +19,7 @@ import {
 } from "@/lib/brandingFavicon";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 import { buildNoFlashCookieShellScript } from "@/lib/cookies/no-flash-cookie-shell-script";
+import { InternalHistoryTracker } from "@/components/navigation/InternalHistoryTracker";
 
 export const metadata: Metadata = applyGlobalRobotsOverride({
   title: "mamaGo — помощник для семейного отдыха и развития",
@@ -92,6 +93,7 @@ export default async function RootLayout({
             <AuthProvider initialUser={initialAuthUser}>
               <PendingActionProvider>
                 <AccountModeProvider>
+                  <InternalHistoryTracker />
                   {children}
                   <GateFlowController />
                   <MobileTapDiagnostics />

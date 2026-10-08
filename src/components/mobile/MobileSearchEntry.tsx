@@ -13,7 +13,7 @@ import {
   type PrimaryNavigationId,
 } from "@/lib/discovery/discoveryIntentConfig";
 import { IconBookOpen, IconCompass, IconPalette, IconParty, IconMap } from "@/components/ui/icons";
-import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
+import { getCityLocativePhrase, getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { formatWhoHeaderSummary } from "@/lib/family/formatWhoHeaderSummary";
@@ -24,6 +24,7 @@ import {
 import {
   MOBILE_DISCOVERY_FIELD_CHROME,
   MOBILE_DISCOVERY_FIELD_GEOMETRY,
+  MOBILE_FLOATING_CHROME,
 } from "@/components/mobile/mobile-control-geometry";
 
 // Map intent IDs to fallback icons
@@ -54,6 +55,11 @@ interface MobileSearchEntryProps {
   showSectionIcon?: boolean;
   /** Подсказка «тапни, чтобы выбрать» — только на главной города (`/{city}`) */
   showTapToSelectHint?: boolean;
+  /**
+   * `chip` — компактный контекст-чип для однострочного хедера:
+   * «🧭 Минск · Я и Степан ▾». Единственная точка входа в поиск.
+   */
+  variant?: "field" | "chip";
 }
 
 export function MobileSearchEntry({
@@ -65,6 +71,7 @@ export function MobileSearchEntry({
   showSectionIcon = false,
   showTapToSelectHint = false,
   locationLabelOverride = null,
+  variant = "field",
 }: MobileSearchEntryProps) {
   const [isClient, setIsClient] = useState(false);
   const { applied } = useDiscoveryFilters();
@@ -286,6 +293,30 @@ export function MobileSearchEntry({
     onlyCitySelected && (showTapToSelectHint || !cityHubOnly);
 
   const TAP_HINT = "[ тапни, чтобы выбрать ]";
+
+  if (variant === "chip") {
+    const chipCity = locationLabelOverride ?? getCityNominativeName(citySlug);
+    const chipText = [chipCity, cityHubOnly ? null : ageText].filter(Boolean).join(" · ");
+    return (
+      <button
+        type="button"
+        onClick={onSearchClick}
+        aria-label="Изменить город и спутников"
+        className={cn(
+          "flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left",
+          MOBILE_DISCOVERY_FIELD_GEOMETRY,
+          MOBILE_FLOATING_CHROME,
+          "transition-transform duration-150 ease-out active:scale-[0.98]",
+          className,
+        )}
+      >
+        <span aria-hidden className="shrink-0 text-base leading-none">🧭</span>
+        <span className="block min-w-0 flex-1 truncate text-sm font-normal text-gray-700">
+          {chipText}
+        </span>
+      </button>
+    );
+  }
 
   return (
     <button

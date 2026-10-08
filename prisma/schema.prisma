@@ -73,6 +73,10 @@ model User {
   bookingFeedbacks                  BookingFeedback[]
   reviewedBusinessVerifications     BusinessVerificationLog[]        @relation("ReviewedBy")
   children                          Child[]
+  familyMemberships                 FamilyMembership[]
+  familyInvitesCreated              FamilyInvite[]                   @relation("FamilyInviteCreator")
+  familyInvitesAccepted             FamilyInvite[]                   @relation("FamilyInviteAcceptor")
+  consentRecords                    ConsentRecord[]
   contentEdits                      ContentEditLog[]                 @relation("ContentEditor")
   ideas                             Idea[]
   assignedImprovementRequests       ImprovementRequest[]             @relation("ImprovementRequestAssignee")
@@ -98,6 +102,8 @@ model User {
   reviewedBusinessAccessRequests    BusinessAccessRequest[]          @relation("BusinessAccessRequestReviewedBy")
   placeRevisions                    PlaceRevision[]                  @relation("PlaceRevisionReviewer")
   planItems                         PlanItem[]
+  inboxItems                        InboxItem[]
+  experiences                       Experience[]
   dayScenarios                      DayScenario[]
   routes                            Route[]                          @relation("RouteAuthor")
   routeIdeas                        RouteIdea[]
@@ -121,6 +127,7 @@ model User {
   editedBroadcastRevisions          AdminBroadcastRevision[]         @relation("AdminBroadcastRevisionEditor")
   devTelegramBusinessApplications   DevTelegramBusinessApplication[]
   searchQueryLogs                   SearchQueryLog[]
+  seoContentPlanItems               SeoContentPlanItem[]            @relation("SeoContentPlanCreatedBy")
   createdPages                      Page[]                           @relation("PageCreatedBy")
   updatedPages                      Page[]                           @relation("PageUpdatedBy")
   requestedOfferPlacements          OfferPlacement[]                 @relation("OfferPlacementRequestedBy")
@@ -173,6 +180,9 @@ model UserBehaviorProfile {
 
 model UserEvent {
   id               String               @id @default(cuid())
+  /// Optional server-only deduplication key. Client analytics ingestion never
+  /// accepts this field; nullable uniqueness leaves ordinary events unchanged.
+  idempotencyKey   String?              @unique
   userId           String?
   sessionId        String?
   eventType        UserEventType
@@ -180,6 +190,19 @@ model UserEvent {
   entityId         String?
   vertical         AnalyticsVertical?
   cityId           String?
+  /// RecommendationRun.id that caused this action, if any. Intentionally not a
+  /// hard FK: raw event history must not depend on recommendation-retention
+  /// tables and must survive their pruning.
+  decisionId       String?
+  /// Guest product identity (client-generated UUID). Distinct from
+  /// `mg_analytics_sid`, which stays a web-analytics session id, not identity.
+  anonymousId      String?
+  /// Family context of the event (Family Core). Server-only, intentionally not
+  /// a hard FK: raw event history must survive family deletion. Null for all
+  /// events written before the Family Core ships.
+  familyId         String?
+  /// Plan audience (PRIVATE | FAMILY) for plan-related events. Server-only.
+  planVisibility   PlanVisibility?
   meta             Json?
   createdAt        DateTime             @default(now())
   promotionActions PromotionAction[]
@@ -191,6 +214,8 @@ model UserEvent {
   @@index([entityType, entityId, createdAt])
   @@index([vertical, createdAt])
   @@index([cityId, createdAt])
+  @@index([decisionId])
+  @@index([anonymousId, createdAt])
 }
 
 model Session {
@@ -316,19 +341,140 @@ model TelegramConnection {
   @@index([environment, isActive])
 }
 
+enum BirthPrecision {
+  DAY
+  MONTH
+}
+
+/// Audience of a plan item at the moment an analytics event was written.
+/// Server-only; used by the Family Core to keep personal signals separate from
+/// family signals.
+enum PlanVisibility {
+  PRIVATE
+  FAMILY
+}
+
+enum FamilyRole {
+  OWNER
+  ADULT
+}
+
+/// Какую историю семьи видит взрослый: ALL — всё; FROM_JOIN — только с момента вступления.
+enum FamilyHistoryAccess {
+  ALL
+  FROM_JOIN
+}
+
+/// Решение по записи плана. PROPOSED — предложение, ещё не принятое семьёй.
+enum PlanDecisionStatus {
+  PROPOSED
+  CONFIRMED
+  CANCELLED
+}
+
+/// Family Core: семья (общий профиль детей и «Мой план»).
+model Family {
+  id          String             @id @default(cuid())
+  name        String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  /// Закрытая семья (когда взрослых не осталось, B3/A2).
+  archivedAt  DateTime?
+  memberships FamilyMembership[]
+  children    Child[]
+  planItems   PlanItem[]
+  invites     FamilyInvite[]
+  consents    ConsentRecord[]
+}
+
+/// Членство взрослого в семье. Инварианты — partial unique индексы в миграции:
+///  - FamilyMembership_active_user: один активный membership на пользователя;
+///  - FamilyMembership_active_owner: один активный OWNER на семью.
+/// Prisma не выражает partial unique, поэтому в schema.prisma их нет.
+model FamilyMembership {
+  id            String              @id @default(cuid())
+  familyId      String
+  userId        String
+  role          FamilyRole          @default(ADULT)
+  historyAccess FamilyHistoryAccess @default(ALL)
+  joinedAt      DateTime            @default(now())
+  /// null = активное членство.
+  leftAt        DateTime?
+  family        Family              @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@index([userId])
+}
+
+/// Статус приглашения. Истечение (7 дней) вычисляется по expiresAt, отдельного статуса нет.
+enum FamilyInviteStatus {
+  ACTIVE
+  ACCEPTED
+  REVOKED
+}
+
+enum ConsentType {
+  FAMILY_SHARED_DATA
+}
+
+/// Приглашение взрослого в семью. Токен хранится только хешем (sha256).
+model FamilyInvite {
+  id           String             @id @default(cuid())
+  familyId     String
+  createdById  String
+  tokenHash    String             @unique
+  status       FamilyInviteStatus @default(ACTIVE)
+  /// null = бессрочное (до принятия или отзыва). Старые приглашения с датой честно истекают.
+  expiresAt    DateTime?
+  createdAt    DateTime           @default(now())
+  acceptedById String?
+  acceptedAt   DateTime?
+  revokedAt    DateTime?
+  family       Family             @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdBy    User               @relation("FamilyInviteCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  acceptedBy   User?              @relation("FamilyInviteAcceptor", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([familyId, status])
+}
+
+/// Согласие пользователя (версия текста фиксируется на момент принятия).
+model ConsentRecord {
+  id          String      @id @default(cuid())
+  userId      String
+  familyId    String?
+  type        ConsentType
+  textVersion String
+  acceptedAt  DateTime    @default(now())
+  revokedAt   DateTime?
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  family      Family?     @relation(fields: [familyId], references: [id], onDelete: SetNull)
+
+  @@index([userId, type])
+}
+
 model Child {
   id              String                @id @default(cuid())
-  name            String
+  name            String?
   birthDate       DateTime?
+  birthPrecision  BirthPrecision?
   interests       String?
   parentId        String
+  /// Family Core: принадлежность ребёнка семье (источник ACL с B2). null до backfill.
+  familyId        String?
+  /// Кто создал запись; НЕ используется как ACL.
+  createdById     String?
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
   parent          User                  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  family          Family?               @relation(fields: [familyId], references: [id], onDelete: Cascade)
   customInterests ChildCustomInterest[]
   systemInterests ChildInterest[]
+  planItems       PlanItem[]
 
+  @@unique([id, familyId])
   @@index([parentId])
+  @@index([familyId])
 }
 
 model ChildInterest {
@@ -368,11 +514,58 @@ model Idea {
   @@index([userId])
 }
 
+enum PlanItemSource {
+  CATALOG
+  TELEGRAM_FORWARD
+  MANUAL
+}
+
+enum PlanEntryType {
+  EVENT
+  ACTIVITY
+  TASK
+}
+
+enum RequirementKind {
+  BRING
+  PAY
+  DOCUMENT
+}
+
+enum InboxStatus {
+  RECEIVED
+  PROCESSING
+  DRAFT_READY
+  CONFIRMED
+  DISCARDED
+  FAILED
+}
+
+enum InboxSourceKind {
+  TEXT
+  FORWARD
+  PHOTO
+}
+
+enum InboxIntent {
+  CREATE
+  UPDATE
+  CANCEL
+  NONE
+}
+
+enum InboxPartKind {
+  TEXT
+  PHOTO
+}
+
 model PlanItem {
   id                String                    @id @default(cuid())
   userId            String
   activityId        String?
-  date              String
+  /// YYYY-MM-DD. null = запись без даты («намерение без даты», Family Core B0);
+  /// ни один текущий writer не создаёт такие строки.
+  date              String?
   startsAt          DateTime?
   createdAt         DateTime                  @default(now())
   title             String?
@@ -386,12 +579,54 @@ model PlanItem {
   planPlaceSlug     String?
   /// Статья в плане (сохранённое чтение без привязки к событию/месту)
   articleId         String?
+  /// Происхождение записи; все существующие строки — CATALOG.
+  source            PlanItemSource            @default(CATALOG)
+  /// null для CATALOG
+  entryType         PlanEntryType?
+  childId           String?
+  arriveAt          DateTime?
+  endsAt            DateTime?
+  /// Только для самостоятельного TASK
+  dueAt             DateTime?
+  /// false: дедлайн только датой (dueAt = начало дня в поясе владельца)
+  dueHasTime        Boolean                   @default(false)
+  locationText      String?
+  notes             String?
+  /// Пользовательские теги заметки. В UI не являются типом/категорией.
+  tags              String[]                  @default([])
+  /// Категория ручного пункта (ключ из PLAN_ITEM_CATEGORY_KEYS: health, sport, school, …).
+  /// null = не задана (legacy / каталожные события); UI тогда определяет её по названию.
+  category          String?
+  /// null = legacy/catalog default; true/false = явный выбор для пользовательской заметки.
+  reminderEnabled   Boolean?
+  priceAmount       Decimal?                  @db.Decimal(10, 2)
+  priceCurrency     String?                   @default("BYN")
+  /// Простая ссылка без FK: входящие чистятся независимо от записей плана
+  inboxItemId       String?
+  /// Канонический Place события (НЕ placeId: тот означает «запись плана — визит в место»)
+  venuePlaceId      String?
+  /// Мягкая отмена; отменённые записи не удаляются
+  cancelledAt       DateTime?
+  /// Family Core M4a: оптимистичная проверка конфликтов правок двух взрослых.
+  updatedAt         DateTime                  @default(now()) @updatedAt
+  /// Family Core: семья-владелец записи (источник ACL с B2). null до backfill.
+  familyId          String?
+  /// Аудитория записи. Существующие строки — FAMILY (семья из одного = как раньше).
+  visibility        PlanVisibility            @default(FAMILY)
+  /// Решение по записи; все существующие строки — CONFIRMED.
+  /// CHECK: visibility=PRIVATE и status=PROPOSED одновременно запрещены (см. миграцию).
+  status            PlanDecisionStatus        @default(CONFIRMED)
+  family            Family?                   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  bookingRequests   BookingRequest[]
   activity          Activity?                 @relation(fields: [activityId], references: [id])
   route             Route?                    @relation(fields: [routeId], references: [id])
-  place             Place?                    @relation(fields: [placeId], references: [id])
+  place             Place?                    @relation("PlanItemToPlace", fields: [placeId], references: [id])
+  venuePlace        Place?                    @relation("PlanItemVenue", fields: [venuePlaceId], references: [id], onDelete: SetNull)
   article           Article?                  @relation(fields: [articleId], references: [id])
   user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  child             Child?                    @relation(fields: [childId], references: [id], onDelete: SetNull)
   scenarioOverrides DayScenarioItemOverride[]
+  requirements      PlanItemRequirement[]
 
   @@index([userId, date])
   @@index([userId])
@@ -402,6 +637,126 @@ model PlanItem {
   @@index([userId, planPlaceSlug])
   @@index([articleId])
   @@index([startsAt])
+  @@index([userId, source, startsAt])
+  @@index([childId])
+  @@index([venuePlaceId])
+  @@index([familyId, date])
+  @@index([familyId, visibility, status])
+  @@unique([id, familyId])
+}
+
+model PlanItemRequirement {
+  id         String          @id @default(cuid())
+  planItemId String
+  planItem   PlanItem        @relation(fields: [planItemId], references: [id], onDelete: Cascade)
+  kind       RequirementKind
+  /// «вода», «справка», «передать классному»
+  text       String
+  /// PAY/DOCUMENT; BRING по умолчанию = начало события
+  dueAt      DateTime?
+  /// false: только дата (dueAt = начало дня в поясе владельца)
+  dueHasTime Boolean         @default(false)
+  amount     Decimal?        @db.Decimal(10, 2)
+  currency   String?         @default("BYN")
+  doneAt     DateTime?
+  createdAt  DateTime        @default(now())
+
+  @@index([planItemId])
+  @@index([dueAt, doneAt])
+}
+
+/// Логический запрос «Отправить в mamaGo» (одно сообщение или один альбом).
+model InboxItem {
+  id                String          @id @default(cuid())
+  /// MVP-владелец; в коде доступ только через PlanOwner
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Окружение бота: update_id и chat_id независимы у DEV/PROD
+  environment       TelegramEnvironment
+  telegramChatId    BigInt
+  mediaGroupId      String?
+  sourceKind        InboxSourceKind
+  /// От первой части: forward_origin.date или message.date
+  anchorAt          DateTime
+  anchorIsForward   Boolean
+  /// now + 2,5 с при каждой новой части альбома
+  debounceUntil     DateTime
+  status            InboxStatus     @default(RECEIVED)
+  intent            InboxIntent?
+  /// CaptureDraft, валидирован zod
+  draft             Json?
+  draftVersion      Int             @default(0)
+  /// Для UPDATE/CANCEL
+  matchedPlanItemId String?
+  cardMessageId     Int?
+  awaitingEditUntil DateTime?
+  escalated         Boolean         @default(false)
+  /// Коды сработавших правил, без содержимого
+  ruleCodes         String[]
+  model             String?
+  tokensIn          Int?
+  tokensOut         Int?
+  /// Только код/класс ошибки, без содержимого
+  error             String?
+  editCount         Int             @default(0)
+  createdAt         DateTime        @default(now())
+  processedAt       DateTime?
+  purgeAfter        DateTime
+  parts             InboxItemPart[]
+
+  @@index([userId, status])
+  @@index([mediaGroupId])
+  @@index([status, debounceUntil])
+}
+
+/// Конкретный апдейт Telegram и одновременно чек получения (идемпотентность приёма).
+model InboxItemPart {
+  id                String        @id @default(cuid())
+  inboxItemId       String
+  inboxItem         InboxItem     @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
+  /// Окружение бота: update_id независимы у разных ботов
+  environment       TelegramEnvironment
+  /// Повторная доставка не создаёт часть (ключ идемпотентности: environment + telegramUpdateId)
+  telegramUpdateId  BigInt
+  telegramMessageId Int
+  kind              InboxPartKind
+  /// Текст или подпись; обнуляется purge-джобой
+  text              String?
+  /// file_id фото; сами файлы не храним
+  telegramFileId    String?
+  /// Порядок по telegramMessageId
+  position          Int
+  createdAt         DateTime      @default(now())
+
+  @@unique([environment, telegramUpdateId])
+  @@index([inboxItemId])
+}
+
+/// Durable, explicit post-plan outcome. Historical references intentionally
+/// are not foreign keys: an experience survives PlanItem/content deletion.
+model Experience {
+  id                    String               @id @default(cuid())
+  userId                String
+  sourcePlanItemId      String               @unique
+  entityType            AnalyticsEntityType
+  entityId              String
+  plannedDate           String
+  plannedStartsAt       DateTime?
+  attendance            ExperienceAttendance
+  attendanceConfirmedAt DateTime
+  subjects              Json?
+  sourceDecisionId      String?
+  sourceExposureId      String?
+  feedbackSentiment     ExperienceSentiment?
+  feedbackAt            DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, plannedDate])
+  @@index([userId, entityType, entityId])
+  @@index([sourceDecisionId])
+  @@index([sourceExposureId])
 }
 
 /// Сценарий дня (Task 7 MVP) — минимальная persisted-разметка поверх
@@ -722,6 +1077,7 @@ model Region {
   priority  Int        @default(0)
   cities    City[]
   articles  Article[]  @relation("ArticleRegion")
+  seoContentPlanItems SeoContentPlanItem[] @relation("SeoContentPlanRegion")
   articleGeographyTargets ArticleGeographyTarget[] @relation("ArticleAdditionalRegion")
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -764,6 +1120,8 @@ model City {
   routes                Route[]
   searchQuickTags       SearchQuickTag[]
   searchQueryLogs       SearchQueryLog[]
+  searchDocuments       SearchDocument[]
+  seoContentPlanItems   SeoContentPlanItem[]  @relation("SeoContentPlanCity")
   offers                Offer[]               @relation("OfferCity")
   activitySlugHistories ActivitySlugHistory[]
   placeSlugHistories    PlaceSlugHistory[]
@@ -1052,6 +1410,7 @@ model Business {
   bookingRequests         BookingRequest[]
   owner                   User                          @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   contracts               BusinessContract[]
+  commercialCounterparty  CommercialCounterparty?
   invites                 BusinessInvite[]
   members                 BusinessMember[]
   placements              BusinessPlacement[]
@@ -1316,7 +1675,9 @@ model Place {
   subcategories   PlaceSubcategory[]
   /// Articles where this place is the editorial subject (relatedPlace).
   relatedArticles Article[]           @relation("ArticleRelatedPlace")
-  planItems       PlanItem[]
+  planItems       PlanItem[]            @relation("PlanItemToPlace")
+  /// PlanItem.venuePlaceId: канонический Place события (не путать с planItems по placeId).
+  venuePlanItems  PlanItem[]            @relation("PlanItemVenue")
   placeIdeas      PlaceIdea[]
   directThreads   DirectThread[]
 
@@ -2503,29 +2864,73 @@ model PromotionAction {
   @@index([promotionId, actionType, createdAt])
 }
 
+model CommercialCounterparty {
+  id            String             @id @default(cuid())
+  name          String
+  unp           String?            @unique
+  contactName   String?
+  phoneE164     String?
+  businessId    String?            @unique
+  egrVerifiedAt DateTime?
+  egrSource     String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  business      Business?          @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  contracts     BusinessContract[]
+
+  @@index([name])
+}
+
 model BusinessContract {
   id                      String                   @id @default(cuid())
-  businessId              String
+  /// Access-scoped/legacy Business link. Client-document wizard contracts leave this null.
+  businessId              String?
+  /// Canonical client/counterparty for newly created commercial documents.
+  counterpartyId          String?
   contractNumber          String                   @unique
   type                    ContractType
+  templateSource          ContractTemplateSource   @default(MAMAGO)
   status                  ContractStatus           @default(DRAFT)
   signedAt                DateTime?
-  startsAt                DateTime
-  endsAt                  DateTime
+  startsAt                DateTime?
+  endsAt                  DateTime?
   autoRenew               Boolean                  @default(false)
   renewalTerms            String?
   renewalPeriod           Int?
   documentUrl             String?
   notes                   String?
+  totalAmount             Decimal                  @default(0) @db.Decimal(12, 2)
+  currency                String                   @default("BYN")
+  prepaymentPercent       Int                      @default(0)
+  prepaymentDueAt         DateTime?
+  postpaymentDueAt        DateTime?
+  paymentComment          String?
+  platform                String                   @default("MAMAGO_BY")
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
-  business                Business                 @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business                Business?                @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  counterparty            CommercialCounterparty?  @relation(fields: [counterpartyId], references: [id], onDelete: Restrict)
+  items                   BusinessContractItem[]
   commercialNotifications CommercialNotification[]
 
   @@index([businessId])
+  @@index([counterpartyId])
   @@index([status])
   @@index([endsAt])
   @@index([status, endsAt])
+}
+
+model BusinessContractItem {
+  id         String           @id @default(cuid())
+  contractId String
+  name       String
+  amount     Decimal          @db.Decimal(12, 2)
+  sortOrder  Int              @default(0)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  contract   BusinessContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
 }
 
 model BusinessPlacement {
@@ -2793,6 +3198,7 @@ model Article {
 
   ideas     ArticleIdea[]
   planItems PlanItem[]
+  seoContentPlanItems SeoContentPlanItem[] @relation("SeoContentPlanArticle")
 
   /// Partial unique index created via raw SQL migration:
   /// CREATE UNIQUE INDEX ... WHERE "cityId" IS NOT NULL AND "slug" IS NOT NULL
@@ -2891,11 +3297,15 @@ model SearchDocument {
   urlPath     String
   isPublished Boolean          @default(false)
   boost       Float            @default(1)
+  cityId      String?
   updatedAt   DateTime         @updatedAt
   createdAt   DateTime         @default(now())
 
+  city City? @relation(fields: [cityId], references: [id], onDelete: SetNull)
+
   @@unique([entityType, entityId])
   @@index([isPublished])
+  @@index([isPublished, cityId])
 }
 
 enum SearchEntityType {
@@ -3250,6 +3660,36 @@ enum UserEventType {
   BOOKING_COMPLETED
   BOOKING_CANCELLED
   FEEDBACK_LEFT
+  /// Onboarding funnel (ONB-013). Properties are IDs/step names/booleans only — never name, DOB, email, or phone.
+  AUTH_STARTED
+  AUTH_COMPLETED
+  FAMILY_ONBOARDING_STARTED
+  CHILD_SAVED
+  CHILD_CONTEXT_COMPLETED
+  ONBOARDING_COMPLETED
+  FIRST_PERSONALIZED_RESULT
+  FIRST_PERSONALIZED_PLAN_ADD
+  /// Server-only audience snapshot for an already-existing PlanItem whose audience/date was
+  /// re-saved (no new plan-add happened). Deliberately NOT a PLAN_ADD so it can't inflate
+  /// positive-signal counts, ranking weights or promotion metrics.
+  PLAN_AUDIENCE_SNAPSHOT
+  ATTENDED
+  EXPERIENCE_FEEDBACK
+  /// Family Core M4a (server-only): visibility/decision domain events of a plan item.
+  PLAN_ITEM_SHARED
+  PLAN_ITEM_MADE_PRIVATE
+  PLAN_ITEM_RESCHEDULED
+}
+
+enum ExperienceAttendance {
+  ATTENDED
+  NOT_ATTENDED
+}
+
+enum ExperienceSentiment {
+  LIKE
+  NEUTRAL
+  DISLIKE
 }
 
 enum AnalyticsEntityType {
@@ -3812,6 +4252,11 @@ enum ContractStatus {
   EXPIRING
   EXPIRED
   TERMINATED
+}
+
+enum ContractTemplateSource {
+  MAMAGO
+  CLIENT
 }
 
 enum ContractType {
@@ -4879,9 +5324,13 @@ model BookingRequest {
   /// Время ответа в минутах (diff firstResponseAt − createdAt)
   responseTimeMinutes Int?
 
+  /// Family Core M6: запись плана, под которую оформлена бронь (видна семье только как безопасный статус).
+  planItemId String?
+
   // Relations
   business     Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
   user         User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  planItem     PlanItem?         @relation(fields: [planItemId], references: [id], onDelete: SetNull)
   activity     Activity?         @relation(fields: [activityId], references: [id], onDelete: SetNull)
   offer        Offer?            @relation(fields: [offerId], references: [id], onDelete: SetNull)
   place        Place?            @relation(fields: [placeId], references: [id], onDelete: SetNull)
@@ -4897,6 +5346,7 @@ model BookingRequest {
   @@index([placeId])
   @@index([selectedSessionId])
   @@index([campShiftId])
+  @@index([planItemId])
   @@index([status])
   @@index([requestedDate])
   @@index([createdAt])
@@ -5274,6 +5724,65 @@ model SearchSynonym {
   @@index([source])
 }
 
+enum SeoContentPlanStatus {
+  IDEA
+  PLANNED
+  IN_PROGRESS
+  PUBLISHED
+}
+
+enum SeoContentPlanSource {
+  MANUAL
+  INTERNAL_SEARCH
+  SEO_OPPORTUNITY
+}
+
+enum SeoContentPlanPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+/// SEO Content OS plan item — weekly/monthly publication backlog for a geo market.
+model SeoContentPlanItem {
+  id               String                 @id @default(cuid())
+  title            String
+  targetQuery      String?
+  /// Normalized targetQuery for duplicate detection (lowercase trimmed).
+  targetQueryKey   String?
+  geoScope         GeoScope
+  cityId           String?
+  regionId         String?
+  scheduledFor     DateTime?
+  status           SeoContentPlanStatus   @default(IDEA)
+  priority         SeoContentPlanPriority @default(MEDIUM)
+  source           SeoContentPlanSource   @default(MANUAL)
+  sourceQuery      String?
+  articleId        String?
+  notes            String?
+  createdByUserId  String
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  city      City?    @relation("SeoContentPlanCity", fields: [cityId], references: [id], onDelete: SetNull)
+  region    Region?  @relation("SeoContentPlanRegion", fields: [regionId], references: [id], onDelete: SetNull)
+  article   Article? @relation("SeoContentPlanArticle", fields: [articleId], references: [id], onDelete: SetNull)
+  createdBy User     @relation("SeoContentPlanCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([geoScope])
+  @@index([cityId])
+  @@index([regionId])
+  @@index([scheduledFor])
+  @@index([status])
+  @@index([targetQuery])
+  @@index([targetQueryKey])
+  @@index([status, scheduledFor])
+  @@index([cityId, status, scheduledFor])
+  @@index([regionId, status, scheduledFor])
+  @@index([createdByUserId])
+  @@index([articleId])
+}
+
 /// Search query log для аналитики и zero-result tracking
 model SearchQueryLog {
   id                String   @id @default(cuid())
@@ -5284,6 +5793,9 @@ model SearchQueryLog {
   cityId            String?
   userId            String?
   sessionId         String?
+  searchId          String?   @unique
+  clickedPosition   Int?
+  clickedAt         DateTime?
   createdAt         DateTime @default(now())
 
   city City? @relation(fields: [cityId], references: [id], onDelete: SetNull)

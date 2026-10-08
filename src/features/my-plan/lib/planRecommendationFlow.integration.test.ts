@@ -45,6 +45,7 @@ function draft(id: string, batchNumber = 1, addedActivityIds: string[] = []): Pl
     addedActivityIds,
     shownActivityIds: [id],
     ageRangeValues: ["6-9"],
+    personaIds: ["child-1"],
     lastSuccessfulFetchAt: "2030-04-12T10:00:00.000Z",
   };
 }

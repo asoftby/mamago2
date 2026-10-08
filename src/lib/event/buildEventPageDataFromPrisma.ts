@@ -2,11 +2,12 @@ import type { ActivityFormat, EventVenueKind } from "@prisma/client";
 import type { Intent } from "@/lib/intent";
 import { DEFAULT_CITY_HUB_PATH } from "@/lib/intent";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
+import { parseVideoUrl } from "@/lib/media/parseVideoUrl";
 import { extractPlainTextFromHtml } from "@/lib/richtext/utils";
 import { sanitizeRichContent } from "@/components/content/richContentHtml";
 import { resolvePlaceLogoUrl } from "@/lib/place/resolvePlaceLogoImage";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
-import { BYN_SYMBOL, formatPrice, formatPriceAmount, formatPriceFrom } from "@/lib/formatters/format-price";
+import { BYN_SYMBOL, formatPrice, formatPriceAmount, formatPriceFrom, formatPriceRange } from "@/lib/formatters/format-price";
 import { formatHHMM } from "@/lib/formatters/date";
 import type { EventPageData } from "./eventPageTypes";
 import {
@@ -57,7 +58,7 @@ export type ActivityForEventPageInput = {
     width?: number | null;
     height?: number | null;
   }>;
-  sessions: Array<{ id: string; startsAt: Date }>;
+  sessions: Array<{ id: string; startsAt: Date; isSaleOpen?: boolean | null }>;
   /** Контактные телефоны события (собственные, до фоллбэка на площадку) */
   phone?: string | null;
   phoneLabel?: string | null;
@@ -92,6 +93,7 @@ export type ActivityForEventPageInput = {
     kind: EventVenueKind;
     title: string | null;
     addressLine: string | null;
+    city?: { slug: string } | null;
     place: {
       id: string;
       slug: string | null;
@@ -116,7 +118,16 @@ export type ActivityForEventPageInput = {
       phone3Label?: string | null;
     } | null;
   } | null;
-  eventCategory: { nameRu: string } | null;
+  eventCategory: { id?: string; nameRu: string; slug?: string } | null;
+  organizer?: {
+    name: string;
+    unp: string | null;
+  } | null;
+  business?: {
+    name: string;
+    legalName: string | null;
+    unp: string | null;
+  } | null;
 };
 
 function discoveryIntentForActivity(): Intent {
@@ -132,11 +143,25 @@ function normalizePriceCurrencyText(text: string): string {
     .trim();
 }
 
+function formatSimpleBynRange(text: string): string | null {
+  if (/€|\$|£|₽/.test(text)) return null;
+
+  const normalized = normalizePriceCurrencyText(text)
+    .replaceAll(BYN_SYMBOL, "")
+    .trim();
+  const match = normalized.match(/^(от\s+)?(\d+(?:[.,]\d+)?)\s*[-–—]\s*(\d+(?:[.,]\d+)?)$/i);
+  if (!match) return null;
+
+  const from = Number(match[2]!.replace(",", "."));
+  const to = Number(match[3]!.replace(",", "."));
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
+
+  const range = formatPriceRange(from, to);
+  return match[1] ? `от ${range}` : range;
+}
+
 /** Если в `priceText` только число/фраза без валюты — дописываем единый символ валюты. */
 function priceTextWithCurrencyIfNeeded(text: string): string {
-  if (/\bbyn\b/i.test(text) || /\bbr\b/i.test(text) || /руб\.?/i.test(text) || text.includes(BYN_SYMBOL)) {
-    return normalizePriceCurrencyText(text);
-  }
   const lower = text.toLowerCase();
   if (
     lower.includes("бесплатно") ||
@@ -145,6 +170,14 @@ function priceTextWithCurrencyIfNeeded(text: string): string {
   ) {
     return text;
   }
+
+  const simpleRange = formatSimpleBynRange(text);
+  if (simpleRange) return simpleRange;
+
+  if (/\bbyn\b/i.test(text) || /\bbr\b/i.test(text) || /руб\.?/i.test(text) || text.includes(BYN_SYMBOL)) {
+    return normalizePriceCurrencyText(text);
+  }
+
   // Если это чистое число (напр. "15" или "15.50") — форматируем через formatPriceAmount,
   // чтобы получить "15,00" с фиксированными двумя знаками после запятой.
   const numStr = formatPriceAmount(text);
@@ -464,6 +497,8 @@ export function buildEventPageDataFromPrismaActivity(
     ownerEditHref?: string;
     /** Pre-fetched Instagram Reels thumbnail URL (og:image from the Reel page). */
     reelsThumbnailUrl?: string;
+    /** Same-category discovery candidates prepared by the route. */
+    similar?: EventPageData["similar"];
   }
 ): EventPageData {
   const citySlug =
@@ -503,6 +538,23 @@ export function buildEventPageDataFromPrismaActivity(
   const isPastEvent =
     sessions.length > 0 && sessions.every((s) => new Date(s.startsAt) < now);
 
+  const organizerSnapshotRaw = getScheduleJsonRecord(activity)?.organizer;
+  const organizerSnapshot =
+    organizerSnapshotRaw && typeof organizerSnapshotRaw === "object"
+      ? (organizerSnapshotRaw as Record<string, unknown>)
+      : null;
+  const organizerName =
+    activity.organizer?.name?.trim() ||
+    (typeof organizerSnapshot?.name === "string" ? organizerSnapshot.name.trim() : "") ||
+    activity.business?.legalName?.trim() ||
+    activity.business?.name?.trim() ||
+    "";
+  const organizerUnp =
+    activity.organizer?.unp?.trim() ||
+    (typeof organizerSnapshot?.unp === "string" ? organizerSnapshot.unp.trim() : "") ||
+    activity.business?.unp?.trim() ||
+    "";
+
   const data: EventPageData = {
     id: activity.id,
     slug: activity.slug ?? null,
@@ -511,6 +563,7 @@ export function buildEventPageDataFromPrismaActivity(
     discoveryIntent: discoveryIntentForActivity(),
     ageFromBadge: activity.agePolicy === "ADULT_ONLY" ? "18+" : formatAgeTagsCompact(activity.ageTags) ?? ageFromPlusBadgeFromAgeTags(activity.ageTags),
     categoryLabel: activity.eventCategory?.nameRu,
+    categorySlug: activity.eventCategory?.slug,
     title: activity.title,
     subtitle: activity.shortDesc,
     factChips: factChipsFromActivity(activity),
@@ -531,14 +584,23 @@ export function buildEventPageDataFromPrismaActivity(
     ],
     about: aboutFromActivity(activity),
     planDayLinks: {},
-    similar: [],
+    organizer: organizerName
+      ? {
+          name: organizerName,
+          ...(organizerUnp ? { unp: organizerUnp } : {}),
+        }
+      : undefined,
+    similar: options?.similar ?? [],
     breadcrumbs: [
       { label: "Главная", href: `/${citySlug}` },
       { label: "События", href: `/${citySlug}/kuda` },
       { label: activity.title, href: "#" },
     ],
     priceLabel: priceLabel(activity),
-    priceDetails: activity.priceDetails ?? undefined,
+    priceDetails:
+      activity.priceDetails?.trim() ||
+      getScheduleJsonString(activity, "priceDetails")?.trim() ||
+      undefined,
     faqItems: normalizeFaqItems(activity.faqItems),
     cta: {
       planLabel: "В план",
@@ -561,19 +623,19 @@ export function buildEventPageDataFromPrismaActivity(
 
 function resolveReelsUrl(activity: Pick<ActivityForEventPageInput, "scheduleJson">): string | undefined {
   const url = getScheduleJsonString(activity, "reelsUrl")?.trim() ?? "";
-  return url && isHttpUrl(url) ? url : undefined;
+  return parseVideoUrl(url)?.url;
 }
 
 /**
  * Builds the gallery strip items shown under the cover image:
- * [reels?, ...extra photos (excl. cover)]
+ * [extra photos (excl. cover), supported video?]
  */
-function buildGalleryItems(
+export function buildGalleryItems(
   activity: ActivityForEventPageInput,
   resolvedPosterUrl: string,
   reelsThumbnailUrl?: string,
 ): MediaGalleryItem[] | undefined {
-  const reelsUrl = resolveReelsUrl(activity);
+  const video = parseVideoUrl(getScheduleJsonString(activity, "reelsUrl"));
 
   // Extra gallery images = all images except the one used as cover
   const rawImages = activity.images ?? [];
@@ -593,26 +655,25 @@ function buildGalleryItems(
 
   const items: MediaGalleryItem[] = [];
 
-  if (reelsUrl) {
-    const thumbnailSrc =
-      reelsThumbnailUrl ??
-      (resolvedPosterUrl !== "/og-default.jpg" ? resolvedPosterUrl : undefined);
-    const isInstagramPost = /instagram\.com\/p\//i.test(reelsUrl);
-    items.push({
-      type: "reels",
-      id: "reels",
-      url: reelsUrl,
-      thumbnailSrc,
-      title: isInstagramPost ? "Post о событии" : "Reels о событии",
-    });
-  }
-
   for (const img of extraImages) {
     items.push({
       type: "image",
       id: img.id,
       src: img.url,
       alt: activity.title,
+    });
+  }
+
+  if (video) {
+    items.push({
+      type: video.type,
+      id: `${video.type}-video`,
+      url: video.url,
+      embedId: video.embedId,
+      posterSrc: video.type === "youtube"
+        ? `https://img.youtube.com/vi/${video.embedId}/hqdefault.jpg`
+        : reelsThumbnailUrl ?? null,
+      title: video.type === "youtube" ? "Видео о событии" : `${video.label} о событии`,
     });
   }
 

@@ -7,19 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  FilterSelect,
-  type FilterSelectOption,
-} from "@/components/ui/filter-select";
+  ChildBirthFields,
+  childBirthDraftFromStored,
+  childBirthDraftPayload,
+  emptyChildBirthDraft,
+} from "@/components/children/ChildBirthFields";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { BodyMuted } from "@/components/ui/typography";
-import { ArrowLeft, Baby, UserRound } from "lucide-react";
+import { ArrowLeft, Baby, RefreshCw, UserRound } from "lucide-react";
 import { useChildInterests } from "@/hooks/useChildInterests";
 import { cn } from "@/lib/utils";
 import { notifyFamilyPersonasChanged } from "@/lib/family/familyPersonaEvents";
-import {
-  FAMILY_ROLE_OPTIONS as FAMILY_ROLES,
-  ADULT_AGE_BANDS as AGE_BANDS,
-} from "@/lib/family/adultPersonaOptions";
+import { FAMILY_ROLE_OPTIONS as FAMILY_ROLES } from "@/lib/family/adultPersonaOptions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,8 +35,9 @@ import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 
 export interface ParticipantChildData {
   id: string;
-  name: string;
+  name: string | null;
   birthDate: Date | null;
+  birthPrecision?: "DAY" | "MONTH" | null;
   systemInterests?: { interestSlug: string }[];
   customInterests?: { label: string }[];
 }
@@ -48,6 +48,8 @@ export type AddParticipantModalProps = {
   childData?: ParticipantChildData;
   /** Сразу форма взрослого (текущий пользователь) */
   editAdult?: boolean;
+  /** Family Core is single-adult: additions on family surfaces are child-only. */
+  childOnly?: boolean;
   onSaved?: (payload: { kind: "child" | "adult"; childId?: string }) => void;
 };
 
@@ -55,43 +57,6 @@ const STEP_ANIMATION =
   "animate-in fade-in slide-in-from-right-2 duration-200 fill-mode-both";
 
 const MAX_PREFERENCE_SIGNALS = 3;
-
-const MONTHS_RU = [
-  { m: 0, label: "Январь" },
-  { m: 1, label: "Февраль" },
-  { m: 2, label: "Март" },
-  { m: 3, label: "Апрель" },
-  { m: 4, label: "Май" },
-  { m: 5, label: "Июнь" },
-  { m: 6, label: "Июль" },
-  { m: 7, label: "Август" },
-  { m: 8, label: "Сентябрь" },
-  { m: 9, label: "Октябрь" },
-  { m: 10, label: "Ноябрь" },
-  { m: 11, label: "Декабрь" },
-];
-
-const BIRTH_MONTH_FILTER_OPTIONS: FilterSelectOption[] = MONTHS_RU.map(
-  ({ m, label }) => ({ value: String(m), label }),
-);
-
-function birthYearOptions(): number[] {
-  const y = new Date().getFullYear();
-  return Array.from({ length: 26 }, (_, i) => y - i);
-}
-
-function birthYearFilterOptions(): FilterSelectOption[] {
-  return birthYearOptions().map((year) => ({
-    value: String(year),
-    label: String(year),
-  }));
-}
-
-function toBirthIso(month: number | "", year: number | ""): string | null {
-  if (month === "" || year === "") return null;
-  const d = new Date(year, month, 1, 12, 0, 0, 0);
-  return d.toISOString();
-}
 
 type AdultPersonaSignalChip = {
   id: string;
@@ -160,6 +125,7 @@ export function AddParticipantModal({
   onClose,
   childData,
   editAdult,
+  childOnly,
   onSaved,
 }: AddParticipantModalProps) {
   /**
@@ -176,12 +142,15 @@ export function AddParticipantModal({
         )}
         style={{ zIndex: 9999 }}
       >
-        <DialogTitle className="sr-only">Добавить участника</DialogTitle>
+        <DialogTitle className="sr-only">
+          {editAdult ? "Изменить мой профиль" : childData ? "Изменить профиль ребёнка" : "Добавить ребёнка"}
+        </DialogTitle>
         <ParticipantFlow
           isOpen={isOpen}
           onClose={onClose}
           childData={childData}
           editAdult={editAdult}
+          childOnly={childOnly}
           onSaved={onSaved}
         />
       </DialogContent>
@@ -194,21 +163,27 @@ function ParticipantFlow({
   onClose,
   childData,
   editAdult,
+  childOnly,
   onSaved,
 }: AddParticipantModalProps) {
   const router = useRouter();
-  const { interests: systemInterests, isLoading: interestsLoading } = useChildInterests();
+  const {
+    interests: systemInterests,
+    isLoading: interestsLoading,
+    error: interestsError,
+    retry: retryInterests,
+  } = useChildInterests();
   const [step, setStep] = useState<1 | 2>(1);
   const [participantType, setParticipantType] = useState<"child" | "adult">("child");
 
   const [childName, setChildName] = useState("");
-  const [birthMonth, setBirthMonth] = useState<number | "">("");
-  const [birthYear, setBirthYear] = useState<number | "">("");
+  const [birthDraft, setBirthDraft] = useState(emptyChildBirthDraft);
+  const [birthDirty, setBirthDirty] = useState(false);
   const [childInterests, setChildInterests] = useState<string[]>([]);
+  const [childInterestsDirty, setChildInterestsDirty] = useState(false);
 
   const [adultName, setAdultName] = useState("");
   const [familyRole, setFamilyRole] = useState<(typeof FAMILY_ROLES)[number]["value"] | "">("");
-  const [ageBand, setAgeBand] = useState<string | "">("");
   const [preferenceSignals, setPreferenceSignals] = useState<AdultPersonaSignalChip[]>([]);
   const [formatSignals, setFormatSignals] = useState<AdultPersonaSignalChip[]>([]);
   const [selectedPreferenceIds, setSelectedPreferenceIds] = useState<string[]>([]);
@@ -225,12 +200,12 @@ function ParticipantFlow({
     setStep(1);
     setParticipantType("child");
     setChildName("");
-    setBirthMonth("");
-    setBirthYear("");
+    setBirthDraft(emptyChildBirthDraft());
+    setBirthDirty(false);
     setChildInterests([]);
+    setChildInterestsDirty(false);
     setAdultName("");
     setFamilyRole("");
-    setAgeBand("");
     setSelectedPreferenceIds([]);
     setSelectedFormatId(null);
     setError(null);
@@ -249,7 +224,6 @@ function ParticipantFlow({
         typeof me.email === "string" ? me.email.split("@")[0] : "";
       setAdultName(trimmed || fromEmail || "");
       setFamilyRole(me.familyRole ?? "");
-      setAgeBand(me.ageBandLabel ?? "");
       const pids = me.preferenceSignalIds;
       setSelectedPreferenceIds(Array.isArray(pids) ? pids : []);
       setSelectedFormatId(
@@ -294,16 +268,11 @@ function ParticipantFlow({
     if (childData) {
       setStep(2);
       setParticipantType("child");
-      setChildName(childData.name);
-      const bd = childData.birthDate ? new Date(childData.birthDate) : null;
-      if (bd && !Number.isNaN(bd.getTime())) {
-        setBirthMonth(bd.getMonth());
-        setBirthYear(bd.getFullYear());
-      } else {
-        setBirthMonth("");
-        setBirthYear("");
-      }
+      setChildName(childData.name ?? "");
+      setBirthDraft(childBirthDraftFromStored(childData));
+      setBirthDirty(false);
       setChildInterests(childData.systemInterests?.map((i) => i.interestSlug) ?? []);
+      setChildInterestsDirty(false);
       return;
     }
 
@@ -314,11 +283,19 @@ function ParticipantFlow({
       return;
     }
 
+    if (childOnly) {
+      resetAll();
+      setStep(2);
+      setParticipantType("child");
+      return;
+    }
+
     resetAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- только id ребёнка, иначе лишние сбросы при ререндере родителя
-  }, [isOpen, childData?.id, editAdult, resetAll, loadMeForAdult]);
+  }, [isOpen, childData?.id, editAdult, childOnly, resetAll, loadMeForAdult]);
 
   const toggleChildInterest = useCallback((slug: string) => {
+    setChildInterestsDirty(true);
     setChildInterests((prev) =>
       prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug],
     );
@@ -345,17 +322,6 @@ function ParticipantFlow({
         onClick: () => setFamilyRole((cur) => (cur === r.value ? "" : r.value)),
       })),
     [familyRole],
-  );
-
-  const ageBandChipItems = useMemo<ChipItem[]>(
-    () =>
-      AGE_BANDS.map((band) => ({
-        id: band,
-        label: band,
-        active: ageBand === band,
-        onClick: () => setAgeBand((cur) => (cur === band ? "" : band)),
-      })),
-    [ageBand],
   );
 
   const childInterestChipItems = useMemo<ChipItem[]>(
@@ -408,26 +374,19 @@ function ParticipantFlow({
   };
 
   const goBackToStep1 = () => {
-    if (isEditChild || isEditAdultMode) {
+    if (isEditChild || isEditAdultMode || childOnly) {
       onClose();
       return;
     }
     setStep(1);
   };
 
-  const canSaveChild = childName.trim().length >= 1;
+  const birthPayload = childBirthDraftPayload(birthDraft);
+  const canSaveChild = isEditChild ? !birthDirty || birthPayload != null : birthPayload != null;
 
-  /** Все обязательные поля взрослого: имя, роль, возраст, предпочтения (если есть варианты), формат досуга (если есть варианты). */
-  const prefsOk =
-    preferenceSignals.length === 0 || selectedPreferenceIds.length >= 1;
-  const formatOk =
-    formatSignals.length === 0 || selectedFormatId !== null;
-  const canSaveAdult =
-    adultName.trim().length >= 1 &&
-    familyRole !== "" &&
-    ageBand !== "" &&
-    prefsOk &&
-    formatOk;
+  // Display name keeps the existing User identity rule. Every Family Core
+  // signal (role, preferences and leisure format) is optional.
+  const canSaveAdult = adultName.trim().length >= 1;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -435,7 +394,7 @@ function ParticipantFlow({
 
     const saveAdult = async () => {
       if (!canSaveAdult) {
-        setError("Заполните все поля профиля");
+        setError("Укажите имя");
         return;
       }
       setIsLoading(true);
@@ -448,7 +407,6 @@ function ParticipantFlow({
           body: JSON.stringify({
             displayName: adultName.trim(),
             familyRole: familyRole || null,
-            ageBandLabel: ageBand || null,
             preferenceSignalIds: selectedPreferenceIds,
             leisureFormatSignalId: selectedFormatId,
             preferenceSummary: null,
@@ -476,17 +434,21 @@ function ParticipantFlow({
 
     const saveChild = async () => {
       if (!canSaveChild) {
-        setError("Укажите имя ребёнка");
+        setError("Укажите месяц и год рождения");
         return;
       }
       setIsLoading(true);
       setError(null);
-      const birthIso = toBirthIso(birthMonth, birthYear);
+      // This modal has no custom-interest UI: on create there's nothing to
+      // preserve, so [] is correct there; on edit, omit the field entirely
+      // so the non-destructive PUT leaves any existing custom interests alone.
       const body = {
         name: childName.trim(),
-        birthDate: birthIso,
-        systemInterests: childInterests,
-        customInterests: [] as string[],
+        ...(!isEditChild || birthDirty ? birthPayload : {}),
+        ...(!isEditChild || childInterestsDirty
+          ? { systemInterests: childInterests }
+          : {}),
+        ...(isEditChild ? {} : { customInterests: [] as string[] }),
       };
       try {
         const url = isEditChild ? `/api/children/${childData!.id}` : "/api/children";
@@ -548,7 +510,7 @@ function ParticipantFlow({
     }
   };
 
-  const showStep1 = step === 1 && !isEditChild && !isEditAdultMode;
+  const showStep1 = step === 1 && !isEditChild && !isEditAdultMode && !childOnly;
   const showChildForm = step === 2 && participantType === "child";
   const showAdultForm = step === 2 && participantType === "adult";
 
@@ -620,7 +582,7 @@ function ParticipantFlow({
             </button>
             <div className="min-w-0 flex-1">
               <h2 className="text-base font-semibold text-neutral-900 truncate">
-                Добавить участника
+                {isEditAdultMode ? "Изменить мой профиль" : isEditChild ? "Изменить профиль ребёнка" : "Добавить ребёнка"}
               </h2>
               <p className="text-xs text-neutral-500 truncate">{headerSubtitle}</p>
             </div>
@@ -640,34 +602,14 @@ function ParticipantFlow({
                     autoComplete="given-name"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="min-w-0 space-y-2">
-                    <Label htmlFor="birth-month">Месяц рождения</Label>
-                    <FilterSelect
-                      id="birth-month"
-                      value={birthMonth === "" ? "" : String(birthMonth)}
-                      placeholder="Не указано"
-                      options={BIRTH_MONTH_FILTER_OPTIONS}
-                      onChange={(v) =>
-                        setBirthMonth(v === "" ? "" : Number(v))
-                      }
-                      selectClassName="h-11"
-                    />
-                  </div>
-                  <div className="min-w-0 space-y-2">
-                    <Label htmlFor="birth-year">Год рождения</Label>
-                    <FilterSelect
-                      id="birth-year"
-                      value={birthYear === "" ? "" : String(birthYear)}
-                      placeholder="Не указано"
-                      options={birthYearFilterOptions()}
-                      onChange={(v) =>
-                        setBirthYear(v === "" ? "" : Number(v))
-                      }
-                      selectClassName="h-11"
-                    />
-                  </div>
-                </div>
+                <ChildBirthFields
+                  value={birthDraft}
+                  onChange={(value) => {
+                    setBirthDraft(value);
+                    setBirthDirty(true);
+                  }}
+                  idPrefix="participant-child-birth"
+                />
                 <ParticipantChipField
                   label="Интересы"
                   hint="Рекомендуем заполнить, для более точных рекомендаций"
@@ -676,6 +618,13 @@ function ParticipantFlow({
                   emptyState={
                     interestsLoading ? (
                       <BodyMuted className="text-sm">Загружаем интересы…</BodyMuted>
+                    ) : interestsError ? (
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-3">
+                        <BodyMuted className="text-sm text-red-700">Не удалось загрузить интересы</BodyMuted>
+                        <Button type="button" variant="outline" size="sm" onClick={retryInterests}>
+                          <RefreshCw className="mr-1 h-4 w-4" /> Повторить
+                        </Button>
+                      </div>
                     ) : systemInterests.length === 0 ? (
                       <BodyMuted className="text-sm">Интересы не найдены</BodyMuted>
                     ) : undefined
@@ -701,11 +650,6 @@ function ParticipantFlow({
                   label="Роль"
                   ariaLabel="Роль в семье"
                   items={familyRoleChipItems}
-                />
-                <ParticipantChipField
-                  label="Возрастной диапазон"
-                  ariaLabel="Возрастной диапазон"
-                  items={ageBandChipItems}
                 />
                 <ParticipantChipField
                   label="Предпочтения"

@@ -92,6 +92,12 @@ async function main() {
       page1.items.every((i) => i.publicUrl && i.publicUrl.includes(runId)),
       "every returned item must belong to this test run",
     );
+    assert.ok(
+      page1.items.every(
+        (i) => i.thumbnailUrl === `/api/media/${encodeURIComponent(i.id)}?variant=sm`,
+      ),
+      "every picker item must expose the authenticated 400px preview URL",
+    );
     assert.equal(page1.items[0].isUsed, true, "persisted usage must be returned with the picker page");
     assert.ok(page1.items.slice(1).every((item) => item.isUsed === false));
 

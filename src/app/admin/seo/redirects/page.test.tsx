@@ -45,10 +45,11 @@ const html = renderToStaticMarkup(
   />,
 );
 
-assert.match(html, /System \/ Migration/);
+assert.match(html, /Миграционные/);
 assert.match(html, />893</);
 assert.match(html, /legacy-proof/);
 assert.match(html, /Системный · Только чтение/);
 assert.doesNotMatch(html, /Сохранить в список/);
+assert.doesNotMatch(html, />Manual</);
 
 console.log("redirect admin page server-render contract: PASS");

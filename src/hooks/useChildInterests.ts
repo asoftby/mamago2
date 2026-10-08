@@ -14,6 +14,8 @@ interface UseChildInterestsResult {
   interests: ChildInterestOption[];
   isLoading: boolean;
   error: string | null;
+  /** Re-run the fetch (e.g. a user-triggered "Повторить" after a failure). */
+  retry: () => void;
 }
 
 /**
@@ -31,6 +33,7 @@ export function useChildInterests(): UseChildInterestsResult {
   const [interests, setInterests] = useState<ChildInterestOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +59,7 @@ export function useChildInterests(): UseChildInterestsResult {
         setInterests(options);
       } catch (err) {
         if (cancelled) return;
-        
+
         console.error("Failed to load child interests:", err);
         setError(err instanceof Error ? err.message : "Failed to load interests");
         setInterests([]);
@@ -72,9 +75,11 @@ export function useChildInterests(): UseChildInterestsResult {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
-  return { interests, isLoading, error };
+  const retry = () => setAttempt((n) => n + 1);
+
+  return { interests, isLoading, error, retry };
 }
 
 /**

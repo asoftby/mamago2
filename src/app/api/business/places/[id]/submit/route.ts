@@ -16,6 +16,7 @@ import { createPublishTimer } from "@/server/utils/publishPipeline";
 import { attachMediaToEntity } from "@/lib/media/mediaRegistry";
 import { ensureMediaAssetForStoredFileUrl } from "@/lib/media/ensureMediaAssetForStoredFileUrl";
 import { extractMediaRelativePathFromUrl } from "@/server/media/media-storage";
+import { notifyAdminsPublicationSubmitted } from "@/server/services/notification.service";
 
 interface ValidationError {
   error: "VALIDATION";
@@ -317,6 +318,21 @@ export async function POST(
         updatedAt: true,
       },
     });
+    if (
+      !isPlatformContentStaff(user.role) &&
+      updatedPlace?.status === ContentStatus.PENDING
+    ) {
+      try {
+        await notifyAdminsPublicationSubmitted({
+          publicationType: "PLACE",
+          publicationId: updatedPlace.id,
+          publicationTitle: updatedPlace.title,
+        });
+      } catch (error) {
+        console.error("[place-submit] admin moderation notification failed:", error);
+      }
+    }
+    timer.mark("notifications");
     timer.mark("response");
     timer.log({ status: updatedPlace?.status ?? null });
 

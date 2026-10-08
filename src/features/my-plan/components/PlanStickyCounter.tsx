@@ -1,12 +1,13 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PlanStickyCounterProps {
   count: number;
   onClick: () => void;
   compact?: boolean;
+  onAdd?: () => void;
 }
 
 /**
@@ -14,8 +15,33 @@ interface PlanStickyCounterProps {
  * Пустой план → компонент не рендерит ничего. Живёт вне скролла результатов
  * (пиннится, как MyPlanHeader), не привязан к слою (виден и до, и после выдачи).
  */
-export function PlanStickyCounter({ count, onClick, compact = false }: PlanStickyCounterProps) {
-  if (count <= 0) return null;
+export function PlanStickyCounter({ count, onClick, compact = false, onAdd }: PlanStickyCounterProps) {
+  if (!compact && count <= 0) return null;
+
+  if (compact) {
+    return (
+      <div className="flex-shrink-0 border-t border-[rgba(20,18,16,.10)] bg-[#FAF7F1] px-4 py-3 pb-[max(.75rem,env(safe-area-inset-bottom))]">
+        <div className="grid grid-cols-[1fr_1.15fr] gap-2.5">
+          <button
+            type="button"
+            onClick={onAdd}
+            className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-hover"
+          >
+            <Plus className="h-4 w-4" />
+            Добавить
+          </button>
+          <button
+            type="button"
+            onClick={onClick}
+            className="flex min-h-12 items-center justify-center gap-2 rounded-full border border-[rgba(20,18,16,.16)] bg-white px-4 text-sm font-semibold text-[#141210]"
+          >
+            Весь план
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

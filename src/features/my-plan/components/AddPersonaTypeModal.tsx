@@ -1,6 +1,6 @@
 "use client";
 
-import { Baby, User } from "lucide-react";
+import { Baby } from "lucide-react";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -10,15 +10,16 @@ interface AddPersonaTypeModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelectChild: () => void;
-  onSelectAdult: () => void;
   layout?: "default" | "desktop";
 }
 
+// The "Adult" option was removed: it posted to a nonexistent /api/adults
+// route (see docs/engineering — B1 defect D10). Adding multiple adults to a
+// family isn't modeled yet.
 export function AddPersonaTypeModal({
   open,
   onOpenChange,
   onSelectChild,
-  onSelectAdult,
   layout = "default",
 }: AddPersonaTypeModalProps) {
   const isDesktop = layout === "desktop";
@@ -59,26 +60,6 @@ export function AddPersonaTypeModal({
             <h3 className="text-base font-semibold text-neutral-900">Ребёнок</h3>
             <p className="mt-0.5 text-sm text-neutral-500">
               Укажем возраст и интересы
-            </p>
-          </div>
-        </button>
-
-        {/* Adult option */}
-        <button
-          type="button"
-          onClick={() => {
-            onSelectAdult();
-            onOpenChange(false);
-          }}
-          className="flex w-full items-center gap-4 rounded-2xl border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-neutral-300 hover:bg-neutral-50"
-        >
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#EF8759]/10">
-            <User className="h-6 w-6 text-[#EF8759]" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-base font-semibold text-neutral-900">Взрослый</h3>
-            <p className="mt-0.5 text-sm text-neutral-500">
-              Настроим предпочтения
             </p>
           </div>
         </button>

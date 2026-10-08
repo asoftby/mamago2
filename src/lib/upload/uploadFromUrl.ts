@@ -10,6 +10,7 @@ import { writeRuntimeUpload } from "@/server/media/media-storage";
 import { assertSafeRemoteUrl } from "@/lib/security/assertSafeRemoteUrl";
 import { contentHashOf, findOwnedMediaByContentHash } from "@/lib/media/dedup";
 import { fetchBinary } from "@/server/modules/import/parsers/fetchHtml";
+import { validateImageContent } from "@/lib/uploads/imageContentValidation";
 
 export interface UploadFromUrlOptions {
   maxWidthOrHeight?: number;
@@ -56,14 +57,16 @@ export async function uploadImageFromUrl(
       },
     });
     buffer = remote.buffer;
-    contentType = remote.headers["content-type"] || "image/jpeg";
-    if (!contentType.startsWith("image/")) {
+    contentType = remote.headers["content-type"] || "";
+    if (contentType && !contentType.startsWith("image/")) {
       throw new Error(`Invalid content type: ${contentType}`);
     }
     console.log("[uploadFromUrl] Downloaded image, size:", buffer.length, "bytes");
   } catch (error) {
     throw error;
   }
+
+  contentType = validateImageContent(buffer, contentType);
 
   // Dedup the raw downloaded bytes before any processing/storage write.
   const contentHash = contentHashOf(buffer);

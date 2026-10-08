@@ -73,8 +73,9 @@ export interface ProfileStatePayload extends ProfileCompletionFlags {
   };
   children: Array<{
     id: string;
-    name: string;
+    name: string | null;
     birthDate: string | null;
+    birthPrecision: "DAY" | "MONTH" | null;
     createdAt: string;
     interestCount: number;
   }>;

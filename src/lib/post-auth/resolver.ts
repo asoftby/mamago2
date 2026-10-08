@@ -1,5 +1,11 @@
-import type { AuthAction, AuthEntryPoint } from "./types";
+import type {
+  AuthAction,
+  AuthEntryPoint,
+  ProfileMandatoryStepId,
+  ProfileStatePayload,
+} from "./types";
 import { trackPostAuthEvent } from "./analytics";
+import { clearPostAuthContext } from "./storage";
 import {
   navigateToCompatibleHref,
   navigateToSurface,
@@ -8,6 +14,41 @@ import { getSafeRedirectPath } from "@/lib/auth/redirectTo";
 import { getRandomLoginSuccessMessage } from "@/lib/notifications/authMessages";
 
 type RouterLike = { push: (href: string) => void; replace: (href: string) => void };
+
+export type PostAuthFlowResolution =
+  | {
+      kind: "completion";
+      source: AuthEntryPoint;
+      returnTo: string | null;
+      resumeStep: ProfileMandatoryStepId;
+    }
+  | {
+      kind: "done";
+      source: AuthEntryPoint;
+      returnTo: string | null;
+    };
+
+/**
+ * Canonical post-auth/onboarding decision. Every auth surface feeds the same
+ * profile snapshot into this resolver instead of interpreting completion
+ * flags independently.
+ */
+export function resolvePostAuthFlow(input: {
+  source: AuthEntryPoint;
+  returnTo: string | null;
+  profile: ProfileStatePayload;
+}): PostAuthFlowResolution {
+  const { source, returnTo, profile } = input;
+  if (!profile.isProfileComplete) {
+    return {
+      kind: "completion",
+      source,
+      returnTo,
+      resumeStep: profile.resumeStep ?? "adult",
+    };
+  }
+  return { kind: "done", source, returnTo };
+}
 
 export function getAuthSuccessToastMessage(authAction: AuthAction): string {
   switch (authAction) {
@@ -121,6 +162,36 @@ export function applyPostAuthCompletionOutcome(
     default:
       return;
   }
+}
+
+/**
+ * Single finalizer for every ProfileCompletionFlow host. It owns analytics,
+ * outcome application and context cleanup, including the already-complete
+ * race where the flow must not emit a second success outcome.
+ */
+export function finishPostAuthOnboarding(
+  source: AuthEntryPoint,
+  options: {
+    alreadyComplete?: boolean;
+    isMobile: boolean;
+    router: RouterLike;
+    returnTo: string | null;
+    toast: typeof import("sonner").toast;
+    skipNavigation?: boolean;
+  },
+): void {
+  trackPostAuthEvent("completion_finished", { source });
+  if (options.alreadyComplete !== true) {
+    applyPostAuthCompletionOutcome(source, {
+      isMobile: options.isMobile,
+      router: options.router,
+      returnTo: options.returnTo,
+      toast: options.toast,
+      skipNavigation: options.skipNavigation,
+      profileJustCompleted: true,
+    });
+  }
+  clearPostAuthContext();
 }
 
 export function trackAuthCompleted(entryPoint: AuthEntryPoint): void {
