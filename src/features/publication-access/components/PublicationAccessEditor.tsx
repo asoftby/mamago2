@@ -57,19 +57,28 @@ export function PublicationAccessEditor({
         {methods.map((method) => {
           const config = ACCESS_METHOD_CONFIG[method];
           const isSelected = value.method === method;
+          const isEventDetails = entityType === "event" && method === "details";
 
           return (
             <AccessMethodCard
               key={method}
-              title={config.title}
-              description={config.description}
+              title={isEventDetails ? "Без отдельного действия" : config.title}
+              description={
+                isEventDetails
+                  ? "Пользователю не требуется билет или предварительная запись"
+                  : config.description
+              }
               icon={config.icon}
               selected={isSelected}
               disabled={disabled}
               onClick={() => setMethod(method)}
             >
               {showPreview ? (
-                <AccessPublicPreview title={labels.previewTitle} value={value} />
+                <AccessPublicPreview
+                  title={labels.previewTitle}
+                  value={value}
+                  entityType={entityType}
+                />
               ) : null}
 
               {config.requiresUrl && config.urlField === "ticketUrl" ? (
