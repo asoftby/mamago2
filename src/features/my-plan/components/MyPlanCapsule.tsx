@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMyPlan } from "../hooks/useMyPlan";
 import {
@@ -66,7 +66,7 @@ export function MyPlanCapsuleView({
         "touch-manipulation outline-none transition-colors",
         "focus-visible:ring-[3px] focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         isEmpty || loading
-          ? "border-[1.5px] border-dashed border-brand bg-surface pr-4"
+          ? "border border-brand/30 bg-surface pr-4"
           : "bg-brand pr-4 text-white hover:bg-brand-hover active:bg-brand-active",
         className,
       )}
@@ -102,18 +102,12 @@ export function MyPlanCapsuleView({
         </>
       ) : (
         <>
-          <span
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand"
-            aria-hidden
-          >
-            <Plus className="h-5 w-5" />
-          </span>
           <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
             <span className="block truncate text-[12px] leading-tight text-brand-active">
-              {loading ? "Мой план" : "Мой план пуст"}
+              Мой <em className="font-display italic text-primary">план</em>
             </span>
             <span className="block truncate text-[15px] font-medium leading-tight text-text-main">
-              {loading ? "Загружаем…" : "Добавьте событие ♡"}
+              {loading ? "Загружаем…" : "Добавить интересненькое..."}
             </span>
           </span>
         </>
