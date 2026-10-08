@@ -96,7 +96,7 @@ function EventMarquee({ items }: { items: string[] }) {
 function EventMetaStrip({ facts }: { facts: EventPageData["importantFacts"] }) {
   if (!facts.length) return null;
   return (
-    <section className="border-y border-[rgba(20,18,16,0.10)]">
+    <section>
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <div
           className="grid grid-cols-2 md:grid-cols-4"
@@ -141,7 +141,7 @@ function EventAboutEditorial({
   descriptionHtml?: string;
 }) {
   return (
-    <section className="border-b border-[rgba(20,18,16,0.10)] py-16 md:py-20">
+    <section className="py-16 md:py-20">
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-[320px_1fr] md:gap-14">
           <div>
@@ -205,7 +205,7 @@ function EventLocationEditorial({ venue }: { venue: NonNullable<EventPageData["v
       mapUrl={venue.mapUrl}
       routeUrl={venue.routeUrl}
       placeHref={venue.placeHref}
-      className="border-b !border-t-0"
+      className="!border-0"
     />
   );
 }
@@ -647,7 +647,7 @@ export function EventPageView({
       />
 
       {(Boolean(data.priceDetails?.trim()) || (data.priceItems?.length ?? 0) > 0 || Boolean(data.priceNote?.trim())) && (
-        <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
+        <section className="py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -674,10 +674,10 @@ export function EventPageView({
         </section>
       )}
 
-      <FaqSection items={data.faqItems} />
+      <FaqSection items={data.faqItems} className="!border-t-0" />
 
       {sessions.length > 0 && (
-        <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
+        <section className="py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -714,8 +714,10 @@ export function EventPageView({
 
       {data.venue && <EventLocationEditorial venue={data.venue} />}
 
+      {data.organizer && <EventOrganizerLegal organizer={data.organizer} />}
+
       {hasSimilar && (
-        <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
+        <section className="py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
             <SimilarEventsSection
               items={visibleSimilar}
@@ -729,8 +731,6 @@ export function EventPageView({
           </div>
         </section>
       )}
-
-      {data.organizer && <EventOrganizerLegal organizer={data.organizer} />}
 
       {!data.hidePublicationStats && (
         <PublicationStatsPanel

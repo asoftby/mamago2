@@ -1,17 +1,19 @@
 import type { FaqItem } from "@/lib/faq/faqItems";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type FaqSectionProps = {
   items: FaqItem[] | null | undefined;
+  className?: string;
 };
 
-export function FaqSection({ items }: FaqSectionProps) {
+export function FaqSection({ items, className }: FaqSectionProps) {
   const normalized = normalizeFaqItems(items);
   if (normalized.length === 0) return null;
 
   return (
-    <section className="border-t border-[rgba(20,18,16,0.10)] py-16 md:py-20">
+    <section className={cn("border-t border-[rgba(20,18,16,0.10)] py-16 md:py-20", className)}>
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <div className="mb-6 flex items-center gap-3.5">
           <span className="text-kicker">
