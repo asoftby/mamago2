@@ -2,17 +2,21 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Clock3, MapPin, StickyNote, X } from "lucide-react";
+import { Bell, EllipsisVertical, Users } from "lucide-react";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
-import { resolveActivityParticipationCta } from "@/lib/plan/resolveActivityParticipationCta";
-import { formatActivityAddressLine } from "../lib/formatActivityAddress";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
+import { toast } from "@/lib/toast";
 import type { PlanItemWithActivity } from "../types/event";
+import { resolvePlanItemCategory, type PlanItemCategoryKey } from "../lib/planItemCategory";
+import { PlanItemCategoryPicker, PlanItemCategoryTile } from "./PlanItemCategoryIcon";
 
 interface PlanItemRowProps {
   item: PlanItemWithActivity;
   onRemove: () => void;
+  /** Имя ребёнка, для кого пункт. Нет → «Вся семья». */
   participantLabel?: string | null;
 }
 
@@ -26,29 +30,26 @@ export function planItemVisualKind(
     : "event";
 }
 
+/** Время напоминания в мета-строке: смещение задаётся в настройках уведомлений, по умолчанию — за час. */
+const REMINDER_LABEL = "за 1 ч";
+
 const twoLineTitleStyle = {
   display: "-webkit-box",
   WebkitLineClamp: 2,
   WebkitBoxOrient: "vertical" as const,
   overflow: "hidden",
-  whiteSpace: "normal" as const,
-  wordBreak: "break-word" as const,
-};
-
-const ctaStyle = {
-  minHeight: 30,
-  padding: "0 11px",
-  borderRadius: 999,
-  border: "1px solid rgba(20,18,16,.16)",
-  fontSize: 12,
-  fontWeight: 600,
-  color: "#3A332B",
-  display: "inline-flex",
-  alignItems: "center",
-  whiteSpace: "nowrap",
-  textDecoration: "none",
-  background: "#fff",
 } as const;
+
+function Avatar({ name }: { name: string | null }) {
+  return (
+    <span
+      aria-hidden
+      className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-brand-soft text-[10px] font-medium leading-none text-brand-active"
+    >
+      {name ? name.trim().charAt(0).toUpperCase() : <Users className="h-2.5 w-2.5" />}
+    </span>
+  );
+}
 
 export function PlanItemRow({ item, onRemove, participantLabel }: PlanItemRowProps) {
   const cityCtx = useOptionalCity();
@@ -56,181 +57,134 @@ export function PlanItemRow({ item, onRemove, participantLabel }: PlanItemRowPro
   const activityDetailHref = item.activity?.id
     ? publicActivityPath(item.activity.id, city, item.activity.slug)
     : null;
-  const participationCta = item.activity
-    ? resolveActivityParticipationCta(item.activity, city)
-    : null;
-  const location =
-    item.locationText?.trim() ||
-    (item.activity ? formatActivityAddressLine(item.activity) : null);
   const title = item.title || item.activity?.title || "Запись";
-  const timeStr = item.startsAt
-    ? new Date(item.startsAt).toLocaleTimeString("ru-RU", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "В течение дня";
-  const visualKind = planItemVisualKind(item);
-  const VisualIcon = visualKind === "event" ? CalendarDays : StickyNote;
-  const [focused, setFocused] = useState(false);
+  const isManual = item.source === "MANUAL";
+  // Тап по карточке: событие mamaGo → его страница; свой пункт → страница плана на этот день.
+  const openHref = activityDetailHref ?? (isManual ? `/me/plan?date=${item.date}` : null);
 
-  const titleNode = activityDetailHref ? (
-    <Link
-      href={activityDetailHref}
-      style={{
-        fontSize: 16,
-        fontWeight: 600,
-        letterSpacing: "-.012em",
-        lineHeight: 1.25,
-        color: "#141210",
-        textDecoration: "none",
-        ...twoLineTitleStyle,
-      }}
-    >
-      {title}
-    </Link>
-  ) : (
-    <span
-      style={{
-        fontSize: 16,
-        fontWeight: 600,
-        letterSpacing: "-.012em",
-        lineHeight: 1.25,
-        color: "#141210",
-        ...twoLineTitleStyle,
-      }}
-    >
-      {title}
-    </span>
+  const time = item.startsAt
+    ? new Date(item.startsAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
+    : null;
+
+  const poster = item.activity?.coverImageUrl ?? item.coverImageUrl;
+  const isCatalogEvent = planItemVisualKind(item) === "event";
+  const [category, setCategory] = useState<PlanItemCategoryKey>(() =>
+    resolvePlanItemCategory(item.category, title),
   );
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const showPoster = isCatalogEvent && Boolean(poster);
+  const showReminder = Boolean(item.reminderEnabled && item.startsAt);
+
+  const changeCategory = async (next: PlanItemCategoryKey) => {
+    const previous = category;
+    setCategory(next);
+    if (!isManual || !item.updatedAt) return;
+    try {
+      const res = await fetch(`/api/plan/manual/${item.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          category: next,
+          expectedUpdatedAt: new Date(item.updatedAt).toISOString(),
+        }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      requestPlanRefetchForDate(item.date);
+    } catch {
+      setCategory(previous);
+      toast.error("Не удалось изменить значок");
+    }
+  };
+
+  const titleClassName = "text-[15px] font-medium leading-[1.3] text-text-main [overflow-wrap:anywhere]";
 
   return (
-    <div
-      className="group"
-      style={{
-        position: "relative",
-        borderRadius: 18,
-        background: "#FAF7F1",
-        border: "1px solid rgba(20,18,16,.06)",
-        padding: "15px 14px",
-      }}
-    >
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "44px minmax(0,1fr) 32px",
-          gap: 12,
-          alignItems: "start",
-        }}
-      >
-        <span
-          aria-label={visualKind === "event" ? "Событие" : "Заметка"}
-          title={visualKind === "event" ? "Событие" : "Заметка"}
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 14,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: visualKind === "event" ? "#C24E22" : "#C98A19",
-            background: visualKind === "event" ? "#FFF0EA" : "#FFF4D9",
-          }}
-        >
-          <VisualIcon size={20} />
-        </span>
+    <article className="group relative rounded-[18px] border border-border bg-brand-muted p-3 transition-colors hover:border-border-hover focus-within:border-border-hover">
+      <div className="flex items-start gap-3">
+        <div className="w-10 shrink-0 pt-0.5 text-center text-text-main">
+          {time ? (
+            <span className="font-mono text-[13px] leading-5">{time}</span>
+          ) : (
+            <span className="block text-[11px] leading-[1.2] text-text-muted">Весь день</span>
+          )}
+        </div>
 
-        <div style={{ minWidth: 0 }}>
-          {titleNode}
+        {showPoster ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={poster!}
+            alt=""
+            className="h-10 w-10 shrink-0 rounded-lg object-cover"
+          />
+        ) : isCatalogEvent ? (
+          <PlanItemCategoryTile category={category} />
+        ) : (
+          <PlanItemCategoryPicker value={category} onChange={(next) => void changeCategory(next)} className="relative z-10" />
+        )}
 
-          {location ? (
-            <span
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                minWidth: 0,
-                marginTop: 6,
-                fontSize: 13,
-                color: "rgba(20,18,16,.55)",
-              }}
+        <div className="min-w-0 flex-1">
+          {openHref ? (
+            <Link
+              href={openHref}
+              className={`${titleClassName} no-underline after:absolute after:inset-0 after:content-['']`}
+              style={twoLineTitleStyle}
             >
-              <MapPin size={13} style={{ flexShrink: 0 }} />
-              <span
-                style={{
-                  minWidth: 0,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {location}
-              </span>
+              {title}
+            </Link>
+          ) : (
+            <span className={titleClassName} style={twoLineTitleStyle}>
+              {title}
             </span>
-          ) : null}
+          )}
 
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: "6px 10px",
-              marginTop: 8,
-            }}
-          >
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 5,
-                fontSize: 12.5,
-                color: "rgba(20,18,16,.58)",
-              }}
-            >
-              <Clock3 size={13} />
-              {timeStr}
-            </span>
-
-            {participantLabel ? (
-              <span style={{ fontSize: 12.5, color: "rgba(20,18,16,.48)" }}>
-                {participantLabel}
+          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] leading-4 text-text-muted">
+            <Avatar name={participantLabel ?? null} />
+            <span className="min-w-0 truncate">{participantLabel || "Вся семья"}</span>
+            {showReminder ? (
+              <span className="inline-flex shrink-0 items-center gap-1">
+                <span aria-hidden>·</span>
+                <Bell className="h-3 w-3" aria-hidden />
+                <span>{REMINDER_LABEL}</span>
               </span>
-            ) : null}
-
-            {participationCta ? (
-              participationCta.external ? (
-                <a
-                  href={participationCta.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={ctaStyle}
-                >
-                  {participationCta.label}
-                </a>
-              ) : (
-                <Link href={participationCta.href} style={ctaStyle}>
-                  {participationCta.label}
-                </Link>
-              )
             ) : null}
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onRemove}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          aria-label={`Убрать «${title}» из плана`}
-          className={
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border " +
-            "border-[rgba(20,18,16,.14)] bg-white/75 text-[rgba(20,18,16,.55)] " +
-            "opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100 " +
-            (focused ? "md:opacity-100" : "")
-          }
-        >
-          <X size={15} />
-        </button>
+        <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label={`Действия: «${title}»`}
+              className="relative z-10 -mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-text-muted outline-none hover:bg-surface-hover focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <EllipsisVertical className="h-4 w-4" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-52 bg-white p-1">
+            {openHref ? (
+              <Link
+                href={openHref}
+                className="flex min-h-10 items-center rounded-md px-3 text-sm text-text-main no-underline hover:bg-surface-hover"
+              >
+                Открыть
+              </Link>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                onRemove();
+              }}
+              aria-label={`Убрать «${title}» из плана`}
+              className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-danger hover:bg-danger-soft"
+            >
+              Убрать из плана
+            </button>
+          </PopoverContent>
+        </Popover>
       </div>
-    </div>
+    </article>
   );
 }

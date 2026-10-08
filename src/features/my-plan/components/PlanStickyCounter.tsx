@@ -25,7 +25,7 @@ export function PlanStickyCounter({ count, onClick, compact = false, onAdd }: Pl
           <button
             type="button"
             onClick={onAdd}
-            className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-white"
+            className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-hover"
           >
             <Plus className="h-4 w-4" />
             Добавить
@@ -35,7 +35,7 @@ export function PlanStickyCounter({ count, onClick, compact = false, onAdd }: Pl
             onClick={onClick}
             className="flex min-h-12 items-center justify-center gap-2 rounded-full border border-[rgba(20,18,16,.16)] bg-white px-4 text-sm font-semibold text-[#141210]"
           >
-            Открыть весь план
+            Весь план
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>

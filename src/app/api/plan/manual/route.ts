@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
       locationText: body.locationText,
       notes: body.notes,
       tags: body.tags,
+      category: body.category,
       reminderEnabled: body.reminderEnabled,
     });
     return NextResponse.json({ item: await loadFamilyCalendarItem({ owner, item }) }, { status: 201 });

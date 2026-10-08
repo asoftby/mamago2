@@ -7,6 +7,11 @@ import { buildPlanCardPresentation } from "@/features/my-plan/lib/planPagePresen
 import { activePlanScopeFor, childScopeFor, familyIdForWrite } from "@/server/family/familyAccess";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import type { PlanBookingState } from "@/server/family/planBookingPure";
+import {
+  detectPlanItemCategory,
+  isPlanItemCategoryKey,
+  type PlanItemCategoryKey,
+} from "@/features/my-plan/lib/planItemCategory";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -39,6 +44,8 @@ export type ManualPlanEntryInput = {
   locationText?: string | null;
   notes?: string | null;
   tags?: string[];
+  /** Ключ категории (planItemCategory). Не передан при создании → определяется по названию. */
+  category?: string | null;
   reminderEnabled?: boolean;
 };
 
@@ -110,6 +117,7 @@ const calendarItemSelect = {
   locationText: true,
   notes: true,
   tags: true,
+  category: true,
   reminderEnabled: true,
   activityId: true,
   coverImageUrl: true,
@@ -141,6 +149,7 @@ export type FamilyCalendarItemDto = {
   locationText: string | null;
   notes: string | null;
   tags: string[];
+  category: string | null;
   reminderEnabled: boolean | null;
   activityId: string | null;
   coverImageUrl: string | null;
@@ -188,6 +197,13 @@ function normalizeTitle(value: unknown): string {
   const title = normalizeText(value, TITLE_MAX, "title");
   if (!title || /[<>]/.test(title)) throw new ManualPlanEntryError("INVALID_INPUT", "invalid_title");
   return title;
+}
+
+/** Неизвестный ключ → ошибка; null/не передан → автоопределение по названию. */
+export function normalizePlanItemCategory(value: unknown, title: string | null | undefined): PlanItemCategoryKey {
+  if (value == null || value === "") return detectPlanItemCategory(title);
+  if (!isPlanItemCategoryKey(value)) throw new ManualPlanEntryError("INVALID_INPUT", "invalid_category");
+  return value;
 }
 
 export function normalizePlanNoteTags(value: unknown): string[] {
@@ -291,6 +307,7 @@ export async function createManualPlanEntry(owner: PlanOwner, input: ManualPlanE
       locationText: normalizeText(input.locationText, LOCATION_MAX, "location"),
       notes: normalizeText(input.notes, NOTES_MAX, "notes"),
       tags: normalizePlanNoteTags(input.tags),
+      category: normalizePlanItemCategory(input.category, title),
       reminderEnabled: input.reminderEnabled === true,
     },
     select: calendarItemSelect,
@@ -352,6 +369,7 @@ export async function updateManualPlanEntry(
       ...(patch.locationText === undefined ? {} : { locationText: normalizeText(patch.locationText, LOCATION_MAX, "location") }),
       ...(patch.notes === undefined ? {} : { notes: normalizeText(patch.notes, NOTES_MAX, "notes") }),
       ...(patch.tags === undefined ? {} : { tags: normalizePlanNoteTags(patch.tags) }),
+      ...(patch.category === undefined ? {} : { category: normalizePlanItemCategory(patch.category, patch.title ?? current.title) }),
       ...(patch.reminderEnabled === undefined ? {} : { reminderEnabled: patch.reminderEnabled === true }),
     },
   });
@@ -450,6 +468,7 @@ export function toFamilyCalendarItemDto(row: CalendarRow, authorName: string | n
     locationText: row.locationText,
     notes: row.notes,
     tags: row.tags,
+    category: row.category,
     reminderEnabled: row.reminderEnabled,
     activityId: row.activityId,
     coverImageUrl: row.coverImageUrl,
