@@ -23,22 +23,50 @@ assert.equal(planItemVisualKind({ source: "MANUAL" }), "note");
 assert.equal(planItemVisualKind({ source: "TELEGRAM_FORWARD" }), "note");
 assert.equal(planItemVisualKind({ source: undefined }), "event");
 
+const longTitle = "Очень длинный заголовок события для проверки двух строк";
+
 const restingHtml = renderToStaticMarkup(
-  <PlanItemRow item={item("one", "Очень длинный заголовок события для проверки двух строк")} onRemove={() => undefined} />,
+  <PlanItemRow item={item("one", longTitle)} onRemove={() => undefined} />,
 );
 
-const removeButton = restingHtml.match(/<button[^>]*aria-label="Убрать[^"]*из плана"[^>]*>/);
-assert.ok(removeButton, "explicit remove button must be rendered");
-assert.match(removeButton![0], /opacity-100/);
-assert.match(removeButton![0], /md:opacity-0/);
+// Без времени → «Весь день»; без ребёнка → «Вся семья»; без напоминания → колокольчика нет.
+assert.match(restingHtml, /Весь день/);
+assert.match(restingHtml, /Вся семья/);
+assert.doesNotMatch(restingHtml, /за 1 ч/);
+
+// Карточка: один «⋮», без шеврона и плашек «Заметка» / «Из mamaGo».
+assert.match(restingHtml, /aria-label="Действия: «/);
+assert.doesNotMatch(restingHtml, /Из mamaGo/);
+assert.doesNotMatch(restingHtml, />Заметка</);
+
+const timedHtml = renderToStaticMarkup(
+  <PlanItemRow
+    item={{
+      ...item("two", "Врач"),
+      source: "MANUAL",
+      startsAt: new Date("2026-09-01T07:30:00"),
+      reminderEnabled: true,
+    }}
+    participantLabel="Тая"
+    onRemove={() => undefined}
+  />,
+);
+assert.match(timedHtml, /07:30/);
+assert.match(timedHtml, />Тая</);
+assert.match(timedHtml, /Напоминание/);
+assert.doesNotMatch(timedHtml, /за 1 ч/);
+assert.match(timedHtml, /aria-label="Значок: Здоровье\. Изменить"/, "ручной пункт: категория из названия, иконку можно сменить");
+
+const telegramHtml = renderToStaticMarkup(
+  <PlanItemRow item={{ ...item("telegram", "Врач"), source: "TELEGRAM_FORWARD" }} onRemove={() => undefined} />,
+);
+assert.doesNotMatch(telegramHtml, /Значок: .*Изменить/, "Telegram item must not offer unsaved category editing");
 
 const rowSource = readFileSync(new URL("./PlanItemRow.tsx", import.meta.url), "utf8");
 assert.doesNotMatch(rowSource, /onTouchStart=/, "mobile row must not use swipe-to-delete");
 assert.doesNotMatch(rowSource, /onTouchMove=/, "mobile row must not use swipe-to-delete");
 assert.doesNotMatch(rowSource, /longPressTimerRef/, "mobile row must not use long-press delete");
 assert.match(rowSource, /WebkitLineClamp: 2/, "titles must render up to two lines");
-assert.match(rowSource, /<MapPin size=\{13\}/, "record card must render an address icon");
-assert.match(rowSource, /<Clock3 size=\{13\}/, "record card must render time in metadata");
-assert.match(rowSource, /gridTemplateColumns: "44px minmax\(0,1fr\) 32px"/, "record card must prioritize icon and two-line content");
+assert.match(rowSource, /items-start/, "columns are top-aligned so cards of different height do not jump");
 
-console.log("PlanItemRow explicit-delete + redesigned record-card tests: OK");
+console.log("PlanItemRow redesigned record-card tests: OK");

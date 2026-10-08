@@ -4,6 +4,8 @@ export const MY_PLAN_OPEN_VALUE = "open";
 export const MY_PLAN_OPEN_EVENT = "my-plan-open-request";
 /** Событие для принудительного рефетча конкретной даты в сторе плана. */
 export const MY_PLAN_REFETCH_DATE_EVENT = "my-plan-refetch-date";
+/** Открыть шторку «Добавить в план» (шторка плана при этом закрывается — на экране одна шторка). */
+export const MY_PLAN_QUICK_ADD_EVENT = "my-plan-quick-add-request";
 
 export function appendMyPlanOpenToHref(href: string): string {
   if (!href || typeof href !== "string") return href;
@@ -27,4 +29,9 @@ export function requestOpenMyPlan() {
 export function requestPlanRefetchForDate(dateISO: string) {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(MY_PLAN_REFETCH_DATE_EVENT, { detail: { date: dateISO } }));
+}
+
+export function requestOpenQuickAdd(dateISO: string) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(MY_PLAN_QUICK_ADD_EVENT, { detail: { date: dateISO } }));
 }
