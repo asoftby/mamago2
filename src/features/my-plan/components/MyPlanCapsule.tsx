@@ -102,7 +102,7 @@ export function MyPlanCapsuleView({
         </>
       ) : (
         <>
-          <span className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft/65 text-primary lg:flex" aria-hidden>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft/65 text-primary" aria-hidden>
             <CalendarDays className="h-[19px] w-[19px]" strokeWidth={1.8} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
@@ -113,7 +113,7 @@ export function MyPlanCapsuleView({
               {loading ? "Загружаем…" : "Добавим что-нибудь?"}
             </span>
           </span>
-          <ArrowRight className="hidden h-4 w-4 shrink-0 text-text-main/65 lg:block" aria-hidden />
+          <ArrowRight className="h-4 w-4 shrink-0 text-text-main/65" aria-hidden />
         </>
       )}
     </Link>
