@@ -35,6 +35,8 @@ type WeekCalendarStripProps = {
   plannedCountByDate?: Record<string, number>;
   countLabelByDate?: Record<string, string>;
   allowPastDates?: boolean;
+  /** Бренд-стиль: выбранный день — коралловый кружок с белым числом (вместо чёрной плашки). */
+  accent?: boolean;
 };
 
 function pluralizePlanEvents(count: number): string {
@@ -58,6 +60,7 @@ export function WeekCalendarStrip({
   plannedCountByDate,
   countLabelByDate,
   allowPastDates = false,
+  accent = false,
 }: WeekCalendarStripProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
@@ -295,9 +298,9 @@ export function WeekCalendarStrip({
                     flexDirection: "column",
                     alignItems: "center",
                     gap: 2,
-                    background: selected ? "#141210" : "transparent",
-                    color: selected ? "#FAF7F1" : isPast ? "rgba(20,18,16,.35)" : "#141210",
-                    border: selected ? "1px solid #141210" : "1px solid transparent",
+                    background: selected && !accent ? "#141210" : "transparent",
+                    color: selected && !accent ? "#FAF7F1" : isPast ? "rgba(20,18,16,.35)" : "#141210",
+                    border: selected && !accent ? "1px solid #141210" : "1px solid transparent",
                     borderRadius: 10,
                     cursor: !allowPastDates && isPast && !selected ? "default" : "pointer",
                     transition: "all .15s",
@@ -316,13 +319,32 @@ export function WeekCalendarStrip({
                     style={{
                       fontSize: 9,
                       letterSpacing: ".08em",
-                      color: selected ? "rgba(250,247,241,.55)" : "rgba(20,18,16,.55)",
+                      color: selected
+                        ? accent ? "var(--brand-active)" : "rgba(250,247,241,.55)"
+                        : "rgba(20,18,16,.55)",
                     }}
                   >
                     {WEEKDAY_SHORT_RU[d.getDay()]}
                   </span>
                   <span
-                    style={{ fontFamily: "var(--font-display)", fontSize: 20, lineHeight: 1, letterSpacing: "-.02em" }}
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: 20,
+                      lineHeight: 1,
+                      letterSpacing: "-.02em",
+                      ...(accent && selected
+                        ? {
+                            width: 32,
+                            height: 32,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: 999,
+                            background: "var(--brand)",
+                            color: "#fff",
+                          }
+                        : null),
+                    }}
                   >
                     {d.getDate()}
                   </span>
@@ -342,7 +364,7 @@ export function WeekCalendarStrip({
                           key={i}
                           className={cn(
                             "h-1 w-1 rounded-full",
-                            selected ? "bg-white" : "bg-[#EF8759]",
+                            selected && !accent ? "bg-white" : "bg-brand",
                           )}
                         />
                       ))}
