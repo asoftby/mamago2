@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PhoneVerificationModal } from "@/components/place/PhoneVerificationModal";
 import { EMOJI_RATING_OPTIONS, type EmojiRatingType } from "@/lib/content-rating/emojiRating";
+import { MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH } from "@/lib/experience/feedback";
 
 export type ExperienceCheckInCandidate = {
   planItemId: string;
@@ -205,7 +206,7 @@ export function ExperienceCheckIn({
               id="experience-feedback-comment"
               value={comment}
               onChange={(event) => setComment(event.target.value)}
-              maxLength={2000}
+              maxLength={MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH}
               rows={3}
               disabled={busy}
               placeholder="Расскажите, что понравилось, а что можно улучшить…"
