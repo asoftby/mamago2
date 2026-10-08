@@ -11,6 +11,7 @@ import {
   type PlanCapsuleModel,
 } from "../lib/planCapsule";
 import { MY_PLAN_FULL_PAGE_HREF } from "../lib/upcomingPlanItems";
+import { requestOpenMyPlan } from "@/lib/my-plan/myPlanOpenIntent";
 
 function DateBubble({ bubble, className }: { bubble: PlanCapsuleDateBubble; className?: string }) {
   return (
@@ -34,10 +35,12 @@ export function MyPlanCapsuleView({
   model,
   loading = false,
   className,
+  openInOverlay = false,
 }: {
   model: PlanCapsuleModel;
   loading?: boolean;
   className?: string;
+  openInOverlay?: boolean;
 }) {
   const isEmpty = model.kind === "empty";
   const ariaLabel = loading ? "Мой план" : model.ariaLabel;
@@ -45,6 +48,15 @@ export function MyPlanCapsuleView({
   return (
     <Link
       href={MY_PLAN_FULL_PAGE_HREF}
+      role={openInOverlay ? "button" : undefined}
+      aria-haspopup={openInOverlay ? "dialog" : undefined}
+      onClick={openInOverlay ? (event) => { event.preventDefault(); requestOpenMyPlan(); } : undefined}
+      onKeyDown={openInOverlay ? (event) => {
+        if (event.key === " ") {
+          event.preventDefault();
+          requestOpenMyPlan();
+        }
+      } : undefined}
       aria-label={ariaLabel}
       aria-busy={loading || undefined}
       data-my-plan-capsule
@@ -111,7 +123,7 @@ export function MyPlanCapsuleView({
 }
 
 /** Капсула с данными плана; пересчитывается при возврате на вкладку/в окно, без поллинга. */
-export function MyPlanCapsule({ className }: { className?: string }) {
+export function MyPlanCapsule({ className, openInOverlay = false }: { className?: string; openInOverlay?: boolean }) {
   const {
     planSummary,
     planSummaryLoading,
@@ -159,5 +171,5 @@ export function MyPlanCapsule({ className }: { className?: string }) {
     [isAuthenticated, now, planSummary, todayIso],
   );
 
-  return <MyPlanCapsuleView model={model} loading={loading} className={className} />;
+  return <MyPlanCapsuleView model={model} loading={loading} className={className} openInOverlay={openInOverlay} />;
 }
