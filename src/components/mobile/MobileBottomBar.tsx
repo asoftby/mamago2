@@ -11,7 +11,7 @@ import { MobileHeaderActions } from "@/components/site/header/MobileHeaderAction
 export function MobileBottomBar({ children }: { children?: ReactNode }) {
   return (
     <div
-      className="pointer-events-auto fixed inset-x-0 bottom-0 z-40 border-t border-[#EBEBEB] bg-[#F6F2EA] px-[14px] lg:hidden"
+      className="pointer-events-auto fixed inset-x-0 bottom-0 z-40 border-t border-[#EBEBEB] bg-[#F6F2EA] px-3 lg:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
       <div className="flex h-16 items-center justify-end gap-2">
