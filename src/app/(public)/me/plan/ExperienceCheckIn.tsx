@@ -62,10 +62,33 @@ export function ExperienceCheckIn({
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [snoozed, setSnoozed] = useState(false);
   const [message, setMessage] = useState("");
   const [phoneModalOpen, setPhoneModalOpen] = useState(false);
   const [complete, setComplete] = useState(false);
   const [exitState, setExitState] = useState<"visible" | "leaving" | "hidden">("visible");
+
+  const currentPlanItemId = submitted?.planItemId ?? candidate?.planItemId ?? null;
+  useEffect(() => {
+    if (!currentPlanItemId) return;
+    try {
+      const until = Number(window.localStorage.getItem("mamago:experience-snooze:" + currentPlanItemId));
+      if (until > Date.now()) setSnoozed(true);
+    } catch {
+      // Storage unavailable.
+    }
+  }, [currentPlanItemId]);
+
+  function postpone() {
+    if (currentPlanItemId) {
+      try {
+        window.localStorage.setItem("mamago:experience-snooze:" + currentPlanItemId, String(Date.now() + 86400000));
+      } catch {
+        // Still allow dismiss.
+      }
+    }
+    setSnoozed(true);
+  }
 
   useEffect(() => {
     if (!complete) return;
@@ -77,7 +100,7 @@ export function ExperienceCheckIn({
     };
   }, [complete]);
 
-  if ((!candidate && !submitted) || exitState === "hidden") return null;
+  if ((!candidate && !submitted) || exitState === "hidden" || snoozed) return null;
 
   async function confirm(attendance: "ATTENDED" | "NOT_ATTENDED") {
     if (!candidate || busy) return;
@@ -161,7 +184,7 @@ export function ExperienceCheckIn({
               className="min-h-11 rounded-xl bg-[#141210] px-4 py-2 text-sm font-semibold text-white">
               Оценить →
             </button>
-            <span className="text-xs text-[#6B6258]">Можно ответить позже</span>
+            <button type="button" onClick={postpone} className="min-h-11 px-2 text-xs text-[#6B6258]">Напомнить завтра</button>
           </div>
         ) : !submitted ? (
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -181,7 +204,7 @@ export function ExperienceCheckIn({
             >
               Не получилось
             </button>
-            <button type="button" disabled={busy} onClick={() => setExpanded(false)} className="min-h-11 px-3 text-sm text-[#6B6258] disabled:opacity-50">Позже</button>
+            <button type="button" disabled={busy} onClick={postpone} className="min-h-11 px-3 text-sm text-[#6B6258] disabled:opacity-50">Позже</button>
           </div>
         ) : submitted.attendance === "NOT_ATTENDED" ? (
           <p className="mt-4 font-semibold text-[#3A332B]">Не получилось</p>
@@ -237,7 +260,7 @@ export function ExperienceCheckIn({
                 type="button"
                 disabled={busy}
                 onClick={() => {
-                  setComplete(true);
+                  postpone();
                   setMessage("Можете оставить отзыв позже");
                 }}
                 className="min-h-11 text-sm font-medium text-[#6B6258] disabled:opacity-50"
