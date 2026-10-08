@@ -51,11 +51,13 @@ export function ExperienceCheckIn({
   candidates: ExperienceCheckInCandidate[];
   recentExperiences: ExperienceCheckInState[];
 }) {
-  const candidate = candidates[0] ?? null;
-  // Revisit only incomplete feedback, never a fully answered visit.
-  const [submitted, setSubmitted] = useState<ExperienceCheckInState | null>(
-    candidate ? null : recentExperiences.find((item) => item.attendance === "ATTENDED" && !item.feedbackSentiment) ?? null,
-  );
+  // Finish a confirmed visit's pending feedback before asking about another event.
+  // Already rated visits do not come back on subsequent page loads.
+  const pendingFeedback = recentExperiences.find(
+    (item) => item.attendance === "ATTENDED" && !item.feedbackSentiment,
+  ) ?? null;
+  const candidate = pendingFeedback ? null : candidates[0] ?? null;
+  const [submitted, setSubmitted] = useState<ExperienceCheckInState | null>(pendingFeedback);
   const [selectedSentiment, setSelectedSentiment] = useState<Sentiment | null>(null);
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
