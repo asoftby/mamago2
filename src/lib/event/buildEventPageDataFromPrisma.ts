@@ -250,6 +250,29 @@ function getScheduleJsonString(
   return typeof value === "string" ? value : undefined;
 }
 
+/**
+ * Phone-only prebooking must remain actionable even when the event/venue
+ * Contacts section is empty. Prefer the explicitly configured prebook number
+ * and preserve any other contact numbers without duplication.
+ */
+export function resolveEventActionPhones(activity: ActivityForEventPageInput): NormalizedPhone[] {
+  const contacts = resolveActivityPhones(activity);
+  if (
+    getScheduleJsonString(activity, "participationMode") !== "prebook" ||
+    getScheduleJsonString(activity, "prebookMethod") !== "phone"
+  ) {
+    return contacts;
+  }
+
+  const prebook = getNormalizedPhones({
+    phone: getScheduleJsonString(activity, "prebookPhone"),
+    phoneLabel: "Предварительная запись",
+  });
+  if (prebook.length === 0) return contacts;
+  const preferred = prebook[0]!;
+  return [preferred, ...contacts.filter((contact) => contact.href !== preferred.href)];
+}
+
 export function resolvePurchaseUrl(activity: Pick<ActivityForEventPageInput, "scheduleJson">): string | undefined {
   const participationMode = getScheduleJsonString(activity, "participationMode");
   if (participationMode === "external-link") {
@@ -608,7 +631,7 @@ export function buildEventPageDataFromPrismaActivity(
       saveLabel: "В идеи",
       purchaseUrl: resolvePurchaseUrl(activity),
       simpleBooking: resolveSimpleBooking(activity.id, activity),
-      phones: resolveActivityPhones(activity),
+      phones: resolveEventActionPhones(activity),
     },
     resolvedCta: resolveEventCanonicalCta(activity),
     reelsUrl: resolveReelsUrl(activity),

@@ -630,7 +630,6 @@ export function EventPageView({
                 onSave={handleSave}
                 isPlanned={saveStatus.inPlan}
                 planDate={saveStatus.planDate}
-
               />
             </div>
           </div>
