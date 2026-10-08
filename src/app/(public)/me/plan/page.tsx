@@ -1,3 +1,4 @@
+import { listPastPlanEntries } from "@/server/services/experience/pastPlanEntries.service";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { PlanPageClient } from "./PlanPageClient";
@@ -17,13 +18,15 @@ import { calendarWeekRange, resolveCalendarDateParam } from "@/features/my-plan/
 export default async function PlanPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ date?: string | string[] }>;
+  searchParams?: Promise<{ date?: string | string[]; historyPage?: string | string[] }>;
 }) {
   const user = await getCurrentUser();
   if (!user) return <PlanGuestFlow />;
 
   const params = await searchParams;
   const selectedDate = resolveCalendarDateParam(params?.date, getLocalDateKey());
+  const pageText = Array.isArray(params?.historyPage) ? params.historyPage[0] : params?.historyPage;
+  const historyPage = pageText && /^[0-9]{1,2}$/.test(pageText) ? Math.min(50, Number(pageText)) : 0;
   const { from: initialFrom, to: initialTo } = calendarWeekRange(selectedDate);
   const calendar = await loadFamilyCalendarRange({
     owner: await resolvePlanOwner(user.id),
@@ -32,9 +35,10 @@ export default async function PlanPage({
   });
   const adultIds = familyReadsEnabled() ? await activeFamilyUserIds(user.id) : [user.id];
   const familyView = adultIds.length > 1 ? { currentUserId: user.id, adultsCount: adultIds.length } : null;
-  const [experienceCandidates, recentExperiences] = await Promise.all([
+  const [experienceCandidates, recentExperiences, pastEntries] = await Promise.all([
     listPendingExperienceCandidates({ userId: user.id, lookbackDays: 14, take: 3 }),
-    listRecentExperienceSummaries({ userId: user.id, take: 1 }),
+    listRecentExperienceSummaries({ userId: user.id, take: 3 }),
+    listPastPlanEntries({ userId: user.id, page: historyPage }),
   ]);
 
   // Load saved ideas for the sidebar
@@ -101,6 +105,9 @@ export default async function PlanPage({
         plannedStartsAt: candidate.plannedStartsAt?.toISOString() ?? null,
       }))}
       recentExperiences={recentExperiences}
+      pastEntries={pastEntries.items}
+      pastEntriesHasNext={pastEntries.hasNext}
+      pastEntriesPage={historyPage}
       activeReminder={
         activeReminder
           ? {
