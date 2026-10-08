@@ -12,6 +12,7 @@ export type PublicCardPriceInput = {
 export function formatPublicCardPrice(input: PublicCardPriceInput): string | null {
   const { priceMode, priceFrom } = input;
   if (priceMode === "FREE") return "Бесплатно";
+  if (priceMode === "ON_REQUEST") return "По запросу";
   if (priceMode === "NONE" || priceMode === "UNKNOWN" || !priceMode) return null;
   if (typeof priceFrom !== "number" || !Number.isFinite(priceFrom) || priceFrom < 0) return null;
   if (priceMode === "EXACT") return formatPrice(priceFrom, { hideZero: true });
