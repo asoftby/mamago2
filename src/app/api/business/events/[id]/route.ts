@@ -566,7 +566,7 @@ export async function PATCH(
       body.priceItems !== undefined || scheduleJsonDirty
     ) {
       const normalizedPrice = normalizePublicationPrice({
-        mode: nextScheduleJson.pricingMode as "free" | "fixed" | "from" | undefined,
+        mode: nextScheduleJson.pricingMode as "free" | "fixed" | "from" | "on_request" | undefined,
         min: body.priceFrom !== undefined ? body.priceFrom : existing.priceFrom,
         max: body.priceTo !== undefined ? body.priceTo : existing.priceTo,
         priceItems: body.priceItems !== undefined ? body.priceItems : existing.priceItems,
