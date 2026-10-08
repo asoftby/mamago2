@@ -48,3 +48,8 @@ test("safely parses unambiguous legacy text", () => {
   assert.equal(parseSafeLegacyPriceText("30–120 руб.").mode, "RANGE");
   assert.equal(parseSafeLegacyPriceText("цена зависит от программы").mode, "UNKNOWN");
 });
+
+test("explicit on-request overrides stale numeric prices without calling it free", () => {
+  const result = normalizePublicationPrice({ mode: "on_request", min: 45, max: 45, priceItems: { items: [{ price: 45 }] }, priceText: "По запросу" });
+  assert.deepEqual({ mode: result.mode, min: result.min, max: result.max }, { mode: "ON_REQUEST", min: null, max: null });
+});
