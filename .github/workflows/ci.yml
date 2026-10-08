@@ -145,6 +145,7 @@ jobs:
           pnpm test:admin-user-360
           pnpm exec tsx src/components/admin/ui/AdminFilterTabs.contract.test.ts
           pnpm exec tsx src/app/admin/commercial/contracts/contractWizard.contract.test.ts
+          pnpm exec tsx src/app/admin/billing/page.contract.test.ts
 
       - name: My Plan presentation regressions
         run: |
