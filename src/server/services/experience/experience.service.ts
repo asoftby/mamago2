@@ -5,6 +5,7 @@ import {
   type Experience,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isSameExperienceFeedback, normalizeExperienceFeedbackComment } from "@/lib/experience/feedback";
 import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
 import { SubjectSchema, type Subject } from "@/lib/decision/decisionContext";
 import { findMostRecentSubjectsSnapshot } from "@/lib/decision/subjects";
@@ -407,7 +408,7 @@ export async function submitExperienceFeedback(input: {
   comment?: string | null;
   sessionId?: string | null;
 }): Promise<Experience> {
-  const comment = input.comment?.trim() || null;
+  const comment = normalizeExperienceFeedbackComment(input.comment);
   const found = await prisma.experience.findUnique({ where: { id: input.experienceId } });
   let existing = found && found.userId === input.userId ? found : null;
   if (found && !existing) {
@@ -421,7 +422,7 @@ export async function submitExperienceFeedback(input: {
   if (existing.attendance !== "ATTENDED") {
     throw new ExperienceDomainError("feedback_not_allowed", "Feedback requires attended experience");
   }
-  if (existing.feedbackSentiment && (existing.feedbackSentiment !== input.sentiment || existing.feedbackComment !== comment)) {
+  if (existing.feedbackSentiment && !isSameExperienceFeedback(existing, { sentiment: input.sentiment, comment })) {
     throw new ExperienceDomainError("feedback_conflict", "Feedback has already been submitted");
   }
 
@@ -432,7 +433,7 @@ export async function submitExperienceFeedback(input: {
       data: { feedbackSentiment: input.sentiment, feedbackComment: comment, feedbackAt: new Date() },
     });
     experience = await prisma.experience.findUniqueOrThrow({ where: { id: existing.id } });
-    if (updated.count === 0 && (experience.feedbackSentiment !== input.sentiment || experience.feedbackComment !== comment)) {
+    if (updated.count === 0 && !isSameExperienceFeedback(experience, { sentiment: input.sentiment, comment })) {
       throw new ExperienceDomainError("feedback_conflict", "Feedback has already been submitted");
     }
   }
