@@ -1,19 +1,22 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { PublicFooter } from "@/components/shell/PublicFooter";
-import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
-import { MobileBottomBarShell } from "@/components/layout/MobileBottomBarShell";
 import { BetaTipMobile } from "@/components/shared/BetaTip";
-import { shouldHideMobileBottomNav } from "@/lib/intent";
+import {
+  isPublicationDetailPath,
+  shouldHideMobileBottomNav,
+  shouldHideMyPlanWidget,
+} from "@/lib/intent";
 import { cn } from "@/lib/utils";
 import { useNavigationReloadDebug } from "@/hooks/useNavigationReloadDebug";
 import { NotificationSurfaceBootstrap } from "@/features/notifications/NotificationSurfaceBootstrap";
 import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 
+/** Виджет «Мой план» (64px) + отступ от низа 12px + зазор 24px + safe-area. */
 const MOBILE_MAIN_BOTTOM =
-  "pb-[calc(5.75rem+env(safe-area-inset-bottom))] lg:pb-0";
+  "pb-[calc(6.25rem+env(safe-area-inset-bottom))] lg:pb-0";
 
 function isPublishedPublicSource(pathname: string): boolean {
   return !(
@@ -47,6 +50,9 @@ function isContentEditDestination(url: URL): boolean {
 export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const hideBottomBar = shouldHideMobileBottomNav(pathname);
+  // На страницах деталей нижнюю панель не рендерим (там EventStickyActionBar) — отступ под неё не нужен.
+  const hasMobilePlanWidget =
+    !shouldHideMyPlanWidget(pathname) && !isPublicationDetailPath(pathname);
   useNavigationReloadDebug(process.env.NODE_ENV !== "production");
 
   useEffect(() => {
@@ -118,22 +124,11 @@ export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <div className={cn(!hideBottomBar ? MOBILE_MAIN_BOTTOM : "pb-0 lg:pb-0")}>
+      <div className={cn(hasMobilePlanWidget ? MOBILE_MAIN_BOTTOM : "pb-0 lg:pb-0")}>
         <PublicFooter withStickyCtaClearance={hideBottomBar} />
       </div>
 
-      {!hideBottomBar ? (
-        <>
-          <BetaTipMobile />
-          <MobileBottomBarShell>
-            <Suspense
-              fallback={<div className="h-[5.75rem] shrink-0" aria-hidden />}
-            >
-              <MobileBottomNav />
-            </Suspense>
-          </MobileBottomBarShell>
-        </>
-      ) : null}
+      {!hideBottomBar ? <BetaTipMobile /> : null}
     </>
   );
 }

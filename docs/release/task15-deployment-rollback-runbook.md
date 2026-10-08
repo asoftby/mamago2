@@ -173,7 +173,7 @@ session's audit data is not a substitute for a fresh check)
    ```bash
    pnpm prisma migrate status
    pnpm prisma migrate diff --from-url "$DATABASE_URL" \
-     --to-schema-datamodel prisma/schema.prisma --script
+     --to-schema-datamodel prisma --script
    ```
    If the diff contains `DROP`/destructive `ALTER` beyond what step 4's
    backup already covers for — stop and review manually before proceeding

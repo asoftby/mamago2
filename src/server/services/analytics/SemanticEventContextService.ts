@@ -4,6 +4,7 @@ import type {
   UserEventType,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { eventSystemInterestSlugs } from "@/lib/event/eventSystemInterests";
 
 const STRONG_SEMANTIC_EVENTS = new Set<UserEventType>([
   "DETAIL_OPEN",
@@ -17,6 +18,8 @@ const STRONG_SEMANTIC_EVENTS = new Set<UserEventType>([
   "BOOKING_COMPLETED",
   "BOOKING_CANCELLED",
   "FEEDBACK_LEFT",
+  "ATTENDED",
+  "EXPERIENCE_FEEDBACK",
 ]);
 
 function asRecord(meta: Prisma.InputJsonValue | undefined): Record<string, unknown> {
@@ -57,7 +60,9 @@ export async function enrichSemanticEventMeta(input: {
     hasStringArray(current.categoryIds) &&
     hasStringArray(current.genreSlugs) &&
     hasStringArray(current.signalIds) &&
-    typeof current.format === "string";
+    typeof current.format === "string" &&
+    (!(input.eventType === "ATTENDED" || input.eventType === "EXPERIENCE_FEEDBACK") ||
+      Array.isArray(current.interestSlugs));
   if (alreadyComplete) return input.meta;
 
   try {
@@ -70,6 +75,7 @@ export async function enrichSemanticEventMeta(input: {
         format: true,
         ageTags: true,
         priceFrom: true,
+        scheduleJson: true,
       },
     });
     if (!activity) return input.meta;
@@ -91,6 +97,9 @@ export async function enrichSemanticEventMeta(input: {
         : {}),
       ...(typeof current.priceFrom !== "number" && activity.priceFrom != null
         ? { priceFrom: activity.priceFrom }
+        : {}),
+      ...(!Array.isArray(current.interestSlugs)
+        ? { interestSlugs: eventSystemInterestSlugs(activity.scheduleJson) }
         : {}),
     } as Prisma.InputJsonValue;
   } catch (error) {

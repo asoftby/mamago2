@@ -31,15 +31,16 @@ export function MobileFilterButton({ intent, className }: MobileFilterButtonProp
       type="button"
       onClick={handleClick}
       className={cn(
-        "relative flex h-[52px] w-[52px] items-center justify-center rounded-full border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-md active:scale-[0.98]",
+        "relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border shadow-sm transition-all duration-200 active:scale-[0.98]",
+        "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50",
         className,
       )}
-      aria-label="Открыть фильтры"
+      aria-label={activeCount > 0 ? `Фильтры, активно: ${activeCount}` : "Открыть фильтры"}
     >
       <SlidersHorizontal className="h-5 w-5 text-gray-600" />
 
       {activeCount > 0 && (
-        <div className="absolute -top-1 -right-1 bg-[#EF8759] text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+        <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
           {activeCount}
         </div>
       )}

@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getActivityCityIdForAnalytics } from "@/lib/analytics/activityCity";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
-import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
+import {
+  trackUserEvent,
+  trackFirstOccurrenceEvent,
+} from "@/server/services/analytics/AnalyticsEventService";
 import {
   addPlacePlanItem,
   addPlanItem,
@@ -11,6 +14,15 @@ import {
 } from "@/server/services/plan.service";
 import { prisma } from "@/lib/prisma";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
+import {
+  buildSubjectsSnapshot,
+  findMostRecentSubjectsSnapshot,
+  recordPlanAudienceSnapshot,
+} from "@/lib/decision/subjects";
+import { readOptionalSafeOpaqueId } from "@/lib/decision/identifiers";
+import { planScopeFor } from "@/server/family/familyAccess";
+import { familyReadsEnabled } from "@/server/family/familyScope";
+import type { PlanVisibility } from "@prisma/client";
 
 function planningTimingForDate(dateKey: string): "same_day" | "weekend" | "advance" {
   if (dateKey === getLocalDateKey()) return "same_day";
@@ -50,6 +62,9 @@ export async function POST(request: NextRequest) {
       coverImageUrl,
       selectedPersonaIds,
       planAddSource,
+      anonymousId,
+      recommendationExposureId,
+      visibility: visibilityRaw,
     } = body as {
       activityId?: string;
       routeId?: string;
@@ -65,7 +80,29 @@ export async function POST(request: NextRequest) {
       coverImageUrl?: string;
       selectedPersonaIds?: unknown;
       planAddSource?: unknown;
+      /** Guest product identity — lets a guest-generated recommendation still
+       * be verifiably attributed after the visitor registers and saves it.
+       * Never trusted for ownership by itself; verifyRecommendationAttribution
+       * re-checks it server-side. */
+      anonymousId?: unknown;
+      recommendationExposureId?: unknown;
+      /** Family Core M4c: audience of a NEW item. Honored only with FAMILY_CORE_READS. */
+      visibility?: unknown;
     };
+
+    // Family Core M4c: "PRIVATE" | "FAMILY"; anything else (or flag off) = default.
+    const visibility: PlanVisibility | undefined =
+      familyReadsEnabled() && (visibilityRaw === "PRIVATE" || visibilityRaw === "FAMILY")
+        ? visibilityRaw
+        : undefined;
+
+    const anonymousIdParsed = readOptionalSafeOpaqueId(anonymousId);
+    const exposureIdParsed = readOptionalSafeOpaqueId(recommendationExposureId);
+    if (!anonymousIdParsed.ok || !exposureIdParsed.ok) {
+      return NextResponse.json({ error: "invalid_identifier" }, { status: 400 });
+    }
+    const validAnonymousId = anonymousIdParsed.value;
+    const validRecommendationExposureId = exposureIdParsed.value;
 
     // Articles have no date semantics — they can only be saved as an idea
     // (see /api/save/idea). Reject before the generic validation below so a
@@ -89,12 +126,24 @@ export async function POST(request: NextRequest) {
     }
 
     const planDateMeta = planDateAnalyticsMeta(date);
+    const personaIds = Array.isArray(selectedPersonaIds)
+      ? selectedPersonaIds.filter((x): x is string => typeof x === "string")
+      : [];
+    const subjects =
+      personaIds.length > 0
+        ? await buildSubjectsSnapshot({ userId: user.id, personaIds, targetDate: date })
+        : [];
+    const subjectsMeta =
+      subjects.length > 0
+        ? { subjects, decisionContextVersion: 1 as const, selectedPersonaIds: personaIds }
+        : {};
     let planItem;
 
     if (placeId) {
       planItem = await addPlacePlanItem(user.id, placeId, date, planPlaceSlug ?? null, {
         title: title ?? null,
         coverImageUrl: coverImageUrl ?? null,
+        visibility,
       });
 
       const place = await prisma.place.findUnique({
@@ -105,7 +154,9 @@ export async function POST(request: NextRequest) {
       void trackUserEvent({
         userId: user.id,
         sessionId: sessionRowId,
+        anonymousId: validAnonymousId,
         eventType: "PLAN_ADD",
+        planVisibility: visibility,
         entityType: "PLACE",
         entityId: placeId,
         vertical: "CITY",
@@ -114,7 +165,9 @@ export async function POST(request: NextRequest) {
           source: "detail",
           section: "places",
           targetAction: "plan",
+          planItemId: planItem.id,
           ...planDateMeta,
+          ...subjectsMeta,
         },
       });
     } else if (routeId) {
@@ -123,13 +176,15 @@ export async function POST(request: NextRequest) {
         routeId,
         date,
         planRouteSlug ?? null,
-        { title: title ?? null, coverImageUrl: coverImageUrl ?? null },
+        { title: title ?? null, coverImageUrl: coverImageUrl ?? null, visibility },
       );
       const sessionRowId = await getSessionRowIdFromCookies();
       void trackUserEvent({
         userId: user.id,
         sessionId: sessionRowId,
+        anonymousId: validAnonymousId,
         eventType: "PLAN_ADD",
+        planVisibility: visibility,
         entityType: "ROUTE",
         entityId: routeId,
         vertical: "CITY",
@@ -138,7 +193,9 @@ export async function POST(request: NextRequest) {
           source: "detail",
           section: "routes",
           targetAction: "plan",
+          planItemId: planItem.id,
           ...planDateMeta,
+          ...subjectsMeta,
         },
       });
     } else if (activityId) {
@@ -169,14 +226,12 @@ export async function POST(request: NextRequest) {
         resolvedStartsAt,
         title ?? undefined,
         coverImageUrl ?? undefined,
+        visibility,
       );
 
       if (planItem.created) {
         const cityId = await getActivityCityIdForAnalytics(activityId);
         const sessionRowId = await getSessionRowIdFromCookies();
-        const personaIds = Array.isArray(selectedPersonaIds)
-          ? selectedPersonaIds.filter((x): x is string => typeof x === "string")
-          : [];
         const sourceTag =
           planAddSource === "recommendation"
             ? ("recommendation" as const)
@@ -186,7 +241,9 @@ export async function POST(request: NextRequest) {
         void trackUserEvent({
           userId: user.id,
           sessionId: sessionRowId,
+          anonymousId: validAnonymousId,
           eventType: "PLAN_ADD",
+        planVisibility: visibility,
           entityType: "EVENT",
           entityId: activityId,
           vertical: "CITY",
@@ -195,12 +252,40 @@ export async function POST(request: NextRequest) {
             source: sourceTag,
             section: "afisha",
             targetAction: "plan",
+            planItemId: planItem.id,
             ...planDateMeta,
             ...(planAddSource === "recommendation" || planAddSource === "idea"
               ? { planAddSource }
               : {}),
-            ...(personaIds.length > 0 ? { selectedPersonaIds: personaIds } : {}),
+            ...(sourceTag === "recommendation" && validRecommendationExposureId
+              ? { recommendationExposureId: validRecommendationExposureId }
+              : {}),
+            ...subjectsMeta,
           },
+        });
+        if (sourceTag === "recommendation") {
+          void trackFirstOccurrenceEvent({
+            userId: user.id,
+            sessionId: sessionRowId,
+            eventType: "FIRST_PERSONALIZED_PLAN_ADD",
+            meta: { recommendationSurface: "my_plan" },
+          });
+        }
+      } else {
+        // Existing PlanItem re-saved (same date with a new audience, or moved
+        // to another date): no new plan-add happened, but the CURRENT audience
+        // must still be recorded so a later remove can never fall back to a
+        // stale one. Separate event type — not a second positive signal.
+        void recordPlanAudienceSnapshot({
+          userId: user.id,
+          sessionId: await getSessionRowIdFromCookies(),
+          anonymousId: validAnonymousId,
+          entityType: "EVENT",
+          entityId: activityId,
+          cityId: await getActivityCityIdForAnalytics(activityId),
+          planItemId: planItem.id,
+          date,
+          subjects,
         });
       }
     }
@@ -233,17 +318,27 @@ export async function DELETE(request: NextRequest) {
     }
 
     const existing = await prisma.planItem.findFirst({
-      where: { id: planItemId, userId: user.id },
-      select: { activityId: true, placeId: true, routeId: true },
+      where: { id: planItemId, ...(await planScopeFor(user.id)) },
+      select: { activityId: true, placeId: true, routeId: true, date: true },
     });
 
     await removePlanItem(user.id, planItemId);
 
     if (existing) {
       const sessionRowId = await getSessionRowIdFromCookies();
+      const removeDateMeta = existing.date ? planDateAnalyticsMeta(existing.date) : {};
 
       if (existing.activityId) {
         const cityId = await getActivityCityIdForAnalytics(existing.activityId);
+        const subjects = existing.date
+          ? await findMostRecentSubjectsSnapshot({
+              userId: user.id,
+              entityType: "EVENT",
+              entityId: existing.activityId,
+              planItemId,
+              currentDate: existing.date,
+            })
+          : [];
         void trackUserEvent({
           userId: user.id,
           sessionId: sessionRowId,
@@ -252,13 +347,27 @@ export async function DELETE(request: NextRequest) {
           entityId: existing.activityId,
           vertical: "CITY",
           cityId,
-          meta: { section: "afisha", targetAction: "plan" },
+          meta: {
+            section: "afisha",
+            targetAction: "plan",
+            ...removeDateMeta,
+            ...(subjects.length > 0 ? { subjects, decisionContextVersion: 1 } : {}),
+          },
         });
       } else if (existing.placeId) {
         const place = await prisma.place.findUnique({
           where: { id: existing.placeId },
           select: { cityId: true },
         });
+        const subjects = existing.date
+          ? await findMostRecentSubjectsSnapshot({
+              userId: user.id,
+              entityType: "PLACE",
+              entityId: existing.placeId,
+              planItemId,
+              currentDate: existing.date,
+            })
+          : [];
         void trackUserEvent({
           userId: user.id,
           sessionId: sessionRowId,
@@ -267,9 +376,23 @@ export async function DELETE(request: NextRequest) {
           entityId: existing.placeId,
           vertical: "CITY",
           cityId: place?.cityId ?? null,
-          meta: { section: "places", targetAction: "plan" },
+          meta: {
+            section: "places",
+            targetAction: "plan",
+            ...removeDateMeta,
+            ...(subjects.length > 0 ? { subjects, decisionContextVersion: 1 } : {}),
+          },
         });
       } else if (existing.routeId) {
+        const subjects = existing.date
+          ? await findMostRecentSubjectsSnapshot({
+              userId: user.id,
+              entityType: "ROUTE",
+              entityId: existing.routeId,
+              planItemId,
+              currentDate: existing.date,
+            })
+          : [];
         void trackUserEvent({
           userId: user.id,
           sessionId: sessionRowId,
@@ -278,7 +401,12 @@ export async function DELETE(request: NextRequest) {
           entityId: existing.routeId,
           vertical: "CITY",
           cityId: null,
-          meta: { section: "routes", targetAction: "plan" },
+          meta: {
+            section: "routes",
+            targetAction: "plan",
+            ...removeDateMeta,
+            ...(subjects.length > 0 ? { subjects, decisionContextVersion: 1 } : {}),
+          },
         });
       }
     }

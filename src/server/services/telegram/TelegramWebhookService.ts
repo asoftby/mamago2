@@ -12,6 +12,10 @@ import {
   touchTelegramConnectionByChatIdForCurrentEnvironment,
 } from "@/server/services/telegram/telegramConnection.service";
 import { TelegramChannel } from "./TelegramChannel";
+import { decodeCallback } from "./capture/callbackCodec";
+import { createDefaultCaptureRoutingDeps, type CaptureRoutingDeps } from "./capture/captureWiring";
+import { parseTelegramUpdate, type ParsedCapture, type RawTelegramUpdate } from "./capture/telegramUpdateParser";
+import { planOwnerWithoutFamily } from "@/server/services/planOwner";
 import { renderDevBusinessApplicationMessage } from "./TelegramTemplateRenderer";
 
 type TelegramUser = {
@@ -39,22 +43,102 @@ type TelegramCallbackQuery = {
 };
 
 export type TelegramUpdate = {
+  update_id?: number;
   message?: TelegramMessage;
   callback_query?: TelegramCallbackQuery;
 };
 
-export class TelegramWebhookService {
-  constructor(private readonly channel = new TelegramChannel()) {}
+/** What the webhook route should do after answering 200. */
+export type HandleUpdateResult = {
+  afterResponse?: () => Promise<void>;
+};
 
-  async handleUpdate(update: TelegramUpdate): Promise<void> {
+export class TelegramWebhookService {
+  private readonly capture: CaptureRoutingDeps;
+
+  constructor(
+    private readonly channel = new TelegramChannel(),
+    capture?: CaptureRoutingDeps,
+  ) {
+    this.capture = capture ?? createDefaultCaptureRoutingDeps();
+  }
+
+  async handleUpdate(update: TelegramUpdate): Promise<HandleUpdateResult> {
+    // The raw payload carries more fields than the narrow legacy type.
+    const parsed = parseTelegramUpdate(update as unknown as RawTelegramUpdate);
+
+    if (parsed.kind === "callback") {
+      const decoded = decodeCallback(parsed.data);
+      if (decoded) {
+        if (parsed.chatId == null) {
+          await this.capture.acknowledgeCallback(parsed.callbackQueryId);
+          return {};
+        }
+
+        const chatId = String(parsed.chatId);
+        const allowlist = this.capture.getAllowlist();
+        const connection =
+          allowlist.size > 0
+            ? await this.capture.findActiveConnection(chatId)
+            : null;
+
+        if (!connection || !allowlist.has(connection.userId)) {
+          await this.capture.acknowledgeCallback(parsed.callbackQueryId);
+          return {};
+        }
+
+        await this.capture.touchConnection(chatId);
+        await this.capture.handleCallback(
+          planOwnerWithoutFamily(connection.userId),
+          parsed,
+          decoded,
+        );
+        return {};
+      }
+    }
+
+    if (parsed.kind === "capture") {
+      const handled = await this.tryCapture(parsed);
+      if (handled) return handled;
+      // Not enabled / not linked / not allowlisted: behave exactly as before.
+    }
+
     if (update.message) {
       await this.handleMessage(update.message);
-      return;
+      return {};
     }
 
     if (update.callback_query) {
       await this.handleCallbackQuery(update.callback_query);
     }
+    return {};
+  }
+
+  /**
+   * Gate: capture runs only for a private chat with an active connection whose
+   * userId is on TELEGRAM_CAPTURE_USER_IDS. Returns null when the gate is
+   * closed so the caller falls through to the legacy path. An empty allowlist
+   * returns before any database access.
+   */
+  private async tryCapture(parsed: ParsedCapture): Promise<HandleUpdateResult | null> {
+    const allowlist = this.capture.getAllowlist();
+    if (allowlist.size === 0) return null;
+
+    const chatId = String(parsed.chatId);
+    const connection = await this.capture.findActiveConnection(chatId);
+    if (!connection || !allowlist.has(connection.userId)) return null;
+
+    await this.capture.touchConnection(chatId);
+    const owner = planOwnerWithoutFamily(connection.userId);
+    const environment = this.capture.getEnvironment();
+
+    const edit = await this.capture.tryEdit(owner, environment, parsed);
+    if (edit) {
+      return edit.afterResponse ? { afterResponse: edit.afterResponse } : {};
+    }
+
+    const result = await this.capture.receive(owner, environment, parsed);
+    return result.afterResponse ? { afterResponse: result.afterResponse } : {};
   }
 
   private async handleMessage(message: TelegramMessage): Promise<void> {
@@ -65,8 +149,8 @@ export class TelegramWebhookService {
 
     // Dev logging: received message
     if (process.env.NODE_ENV !== "production") {
-      console.log("[telegram:webhook] handleMessage chatId=%s from_id=%s text=%s",
-        chatId, message.from?.id ?? "unknown", text ?? "(no text)");
+      // No chat id, sender id or message text: forwarded messages are user content.
+      console.log("[telegram:webhook] handleMessage type=message");
     }
 
     // Not a /start command at all — ignore silently
@@ -83,7 +167,7 @@ export class TelegramWebhookService {
 
     // Dev logging: extracted payload
     if (process.env.NODE_ENV !== "production") {
-      console.log("[telegram:webhook] /start command detected - payload=%s", payload ?? "(none)");
+      console.log("[telegram:webhook] /start command detected - hasPayload=%s", payload !== null);
     }
 
     // Plain /start without link token — greet and explain

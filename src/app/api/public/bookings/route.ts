@@ -23,6 +23,7 @@ const createBookingSchema = z.object({
   customerComment: z.string().optional(),
   adultsCount: z.number().int().min(0).default(1),
   childrenCount: z.number().int().min(0).default(0),
+  planItemId: z.string().min(1).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
       adultsCount: data.adultsCount,
       childrenCount: data.childrenCount,
       userId: user?.id ?? null,
+      planItemId: data.planItemId ?? null,
     });
 
     const booking = await prisma.bookingRequest.findUnique({

@@ -26,10 +26,12 @@ export interface EventScheduleCardProps {
   onRemove: () => void;
   canRemove: boolean;
   disabled?: boolean;
+  durationMinutes?: number;
 }
 
 export interface EventScheduleListProps {
   items: EventScheduleItem[];
   onChange: (items: EventScheduleItem[]) => void;
   disabled?: boolean;
+  durationMinutes?: number;
 }

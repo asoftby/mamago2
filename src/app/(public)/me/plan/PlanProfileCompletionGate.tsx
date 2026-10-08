@@ -6,8 +6,12 @@ import { toast } from "@/lib/toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ProfileCompletionFlow } from "@/components/post-auth/ProfileCompletionFlow";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { savePostAuthContext, clearPostAuthContext } from "@/lib/post-auth";
-import { applyPostAuthCompletionOutcome } from "@/lib/post-auth/resolver";
+import {
+  finishPostAuthOnboarding,
+  resolvePostAuthFlow,
+  savePostAuthContext,
+  type ProfileStatePayload,
+} from "@/lib/post-auth";
 import { trackPostAuthEvent } from "@/lib/post-auth/analytics";
 import { useAuthMe } from "@/lib/auth/useAuthMe";
 
@@ -61,9 +65,14 @@ export function PlanProfileCompletionGate() {
           }
           return;
         }
-        const data = (await res.json()) as { isProfileComplete?: boolean };
+        const data = (await res.json()) as ProfileStatePayload;
         if (cancelled) return;
-        setShouldOpen(!Boolean(data.isProfileComplete));
+        const resolution = resolvePostAuthFlow({
+          source: "my_plan",
+          returnTo: "/me/plan",
+          profile: data,
+        });
+        setShouldOpen(resolution.kind === "completion");
       } catch {
         if (!cancelled) {
           setShouldOpen(false);
@@ -109,17 +118,14 @@ export function PlanProfileCompletionGate() {
           entryPoint="my_plan"
           returnTo="/me/plan"
           onFinished={(opts) => {
-            trackPostAuthEvent("completion_finished", { source: "my_plan" });
-            clearPostAuthContext();
-            if (opts?.alreadyComplete !== true) {
-              applyPostAuthCompletionOutcome("my_plan", {
-                isMobile,
-                router,
-                returnTo: "/me/plan",
-                toast,
-                skipNavigation: false,
-              });
-            }
+            finishPostAuthOnboarding("my_plan", {
+              alreadyComplete: opts?.alreadyComplete,
+              isMobile,
+              router,
+              returnTo: "/me/plan",
+              toast,
+              skipNavigation: false,
+            });
             setDismissed(true);
             router.refresh();
           }}

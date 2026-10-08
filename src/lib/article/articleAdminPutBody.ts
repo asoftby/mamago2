@@ -5,6 +5,7 @@ import {
   deriveArticleExcerptFromContent,
 } from "@/lib/publications/articleMvp";
 import type { ArticleSaveInput } from "@/lib/article/articleAdminTypes";
+import { detachLegacyArticleMainGallery } from "@/lib/article/articleMainGallery";
 
 const ArticleGeographyTargetSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("CITY"), cityId: z.string().min(1) }).strict(),
@@ -44,13 +45,17 @@ export const ArticleAdminPutBodySchema = z.object({
 export function articleSaveInputFromPutBody(
   data: z.infer<typeof ArticleAdminPutBodySchema>,
 ): ArticleSaveInput {
+  const articleMedia = detachLegacyArticleMainGallery({
+    coverImageId: data.coverImageId,
+    content: data.content,
+  });
   return {
     title: data.title,
     slug: data.slug,
     subtitle: data.subtitle ?? null,
-    excerpt: deriveArticleExcerptFromContent(data.content),
-    content: data.content,
-    coverImageId: data.coverImageId,
+    excerpt: deriveArticleExcerptFromContent(articleMedia.content),
+    content: articleMedia.content,
+    coverImageId: articleMedia.coverImageId,
     authorLabel: data.authorLabel ?? null,
     authorUserId: data.authorUserId ?? null,
     cityContext: data.cityContext ?? null,

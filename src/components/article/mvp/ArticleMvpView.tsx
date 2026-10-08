@@ -25,7 +25,7 @@ import {
 import { ArticleReadingScrollPadding } from "@/components/article/mvp/ArticleReadingScrollPadding";
 import { articleBlockHtmlForEditor, articleBlockHtmlForPublic } from "@/lib/article/articleBlockHtml";
 import { ArticleGallery } from "@/components/article/mvp/ArticleGallery";
-import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
+import { ArticleMobileBackNavigation } from "@/components/article/mvp/ArticleMobileBackNavigation";
 import { PublicationTagChips } from "@/components/article/PublicationTagChips";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
@@ -160,9 +160,7 @@ export function ArticleMvpView({
       >
         <ArticleReadingScrollPadding extraTopRem={readingScrollPaddingExtraRem ?? 0} />
         {showChromeBack ? (
-          <div className="-mt-3 mb-7 md:mt-0 md:mb-0">
-            <MobileSmartBackButton fallbackHref={cityHomeHref} />
-          </div>
+          <ArticleMobileBackNavigation fallbackHref={cityHomeHref} />
         ) : null}
         {draftWatermark ? (
           <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">

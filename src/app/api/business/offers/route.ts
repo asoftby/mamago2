@@ -29,6 +29,7 @@ import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { formatZodErrorResponse } from "@/lib/validation/zodErrorResponse";
 import { shouldRejectUnlinkedPlaceForOfferMutation } from "@/lib/offers/offerLinkedBusinessAccess";
+import { notifyAdminsPublicationSubmitted } from "@/server/services/notification.service";
 
 const offerProductTypeSchema = z.enum([
   "PLACE_VISIT",
@@ -458,6 +459,21 @@ export async function POST(request: NextRequest) {
           );
         }
       }
+
+      // Operational alert only for manual business submissions that actually
+      // enter moderation. Import/parser pipelines do not use this business route.
+      if (!isPlatformContentStaff(user.role) && offer.status === "PENDING") {
+        try {
+          await notifyAdminsPublicationSubmitted({
+            publicationType: "OFFER",
+            publicationId: offer.id,
+            publicationTitle: offer.title,
+          });
+        } catch (error) {
+          console.error("[offer-create] admin moderation notification failed:", error);
+        }
+      }
+      timer.mark("notifications");
 
       // Sync media usage if cover or gallery provided (don't block on errors)
       if (data.coverImage || (data.gallery && data.gallery.length > 0)) {

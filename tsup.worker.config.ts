@@ -24,8 +24,10 @@ export default defineConfig({
       "scripts/legacy-routes-current-to-articles-migration.ts",
     "ops/legacy-routes-current-to-articles-cutover":
       "scripts/legacy-routes-current-to-articles-cutover.ts",
+    "ops/inbox-purge-smoke": "scripts/ops/inbox-purge-smoke.ts",
     "ops/legacy-routes-article-media-backfill":
       "scripts/legacy-routes-article-media-backfill.ts",
+    "ops/family-core-backfill": "scripts/family-core-backfill.ts",
   },
   format: ["cjs"],
   platform: "node",

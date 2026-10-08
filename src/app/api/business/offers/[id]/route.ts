@@ -29,6 +29,7 @@ import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { formatZodErrorResponse } from "@/lib/validation/zodErrorResponse";
 import { shouldRejectUnlinkedPlaceForOfferMutation } from "@/lib/offers/offerLinkedBusinessAccess";
+import { notifyAdminsPublicationSubmitted } from "@/server/services/notification.service";
 import { offerStatusRequiresPlace } from "@/lib/offers/offerPlaceRequirement";
 import {
   OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
@@ -620,6 +621,25 @@ export async function PATCH(
         assignOfferSlugIfMissing(offer.id, title),
       );
     }
+
+    // Notify only on an actual transition into moderation. Re-saving an
+    // already-PENDING offer must not create duplicate alerts.
+    if (
+      !canPublishContentDirectly(user.role) &&
+      offer.status === "PENDING" &&
+      existingOffer.status !== "PENDING"
+    ) {
+      try {
+        await notifyAdminsPublicationSubmitted({
+          publicationType: "OFFER",
+          publicationId: offer.id,
+          publicationTitle: offer.title,
+        });
+      } catch (error) {
+        console.error("[offer-update] admin moderation notification failed:", error);
+      }
+    }
+    timer.mark("notifications");
 
     // Sync media usage if cover or gallery changed (don't block on errors)
     const mediaChanged = data.coverImage !== undefined || data.gallery !== undefined;

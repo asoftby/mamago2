@@ -20,9 +20,9 @@ import { resolveCanonicalEventPublicPathBySlugOrId } from "@/lib/business/resolv
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { resolveEventCanonicalUrl } from "@/lib/seo/resolveEventCanonicalUrl";
 import { fetchReelsThumbnail } from "@/lib/instagram/fetchReelsThumbnail";
-import { tryResolvePublicationForCta } from "@/server/services/direct/directThread.service";
+import { parseVideoUrl } from "@/lib/media/parseVideoUrl";
 import { getCityDisplayName, getCityNominativeName } from "@/lib/city/cityDisplayNames";
-import { PublicationType } from "@prisma/client";
+import { loadSimilarActivities } from "@/lib/event/loadSimilarActivities";
 
 interface EventPublicPageProps {
   params: Promise<{ city: string; slugOrId: string }>;
@@ -131,6 +131,13 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
       fromDb.place?.formattedAddr ||
       fromDb.place?.customAddress ||
       undefined;
+    // The route city is a listing/canonical concern, not proof of the physical address locality.
+    // If the venue/place city is unknown, omit addressLocality instead of inventing it from the URL.
+    const locationCitySlug =
+      fromDb.venue?.place?.city?.slug ||
+      fromDb.venue?.city?.slug ||
+      fromDb.place?.city?.slug ||
+      undefined;
     const generatedJsonLd = buildEventJsonLd({
       canonicalUrl,
       title: fromDb.title,
@@ -144,6 +151,9 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
           ? {
               name: locationName,
               address: locationAddress,
+              addressLocality: locationCitySlug
+                ? getCityNominativeName(locationCitySlug)
+                : undefined,
             }
           : undefined,
       pricing: {
@@ -191,9 +201,21 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
       typeof (fromDb.scheduleJson as Record<string, unknown>).reelsUrl === "string"
         ? ((fromDb.scheduleJson as Record<string, unknown>).reelsUrl as string).trim()
         : null;
-    const reelsThumbnailUrl = rawReelsUrl
+    const reelsThumbnailUrl = rawReelsUrl && parseVideoUrl(rawReelsUrl)?.type === "instagram"
       ? await fetchReelsThumbnail(rawReelsUrl)
       : null;
+
+    const similar = fromDb.eventCategory?.id
+      ? await loadSimilarActivities({
+          activityId: fromDb.id,
+          cityId: fromDb.cityId,
+          citySlug: city,
+          eventCategoryId: fromDb.eventCategory.id,
+          limit: 4,
+          sameCategoryOnly: true,
+          userId: user?.id ?? null,
+        })
+      : [];
 
     const data = withEventPagePriceData(
       buildEventPageDataFromPrismaActivity(fromDb, {
@@ -201,23 +223,11 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
         ownerEditHref,
         previewBannerLabel,
         reelsThumbnailUrl: reelsThumbnailUrl ?? undefined,
+        similar,
       }),
       fromDb.priceItems,
     );
     const faqJsonLd = buildFaqJsonLd(data.faqItems);
-
-    // Direct CTA — omitted when the event has no resolvable owning Business (rule 5).
-    const directPublication = await tryResolvePublicationForCta({
-      publicationType: PublicationType.EVENT,
-      activityId: fromDb.id,
-    });
-    const directCta = directPublication
-      ? {
-          activityId: fromDb.id,
-          publicationTitle: fromDb.title,
-          brandName: fromDb.venue?.place?.title || fromDb.place?.title || directPublication.business.name,
-        }
-      : undefined;
 
     return (
       <>
@@ -231,7 +241,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
         <JsonLd
           data={[jsonLd, breadcrumbJsonLd, faqJsonLd].filter(Boolean) as Record<string, unknown>[]}
         />
-        <EventPageView data={data} direct={directCta} />
+        <EventPageView data={data} />
       </>
     );
   }

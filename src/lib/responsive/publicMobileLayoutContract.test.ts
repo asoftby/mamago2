@@ -32,7 +32,7 @@ assert.match(
 );
 assert.match(
   publicLayout,
-  /<div className=\{cn\(!hideBottomBar \? MOBILE_MAIN_BOTTOM/,
+  /<div className=\{cn\(hasMobilePlanWidget \? MOBILE_MAIN_BOTTOM/,
   "Footer wrapper must keep the single mobile bottom-nav clearance",
 );
 assert.doesNotMatch(

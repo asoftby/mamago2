@@ -17,18 +17,18 @@ function Tile({
   overflowCount?: number;
   onClick: () => void;
 }) {
-  const isReels = item.type === "reels";
+  const isVideo = item.type !== "image";
   const instagramMediaLabel =
-    isReels && /instagram\.com\/p\//i.test(item.url) ? "Post" : "Reels";
-  const bgSrc = isReels
-    ? (item as Extract<MediaGalleryItem, { type: "reels" }>).thumbnailSrc
+    item.type === "instagram" && /instagram\.com\/p\//i.test(item.url) ? "Post" : item.type === "youtube" ? "YouTube" : "Reels";
+  const bgSrc = isVideo
+    ? item.posterSrc ?? undefined
     : (item as Extract<MediaGalleryItem, { type: "image" }>).src;
 
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={isReels ? `Смотреть ${instagramMediaLabel}` : "Открыть фото"}
+      aria-label={isVideo ? `Смотреть ${instagramMediaLabel}` : "Открыть фото"}
       className={cn(
         "group relative overflow-hidden rounded-[16px] bg-[#E8E0D4]",
         "aspect-square w-full shrink-0",
@@ -54,7 +54,7 @@ function Tile({
           "absolute inset-0 transition-opacity",
           overflowCount
             ? "bg-black/35"
-            : isReels
+            : isVideo
               ? "bg-black/30 group-hover:bg-black/40"
               : "bg-black/0 group-hover:bg-black/15",
         )}
@@ -67,7 +67,7 @@ function Tile({
             +{overflowCount}
           </span>
         </div>
-      ) : isReels ? (
+      ) : isVideo ? (
         /* Instagram media: play icon + label */
         <>
           <div className="absolute inset-0 flex items-center justify-center">
@@ -89,18 +89,25 @@ interface MediaGalleryStripProps {
   items: MediaGalleryItem[];
   /** Max tiles shown before "+N". Default: 4. */
   maxVisible?: number;
+  /** Optional full lightbox sequence. Useful when the visible poster is item 0. */
+  lightboxItems?: MediaGalleryItem[];
+  /** Offset of this strip's first item inside lightboxItems. */
+  lightboxIndexOffset?: number;
   className?: string;
 }
 
 export function MediaGalleryStrip({
   items,
   maxVisible = 4,
+  lightboxItems,
+  lightboxIndexOffset = 0,
   className,
 }: MediaGalleryStripProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   if (items.length === 0) return null;
 
+  const resolvedLightboxItems = lightboxItems ?? items;
   const visibleItems = items.slice(0, maxVisible);
   const overflowCount = Math.max(0, items.length - maxVisible);
   // The last visible tile shows "+N" when there's overflow
@@ -145,7 +152,11 @@ export function MediaGalleryStrip({
               <Tile
                 item={item}
                 overflowCount={isLast && overflowCount > 0 ? overflowCount : undefined}
-                onClick={() => setLightboxIndex(isLast && overflowCount > 0 ? maxVisible - 1 : i)}
+                onClick={() =>
+                  setLightboxIndex(
+                    lightboxIndexOffset + (isLast && overflowCount > 0 ? maxVisible - 1 : i),
+                  )
+                }
               />
             </div>
           );
@@ -155,7 +166,7 @@ export function MediaGalleryStrip({
       {/* ── Lightbox ──────────────────────────────────────────── */}
       {lightboxIndex !== null && (
         <MediaLightbox
-          items={items}
+          items={resolvedLightboxItems}
           startIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
         />

@@ -1,9 +1,95 @@
-import type { SeoEntityProvider, SeoEntityType, SeoEntityUpdateInput } from "./types";
+import type {
+  SeoEntityListingRow,
+  SeoEntityProvider,
+  SeoEntityType,
+  SeoEntityUpdateInput,
+} from "./types";
 import { getSeoEntityProvider, seoEntityProviders } from "./registry";
+import type { SeoEntityListFilters } from "./listFilters";
+import { planProviderPageWindows } from "./listFilters";
+import type { SeoPageType } from "@/lib/admin/seo/domain/types";
 
 export async function listAllEntityRows() {
   const rowsNested = await Promise.all(seoEntityProviders.map((p) => p.listRows()));
   return rowsNested.flat();
+}
+
+function resolveProviders(type: SeoPageType | "all"): SeoEntityProvider[] {
+  if (
+    type === "event" ||
+    type === "place" ||
+    type === "offer" ||
+    type === "route" ||
+    type === "article"
+  ) {
+    return [getSeoEntityProvider(type)];
+  }
+  return [...seoEntityProviders];
+}
+
+export async function countEntityRows(input: {
+  filters: SeoEntityListFilters;
+  type: SeoPageType | "all";
+}): Promise<{
+  total: number;
+  counts: number[];
+  providers: SeoEntityProvider[];
+}> {
+  const providers = resolveProviders(input.type);
+  const counts = await Promise.all(
+    providers.map((p) => p.countRows(input.filters)),
+  );
+  const total = counts.reduce((sum, n) => sum + n, 0);
+  return { total, counts, providers };
+}
+
+/**
+ * Bounded cross-provider listing preserving registry concat order:
+ * event → place → offer → route → article (each updatedAt desc).
+ *
+ * Pass precomputed `counts`/`providers` from countEntityRows to avoid a
+ * second round of COUNT queries when clamping pagination.
+ */
+export async function listEntityRowsPage(input: {
+  filters: SeoEntityListFilters;
+  type: SeoPageType | "all";
+  skip: number;
+  take: number;
+  counts?: number[];
+  providers?: SeoEntityProvider[];
+}): Promise<{ rows: SeoEntityListingRow[]; total: number }> {
+  const counted =
+    input.counts && input.providers
+      ? {
+          total: input.counts.reduce((sum, n) => sum + n, 0),
+          counts: input.counts,
+          providers: input.providers,
+        }
+      : await countEntityRows({
+          filters: input.filters,
+          type: input.type,
+        });
+
+  if (input.take <= 0) {
+    return { rows: [], total: counted.total };
+  }
+
+  const windows = planProviderPageWindows(
+    counted.counts,
+    input.skip,
+    input.take,
+  );
+
+  const chunks = await Promise.all(
+    windows.map((w) =>
+      counted.providers[w.providerIndex]!.listRowsPage(input.filters, {
+        skip: w.skip,
+        take: w.take,
+      }),
+    ),
+  );
+
+  return { rows: chunks.flat(), total: counted.total };
 }
 
 export async function loadEntityEditorModel(type: SeoEntityType, id: string) {
@@ -33,4 +119,3 @@ export function providerForApiRoute(route: "activity" | "place" | "offer" | "rou
   if (route === "route") return getSeoEntityProvider("route");
   return getSeoEntityProvider("article");
 }
-

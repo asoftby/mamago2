@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import type { SearchResultItem, SearchResultType } from "@/lib/search/types";
 import { logSearchQuery } from "@/lib/search/logSearchQuery";
+import { resolveSearchLogCityId } from "@/lib/search/resolveSearchLogCityId";
 import { getCurrentUser } from "@/lib/auth/server";
 import { activityAddressLine, activityMetaLine, resolveActivityAgeLabel } from "@/lib/search/metaLines";
 
@@ -41,7 +42,8 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = (searchParams.get("q")?.trim() ?? "").slice(0, MAX_QUERY_LENGTH);
   const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "8", 10), 1), 20);
-  const cityId = searchParams.get("cityId") || undefined;
+  const citySlug = searchParams.get("citySlug");
+  const legacyCityId = searchParams.get("cityId");
 
   if (q.length < 2) {
     return NextResponse.json({ results: [] satisfies SearchResultItem[] });
@@ -50,6 +52,12 @@ export async function GET(request: Request) {
   try {
     // Get current user for logging (optional)
     const user = await getCurrentUser().catch(() => null);
+    // Telemetry only — does not affect ranking/results. Prefer citySlug; keep
+    // legacy cityId for older callers. Unknown slug → null (never invent Minsk).
+    const logCityId = await resolveSearchLogCityId({
+      citySlug,
+      legacyCityId,
+    });
 
     const docs = await prisma.searchDocument.findMany({
       where: {
@@ -192,7 +200,7 @@ export async function GET(request: Request) {
     logSearchQuery({
       query: q,
       resultsCount: results.length,
-      cityId,
+      cityId: logCityId ?? undefined,
       userId: user?.id,
       // sessionId can be added later from cookies/headers
     }).catch((err) => console.error("Search logging failed:", err));

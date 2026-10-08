@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { listPlanItemsByDate } from "@/server/services/plan.service";
-import { getDayScenario, computePlanFingerprint } from "@/server/services/dayScenario.service";
+import { getDayScenario, listScenarioItemOverrides, matchesScenarioPlanFingerprint } from "@/server/services/dayScenario.service";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
@@ -21,8 +21,9 @@ export async function GET(req: NextRequest) {
   // surface — full page and overlay alike — can show the same Scenario CTA
   // state (Task 7 "single converged entry point" requirement).
   const scenario = await getDayScenario(user.id, date);
+  const overrides = scenario ? await listScenarioItemOverrides(scenario.id) : new Map<string, Date>();
   const scenarioStatus = scenario
-    ? computePlanFingerprint(items) === scenario.planFingerprint
+    ? matchesScenarioPlanFingerprint(scenario.planFingerprint, items, overrides, scenario.acceptedConflictKeys)
       ? "ready"
       : "changed"
     : null;

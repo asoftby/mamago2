@@ -25,6 +25,10 @@ type MediaPreviewResponse = {
 
 const ARTICLE_MEDIA_CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
 
+function mediaThumbnailUrl(mediaId: string): string {
+  return `/api/media/${encodeURIComponent(mediaId)}?variant=sm`;
+}
+
 async function resolveMediaPreview(mediaId: string): Promise<MediaPreviewResponse | null> {
   try {
     const res = await fetch(`/api/admin/articles/media-preview?id=${encodeURIComponent(mediaId)}`, {
@@ -102,7 +106,7 @@ export function useArticleMediaSource(params: {
 
         const persisted = data.items.map((item) => ({
           id: item.id,
-          url: item.publicUrl,
+          url: mediaThumbnailUrl(item.id),
           alt: item.alt,
           title: item.title,
           usage: item.usage,
@@ -116,7 +120,7 @@ export function useArticleMediaSource(params: {
               return asset?.publicUrl
                 ? {
                     id: asset.id,
-                    url: asset.publicUrl,
+                    url: mediaThumbnailUrl(asset.id),
                     alt: asset.alt,
                     title: asset.title,
                     usage: entry.usage,
@@ -136,7 +140,7 @@ export function useArticleMediaSource(params: {
             if (!asset?.publicUrl) return null;
             const item: ArticleMediaLibraryItem = {
               id: asset.id,
-              url: asset.publicUrl,
+              url: mediaThumbnailUrl(asset.id),
               alt: asset.alt,
               title: asset.title,
               usage: entry.usage,

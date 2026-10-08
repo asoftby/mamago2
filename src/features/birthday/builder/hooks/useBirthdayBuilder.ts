@@ -16,7 +16,13 @@ import type {
   PlaceType,
 } from "../types/builder";
 import type { ScenarioItemSchedule } from "../lib/scheduleUtils";
-import { ageYearsFromBirthDate, formatYearsRu } from "../lib/partyChildUtils";
+import { formatYearsRu } from "../lib/partyChildUtils";
+import {
+  exactProfileChildToParty,
+  profileChildAgeYears,
+  type ProfileChildPayload,
+} from "../lib/profileChildSelection";
+export type { ProfileChildPayload } from "../lib/profileChildSelection";
 import { BUILDER_STEP_ORDER } from "../lib/stepOrder";
 import { birthdayOffers } from "../../data/birthdayOffers";
 import { revalidateAddons } from "../lib/compatibility";
@@ -94,14 +100,6 @@ function ageGroupFromYears(years: number): BirthdayAgeGroup {
   if (years < 8) return "5-8";
   return "8-12";
 }
-
-/** Ребёнок из GET /api/children для применения к сценарию после логина */
-export type ProfileChildPayload = {
-  id: string;
-  name: string;
-  birthDate: string;
-  systemInterests?: { interestSlug: string }[];
-};
 
 const AGE_URL_MAP: Record<string, BirthdayAgeGroup> = {
   "0-3": "0-3",
@@ -255,25 +253,13 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
   }, []);
 
   const applyProfileChildToScenario = useCallback((child: ProfileChildPayload) => {
-    const birthIso =
-      typeof child.birthDate === "string"
-        ? child.birthDate.slice(0, 10)
-        : new Date(child.birthDate).toISOString().slice(0, 10);
-    const years = ageYearsFromBirthDate(birthIso);
+    const years = profileChildAgeYears(child);
+    if (years == null) return;
     const ageGroup = ageGroupFromYears(years);
     const selectedAgeLabel = formatYearsRu(years);
-    const interestSlugs = (child.systemInterests ?? [])
-      .map((x) => x.interestSlug)
-      .filter(Boolean);
 
     setState((s) => {
-      const partyForChild: PartyForChild = {
-        profileChildId: child.id,
-        name: child.name,
-        ageLabel: selectedAgeLabel,
-        birthDateIso: birthIso,
-        interestSlugs,
-      };
+      const partyForChild = exactProfileChildToParty(child);
       const newBase = birthdayOffers.find((o) => o.id === s.selection.selectedBaseId) || null;
       const conflicts = revalidateAddons(
         s.selection.selectedAddonIds,

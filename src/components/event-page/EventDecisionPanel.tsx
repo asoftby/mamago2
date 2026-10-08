@@ -14,36 +14,7 @@ import { SidebarCard, SidebarCardTopSection, SidebarCardShare } from "@/componen
 import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
 import { CallActionButton } from "@/components/shared/CallActionButton";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
-
-/**
- * Переформатирует адрес из Google-формата «Улица Дом, Город, Область»
- * в читаемый: «г. Город, Улица, Дом»
- */
-function formatAddress(raw: string): string {
-  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
-  if (parts.length < 2) return raw;
-
-  // Отбрасываем «Область» / «район» / «Беларусь» и т.п. (последние части)
-  const filtered = parts.filter(
-    (p) => !/область|район|беларусь|belarus/i.test(p),
-  );
-
-  // Первая часть — «Улица Дом», остальные — город и т.д.
-  const [streetHouse, ...rest] = filtered;
-  const city = rest[0];
-
-  if (!city) return raw;
-
-  // Пробуем отделить номер дома от названия улицы (последний «токен» с цифрой)
-  const houseMatch = streetHouse.match(/^(.+?)\s+(\d+\S*)$/);
-  if (houseMatch) {
-    const street = houseMatch[1].trim();
-    const house = houseMatch[2].trim();
-    return `г. ${city}, ${street}, ${house}`;
-  }
-
-  return `г. ${city}, ${streetHouse}`;
-}
+import { formatVenueAddressForPublicDisplay } from "@/lib/event/formatVenueAddressForDisplay";
 
 type EventDecisionPanelProps = {
   data: Pick<
@@ -176,7 +147,7 @@ export function EventDecisionPanel({
       {/* Breadcrumbs */}
       <EventBreadcrumbs
         items={data.breadcrumbs}
-        className="text-[13px] text-[rgba(20,18,16,0.55)]"
+        className="hidden text-[13px] text-[rgba(20,18,16,0.55)] md:flex"
       />
 
       {/* Kicker: category pill + age + format caps */}
@@ -189,7 +160,7 @@ export function EventDecisionPanel({
       >
         {data.categoryLabel && (
           <span className="inline-flex h-7 items-center rounded-full bg-[#FFE8DC] px-3 text-[12px] font-semibold text-[#E86A3A]">
-            ● {data.categoryLabel}
+            {data.categoryLabel}
           </span>
         )}
         {data.ageFromBadge && (
@@ -257,11 +228,19 @@ export function EventDecisionPanel({
               const spaceIdx = priceStr.lastIndexOf(" ");
               const numPart = spaceIdx !== -1 ? priceStr.slice(0, spaceIdx) : priceStr;
               const currencyPart = spaceIdx !== -1 ? priceStr.slice(spaceIdx + 1) : "";
+              const fromMatch = numPart.match(/^(от)\s+/i);
+              const fromPrefix = fromMatch?.[1] ?? "";
+              const amountPart = fromMatch ? numPart.slice(fromMatch[0].length) : numPart;
               return (
                 <div>
                   <div className="flex items-baseline justify-end gap-1">
+                    {fromPrefix && (
+                      <span className="font-pt-serif text-[20px] font-normal leading-tight tracking-[-0.5px] text-[#141210]">
+                        {fromPrefix}
+                      </span>
+                    )}
                     <span className="font-pt-serif text-[40px] font-normal leading-tight tracking-[-1px] text-[#141210]">
-                      {numPart}
+                      {amountPart}
                     </span>
                     {currencyPart && (
                       <span
@@ -285,7 +264,7 @@ export function EventDecisionPanel({
             <PlaceInfoRow
               name={venueName}
               logoUrl={data.venue?.logoUrl}
-              address={venueAddress ? formatAddress(venueAddress) : undefined}
+              address={venueAddress ? formatVenueAddressForPublicDisplay(venueAddress) : undefined}
               district={data.venue?.district}
               metro={venueMetro}
               href={data.venue?.placeHref}
@@ -329,7 +308,7 @@ export function EventDecisionPanel({
               onClick={onBuy}
               className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-[#E86A3A] text-[16px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
             >
-              {data.cta.buyLabel} <span aria-hidden>→</span>
+              {data.cta.buyLabel}
             </a>
           )}
 

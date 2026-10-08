@@ -3,9 +3,6 @@ import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { getCurrentUser } from "@/lib/auth/server";
 import { redirect, notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
 import { BusinessVisibilityControl } from "@/components/admin/business/BusinessVisibilityControl";
 import { UnpVerificationSection } from "@/components/admin/business/UnpVerificationSection";
 import { normalizeBusinessVisibilityStatus } from "@/lib/business/businessStatusModel";
@@ -390,12 +387,6 @@ export default async function PartnerDetailPage({
     <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
       <div>
-        <Link href="/admin/b2b/partners">
-          <Button variant="ghost" size="sm" className="-ml-2 mb-2">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Назад к списку
-          </Button>
-        </Link>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl md:text-xl font-bold text-gray-900">{business.name}</h1>
           <div className="flex flex-wrap items-center gap-2">

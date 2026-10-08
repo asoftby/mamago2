@@ -1,27 +1,87 @@
-import { Button } from "@/components/ui/button";
 import { SeoPagesClient } from "@/components/admin/seo/SeoPagesClient";
 import { SeoPageHeader } from "@/components/admin/seo/primitives/SeoPageHeader";
-import { getSeoPages } from "@/lib/admin/seo/data/seoAdminData";
+import { getSeoPagesList } from "@/lib/admin/seo/data/seoAdminData";
+import { resolveSeoMarketSession } from "@/lib/admin/seo/geo/resolveSeoGeoSession";
+import { firstSearchParam } from "@/lib/admin/firstSearchParam";
+import { parseAdminPage } from "@/lib/admin/pagination";
+import { parseSeoPagesPageSize } from "@/lib/admin/seoNavConfig";
+import type {
+  SeoPageIndexationStatus,
+  SeoPageType,
+} from "@/lib/admin/seo/domain/types";
 
-export default async function AdminSeoPagesPage() {
-  const rows = await getSeoPages();
+export const dynamic = "force-dynamic";
+
+const ENTITY_TYPES = new Set<SeoPageType>([
+  "event",
+  "place",
+  "offer",
+  "route",
+  "article",
+]);
+
+const INDEXATION = new Set<SeoPageIndexationStatus>([
+  "indexed",
+  "noindex",
+  "draft",
+]);
+
+interface PageProps {
+  searchParams: Promise<{
+    page?: string | string[];
+    pageSize?: string | string[];
+    q?: string | string[];
+    type?: string | string[];
+    indexation?: string | string[];
+  }>;
+}
+
+export default async function AdminSeoPagesPage({ searchParams }: PageProps) {
+  const raw = await searchParams;
+  const session = await resolveSeoMarketSession();
+
+  const pageRaw = firstSearchParam(raw.page);
+  const pageSizeRaw = firstSearchParam(raw.pageSize);
+  const q = firstSearchParam(raw.q);
+  const typeRaw = firstSearchParam(raw.type);
+  const indexationRaw = firstSearchParam(raw.indexation);
+
+  const type =
+    typeRaw && ENTITY_TYPES.has(typeRaw as SeoPageType)
+      ? (typeRaw as SeoPageType)
+      : "all";
+  const indexation =
+    indexationRaw && INDEXATION.has(indexationRaw as SeoPageIndexationStatus)
+      ? (indexationRaw as SeoPageIndexationStatus)
+      : "all";
+
+  const list = await getSeoPagesList(session.filter, {
+    page: parseAdminPage(pageRaw),
+    pageSize: parseSeoPagesPageSize(pageSizeRaw),
+    q,
+    type,
+    indexation,
+  });
+
+  const currentParams: Record<string, string | undefined> = {
+    ...(q ? { q } : {}),
+    ...(type !== "all" ? { type } : {}),
+    ...(indexation !== "all" ? { indexation } : {}),
+    pageSize: String(list.filters.pageSize),
+  };
+
   return (
     <div className="space-y-8">
       <SeoPageHeader
-        title="SEO Pages"
-        subtitle="Пресеты и сгенерированные страницы — вместе с реальными сущностями из БД (события, места, офферы, маршруты, статьи). Для сущностей показаны slug, public path и диагностика id vs slug."
-        actions={
-          <Button type="button" disabled className="shrink-0">
-            Создать SEO Page
-          </Button>
-        }
+        title="Страницы"
+        subtitle={`SEO существующих страниц · ${session.presentation.marketLabel}`}
       />
-      <p className="-mt-4 text-xs text-gray-400">
-        Кнопка «Создать SEO Page» — только для manual landing pages. Сущности (event/place/…) редактируются через Edit SEO.
-      </p>
-
-      {/* Note: server-side fetch; client handles filtering */}
-      <SeoPagesClient initialRows={rows} />
+      <SeoPagesClient
+        initialRows={list.items}
+        pagination={list.pagination}
+        filters={list.filters}
+        currentParams={currentParams}
+      />
     </div>
   );
 }

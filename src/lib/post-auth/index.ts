@@ -27,7 +27,13 @@ export {
   buildProfileStatePayload,
 } from "./profileCompletion";
 export { executePendingPostAuthAction } from "./executePendingAction";
-export { applyPostAuthCompletionOutcome, trackAuthCompleted } from "./resolver";
+export {
+  applyPostAuthCompletionOutcome,
+  finishPostAuthOnboarding,
+  resolvePostAuthFlow,
+  trackAuthCompleted,
+} from "./resolver";
+export type { PostAuthFlowResolution } from "./resolver";
 export { trackPostAuthEvent } from "./analytics";
 export { runPostAuthPipeline } from "./pipeline";
 export type { PostAuthPipelineResult, RunPostAuthPipelineOptions } from "./pipeline";

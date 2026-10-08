@@ -6,13 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { computePlanFingerprint, listConfirmedBookingActivityIds } from "@/server/services/dayScenario.service";
 import { resolveScenarioItemTime } from "@/features/my-plan/lib/scenarioProjection";
-import { resolveScenarioScheduling } from "@/features/my-plan/lib/scenarioScheduling";
+import { resolvePlanItemScenarioScheduling } from "@/features/my-plan/lib/scenarioScheduling";
 import { formatScenarioPriceLabel } from "@/features/my-plan/lib/scenarioPricing";
 import { formatActivityAddressLine } from "@/features/my-plan/lib/formatActivityAddress";
 import {
   conflictsForScenarioItems,
   type ScenarioClientItem,
 } from "@/features/my-plan/lib/scenarioDraft";
+import { activePlanScopeFor, planScopeFor } from "@/server/family/familyAccess";
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -79,10 +80,15 @@ const activitySelect = {
   sessions: { select: { id: true, startsAt: true }, orderBy: { startsAt: "asc" as const } },
 } satisfies Prisma.ActivitySelect;
 
-async function loadCanonical(tx: Tx, userId: string, date: string, scenarioId: string) {
+async function loadCanonical(
+  tx: Tx,
+  scope: Prisma.PlanItemWhereInput,
+  date: string,
+  scenarioId: string,
+) {
   const [items, overrideRows] = await Promise.all([
     tx.planItem.findMany({
-      where: { userId, date },
+      where: { ...scope, date },
       include: { activity: { select: activitySelect } },
       orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
     }),
@@ -103,7 +109,9 @@ function projectItems(
       { startsAt: row.startsAt, activity: row.activity ? { sessions } : null },
       overrides.get(row.id) ?? null,
     );
-    const scheduling = resolveScenarioScheduling({ activity: row.activity, timing });
+    const scheduling = resolvePlanItemScenarioScheduling({
+      source: row.source, endsAt: row.endsAt, activity: row.activity, timing,
+    });
     const matchedSession = sessions.find((session) => session.startsAt.getTime() === scheduling.startsAt?.getTime());
     return {
       planItemId: row.id,
@@ -142,6 +150,9 @@ export async function saveScenarioDraftForUser(
     removals: [...intent.removals].sort(),
     acceptedConflictKeys: [...new Set(intent.acceptedConflictKeys)].sort(),
   })).digest("hex");
+  // Family Core M1a: the scenario row stays per-user, but its items are the
+  // plan items this user can see (family scope; flag off = own items).
+  const [activeScope, aclScope] = await Promise.all([activePlanScopeFor(userId), planScopeFor(userId)]);
   return prisma.$transaction(async (tx) => {
     const scenario = await tx.dayScenario.findUnique({ where: { userId_date: { userId, date: intent.date } } });
     if (!scenario) throw new ScenarioSaveError(404, "SCENARIO_NOT_FOUND");
@@ -155,7 +166,7 @@ export async function saveScenarioDraftForUser(
       return locked.lastSaveResponse;
     }
 
-    const current = await loadCanonical(tx as Tx, userId, intent.date, scenario.id);
+    const current = await loadCanonical(tx as Tx, activeScope, intent.date, scenario.id);
     if (fingerprint(current, locked.acceptedConflictKeys) !== intent.baseFingerprint) {
       throw new ScenarioSaveError(409, "PLAN_CHANGED");
     }
@@ -168,7 +179,7 @@ export async function saveScenarioDraftForUser(
       const activity = await tx.activity.findUnique({ where: { id: replacement.newActivityId }, select: activitySelect });
       if (!activity || activity.status !== "PUBLISHED") throw new ScenarioSaveError(422, "INVALID_REPLACEMENT", replacement.newActivityId);
       const duplicate = await tx.planItem.findFirst({
-        where: { userId, activityId: activity.id, id: { not: replacement.planItemId } },
+        where: { ...activeScope, activityId: activity.id, id: { not: replacement.planItemId } },
         select: { id: true },
       });
       if (duplicate) throw new ScenarioSaveError(422, "DUPLICATE_ACTIVITY", activity.id);
@@ -191,10 +202,10 @@ export async function saveScenarioDraftForUser(
 
     if (intent.removals.length > 0) {
       await tx.dayScenarioItemOverride.deleteMany({ where: { scenarioId: scenario.id, planItemId: { in: intent.removals } } });
-      await tx.planItem.deleteMany({ where: { userId, date: intent.date, id: { in: intent.removals } } });
+      await tx.planItem.deleteMany({ where: { ...aclScope, date: intent.date, id: { in: intent.removals } } });
     }
 
-    const finalLoaded = await loadCanonical(tx as Tx, userId, intent.date, scenario.id);
+    const finalLoaded = await loadCanonical(tx as Tx, activeScope, intent.date, scenario.id);
     const finalActivityIds = finalLoaded.items
       .map((item) => item.activityId)
       .filter((id): id is string => id != null);
