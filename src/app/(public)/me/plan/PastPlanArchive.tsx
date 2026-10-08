@@ -25,7 +25,7 @@ export function PastPlanArchive({
   hasNext: boolean;
   selectedDate: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(page > 0);
   const href = (number: number) => `/me/plan?date=${encodeURIComponent(selectedDate)}&historyPage=${number}#past-plan-history`;
   return (
     <section id="past-plan-history" aria-labelledby="past-plan-history-heading" className="mb-8 rounded-2xl border border-[#E4E0D9] bg-white p-4 sm:p-6">
