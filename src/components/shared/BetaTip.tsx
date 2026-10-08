@@ -85,15 +85,20 @@ export function BetaTipMobile() {
   if (!visible) return null;
 
   return (
-    <div
-      className={cn(
-        "lg:hidden fixed z-50 left-3 right-3 pointer-events-none",
-      )}
-      /* 10px над нижней панелью высотой 64px */
-      style={{ bottom: "calc(74px + env(safe-area-inset-bottom, 0px))" }}
-    >
-      <BetaTipContent variant="mobile" onDismiss={dismiss} />
-    </div>
+    <>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-30 bg-[#F6F2EA] lg:hidden"
+        style={{ height: "calc(74px + env(safe-area-inset-bottom, 0px))" }}
+      />
+      <div
+        className="pointer-events-none fixed z-50 left-3 right-3 lg:hidden"
+        /* 10px над нижней панелью высотой 64px */
+        style={{ bottom: "calc(74px + env(safe-area-inset-bottom, 0px))" }}
+      >
+        <BetaTipContent variant="mobile" onDismiss={dismiss} />
+      </div>
+    </>
   );
 }
 
