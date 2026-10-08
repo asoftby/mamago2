@@ -70,8 +70,7 @@ export default async function AdminBillingPage() {
           <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800">
             <li>Остановите dev-сервер (Ctrl+C)</li>
             <li>Выполните: <code className="bg-blue-100 px-2 py-1 rounded">npm run db:generate</code></li>
-            <li>Выполните: <code className="bg-blue-100 px-2 py-1 rounded">npm run db:migrate</code> (при необходимости)</li>
-            <li>Выполните: <code className="bg-blue-100 px-2 py-1 rounded">npm run db:seed</code> (для тестовых данных)</li>
+            <li>Миграции БД выполняются отдельно при релизе только через <code className="bg-blue-100 px-2 py-1 rounded">prisma migrate deploy</code>.</li>
             <li>Запустите dev-сервер: <code className="bg-blue-100 px-2 py-1 rounded">npm run dev</code></li>
           </ol>
         </div>

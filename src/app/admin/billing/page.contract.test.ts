@@ -52,6 +52,7 @@ assert.equal(
   true,
   "monthly revenue must use the compact BYN symbol",
 );
+assert.doesNotMatch(source, /npm run db:migrate|prisma migrate dev|prisma db push|npm run db:seed/, "billing guidance must not recommend destructive or development-only DB commands");
 assert.equal(source.includes("TransactionTypeBadge"), true);
 assert.equal(source.includes("TransactionStatusBadge"), true);
 assert.equal(source.includes("icon={Banknote}"), true);
