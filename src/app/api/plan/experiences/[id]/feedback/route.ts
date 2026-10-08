@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH } from "@/lib/experience/feedback";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import {
@@ -10,7 +11,7 @@ import {
 
 const requestSchema = z.object({
   sentiment: z.enum(["LIKE", "NEUTRAL", "DISLIKE"]),
-  comment: z.string().trim().max(2000).nullable().optional(),
+  comment: z.string().trim().max(MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH).nullable().optional(),
 }).strict();
 
 export async function POST(
