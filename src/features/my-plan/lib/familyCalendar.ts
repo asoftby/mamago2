@@ -49,7 +49,7 @@ export function buildFamilyCalendarItemPresentation(
       : item.source === "TELEGRAM_FORWARD"
         ? "Из Telegram"
         : item.entryType ? TYPE_LABELS[item.entryType] : "Запись",
-    personLabel: item.childId ? (item.childName ?? "Ребёнок") : "Семья",
+    personLabel: item.childId ? (item.childName ?? "Ребёнок") : "Взрослые",
     locationLabel: isCatalog ? catalogLocation : item.locationText,
     isCatalog,
     canEdit: item.source === "MANUAL",

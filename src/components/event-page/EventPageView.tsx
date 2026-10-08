@@ -296,7 +296,7 @@ function EventFinalCta({
                 onClick={onBuy}
                 className="inline-flex h-16 items-center gap-2 rounded-full bg-[#E86A3A] px-7 text-[17px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px"
               >
-                {buyLabel}&nbsp;{renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })} <span aria-hidden>→</span>
+                {buyLabel}&nbsp;{renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })}
               </a>
             )}
             <button

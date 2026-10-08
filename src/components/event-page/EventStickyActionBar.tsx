@@ -124,7 +124,7 @@ export function EventStickyActionBar({
                 {isPrimaryLoading ? (
                   <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                 ) : (
-                  <>{primaryLabel} <span aria-hidden>→</span></>
+                  <>{primaryLabel}</>
                 )}
               </a>
             ) : (
@@ -231,7 +231,7 @@ export function EventStickyActionBar({
           {isPrimaryLoading ? (
             <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
           ) : (
-            <>{primaryLabel} <span aria-hidden>→</span></>
+            <>{primaryLabel}</>
           )}
         </a>
       ) : onBook ? (
