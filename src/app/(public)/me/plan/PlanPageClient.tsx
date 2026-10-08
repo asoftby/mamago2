@@ -549,18 +549,15 @@ export function PlanPageClient({
                 event.currentTarget.style.transform = "none";
               }}
             >
-              <span
-                className="font-sans"
-                style={{ fontSize: 17, lineHeight: 1.35, color: "#141210" }}
-              >
-                На этой неделе запланировано {weekItems.length} {pluralizeEvents(weekItems.length)}
-                {nearestWeekItem
-                  ? `, ближайшее ${formatNearestWeekItem(nearestWeekItem.date, todayISO)}`
-                  : ""}
+              <span className="font-mono text-[11px] uppercase tracking-[.12em] text-[#6B6258]">
+                На этой неделе
+              </span>
+              <span className="font-sans text-[27px] font-semibold leading-tight text-[#141210]">
+                {weekItems.length} {pluralizeEvents(weekItems.length)}
               </span>
               {weekItems.length > 0 && (
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#C24E22" }}>
-                  Обзор недели
+                <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-[#C24E22]">
+                  Посмотреть все <span aria-hidden="true">→</span>
                 </span>
               )}
             </button>
@@ -618,7 +615,7 @@ export function PlanPageClient({
         <div className="mt-4 flex flex-wrap gap-2" aria-label="Фильтр по члену семьи">
           {([
             ["all", "Все"],
-            ["family", "Взрослые"],
+            ["family", "Я"],
             ...familyChildren.map((child) => [`child:${child.id}`, child.name]),
           ] as Array<[FamilyCalendarFilter, string]>).map(([value, label]) => (
             <button
