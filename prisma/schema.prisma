@@ -745,6 +745,7 @@ model Experience {
   sourceDecisionId      String?
   sourceExposureId      String?
   feedbackSentiment     ExperienceSentiment?
+  feedbackComment       String?              @db.Text
   feedbackAt            DateTime?
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
