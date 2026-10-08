@@ -5,84 +5,74 @@ import { cn } from "@/lib/utils";
 
 type RecommendationDecisionBlockProps = {
   onDecide: () => void;
-  onCatalog: () => void;
   isGenerating?: boolean;
   compact?: boolean;
 };
 
-const ArrowIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 12h14M13 6l6 6-6 6"/>
-  </svg>
-);
-
 export function RecommendationDecisionBlock({
   onDecide,
-  onCatalog,
   isGenerating = false,
   compact = false,
 }: RecommendationDecisionBlockProps) {
   return (
-    <section className={cn("space-y-3", compact && "space-y-2")} aria-label="Выбор действия" style={{ padding: compact ? "4px 4px 0" : "8px 4px 0" }}>
-      <button
-        type="button"
-        onClick={onDecide}
-        disabled={isGenerating}
+    <section
+      className={cn(compact ? "px-1 pt-1" : "px-1 pt-2")}
+      aria-label="Подбор рекомендаций"
+    >
+      <div
+        className="rounded-full p-px"
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 9,
-          width: "100%",
-          height: 52,
-          borderRadius: 999,
-          background: "#E86A3A",
-          color: "#fff",
-          fontSize: 15,
-          fontWeight: 600,
-          border: 0,
-          cursor: isGenerating ? "default" : "pointer",
-          transition: "background .18s",
-        }}
-        onMouseEnter={(e) => {
-          if (!isGenerating) (e.currentTarget as HTMLButtonElement).style.background = "#C24E22";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = "#E86A3A";
+          background:
+            "linear-gradient(120deg, rgba(232,106,58,.58), rgba(239,135,89,.38), rgba(202,139,255,.34), rgba(112,183,255,.34), rgba(118,205,166,.32), rgba(232,106,58,.58))",
+          backgroundSize: "220% 220%",
+          animation: "myPlanRainbowBorder 8s ease-in-out infinite",
+          boxShadow: "0 8px 24px rgba(20,18,16,.05)",
         }}
       >
-        {isGenerating ? <RefreshCw className="h-[17px] w-[17px] animate-spin" /> : <Sparkles className="h-[17px] w-[17px]" />}
-        Подобрать за пару секунд
-      </button>
-
-      <div style={{ textAlign: "center" }}>
         <button
           type="button"
-          onClick={onCatalog}
+          onClick={onDecide}
+          disabled={isGenerating}
           style={{
-            display: "inline-flex",
+            display: "flex",
             alignItems: "center",
-            gap: 7,
-            fontSize: 14,
-            fontWeight: 600,
+            justifyContent: "center",
+            gap: 9,
+            width: "100%",
+            height: compact ? 50 : 52,
+            borderRadius: 999,
+            background: "#FAF7F1",
             color: "#3A332B",
-            background: "none",
+            fontSize: 15,
+            fontWeight: 600,
             border: 0,
-            cursor: "pointer",
-            transition: "gap .15s, color .15s",
+            cursor: isGenerating ? "default" : "pointer",
+            transition: "background .18s, transform .18s",
           }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.gap = "11px";
-            (e.currentTarget as HTMLButtonElement).style.color = "#C24E22";
+          onMouseEnter={(event) => {
+            if (!isGenerating) {
+              event.currentTarget.style.background = "#F6F1E8";
+            }
           }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.gap = "7px";
-            (e.currentTarget as HTMLButtonElement).style.color = "#3A332B";
+          onMouseLeave={(event) => {
+            event.currentTarget.style.background = "#FAF7F1";
           }}
         >
-          Выбрать самой <ArrowIcon />
+          {isGenerating ? (
+            <RefreshCw className="h-[17px] w-[17px] animate-spin text-primary" />
+          ) : (
+            <Sparkles className="h-[17px] w-[17px] text-primary" />
+          )}
+          Подобрать за пару секунд
         </button>
       </div>
+
+      <style jsx>{`
+        @keyframes myPlanRainbowBorder {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+      `}</style>
     </section>
   );
 }

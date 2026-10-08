@@ -108,7 +108,7 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
                 className="font-mono uppercase"
                 style={{ fontSize: 11, letterSpacing: ".12em", color: "rgba(20,18,16,.55)" }}
               >
-                {items.length} {items.length === 1 ? "событие" : items.length <= 4 ? "события" : "событий"}
+                {items.length} {items.length === 1 ? "пункт" : items.length <= 4 ? "пункта" : "пунктов"}
               </span>
             )}
             <button
@@ -116,7 +116,7 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
               onClick={onAddManual}
               className="min-h-11 rounded-full bg-primary px-4 text-sm font-semibold text-white"
             >
-              + Добавить своё
+              + Добавить
             </button>
           </div>
         </div>
@@ -158,9 +158,9 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
               color: "#141210",
             }}
           >
-            Нет событий{" "}
+            На этот день{" "}
             <span className="font-display-italic" style={{ color: "var(--primary)" }}>
-              на этот день
+              пока ничего нет
             </span>
           </h3>
           <p
@@ -175,7 +175,7 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
               marginRight: "auto",
             }}
           >
-            Добавьте событие, место или идею, чтобы собрать план на{" "}
+            Добавьте заметку или выберите событие mamaGo для{" "}
             {weekday.toLowerCase()}.
           </p>
           <div style={{ display: "inline-flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
@@ -184,7 +184,7 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
               onClick={onAddManual}
               className="min-h-[50px] rounded-full bg-primary px-5 text-sm font-semibold text-white"
             >
-              + Добавить своё
+              + Добавить
             </button>
             <Link
               href="/minsk"

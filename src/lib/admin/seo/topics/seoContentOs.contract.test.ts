@@ -138,23 +138,25 @@ assert.equal(mix.cityCount, 2);
 assert.equal(mix.regionCount, 1);
 assert.equal(mix.plannedTotal, 3);
 
-// market filter pages
+// market filter pages — real Minsk shape: admin regionId null, SEO market mapped
 const minsk = {
   kind: "city" as const,
   cityId: "c1",
   citySlug: "minsk",
   cityName: "Минск",
-  regionId: "r1",
-  regionName: "Минская область",
+  regionId: null,
+  regionName: null,
+  seoMarketRegionId: "r1",
+  seoMarketRegionName: "Минская область",
   countryId: "by",
   countryName: "Беларусь",
 };
 assert.equal(presentSeoMarket(minsk).marketLabel, "Минск + Минская область");
+assert.equal(presentSeoMarket(minsk).supportsMarketScopes, true);
 
 const market = enrichMarketFilterWithRegionCities(
   resolveSeoMarketFilter(minsk, "market"),
   [
-    { id: "c1", slug: "minsk" },
     { id: "c2", slug: "zhodino" },
   ],
 );

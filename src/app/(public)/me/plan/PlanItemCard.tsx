@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CalendarDays, StickyNote } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { formatHHMM } from "@/lib/formatters/date";
@@ -55,7 +56,7 @@ export function PlanItemCard({
   const image = item.activity?.coverImageUrl ?? item.coverImageUrl;
   const category = presentation.isCatalog
     ? resolvePlanItemCategoryLabel(item.activity)
-    : presentation.typeLabel;
+    : null;
   const time = formatTime(item.effectiveStartsAt);
   const endTime = formatTime(item.endsAt);
   const age = item.activity?.ageLabel ?? null;
@@ -183,6 +184,17 @@ export function PlanItemCard({
 
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-2">
+          <span
+            aria-label={presentation.isCatalog ? "Событие" : "Заметка"}
+            title={presentation.isCatalog ? "Событие" : "Заметка"}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg"
+            style={{
+              color: presentation.isCatalog ? "#C24E22" : "#C98A19",
+              background: presentation.isCatalog ? "#FFF0EA" : "#FFF4D9",
+            }}
+          >
+            {presentation.isCatalog ? <CalendarDays size={14} /> : <StickyNote size={14} />}
+          </span>
           {category && (
             <span
               className="font-mono text-[10px] uppercase tracking-[0.12em]"

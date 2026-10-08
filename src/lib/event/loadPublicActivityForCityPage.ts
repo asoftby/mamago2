@@ -21,6 +21,7 @@ export async function loadPublicActivityForCityPage(
   slugOrId: string,
 ): Promise<
   | (ActivityForEventPageInput & {
+      cityId: string;
       status: ContentStatus;
       slug: string | null;
       seoTitle: string | null;
@@ -128,7 +129,9 @@ export async function loadPublicActivityForCityPage(
           },
         },
       },
-      eventCategory: { select: { nameRu: true } },
+      eventCategory: { select: { id: true, nameRu: true, slug: true } },
+      organizer: { select: { name: true, unp: true } },
+      business: { select: { name: true, legalName: true, unp: true } },
     },
   });
 
@@ -265,6 +268,8 @@ export async function loadPublicActivityForCityPage(
         }
       : null,
     eventCategory: activity.eventCategory,
+    organizer: activity.organizer,
+    business: activity.business,
     ownerUserId: activity.ownerUserId,
     ...(redirectToSlug ? { _redirectToSlug: redirectToSlug } : {}),
   };

@@ -16,6 +16,7 @@ import {
   type AgeRangeSelection,
 } from "@/features/filters/discovery/childrenScope.store";
 import { toast } from "@/lib/toast";
+import { LiquidNotification } from "@/components/ui/liquid-notification";
 import { WeekCalendarStrip } from "./WeekCalendarStrip";
 import { UpcomingPlanBlock } from "./UpcomingPlanBlock";
 import { selectUpcomingPlanItems } from "../lib/upcomingPlanItems";
@@ -27,6 +28,7 @@ import { MyPlanHeader } from "./MyPlanHeader";
 import { RecommendationDecisionBlock } from "./RecommendationDecisionBlock";
 import { PlanRecommendationCta } from "./PlanRecommendationCta";
 import { PlanStickyCounter } from "./PlanStickyCounter";
+import { requestOpenQuickAdd } from "@/lib/my-plan/myPlanOpenIntent";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
@@ -295,9 +297,9 @@ const RECOMMENDATIONS_BLOCK_SUBTITLE =
 function pluralizeActivities(count: number): string {
   const mod10 = count % 10;
   const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return "активность";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "активности";
-  return "активностей";
+  if (mod10 === 1 && mod100 !== 11) return "запись";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "записи";
+  return "записей";
 }
 
 /** Short day label for the compact "day context" line above the plan-item list. */
@@ -374,6 +376,45 @@ function weekdayForNa(date: Date): string {
   return accusativeByNa[weekday] ?? weekday;
 }
 
+function PlanDeleteCountdownToast({
+  toastId,
+  onUndo,
+  onExpire,
+}: {
+  toastId: string;
+  onUndo: () => void;
+  onExpire: () => void;
+}) {
+  const [seconds, setSeconds] = useState(5);
+
+  useEffect(() => {
+    const timers = [1, 2, 3, 4].map((elapsedSeconds) =>
+      window.setTimeout(() => setSeconds(5 - elapsedSeconds), elapsedSeconds * 1000),
+    );
+    const expireTimer = window.setTimeout(() => {
+      onExpire();
+      toast.dismiss(toastId);
+    }, 5000);
+
+    return () => {
+      for (const timer of timers) window.clearTimeout(timer);
+      window.clearTimeout(expireTimer);
+    };
+  }, [onExpire, toastId]);
+
+  return (
+    <LiquidNotification
+      variant="brand"
+      title={`Удаление через ${seconds} сек.`}
+      actionLabel="Отменить"
+      onAction={() => {
+        onUndo();
+        toast.dismiss(toastId);
+      }}
+    />
+  );
+}
+
 export function PlanMainContent({
   selectedDate,
   onChangeDate,
@@ -415,6 +456,8 @@ export function PlanMainContent({
   const [showAddPersonaTypeModal, setShowAddPersonaTypeModal] = useState(false);
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
+  const [hiddenPlanItemIds, setHiddenPlanItemIds] = useState<Set<string>>(() => new Set());
+  const pendingRemovalIdsRef = useRef<Set<string>>(new Set());
   const [awaitingAgeAnswer, setAwaitingAgeAnswer] = useState(false);
   const [needsAgeAnswerValues, setNeedsAgeAnswerValues] = useState<string[] | null>(null);
   /** Реальные саджесты из /api/plan/suggestions (M2.4) — не клиентский demo-пул. */
@@ -432,16 +475,74 @@ export function PlanMainContent({
   const hydratedDraftKeyRef = useRef<string | null>(null);
   const skipNextDraftPersistRef = useRef<string | null>(null);
 
-  const handleRemoveFromPlan = async (itemId: string) => {
-    if (!onRemoveItemFromPlan) return;
+  const restorePendingPlanItem = useCallback((itemId: string) => {
+    pendingRemovalIdsRef.current.delete(itemId);
+    setHiddenPlanItemIds((current) => {
+      if (!current.has(itemId)) return current;
+      const next = new Set(current);
+      next.delete(itemId);
+      return next;
+    });
+  }, []);
+
+  const commitPendingPlanItemRemoval = useCallback(async (itemId: string) => {
+    if (!onRemoveItemFromPlan || !pendingRemovalIdsRef.current.has(itemId)) return;
+    pendingRemovalIdsRef.current.delete(itemId);
     try {
       const result = onRemoveItemFromPlan(itemId);
       const ok = result instanceof Promise ? await result : true;
-      if (!ok) toast.error("Не получилось убрать событие из плана");
+      if (!ok) {
+        restorePendingPlanItem(itemId);
+        toast.error("Не получилось убрать из плана");
+      }
     } catch {
-      toast.error("Не получилось убрать событие из плана");
+      restorePendingPlanItem(itemId);
+      toast.error("Не получилось убрать из плана");
     }
-  };
+  }, [onRemoveItemFromPlan, restorePendingPlanItem]);
+
+  const handleRemoveFromPlan = useCallback((itemId: string) => {
+    if (!onRemoveItemFromPlan || pendingRemovalIdsRef.current.has(itemId)) return;
+
+    pendingRemovalIdsRef.current.add(itemId);
+    setHiddenPlanItemIds((current) => {
+      const next = new Set(current);
+      next.add(itemId);
+      return next;
+    });
+
+    const toastId = `plan-delete-${itemId}`;
+    let resolved = false;
+
+    const undo = () => {
+      if (resolved) return;
+      resolved = true;
+      restorePendingPlanItem(itemId);
+    };
+
+    const expire = () => {
+      if (resolved) return;
+      resolved = true;
+      void commitPendingPlanItemRemoval(itemId);
+    };
+
+    toast.custom(
+      () => (
+        <PlanDeleteCountdownToast
+          toastId={toastId}
+          onUndo={undo}
+          onExpire={expire}
+        />
+      ),
+      {
+        id: toastId,
+        duration: Infinity,
+        onDismiss: undo,
+        className:
+          "!w-auto !max-w-none !border-0 !bg-transparent !p-0 !shadow-none pointer-events-auto",
+      },
+    );
+  }, [commitPendingPlanItemRemoval, onRemoveItemFromPlan, restorePendingPlanItem]);
 
 
 
@@ -587,13 +688,6 @@ export function PlanMainContent({
     }, 0);
   }, [buildFindAndAddHref, onRequestClose, router]);
 
-  /** M-B: узкий пул — частый случай, пустая выдача сразу предлагает сменить дату. */
-  const handleScrollToCalendar = useCallback(() => {
-    document
-      .getElementById("plan-week-calendar")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
-
   /** M3.5: тап по sticky-счётчику «В плане: N» — на страницу плана целиком, не в саму модалку. */
   const handleOpenPlanPage = useCallback(() => {
     onRequestClose?.();
@@ -610,7 +704,27 @@ export function PlanMainContent({
     }, 0);
   }, [city, onRequestClose, router, selectedDate]);
 
-  const dayItems = useMemo(() => planItemsByDate?.[selectedDate] ?? [], [planItemsByDate, selectedDate]);
+  const dayItems = useMemo(
+    () => (planItemsByDate?.[selectedDate] ?? []).filter((item) => !hiddenPlanItemIds.has(item.id)),
+    [hiddenPlanItemIds, planItemsByDate, selectedDate],
+  );
+
+  useEffect(() => {
+    const existingIds = new Set(
+      Object.values(planItemsByDate ?? {})
+        .flat()
+        .map((item) => item.id),
+    );
+    setHiddenPlanItemIds((current) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of current) {
+        if (existingIds.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [planItemsByDate]);
   const upcomingSelection = useMemo(
     () => selectUpcomingPlanItems({
       selectedDate,
@@ -1012,10 +1126,10 @@ export function PlanMainContent({
         {...PLAN_RECOMMENDATION_RESULTS_A11Y}
       >
         {dayPartSections.length > 0 ? (
-          <section className="space-y-2" aria-label="В вашем плане">
+          <section aria-label="В вашем плане">
             <p
               style={{
-                margin: 0,
+                margin: compact ? "0 0 18px" : "0 0 14px",
                 fontSize: 13,
                 color: "rgba(20,18,16,.55)",
               }}
@@ -1024,10 +1138,19 @@ export function PlanMainContent({
               {" · "}
               {totalPlannedCount} {pluralizeActivities(totalPlannedCount)}
             </p>
-            <div className="space-y-2">
+            <div className={compact ? "space-y-3" : "space-y-2"}>
               {dayPartSections.map((section) =>
                 section.items.map((item) => (
-                  <PlanItemRow key={item.id} item={item} onRemove={() => handleRemoveFromPlan(item.id)} />
+                  <PlanItemRow
+                    key={item.id}
+                    item={item}
+                    participantLabel={
+                      item.childId
+                        ? childrenList.find((child) => child.id === item.childId)?.name ?? null
+                        : null
+                    }
+                    onRemove={() => handleRemoveFromPlan(item.id)}
+                  />
                 )),
               )}
             </div>
@@ -1036,11 +1159,11 @@ export function PlanMainContent({
 
         <section
           className={compact ? "space-y-3 px-1" : "space-y-3 px-1"}
-          aria-label="Подходит вашим детям"
+          aria-label="Можно добавить в этот день"
         >
           <div>
             <h3 style={{ fontFamily: "var(--font-sans)", fontSize: compact ? 18 : 22, fontWeight: 600, lineHeight: 1.1, color: "#141210" }}>
-              Подходит вашим детям
+              Можно добавить в этот день
             </h3>
             <p className="mt-1 text-sm text-neutral-500">Подобрано по возрасту и интересам</p>
           </div>
@@ -1071,13 +1194,6 @@ export function PlanMainContent({
             <p className="text-sm text-neutral-600">
               {buildEmptySuggestionsMessage(selectedDate, todayKey, lastRequestSnapshotRef.current.ageRangeValues)}
             </p>
-            <button
-              type="button"
-              onClick={handleScrollToCalendar}
-              className="mt-2 text-sm font-medium text-primary underline-offset-2 hover:underline"
-            >
-              Выбрать другой день
-            </button>
           </div>
         ) : (
           <section className={compact ? "space-y-3" : "space-y-3"}>
@@ -1145,6 +1261,7 @@ export function PlanMainContent({
           {onChangeDate ? (
             <div id="plan-week-calendar">
               <WeekCalendarStrip
+                accent
                 selectedDate={selectedDate}
                 onChangeDate={onChangeDate}
                 showArrows
@@ -1153,7 +1270,7 @@ export function PlanMainContent({
             </div>
           ) : null}
 
-          {upcomingSelection ? (
+          {isDesktop && upcomingSelection ? (
             <UpcomingPlanBlock
               items={upcomingSelection.items}
               totalCount={upcomingSelection.count}
@@ -1168,7 +1285,6 @@ export function PlanMainContent({
           ) : showDecisionFork ? (
             <RecommendationDecisionBlock
               onDecide={handleDecideClick}
-              onCatalog={handleOpenCatalog}
               isGenerating={isFetchingSuggestions}
             />
           ) : null}
@@ -1226,20 +1342,22 @@ export function PlanMainContent({
 
       <div
         id="my-plan-recommendations"
-        className="flex-1 space-y-4 overflow-y-auto bg-white px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3"
+        className="flex-1 space-y-5 overflow-y-auto bg-white px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4"
       >
         {onChangeDate ? (
           <div id="plan-week-calendar">
             <WeekCalendarStrip
+              accent
               selectedDate={selectedDate}
               onChangeDate={onChangeDate}
               compact
+              showArrows={false}
               plannedCountByDate={plannedCountByDate}
             />
           </div>
         ) : null}
 
-        {upcomingSelection ? (
+        {isDesktop && upcomingSelection ? (
           <UpcomingPlanBlock
             items={upcomingSelection.items}
             totalCount={upcomingSelection.count}
@@ -1254,7 +1372,6 @@ export function PlanMainContent({
         ) : showDecisionFork ? (
           <RecommendationDecisionBlock
             onDecide={handleDecideClick}
-            onCatalog={handleOpenCatalog}
             isGenerating={isFetchingSuggestions}
             compact
           />
@@ -1277,7 +1394,12 @@ export function PlanMainContent({
         {renderBottomActions()}
       </div>
 
-      <PlanStickyCounter count={totalPlannedCount} onClick={handleOpenPlanPage} compact />
+      <PlanStickyCounter
+        count={totalPlannedCount}
+        onClick={handleOpenPlanPage}
+        onAdd={() => requestOpenQuickAdd(selectedDate)}
+        compact
+      />
 
       <AddPersonaTypeModal
         open={showAddPersonaTypeModal}

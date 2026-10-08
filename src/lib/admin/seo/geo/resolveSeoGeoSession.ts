@@ -73,13 +73,15 @@ export async function resolveSeoMarketSession(
   let filter = resolveSeoMarketFilter(context, viewScope);
 
   // Enrich region/market with city membership from DB (avoid stale empty lists).
+  // Use SEO market region (not administrative City.regionId) so Minsk MARKET
+  // includes Минская область cities while Minsk itself stays regionId=null.
   const regionIdForCities =
     filter.kind === "market"
       ? filter.regionId
       : filter.kind === "region"
         ? filter.regionId
         : context.kind === "city"
-          ? context.regionId
+          ? context.seoMarketRegionId
           : null;
 
   if (

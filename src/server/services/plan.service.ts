@@ -1,4 +1,4 @@
-import type { PlanVisibility } from "@prisma/client";
+import { PlanItemSource, type PlanVisibility } from "@prisma/client";
 import { planCountUnit } from "@/server/family/familyAnalyticsPure";
 import { prisma } from "@/lib/prisma";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
@@ -84,6 +84,19 @@ export type PlanItemWithActivity = {
   title: string | null;
   coverImageUrl: string | null;
   createdAt: Date;
+  /** Source drives the intentionally tiny UI taxonomy: CATALOG = event, everything user-created = note. */
+  source?: PlanItemSource;
+  entryType?: "EVENT" | "ACTIVITY" | "TASK" | null;
+  childId?: string | null;
+  endsAt?: Date | null;
+  dueAt?: Date | null;
+  dueHasTime?: boolean;
+  locationText?: string | null;
+  notes?: string | null;
+  tags?: string[];
+  /** Ключ категории ручного пункта (planItemCategory); null у каталожных. */
+  category?: string | null;
+  reminderEnabled?: boolean | null;
   /** Family Core: audience + version for edit-conflict checks (persisted rows). */
   visibility?: PlanVisibility;
   updatedAt?: Date;
@@ -598,7 +611,13 @@ export async function listPlanItemsDueForReminder(args: {
 }): Promise<PlanReminderCandidate[]> {
   const rows = (await prisma.planItem.findMany({
     where: {
-      activityId: { not: null },
+      OR: [
+        { activityId: { not: null } },
+        {
+          source: { in: [PlanItemSource.MANUAL, PlanItemSource.TELEGRAM_FORWARD] },
+          reminderEnabled: true,
+        },
+      ],
       ...NOT_CANCELLED,
       ...DATED,
       startsAt: {
