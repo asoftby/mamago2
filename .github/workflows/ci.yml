@@ -150,6 +150,7 @@ jobs:
         run: |
           pnpm exec tsx src/features/my-plan/lib/planItemMeta.test.ts
           pnpm exec tsx src/features/my-plan/lib/planPagePresentation.test.ts
+          pnpm test:experience-feedback
 
       - name: Account greeting regressions
         run: pnpm exec tsx src/features/me/lib/accountGreeting.test.ts
