@@ -82,7 +82,7 @@ export default function CitiesPage() {
   }
 
   return (
-    <div className="space-y-6 p-6 md:p-4">
+    <div className="space-y-6 p-4 sm:p-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 md:text-xl">Города</h1>
         <p className="mt-1 text-sm text-gray-600">

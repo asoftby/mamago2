@@ -40,7 +40,7 @@ export function HeroBalanceCard({
   return (
     <div
       className={`
-        relative overflow-hidden rounded-3xl border p-8
+        relative overflow-hidden rounded-3xl border p-5 sm:p-8
         ${
           isLowBalance
             ? "border-orange-200 bg-gradient-to-br from-orange-50 to-white"
@@ -50,7 +50,7 @@ export function HeroBalanceCard({
     >
       {/* Low Balance Warning */}
       {isLowBalance && (
-        <div className="absolute top-4 right-4">
+        <div className="mb-4 sm:absolute sm:right-4 sm:top-4 sm:mb-0">
           <div className="flex items-center gap-2 rounded-full bg-orange-100 px-3 py-1.5">
             <AlertCircle className="w-4 h-4 text-orange-600" />
             <span className="text-sm font-medium text-orange-900">Низкий баланс</span>
@@ -61,10 +61,10 @@ export function HeroBalanceCard({
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
         {/* Left: Balance Info */}
         <div className="flex-1">
-          <div className="flex items-center gap-4 mb-4">
+          <div className="mb-4 flex min-w-0 items-center gap-3 sm:gap-4">
             <div
               className={`
-                flex h-16 w-16 items-center justify-center rounded-2xl
+                flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl sm:h-16 sm:w-16
                 ${isLowBalance ? "bg-orange-200" : "bg-green-200"}
               `}
             >
@@ -76,7 +76,7 @@ export function HeroBalanceCard({
             <p className="text-sm font-medium text-stone-600 mb-1">Текущий баланс</p>
             <p
                 className={`
-                  text-5xl font-bold tracking-tight
+                  break-words text-3xl font-bold tracking-tight sm:text-5xl
                   ${isLowBalance ? "text-orange-900" : "text-green-900"}
                 `}
               >
@@ -111,7 +111,7 @@ export function HeroBalanceCard({
           <button
             onClick={onTopUp}
             className="
-              inline-flex items-center justify-center gap-2 px-6 py-3
+              inline-flex min-h-11 w-full items-center justify-center gap-2 px-6 py-3 md:w-auto
               bg-[#EF8759] text-white font-medium rounded-xl
               hover:bg-[#EF8759]/90 transition-colors
               shadow-sm hover:shadow-md
@@ -125,7 +125,7 @@ export function HeroBalanceCard({
             <button
               onClick={onDownloadInvoice}
               className="
-                inline-flex items-center justify-center gap-2 px-6 py-3
+                inline-flex min-h-11 w-full items-center justify-center gap-2 px-6 py-3 md:w-auto
                 bg-white text-stone-700 font-medium rounded-xl
                 border border-stone-300 hover:bg-stone-50 transition-colors
               "

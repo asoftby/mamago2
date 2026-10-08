@@ -37,7 +37,7 @@ const mobileSmartBackButton = read(
 // MobileHeader documents its own `< lg` viewport contract.
 assert.match(
   mobileHeader,
-  /Хедер для viewport \*\*&lt;\s*lg\*\*/,
+  /Хедер для viewport \*\*<\s*lg\*\*/,
   "MobileHeader must keep documenting its `< lg` viewport contract",
 );
 

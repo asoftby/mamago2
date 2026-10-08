@@ -13,7 +13,7 @@ export interface BottomSheetProps {
   hideTitle?: boolean;
   /** Показать кнопку закрытия в хедере */
   showCloseButton?: boolean;
-  /** Высота sheet (по умолчанию 85vh) */
+  /** Высота sheet (по умолчанию 85dvh) */
   height?: string;
   /** Дополнительные классы для контента */
   className?: string;
@@ -32,7 +32,7 @@ export function BottomSheet({
   title = "Заголовок",
   hideTitle = false,
   showCloseButton = true,
-  height = "85vh",
+  height = "85dvh",
   className,
   headerClassName,
   headerContent,
@@ -79,7 +79,9 @@ export function BottomSheet({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto bg-white">{children}</div>
+        <div className="flex-1 overflow-y-auto bg-white pb-[env(safe-area-inset-bottom)]">
+          {children}
+        </div>
       </SheetContent>
     </Sheet>
   );

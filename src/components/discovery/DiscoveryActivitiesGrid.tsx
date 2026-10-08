@@ -17,6 +17,7 @@ import type { ActivityMock } from "@/types/activity";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useOptionalCity } from "@/contexts/CityContext";
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 import { getActivityFormatLabel } from "@/domain/activities/activity-format";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
@@ -72,6 +73,7 @@ export function DiscoveryActivitiesGrid({
   const citySlug = cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
   const ratio = coverRatio ?? "4/5";
   const { applied, actions, derived } = useDiscoveryFilters();
+  const family = useFamilyPersona();
   const debounced = useDebouncedValue(applied, 400);
   const appliedFilterSummary = filtersSignature(applied);
   const filterSummary = filtersSignature(debounced);
@@ -98,8 +100,12 @@ export function DiscoveryActivitiesGrid({
   }, [citySlug, filterSummary]);
 
   const { primary, secondary, secondaryHeading } = useMemo(
-    () => partitionDiscoveryFeed(debounced, activities),
-    [debounced, activities],
+    () =>
+      partitionDiscoveryFeed(debounced, activities, {
+        personas: family?.personas ?? [],
+        selectedPersonaIds: family?.selectedPersonaIds ?? [],
+      }),
+    [debounced, activities, family?.personas, family?.selectedPersonaIds],
   );
 
   const renderCard = (
@@ -194,7 +200,7 @@ export function DiscoveryActivitiesGrid({
       {!showEmpty && (
       <div
         className={cn(
-          "grid grid-cols-2 gap-5 lg:grid-cols-4",
+          "grid grid-cols-1 gap-5 min-[360px]:grid-cols-2 lg:grid-cols-4",
           className,
         )}
       >
@@ -221,7 +227,7 @@ export function DiscoveryActivitiesGrid({
             {secondaryHeading}
           </h2>
           <div
-            className="grid grid-cols-2 gap-5 lg:grid-cols-4"
+            className="grid grid-cols-1 gap-5 min-[360px]:grid-cols-2 lg:grid-cols-4"
           >
             {secondary.map((activity, index) =>
               renderCard(activity, primary.length + index + 1, "secondary"),

@@ -71,8 +71,8 @@ export function BreakingNewsModal({
         onClick={onClose}
         className={cn(
           "absolute z-[60]",
-          "md:top-6 md:right-6",
-          "top-4 right-4",
+          "h-11 w-11 md:h-10 md:w-10",
+          "right-4 top-[max(1rem,env(safe-area-inset-top))] md:right-6 md:top-6",
         )}
       />
 
@@ -104,7 +104,7 @@ export function BreakingNewsModal({
         </div>
 
         {/* ── List ── */}
-        <div className="overflow-y-auto max-h-[calc(92dvh-72px)] md:max-h-[calc(80vh-72px)]">
+        <div className="max-h-[calc(92dvh-72px)] overflow-y-auto pb-[env(safe-area-inset-bottom)] md:max-h-[calc(80vh-72px)] md:pb-0">
           <div className="divide-y divide-neutral-100">
             {newsItems.map((item, index) => (
               <article

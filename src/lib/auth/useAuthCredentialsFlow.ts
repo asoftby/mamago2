@@ -11,6 +11,7 @@ import { navigateToCompatibleHref } from "@/lib/routing/clientNavigation";
 import { toast } from "@/lib/toast";
 import { VERIFICATION_EMAIL_SEND_FAILED_AFTER_REGISTRATION_TOAST } from "@/lib/auth/registrationVerificationToast";
 import { PASSWORD_MIN_LENGTH, validatePasswordPolicy } from "@/lib/auth/passwordPolicy";
+import { trackAuthStarted, trackAuthCompletedEvent } from "@/lib/onboarding/firstPartyEvents";
 
 export type AuthFlowMode = "login" | "register";
 
@@ -134,6 +135,7 @@ export function useAuthCredentialsFlow({
       const target = appendBirthdayBuilderAuthParam(
         getSafeRedirectPath(rawRedirect, nextHref ?? getPostAuthRedirect()),
       );
+      trackAuthCompletedEvent(mode);
       if (embedded && beforeFinishAuthSession) {
         await beforeFinishAuthSession();
       }
@@ -167,7 +169,7 @@ export function useAuthCredentialsFlow({
       }
       navigateToCompatibleHref(router, target, { replace: true });
     },
-    [embedded, beforeFinishAuthSession, nextHref, onAuthSuccess, router, skipRedirectAfterAuth],
+    [embedded, beforeFinishAuthSession, nextHref, onAuthSuccess, router, skipRedirectAfterAuth, mode],
   );
 
   /**
@@ -228,6 +230,7 @@ export function useAuthCredentialsFlow({
       setError("Введите email и пароль");
       return;
     }
+    trackAuthStarted("login");
     await attemptLogin(emailVal, password);
   }, [email, password, attemptLogin]);
 
@@ -259,6 +262,7 @@ export function useAuthCredentialsFlow({
       setError(validation.error);
       return;
     }
+    trackAuthStarted("register");
     setLoading(true);
     try {
       const res = await fetch("/api/auth/complete-registration", {

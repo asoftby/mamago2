@@ -13,47 +13,52 @@ import {
   SEO_ROBOTS_INDEX_FOLLOW,
   SEO_ROBOTS_NOINDEX_FOLLOW,
 } from "@/lib/admin/seo/entities/robotsConstants";
+import {
+  buildPlaceListWhere,
+  type SeoEntityListFilters,
+  type SeoEntityPageWindow,
+} from "../listFilters";
 
-const PLACE_LIST_LIMIT = 400;
 
-export const placeProvider: SeoEntityProvider = {
-  entityType: "place",
-  badgeLabel: "Place",
-  section: "kuda",
 
-  async listRows() {
-    const places = await prisma.place.findMany({
-      where: {
-        archivedAt: null,
-        status: { not: ContentStatus.DELETED },
-      },
-      orderBy: { updatedAt: "desc" },
-      take: PLACE_LIST_LIMIT,
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        shortDesc: true,
-        status: true,
-        updatedAt: true,
-        seoH1: true,
-        seoTitle: true,
-        seoDescription: true,
-        seoCanonicalUrl: true,
-        seoCanonicalSource: true,
-        seoRobots: true,
-        city: { select: { slug: true } },
-      },
-    });
+async function listPlaceRows(
+  filters: SeoEntityListFilters | null,
+  page: SeoEntityPageWindow | null,
+) {
+  const places = await prisma.place.findMany({
+    where: filters
+      ? buildPlaceListWhere(filters)
+      : {
+          archivedAt: null,
+          status: { not: ContentStatus.DELETED },
+        },
+    orderBy: { updatedAt: "desc" },
+    ...(page ? { skip: page.skip, take: page.take } : {}),
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      shortDesc: true,
+      status: true,
+      updatedAt: true,
+      seoH1: true,
+      seoTitle: true,
+      seoDescription: true,
+      seoCanonicalUrl: true,
+      seoCanonicalSource: true,
+      seoRobots: true,
+      cityId: true,
+      city: { select: { id: true, slug: true, name: true } },
+    },
+  });
 
-    return places.map((p) => {
-      const published = p.status === ContentStatus.PUBLISHED;
-      const seg = p.slug?.trim() || p.id;
-      // A cityless Place can't get a city-scoped path — see
-      // docs/migration/seo/final-url-architecture-2026-08-15.md §2.
-      const path = p.city?.slug ? buildCityPublicPath({ citySlug: p.city.slug, type: "place", slug: seg }) : `/places/${seg}`;
-      const canonical = p.seoCanonicalUrl?.trim() || path;
-      const entityDiagnostics = buildSegmentEntityDiagnostics("place", {
+  return places.map((p) => {
+    const published = p.status === ContentStatus.PUBLISHED;
+    const seg = p.slug?.trim() || p.id;
+    const path = p.city?.slug ? buildCityPublicPath({ citySlug: p.city.slug, type: "place", slug: seg }) : `/places/${seg}`;
+    const canonical = p.seoCanonicalUrl?.trim() || path;
+    const entityDiagnostics = {
+      ...buildSegmentEntityDiagnostics("place", {
         entityId: p.id,
         title: p.title,
         slug: p.slug,
@@ -61,26 +66,52 @@ export const placeProvider: SeoEntityProvider = {
         seoCanonicalSource: p.seoCanonicalSource,
         seoRobots: p.seoRobots,
         contentStatus: p.status,
-      });
-      return {
-        id: `entity:place:${p.id}`,
-        path,
-        section: "kuda",
-        type: "place",
-        filtersSnapshot: { entity: "place", entityId: p.id },
-        title: p.seoTitle?.trim() || p.title,
-        h1: p.seoH1?.trim() || p.title,
-        description: p.seoDescription?.trim() || p.shortDesc || "",
-        canonical,
-        updatedAt: p.updatedAt.toISOString(),
-        indexationStatus: indexationStatusForPublishedEntity(
-          published,
-          p.seoRobots,
-        ),
-        isIndexable: isIndexableForPublishedEntity(published, p.seoRobots),
-        entityDiagnostics,
-      };
-    });
+      }),
+      citySlug: p.city?.slug ?? null,
+    };
+    return {
+      id: `entity:place:${p.id}`,
+      path,
+      section: "kuda" as const,
+      type: "place" as const,
+      filtersSnapshot: {
+        entity: "place" as const,
+        entityId: p.id,
+        cityId: p.cityId,
+        citySlug: p.city?.slug ?? null,
+        cityName: p.city?.name ?? null,
+        geoScope: p.cityId ? ("CITY" as const) : null,
+      },
+      title: p.seoTitle?.trim() || p.title,
+      h1: p.seoH1?.trim() || p.title,
+      description: p.seoDescription?.trim() || p.shortDesc || "",
+      canonical,
+      updatedAt: p.updatedAt.toISOString(),
+      indexationStatus: indexationStatusForPublishedEntity(
+        published,
+        p.seoRobots,
+      ),
+      isIndexable: isIndexableForPublishedEntity(published, p.seoRobots),
+      entityDiagnostics,
+    };
+  });
+}
+
+export const placeProvider: SeoEntityProvider = {
+  entityType: "place",
+  badgeLabel: "Place",
+  section: "kuda",
+
+  async countRows(filters) {
+    return prisma.place.count({ where: buildPlaceListWhere(filters) });
+  },
+
+  async listRowsPage(filters, page) {
+    return listPlaceRows(filters, page);
+  },
+
+  async listRows() {
+    return listPlaceRows(null, null);
   },
 
   async loadEditorModel(entityId) {

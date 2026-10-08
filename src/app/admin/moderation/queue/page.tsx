@@ -176,7 +176,7 @@ export default async function ModerationQueuePage() {
   const items = await getQueueItems();
 
   return (
-    <div className="p-6 md:p-4 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl md:text-xl font-bold text-gray-900">Очередь модерации</h1>

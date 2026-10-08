@@ -21,10 +21,7 @@ export const maxDuration = 30;
 // Note: Body size limit is configured in next.config.ts
 // For App Router, use: experimental.serverActions.bodySizeLimit
 import { getCurrentUser } from "@/lib/auth/server";
-import {
-  detectUploadMimeTypeFromBuffer,
-  resolveUploadMimeType,
-} from "@/lib/uploads/uploadConfig";
+import { validateUploadFileContent } from "@/lib/uploads/imageContentValidation";
 import { jsonUploadError } from "@/lib/uploads/uploadErrors";
 import type { UploadSuccessResponse } from "@/lib/uploads/uploadTypes";
 import { validateUploadPreflight } from "@/lib/uploads/validateUploadPreflight";
@@ -105,6 +102,12 @@ export async function POST(req: NextRequest) {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
+    let actualMimeType: string;
+    try {
+      actualMimeType = validateUploadFileContent(buffer, file);
+    } catch (error) {
+      return jsonUploadError("INVALID_FILE_TYPE", error instanceof Error ? error.message : "Invalid image content", 415);
+    }
 
     // Dedup (Phase A): hash the raw original bytes and reuse an owner's existing
     // asset before doing any processing or storage writes.
@@ -118,11 +121,6 @@ export async function POST(req: NextRequest) {
       });
       return NextResponse.json(buildDedupUploadResponse(existingByHash));
     }
-
-    const actualMimeType =
-      detectUploadMimeTypeFromBuffer(buffer) ??
-      resolveUploadMimeType(file) ??
-      file.type;
 
     console.log("[UPLOAD] Buffer created", {
       userId: user.id,
@@ -156,7 +154,11 @@ export async function POST(req: NextRequest) {
         fileType: file.type,
         fileName: file.name,
       });
-      return jsonUploadError("IMAGE_PROCESSING_FAILED", message, 400);
+      const userMessage =
+        actualMimeType === "image/heic" || actualMimeType === "image/heif"
+          ? "Не удалось преобразовать HEIC/HEIF в JPEG перед загрузкой. Обновите страницу и попробуйте загрузить фото ещё раз."
+          : message;
+      return jsonUploadError("IMAGE_PROCESSING_FAILED", userMessage, 400);
     }
 
     let masterFilename = "";

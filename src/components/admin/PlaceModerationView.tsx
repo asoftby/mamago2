@@ -3,10 +3,10 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Navigation, Phone, Globe, Instagram, ArrowLeft, ExternalLink, Clock, Building2 } from "lucide-react";
+import { MapPin, Navigation, Phone, Globe, Instagram, ExternalLink, Clock, Building2 } from "lucide-react";
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
 import { formatDistance } from "@/lib/formatDistance";
 import { formatDistanceToNow } from "date-fns";
@@ -20,7 +20,6 @@ import { getFormatLabel } from "@/lib/placeChips";
 import { GoogleReviewsStatusBadge } from "@/components/admin/moderation/GoogleReviewsStatusBadge";
 import { FaqReadonlySection } from "@/components/admin/moderation/FaqReadonlySection";
 import { DAY_SHORT_LABELS, ALL_DAYS, MODE_LABELS } from "@/components/openingHours/openingHours.types";
-import { getPlaceDetailBackLink } from "@/lib/admin/placeDetailNavigation";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
 
 const STATUS_CONFIG = {
@@ -136,10 +135,8 @@ export function PlaceModerationView({
   canDeletePlace = false,
 }: PlaceModerationViewProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const backLink = getPlaceDetailBackLink(searchParams.get("returnTo"));
 
   const statusConfig = STATUS_CONFIG[place.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.DRAFT;
 
@@ -219,13 +216,6 @@ export function PlaceModerationView({
       {/* Header */}
       <div className="mb-6">
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <Link
-            href={backLink.href}
-            className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            {backLink.label}
-          </Link>
           <Button variant="outline" size="sm" asChild>
             <Link
               href={`/editor/place/${place.id}/edit?returnTo=${encodeURIComponent(`/admin/content/places/${place.id}`)}`}

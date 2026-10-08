@@ -3,6 +3,7 @@
 import type { EventFormData } from "./types";
 import type { PendingLocation } from "./types";
 import type { CtaStepFormValue } from "@/components/business/wizard/shared/CtaStep";
+import { AgePolicy } from "@prisma/client";
 import type { Activity, ActivityFormat } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { getDefaultFormData } from "./defaults";
@@ -727,9 +728,12 @@ export function buildEventPayload(data: EventFormData): EventPayload {
     title: data.title ?? "",
     fullDescriptionHtml: data.fullDescription ?? "",
   });
-  const normalizedAgeBuckets = sortAgeKeys(
-    (data.ageTags.length > 0 ? data.ageTags : data.ageRangeIds).filter(Boolean),
-  );
+  const normalizedAgeBuckets =
+    data.agePolicy === AgePolicy.SPECIFIC
+      ? sortAgeKeys(
+          (data.ageTags.length > 0 ? data.ageTags : data.ageRangeIds).filter(Boolean),
+        )
+      : [];
   const ageRange = getCombinedAgeRange(normalizedAgeBuckets);
   const ageLabel =
     normalizedAgeBuckets.length > 0

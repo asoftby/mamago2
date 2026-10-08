@@ -56,7 +56,7 @@ export default async function AdminCommercialPage() {
   const expiredContracts = overview.contracts.expired;
 
   return (
-    <div className="p-6 md:p-4 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <AdminPageHeader
         title="Коммерческий контроль"
         subtitle="Договоры, размещение и сроки действия коммерческих услуг"

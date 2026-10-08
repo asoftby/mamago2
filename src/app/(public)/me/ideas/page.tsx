@@ -16,6 +16,7 @@ import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
 import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { normalizePricingMode } from "@/components/business/wizard/event/pricingMode";
 import { getMinCampSessionPrice } from "@/lib/offers/campPricing";
+import { activePlanScopeFor } from "@/server/family/familyAccess";
 
 export const metadata = { title: "Мои идеи — mamaGo" };
 
@@ -275,15 +276,14 @@ async function getUserIdeas(userId: string): Promise<IdeaItem[]> {
   const plannedItems = planLookupConditions.length
     ? await prisma.planItem.findMany({
     where: {
-      userId,
-      OR: planLookupConditions,
+      AND: [await activePlanScopeFor(userId), { OR: planLookupConditions }],
     },
     select: { id: true, activityId: true, routeId: true, date: true },
     orderBy: { date: "asc" },
   })
     : [];
-  const plannedByActivityId = new Map<string, Array<{ id: string; date: string }>>();
-  const plannedByRouteId = new Map<string, Array<{ id: string; date: string }>>();
+  const plannedByActivityId = new Map<string, Array<{ id: string; date: string | null }>>();
+  const plannedByRouteId = new Map<string, Array<{ id: string; date: string | null }>>();
   for (const item of plannedItems) {
     if (item.activityId) {
       const existing = plannedByActivityId.get(item.activityId) ?? [];

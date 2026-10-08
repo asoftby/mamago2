@@ -2,19 +2,8 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getOperationsView } from "@/server/ops/read/getOperationsView";
 import type { OperationsSyntheticSignal, OperationsView } from "@/server/ops/read/getOperationsView";
 import type { OperationalSignal } from "@prisma/client";
-import {
-  deriveProductPulse,
-  deriveNorthStar,
-  deriveHabit,
-  deriveEngagementFunnel,
-  deriveGrowth,
-  deriveDiscoveryQuality,
-  deriveSupplyHealth,
-  deriveB2BHealth,
-  deriveWorkload,
-  deriveDataQuality,
-} from "@/lib/admin/dashboardViewModels";
-import { deriveGscSeo } from "@/lib/admin/gscSeoViewModel";
+import { deriveWorkload } from "@/lib/admin/dashboardViewModels";
+import { deriveGrowthOverview, deriveOrganicRecovery } from "@/lib/admin/growthDashboardViewModel";
 import { AdminDashboardShell } from "./_components/AdminDashboardShell";
 import type { DashboardSignal } from "./_components/OperationsBlock";
 import { OperationsLoadErrorState } from "./_components/OperationsLoadErrorState";
@@ -59,17 +48,9 @@ export default async function AdminDashboardPage() {
 
   const now = new Date();
   const signals = view.signals.map((signal) => toDashboardSignal(signal, view));
-  const product = deriveProductPulse(view.kpis);
-  const northStar = deriveNorthStar(view.kpis);
-  const habit = deriveHabit(view.kpis);
-  const funnel = deriveEngagementFunnel(view.kpis);
-  const growth = deriveGrowth(view.kpis);
-  const seo = deriveGscSeo(view.kpis);
-  const search = deriveDiscoveryQuality(view.kpis);
-  const supply = deriveSupplyHealth(view.kpis);
-  const b2b = deriveB2BHealth(view.kpis);
+  const organic = deriveOrganicRecovery(view.kpis);
+  const growth = deriveGrowthOverview(view.kpis);
   const workload = deriveWorkload(view.queues, view.kpis);
-  const dataQuality = deriveDataQuality(view.stale);
 
   return (
     <AdminDashboardShell
@@ -82,17 +63,9 @@ export default async function AdminDashboardPage() {
       canResolve={user.role === "ADMIN"}
       serverNow={now}
       isDev={!isProductionAppEnv()}
-      product={product}
-      northStar={northStar}
-      habit={habit}
-      funnel={funnel}
+      organic={organic}
       growth={growth}
-      seo={seo}
-      search={search}
-      supply={supply}
-      b2b={b2b}
       workload={workload}
-      dataQuality={dataQuality}
     />
   );
 }

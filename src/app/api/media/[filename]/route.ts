@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import { existsSync } from "fs";
+import { parse as parsePath, join as joinPath } from "path";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import {
@@ -20,8 +21,19 @@ import {
 } from "@/server/media/mediaPublicAccess";
 import { decideMediaResponsePolicy } from "@/server/media/mediaResponsePolicy";
 
+const MEDIA_PREVIEW_VARIANTS = new Set(["sm", "md", "lg", "xl"]);
+
+function resolveResponsiveVariantPath(masterPath: string, variant: string | null): string {
+  if (!variant) return masterPath;
+  if (!MEDIA_PREVIEW_VARIANTS.has(variant)) return masterPath;
+
+  const parsed = parsePath(masterPath);
+  const candidate = joinPath(parsed.dir, `${parsed.name}-${variant}.webp`);
+  return existsSync(candidate) ? candidate : masterPath;
+}
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ filename: string }> },
 ) {
   try {
@@ -70,6 +82,14 @@ export async function GET(
       resolveLegacyPublicUploadPath(media.storageKey);
 
     if (!filepath || !existsSync(filepath)) {
+      const externalPublicUrl = media.publicUrl?.trim();
+      if (externalPublicUrl && /^https?:\/\//i.test(externalPublicUrl)) {
+        return NextResponse.redirect(externalPublicUrl, {
+          status: 307,
+          headers: { "Cache-Control": responsePolicy.cacheControl },
+        });
+      }
+
       console.warn(
         `[media-api] file missing on disk: mediaId="${media.id}" publicUrl="${media.publicUrl}" storageKey="${media.storageKey}" resolvedPath="${filepath}"`,
       );
@@ -79,11 +99,16 @@ export async function GET(
       );
     }
 
-    const fileBuffer = await readFile(filepath);
+    const variant = request.nextUrl.searchParams.get("variant")?.trim().toLowerCase() || null;
+    const responsePath = resolveResponsiveVariantPath(filepath, variant);
+    const fileBuffer = await readFile(responsePath);
 
     return new NextResponse(fileBuffer, {
       headers: {
-        "Content-Type": media.mimeType || "application/octet-stream",
+        "Content-Type":
+          responsePath === filepath
+            ? media.mimeType || "application/octet-stream"
+            : "image/webp",
         "Content-Length": fileBuffer.length.toString(),
         "Cache-Control": responsePolicy.cacheControl,
         "X-Content-Type-Options": "nosniff",

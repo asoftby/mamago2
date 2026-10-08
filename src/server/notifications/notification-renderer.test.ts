@@ -12,10 +12,10 @@ import { renderNotificationContentCore } from "./notification-renderer-core";
     cityName: "Минск",
   });
 
-  assert.equal(rendered.title, "Скоро событие");
+  assert.equal(rendered.title, "Скоро в плане");
   assert.equal(
     rendered.body,
-    "В 15:00 у вас в плане: Мастер-класс по рисованию",
+    "В 15:00: Мастер-класс по рисованию",
   );
   assert.equal(rendered.ctaLabel, "Открыть план");
   assert.equal(rendered.ctaUrl, "/me/day/2026-04-24");
@@ -28,7 +28,7 @@ import { renderNotificationContentCore } from "./notification-renderer-core";
     startsAt: new Date("2026-03-29T22:30:00.000Z"),
     timeZone: "Europe/Amsterdam",
   });
-  assert.equal(rendered.body, "В 00:30 у вас в плане: DST test");
+  assert.equal(rendered.body, "В 00:30: DST test");
   assert.equal(rendered.ctaUrl, "/me/day/2026-03-30");
 }
 

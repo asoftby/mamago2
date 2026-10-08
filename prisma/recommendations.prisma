@@ -43,6 +43,8 @@ model RecommendationRun {
   id               String                @id @default(cuid())
   userId           String?
   sessionId        String?
+  /// Guest product identity (client-generated UUID) when userId is absent.
+  anonymousId      String?
   surface          RecommendationSurface
   cityId           String?
   citySlug         String?
@@ -60,6 +62,7 @@ model RecommendationRun {
 
   @@index([userId, generatedAt])
   @@index([sessionId, generatedAt])
+  @@index([anonymousId, generatedAt])
   @@index([surface, generatedAt])
   @@index([cityId, generatedAt])
   @@index([policyId])

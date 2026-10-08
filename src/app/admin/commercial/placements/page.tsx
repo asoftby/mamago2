@@ -28,7 +28,7 @@ export default async function AdminPlacementsPage() {
 
   if (error) {
     return (
-      <div className="p-6 md:p-4 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6">
         {/* AdminPageHeader */}
         <div>
           <h1 className="text-2xl md:text-xl font-bold text-gray-900">Размещения</h1>
@@ -50,7 +50,7 @@ export default async function AdminPlacementsPage() {
   };
 
   return (
-    <div className="p-6 md:p-4 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* AdminPageHeader */}
       <div className="flex items-center justify-between">
         <div>

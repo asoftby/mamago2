@@ -24,7 +24,7 @@ export default async function EditPagePage({ params }: PageProps) {
   }
 
   return (
-    <div className="p-6 md:p-4 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl md:text-xl font-bold text-gray-900">Редактировать страницу</h1>
         <p className="text-sm text-gray-600 mt-1">{page.title}</p>

@@ -79,7 +79,7 @@ export function BalancePage({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-stone-200 bg-white p-6">
+      <div className="rounded-3xl border border-stone-200 bg-white p-4 sm:p-6">
         <h1 className="text-2xl font-bold text-stone-950">Баланс и расходы</h1>
         <p className="mt-2 text-sm text-stone-600">
           Баланс хранится в BYN и не сгорает. Лиды, заявки и контакты бесплатны; средства списываются только после явного подтверждения Boost.
@@ -112,7 +112,7 @@ export function BalancePage({
         lastChargeAmount={stats.lastChargeAmount}
       />
 
-      <div className="rounded-3xl border border-stone-200 bg-white p-6">
+      <div className="rounded-3xl border border-stone-200 bg-white p-4 sm:p-6">
         <h3 className="text-lg font-semibold text-stone-950">First-PROD правила</h3>
         <p className="mt-2 text-sm text-stone-600">
           Базовое присутствие и MVP-объём публикаций сохраняются при нулевом балансе.

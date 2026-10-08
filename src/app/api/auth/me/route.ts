@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getCurrentAuthState } from "@/lib/auth/getCurrentAuthState";
 import { prisma } from "@/lib/prisma";
+import { buildMeProfileUpdateData } from "@/lib/account/buildMeProfileUpdateData";
 
 /**
  * GET /api/auth/me
@@ -44,35 +45,7 @@ export async function PATCH(request: Request) {
 
     const body = await request.json().catch(() => ({}));
 
-    const updateData: Record<string, unknown> = {};
-
-    if (typeof body.displayName === "string") {
-      updateData.displayName = body.displayName.trim();
-    }
-
-    if (typeof body.familyRole === "string") {
-      updateData.familyRole = body.familyRole || null;
-    }
-
-    if (typeof body.ageBandLabel === "string") {
-      updateData.ageBandLabel = body.ageBandLabel || null;
-    }
-
-    if (Array.isArray(body.preferenceSignalIds)) {
-      updateData.preferenceSignalIds = body.preferenceSignalIds;
-    }
-
-    if (typeof body.leisureFormatSignalId === "string" || body.leisureFormatSignalId === null) {
-      updateData.leisureFormatSignalId = body.leisureFormatSignalId;
-    }
-
-    if (typeof body.preferenceSummary === "string" || body.preferenceSummary === null) {
-      updateData.preferenceSummary = body.preferenceSummary;
-    }
-
-    if (typeof body.leisureFormatSummary === "string" || body.leisureFormatSummary === null) {
-      updateData.leisureFormatSummary = body.leisureFormatSummary;
-    }
+    const updateData = buildMeProfileUpdateData(body);
 
     const updated = await prisma.user.update({
       where: { id: user.id },

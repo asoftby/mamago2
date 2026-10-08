@@ -78,7 +78,7 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 
 export default function MyAdminPage() {
   return (
-    <div className="p-6 md:p-4 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <AdminPageHeader
         title="Page Title"
         subtitle="Optional description"

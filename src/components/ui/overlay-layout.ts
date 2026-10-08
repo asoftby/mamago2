@@ -50,7 +50,7 @@ export const desktopDialogShellLarge = [
  * now a standalone page, not a Dialog/Sheet — see
  * src/app/(public)/[city]/my-plan/[date]/scenario/page.tsx.
  *
- * Только Dialog: DefaultAuthModal, SiteAuthModal, QuickAddChildModal, QuickAddAdultModal,
+ * Только Dialog: DefaultAuthModal, SiteAuthModal, QuickAddChildModal,
  * AddParticipantModal, EventPageView, auth modals, и др.
  *
  * Кастом fixed overlay: MobileSearchSheet, MyPlanProvider preview, RefinementFiltersModal,

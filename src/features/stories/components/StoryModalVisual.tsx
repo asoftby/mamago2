@@ -227,7 +227,7 @@ export function StoryModalVisual({
         onClick={onPrev}
         className={cn(
           "absolute left-3 top-1/2 -translate-y-1/2 z-[7]",
-          "h-9 w-9 flex items-center justify-center rounded-full",
+          "h-11 w-11 md:h-9 md:w-9 flex items-center justify-center rounded-full",
           "bg-black/30 backdrop-blur-sm text-white border border-white/10",
           "hover:bg-black/50 transition-all",
           isFirst && "opacity-0 pointer-events-none",
@@ -235,21 +235,21 @@ export function StoryModalVisual({
         aria-label="Назад"
         tabIndex={isFirst ? -1 : 0}
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft className="h-5 w-5 md:h-4 md:w-4" />
       </button>
 
       <button
         onClick={onNext}
         className={cn(
           "absolute right-3 top-1/2 -translate-y-1/2 z-[7]",
-          "h-9 w-9 flex items-center justify-center rounded-full",
+          "h-11 w-11 md:h-9 md:w-9 flex items-center justify-center rounded-full",
           "bg-black/30 backdrop-blur-sm text-white border border-white/10",
           "hover:bg-black/50 transition-all",
           !nextItem && "opacity-40",
         )}
         aria-label="Вперёд"
       >
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-5 w-5 md:h-4 md:w-4" />
       </button>
     </div>
   );

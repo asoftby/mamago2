@@ -11,14 +11,19 @@ type MinimalUser = {
 
 type MinimalChild = {
   id: string;
-  name: string;
+  name: string | null;
   birthDate: Date | string | null;
+  birthPrecision?: "DAY" | "MONTH" | null;
   createdAt: Date | string;
   systemInterests?: { interestSlug: string }[];
 };
 
+/**
+ * Informational only — family role is an optional profile attribute (B1) and
+ * never gates completion. Adult age/DOB is not collected at all.
+ */
 export function hasAdultProfile(user: MinimalUser): boolean {
-  return Boolean(user.familyRole?.trim() && user.ageBandLabel?.trim());
+  return Boolean(user.familyRole?.trim());
 }
 
 /** Месяц/год из birthDate (день может быть 1-е число). */
@@ -45,6 +50,11 @@ export function getPrimaryChild(children: MinimalChild[]): MinimalChild | null {
   return sorted[0] ?? null;
 }
 
+/**
+ * B1: adult profile (role/age) and child interests are no longer mandatory —
+ * only a usable child birth month/year gates "complete". Adult age is never
+ * collected; family role is optional and tracked only informationally.
+ */
 export function computeProfileCompletionFlags(
   user: MinimalUser,
   children: MinimalChild[],
@@ -58,21 +68,24 @@ export function computeProfileCompletionFlags(
     hasAdultProfile: hasAdultProfile(user),
     hasChildProfile: childProfileOk,
     hasChildInterests: childInterestsOk,
-    isProfileComplete:
-      hasAdultProfile(user) && childProfileOk && childInterestsOk,
+    isProfileComplete: childProfileOk,
   };
 }
 
-/** Только для незавершённого usable-профиля; иначе null. */
+/**
+ * Only for a not-yet-usable profile; otherwise null. The optional adult/role
+ * prompt is offered once, only to a brand-new profile with no children yet —
+ * it never blocks and is never forced on a return visit. Interests are
+ * optional (B1) and no longer produce a resume step.
+ */
 export function resolveResumeStep(
   user: MinimalUser,
   children: MinimalChild[],
 ): ProfileMandatoryStepId | null {
-  if (!hasAdultProfile(user)) return "adult";
   const primary = getPrimaryChild(children);
-  if (!primary || !childHasBirthMonthYear(primary)) return "child";
-  if (!childHasInterests(primary)) return "child_interests";
-  return null;
+  if (primary && childHasBirthMonthYear(primary)) return null;
+  if (children.length === 0) return "adult";
+  return "child";
 }
 
 export function buildProfileStatePayload(
@@ -100,6 +113,7 @@ export function buildProfileStatePayload(
           ? c.birthDate
           : c.birthDate.toISOString()
         : null,
+      birthPrecision: c.birthPrecision ?? null,
       createdAt:
         typeof c.createdAt === "string" ? c.createdAt : c.createdAt.toISOString(),
       interestCount: c.systemInterests?.length ?? 0,

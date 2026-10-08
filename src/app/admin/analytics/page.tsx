@@ -3,7 +3,7 @@ import { AdminAnalyticsPageContent } from "@/components/admin/analytics/AdminAna
 
 export default function AdminAnalyticsPage() {
   return (
-    <div className="space-y-6 p-6 md:p-4">
+    <div className="space-y-6 p-4 sm:p-6">
       <AdminPageHeader
         title="Analytics"
         subtitle="User behavior, segments and content performance"

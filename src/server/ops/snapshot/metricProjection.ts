@@ -9,6 +9,7 @@
  * genuinely observed zero.
  */
 import type { PrismaClient } from "@prisma/client";
+import { format } from "date-fns";
 
 async function latestMetricValue(prisma: PrismaClient, metric: string, dimKey = ""): Promise<number | null> {
   const row = await prisma.metricSample.findFirst({
@@ -155,13 +156,96 @@ async function projectGscPageMovers(prisma: PrismaClient): Promise<{
   };
 }
 
-export async function projectOperationsKpis(prisma: PrismaClient): Promise<Record<string, unknown>> {
-  const [entries, pageMovers] = await Promise.all([
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const DASHBOARD_TIME_ZONE = "Europe/Minsk";
+
+/**
+ * Latest value per dimKey for a dimensioned metric (e.g. one sample per ISO
+ * week), limited to samples collected since `since`. Later collections of the
+ * same dimKey (a re-computed week) win.
+ */
+async function latestValuesByDimKey(
+  prisma: PrismaClient,
+  metric: string,
+  since: Date,
+): Promise<Record<string, number>> {
+  const rows = await prisma.metricSample.findMany({
+    where: { metric, collectedAt: { gte: since }, NOT: { dimKey: "" } },
+    orderBy: { collectedAt: "asc" },
+    select: { dimKey: true, value: true },
+  });
+  const result: Record<string, number> = {};
+  for (const row of rows) result[row.dimKey] = row.value;
+  return result;
+}
+
+/** ISO week label ("2026-W39") of an instant, in the dashboard's time zone. */
+export function isoWeekInTimeZone(instant: Date, timeZone = DASHBOARD_TIME_ZONE): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(instant);
+  const v = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return format(new Date(Number(v.year), Number(v.month) - 1, Number(v.day), 12), "RRRR-'W'II");
+}
+
+export interface WeeklyHistoryPoint {
+  isoWeek: string;
+  value: number;
+}
+
+/**
+ * For a rolling global metric (e.g. WAU = trailing 7 days), the value as last
+ * observed in each ISO week — i.e. the week-end reading, and "so far" for the
+ * current week. Weeks without any sample are absent, never 0.
+ */
+export function bucketLastValuePerWeek(
+  rows: readonly { collectedAt: Date; value: number }[],
+  timeZone = DASHBOARD_TIME_ZONE,
+): WeeklyHistoryPoint[] {
+  const byWeek = new Map<string, number>();
+  for (const row of [...rows].sort((a, b) => a.collectedAt.getTime() - b.collectedAt.getTime())) {
+    byWeek.set(isoWeekInTimeZone(row.collectedAt, timeZone), row.value);
+  }
+  return [...byWeek.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([isoWeek, value]) => ({ isoWeek, value }));
+}
+
+async function weeklyHistory(
+  prisma: PrismaClient,
+  metric: string,
+  now: Date,
+  weeks: number,
+): Promise<WeeklyHistoryPoint[]> {
+  const rows = await prisma.metricSample.findMany({
+    where: { metric, dimKey: "", collectedAt: { gte: new Date(now.getTime() - weeks * WEEK_MS) } },
+    select: { collectedAt: true, value: true },
+  });
+  return bucketLastValuePerWeek(rows).slice(-weeks);
+}
+
+export async function projectOperationsKpis(
+  prisma: PrismaClient,
+  now: Date = new Date(),
+): Promise<Record<string, unknown>> {
+  const since = new Date(now.getTime() - 16 * WEEK_MS);
+  const [entries, pageMovers, evergreenWeekly, totalWeekly, wauWeekly, wpfWeekly] = await Promise.all([
     Promise.all(KPI_METRIC_NAMES.map(async (metric) => [metric, await latestMetricValue(prisma, metric)] as const)),
     projectGscPageMovers(prisma),
+    latestValuesByDimKey(prisma, "seo.evergreen_clicks_weekly", since),
+    latestValuesByDimKey(prisma, "seo.total_clicks_weekly", since),
+    weeklyHistory(prisma, "audience.wau", now, 8),
+    weeklyHistory(prisma, "planning.wpf", now, 8),
   ]);
   return {
     ...Object.fromEntries(entries),
     "gsc.page_movers": pageMovers,
+    "seo.evergreen_weekly": evergreenWeekly,
+    "seo.total_weekly": totalWeekly,
+    "audience.wau_weekly": wauWeekly,
+    "planning.wpf_weekly": wpfWeekly,
   };
 }

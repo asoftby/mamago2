@@ -11,7 +11,7 @@ export default async function AdminBroadcastsPage() {
   const { items, total } = await listAdminBroadcasts({ limit: 50 });
 
   return (
-    <div className="p-6 md:p-4 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       <AdminPageHeader
         title="Сообщения"
         subtitle="Новости, объявления и системные уведомления для пользователей и бизнес-партнёров"

@@ -161,6 +161,7 @@ export function PlaceSaveHeart({
         }}
         source={source}
         onPersist={handlePersist}
+        showVisibilityToggle
         isIdea={saveStatus.isIdea}
         inPlan={saveStatus.inPlan}
         planDate={saveStatus.planDate}

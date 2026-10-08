@@ -118,7 +118,7 @@ export function OccasionEditPage({
 
   if (loading) {
     return (
-      <div className="p-6 md:p-4">
+      <div className="p-4 sm:p-6">
         <p className="text-sm text-gray-600">Загрузка…</p>
       </div>
     );
@@ -126,7 +126,7 @@ export function OccasionEditPage({
 
   if (notFound || !entry) {
     return (
-      <div className="p-6 md:p-4 space-y-4">
+      <div className="p-4 sm:p-6 space-y-4">
         <p className="text-sm text-gray-700">Запись не найдена.</p>
         <Button variant="outline" asChild>
           <Link href={listHrefBase}>{listLabel}</Link>
@@ -136,7 +136,7 @@ export function OccasionEditPage({
   }
 
   return (
-    <div className="p-6 md:p-4 space-y-6 max-w-4xl">
+    <div className="p-4 sm:p-6 space-y-6 max-w-4xl">
       <div>
         <Link
           href={listHrefWithType}

@@ -11,11 +11,8 @@ import { FaqReadonlySection } from "@/components/admin/moderation/FaqReadonlySec
 import { getPlacePublicUrl } from "@/lib/placePublicUrl";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft } from "lucide-react";
 import { PlaceFormData } from "@/components/business/wizard/place/types";
 import { ContentStatus, PlaceKind } from "@prisma/client";
-import Link from "next/link";
-import { getPlaceDetailBackLink } from "@/lib/admin/placeDetailNavigation";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { AdminPlaceGroupManager } from "@/components/admin/AdminPlaceGroupManager";
 import {
@@ -39,8 +36,7 @@ export default async function PlaceModerationPage({
   }
 
   const { id } = await params;
-  const { mode, returnTo } = await searchParams;
-  const backLink = getPlaceDetailBackLink(returnTo);
+  const { mode } = await searchParams;
 
   const place = await loadPlaceForBasicModeration(id);
 
@@ -193,16 +189,6 @@ export default async function PlaceModerationPage({
           {/* Header */}
           <div className="bg-white border-b">
             <div className="max-w-7xl mx-auto px-6 py-4">
-              <div className="flex items-center justify-between mb-4">
-                <Link
-                  href={backLink.href}
-                  className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-1" />
-                  {backLink.label}
-                </Link>
-              </div>
-
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
@@ -404,16 +390,6 @@ export default async function PlaceModerationPage({
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <Link
-              href="/admin/content/places"
-              className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
-            >
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Назад к списку
-            </Link>
-          </div>
-
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">

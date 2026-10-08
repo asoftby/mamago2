@@ -36,31 +36,7 @@ import { useHydrated } from "@/hooks/use-hydrated";
 import { cn } from "@/lib/utils";
 import { ArticleContactsBlockEditor, ArticleInfoBlockEditor, ArticleOpeningHoursBlockEditor, ArticlePriceBlockEditor } from "./ArticleStructuredInfoBlockEditors";
 import { ArticleStructuredBlockSubjectEditor } from "./ArticleStructuredBlockSubjectEditor";
-
-/** `image` → `gallery`, тот же порядок id, тот же MediaAsset — без перезагрузки/копирования файла. */
-export function convertImageBlockToGallery(block: Extract<ArticleBlockMvp, { type: "image" }>): ArticleBlockMvp {
-  return {
-    id: block.id,
-    type: "gallery",
-    mediaIds: block.mediaId ? [block.mediaId] : [],
-    presentation: "carousel",
-    caption: block.caption,
-  };
-}
-
-/** Два соседних `image`-блока → один `gallery` на месте первого, порядок A,B сохранён. */
-export function mergeImageBlocksIntoGallery(
-  a: Extract<ArticleBlockMvp, { type: "image" }>,
-  b: Extract<ArticleBlockMvp, { type: "image" }>,
-): ArticleBlockMvp {
-  return {
-    id: a.id,
-    type: "gallery",
-    mediaIds: [a.mediaId, b.mediaId].filter((id): id is string => Boolean(id)),
-    presentation: "carousel",
-    caption: a.caption || b.caption,
-  };
-}
+import { convertImageBlockToGallery, mergeImageBlocksIntoGallery } from "./ArticleBlocksMvpEditorHelpers";
 
 const BLOCK_LABEL: Record<ArticleBlockMvp["type"], string> = {
   intro: "Лид",
@@ -148,7 +124,7 @@ function BlockTypePicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         {children ?? (
-          <Button type="button" variant={variant} size={size} className={cn("gap-1.5 font-normal", triggerClassName)}>
+          <Button type="button" variant={variant} size={size} className={cn("min-h-11 gap-1.5 font-normal sm:min-h-0", triggerClassName)}>
             <Plus className="h-4 w-4 shrink-0" />
             Добавить блок
           </Button>
@@ -160,7 +136,7 @@ function BlockTypePicker({
             <button
               key={item.type}
               type="button"
-              className="rounded-md px-3 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-muted"
+              className="min-h-11 rounded-md px-3 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-muted"
               onClick={() => {
                 onPick(item.type);
                 setOpen(false);
@@ -512,20 +488,20 @@ export function ArticleBlocksMvpEditor({
           {blocks.map((block, i) => (
             <div key={block.id}>
               <Card className={cn("border-border/60 shadow-none transition-colors", block.type === "intro" && "border-primary/25 bg-primary/[0.03]")}>
-                <div className="flex flex-row items-center gap-2 border-b border-border/50 px-3 py-2 sm:px-4">
-                  <span className={cn("text-xs font-medium tracking-tight", block.type === "intro" ? "text-primary" : "text-muted-foreground")}>
+                <div className="flex min-w-0 flex-row items-center gap-2 border-b border-border/50 px-2 py-2 sm:px-4">
+                  <span className={cn("min-w-0 flex-1 truncate text-xs font-medium tracking-tight", block.type === "intro" ? "text-primary" : "text-muted-foreground")}>
                     {BLOCK_LABEL[block.type]}
-                    {block.type === "intro" ? <span className="ml-1.5 font-normal text-muted-foreground">· начало статьи</span> : null}
+                    {block.type === "intro" ? <span className="ml-1.5 hidden font-normal text-muted-foreground sm:inline">· начало статьи</span> : null}
                   </span>
                   <div className="ml-auto flex items-center gap-0.5">
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" aria-label="Выше" onClick={() => move(i, -1)} disabled={i === 0}>
-                      <ChevronUp className="h-4 w-4" />
+                    <Button type="button" variant="ghost" size="icon" className="h-11 w-11 shrink-0 text-muted-foreground sm:h-8 sm:w-8" aria-label="Выше" onClick={() => move(i, -1)} disabled={i === 0}>
+                      <ChevronUp className="h-5 w-5 sm:h-4 sm:w-4" />
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" aria-label="Ниже" onClick={() => move(i, 1)} disabled={i === blocks.length - 1}>
-                      <ChevronDown className="h-4 w-4" />
+                    <Button type="button" variant="ghost" size="icon" className="h-11 w-11 shrink-0 text-muted-foreground sm:h-8 sm:w-8" aria-label="Ниже" onClick={() => move(i, 1)} disabled={i === blocks.length - 1}>
+                      <ChevronDown className="h-5 w-5 sm:h-4 sm:w-4" />
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" aria-label="Удалить" onClick={() => removeAt(i)}>
-                      <Trash2 className="h-4 w-4" />
+                    <Button type="button" variant="ghost" size="icon" className="h-11 w-11 shrink-0 text-destructive hover:text-destructive sm:h-8 sm:w-8" aria-label="Удалить" onClick={() => removeAt(i)}>
+                      <Trash2 className="h-5 w-5 sm:h-4 sm:w-4" />
                     </Button>
                   </div>
                 </div>
@@ -535,13 +511,13 @@ export function ArticleBlocksMvpEditor({
               {i < blocks.length - 1 ? (
                 <div className="relative flex justify-center py-2">
                   <div className="pointer-events-none absolute inset-x-8 top-1/2 border-t border-dashed border-border/80" aria-hidden />
-                  <div className="relative flex items-center gap-1 bg-background px-2">
+                  <div className="relative flex flex-wrap items-center justify-center gap-1 bg-background px-2">
                     {block.type === "image" && blocks[i + 1]?.type === "image" ? (
-                      <Button type="button" variant="ghost" size="sm" className="gap-1.5 text-xs font-normal text-muted-foreground hover:text-foreground h-8" onClick={() => mergeAdjacentImagesAt(i)}>
+                      <Button type="button" variant="ghost" size="sm" className="h-11 gap-1.5 text-xs font-normal text-muted-foreground hover:text-foreground sm:h-8" onClick={() => mergeAdjacentImagesAt(i)}>
                         <Images className="h-3.5 w-3.5 shrink-0" />Объединить в галерею
                       </Button>
                     ) : null}
-                    <BlockTypePicker hasIntro={hasIntro} onPick={(type) => insertAt(i + 1, type)} variant="ghost" size="sm" triggerClassName="text-muted-foreground hover:text-foreground h-8 text-xs" />
+                    <BlockTypePicker hasIntro={hasIntro} onPick={(type) => insertAt(i + 1, type)} variant="ghost" size="sm" triggerClassName="h-11 text-xs text-muted-foreground hover:text-foreground sm:h-8" />
                   </div>
                 </div>
               ) : null}

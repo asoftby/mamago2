@@ -3,7 +3,6 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useHydrated } from "@/hooks/use-hydrated";
-import { BackButton } from "@/components/admin/BackButton";
 import {
   NewsPublicationEditor,
   CollectionPublicationEditor,
@@ -45,9 +44,8 @@ export function PublicationNewClient({
 
   if (!valid) {
     return (
-      <div className="p-6 md:p-4 space-y-6 max-w-lg">
-        <div className="flex items-center gap-3">
-          <BackButton href="/admin/content/publications" />
+      <div className="p-4 sm:p-6 space-y-6 max-w-lg">
+        <div>
           <h1 className="text-2xl md:text-xl font-bold text-gray-900">Тип публикации</h1>
         </div>
         <p className="text-sm text-gray-600">
@@ -65,9 +63,8 @@ export function PublicationNewClient({
   }
 
   return (
-    <div className="p-6 md:p-4 space-y-8">
-      <div className="flex max-w-3xl items-start gap-3">
-        <BackButton href="/admin/content/publications" />
+    <div className="p-4 sm:p-6 space-y-8">
+      <div className="max-w-3xl">
         <div className="min-w-0">
           <h1 className="text-2xl md:text-xl font-bold text-gray-900 min-w-0 break-words">
             {type === "news"

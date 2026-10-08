@@ -17,6 +17,7 @@
  *
  * External SEO health (read-only, fail-closed):
  *   google_search_console (6h)
+ *   seo_evergreen_weekly (12h) — recovery-gate metric per ISO week
  *
  * db.latency_ms / db.connection_capacity_pct are NOT collectors — they
  * remain owned exclusively by the db_degraded detector (Step 3), written
@@ -38,6 +39,7 @@ import { importMetricsCollector } from "./importMetrics";
 import { moderationQueueMetricsCollector } from "./moderationQueues";
 import { retentionCollector } from "./retention";
 import { searchMetricsCollector } from "./search";
+import { seoEvergreenWeeklyCollector } from "./seoEvergreenWeekly";
 import { supplyHealthCollector } from "./supplyHealth";
 import { telemetryEventsCollector } from "./telemetry";
 import { weeklyPlanningFamiliesCollector } from "./weeklyPlanningFamilies";
@@ -59,4 +61,5 @@ export function registerCoreMetricCollectors(): void {
   registerMetricCollector(supplyHealthCollector);
   registerMetricCollector(b2bHealthCollector);
   registerMetricCollector(googleSearchConsoleCollector);
+  registerMetricCollector(seoEvergreenWeeklyCollector);
 }

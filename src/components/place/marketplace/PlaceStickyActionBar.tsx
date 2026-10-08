@@ -35,6 +35,7 @@ export function PlaceStickyActionBar({
   className,
   directSlot,
 }: PlaceStickyActionBarProps) {
+  const hasThreeActions = Boolean(directSlot) && phones.length > 0;
   const [ctaPassed, setCtaPassed] = useState(false);
   useEffect(() => {
     const el = ctaRef?.current;
@@ -80,7 +81,7 @@ export function PlaceStickyActionBar({
       aria-label="Действия с местом"
       aria-hidden={!ctaPassed}
     >
-      <div className="min-w-0 flex-1">
+      <div className={cn("min-w-0 flex-1", hasThreeActions && "hidden sm:block")}>
         {(statusLabel || addressLine) && (
           <div className="truncate font-mono text-[10px] uppercase tracking-[0.1em]">
             {statusLabel && <span className="text-[#E86A3A]">{statusLabel}</span>}
@@ -105,10 +106,13 @@ export function PlaceStickyActionBar({
         <PlacePhoneActionButton
           phones={phones}
           placeTitle={placeTitle}
-          className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px"
+          className={cn(
+            "inline-flex h-[46px] shrink-0 items-center justify-center gap-2 rounded-full bg-[#E86A3A] text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px",
+            hasThreeActions ? "w-[46px] px-0 sm:w-auto sm:px-5" : "px-5",
+          )}
         >
           <Phone className="h-4 w-4 shrink-0" aria-hidden />
-          Позвонить
+          <span className={cn(hasThreeActions && "sr-only sm:not-sr-only")}>Позвонить</span>
         </PlacePhoneActionButton>
       )}
 

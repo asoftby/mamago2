@@ -284,9 +284,10 @@ export function ActivityCardEntityPicker({
 
           {/* Search input with live dropdown */}
           <div ref={dropdownRef} className="relative">
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 min-[360px]:flex-row">
               <Input
                 ref={inputRef}
+                className="min-h-11"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Поиск по названию…"
@@ -307,6 +308,7 @@ export function ActivityCardEntityPicker({
               <Button
                 type="button"
                 variant="secondary"
+                className="min-h-11 shrink-0"
                 onClick={handleSearchButtonClick}
                 disabled={loading}
               >
@@ -315,7 +317,7 @@ export function ActivityCardEntityPicker({
             </div>
 
             {showDropdown ? (
-              <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[280px] overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg text-sm">
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[min(50dvh,280px)] overflow-y-auto overscroll-contain rounded-md border border-gray-200 bg-white shadow-lg text-sm">
                 {loading ? (
                   <div className="px-3 py-2.5 text-muted-foreground">Ищем…</div>
                 ) : noResults ? (
@@ -326,7 +328,7 @@ export function ActivityCardEntityPicker({
                       <li key={r.id}>
                         <button
                           type="button"
-                          className="w-full px-3 py-2 text-left hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-none"
+                          className="min-h-11 w-full px-3 py-2 text-left hover:bg-gray-50 focus-visible:bg-gray-50 focus-visible:outline-none"
                           onMouseDown={(e) => {
                             // prevent input blur before click registers
                             e.preventDefault();

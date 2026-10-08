@@ -24,6 +24,7 @@ export async function persistPlaceSave(
         placeId: meta.placeId,
         planPlaceSlug: meta.placeSlug,
         date: result.dateISO,
+        ...(result.visibility ? { visibility: result.visibility } : {}),
         title: meta.title,
         coverImageUrl: meta.coverImageUrl,
       }),

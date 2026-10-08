@@ -1,6 +1,6 @@
 import { AnalyticsEntityType, BillingTransactionType, type UserEventType } from "@prisma/client";
-import { NotificationAudience } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { getUserInbox } from "@/server/notifications/notification.service";
 import { getBusinessBillingSummary } from "@/server/services/billing/billingBusiness.service";
 import { getPromotionOverviewData } from "@/server/services/promotion/promotion.service";
 
@@ -284,17 +284,15 @@ export async function getBusinessWorkspaceData(params: {
     (tx) => tx.type === BillingTransactionType.LEAD_CHARGE,
   ).length;
 
-  // Inbox preview: latest 3 admin broadcasts for this business user.
-  const inboxPreview = await prisma.notification.findMany({
-    where: {
-      userId: params.userId,
-      audience: NotificationAudience.BUSINESS,
-      type: "BUSINESS_NEWS",
-    },
-    orderBy: { createdAt: "desc" },
-    take: 3,
-    select: { id: true, title: true, type: true, createdAt: true, seenAt: true },
+  // Dashboard is a strict preview of the same canonical business inbox feed.
+  const inboxPreviewRows = await getUserInbox(params.userId, {
+    stream: "business",
+    limit: 3,
+    options: { accessibleSurfaces: ["BUSINESS"] },
   });
+  const inboxPreview = inboxPreviewRows.map(({ id, title, type, createdAt, seenAt }) => ({
+    id, title, type, createdAt, seenAt,
+  }));
 
   const spend = billingSummary?.monthSpent ?? 0;
   const leadCharges = transactionWindow.filter(

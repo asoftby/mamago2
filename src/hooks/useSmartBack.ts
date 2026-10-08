@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 import { useCityHomeHref } from "@/hooks/useCityHomeHref";
+import { hasInternalHistoryBackEntry } from "@/lib/navigation/internalHistory";
 
 function hasSameOriginReferrer(): boolean {
   if (typeof window === "undefined" || !document.referrer) {
@@ -18,8 +19,9 @@ function hasSameOriginReferrer(): boolean {
 }
 
 /**
- * Безопасно ли делать router.back(): пользователь пришёл изнутри сайта
- * (same-origin referrer) и в истории есть куда возвращаться.
+ * Безопасно ли делать router.back(): предыдущая запись истории принадлежит
+ * mamaGo — либо это same-origin document referrer, либо запись была создана
+ * Next.js client navigation внутри текущего документа.
  * Вызывать только из клиентских обработчиков.
  */
 export function canUseHistoryBack(): boolean {
@@ -27,7 +29,10 @@ export function canUseHistoryBack(): boolean {
     return false;
   }
 
-  return hasSameOriginReferrer() && window.history.length > 1;
+  return (
+    window.history.length > 1 &&
+    (hasInternalHistoryBackEntry() || hasSameOriginReferrer())
+  );
 }
 
 export function useSmartBack(fallbackHref?: string) {

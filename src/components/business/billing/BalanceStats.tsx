@@ -15,14 +15,14 @@ interface StatCardProps {
 
 function StatCard({ icon: Icon, label, value, subtitle }: StatCardProps) {
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-5">
+    <div className="min-w-0 rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
       <div className="flex items-center gap-3 mb-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-100">
           <Icon className="w-5 h-5 text-stone-600" />
         </div>
         <p className="text-sm font-medium text-stone-600">{label}</p>
       </div>
-      <p className="text-2xl font-bold text-stone-950 mb-1">{value}</p>
+      <p className="mb-1 break-words text-xl font-bold text-stone-950 sm:text-2xl">{value}</p>
       <p className="text-xs text-stone-500">{subtitle}</p>
     </div>
   );
@@ -48,7 +48,7 @@ export function BalanceStats({
   return (
     <div>
       <h3 className="text-lg font-semibold text-stone-950 mb-4">Статистика за месяц</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard
           icon={TrendingDown}
           label="Потрачено"

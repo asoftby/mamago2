@@ -96,7 +96,7 @@ export function OfferCard({
 
           {/* Promo badge — top right */}
           {promoBadge && (
-            <span className="absolute right-3 top-3 inline-flex h-7 items-center rounded-full bg-[#E86A3A] px-3 text-[12px] font-semibold text-white shadow-[0_2px_8px_rgba(232,106,58,0.35)]">
+            <span className="absolute left-3 top-3 inline-flex h-7 max-w-[calc(100%-4.5rem)] items-center truncate rounded-full bg-[#E86A3A] px-3 text-[12px] font-semibold text-white shadow-[0_2px_8px_rgba(232,106,58,0.35)] sm:max-w-[calc(100%-3.75rem)]">
               {promoBadge}
             </span>
           )}
@@ -137,8 +137,8 @@ export function OfferCard({
           eventPlanDateISO={saveDateISO ?? null}
           eventPlanDateEndISO={saveDateEndISO ?? null}
           source={saveSource}
-          className="absolute right-3 top-3 h-8 w-8 bg-[rgba(250,247,241,0.82)] shadow-[0_1px_4px_rgba(20,18,16,0.10)] backdrop-blur-[6px]"
-          iconClassName="h-4 w-4"
+          className="absolute right-3 top-3 h-11 w-11 bg-[rgba(250,247,241,0.82)] shadow-[0_1px_4px_rgba(20,18,16,0.10)] backdrop-blur-[6px] sm:h-8 sm:w-8"
+          iconClassName="h-5 w-5 sm:h-4 sm:w-4"
         />
       )}
     </div>

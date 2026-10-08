@@ -5,6 +5,7 @@ import MamagoWelcomeTemplate from "../../../../emails/mamago-welcome";
 import PasswordResetTemplate from "../templates/password-reset";
 import VerifyEmailTemplate from "../templates/verify-email";
 import BusinessInviteTemplate from "../templates/business-invite";
+import FamilyInviteTemplate from "../templates/family-invite";
 import {
   buildPasswordResetUrl,
   buildVerifyEmailUrl,
@@ -49,7 +50,7 @@ function getReplyTo(): string {
   return replyTo;
 }
 
-type EmailKind = "verify-email" | "password-reset" | "welcome" | "notification" | "business-invite";
+type EmailKind = "verify-email" | "password-reset" | "welcome" | "notification" | "business-invite" | "family-invite";
 
 type SendViaResendInput =
   | {
@@ -444,6 +445,33 @@ export class EmailService {
         />
       ),
     });
+  }
+
+  async sendFamilyInvite(params: {
+    to: string;
+    inviterName?: string | null;
+    acceptUrl: string;
+  }): Promise<boolean> {
+    const debugTo = getDebugRedirectTo();
+    if (!isEmailEnabled()) {
+      console.warn("[email] SEND SKIPPED: EMAIL_ENABLED is not 'true'", {
+        kind: "family-invite",
+        debugRedirect: Boolean(debugTo),
+      });
+      return false;
+    }
+    await sendViaResend({
+      kind: "family-invite",
+      intendedTo: params.to,
+      subject: EMAIL_SUBJECTS.familyInvite,
+      react: (
+        <FamilyInviteTemplate
+          inviterName={params.inviterName}
+          acceptUrl={params.acceptUrl}
+        />
+      ),
+    });
+    return true;
   }
 }
 

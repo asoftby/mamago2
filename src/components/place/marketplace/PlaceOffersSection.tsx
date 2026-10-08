@@ -41,10 +41,7 @@ export function PlaceOffersSection({
         background: "#ffffff",
       }}
     >
-      <div
-        style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}
-        className="offers-wrap"
-      >
+      <div className="offers-wrap mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-7">
         {/* Header */}
         <div
           style={{
@@ -79,6 +76,7 @@ export function PlaceOffersSection({
           </div>
           <Link
             href={`/places/${placeId}#offers`}
+            className="inline-flex min-h-11 items-center"
             style={{
               fontSize: 14,
               color: "#3A332B",
@@ -113,11 +111,9 @@ export function PlaceOffersSection({
       <style>{`
         @media (max-width: 900px) {
           .offers-grid { grid-template-columns: repeat(2, 1fr) !important; }
-          .offers-wrap { padding: 0 22px !important; }
         }
         @media (max-width: 520px) {
           .offers-grid { grid-template-columns: 1fr !important; }
-          .offers-wrap { padding: 0 18px !important; }
         }
       `}</style>
     </section>

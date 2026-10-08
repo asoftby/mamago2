@@ -95,6 +95,9 @@ export type EventPageSimilar = {
   categoryLabel?: string;
   ageLabel?: string;
   href: string;
+  ageFrom: number;
+  ageTo: number;
+  agePolicy?: import("@prisma/client").AgePolicy;
 };
 
 export type EventPageData = {
@@ -109,6 +112,7 @@ export type EventPageData = {
   /** Бэйдж «5+» из возрастных диапазонов — перед категорией в шапке решения. */
   ageFromBadge?: string;
   categoryLabel?: string;
+  categorySlug?: string;
   title: string;
   subtitle: string;
   /** Compact fact chips under title (age, duration, format, …). */
@@ -137,6 +141,10 @@ export type EventPageData = {
     nearbyHref?: string;
   };
   organizerNote?: string;
+  organizer?: {
+    name: string;
+    unp?: string;
+  };
   similar: EventPageSimilar[];
   breadcrumbs: EventPageBreadcrumb[];
   priceLabel: string;

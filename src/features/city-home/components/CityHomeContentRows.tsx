@@ -33,6 +33,7 @@ import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 
 const cardShell = EVENT_CARD_SHELL;
 const kudaCardShell = EVENT_CARD_SHELL;
+const HOME_PERSONALIZED_PREVIEW_TAKE = 8;
 /** Оболочка ширины карточки статьи — тот же ритм, что у ленты «Куда», но 5 карточек в ряду на desktop. */
 const ARTICLE_CARD_SHELL =
   "shrink-0 snap-start w-[44vw] min-w-[160px] max-w-[230px] sm:max-w-[250px] " +
@@ -97,7 +98,7 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
       applyPersonaRanking(activities, {
         personas: family?.personas ?? [],
         selectedPersonaIds: family?.selectedPersonaIds ?? [],
-      }),
+      }).slice(0, HOME_PERSONALIZED_PREVIEW_TAKE),
     [activities, family?.personas, family?.selectedPersonaIds],
   );
 
@@ -366,8 +367,8 @@ export function CityHomeJournalSection({
                     initialStatus={saveStatuses[a.id]}
                     skipOwnFetch
                     source="city-home-journal-card"
-                    className="h-8 w-8 bg-[rgba(250,247,241,0.82)] shadow-[0_1px_4px_rgba(20,18,16,0.10)] backdrop-blur-[6px]"
-                    iconClassName="h-4 w-4"
+                    className="h-11 w-11 bg-[rgba(250,247,241,0.82)] shadow-[0_1px_4px_rgba(20,18,16,0.10)] backdrop-blur-[6px] sm:h-8 sm:w-8"
+                    iconClassName="h-5 w-5 sm:h-4 sm:w-4"
                   />
                 </div>
               </div>

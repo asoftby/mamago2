@@ -18,10 +18,7 @@ import {
   buildDedupUploadResponse,
 } from "@/lib/media/dedup";
 import { MediaSourceType } from "@prisma/client";
-import {
-  detectUploadMimeTypeFromBuffer,
-  resolveUploadMimeType,
-} from "@/lib/uploads/uploadConfig";
+import { validateUploadFileContent } from "@/lib/uploads/imageContentValidation";
 import { jsonUploadError } from "@/lib/uploads/uploadErrors";
 import { validateUploadPreflight } from "@/lib/uploads/validateUploadPreflight";
 import {
@@ -68,6 +65,12 @@ export async function POST(req: NextRequest) {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
+    let actualMimeType: string;
+    try {
+      actualMimeType = validateUploadFileContent(buffer, file);
+    } catch (error) {
+      return jsonUploadError("INVALID_FILE_TYPE", error instanceof Error ? error.message : "Invalid image content", 415);
+    }
 
     // Dedup (Phase A): hash the raw original bytes and reuse an owner's existing
     // asset before doing any processing or storage writes.
@@ -80,11 +83,6 @@ export async function POST(req: NextRequest) {
       });
       return NextResponse.json(buildDedupUploadResponse(existingByHash));
     }
-
-    const actualMimeType =
-      detectUploadMimeTypeFromBuffer(buffer) ??
-      resolveUploadMimeType(file) ??
-      file.type;
 
     let processedImageSet;
     try {

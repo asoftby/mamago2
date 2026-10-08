@@ -11,7 +11,7 @@ export const revalidate = 0;
 
 export default function AdminCommunicationsTelegramPage() {
   return (
-    <div className="space-y-6 p-6 md:p-4">
+    <div className="space-y-6 p-4 sm:p-6">
       <AdminPageHeader
         title="Telegram"
         subtitle="MVP-поверхность для Telegram-канала в домене коммуникаций."

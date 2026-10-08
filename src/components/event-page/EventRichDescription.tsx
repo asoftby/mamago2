@@ -63,37 +63,26 @@ export function EventRichDescription({
         <div
           ref={contentRef}
           className={cn(
-            // Base prose styles
-            "prose prose-sm max-w-none",
+            // Explicit descendant styles: public rendering must not depend on
+            // @tailwindcss/typography, which is not part of the app bundle.
+            "max-w-none text-[#141210]",
             // Headings
-            "prose-headings:font-headline prose-headings:font-semibold prose-headings:text-foreground",
-            "prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg",
-            "prose-h1:mb-5 prose-h2:mb-4 prose-h3:mb-3",
-            "prose-h1:mt-7 prose-h2:mt-6 prose-h3:mt-5",
+            "[&_h1]:mb-5 [&_h1]:mt-7 [&_h1]:text-2xl [&_h1]:font-semibold",
+            "[&_h2]:mb-4 [&_h2]:mt-6 [&_h2]:text-xl [&_h2]:font-semibold",
+            "[&_h3]:mb-3 [&_h3]:mt-5 [&_h3]:text-lg [&_h3]:font-semibold",
             // Paragraphs
-            "prose-p:text-[15px] prose-p:leading-8 prose-p:text-foreground",
-            "prose-p:my-5 first:prose-p:mt-0 last:prose-p:mb-0",
-            "[&_p+_p]:mt-6",
-            // Links
-            "prose-a:text-primary prose-a:font-medium prose-a:no-underline hover:prose-a:underline",
-            "prose-a:transition-colors",
-            // Strong/Bold
-            "prose-strong:font-semibold prose-strong:text-foreground",
+            "[&_p]:my-5 [&_p]:text-[15px] [&_p]:leading-8 [&_p]:text-[#141210]",
+            "[&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_p+_p]:mt-6",
+            // Links / emphasis
+            "[&_a]:font-medium [&_a]:text-primary [&_a]:no-underline [&_a:hover]:underline",
+            "[&_strong]:font-semibold [&_strong]:text-[#141210]",
             // Lists
-            "prose-ul:text-[15px] prose-ul:text-foreground prose-ul:my-5",
-            "prose-ol:text-[15px] prose-ol:text-foreground prose-ol:my-5",
-            "prose-li:mb-2.5 prose-li:leading-8",
-            "prose-ul:list-disc prose-ul:pl-6",
-            "prose-ol:list-decimal prose-ol:pl-6",
-            "prose-li:marker:text-muted-foreground",
+            "[&_ul]:my-5 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:text-[15px] [&_ul]:text-[#141210]",
+            "[&_ol]:my-5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:text-[15px] [&_ol]:text-[#141210]",
+            "[&_li]:mb-2.5 [&_li]:leading-8 [&_li::marker]:text-[rgba(20,18,16,0.55)]",
             // Blockquotes
-            "prose-blockquote:border-l-4 prose-blockquote:border-primary/30",
-            "prose-blockquote:my-6 prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-muted-foreground",
-            // Code
-            "prose-code:text-[14px] prose-code:bg-accent prose-code:px-1.5 prose-code:py-0.5",
-            "prose-code:rounded prose-code:font-mono",
-            // Images
-            "prose-img:rounded-xl prose-img:shadow-sm",
+            "[&_blockquote]:my-6 [&_blockquote]:border-l-4 [&_blockquote]:border-primary/30",
+            "[&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-[rgba(20,18,16,0.65)]",
             // Collapsed state
             !isExpanded && shouldShowButton && "overflow-hidden",
             // Smooth transition

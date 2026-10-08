@@ -1,16 +1,34 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 import { InstagramReelEmbed } from "./InstagramReelEmbed";
 
+type SlideDirection = -1 | 1;
+
+export function nextLightboxIndex(index: number, total: number, direction: SlideDirection) {
+  return (index + direction + total) % total;
+}
+
 /* ─── Single item renderer ──────────────────────────────────── */
 function LightboxItem({ item }: { item: MediaGalleryItem }) {
-  if (item.type === "reels") {
-    // Официальный embed.js-плеер: Reels воспроизводится инлайн в модалке.
+  if (item.type === "instagram") {
     return <InstagramReelEmbed url={item.url} title={item.title} />;
+  }
+
+  if (item.type === "youtube") {
+    return (
+      <iframe
+        key={item.embedId}
+        src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(item.embedId)}`}
+        title={item.title ?? "YouTube видео"}
+        className="aspect-video w-[min(88vw,1100px)] rounded-xl bg-black shadow-2xl"
+        allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+      />
+    );
   }
 
   return (
@@ -33,22 +51,104 @@ interface MediaLightboxProps {
 
 export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps) {
   const [idx, setIdx] = useState(startIndex);
+  const [transition, setTransition] = useState<{
+    from: number;
+    to: number;
+    direction: SlideDirection;
+    moving: boolean;
+  } | null>(null);
   const total = items.length;
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const didSwipeRef = useRef(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
 
-  const prev = useCallback(() => setIdx((i) => (i - 1 + total) % total), [total]);
-  const next = useCallback(() => setIdx((i) => (i + 1) % total), [total]);
+  const navigate = useCallback((direction: SlideDirection) => {
+    if (total <= 1 || transition) return;
+    const to = nextLightboxIndex(idx, total, direction);
+    if (items[idx]?.type !== "image" || items[to]?.type !== "image" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setIdx(to);
+      return;
+    }
+    setTransition({ from: idx, to, direction, moving: false });
+  }, [idx, items, total, transition]);
+  const prev = useCallback(() => navigate(-1), [navigate]);
+  const next = useCallback(() => navigate(1), [navigate]);
+
+  useEffect(() => {
+    if (!transition || transition.moving) return;
+    const frame = requestAnimationFrame(() => {
+      setTransition((value) => value ? { ...value, moving: true } : null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [transition]);
+
+  useEffect(() => {
+    if (!transition?.moving) return;
+    const timer = window.setTimeout(() => {
+      setIdx(transition.to);
+      setTransition(null);
+    }, 260);
+    return () => window.clearTimeout(timer);
+  }, [transition]);
+
+  function handleTouchStart(event: React.TouchEvent) {
+    const touch = event.touches[0];
+    if (!touch) return;
+    didSwipeRef.current = false;
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }
+
+  function handleTouchEnd(event: React.TouchEvent) {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    const touch = event.changedTouches[0];
+    if (!start || !touch || total <= 1) return;
+
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 48 || Math.abs(dx) <= Math.abs(dy)) return;
+    didSwipeRef.current = true;
+    if (dx < 0) next();
+    else prev();
+  }
+
+  function handleBackdropClick() {
+    if (didSwipeRef.current) {
+      didSwipeRef.current = false;
+      return;
+    }
+    onClose();
+  }
+
+  useEffect(() => {
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus();
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+      openerRef.current?.focus();
+    };
+  }, [onClose]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
       if (e.key === "ArrowLeft") prev();
       if (e.key === "ArrowRight") next();
+      if (e.key === "Tab") {
+        const focusable = dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], iframe, [tabindex]:not([tabindex="-1"])');
+        if (!focusable?.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
     }
     document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
     };
   }, [onClose, prev, next]);
 
@@ -57,14 +157,18 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/92 p-4 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={handleBackdropClick}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
       role="dialog"
       aria-modal="true"
       aria-label="Просмотр медиа"
     >
       {/* Close */}
       <button
+        ref={closeRef}
         type="button"
         onClick={onClose}
         aria-label="Закрыть"
@@ -89,17 +193,46 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
           className={cn(
             "absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full p-2.5 text-white transition-colors",
             "bg-white/10 hover:bg-white/20",
-            "hidden md:flex items-center justify-center",
+            "flex items-center justify-center",
           )}
         >
           <ChevronLeft className="h-6 w-6" />
         </button>
       )}
 
-      {/* Item */}
-      <div className="flex items-center justify-center">
-        <LightboxItem item={current} />
+      {/* Items: keep outgoing and incoming media in one fixed viewport so images and embeds do not resize the dialog. */}
+      <div className="relative flex h-[88vh] w-[88vw] items-center justify-center overflow-hidden" data-lightbox-slide-viewport>
+        {transition ? (
+          <>
+            <div
+              data-lightbox-slide="outgoing"
+              className="absolute inset-0 flex items-center justify-center transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
+              style={{ transform: transition.moving ? `translateX(${-transition.direction * 100}%)` : "translateX(0)" }}
+            >
+              <LightboxItem item={items[transition.from]} />
+            </div>
+            <div
+              data-lightbox-slide="incoming"
+              className="absolute inset-0 flex items-center justify-center transition-transform duration-[260ms] ease-out motion-reduce:transition-none"
+              style={{ transform: transition.moving ? "translateX(0)" : `translateX(${transition.direction * 100}%)` }}
+            >
+              <LightboxItem item={items[transition.to]} />
+            </div>
+          </>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center" data-lightbox-slide="current">
+            <LightboxItem item={current} />
+          </div>
+        )}
       </div>
+
+      {total > 1 && total <= 10 && (
+        <div className="pointer-events-none absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 gap-1.5" data-lightbox-dots aria-hidden="true">
+          {items.map((item, index) => (
+            <span key={item.id} className={cn("h-1 w-1 rounded-full", index === idx ? "bg-white" : "bg-white/45")} />
+          ))}
+        </div>
+      )}
 
       {/* Next */}
       {total > 1 && (
@@ -108,28 +241,15 @@ export function MediaLightbox({ items, startIndex, onClose }: MediaLightboxProps
           onClick={(e) => { e.stopPropagation(); next(); }}
           aria-label="Следующее"
           className={cn(
-            "absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full p-2.5 text-white transition-colors",
+            "absolute right-3 top-1/2 z-20 -translate-y-1/2 rounded-full p-2.5 text-white transition-colors",
             "bg-white/10 hover:bg-white/20",
-            "hidden md:flex items-center justify-center",
+            "flex items-center justify-center",
           )}
         >
           <ChevronRight className="h-6 w-6" />
         </button>
       )}
 
-      {/* Mobile tap zones */}
-      {total > 1 && (
-        <>
-          <div
-            className="absolute left-0 top-0 bottom-0 w-1/3 md:hidden"
-            onClick={(e) => { e.stopPropagation(); prev(); }}
-          />
-          <div
-            className="absolute right-0 top-0 bottom-0 w-1/3 md:hidden"
-            onClick={(e) => { e.stopPropagation(); next(); }}
-          />
-        </>
-      )}
     </div>
   );
 }

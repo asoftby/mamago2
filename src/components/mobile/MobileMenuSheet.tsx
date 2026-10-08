@@ -33,7 +33,7 @@ export function MobileMenuSheet({
         showCloseButton={false}
         className={cn(
           mobileSheetShellBase,
-          "z-[70] max-h-[80vh] rounded-t-[24px] gap-0 p-0",
+          "z-[70] max-h-[80dvh] rounded-t-[24px] gap-0 p-0",
           className,
         )}
       >
@@ -51,7 +51,7 @@ export function MobileMenuSheet({
             </h2>
             <ModalCloseButton
               type="button"
-              className="h-9 w-9 bg-neutral-100 text-neutral-600 shadow-none hover:bg-neutral-200"
+              className="h-11 w-11 bg-neutral-100 text-neutral-600 shadow-none hover:bg-neutral-200"
               onClick={() => onOpenChange(false)}
             />
           </div>

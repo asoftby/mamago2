@@ -161,7 +161,7 @@ Does **not** apply migrations. Safe to run.
 ```bash
 pnpm prisma migrate diff \
   --from-url "$DATABASE_URL" \
-  --to-schema-datamodel prisma/schema.prisma \
+  --to-schema-datamodel prisma \
   --script > /tmp/diff-db-to-schema.sql
 
 wc -l /tmp/diff-db-to-schema.sql
@@ -173,7 +173,7 @@ head -50 /tmp/diff-db-to-schema.sql
 ```bash
 pnpm prisma migrate diff \
   --from-migrations prisma/migrations \
-  --to-schema-datamodel prisma/schema.prisma \
+  --to-schema-datamodel prisma \
   --shadow-database-url "$SHADOW_DATABASE_URL" \
   --script > /tmp/diff-migrations-to-schema.sql
 ```
@@ -330,7 +330,7 @@ SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename L
 ```
 
 ```bash
-pnpm prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --script
+pnpm prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma --script
 ```
 
 ### Options (choose with DBA — not automated here)
@@ -393,7 +393,7 @@ pnpm prisma migrate status | tee /tmp/mamago-migrate-audit-*/migrate-status.txt
 
 pnpm prisma migrate diff \
   --from-url "$DATABASE_URL" \
-  --to-schema-datamodel prisma/schema.prisma \
+  --to-schema-datamodel prisma \
   --script | tee /tmp/mamago-migrate-audit-*/diff-db-to-schema.sql
 
 pnpm prisma migrate diff \
@@ -522,7 +522,7 @@ Repeat steps 4–7 on production during maintenance window with fresh backup.
 # 3. Run:
 export DATABASE_URL="..."
 pnpm prisma migrate status
-pnpm prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --script | head -100
+pnpm prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma --script | head -100
 # 4. Save output and compare against Decision Matrix
 # 5. Do NOT run migrate deploy until diff review passes
 ```

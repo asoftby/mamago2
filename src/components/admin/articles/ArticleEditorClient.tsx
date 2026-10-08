@@ -72,6 +72,7 @@ import {
   fromLocalDatetimeValue,
   toLocalDatetimeValue,
 } from "@/lib/article/articleEditorComparable";
+import { detachLegacyArticleMainGallery } from "@/lib/article/articleMainGallery";
 
 function applySnapshot(setters: {
   setTitle: (v: string) => void;
@@ -129,6 +130,10 @@ export function ArticleEditorClient({
   /** Только ADMIN/MODERATOR видят решения по статье в статусе PENDING. */
   canModerate?: boolean;
 }) {
+  const initialArticleMedia = useMemo(
+    () => detachLegacyArticleMainGallery({ coverImageId: initial.coverImageId, content: initial.content }),
+    [initial.coverImageId, initial.content],
+  );
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -149,7 +154,7 @@ export function ArticleEditorClient({
   const [title, setTitle] = useState(initial.title);
   const [slug, setSlug] = useState(initial.slug ?? "");
   const [pinnedSlug, setPinnedSlug] = useState<string | null>(initial.slug?.trim() || null);
-  const [coverImageId, setCoverImageId] = useState(initial.coverImageId ?? "");
+  const [coverImageId, setCoverImageId] = useState(initialArticleMedia.coverImageId ?? "");
   const [coverImagePreviewUrl, setCoverImagePreviewUrl] = useState(initial.coverImageUrl ?? "");
   const [authorUserId, setAuthorUserId] = useState<string | null>(initial.authorUserId ?? null);
   const [authorLabel, setAuthorLabel] = useState(initial.authorLabel ?? "");
@@ -168,7 +173,7 @@ export function ArticleEditorClient({
     { id: string; title: string; description: string | null; isActive: boolean }[]
   >([]);
   const [geoScopeError, setGeoScopeError] = useState<string | null>(null);
-  const [content, setContent] = useState<ArticleContentPayload>(initial.content);
+  const [content, setContent] = useState<ArticleContentPayload>(initialArticleMedia.content);
   const [status, setStatus] = useState<ContentStatus>(initial.status);
   const [publishedAtLocal, setPublishedAtLocal] = useState(toLocalDatetimeValue(initial.publishedAt));
   const [scheduledAtLocal, setScheduledAtLocal] = useState(toLocalDatetimeValue(initial.scheduledAt));
@@ -195,7 +200,11 @@ export function ArticleEditorClient({
     blocks: content.blocks,
   });
 
-  const savedComparableRef = useRef(buildSavedComparable(initial));
+  const savedComparableRef = useRef(buildSavedComparable({
+    ...initial,
+    coverImageId: initialArticleMedia.coverImageId,
+    content: initialArticleMedia.content,
+  }));
 
   const currentComparable = useMemo(
     () =>
@@ -372,11 +381,29 @@ export function ArticleEditorClient({
   const applyEditorSnapshot = useCallback(
     (snap: ArticleEditorSnapshot) => {
       applySnapshot(editorSetters, snap);
+      const articleMedia = detachLegacyArticleMainGallery({ coverImageId: snap.coverImageId, content: snap.content });
+      setCoverImageId(articleMedia.coverImageId ?? "");
+      setContent(articleMedia.content);
       setPinnedSlug(snap.slug?.trim() || null);
       hydrateSlug(snap.slug);
     },
     [editorSetters, hydrateSlug],
   );
+
+  useEffect(() => {
+    if (!coverImageId) {
+      setCoverImagePreviewUrl("");
+      return;
+    }
+    let cancelled = false;
+    void fetch(`/api/admin/articles/media-preview?id=${encodeURIComponent(coverImageId)}`, { credentials: "include" })
+      .then((response) => response.ok ? response.json() as Promise<{ publicUrl: string | null }> : null)
+      .then((data) => {
+        if (!cancelled) setCoverImagePreviewUrl(data?.publicUrl ?? "");
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [coverImageId]);
 
   const showSuccessModal = useCallback(
     (payload: Omit<ContentSuccessPayload, "surface" | "returnTo">) => {
@@ -830,7 +857,7 @@ export function ArticleEditorClient({
 
   return (
     <>
-    <div className={cn("p-6 md:p-4 space-y-8 max-w-4xl", everDirty && "pb-28 md:pb-24")}>
+    <div className={cn("w-full max-w-4xl space-y-6 px-4 py-4 sm:space-y-8 sm:px-6 sm:py-6", everDirty && "pb-[calc(8rem+env(safe-area-inset-bottom))] md:pb-24")}>
       <div className="flex flex-wrap items-start justify-between gap-3 gap-y-2">
         <div className="min-w-0 flex-1 pr-2">
           <p className="text-xs font-medium text-muted-foreground mb-1">Статья</p>
@@ -854,13 +881,13 @@ export function ArticleEditorClient({
 
       {/* Основная информация */}
       <Card className="border-gray-200 shadow-sm">
-        <CardHeader>
+        <CardHeader className="px-4 sm:px-6">
           <CardTitle className="text-lg">Основная информация</CardTitle>
           <CardDescription>
             Заголовок, категория, адрес страницы, обложка, автор и городской контекст
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-5 px-4 sm:px-6">
           <div className="space-y-2">
             <Label>Заголовок</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -953,6 +980,8 @@ export function ArticleEditorClient({
           <ArticleEditorCoverField
             value={coverImageId}
             initialPreviewUrl={initial.coverImageUrl}
+            label="Обложка статьи"
+            description="Используется только как обложка статьи и не выводится в тексте."
             authorUserId={authorUserId}
             articleId={hasPersistedId ? initial.id : null}
             onChange={(id, previewUrl) => {
@@ -1119,11 +1148,11 @@ export function ArticleEditorClient({
 
       {/* Контент */}
       <Card className="border-gray-200 shadow-sm">
-        <CardHeader>
+        <CardHeader className="px-4 sm:px-6">
           <CardTitle className="text-lg">Контент статьи</CardTitle>
           <CardDescription>Блоки в фиксированном порядке</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           <ArticleBlocksMvpEditor
             blocks={content.blocks}
             onChange={(blocks) => setContent((prev) => ({ ...prev, blocks }))}
@@ -1199,14 +1228,14 @@ export function ArticleEditorClient({
       ) : null}
 
       <AlertDialog open={leaveDialogOpen} onOpenChange={onLeaveDialogOpenChange}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-h-[92dvh] max-w-[calc(100%-1rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">
           <AlertDialogHeader>
             <AlertDialogTitle>Несохранённые изменения</AlertDialogTitle>
             <AlertDialogDescription>
               Вы изменили статью. Уйти без сохранения? Несохранённые правки будут потеряны.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="gap-2 [&_button]:min-h-11 sm:gap-0 sm:[&_button]:min-h-9">
             <AlertDialogCancel type="button">Остаться</AlertDialogCancel>
             <AlertDialogAction type="button" onClick={confirmLeave}>
               Уйти без сохранения
@@ -1216,7 +1245,7 @@ export function ArticleEditorClient({
       </AlertDialog>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-h-[92dvh] max-w-[calc(100%-1rem)] overflow-y-auto p-4 sm:max-w-lg sm:p-6">
           <AlertDialogHeader>
             <AlertDialogTitle>Удалить черновик?</AlertDialogTitle>
             <AlertDialogDescription asChild>
@@ -1225,7 +1254,7 @@ export function ArticleEditorClient({
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="gap-2 [&_button]:min-h-11 sm:gap-0 sm:[&_button]:min-h-9">
             <AlertDialogCancel type="button" disabled={deleting}>
               Отмена
             </AlertDialogCancel>

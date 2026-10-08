@@ -234,7 +234,7 @@ export function ArticleBlockRichEditor({
         disabled && "opacity-50 cursor-not-allowed",
       )}
     >
-      <div className="sticky top-16 z-10 border-b bg-background px-2 py-1.5 flex flex-wrap items-center gap-0.5">
+      <div className="sticky top-16 z-10 flex items-center gap-0.5 overflow-x-auto border-b bg-background px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible">
         {variant !== "quote" ? (
           <ToolbarIcon
             title="Жирный"
@@ -297,14 +297,14 @@ export function ArticleBlockRichEditor({
                   title="Ссылка"
                   onMouseDown={(e) => e.preventDefault()}
                   className={cn(
-                    "p-1.5 rounded-md hover:bg-muted transition-colors disabled:opacity-30",
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-muted transition-colors disabled:opacity-30 sm:h-8 sm:w-8",
                     editor.isActive("link") && "bg-muted",
                   )}
                 >
                   <Link2 className="w-4 h-4" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-[min(100vw-2rem,22rem)] p-3">
+              <PopoverContent align="start" className="max-h-[min(70dvh,32rem)] w-[min(100vw-2rem,22rem)] overflow-y-auto p-3">
                 <div className="space-y-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="article-block-link-href">Адрес ссылки</Label>
@@ -350,7 +350,7 @@ export function ArticleBlockRichEditor({
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 pt-1">
+                  <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap [&_button]:min-h-11 sm:[&_button]:min-h-8">
                     <Button type="button" size="sm" onClick={applyLink}>
                       Готово
                     </Button>
@@ -460,7 +460,7 @@ function ToolbarIcon({
       }}
       onClick={onClick}
       className={cn(
-        "p-1.5 rounded-md hover:bg-muted transition-colors disabled:opacity-30",
+        "flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-muted transition-colors disabled:opacity-30 sm:h-8 sm:w-8",
         active && "bg-muted",
       )}
     >

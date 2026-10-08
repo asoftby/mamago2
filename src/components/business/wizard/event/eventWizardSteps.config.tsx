@@ -237,7 +237,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
     key: "media",
     shortLabel: "Фото",
     title: "Медиа",
-    description: "Главное изображение, галерея и видео",
+    description: "Фото события и видео",
     component: Step3Media,
     
     isComplete: (data) => !!data.coverImage,
@@ -251,7 +251,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
         isMissing: !data.coverImage,
       },
       {
-        label: "Галерея",
+        label: "Дополнительные фото",
         value: `${data.gallery.length} изображений`,
       },
       {
@@ -261,7 +261,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
     ],
     
     getMissingFields: (data) => {
-      return data.coverImage ? [] : ["Главное изображение"];
+      return data.coverImage ? [] : ["Фото события"];
     },
   },
   

@@ -139,7 +139,9 @@ function counterDelta(eventType: UserEventType): {
 /**
  * Semantic enrichment happens once in AnalyticsEventService before UserEvent is
  * persisted. The behavior projection consumes that immutable event context and
- * must not re-query Activity for the same action.
+ * must not re-query Activity for the same action. Phase C/D outcome events are
+ * intentionally excluded from account-wide affinity: their subject-aware
+ * interpretation is resolved directly from immutable outcome events.
  */
 function resolveSemanticTraits(meta: Prisma.JsonValue | null | undefined): SemanticTraits {
   const m = metaRecord(meta);
@@ -180,7 +182,11 @@ export async function applyUserBehaviorEvent(
     let preferredFormats = asRecord(existing?.preferredFormats);
     let preferredSignals = asRecord(existing?.preferredSignals);
 
-    if (vertical) preferredVerticals = bump(preferredVerticals, vertical);
+    // Phase C/D outcomes intentionally stay out of this account-wide affinity.
+    // Their sentiment is interpreted only by the subject-aware bounded resolver.
+    const isExperienceOutcome =
+      eventType === "ATTENDED" || eventType === "EXPERIENCE_FEEDBACK";
+    if (vertical && !isExperienceOutcome) preferredVerticals = bump(preferredVerticals, vertical);
 
     const affinityDelta = behaviorAffinityDelta(eventType, metaRecord(meta));
     preferredCategories = bumpBy(

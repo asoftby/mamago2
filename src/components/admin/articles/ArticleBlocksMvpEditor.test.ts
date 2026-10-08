@@ -8,7 +8,7 @@
  */
 import assert from "node:assert/strict";
 import { newBlock, type ArticleBlockMvp } from "@/lib/publications/articleMvp";
-import { convertImageBlockToGallery, mergeImageBlocksIntoGallery } from "./ArticleBlocksMvpEditor";
+import { convertImageBlockToGallery, mergeImageBlocksIntoGallery } from "./ArticleBlocksMvpEditorHelpers";
 import {
   addExceptionInterval,
   contactsDraftFieldErrors,

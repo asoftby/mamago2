@@ -1,19 +1,27 @@
-import { SeoSubNav } from "@/components/admin/seo/SeoSubNav";
+import { SeoLayoutHeader } from "@/components/admin/seo/SeoLayoutHeader";
+import { resolveSeoMarketSession } from "@/lib/admin/seo/geo/resolveSeoGeoSession";
 
 /**
- * Общий каркас SEO: только вторичная навигация.
- * Заголовок раздела — на странице дашборда и в подразделах.
+ * Каркас SEO: продуктовая навигация + SEO-рынок (не на settings/**).
  */
-export default function SeoControlCenterLayout({
+export default async function SeoLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await resolveSeoMarketSession();
+
   return (
-    <div className="p-6 md:p-4 space-y-6">
-      <header className="border-b border-gray-200 pb-4">
-        <SeoSubNav />
-      </header>
+    <div className="space-y-6 p-4 sm:p-6">
+      <SeoLayoutHeader
+        token={session.token}
+        marketLabel={session.presentation.marketLabel}
+        cityName={session.presentation.cityName}
+        regionName={session.presentation.regionName}
+        viewScope={session.viewScope}
+        supportsMarketScopes={session.presentation.supportsMarketScopes}
+        options={session.catalog.options}
+      />
 
       <div className="min-w-0">{children}</div>
     </div>

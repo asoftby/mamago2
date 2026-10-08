@@ -1,15 +1,14 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef } from "react";
-import { cn } from "@/lib/utils";
 import {
   getNextWeekStart,
   getPrevWeekStart,
   getWeekDays,
   getWeekStart,
-  isoFromDate,
   preserveWeekday,
 } from "@/features/my-plan/lib/weekCalendar";
+import { getLocalDateKey } from "@/lib/date/localDateKey";
 import type { SerializedPlanItem } from "./PlanPageClient";
 
 const DAYS_RU_SHORT: Record<number, string> = { 1:"Пн", 2:"Вт", 3:"Ср", 4:"Чт", 5:"Пт", 6:"Сб", 0:"Вс" };
@@ -19,10 +18,12 @@ type Props = {
   selectedDate: string;
   onSelect: (date: string) => void;
   itemsByDate: Record<string, SerializedPlanItem[]>;
+  onToday: () => void;
+  loading?: boolean;
 };
 
-export function WeekCalendar({ selectedDate, onSelect, itemsByDate }: Props) {
-  const todayISO = isoFromDate(new Date());
+export function WeekCalendar({ selectedDate, onSelect, itemsByDate, onToday, loading = false }: Props) {
+  const todayISO = getLocalDateKey();
   const [weekStart, setWeekStart] = React.useState(() => getWeekStart(selectedDate));
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
@@ -46,16 +47,16 @@ export function WeekCalendar({ selectedDate, onSelect, itemsByDate }: Props) {
   };
 
   // Determine current month label from the first date in the strip
-  const firstDate = new Date(weekDates[0] + "T12:00:00");
-  const lastDate = new Date(weekDates[weekDates.length - 1] + "T12:00:00");
-  const monthLabel = firstDate.getMonth() === lastDate.getMonth()
-    ? `${MONTHS_RU[firstDate.getMonth()].charAt(0).toUpperCase() + MONTHS_RU[firstDate.getMonth()].slice(1)} ${firstDate.getFullYear()}`
-    : `${MONTHS_RU[firstDate.getMonth()].charAt(0).toUpperCase() + MONTHS_RU[firstDate.getMonth()].slice(1)} – ${MONTHS_RU[lastDate.getMonth()]} ${lastDate.getFullYear()}`;
+  const firstDate = new Date(`${weekDates[0]}T00:00:00.000Z`);
+  const lastDate = new Date(`${weekDates[weekDates.length - 1]}T00:00:00.000Z`);
+  const monthLabel = firstDate.getUTCMonth() === lastDate.getUTCMonth()
+    ? `${MONTHS_RU[firstDate.getUTCMonth()].charAt(0).toUpperCase() + MONTHS_RU[firstDate.getUTCMonth()].slice(1)} ${firstDate.getUTCFullYear()}`
+    : `${MONTHS_RU[firstDate.getUTCMonth()].charAt(0).toUpperCase() + MONTHS_RU[firstDate.getUTCMonth()].slice(1)} – ${MONTHS_RU[lastDate.getUTCMonth()]} ${lastDate.getUTCFullYear()}`;
 
   return (
     <div>
       {/* Month header row */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 14, marginBottom: 14 }}>
         <span
           className="font-mono uppercase"
           style={{ fontSize: 11, letterSpacing: ".14em", color: "rgba(20,18,16,.55)", whiteSpace: "nowrap" }}
@@ -79,6 +80,15 @@ export function WeekCalendar({ selectedDate, onSelect, itemsByDate }: Props) {
         >
           след →
         </button>
+        <button
+          type="button"
+          onClick={onToday}
+          className="min-h-11 rounded-full border px-3 text-xs font-semibold"
+          style={{ borderColor: "rgba(20,18,16,.18)", color: "#3A332B" }}
+        >
+          Сегодня
+        </button>
+        {loading ? <span role="status" className="text-xs text-neutral-500">Загрузка…</span> : null}
       </div>
 
       {/* Strip */}
@@ -107,9 +117,9 @@ export function WeekCalendar({ selectedDate, onSelect, itemsByDate }: Props) {
           }}
         >
           {weekDates.map((dateStr) => {
-            const date = new Date(dateStr + "T12:00:00");
-            const dow = DAYS_RU_SHORT[date.getDay()];
-            const dayNum = date.getDate();
+            const date = new Date(`${dateStr}T00:00:00.000Z`);
+            const dow = DAYS_RU_SHORT[date.getUTCDay()];
+            const dayNum = date.getUTCDate();
             const isToday = dateStr === todayISO;
             const isSelected = dateStr === selectedDate;
             const itemsCount = itemsByDate[dateStr]?.length ?? 0;
@@ -120,7 +130,6 @@ export function WeekCalendar({ selectedDate, onSelect, itemsByDate }: Props) {
                 key={dateStr}
                 ref={isSelected ? selectedRef : undefined}
                 type="button"
-                disabled={isPast && !isSelected}
                 onClick={() => onSelect(dateStr)}
                 style={{
                   flex: "1 1 0",
@@ -135,13 +144,13 @@ export function WeekCalendar({ selectedDate, onSelect, itemsByDate }: Props) {
                   color: isSelected ? "#FAF7F1" : isPast ? "rgba(20,18,16,.38)" : "#141210",
                   border: `1px solid ${isSelected ? "#141210" : "rgba(20,18,16,.10)"}`,
                   borderRadius: 14,
-                  cursor: isPast && !isSelected ? "default" : "pointer",
+                  cursor: "pointer",
                   transition: "all .15s",
                   position: "relative",
-                  opacity: isPast && !isSelected ? 0.5 : 1,
+                  opacity: isPast && !isSelected ? 0.72 : 1,
                 }}
                 onMouseEnter={(e) => {
-                  if (!isSelected && !isPast) {
+                  if (!isSelected) {
                     (e.currentTarget as HTMLButtonElement).style.borderColor = "#141210";
                   }
                 }}

@@ -5,19 +5,7 @@
 import assert from "node:assert/strict";
 import { ADMIN_DASHBOARD_BLOCKS, getEnabledDashboardBlocks, getDashboardBlock } from "./dashboardBlocks";
 
-const ENABLED_IDS = [
-  "operations",
-  "product",
-  "northStar",
-  "habit",
-  "funnel",
-  "growth",
-  "search",
-  "supply",
-  "b2b",
-  "workload",
-  "dataQuality",
-] as const;
+const ENABLED_IDS = ["operations", "organic", "growthKpis", "valuePath", "supply", "workload"] as const;
 const DISABLED_IDS = ["traffic", "engagement", "finance"] as const;
 
 function main() {
@@ -48,7 +36,7 @@ function main() {
     "returned blocks must be strictly ascending by order",
   );
 
-  assert.equal(getDashboardBlock("habit").enabled, true);
+  assert.equal(getDashboardBlock("organic").enabled, true);
   assert.equal(getDashboardBlock("traffic").enabled, false);
   assert.throws(() => getDashboardBlock("unknown" as never), "unknown id must throw, not silently return undefined");
 

@@ -1,0 +1,80 @@
+import type { Prisma } from "@prisma/client";
+
+import { prisma } from "@/lib/prisma";
+
+import { ensureFamilyForUser, findActiveFamilyId } from "./ensureFamily";
+import {
+  childScopeWhere,
+  familyReadsEnabled,
+  planItemScopeWhere,
+  sharedHistoryFromMembership,
+  type FamilyScope,
+} from "./familyScope";
+
+import { NOT_CANCELLED } from "./familyScope";
+
+export { NOT_CANCELLED, familyReadsEnabled } from "./familyScope";
+export type { FamilyScope } from "./familyScope";
+
+/**
+ * Family Core B2 DB-backed access helpers (pure fragments live in familyScope.ts).
+ * Carries the member's history boundary: a FROM_JOIN joiner does not see shared
+ * plan items created before joinedAt.
+ */
+export async function resolveFamilyScope(userId: string): Promise<FamilyScope> {
+  const membership = await prisma.familyMembership.findFirst({
+    where: { userId, leftAt: null },
+    select: { familyId: true, historyAccess: true, joinedAt: true },
+  });
+  if (!membership) return { userId, familyId: null };
+  return {
+    userId,
+    familyId: membership.familyId,
+    sharedHistoryFrom: sharedHistoryFromMembership(membership),
+  };
+}
+
+/** Where fragment for PlanItem reads/dedup/deletes of this user (no DB hit when reads are off). */
+export async function planScopeFor(userId: string): Promise<Prisma.PlanItemWhereInput> {
+  if (!familyReadsEnabled()) return { userId };
+  return planItemScopeWhere(await resolveFamilyScope(userId), true);
+}
+
+/**
+ * ACL scope + not cancelled. Use ONLY for "is it actively in the plan / already
+ * planned / dedup before adding" lookups. CANCELLED rows are history: they never
+ * count as planned and are never reactivated by a new add. Plain ACL checks
+ * (remove, ownership reads) keep using planScopeFor.
+ */
+export async function activePlanScopeFor(userId: string): Promise<Prisma.PlanItemWhereInput> {
+  return { ...(await planScopeFor(userId)), ...NOT_CANCELLED };
+}
+
+/** Where fragment for Child reads/guards of this user. */
+export async function childScopeFor(userId: string): Promise<Prisma.ChildWhereInput> {
+  if (!familyReadsEnabled()) return { parentId: userId };
+  return childScopeWhere(await resolveFamilyScope(userId), true);
+}
+
+/** Family id for writes: always ensured (lazy family on first family write). */
+export async function familyIdForWrite(userId: string): Promise<string> {
+  return ensureFamilyForUser(prisma, userId);
+}
+
+/**
+ * User ids of all active adults in the user's family (the user included).
+ * Flag off or family-less user: just the user. Used by consumers that key a row
+ * by the recorder (Experience.userId) but expose it family-wide.
+ */
+export async function activeFamilyUserIds(userId: string): Promise<string[]> {
+  if (!familyReadsEnabled()) return [userId];
+  const familyId = await findActiveFamilyId(prisma, userId);
+  if (!familyId) return [userId];
+  const rows = await prisma.familyMembership.findMany({
+    where: { familyId, leftAt: null },
+    select: { userId: true },
+  });
+  const ids = new Set(rows.map((row) => row.userId));
+  ids.add(userId);
+  return [...ids];
+}

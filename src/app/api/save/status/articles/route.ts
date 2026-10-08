@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       listArticlePlanItemsBatch(user.id, articleIds),
     ]);
 
-    const planItemsByArticle = new Map<string, { id: string; date: string }[]>();
+    const planItemsByArticle = new Map<string, { id: string; date: string | null }[]>();
     const startsAtById = new Map<string, Date | null>();
     for (const item of planItems) {
       if (!item.articleId) continue;

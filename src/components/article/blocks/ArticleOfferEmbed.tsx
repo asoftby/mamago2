@@ -188,8 +188,8 @@ export function ArticleOfferEmbed({ card }: { card: ResolvedOfferEmbedCard }) {
               activityTitle={card.title}
               coverImageUrl={card.imageUrl}
               source="article-offer-embed"
-              className="h-9 w-9 !bg-[rgba(250,247,241,.94)] !rounded-full !shadow-[rgba(20,18,16,.12)_0px_6px_18px_0px]"
-              iconClassName="h-4 w-4"
+              className="h-11 w-11 !rounded-full !bg-[rgba(250,247,241,.94)] !shadow-[rgba(20,18,16,.12)_0px_6px_18px_0px] sm:h-9 sm:w-9"
+              iconClassName="h-5 w-5 sm:h-4 sm:w-4"
             />
           </div>
 

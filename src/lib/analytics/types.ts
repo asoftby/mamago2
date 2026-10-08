@@ -1,8 +1,10 @@
 import type {
   AnalyticsEntityType,
   AnalyticsVertical,
+  PlanVisibility,
   UserEventType,
 } from "@prisma/client";
+import type { Subject } from "@/lib/decision/decisionContext";
 
 /**
  * Lightweight context shared by first-party product telemetry.
@@ -26,6 +28,9 @@ export type AnalyticsMetaPayload = {
 
   /** Small, normalized user/context dimensions useful for later ranking. */
   selectedPersonaIds?: string[];
+  /** decisionContext.v1 participant snapshot — IDs/roles/ageRange only, never name or DOB. */
+  subjects?: Subject[];
+  decisionContextVersion?: 1;
   ageRanges?: string[];
   dateFrom?: string;
   dateTo?: string;
@@ -35,6 +40,8 @@ export type AnalyticsMetaPayload = {
   /** Reserved for domains that expose stable genre IDs later. */
   genreIds?: string[];
   signalIds?: string[];
+  /** Canonical SYSTEM_INTERESTS slugs captured at event time. */
+  interestSlugs?: string[];
   format?: string;
   districtId?: string;
   metroId?: string;
@@ -47,9 +54,17 @@ export type AnalyticsMetaPayload = {
 };
 
 export type TrackUserEventInput = {
+  /** Server-only DB-backed deduplication key; never part of the HTTP ingestion contract. */
+  idempotencyKey?: string | null;
   userId?: string | null;
   /** Id строки Session (сервер) или клиентский anonymous id */
   sessionId?: string | null;
+  /** Guest product identity (client-generated UUID). Distinct from sessionId. */
+  anonymousId?: string | null;
+  /** Server-only Family Core context; never part of the HTTP ingestion contract. */
+  familyId?: string | null;
+  /** Server-only plan audience for plan-related events; never accepted from clients. */
+  planVisibility?: PlanVisibility | null;
   eventType: UserEventType;
   entityType?: AnalyticsEntityType | null;
   entityId?: string | null;

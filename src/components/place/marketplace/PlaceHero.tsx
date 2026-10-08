@@ -18,6 +18,7 @@ import {
   SidebarCardShare,
 } from "@/components/shared/SidebarCard";
 import { MediaGalleryStrip } from "@/components/media/MediaGalleryStrip";
+import { MobileMediaCarousel } from "@/components/media/MobileMediaCarousel";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 
 interface PlaceHeroProps {
@@ -44,6 +45,8 @@ interface PlaceHeroProps {
   onShareClick?: () => void;
   ownerEditPlaceId?: string;
   media?: {
+    posterUrl?: string;
+    posterAlt: string;
     galleryItems: MediaGalleryItem[];
   };
   /** Optional "Отправить заявку" CTA (Direct) — additive, rendered after the existing buttons. */
@@ -119,17 +122,31 @@ export function PlaceHero({
       ? summaryPrimary
       : summaryExtra;
 
+  const mobileMediaItems: MediaGalleryItem[] = (() => {
+    const poster = media?.posterUrl?.trim();
+    const rest = (media?.galleryItems ?? []).filter(
+      (item) => item.type !== "image" || item.src.trim() !== poster,
+    );
+    if (!poster) return rest;
+    return [
+      {
+        type: "image",
+        id: "place-poster",
+        src: poster,
+        alt: media?.posterAlt || title,
+      },
+      ...rest,
+    ];
+  })();
+
   return (
     <section
       style={{ paddingTop: 8, paddingBottom: 56, background: "#ffffff" }}
     >
       {/* Breadcrumbs */}
       <div
-        className="breadcrumbs"
+        className="breadcrumbs mx-auto w-full max-w-[1200px] px-4 pb-2.5 pt-5 sm:px-6 lg:px-7"
         style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          padding: "20px 28px 10px",
           display: "flex",
           gap: 8,
           alignItems: "center",
@@ -154,11 +171,8 @@ export function PlaceHero({
 
       {/* Hero grid */}
       <div
-        className="hero-grid"
+        className="hero-grid mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-7"
         style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          padding: "0 28px",
           display: "grid",
           gridTemplateColumns: "1fr 420px",
           gap: 56,
@@ -212,10 +226,10 @@ export function PlaceHero({
 
           {/* Title */}
           <h1
+            className="text-[34px] sm:text-[40px]"
             style={{
               fontFamily: "var(--font-sans)",
               fontWeight: 600,
-              fontSize: 40,
               lineHeight: 1.1,
               letterSpacing: "-.025em",
               margin: "0 0 8px",
@@ -227,10 +241,10 @@ export function PlaceHero({
 
           {/* Subtitle */}
           <div
+            className="text-[17px] sm:text-[19px]"
             style={{
               maxWidth: 600,
               color: "#3A332B",
-              fontSize: 19,
               lineHeight: 1.5,
               marginBottom: 8,
             }}
@@ -238,9 +252,14 @@ export function PlaceHero({
             {shortDesc}
           </div>
 
-          {media && media.galleryItems.length > 0 && (
+          {media && mobileMediaItems.length > 0 && (
             <div style={{ marginTop: 8 }}>
-              <MediaGalleryStrip items={media.galleryItems} maxVisible={3} />
+              <div className="lg:hidden">
+                <MobileMediaCarousel items={mobileMediaItems} ariaLabel="Фото места" />
+              </div>
+              <div className="hidden lg:block">
+                <MediaGalleryStrip items={media.galleryItems} maxVisible={3} />
+              </div>
             </div>
           )}
         </div>
@@ -380,11 +399,6 @@ export function PlaceHero({
           .hero-grid {
             grid-template-columns: 1fr !important;
             gap: 36px !important;
-          }
-        }
-        @media (max-width: 1100px) {
-          .hero-grid {
-            padding: 0 22px !important;
           }
         }
       `}</style>

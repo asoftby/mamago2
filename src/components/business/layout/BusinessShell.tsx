@@ -12,19 +12,19 @@ interface BusinessShellProps {
 
 export function BusinessShell({ children, user, buildInfo }: BusinessShellProps) {
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f9f7f3_0%,#f5f5f4_100%)]">
+    <div className="min-h-dvh bg-[linear-gradient(180deg,#f9f7f3_0%,#f5f5f4_100%)]">
       <NotificationSurfaceBootstrap surface="business" />
       <BusinessHeader user={user} buildInfo={buildInfo} />
 
       {/* Two-column layout: Sidebar + Content */}
-      <div className="flex min-h-[calc(100vh-4rem)]">
+      <div className="flex min-h-[calc(100dvh-4rem)]">
         {/* Left Sidebar - hidden on mobile */}
         <div className="hidden lg:flex lg:flex-col self-stretch">
           <BusinessSidebar buildInfo={buildInfo} />
         </div>
 
         {/* Right Content Area */}
-        <main className="min-w-0 flex-1 w-full lg:w-auto px-5 py-6 sm:px-6 lg:px-8">
+        <main className="min-w-0 flex-1 w-full px-4 py-5 sm:px-6 sm:py-6 lg:w-auto lg:px-8">
           <div className="mx-auto w-full min-w-0 max-w-[1380px] space-y-6">
             {children}
           </div>

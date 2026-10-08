@@ -51,7 +51,10 @@ export function WizardProgress({
       ref={listRef}
       role="tablist"
       aria-label="Шаги"
-      className={cn("no-scrollbar flex w-full overflow-x-auto", className)}
+      className={cn(
+        "no-scrollbar flex w-full overflow-hidden sm:overflow-x-auto",
+        className,
+      )}
     >
       {steps.map((step) => {
         const isActive = step.id === currentStep;
@@ -68,21 +71,24 @@ export function WizardProgress({
             ref={isActive ? activeRef : undefined}
             type="button"
             role="tab"
+            aria-label={`Шаг ${step.id}: ${step.label}`}
             aria-selected={isActive}
             disabled={isDisabled}
             onClick={() => onStepChange(step.id)}
             className={cn(
-              "group relative flex flex-1 flex-col items-center gap-1.5",
-              "select-none pb-3 pt-1",
+              "group relative flex min-w-0 flex-1 flex-col items-center justify-end gap-1.5",
+              "select-none pb-2 pt-1 sm:min-w-[88px] sm:pb-3",
               isDisabled ? "cursor-not-allowed" : "cursor-pointer",
               "transition-colors duration-150",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/40 focus-visible:ring-offset-1",
             )}
           >
-            {/* Label */}
+            {/* Full text labels belong to tablet/desktop; mobile already names
+                the active step in the header subtitle and keeps the progress
+                row readable even with 8–10 steps. */}
             <span
               className={cn(
-                "flex items-center gap-1 text-xs font-medium whitespace-nowrap transition-colors duration-150",
+                "hidden items-center gap-1 whitespace-nowrap text-xs font-medium transition-colors duration-150 sm:flex",
                 isActive
                   ? "text-[#EF8759]"
                   : isDone
@@ -102,11 +108,10 @@ export function WizardProgress({
               ) : null}
             </span>
 
-            {/* Step dot */}
             <span
               aria-hidden
               className={cn(
-                "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold transition-all duration-200",
+                "flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold transition-all duration-200 sm:h-5 sm:w-5 sm:text-[10px]",
                 isActive
                   ? "bg-[#EF8759] text-white ring-2 ring-[#EF8759]/30"
                   : isDone
@@ -121,14 +126,15 @@ export function WizardProgress({
               {step.id}
             </span>
 
-            {/* Underline */}
             <span
               aria-hidden
               className={cn(
                 "absolute bottom-0 left-0 right-0 h-0.5 rounded-full transition-all duration-200",
                 isActive
                   ? "bg-[#EF8759]"
-                  : "bg-gray-200 group-hover:bg-gray-300",
+                  : isDone
+                    ? "bg-[#EF8759]/55"
+                    : "bg-gray-200 group-hover:bg-gray-300",
               )}
             />
           </button>

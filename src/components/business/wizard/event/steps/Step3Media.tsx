@@ -9,7 +9,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useImageUpload } from "@/hooks/useImageUpload";
+import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 import { toast } from "@/lib/toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -46,9 +46,11 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   MAX_IMAGE_FILE_SIZE_MB,
+  MAX_IMAGE_FILES,
   getFileTooLargeMessage,
   validateUploadMimeType,
 } from "@/lib/uploads/uploadConfig";
+import { mergePrimaryWithGallery, splitPrimaryFromGallery } from "@/lib/media/publicationMediaOrder";
 
 interface Step3MediaProps {
   data: EventFormData;
@@ -90,6 +92,22 @@ type ImportedMedia = {
 type MediaStatus = "loading" | "loaded" | "empty";
 
 /**
+ * Event uploads use the shared transport boundary. It converts HEIC/HEIF to
+ * JPEG before the request, while ordinary JPEG/PNG/WebP/AVIF files pass
+ * through unchanged. Keep event-specific preview/state work after upload so
+ * raw HEIC bytes never reach sharp and the wizard has no format-specific
+ * bypass of the common pipeline.
+ */
+async function uploadEventMediaFile(file: File) {
+  const uploaded = await uploadMediaFile(file);
+  return {
+    ...uploaded,
+    url: `/api/media/${encodeURIComponent(uploaded.id)}?variant=sm`,
+    mediaId: uploaded.id,
+  };
+}
+
+/**
  * Get preview URL from media asset
  * Handles various URL formats and ensures proper path
  */
@@ -104,6 +122,7 @@ function getMediaAssetPreviewUrl(asset: {
 }): string {
   const url =
     asset.thumbnailUrl ||
+    (asset.id ? `/api/media/${encodeURIComponent(asset.id)}?variant=sm` : "") ||
     asset.publicUrl ||
     asset.url ||
     asset.fileUrl ||
@@ -112,10 +131,6 @@ function getMediaAssetPreviewUrl(asset: {
     "";
 
   if (!url) {
-    // `/api/media/:id` is served by the file proxy and supports MediaAsset id lookup.
-    if (asset.id) {
-      return `/api/media/${encodeURIComponent(asset.id)}`;
-    }
     return "";
   }
 
@@ -262,7 +277,7 @@ function GalleryItemContent({
       ) : null}
 
       <div className="absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 text-xs font-medium text-white">
-        Фото {index + 1}
+        {index === 0 ? "Главное" : `Фото ${index + 1}`}
       </div>
     </>
   );
@@ -299,7 +314,6 @@ export function Step3Media({
   const [chosenImportedGalleryUrls, setChosenImportedGalleryUrls] = useState<string[]>([]);
   const [importedAssetSourceById, setImportedAssetSourceById] = useState<Record<string, string>>({});
   const [importedMediaIdBySourceUrl, setImportedMediaIdBySourceUrl] = useState<Record<string, string>>({});
-  const [trailerHint, setTrailerHint] = useState<string | null>(null);
 
   const hasInitialized = useRef(false);
   const coverDropzoneRef = useRef<MediaDropzoneHandle | null>(null);
@@ -321,23 +335,16 @@ export function Step3Media({
     });
   }
 
-  const { uploadImage } = useImageUpload({
-    maxSizeMB: MAX_IMAGE_FILE_SIZE_MB,
-    maxWidthOrHeight: 1920,
-    quality: 0.9,
-  });
-
   useEffect(() => {
-    if (!hasInitialized.current && data.gallery.length > 0) {
-      const items = data.gallery.map((id) => ({
-        id,
-        url: getMediaAssetPreviewUrl({ id }),
-        status: "done" as const,
-      }));
-      setGalleryItems(items);
-      hasInitialized.current = true;
-    }
-  }, [data.gallery]);
+    if (hasInitialized.current) return;
+    const ids = mergePrimaryWithGallery(data.coverImage, data.gallery);
+    setGalleryItems(ids.map((id) => ({
+      id,
+      url: getMediaAssetPreviewUrl({ id }),
+      status: "done" as const,
+    })));
+    hasInitialized.current = true;
+  }, [data.coverImage, data.gallery]);
 
   useEffect(() => {
     if (data.coverImage) {
@@ -392,23 +399,6 @@ export function Step3Media({
     return () => {
       cancelled = true;
     };
-  }, [eventId]);
-
-  // Load trailer hint from import source
-  useEffect(() => {
-    if (!eventId) { setTrailerHint(null); return; }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/business/events/${eventId}/trailer-source`, { credentials: "include" });
-        if (!res.ok || cancelled) return;
-        const payload = (await res.json()) as { trailer?: { trailerUrl?: string } | null };
-        if (!cancelled) setTrailerHint(payload.trailer?.trailerUrl ?? null);
-      } catch {
-        // silent — trailer hint is optional
-      }
-    })();
-    return () => { cancelled = true; };
   }, [eventId]);
 
   const sourceImageUrls = useMemo(
@@ -466,6 +456,15 @@ export function Step3Media({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  const syncUnifiedMedia = useCallback((items: GalleryItem[]) => {
+    const ids = items.filter((item) => item.status === "done").map((item) => item.id);
+    const { primary, gallery } = splitPrimaryFromGallery(ids);
+    onChange({ coverImage: primary, gallery });
+    const primaryItem = items.find((item) => item.status === "done" && item.id === primary);
+    setCoverPreview(primaryItem?.url ?? (primary ? getMediaAssetPreviewUrl({ id: primary }) : null));
+    setCoverPreviewUnavailable(false);
+  }, [onChange]);
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
@@ -473,7 +472,7 @@ export function Step3Media({
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
         const reordered = arrayMove(items, oldIndex, newIndex);
-        onChange({ gallery: reordered.map((item) => item.id) });
+        syncUnifiedMedia(reordered);
         return reordered;
       });
     }
@@ -585,7 +584,12 @@ export function Step3Media({
 
     if (pickerMode === "cover") {
       const first = selectedItems[0];
-      onChange({ coverImage: first.raw.id });
+      setGalleryItems((prev) => {
+        const nextItem: GalleryItem = { id: first.raw.id, url: first.normalized.url, status: "done" };
+        const merged = [nextItem, ...prev.filter((item) => item.id !== first.raw.id)];
+        syncUnifiedMedia(merged);
+        return merged;
+      });
       setCoverPreview(first.normalized.url);
       setCoverPreviewUnavailable(false);
       setPickerOpen(false);
@@ -604,7 +608,7 @@ export function Step3Media({
             status: "done" as const,
           })),
       ];
-      onChange({ gallery: merged.map((item) => item.id) });
+      syncUnifiedMedia(merged);
       return merged;
     });
     setPickerOpen(false);
@@ -623,8 +627,13 @@ export function Step3Media({
       setImportedMediaIdBySourceUrl((prev) => ({ ...prev, [cover.sourceUrl]: cover.mediaId }));
       setChosenImportedCoverUrl(url);
       setSelectedImportedUrl(url);
-      onChange({ coverImage: cover.mediaId });
-      toast.success("Изображение из источника установлено как обложка");
+      setGalleryItems((prev) => {
+        const nextItem: GalleryItem = { id: cover.mediaId, url: cover.publicUrl, status: "done" };
+        const merged = [nextItem, ...prev.filter((item) => item.id !== cover.mediaId)];
+        syncUnifiedMedia(merged);
+        return merged;
+      });
+      toast.success("Изображение из источника установлено как главное");
     } catch (error) {
       console.error("Apply imported cover error:", error);
       toast.error(error instanceof Error ? error.message : "Не удалось использовать изображение из источника");
@@ -638,7 +647,8 @@ export function Step3Media({
     setApplyingImportedGalleryUrls((prev) => [...new Set([...prev, ...urls])]);
     try {
       const imported = await Promise.all(urls.map((url) => importRemoteImage(url)));
-      const toAdd = imported.filter((item) => !data.gallery.includes(item.mediaId));
+      const selectedIds = new Set(mergePrimaryWithGallery(data.coverImage, data.gallery));
+      const toAdd = imported.filter((item) => !selectedIds.has(item.mediaId));
 
       if (toAdd.length === 0) {
         toast.message("Эти изображения уже добавлены");
@@ -656,7 +666,7 @@ export function Step3Media({
               status: "done" as const,
             })),
         ];
-        onChange({ gallery: merged.map((item) => item.id) });
+        syncUnifiedMedia(merged);
         return merged;
       });
       setImportedAssetSourceById((prev) => {
@@ -702,12 +712,12 @@ export function Step3Media({
 
     setIsUploadingCover(true);
     try {
-      const uploadedImage = await withUploadTimeout(uploadImage(file), "Обложка");
+      const uploadedImage = await withUploadTimeout(uploadEventMediaFile(file), "Обложка");
       if (!uploadedImage) throw new Error("Failed to upload image");
 
       setCoverPreview(uploadedImage.url);
       setCoverPreviewUnavailable(false);
-      onChange({ coverImage: uploadedImage.mediaId ?? uploadedImage.id });
+      onChange({ coverImage: uploadedImage.id });
       toast.success("Обложка загружена");
     } catch (error) {
       console.error("Cover upload error:", error);
@@ -719,7 +729,20 @@ export function Step3Media({
 
   const handleGalleryFilesSelect = async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
-    const validFiles = fileArray.filter((file) => {
+    const remainingSlots = Math.max(0, MAX_IMAGE_FILES - galleryItems.length);
+
+    if (remainingSlots === 0) {
+      toast.error(`Можно добавить не больше ${MAX_IMAGE_FILES} изображений`);
+      return;
+    }
+
+    if (fileArray.length > remainingSlots) {
+      toast.message(
+        `Будут загружены первые ${remainingSlots} из ${fileArray.length} изображений. Максимум — ${MAX_IMAGE_FILES}.`,
+      );
+    }
+
+    const validFiles = fileArray.slice(0, remainingSlots).filter((file) => {
       if (!validateUploadMimeType(file)) {
         toast.error(`${file.name} не является изображением`);
         return false;
@@ -733,34 +756,31 @@ export function Step3Media({
 
     if (validFiles.length === 0) return;
 
-    const placeholders: GalleryItem[] = validFiles.map((file) => ({
+    const placeholders: GalleryItem[] = validFiles.map(() => ({
       id: `temp-${Date.now()}-${Math.random()}`,
-      url: URL.createObjectURL(file),
+      url: "",
       status: "uploading" as const,
     }));
     setGalleryItems((prev) => [...prev, ...placeholders]);
 
-    let nextGallery = [...data.gallery];
     for (let i = 0; i < validFiles.length; i++) {
       const file = validFiles[i];
       const placeholderId = placeholders[i].id;
       try {
-        const uploadedImage = await withUploadTimeout(uploadImage(file), file.name);
+        const uploadedImage = await withUploadTimeout(uploadEventMediaFile(file), file.name);
         if (!uploadedImage) throw new Error("Failed to upload image");
 
-        const mediaId = uploadedImage.mediaId ?? uploadedImage.id;
-        setGalleryItems((prev) =>
-          prev.map((img) =>
+        const mediaId = uploadedImage.id;
+        setGalleryItems((prev) => {
+          const next = prev.map((img) =>
             img.id === placeholderId ? { id: mediaId, url: uploadedImage.url, status: "done" as const } : img,
-          ),
-        );
-        onChange({ gallery: [...nextGallery, mediaId] });
-        nextGallery = [...nextGallery, mediaId];
+          );
+          syncUnifiedMedia(next);
+          return next;
+        });
       } catch (error) {
         console.error("Gallery upload error:", error);
-        setGalleryItems((prev) =>
-          prev.map((img) => (img.id === placeholderId ? { ...img, status: "error" as const } : img)),
-        );
+        setGalleryItems((prev) => prev.filter((img) => img.id !== placeholderId));
         toast.error(`Ошибка загрузки ${file.name}`);
       }
     }
@@ -796,8 +816,11 @@ export function Step3Media({
         return next;
       });
     }
-    setGalleryItems((prev) => prev.filter((img) => img.id !== imageId));
-    onChange({ gallery: data.gallery.filter((id) => id !== imageId) });
+    setGalleryItems((prev) => {
+      const next = prev.filter((img) => img.id !== imageId);
+      syncUnifiedMedia(next);
+      return next;
+    });
   };
 
   const hasRenderedGallery = galleryItems.length > 0;
@@ -852,7 +875,7 @@ export function Step3Media({
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-sky-950">Постер найден в источнике</p>
                     <p className="text-[12px] text-sky-900/75">
-                      Это изображение можно сразу использовать как обложку события.
+                      Это изображение можно сразу использовать как главное фото события.
                     </p>
                     <p className="text-[12px] text-sky-900/60">
                       При применении изображение будет сохранено в медиатеку.
@@ -866,13 +889,13 @@ export function Step3Media({
                       onClick={() => void applyImportedCover(importedCoverCandidateUrl)}
                     >
                       {isApplyingImportedCover ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      {data.coverImage || coverPreview ? "Заменить на изображение из источника" : "Применить как обложку"}
+                      {data.coverImage || coverPreview ? "Сделать главным" : "Добавить как главное"}
                     </Button>
                   </div>
                   {chosenImportedCoverUrl === importedCoverCandidateUrl ? (
                     <div className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-[12px] font-medium text-emerald-800">
                       <Check className="h-3.5 w-3.5" />
-                      Обложка выбрана из источника
+                      Главное фото выбрано из источника
                     </div>
                   ) : null}
                 </div>
@@ -951,7 +974,7 @@ export function Step3Media({
         </div>
       ) : null}
 
-      <div>
+      <div className="hidden" aria-hidden="true">
         <h3 className="mb-2 text-sm font-medium">
           Главное изображение <span className="text-red-500">*</span>
         </h3>
@@ -1075,9 +1098,11 @@ export function Step3Media({
       </div>
 
       <div>
-        <h3 className="mb-2 text-sm font-medium">Галерея</h3>
+        <h3 className="mb-2 text-sm font-medium">
+          Фото события <span className="text-red-500">*</span>
+        </h3>
         <p className="mb-3 text-[12px] text-muted-foreground">
-          Добавьте дополнительные изображения из источника, медиатеки или загрузите их вручную.
+          Первое фото используется как главное изображение и обложка. Перетащите другое фото на первое место, чтобы сменить обложку.
         </p>
 
         {!hasRenderedGallery ? (
@@ -1140,26 +1165,41 @@ export function Step3Media({
           </>
         ) : null}
 
+        {hasRenderedGallery ? (
+          <MediaDropzone
+            selectionMode="gallery"
+            isEditable={isEditable}
+            isDragging={isDraggingGallery}
+            onDraggingChange={setIsDraggingGallery}
+            onFilesSelected={handleGalleryFilesSelect}
+            className="mt-4"
+          >
+            {({ openFilePicker }) => (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-[12px] text-muted-foreground">Добавьте ещё фото или перетащите их сюда.</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline" disabled={!isEditable} onClick={(e) => {
+                    e.stopPropagation();
+                    openPicker("gallery");
+                  }}>
+                    Из медиатеки
+                  </Button>
+                  <Button type="button" size="sm" disabled={!isEditable} onClick={(e) => {
+                    e.stopPropagation();
+                    openFilePicker();
+                  }}>
+                    Загрузить фото
+                  </Button>
+                </div>
+              </div>
+            )}
+          </MediaDropzone>
+        ) : null}
+
       </div>
 
       <div>
-        <h3 className="mb-2 text-sm font-medium">Ссылка на reels / видео</h3>
-        {trailerHint && !data.reelsUrl && (
-          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-sky-950">Трейлер найден в источнике</p>
-              <p className="mt-0.5 truncate font-mono text-[11px] text-sky-700">{trailerHint}</p>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              disabled={!isEditable}
-              onClick={() => onChange({ reelsUrl: trailerHint })}
-            >
-              Использовать
-            </Button>
-          </div>
-        )}
+        <h3 className="mb-2 text-sm font-medium">Ссылка на Instagram или YouTube</h3>
         <Input
           type="url"
           value={data.reelsUrl || ""}
@@ -1168,7 +1208,7 @@ export function Step3Media({
           disabled={!isEditable}
           className="!text-[13px]"
         />
-        <p className="mt-2 text-[12px] text-muted-foreground">Добавьте ссылку на видео о событии</p>
+        <p className="mt-2 text-[12px] text-muted-foreground">Поддерживаются Instagram Reel/Post и YouTube watch, Shorts или embed. Ссылка добавляется только вручную.</p>
       </div>
 
       <Dialog
@@ -1180,7 +1220,7 @@ export function Step3Media({
       >
         <DialogContent className="flex max-h-[85vh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
           <DialogHeader className="px-6 pb-2 pt-6">
-            <DialogTitle>{pickerMode === "cover" ? "Выбрать главное изображение" : "Выбрать изображения для галереи"}</DialogTitle>
+            <DialogTitle>Выбрать фото события</DialogTitle>
             <DialogDescription>
               В этом окне объединены изображения из внутренней медиатеки и уже связанных с событием media assets.
             </DialogDescription>
@@ -1199,7 +1239,7 @@ export function Step3Media({
                 {pickerItems.map((item) => {
                   const selected = pickerSelection.has(item.id);
                   const normalized = normalizeMediaImage(item);
-                  const currentFieldIds = pickerMode === "cover" ? new Set([data.coverImage].filter(Boolean)) : new Set(data.gallery);
+                  const currentFieldIds = new Set(mergePrimaryWithGallery(data.coverImage, data.gallery));
                   const selectedInCurrentField = currentFieldIds.has(item.id);
                   const usedElsewhere = !selectedInCurrentField && (item.isUsed === true || item.fromEntity === true);
                   const interactive = Boolean(normalized) && !selectedInCurrentField;
@@ -1251,7 +1291,7 @@ export function Step3Media({
               Отмена
             </Button>
             <Button type="button" onClick={applyPickerSelection} disabled={pickerSelection.size === 0}>
-              {pickerMode === "cover" ? "Выбрать изображение" : "Добавить выбранные"}
+              Добавить выбранные
             </Button>
           </DialogFooter>
         </DialogContent>

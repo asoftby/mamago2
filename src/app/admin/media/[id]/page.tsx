@@ -118,7 +118,7 @@ export default async function AdminMediaDetailPage({
   const pageTitle = effectiveMetadata.title || filenameWithoutExt;
 
   return (
-    <div className="p-6 md:p-4 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* AdminPageHeader */}
       <div className="flex items-center justify-between">
         <div>
@@ -135,14 +135,6 @@ export default async function AdminMediaDetailPage({
           <MediaStatusBadge status={media.status} />
         </div>
       </div>
-
-      {/* Back Link */}
-      <Link
-        href="/admin/media"
-        className="text-sm text-blue-600 hover:text-blue-700 inline-block"
-      >
-        ← Назад к медиатеке
-      </Link>
 
       {/* Metadata Editor and Actions */}
       <div className="grid lg:grid-cols-3 gap-6">

@@ -175,7 +175,8 @@ function ShareContent({
           color: T.ink,
           paddingRight: 40,
           fontFamily: "var(--font-sans), sans-serif",
-          fontWeight: 600,
+          fontStyle: "normal",
+          fontWeight: 400,
         }}
       >
         Поде&shy;литься{" "}

@@ -122,7 +122,7 @@ export default async function AdminNotificationDeliveriesPage({
   });
 
   return (
-    <div className="space-y-6 p-6 md:p-4">
+    <div className="space-y-6 p-4 sm:p-6">
       <AdminPageHeader
         title="Notification Deliveries"
         subtitle="Минимальная видимость по MVP уведомлениям: что отправилось, что не отправилось и почему."

@@ -138,7 +138,7 @@ export default function EditFilterPage() {
 
   if (loading) {
     return (
-      <div className="p-6 md:p-4">
+      <div className="p-4 sm:p-6">
         <p className="text-sm text-gray-600">Загрузка…</p>
       </div>
     );
@@ -146,7 +146,7 @@ export default function EditFilterPage() {
 
   if (notFound || !filter) {
     return (
-      <div className="p-6 md:p-4 space-y-4">
+      <div className="p-4 sm:p-6 space-y-4">
         <p className="text-sm text-gray-700">Фильтр не найден.</p>
         <Button variant="outline" asChild>
           <Link href={LIST_HREF}>К списку фильтров</Link>
@@ -156,7 +156,7 @@ export default function EditFilterPage() {
   }
 
   return (
-    <div className="p-6 md:p-4 space-y-6 max-w-5xl">
+    <div className="p-4 sm:p-6 space-y-6 max-w-5xl">
       <div>
         <Link
           href={LIST_HREF}

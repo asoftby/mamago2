@@ -72,18 +72,25 @@ export function SecondaryFiltersForm({
         />
       ))}
 
-      <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+      <div
+        className={cn(
+          "flex items-center justify-between border-t border-gray-200",
+          compact
+            ? "sticky bottom-0 z-10 -mx-4 gap-2 bg-white/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:-mx-6 lg:px-6 lg:pb-4"
+            : "pt-2",
+        )}
+      >
         <button
           type="button"
           onClick={handleReset}
-          className="text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors underline decoration-transparent hover:decoration-current underline-offset-2"
+          className="min-h-11 rounded-xl px-3 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
         >
           Сбросить
         </button>
         <button
           type="button"
           onClick={onApply}
-          className="px-8 py-3 bg-gray-900 text-white rounded-lg font-semibold hover:bg-gray-800 transition-all duration-200 shadow-lg hover:shadow-xl"
+          className="min-h-11 min-w-[8rem] rounded-xl bg-gray-900 px-5 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
         >
           Готово
         </button>
