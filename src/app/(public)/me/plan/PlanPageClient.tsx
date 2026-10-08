@@ -129,12 +129,6 @@ function itemForCacheMessage(item: SerializedPlanItem): string {
   return item.source === "MANUAL" ? "Календарь обновлён" : "План обновлён";
 }
 
-function pluralizeDays(n: number) {
-  if (n === 1) return "день";
-  if (n >= 2 && n <= 4) return "дня";
-  return "дней";
-}
-
 function pluralizeEvents(n: number) {
   const mod10 = n % 10;
   const mod100 = n % 100;
@@ -300,7 +294,6 @@ export function PlanPageClient({
   initialSelectedDate,
   initialRange,
   familyChildren,
-  ideaActivityIds,
   initialIdeas = [],
   scenarioStatusByDate = {},
   experienceCandidates = [],
