@@ -395,7 +395,11 @@ export function PlanPageClient({
     }, {});
   }, [visibleItems]);
 
-  const dayItems = filterFamilyCalendarItems(itemsByDate[selectedDate] ?? [], calendarFilter);
+  const dayItems = calendarFilter === "family" && familyView
+    ? filterFamilyCalendarItems(itemsByDate[selectedDate] ?? [], calendarFilter).filter(
+        (item) => item.authorId === familyView.currentUserId,
+      )
+    : filterFamilyCalendarItems(itemsByDate[selectedDate] ?? [], calendarFilter);
   const conflictIds = useMemo(() => findFamilyCalendarConflictIds(dayItems), [dayItems]);
   const selectedWeekStart = getWeekStart(selectedDate);
   const selectedWeekEnd = addDaysIso(selectedWeekStart, 6);
