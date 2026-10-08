@@ -365,6 +365,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       
       const pricingLabels = {
         free: "Бесплатно",
+        on_request: "По запросу",
         fixed: isValidPrice ? formatPrice(priceValue) : "—",
         from: isValidPrice ? formatPriceFrom(priceValue) : "—",
       };

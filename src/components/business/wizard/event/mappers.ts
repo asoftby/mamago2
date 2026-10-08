@@ -449,7 +449,7 @@ export function mapEventToFormData(event: ActivityWithRelations): EventFormData 
     priceTo: priceToDb,
   });
 
-  if (formData.pricingMode === "free") {
+  if (formData.pricingMode === "free" || formData.pricingMode === "on_request") {
     formData.price = "";
   } else {
     formData.price =
@@ -862,7 +862,7 @@ export function buildEventPayload(data: EventFormData): EventPayload {
     priceText:
       data.pricingMode === "free"
         ? "бесплатно"
-        : data.price?.trim()
+        : data.pricingMode === "on_request" ? "По запросу" : data.price?.trim()
           ? data.price.trim()
           : "",
     priceDetails: data.priceDetails,
@@ -990,7 +990,8 @@ export function extractChanges(current: EventFormData, original: EventFormData):
     changes.priceTo =
       current.pricingMode === "fixed" && has ? parsed : null;
     changes.priceText =
-      current.pricingMode === "free" ? "бесплатно" : has ? p : "";
+      current.pricingMode === "free" ? "бесплатно"
+        : current.pricingMode === "on_request" ? "По запросу" : has ? p : "";
   }
 
   // Venue changes

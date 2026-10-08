@@ -4370,6 +4370,7 @@ enum RouteStopPriceType {
 
 enum PublicationPriceMode {
   FREE
+  ON_REQUEST
   EXACT
   FROM
   RANGE
