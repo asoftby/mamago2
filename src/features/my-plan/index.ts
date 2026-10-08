@@ -1,4 +1,5 @@
 export { MyPlanWidget } from "./components/MyPlanWidget";
+export { MyPlanMobileWidget } from "./components/MyPlanMobileWidget";
 export { MyPlanOverlay } from "./components/MyPlanOverlay";
 export type {
   MyPlanGuestPanelPhase,

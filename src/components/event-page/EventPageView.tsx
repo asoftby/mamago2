@@ -96,7 +96,7 @@ function EventMarquee({ items }: { items: string[] }) {
 function EventMetaStrip({ facts }: { facts: EventPageData["importantFacts"] }) {
   if (!facts.length) return null;
   return (
-    <section className="border-y border-[rgba(20,18,16,0.10)]">
+    <section>
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <div
           className="grid grid-cols-2 md:grid-cols-4"
@@ -141,7 +141,7 @@ function EventAboutEditorial({
   descriptionHtml?: string;
 }) {
   return (
-    <section className="border-b border-[rgba(20,18,16,0.10)] py-16 md:py-20">
+    <section className="py-16 md:py-20">
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-[320px_1fr] md:gap-14">
           <div>
@@ -205,8 +205,29 @@ function EventLocationEditorial({ venue }: { venue: NonNullable<EventPageData["v
       mapUrl={venue.mapUrl}
       routeUrl={venue.routeUrl}
       placeHref={venue.placeHref}
-      className="border-b"
+      className="!border-0"
     />
+  );
+}
+
+function EventOrganizerLegal({ organizer }: { organizer: NonNullable<EventPageData["organizer"]> }) {
+  return (
+    <section className="py-8 md:py-10">
+      <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
+          <span
+            className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.45)]"
+            style={{ fontFamily: "Menlo, monospace" }}
+          >
+            Организатор события
+          </span>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px] text-[rgba(20,18,16,0.60)]">
+            <span className="font-medium text-[#141210]">{organizer.name}</span>
+            {organizer.unp ? <span>УНП {organizer.unp}</span> : null}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -275,7 +296,7 @@ function EventFinalCta({
                 onClick={onBuy}
                 className="inline-flex h-16 items-center gap-2 rounded-full bg-[#E86A3A] px-7 text-[17px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px"
               >
-                {buyLabel}&nbsp;{renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })} <span aria-hidden>→</span>
+                {buyLabel}&nbsp;{renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })}
               </a>
             )}
             <button
@@ -466,9 +487,9 @@ export function EventPageView({
             }),
           });
           if (!res.ok) throw new Error("plan_save_failed");
-          toast.success(
-            `Событие добавлено на ${formatPlanTargetDateRu(result.dateISO)}`,
-          );
+          toast.success("Добавлено в план", {
+            description: `На ${formatPlanTargetDateRu(result.dateISO)}`,
+          });
           requestPlanRefetchForDate(result.dateISO);
         } else if (result.action === "ideas") {
           const res = await fetch("/api/save/idea", {
@@ -512,9 +533,9 @@ export function EventPageView({
         if (!res.ok) throw new Error("plan_save_failed");
         await loadSaveStatus();
         requestPlanRefetchForDate(dateISO);
-        toast.success(
-          `Событие добавлено на ${formatPlanTargetDateRu(dateISO)}`,
-        );
+        toast.success("Добавлено в план", {
+            description: `На ${formatPlanTargetDateRu(dateISO)}`,
+          });
       } catch {
         toast.error("Не получилось выполнить действие", { description: "Попробуйте еще раз" });
       }
@@ -556,7 +577,8 @@ export function EventPageView({
   const hasSimpleBooking = Boolean(data.cta.simpleBooking);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const handleBook = useCallback(() => setBookingModalOpen(true), []);
-  const hasSimilar = data.similar.length > 0;
+  const visibleSimilar = data.similar.slice(0, 4);
+  const hasSimilar = visibleSimilar.length > 0;
   const hasWhyGo = data.whyGo.length > 0;
   const hasGoodFit = data.goodFit.length > 0;
 
@@ -624,7 +646,7 @@ export function EventPageView({
       />
 
       {(Boolean(data.priceDetails?.trim()) || (data.priceItems?.length ?? 0) > 0 || Boolean(data.priceNote?.trim())) && (
-        <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
+        <section className="py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -651,10 +673,10 @@ export function EventPageView({
         </section>
       )}
 
-      <FaqSection items={data.faqItems} />
+      <FaqSection items={data.faqItems} className="!border-t-0" />
 
       {sessions.length > 0 && (
-        <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
+        <section className="py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
             <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -691,10 +713,20 @@ export function EventPageView({
 
       {data.venue && <EventLocationEditorial venue={data.venue} />}
 
+      {data.organizer && <EventOrganizerLegal organizer={data.organizer} />}
+
       {hasSimilar && (
-        <section className="border-b border-[rgba(20,18,16,0.10)] py-14 md:py-16">
+        <section className="py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
-            <SimilarEventsSection items={data.similar} onPlan={handlePlanSimilar} />
+            <SimilarEventsSection
+              items={visibleSimilar}
+              onPlan={handlePlanSimilar}
+              allHref={
+                data.categorySlug
+                  ? `/${data.citySlug}/events/category/${data.categorySlug}`
+                  : `/${data.citySlug}/events`
+              }
+            />
           </div>
         </section>
       )}

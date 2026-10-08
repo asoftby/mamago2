@@ -7,12 +7,19 @@ import { buildPlanCardPresentation } from "@/features/my-plan/lib/planPagePresen
 import { activePlanScopeFor, childScopeFor, familyIdForWrite } from "@/server/family/familyAccess";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import type { PlanBookingState } from "@/server/family/planBookingPure";
+import {
+  detectPlanItemCategory,
+  isPlanItemCategoryKey,
+  type PlanItemCategoryKey,
+} from "@/features/my-plan/lib/planItemCategory";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const TITLE_MAX = 160;
 const LOCATION_MAX = 240;
 const NOTES_MAX = 2_000;
+const TAG_MAX = 32;
+const TAG_COUNT_MAX = 12;
 export const FAMILY_CALENDAR_MAX_RANGE_DAYS = 42;
 
 export class ManualPlanEntryError extends Error {
@@ -25,7 +32,8 @@ export class ManualPlanEntryError extends Error {
 }
 
 export type ManualPlanEntryInput = {
-  entryType: PlanEntryType;
+  /** Internal legacy shape. The universal note form does not ask the user for a type. */
+  entryType?: PlanEntryType;
   title: string;
   childId?: string | null;
   date: string;
@@ -35,6 +43,10 @@ export type ManualPlanEntryInput = {
   dueHasTime?: boolean;
   locationText?: string | null;
   notes?: string | null;
+  tags?: string[];
+  /** Ключ категории (planItemCategory). Не передан при создании → определяется по названию. */
+  category?: string | null;
+  reminderEnabled?: boolean;
 };
 
 export type ManualPlanEntryPatch = Partial<ManualPlanEntryInput>;
@@ -104,6 +116,9 @@ const calendarItemSelect = {
   childId: true,
   locationText: true,
   notes: true,
+  tags: true,
+  category: true,
+  reminderEnabled: true,
   activityId: true,
   coverImageUrl: true,
   createdAt: true,
@@ -133,6 +148,9 @@ export type FamilyCalendarItemDto = {
   childName: string | null;
   locationText: string | null;
   notes: string | null;
+  tags: string[];
+  category: string | null;
+  reminderEnabled: boolean | null;
   activityId: string | null;
   coverImageUrl: string | null;
   visibility: "PRIVATE" | "FAMILY";
@@ -179,6 +197,35 @@ function normalizeTitle(value: unknown): string {
   const title = normalizeText(value, TITLE_MAX, "title");
   if (!title || /[<>]/.test(title)) throw new ManualPlanEntryError("INVALID_INPUT", "invalid_title");
   return title;
+}
+
+/** Неизвестный ключ → ошибка; null/не передан → автоопределение по названию. */
+export function normalizePlanItemCategory(value: unknown, title: string | null | undefined): PlanItemCategoryKey {
+  if (value == null || value === "") return detectPlanItemCategory(title);
+  if (!isPlanItemCategoryKey(value)) throw new ManualPlanEntryError("INVALID_INPUT", "invalid_category");
+  return value;
+}
+
+export function normalizePlanNoteTags(value: unknown): string[] {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.length > TAG_COUNT_MAX) {
+    throw new ManualPlanEntryError("INVALID_INPUT", "invalid_tags");
+  }
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of value) {
+    if (typeof raw !== "string") throw new ManualPlanEntryError("INVALID_INPUT", "invalid_tags");
+    const tag = raw.trim().replace(/^#+/, "").trim();
+    if (!tag) continue;
+    if (tag.length > TAG_MAX || /[<>\n\r]/.test(tag)) {
+      throw new ManualPlanEntryError("INVALID_INPUT", "invalid_tags");
+    }
+    const key = tag.toLocaleLowerCase("ru-RU");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(tag);
+  }
+  return result;
 }
 
 function parseWallClock(date: string, value: unknown, field: string): Date | null {
@@ -233,7 +280,8 @@ function assertTimeOrder(startsAt: Date | null, endsAt: Date | null): void {
 }
 
 export async function createManualPlanEntry(owner: PlanOwner, input: ManualPlanEntryInput) {
-  assertEntryType(input.entryType);
+  const entryType = input.entryType ?? PlanEntryType.TASK;
+  assertEntryType(entryType);
   assertDate(input.date);
   const title = normalizeTitle(input.title);
   const childId = normalizeChildId(input.childId);
@@ -248,7 +296,7 @@ export async function createManualPlanEntry(owner: PlanOwner, input: ManualPlanE
       userId: owner.userId,
       familyId: await familyIdForWrite(owner.userId),
       source: PlanItemSource.MANUAL,
-      entryType: input.entryType,
+      entryType,
       title,
       childId,
       date: input.date,
@@ -258,6 +306,9 @@ export async function createManualPlanEntry(owner: PlanOwner, input: ManualPlanE
       dueHasTime: input.dueHasTime === true && dueAt != null,
       locationText: normalizeText(input.locationText, LOCATION_MAX, "location"),
       notes: normalizeText(input.notes, NOTES_MAX, "notes"),
+      tags: normalizePlanNoteTags(input.tags),
+      category: normalizePlanItemCategory(input.category, title),
+      reminderEnabled: input.reminderEnabled === true,
     },
     select: calendarItemSelect,
   });
@@ -317,6 +368,9 @@ export async function updateManualPlanEntry(
         : { dueHasTime: (patch.dueHasTime ?? current.dueHasTime) === true && dueAt != null }),
       ...(patch.locationText === undefined ? {} : { locationText: normalizeText(patch.locationText, LOCATION_MAX, "location") }),
       ...(patch.notes === undefined ? {} : { notes: normalizeText(patch.notes, NOTES_MAX, "notes") }),
+      ...(patch.tags === undefined ? {} : { tags: normalizePlanNoteTags(patch.tags) }),
+      ...(patch.category === undefined ? {} : { category: normalizePlanItemCategory(patch.category, patch.title ?? current.title) }),
+      ...(patch.reminderEnabled === undefined ? {} : { reminderEnabled: patch.reminderEnabled === true }),
     },
   });
   if (result.count === 0) throw new ManualPlanEntryError("CONFLICT", "conflict");
@@ -413,6 +467,9 @@ export function toFamilyCalendarItemDto(row: CalendarRow, authorName: string | n
     childName: row.child?.name?.trim() || null,
     locationText: row.locationText,
     notes: row.notes,
+    tags: row.tags,
+    category: row.category,
+    reminderEnabled: row.reminderEnabled,
     activityId: row.activityId,
     coverImageUrl: row.coverImageUrl,
     planAvailability: getPlanActivityPublicAvailability(row.activity),

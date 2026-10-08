@@ -34,6 +34,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Info, Loader2, Sparkles } from "lucide-react";
 import type { EnrichmentResult } from "@/lib/ai/enrichEvent";
 
+const EVENT_OCCASION_EXCLUDED_SLUGS = ["birthday"] as const;
+
 /** Совпадает с prisma/seed.ts (сигнал age) — если API недоступен или пустой. */
 const FALLBACK_AGE_OPTIONS: PublicAgeOption[] = AGE_OPTIONS.map((option) => ({
   id: option.id ?? `fb-age-${option.key}`,
@@ -556,10 +558,21 @@ export function Step1Basics({
     onChange({ ...selected, ageRangeIds: selected.ageTags, ageDetectionUserOverride: true, ageDetectionAutoApplied: false });
   };
 
-  const clearAgeSelection = () => {
+  const selectAllAges = () => {
     const selected = selectUnrestrictedAge();
+    const allAgeRangeIds = sortAgeKeys(ageOptions.map((option) => option.value));
     onChange({
       ...selected,
+      ageRangeIds: allAgeRangeIds,
+      ageDetectionUserOverride: true,
+      ageDetectionAutoApplied: false,
+    });
+  };
+
+  const clearAgeSelection = () => {
+    onChange({
+      agePolicy: AgePolicy.UNKNOWN,
+      ageTags: [],
       ageRangeIds: [],
       ageDetectionUserOverride: true,
       ageDetectionAutoApplied: false,
@@ -628,7 +641,7 @@ export function Step1Basics({
     label: "Любой",
     active: data.agePolicy === AgePolicy.UNRESTRICTED,
     disabled: !isEditable || loading,
-    onClick: clearAgeSelection,
+    onClick: selectAllAges,
   });
   ageItems.push({
     id: "adult-only",
@@ -1109,6 +1122,7 @@ export function Step1Basics({
         value={data.occasionIds ?? []}
         onChange={(ids) => onChange({ occasionIds: ids })}
         disabled={!isEditable}
+        excludeSlugs={EVENT_OCCASION_EXCLUDED_SLUGS}
       />
 
     </div>

@@ -48,6 +48,11 @@ const infra = (retryable: boolean): OpenRouterCallResult => ({
   code: retryable ? "OPENROUTER_HTTP_5XX" : "OPENROUTER_HTTP_4XX",
   retryable,
 });
+const badResponse = (): OpenRouterCallResult => ({
+  ok: false,
+  code: "OPENROUTER_BAD_RESPONSE",
+  retryable: true,
+});
 
 function harness(script: Scripted[] | Scripted, over: { models?: CaptureModelConfig; telegram?: { fileOk?: boolean } } = {}) {
   const calls: OpenRouterCallInput[] = [];
@@ -279,6 +284,19 @@ test("a transient provider error is retried once on the normal model", async () 
   await h.processor.process(item.id);
   assert.equal((await reload(item.id)).status, "DRAFT_READY");
   assert.deepEqual(h.calls.map((c) => c.model), [FAST, FAST]);
+});
+
+test("bad provider response after the fast retry escalates once to the strong model", async () => {
+  const h = harness([badResponse(), badResponse(), okReply(valid(), STRONG)]);
+  const item = await makeItem({ owner: "zero", text: "Экскурсия 9 октября" });
+  await h.processor.process(item.id);
+  const saved = await reload(item.id);
+  assert.equal(saved.status, "DRAFT_READY");
+  assert.equal(saved.error, null);
+  assert.equal(saved.escalated, true);
+  assert.ok(saved.ruleCodes.includes("ESCALATE_BAD_RESPONSE"));
+  assert.deepEqual(h.calls.map((c) => c.model), [FAST, FAST, STRONG]);
+  assert.equal(saved.model, STRONG);
 });
 
 test("provider failure after the retry ends in FAILED OPENROUTER_FAILED (no escalation for infrastructure errors)", async () => {

@@ -47,13 +47,13 @@ async function load() {
 type Spy = {
   allowlist: string[];
   connection: { userId: string } | null;
-  counters: { find: number; touch: number; receive: number; ack: number };
+  counters: { find: number; touch: number; edit: number; receive: number; callback: number; ack: number };
   received: Array<{ userId: string; environment: string }>;
   deps: import("./captureWiring").CaptureRoutingDeps;
 };
 
 function makeSpy(allowlist: string[], connection: { userId: string } | null): Spy {
-  const counters = { find: 0, touch: 0, receive: 0, ack: 0 };
+  const counters = { find: 0, touch: 0, edit: 0, receive: 0, callback: 0, ack: 0 };
   const received: Spy["received"] = [];
   const deps: Spy["deps"] = {
     getAllowlist: () => new Set(allowlist),
@@ -65,10 +65,17 @@ function makeSpy(allowlist: string[], connection: { userId: string } | null): Sp
       counters.touch += 1;
     },
     getEnvironment: () => "DEV",
+    tryEdit: async () => {
+      counters.edit += 1;
+      return null;
+    },
     receive: async (owner, environment) => {
       counters.receive += 1;
       received.push({ userId: owner.userId, environment });
       return { outcome: { status: "duplicate" }, afterResponse: async () => undefined };
+    },
+    handleCallback: async () => {
+      counters.callback += 1;
     },
     acknowledgeCallback: async () => {
       counters.ack += 1;
@@ -104,7 +111,7 @@ test("empty allowlist: capture is off, nothing touches capture deps or the chann
   const spy = makeSpy([], { userId: "u1" });
   const result = await new Service(channel as never, spy.deps).handleUpdate(textUpdate() as never);
   assert.deepEqual(result, {});
-  assert.deepEqual(spy.counters, { find: 0, touch: 0, receive: 0, ack: 0 });
+  assert.deepEqual(spy.counters, { find: 0, touch: 0, edit: 0, receive: 0, callback: 0, ack: 0 });
   assert.deepEqual(calls, []);
 });
 
@@ -131,6 +138,22 @@ test("gate open: capture goes to intake with the plan owner and passes afterResp
   assert.equal(typeof result.afterResponse, "function");
   assert.deepEqual(spy.received, [{ userId: "u1", environment: "DEV" }]);
   assert.equal(spy.counters.touch, 1);
+  assert.equal(spy.counters.edit, 1);
+  assert.deepEqual(calls, []);
+});
+
+test("active edit intercepts the message before normal intake", async () => {
+  const Service = await load();
+  const { channel, calls } = makeChannel();
+  const spy = makeSpy(["u1"], { userId: "u1" });
+  spy.deps.tryEdit = async () => {
+    spy.counters.edit += 1;
+    return { handled: true, afterResponse: async () => undefined };
+  };
+  const result = await new Service(channel as never, spy.deps).handleUpdate(textUpdate() as never);
+  assert.equal(typeof result.afterResponse, "function");
+  assert.equal(spy.counters.edit, 1);
+  assert.equal(spy.counters.receive, 0);
   assert.deepEqual(calls, []);
 });
 
@@ -217,7 +240,7 @@ test("legacy callbacks: unknown and application:* buttons keep their old answers
   assert.equal(spy.counters.ack, 0);
 });
 
-test("inb: and req: callbacks are acknowledged by the neutral stub, not the legacy handler", async () => {
+test("inb: and req: callbacks route through capture handlers when the gate is open", async () => {
   const Service = await load();
   const { channel, calls } = makeChannel();
   const spy = makeSpy(["u1"], { userId: "u1" });
@@ -232,6 +255,8 @@ test("inb: and req: callbacks are acknowledged by the neutral stub, not the lega
       callback_query: { id, data, from: { id: 1 }, message: { message_id: 1, chat: { id: 1 } } },
     } as never);
   }
-  assert.equal(spy.counters.ack, 3);
+  assert.equal(spy.counters.callback, 3);
+  assert.equal(spy.counters.ack, 0);
+  assert.equal(spy.counters.touch, 3);
   assert.deepEqual(calls, []);
 });

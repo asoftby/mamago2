@@ -3,7 +3,9 @@
 /**
  * Хедер для viewport **< lg**.
  * Поисковая точка входа — как на discovery.
- * Иконка фильтров скрыта на посадочных маршрутах (`getSiteHeaderVariant` === `landing`), на витринах — как раньше.
+ * Одна строка: значок «Ma» → главная · контекст-чип (вход в поиск) · ⚙ фильтры (только на категориях).
+ * 🔔 и 👤 живут в нижней панели (MobileBottomBar).
+ * Прячется при скролле вниз, возвращается при скролле вверх.
  */
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
@@ -11,6 +13,8 @@ import { cn } from "@/lib/utils";
 import { MobileSearchEntry } from "@/components/mobile/MobileSearchEntry";
 import { MobileSearchSheet } from "@/components/mobile/MobileSearchSheet";
 import { MobileFilterButton } from "@/components/mobile/MobileFilterButton";
+import { NavIconButton } from "@/components/mobile/NavIconButton";
+import { MOBILE_HEADER_ROW_HEIGHT } from "@/components/mobile/mobile-control-geometry";
 import {
   getIntentFromPath,
   getCityFromPath,
@@ -21,21 +25,23 @@ import {
   isNonStickyHeaderPath,
   isJournalPath,
 } from "@/lib/intent";
+import { getSiteHeaderVariant } from "@/lib/site/siteHeaderVariant";
 import { useCity } from "@/contexts/CityContext";
 import { usePublicationIntent } from "@/contexts/PublicationIntentContext";
 import { useArticleGeoLabel } from "@/contexts/ArticleGeoLabelContext";
-import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { useHeaderScrolled } from "@/hooks/useHeaderScrolled";
-import { getSiteHeaderVariant } from "@/lib/site/siteHeaderVariant";
+import { useHideOnScrollDirection } from "@/hooks/useHideOnScrollDirection";
+import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
+import { useBranding } from "@/contexts/BrandingContext";
 import { OPEN_MOBILE_SEARCH_EVENT } from "@/lib/mobile/openMobileSearchEvent";
 import { OPEN_PUBLIC_SEARCH_EVENT } from "@/lib/search/openPublicSearchEvent";
-import { MOBILE_DISCOVERY_EDGE_PADDING } from "@/components/mobile/mobile-control-geometry";
 
 export function MobileHeader() {
   const [isSearchSheetOpen, setIsSearchSheetOpen] = useState(false);
   const pathname = usePathname();
-  const siteHeaderVariant = getSiteHeaderVariant(pathname);
   const isScrolled = useHeaderScrolled(50);
+  const scrollHidden = useHideOnScrollDirection({ threshold: 8, topOffset: 24 });
+  const { logoUrl } = useBranding();
 
   const routeIntent = getIntentFromPath(pathname);
   const publicationIntent = usePublicationIntent();
@@ -63,11 +69,13 @@ export function MobileHeader() {
     : searchIntent ?? (isCityHubRoute ? undefined : "kuda");
 
   const isDiscoveryPage = searchIntent !== null && currentCity !== null;
-  const intentConfig = searchIntent
-    ? DISCOVERY_INTENT_CONFIG[searchIntent]
-    : null;
+  const showFilterButton =
+    getSiteHeaderVariant(pathname) !== "landing" &&
+    isDiscoveryPage &&
+    !!searchIntent && DISCOVERY_INTENT_CONFIG[searchIntent].hasFilters;
 
   const cityHubOnly = isPublicationPage || isJournalRoute;
+  const isSticky = !isNonStickyHeaderPath(pathname);
 
   useEffect(() => {
     const open = () => setIsSearchSheetOpen(true);
@@ -89,36 +97,35 @@ export function MobileHeader() {
     <>
       <header
         data-header-shell
+        inert={isSticky && scrollHidden}
         className={cn(
           // На страницах событий и деталях маршрута хедер не sticky
-          isNonStickyHeaderPath(pathname) ? "relative z-50 w-full" : "sticky top-0 z-50 w-full",
-          "border-b border-[#EBEBEB] bg-[#F6F2EA] text-foreground antialiased transition-shadow duration-200",
+          isSticky ? "sticky top-0 z-50 w-full" : "relative z-50 w-full",
+          "border-b border-[#EBEBEB] bg-[#F6F2EA] pt-[env(safe-area-inset-top)] text-foreground antialiased",
+          "transition-[transform,box-shadow] duration-200 ease-in-out motion-reduce:transition-none",
+          isSticky && scrollHidden && "-translate-y-full",
           isScrolled && "shadow-[0_4px_20px_rgba(0,0,0,0.08)]",
         )}
       >
-        <div className="mx-auto w-full">
-          <div className={cn(MOBILE_DISCOVERY_EDGE_PADDING, "pb-4 pt-4")}>
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <MobileSearchEntry
-                  cityHubOnly={cityHubOnly}
-                  showSectionIcon={isPublicationPage}
-                  showTapToSelectHint={false}
-                  onSearchClick={() => setIsSearchSheetOpen(true)}
-                  citySlug={displayCity}
-                  currentIntent={displayIntent}
-                  locationLabelOverride={articleGeoLabel}
-                />
-              </div>
-
-              {siteHeaderVariant !== "landing" &&
-                isDiscoveryPage &&
-                intentConfig?.hasFilters &&
-                searchIntent && (
-                  <MobileFilterButton intent={searchIntent} />
-                )}
-            </div>
-          </div>
+        <div className={cn("flex min-w-0 items-center gap-2 px-3", MOBILE_HEADER_ROW_HEIGHT)}>
+          <NavIconButton
+            href={`/${displayCity}`}
+            isActive={false}
+            ariaLabel="На главную"
+            isHomeLogo
+            logoSrc={logoUrl ?? undefined}
+            chrome="dark"
+            className="border-2 border-white bg-white shadow-none"
+          />
+          <MobileSearchEntry
+            variant="chip"
+            cityHubOnly={cityHubOnly}
+            onSearchClick={() => setIsSearchSheetOpen(true)}
+            citySlug={displayCity}
+            currentIntent={displayIntent}
+            locationLabelOverride={articleGeoLabel}
+          />
+          {showFilterButton && searchIntent ? <MobileFilterButton intent={searchIntent} className="h-[52px] w-[52px]" /> : null}
         </div>
       </header>
 

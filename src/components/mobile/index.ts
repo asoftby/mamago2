@@ -3,7 +3,6 @@ export * from "./MobileSearch";
 export * from "./MobileSearchHeroRow";
 export * from "./MobileIntentTabs";
 export * from "./MobileSearchSheet";
-export * from "./MobileBottomNav";
 export * from "./NavIconButton";
-export * from "./PlanPillNavButton";
 export * from "./MobileFilterButton";
+export * from "./MobileBottomBar";

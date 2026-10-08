@@ -67,10 +67,34 @@ export class TelegramWebhookService {
     // The raw payload carries more fields than the narrow legacy type.
     const parsed = parseTelegramUpdate(update as unknown as RawTelegramUpdate);
 
-    if (parsed.kind === "callback" && decodeCallback(parsed.data)) {
-      // inb:/req: buttons: handlers arrive with PR4; acknowledge neutrally.
-      await this.capture.acknowledgeCallback(parsed.callbackQueryId);
-      return {};
+    if (parsed.kind === "callback") {
+      const decoded = decodeCallback(parsed.data);
+      if (decoded) {
+        if (parsed.chatId == null) {
+          await this.capture.acknowledgeCallback(parsed.callbackQueryId);
+          return {};
+        }
+
+        const chatId = String(parsed.chatId);
+        const allowlist = this.capture.getAllowlist();
+        const connection =
+          allowlist.size > 0
+            ? await this.capture.findActiveConnection(chatId)
+            : null;
+
+        if (!connection || !allowlist.has(connection.userId)) {
+          await this.capture.acknowledgeCallback(parsed.callbackQueryId);
+          return {};
+        }
+
+        await this.capture.touchConnection(chatId);
+        await this.capture.handleCallback(
+          planOwnerWithoutFamily(connection.userId),
+          parsed,
+          decoded,
+        );
+        return {};
+      }
     }
 
     if (parsed.kind === "capture") {
@@ -105,11 +129,15 @@ export class TelegramWebhookService {
     if (!connection || !allowlist.has(connection.userId)) return null;
 
     await this.capture.touchConnection(chatId);
-    const result = await this.capture.receive(
-      planOwnerWithoutFamily(connection.userId),
-      this.capture.getEnvironment(),
-      parsed,
-    );
+    const owner = planOwnerWithoutFamily(connection.userId);
+    const environment = this.capture.getEnvironment();
+
+    const edit = await this.capture.tryEdit(owner, environment, parsed);
+    if (edit) {
+      return edit.afterResponse ? { afterResponse: edit.afterResponse } : {};
+    }
+
+    const result = await this.capture.receive(owner, environment, parsed);
     return result.afterResponse ? { afterResponse: result.afterResponse } : {};
   }
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CalendarDays, StickyNote } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { formatHHMM } from "@/lib/formatters/date";
@@ -55,7 +56,7 @@ export function PlanItemCard({
   const image = item.activity?.coverImageUrl ?? item.coverImageUrl;
   const category = presentation.isCatalog
     ? resolvePlanItemCategoryLabel(item.activity)
-    : presentation.typeLabel;
+    : null;
   const time = formatTime(item.effectiveStartsAt);
   const endTime = formatTime(item.endsAt);
   const age = item.activity?.ageLabel ?? null;
@@ -134,7 +135,7 @@ export function PlanItemCard({
 
   const imageNode = (
     <div
-      className="h-[118px] w-[176px] shrink-0 overflow-hidden rounded-[14px] max-sm:h-[84px] max-sm:w-[112px] max-sm:rounded-[12px]"
+      className="h-[118px] w-[176px] shrink-0 overflow-hidden rounded-[14px] max-sm:h-[72px] max-sm:w-[72px] max-sm:rounded-[12px]"
       style={{ background: "#EEE8DE" }}
     >
       {image ? (
@@ -162,7 +163,7 @@ export function PlanItemCard({
   return (
     <article
       className={showCatalogMedia
-        ? "group grid grid-cols-[176px_minmax(0,1fr)_auto] items-center gap-5 rounded-[18px] border p-[14px] transition-[border-color,transform] duration-200 max-sm:grid-cols-[112px_minmax(0,1fr)_auto] max-sm:gap-3 max-sm:p-3"
+        ? "group grid grid-cols-[176px_minmax(0,1fr)_auto] items-center gap-5 rounded-[18px] border p-[14px] transition-[border-color,transform] duration-200 max-sm:grid-cols-[72px_minmax(0,1fr)_auto] max-sm:gap-3 max-sm:p-3"
         : "group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-[18px] border p-4 transition-[border-color] duration-200"}
       style={{
         background: isPrivate ? "#F3EFE7" : "#FAF7F1",
@@ -183,6 +184,17 @@ export function PlanItemCard({
 
       <div className="flex min-w-0 flex-col gap-1.5">
         <div className="flex flex-wrap items-center gap-2">
+          <span
+            aria-label={presentation.isCatalog ? "Событие" : "Заметка"}
+            title={presentation.isCatalog ? "Событие" : "Заметка"}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg"
+            style={{
+              color: presentation.isCatalog ? "#C24E22" : "#C98A19",
+              background: presentation.isCatalog ? "#FFF0EA" : "#FFF4D9",
+            }}
+          >
+            {presentation.isCatalog ? <CalendarDays size={14} /> : <StickyNote size={14} />}
+          </span>
           {category && (
             <span
               className="font-mono text-[10px] uppercase tracking-[0.12em]"
