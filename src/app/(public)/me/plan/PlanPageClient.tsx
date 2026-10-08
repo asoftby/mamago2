@@ -129,16 +129,19 @@ function itemForCacheMessage(item: SerializedPlanItem): string {
   return item.source === "MANUAL" ? "Календарь обновлён" : "План обновлён";
 }
 
-function pluralizeDays(n: number) {
-  if (n === 1) return "день";
-  if (n >= 2 && n <= 4) return "дня";
-  return "дней";
+function pluralizeEvents(n: number) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "событие";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "события";
+  return "событий";
 }
 
-function pluralizeEvents(n: number) {
-  if (n === 1) return "событие";
-  if (n >= 2 && n <= 4) return "события";
-  return "событий";
+function formatNearestWeekItem(date: string, todayISO: string): string {
+  if (date === todayISO) return "сегодня";
+  if (date === addDaysIso(todayISO, 1)) return "завтра";
+  const parsed = new Date(`${date}T12:00:00`);
+  return parsed.toLocaleDateString("ru-RU", { weekday: "long" });
 }
 
 function formatAddedDate(iso: string) {
@@ -291,7 +294,6 @@ export function PlanPageClient({
   initialSelectedDate,
   initialRange,
   familyChildren,
-  ideaActivityIds,
   initialIdeas = [],
   scenarioStatusByDate = {},
   experienceCandidates = [],
@@ -395,8 +397,23 @@ export function PlanPageClient({
 
   const dayItems = filterFamilyCalendarItems(itemsByDate[selectedDate] ?? [], calendarFilter);
   const conflictIds = useMemo(() => findFamilyCalendarConflictIds(dayItems), [dayItems]);
-  const totalItems = visibleItems.length;
-  const totalDays = Object.keys(itemsByDate).length;
+  const selectedWeekStart = getWeekStart(selectedDate);
+  const selectedWeekEnd = addDaysIso(selectedWeekStart, 6);
+  const weekItems = visibleItems
+    .filter((item) => item.date >= selectedWeekStart && item.date <= selectedWeekEnd)
+    .sort((a, b) => {
+      const byDate = a.date.localeCompare(b.date);
+      if (byDate !== 0) return byDate;
+      return (a.effectiveStartsAt ?? a.startsAt ?? "").localeCompare(
+        b.effectiveStartsAt ?? b.startsAt ?? "",
+      );
+    });
+  const selectedWeekByDate = weekItems.reduce<Record<string, SerializedPlanItem[]>>((acc, item) => {
+    (acc[item.date] ??= []).push(item);
+    return acc;
+  }, {});
+  const nearestWeekItem =
+    weekItems.find((item) => item.date >= todayISO) ?? weekItems[0] ?? null;
 
   const replaceCachedItem = useCallback((saved: SerializedPlanItem) => {
     setItemsByWeek((current) => upsertCalendarWeekItem(current, saved));
@@ -504,24 +521,25 @@ export function PlanPageClient({
           <div className="flex flex-col items-end">
             <button
               type="button"
-              onClick={() => totalItems > 0 && setOverviewOpen(true)}
-              disabled={totalItems === 0}
-              aria-label={totalItems > 0 ? "Посмотреть загруженные недели" : "План пока пуст"}
+              onClick={() => weekItems.length > 0 && setOverviewOpen(true)}
+              disabled={weekItems.length === 0}
+              aria-label={weekItems.length > 0 ? "Открыть обзор недели" : "На этой неделе план пока пуст"}
               style={{
-                padding: "14px 16px",
+                padding: "16px 18px",
                 background: "#FAF7F1",
                 border: "1px solid rgba(20,18,16,.10)",
                 borderRadius: 14,
-                minWidth: 220,
-                textAlign: "right",
+                width: "100%",
+                maxWidth: 320,
+                textAlign: "left",
                 display: "flex",
                 flexDirection: "column",
-                gap: 4,
-                cursor: totalItems > 0 ? "pointer" : "default",
+                gap: 8,
+                cursor: weekItems.length > 0 ? "pointer" : "default",
                 transition: "border-color .18s, transform .18s",
               }}
               onMouseEnter={(event) => {
-                if (totalItems > 0) {
+                if (weekItems.length > 0) {
                   event.currentTarget.style.borderColor = "rgba(20,18,16,.32)";
                   event.currentTarget.style.transform = "translateY(-2px)";
                 }
@@ -532,34 +550,17 @@ export function PlanPageClient({
               }}
             >
               <span
-                className="font-mono uppercase"
-                style={{ fontSize: 11, letterSpacing: ".14em", color: "var(--primary)" }}
-              >
-                ● загружено
-              </span>
-              <div
                 className="font-sans"
-                style={{ fontSize: 34, lineHeight: 1, letterSpacing: "-.02em", color: "#141210" }}
+                style={{ fontSize: 17, lineHeight: 1.35, color: "#141210" }}
               >
-                {totalItems} {pluralizeEvents(totalItems)}
-              </div>
-              <div
-                className="font-mono uppercase"
-                style={{ fontSize: 11, letterSpacing: ".06em", color: "rgba(20,18,16,.55)" }}
-              >
-                на {totalDays} {pluralizeDays(totalDays)}
-                {ideaActivityIds.length > 0 ? ` · ${ideaActivityIds.length} идей` : ""}
-              </div>
-              {totalItems > 0 && (
-                <span
-                  style={{
-                    marginTop: 4,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "#C24E22",
-                  }}
-                >
-                  Обзор недель →
+                На этой неделе запланировано {weekItems.length} {pluralizeEvents(weekItems.length)}
+                {nearestWeekItem
+                  ? `, ближайшее ${formatNearestWeekItem(nearestWeekItem.date, todayISO)}`
+                  : ""}
+              </span>
+              {weekItems.length > 0 && (
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#C24E22" }}>
+                  Обзор недели
                 </span>
               )}
             </button>
@@ -617,7 +618,7 @@ export function PlanPageClient({
         <div className="mt-4 flex flex-wrap gap-2" aria-label="Фильтр по члену семьи">
           {([
             ["all", "Все"],
-            ["family", "Я / Семья"],
+            ["family", "Взрослые"],
             ...familyChildren.map((child) => [`child:${child.id}`, child.name]),
           ] as Array<[FamilyCalendarFilter, string]>).map(([value, label]) => (
             <button
@@ -667,9 +668,9 @@ export function PlanPageClient({
       <PlanOverviewDialog
         open={overviewOpen}
         onOpenChange={setOverviewOpen}
-        itemsByDate={itemsByDate}
-        totalItems={totalItems}
-        totalDays={totalDays}
+        itemsByDate={selectedWeekByDate}
+        totalItems={weekItems.length}
+        totalDays={Object.keys(selectedWeekByDate).length}
         onRemove={handleRemoveItem}
         familyView={familyUi ? familyView : null}
         onVisibilityChange={handleVisibilityChange}
