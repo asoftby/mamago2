@@ -29,7 +29,7 @@ import { MyPlanHeader } from "./MyPlanHeader";
 import { RecommendationDecisionBlock } from "./RecommendationDecisionBlock";
 import { PlanRecommendationCta } from "./PlanRecommendationCta";
 import { PlanStickyCounter } from "./PlanStickyCounter";
-import { QuickAddPlanNoteSheet } from "./QuickAddPlanNoteSheet";
+import { requestOpenQuickAdd } from "@/lib/my-plan/myPlanOpenIntent";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
@@ -438,7 +438,6 @@ export function PlanMainContent({
   const [showAddPersonaTypeModal, setShowAddPersonaTypeModal] = useState(false);
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [hiddenPlanItemIds, setHiddenPlanItemIds] = useState<Set<string>>(() => new Set());
   const pendingRemovalIdsRef = useRef<Set<string>>(new Set());
   const [awaitingAgeAnswer, setAwaitingAgeAnswer] = useState(false);
@@ -1281,11 +1280,7 @@ export function PlanMainContent({
             renderPastDay(false)
           ) : (
             <>
-              {isPastDay ? (
-          renderPastDay(true)
-        ) : (
-          <>
-            {renderRecommendationContext()}
+              {renderRecommendationContext()}
 
                   {awaitingAgeAnswer ? (
                     <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} />
@@ -1310,8 +1305,6 @@ export function PlanMainContent({
                   ) : null}
 
                   {renderBottomActions()}
-          </>
-        )}
             </>
           )}
         </div>
@@ -1365,7 +1358,11 @@ export function PlanMainContent({
           />
         ) : null}
 
-        {renderRecommendationContext()}
+        {isPastDay ? (
+          renderPastDay(true)
+        ) : (
+          <>
+            {renderRecommendationContext()}
 
         {awaitingAgeAnswer ? (
           <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} compact />
@@ -1392,22 +1389,15 @@ export function PlanMainContent({
         ) : null}
 
         {renderBottomActions()}
+          </>
+        )}
       </div>
 
       <PlanStickyCounter
         count={totalPlannedCount}
         onClick={handleOpenPlanPage}
-        onAdd={() => setQuickAddOpen(true)}
+        onAdd={isPastDay ? undefined : () => requestOpenQuickAdd(selectedDate)}
         compact
-      />
-
-      <QuickAddPlanNoteSheet
-        open={quickAddOpen}
-        onOpenChange={setQuickAddOpen}
-        selectedDate={selectedDate}
-        childrenList={childrenList.map((child) => ({ id: child.id, name: child.name }))}
-        city={city}
-        onRequestClose={onRequestClose}
       />
 
       <AddPersonaTypeModal

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { monthMatrix, type DateKey } from "@/lib/date/dateKey";
+import type { PlanScopeFilter } from "@/features/my-plan/lib/planVisibilityView";
 import { DesktopWeek } from "./DesktopWeek";
 import { MobileStrip } from "./MobileStrip";
 import { usePlanCalendar } from "./usePlanCalendar";
@@ -15,6 +16,7 @@ export type PlanCalendarProps = {
   variant: "widget" | "page";
   /** Overrides the built-in markers (family = "family", child = memberId). */
   dayMarkers?: Record<DateKey, Array<"family" | string>>;
+  markerScope?: PlanScopeFilter;
   minDate?: DateKey;
   maxDate?: DateKey;
   className?: string;
@@ -28,7 +30,7 @@ const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayout
  * < 600px → swipe strip, otherwise week row. SSR renders the week row; the mode
  * is refined before first paint on the client. Row height is the same in both.
  */
-export function PlanCalendar({ value, onChange, variant, dayMarkers, minDate, maxDate, className }: PlanCalendarProps) {
+export function PlanCalendar({ value, onChange, variant, dayMarkers, markerScope = "all", minDate, maxDate, className }: PlanCalendarProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [narrow, setNarrow] = useState(false);
   const focusAfterMove = useRef(false);
@@ -69,7 +71,7 @@ export function PlanCalendar({ value, onChange, variant, dayMarkers, minDate, ma
     return { from: calendar.days[0]!, to: calendar.days[6]! };
   }, [narrow, stripRange, monthView, calendar.days]);
 
-  const fetched = usePlanDayCounts(range, { enabled: !dayMarkers });
+  const fetched = usePlanDayCounts(range, { enabled: !dayMarkers, scope: markerScope });
   const markers = dayMarkers ?? fetched;
 
   // After a keyboard move, keep focus on the (possibly re-rendered) selected cell.

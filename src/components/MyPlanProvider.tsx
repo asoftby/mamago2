@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { MobileBottomBar } from "@/components/mobile/MobileBottomBar";
 import { MyPlanWidget, MyPlanMobileWidget, MyPlanOverlay } from "@/features/my-plan";
+import { PlanQuickAddHost } from "@/features/my-plan/components/PlanQuickAddHost";
 import { MyPlanStateProvider } from "@/features/my-plan/hooks/useMyPlan";
 import { appendMyPlanOpenToHref, MY_PLAN_OPEN_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
 import {
@@ -80,13 +81,14 @@ function MyPlanOverlayHost({ pathname }: { pathname: string }) {
 
   return (
     <>
-      {!hidePlanEntryEffective ? <MyPlanWidget onOpen={handleOpenMyPlan} /> : null}
+      {!hidePlanEntryEffective ? <MyPlanWidget /> : null}
       {!hideMobileBottomBar ? (
         <MobileBottomBar>
-          <MyPlanMobileWidget onOpen={handleOpenMyPlan} />
+          <MyPlanMobileWidget />
         </MobileBottomBar>
       ) : null}
       <MyPlanOverlay open={planOpen} onOpenChange={handlePlanOpenChange} />
+      <PlanQuickAddHost />
     </>
   );
 }

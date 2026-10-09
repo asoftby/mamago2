@@ -5,7 +5,8 @@ import {
   listFamilyCalendarItems,
   ManualPlanEntryError,
 } from "@/server/services/manualPlanEntry.service";
-import { buildPlanDayMarkers } from "@/server/services/planDayMarkers";
+import { buildScopedPlanDayMarkers } from "@/server/services/planDayMarkers";
+import { parsePlanScopeFilter } from "@/features/my-plan/lib/planVisibilityView";
 
 /**
  * Lightweight day aggregates for the plan calendar: date → distinct owners
@@ -18,9 +19,10 @@ export async function GET(request: NextRequest) {
   try {
     const from = request.nextUrl.searchParams.get("from") ?? "";
     const to = request.nextUrl.searchParams.get("to") ?? "";
+    const scope = parsePlanScopeFilter(request.nextUrl.searchParams.get("scope"));
     const items = await listFamilyCalendarItems({ owner: await resolvePlanOwner(user.id), from, to });
     return NextResponse.json(
-      { markers: buildPlanDayMarkers(items) },
+      { markers: buildScopedPlanDayMarkers(items, scope, user.id) },
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {

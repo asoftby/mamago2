@@ -135,7 +135,7 @@ export interface EventFormData {
   repeatUntil: string | null; // YYYY-MM-DD
   
   // Step 5: Pricing & Participation
-  pricingMode: "free" | "fixed" | "from";
+  pricingMode: "free" | "fixed" | "from" | "on_request";
   price: string;
   priceDetails: string; // Optional details for "from" mode (e.g., different ticket categories)
   priceItems: PriceData;

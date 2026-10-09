@@ -576,7 +576,6 @@ export function ArticleInfoCard({
                   <span className="min-w-0 break-words">
                     {location.label && <strong className="mb-0.5 block font-medium">{location.label}</strong>}
                     {location.address && <span className="block">{location.address}</span>}
-                    {location.coordinates && <small className="block break-all font-mono text-xs text-muted-foreground">{location.coordinates.latitude}, {location.coordinates.longitude}</small>}
                   </span>
                 </span>
                 <span className="flex flex-wrap items-center gap-2 sm:shrink-0">

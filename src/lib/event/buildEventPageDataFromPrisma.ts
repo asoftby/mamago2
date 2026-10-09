@@ -166,6 +166,7 @@ function priceTextWithCurrencyIfNeeded(text: string): string {
   if (
     lower.includes("бесплатно") ||
     lower.includes("уточняйте") ||
+    lower === "по запросу" ||
     /€|\$|£|₽/.test(text)
   ) {
     return text;
@@ -190,7 +191,9 @@ function priceLabel(
 ): string {
   const pricingMode = getScheduleJsonString(activity, "pricingMode")?.trim().toLowerCase();
   const explicitFrom = pricingMode === "from";
+  if (pricingMode === "on_request") return "По запросу";
   const t = activity.priceText?.trim();
+  if (t?.toLowerCase() === "по запросу") return "По запросу";
 
   if (t) {
     const label = priceTextWithCurrencyIfNeeded(t);
@@ -248,6 +251,29 @@ function getScheduleJsonString(
 ): string | undefined {
   const value = getScheduleJsonRecord(activity)?.[key];
   return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * Phone-only prebooking must remain actionable even when the event/venue
+ * Contacts section is empty. Prefer the explicitly configured prebook number
+ * and preserve any other contact numbers without duplication.
+ */
+export function resolveEventActionPhones(activity: ActivityForEventPageInput): NormalizedPhone[] {
+  const contacts = resolveActivityPhones(activity);
+  if (
+    getScheduleJsonString(activity, "participationMode") !== "prebook" ||
+    getScheduleJsonString(activity, "prebookMethod") !== "phone"
+  ) {
+    return contacts;
+  }
+
+  const prebook = getNormalizedPhones({
+    phone: getScheduleJsonString(activity, "prebookPhone"),
+    phoneLabel: "Предварительная запись",
+  });
+  if (prebook.length === 0) return contacts;
+  const preferred = prebook[0]!;
+  return [preferred, ...contacts.filter((contact) => contact.href !== preferred.href)];
 }
 
 export function resolvePurchaseUrl(activity: Pick<ActivityForEventPageInput, "scheduleJson">): string | undefined {
@@ -608,7 +634,7 @@ export function buildEventPageDataFromPrismaActivity(
       saveLabel: "В идеи",
       purchaseUrl: resolvePurchaseUrl(activity),
       simpleBooking: resolveSimpleBooking(activity.id, activity),
-      phones: resolveActivityPhones(activity),
+      phones: resolveEventActionPhones(activity),
     },
     resolvedCta: resolveEventCanonicalCta(activity),
     reelsUrl: resolveReelsUrl(activity),
