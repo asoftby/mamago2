@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowRight, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMyPlan } from "../hooks/useMyPlan";
 import {
@@ -11,6 +11,7 @@ import {
   type PlanCapsuleModel,
 } from "../lib/planCapsule";
 import { MY_PLAN_FULL_PAGE_HREF } from "../lib/upcomingPlanItems";
+import { requestOpenMyPlan } from "@/lib/my-plan/myPlanOpenIntent";
 
 function DateBubble({ bubble, className }: { bubble: PlanCapsuleDateBubble; className?: string }) {
   return (
@@ -34,10 +35,12 @@ export function MyPlanCapsuleView({
   model,
   loading = false,
   className,
+  openInOverlay = false,
 }: {
   model: PlanCapsuleModel;
   loading?: boolean;
   className?: string;
+  openInOverlay?: boolean;
 }) {
   const isEmpty = model.kind === "empty";
   const ariaLabel = loading ? "Мой план" : model.ariaLabel;
@@ -45,6 +48,15 @@ export function MyPlanCapsuleView({
   return (
     <Link
       href={MY_PLAN_FULL_PAGE_HREF}
+      role={openInOverlay ? "button" : undefined}
+      aria-haspopup={openInOverlay ? "dialog" : undefined}
+      onClick={openInOverlay ? (event) => { event.preventDefault(); requestOpenMyPlan(); } : undefined}
+      onKeyDown={openInOverlay ? (event) => {
+        if (event.key === " ") {
+          event.preventDefault();
+          requestOpenMyPlan();
+        }
+      } : undefined}
       aria-label={ariaLabel}
       aria-busy={loading || undefined}
       data-my-plan-capsule
@@ -54,7 +66,7 @@ export function MyPlanCapsuleView({
         "touch-manipulation outline-none transition-colors",
         "focus-visible:ring-[3px] focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         isEmpty || loading
-          ? "border-[1.5px] border-dashed border-brand bg-surface pr-4"
+          ? "border border-brand/30 bg-surface pr-4"
           : "bg-brand pr-4 text-white hover:bg-brand-hover active:bg-brand-active",
         className,
       )}
@@ -90,20 +102,18 @@ export function MyPlanCapsuleView({
         </>
       ) : (
         <>
-          <span
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand"
-            aria-hidden
-          >
-            <Plus className="h-5 w-5" />
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft/65 text-primary" aria-hidden>
+            <CalendarDays className="h-[19px] w-[19px]" strokeWidth={1.8} />
           </span>
-          <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-            <span className="block truncate text-[12px] leading-tight text-brand-active">
-              {loading ? "Мой план" : "Мой план пуст"}
+          <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+            <span className="block text-[12px] leading-tight text-text-main">
+              Мой <em className="font-display italic text-primary">план</em>
             </span>
-            <span className="block truncate text-[15px] font-medium leading-tight text-text-main">
-              {loading ? "Загружаем…" : "Добавьте событие ♡"}
+            <span className="block text-[13px] font-medium leading-[1.2] text-text-main lg:line-clamp-2">
+              {loading ? "Загружаем…" : "Добавим что-нибудь?"}
             </span>
           </span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-text-main/65" aria-hidden />
         </>
       )}
     </Link>
@@ -111,7 +121,7 @@ export function MyPlanCapsuleView({
 }
 
 /** Капсула с данными плана; пересчитывается при возврате на вкладку/в окно, без поллинга. */
-export function MyPlanCapsule({ className }: { className?: string }) {
+export function MyPlanCapsule({ className, openInOverlay = false }: { className?: string; openInOverlay?: boolean }) {
   const {
     planSummary,
     planSummaryLoading,
@@ -159,5 +169,5 @@ export function MyPlanCapsule({ className }: { className?: string }) {
     [isAuthenticated, now, planSummary, todayIso],
   );
 
-  return <MyPlanCapsuleView model={model} loading={loading} className={className} />;
+  return <MyPlanCapsuleView model={model} loading={loading} className={className} openInOverlay={openInOverlay} />;
 }

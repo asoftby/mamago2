@@ -4,6 +4,7 @@ import { formatPublicCardPrice } from "./publicCardPrice";
 
 test("formats canonical public card price semantics", () => {
   assert.equal(formatPublicCardPrice({ priceMode: "FREE", priceFrom: 0 }), "Бесплатно");
+  assert.equal(formatPublicCardPrice({ priceMode: "ON_REQUEST", priceFrom: null }), "По запросу");
   assert.equal(formatPublicCardPrice({ priceMode: "EXACT", priceFrom: 30, priceTo: 30 }), "30,00 \uE901");
   assert.equal(formatPublicCardPrice({ priceMode: "FROM", priceFrom: 30 }), "от 30,00 \uE901");
   assert.equal(formatPublicCardPrice({ priceMode: "RANGE", priceFrom: 30, priceTo: 120 }), "от 30,00 \uE901");

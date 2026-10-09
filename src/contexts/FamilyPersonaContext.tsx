@@ -49,16 +49,17 @@ function buildPersonas(me: MeApiUser, children: FamilyChildRow[]): FamilyPersona
   return [adult, ...childPersonas];
 }
 
-function readStoredIds(fallback: string[]): string[] {
-  if (typeof window === "undefined") return fallback;
+function readStoredIds(): string[] {
+  if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_SELECTED);
-    if (!raw) return fallback;
+    /** Нет сохранённого выбора = новый/не настроенный пользователь = свободный поиск. */
+    if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return fallback;
+    if (!Array.isArray(parsed)) return [];
     return parsed.filter((x): x is string => typeof x === "string");
   } catch {
-    return fallback;
+    return [];
   }
 }
 
@@ -163,7 +164,7 @@ export function FamilyPersonaProvider({ children }: { children: React.ReactNode 
       const built = buildPersonas(authUser, children);
       const allIds = built.map((p) => p.id);
       const allowed = new Set(allIds);
-      const stored = readStoredIds(allIds);
+      const stored = readStoredIds();
       const next = normalizeStoredSelection(stored, allowed, built, authUser.id);
       setSelectedPersonaIdsState((prev) => {
         if (hasUserTouchedSelectionRef.current) {

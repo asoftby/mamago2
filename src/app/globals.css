@@ -327,6 +327,44 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   --sidebar-ring: oklch(0.439 0 0);
 }
 
+/* Plan calendar (features/plan-calendar). Own --plan-* namespace: shadcn --accent stays untouched. */
+:root {
+  --plan-ink: #141210;
+  --plan-surface: #f3eee4;
+  --plan-cell: #faf7f1;
+  --plan-line: rgba(20, 18, 16, 0.1);
+  --plan-muted: rgba(20, 18, 16, 0.55);
+  --plan-faint: rgba(20, 18, 16, 0.35);
+  --plan-accent: #e86a3a; /* fills: dots, today ring; owned by "Family" */
+  --plan-accent-ink: #c24e22; /* text on light backgrounds */
+  --plan-on-ink: #faf7f1;
+  /* Child dot palette (deterministic by childId); orange is reserved for Family */
+  --plan-child-1: #2f8f83;
+  --plan-child-2: #3b6fd4;
+  --plan-child-3: #8a5cc7;
+  --plan-child-4: #5e9b3b;
+  --plan-child-5: #c94f8a;
+  --plan-child-6: #9a7b2f;
+}
+
+.dark {
+  --plan-ink: #faf7f1;
+  --plan-surface: #231f1b;
+  --plan-cell: #1b1815;
+  --plan-line: rgba(250, 247, 241, 0.14);
+  --plan-muted: rgba(250, 247, 241, 0.6);
+  --plan-faint: rgba(250, 247, 241, 0.38);
+  --plan-accent: #f07f52;
+  --plan-accent-ink: #f59a74;
+  --plan-on-ink: #141210;
+  --plan-child-1: #4fb3a5;
+  --plan-child-2: #6e95ee;
+  --plan-child-3: #a98be0;
+  --plan-child-4: #83bb5f;
+  --plan-child-5: #e07aab;
+  --plan-child-6: #c4a04f;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

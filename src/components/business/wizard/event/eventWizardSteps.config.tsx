@@ -365,6 +365,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       
       const pricingLabels = {
         free: "Бесплатно",
+        on_request: "По запросу",
         fixed: isValidPrice ? formatPrice(priceValue) : "—",
         from: isValidPrice ? formatPriceFrom(priceValue) : "—",
       };
@@ -380,7 +381,7 @@ export const EVENT_WIZARD_STEPS: WizardStepConfig<EventFormData>[] = [
       const participationLabels = {
         "external-link": "Покупка по ссылке",
         "time-slots": "Запись по времени",
-        "walk-in": "Узнать подробнее",
+        "walk-in": "Без отдельного действия",
         "prebook": "Предварительная запись",
       };
       const effectiveParticipation = data.participationMode;
