@@ -41,7 +41,7 @@ import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 
-type Props = { route: PublicRouteCardModel };
+type Props = { route: PublicRouteCardModel; canEdit: boolean };
 
 function buildGoogleMapsUrl(stops: PublicRouteCardModel["stops"]): string {
   const withCoords = stops.filter((s) => s.lat != null && s.lng != null);
@@ -280,7 +280,7 @@ function StopCard({
   );
 }
 
-export function RouteDetailClient({ route }: Props) {
+export function RouteDetailClient({ route, canEdit }: Props) {
   const [shareOpen, setShareOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const [inPlan, setInPlan] = useState(false);
@@ -292,7 +292,7 @@ export function RouteDetailClient({ route }: Props) {
   const [stickyBarVisible, setStickyBarVisible] = useState(false);
   const actionBlockRef = useRef<HTMLDivElement>(null);
   const stickyBarRef = useRef<HTMLDivElement>(null);
-  const { isAuthenticated, user } = useAuthMe();
+  const { isAuthenticated } = useAuthMe();
 
   // Снимаем фокус при скрытии sticky bar
   useEffect(() => {
@@ -315,13 +315,6 @@ export function RouteDetailClient({ route }: Props) {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-
-  // Check if user can edit this route (author or admin)
-  const canEdit =
-    user &&
-    (route.authorName === user.email ||
-      user.role === "ADMIN" ||
-      user.role === "MODERATOR");
 
   const handlePhotoClick = (photos: string[], initialIndex: number) => {
     setGalleryPhotos(photos);
