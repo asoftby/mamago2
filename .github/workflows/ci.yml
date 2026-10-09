@@ -153,6 +153,7 @@ jobs:
           pnpm exec tsx src/features/my-plan/lib/planPagePresentation.test.ts
           pnpm test:experience-feedback
           pnpm test:plan-experience-contract
+          pnpm exec tsx src/server/services/experience/pastPlanArchive.contract.test.ts
 
       - name: Account greeting regressions
         run: pnpm exec tsx src/features/me/lib/accountGreeting.test.ts

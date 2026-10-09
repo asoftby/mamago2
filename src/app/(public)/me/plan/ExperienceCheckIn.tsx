@@ -61,10 +61,34 @@ export function ExperienceCheckIn({
   const [selectedSentiment, setSelectedSentiment] = useState<Sentiment | null>(null);
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [snoozed, setSnoozed] = useState(false);
   const [message, setMessage] = useState("");
   const [phoneModalOpen, setPhoneModalOpen] = useState(false);
   const [complete, setComplete] = useState(false);
   const [exitState, setExitState] = useState<"visible" | "leaving" | "hidden">("visible");
+
+  const currentPlanItemId = submitted?.planItemId ?? candidate?.planItemId ?? null;
+  useEffect(() => {
+    if (!currentPlanItemId) return;
+    try {
+      const until = Number(window.localStorage.getItem("mamago:experience-snooze:" + currentPlanItemId));
+      if (until > Date.now()) setSnoozed(true);
+    } catch {
+      // Storage unavailable.
+    }
+  }, [currentPlanItemId]);
+
+  function postpone() {
+    if (currentPlanItemId) {
+      try {
+        window.localStorage.setItem("mamago:experience-snooze:" + currentPlanItemId, String(Date.now() + 86400000));
+      } catch {
+        // Still allow dismiss.
+      }
+    }
+    setSnoozed(true);
+  }
 
   useEffect(() => {
     if (!complete) return;
@@ -76,7 +100,7 @@ export function ExperienceCheckIn({
     };
   }, [complete]);
 
-  if ((!candidate && !submitted) || exitState === "hidden") return null;
+  if ((!candidate && !submitted) || exitState === "hidden" || snoozed) return null;
 
   async function confirm(attendance: "ATTENDED" | "NOT_ATTENDED") {
     if (!candidate || busy) return;
@@ -144,7 +168,7 @@ export function ExperienceCheckIn({
     <>
       <section
         aria-labelledby="experience-check-in-title"
-        className={`mb-8 rounded-2xl border border-[rgba(20,18,16,.12)] bg-[#FAF7F1] p-5 transition-all duration-300 sm:p-6 ${exitState === "leaving" ? "translate-y-2 opacity-0" : "opacity-100"}`}
+        className={`mb-5 rounded-2xl border border-[rgba(20,18,16,.12)] bg-[#FAF7F1] p-4 transition-all duration-300 sm:p-5 ${exitState === "leaving" ? "translate-y-2 opacity-0" : "opacity-100"}`}
       >
         <p className="font-mono text-[11px] uppercase tracking-[.14em] text-[var(--primary)]">
           Как прошло?
@@ -154,8 +178,16 @@ export function ExperienceCheckIn({
         </h2>
         <p className="mt-1 text-sm text-[#6B6258]">{formatDate(shownDate)}</p>
 
-        {!submitted ? (
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+        {!submitted && !expanded ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button type="button" aria-expanded={false} onClick={() => setExpanded(true)}
+              className="min-h-11 rounded-xl bg-[#141210] px-4 py-2 text-sm font-semibold text-white">
+              Оценить →
+            </button>
+            <button type="button" onClick={postpone} className="min-h-11 px-2 text-xs text-[#6B6258]">Напомнить завтра</button>
+          </div>
+        ) : !submitted ? (
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
               disabled={busy}
@@ -172,6 +204,7 @@ export function ExperienceCheckIn({
             >
               Не получилось
             </button>
+            <button type="button" disabled={busy} onClick={postpone} className="min-h-11 px-3 text-sm text-[#6B6258] disabled:opacity-50">Позже</button>
           </div>
         ) : submitted.attendance === "NOT_ATTENDED" ? (
           <p className="mt-4 font-semibold text-[#3A332B]">Не получилось</p>
@@ -227,7 +260,7 @@ export function ExperienceCheckIn({
                 type="button"
                 disabled={busy}
                 onClick={() => {
-                  setComplete(true);
+                  postpone();
                   setMessage("Можете оставить отзыв позже");
                 }}
                 className="min-h-11 text-sm font-medium text-[#6B6258] disabled:opacity-50"

@@ -17,6 +17,8 @@ import {
   type ExperienceCheckInCandidate,
   type ExperienceCheckInState,
 } from "./ExperienceCheckIn";
+import { PastPlanArchive } from "./PastPlanArchive";
+import type { PastPlanEntry } from "@/server/services/experience/pastPlanEntries.service";
 import { ManualPlanEntryDialog } from "./ManualPlanEntryDialog";
 import { addDays, monthName, startOfWeek, todayKey } from "@/lib/date/dateKey";
 import {
@@ -107,6 +109,9 @@ type Props = {
   scenarioStatusByDate?: Record<string, "ready" | "changed">;
   experienceCandidates?: ExperienceCheckInCandidate[];
   recentExperiences?: ExperienceCheckInState[];
+  pastEntries?: PastPlanEntry[];
+  pastEntriesHasNext?: boolean;
+  pastEntriesPage?: number;
   activeReminder?: {
     id: string;
     title: string;
@@ -291,6 +296,9 @@ export function PlanPageClient({
   scenarioStatusByDate = {},
   experienceCandidates = [],
   recentExperiences = [],
+  pastEntries = [],
+  pastEntriesHasNext = false,
+  pastEntriesPage = 0,
 }: Props) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -578,6 +586,7 @@ export function PlanPageClient({
           candidates={experienceCandidates}
           recentExperiences={recentExperiences}
         />
+        <PastPlanArchive entries={pastEntries} hasNext={pastEntriesHasNext} page={pastEntriesPage} selectedDate={selectedDate} />
       </Container>
 
       {familyUi && (
