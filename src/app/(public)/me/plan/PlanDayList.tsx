@@ -99,7 +99,7 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
                 className="font-mono uppercase"
                 style={{ fontSize: 11, letterSpacing: ".12em", color: "rgba(20,18,16,.55)" }}
               >
-                {items.length} {items.length === 1 ? "пункт" : items.length <= 4 ? "пункта" : "пунктов"}
+                {items.length} {items.length % 10 === 1 && items.length % 100 !== 11 ? "запись" : [2, 3, 4].includes(items.length % 10) && (items.length % 100 < 12 || items.length % 100 > 14) ? "записи" : "записей"}
               </span>
             )}
             <button

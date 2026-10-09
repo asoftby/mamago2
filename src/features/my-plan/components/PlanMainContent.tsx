@@ -1088,7 +1088,9 @@ export function PlanMainContent({
   const planCalendar = onChangeDate ? (
     <div
       id="plan-week-calendar"
-      className="min-w-0 rounded-[18px] border border-[var(--plan-line)] bg-[var(--plan-surface)] p-3.5"
+      className={isDesktop
+        ? "min-w-0 bg-transparent px-0 py-3"
+        : "min-w-0 rounded-[18px] border border-[var(--plan-line)] bg-[var(--plan-surface)] p-3.5"}
     >
       <PlanCalendar value={selectedDate} onChange={onChangeDate} variant="widget" />
     </div>

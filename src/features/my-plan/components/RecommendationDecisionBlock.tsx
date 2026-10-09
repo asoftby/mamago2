@@ -63,7 +63,7 @@ export function RecommendationDecisionBlock({
           ) : (
             <Sparkles className="h-[17px] w-[17px] text-primary" />
           )}
-          Подобрать за пару секунд
+          Найдем активности за пару сек
         </button>
       </div>
 

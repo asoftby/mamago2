@@ -4,5 +4,5 @@ import { MyPlanCapsule } from "./MyPlanCapsule";
 
 /** Мобильный (< lg) «Мой план» в нижней панели: [капсула flex:1] [🔔] [👤]. Сжимается только капсула. */
 export function MyPlanMobileWidget() {
-  return <MyPlanCapsule className="min-w-0 flex-1" />;
+  return <MyPlanCapsule className="min-w-0 flex-1 !h-[52px]" />;
 }
