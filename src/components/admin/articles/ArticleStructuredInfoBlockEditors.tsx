@@ -182,7 +182,7 @@ export function ArticleContactsBlockEditor({ value, onChange, hideAddress = fals
   </div>;
 }
 
-const PRICE_LABELS: Record<SharedPriceData["mode"], string> = { FREE: "Бесплатно", EXACT: "Точная", FROM: "От", RANGE: "Диапазон", NONE: "Не применяется", UNKNOWN: "Не указана" };
+const PRICE_LABELS: Record<SharedPriceData["mode"], string> = { FREE: "Бесплатно", ON_REQUEST: "По запросу", EXACT: "Точная", FROM: "От", RANGE: "Диапазон", NONE: "Не применяется", UNKNOWN: "Не указана" };
 
 export function ArticlePriceBlockEditor({ value, onChange }: { value: SharedPriceData; onChange: (value: SharedPriceData) => void }) {
   const updateAmount = (key: "min" | "max", raw: string) => { const amount = raw === "" ? null : Number(raw); const next = { ...value, [key]: Number.isFinite(amount) ? amount : null }; onChange(next.mode === "EXACT" ? { ...next, min: next.min, max: next.min } : next); };

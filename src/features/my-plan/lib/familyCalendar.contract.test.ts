@@ -26,14 +26,15 @@ test("calendar and manual routes require auth and keep domain logic in owner-sco
 test("My Plan uses bounded calendar ranges, URL date state, cached weeks, and visible navigation", () => {
   const page = read("src/app/(public)/me/plan/page.tsx");
   const client = read("src/app/(public)/me/plan/PlanPageClient.tsx");
-  const week = read("src/app/(public)/me/plan/WeekCalendar.tsx");
+  const week = read("src/features/plan-calendar/DesktopWeek.tsx");
   assert.doesNotMatch(page, /listAllPlanItems/);
   assert.match(page, /loadFamilyCalendarRange/);
   assert.match(client, /\/api\/plan\/calendar\?from=/);
   assert.match(client, /shouldFetchCalendarWeek/);
-  assert.match(client, /router\.replace/);
-  assert.match(week, /getPrevWeekStart/);
-  assert.match(week, /getNextWeekStart/);
+  assert.match(client, /history\.replaceState/);
+  assert.match(client, /<PlanCalendar/);
+  assert.match(week, /shiftWeek\(-1\)/);
+  assert.match(week, /shiftWeek\(1\)/);
   assert.match(week, /Сегодня/);
 });
 

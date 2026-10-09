@@ -9,7 +9,7 @@ function normalizeRawKey(raw: unknown): string {
 
 /**
  * Нормализует режим цены из scheduleJson / черновика / БД.
- * Удалённый режим «По запросу» (on-request / ON_REQUEST) → «Цена от», если есть цена, иначе «Бесплатно».
+ * Явный режим «По запросу» сохраняется; отсутствие цены само по себе не делает событие бесплатным.
  */
 export function normalizePricingMode(
   raw: unknown,
@@ -33,9 +33,7 @@ export function normalizePricingMode(
   if (key === "free") return "free";
   if (key === "fixed") return "fixed";
   if (key === "from") return "from";
-  if (key === "on_request" || key === "onrequest") {
-    return ptValid || hasNumeric ? "from" : "free";
-  }
+  if (key === "on_request" || key === "onrequest") return "on_request";
 
   if (raw == null || raw === "") {
     if (!ptValid && !hasNumeric) return "free";

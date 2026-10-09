@@ -1,0 +1,26 @@
+import { filterByScope, type PlanScopeFilter, type PlanVisibilityItem } from "@/features/my-plan/lib/planVisibilityView";
+
+/** Marker owner: `family` for items without a child, else the child id. */
+export type PlanDayMarkerOwner = "family" | string;
+
+export function buildPlanDayMarkers(
+  items: ReadonlyArray<{ date: string; childId: string | null }>,
+): Record<string, PlanDayMarkerOwner[]> {
+  const byDate: Record<string, PlanDayMarkerOwner[]> = {};
+  for (const item of items) {
+    const owner = item.childId ?? "family";
+    const owners = (byDate[item.date] ??= []);
+    if (!owners.includes(owner)) owners.push(owner);
+  }
+  return byDate;
+}
+
+
+/** Match the visibility filter of the My Plan list after the authorized family query. */
+export function buildScopedPlanDayMarkers<T extends PlanVisibilityItem & { date: string; childId: string | null }>(
+  items: ReadonlyArray<T>,
+  scope: PlanScopeFilter,
+  currentUserId: string,
+): Record<string, PlanDayMarkerOwner[]> {
+  return buildPlanDayMarkers(filterByScope([...items], scope, currentUserId));
+}

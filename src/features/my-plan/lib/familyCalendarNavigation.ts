@@ -1,11 +1,7 @@
-import { addDaysIso, getWeekStart } from "./weekCalendar";
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+import { addDays, isDateKey, startOfWeek } from "@/lib/date/dateKey";
 
 export function isValidCalendarDate(value: unknown): value is string {
-  if (typeof value !== "string" || !DATE_RE.test(value)) return false;
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(Date.UTC(year!, month! - 1, day!)).toISOString().slice(0, 10) === value;
+  return isDateKey(value);
 }
 
 export function resolveCalendarDateParam(value: unknown, today: string): string {
@@ -13,12 +9,12 @@ export function resolveCalendarDateParam(value: unknown, today: string): string 
 }
 
 export function calendarWeekRange(date: string): { from: string; to: string } {
-  const from = getWeekStart(date);
-  return { from, to: addDaysIso(from, 6) };
+  const from = startOfWeek(date);
+  return { from, to: addDays(from, 6) };
 }
 
 export function shouldFetchCalendarWeek<T>(cache: Readonly<Record<string, readonly T[]>>, date: string): boolean {
-  return cache[getWeekStart(date)] === undefined;
+  return cache[startOfWeek(date)] === undefined;
 }
 
 export function upsertCalendarWeekItem<T extends { id: string; date: string }>(
@@ -29,7 +25,7 @@ export function upsertCalendarWeekItem<T extends { id: string; date: string }>(
   for (const [week, items] of Object.entries(cache)) {
     next[week] = items.filter((current) => current.id !== item.id);
   }
-  const targetWeek = getWeekStart(item.date);
+  const targetWeek = startOfWeek(item.date);
   next[targetWeek] = [...(next[targetWeek] ?? []), item];
   return next;
 }
