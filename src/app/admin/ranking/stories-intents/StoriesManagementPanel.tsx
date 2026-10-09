@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { getCityTimeZone } from "@/lib/stories/getCityTimeZone";
 import { zonedDateKey, zonedDayRange } from "@/lib/stories/ranges";
 import { addOfferOccurrenceAction, editCanonicalStoryAction, editStoryItemAction } from "@/app/admin/content/stories/actions";
-import { getWeekDays, getWeekStart } from "@/features/my-plan/lib/weekCalendar";
+import { startOfWeek, weekDays as weekDaysOf } from "@/lib/date/dateKey";
 import { AdminStoryDateScale } from "./AdminStoryDateScale";
 import { MAX_HOME_STORY_ITEMS_PER_DATE } from "@/server/stories/homeStoryItems";
 import { loadPublicStoryCollections } from "@/server/stories/loadPublicStoryCollections";
@@ -22,7 +22,7 @@ export async function StoriesManagementPanel({ searchParams }: Props) {
   const today = zonedDateKey(new Date(), timeZone);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(query.date ?? "") ? query.date! : today;
   const range = zonedDayRange(date, 1, timeZone);
-  const weekDays = getWeekDays(getWeekStart(date));
+  const weekDays = weekDaysOf(startOfWeek(date));
   const weekRange = zonedDayRange(weekDays[0]!, 7, timeZone);
   const now = new Date();
   const previewNow = date === today ? now : new Date(range.start.getTime() + 12 * 60 * 60 * 1000);

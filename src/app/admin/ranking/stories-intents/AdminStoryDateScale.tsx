@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { WeekCalendarStrip } from "@/features/my-plan/components/WeekCalendarStrip";
+import { WeekCalendarStrip } from "./WeekCalendarStrip";
 import { pluralizeStories } from "./storiesAdminDateScale";
 
 export function AdminStoryDateScale({ selectedDate, counts }: { selectedDate: string; counts: Record<string, number> }) {

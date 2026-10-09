@@ -5247,3 +5247,45 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Reason deferred: зависит от Opportunity Engine и configurable `GeoContentMix`.
 - Acceptance criteria: weekly plan с target/actual mix; warning при нехватке качественных региональных тем; editable cityShare/regionShare/nationalShare (сумма 100%).
 - Source: feat/seo-admin-geo-context-20261006-2.
+
+## [BACKLOG-181] Plan summary/day API считают без семьи — точки и список виджета могут расходиться
+
+- Status: OPEN
+- Priority: P2
+- Area: My Plan / Family
+- Added: 2026-10-07
+- Reason deferred: PlanCalendar (PR feat/plan-calendar) берёт точки из `/api/plan/day-markers` (семья через `resolvePlanOwner`/`activePlanScopeFor`), но не трогает остальные эндпоинты виджета.
+- Context: `/api/save/plan/summary` и `/api/save/plan/day` используют `listPlanItemsInRange(user.id, …)` без семейной области видимости, а страница читает `/api/plan/calendar` (семья). У пользователя в семье точка на дне может быть (запись другого взрослого/ребёнка), а список виджета для этого дня — пустой; `nearestDate`/счётчики «В плане: N» считаются по другой выборке.
+- Acceptance criteria: summary/day/upcoming переведены на тот же scope, что и календарь (`activePlanScopeFor`), счётчики виджета совпадают с точками и страницей; тест на расхождение в семье из двух взрослых.
+- Source: feat/plan-calendar-20261007.
+
+## [BACKLOG-182] Свести разрозненные `addDaysIso` и `toISOString().split("T")[0]` к `lib/date/dateKey`
+
+- Status: OPEN
+- Priority: P3
+- Area: Dates
+- Added: 2026-10-07
+- Reason deferred: в PR PlanCalendar переведены только `familyCalendarNavigation` и админская лента; остальное вне scope.
+- Context: `lib/date/dateKey.ts` — единый модуль дат (Europe/Minsk для «сегодня»). Остались локальные копии/сдвиг на день через UTC: `app/api/save/plan/summary/route.ts` (`addDaysIso`), `app/api/save/plan/upcoming/route.ts`, `server/services/plan.service.ts` (стр. ~509, 544, 666), `features/my-plan/hooks/useMyPlan.tsx` (`addDaysIso`, `todayISO`), `features/my-plan/components/PlanMainContent.tsx` (`addDaysIso`, `new Date().toISOString().split("T")[0]` как fallback «сегодня»), `features/my-plan/components/GuestMyPlanPanel.tsx`, `app/admin/commercial/contracts/CreateContractWizard.tsx`. `addDaysLocal` в `lib/date/localDateKey.ts` дублирует `addDays`.
+- Acceptance criteria: перечисленные места используют `dateKey`; `toISOString().split("T")[0]` для «сегодня» не остаётся.
+- Source: feat/plan-calendar-20261007.
+
+## [BACKLOG-183] Цвет ребёнка в профиле (`Child.color`)
+
+- Status: OPEN
+- Priority: P3
+- Area: Family / Profile
+- Added: 2026-10-07
+- Reason deferred: PlanCalendar красит точки детей детерминированно по хешу `childId` из палитры `--plan-child-1..6`; поле в схеме требует миграции и UI выбора.
+- Acceptance criteria: `Child.color` (nullable, из той же палитры токенов), выбор в профиле ребёнка, `ownerColor()` предпочитает сохранённый цвет.
+- Source: feat/plan-calendar-20261007.
+
+## [BACKLOG-184] Рекомендации и «Собрать сценарий» для прошедших дат в виджете
+
+- Status: DONE (2026-10-07, feat/plan-calendar-20261007: past day shows records only, empty state «В этот день записей не было»)
+- Priority: P3
+- Area: My Plan
+- Added: 2026-10-07
+- Reason deferred: прошедшие дни стали доступны в виджете (просмотр «что было вчера»), но блок рекомендаций/подборок и сценария дня не адаптирован под прошлое.
+- Acceptance criteria: для даты < сегодня виджет показывает только записи; рекомендации/подборки/сценарий скрыты.
+- Source: feat/plan-calendar-20261007.
