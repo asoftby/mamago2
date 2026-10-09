@@ -5,6 +5,7 @@ import {
   type Experience,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isSameExperienceFeedback, normalizeExperienceFeedbackComment } from "@/lib/experience/feedback";
 import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
 import { SubjectSchema, type Subject } from "@/lib/decision/decisionContext";
 import { findMostRecentSubjectsSnapshot } from "@/lib/decision/subjects";
@@ -53,7 +54,7 @@ export async function listRecentExperienceSummaries(input: {
   // Family Core M1a: an Experience is keyed by the adult who recorded it but is
   // visible to every adult who can see its plan item (PRIVATE items stay hidden).
   const candidates = await prisma.experience.findMany({
-    where: { userId: { in: memberIds }, entityType: "EVENT" },
+    where: { userId: { in: memberIds }, entityType: "EVENT", attendance: "ATTENDED", feedbackSentiment: null },
     orderBy: { attendanceConfirmedAt: "desc" },
     take: memberIds.length > 1 ? take * 5 : take,
   });
@@ -404,8 +405,10 @@ export async function submitExperienceFeedback(input: {
   userId: string;
   experienceId: string;
   sentiment: ExperienceSentiment;
+  comment?: string | null;
   sessionId?: string | null;
 }): Promise<Experience> {
+  const comment = normalizeExperienceFeedbackComment(input.comment);
   const found = await prisma.experience.findUnique({ where: { id: input.experienceId } });
   let existing = found && found.userId === input.userId ? found : null;
   if (found && !existing) {
@@ -419,7 +422,7 @@ export async function submitExperienceFeedback(input: {
   if (existing.attendance !== "ATTENDED") {
     throw new ExperienceDomainError("feedback_not_allowed", "Feedback requires attended experience");
   }
-  if (existing.feedbackSentiment && existing.feedbackSentiment !== input.sentiment) {
+  if (existing.feedbackSentiment && !isSameExperienceFeedback(existing, { sentiment: input.sentiment, comment })) {
     throw new ExperienceDomainError("feedback_conflict", "Feedback has already been submitted");
   }
 
@@ -427,10 +430,10 @@ export async function submitExperienceFeedback(input: {
   if (!existing.feedbackSentiment) {
     const updated = await prisma.experience.updateMany({
       where: { id: existing.id, feedbackSentiment: null },
-      data: { feedbackSentiment: input.sentiment, feedbackAt: new Date() },
+      data: { feedbackSentiment: input.sentiment, feedbackComment: comment, feedbackAt: new Date() },
     });
     experience = await prisma.experience.findUniqueOrThrow({ where: { id: existing.id } });
-    if (updated.count === 0 && experience.feedbackSentiment !== input.sentiment) {
+    if (updated.count === 0 && !isSameExperienceFeedback(experience, { sentiment: input.sentiment, comment })) {
       throw new ExperienceDomainError("feedback_conflict", "Feedback has already been submitted");
     }
   }
@@ -449,6 +452,7 @@ export function serializeExperience(experience: Experience) {
     attendance: experience.attendance,
     attendanceConfirmedAt: experience.attendanceConfirmedAt.toISOString(),
     feedbackSentiment: experience.feedbackSentiment,
+    feedbackComment: experience.feedbackComment,
     feedbackAt: experience.feedbackAt?.toISOString() ?? null,
   };
 }

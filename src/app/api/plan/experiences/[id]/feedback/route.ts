@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH } from "@/lib/experience/feedback";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import {
@@ -10,6 +11,7 @@ import {
 
 const requestSchema = z.object({
   sentiment: z.enum(["LIKE", "NEUTRAL", "DISLIKE"]),
+  comment: z.string().trim().max(MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH).nullable().optional(),
 }).strict();
 
 export async function POST(
@@ -24,11 +26,15 @@ export async function POST(
     if (!parsed.success) {
       return NextResponse.json({ error: "invalid_sentiment" }, { status: 400 });
     }
+    if (!user.phoneE164 || !user.phoneVerifiedAt) {
+      return NextResponse.json({ error: "PHONE_NOT_VERIFIED", message: "Подтвердите номер телефона, чтобы оставить отзыв" }, { status: 403 });
+    }
     const { id } = await context.params;
     const experience = await submitExperienceFeedback({
       userId: user.id,
       experienceId: id,
       sentiment: parsed.data.sentiment,
+      comment: parsed.data.comment,
       sessionId: await getSessionRowIdFromCookies(),
     });
     return NextResponse.json({ experience: serializeExperience(experience) });
