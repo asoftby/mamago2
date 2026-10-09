@@ -2,17 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
 import {
-  buildWeekMonthLabel,
-  getNextWeekStart,
-  getPrevWeekStart,
-  getWeekDays,
-  getWeekStart,
-  preserveWeekday,
-} from "../lib/weekCalendar";
-
-const WEEKDAY_SHORT_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"] as const;
+  addDays,
+  dayOfMonth,
+  monthName,
+  startOfWeek,
+  todayKey,
+  weekDays as weekDaysOf,
+  weekdayShort,
+  yearOf,
+} from "@/lib/date/dateKey";
 
 const ChevronLeft = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -29,8 +28,6 @@ type WeekCalendarStripProps = {
   selectedDate: string;
   onChangeDate?: (iso: string) => void;
   className?: string;
-  compact?: boolean;
-  showArrows?: boolean;
   itemsByDate?: Record<string, unknown[]>;
   plannedCountByDate?: Record<string, number>;
   countLabelByDate?: Record<string, string>;
@@ -54,8 +51,6 @@ export function WeekCalendarStrip({
   selectedDate,
   onChangeDate,
   className,
-  compact = false,
-  showArrows = true,
   itemsByDate,
   plannedCountByDate,
   countLabelByDate,
@@ -64,17 +59,15 @@ export function WeekCalendarStrip({
 }: WeekCalendarStripProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const compactScrollTimerRef = useRef<number | null>(null);
 
   const [visibleWeekStart, setVisibleWeekStart] = useState(() =>
-    getWeekStart(selectedDate),
+    startOfWeek(selectedDate),
   );
 
   const [prevSelectedDate, setPrevSelectedDate] = useState(selectedDate);
   if (selectedDate !== prevSelectedDate) {
-    const ws = getWeekStart(selectedDate);
-    const prevWs = getWeekStart(prevSelectedDate);
+    const ws = startOfWeek(selectedDate);
+    const prevWs = startOfWeek(prevSelectedDate);
     if (prevWs !== ws) setVisibleWeekStart(ws);
     setPrevSelectedDate(selectedDate);
   }
@@ -85,105 +78,57 @@ export function WeekCalendarStrip({
     }
   }, [selectedDate]);
 
-  const weekDays = useMemo(() => getWeekDays(visibleWeekStart), [visibleWeekStart]);
-  const compactDays = useMemo(() => {
-    const today = getLocalDateKey();
-    const defaultStart = addDaysLocal(today, -7);
-    const defaultFutureEnd = addDaysLocal(today, 67);
-    const start = allowPastDates
-      ? addDaysLocal(selectedDate, -14)
-      : selectedDate > defaultFutureEnd
-        ? addDaysLocal(selectedDate, -7)
-        : defaultStart;
-    return Array.from({ length: allowPastDates ? 45 : 75 }, (_, index) =>
-      addDaysLocal(start, index),
-    );
-  }, [allowPastDates, selectedDate]);
-  const renderedDays = compact ? compactDays : weekDays;
-  const monthLabel = useMemo(() => buildWeekMonthLabel(weekDays, selectedDate), [weekDays, selectedDate]);
-  const yearLabel = useMemo(() => new Date(`${visibleWeekStart}T12:00:00`).getFullYear(), [visibleWeekStart]);
-  const todayIso = getLocalDateKey();
-  const todayWeekStart = getWeekStart(todayIso);
+  const weekDays = useMemo(() => weekDaysOf(visibleWeekStart), [visibleWeekStart]);
+  const monthLabel = monthName(selectedDate).toUpperCase();
+  const yearLabel = yearOf(visibleWeekStart);
+  const todayIso = todayKey();
+  const todayWeekStart = startOfWeek(todayIso);
   const canShiftToPreviousWeek = allowPastDates || visibleWeekStart > todayWeekStart;
 
   const selectDate = (nextDate: string) => {
     const clampedDate = !allowPastDates && nextDate < todayIso ? todayIso : nextDate;
-    setVisibleWeekStart(getWeekStart(clampedDate));
+    setVisibleWeekStart(startOfWeek(clampedDate));
     onChangeDate?.(clampedDate);
   };
 
   const shiftWeek = (dir: 1 | -1) => {
     if (dir === -1 && !canShiftToPreviousWeek) return;
 
-    const nextStart = dir === 1
-      ? getNextWeekStart(visibleWeekStart)
-      : getPrevWeekStart(visibleWeekStart);
-    const preservedDate = preserveWeekday(selectedDate, nextStart);
-    selectDate(preservedDate);
+    selectDate(addDays(selectedDate, dir * 7));
   };
 
   const selectToday = () => {
     selectDate(todayIso);
   };
 
-  const handleCompactScroll = () => {
-    if (!compact) return;
-    if (compactScrollTimerRef.current != null) {
-      window.clearTimeout(compactScrollTimerRef.current);
-    }
-    compactScrollTimerRef.current = window.setTimeout(() => {
-      const container = scrollRef.current;
-      if (!container) return;
-      const buttons = Array.from(
-        container.querySelectorAll<HTMLButtonElement>("[data-plan-date]"),
-      );
-      if (buttons.length === 0) return;
-      const containerRect = container.getBoundingClientRect();
-      const center = containerRect.left + containerRect.width / 2;
-      let nearest = buttons[0]!;
-      let nearestDistance = Number.POSITIVE_INFINITY;
-      for (const button of buttons) {
-        const buttonRect = button.getBoundingClientRect();
-        const buttonCenter = buttonRect.left + buttonRect.width / 2;
-        const distance = Math.abs(buttonCenter - center);
-        if (distance < nearestDistance) {
-          nearest = button;
-          nearestDistance = distance;
-        }
-      }
-      const nextDate = nearest.dataset.planDate;
-      if (nextDate && nextDate !== selectedDate) selectDate(nextDate);
-    }, 90);
-  };
-
   return (
     <div
       className={cn(className)}
       style={{
-        padding: compact ? "18px 14px 16px" : "14px 14px 12px",
+        padding: "14px 14px 12px",
         background: "#FAF7F1",
         border: "1px solid rgba(20,18,16,.10)",
         borderRadius: 18,
       }}
     >
       {/* Strip: arrows + days в одной строке */}
-      <div style={{ display: "grid", gridTemplateColumns: showArrows ? "36px 1fr 36px" : "1fr", gap: 10, alignItems: "center" }}>
-        {showArrows ? <button
+      <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 28px", gap: 8, alignItems: "center" }}>
+        <button
           type="button"
           onClick={() => shiftWeek(-1)}
           disabled={!canShiftToPreviousWeek}
           aria-label="Предыдущая неделя"
           style={{
-            width: 36, height: 36, borderRadius: 99,
-            background: "#fff", border: "1px solid rgba(20,18,16,.16)",
+            width: 28, height: 28, borderRadius: 99,
+            background: "transparent", border: "1px solid rgba(20,18,16,.18)",
             color: "#3A332B", cursor: canShiftToPreviousWeek ? "pointer" : "default",
             display: "flex", alignItems: "center", justifyContent: "center",
             flexShrink: 0,
             opacity: canShiftToPreviousWeek ? 1 : 0.35,
           }}
-        ><ChevronLeft /></button> : null}
+        ><ChevronLeft /></button>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: compact ? 10 : 6 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {/* Month + year + quick jump to today */}
           <div
             style={{
@@ -241,37 +186,9 @@ export function WeekCalendarStrip({
           {/* Days row */}
           <div
             ref={scrollRef}
-            onScroll={compact ? handleCompactScroll : undefined}
-            onTouchStart={(event) => {
-              if (compact) return;
-              const touch = event.touches[0];
-              if (touch) touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-            }}
-            onTouchEnd={(event) => {
-              if (compact) return;
-              const start = touchStartRef.current;
-              const touch = event.changedTouches[0];
-              touchStartRef.current = null;
-              if (!start || !touch) return;
-              const dx = touch.clientX - start.x;
-              const dy = touch.clientY - start.y;
-              if (Math.abs(dx) < 36 || Math.abs(dx) <= Math.abs(dy)) return;
-              shiftWeek(dx < 0 ? 1 : -1);
-            }}
-            className={compact ? "no-scrollbar" : undefined}
-            style={{
-              display: "flex",
-              gap: compact ? 8 : 3,
-              overflowX: compact ? "auto" : "visible",
-              scrollSnapType: compact ? "x mandatory" : undefined,
-              WebkitOverflowScrolling: compact ? "touch" : undefined,
-              scrollbarWidth: compact ? "none" : undefined,
-              touchAction: compact ? "pan-x pan-y" : "pan-y",
-              paddingInline: compact ? 2 : 0,
-            }}
+            style={{ display: "flex", gap: 3 }}
           >
-            {renderedDays.map((iso) => {
-              const d = new Date(`${iso}T12:00:00`);
+            {weekDays.map((iso) => {
               const selected = iso === selectedDate;
               const isToday = iso === todayIso;
               const isPast = iso < todayIso;
@@ -283,17 +200,15 @@ export function WeekCalendarStrip({
               return (
                 <button
                   key={iso}
-                  data-plan-date={iso}
                   ref={selected ? selectedRef : undefined}
                   type="button"
                   disabled={!allowPastDates && isPast && !selected}
                   onClick={() => (allowPastDates || !isPast) && selectDate(iso)}
                   style={{
-                    flex: compact ? "0 0 54px" : "1 1 0",
-                    minWidth: compact ? 54 : 0,
-                    scrollSnapAlign: compact ? "center" : undefined,
-                    minHeight: countLabelByDate ? 70 : compact ? 62 : 56,
-                    padding: compact ? "8px 4px 12px" : "7px 4px 11px",
+                    flex: "1 1 0",
+                    minWidth: 0,
+                    minHeight: countLabelByDate ? 70 : 56,
+                    padding: "7px 4px 11px",
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
@@ -324,7 +239,7 @@ export function WeekCalendarStrip({
                         : "rgba(20,18,16,.55)",
                     }}
                   >
-                    {WEEKDAY_SHORT_RU[d.getDay()]}
+                    {weekdayShort(iso)}
                   </span>
                   <span
                     style={{
@@ -346,7 +261,7 @@ export function WeekCalendarStrip({
                         : null),
                     }}
                   >
-                    {d.getDate()}
+                    {dayOfMonth(iso)}
                   </span>
                   {countLabelByDate ? (
                     <span style={{ fontSize: 9, lineHeight: 1.1, whiteSpace: "nowrap", color: selected ? "rgba(250,247,241,.72)" : "rgba(20,18,16,.58)" }}>
@@ -385,18 +300,18 @@ export function WeekCalendarStrip({
           </div>
         </div>
 
-        {showArrows ? <button
+        <button
           type="button"
           onClick={() => shiftWeek(1)}
           aria-label="Следующая неделя"
           style={{
-            width: 36, height: 36, borderRadius: 99,
-            background: "#fff", border: "1px solid rgba(20,18,16,.16)",
+            width: 28, height: 28, borderRadius: 99,
+            background: "transparent", border: "1px solid rgba(20,18,16,.18)",
             color: "#3A332B", cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
             flexShrink: 0,
           }}
-        ><ChevronRight /></button> : null}
+        ><ChevronRight /></button>
       </div>
     </div>
   );

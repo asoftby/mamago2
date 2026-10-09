@@ -17,7 +17,8 @@ import {
 } from "@/features/filters/discovery/childrenScope.store";
 import { toast } from "@/lib/toast";
 import { LiquidNotification } from "@/components/ui/liquid-notification";
-import { WeekCalendarStrip } from "./WeekCalendarStrip";
+import { PlanCalendar } from "@/features/plan-calendar";
+import { pluralRu, relativeLabel } from "@/lib/date/dateKey";
 import { UpcomingPlanBlock } from "./UpcomingPlanBlock";
 import { selectUpcomingPlanItems } from "../lib/upcomingPlanItems";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
@@ -69,7 +70,6 @@ interface PlanMainContentProps {
   nearestPlanDate?: string | null;
   nearestPlanCount?: number;
   nearestPlanItems?: PlanItemWithActivity[];
-  plannedCountByDate?: Record<string, number>;
   serverPlanSnapshotConfirmed?: boolean;
   todayIso?: string;
   layout?: "default" | "desktop";
@@ -294,23 +294,6 @@ function buildAutoPlanHint(input: {
 const RECOMMENDATIONS_BLOCK_SUBTITLE =
   "Подобрано на основании ваших интересов и предпочтений";
 
-function pluralizeActivities(count: number): string {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return "запись";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "записи";
-  return "записей";
-}
-
-/** Short day label for the compact "day context" line above the plan-item list. */
-function formatDayContextLabel(selectedDate: string, todayKey: string): string {
-  if (selectedDate === todayKey) return "Сегодня";
-  if (selectedDate === addDaysIso(todayKey, 1)) return "Завтра";
-  const d = new Date(selectedDate + "T12:00:00");
-  const label = d.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
 function formatRecommendationHeading(selectedDate: string, todayKey: string): string {
   const d = new Date(selectedDate + "T12:00:00");
   const dayMonth = d.toLocaleDateString("ru-RU", {
@@ -423,7 +406,6 @@ export function PlanMainContent({
   nearestPlanDate = null,
   nearestPlanCount = 0,
   nearestPlanItems = [],
-  plannedCountByDate = {},
   serverPlanSnapshotConfirmed = false,
   todayIso,
   layout = "default",
@@ -692,9 +674,9 @@ export function PlanMainContent({
   const handleOpenPlanPage = useCallback(() => {
     onRequestClose?.();
     window.setTimeout(() => {
-      router.push("/me/plan");
+      router.push(`/me/plan?date=${selectedDate}`);
     }, 0);
-  }, [onRequestClose, router]);
+  }, [onRequestClose, router, selectedDate]);
 
   /** «Собрать сценарий дня» — переход на отдельную страницу, а не модалка поверх модалки. */
   const handleOpenScenarioPage = useCallback(() => {
@@ -1102,7 +1084,65 @@ export function PlanMainContent({
    * дня и не пропадает навсегда для дня, который снова опустел.
    */
   const showDecisionFork = dayPartSections.length === 0 && !hasRequestedSuggestions;
-  const dayContextLabel = formatDayContextLabel(selectedDate, todayKey);
+  // One calendar for both layouts: strip vs week row is chosen by container width.
+  const planCalendar = onChangeDate ? (
+    <div
+      id="plan-week-calendar"
+      className={isDesktop
+        ? "min-w-0 bg-transparent px-0 py-3"
+        : "min-w-0 rounded-[18px] border border-[var(--plan-line)] bg-[var(--plan-surface)] p-3.5"}
+    >
+      <PlanCalendar value={selectedDate} onChange={onChangeDate} variant="widget" />
+    </div>
+  ) : null;
+  const dayContextLabel = relativeLabel(selectedDate, todayKey);
+
+  const renderDayPlanSection = (compact: boolean) => (
+    <section aria-label="В вашем плане">
+      <p
+        style={{
+          margin: compact ? "0 0 18px" : "0 0 14px",
+          fontSize: 13,
+          color: "rgba(20,18,16,.55)",
+        }}
+      >
+        <span style={{ color: "#141210", fontWeight: 600 }}>{dayContextLabel}</span>
+        {" · "}
+        {totalPlannedCount} {pluralRu(totalPlannedCount, ["запись", "записи", "записей"])}
+      </p>
+      <div className={compact ? "space-y-3" : "space-y-2"}>
+        {dayPartSections.map((section) =>
+          section.items.map((item) => (
+            <PlanItemRow
+              key={item.id}
+              item={item}
+              participantLabel={
+                item.childId
+                  ? childrenList.find((child) => child.id === item.childId)?.name ?? null
+                  : null
+              }
+              onRemove={() => handleRemoveFromPlan(item.id)}
+            />
+          )),
+        )}
+      </div>
+    </section>
+  );
+
+  const isPastDay = selectedDate < todayKey;
+
+  /** Past days: records only — no recommendations, decision fork or scenario CTA. */
+  const renderPastDay = (compact: boolean) =>
+    isPendingDateHydration ? null : dayPartSections.length > 0 ? (
+      renderDayPlanSection(compact)
+    ) : (
+      <p
+        role="status"
+        className="rounded-[24px] border border-dashed border-neutral-300 bg-neutral-50 p-4 text-center text-sm text-neutral-600"
+      >
+        В этот день записей не было
+      </p>
+    );
 
   const renderRecommendationArea = (compact: boolean) => {
     if (isPendingDateHydration) {
@@ -1125,37 +1165,7 @@ export function PlanMainContent({
         className="space-y-4 outline-none"
         {...PLAN_RECOMMENDATION_RESULTS_A11Y}
       >
-        {dayPartSections.length > 0 ? (
-          <section aria-label="В вашем плане">
-            <p
-              style={{
-                margin: compact ? "0 0 18px" : "0 0 14px",
-                fontSize: 13,
-                color: "rgba(20,18,16,.55)",
-              }}
-            >
-              <span style={{ color: "#141210", fontWeight: 600 }}>{dayContextLabel}</span>
-              {" · "}
-              {totalPlannedCount} {pluralizeActivities(totalPlannedCount)}
-            </p>
-            <div className={compact ? "space-y-3" : "space-y-2"}>
-              {dayPartSections.map((section) =>
-                section.items.map((item) => (
-                  <PlanItemRow
-                    key={item.id}
-                    item={item}
-                    participantLabel={
-                      item.childId
-                        ? childrenList.find((child) => child.id === item.childId)?.name ?? null
-                        : null
-                    }
-                    onRemove={() => handleRemoveFromPlan(item.id)}
-                  />
-                )),
-              )}
-            </div>
-          </section>
-        ) : null}
+        {dayPartSections.length > 0 ? renderDayPlanSection(compact) : null}
 
         <section
           className={compact ? "space-y-3 px-1" : "space-y-3 px-1"}
@@ -1258,17 +1268,7 @@ export function PlanMainContent({
           id="my-plan-recommendations"
           className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-8 pb-6 pt-1"
         >
-          {onChangeDate ? (
-            <div id="plan-week-calendar">
-              <WeekCalendarStrip
-                accent
-                selectedDate={selectedDate}
-                onChangeDate={onChangeDate}
-                showArrows
-                plannedCountByDate={plannedCountByDate}
-              />
-            </div>
-          ) : null}
+          {planCalendar}
 
           {isDesktop && upcomingSelection ? (
             <UpcomingPlanBlock
@@ -1278,31 +1278,37 @@ export function PlanMainContent({
             />
           ) : null}
 
-          {renderRecommendationContext()}
+          {isPastDay ? (
+            renderPastDay(false)
+          ) : (
+            <>
+              {renderRecommendationContext()}
 
-          {awaitingAgeAnswer ? (
-            <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} />
-          ) : showDecisionFork ? (
-            <RecommendationDecisionBlock
-              onDecide={handleDecideClick}
-              isGenerating={isFetchingSuggestions}
-            />
-          ) : null}
+                  {awaitingAgeAnswer ? (
+                    <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} />
+                  ) : showDecisionFork ? (
+                    <RecommendationDecisionBlock
+                      onDecide={handleDecideClick}
+                      isGenerating={isFetchingSuggestions}
+                    />
+                  ) : null}
 
-          {renderRecommendationArea(false)}
+                  {renderRecommendationArea(false)}
 
-          {suggestionsGeneration > 0 ? (
-            <PlanRecommendationCta
-              onRegenerate={handleRegenerate}
-              onCatalog={handleOpenCatalog}
-              isRegenerating={isFetchingSuggestions}
-              batchNumber={suggestionsGeneration}
-              maxBatches={MAX_SUGGESTION_BATCHES}
-              isExhausted={suggestionsExhausted}
-            />
-          ) : null}
+                  {suggestionsGeneration > 0 ? (
+                    <PlanRecommendationCta
+                      onRegenerate={handleRegenerate}
+                      onCatalog={handleOpenCatalog}
+                      isRegenerating={isFetchingSuggestions}
+                      batchNumber={suggestionsGeneration}
+                      maxBatches={MAX_SUGGESTION_BATCHES}
+                      isExhausted={suggestionsExhausted}
+                    />
+                  ) : null}
 
-          {renderBottomActions()}
+                  {renderBottomActions()}
+            </>
+          )}
         </div>
 
         <PlanStickyCounter count={totalPlannedCount} onClick={handleOpenPlanPage} />
@@ -1344,18 +1350,7 @@ export function PlanMainContent({
         id="my-plan-recommendations"
         className="flex-1 space-y-5 overflow-y-auto bg-white px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4"
       >
-        {onChangeDate ? (
-          <div id="plan-week-calendar">
-            <WeekCalendarStrip
-              accent
-              selectedDate={selectedDate}
-              onChangeDate={onChangeDate}
-              compact
-              showArrows={false}
-              plannedCountByDate={plannedCountByDate}
-            />
-          </div>
-        ) : null}
+        {planCalendar}
 
         {isDesktop && upcomingSelection ? (
           <UpcomingPlanBlock
@@ -1365,7 +1360,11 @@ export function PlanMainContent({
           />
         ) : null}
 
-        {renderRecommendationContext()}
+        {isPastDay ? (
+          renderPastDay(true)
+        ) : (
+          <>
+            {renderRecommendationContext()}
 
         {awaitingAgeAnswer ? (
           <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} compact />
@@ -1392,12 +1391,14 @@ export function PlanMainContent({
         ) : null}
 
         {renderBottomActions()}
+          </>
+        )}
       </div>
 
       <PlanStickyCounter
         count={totalPlannedCount}
         onClick={handleOpenPlanPage}
-        onAdd={() => requestOpenQuickAdd(selectedDate)}
+        onAdd={isPastDay ? undefined : () => requestOpenQuickAdd(selectedDate)}
         compact
       />
 

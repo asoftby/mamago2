@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
         : {}),
     };
     const normalizedPrice = normalizePublicationPrice({
-      mode: scheduleJsonWithOrganizer.pricingMode as "free" | "fixed" | "from" | undefined,
+      mode: scheduleJsonWithOrganizer.pricingMode as "free" | "fixed" | "from" | "on_request" | undefined,
       min: body.priceFrom,
       max: body.priceTo,
       priceItems: body.priceItems,

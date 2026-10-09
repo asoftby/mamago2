@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { resolvePurchaseUrl } from "./buildEventPageDataFromPrisma";
+import { resolveEventActionPhones, resolvePurchaseUrl, type ActivityForEventPageInput } from "./buildEventPageDataFromPrisma";
 import { ABWS_DISTRIBUTOR_COMPANY_ID } from "@/lib/abws/saleframeUrl";
 
 /**
@@ -46,6 +46,53 @@ import { ABWS_DISTRIBUTOR_COMPANY_ID } from "@/lib/abws/saleframeUrl";
     },
   });
   assert.equal(url, "https://example.com/book");
+}
+
+// Phone-only prebooking must not lose its actionable telephone CTA when
+// the optional Contacts wizard step is empty.
+{
+  const phones = resolveEventActionPhones({
+    scheduleJson: {
+      participationMode: "prebook",
+      prebookMethod: "phone",
+      prebookPhone: "+375 (29) 123-45-67",
+    },
+    place: null,
+  } as ActivityForEventPageInput);
+  assert.equal(phones.length, 1);
+  assert.equal(phones[0]?.href, "tel:+375291234567");
+  assert.equal(phones[0]?.label, "Предварительная запись");
+}
+
+// Explicit prebook number takes priority over inherited contact numbers,
+// without duplicating the same telephone.
+{
+  const phones = resolveEventActionPhones({
+    scheduleJson: {
+      participationMode: "prebook",
+      prebookMethod: "phone",
+      prebookPhone: "+375291234567",
+    },
+    phone: "+375291234567",
+    phone2: "+375291111111",
+    place: null,
+  } as ActivityForEventPageInput);
+  assert.deepEqual(phones.map((phone) => phone.href), [
+    "tel:+375291234567",
+    "tel:+375291111111",
+  ]);
+}
+
+// Information-only publications must never turn the prebook field into an action.
+{
+  const phones = resolveEventActionPhones({
+    scheduleJson: {
+      participationMode: "none",
+      prebookPhone: "+375291234567",
+    },
+    place: null,
+  } as ActivityForEventPageInput);
+  assert.deepEqual(phones, []);
 }
 
 console.log("buildEventPageDataFromPrisma abws-ticketLink tests: OK");

@@ -298,7 +298,7 @@ export async function POST(request: NextRequest) {
       // Calculate price fields
       let priceFrom: number | null = null;
       let priceTo: number | null = null;
-      let priceMode: "FREE" | "EXACT" | "FROM" | "RANGE" | "NONE" | "UNKNOWN" = "UNKNOWN";
+      let priceMode: "FREE" | "EXACT" | "FROM" | "RANGE" | "NONE" | "UNKNOWN" | "ON_REQUEST" = "UNKNOWN";
       let priceItems: Prisma.InputJsonValue | typeof Prisma.DbNull = Prisma.DbNull;
       let priceText: string | null = null;
 

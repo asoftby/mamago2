@@ -1,4 +1,4 @@
-export const PUBLICATION_PRICE_MODES = ["FREE", "EXACT", "FROM", "RANGE", "NONE", "UNKNOWN"] as const;
+export const PUBLICATION_PRICE_MODES = ["FREE", "ON_REQUEST", "EXACT", "FROM", "RANGE", "NONE", "UNKNOWN"] as const;
 
 export type PublicationPriceMode = (typeof PUBLICATION_PRICE_MODES)[number];
 
@@ -73,7 +73,7 @@ export function parseSafeLegacyPriceText(value: unknown): PriceNormalizationResu
 }
 
 export function normalizePublicationPrice(input: {
-  mode?: PublicationPriceMode | "free" | "fixed" | "from" | "single" | "multiple" | "none" | null;
+  mode?: PublicationPriceMode | "free" | "fixed" | "from" | "single" | "multiple" | "none" | "on_request" | null;
   min?: unknown;
   max?: unknown;
   priceItems?: unknown;
@@ -84,6 +84,7 @@ export function normalizePublicationPrice(input: {
   // Explicit semantic modes are authoritative. A user switching a publication
   // to FREE/NONE must not be overridden by stale tariff rows left in priceItems.
   if (rawMode === "NONE") return result("NONE", null, null, "NONE");
+  if (rawMode === "ON_REQUEST") return result("ON_REQUEST", null, null, "NONE");
   if (rawMode === "FREE") return result("FREE", 0, 0, "NUMERIC");
 
   const values = extractStructuredPriceValues(input.priceItems);

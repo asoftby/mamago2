@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { migrateGuestMyPlanAfterAuth } from "@/lib/my-plan/migrateGuestMyPlanAfterAuth";
 import { useMyPlan } from "../hooks/useMyPlan";
@@ -19,7 +19,8 @@ function isCurrentOrFuturePlanItem(
   todayIso: string,
   nowMs: number,
 ): boolean {
-  if (item.date < todayIso) return false;
+  // Past days are viewable in full ("what happened yesterday"); only today hides started items.
+  if (item.date < todayIso) return true;
   if (item.date > todayIso || item.startsAt == null) return true;
 
   const startsAtMs =
@@ -49,7 +50,6 @@ export function MyPlanPanelContent({
     planItemsByDate,
     scenarioStatusByDate,
     planSummary,
-    planCountsByDate,
     serverConfirmedPlanDates,
     todayIso,
     markSlotSaved,
@@ -68,22 +68,14 @@ export function MyPlanPanelContent({
   const { isAuthenticated, isLoading: authMeLoading } = useAuthMe();
 
   const [isDateLoading, setIsDateLoading] = useState(false);
-  const effectiveSelectedPlanDate =
-    selectedPlanDate < todayIso ? todayIso : selectedPlanDate;
-
-  const handleChangeDate = useCallback(
-    (date: string) => {
-      setSelectedPlanDate(date < todayIso ? todayIso : date);
-    },
-    [setSelectedPlanDate, todayIso],
-  );
+  const effectiveSelectedPlanDate = selectedPlanDate;
+  const handleChangeDate = setSelectedPlanDate;
 
   const visiblePlanItemsByDate = useMemo(() => {
     const nowMs = Date.now();
     const next: Record<string, PlanItemWithActivity[]> = {};
 
     for (const [date, items] of Object.entries(planItemsByDate)) {
-      if (date < todayIso) continue;
       const visibleItems = items.filter((item) =>
         isCurrentOrFuturePlanItem(item, todayIso, nowMs),
       );
@@ -94,25 +86,6 @@ export function MyPlanPanelContent({
 
     return next;
   }, [effectiveSelectedPlanDate, open, planItemsByDate, todayIso]);
-
-  const visiblePlanCountsByDate = useMemo(() => {
-    const next = Object.fromEntries(
-      Object.entries(planCountsByDate).filter(([date]) => date >= todayIso),
-    ) as Record<string, number>;
-
-    for (const date of serverConfirmedPlanDates) {
-      if (date < todayIso) continue;
-      next[date] = visiblePlanItemsByDate[date]?.length ?? 0;
-    }
-
-    return next;
-  }, [planCountsByDate, serverConfirmedPlanDates, todayIso, visiblePlanItemsByDate]);
-
-  /** Старую сохранённую дату виджета никогда не восстанавливаем как активную. */
-  useEffect(() => {
-    if (!open || !isAuthenticated || selectedPlanDate >= todayIso) return;
-    setSelectedPlanDate(todayIso);
-  }, [open, isAuthenticated, selectedPlanDate, setSelectedPlanDate, todayIso]);
 
   /**
    * Recovery bridge for guest "Подбери за меня" -> auth.
@@ -190,18 +163,6 @@ export function MyPlanPanelContent({
     );
   }
 
-  // Не показываем ни одного кадра со старой persisted-датой, пока исправляем state.
-  if (selectedPlanDate < todayIso) {
-    return (
-      <div className="flex min-h-[320px] flex-1 items-center justify-center">
-        <div className="px-6 text-center">
-          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-primary" />
-          <p className="text-gray-600">Загружаем ваш план...</p>
-        </div>
-      </div>
-    );
-  }
-
   if (isLoading || accessPhase === "loading") {
     return (
       <div className="flex items-center justify-center flex-1 min-h-[320px]">
@@ -223,7 +184,6 @@ export function MyPlanPanelContent({
       nearestPlanDate={planSummary?.nearestDate ?? null}
       nearestPlanCount={planSummary?.nearestCount ?? 0}
       nearestPlanItems={planSummary?.nearestItems ?? []}
-      plannedCountByDate={visiblePlanCountsByDate}
       serverPlanSnapshotConfirmed={serverConfirmedPlanDates.includes(effectiveSelectedPlanDate)}
       todayIso={todayIso}
       onAddItemToPlan={markSlotSaved}

@@ -48,7 +48,7 @@ function BetaTipContent({
               "shadow-[0_2px_16px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.7)]",
             ]
           : [
-              "rounded-full px-4 py-3.5",
+              "rounded-full px-4 py-3.5 h-[80px]",
               "shadow-[0_16px_30px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.7)]",
             ],
       )}
@@ -85,15 +85,20 @@ export function BetaTipMobile() {
   if (!visible) return null;
 
   return (
-    <div
-      className={cn(
-        "lg:hidden fixed z-50 left-3 right-3 pointer-events-none",
-      )}
-      /* над виджетом «Мой план» (всегда виден): 12px + 64px + 8px */
-      style={{ bottom: "calc(5.75rem + env(safe-area-inset-bottom, 0px))" }}
-    >
-      <BetaTipContent variant="mobile" onDismiss={dismiss} />
-    </div>
+    <>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-30 bg-[#F6F2EA] lg:hidden"
+        style={{ height: "calc(138px + env(safe-area-inset-bottom, 0px))" }}
+      />
+      <div
+        className="pointer-events-none fixed z-50 left-3 right-3 lg:hidden"
+        /* 10px над нижней панелью высотой 64px */
+        style={{ bottom: "calc(74px + env(safe-area-inset-bottom, 0px))" }}
+      >
+        <BetaTipContent variant="mobile" onDismiss={dismiss} />
+      </div>
+    </>
   );
 }
 

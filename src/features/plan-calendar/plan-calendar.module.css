@@ -1,0 +1,223 @@
+/* Single calendar for "Мой план" (widget + page). Colors come from --plan-* tokens in globals.css. */
+
+.root {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--plan-ink);
+  font-feature-settings: "tnum";
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.monthLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--plan-muted);
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: default;
+}
+button.monthLabel { cursor: pointer; }
+button.monthLabel:hover { color: var(--plan-ink); }
+
+.rule { flex: 1 1 auto; height: 1px; background: var(--plan-line); min-width: 8px; }
+
+.textNav {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--plan-ink);
+  background: none;
+  border: 0;
+  padding: 0 2px;
+  min-height: 32px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.textNav:disabled { color: var(--plan-faint); cursor: default; }
+
+.todayPill {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--plan-line);
+  background: transparent;
+  color: var(--plan-ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.todayPill:disabled { color: var(--plan-faint); cursor: default; }
+
+.row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rowCompact { gap: 6px; }
+
+.arrow {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid var(--plan-line);
+  background: var(--plan-cell);
+  color: var(--plan-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+.arrow:disabled { opacity: 0.35; cursor: default; }
+.rowCompact .arrow { width: 32px; height: 32px; }
+
+.days {
+  flex: 1 1 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+.rowCompact .days { gap: 4px; }
+
+.weekAnim { animation: planWeekIn 220ms ease-out both; }
+.weekAnim[data-dir="-1"] { --plan-shift: -14px; }
+.weekAnim[data-dir="1"] { --plan-shift: 14px; }
+@keyframes planWeekIn {
+  from { opacity: 0; transform: translateX(var(--plan-shift, 0)); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .weekAnim { animation: none; }
+}
+
+/* ---- day cell (shared) ---- */
+.cell {
+  position: relative;
+  box-sizing: border-box;
+  height: 84px;
+  min-width: 0;
+  padding: 10px 2px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 14px;
+  border: 1px solid var(--plan-line);
+  background: var(--plan-cell);
+  color: var(--plan-ink);
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.cell:hover { border-color: var(--plan-ink); }
+.cell:focus-visible { outline: 2px solid var(--plan-accent-ink); outline-offset: 2px; }
+
+.cellMobile { border-color: transparent; background: transparent; border-radius: 12px; }
+.cellMobile:hover { border-color: transparent; }
+
+.dow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  color: var(--plan-muted);
+}
+.dowMonth { font-weight: 700; color: var(--plan-ink); }
+
+.num {
+  font-family: var(--font-display), ui-serif, serif;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.dots { display: flex; gap: 3px; height: 6px; align-items: center; }
+.dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; }
+
+.past:not(.selected) { color: var(--plan-faint); }
+.past:not(.selected) .dow { color: var(--plan-faint); }
+
+.today:not(.selected) .num,
+.today:not(.selected) .dow { color: var(--plan-accent-ink); }
+.cellMobile.today:not(.selected) { box-shadow: inset 0 0 0 1.5px var(--plan-accent); }
+
+.selected {
+  background: var(--plan-ink);
+  border-color: var(--plan-ink);
+  color: var(--plan-on-ink);
+}
+.selected:hover { border-color: var(--plan-ink); }
+.selected .dow { color: var(--plan-on-ink); opacity: 0.6; }
+.selected .dowMonth { opacity: 0.85; }
+.selected .dot { opacity: 0.9; }
+
+/* ---- month grid ---- */
+.month {
+  margin: 0 0 14px;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--plan-surface);
+  border: 1px solid var(--plan-line);
+}
+.monthHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.monthTitle { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--plan-muted); }
+.monthGrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.monthDow { text-align: center; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--plan-faint); padding: 4px 0; }
+.monthWeek { display: contents; }
+.monthWeekCurrent > * { background: color-mix(in srgb, var(--plan-ink) 6%, transparent); }
+.monthDay {
+  position: relative;
+  min-height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--plan-ink);
+  font-family: var(--font-display), ui-serif, serif;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+.monthDayOther { color: var(--plan-faint); }
+.monthDayToday { color: var(--plan-accent-ink); }
+.monthDay.monthDaySelected { background: var(--plan-ink); color: var(--plan-on-ink); }
+.monthDay:focus-visible { outline: 2px solid var(--plan-accent-ink); outline-offset: 1px; }
+.monthDot { width: 4px; height: 4px; border-radius: 999px; background: currentColor; }
+.monthDotSlot { display: flex; gap: 2px; height: 4px; }
+
+/* ---- mobile strip ---- */
+.strip {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  min-width: 0;
+  max-width: 100%;
+}
+.strip::-webkit-scrollbar { display: none; }
+.stripItem { flex: 0 0 calc(100% / 7); min-width: 0; padding: 0 2px; scroll-snap-align: start; box-sizing: border-box; }
+.stripItem .cell { width: 100%; }
