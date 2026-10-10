@@ -310,7 +310,7 @@ export function MobileSearchEntry({
           className,
         )}
       >
-        <span aria-hidden className="shrink-0 text-base leading-none">🧭</span>
+        <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center text-[20px] leading-none">🧭</span>
         <span className="block min-w-0 flex-1 truncate text-sm font-normal text-gray-700">
           {chipText}
         </span>
