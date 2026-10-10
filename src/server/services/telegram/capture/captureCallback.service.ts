@@ -10,6 +10,7 @@ import type { DecodedCallback } from "./callbackCodec";
 import { CaptureDraftSchema } from "./captureDraft.schema";
 import type { ParsedCallback } from "./telegramUpdateParser";
 import type { CaptureCardPresenter } from "./captureCardPresenter";
+import { CAPTURE_REPLACE_TEXT_RULE } from "./captureReplies";
 
 export type CaptureCallbackChannel = {
   answerCallbackQuery(input: {
@@ -178,31 +179,45 @@ export function createCaptureCallbackService(deps: {
         return;
       }
 
-      if (action === "edit") {
-        const until = new Date(now().getTime() + EDIT_WINDOW_MS);
-        const updated = await deps.db.inboxItem.updateMany({
+      if (action === "edit" || action === "replace") {
+        const item = await deps.db.inboxItem.findFirst({
           where: {
             id: inboxItemId,
             userId: owner.userId,
             status: "DRAFT_READY",
           },
-          data: { awaitingEditUntil: until },
+          select: { draftVersion: true, ruleCodes: true },
         });
+        const until = new Date(now().getTime() + EDIT_WINDOW_MS);
+        const nextRuleCodes = item?.ruleCodes.filter((code) => code !== CAPTURE_REPLACE_TEXT_RULE) ?? [];
+        if (action === "replace") nextRuleCodes.push(CAPTURE_REPLACE_TEXT_RULE);
+        const updated = item
+          ? await deps.db.inboxItem.updateMany({
+              where: {
+                id: inboxItemId,
+                userId: owner.userId,
+                status: "DRAFT_READY",
+                draftVersion: item.draftVersion,
+              },
+              data: { awaitingEditUntil: until, ruleCodes: nextRuleCodes },
+            })
+          : { count: 0 };
 
         if (updated.count !== 1) {
-          await answer(
-            parsed.callbackQueryId,
-            "Черновик уже недоступен",
-            true,
-          );
+          await answer(parsed.callbackQueryId, "Черновик уже недоступен", true);
           return;
         }
 
-        await answer(parsed.callbackQueryId, "Напишите, что изменить");
+        await answer(
+          parsed.callbackQueryId,
+          action === "replace" ? "Ожидаю исправленный текст" : "Напишите, что изменить",
+        );
         if (parsed.chatId != null) {
           await deps.channel.sendMessage({
             chatId: String(parsed.chatId),
-            text: "Напишите изменение, например: «перенеси на 19:00» или «это для Стёпы».",
+            text: action === "replace"
+              ? "Отправьте правильное описание события целиком одним текстовым сообщением. Я распознаю его заново вместо скриншота."
+              : "Напишите изменение, например: «перенеси на 19:00» или «это для Стёпы». Для полной замены используйте «Исправить текст».",
           });
         }
         return;
