@@ -9,6 +9,8 @@ import { PlacePhoneActionButton } from "@/components/place/PlacePhoneActions";
 export interface PlaceStickyActionBarProps {
   ctaRef?: React.RefObject<HTMLElement | null>;
   statusLabel?: string;
+  /** Цвет статуса: открыто — зелёный, закрыто — красный; без значения — акцентный оранжевый. */
+  statusTone?: "open" | "closed";
   addressLine?: string;
   detailLine?: string;
   phones: NormalizedPlacePhone[];
@@ -24,6 +26,7 @@ export interface PlaceStickyActionBarProps {
 export function PlaceStickyActionBar({
   ctaRef,
   statusLabel,
+  statusTone,
   addressLine,
   detailLine,
   phones,
@@ -81,7 +84,17 @@ export function PlaceStickyActionBar({
       <div className={cn("min-w-0 flex-1", hasThreeActions && "hidden sm:block")}>
         {(statusLabel || addressLine) && (
           <div className="truncate font-mono text-[10px] uppercase tracking-[0.1em]">
-            {statusLabel && <span className="text-[#E86A3A]">{statusLabel}</span>}
+            {statusLabel && (
+              <span
+                className={cn(
+                  statusTone === "open" && "text-[#1F8A5B]",
+                  statusTone === "closed" && "text-[#C24E22]",
+                  !statusTone && "text-[#E86A3A]",
+                )}
+              >
+                {statusLabel}
+              </span>
+            )}
             {statusLabel && addressLine && (
               <span className="text-[rgba(20,18,16,0.55)]"> · {addressLine}</span>
             )}

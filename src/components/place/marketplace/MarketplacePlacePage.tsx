@@ -177,6 +177,7 @@ export function MarketplacePlacePage({
   const stickyStatusLabel = (() => {
     if (place.isOpenNow != null) {
       const status = place.isOpenNow ? "Открыто" : "Закрыто";
+      if (place.hoursStatusDetail) return `${status} · ${place.hoursStatusDetail}`;
       return place.todayHoursText
         ? `${status} · сегодня ${place.todayHoursText}`
         : status;
@@ -331,7 +332,8 @@ export function MarketplacePlacePage({
       <PlaceStickyActionBar
         ctaRef={ctaRef}
         statusLabel={stickyStatusLabel}
-        addressLine={stickyAddressLine}
+        statusTone={place.isOpenNow == null ? undefined : place.isOpenNow ? "open" : "closed"}
+        addressLine={stickyStatusLabel && place.isOpenNow != null ? undefined : stickyAddressLine}
         detailLine={stickyDetailLine}
         phones={place.phones}
         placeId={place.id}
