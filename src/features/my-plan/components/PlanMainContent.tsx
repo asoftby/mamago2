@@ -27,9 +27,16 @@ import { AddPersonaTypeModal } from "./AddPersonaTypeModal";
 import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
 import { RecommendationDecisionBlock } from "./RecommendationDecisionBlock";
+import { PlanSuggestionAudiencePicker } from "./PlanSuggestionAudiencePicker";
 import { PlanRecommendationCta } from "./PlanRecommendationCta";
 import { PlanStickyCounter } from "./PlanStickyCounter";
-import { requestOpenQuickAdd } from "@/lib/my-plan/myPlanOpenIntent";
+import { PlanNewTaskScreen } from "./v3/PlanNewTaskScreen";
+import { PlanVisitsScreen } from "./v3/PlanVisitsScreen";
+import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
+import { PlanDayBar } from "./v3/PlanDayBar";
+import { PlanMoveSheet, canMovePlanItem } from "./v3/PlanMoveSheet";
+import { fetchPlanExperienceFeed, type PlanExperienceFeed } from "./v3/planExperienceApi";
+import { History } from "lucide-react";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
@@ -37,6 +44,7 @@ import { resolveScenarioCtaState, resolveScenarioCtaLabel } from "../lib/canOpen
 import { sortPlanItemsForDay } from "../lib/sortPlanItemsForDay";
 import { useResolveDefaultParticipants } from "../lib/useResolveDefaultParticipants";
 import { writeLastPlanAgeRanges } from "../lib/lastPlanAgeRangesStorage";
+import { writeLastPlanParticipants } from "../lib/lastPlanParticipantsStorage";
 import {
   fetchPlanSuggestions,
   createPlanSuggestionAudienceSnapshot,
@@ -44,7 +52,6 @@ import {
   type PlanSuggestionAudienceSnapshot,
   type PlanSuggestionItem,
 } from "../lib/fetchPlanSuggestions";
-import { getAgeGroupByValue } from "@/features/filters/age/ageGroups";
 import {
   loadRecommendationDraft,
   persistRecommendationDraft,
@@ -294,44 +301,6 @@ function buildAutoPlanHint(input: {
 const RECOMMENDATIONS_BLOCK_SUBTITLE =
   "Подобрано на основании ваших интересов и предпочтений";
 
-function formatRecommendationHeading(selectedDate: string, todayKey: string): string {
-  const d = new Date(selectedDate + "T12:00:00");
-  const dayMonth = d.toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "long",
-  });
-  if (selectedDate === todayKey) return "Вот что я рекомендую на сегодня";
-  if (selectedDate === addDaysIso(todayKey, 1)) return "Вот что я рекомендую на завтра";
-  return `Вот что я рекомендую на ${dayMonth}`;
-}
-
-/**
- * Узкий пул — частый случай, не край (проверено замером: ~30% дат в горизонте месяца
- * дают 0 совпадений на dev-фикстуре). Сообщение объясняет причину предметно (дата,
- * при наличии — возраст), а не отделывается общим «ничего не нашли».
- */
-function buildEmptySuggestionsMessage(
-  selectedDate: string,
-  todayKey: string,
-  ageRangeValues: string[],
-): string {
-  const d = new Date(selectedDate + "T12:00:00");
-  const dayMonth = d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
-  const whenPart =
-    selectedDate === todayKey
-      ? "На сегодня"
-      : selectedDate === addDaysIso(todayKey, 1)
-        ? "На завтра"
-        : `На ${dayMonth}`;
-
-  const ageLabels = ageRangeValues
-    .map((v) => getAgeGroupByValue(v)?.label)
-    .filter((label): label is string => Boolean(label));
-  const agePart = ageLabels.length > 0 ? ` для ${ageLabels.join(", ")}` : "";
-
-  return `${whenPart}${agePart} пока ничего не нашли.`;
-}
-
 function buildParticipantSummaryLabels(
   selectedPersonaIds: string[],
   personas: PersonaForCopy[],
@@ -438,6 +407,16 @@ export function PlanMainContent({
   const [showAddPersonaTypeModal, setShowAddPersonaTypeModal] = useState(false);
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
+  /** Вложенные экраны модалки: «Новое дело» и «Где мы уже были» заменяют план, а не открываются поверх. */
+  const [screen, setScreen] = useState<"plan" | "new" | "visits">("plan");
+  const [movingItem, setMovingItem] = useState<PlanItemWithActivity | null>(null);
+  const [experienceFeed, setExperienceFeed] = useState<PlanExperienceFeed | null>(null);
+  const reloadExperienceFeed = useCallback(async () => {
+    setExperienceFeed(await fetchPlanExperienceFeed());
+  }, []);
+  useEffect(() => {
+    void reloadExperienceFeed();
+  }, [reloadExperienceFeed]);
   const [hiddenPlanItemIds, setHiddenPlanItemIds] = useState<Set<string>>(() => new Set());
   const pendingRemovalIdsRef = useRef<Set<string>>(new Set());
   const [awaitingAgeAnswer, setAwaitingAgeAnswer] = useState(false);
@@ -445,6 +424,8 @@ export function PlanMainContent({
   /** Реальные саджесты из /api/plan/suggestions (M2.4) — не клиентский demo-пул. */
   const [suggestions, setSuggestions] = useState<PlanSuggestionItem[]>([]);
   const [suggestionsGeneration, setSuggestionsGeneration] = useState(0);
+  /** Selection local to plan recommendations, separate from global discovery filters. */
+  const [planAudienceOverride, setPlanAudienceOverride] = useState<string[] | null>(null);
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState(false);
   const [addedSuggestionActivityIds, setAddedSuggestionActivityIds] = useState<string[]>([]);
@@ -528,11 +509,23 @@ export function PlanMainContent({
 
 
 
-  // Персоны для audience selector (must be declared before use)
-  const personas = useMemo(() => {
-    if (!family?.personas) return [];
-    return family.personas;
-  }, [family?.personas]);
+  // Resolve the real family profile (and last explicitly used plan audience)
+  // before rendering the picker or building the draft key.
+  const defaultParticipants = useResolveDefaultParticipants();
+  const personas = useMemo(() => family?.personas ?? [], [family?.personas]);
+  const planAudienceIds = useMemo(
+    () => planAudienceOverride ?? (
+      defaultParticipants.source === "last-used" || defaultParticipants.source === "profile"
+        ? defaultParticipants.participants
+        : []
+    ),
+    [defaultParticipants, planAudienceOverride],
+  );
+  const changePlanAudience = useCallback((ids: string[]) => {
+    setPlanAudienceOverride(ids);
+    writeLastPlanParticipants(ids);
+    setAwaitingAgeAnswer(false);
+  }, []);
 
   /**
    * Полный список выбранных персон (взрослые + дети) из FamilyPersonaContext
@@ -542,8 +535,8 @@ export function PlanMainContent({
     return family.selectedPersonaIds;
   }, [family?.selectedPersonaIds]);
   const recommendationDraftKeyValue = useMemo(
-    () => recommendationDraftKey({ citySlug: city, date: selectedDate, audienceIds: selectedPersonaIds }),
-    [city, selectedDate, selectedPersonaIds],
+    () => recommendationDraftKey({ citySlug: city, date: selectedDate, audienceIds: planAudienceIds }),
+    [city, selectedDate, planAudienceIds],
   );
   const effectiveSelectedChildIds = useMemo(() => {
     if (selectedPersonaIds.length > 0) {
@@ -782,8 +775,6 @@ export function PlanMainContent({
     [city, selectedDate, planItemsByDate, addedSuggestionActivityIds],
   );
 
-  const defaultParticipants = useResolveDefaultParticipants();
-
   /**
    * Слой 0: «Реши за меня» — намерение сначала, состав правится после выдачи (M3).
    * Возраст для запроса выводится из резолвленного состава напрямую (не через
@@ -791,28 +782,31 @@ export function PlanMainContent({
    * клика попадал под effect ниже, который сбрасывает выдачу при смене selectedPersonaIds.
    */
   const handleDecideClick = useCallback(() => {
-    if (defaultParticipants.source === "needs-age") {
-      if (needsAgeAnswerValues && needsAgeAnswerValues.length > 0) {
-        void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(needsAgeAnswerValues, []));
-        return;
-      }
-      setAwaitingAgeAnswer(true);
+    // The visible chips are the actual request audience, never an invisible
+    // global-filter selection. An explicit empty set means no age restriction.
+    if (planAudienceOverride !== null ||
+        defaultParticipants.source === "last-used" ||
+        defaultParticipants.source === "profile") {
+      const childIds = personas
+        .filter((persona) => persona.kind === "child" && planAudienceIds.includes(persona.id))
+        .map((persona) => persona.id);
+      const ages = childIds.length === 0 && planAudienceIds.length > 0
+        ? ["18+"]
+        : deriveAgeRangesFromChildren(childrenList, childIds).map((item) => item.range);
+      void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(ages, planAudienceIds));
       return;
     }
+
     if (defaultParticipants.source === "last-used-age-ranges") {
       void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(defaultParticipants.ageRanges, []));
       return;
     }
-    const resolvedChildIds = personas
-      .filter((p) => p.kind === "child" && defaultParticipants.participants.includes(p.id))
-      .map((p) => p.id);
-    const ageRangeValues = deriveAgeRangesFromChildren(childrenList, resolvedChildIds).map(
-      (r) => r.range,
-    );
-    void handleFetchSuggestions(
-      createPlanSuggestionAudienceSnapshot(ageRangeValues, defaultParticipants.participants),
-    );
-  }, [defaultParticipants, needsAgeAnswerValues, personas, childrenList, handleFetchSuggestions]);
+    if (needsAgeAnswerValues?.length) {
+      void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(needsAgeAnswerValues, []));
+      return;
+    }
+    setAwaitingAgeAnswer(true);
+  }, [planAudienceOverride, planAudienceIds, defaultParticipants, personas, childrenList, needsAgeAnswerValues, handleFetchSuggestions]);
 
   const handleAgeAnswerConfirm = useCallback(
     (ageRanges: string[]) => {
@@ -1030,26 +1024,14 @@ export function PlanMainContent({
     );
   }, [recommendationDraftKeyValue, selectedDate, suggestions, suggestionsGeneration, addedSuggestionActivityIds]);
 
-  const handleChangeChoice = useCallback(() => {
-    setSuggestions([]);
-    setSuggestionsGeneration(0);
-    setSuggestionsError(false);
-    shownSuggestionActivityIdsRef.current = new Set();
-    persistRecommendationDraft(recommendationDraftKeyValue, null, selectedDate);
-  }, [recommendationDraftKeyValue, selectedDate]);
-
-  const participantLabels = useMemo(
-    () => buildParticipantSummaryLabels(selectedPersonaIds, personas),
-    [selectedPersonaIds, personas],
-  );
-
-  const recommendationHeading = useMemo(
-    () => formatRecommendationHeading(selectedDate, todayKey),
-    [selectedDate, todayKey],
-  );
-
-  const recommendationAudienceLine =
-    participantLabels.length > 0 ? participantLabels.join(" + ") : "Свободный поиск";
+  const recommendationAudienceLabel = useMemo(() => {
+    const labels = buildParticipantSummaryLabels(planAudienceIds, personas);
+    if (labels.length > 0) return labels.join(" · ");
+    if (defaultParticipants.source === "last-used-age-ranges" && planAudienceOverride === null) {
+      return "По возрасту детей";
+    }
+    return "Свободный поиск";
+  }, [planAudienceIds, personas, defaultParticipants, planAudienceOverride]);
 
   /** Только уже спланированные события — у них есть реальный startsAt, есть смысл группировать по слотам. */
   const dayPartSections = useMemo(() => {
@@ -1090,46 +1072,79 @@ export function PlanMainContent({
       id="plan-week-calendar"
       className={isDesktop
         ? "min-w-0 bg-transparent px-0 py-3"
-        : "min-w-0 rounded-[18px] border border-[var(--plan-line)] bg-[var(--plan-surface)] p-3.5"}
+        : "min-w-0 rounded-[18px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-3.5"}
     >
       <PlanCalendar value={selectedDate} onChange={onChangeDate} variant="widget" />
     </div>
   ) : null;
   const dayContextLabel = relativeLabel(selectedDate, todayKey);
 
-  const renderDayPlanSection = (compact: boolean) => (
-    <section aria-label="В вашем плане">
-      <p
-        style={{
-          margin: compact ? "0 0 18px" : "0 0 14px",
-          fontSize: 13,
-          color: "rgba(20,18,16,.55)",
-        }}
-      >
-        <span style={{ color: "#141210", fontWeight: 600 }}>{dayContextLabel}</span>
-        {" · "}
-        {totalPlannedCount} {pluralRu(totalPlannedCount, ["запись", "записи", "записей"])}
-      </p>
-      <div className={compact ? "space-y-3" : "space-y-2"}>
-        {dayPartSections.map((section) =>
-          section.items.map((item) => (
-            <PlanItemRow
-              key={item.id}
-              item={item}
-              participantLabel={
-                item.childId
-                  ? childrenList.find((child) => child.id === item.childId)?.name ?? null
-                  : null
-              }
-              onRemove={() => handleRemoveFromPlan(item.id)}
-            />
-          )),
-        )}
-      </div>
-    </section>
-  );
-
   const isPastDay = selectedDate < todayKey;
+
+  const renderDayPlanSection = (compact: boolean) => {
+    const rows = dayPartSections.flatMap((section) => section.items);
+    const timedRows = rows.filter((item) => item.startsAt);
+    const untimedRows = rows.filter((item) => !item.startsAt);
+    const isToday = selectedDate === todayKey;
+    const nowMs = Date.now();
+    const nowIndex = isToday
+      ? timedRows.findIndex((item) => new Date(item.startsAt!).getTime() > nowMs)
+      : -2;
+    const nowLabel = new Date(nowMs).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", hour12: false });
+    const renderRow = (item: PlanItemWithActivity) => (
+      <PlanItemRow
+        key={item.id}
+        item={item}
+        participantLabel={
+          item.childId
+            ? childrenList.find((child) => child.id === item.childId)?.name ?? null
+            : item.assigneeUserId
+              ? (personas.find((persona) => persona.id === item.assigneeUserId)?.displayName?.trim() || "Взрослый")
+              : null
+        }
+        onRemove={() => handleRemoveFromPlan(item.id)}
+        onMove={canMovePlanItem(item) && !isPastDay ? () => setMovingItem(item) : undefined}
+      />
+    );
+    const nowLine = (
+      <div key="now-line" className="my-0.5 ml-2.5 flex items-center gap-2 text-xs font-bold tabular-nums text-[var(--mp-ac-dark)]">
+        <span>{nowLabel}</span>
+        <i className="h-px flex-1 bg-[var(--mp-ac)] opacity-45" />
+        <span>сейчас</span>
+      </div>
+    );
+    return (
+      <section aria-label="В вашем плане">
+        <p
+          style={{
+            margin: compact ? "0 0 12px" : "0 0 10px",
+            fontSize: 13,
+            fontWeight: 600,
+            color: "var(--mp-tx2)",
+          }}
+        >
+          <span style={{ color: "var(--mp-tx)", fontWeight: 700 }}>{dayContextLabel}</span>
+          {" · "}
+          {totalPlannedCount} {pluralRu(totalPlannedCount, ["запись", "записи", "записей"])}
+        </p>
+        <div className="space-y-2">
+          {timedRows.map((item, index) => (
+            <div key={item.id} className="space-y-2">
+              {index === nowIndex ? nowLine : null}
+              {renderRow(item)}
+            </div>
+          ))}
+          {nowIndex === -1 && timedRows.length > 0 ? nowLine : null}
+        </div>
+        {untimedRows.length > 0 ? (
+          <>
+            <p className="mb-2.5 mt-[18px] text-[13px] font-bold text-[var(--mp-tx2)]">В любое время</p>
+            <div className="space-y-2">{untimedRows.map(renderRow)}</div>
+          </>
+        ) : null}
+      </section>
+    );
+  };
 
   /** Past days: records only — no recommendations, decision fork or scenario CTA. */
   const renderPastDay = (compact: boolean) =>
@@ -1138,7 +1153,7 @@ export function PlanMainContent({
     ) : (
       <p
         role="status"
-        className="rounded-[24px] border border-dashed border-neutral-300 bg-neutral-50 p-4 text-center text-sm text-neutral-600"
+        className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-center text-[15px] leading-6 text-[var(--mp-tx2)]"
       >
         В этот день записей не было
       </p>
@@ -1147,7 +1162,7 @@ export function PlanMainContent({
   const renderRecommendationArea = (compact: boolean) => {
     if (isPendingDateHydration) {
       return (
-        <div className="animate-pulse rounded-[26px] border border-neutral-200 bg-white p-4 shadow-sm">
+        <div className="animate-pulse rounded-[18px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-4">
           <div className="h-4 w-44 rounded bg-neutral-200" />
           <div className="mt-3 h-3 w-52 rounded bg-neutral-100" />
           <div className="mt-4 h-24 rounded-[22px] bg-neutral-100/80" />
@@ -1167,42 +1182,45 @@ export function PlanMainContent({
       >
         {dayPartSections.length > 0 ? renderDayPlanSection(compact) : null}
 
-        <section
-          className={compact ? "space-y-3 px-1" : "space-y-3 px-1"}
-          aria-label="Можно добавить в этот день"
-        >
-          <div>
-            <h3 style={{ fontFamily: "var(--font-sans)", fontSize: compact ? 18 : 22, fontWeight: 600, lineHeight: 1.1, color: "#141210" }}>
-              Можно добавить в этот день
+        {hasRequestedSuggestions && !suggestionsError && !isFetchingSuggestions && suggestions.length > 0 && (
+          <section className="space-y-1 px-1" aria-label="Результаты подбора">
+            <h3 className="text-[20px] font-bold tracking-[-.02em] text-[var(--mp-tx)]">
+              Нашли {suggestions.length} {pluralRu(suggestions.length, ["вариант", "варианта", "вариантов"])}
             </h3>
-            <p className="mt-1 text-sm text-neutral-500">Подобрано по возрасту и интересам</p>
-          </div>
-        </section>
+            <p className="text-sm text-[var(--mp-tx2)]">
+              {new Date(selectedDate + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" })} · {recommendationAudienceLabel}
+            </p>
+          </section>
+        )}
 
-        {isFetchingSuggestions ? (
+        {!hasRequestedSuggestions ? null : isFetchingSuggestions ? (
           <div className="space-y-3">
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
-                className="h-24 animate-pulse rounded-[24px] border border-neutral-200 bg-white p-4 shadow-sm"
+                className="h-24 animate-pulse rounded-[18px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-4"
               />
             ))}
           </div>
         ) : suggestionsError ? (
-          <div className="rounded-[24px] border border-dashed border-neutral-300 bg-neutral-50 p-4 text-center">
-            <p className="text-sm text-neutral-600">Не получилось загрузить рекомендации</p>
+          <div className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-center">
+            <p className="text-[15px] leading-6 text-[var(--mp-tx2)]">Не получилось загрузить рекомендации</p>
             <button
               type="button"
               onClick={() => void handleFetchSuggestions(lastRequestSnapshotRef.current)}
-              className="mt-2 text-sm font-medium text-primary underline-offset-2 hover:underline"
+              className="mt-2 inline-flex min-h-11 items-center text-[15px] font-bold text-[var(--mp-ac-dark)] underline-offset-2 hover:underline"
             >
               Попробовать снова
             </button>
           </div>
         ) : suggestions.length === 0 ? (
-          <div className="rounded-[24px] border border-dashed border-neutral-300 bg-neutral-50 p-4 text-center">
-            <p className="text-sm text-neutral-600">
-              {buildEmptySuggestionsMessage(selectedDate, todayKey, lastRequestSnapshotRef.current.ageRangeValues)}
+          <div className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px]">
+            <p className="text-[17px] font-bold leading-6 text-[var(--mp-tx)]">
+              На эту дату подходящих событий пока нет
+            </p>
+            <p className="mt-1 text-[14px] leading-6 text-[var(--mp-tx2)]">
+              Искали на {new Date(selectedDate + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" })} · {recommendationAudienceLabel}.
+              Попробуйте изменить участников выше или посмотрите все события в каталоге.
             </p>
           </div>
         ) : (
@@ -1233,42 +1251,64 @@ export function PlanMainContent({
           }
         />
       ) : null}
+      <button
+        type="button"
+        onClick={() => setScreen("visits")}
+        className="flex min-h-11 w-full items-center justify-center gap-[7px] rounded-xl text-[15px] font-bold text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)]"
+      >
+        <History className="h-[17px] w-[17px]" aria-hidden />
+        Где мы уже были
+      </button>
     </div>
   );
 
-  const renderRecommendationContext = () =>
-    suggestionsGeneration > 0 ? (
-      <div className="flex items-center justify-between gap-3 rounded-2xl bg-[#FFF4EE] px-3 py-2">
-        <div className="min-w-0">
-          <span className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs font-medium text-primary shadow-sm">
-            Реши за меня
-          </span>
-          <p className="mt-1 truncate text-xs text-neutral-600">
-            {suggestions.length} идеи · подборка {suggestionsGeneration}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={handleChangeChoice}
-          className="shrink-0 rounded-full px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          Изменить выбор
-        </button>
-      </div>
-    ) : null;
+  const renderAudiencePicker = () => (
+    <PlanSuggestionAudiencePicker
+      personas={personas}
+      selectedIds={planAudienceIds}
+      onChange={changePlanAudience}
+      disabled={isFetchingSuggestions || family?.loading}
+    />
+  );
+
+  if (screen === "new") {
+    return (
+      <PlanNewTaskScreen
+        todayIso={todayKey}
+        initialDate={selectedDate < todayKey ? todayKey : selectedDate}
+        people={personas.map((persona) => ({
+          id: persona.id,
+          name: persona.kind === "adult" ? (persona.displayName?.trim() || "Я") : persona.displayName,
+          kind: persona.kind,
+        }))}
+        onBack={() => setScreen("plan")}
+        onSaved={(date) => {
+          onChangeDate?.(date);
+          setScreen("plan");
+        }}
+      />
+    );
+  }
+
+  if (screen === "visits") {
+    return <PlanVisitsScreen onBack={() => setScreen("plan")} />;
+  }
 
   if (isDesktop) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-white">
+      <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
         <div className="sticky top-0 z-20 flex-shrink-0">
           <MyPlanHeader onClose={onRequestClose} />
         </div>
 
         <div
           id="my-plan-recommendations"
-          className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white px-8 pb-6 pt-1"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[var(--mp-bg)] px-8 pb-6 pt-1"
         >
           {planCalendar}
+
+          {selectedDate === todayKey ? <PlanDayBar items={dayItemsSorted} /> : null}
+          <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
 
           {isDesktop && upcomingSelection ? (
             <UpcomingPlanBlock
@@ -1282,7 +1322,7 @@ export function PlanMainContent({
             renderPastDay(false)
           ) : (
             <>
-              {renderRecommendationContext()}
+              {renderAudiencePicker()}
 
                   {awaitingAgeAnswer ? (
                     <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} />
@@ -1311,9 +1351,21 @@ export function PlanMainContent({
           )}
         </div>
 
-        <PlanStickyCounter count={totalPlannedCount} onClick={handleOpenPlanPage} />
+        <PlanStickyCounter
+          count={totalPlannedCount}
+          onClick={handleOpenPlanPage}
+          onAdd={isPastDay ? undefined : () => setScreen("new")}
+        />
 
-        <AddPersonaTypeModal
+        <PlanMoveSheet
+        item={movingItem}
+        onClose={() => setMovingItem(null)}
+        onMoved={(date) => {
+          setMovingItem(null);
+          onChangeDate?.(date);
+        }}
+      />
+      <AddPersonaTypeModal
           open={showAddPersonaTypeModal}
           onOpenChange={setShowAddPersonaTypeModal}
           onSelectChild={() => setShowAddChildModal(true)}
@@ -1341,16 +1393,19 @@ export function PlanMainContent({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-white">
+    <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
       <div className="flex-shrink-0">
         <MyPlanHeader onClose={onRequestClose} compact />
       </div>
 
       <div
         id="my-plan-recommendations"
-        className="flex-1 space-y-5 overflow-y-auto bg-white px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4"
+        className="flex-1 space-y-5 overflow-y-auto bg-[var(--mp-bg)] px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4"
       >
         {planCalendar}
+
+        {selectedDate === todayKey ? <PlanDayBar items={dayItemsSorted} /> : null}
+        <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
 
         {isDesktop && upcomingSelection ? (
           <UpcomingPlanBlock
@@ -1364,7 +1419,7 @@ export function PlanMainContent({
           renderPastDay(true)
         ) : (
           <>
-            {renderRecommendationContext()}
+            {renderAudiencePicker()}
 
         {awaitingAgeAnswer ? (
           <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} compact />
@@ -1398,10 +1453,18 @@ export function PlanMainContent({
       <PlanStickyCounter
         count={totalPlannedCount}
         onClick={handleOpenPlanPage}
-        onAdd={isPastDay ? undefined : () => requestOpenQuickAdd(selectedDate)}
+        onAdd={isPastDay ? undefined : () => setScreen("new")}
         compact
       />
 
+      <PlanMoveSheet
+        item={movingItem}
+        onClose={() => setMovingItem(null)}
+        onMoved={(date) => {
+          setMovingItem(null);
+          onChangeDate?.(date);
+        }}
+      />
       <AddPersonaTypeModal
         open={showAddPersonaTypeModal}
         onOpenChange={setShowAddPersonaTypeModal}

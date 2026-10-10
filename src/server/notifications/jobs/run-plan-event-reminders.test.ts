@@ -84,6 +84,32 @@ void (async () => {
     assert.equal(result.results[0]?.offsetMinutes, 5);
   }
 
+  {
+    // Срок напоминания у самой записи важнее общего расписания пользователя (120 мин).
+    const now = new Date("2026-08-27T12:00:00.000Z");
+    const sends: string[] = [];
+    const result = await runPlanEventRemindersCore(
+      { now },
+      {
+        listPlanItemsDueForReminderFn: async () => [
+          { ...candidate("own15", new Date("2026-08-27T12:15:00.000Z")), reminderLeadMinutes: 15 },
+          { ...candidate("fallback", new Date("2026-08-27T12:15:00.000Z")), reminderLeadMinutes: null },
+        ],
+        getReminderSettingsForUsersFn: async () =>
+          new Map([
+            ["own15", { enabled: true, offsetMinutes: 120, timeZone: "Europe/Minsk" }],
+            ["fallback", { enabled: true, offsetMinutes: 120, timeZone: "Europe/Minsk" }],
+          ]),
+        sendNotificationFn: async (input) => {
+          sends.push(input.userId);
+          return sentResult;
+        },
+      },
+    );
+    assert.deepEqual(sends, ["own15"]);
+    assert.equal(result.results[0]?.offsetMinutes, 15);
+  }
+
   console.log("run-plan-event-reminders tests: OK");
 })().catch((error) => {
   console.error(error);

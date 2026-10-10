@@ -101,7 +101,8 @@ model User {
   businessAccessRequests            BusinessAccessRequest[]          @relation("BusinessAccessRequester")
   reviewedBusinessAccessRequests    BusinessAccessRequest[]          @relation("BusinessAccessRequestReviewedBy")
   placeRevisions                    PlaceRevision[]                  @relation("PlaceRevisionReviewer")
-  planItems                         PlanItem[]
+  planItems                         PlanItem[]                       @relation("PlanItemOwner")
+  assignedPlanItems                 PlanItem[]                       @relation("PlanItemAssignee")
   inboxItems                        InboxItem[]
   experiences                       Experience[]
   dayScenarios                      DayScenario[]
@@ -599,6 +600,12 @@ model PlanItem {
   category          String?
   /// null = legacy/catalog default; true/false = явный выбор для пользовательской заметки.
   reminderEnabled   Boolean?
+  /// За сколько минут до начала напомнить об этой записи. null = по общему расписанию
+  /// уведомлений пользователя (UserNotificationSchedule). Только для ручных записей с временем.
+  reminderLeadMinutes Int?
+  /// Взрослый член семьи, на кого записано дело («Я»). null = не задано / вся семья.
+  /// childId задаёт ребёнка, assigneeUserId — взрослого; вместе не используются.
+  assigneeUserId    String?
   priceAmount       Decimal?                  @db.Decimal(10, 2)
   priceCurrency     String?                   @default("BYN")
   /// Простая ссылка без FK: входящие чистятся независимо от записей плана
@@ -623,8 +630,9 @@ model PlanItem {
   place             Place?                    @relation("PlanItemToPlace", fields: [placeId], references: [id])
   venuePlace        Place?                    @relation("PlanItemVenue", fields: [venuePlaceId], references: [id], onDelete: SetNull)
   article           Article?                  @relation(fields: [articleId], references: [id])
-  user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User                      @relation("PlanItemOwner", fields: [userId], references: [id], onDelete: Cascade)
   child             Child?                    @relation(fields: [childId], references: [id], onDelete: SetNull)
+  assignee          User?                     @relation("PlanItemAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull)
   scenarioOverrides DayScenarioItemOverride[]
   requirements      PlanItemRequirement[]
 
@@ -639,6 +647,7 @@ model PlanItem {
   @@index([startsAt])
   @@index([userId, source, startsAt])
   @@index([childId])
+  @@index([assigneeUserId])
   @@index([venuePlaceId])
   @@index([familyId, date])
   @@index([familyId, visibility, status])

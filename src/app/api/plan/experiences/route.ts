@@ -5,6 +5,9 @@ import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import {
   confirmPlanExperience,
   ExperienceDomainError,
+  listAttendedExperienceVisits,
+  listPendingExperienceCandidates,
+  listRecentExperienceSummaries,
   serializeExperience,
 } from "@/server/services/experience/experience.service";
 
@@ -37,6 +40,35 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof ExperienceDomainError) return domainResponse(error);
     console.error("[experience] attendance confirmation failed", error);
+    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  }
+}
+
+/**
+ * Данные для модалки «Мой план»: что спросить («Как прошло?») и список «Где мы были».
+ * `pending` — прошедшие события без ответа «были/не были»; `awaitingFeedback` —
+ * подтверждённые визиты без оценки; `visits` — все подтверждённые визиты.
+ */
+export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const [pending, awaitingFeedback, visits] = await Promise.all([
+      listPendingExperienceCandidates({ userId: user.id, lookbackDays: 14, take: 3 }),
+      listRecentExperienceSummaries({ userId: user.id, take: 3 }),
+      listAttendedExperienceVisits({ userId: user.id }),
+    ]);
+    return NextResponse.json({
+      pending: pending.map((item) => ({
+        ...item,
+        plannedStartsAt: item.plannedStartsAt?.toISOString() ?? null,
+      })),
+      awaitingFeedback,
+      visits,
+      phoneVerified: Boolean(user.phoneE164 && user.phoneVerifiedAt),
+    });
+  } catch (error) {
+    console.error("[experience] feed failed", error);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 }

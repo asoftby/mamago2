@@ -34,8 +34,14 @@ assert.match(restingHtml, /Весь день/);
 assert.match(restingHtml, /Вся семья/);
 assert.doesNotMatch(restingHtml, /за 1 ч/);
 
-// Карточка: один «⋮», без шеврона и плашек «Заметка» / «Из mamaGo».
-assert.match(restingHtml, /aria-label="Действия: «/);
+// Карточка: иконка «Удалить» (и «Перенести», когда родитель передал onMove), без «⋮», шеврона и плашек «Заметка» / «Из mamaGo».
+assert.match(restingHtml, /aria-label="Убрать «/);
+assert.doesNotMatch(restingHtml, /aria-label="Перенести «/, "без onMove кнопки переноса нет");
+assert.doesNotMatch(restingHtml, /aria-label="Действия: «/);
+const movableHtml = renderToStaticMarkup(
+  <PlanItemRow item={item("move", "Мастер-класс")} onRemove={() => undefined} onMove={() => undefined} />,
+);
+assert.match(movableHtml, /aria-label="Перенести «Мастер-класс»"/);
 assert.doesNotMatch(restingHtml, /Из mamaGo/);
 assert.doesNotMatch(restingHtml, />Заметка</);
 

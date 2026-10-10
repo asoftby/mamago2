@@ -5,6 +5,9 @@ import { ResponsiveOverlay } from "@/components/ui/responsive-overlay";
 import { MyPlanPanelContent } from "./MyPlanPanelContent";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { MY_PLAN_V3_TOKENS } from "./v3/myPlanV3Tokens";
+
+
 
 export interface MyPlanOverlayProps {
   open: boolean;
@@ -64,8 +67,9 @@ export function MyPlanOverlay({ open, onOpenChange }: MyPlanOverlayProps) {
       bodyClassName="min-h-0 overflow-hidden"
     >
       <div
+        style={MY_PLAN_V3_TOKENS}
         className={cn(
-          "flex min-h-0 flex-1 flex-col",
+          "flex min-h-0 flex-1 flex-col bg-[var(--mp-bg)] text-[var(--mp-tx)]",
           "animate-in fade-in-0 duration-150",
         )}
       >

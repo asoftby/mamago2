@@ -13,11 +13,11 @@ export function BuildScenarioButton({ onClick, label, hint }: BuildScenarioButto
     <div className="space-y-2">
       <Button
         onClick={onClick}
-        className="h-12 w-full rounded-2xl bg-neutral-900 text-base font-semibold hover:bg-neutral-800"
+        className="h-[54px] w-full rounded-2xl bg-[var(--mp-tx)] text-base font-bold hover:bg-[var(--mp-tx)]/90"
       >
         {label}
       </Button>
-      {hint ? <p className="text-center text-xs text-neutral-500">{hint}</p> : null}
+      {hint ? <p className="text-center text-[13px] text-[var(--mp-tx2)]">{hint}</p> : null}
     </div>
   );
 }

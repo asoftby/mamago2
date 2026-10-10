@@ -28,6 +28,8 @@ export async function POST(request: NextRequest) {
       tags: body.tags,
       category: body.category,
       reminderEnabled: body.reminderEnabled,
+      reminderLeadMinutes: body.reminderLeadMinutes,
+      assigneeUserId: body.assigneeUserId,
     });
     return NextResponse.json({ item: await loadFamilyCalendarItem({ owner, item }) }, { status: 201 });
   } catch (error) {

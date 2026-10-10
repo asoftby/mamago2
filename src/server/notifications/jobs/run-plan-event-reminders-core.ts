@@ -115,7 +115,9 @@ export async function runPlanEventRemindersCore(
       continue;
     }
 
-    const dueAt = addMinutes(startsAt, -settings.offsetMinutes);
+    // Свой срок у записи («за 15 минут», «за час») важнее общего расписания уведомлений.
+    const offsetMinutes = candidate.reminderLeadMinutes ?? settings.offsetMinutes;
+    const dueAt = addMinutes(startsAt, -offsetMinutes);
     const oldestAllowedDueAt = addMinutes(now, -dueGraceMinutes);
     if (dueAt.getTime() > now.getTime() || dueAt.getTime() < oldestAllowedDueAt.getTime()) {
       skippedSchedule += 1;
@@ -147,7 +149,7 @@ export async function runPlanEventRemindersCore(
         activityId: candidate.activityId,
         eventTitle: candidate.activity?.title ?? candidate.title ?? "Событие",
         startsAt: startsAt.toISOString(),
-        offsetMinutes: settings.offsetMinutes,
+        offsetMinutes,
         result,
       });
     } catch (error) {
@@ -158,7 +160,7 @@ export async function runPlanEventRemindersCore(
         activityId: candidate.activityId,
         eventTitle: candidate.activity?.title ?? candidate.title ?? "Событие",
         startsAt: startsAt.toISOString(),
-        offsetMinutes: settings.offsetMinutes,
+        offsetMinutes,
         result: {
           status: "FAILED",
           errorMessage: error instanceof Error ? error.message : "REMINDER_JOB_FAILED",

@@ -1,5 +1,7 @@
 "use client";
 
+import { X } from "lucide-react";
+
 type MyPlanHeaderProps = {
   onClose?: () => void;
   compact?: boolean;
@@ -8,63 +10,40 @@ type MyPlanHeaderProps = {
 export function MyPlanHeader({ onClose, compact = false }: MyPlanHeaderProps) {
   return (
     <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 14,
-        padding: compact ? "16px 16px 12px" : "22px 24px 18px",
-        borderBottom: "1px solid rgba(20,18,16,.10)",
-        background: "#FAF7F1",
-      }}
+      className="flex items-center justify-between gap-3 bg-[var(--mp-bg)]"
+      style={{ padding: compact ? "10px 12px 4px 20px" : "20px 20px 6px 32px", minHeight: 56 }}
     >
       <h2
         style={{
           margin: 0,
           fontFamily: "var(--font-sans)",
-          fontSize: 24,
-          fontWeight: 400,
-          lineHeight: 1,
-          letterSpacing: "-.02em",
-          color: "#141210",
+          fontSize: 26,
+          fontWeight: 700,
+          lineHeight: 1.1,
+          letterSpacing: "-.025em",
+          color: "var(--mp-tx)",
         }}
       >
-        Мой <em style={{ fontFamily: "var(--font-display), Georgia, serif", fontStyle: "italic", color: "var(--primary)" }}>план</em>
+        <span style={{ fontWeight: 400 }}>Мой</span>{" "}
+        <em
+          style={{
+            fontFamily: "var(--font-display), Georgia, serif",
+            fontStyle: "italic",
+            fontWeight: 500,
+            color: "var(--mp-ac)",
+          }}
+        >
+          план
+        </em>
       </h2>
 
       <button
         type="button"
         aria-label="Закрыть мой план"
         onClick={() => onClose?.()}
-        style={{
-          width: compact ? 44 : 40,
-          height: compact ? 44 : 40,
-          borderRadius: 99,
-          background: "transparent",
-          border: "1px solid rgba(20,18,16,.18)",
-          color: "rgba(20,18,16,.55)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          transition: "all .15s",
-          flexShrink: 0,
-          fontSize: 13,
-        }}
-        onMouseEnter={(e) => {
-          const b = e.currentTarget;
-          b.style.background = "#141210";
-          b.style.color = "#FAF7F1";
-          b.style.borderColor = "#141210";
-        }}
-        onMouseLeave={(e) => {
-          const b = e.currentTarget;
-          b.style.background = "transparent";
-          b.style.color = "rgba(20,18,16,.55)";
-          b.style.borderColor = "rgba(20,18,16,.18)";
-        }}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--mp-tx2)] transition-colors hover:bg-[var(--mp-soft)] hover:text-[var(--mp-tx)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mp-ac)]"
       >
-        ✕
+        <X className="h-5 w-5" strokeWidth={2} aria-hidden />
       </button>
     </div>
   );

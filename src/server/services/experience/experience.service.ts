@@ -77,6 +77,46 @@ export async function listRecentExperienceSummaries(input: {
   }));
 }
 
+export type ExperienceVisit = ReturnType<typeof serializeExperience> & {
+  title: string;
+};
+
+/**
+ * История посещений для «Где мы были» в модалке «Мой план»: подтверждённые визиты
+ * (ATTENDED), новые сверху. Видимость как у listRecentExperienceSummaries —
+ * через семейный scope плана (PRIVATE-пункты скрыты).
+ */
+export async function listAttendedExperienceVisits(input: {
+  userId: string;
+  take?: number;
+}): Promise<ExperienceVisit[]> {
+  const take = Math.min(100, Math.max(1, input.take ?? 60));
+  const [memberIds, scope] = await Promise.all([
+    activeFamilyUserIds(input.userId),
+    planScopeFor(input.userId),
+  ]);
+  const rows = await prisma.experience.findMany({
+    where: { userId: { in: memberIds }, entityType: "EVENT", attendance: "ATTENDED" },
+    orderBy: [{ plannedDate: "desc" }, { attendanceConfirmedAt: "desc" }],
+    take: memberIds.length > 1 ? take * 2 : take,
+  });
+  if (rows.length === 0) return [];
+  const planItems = await prisma.planItem.findMany({
+    where: { id: { in: rows.map((row) => row.sourcePlanItemId) }, ...scope },
+    select: { id: true, title: true, activity: { select: { title: true } } },
+  });
+  const titleByPlanItemId = new Map(
+    planItems.map((item) => [item.id, item.activity?.title || item.title || "Событие"]),
+  );
+  return rows
+    .filter((row) => titleByPlanItemId.has(row.sourcePlanItemId))
+    .slice(0, take)
+    .map((row) => ({
+      ...serializeExperience(row),
+      title: titleByPlanItemId.get(row.sourcePlanItemId) ?? "Событие",
+    }));
+}
+
 type TelemetryContext = {
   sessionId?: string | null;
 };
