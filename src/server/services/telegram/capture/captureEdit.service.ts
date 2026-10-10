@@ -37,6 +37,7 @@ import type { CaptureCardPresenter } from "./captureCardPresenter";
 import type { ParsedCapture } from "./telegramUpdateParser";
 import { CAPTURE_LIMITS } from "./captureLimits";
 import { CAPTURE_REPLIES, CAPTURE_REPLACE_TEXT_RULE } from "./captureReplies";
+import { resolveCaptureEditAnchor } from "./captureEditAnchor";
 
 type Usage = {
   model: string | null;
@@ -229,6 +230,7 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
   async function runModel(
     snapshot: EditSnapshot,
     instruction: string,
+    capture: ParsedCapture,
   ): Promise<
     | {
         ok: true;
@@ -258,12 +260,12 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
           instruction,
         ].join(" ");
 
+    const anchor = resolveCaptureEditAnchor(snapshot, capture, replacingText);
     const context = await loadCaptureContext(
       deps.context,
       { userId: snapshot.userId },
       {
-        anchorAt: snapshot.anchorAt,
-        anchorIsForward: snapshot.anchorIsForward,
+        ...anchor,
         text: contextText,
       },
     );
@@ -399,7 +401,7 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
 
     try {
       await deps.notifier.typing(capture.chatId);
-      const result = await runModel(snapshot, capture.text);
+      const result = await runModel(snapshot, capture.text, capture);
       if (!result.ok) {
         safeLog(result.code, snapshot.id, snapshot.userId);
         await deps.notifier.reply(
@@ -422,6 +424,13 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
           draftVersion: snapshot.draftVersion,
         },
         data: {
+          ...(snapshot.ruleCodes.includes(CAPTURE_REPLACE_TEXT_RULE)
+            ? {
+                anchorAt: capture.anchorAt,
+                anchorIsForward: capture.anchorIsForward,
+                sourceKind: capture.sourceKind,
+              }
+            : {}),
           draft: result.draft as unknown as Prisma.InputJsonValue,
           draftVersion: { increment: 1 },
           editCount: { increment: 1 },

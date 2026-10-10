@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { draft } from "./captureDraft.testkit";
+import { resolveCaptureEditAnchor } from "./captureEditAnchor";
 import {
   buildCaptureEditUserParts,
   buildCaptureUserParts,
@@ -61,4 +62,23 @@ test("corrected screenshot text can be parsed as a fresh source without carrying
   assert.match(parts[0].text, /Добавь Тае плавание/);
   assert.doesNotMatch(parts[0].text, /CURRENT_DRAFT/);
   assert.doesNotMatch(parts[0].text, /Экскурсия в музей/);
+});
+
+test("replacement text resolves relative dates from the new message, not an old forward", () => {
+  const oldForward = {
+    anchorAt: new Date("2026-09-01T09:00:00Z"),
+    anchorIsForward: true,
+  };
+  const newTypedMessage = {
+    anchorAt: new Date("2026-10-10T09:00:00Z"),
+    anchorIsForward: false,
+  };
+  assert.deepEqual(
+    resolveCaptureEditAnchor(oldForward, newTypedMessage, true),
+    newTypedMessage,
+  );
+  assert.deepEqual(
+    resolveCaptureEditAnchor(oldForward, newTypedMessage, false),
+    oldForward,
+  );
 });
