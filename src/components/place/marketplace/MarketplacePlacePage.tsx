@@ -427,9 +427,9 @@ function MetaStrip({ items, isOpenNow }: { items: Array<[string, string, string]
             </div>
             <div style={{ fontSize: 17, fontWeight: 500, letterSpacing: "-.01em", color: "#141210", display: "flex", alignItems: "center", gap: 6 }}>
               {label === "Часы" && isOpenNow != null && (
-                <span style={{ fontSize: 7, color: isOpenNow ? "#1F8A5B" : "#C24E22", flexShrink: 0, lineHeight: 1 }}>●</span>
+                <span style={{ fontSize: 7, color: isOpenNow ? "#1F8A5B" : "#E5322D", flexShrink: 0, lineHeight: 1 }}>●</span>
               )}
-              <span style={label === "Часы" && isOpenNow != null ? { color: isOpenNow ? "#1F8A5B" : "#C24E22" } : undefined}>
+              <span style={label === "Часы" && isOpenNow != null ? { color: isOpenNow ? "#1F8A5B" : "#E5322D" } : undefined}>
                 {value}
               </span>
             </div>
@@ -527,7 +527,7 @@ function WorkingHoursSection({ summary }: { summary: string }) {
             <p style={{ fontSize: 15, marginTop: 14, maxWidth: 260, lineHeight: 1.5, color: "rgba(20,18,16,.55)" }}>
               {!isOpen && !isByAppointment && statusLine ? (
                 <>
-                  <span style={{ color: "#C24E22", display: "block" }}>{statusLine.split("•")[0]?.trim()}</span>
+                  <span style={{ color: "#E5322D", display: "block" }}>{statusLine.split("•")[0]?.trim()}</span>
                   {statusLine.includes("•") && (
                     <span style={{ display: "block" }}>{statusLine.split("•").slice(1).join("•").trim()}</span>
                   )}

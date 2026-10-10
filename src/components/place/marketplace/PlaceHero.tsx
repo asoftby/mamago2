@@ -289,7 +289,7 @@ export function PlaceHero({
                     <div style={{ marginTop: 3, fontSize: 13, color: "rgba(20,18,16,.55)", lineHeight: 1.35 }}>{address}</div>
                   )}
                   {isOpenNow != null && (
-                    <div style={{ marginTop: 3, display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: isOpenNow ? "#1F8A5B" : "#C24E22" }}>
+                    <div style={{ marginTop: 3, display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: isOpenNow ? "#1F8A5B" : "#E5322D" }}>
                       <span aria-hidden style={{ width: 7, height: 7, borderRadius: 99, background: "currentColor", flexShrink: 0 }} />
                       <span>
                         {isOpenNow

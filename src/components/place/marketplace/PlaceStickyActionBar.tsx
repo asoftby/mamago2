@@ -88,7 +88,7 @@ export function PlaceStickyActionBar({
               <span
                 className={cn(
                   statusTone === "open" && "text-[#1F8A5B]",
-                  statusTone === "closed" && "text-[#C24E22]",
+                  statusTone === "closed" && "text-[#E5322D]",
                   !statusTone && "text-[#E86A3A]",
                 )}
               >
