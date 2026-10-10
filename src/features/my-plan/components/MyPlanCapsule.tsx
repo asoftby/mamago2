@@ -84,18 +84,18 @@ export function MyPlanCapsuleView({
         </>
       ) : (
         <>
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-white" aria-hidden>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-white lg:bg-brand-soft/65 lg:text-primary" aria-hidden>
             <CalendarDays className="h-[19px] w-[19px]" strokeWidth={1.8} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
-            <span className="block text-[12px] leading-tight text-white/90">
-              Мой <em className="font-display italic text-white">план</em>
+            <span className="block text-[12px] leading-tight text-white/90 lg:text-text-main">
+              Мой <em className="font-display italic text-white lg:text-primary">план</em>
             </span>
-            <span className="block text-[13px] font-medium leading-[1.2] text-white lg:line-clamp-2">
+            <span className="block text-[13px] font-medium leading-[1.2] text-white lg:text-text-main lg:line-clamp-2">
               {loading ? "Загружаем…" : "Добавим что-нибудь?"}
             </span>
           </span>
-          <ArrowRight className="h-4 w-4 shrink-0 text-white/85" aria-hidden />
+          <ArrowRight className="h-4 w-4 shrink-0 text-white/85 lg:text-text-main/65" aria-hidden />
         </>
       )}
     </>
