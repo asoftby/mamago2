@@ -72,7 +72,8 @@ export function createCaptureCardPresenter(deps: {
 
       const chatId = item.telegramChatId.toString();
 
-      if (item.cardMessageId) {
+      // -1 reserves a pending status send; it is never a real Telegram message.
+      if (item.cardMessageId !== null && item.cardMessageId > 0) {
         await deps.channel.editMessageText({
           chatId,
           messageId: item.cardMessageId,
@@ -92,7 +93,7 @@ export function createCaptureCardPresenter(deps: {
         where: {
           id: item.id,
           status: "DRAFT_READY",
-          cardMessageId: null,
+          cardMessageId: item.cardMessageId,
         },
         data: { cardMessageId: sent.message_id },
       });
