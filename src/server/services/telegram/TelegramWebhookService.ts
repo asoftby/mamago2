@@ -17,6 +17,15 @@ import { createDefaultCaptureRoutingDeps, type CaptureRoutingDeps } from "./capt
 import { parseTelegramUpdate, type ParsedCapture, type RawTelegramUpdate } from "./capture/telegramUpdateParser";
 import { planOwnerWithoutFamily } from "@/server/services/planOwner";
 import { renderDevBusinessApplicationMessage } from "./TelegramTemplateRenderer";
+import {
+  ALREADY_CONNECTED_TEXT,
+  RELINKED_TEXT,
+  createPrismaWelcomeStore,
+  openPlanReplyMarkup,
+  welcomeTextFor,
+  type WelcomeStore,
+} from "./botWelcome";
+
 
 type TelegramUser = {
   id: number;
@@ -56,11 +65,59 @@ export type HandleUpdateResult = {
 export class TelegramWebhookService {
   private readonly capture: CaptureRoutingDeps;
 
+  private readonly welcomeStore: WelcomeStore;
+
   constructor(
     private readonly channel = new TelegramChannel(),
     capture?: CaptureRoutingDeps,
+    welcomeStore?: WelcomeStore,
   ) {
     this.capture = capture ?? createDefaultCaptureRoutingDeps();
+    this.welcomeStore = welcomeStore ?? createPrismaWelcomeStore();
+  }
+
+  /** Full text for pilot (capture allowlist) users, short for everyone else. */
+  private welcomeText(userId: string): string {
+    return welcomeTextFor(this.capture.getAllowlist().has(userId));
+  }
+
+  private async sendWelcome(chatId: string, userId: string): Promise<void> {
+    await this.channel.sendMessage({
+      chatId,
+      text: this.welcomeText(userId),
+      parseMode: "HTML",
+      replyMarkup: openPlanReplyMarkup(),
+    });
+  }
+
+  /**
+   * Sends the welcome at most once per connection: the compare-and-set on
+   * welcomeSentAt picks a single winner among parallel /start deliveries.
+   * Returns false when someone else already claimed it. A failed send gives
+   * the claim back so the next /start can retry.
+   */
+  private async sendWelcomeOnce(chatId: string, userId: string, connectionId: string): Promise<boolean> {
+    const at = new Date();
+    if (!(await this.welcomeStore.claim(connectionId, at))) return false;
+    try {
+      await this.sendWelcome(chatId, userId);
+    } catch (e) {
+      console.error("[telegram:webhook] Failed to send welcome message", e);
+      try {
+        await this.welcomeStore.release(connectionId, at);
+      } catch (releaseError) {
+        console.error("[telegram:webhook] Failed to release welcome claim", releaseError);
+      }
+    }
+    return true;
+  }
+
+  private async sendShortReply(chatId: string, text: string): Promise<void> {
+    try {
+      await this.channel.sendMessage({ chatId, text, replyMarkup: openPlanReplyMarkup() });
+    } catch (e) {
+      console.error("[telegram:webhook] Failed to send reply", e);
+    }
   }
 
   async handleUpdate(update: TelegramUpdate): Promise<HandleUpdateResult> {
@@ -153,6 +210,11 @@ export class TelegramWebhookService {
       console.log("[telegram:webhook] handleMessage type=message");
     }
 
+    if (text && /^\/help(?:@\w+)?(?:\s|$)/u.test(text)) {
+      await this.handleHelp(chatId);
+      return;
+    }
+
     // Not a /start command at all — ignore silently
     if (!text?.startsWith("/start")) {
       if (process.env.NODE_ENV !== "production") {
@@ -170,10 +232,15 @@ export class TelegramWebhookService {
       console.log("[telegram:webhook] /start command detected - hasPayload=%s", payload !== null);
     }
 
-    // Plain /start without link token — greet and explain
+    // Plain /start without link token: welcome a connected user, otherwise explain
     if (!payload || !payload.startsWith("link_")) {
-      if (process.env.NODE_ENV !== "production") {
-        console.log("[telegram:webhook] Plain /start without link_ payload, sending instructions");
+      const connection = await findTelegramConnectionByChatIdForCurrentEnvironment(chatId);
+      if (connection?.isActive) {
+        const sent = !connection.welcomeSentAt
+          ? await this.sendWelcomeOnce(chatId, connection.userId, connection.id)
+          : false;
+        if (!sent) await this.sendShortReply(chatId, ALREADY_CONNECTED_TEXT);
+        return;
       }
       try {
         await this.channel.sendMessage({
@@ -244,15 +311,41 @@ export class TelegramWebhookService {
         result.ok, result.ok ? "success" : (result as { reason: string }).reason, result.ok ? result.userId : "n/a");
     }
 
-    try {
-      await this.channel.sendMessage({
+    if (!result.ok) {
+      await this.sendShortReply(
         chatId,
-        text: result.ok
-          ? "✅ Telegram подключён к mamaGo для текущей среды."
-          : "Ссылка устарела или уже использована. Запросите новую в настройках уведомлений.",
-      });
+        "Ссылка устарела или уже использована. Запросите новую в настройках уведомлений.",
+      );
+      return;
+    }
+
+    // The welcome replaces the old one-line confirmation; a re-link of a
+    // connection that already got it keeps the short confirmation.
+    try {
+      const connection = await this.welcomeStore.findByUser(result.userId, this.capture.getEnvironment());
+      const welcomed = connection
+        ? await this.sendWelcomeOnce(chatId, result.userId, connection.id)
+        : false;
+      if (!welcomed) await this.sendShortReply(chatId, RELINKED_TEXT);
     } catch (e) {
       console.error("[telegram:webhook] Failed to send reply after link attempt", e);
+    }
+  }
+
+  /** /help: the welcome text again, any number of times, for a connected chat. */
+  private async handleHelp(chatId: string): Promise<void> {
+    const connection = await findTelegramConnectionByChatIdForCurrentEnvironment(chatId);
+    try {
+      if (connection?.isActive) {
+        await this.sendWelcome(chatId, connection.userId);
+      } else {
+        await this.channel.sendMessage({
+          chatId,
+          text: "Откройте ссылку из mamaGo, чтобы подключить Telegram к вашему аккаунту.",
+        });
+      }
+    } catch (e) {
+      console.error("[telegram:webhook] Failed to send help message", e);
     }
   }
 
