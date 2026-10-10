@@ -1,23 +1,20 @@
 "use client";
 
 import { ArrowLeft } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useSmartBack } from "@/hooks/useSmartBack";
 import { getNavIconButtonClassName } from "@/components/mobile/NavIconButton";
 
 /**
- * «←» внутренних страниц: `router.back()`, а если истории нет (страница открыта по прямой
- * ссылке) — переход на главную города.
+ * «←» внутренних страниц: `router.back()` только если предыдущая запись истории принадлежит mamaGo
+ * (`useSmartBack`), иначе (прямая ссылка, внешний реферер) — переход на главную города.
  */
 export function MobileHeaderBackButton({ fallbackHref }: { fallbackHref: string }) {
-  const router = useRouter();
+  const goBack = useSmartBack(fallbackHref);
   return (
     <button
       type="button"
       aria-label="Назад"
-      onClick={() => {
-        if (window.history.length > 1) router.back();
-        else router.push(fallbackHref);
-      }}
+      onClick={goBack}
       className={getNavIconButtonClassName({ isActive: false, chrome: "dark", size: "compact" })}
     >
       <ArrowLeft className="h-5 w-5 text-gray-700" aria-hidden />
