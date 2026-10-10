@@ -589,6 +589,31 @@ export function EventPageView({
     });
     return candidates.slice(0, 4);
   }, [data.similar, familyPersona]);
+
+  // Сервер записал экспозиции по всем кандидатам; после клиентского фильтра и обрезки сообщаем, что
+  // реально показано, чтобы аналитика рекомендаций не завышала показы. Ждём загрузки персон.
+  const similarRunId = data.similarRunId ?? null;
+  const personasReady = !familyPersona || !familyPersona.loading;
+  const shownSimilarKey = visibleSimilar.map((item) => item.id).join(",");
+  const reportedSimilarRunRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!similarRunId || !personasReady) return;
+    // Один раз на запуск: если пользователь потом сменит аудиторию в шапке, то уже показанное остаётся показанным.
+    if (reportedSimilarRunRef.current === similarRunId) return;
+    reportedSimilarRunRef.current = similarRunId;
+    void fetch("/api/recommendations/exposures/shown", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      keepalive: true,
+      body: JSON.stringify({
+        runId: similarRunId,
+        entityIds: shownSimilarKey ? shownSimilarKey.split(",") : [],
+      }),
+    }).catch(() => {
+      // Телеметрия не должна влиять на страницу.
+    });
+  }, [similarRunId, personasReady, shownSimilarKey]);
   const hasSimilar = visibleSimilar.length > 0;
   const hasWhyGo = data.whyGo.length > 0;
   const hasGoodFit = data.goodFit.length > 0;

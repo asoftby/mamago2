@@ -23,7 +23,7 @@ import { resolveEventCanonicalUrl } from "@/lib/seo/resolveEventCanonicalUrl";
 import { fetchReelsThumbnail } from "@/lib/instagram/fetchReelsThumbnail";
 import { parseVideoUrl } from "@/lib/media/parseVideoUrl";
 import { getCityDisplayName, getCityNominativeName } from "@/lib/city/cityDisplayNames";
-import { loadSimilarActivities } from "@/lib/event/loadSimilarActivities";
+import { loadSimilarActivitiesWithTrace } from "@/lib/event/loadSimilarActivities";
 
 interface EventPublicPageProps {
   params: Promise<{ city: string; slugOrId: string }>;
@@ -210,8 +210,8 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
       ? await fetchReelsThumbnail(rawReelsUrl)
       : null;
 
-    const similar = fromDb.eventCategory?.id
-      ? await loadSimilarActivities({
+    const similarResult = fromDb.eventCategory?.id
+      ? await loadSimilarActivitiesWithTrace({
           activityId: fromDb.id,
           cityId: fromDb.cityId,
           citySlug: city,
@@ -221,18 +221,22 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
           sameCategoryOnly: true,
           userId: user?.id ?? null,
         })
-      : [];
+      : { similar: [], recommendationRunId: null };
+    const similar = similarResult.similar;
 
-    const data = withEventPagePriceData(
-      buildEventPageDataFromPrismaActivity(fromDb, {
-        citySlug: city,
-        ownerEditHref,
-        previewBannerLabel,
-        reelsThumbnailUrl: reelsThumbnailUrl ?? undefined,
-        similar,
-      }),
-      fromDb.priceItems,
-    );
+    const data = {
+      ...withEventPagePriceData(
+        buildEventPageDataFromPrismaActivity(fromDb, {
+          citySlug: city,
+          ownerEditHref,
+          previewBannerLabel,
+          reelsThumbnailUrl: reelsThumbnailUrl ?? undefined,
+          similar,
+        }),
+        fromDb.priceItems,
+      ),
+      similarRunId: similarResult.recommendationRunId,
+    };
     const faqJsonLd = buildFaqJsonLd(data.faqItems);
 
     return (

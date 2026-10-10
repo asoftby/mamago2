@@ -122,7 +122,22 @@ function rowToSimilar(row: SimilarRow, citySlug: string): EventPageSimilar {
   };
 }
 
-export async function loadSimilarActivities(opts: {
+export const SIMILAR_EVENTS_INTENT = "related_event_suggestions";
+
+export type SimilarActivitiesResult = {
+  similar: EventPageSimilar[];
+  /** Запуск рекомендаций, в который записаны показанные экспозиции (null, если записать не удалось). */
+  recommendationRunId: string | null;
+};
+
+/** Обёртка для вызовов, которым не нужен id запуска. */
+export async function loadSimilarActivities(
+  opts: Parameters<typeof loadSimilarActivitiesWithTrace>[0],
+): Promise<EventPageSimilar[]> {
+  return (await loadSimilarActivitiesWithTrace(opts)).similar;
+}
+
+export async function loadSimilarActivitiesWithTrace(opts: {
   activityId: string;
   cityId: string;
   citySlug: string;
@@ -130,7 +145,7 @@ export async function loadSimilarActivities(opts: {
   limit?: number;
   sameCategoryOnly?: boolean;
   userId?: string | null;
-}): Promise<EventPageSimilar[]> {
+}): Promise<SimilarActivitiesResult> {
   const {
     activityId,
     cityId,
@@ -183,7 +198,7 @@ export async function loadSimilarActivities(opts: {
   );
   const selectedRanked = ranked.slice(0, limit);
   if (selectedRanked.length === 0) {
-    await recordRecommendationRun({
+    const emptyRun = await recordRecommendationRun({
       userId,
       surface: RecommendationSurface.DISCOVERY,
       cityId,
@@ -192,7 +207,7 @@ export async function loadSimilarActivities(opts: {
       candidateCount: rankedBatch.candidateCount,
       items: [],
       decisionContext: {
-        intent: "related_event_suggestions",
+        intent: SIMILAR_EVENTS_INTENT,
         subjects: selectedProfileContext.subjects,
         constraints: {
           ...(eventCategoryId
@@ -210,7 +225,7 @@ export async function loadSimilarActivities(opts: {
         actor: { kind: userId ? "user" : "guest", id: userId },
       },
     });
-    return [];
+    return { similar: [], recommendationRunId: emptyRun?.runId ?? null };
   }
 
   const now = new Date();
@@ -257,7 +272,7 @@ export async function loadSimilarActivities(opts: {
     selectedRanked.map((item) => [item.activity.id, item]),
   );
 
-  await recordRecommendationRun({
+  const run = await recordRecommendationRun({
     userId,
     surface: RecommendationSurface.DISCOVERY,
     cityId,
@@ -280,7 +295,7 @@ export async function loadSimilarActivities(opts: {
       };
     }),
     decisionContext: {
-      intent: "related_event_suggestions",
+      intent: SIMILAR_EVENTS_INTENT,
       subjects: selectedProfileContext.subjects,
       constraints: {
         ...(eventCategoryId
@@ -299,5 +314,5 @@ export async function loadSimilarActivities(opts: {
     },
   });
 
-  return results;
+  return { similar: results, recommendationRunId: run?.runId ?? null };
 }

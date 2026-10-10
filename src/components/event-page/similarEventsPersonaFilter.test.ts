@@ -45,4 +45,15 @@ const page = readFileSync(
 );
 assert.match(page, /limit: 12,/);
 
+// Экспозиции: клиент один раз сообщает серверу реально показанные ID (после фильтра и обрезки до 4).
+assert.match(view, /\/api\/recommendations\/exposures\/shown/);
+assert.match(view, /reportedSimilarRunRef\.current === similarRunId/);
+assert.match(view, /personasReady/);
+const route = readFileSync(
+  new URL("../../app/api/recommendations/exposures/shown/route.ts", import.meta.url),
+  "utf8",
+);
+assert.match(route, /narrowRunExposuresToShown\(/);
+assert.match(route, /SIMILAR_EVENTS_INTENT/);
+
 console.log("similar events persona filter: OK");

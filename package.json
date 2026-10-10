@@ -179,6 +179,7 @@
     "test:business-event-access": "tsx src/lib/auth/activityAccess.test.ts",
     "test:public-edit-permissions": "tsx src/lib/permissions/publicEditPermissions.test.ts",
     "test:similar-events-persona": "tsx src/components/event-page/similarEventsPersonaFilter.test.ts",
+    "test:recommendation-narrow-exposures": "tsx --test src/server/services/recommendations/narrowRunExposures.integration.test.ts",
     "test:article-actions": "tsx src/lib/save/parseArticleIdsForBatch.test.ts && tsx src/lib/post-auth/executePendingAction.test.ts && tsx src/server/services/articleSaveActions.test.ts && tsx src/features/save/persistArticleSave.test.ts && tsx src/components/activity/SaveToPlanModal.test.tsx",
     "test:save-status": "tsx src/features/save/saveStatusFetchGuard.test.ts && tsx src/features/save/saveStatusFetchGuardWiring.test.ts && tsx src/app/api/save/status/route.test.ts",
     "test:article-gallery": "tsx src/lib/article/articleMainGallery.test.ts && tsx src/components/article/mvp/ArticleGallery.test.tsx",
