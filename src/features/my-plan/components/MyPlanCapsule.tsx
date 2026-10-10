@@ -36,14 +36,11 @@ export function MyPlanCapsuleView({
   loading = false,
   className,
   openInOverlay = false,
-  compact = false,
 }: {
   model: PlanCapsuleModel;
   loading?: boolean;
   className?: string;
   openInOverlay?: boolean;
-  /** Сжатое состояние: только кружок с датой (или иконка календаря), без текста. */
-  compact?: boolean;
 }) {
   const isEmpty = model.kind === "empty";
   const ariaLabel = loading ? "Мой план" : model.ariaLabel;
@@ -65,7 +62,7 @@ export function MyPlanCapsuleView({
       data-my-plan-capsule
       data-state={loading ? "loading" : model.kind}
       className={cn(
-        "pointer-events-auto flex h-14 min-w-0 items-center gap-3 overflow-hidden rounded-[28px] pl-2 text-left no-underline",
+        "pointer-events-auto flex h-14 min-w-0 items-center gap-3 rounded-[28px] pl-2 text-left no-underline",
         "touch-manipulation outline-none transition-colors",
         "focus-visible:ring-[3px] focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         isEmpty || loading
@@ -97,7 +94,7 @@ export function MyPlanCapsuleView({
               ) : null}
             </span>
           )}
-          <span aria-hidden={compact || undefined} className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 whitespace-nowrap">
+          <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
             <span className="block truncate text-[12px] leading-tight text-white/85">{model.caption}</span>
             <span className="block truncate text-[15px] font-medium leading-tight not-italic">{model.title}</span>
           </span>
@@ -108,7 +105,7 @@ export function MyPlanCapsuleView({
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft/65 text-primary" aria-hidden>
             <CalendarDays className="h-[19px] w-[19px]" strokeWidth={1.8} />
           </span>
-          <span aria-hidden={compact || undefined} className="flex min-w-0 flex-1 flex-col justify-center gap-1 whitespace-nowrap">
+          <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
             <span className="block text-[12px] leading-tight text-text-main">
               Мой <em className="font-display italic text-primary">план</em>
             </span>
@@ -124,15 +121,7 @@ export function MyPlanCapsuleView({
 }
 
 /** Капсула с данными плана; пересчитывается при возврате на вкладку/в окно, без поллинга. */
-export function MyPlanCapsule({
-  className,
-  openInOverlay = false,
-  compact = false,
-}: {
-  className?: string;
-  openInOverlay?: boolean;
-  compact?: boolean;
-}) {
+export function MyPlanCapsule({ className, openInOverlay = false }: { className?: string; openInOverlay?: boolean }) {
   const {
     planSummary,
     planSummaryLoading,
@@ -180,13 +169,5 @@ export function MyPlanCapsule({
     [isAuthenticated, now, planSummary, todayIso],
   );
 
-  return (
-    <MyPlanCapsuleView
-      model={model}
-      loading={loading}
-      className={className}
-      openInOverlay={openInOverlay}
-      compact={compact}
-    />
-  );
+  return <MyPlanCapsuleView model={model} loading={loading} className={className} openInOverlay={openInOverlay} />;
 }
