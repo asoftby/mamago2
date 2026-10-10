@@ -3,38 +3,13 @@
 import { useCallback, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
-import { MobileBottomBar } from "@/components/mobile/MobileBottomBar";
 import { MyPlanWidget, MyPlanMobileWidget, MyPlanOverlay } from "@/features/my-plan";
 import { PlanQuickAddHost } from "@/features/my-plan/components/PlanQuickAddHost";
 import { MyPlanStateProvider } from "@/features/my-plan/hooks/useMyPlan";
 import { appendMyPlanOpenToHref, MY_PLAN_OPEN_EVENT } from "@/lib/my-plan/myPlanOpenIntent";
-import {
-  isMyPlanShellExcludedPath,
-  isPublicationDetailPath,
-  shouldHideMyPlanWidget,
-} from "@/lib/intent";
+import { isMyPlanShellExcludedPath, shouldHideMyPlanWidget } from "@/lib/intent";
+import { isMyPlanFullPageRoute, resolveMobileBottomSlot } from "@/lib/mobile/bottomSlot";
 import { PlanOverlayProvider, usePlanOverlay } from "@/lib/my-plan/usePlanOverlay";
-
-function isMyPlanFullPageRoute(pathname: string | null): boolean {
-  if (!pathname) return true;
-  const segments = pathname.split("/").filter(Boolean);
-  if (segments.length >= 2 && segments[0] === "me" && (segments[1] === "plan" || segments[1] === "day")) {
-    return true;
-  }
-  if (
-    segments.length >= 3 &&
-    segments[1] === "me" &&
-    (segments[2] === "plan" || segments[2] === "day")
-  ) {
-    return true;
-  }
-  // /{city}/my-plan/{date}/scenario (Task 7 Day Scenario) — a real standalone
-  // page, not an overlay; must not render nested behind the My Plan overlay.
-  if (segments.length >= 2 && segments[1] === "my-plan") {
-    return true;
-  }
-  return false;
-}
 
 function MyPlanOverlayHost({ pathname }: { pathname: string }) {
   const hidePlanEntry = shouldHideMyPlanWidget(pathname);
@@ -42,9 +17,9 @@ function MyPlanOverlayHost({ pathname }: { pathname: string }) {
   const { isLoading: authLoading } = useAuthMe();
   const { isOpen: planOpen, open: openPlan, close: closePlan } = usePlanOverlay();
   const hidePlanEntryEffective = hidePlanEntry;
-  // На страницах деталей (events/activity/offers) внизу EventStickyActionBar —
-  // у него приоритет, мобильную нижнюю панель (план + 🔔/👤) не рендерим.
-  const hideMobileBottomBar = hidePlanEntryEffective || isPublicationDetailPath(pathname);
+  // Внизу максимум один липкий элемент: на деталях (events/activity/offers) это
+  // EventStickyActionBar (`purchase`), «Мой план» рендерим только для слота `plan`.
+  const showMobilePlanBar = resolveMobileBottomSlot(pathname) === "plan";
 
   // Открытие по URL param ?myPlan=open (гость или пользователь)
   useEffect(() => {
@@ -82,11 +57,7 @@ function MyPlanOverlayHost({ pathname }: { pathname: string }) {
   return (
     <>
       {!hidePlanEntryEffective ? <MyPlanWidget /> : null}
-      {!hideMobileBottomBar ? (
-        <MobileBottomBar>
-          <MyPlanMobileWidget />
-        </MobileBottomBar>
-      ) : null}
+      {showMobilePlanBar ? <MyPlanMobileWidget /> : null}
       <MyPlanOverlay open={planOpen} onOpenChange={handlePlanOpenChange} />
       <PlanQuickAddHost />
     </>
@@ -99,10 +70,6 @@ export function MyPlanProvider() {
     return null;
   }
   const isFullPageRoute = isMyPlanFullPageRoute(pathname);
-  if (isFullPageRoute && !shouldHideMyPlanWidget(pathname) && !isPublicationDetailPath(pathname)) {
-    // Полноэкранный план: виджет не нужен, но 🔔/👤 внизу остаются.
-    return <MobileBottomBar />;
-  }
 
   return (
     <PlanOverlayProvider>

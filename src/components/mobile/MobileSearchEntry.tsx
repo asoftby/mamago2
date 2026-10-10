@@ -59,7 +59,11 @@ interface MobileSearchEntryProps {
    * `chip` — компактный контекст-чип для однострочного хедера:
    * «🧭 Минск · Я и Степан ▾». Единственная точка входа в поиск.
    */
-  variant?: "field" | "chip";
+  /**
+   * `bar` — плашка второго ряда хедера: лупа, «Куда сходить?» и мелкая строка с текущим
+   * состоянием фильтра («Минск · Я и Степан»).
+   */
+  variant?: "field" | "chip" | "bar";
 }
 
 export function MobileSearchEntry({
@@ -293,6 +297,32 @@ export function MobileSearchEntry({
     onlyCitySelected && (showTapToSelectHint || !cityHubOnly);
 
   const TAP_HINT = "[ тапни, чтобы выбрать ]";
+
+  if (variant === "bar") {
+    const barCity = locationLabelOverride ?? getCityNominativeName(citySlug);
+    const barState = [barCity, cityHubOnly ? null : ageText].filter(Boolean).join(" · ");
+    return (
+      <button
+        type="button"
+        onClick={onSearchClick}
+        aria-label={`Куда сходить? Поиск и фильтры: ${barState}`}
+        className={cn(
+          "flex h-11 min-w-0 flex-1 items-center gap-3 overflow-hidden rounded-full px-4 text-left",
+          MOBILE_FLOATING_CHROME,
+          "transition-transform duration-150 ease-out active:scale-[0.98]",
+          className,
+        )}
+      >
+        <Search className="h-5 w-5 shrink-0 text-gray-500" aria-hidden />
+        <span className="flex min-w-0 flex-1 flex-col justify-center">
+          <span className="block truncate text-[14px] font-medium leading-tight text-gray-900">
+            Куда сходить?
+          </span>
+          <span className="block truncate text-[12px] leading-tight text-gray-500">{barState}</span>
+        </span>
+      </button>
+    );
+  }
 
   if (variant === "chip") {
     const chipCity = locationLabelOverride ?? getCityNominativeName(citySlug);

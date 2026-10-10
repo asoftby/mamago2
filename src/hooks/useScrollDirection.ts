@@ -1,62 +1,98 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-export function useScrollDirection(threshold: number = 10) {
-  const [scrollDirection, setScrollDirection] = useState<"up" | "down" | null>(null);
-  const [isScrolled, setIsScrolled] = useState(false);
+export interface UseScrollDirectionOptions {
+  /** Скролл вниз больше этого значения от последней точки разворота сворачивает (px). */
+  downThreshold?: number;
+  /** Любой скролл вверх больше этого значения разворачивает (px). */
+  upThreshold?: number;
+  /** При `scrollY` меньше значения — всегда развёрнуто (px). */
+  expandedAbove?: number;
+  /** Вернуть `true`, чтобы не сворачивать (например, фокус внутри сворачиваемого ряда). */
+  isLocked?: () => boolean;
+  /** Смена значения (например, pathname) сбрасывает состояние в «развёрнуто». */
+  resetKey?: string | null;
+}
+
+/**
+ * `collapsed: true` — пользователь прокручивает вниз (хедер/нижний бар сворачиваем),
+ * `false` — вверх или у верха страницы. Passive-слушатель + rAF; `setState` вызывается
+ * только при смене значения, поэтому нет перерендеров на каждый пиксель.
+ */
+export function useScrollDirection({
+  downThreshold = 10,
+  upThreshold = 4,
+  expandedAbove = 48,
+  isLocked,
+  resetKey = null,
+}: UseScrollDirectionOptions = {}): boolean {
+  const [collapsed, setCollapsed] = useState(false);
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
+    setCollapsed(false);
+  }
+  const collapsedRef = useRef(false);
+  const anchorY = useRef(0);
+  const ticking = useRef(false);
+  const isLockedRef = useRef(isLocked);
 
   useEffect(() => {
-    let lastScrollY = window.scrollY;
-    let ticking = false;
+    isLockedRef.current = isLocked;
+  }, [isLocked]);
 
-    const updateScrollDirection = () => {
-      const scrollY = window.scrollY;
-      const difference = Math.abs(scrollY - lastScrollY);
-      
-      // Update isScrolled state
-      const id = requestAnimationFrame(() => {
-        setIsScrolled(scrollY > threshold);
-      });
+  useEffect(() => {
+    collapsedRef.current = false;
+    anchorY.current = window.scrollY;
 
-      // Only update direction if we've scrolled enough to avoid jitter
-      if (difference < threshold) {
-        ticking = false;
+    const apply = (next: boolean) => {
+      if (collapsedRef.current === next) return;
+      collapsedRef.current = next;
+      setCollapsed(next);
+    };
+
+    const update = () => {
+      ticking.current = false;
+      const maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      // iOS rubber-band: scrollY выходит за [0, maxY] и «возвращается» — это не жест пользователя.
+      const y = Math.min(Math.max(window.scrollY, 0), maxY);
+
+      if (y < expandedAbove) {
+        anchorY.current = y;
+        apply(false);
         return;
       }
 
-      const directionId = requestAnimationFrame(() => {
-        if (scrollY > lastScrollY && scrollY > threshold) {
-          // Scrolling down
-          setScrollDirection("down");
-        } else if (scrollY < lastScrollY) {
-          // Scrolling up
-          setScrollDirection("up");
+      if (collapsedRef.current) {
+        anchorY.current = Math.max(anchorY.current, y);
+        if (anchorY.current - y >= upThreshold) {
+          anchorY.current = y;
+          apply(false);
         }
-      });
+        return;
+      }
 
-      lastScrollY = scrollY > 0 ? scrollY : 0;
-      ticking = false;
-    };
-
-    const onScroll = () => {
-      if (!ticking) {
-        requestAnimationFrame(updateScrollDirection);
-        ticking = true;
+      anchorY.current = Math.min(anchorY.current, y);
+      if (y - anchorY.current >= downThreshold) {
+        if (isLockedRef.current?.()) {
+          anchorY.current = y;
+          return;
+        }
+        anchorY.current = y;
+        apply(true);
       }
     };
 
-    // Set initial state
-    const initialId = requestAnimationFrame(() => {
-      setIsScrolled(window.scrollY > threshold);
-    });
+    const onScroll = () => {
+      if (ticking.current) return;
+      ticking.current = true;
+      window.requestAnimationFrame(update);
+    };
 
     window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [downThreshold, upThreshold, expandedAbove, resetKey]);
 
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-    };
-  }, [threshold]);
-
-  return { scrollDirection, isScrolled };
+  return collapsed;
 }
