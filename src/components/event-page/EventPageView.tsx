@@ -3,6 +3,8 @@
 import "@/styles/event-page.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRegisterHeaderSaveAction, useSetPublicationIntent } from "@/contexts/PublicationIntentContext";
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
+import { matchesSelectedPersonaAudience } from "@/lib/discovery/audienceEligibility";
 import { toast } from "@/lib/toast";
 import {
   Dialog,
@@ -574,7 +576,19 @@ export function EventPageView({
   const hasSimpleBooking = Boolean(data.cta.simpleBooking);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const handleBook = useCallback(() => setBookingModalOpen(true), []);
-  const visibleSimilar = data.similar.slice(0, 4);
+  // Сервер ранжирует по всей семье и не знает, кого пользователь выбрал в шапке («Я» / ребёнок / свободный
+  // поиск), поэтому подходящих по аудитории оставляем на клиенте. Пока персоны грузятся — показываем всех.
+  const familyPersona = useFamilyPersona();
+  const visibleSimilar = useMemo(() => {
+    const candidates = data.similar.filter((item) => {
+      if (!familyPersona || familyPersona.loading) return true;
+      return matchesSelectedPersonaAudience(item, {
+        personas: familyPersona.personas,
+        selectedPersonaIds: familyPersona.selectedPersonaIds,
+      });
+    });
+    return candidates.slice(0, 4);
+  }, [data.similar, familyPersona]);
   const hasSimilar = visibleSimilar.length > 0;
   const hasWhyGo = data.whyGo.length > 0;
   const hasGoodFit = data.goodFit.length > 0;

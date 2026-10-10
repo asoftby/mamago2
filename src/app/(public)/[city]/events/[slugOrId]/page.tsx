@@ -216,7 +216,8 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
           cityId: fromDb.cityId,
           citySlug: city,
           eventCategoryId: fromDb.eventCategory.id,
-          limit: 4,
+          // Запас под клиентский фильтр по выбранной аудитории (EventPageView показывает первые 4 подходящих).
+          limit: 12,
           sameCategoryOnly: true,
           userId: user?.id ?? null,
         })
