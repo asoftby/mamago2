@@ -314,6 +314,7 @@ export function MobileSearchEntry({
         <span className="block min-w-0 flex-1 truncate text-sm font-normal text-gray-700">
           {chipText}
         </span>
+        <Search aria-hidden className="h-5 w-5 shrink-0 text-gray-400" />
       </button>
     );
   }
