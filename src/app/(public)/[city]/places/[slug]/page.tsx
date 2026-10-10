@@ -668,6 +668,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
 
   let isOpenNow: boolean | undefined;
   let todayHoursText: string | undefined;
+  let hoursStatusDetail: string | undefined;
   if (openingHoursResolved) {
     const openingStatus = getOpeningStatus(
       openingHoursResolved as OpeningHoursWithRelations,
@@ -675,6 +676,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     );
     if (openingHoursResolved.mode !== "BY_APPOINTMENT") {
       isOpenNow = openingStatus.isOpen;
+      hoursStatusDetail = openingStatus.statusDetail;
     }
     if (openingStatus.todayIntervals && openingStatus.todayIntervals.length > 0) {
       todayHoursText = openingStatus.todayIntervals
@@ -752,6 +754,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     workingHoursSummary,
     isOpenNow,
     todayHoursText,
+    hoursStatusDetail,
     fallbackUrl: `/${placeCitySlug}`,
 
     // Media

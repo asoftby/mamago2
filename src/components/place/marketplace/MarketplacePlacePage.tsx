@@ -57,6 +57,8 @@ interface MarketplacePlacePageProps {
     workingHoursSummary?: string;
     isOpenNow?: boolean;
     todayHoursText?: string;
+    /** «закроется в 18:00» / «откроется завтра в 09:00» — вторая строка статуса в карточке. */
+    hoursStatusDetail?: string;
 
     // Additional info
     yearFounded?: number;
@@ -215,6 +217,7 @@ export function MarketplacePlacePage({
         workingHoursSummary={place.workingHoursSummary}
         isOpenNow={place.isOpenNow}
         todayHoursText={place.todayHoursText}
+        hoursStatusDetail={place.hoursStatusDetail}
         breadcrumbItems={place.breadcrumbItems}
         onShareClick={handleShare}
         ownerEditPlaceId={ownerEditPlaceId}

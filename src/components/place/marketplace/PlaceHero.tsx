@@ -40,6 +40,8 @@ interface PlaceHeroProps {
   workingHoursSummary?: string;
   isOpenNow?: boolean;
   todayHoursText?: string;
+  /** Вторая строка статуса: «закроется в 18:00» / «откроется в 09:00». */
+  hoursStatusDetail?: string;
   breadcrumbItems: Array<{ label: string; href?: string }>;
   onShareClick?: () => void;
   ownerEditPlaceId?: string;
@@ -71,6 +73,7 @@ export function PlaceHero({
   workingHoursSummary,
   isOpenNow,
   todayHoursText,
+  hoursStatusDetail,
   breadcrumbItems,
   directSlot,
   onShareClick,
@@ -115,7 +118,9 @@ export function PlaceHero({
   const summaryPrimary = summaryLines[0];
   const summaryExtra =
     summaryLines.length > 1 ? summaryLines.slice(1).join("\n") : undefined;
-  const hoursDetail = todayHoursText
+  const hoursDetail = hoursStatusDetail
+    ? hoursStatusDetail
+    : todayHoursText
     ? `сегодня ${todayHoursText}`
     : isOpenNow != null
       ? summaryPrimary
