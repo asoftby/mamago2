@@ -314,3 +314,73 @@ export const RecommendationTraceService = {
   linkRecommendationOutcome,
   getPublishedRecommendationSurfacePolicy,
 };
+
+/** Окно, в течение которого клиент может уточнить, какие элементы запуска реально показаны. */
+export const NARROW_EXPOSURES_MAX_AGE_MS = 15 * 60 * 1000;
+export const NARROW_EXPOSURES_MAX_IDS = 20;
+
+export type NarrowRunExposuresInput = {
+  runId: string;
+  entityType: AnalyticsEntityType;
+  /** ID, которые пользователь реально увидел, в порядке показа. */
+  shownEntityIds: string[];
+  /** Текущий пользователь (null — гость). */
+  actorUserId: string | null;
+  intent: string;
+  now?: Date;
+};
+
+export type NarrowRunExposuresResult =
+  | { ok: true; kept: number; removed: number }
+  | { ok: false; reason: "not_found" | "forbidden" | "expired" | "invalid" };
+
+/**
+ * Сервер записывает запуск рекомендаций при рендере и не знает, что клиент потом отфильтровал
+ * (например, по выбранной в шапке аудитории) и обрезал до 4. Этот метод оставляет в запуске
+ * только реально показанные экспозиции и перенумеровывает позиции.
+ *
+ * Только сужение: ничего не добавляет. Запуск должен быть свежим, нужного intent, а запуск
+ * авторизованного пользователя может сужать только он сам (гостевой — любой, кто знает
+ * неугадываемый runId, в течение окна). Экспозиции с зафиксированными исходами не удаляются.
+ */
+export async function narrowRunExposuresToShown(
+  input: NarrowRunExposuresInput,
+): Promise<NarrowRunExposuresResult> {
+  const shown = [...new Set(input.shownEntityIds.map((id) => id.trim()).filter(Boolean))];
+  if (shown.length > NARROW_EXPOSURES_MAX_IDS) return { ok: false, reason: "invalid" };
+
+  const run = await prisma.recommendationRun.findUnique({
+    where: { id: input.runId },
+    select: { id: true, userId: true, generatedAt: true, context: true },
+  });
+  if (!run) return { ok: false, reason: "not_found" };
+
+  const runIntent = (run.context as { intent?: unknown } | null)?.intent;
+  if (runIntent !== input.intent) return { ok: false, reason: "forbidden" };
+  if (run.userId && run.userId !== input.actorUserId) return { ok: false, reason: "forbidden" };
+
+  const now = (input.now ?? new Date()).getTime();
+  if (now - run.generatedAt.getTime() > NARROW_EXPOSURES_MAX_AGE_MS) {
+    return { ok: false, reason: "expired" };
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const removed = await tx.recommendationExposure.deleteMany({
+      where: {
+        runId: run.id,
+        entityType: input.entityType,
+        entityId: { notIn: shown },
+        outcomes: { none: {} },
+      },
+    });
+    for (const [index, entityId] of shown.entries()) {
+      await tx.recommendationExposure.updateMany({
+        where: { runId: run.id, entityType: input.entityType, entityId },
+        data: { position: index + 1 },
+      });
+    }
+    const kept = await tx.recommendationExposure.count({ where: { runId: run.id } });
+    await tx.recommendationRun.update({ where: { id: run.id }, data: { selectedCount: kept } });
+    return { ok: true as const, kept, removed: removed.count };
+  });
+}

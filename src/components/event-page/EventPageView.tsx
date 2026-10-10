@@ -3,6 +3,8 @@
 import "@/styles/event-page.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRegisterHeaderSaveAction, useSetPublicationIntent } from "@/contexts/PublicationIntentContext";
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
+import { matchesSelectedPersonaAudience } from "@/lib/discovery/audienceEligibility";
 import { toast } from "@/lib/toast";
 import {
   Dialog,
@@ -574,7 +576,44 @@ export function EventPageView({
   const hasSimpleBooking = Boolean(data.cta.simpleBooking);
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const handleBook = useCallback(() => setBookingModalOpen(true), []);
-  const visibleSimilar = data.similar.slice(0, 4);
+  // Сервер ранжирует по всей семье и не знает, кого пользователь выбрал в шапке («Я» / ребёнок / свободный
+  // поиск), поэтому подходящих по аудитории оставляем на клиенте. Пока персоны грузятся — показываем всех.
+  const familyPersona = useFamilyPersona();
+  const visibleSimilar = useMemo(() => {
+    const candidates = data.similar.filter((item) => {
+      if (!familyPersona || familyPersona.loading) return true;
+      return matchesSelectedPersonaAudience(item, {
+        personas: familyPersona.personas,
+        selectedPersonaIds: familyPersona.selectedPersonaIds,
+      });
+    });
+    return candidates.slice(0, 4);
+  }, [data.similar, familyPersona]);
+
+  // Сервер записал экспозиции по всем кандидатам; после клиентского фильтра и обрезки сообщаем, что
+  // реально показано, чтобы аналитика рекомендаций не завышала показы. Ждём загрузки персон.
+  const similarRunId = data.similarRunId ?? null;
+  const personasReady = !familyPersona || !familyPersona.loading;
+  const shownSimilarKey = visibleSimilar.map((item) => item.id).join(",");
+  const reportedSimilarRunRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!similarRunId || !personasReady) return;
+    // Один раз на запуск: если пользователь потом сменит аудиторию в шапке, то уже показанное остаётся показанным.
+    if (reportedSimilarRunRef.current === similarRunId) return;
+    reportedSimilarRunRef.current = similarRunId;
+    void fetch("/api/recommendations/exposures/shown", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      keepalive: true,
+      body: JSON.stringify({
+        runId: similarRunId,
+        entityIds: shownSimilarKey ? shownSimilarKey.split(",") : [],
+      }),
+    }).catch(() => {
+      // Телеметрия не должна влиять на страницу.
+    });
+  }, [similarRunId, personasReady, shownSimilarKey]);
   const hasSimilar = visibleSimilar.length > 0;
   const hasWhyGo = data.whyGo.length > 0;
   const hasGoodFit = data.goodFit.length > 0;

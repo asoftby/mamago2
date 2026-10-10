@@ -150,6 +150,8 @@ export type EventPageData = {
     unp?: string;
   };
   similar: EventPageSimilar[];
+  /** Запуск рекомендаций, в котором записаны экспозиции «Похожих событий» (клиент сужает его до показанных). */
+  similarRunId?: string | null;
   breadcrumbs: EventPageBreadcrumb[];
   priceLabel: string;
   priceDetails?: string;
