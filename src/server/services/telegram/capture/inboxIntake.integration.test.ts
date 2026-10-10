@@ -508,3 +508,78 @@ test("a throwing processor marks the item FAILED with PROCESSOR_ERROR", async ()
   assert.ok(logged.some((line) => line.includes("code=PROCESSOR_ERROR")));
   assert.ok(logged.every((line) => !line.includes("sensitive")));
 });
+
+test("accepted text has one processing acknowledgment whose message is reused for the preview", async () => {
+  const owner = await makeUser("ack-text");
+  const acknowledged: Array<{ chatId: number; partKind: string }> = [];
+  const h = makeIntake({
+    notifier: {
+      async reply() {},
+      async typing() {},
+      async progress(chatId, partKind) {
+        acknowledged.push({ chatId, partKind });
+        return 8765;
+      },
+    },
+    processor: { async process() {} },
+  });
+  const incoming = capture();
+  const first = await h.intake.receive(owner, "DEV", incoming);
+  const replay = await h.intake.receive(owner, "DEV", incoming);
+  assert.equal(replay.outcome.status, "duplicate");
+  assert.ok(first.afterResponse);
+  await first.afterResponse();
+  assert.deepEqual(acknowledged, [{ chatId: 4242, partKind: "TEXT" }]);
+  if (first.outcome.status !== "stored") throw new Error("expected stored");
+  const item = await db.inboxItem.findUniqueOrThrow({ where: { id: first.outcome.inboxItemId } });
+  assert.equal(item.cardMessageId, 8765);
+});
+
+test("three screenshots in one album yield one progress message", async () => {
+  const owner = await makeUser("ack-album");
+  const acknowledged: string[] = [];
+  const h = makeIntake({
+    notifier: {
+      async reply() {},
+      async typing() {},
+      async progress(_chatId, kind) {
+        acknowledged.push(kind);
+        return 9876;
+      },
+    },
+    processor: { async process() {} },
+  });
+  const parts = [photo("ack-album"), photo("ack-album"), photo("ack-album")];
+  const received = await Promise.all(parts.map((part) => h.intake.receive(owner, "DEV", part)));
+  await Promise.all(received.map((result) => result.afterResponse?.()));
+  assert.deepEqual(acknowledged, ["PHOTO"]);
+  const ids = new Set(received.map((result) =>
+    result.outcome.status === "stored" ? result.outcome.inboxItemId : null,
+  ));
+  assert.equal(ids.size, 1);
+  const item = await db.inboxItem.findUniqueOrThrow({ where: { id: [...ids][0]! } });
+  assert.equal(item.cardMessageId, 9876);
+});
+
+test("processor exception replaces the status with an error instead of silence", async () => {
+  const owner = await makeUser("ack-fail");
+  const notices: Array<{ messageId: number | null; text: string }> = [];
+  const h = makeIntake({
+    notifier: {
+      async reply() {},
+      async typing() {},
+      async progress() { return 1111; },
+      async failed(_chatId, messageId, text) { notices.push({ messageId, text }); },
+    },
+    processor: { async process() { throw new Error("synthetic model failure"); } },
+  });
+  const result = await h.intake.receive(owner, "DEV", capture());
+  assert.ok(result.afterResponse);
+  await result.afterResponse();
+  assert.equal(notices.length, 1);
+  assert.equal(notices[0]!.messageId, 1111);
+  assert.match(notices[0]!.text, /Не получилось распознать/);
+  if (result.outcome.status !== "stored") throw new Error("expected stored");
+  const item = await db.inboxItem.findUniqueOrThrow({ where: { id: result.outcome.inboxItemId } });
+  assert.equal(item.status, "FAILED");
+});
