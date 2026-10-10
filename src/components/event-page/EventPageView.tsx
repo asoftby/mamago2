@@ -94,7 +94,7 @@ function EventMarquee({ items }: { items: string[] }) {
 function EventMetaStrip({ facts }: { facts: EventPageData["importantFacts"] }) {
   if (!facts.length) return null;
   return (
-    <section>
+    <section className="border-y border-[rgba(20,18,16,0.10)]">
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <div
           className="grid grid-cols-2 md:grid-cols-4"
@@ -141,14 +141,14 @@ function EventAboutEditorial({
   return (
     <section className="py-16 md:py-20">
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <div className="mb-4 flex items-center gap-3.5">
+          <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
+            О событии
+          </span>
+          <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
+        </div>
         <div className="grid grid-cols-1 gap-10 md:grid-cols-[320px_1fr] md:gap-14">
           <div>
-            <div className="mb-4 flex items-center gap-3.5">
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-                О событии
-              </span>
-              <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
-            </div>
             <h2
               style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
             >
@@ -212,13 +212,14 @@ function EventOrganizerLegal({ organizer }: { organizer: NonNullable<EventPageDa
   return (
     <section className="py-8 md:py-10">
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3.5">
           <span
-            className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.45)]"
+            className="shrink-0 text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]"
             style={{ fontFamily: "Menlo, monospace" }}
           >
             Организатор события
           </span>
+          <span className="hidden h-px flex-1 bg-[rgba(20,18,16,0.10)] sm:block" />
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px] text-[rgba(20,18,16,0.60)]">
             <span className="font-medium text-[#141210]">{organizer.name}</span>
             {organizer.unp ? <span>УНП {organizer.unp}</span> : null}
@@ -670,23 +671,21 @@ export function EventPageView({
       {sessions.length > 0 && (
         <section className="py-14 md:py-16">
           <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
-            <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <div className="mb-3 flex items-center gap-3.5">
-                  <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-                    Расписание и сеансы
-                  </span>
-                  <span className="h-px w-[120px] bg-[rgba(20,18,16,0.10)]" />
-                </div>
-                <h2
-                  style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
-                >
-                  <span style={{ fontFamily: "var(--font-sans)" }}>Выбери </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>удобное время</span>
-                </h2>
+            <div className="mb-6">
+              <div className="mb-3 flex items-center gap-3.5">
+                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
+                  Расписание и сеансы
+                </span>
+                <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
+                <span className="inline-flex h-7 shrink-0 items-center rounded-full border border-[rgba(20,18,16,0.18)] px-3 text-[13px] text-[#141210]" style={{ fontFamily: "Menlo, monospace" }}>
+                  {formatSessionCount(sessions.length)}
+                </span>
               </div>
-              <span className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] px-3 text-[13px] text-[#141210]" style={{ fontFamily: "Menlo, monospace" }}>
-                {formatSessionCount(sessions.length)}
-              </span>
+              <h2
+                style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
+              >
+                <span style={{ fontFamily: "var(--font-sans)" }}>Выбери </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>удобное время</span>
+              </h2>
             </div>
             <EventSessionSelector
               sessions={sessions}

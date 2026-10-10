@@ -159,21 +159,20 @@ export function LocationBlock({
   return (
     <section className={cn("border-t border-[rgba(20,18,16,0.10)] py-14 md:py-16", className)}>
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        {/* Kicker — линия на всю ширину блока */}
+        <div className="mb-5 flex items-center gap-3.5">
+          <span
+            className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]"
+            style={{ fontFamily: "Menlo, monospace" }}
+          >
+            {kicker}
+          </span>
+          <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
+        </div>
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
 
           {/* ── Left: text ── */}
           <div className="flex flex-col">
-            {/* Kicker */}
-            <div className="mb-5 flex items-center gap-3.5">
-              <span
-                className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]"
-                style={{ fontFamily: "Menlo, monospace" }}
-              >
-                {kicker}
-              </span>
-              <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
-            </div>
-
             {/* Logo + Headline */}
             <div className="mb-5 flex items-center gap-4 leading-[1.1]">
               <div

@@ -131,12 +131,6 @@ export function EventDecisionPanel({
 
   const { head, tail } = splitTitle(data.title);
 
-  const planLabel = isPlanned
-    ? planDate
-      ? `В плане на ${new Date(`${planDate}T12:00:00`).toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })}`
-      : "В плане ✓"
-    : data.cta.planLabel;
-
   const venueName = data.venue?.name ?? venueShort;
   const venueAddress = data.venue?.address;
   const venueMetro = data.venue?.metro;
@@ -367,28 +361,6 @@ export function EventDecisionPanel({
               <span className="sr-only">Позвонить</span>
             </CallActionButton>
           )}
-
-          <button
-            type="button"
-            onClick={onPlan}
-            aria-label={isPlanned ? planLabel : "Добавить в план"}
-            className={cn(
-              "flex h-14 shrink-0 items-center justify-center rounded-full border transition-colors",
-              (data.cta.purchaseUrl || data.cta.simpleBooking) ? "w-14 lg:hidden" : "flex-1 gap-2 px-4 text-[16px] font-semibold",
-              isPlanned
-                ? "border-[#E86A3A] bg-[#FFE8DC] text-[#E86A3A]"
-                : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.45)] hover:border-[#141210] hover:text-[#141210]",
-            )}
-          >
-            <Heart
-              size={20}
-              strokeWidth={1.75}
-              className={isPlanned ? "fill-[#E86A3A]" : ""}
-            />
-            {!(data.cta.purchaseUrl || data.cta.simpleBooking) && (
-              <span>{isPlanned ? planLabel : "Сохранить"}</span>
-            )}
-          </button>
         </div>
 
 
