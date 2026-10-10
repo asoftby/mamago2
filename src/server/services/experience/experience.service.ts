@@ -77,6 +77,59 @@ export async function listRecentExperienceSummaries(input: {
   }));
 }
 
+export type ExperienceVisit = ReturnType<typeof serializeExperience> & {
+  title: string;
+};
+
+/**
+ * История посещений для «Где мы были» в модалке «Мой план»: подтверждённые визиты
+ * (ATTENDED), новые сверху. Видимость как у listRecentExperienceSummaries —
+ * через семейный scope плана (PRIVATE-пункты скрыты).
+ */
+export async function listAttendedExperienceVisits(input: {
+  userId: string;
+  take?: number;
+}): Promise<ExperienceVisit[]> {
+  const take = Math.min(100, Math.max(1, input.take ?? 60));
+  const [memberIds, scope] = await Promise.all([
+    activeFamilyUserIds(input.userId),
+    planScopeFor(input.userId),
+  ]);
+  const where = { userId: { in: memberIds }, entityType: "EVENT" as const, attendance: "ATTENDED" as const };
+  const orderBy = [{ plannedDate: "desc" as const }, { attendanceConfirmedAt: "desc" as const }];
+  // Видимость плана проверяется после выборки, поэтому читаем страницами, пока не наберём `take`
+  // видимых визитов (иначе чужие приватные записи вытесняют ваши из лимита).
+  const batchSize = memberIds.length > 1 ? take * 2 : take;
+  const MAX_BATCHES = 10;
+  const visits: ExperienceVisit[] = [];
+  for (let batch = 0; batch < MAX_BATCHES && visits.length < take; batch += 1) {
+    const rows = await prisma.experience.findMany({
+      where,
+      orderBy,
+      skip: batch * batchSize,
+      take: batchSize,
+    });
+    if (rows.length === 0) break;
+    const planItems = await prisma.planItem.findMany({
+      where: { id: { in: rows.map((row) => row.sourcePlanItemId) }, ...scope },
+      select: { id: true, title: true, activity: { select: { title: true } } },
+    });
+    const titleByPlanItemId = new Map(
+      planItems.map((item) => [item.id, item.activity?.title || item.title || "Событие"]),
+    );
+    for (const row of rows) {
+      if (!titleByPlanItemId.has(row.sourcePlanItemId)) continue;
+      visits.push({
+        ...serializeExperience(row),
+        title: titleByPlanItemId.get(row.sourcePlanItemId) ?? "Событие",
+      });
+      if (visits.length >= take) break;
+    }
+    if (rows.length < batchSize) break;
+  }
+  return visits;
+}
+
 type TelemetryContext = {
   sessionId?: string | null;
 };

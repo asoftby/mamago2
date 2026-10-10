@@ -57,7 +57,6 @@ export function PlaceReviewsSection({
       id="reviews"
       style={{
         padding: "72px 0 56px",
-        borderTop: "1px solid rgba(20,18,16,.10)",
         background: "#ffffff",
       }}
     >

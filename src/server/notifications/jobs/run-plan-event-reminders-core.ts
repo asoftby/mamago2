@@ -109,13 +109,20 @@ export async function runPlanEventRemindersCore(
       offsetMinutes: 120,
       timeZone: DEFAULT_NOTIFICATION_TIME_ZONE,
     };
+    // Дело назначено одному взрослому — копии для остальных членов семьи не напоминаем.
+    if (candidate.assigneeUserId && candidate.assigneeUserId !== candidate.userId) {
+      skippedSchedule += 1;
+      continue;
+    }
     const startsAt = candidate.startsAt;
     if (!settings.enabled || !startsAt || startsAt.getTime() <= now.getTime()) {
       skippedSchedule += 1;
       continue;
     }
 
-    const dueAt = addMinutes(startsAt, -settings.offsetMinutes);
+    // Свой срок у записи («за 15 минут», «за час») важнее общего расписания уведомлений.
+    const offsetMinutes = candidate.reminderLeadMinutes ?? settings.offsetMinutes;
+    const dueAt = addMinutes(startsAt, -offsetMinutes);
     const oldestAllowedDueAt = addMinutes(now, -dueGraceMinutes);
     if (dueAt.getTime() > now.getTime() || dueAt.getTime() < oldestAllowedDueAt.getTime()) {
       skippedSchedule += 1;
@@ -147,7 +154,7 @@ export async function runPlanEventRemindersCore(
         activityId: candidate.activityId,
         eventTitle: candidate.activity?.title ?? candidate.title ?? "Событие",
         startsAt: startsAt.toISOString(),
-        offsetMinutes: settings.offsetMinutes,
+        offsetMinutes,
         result,
       });
     } catch (error) {
@@ -158,7 +165,7 @@ export async function runPlanEventRemindersCore(
         activityId: candidate.activityId,
         eventTitle: candidate.activity?.title ?? candidate.title ?? "Событие",
         startsAt: startsAt.toISOString(),
-        offsetMinutes: settings.offsetMinutes,
+        offsetMinutes,
         result: {
           status: "FAILED",
           errorMessage: error instanceof Error ? error.message : "REMINDER_JOB_FAILED",

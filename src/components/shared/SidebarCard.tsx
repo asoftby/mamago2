@@ -68,13 +68,16 @@ export function SidebarCardTopSection({
   children,
   mt = 14,
   pt = 14,
+  className,
 }: {
   children: ReactNode;
   mt?: number;
   pt?: number;
+  className?: string;
 }) {
   return (
     <div
+      className={className}
       style={{
         marginTop: mt,
         paddingTop: pt,

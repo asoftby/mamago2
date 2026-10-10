@@ -32,21 +32,21 @@ export function PlanRecommendationCta({
   isExhausted = false,
 }: PlanRecommendationCtaProps) {
   const atCap = batchNumber >= maxBatches;
-  const showRegenerateButton = !isExhausted;
+  const showRegenerateButton = !isExhausted && !atCap;
   const catalogIsPrimary = isExhausted || atCap;
 
   return (
-    <div className={cn("flex items-center justify-between gap-3", compact && "flex-wrap")}>
+    <div className={cn("flex items-center gap-3", catalogIsPrimary ? "justify-center" : "justify-between", compact && "flex-wrap")}>
       {showRegenerateButton ? (
         <button
           type="button"
           onClick={onRegenerate}
           disabled={isRegenerating || atCap}
           className={cn(
-            "inline-flex shrink-0 items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+            "inline-flex shrink-0 items-center gap-2 min-h-11 rounded-2xl px-5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60",
             catalogIsPrimary
-              ? "border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"
-              : "bg-[#EF8759] text-white hover:bg-[#e17a48]",
+              ? "border border-[var(--mp-line)] bg-[var(--mp-card)] text-[var(--mp-tx)] hover:border-[var(--mp-line-strong)]"
+              : "bg-[var(--mp-ac)] text-white hover:bg-[var(--mp-ac-dark)]",
           )}
         >
           <RefreshCw className={cn("h-4 w-4", isRegenerating && "animate-spin")} />
@@ -61,8 +61,8 @@ export function PlanRecommendationCta({
         onClick={onCatalog}
         className={cn(
           catalogIsPrimary
-            ? "inline-flex shrink-0 items-center gap-2 rounded-full bg-[#EF8759] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#e17a48]"
-            : "text-sm font-medium text-neutral-600 underline-offset-2 transition-colors hover:text-neutral-900 hover:underline",
+            ? "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-2xl bg-[var(--mp-ac)] px-5 text-sm font-bold text-white transition-colors hover:bg-[var(--mp-ac-dark)]"
+            : "min-h-11 text-sm font-bold text-[var(--mp-tx2)] underline-offset-2 transition-colors hover:text-[var(--mp-tx)] hover:underline",
         )}
       >
         {catalogIsPrimary ? "Смотреть каталог" : "Или посмотреть каталог"}

@@ -19,7 +19,7 @@ test("history includes places, offers, manually entered tasks, and attendance st
   assert.match(history, /row\.activity\?\.type === "OFFER"/);
   assert.match(history, /row\.entryType === "TASK"/);
   assert.match(history, /sourcePlanItemId/);
-  assert.match(archive, /Прошедшее/);
+  assert.match(archive, /Архив событий/);
   assert.match(archive, /Ждёт оценки/);
   assert.match(archive, /Не получилось/);
   assert.match(page, /listPastPlanEntries/);

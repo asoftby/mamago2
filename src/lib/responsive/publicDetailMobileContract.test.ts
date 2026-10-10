@@ -134,10 +134,10 @@ assert.match(
   /inline-flex min-h-11 items-center rounded-lg px-2/,
   "Place Reviews 'read all' action must expose a 44px touch target",
 );
-assert.match(
+assert.doesNotMatch(
   placeOffers,
-  /inline-flex min-h-11 items-center/,
-  "Place Offers 'all offers' action must expose a 44px touch target",
+  /Все предложения/,
+  "Place Offers section no longer renders the 'all offers' link",
 );
 
 assert.match(

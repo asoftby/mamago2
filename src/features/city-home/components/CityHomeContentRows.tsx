@@ -110,6 +110,7 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
       <CityHomeSection
         className="pt-[5px]"
         title={title}
+        titleCitySlug={citySlug}
         actionLabel={eventsLabel}
         actionHref={eventsHref}
         actionInlineText
@@ -125,6 +126,7 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
     <CityHomeSection
       className="pt-[5px]"
       title={title}
+      titleCitySlug={citySlug}
       actionLabel={eventsLabel}
       actionHref={eventsHref}
       actionInlineText

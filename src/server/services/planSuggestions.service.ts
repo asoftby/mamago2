@@ -317,7 +317,10 @@ export async function rankPlanSuggestionsForCity(
 
   let ageFallbackUsed = false;
   let rows = await fetchCandidateRows(true);
-  if (rows.length === 0 && ageRangeValues.length > 0) {
+  // An explicit adult-only search must never fall back to child-targeted
+  // events just to fill the recommendation batch.
+  const adultOnly = ageRangeValues.length === 1 && ageRangeValues[0] === "18+";
+  if (rows.length === 0 && ageRangeValues.length > 0 && !adultOnly) {
     ageFallbackUsed = true;
     rows = await fetchCandidateRows(false);
   }

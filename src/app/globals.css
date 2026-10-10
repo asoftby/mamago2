@@ -603,6 +603,17 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   color: rgba(20, 18, 16, 0.55);
 }
 
+/* Типографика «Мой план»: serif — смысл и атмосфера, sans — интерактив, mono — мета (месяц, дни недели). */
+.mp-font-display {
+  font-family: var(--mp-font-display, var(--font-display)), ui-serif, Georgia, serif;
+}
+.mp-font-ui {
+  font-family: var(--mp-font-ui, var(--font-sans)), ui-sans-serif, system-ui, sans-serif;
+}
+.mp-font-meta {
+  font-family: var(--mp-font-meta, var(--font-mono)), ui-monospace, monospace;
+}
+
 .kicker-row {
   display: flex;
   align-items: center;

@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CityTitle } from "@/components/ui/CityTitle";
 
 export type SectionHeaderProps = {
   title: string;
+  /** Если задан — заголовок набирается как «Обзоры и статьи» (serif), а «в {город}» — курсивом primary. */
+  titleCitySlug?: string;
   subtitle?: string | null;
   /** Текст ссылки справа (например «Смотреть все»); для `actionIconButton` используется как `aria-label` */
   actionLabel?: string | null;
@@ -48,6 +51,7 @@ export function CityHomeAllLink({
 
 export function SectionHeader({
   title,
+  titleCitySlug,
   subtitle,
   actionLabel,
   actionHref,
@@ -60,6 +64,11 @@ export function SectionHeader({
   const useInlineText = showAction && actionInlineText;
   const useIconButton = showAction && actionIconButton && !useInlineText;
   const inlineTitleAndAction = (useIconButton || useInlineText) && !subtitle;
+
+  const titleNode = titleCitySlug ? <CityTitle title={title} citySlug={titleCitySlug} /> : title;
+  const titleStyle = titleCitySlug
+    ? { fontFamily: "var(--font-serif)", fontWeight: 400, fontSize: 30, letterSpacing: "-0.03em" }
+    : { fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 30, letterSpacing: "-1px" };
 
   const actionLink = showAction ? (
     useInlineText ? (
@@ -106,8 +115,8 @@ export function SectionHeader({
           className,
         )}
       >
-        <h2 className="min-w-0 text-neutral-900 leading-tight" style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 30, letterSpacing: "-1px" }}>
-          {title}
+        <h2 className="min-w-0 text-neutral-900 leading-tight" style={titleStyle}>
+          {titleNode}
         </h2>
         {actionLink}
       </div>
@@ -122,8 +131,8 @@ export function SectionHeader({
       )}
     >
       <div className="min-w-0 space-y-1">
-        <h2 className="text-neutral-900 leading-tight" style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 30, letterSpacing: "-1px" }}>
-          {title}
+        <h2 className="text-neutral-900 leading-tight" style={titleStyle}>
+          {titleNode}
         </h2>
         {subtitle ? (
           <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-[0.2em]">

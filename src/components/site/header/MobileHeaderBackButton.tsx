@@ -17,7 +17,7 @@ export function MobileHeaderBackButton({ fallbackHref }: { fallbackHref: string 
       onClick={goBack}
       className={getNavIconButtonClassName({ isActive: false, chrome: "dark", size: "compact" })}
     >
-      <ArrowLeft className="h-5 w-5 text-gray-700" aria-hidden />
+      <ArrowLeft className="h-5 w-5 text-gray-400" aria-hidden />
     </button>
   );
 }

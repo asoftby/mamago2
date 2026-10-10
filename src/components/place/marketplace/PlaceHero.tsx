@@ -1,6 +1,8 @@
 "use client";
 
-import { Phone } from "lucide-react";
+import { Instagram, Link2, Phone, Share2 } from "lucide-react";
+import { useState } from "react";
+import { ShareModal } from "@/components/shared/ShareModal";
 import { PlaceSaveHeart } from "@/features/save/PlaceSaveHeart";
 import Link from "next/link";
 import Image from "next/image";
@@ -11,14 +13,10 @@ import { PlacePhoneActionButton } from "@/components/place/PlacePhoneActions";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 import {
   SidebarCard,
-  SidebarCardSection,
   SidebarCardTopSection,
   SidebarCardAddressRow,
-  SidebarCardContactRow,
-  SidebarCardShare,
 } from "@/components/shared/SidebarCard";
 import { MediaGalleryStrip } from "@/components/media/MediaGalleryStrip";
-import { MobileMediaCarousel } from "@/components/media/MobileMediaCarousel";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 
 interface PlaceHeroProps {
@@ -41,6 +39,10 @@ interface PlaceHeroProps {
   workingHoursSummary?: string;
   isOpenNow?: boolean;
   todayHoursText?: string;
+  /** Вторая строка статуса: «закроется в 18:00» / «откроется в 09:00». */
+  hoursStatusDetail?: string;
+  /** Коротко для шапки карточки: «до 18:00» / «с 09:00». */
+  hoursStatusShort?: string;
   breadcrumbItems: Array<{ label: string; href?: string }>;
   onShareClick?: () => void;
   ownerEditPlaceId?: string;
@@ -60,7 +62,6 @@ export function PlaceHero({
   title,
   shortDesc,
   categoryLabel,
-  city,
   district,
   address,
   metro,
@@ -70,15 +71,16 @@ export function PlaceHero({
   logoUrl,
   rating,
   reviewCount,
-  workingHoursSummary,
   isOpenNow,
-  todayHoursText,
+  hoursStatusDetail,
+  hoursStatusShort,
   breadcrumbItems,
   directSlot,
   onShareClick,
   ownerEditPlaceId,
   media,
 }: PlaceHeroProps) {
+  const [shareOpen, setShareOpen] = useState(false);
   const trimmedTitle = title.trim();
   // Заголовок одной строкой (без принудительного переноса после первого слова),
   // с editorial-точкой в конце, если её ещё нет.
@@ -108,46 +110,14 @@ export function PlaceHero({
     });
   };
 
-  const summaryLines =
-    workingHoursSummary
-      ?.split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean) ?? [];
-  const summaryPrimary = summaryLines[0];
-  const summaryExtra =
-    summaryLines.length > 1 ? summaryLines.slice(1).join("\n") : undefined;
-  const hoursDetail = todayHoursText
-    ? `сегодня ${todayHoursText}`
-    : isOpenNow != null
-      ? summaryPrimary
-      : summaryExtra;
-
-  const mobileMediaItems: MediaGalleryItem[] = (() => {
-    const poster = media?.posterUrl?.trim();
-    const rest = (media?.galleryItems ?? []).filter(
-      (item) => item.type !== "image" || item.src.trim() !== poster,
-    );
-    if (!poster) return rest;
-    return [
-      {
-        type: "image",
-        id: "place-poster",
-        src: poster,
-        alt: media?.posterAlt || title,
-      },
-      ...rest,
-    ];
-  })();
-
   return (
     <section
-      style={{ paddingTop: 8, paddingBottom: 56, background: "#ffffff" }}
+      style={{ paddingTop: 16, paddingBottom: 56, background: "#ffffff" }}
     >
       {/* Breadcrumbs */}
       <div
-        className="breadcrumbs mx-auto w-full max-w-[1200px] px-4 pb-2.5 pt-5 sm:px-6 lg:px-7"
+        className="breadcrumbs mx-auto w-full max-w-[1200px] px-4 pb-2.5 pt-5 sm:px-6 lg:px-7 hidden lg:flex"
         style={{
-          display: "flex",
           gap: 8,
           alignItems: "center",
           color: "rgba(20,18,16,.55)",
@@ -180,14 +150,13 @@ export function PlaceHero({
         }}
       >
         {/* Left: editorial title */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {/* Kicker */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: 10,
-              marginBottom: 6,
               flexWrap: "wrap",
             }}
           >
@@ -197,19 +166,19 @@ export function PlaceHero({
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 6,
-                  height: 30,
+                  height: 28,
                   padding: "0 12px",
                   borderRadius: 999,
                   background: "#FFE8DC",
                   color: "#E86A3A",
-                  fontSize: 13,
-                  fontWeight: 500,
+                  fontSize: 12,
+                  fontWeight: 600,
                 }}
               >
-                ● {categoryLabel}
+                {categoryLabel}
               </span>
             )}
-            {(city || district) && (
+            {district && (
               <span
                 style={{
                   fontFamily: "var(--font-mono, monospace)",
@@ -219,10 +188,37 @@ export function PlaceHero({
                   color: "rgba(20,18,16,.55)",
                 }}
               >
-                {[city, district].filter(Boolean).join(" · ")}
+                {district}
               </span>
             )}
+            {/* Desktop: «Сохранить» и «Поделиться» справа в строке категории; на мобильном — иконки в хедере. */}
+            <div className="ml-auto hidden items-center gap-5 lg:flex">
+              <PlaceSaveHeart
+                variant="text"
+                registerInHeader
+                placeId={placeId}
+                placeSlug={placeSlug}
+                placeTitle={title}
+                coverImageUrl={logoUrl}
+                source="place-detail"
+              />
+              <button
+                type="button"
+                onClick={() => setShareOpen(true)}
+                className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
+              >
+                <Share2 size={18} strokeWidth={1.75} aria-hidden />
+                Поделиться
+              </button>
+            </div>
           </div>
+          <ShareModal
+            open={shareOpen}
+            onOpenChange={setShareOpen}
+            url={typeof window !== "undefined" ? window.location.href : ""}
+            title={title}
+            entityNoun="местом"
+          />
 
           {/* Title */}
           <h1
@@ -232,7 +228,7 @@ export function PlaceHero({
               fontWeight: 600,
               lineHeight: 1.1,
               letterSpacing: "-.025em",
-              margin: "0 0 8px",
+              margin: 0,
               color: "#141210",
             }}
           >
@@ -246,20 +242,15 @@ export function PlaceHero({
               maxWidth: 600,
               color: "#3A332B",
               lineHeight: 1.5,
-              marginBottom: 8,
             }}
           >
             {shortDesc}
           </div>
 
-          {media && mobileMediaItems.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <div className="lg:hidden">
-                <MobileMediaCarousel items={mobileMediaItems} ariaLabel="Фото места" />
-              </div>
-              <div className="hidden lg:block">
-                <MediaGalleryStrip items={media.galleryItems} maxVisible={3} />
-              </div>
+          {/* Фото: на мобильном — первым блоком, как на десктопе (3 в ряд, первым Reels, если есть). */}
+          {media && media.galleryItems.length > 0 && (
+            <div className="order-first lg:order-none lg:mt-2">
+              <MediaGalleryStrip items={media.galleryItems} maxVisible={3} />
             </div>
           )}
         </div>
@@ -267,10 +258,15 @@ export function PlaceHero({
         {/* Right: sticky decision card */}
         <aside>
           <SidebarCard sticky>
-            {/* Logo + status */}
-            <SidebarCardSection mb={18} pb={16}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* Логотип + название места + адрес и статус работы */}
+            <div
+              style={{
+                marginBottom: 14,
+                paddingBottom: metro || district ? 16 : 0,
+                borderBottom: metro || district ? "1px solid rgba(20,18,16,.10)" : "none",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {/* Logo circle */}
                   <div style={{ width: 44, height: 44, borderRadius: 99, overflow: "hidden", flexShrink: 0, background: "#E86A3A", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {logoUrl ? (
@@ -285,59 +281,37 @@ export function PlaceHero({
                       </span>
                     )}
                   </div>
-                  {/* Status + hours */}
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontFamily: "var(--font-mono, monospace)", textTransform: "uppercase", fontSize: 11, letterSpacing: ".14em", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: isOpenNow == null ? "rgba(20,18,16,.45)" : isOpenNow ? "#1F8A5B" : "#C24E22" }}>
-                      {isOpenNow != null
-                        ? `● ${isOpenNow ? "Открыто" : "Закрыто"}`
-                        : summaryPrimary
-                          ? `● ${summaryPrimary}`
-                          : title}
-                    </div>
-                    {hoursDetail && (
-                      <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 12, color: "rgba(20,18,16,.55)", marginTop: 2, letterSpacing: ".02em" }}>
-                        {hoursDetail}
-                      </div>
-                    )}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 16, lineHeight: 1.25, color: "#141210", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {title}
                   </div>
+                  {address && (
+                    <div style={{ marginTop: 3, fontSize: 13, color: "rgba(20,18,16,.55)", lineHeight: 1.35 }}>{address}</div>
+                  )}
+                  {isOpenNow != null && (
+                    <div style={{ marginTop: 3, display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: isOpenNow ? "#1F8A5B" : "#E5322D" }}>
+                      <span aria-hidden style={{ width: 7, height: 7, borderRadius: 99, background: "currentColor", flexShrink: 0 }} />
+                      <span>
+                        {isOpenNow
+                          ? hoursStatusShort ? `Сейчас открыто ${hoursStatusShort}` : "Сейчас открыто"
+                          : hoursStatusDetail
+                            ? hoursStatusDetail.charAt(0).toUpperCase() + hoursStatusDetail.slice(1)
+                            : "Сейчас закрыто"}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
-            </SidebarCardSection>
+            </div>
 
-            {/* Address */}
-            {(address || metro || district) && (
-              <SidebarCardSection mb={14} pb={16}>
-                <SidebarCardAddressRow address={address} metro={metro} district={district} />
-              </SidebarCardSection>
+            {/* Метро / район (адрес вынесен в шапку карточки) */}
+            {(metro || district) && (
+              <div style={{ marginBottom: 14 }}>
+                <SidebarCardAddressRow metro={metro} district={district} />
+              </div>
             )}
 
-            {/* Contacts (телефоны не дублируем — есть кнопка «Позвонить») */}
-            {(website || instagramUrl) && (
-              <SidebarCardSection>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {website && websiteDisplay && (
-                    <SidebarCardContactRow
-                      label="Сайт"
-                      href={website.startsWith("http") ? website : `https://${website}`}
-                      value={websiteDisplay}
-                      external
-                      onClick={() => trackCta("website")}
-                    />
-                  )}
-                  {instagramUrl && instagramDisplay && (
-                    <SidebarCardContactRow
-                      label="Instagram"
-                      href={instagramUrl}
-                      value={instagramDisplay}
-                      external
-                      onClick={() => trackCta("instagram")}
-                    />
-                  )}
-                </div>
-              </SidebarCardSection>
-            )}
-
-            {/* Позвонить + Сохранить */}
+            {/* Позвонить */}
             <SidebarCardTopSection>
               <div ref={ctaRef} className="flex items-center gap-3">
                 {phones.length > 0 && (
@@ -351,13 +325,6 @@ export function PlaceHero({
                     Позвонить
                   </PlacePhoneActionButton>
                 )}
-                <PlaceSaveHeart
-                  placeId={placeId}
-                  placeSlug={placeSlug}
-                  placeTitle={title}
-                  coverImageUrl={logoUrl}
-                  source="place-detail"
-                />
               </div>
               {directSlot && <div className="mt-3">{directSlot}</div>}
             </SidebarCardTopSection>
@@ -369,10 +336,10 @@ export function PlaceHero({
               </SidebarCardTopSection>
             )}
 
-            {/* Rating + Share */}
-            <SidebarCardTopSection mt={20} pt={20}>
-              <div className="flex items-center justify-between">
-                {rating != null && reviewCount != null && reviewCount > 0 ? (
+            {/* Rating */}
+            {rating != null && reviewCount != null && reviewCount > 0 ? (
+              <SidebarCardTopSection mt={20} pt={20}>
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[13px] text-[rgba(20,18,16,0.55)]">
                       <span className="text-[16px] text-[#E86A3A]">★</span> {rating.toFixed(1)}
@@ -386,10 +353,43 @@ export function PlaceHero({
                       {reviewCount} {reviewCount === 1 ? "отзыв" : reviewCount >= 2 && reviewCount <= 4 ? "отзыва" : "отзывов"}
                     </a>
                   </div>
-                ) : <span />}
-                <SidebarCardShare title={title} entityNoun="местом" />
-              </div>
-            </SidebarCardTopSection>
+                </div>
+              </SidebarCardTopSection>
+            ) : null}
+
+            {/* Соцсети слева, сайт справа */}
+            {(instagramUrl || (website && websiteDisplay)) && (
+              <SidebarCardTopSection mt={20} pt={20}>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    {instagramUrl && (
+                      <a
+                        href={instagramUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={instagramDisplay ? `Instagram ${instagramDisplay}` : "Instagram"}
+                        onClick={() => trackCta("instagram")}
+                        className="flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(20,18,16,0.18)] text-[rgba(20,18,16,0.55)] transition-colors hover:border-[#141210] hover:text-[#141210]"
+                      >
+                        <Instagram size={18} strokeWidth={1.75} aria-hidden />
+                      </a>
+                    )}
+                  </div>
+                  {website && websiteDisplay && (
+                    <a
+                      href={website.startsWith("http") ? website : `https://${website}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => trackCta("website")}
+                      className="inline-flex min-w-0 items-center gap-1.5 text-[14px] text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
+                    >
+                      <Link2 size={16} strokeWidth={1.75} className="shrink-0" aria-hidden />
+                      <span className="truncate">{websiteDisplay}</span>
+                    </a>
+                  )}
+                </div>
+              </SidebarCardTopSection>
+            )}
           </SidebarCard>
         </aside>
       </div>

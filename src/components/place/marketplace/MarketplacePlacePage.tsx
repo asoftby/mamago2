@@ -10,7 +10,6 @@ import { PlaceAddressSection } from "./PlaceAddressSection";
 import { PlaceReviewsSection } from "./PlaceReviewsSection";
 import { PlaceNetworkSection, type NetworkPlace } from "@/components/place/PlaceNetworkSection";
 import { PriceListBlock } from "@/components/shared/PriceListBlock";
-import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { FaqSection } from "@/components/public/FaqSection";
 import type { ActivityMock } from "@/types/activity";
 import type { PriceData } from "@/lib/priceItems";
@@ -58,6 +57,10 @@ interface MarketplacePlacePageProps {
     workingHoursSummary?: string;
     isOpenNow?: boolean;
     todayHoursText?: string;
+    /** «закроется в 18:00» / «откроется завтра в 09:00» — вторая строка статуса в карточке. */
+    hoursStatusDetail?: string;
+    /** Коротко для карточки: «до 18:00» / «с 09:00». */
+    hoursStatusShort?: string;
 
     // Additional info
     yearFounded?: number;
@@ -168,26 +171,12 @@ export function MarketplacePlacePage({
   if (place.metro) metaItems.push(["Метро", place.metro, String(metaItems.length + 1).padStart(2, "0")]);
   if (place.district && metaItems.length < 5) metaItems.push(["Район", place.district, String(metaItems.length + 1).padStart(2, "0")]);
 
-  const summaryPrimary = place.workingHoursSummary
-    ?.split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)[0];
   const stickyAddressLine = place.address?.trim() || undefined;
-  const stickyStatusLabel = (() => {
-    if (place.isOpenNow != null) {
-      const status = place.isOpenNow ? "Открыто" : "Закрыто";
-      return place.todayHoursText
-        ? `${status} · сегодня ${place.todayHoursText}`
-        : status;
-    }
-    if (summaryPrimary) {
-      return summaryPrimary.split("•")[0]?.trim() || summaryPrimary;
-    }
-    if (!stickyAddressLine) {
-      return [place.city, place.district].filter(Boolean).join(" · ") || undefined;
-    }
-    return undefined;
-  })();
+  // Нижняя плашка: название, ниже адрес и (если известно) точка статуса с «до 18:00» / «с 09:00».
+  const stickyStatusLabel =
+    place.isOpenNow != null
+      ? place.hoursStatusShort ?? (place.isOpenNow ? "Открыто" : "Закрыто")
+      : undefined;
   const stickyDetailLine = place.title;
 
   return (
@@ -195,10 +184,6 @@ export function MarketplacePlacePage({
       className="pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0"
       style={{ background: "#ffffff", minHeight: "100vh" }}
     >
-      <div className="mx-auto w-full max-w-[1200px] px-4 pt-4 sm:px-6 lg:px-8">
-        <MobileSmartBackButton fallbackHref={place.fallbackUrl} />
-      </div>
-
       {/* Hero */}
       <PlaceHero
         ctaRef={ctaRef}
@@ -220,6 +205,8 @@ export function MarketplacePlacePage({
         workingHoursSummary={place.workingHoursSummary}
         isOpenNow={place.isOpenNow}
         todayHoursText={place.todayHoursText}
+        hoursStatusDetail={place.hoursStatusDetail}
+        hoursStatusShort={place.hoursStatusShort}
         breadcrumbItems={place.breadcrumbItems}
         onShareClick={handleShare}
         ownerEditPlaceId={ownerEditPlaceId}
@@ -264,7 +251,6 @@ export function MarketplacePlacePage({
         <section
           style={{
             padding: "56px 0",
-            borderTop: "1px solid rgba(20,18,16,.10)",
             background: "#ffffff",
           }}
         >
@@ -334,6 +320,7 @@ export function MarketplacePlacePage({
       <PlaceStickyActionBar
         ctaRef={ctaRef}
         statusLabel={stickyStatusLabel}
+        statusTone={place.isOpenNow == null ? undefined : place.isOpenNow ? "open" : "closed"}
         addressLine={stickyAddressLine}
         detailLine={stickyDetailLine}
         phones={place.phones}
@@ -424,10 +411,9 @@ function MetaStrip({ items, isOpenNow }: { items: Array<[string, string, string]
               </span>
             </div>
             <div style={{ fontSize: 17, fontWeight: 500, letterSpacing: "-.01em", color: "#141210", display: "flex", alignItems: "center", gap: 6 }}>
-              {label === "Часы" && isOpenNow != null && (
-                <span style={{ fontSize: 14, color: isOpenNow ? "#1F8A5B" : "#C24E22", flexShrink: 0, lineHeight: 1 }}>●</span>
-              )}
-              {value}
+              <span style={label === "Часы" && isOpenNow != null ? { color: isOpenNow ? "#1F8A5B" : "#E5322D" } : undefined}>
+                {value}
+              </span>
             </div>
           </div>
         ))}
@@ -493,7 +479,6 @@ function WorkingHoursSection({ summary }: { summary: string }) {
     <section
       style={{
         padding: "56px 0",
-        borderTop: "1px solid rgba(20,18,16,.10)",
         background: "#ffffff",
       }}
     >
@@ -524,7 +509,7 @@ function WorkingHoursSection({ summary }: { summary: string }) {
             <p style={{ fontSize: 15, marginTop: 14, maxWidth: 260, lineHeight: 1.5, color: "rgba(20,18,16,.55)" }}>
               {!isOpen && !isByAppointment && statusLine ? (
                 <>
-                  <span style={{ color: "#C24E22", display: "block" }}>{statusLine.split("•")[0]?.trim()}</span>
+                  <span style={{ color: "#E5322D", display: "block" }}>{statusLine.split("•")[0]?.trim()}</span>
                   {statusLine.includes("•") && (
                     <span style={{ display: "block" }}>{statusLine.split("•").slice(1).join("•").trim()}</span>
                   )}
