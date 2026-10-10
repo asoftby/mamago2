@@ -25,3 +25,9 @@ export function formatPlanTargetDateRu(iso: string): string {
 
   return `${weekday}, ${dayMonth}`;
 }
+
+/** Короткая дата для тостов и компактных подписей: "ср, 14". */
+export function formatPlanTargetDateShortRu(iso: string): string {
+  const date = new Date(`${iso}T12:00:00`);
+  return date.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric" });
+}

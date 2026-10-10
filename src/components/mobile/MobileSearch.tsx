@@ -35,6 +35,8 @@ export type MobileSearchProps = {
   onResultNavigate: (item: SearchResultItemType) => void;
   /** Pending/active city slug for SearchQueryLog geo telemetry. */
   citySlug?: string | null;
+  /** Сфокусировать поле поиска при монтировании (поиск в шите открывается по тапу на плашку хедера). */
+  autoFocusInput?: boolean;
 };
 
 export function MobileSearch({
@@ -45,6 +47,7 @@ export function MobileSearch({
   filtersSection,
   onResultNavigate,
   citySlug,
+  autoFocusInput = false,
 }: MobileSearchProps) {
   const lastSearch = useLastPublicSearchQuery();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -139,6 +142,12 @@ export function MobileSearch({
       cancelled = true;
     };
   }, [trimmed, citySlug]);
+
+  useEffect(() => {
+    if (!autoFocusInput) return;
+    const id = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [autoFocusInput]);
 
   const handlePopularPick = useCallback(
     (term: string) => {

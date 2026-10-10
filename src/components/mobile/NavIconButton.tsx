@@ -33,6 +33,7 @@ export type NavIconButtonProps = {
   chrome?: NavIconChrome;
   /** bare — без круглой подложки (лого / иконка на высоту pill) */
   variant?: NavIconVariant;
+  onClick?: React.MouseEventHandler<HTMLAnchorElement>;
 };
 
 export function getNavIconButtonClassName({
@@ -94,6 +95,7 @@ export function NavIconButton({
   size = "default",
   chrome = "light",
   variant = "pill",
+  onClick,
 }: NavIconButtonProps) {
   const showBadge = badgeCount > 0;
   const compact = size === "compact";
@@ -103,6 +105,7 @@ export function NavIconButton({
     <Link
       href={href}
       aria-label={ariaLabel}
+      onClick={onClick}
       className={cn(
         getNavIconButtonClassName({ isActive, size, className, chrome, variant }),
         isHomeLogo && !bare && "p-[2px]",

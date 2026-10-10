@@ -2,7 +2,7 @@
 
 import "@/styles/event-page.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSetPublicationIntent } from "@/contexts/PublicationIntentContext";
+import { useRegisterHeaderFavoriteTarget, useSetPublicationIntent } from "@/contexts/PublicationIntentContext";
 import { toast } from "@/lib/toast";
 import {
   Dialog,
@@ -41,7 +41,7 @@ import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { cn } from "@/lib/utils";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
-import { formatPlanTargetDateRu } from "@/lib/date/formatPlanTargetDateRu";
+import { toastAddedToPlan } from "@/lib/my-plan/toastAddedToPlan";
 import { useUpcomingSessions } from "./useUpcomingSessions";
 import { formatVenueAddressForPublicDisplay } from "@/lib/event/formatVenueAddressForDisplay";
 
@@ -323,6 +323,7 @@ export function EventPageView({
 }) {
   const { isAuthenticated } = useAuthMe();
   const setPublicationIntent = useSetPublicationIntent();
+  useRegisterHeaderFavoriteTarget(data.id);
   const ctaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -487,9 +488,7 @@ export function EventPageView({
             }),
           });
           if (!res.ok) throw new Error("plan_save_failed");
-          toast.success("Добавлено в план", {
-            description: `На ${formatPlanTargetDateRu(result.dateISO)}`,
-          });
+          toastAddedToPlan(result.dateISO);
           requestPlanRefetchForDate(result.dateISO);
         } else if (result.action === "ideas") {
           const res = await fetch("/api/save/idea", {
@@ -533,9 +532,7 @@ export function EventPageView({
         if (!res.ok) throw new Error("plan_save_failed");
         await loadSaveStatus();
         requestPlanRefetchForDate(dateISO);
-        toast.success("Добавлено в план", {
-            description: `На ${formatPlanTargetDateRu(dateISO)}`,
-          });
+        toastAddedToPlan(dateISO);
       } catch {
         toast.error("Не получилось выполнить действие", { description: "Попробуйте еще раз" });
       }

@@ -4,11 +4,8 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { PublicFooter } from "@/components/shell/PublicFooter";
 import { BetaTipMobile } from "@/components/shared/BetaTip";
-import {
-  isPublicationDetailPath,
-  shouldHideMobileBottomNav,
-  shouldHideMyPlanWidget,
-} from "@/lib/intent";
+import { shouldHideMobileBottomNav } from "@/lib/intent";
+import { resolveMobileBottomSlot } from "@/lib/mobile/bottomSlot";
 import { cn } from "@/lib/utils";
 import { useNavigationReloadDebug } from "@/hooks/useNavigationReloadDebug";
 import { NotificationSurfaceBootstrap } from "@/features/notifications/NotificationSurfaceBootstrap";
@@ -50,9 +47,8 @@ function isContentEditDestination(url: URL): boolean {
 export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const hideBottomBar = shouldHideMobileBottomNav(pathname);
-  // На страницах деталей нижнюю панель не рендерим (там EventStickyActionBar) — отступ под неё не нужен.
-  const hasMobilePlanWidget =
-    !shouldHideMyPlanWidget(pathname) && !isPublicationDetailPath(pathname);
+  // Отступ под «Мой план» нужен только в слоте `plan` (на деталях внизу свой бар покупки).
+  const hasMobilePlanWidget = resolveMobileBottomSlot(pathname) === "plan";
   useNavigationReloadDebug(process.env.NODE_ENV !== "production");
 
   useEffect(() => {

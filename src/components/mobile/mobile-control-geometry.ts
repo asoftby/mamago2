@@ -10,9 +10,12 @@ export const MOBILE_DISCOVERY_FIELD_GEOMETRY =
 export const MOBILE_DISCOVERY_FIELD_CHROME =
   "border border-gray-200 bg-white shadow-sm";
 
-/** Высота строки мобильного хедера и соответствующий sticky-отступ для элементов под ним (литералы — для Tailwind). */
-export const MOBILE_HEADER_ROW_HEIGHT = "h-16";
-export const MOBILE_HEADER_STICKY_TOP = "top-16";
+/**
+ * Мобильный хедер — одна строка 48px. Литералы (не шаблоны) — чтобы Tailwind увидел классы.
+ */
+export const MOBILE_HEADER_ROW_HEIGHT = "h-12";
+/** Sticky-отступ для элементов под хедером. */
+export const MOBILE_HEADER_STICKY_TOP = "top-12";
 
 /** Белые непрозрачные плавающие контролы (виджет, 🔔, 👤, чип хедера): тонкая серая граница, без тени. */
 export const MOBILE_FLOATING_CHROME = "border border-gray-200 bg-white";

@@ -12,7 +12,7 @@ import { useUserNotificationBadgeCount } from "@/features/notifications/hooks/us
 import { cn } from "@/lib/utils";
 
 /**
- * Сервисные действия нижней панели: 🔔 уведомления + 👤 профиль (белые круги 52px, как плашка поиска).
+ * Сервисные действия верхнего ряда хедера: 🔔 уведомления + 👤 профиль (белые круги 44px).
  * Колокольчик — только для авторизованных (у гостя нет уведомлений).
  */
 export function MobileHeaderActions() {
@@ -39,12 +39,17 @@ export function MobileHeaderActions() {
       {isAuthenticated && (
         <button
           type="button"
-          aria-label="Уведомления"
+          aria-label={
+            displayUnreadCount > 0
+              ? `Уведомления, ${displayUnreadCount} непрочитанных`
+              : "Уведомления"
+          }
           aria-expanded={isNotificationsActive}
           onClick={() => setActiveSheet("notifications")}
           className={getNavIconButtonClassName({
             isActive: isNotificationsActive,
             chrome: "dark",
+            size: "compact",
           })}
         >
           <NavBellIcon
@@ -85,6 +90,7 @@ export function MobileHeaderActions() {
         open={activeSheet === "profile"}
         onOpenChange={(open) => setActiveSheet(open ? "profile" : null)}
         isProfileActive={isProfileActive}
+        compact
         chrome="dark"
       />
     </div>
