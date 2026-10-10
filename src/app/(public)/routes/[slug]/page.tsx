@@ -15,6 +15,7 @@ import { mapRouteStopPublicPhotos } from "@/lib/routes/mapRouteStopPublicPhotos"
 import { resolveReadyLegacyEditorialRouteArticlePath } from "@/server/routes/legacyEditorialRouteCutover";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canViewRoute } from "@/lib/routes/routeAccess";
+import { canEditRouteForUser } from "@/lib/permissions/routeEditPermissions";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -200,7 +201,8 @@ export default async function RouteDetailPage({ params }: Props) {
       },
     });
     if (db) {
-      if (!canViewRoute(db, await getCurrentUser())) {
+      const user = await getCurrentUser();
+      if (!canViewRoute(db, user)) {
         notFound();
       }
       const budgetSummary = summarizeRouteBudget(db.stops);
@@ -264,7 +266,7 @@ export default async function RouteDetailPage({ params }: Props) {
             cityId={db.cityId}
           />
           <JsonLd data={[jsonLd, breadcrumbJsonLd].filter(Boolean) as Record<string, unknown>[]} />
-          <RouteDetailClient route={route} />
+          <RouteDetailClient route={route} canEdit={canEditRouteForUser(user, db.authorId)} />
         </>
       );
     }
