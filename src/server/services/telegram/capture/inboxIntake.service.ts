@@ -1,7 +1,7 @@
 import { Prisma, type PrismaClient, type TelegramEnvironment } from "@prisma/client";
 import type { PlanOwner } from "@/server/services/planOwner";
 import { CAPTURE_LIMITS } from "./captureLimits";
-import { CAPTURE_REPLIES } from "./captureReplies";
+import { CAPTURE_PROCESSING_FAILED_TEXT, CAPTURE_REPLIES } from "./captureReplies";
 import { numberInboxParts } from "./inboxParts";
 import type { InboxProcessor } from "./inboxProcessor";
 import type { ParsedCapture } from "./telegramUpdateParser";
@@ -18,6 +18,10 @@ export type IntakeNotifier = {
   reply(chatId: number, text: string): Promise<void>;
   /** Best-effort typing indicator: must never throw. */
   typing(chatId: number): Promise<void>;
+  /** Send one processing status; message id becomes the eventual preview card. */
+  progress?(chatId: number, partKind: "TEXT" | "PHOTO"): Promise<number | null>;
+  /** Edit the processing status to an error, falling back to a new reply. */
+  failed?(chatId: number, messageId: number | null, text: string): Promise<void>;
 };
 
 export type InboxIntakeDeps = {
@@ -255,6 +259,55 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
     }
   }
 
+  /**
+   * Reserve the preview message ID so concurrent album parts do not send
+   * duplicate acknowledgements. -1 is a temporary reservation, never sent
+   * to Telegram as a message ID. A restart/recovery can still send the card.
+   */
+  async function announceProgress(inboxItemId: string, capture: ParsedCapture): Promise<void> {
+    if (!notifier.progress) return;
+    const reserved = await db.inboxItem.updateMany({
+      where: { id: inboxItemId, status: "RECEIVED", cardMessageId: null },
+      data: { cardMessageId: -1 },
+    });
+    if (reserved.count !== 1) return;
+
+    try {
+      const messageId = await notifier.progress(
+        capture.chatId,
+        capture.partKind === "PHOTO" ? "PHOTO" : "TEXT",
+      );
+      if (!messageId || messageId <= 0) throw new Error("STATUS_SEND_FAILED");
+      await db.inboxItem.updateMany({
+        where: { id: inboxItemId, cardMessageId: -1 },
+        data: { cardMessageId: messageId },
+      });
+    } catch {
+      // Keep parsing even if Telegram rejects the progress message.
+      // Presenter treats null and -1 as unsent; no id is leaked to logs.
+      await db.inboxItem.updateMany({
+        where: { id: inboxItemId, cardMessageId: -1 },
+        data: { cardMessageId: null },
+      });
+      logCode("PROGRESS_SEND_FAILED", "capture");
+    }
+  }
+
+  async function notifyFailed(inboxItemId: string, chatId: number): Promise<void> {
+    const item = await db.inboxItem.findUnique({
+      where: { id: inboxItemId },
+      select: { cardMessageId: true },
+    });
+    const messageId = item?.cardMessageId && item.cardMessageId > 0
+      ? item.cardMessageId
+      : null;
+    if (notifier.failed) {
+      await notifier.failed(chatId, messageId, CAPTURE_PROCESSING_FAILED_TEXT);
+    } else {
+      await notifier.reply(chatId, CAPTURE_PROCESSING_FAILED_TEXT);
+    }
+  }
+
   /** Compare-and-set claim: exactly one caller wins. */
   async function claim(inboxItemId: string): Promise<boolean> {
     const result = await db.inboxItem.updateMany({
@@ -271,6 +324,7 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
     stored: Extract<IntakeOutcome, { status: "stored" }>,
   ): Promise<void> {
     try {
+      await announceProgress(stored.inboxItemId, capture);
       if (stored.isAlbumPart) {
         const wait = Math.max(0, stored.debounceUntil.getTime() - now().getTime()) + jitter();
         await sleep(wait);
@@ -283,10 +337,11 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
         await processor.process(stored.inboxItemId);
       } catch {
         logCode("PROCESSOR_ERROR", owner.userId);
-        await db.inboxItem.updateMany({
+        const failed = await db.inboxItem.updateMany({
           where: { id: stored.inboxItemId, status: "PROCESSING" },
           data: { status: "FAILED", error: "PROCESSOR_ERROR", processedAt: now() },
         });
+        if (failed.count === 1) await notifyFailed(stored.inboxItemId, capture.chatId);
       }
     } catch {
       logCode("AFTER_RESPONSE_ERROR", owner.userId);
