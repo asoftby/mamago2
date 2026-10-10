@@ -17,6 +17,7 @@ import { applyPostLlmRules, detectEscalationReason, RULE_CODES, type RuleResult 
 import type { InboxProcessor } from "./inboxProcessor";
 import { findPlanDuplicates, type DuplicateMatch } from "./planDuplicates";
 import type { TelegramCaptureClient } from "./telegramCaptureClient.core";
+import { CAPTURE_PROCESSING_FAILED_TEXT } from "./captureReplies";
 
 /**
  * The capture parsing pipeline (forward-to-plan spec v1.3, PR3):
@@ -41,7 +42,10 @@ export type CaptureProcessorDeps = {
   models: () => CaptureModelConfig;
   context: CaptureContextDeps;
   presenter?: { present(inboxItemId: string): Promise<void> };
-  notifier?: { reply(chatId: number, text: string): Promise<void> };
+  notifier?: {
+    reply(chatId: number, text: string): Promise<void>;
+    failed?(chatId: number, messageId: number | null, text: string): Promise<void>;
+  };
   now?: () => Date;
 };
 
@@ -295,10 +299,18 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
       logResult(item, "FAILED", result.code, result, startedAt);
       if (failed.count === 1 && deps.notifier) {
         try {
-          await deps.notifier.reply(
-            Number(item.telegramChatId),
-            "Не получилось распознать сообщение. Попробуйте отправить его ещё раз или укажите название, дату и время текстом.",
-          );
+          const progressMessageId = item.cardMessageId !== null && item.cardMessageId > 0
+            ? item.cardMessageId
+            : null;
+          if (deps.notifier.failed) {
+            await deps.notifier.failed(
+              Number(item.telegramChatId),
+              progressMessageId,
+              CAPTURE_PROCESSING_FAILED_TEXT,
+            );
+          } else {
+            await deps.notifier.reply(Number(item.telegramChatId), CAPTURE_PROCESSING_FAILED_TEXT);
+          }
         } catch {
           console.error(`[capture-processor] inboxItemId=${item.id} code=FAILURE_REPLY_FAILED`);
         }
