@@ -13,7 +13,7 @@ assert.doesNotMatch(
 
 assert.match(
   footerSource,
-  /<CookieSettingsFooterLink \/>/,
+  /<CookieSettingsFooterLink[^>]*\/>/,
   "Footer keeps a text trigger («Настройки cookies») for reopening the cookie preferences modal",
 );
 
