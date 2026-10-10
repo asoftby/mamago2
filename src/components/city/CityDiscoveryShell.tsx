@@ -8,9 +8,9 @@ import { Intent } from "@/lib/intent";
 import { H1 } from "@/components/ui/typography";
 import { CityTitle } from "@/components/ui/CityTitle";
 
-/** Заголовок раздела — serif 600/30px; город выделяется курсивом (CityTitle). */
+/** Заголовок раздела — serif 400/30px; город выделяется курсивом (CityTitle). */
 const DISCOVERY_TITLE_CLASS =
-  "px-1 font-serif text-[30px] font-semibold leading-[1.1] tracking-[-0.03em]";
+  "px-1 font-serif text-[30px] font-normal leading-[1.1] tracking-[-0.03em]";
 import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { formatCityTitle } from "@/lib/city/cityDisplayNames";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
