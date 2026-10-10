@@ -73,16 +73,23 @@ export function renderChildChoiceCard(
   return {
     text: "Для кого это?",
     replyMarkup: {
-      inline_keyboard: children.map((child) => [
-        {
-          text: child.name?.trim() || "Ребёнок",
-          callback_data: encodeCallback({
-            kind: "inbox_child",
-            inboxItemId,
-            childId: child.id,
-          }),
-        },
-      ]),
+      inline_keyboard: [
+        ...children.map((child) => [
+          {
+            text: child.name?.trim() || "Ребёнок",
+            callback_data: encodeCallback({
+              kind: "inbox_child" as const,
+              inboxItemId,
+              childId: child.id,
+            }),
+          },
+        ]),
+        [
+          { text: "Изменить", callback_data: encodeCallback({ kind: "inbox", action: "edit", inboxItemId }) },
+          { text: "Исправить текст", callback_data: encodeCallback({ kind: "inbox", action: "replace", inboxItemId }) },
+        ],
+        [{ text: "Не то", callback_data: encodeCallback({ kind: "inbox", action: "no", inboxItemId }) }],
+      ],
     },
   };
 }
@@ -95,13 +102,25 @@ export function renderCaptureCard(
 ): CaptureCard {
   if (draft.intent === "NONE" || draft.entries.length === 0) {
     return {
-      text: "Не нашёл здесь событие или задачу. Напишите, что добавить, или пропустите.",
+      text: "Не нашёл здесь событие или задачу. Можно отправить исправленное описание целиком.",
+      replyMarkup: {
+        inline_keyboard: [
+          [{ text: "Исправить текст", callback_data: encodeCallback({ kind: "inbox", action: "replace", inboxItemId }) }],
+          [{ text: "Не то", callback_data: encodeCallback({ kind: "inbox", action: "no", inboxItemId }) }],
+        ],
+      },
     };
   }
 
   if (draft.intent !== "CREATE") {
     return {
-      text: "Похоже, это изменение уже добавленного события. Подтверждение изменений подключим следующим этапом.",
+      text: "Похоже, это изменение уже добавленного события. Подтверждение изменений пока недоступно; можно исправить текст и распознать заново.",
+      replyMarkup: {
+        inline_keyboard: [
+          [{ text: "Исправить текст", callback_data: encodeCallback({ kind: "inbox", action: "replace", inboxItemId }) }],
+          [{ text: "Не то", callback_data: encodeCallback({ kind: "inbox", action: "no", inboxItemId }) }],
+        ],
+      },
     };
   }
 
@@ -142,6 +161,10 @@ export function renderCaptureCard(
                 }),
               },
             ],
+            [
+              { text: "Изменить", callback_data: encodeCallback({ kind: "inbox", action: "edit", inboxItemId }) },
+              { text: "Исправить текст", callback_data: encodeCallback({ kind: "inbox", action: "replace", inboxItemId }) },
+            ],
           ],
         }
       : {
@@ -165,6 +188,16 @@ export function renderCaptureCard(
                   inboxItemId,
                 }),
               },
+              {
+                text: "Исправить текст",
+                callback_data: encodeCallback({
+                  kind: "inbox",
+                  action: "replace",
+                  inboxItemId,
+                }),
+              },
+            ],
+            [
               {
                 text: "Не то",
                 callback_data: encodeCallback({

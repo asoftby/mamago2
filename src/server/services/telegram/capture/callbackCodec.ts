@@ -4,14 +4,14 @@
  */
 export const CALLBACK_DATA_MAX_BYTES = 64;
 
-export type InboxCallbackAction = "add" | "edit" | "no" | "dup" | "upd" | "new";
+export type InboxCallbackAction = "add" | "edit" | "replace" | "no" | "dup" | "upd" | "new";
 
 export type DecodedCallback =
   | { kind: "inbox"; action: InboxCallbackAction; inboxItemId: string }
   | { kind: "inbox_child"; inboxItemId: string; childId: string }
   | { kind: "requirement_done"; requirementId: string };
 
-const INBOX_ACTIONS: readonly InboxCallbackAction[] = ["add", "edit", "no", "dup", "upd", "new"];
+const INBOX_ACTIONS: readonly InboxCallbackAction[] = ["add", "edit", "replace", "no", "dup", "upd", "new"];
 
 function assertId(value: string, label: string): void {
   if (!value || value.includes(":")) {

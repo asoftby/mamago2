@@ -21,7 +21,9 @@ import {
 } from "./captureRules";
 import {
   buildCaptureEditUserParts,
+  buildCaptureUserParts,
   CAPTURE_EDIT_SYSTEM_PROMPT,
+  CAPTURE_SYSTEM_PROMPT,
 } from "./capturePrompt";
 import {
   findPlanDuplicates,
@@ -34,7 +36,8 @@ import {
 import type { CaptureCardPresenter } from "./captureCardPresenter";
 import type { ParsedCapture } from "./telegramUpdateParser";
 import { CAPTURE_LIMITS } from "./captureLimits";
-import { CAPTURE_REPLIES } from "./captureReplies";
+import { CAPTURE_REPLIES, CAPTURE_REPLACE_TEXT_RULE } from "./captureReplies";
+import { resolveCaptureEditAnchor } from "./captureEditAnchor";
 
 type Usage = {
   model: string | null;
@@ -227,6 +230,7 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
   async function runModel(
     snapshot: EditSnapshot,
     instruction: string,
+    capture: ParsedCapture,
   ): Promise<
     | {
         ok: true;
@@ -243,30 +247,42 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
     const models = deps.models();
     if (!models.fast) return { ok: false, code: "CAPTURE_MODEL_NOT_CONFIGURED" };
 
-    const contextText = [
-      ...current.data.entries.map((entry) => entry.title.value),
-      ...current.data.entries
-        .map((entry) => entry.location.value)
-        .filter((value): value is string => Boolean(value)),
-      instruction,
-    ].join(" ");
+    // Full-text correction replaces the screenshot interpretation. Field edits
+    // keep the existing draft and only apply the requested change.
+    const replacingText = snapshot.ruleCodes.includes(CAPTURE_REPLACE_TEXT_RULE);
+    const contextText = replacingText
+      ? instruction
+      : [
+          ...current.data.entries.map((entry) => entry.title.value),
+          ...current.data.entries
+            .map((entry) => entry.location.value)
+            .filter((value): value is string => Boolean(value)),
+          instruction,
+        ].join(" ");
 
+    const anchor = resolveCaptureEditAnchor(snapshot, capture, replacingText);
     const context = await loadCaptureContext(
       deps.context,
       { userId: snapshot.userId },
       {
-        anchorAt: snapshot.anchorAt,
-        anchorIsForward: snapshot.anchorIsForward,
+        ...anchor,
         text: contextText,
       },
     );
 
-    const userParts = buildCaptureEditUserParts({
-      context,
-      currentDraft: current.data,
-      instruction,
-      now: now(),
-    });
+    const userParts = replacingText
+      ? buildCaptureUserParts({
+          context,
+          text: instruction,
+          imageDataUrls: [],
+          now: now(),
+        })
+      : buildCaptureEditUserParts({
+          context,
+          currentDraft: current.data,
+          instruction,
+          now: now(),
+        });
     const responseFormat: OpenRouterResponseFormat =
       models.responseFormat === "json_schema"
         ? {
@@ -285,7 +301,7 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
     const attempt = async (model: string): Promise<Attempt> => {
       const response = await deps.openrouter.chat({
         model,
-        systemPrompt: CAPTURE_EDIT_SYSTEM_PROMPT,
+        systemPrompt: replacingText ? CAPTURE_SYSTEM_PROMPT : CAPTURE_EDIT_SYSTEM_PROMPT,
         userParts,
         responseFormat,
       });
@@ -345,7 +361,7 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
       }
     }
 
-    if (result.draft.intent !== current.data.intent) {
+    if (!replacingText && result.draft.intent !== current.data.intent) {
       return { ok: false, code: "EDIT_INTENT_CHANGED" };
     }
 
@@ -385,12 +401,14 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
 
     try {
       await deps.notifier.typing(capture.chatId);
-      const result = await runModel(snapshot, capture.text);
+      const result = await runModel(snapshot, capture.text, capture);
       if (!result.ok) {
         safeLog(result.code, snapshot.id, snapshot.userId);
         await deps.notifier.reply(
           capture.chatId,
-          "Не получилось применить правку. Нажмите «Изменить» и попробуйте ещё раз.",
+          snapshot.ruleCodes.includes(CAPTURE_REPLACE_TEXT_RULE)
+            ? "Не получилось распознать исправленный текст. Нажмите «Исправить текст» и попробуйте ещё раз."
+            : "Не получилось применить правку. Нажмите «Изменить» и попробуйте ещё раз.",
         );
         return;
       }
@@ -406,6 +424,13 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
           draftVersion: snapshot.draftVersion,
         },
         data: {
+          ...(snapshot.ruleCodes.includes(CAPTURE_REPLACE_TEXT_RULE)
+            ? {
+                anchorAt: capture.anchorAt,
+                anchorIsForward: capture.anchorIsForward,
+                sourceKind: capture.sourceKind,
+              }
+            : {}),
           draft: result.draft as unknown as Prisma.InputJsonValue,
           draftVersion: { increment: 1 },
           editCount: { increment: 1 },
@@ -430,7 +455,9 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
       safeLog("EDIT_PROCESSOR_ERROR", snapshot.id, snapshot.userId);
       await deps.notifier.reply(
         capture.chatId,
-        "Не получилось применить правку. Нажмите «Изменить» и попробуйте ещё раз.",
+        snapshot.ruleCodes.includes(CAPTURE_REPLACE_TEXT_RULE)
+          ? "Не получилось распознать исправленный текст. Нажмите «Исправить текст» и попробуйте ещё раз."
+          : "Не получилось применить правку. Нажмите «Изменить» и попробуйте ещё раз.",
       );
     }
   }

@@ -72,14 +72,21 @@ export function createCaptureCardPresenter(deps: {
 
       const chatId = item.telegramChatId.toString();
 
-      if (item.cardMessageId) {
-        await deps.channel.editMessageText({
-          chatId,
-          messageId: item.cardMessageId,
-          text: card.text,
-          replyMarkup: card.replyMarkup,
-        });
-        return;
+      // -1 reserves a pending status send; it is never a real Telegram message.
+      if (item.cardMessageId !== null && item.cardMessageId > 0) {
+        try {
+          await deps.channel.editMessageText({
+            chatId,
+            messageId: item.cardMessageId,
+            text: card.text,
+            replyMarkup: card.replyMarkup,
+          });
+          return;
+        } catch {
+          // The progress status may have been deleted or become uneditable.
+          // Never leave the user with a permanently pending status.
+          console.error("[telegram:capture] code=PREVIEW_EDIT_FAILED");
+        }
       }
 
       const sent = await deps.channel.sendMessage({
@@ -92,7 +99,7 @@ export function createCaptureCardPresenter(deps: {
         where: {
           id: item.id,
           status: "DRAFT_READY",
-          cardMessageId: null,
+          cardMessageId: item.cardMessageId,
         },
         data: { cardMessageId: sent.message_id },
       });

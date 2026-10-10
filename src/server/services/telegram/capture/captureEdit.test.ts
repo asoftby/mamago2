@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { draft } from "./captureDraft.testkit";
+import { resolveCaptureEditAnchor } from "./captureEditAnchor";
 import {
   buildCaptureEditUserParts,
+  buildCaptureUserParts,
   CAPTURE_EDIT_SYSTEM_PROMPT,
+  CAPTURE_SYSTEM_PROMPT,
 } from "./capturePrompt";
 
 const context = {
@@ -39,4 +42,43 @@ test("edit system prompt requires full-draft preservation and stable intent", ()
   assert.match(CAPTURE_EDIT_SYSTEM_PROMPT, /Preserve every existing field/);
   assert.match(CAPTURE_EDIT_SYSTEM_PROMPT, /intent must stay the same/);
   assert.match(CAPTURE_EDIT_SYSTEM_PROMPT, /Return the complete updated draft/);
+});
+
+test("direct typed messages are supported as capture source, not rejected as instructions", () => {
+  assert.match(CAPTURE_SYSTEM_PROMPT, /direct user request to add/);
+  assert.match(CAPTURE_SYSTEM_PROMPT, /direct message written by the parent/);
+});
+
+test("corrected screenshot text can be parsed as a fresh source without carrying prior draft", () => {
+  const parts = buildCaptureUserParts({
+    context,
+    text: "Добавь Тае плавание 18 октября в 17:30",
+    imageDataUrls: [],
+    now: new Date("2026-10-07T09:00:00.000Z"),
+  });
+  assert.equal(parts.length, 1);
+  assert.equal(parts[0]!.type, "text");
+  if (parts[0]!.type !== "text") throw new Error("expected text part");
+  assert.match(parts[0].text, /Добавь Тае плавание/);
+  assert.doesNotMatch(parts[0].text, /CURRENT_DRAFT/);
+  assert.doesNotMatch(parts[0].text, /Экскурсия в музей/);
+});
+
+test("replacement text resolves relative dates from the new message, not an old forward", () => {
+  const oldForward = {
+    anchorAt: new Date("2026-09-01T09:00:00Z"),
+    anchorIsForward: true,
+  };
+  const newTypedMessage = {
+    anchorAt: new Date("2026-10-10T09:00:00Z"),
+    anchorIsForward: false,
+  };
+  assert.deepEqual(
+    resolveCaptureEditAnchor(oldForward, newTypedMessage, true),
+    newTypedMessage,
+  );
+  assert.deepEqual(
+    resolveCaptureEditAnchor(oldForward, newTypedMessage, false),
+    oldForward,
+  );
 });

@@ -49,7 +49,7 @@ test("CREATE card renders add/edit/no callbacks and inferred markers", () => {
   assert.match(card.text, /взять воду/);
   assert.deepEqual(
     card.replyMarkup?.inline_keyboard.flat().map((button) => button.callback_data),
-    ["inb:add:inbox-1", "inb:edit:inbox-1", "inb:no:inbox-1"],
+    ["inb:add:inbox-1", "inb:edit:inbox-1", "inb:replace:inbox-1", "inb:no:inbox-1"],
   );
 });
 
@@ -64,7 +64,7 @@ test("duplicate card never silently creates a second item", () => {
   assert.match(card.text, /уже в плане/);
   assert.deepEqual(
     card.replyMarkup?.inline_keyboard.flat().map((button) => button.callback_data),
-    ["inb:no:inbox-2", "inb:dup:inbox-2"],
+    ["inb:no:inbox-2", "inb:dup:inbox-2", "inb:edit:inbox-2", "inb:replace:inbox-2"],
   );
 });
 
@@ -77,6 +77,33 @@ test("child choice uses inbox_child callbacks", () => {
   assert.equal(card.text, "Для кого это?");
   assert.deepEqual(
     card.replyMarkup?.inline_keyboard.flat().map((button) => button.callback_data),
-    ["inb:child:inbox-3:c1", "inb:child:inbox-3:c2"],
+    ["inb:child:inbox-3:c1", "inb:child:inbox-3:c2", "inb:edit:inbox-3", "inb:replace:inbox-3", "inb:no:inbox-3"],
+  );
+});
+
+test("a screenshot interpreted as NONE still offers a way to replace the text", () => {
+  const card = renderCaptureCard(
+    "inbox-none",
+    draft({ intent: "NONE", entries: [] }),
+    [],
+    new Map(),
+  );
+  assert.match(card.text, /исправленное описание/);
+  assert.deepEqual(
+    card.replyMarkup?.inline_keyboard.flat().map((button) => button.callback_data),
+    ["inb:replace:inbox-none", "inb:no:inbox-none"],
+  );
+});
+
+test("a screenshot interpreted as UPDATE still allows full text replacement", () => {
+  const card = renderCaptureCard(
+    "inbox-update",
+    draft({ intent: "UPDATE" }),
+    [],
+    new Map(),
+  );
+  assert.deepEqual(
+    card.replyMarkup?.inline_keyboard.flat().map((button) => button.callback_data),
+    ["inb:replace:inbox-update", "inb:no:inbox-update"],
   );
 });

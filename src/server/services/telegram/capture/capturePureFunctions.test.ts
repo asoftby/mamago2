@@ -173,7 +173,7 @@ test("callback_query is parsed with its data", () => {
 });
 
 test("callback codec round-trips every action", () => {
-  for (const action of ["add", "edit", "no", "dup", "upd", "new"] as const) {
+  for (const action of ["add", "edit", "replace", "no", "dup", "upd", "new"] as const) {
     const data = encodeCallback({ kind: "inbox", action, inboxItemId: "cmabc123" });
     assert.equal(data, `inb:${action}:cmabc123`);
     assert.deepEqual(decodeCallback(data), { kind: "inbox", action, inboxItemId: "cmabc123" });
