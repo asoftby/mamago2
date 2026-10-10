@@ -239,31 +239,49 @@ export function getNextOpeningTime(
 
 const WEEKDAY_SHORT_RU = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"] as const;
 
+type NextOpening = { time: string; day: "today" | "tomorrow" | string };
+
 /**
- * Ближайшее открытие в виде текста по времени заведения (без привязки к часовому поясу сервера):
- * «в 09:00» (сегодня), «завтра в 09:00», «в пн в 09:00».
+ * Ближайшее открытие по времени заведения (без привязки к часовому поясу сервера):
+ * `day` — «today», «tomorrow» или короткий день недели («пн»).
  */
-function describeNextOpening(openingHours: OpeningHoursScheduleLike, now: Date): string | null {
+function findNextOpening(openingHours: OpeningHoursScheduleLike, now: Date): NextOpening | null {
   const timezone = openingHours.timezone;
   const currentTime = getTimeStringInTimezone(now, timezone);
   for (const interval of getTodayIntervals(openingHours, now)) {
     const cmp = compareTime(currentTime, interval.startTime);
-    if (cmp !== null && cmp < 0) return `в ${interval.startTime.slice(0, 5)}`;
+    if (cmp !== null && cmp < 0) return { time: interval.startTime.slice(0, 5), day: "today" };
   }
   for (let daysAhead = 1; daysAhead <= 7; daysAhead++) {
     const future = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
     const intervals = getTodayIntervals(openingHours, future);
     if (intervals.length === 0) continue;
     const time = intervals[0].startTime.slice(0, 5);
-    if (daysAhead === 1) return `завтра в ${time}`;
+    if (daysAhead === 1) return { time, day: "tomorrow" };
     const weekday = new Intl.DateTimeFormat("ru-RU", { weekday: "short", timeZone: timezone })
       .format(future)
       .replace(".", "");
-    return `в ${weekday || WEEKDAY_SHORT_RU[future.getDay()]} в ${time}`;
+    return { time, day: weekday || WEEKDAY_SHORT_RU[future.getDay()] };
   }
   return null;
 }
 
+/** «в 09:00» / «завтра в 09:00» / «в пн в 09:00». */
+function describeNextOpening(openingHours: OpeningHoursScheduleLike, now: Date): string | null {
+  const next = findNextOpening(openingHours, now);
+  if (!next) return null;
+  if (next.day === "today") return `в ${next.time}`;
+  if (next.day === "tomorrow") return `завтра в ${next.time}`;
+  return `в ${next.day} в ${next.time}`;
+}
+
+/** Коротко: «с 09:00» (сегодня/завтра) или «пн, с 09:00». */
+function describeNextOpeningShort(openingHours: OpeningHoursScheduleLike, now: Date): string | null {
+  const next = findNextOpening(openingHours, now);
+  if (!next) return null;
+  if (next.day === "today" || next.day === "tomorrow") return `с ${next.time}`;
+  return `${next.day}, с ${next.time}`;
+}
 
 /**
  * Get detailed opening status with message
@@ -329,6 +347,7 @@ export function getOpeningStatus(
         status: "open",
         message: `Открыто до ${closingTime}`,
         statusDetail: `закроется в ${closingTime.slice(0, 5)}`,
+        statusShort: `до ${closingTime.slice(0, 5)}`,
         todayIntervals: intervals,
       };
     }
@@ -345,6 +364,7 @@ export function getOpeningStatus(
   const nextOpening = getNextOpeningTime(openingHours, now);
   const nextOpeningText = describeNextOpening(openingHours, now);
   const statusDetail = nextOpeningText ? `откроется ${nextOpeningText}` : undefined;
+  const statusShort = describeNextOpeningShort(openingHours, now) ?? undefined;
 
   if (nextOpening) {
     const nextOpeningTime = getTimeStringInTimezone(nextOpening, timezone);
@@ -358,6 +378,7 @@ export function getOpeningStatus(
         status: "closed",
         message: `Сейчас закрыто • Откроется в ${nextOpeningTime}`,
         statusDetail,
+        statusShort,
         nextChange: nextOpening,
         todayIntervals: intervals,
       };
@@ -369,6 +390,7 @@ export function getOpeningStatus(
       status: "closed",
       message: "Сейчас закрыто",
       statusDetail,
+      statusShort,
       nextChange: nextOpening,
       todayIntervals: intervals,
     };
@@ -380,6 +402,7 @@ export function getOpeningStatus(
     status: "closed",
     message: "Сейчас закрыто",
     statusDetail,
+    statusShort,
     todayIntervals: intervals,
   };
 }

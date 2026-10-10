@@ -13,7 +13,6 @@ import { PlacePhoneActionButton } from "@/components/place/PlacePhoneActions";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 import {
   SidebarCard,
-  SidebarCardSection,
   SidebarCardTopSection,
   SidebarCardAddressRow,
 } from "@/components/shared/SidebarCard";
@@ -42,6 +41,8 @@ interface PlaceHeroProps {
   todayHoursText?: string;
   /** Вторая строка статуса: «закроется в 18:00» / «откроется в 09:00». */
   hoursStatusDetail?: string;
+  /** Коротко для шапки карточки: «до 18:00» / «с 09:00». */
+  hoursStatusShort?: string;
   breadcrumbItems: Array<{ label: string; href?: string }>;
   onShareClick?: () => void;
   ownerEditPlaceId?: string;
@@ -70,10 +71,8 @@ export function PlaceHero({
   logoUrl,
   rating,
   reviewCount,
-  workingHoursSummary,
   isOpenNow,
-  todayHoursText,
-  hoursStatusDetail,
+  hoursStatusShort,
   breadcrumbItems,
   directSlot,
   onShareClick,
@@ -109,22 +108,6 @@ export function PlaceHero({
       meta: { source: "detail", targetAction },
     });
   };
-
-  const summaryLines =
-    workingHoursSummary
-      ?.split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean) ?? [];
-  const summaryPrimary = summaryLines[0];
-  const summaryExtra =
-    summaryLines.length > 1 ? summaryLines.slice(1).join("\n") : undefined;
-  const hoursDetail = hoursStatusDetail
-    ? hoursStatusDetail
-    : todayHoursText
-    ? `сегодня ${todayHoursText}`
-    : isOpenNow != null
-      ? summaryPrimary
-      : summaryExtra;
 
   return (
     <section
@@ -274,10 +257,15 @@ export function PlaceHero({
         {/* Right: sticky decision card */}
         <aside>
           <SidebarCard sticky>
-            {/* Logo + status */}
-            <SidebarCardSection mb={18} pb={16}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* Логотип + название места + адрес и статус работы */}
+            <div
+              style={{
+                marginBottom: 14,
+                paddingBottom: metro || district ? 16 : 0,
+                borderBottom: metro || district ? "1px solid rgba(20,18,16,.10)" : "none",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {/* Logo circle */}
                   <div style={{ width: 44, height: 44, borderRadius: 99, overflow: "hidden", flexShrink: 0, background: "#E86A3A", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {logoUrl ? (
@@ -292,29 +280,27 @@ export function PlaceHero({
                       </span>
                     )}
                   </div>
-                  {/* Status + hours */}
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontFamily: "var(--font-mono, monospace)", textTransform: "uppercase", fontSize: 11, letterSpacing: ".14em", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: isOpenNow == null ? "rgba(20,18,16,.45)" : isOpenNow ? "#1F8A5B" : "#C24E22" }}>
-                      {isOpenNow != null
-                        ? (isOpenNow ? "Открыто" : "Закрыто")
-                        : summaryPrimary
-                          ? summaryPrimary
-                          : title}
-                    </div>
-                    {hoursDetail && (
-                      <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 12, color: "rgba(20,18,16,.55)", marginTop: 2, letterSpacing: ".02em" }}>
-                        {hoursDetail}
-                      </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 16, lineHeight: 1.25, color: "#141210", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {title}
+                  </div>
+                  <div style={{ marginTop: 3, display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 2, fontSize: 13, color: "rgba(20,18,16,.55)", lineHeight: 1.35 }}>
+                    {address && <span>{address}</span>}
+                    {isOpenNow != null && (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontWeight: 500, color: isOpenNow ? "#1F8A5B" : "#C24E22" }}>
+                        <span aria-hidden style={{ width: 7, height: 7, borderRadius: 99, background: "currentColor", flexShrink: 0 }} />
+                        {hoursStatusShort ?? (isOpenNow ? "Открыто" : "Закрыто")}
+                      </span>
                     )}
                   </div>
                 </div>
               </div>
-            </SidebarCardSection>
+            </div>
 
-            {/* Address */}
-            {(address || metro || district) && (
+            {/* Метро / район (адрес вынесен в шапку карточки) */}
+            {(metro || district) && (
               <div style={{ marginBottom: 14 }}>
-                <SidebarCardAddressRow address={address} metro={metro} district={district} />
+                <SidebarCardAddressRow metro={metro} district={district} />
               </div>
             )}
 

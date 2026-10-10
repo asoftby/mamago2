@@ -59,6 +59,8 @@ interface MarketplacePlacePageProps {
     todayHoursText?: string;
     /** «закроется в 18:00» / «откроется завтра в 09:00» — вторая строка статуса в карточке. */
     hoursStatusDetail?: string;
+    /** Коротко для карточки: «до 18:00» / «с 09:00». */
+    hoursStatusShort?: string;
 
     // Additional info
     yearFounded?: number;
@@ -219,6 +221,7 @@ export function MarketplacePlacePage({
         isOpenNow={place.isOpenNow}
         todayHoursText={place.todayHoursText}
         hoursStatusDetail={place.hoursStatusDetail}
+        hoursStatusShort={place.hoursStatusShort}
         breadcrumbItems={place.breadcrumbItems}
         onShareClick={handleShare}
         ownerEditPlaceId={ownerEditPlaceId}
@@ -426,7 +429,9 @@ function MetaStrip({ items, isOpenNow }: { items: Array<[string, string, string]
               {label === "Часы" && isOpenNow != null && (
                 <span style={{ fontSize: 7, color: isOpenNow ? "#1F8A5B" : "#C24E22", flexShrink: 0, lineHeight: 1 }}>●</span>
               )}
-              {value}
+              <span style={label === "Часы" && isOpenNow != null ? { color: isOpenNow ? "#1F8A5B" : "#C24E22" } : undefined}>
+                {value}
+              </span>
             </div>
           </div>
         ))}

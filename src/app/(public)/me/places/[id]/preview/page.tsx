@@ -521,11 +521,13 @@ export default async function MePlacePreviewPage({ params }: PageProps) {
   let isOpenNow: boolean | undefined;
   let todayHoursText: string | undefined;
   let hoursStatusDetail: string | undefined;
+  let hoursStatusShort: string | undefined;
   if (previewOpeningHours) {
     const openingStatus = getOpeningStatus(previewOpeningHours, new Date());
     if (previewOpeningHours.mode !== "BY_APPOINTMENT") {
       isOpenNow = openingStatus.isOpen;
       hoursStatusDetail = openingStatus.statusDetail;
+      hoursStatusShort = openingStatus.statusShort;
     }
     if (openingStatus.todayIntervals && openingStatus.todayIntervals.length > 0) {
       todayHoursText = openingStatus.todayIntervals
@@ -569,6 +571,7 @@ export default async function MePlacePreviewPage({ params }: PageProps) {
     isOpenNow,
     todayHoursText,
     hoursStatusDetail,
+    hoursStatusShort,
     fallbackUrl: `/${previewCity?.slug || "minsk"}`,
     media: placeMedia,
     priceData: parsePriceData(place.priceItems),

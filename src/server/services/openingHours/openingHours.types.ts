@@ -51,6 +51,8 @@ export interface OpeningStatus {
   todayIntervals?: TimeInterval[]; // Today's intervals (if applicable)
   /** Вторая строка статуса: «закроется в 18:00» / «откроется в 09:00» / «откроется завтра в 09:00». */
   statusDetail?: string;
+  /** Коротко для карточки: «до 18:00» (открыто) / «с 09:00» (закрыто). */
+  statusShort?: string;
 }
 
 /**

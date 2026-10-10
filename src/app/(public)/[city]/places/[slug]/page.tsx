@@ -669,6 +669,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
   let isOpenNow: boolean | undefined;
   let todayHoursText: string | undefined;
   let hoursStatusDetail: string | undefined;
+  let hoursStatusShort: string | undefined;
   if (openingHoursResolved) {
     const openingStatus = getOpeningStatus(
       openingHoursResolved as OpeningHoursWithRelations,
@@ -677,6 +678,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     if (openingHoursResolved.mode !== "BY_APPOINTMENT") {
       isOpenNow = openingStatus.isOpen;
       hoursStatusDetail = openingStatus.statusDetail;
+      hoursStatusShort = openingStatus.statusShort;
     }
     if (openingStatus.todayIntervals && openingStatus.todayIntervals.length > 0) {
       todayHoursText = openingStatus.todayIntervals
@@ -755,6 +757,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     isOpenNow,
     todayHoursText,
     hoursStatusDetail,
+    hoursStatusShort,
     fallbackUrl: `/${placeCitySlug}`,
 
     // Media
