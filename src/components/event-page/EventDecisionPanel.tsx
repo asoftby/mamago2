@@ -2,7 +2,7 @@
 
 import "@/styles/event-page.css";
 import { useEffect, useRef, useState } from "react";
-import { Heart, Phone } from "lucide-react";
+import { Heart, Phone, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BYN_SYMBOL, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
@@ -11,6 +11,7 @@ import { EventBreadcrumbs } from "./EventBreadcrumbs";
 import { OwnerEditDropdown } from "./OwnerEditDropdown";
 import { PlaceInfoRow } from "@/components/shared/PlaceInfoRow";
 import { SidebarCard, SidebarCardTopSection, SidebarCardShare } from "@/components/shared/SidebarCard";
+import { ShareModal } from "@/components/shared/ShareModal";
 import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
 import { CallActionButton } from "@/components/shared/CallActionButton";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
@@ -109,6 +110,7 @@ export function EventDecisionPanel({
   const subtitleRef = useRef<HTMLDivElement>(null);
   const cd = useCountdown(sessionTargetDate);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   /* Reveal animations */
   useEffect(() => {
@@ -171,7 +173,33 @@ export function EventDecisionPanel({
             {data.factChips[0].label}
           </span>
         )}
+        {/* Desktop: «Сохранить» и «Поделиться» справа от категории (на мобильном — иконки в хедере). */}
+        <div className="ml-auto hidden items-center gap-5 lg:flex">
+          <button
+            type="button"
+            onClick={onPlan}
+            aria-pressed={isPlanned}
+            className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.7)] transition-colors hover:text-[#141210]"
+          >
+            <Heart size={18} strokeWidth={1.75} className={isPlanned ? "fill-[#E86A3A] text-[#E86A3A]" : ""} aria-hidden />
+            {isPlanned ? "Сохранено" : "Сохранить"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.7)] transition-colors hover:text-[#141210]"
+          >
+            <Share2 size={18} strokeWidth={1.75} aria-hidden />
+            Поделиться
+          </button>
+        </div>
       </div>
+      <ShareModal
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        url={typeof window !== "undefined" ? window.location.href : ""}
+        title={data.title}
+      />
 
       {/* Editorial display title */}
       <h1
@@ -346,7 +374,7 @@ export function EventDecisionPanel({
             aria-label={isPlanned ? planLabel : "Добавить в план"}
             className={cn(
               "flex h-14 shrink-0 items-center justify-center rounded-full border transition-colors",
-              (data.cta.purchaseUrl || data.cta.simpleBooking) ? "w-14" : "flex-1 gap-2 px-4 text-[16px] font-semibold",
+              (data.cta.purchaseUrl || data.cta.simpleBooking) ? "w-14 lg:hidden" : "flex-1 gap-2 px-4 text-[16px] font-semibold",
               isPlanned
                 ? "border-[#E86A3A] bg-[#FFE8DC] text-[#E86A3A]"
                 : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.45)] hover:border-[#141210] hover:text-[#141210]",
@@ -385,8 +413,8 @@ export function EventDecisionPanel({
           </SidebarCardTopSection>
         )}
 
-        {/* Share */}
-        <SidebarCardTopSection mt={20} pt={20}>
+        {/* Share (мобильный: на desktop «Поделиться» вынесено в строку категории) */}
+        <SidebarCardTopSection mt={20} pt={20} className="lg:hidden">
           <div className="flex justify-end">
             <SidebarCardShare title={data.title} />
           </div>
