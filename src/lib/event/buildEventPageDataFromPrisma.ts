@@ -88,6 +88,8 @@ export type ActivityForEventPageInput = {
     phone2Label?: string | null;
     phone3?: string | null;
     phone3Label?: string | null;
+    website?: string | null;
+    instagramUrl?: string | null;
   } | null;
   venue: {
     kind: EventVenueKind;
@@ -116,6 +118,8 @@ export type ActivityForEventPageInput = {
       phone2Label?: string | null;
       phone3?: string | null;
       phone3Label?: string | null;
+      website?: string | null;
+      instagramUrl?: string | null;
     } | null;
   } | null;
   eventCategory: { id?: string; nameRu: string; slug?: string } | null;
