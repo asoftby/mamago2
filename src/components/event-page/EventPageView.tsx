@@ -2,7 +2,7 @@
 
 import "@/styles/event-page.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSetPublicationIntent } from "@/contexts/PublicationIntentContext";
+import { useRegisterHeaderSaveAction, useSetPublicationIntent } from "@/contexts/PublicationIntentContext";
 import { toast } from "@/lib/toast";
 import {
   Dialog,
@@ -466,6 +466,8 @@ export function EventPageView({
     });
     setSaveModalOpen(true);
   }, [data.citySlug, data.id, saveStatus.inPlan]);
+
+  useRegisterHeaderSaveAction(saveStatus.inPlan || saveStatus.isIdea, handlePlan, data.title);
 
   const handleSaveToPlanConfirm = useCallback(
     async (result: SaveToPlanResult) => {

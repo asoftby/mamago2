@@ -3,7 +3,7 @@
 /**
  * Хедер для viewport **< lg** — одна строка (48px).
  * Discovery: лого/«←» · чип «🧭 Минск · Я и Степан» (вход в поиск) · 🔔 · 👤. Кнопка ⚙ фильтров — в строке заголовка раздела.
- * Landing (посадочные): «←» · 🔔 · 👤.
+ * Landing (посадочные): «←» · 🔔 · 👤; на странице события вместо 🔔/👤 — «поделиться» и «сохранить».
  * Скролл вниз → хедер уезжает через transform (без layout shift), скролл вверх → возвращается.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -22,7 +22,7 @@ import {
 } from "@/lib/intent";
 import { getSiteHeaderVariant } from "@/lib/site/siteHeaderVariant";
 import { useCity } from "@/contexts/CityContext";
-import { usePublicationIntent } from "@/contexts/PublicationIntentContext";
+import { useHeaderSaveAction, usePublicationIntent } from "@/contexts/PublicationIntentContext";
 import { useArticleGeoLabel } from "@/contexts/ArticleGeoLabelContext";
 import { useHeaderScrolled } from "@/hooks/useHeaderScrolled";
 import { useScrollDirection } from "@/hooks/useScrollDirection";
@@ -30,6 +30,7 @@ import { useBranding } from "@/contexts/BrandingContext";
 import { OPEN_MOBILE_SEARCH_EVENT } from "@/lib/mobile/openMobileSearchEvent";
 import { OPEN_PUBLIC_SEARCH_EVENT } from "@/lib/search/openPublicSearchEvent";
 import { MobileHeaderActions } from "./MobileHeaderActions";
+import { MobileEventActions } from "./MobileEventActions";
 import { MobileHeaderBackButton } from "./MobileHeaderBackButton";
 
 const HEADER_BG = "bg-[#F6F2EA]";
@@ -53,6 +54,7 @@ export function MobileHeader() {
 
   const routeIntent = getIntentFromPath(pathname);
   const publicationIntent = usePublicationIntent();
+  const saveAction = useHeaderSaveAction();
   const isPublicationPage = isPublicationDetailPath(pathname);
   /** Intent из pathname, чтобы SSR и первый клиентский кадр совпадали (контекст публикации заполняется позже в useEffect). */
   const intentFromPathForPublication = getDiscoveryIntentForPublicationPath(pathname);
@@ -139,7 +141,7 @@ export function MobileHeader() {
           {leading}
           {isLanding ? (
             <div className="ml-auto flex shrink-0 items-center gap-2">
-              <MobileHeaderActions />
+              {saveAction ? <MobileEventActions saveAction={saveAction} /> : <MobileHeaderActions />}
             </div>
           ) : (
             <>
