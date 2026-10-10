@@ -19,7 +19,7 @@ export function MobileEventActions({ saveAction }: { saveAction: HeaderSaveActio
   return (
     <div className="flex shrink-0 items-center gap-2">
       <button type="button" aria-label="Поделиться" onClick={() => setShareOpen(true)} className={buttonClass}>
-        <Share2 className="h-5 w-5 text-gray-600" strokeWidth={1.75} aria-hidden />
+        <Share2 className="h-5 w-5 text-gray-400" strokeWidth={1.75} aria-hidden />
       </button>
       <button
         type="button"
@@ -29,7 +29,7 @@ export function MobileEventActions({ saveAction }: { saveAction: HeaderSaveActio
         className={buttonClass}
       >
         <Heart
-          className={cn("h-5 w-5", saveAction.saved ? "fill-[#E86A3A] text-[#E86A3A]" : "text-gray-600")}
+          className={cn("h-5 w-5", saveAction.saved ? "fill-[#E86A3A] text-[#E86A3A]" : "text-gray-400")}
           strokeWidth={1.75}
           aria-hidden
         />

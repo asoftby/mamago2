@@ -10,7 +10,7 @@ import type { EventPageData } from "@/lib/event/eventPageTypes";
 import { EventBreadcrumbs } from "./EventBreadcrumbs";
 import { OwnerEditDropdown } from "./OwnerEditDropdown";
 import { PlaceInfoRow } from "@/components/shared/PlaceInfoRow";
-import { SidebarCard, SidebarCardTopSection, SidebarCardShare } from "@/components/shared/SidebarCard";
+import { SidebarCard, SidebarCardTopSection } from "@/components/shared/SidebarCard";
 import { ShareModal } from "@/components/shared/ShareModal";
 import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
 import { CallActionButton } from "@/components/shared/CallActionButton";
@@ -173,7 +173,7 @@ export function EventDecisionPanel({
             type="button"
             onClick={onPlan}
             aria-pressed={isPlanned}
-            className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.7)] transition-colors hover:text-[#141210]"
+            className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
           >
             <Heart size={18} strokeWidth={1.75} className={isPlanned ? "fill-[#E86A3A] text-[#E86A3A]" : ""} aria-hidden />
             {isPlanned ? "Сохранено" : "Сохранить"}
@@ -181,7 +181,7 @@ export function EventDecisionPanel({
           <button
             type="button"
             onClick={() => setShareOpen(true)}
-            className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.7)] transition-colors hover:text-[#141210]"
+            className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
           >
             <Share2 size={18} strokeWidth={1.75} aria-hidden />
             Поделиться
@@ -384,13 +384,6 @@ export function EventDecisionPanel({
             />
           </SidebarCardTopSection>
         )}
-
-        {/* Share (мобильный: на desktop «Поделиться» вынесено в строку категории) */}
-        <SidebarCardTopSection mt={20} pt={20} className="lg:hidden">
-          <div className="flex justify-end">
-            <SidebarCardShare title={data.title} />
-          </div>
-        </SidebarCardTopSection>
       </SidebarCard>
 
 

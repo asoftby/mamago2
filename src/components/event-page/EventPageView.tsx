@@ -212,15 +212,15 @@ function EventOrganizerLegal({ organizer }: { organizer: NonNullable<EventPageDa
   return (
     <section className="py-8 md:py-10">
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3.5">
+        <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
           <span
             className="shrink-0 text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]"
             style={{ fontFamily: "Menlo, monospace" }}
           >
             Организатор события
           </span>
-          <span className="hidden h-px flex-1 bg-[rgba(20,18,16,0.10)] sm:block" />
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px] text-[rgba(20,18,16,0.60)]">
+          <span className="h-px min-w-6 flex-1 bg-[rgba(20,18,16,0.10)]" />
+          <div className="flex basis-full flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px] text-[rgba(20,18,16,0.60)] sm:basis-auto">
             <span className="font-medium text-[#141210]">{organizer.name}</span>
             {organizer.unp ? <span>УНП {organizer.unp}</span> : null}
           </div>
