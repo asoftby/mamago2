@@ -1278,7 +1278,7 @@ export function PlanMainContent({
         initialDate={selectedDate < todayKey ? todayKey : selectedDate}
         people={personas.map((persona) => ({
           id: persona.id,
-          name: persona.kind === "adult" ? (persona.displayName?.trim() || "Я") : persona.displayName,
+          name: persona.displayName?.trim() || (persona.kind === "adult" ? "Я" : ""),
           kind: persona.kind,
         }))}
         onBack={() => setScreen("plan")}

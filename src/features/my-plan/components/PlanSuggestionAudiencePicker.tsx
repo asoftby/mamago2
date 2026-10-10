@@ -7,6 +7,7 @@ import {
   FAMILY_SELECTION_LIMIT_MESSAGE,
 } from "@/lib/family/wholeFamilyPreset";
 import { toast } from "@/lib/toast";
+import { PLAN_CHIP, PLAN_CHIP_DISABLED, PLAN_CHIP_OFF, PLAN_CHIP_ON } from "./v3/planChipStyles";
 
 interface PlanSuggestionAudiencePickerProps {
   personas: FamilyPersona[];
@@ -38,10 +39,10 @@ export function PlanSuggestionAudiencePicker({
   return (
     <section className="space-y-3 rounded-[20px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-4" aria-label="Для кого подбираем события">
       <div>
-        <h3 className="text-[16px] font-bold leading-6 text-[var(--mp-tx)]">
-          Для кого ищем?
+        <h3 className="mp-font-ui text-[16px] font-bold leading-6 text-[var(--mp-tx)]">
+          Для кого
         </h3>
-        <p className="mt-0.5 text-[13px] leading-5 text-[var(--mp-tx2)]">
+        <p className="mp-font-ui mt-0.5 text-[13px] leading-5 text-[var(--mp-tx2)]">
           Выберите участников. Возраст детей возьмём из профиля.
         </p>
       </div>
@@ -56,13 +57,7 @@ export function PlanSuggestionAudiencePicker({
               aria-pressed={selected}
               disabled={disabled}
               onClick={() => toggle(persona.id)}
-              className={cn(
-                "inline-flex min-h-11 items-center justify-center rounded-full border px-3.5 py-2 text-sm font-semibold transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mp-ac)] disabled:opacity-60",
-                selected
-                  ? "border-[var(--mp-ac)] bg-[var(--mp-ac-soft)] text-[var(--mp-tx)]"
-                  : "border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx2)] hover:border-[var(--mp-ac)]",
-              )}
+              className={cn(PLAN_CHIP, selected ? PLAN_CHIP_ON : PLAN_CHIP_OFF, PLAN_CHIP_DISABLED)}
             >
               <span>{label}</span>
             </button>
@@ -73,13 +68,7 @@ export function PlanSuggestionAudiencePicker({
           aria-pressed={selectedIds.length === 0}
           disabled={disabled}
           onClick={() => onChange([])}
-          className={cn(
-            "min-h-11 rounded-full border px-3.5 py-2 text-sm font-semibold transition-colors",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mp-ac)] disabled:opacity-60",
-            selectedIds.length === 0
-              ? "border-[var(--mp-ac)] bg-[var(--mp-ac-soft)] text-[var(--mp-tx)]"
-              : "border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx2)] hover:border-[var(--mp-ac)]",
-          )}
+          className={cn(PLAN_CHIP, selectedIds.length === 0 ? PLAN_CHIP_ON : PLAN_CHIP_OFF, PLAN_CHIP_DISABLED)}
         >
           Свободный поиск
         </button>

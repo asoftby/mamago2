@@ -13,28 +13,9 @@ export function MyPlanHeader({ onClose, compact = false }: MyPlanHeaderProps) {
       className="flex items-center justify-between gap-3 bg-[var(--mp-bg)]"
       style={{ padding: compact ? "10px 12px 4px 20px" : "20px 20px 6px 32px", minHeight: 56 }}
     >
-      <h2
-        style={{
-          margin: 0,
-          fontFamily: "var(--font-sans)",
-          fontSize: 26,
-          fontWeight: 700,
-          lineHeight: 1.1,
-          letterSpacing: "-.025em",
-          color: "var(--mp-tx)",
-        }}
-      >
-        <span style={{ fontWeight: 400 }}>Мой</span>{" "}
-        <em
-          style={{
-            fontFamily: "var(--font-display), Georgia, serif",
-            fontStyle: "italic",
-            fontWeight: 500,
-            color: "var(--mp-ac)",
-          }}
-        >
-          план
-        </em>
+      <h2 className="mp-font-display m-0 text-[28px] font-normal leading-[1.1] tracking-[-.02em] text-[var(--mp-tx)]">
+        Мой{" "}
+        <em className="font-medium italic text-[var(--mp-ac)]">план</em>
       </h2>
 
       <button

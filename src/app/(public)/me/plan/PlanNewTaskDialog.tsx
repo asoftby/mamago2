@@ -30,7 +30,7 @@ export function PlanNewTaskDialog({
   const family = useFamilyPersona();
   const people: PlanNewTaskPerson[] = (family?.personas ?? []).map((person) => ({
     id: person.id,
-    name: person.kind === "adult" ? "Я" : person.displayName,
+    name: person.displayName?.trim() || (person.kind === "adult" ? "Я" : ""),
     kind: person.kind,
   }));
   // During profile loading, known children remain selectable.

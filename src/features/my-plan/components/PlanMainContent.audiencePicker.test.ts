@@ -7,7 +7,7 @@ const service = readFileSync(new URL("../../../server/services/planSuggestions.s
 
 // Desktop and mobile must expose the same visible audience choice.
 assert.equal((content.match(/\{renderAudiencePicker\(\)\}/g) ?? []).length, 2);
-assert.match(picker, /Для кого ищем\?/);
+assert.match(picker, />\s*Для кого\s*</);
 assert.match(picker, /aria-pressed=\{selected\}/);
 assert.match(picker, /onChange\(\[\]\)/);
 

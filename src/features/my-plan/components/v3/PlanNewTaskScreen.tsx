@@ -7,6 +7,17 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { detectPlanItemCategory } from "../../lib/planItemCategory";
 import { PlanScreenHead } from "./PlanScreenHead";
+import {
+  PLAN_CHIP,
+  PLAN_CHIP_DISABLED,
+  PLAN_CHIP_OFF,
+  PLAN_CHIP_ON,
+  PLAN_FOCUS,
+  PLAN_SEG,
+  PLAN_SEG_BTN,
+  PLAN_SEG_OFF,
+  PLAN_SEG_ON,
+} from "./planChipStyles";
 
 export type PlanNewTaskPerson = { id: string; name: string; kind: "adult" | "child" };
 
@@ -37,8 +48,7 @@ function longDay(dateIso: string): string {
   return new Date(y!, m! - 1, d!).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 }
 
-const SEG = "grid auto-cols-fr grid-flow-col gap-1 rounded-[15px] bg-[var(--mp-soft)] p-1";
-const SEG_BTN = "h-11 rounded-[11px] text-[14.5px] font-bold transition-colors";
+const SECTION_LABEL = "mp-font-ui mb-[9px] text-[15px] font-bold text-[var(--mp-tx)]";
 
 /**
  * «Новое дело» в той же шторке: текст → когда → время → для кого → напомнить.
@@ -58,6 +68,8 @@ export function PlanNewTaskScreen({
   onSaved: (date: string) => void;
 }) {
   const tomorrowIso = useMemo(() => addDays(todayIso, 1), [todayIso]);
+  /** Взрослый в профиле выводится как «Я» (как в «Мой план»), а не логином; остальные — по имени. */
+  const firstAdultId = useMemo(() => people.find((p) => p.kind === "adult")?.id ?? null, [people]);
   const initialWhen = initialDate === todayIso ? "today" : initialDate === tomorrowIso ? "tomorrow" : "other";
   const [text, setText] = useState("");
   const [when, setWhen] = useState<"today" | "tomorrow" | "other">(initialWhen);
@@ -93,12 +105,16 @@ export function PlanNewTaskScreen({
       ? "Выберите день"
       : timed && !timeValid
         ? "Укажите время"
-        : `Добавить на ${whenWord}${timed ? ` в ${time}` : ""}`;
+        : "Добавить в план";
 
   function enableTime() {
     setTimed(true);
     // Как в дизайне: со временем напоминание включено по умолчанию («за час»), пока человек не выбрал сам.
     if (!leadTouched && lead === null) setLead(60);
+  }
+
+  function displayName(p: PlanNewTaskPerson): string {
+    return p.id !== "" && p.id === firstAdultId ? "Я" : p.name;
   }
 
   async function submit() {
@@ -137,29 +153,42 @@ export function PlanNewTaskScreen({
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
       <PlanScreenHead back="План" onBack={onBack} />
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 md:px-8">
-        <textarea
-          autoFocus
-          rows={2}
-          maxLength={160}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          placeholder="Что нужно сделать?"
-          className="block w-full resize-none border-0 bg-transparent py-1.5 text-[22px] font-bold leading-[1.3] tracking-[-.015em] text-[var(--mp-tx)] outline-none placeholder:text-[#6F6A65]"
-        />
-        <div className="mb-[18px] flex items-center gap-[7px] border-b border-[var(--mp-line)] pb-4 pt-1 text-[13px] text-[var(--mp-tx2)] md:hidden">
+        <h2 className="mp-font-display mb-3 mt-1 text-[28px] font-normal leading-[1.1] tracking-[-.02em] text-[var(--mp-tx)]">
+          Новое{" "}
+          <em className="font-medium italic text-[var(--mp-ac)]">дело</em>
+        </h2>
+        <label className="block">
+          <span className="sr-only">Что нужно сделать</span>
+          <textarea
+            autoFocus
+            rows={2}
+            maxLength={160}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            placeholder="Что нужно сделать?"
+            className={cn(
+              "mp-font-ui block w-full resize-none rounded-2xl border border-[var(--mp-chip-line)] bg-white px-4 py-3",
+              "text-[20px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)] caret-[var(--mp-ac)]",
+              "outline-none transition-shadow placeholder:font-medium placeholder:text-[#6B665F]",
+              "focus:border-[var(--mp-tx)] focus:shadow-[0_0_0_3px_rgba(29,27,25,.08)]",
+            )}
+          />
+        </label>
+        <div className="mb-[18px] mt-2 flex items-center gap-[7px] border-b border-[var(--mp-line)] pb-4 text-[13px] text-[var(--mp-tx2)] md:hidden">
           <Mic className="h-[15px] w-[15px]" aria-hidden />
           Удобнее голосом — нажмите микрофон на&nbsp;клавиатуре
         </div>
 
         <div className="mb-[22px]">
-          <div className="mb-[9px] text-[15px] font-bold text-[var(--mp-tx)]">Когда</div>
-          <div className={SEG}>
+          <div className={SECTION_LABEL}>Когда</div>
+          <div className={PLAN_SEG}>
             {([["today", "Сегодня"], ["tomorrow", "Завтра"], ["other", "Другой день"]] as const).map(([key, name]) => (
               <button
                 key={key}
                 type="button"
+                aria-pressed={when === key}
                 onClick={() => setWhen(key)}
-                className={cn(SEG_BTN, when === key ? "bg-white text-[var(--mp-tx)] shadow-[0_1px_3px_rgba(29,27,25,.12)]" : "text-[var(--mp-tx2)]")}
+                className={cn(PLAN_SEG_BTN, when === key ? PLAN_SEG_ON : PLAN_SEG_OFF)}
               >
                 {name}
               </button>
@@ -210,17 +239,18 @@ export function PlanNewTaskScreen({
         </div>
 
         <div className="mb-[22px]">
-          <div className="mb-[9px] text-[15px] font-bold text-[var(--mp-tx)]">Время</div>
-          <div className={SEG}>
+          <div className={SECTION_LABEL}>Время</div>
+          <div className={PLAN_SEG}>
             <button
               type="button"
+              aria-pressed={!timed}
               onClick={() => setTimed(false)}
-              className={cn(SEG_BTN, !timed ? "bg-white text-[var(--mp-tx)] shadow-[0_1px_3px_rgba(29,27,25,.12)]" : "text-[var(--mp-tx2)]")}
+              className={cn(PLAN_SEG_BTN, !timed ? PLAN_SEG_ON : PLAN_SEG_OFF)}
             >
               Без времени
             </button>
             <label
-              className={cn(SEG_BTN, "flex cursor-text items-center justify-center gap-[7px] px-3", timed ? "bg-white shadow-[0_1px_3px_rgba(29,27,25,.12)]" : "text-[var(--mp-tx2)]")}
+              className={cn(PLAN_SEG_BTN, "flex cursor-text items-center justify-center gap-[7px] px-3 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--mp-ac)]", timed ? PLAN_SEG_ON : PLAN_SEG_OFF)}
               onClick={() => {
                 enableTime();
                 window.setTimeout(() => timeRef.current?.focus(), 0);
@@ -244,21 +274,21 @@ export function PlanNewTaskScreen({
         </div>
 
         <div className="mb-[22px]">
-          <div className="mb-[9px] text-[15px] font-bold text-[var(--mp-tx)]">Для кого</div>
+          <div className={SECTION_LABEL}>Для кого</div>
           <div className="flex flex-wrap gap-5">
             {[{ id: "", name: "Вся семья", kind: "adult" as const }, ...people].map((p) => {
               const on = whoId === p.id;
               return (
-                <button key={p.id || "family"} type="button" aria-pressed={on} onClick={() => setWhoId(p.id)} className="flex flex-col items-center gap-[7px]">
+                <button key={p.id || "family"} type="button" aria-pressed={on} onClick={() => setWhoId(p.id)} className={cn("flex min-w-11 flex-col items-center gap-[7px] rounded-2xl", PLAN_FOCUS)}>
                   <span className={cn("relative flex h-[62px] w-[62px] items-center justify-center rounded-full border-2 text-[21px] font-extrabold transition-colors", on ? "border-[var(--mp-tx)] bg-white" : "border-transparent bg-[var(--mp-soft)] hover:border-[var(--mp-line-strong)]")}>
-                    {p.id === "" ? <Users className="h-6 w-6" aria-hidden /> : p.name.trim().charAt(0).toUpperCase()}
+                    {p.id === "" ? <Users className="h-6 w-6" aria-hidden /> : displayName(p).trim().charAt(0).toUpperCase()}
                     {on ? (
                       <span className="absolute -bottom-[3px] -right-[3px] flex h-[23px] w-[23px] items-center justify-center rounded-full border-2 border-[var(--mp-bg)] bg-[var(--mp-tx)] text-white">
                         <Check className="h-3 w-3" strokeWidth={2.8} aria-hidden />
                       </span>
                     ) : null}
                   </span>
-                  <span className="max-w-[72px] truncate text-sm font-semibold text-[var(--mp-tx)]">{p.name}</span>
+                  <span className="mp-font-ui max-w-[72px] truncate text-sm font-semibold text-[var(--mp-tx)]">{displayName(p)}</span>
                 </button>
               );
             })}
@@ -266,24 +296,23 @@ export function PlanNewTaskScreen({
         </div>
 
         <div className="mb-[22px]">
-          <div className="mb-[9px] text-[15px] font-bold text-[var(--mp-tx)]">Когда напомнить?</div>
+          <div className={SECTION_LABEL}>Когда напомнить?</div>
           <div className="flex flex-wrap gap-2">
             {REMIND_OPTIONS.map((o) => {
               const on = timed ? lead === o.minutes : o.minutes === null;
+              // Без времени доступно только «Не напоминать»; остальные явно выключены.
+              const disabled = !timed && o.minutes !== null;
               return (
                 <button
                   key={o.label}
                   type="button"
                   aria-pressed={on}
-                  disabled={!timed}
+                  disabled={disabled}
                   onClick={() => {
                     setLead(o.minutes);
                     setLeadTouched(true);
                   }}
-                  className={cn(
-                    "inline-flex h-11 items-center gap-1.5 rounded-full border px-4 text-[15px] font-semibold transition-colors disabled:cursor-default disabled:opacity-60",
-                    on ? "border-[var(--mp-tx)] bg-[var(--mp-tx)] text-white" : "border-[var(--mp-line)] bg-[var(--mp-card)] text-[var(--mp-tx)] enabled:hover:border-[var(--mp-line-strong)]",
-                  )}
+                  className={cn(PLAN_CHIP, on ? PLAN_CHIP_ON : PLAN_CHIP_OFF, PLAN_CHIP_DISABLED)}
                 >
                   {o.minutes !== null ? <Bell className="h-4 w-4" aria-hidden /> : null}
                   {o.label}
@@ -299,7 +328,7 @@ export function PlanNewTaskScreen({
           type="button"
           disabled={!can || saving}
           onClick={() => void submit()}
-          className="flex h-[54px] w-full items-center justify-center rounded-2xl bg-[var(--mp-ac)] text-base font-bold text-white transition-colors hover:bg-[var(--mp-ac-dark)] disabled:bg-[#E6E0D9] disabled:text-[#6F6A65]"
+          className={cn("mp-font-ui flex h-[54px] w-full items-center justify-center rounded-2xl bg-[var(--mp-ac)] text-base font-bold text-white transition-colors hover:bg-[var(--mp-ac-dark)] disabled:bg-[#E6E0D9] disabled:text-[#5F5A55]", PLAN_FOCUS)}
         >
           {saving ? "Сохраняем…" : label}
         </button>
