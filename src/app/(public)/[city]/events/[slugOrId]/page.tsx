@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { EventPageView } from "@/components/event-page";
 import { loadPublicActivityForCityPage } from "@/lib/event/loadPublicActivityForCityPage";
-import { ContentStatus } from "@prisma/client";
+import { ActivityType, ContentStatus } from "@prisma/client";
+import { canEditEventActivity } from "@/lib/permissions/eventEditPermissions";
 import { buildEventPageDataFromPrismaActivity } from "@/lib/event/buildEventPageDataFromPrisma";
 import { withEventPagePriceData } from "@/lib/event/withEventPagePriceData";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -182,10 +183,14 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
     );
 
     const user = await getCurrentUser();
-    const ownerEditHref =
-      user?.id && fromDb.ownerUserId === user.id
-        ? editorEventEditHref(fromDb.id)
-        : undefined;
+    // The public Edit control must use the same authorization as the editor.
+    // Ownership alone is insufficient: business managers and staff may edit,
+    // while former owners must not be shown a non-working action.
+    const canEditEvent = user != null && await canEditEventActivity(user, {
+      id: fromDb.id,
+      type: ActivityType.EVENT,
+    });
+    const ownerEditHref = canEditEvent ? editorEventEditHref(fromDb.id) : undefined;
 
     const previewBannerLabel =
       fromDb.status === ContentStatus.PENDING_UPDATE
