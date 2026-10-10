@@ -2,7 +2,7 @@
 
 import "@/styles/event-page.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRegisterHeaderFavoriteTarget, useSetPublicationIntent } from "@/contexts/PublicationIntentContext";
+import { useSetPublicationIntent } from "@/contexts/PublicationIntentContext";
 import { toast } from "@/lib/toast";
 import {
   Dialog,
@@ -36,9 +36,7 @@ import { EventWhyGo } from "./EventWhyGo";
 import { EventGoodFit } from "./EventGoodFit";
 import { PublicationMediaColumn } from "@/components/media/PublicationMediaColumn";
 import { PublicationStatsPanel } from "@/components/publication-stats";
-import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
-import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { cn } from "@/lib/utils";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { toastAddedToPlan } from "@/lib/my-plan/toastAddedToPlan";
@@ -323,7 +321,6 @@ export function EventPageView({
 }) {
   const { isAuthenticated } = useAuthMe();
   const setPublicationIntent = useSetPublicationIntent();
-  useRegisterHeaderFavoriteTarget(data.id);
   const ctaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -604,10 +601,6 @@ export function EventPageView({
 
       <section className="pt-4 pb-14 lg:pt-12">
         <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
-          <div className="mb-4 md:mb-0">
-            <MobileSmartBackButton fallbackHref={getCityHomeHref(data.citySlug)} />
-          </div>
-
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-[440px_1fr] lg:gap-14 lg:items-start">
             <div>
               <PublicationMediaColumn

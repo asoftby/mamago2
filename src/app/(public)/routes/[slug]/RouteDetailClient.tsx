@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { ShareSheet } from "@/components/routes/ShareSheet";
-import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { toast } from "@/lib/toast";
@@ -446,10 +445,9 @@ export function RouteDetailClient({ route }: Props) {
 
       <div className="min-h-screen bg-[#F8F8F7]">
         {/* Back nav — НЕ sticky, уходит вверх при скролле */}
-        <div className="bg-[#F8F8F7] border-b border-neutral-100">
+        <div className="hidden border-b border-neutral-100 bg-[#F8F8F7] md:block">
           <Container className="max-w-2xl">
             <div className="flex items-center justify-between h-12 pt-[20px]">
-              <MobileSmartBackButton className="shrink-0" />
               <Link
                 href="/routes"
                 className="hidden items-center gap-1.5 text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900 md:inline-flex"

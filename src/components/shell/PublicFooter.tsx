@@ -28,7 +28,7 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
           "pt-12 md:pt-16",
           withStickyCtaClearance
             ? cn(STICKY_CTA_FOOTER_PAD, "lg:pb-16")
-            : "pb-12 md:pb-16",
+            : "pb-4 md:pb-16",
         )}
       >
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
@@ -76,14 +76,14 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
               <Link href="#" className="hover:text-primary transition-colors">Политика конфиденциальности</Link>
               <Link href="#" className="hover:text-primary transition-colors">Пользовательское соглашение</Link>
-              <CookieSettingsFooterLink iconOnly />
+              <CookieSettingsFooterLink />
             </div>
           </div>
         </div>
 
         {/* Bottom: строка 1 — лого слева, соцсети справа; строка 2 — копирайт по центру */}
-        <div className="flex flex-col gap-4 pt-8 border-t">
-          <div className="flex w-full flex-col items-center gap-4 min-[769px]:grid min-[769px]:grid-cols-[1fr_auto_1fr]">
+        <div className="flex flex-col gap-2 pt-8 border-t">
+          <div className="flex w-full flex-col items-center gap-3 min-[769px]:grid min-[769px]:grid-cols-[1fr_auto_1fr]">
             <Image
               src="/logomamago.webp"
               alt="mamaGo"

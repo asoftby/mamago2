@@ -12,7 +12,6 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { PublicationTagChips } from "@/components/article/PublicationTagChips";
-import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import type { ArticleMvpResolvedBlock, PlaceCardExtra } from "@/lib/article/articleMvpRenderData";
 import { ArticleLivePlaceBlock } from "@/components/article/blocks/ArticleLivePlaceBlock";
 import { ArticleInfoCard } from "@/components/article/blocks/ArticleStructuredInfoBlocks";
@@ -1000,10 +999,6 @@ export function BreakingNewsView({
           </div>
         </div>
       )}
-
-      <div className="mx-auto w-full max-w-3xl px-4 pt-4 sm:px-6">
-        <MobileSmartBackButton fallbackHref={cityHomeHref} />
-      </div>
 
       <div className="mx-auto w-full max-w-3xl px-4 pb-4 pt-7 sm:px-6">
         <ArticleBreadcrumbs title={title} homeHref={cityHomeHref} journalHref={journalHref} />

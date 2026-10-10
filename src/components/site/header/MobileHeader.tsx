@@ -3,7 +3,7 @@
 /**
  * Хедер для viewport **< lg** — одна строка (48px).
  * Discovery: лого/«←» · чип «🧭 Минск · Я и Степан» (вход в поиск) · 🔔 · 👤. Кнопка ⚙ фильтров — в строке заголовка раздела.
- * Landing (посадочные): «←» · ♡ · поделиться · 🔔 · 👤.
+ * Landing (посадочные): «←» · 🔔 · 👤.
  * Скролл вниз → хедер уезжает через transform (без layout shift), скролл вверх → возвращается.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils";
 import { MobileSearchEntry } from "@/components/mobile/MobileSearchEntry";
 import { MobileSearchSheet } from "@/components/mobile/MobileSearchSheet";
 import { NavIconButton } from "@/components/mobile/NavIconButton";
-import { MOBILE_HEADER_ROW_HEIGHT } from "@/components/mobile/mobile-control-geometry";
 import {
   getIntentFromPath,
   getDiscoveryIntentForPublicationPath,
@@ -32,7 +31,6 @@ import { OPEN_MOBILE_SEARCH_EVENT } from "@/lib/mobile/openMobileSearchEvent";
 import { OPEN_PUBLIC_SEARCH_EVENT } from "@/lib/search/openPublicSearchEvent";
 import { MobileHeaderActions } from "./MobileHeaderActions";
 import { MobileHeaderBackButton } from "./MobileHeaderBackButton";
-import { MobileLandingActions } from "./MobileLandingActions";
 
 const HEADER_BG = "bg-[#F6F2EA]";
 
@@ -80,7 +78,8 @@ export function MobileHeader() {
   const cityHubOnly = isPublicationPage || isJournalRoute;
   const isLanding = getSiteHeaderVariant(pathname) === "landing";
   /** Корневые страницы города (хаб, витрины, подборки) — лого; внутренние — «←». */
-  const isRootPage = !isLanding && pathname.split("/").filter(Boolean).length <= 2;
+  const pathSegments = pathname.split("/").filter(Boolean);
+  const isRootPage = !isLanding && pathSegments.length <= 2 && pathSegments[0] !== "page";
   const homeHref = `/${displayCity}`;
 
   useEffect(() => {
@@ -135,12 +134,11 @@ export function MobileHeader() {
       >
         <div
           ref={row1Ref}
-          className={cn("flex min-w-0 items-center gap-2 px-3", MOBILE_HEADER_ROW_HEIGHT)}
+          className={cn("flex min-w-0 items-center gap-2 px-3", "h-14")}
         >
           {leading}
           {isLanding ? (
             <div className="ml-auto flex shrink-0 items-center gap-2">
-              <MobileLandingActions />
               <MobileHeaderActions />
             </div>
           ) : (
@@ -152,7 +150,7 @@ export function MobileHeader() {
                 citySlug={displayCity}
                 currentIntent={displayIntent}
                 locationLabelOverride={articleGeoLabel}
-                className="!h-11"
+                className="!h-12"
               />
               <MobileHeaderActions />
             </>

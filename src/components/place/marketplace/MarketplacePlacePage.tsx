@@ -10,7 +10,6 @@ import { PlaceAddressSection } from "./PlaceAddressSection";
 import { PlaceReviewsSection } from "./PlaceReviewsSection";
 import { PlaceNetworkSection, type NetworkPlace } from "@/components/place/PlaceNetworkSection";
 import { PriceListBlock } from "@/components/shared/PriceListBlock";
-import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { FaqSection } from "@/components/public/FaqSection";
 import type { ActivityMock } from "@/types/activity";
 import type { PriceData } from "@/lib/priceItems";
@@ -195,10 +194,6 @@ export function MarketplacePlacePage({
       className="pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0"
       style={{ background: "#ffffff", minHeight: "100vh" }}
     >
-      <div className="mx-auto w-full max-w-[1200px] px-4 pt-4 sm:px-6 lg:px-8">
-        <MobileSmartBackButton fallbackHref={place.fallbackUrl} />
-      </div>
-
       {/* Hero */}
       <PlaceHero
         ctaRef={ctaRef}

@@ -13,14 +13,14 @@ assert.doesNotMatch(
 
 assert.match(
   footerSource,
-  /<CookieSettingsFooterLink iconOnly \/>/,
-  "Footer keeps an icon-only trigger for reopening the cookie preferences modal",
+  /<CookieSettingsFooterLink \/>/,
+  "Footer keeps a text trigger («Настройки cookies») for reopening the cookie preferences modal",
 );
 
 assert.doesNotMatch(
   footerSource,
   /Настройки cookies/,
-  "Public footer must not render visible cookie-settings text",
+  "Cookie-settings label lives in CookieSettingsFooterLink, not hard-coded in the footer",
 );
 
 
