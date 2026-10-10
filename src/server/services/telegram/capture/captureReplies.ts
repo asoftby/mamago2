@@ -7,3 +7,6 @@ export const CAPTURE_REPLIES = {
 } as const;
 
 export type CaptureReplyKey = keyof typeof CAPTURE_REPLIES;
+
+/** Pending input replaces the entire recognized draft rather than applying a field edit. */
+export const CAPTURE_REPLACE_TEXT_RULE = "CAPTURE_REPLACE_TEXT_AWAITING";
