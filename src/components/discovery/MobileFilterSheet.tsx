@@ -2,13 +2,9 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { ModalHeader, ModalFooter, ModalPrimaryAction } from "@/components/ui/modal-chrome";
+import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
 import { MobileDateSheet } from "@/components/filters/MobileDateSheet";
 import { MobileSelectSheet } from "@/components/filters/MobileSelectSheet";
 import { ChevronDown, X } from "lucide-react";
@@ -150,10 +146,11 @@ export function MobileFilterSheet({
         showCloseButton={false}
         className="fixed inset-x-0 bottom-0 w-full max-h-[85vh] rounded-t-3xl border-t border-gray-200/80 bg-white shadow-2xl p-0 flex flex-col overflow-hidden gap-0"
       >
-        {/* Header */}
-        <div className="flex shrink-0 items-center justify-center border-b border-gray-200/80 bg-white p-4 relative">
-          <SheetTitle>Фильтры</SheetTitle>
-        </div>
+        <ModalHeader
+          title={<SheetTitle className="text-lg font-semibold text-gray-900">Фильтры</SheetTitle>}
+          onClose={() => onOpenChange(false)}
+          className="border-gray-200/80"
+        />
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-4 py-4 pb-24">
@@ -305,22 +302,13 @@ export function MobileFilterSheet({
           </div>
         </div>
 
-        {/* Sticky Footer Action Bar */}
-        <div className="sticky bottom-0 border-t border-gray-200/80 bg-white px-4 py-3 pb-[calc(16px+env(safe-area-inset-bottom))] flex items-center justify-between shrink-0">
-          <button
-            onClick={onReset}
-            className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
+        <ModalFooter>
+          <MobileOverlayResetAction onClick={onReset}>
             Сбросить
-          </button>
-          <Button
-            onClick={onDone}
-            variant="default"
-            className="rounded-full shadow-lg active:scale-95 transition-all px-8 font-semibold"
-          >
-            Готово
-          </Button>
-        </div>
+          </MobileOverlayResetAction>
+          <div className="min-w-0 flex-1" />
+          <ModalPrimaryAction onClick={onDone}>Готово</ModalPrimaryAction>
+        </ModalFooter>
       </SheetContent>
     </Sheet>
   );

@@ -227,7 +227,7 @@
     "test:instagram-reels-ssrf": "tsx src/lib/instagram/fetchReelsThumbnail.test.ts && tsx src/server/modules/import/parsers/safeRemoteFetch.test.ts",
     "test:import-html-ssrf": "tsx src/server/modules/import/parsers/fetchHtml.test.ts && tsx src/server/modules/import/parsers/safeRemoteFetch.test.ts && tsx src/server/modules/import/parsers/familyByUrlPolicy.test.ts && tsx src/server/modules/import/parsers/familyByImportSsrfWiring.test.ts",
     "test:responsive-public-detail": "tsx src/lib/responsive/publicDetailMobileContract.test.ts",
-    "test:responsive-public-overlay": "tsx src/lib/responsive/publicOverlayMediaMobileContract.test.ts",
+    "test:responsive-public-overlay": "tsx src/lib/responsive/publicOverlayMediaMobileContract.test.ts && tsx src/components/ui/modal-chrome.test.tsx",
     "test:responsive-business": "tsx src/lib/responsive/businessMobileLayoutContract.test.ts",
     "test:responsive-content-editor": "tsx src/lib/responsive/contentEditorMobileLayoutContract.test.ts",
     "test:responsive-admin": "tsx src/lib/responsive/adminMobileLayoutContract.test.ts",
