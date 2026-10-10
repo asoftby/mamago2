@@ -41,6 +41,7 @@ export type CaptureProcessorDeps = {
   models: () => CaptureModelConfig;
   context: CaptureContextDeps;
   presenter?: { present(inboxItemId: string): Promise<void> };
+  notifier?: { reply(chatId: number, text: string): Promise<void> };
   now?: () => Date;
 };
 
@@ -287,11 +288,21 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
         return;
       }
 
-      await db.inboxItem.updateMany({
+      const failed = await db.inboxItem.updateMany({
         where: { id: item.id, status: "PROCESSING" },
         data: { ...usageData, status: "FAILED", error: result.code },
       });
       logResult(item, "FAILED", result.code, result, startedAt);
+      if (failed.count === 1 && deps.notifier) {
+        try {
+          await deps.notifier.reply(
+            Number(item.telegramChatId),
+            "Не получилось распознать сообщение. Попробуйте отправить его ещё раз или укажите название, дату и время текстом.",
+          );
+        } catch {
+          console.error(`[capture-processor] inboxItemId=${item.id} code=FAILURE_REPLY_FAILED`);
+        }
+      }
     },
   };
 }
