@@ -188,13 +188,11 @@ export function PlanVisitsScreen({ onBack }: { onBack: () => void }) {
                   ) : visit.feedbackSentiment ? (
                     <div className="mt-1.5">
                       <div className="flex items-center justify-between gap-2">
+                        {/* Отправленный отзыв не редактируется: API отвечает 409 на изменённую оценку. */}
                         <span className="inline-flex items-center gap-1.5 text-[13.5px] font-bold text-[var(--mp-tx)]">
                           <PlanFace mouth={sentimentMouth(visit.feedbackSentiment)} size={20} />
                           {PLAN_FACE_LABEL[visit.feedbackSentiment]}
                         </span>
-                        <button type="button" onClick={() => setOpenId(visit.id)} className="min-h-11 px-2 text-[13.5px] font-bold text-[var(--mp-ac-dark)]">
-                          Изменить
-                        </button>
                       </div>
                       {visit.feedbackComment ? (
                         <p className="mb-1 mt-0.5 text-[13.5px] italic leading-[1.45] text-[var(--mp-tx2)]">«{visit.feedbackComment}»</p>

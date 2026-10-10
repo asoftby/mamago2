@@ -381,8 +381,9 @@ export async function updateManualPlanEntry(
   if (patch.entryType !== undefined) assertEntryType(patch.entryType);
   const childId = patch.childId === undefined ? current.childId : normalizeChildId(patch.childId);
   await assertOwnedChild(owner, childId ?? null);
+  // Смена исполнителя на ребёнка без явного assigneeUserId снимает взрослого исполнителя.
   const assigneeUserId = patch.assigneeUserId === undefined
-    ? current.assigneeUserId
+    ? (patch.childId !== undefined && childId ? null : current.assigneeUserId)
     : normalizeAssigneeUserId(patch.assigneeUserId);
   if (assigneeUserId && childId) throw new ManualPlanEntryError("INVALID_INPUT", "assignee_and_child");
   await assertFamilyAssignee(owner, assigneeUserId ?? null);
@@ -398,12 +399,16 @@ export async function updateManualPlanEntry(
     : parseWallClock(date, patch.dueAt, "due_at");
   assertTimeOrder(startsAt, endsAt);
   const reminderEnabled = patch.reminderEnabled === undefined ? current.reminderEnabled === true : patch.reminderEnabled === true;
-  const reminderLeadMinutes = patch.reminderLeadMinutes === undefined
+  const requestedLeadMinutes = patch.reminderLeadMinutes === undefined
     ? current.reminderLeadMinutes
     : normalizeReminderLeadMinutes(patch.reminderLeadMinutes);
-  if (reminderLeadMinutes != null && (!startsAt || !reminderEnabled)) {
+  const leadApplicable = Boolean(startsAt) && reminderEnabled;
+  // Явно присланное время напоминания без времени/включённого напоминания — ошибка;
+  // сохранённое ранее значение при выключении напоминания или снятии времени просто сбрасывается.
+  if (patch.reminderLeadMinutes !== undefined && requestedLeadMinutes != null && !leadApplicable) {
     throw new ManualPlanEntryError("INVALID_INPUT", "reminder_lead_requires_time");
   }
+  const reminderLeadMinutes = leadApplicable ? requestedLeadMinutes : null;
 
   const result = await prisma.planItem.updateMany({
     where: { id: current.id, ...(await activePlanScopeFor(owner.userId)), source: PlanItemSource.MANUAL, status: "CONFIRMED", updatedAt: expected },
@@ -412,8 +417,12 @@ export async function updateManualPlanEntry(
       ...(patch.entryType === undefined ? {} : { entryType: patch.entryType }),
       ...(patch.title === undefined ? {} : { title: normalizeTitle(patch.title) }),
       ...(patch.childId === undefined ? {} : { childId: childId ?? null }),
-      ...(patch.assigneeUserId === undefined ? {} : { assigneeUserId: assigneeUserId ?? null }),
-      ...(patch.reminderLeadMinutes === undefined ? {} : { reminderLeadMinutes }),
+      ...(patch.assigneeUserId === undefined && assigneeUserId === current.assigneeUserId
+        ? {}
+        : { assigneeUserId: assigneeUserId ?? null }),
+      ...(patch.reminderLeadMinutes === undefined && reminderLeadMinutes === current.reminderLeadMinutes
+        ? {}
+        : { reminderLeadMinutes }),
       ...(patch.date === undefined ? {} : { date }),
       ...(patch.startsAt === undefined && patch.date === undefined ? {} : { startsAt }),
       ...(patch.endsAt === undefined && patch.date === undefined ? {} : { endsAt }),

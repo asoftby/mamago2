@@ -109,6 +109,11 @@ export async function runPlanEventRemindersCore(
       offsetMinutes: 120,
       timeZone: DEFAULT_NOTIFICATION_TIME_ZONE,
     };
+    // Дело назначено одному взрослому — копии для остальных членов семьи не напоминаем.
+    if (candidate.assigneeUserId && candidate.assigneeUserId !== candidate.userId) {
+      skippedSchedule += 1;
+      continue;
+    }
     const startsAt = candidate.startsAt;
     if (!settings.enabled || !startsAt || startsAt.getTime() <= now.getTime()) {
       skippedSchedule += 1;
