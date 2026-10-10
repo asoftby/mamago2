@@ -20,7 +20,13 @@ type PublicationIntentContextValue = {
   setSaveAction: (action: HeaderSaveAction | null) => void;
 };
 
-export type HeaderSaveAction = { saved: boolean; onSave: () => void; shareTitle: string };
+export type HeaderSaveAction = {
+  saved: boolean;
+  onSave: () => void;
+  shareTitle: string;
+  /** Слово в заголовке модалки шеринга: «местом», «предложением»… По умолчанию «событием». */
+  entityNoun?: string;
+};
 
 const PublicationIntentContext =
   createContext<PublicationIntentContextValue | null>(null);
@@ -58,15 +64,21 @@ export function useHeaderSaveAction(): HeaderSaveAction | null {
 }
 
 /** Страница публикации регистрирует «сохранить» для мобильного хедера; на unmount сбрасывает. */
-export function useRegisterHeaderSaveAction(saved: boolean, onSave: () => void, shareTitle: string) {
+export function useRegisterHeaderSaveAction(
+  saved: boolean,
+  onSave: () => void,
+  shareTitle: string,
+  options: { entityNoun?: string; enabled?: boolean } = {},
+) {
+  const { entityNoun, enabled = true } = options;
   const setSaveAction = useContext(PublicationIntentContext)?.setSaveAction;
   const onSaveRef = useRef(onSave);
   useEffect(() => {
     onSaveRef.current = onSave;
   });
   useEffect(() => {
-    if (!setSaveAction) return;
-    setSaveAction({ saved, shareTitle, onSave: () => onSaveRef.current() });
+    if (!setSaveAction || !enabled) return;
+    setSaveAction({ saved, shareTitle, entityNoun, onSave: () => onSaveRef.current() });
     return () => setSaveAction(null);
-  }, [saved, shareTitle, setSaveAction]);
+  }, [saved, shareTitle, entityNoun, enabled, setSaveAction]);
 }

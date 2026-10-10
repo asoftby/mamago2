@@ -7,6 +7,7 @@ import { toast } from "@/lib/toast";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
+import { useRegisterHeaderSaveAction } from "@/contexts/PublicationIntentContext";
 import { persistPlaceSave } from "@/features/save/persistPlaceSave";
 import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose } from "@/features/save/saveStatusFetchGuard";
 
@@ -18,6 +19,10 @@ type PlaceSaveHeartProps = {
   source?: string;
   className?: string;
   iconClassName?: string;
+  /** `text` — «♡ Сохранить» (иконка + подпись) вместо круглой кнопки. */
+  variant?: "icon" | "text";
+  /** Зарегистрировать «сохранить» в мобильном хедере публикации (единый источник — этот компонент). */
+  registerInHeader?: boolean;
 };
 
 function formatPlanDateRu(iso: string) {
@@ -36,6 +41,8 @@ export function PlaceSaveHeart({
   source = "place-detail",
   className,
   iconClassName,
+  variant = "icon",
+  registerInHeader = false,
 }: PlaceSaveHeartProps) {
   const { isAuthenticated } = useAuthMe();
   const [flowOpen, setFlowOpen] = useState(false);
@@ -94,6 +101,11 @@ export function PlaceSaveHeart({
     void checkSaveStatus();
   }, [flowOpen, checkSaveStatus]);
 
+  useRegisterHeaderSaveAction(isSaved, () => setFlowOpen(true), placeTitle, {
+    entityNoun: "местом",
+    enabled: registerInHeader,
+  });
+
   const handlePersist = useCallback(
     async (result: SaveToPlanResult) => {
       setIsLoading(true);
@@ -132,24 +144,46 @@ export function PlaceSaveHeart({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setFlowOpen(true)}
-        disabled={isLoading}
-        aria-label={isSaved ? "Изменить сохранение" : "Сохранить в план или в идеи"}
-        className={cn(
-          "flex h-14 w-14 shrink-0 items-center justify-center rounded-full border transition-all",
-          isSaved
-            ? "border-[#E86A3A] bg-[#FFE8DC] text-[#C24E22]"
-            : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.45)] hover:border-[#141210] hover:text-[#141210]",
-          isLoading && "cursor-not-allowed opacity-50",
-          className,
-        )}
-      >
-        <Heart
-          className={cn("h-5 w-5", isSaved && "fill-current", iconClassName)}
-        />
-      </button>
+      {variant === "text" ? (
+        <button
+          type="button"
+          onClick={() => setFlowOpen(true)}
+          disabled={isLoading}
+          aria-pressed={isSaved}
+          className={cn(
+            "inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]",
+            isLoading && "cursor-not-allowed opacity-50",
+            className,
+          )}
+        >
+          <Heart
+            size={18}
+            strokeWidth={1.75}
+            className={cn(isSaved && "fill-[#E86A3A] text-[#E86A3A]", iconClassName)}
+            aria-hidden
+          />
+          {isSaved ? "Сохранено" : "Сохранить"}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setFlowOpen(true)}
+          disabled={isLoading}
+          aria-label={isSaved ? "Изменить сохранение" : "Сохранить в план или в идеи"}
+          className={cn(
+            "flex h-14 w-14 shrink-0 items-center justify-center rounded-full border transition-all",
+            isSaved
+              ? "border-[#E86A3A] bg-[#FFE8DC] text-[#C24E22]"
+              : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.45)] hover:border-[#141210] hover:text-[#141210]",
+            isLoading && "cursor-not-allowed opacity-50",
+            className,
+          )}
+        >
+          <Heart
+            className={cn("h-5 w-5", isSaved && "fill-current", iconClassName)}
+          />
+        </button>
+      )}
 
       <SaveActivityFlowAdaptive
         open={flowOpen}

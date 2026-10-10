@@ -1,6 +1,8 @@
 "use client";
 
-import { Phone } from "lucide-react";
+import { Instagram, Phone, Share2 } from "lucide-react";
+import { useState } from "react";
+import { ShareModal } from "@/components/shared/ShareModal";
 import { PlaceSaveHeart } from "@/features/save/PlaceSaveHeart";
 import Link from "next/link";
 import Image from "next/image";
@@ -14,8 +16,6 @@ import {
   SidebarCardSection,
   SidebarCardTopSection,
   SidebarCardAddressRow,
-  SidebarCardContactRow,
-  SidebarCardShare,
 } from "@/components/shared/SidebarCard";
 import { MediaGalleryStrip } from "@/components/media/MediaGalleryStrip";
 import { MobileMediaCarousel } from "@/components/media/MobileMediaCarousel";
@@ -79,6 +79,7 @@ export function PlaceHero({
   ownerEditPlaceId,
   media,
 }: PlaceHeroProps) {
+  const [shareOpen, setShareOpen] = useState(false);
   const trimmedTitle = title.trim();
   // Заголовок одной строкой (без принудительного переноса после первого слова),
   // с editorial-точкой в конце, если её ещё нет.
@@ -222,7 +223,34 @@ export function PlaceHero({
                 {[city, district].filter(Boolean).join(" · ")}
               </span>
             )}
+            {/* Desktop: «Сохранить» и «Поделиться» справа в строке категории; на мобильном — иконки в хедере. */}
+            <div className="ml-auto hidden items-center gap-5 lg:flex">
+              <PlaceSaveHeart
+                variant="text"
+                registerInHeader
+                placeId={placeId}
+                placeSlug={placeSlug}
+                placeTitle={title}
+                coverImageUrl={logoUrl}
+                source="place-detail"
+              />
+              <button
+                type="button"
+                onClick={() => setShareOpen(true)}
+                className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
+              >
+                <Share2 size={18} strokeWidth={1.75} aria-hidden />
+                Поделиться
+              </button>
+            </div>
           </div>
+          <ShareModal
+            open={shareOpen}
+            onOpenChange={setShareOpen}
+            url={typeof window !== "undefined" ? window.location.href : ""}
+            title={title}
+            entityNoun="местом"
+          />
 
           {/* Title */}
           <h1
@@ -306,38 +334,12 @@ export function PlaceHero({
 
             {/* Address */}
             {(address || metro || district) && (
-              <SidebarCardSection mb={14} pb={16}>
+              <div style={{ marginBottom: 14 }}>
                 <SidebarCardAddressRow address={address} metro={metro} district={district} />
-              </SidebarCardSection>
+              </div>
             )}
 
-            {/* Contacts (телефоны не дублируем — есть кнопка «Позвонить») */}
-            {(website || instagramUrl) && (
-              <SidebarCardSection>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {website && websiteDisplay && (
-                    <SidebarCardContactRow
-                      label="Сайт"
-                      href={website.startsWith("http") ? website : `https://${website}`}
-                      value={websiteDisplay}
-                      external
-                      onClick={() => trackCta("website")}
-                    />
-                  )}
-                  {instagramUrl && instagramDisplay && (
-                    <SidebarCardContactRow
-                      label="Instagram"
-                      href={instagramUrl}
-                      value={instagramDisplay}
-                      external
-                      onClick={() => trackCta("instagram")}
-                    />
-                  )}
-                </div>
-              </SidebarCardSection>
-            )}
-
-            {/* Позвонить + Сохранить */}
+            {/* Позвонить */}
             <SidebarCardTopSection>
               <div ref={ctaRef} className="flex items-center gap-3">
                 {phones.length > 0 && (
@@ -351,13 +353,6 @@ export function PlaceHero({
                     Позвонить
                   </PlacePhoneActionButton>
                 )}
-                <PlaceSaveHeart
-                  placeId={placeId}
-                  placeSlug={placeSlug}
-                  placeTitle={title}
-                  coverImageUrl={logoUrl}
-                  source="place-detail"
-                />
               </div>
               {directSlot && <div className="mt-3">{directSlot}</div>}
             </SidebarCardTopSection>
@@ -369,10 +364,10 @@ export function PlaceHero({
               </SidebarCardTopSection>
             )}
 
-            {/* Rating + Share */}
-            <SidebarCardTopSection mt={20} pt={20}>
-              <div className="flex items-center justify-between">
-                {rating != null && reviewCount != null && reviewCount > 0 ? (
+            {/* Rating */}
+            {rating != null && reviewCount != null && reviewCount > 0 ? (
+              <SidebarCardTopSection mt={20} pt={20}>
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[13px] text-[rgba(20,18,16,0.55)]">
                       <span className="text-[16px] text-[#E86A3A]">★</span> {rating.toFixed(1)}
@@ -386,10 +381,42 @@ export function PlaceHero({
                       {reviewCount} {reviewCount === 1 ? "отзыв" : reviewCount >= 2 && reviewCount <= 4 ? "отзыва" : "отзывов"}
                     </a>
                   </div>
-                ) : <span />}
-                <SidebarCardShare title={title} entityNoun="местом" />
-              </div>
-            </SidebarCardTopSection>
+                </div>
+              </SidebarCardTopSection>
+            ) : null}
+
+            {/* Соцсети слева, сайт справа */}
+            {(instagramUrl || (website && websiteDisplay)) && (
+              <SidebarCardTopSection mt={20} pt={20}>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    {instagramUrl && (
+                      <a
+                        href={instagramUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={instagramDisplay ? `Instagram ${instagramDisplay}` : "Instagram"}
+                        onClick={() => trackCta("instagram")}
+                        className="flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(20,18,16,0.18)] text-[rgba(20,18,16,0.55)] transition-colors hover:border-[#141210] hover:text-[#141210]"
+                      >
+                        <Instagram size={18} strokeWidth={1.75} aria-hidden />
+                      </a>
+                    )}
+                  </div>
+                  {website && websiteDisplay && (
+                    <a
+                      href={website.startsWith("http") ? website : `https://${website}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => trackCta("website")}
+                      className="min-w-0 truncate text-[14px] text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
+                    >
+                      {websiteDisplay}
+                    </a>
+                  )}
+                </div>
+              </SidebarCardTopSection>
+            )}
           </SidebarCard>
         </aside>
       </div>

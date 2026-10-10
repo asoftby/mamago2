@@ -3,7 +3,7 @@
 /**
  * Хедер для viewport **< lg** — одна строка (48px).
  * Discovery: лого/«←» · чип «🧭 Минск · Я и Степан» (вход в поиск) · 🔔 · 👤. Кнопка ⚙ фильтров — в строке заголовка раздела.
- * Landing (посадочные): «←» · 🔔 · 👤; на странице события вместо 🔔/👤 — «поделиться» и «сохранить».
+ * Landing (любая публикация): «←» · «поделиться» · «сохранить» (если страница его регистрирует).
  * Скролл вниз → хедер уезжает через transform (без layout shift), скролл вверх → возвращается.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -34,6 +34,17 @@ import { MobileEventActions } from "./MobileEventActions";
 import { MobileHeaderBackButton } from "./MobileHeaderBackButton";
 
 const HEADER_BG = "bg-[#F6F2EA]";
+
+/** Слово в заголовке модалки шеринга для страниц, которые не зарегистрировали своё. */
+function shareNounForPath(pathname: string): string | undefined {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.includes("places")) return "местом";
+  if (segments.includes("offers")) return "предложением";
+  if (segments.includes("routes")) return "маршрутом";
+  if (segments.includes("blog") || segments[0] === "preview") return "статьёй";
+  if (segments.includes("events") || segments.includes("activity")) return "событием";
+  return "страницей";
+}
 
 export function MobileHeader() {
   const [isSearchSheetOpen, setIsSearchSheetOpen] = useState(false);
@@ -141,7 +152,7 @@ export function MobileHeader() {
           {leading}
           {isLanding ? (
             <div className="ml-auto flex shrink-0 items-center gap-2">
-              {saveAction ? <MobileEventActions saveAction={saveAction} /> : <MobileHeaderActions />}
+              <MobileEventActions saveAction={saveAction} fallbackNoun={shareNounForPath(pathname)} />
             </div>
           ) : (
             <>

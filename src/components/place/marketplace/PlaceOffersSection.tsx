@@ -28,7 +28,6 @@ interface PlaceOffersSectionProps {
 
 export function PlaceOffersSection({
   offers,
-  placeId,
   citySlug = "minsk",
 }: PlaceOffersSectionProps) {
   if (offers.length === 0) return null;
@@ -42,52 +41,27 @@ export function PlaceOffersSection({
       }}
     >
       <div className="offers-wrap mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-7">
-        {/* Header */}
-        <div
+        {/* Header: линия кикера на всю ширину блока */}
+        <div className="kicker-row" style={{ marginBottom: 14 }}>
+          <span className="text-kicker">Предложения</span>
+          <span className="kicker-line" />
+        </div>
+        <h2
           style={{
-            display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "space-between",
+            fontSize: 30,
+            margin: 0,
             marginBottom: 34,
-            gap: 16,
-            flexWrap: "wrap",
+            letterSpacing: "-.02em",
+            color: "#141210",
+            fontFamily: "var(--font-sans)",
+            fontWeight: 400,
           }}
         >
-          <div>
-            <div className="kicker-row" style={{ marginBottom: 14 }}>
-              <span className="text-kicker">Предложения</span>
-              <span className="kicker-line" style={{ width: 120 }} />
-            </div>
-            <h2
-              style={{
-                fontSize: 30,
-                margin: 0,
-                letterSpacing: "-.02em",
-                color: "#141210",
-                fontFamily: "var(--font-sans)",
-                fontWeight: 400,
-              }}
-            >
-              Чему{" "}
-              <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>
-                научим
-              </em>
-            </h2>
-          </div>
-          <Link
-            href={`/places/${placeId}#offers`}
-            className="inline-flex min-h-11 items-center"
-            style={{
-              fontSize: 14,
-              color: "#3A332B",
-              textDecoration: "underline",
-              textUnderlineOffset: 4,
-              whiteSpace: "nowrap",
-            }}
-          >
-            Все предложения →
-          </Link>
-        </div>
+          Чему{" "}
+          <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>
+            научим
+          </em>
+        </h2>
 
         {/* 4-col card grid */}
         <div

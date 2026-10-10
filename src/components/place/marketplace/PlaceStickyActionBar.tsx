@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PlaceSaveHeart } from "@/features/save/PlaceSaveHeart";
 import type { NormalizedPlacePhone } from "@/lib/place/placePhones";
 import { PlacePhoneActionButton } from "@/components/place/PlacePhoneActions";
 
@@ -29,9 +28,7 @@ export function PlaceStickyActionBar({
   detailLine,
   phones,
   placeId,
-  placeSlug,
   placeTitle,
-  coverImageUrl,
   className,
   directSlot,
 }: PlaceStickyActionBarProps) {
@@ -115,16 +112,6 @@ export function PlaceStickyActionBar({
           <span className={cn(hasThreeActions && "sr-only sm:not-sr-only")}>Позвонить</span>
         </PlacePhoneActionButton>
       )}
-
-      <PlaceSaveHeart
-        placeId={placeId}
-        placeSlug={placeSlug}
-        placeTitle={placeTitle}
-        coverImageUrl={coverImageUrl}
-        source="place-detail-sticky"
-        className="h-[46px] w-[46px]"
-        iconClassName="h-4 w-4"
-      />
     </div>
   );
 }
