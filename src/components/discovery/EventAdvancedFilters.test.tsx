@@ -101,3 +101,12 @@ test("price range normalizes selected and unbounded values", () => {
   assert.equal(priceSliderValueFromKey("ArrowLeft", 60, 60, 10), 50);
   assert.equal(priceSliderValueFromKey("End", 50, 60, 10), 60);
 });
+
+test("mobile filter button badge for kuda uses refinements only, not header context", () => {
+  const source = readFileSync(
+    new URL("../mobile/MobileFilterButton.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /getEventRefinementCount\(applied\)/);
+  assert.doesNotMatch(source, /derived\.activeCount/);
+});
