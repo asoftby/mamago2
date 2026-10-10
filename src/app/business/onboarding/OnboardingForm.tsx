@@ -196,6 +196,7 @@ export function OnboardingForm({
           id="unp"
           name="unp"
           label="УНП (Учетный номер плательщика)"
+          inputClassName="placeholder:text-gray-400"
           value={unp}
           required
           onValueChange={handleUnpChange}
@@ -241,6 +242,7 @@ export function OnboardingForm({
           minLength={2}
           maxLength={200}
           placeholder="ООО «Детский центр Радуга»"
+          className="placeholder:text-gray-400"
         />
         {showFieldErrors && state.fieldErrors?.legalName && (
           <p className="mt-1 text-sm text-red-600">
