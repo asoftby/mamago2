@@ -42,35 +42,17 @@ export function MyPlanCapsuleView({
   className?: string;
   openInOverlay?: boolean;
 }) {
-  const isEmpty = model.kind === "empty";
   const ariaLabel = loading ? "Мой план" : model.ariaLabel;
 
-  return (
-    <Link
-      href={MY_PLAN_FULL_PAGE_HREF}
-      role={openInOverlay ? "button" : undefined}
-      aria-haspopup={openInOverlay ? "dialog" : undefined}
-      onClick={openInOverlay ? (event) => { event.preventDefault(); requestOpenMyPlan(); } : undefined}
-      onKeyDown={openInOverlay ? (event) => {
-        if (event.key === " ") {
-          event.preventDefault();
-          requestOpenMyPlan();
-        }
-      } : undefined}
-      aria-label={ariaLabel}
-      aria-busy={loading || undefined}
-      data-my-plan-capsule
-      data-state={loading ? "loading" : model.kind}
-      className={cn(
-        "pointer-events-auto flex h-14 min-w-0 items-center gap-3 rounded-[28px] pl-2 text-left no-underline",
-        "touch-manipulation outline-none transition-colors",
-        "focus-visible:ring-[3px] focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        isEmpty || loading
-          ? "border border-brand/30 bg-surface pr-4"
-          : "bg-brand pr-4 text-white hover:bg-brand-hover active:bg-brand-active",
-        className,
-      )}
-    >
+  const capsuleClassName = cn(
+    "pointer-events-auto flex h-14 min-w-0 items-center gap-3 rounded-[28px] pl-2 pr-4 text-left no-underline",
+    "touch-manipulation outline-none transition-colors bg-brand text-white hover:bg-brand-hover active:bg-brand-active",
+    "focus-visible:ring-[3px] focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+    className,
+  );
+
+  const capsuleContent = (
+    <>
       {model.kind === "events" && !loading ? (
         <>
           {model.stackedNext ? (
@@ -102,20 +84,50 @@ export function MyPlanCapsuleView({
         </>
       ) : (
         <>
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft/65 text-primary" aria-hidden>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-white lg:bg-brand-soft/65 lg:text-primary" aria-hidden>
             <CalendarDays className="h-[19px] w-[19px]" strokeWidth={1.8} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
-            <span className="block text-[12px] leading-tight text-text-main">
-              Мой <em className="font-display italic text-primary">план</em>
+            <span className="block text-[12px] leading-tight text-white/90 lg:text-text-main">
+              Мой <em className="font-display italic text-white lg:text-primary">план</em>
             </span>
-            <span className="block text-[13px] font-medium leading-[1.2] text-text-main lg:line-clamp-2">
+            <span className="block text-[13px] font-medium leading-[1.2] text-white lg:text-text-main lg:line-clamp-2">
               {loading ? "Загружаем…" : "Добавим что-нибудь?"}
             </span>
           </span>
-          <ArrowRight className="h-4 w-4 shrink-0 text-text-main/65" aria-hidden />
+          <ArrowRight className="h-4 w-4 shrink-0 text-white/85 lg:text-text-main/65" aria-hidden />
         </>
       )}
+    </>
+  );
+
+  if (openInOverlay) {
+    return (
+      <button
+        type="button"
+        onClick={requestOpenMyPlan}
+        aria-haspopup="dialog"
+        aria-label={ariaLabel}
+        aria-busy={loading || undefined}
+        data-my-plan-capsule
+        data-state={loading ? "loading" : model.kind}
+        className={capsuleClassName}
+      >
+        {capsuleContent}
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      href={MY_PLAN_FULL_PAGE_HREF}
+      aria-label={ariaLabel}
+      aria-busy={loading || undefined}
+      data-my-plan-capsule
+      data-state={loading ? "loading" : model.kind}
+      className={capsuleClassName}
+    >
+      {capsuleContent}
     </Link>
   );
 }
