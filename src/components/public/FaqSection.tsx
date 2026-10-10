@@ -13,7 +13,7 @@ export function FaqSection({ items, className }: FaqSectionProps) {
   if (normalized.length === 0) return null;
 
   return (
-    <section className={cn("border-t border-[rgba(20,18,16,0.10)] py-16 md:py-20", className)}>
+    <section className={cn("py-16 md:py-20", className)}>
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
         <div className="mb-6 flex items-center gap-3.5">
           <span className="text-kicker">

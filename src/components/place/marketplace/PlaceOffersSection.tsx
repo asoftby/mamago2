@@ -36,7 +36,6 @@ export function PlaceOffersSection({
     <section
       style={{
         padding: "56px 0",
-        borderTop: "1px solid rgba(20,18,16,.10)",
         background: "#ffffff",
       }}
     >

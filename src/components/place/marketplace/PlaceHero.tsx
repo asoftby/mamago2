@@ -18,7 +18,6 @@ import {
   SidebarCardAddressRow,
 } from "@/components/shared/SidebarCard";
 import { MediaGalleryStrip } from "@/components/media/MediaGalleryStrip";
-import { MobileMediaCarousel } from "@/components/media/MobileMediaCarousel";
 import type { MediaGalleryItem } from "@/lib/media/galleryTypes";
 
 interface PlaceHeroProps {
@@ -60,7 +59,6 @@ export function PlaceHero({
   title,
   shortDesc,
   categoryLabel,
-  city,
   district,
   address,
   metro,
@@ -123,26 +121,9 @@ export function PlaceHero({
       ? summaryPrimary
       : summaryExtra;
 
-  const mobileMediaItems: MediaGalleryItem[] = (() => {
-    const poster = media?.posterUrl?.trim();
-    const rest = (media?.galleryItems ?? []).filter(
-      (item) => item.type !== "image" || item.src.trim() !== poster,
-    );
-    if (!poster) return rest;
-    return [
-      {
-        type: "image",
-        id: "place-poster",
-        src: poster,
-        alt: media?.posterAlt || title,
-      },
-      ...rest,
-    ];
-  })();
-
   return (
     <section
-      style={{ paddingTop: 8, paddingBottom: 56, background: "#ffffff" }}
+      style={{ paddingTop: 16, paddingBottom: 56, background: "#ffffff" }}
     >
       {/* Breadcrumbs */}
       <div
@@ -180,14 +161,13 @@ export function PlaceHero({
         }}
       >
         {/* Left: editorial title */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {/* Kicker */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: 10,
-              marginBottom: 6,
               flexWrap: "wrap",
             }}
           >
@@ -197,19 +177,19 @@ export function PlaceHero({
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 6,
-                  height: 30,
+                  height: 28,
                   padding: "0 12px",
                   borderRadius: 999,
                   background: "#FFE8DC",
                   color: "#E86A3A",
-                  fontSize: 13,
-                  fontWeight: 500,
+                  fontSize: 12,
+                  fontWeight: 600,
                 }}
               >
                 ● {categoryLabel}
               </span>
             )}
-            {(city || district) && (
+            {district && (
               <span
                 style={{
                   fontFamily: "var(--font-mono, monospace)",
@@ -219,7 +199,7 @@ export function PlaceHero({
                   color: "rgba(20,18,16,.55)",
                 }}
               >
-                {[city, district].filter(Boolean).join(" · ")}
+                {district}
               </span>
             )}
             {/* Desktop: «Сохранить» и «Поделиться» справа в строке категории; на мобильном — иконки в хедере. */}
@@ -259,7 +239,7 @@ export function PlaceHero({
               fontWeight: 600,
               lineHeight: 1.1,
               letterSpacing: "-.025em",
-              margin: "0 0 8px",
+              margin: 0,
               color: "#141210",
             }}
           >
@@ -273,20 +253,15 @@ export function PlaceHero({
               maxWidth: 600,
               color: "#3A332B",
               lineHeight: 1.5,
-              marginBottom: 8,
             }}
           >
             {shortDesc}
           </div>
 
-          {media && mobileMediaItems.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <div className="lg:hidden">
-                <MobileMediaCarousel items={mobileMediaItems} ariaLabel="Фото места" />
-              </div>
-              <div className="hidden lg:block">
-                <MediaGalleryStrip items={media.galleryItems} maxVisible={3} />
-              </div>
+          {/* Фото: на мобильном — первым блоком, как на десктопе (3 в ряд, первым Reels, если есть). */}
+          {media && media.galleryItems.length > 0 && (
+            <div className="order-first lg:order-none lg:mt-2">
+              <MediaGalleryStrip items={media.galleryItems} maxVisible={3} />
             </div>
           )}
         </div>

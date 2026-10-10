@@ -34,7 +34,6 @@ export function PlaceAboutSection({
     <section
       style={{
         padding: "80px 0 56px",
-        borderTop: "1px solid rgba(20,18,16,.10)",
         background: "#ffffff",
       }}
     >

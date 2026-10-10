@@ -157,7 +157,7 @@ export function LocationBlock({
   const hasMap = mapDoc || mapImageUrl;
 
   return (
-    <section className={cn("border-t border-[rgba(20,18,16,0.10)] py-14 md:py-16", className)}>
+    <section className={cn("py-14 md:py-16", className)}>
       <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
         {/* Kicker — линия на всю ширину блока */}
         <div className="mb-5 flex items-center gap-3.5">
