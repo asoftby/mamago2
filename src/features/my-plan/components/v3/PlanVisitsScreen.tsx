@@ -6,7 +6,7 @@ import { MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH } from "@/lib/experience/feedbac
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { PLAN_FACES, PLAN_FACE_LABEL, PlanFace, sentimentMouth, type PlanSentiment } from "./PlanFace";
-import { PlanScreenHead } from "./PlanScreenHead";
+import { PlanScreenTitleHead } from "./PlanScreenTitleHead";
 import {
   fetchPlanExperienceFeed,
   postExperienceFeedback,
@@ -147,12 +147,8 @@ export function PlanVisitsScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
-      <PlanScreenHead back="План" onBack={onBack} />
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 md:px-8">
-        <h2 className="mb-1 text-[26px] font-bold leading-[1.1] tracking-[-.025em] text-[var(--mp-tx)]">
-          Где мы уже{" "}
-          <em className="font-display font-medium not-italic text-[var(--mp-ac)]" style={{ fontStyle: "italic" }}>были</em>
-        </h2>
+      <PlanScreenTitleHead title={<>Где мы <em>уже были</em></>} onBack={onBack} />
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-1 md:px-8">
 
         {visits === null && !failed ? (
           <div className="mt-5 space-y-2" aria-busy>

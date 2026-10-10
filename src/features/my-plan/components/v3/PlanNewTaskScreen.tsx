@@ -17,6 +17,7 @@ import {
   PLAN_SEG_OFF,
   PLAN_SEG_ON,
 } from "./planChipStyles";
+import { PlanScreenTitleHead } from "./PlanScreenTitleHead";
 
 export type PlanNewTaskPerson = { id: string; name: string; kind: "adult" | "child" };
 
@@ -150,24 +151,7 @@ export function PlanNewTaskScreen({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
-      {/* Заголовок модалки со стрелкой «назад» (возврат в план). */}
-      <div className="flex min-h-14 shrink-0 items-center px-4 pt-2 md:px-8">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Назад в план"
-          className={cn(
-            "mp-font-display -ml-2 inline-flex min-h-11 items-center gap-1 rounded-xl pl-1 pr-3 text-[28px] font-normal leading-[1.1] tracking-[-.02em] text-[var(--mp-tx)]",
-            "transition-colors hover:bg-[var(--mp-soft)]",
-            PLAN_FOCUS,
-          )}
-        >
-          <ChevronLeft className="h-6 w-6 shrink-0" strokeWidth={2} aria-hidden />
-          <span>
-            Новое <em className="font-medium italic text-[var(--mp-ac)]">дело</em>
-          </span>
-        </button>
-      </div>
+      <PlanScreenTitleHead title={<>Новое <em>дело</em></>} onBack={onBack} />
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 md:px-8">
         <div className="mb-[22px] mt-1">
         <label className="block">
