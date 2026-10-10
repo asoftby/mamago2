@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { splitUiPriceLabel } from "@/lib/formatters/format-price";
-import { CalendarPlus, Check, Heart } from "lucide-react";
+import { Heart } from "lucide-react";
 
 export interface EventStickyActionBarProps {
   ctaRef?: React.RefObject<HTMLElement | null>;
@@ -221,34 +221,6 @@ export function EventStickyActionBar({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        {onPlan ? (
-          <button
-            type="button"
-            onClick={onPlan}
-            disabled={isPlanLoading}
-            aria-label={isPlanned ? "В плане" : "Добавить в план"}
-            className={cn(
-              "inline-flex h-[46px] shrink-0 items-center justify-center gap-1.5 rounded-full border px-3.5 text-[14px] font-semibold transition-colors min-[400px]:px-4",
-              isPlanned
-                ? "border-[#E86A3A] bg-[#FFE8DC] text-[#E86A3A]"
-                : "border-[rgba(20,18,16,0.18)] bg-transparent text-[#141210] hover:border-[#141210]",
-            )}
-          >
-            {isPlanLoading ? (
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : isPlanned ? (
-              <>
-                <Check size={16} strokeWidth={2} aria-hidden />
-                <span className="hidden min-[400px]:inline">В плане</span>
-              </>
-            ) : (
-              <>
-                <CalendarPlus size={16} strokeWidth={1.75} aria-hidden />
-                <span className="hidden min-[400px]:inline">В план</span>
-              </>
-            )}
-          </button>
-        ) : null}
         {hasPurchaseUrl ? (
           <a
             href={primaryHref}

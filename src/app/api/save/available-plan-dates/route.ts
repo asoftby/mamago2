@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { formatHHMM } from "@/lib/formatters/date";
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,22 +31,25 @@ export async function GET(request: NextRequest) {
         sessions: {
           where: { startsAt: { gte: now }, withdrawnAt: null },
           orderBy: { startsAt: "asc" },
-          select: { startsAt: true },
+          select: { id: true, startsAt: true },
         },
       },
     });
 
     if (!activity) {
-      return NextResponse.json({ dates: [] });
+      return NextResponse.json({ dates: [], sessionsByDate: {} });
     }
 
     const unique = new Set<string>();
+    const sessionsByDate: Record<string, Array<{ id: string; time: string }>> = {};
     for (const s of activity.sessions) {
-      unique.add(getLocalDateKey(s.startsAt));
+      const key = getLocalDateKey(s.startsAt);
+      unique.add(key);
+      (sessionsByDate[key] ??= []).push({ id: s.id, time: formatHHMM(s.startsAt) });
     }
 
     const dates = Array.from(unique).sort();
-    return NextResponse.json({ dates });
+    return NextResponse.json({ dates, sessionsByDate });
   } catch (error) {
     console.error("[save/available-plan-dates] GET failed", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

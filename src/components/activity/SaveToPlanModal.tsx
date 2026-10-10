@@ -56,6 +56,11 @@ export type SaveScenario =
        * legacy inPlan/planDate state.
        */
       ideaOnly?: boolean;
+      /**
+       * Перенос уже добавленной записи («Мой план»): тот же выбор даты и сеанса,
+       * но без «в идеи» и с кнопкой «Перенести».
+       */
+      moveMode?: boolean;
     };
 
 export type SaveToPlanResult =
@@ -581,7 +586,7 @@ function TimeChipRow({ sessions, selectedId, onSelect }: TimeChipRowProps) {
 }
 
 // ─── Dark confirmation bar ────────────────────────────────────────────────────
-function ConfirmBar({ iso, time, onConfirm }: { iso: string; time?: string | null; onConfirm: () => void }) {
+function ConfirmBar({ iso, time, onConfirm, label = "Сохранить" }: { iso: string; time?: string | null; onConfirm: () => void; label?: string }) {
   const chip = fmtDateChip(iso);
   const DOW_FULL: Record<string, string> = {
     вс: "Воскресенье", пн: "Понедельник", вт: "Вторник",
@@ -623,7 +628,7 @@ function ConfirmBar({ iso, time, onConfirm }: { iso: string; time?: string | nul
         onMouseUp={(e) => { (e.currentTarget as HTMLElement).style.transform = "none"; }}
         onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = "none"; }}
       >
-        Сохранить
+        {label}
         <ArrowIcon size={14} color="#fff" />
       </button>
     </div>
@@ -760,10 +765,12 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
 // ─── Date Slider View (Variant B) ─────────────────────────────────────────────
 function DateSliderView({
   options, title, category,
-  onConfirm, onIdea, sessionsByDate,
+  onConfirm, onIdea, sessionsByDate, confirmLabel,
 }: {
   options: string[]; title: string; category?: string;
-  onConfirm: (iso: string, sessionId: string | null) => void; onIdea: () => void;
+  onConfirm: (iso: string, sessionId: string | null) => void; onIdea?: () => void;
+  /** Подпись кнопки подтверждения; по умолчанию «Сохранить». */
+  confirmLabel?: string;
   sessionsByDate?: Record<string, Array<{ id: string; time: string }>>;
 }) {
   const [selISO, setSelISO] = React.useState<string>(options[0] ?? "");
@@ -901,11 +908,16 @@ function DateSliderView({
             iso={selISO}
             time={selectedTime}
             onConfirm={() => onConfirm(selISO, selectedSessionId)}
+            label={confirmLabel}
           />
         )}
 
-        <OrDivider label="или без даты" />
-        <IdeasRow onClick={onIdea} />
+        {onIdea ? (
+          <>
+            <OrDivider label="или без даты" />
+            <IdeasRow onClick={onIdea} />
+          </>
+        ) : null}
       </div>
 
       {/* All-dates drawer */}
@@ -1728,7 +1740,8 @@ function PickerBodyInner({
         title={scenario.title}
         sessionsByDate={sessionsByDate}
         onConfirm={(iso, sessionId) => onCommit({ action: "plan", dateISO: iso, timeSlotId: sessionId ?? null })}
-        onIdea={() => onCommit({ action: "ideas" })}
+        onIdea={scenario.moveMode ? undefined : () => onCommit({ action: "ideas" })}
+        confirmLabel={scenario.moveMode ? "Перенести" : undefined}
       />
     </div>
   );

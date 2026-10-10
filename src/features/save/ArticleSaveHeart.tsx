@@ -7,6 +7,7 @@ import { toast } from "@/lib/toast";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
+import { useRegisterHeaderSaveAction } from "@/contexts/PublicationIntentContext";
 import { persistArticleSave } from "@/features/save/persistArticleSave";
 import { shouldFetchOwnSaveStatus, shouldRefetchAfterFlowClose } from "@/features/save/saveStatusFetchGuard";
 
@@ -40,6 +41,8 @@ type ArticleSaveHeartProps = {
    * равно перепроверяется — это ограниченный, не N+1 запрос.
    */
   skipOwnFetch?: boolean;
+  /** Зарегистрировать «сохранить» в мобильном хедере публикации (страница статьи). */
+  registerInHeader?: boolean;
 };
 
 function formatPlanDateRu(iso: string) {
@@ -60,6 +63,7 @@ export function ArticleSaveHeart({
   variant = "icon",
   initialStatus,
   skipOwnFetch = false,
+  registerInHeader = false,
 }: ArticleSaveHeartProps) {
   const { isAuthenticated } = useAuthMe();
   const [flowOpen, setFlowOpen] = useState(false);
@@ -76,6 +80,10 @@ export function ArticleSaveHeart({
   );
 
   const isSaved = saveStatus.isIdea || saveStatus.inPlan;
+  useRegisterHeaderSaveAction(isSaved, () => setFlowOpen(true), articleTitle, {
+    entityNoun: "статьёй",
+    enabled: registerInHeader,
+  });
 
   const checkSaveStatus = useCallback(async () => {
     if (!shouldFetchOwnSaveStatus(isAuthenticated)) {

@@ -149,12 +149,12 @@ export function RecommendationCard({
     <Link
       href={activityDetailHref}
       onClick={trackRecommendationDetailOpen}
-      className="line-clamp-2 text-left text-base font-semibold leading-snug tracking-tight text-neutral-900 hover:text-neutral-700"
+      className="line-clamp-2 text-left text-[15.5px] font-bold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)] hover:text-[var(--mp-ac-dark)]"
     >
       {title}
     </Link>
   ) : (
-    <span className="line-clamp-2 text-base font-semibold leading-snug tracking-tight text-neutral-900">
+    <span className="line-clamp-2 text-[15.5px] font-bold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">
       {title}
     </span>
   );
@@ -162,25 +162,24 @@ export function RecommendationCard({
   const card = (
     <div
       className={cn(
-        "flex flex-col gap-3 overflow-hidden rounded-[24px] border p-4 shadow-sm transition-all",
-        "sm:gap-4 sm:p-5",
+        "flex flex-col gap-3 overflow-hidden rounded-[18px] border bg-[var(--mp-card)] p-3 transition-colors",
         isInPlan
-          ? "border-primary bg-white"
-          : "border-dashed border-[#D4D4D8] bg-[#FCFCFC] opacity-[0.74] hover:opacity-100 [border-image:none]",
+          ? "border-[var(--mp-tx)]"
+          : "border-[var(--mp-line)] hover:border-[var(--mp-line-strong)]",
       )}
     >
       {!isInPlan ? (
-        <div className="inline-flex w-fit max-w-full shrink-0 items-center rounded-full border border-neutral-300 bg-transparent px-3 py-1.5">
-          <Sparkles className="mr-1.5 h-3.5 w-3.5 shrink-0 text-primary" />
-          <p className="text-[11px] font-medium leading-none tracking-wide text-primary/90">
-            Рекомендовано <span className="font-semibold text-neutral-900">mamaGo</span>
+        <div className="inline-flex w-fit max-w-full shrink-0 items-center rounded-full bg-[var(--mp-ac-soft)] px-3 py-1.5">
+          <Sparkles className="mr-1.5 h-3.5 w-3.5 shrink-0 text-[var(--mp-ac)]" />
+          <p className="text-[11px] font-semibold leading-none tracking-wide text-[var(--mp-ac-dark)]">
+            Рекомендовано <span className="font-bold text-[var(--mp-tx)]">mamaGo</span>
           </p>
         </div>
       ) : (
         <div className="flex w-full items-center justify-between">
-          <div className="inline-flex shrink-0 items-center rounded-full bg-emerald-50 px-3 py-1.5">
-            <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
-            <p className="text-[11px] font-medium leading-none tracking-wide text-emerald-700">
+          <div className="inline-flex shrink-0 items-center rounded-full bg-[#E6F0EA] px-3 py-1.5">
+            <Check className="mr-1.5 h-3.5 w-3.5 text-[#2B6448]" />
+            <p className="text-[11px] font-medium leading-none tracking-wide text-[#2B6448]">
               Добавлено
             </p>
           </div>
@@ -189,7 +188,7 @@ export function RecommendationCard({
             onClick={onRemoveFromPlan}
             variant="ghost"
             size="sm"
-            className="h-9 shrink-0 rounded-full px-2 text-neutral-500 hover:text-neutral-700"
+            className="h-11 shrink-0 rounded-full px-3 text-[var(--mp-tx2)] hover:text-[var(--mp-tx)]"
           >
             <X className="mr-1 h-4 w-4" />
             Убрать
@@ -199,40 +198,40 @@ export function RecommendationCard({
 
       <div
         className={cn(
-          "flex flex-col gap-4 transition-all duration-150 sm:flex-row sm:items-center sm:gap-5",
+          "flex flex-col gap-3 transition-all duration-150",
           isAnimating ? "opacity-80" : "opacity-100",
         )}
       >
-        <div className="flex min-w-0 flex-1 flex-row items-center gap-4">
-          <div className="w-16 shrink-0 sm:w-20">
+        <div className="flex min-w-0 flex-1 flex-row items-start gap-3">
+          <div className="w-[88px] shrink-0">
             <MediaCover
               imageUrl={item.coverImageUrl || undefined}
               alt={title}
               ratio="1/1"
-              className="rounded-2xl shadow-none"
+              className="rounded-xl shadow-none"
             />
           </div>
 
           <div className="min-w-0 flex-1">
             <div className="min-w-0 space-y-1">
               {isRoute ? (
-                <p className="text-xs font-medium uppercase tracking-wider text-neutral-400">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--mp-tx2)]">
                   Маршрут
                 </p>
               ) : categoryLabel ? (
-                <p className="text-xs font-medium uppercase tracking-wider text-neutral-400">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--mp-tx2)]">
                   {categoryLabel}
                 </p>
               ) : null}
               {titleEl}
               {metaLine ? (
-                <p className="line-clamp-2 text-sm text-gray-400 sm:line-clamp-1">{metaLine}</p>
+                <p className="line-clamp-2 text-[13px] leading-[1.4] text-[var(--mp-tx2)]">{metaLine}</p>
               ) : null}
             </div>
           </div>
         </div>
 
-        <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
+        <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2">
           {isInPlan ? (
             <>
               {participationCta ? (
@@ -240,7 +239,7 @@ export function RecommendationCard({
                   asChild
                   variant="default"
                   size="sm"
-                  className="h-9 shrink-0 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                  className="h-11 w-full shrink-0 rounded-xl bg-[var(--mp-ac)] px-4 text-[14.5px] font-bold text-white hover:bg-[var(--mp-ac-dark)]"
                 >
                   {participationCta.external ? (
                     <a
@@ -257,10 +256,10 @@ export function RecommendationCard({
               ) : null}
             </>
           ) : (
-            <div className="flex w-full min-w-0 justify-end sm:w-auto">
+            <div className="flex w-full min-w-0 justify-end">
               <div
                 className={cn(
-                  "grid w-full max-w-full grid-cols-[auto_auto] items-start gap-x-2 sm:w-auto sm:max-w-none",
+                  "grid w-full max-w-full grid-cols-[auto_1fr] items-start gap-x-2",
                   noMoreAlternatives ? "grid-rows-[auto_auto] gap-y-1" : "grid-rows-[auto]",
                 )}
               >
@@ -272,12 +271,12 @@ export function RecommendationCard({
                       size="sm"
                       onClick={onShowMore}
                       disabled={!onShowMore || noMoreAlternatives}
-                      className="h-9 rounded-full border-gray-200 px-4 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                      className="h-11 rounded-xl border-[var(--mp-line-strong)] px-3 text-sm font-bold text-[var(--mp-tx)] hover:bg-[var(--mp-soft)]"
                     >
                       <span className="inline-flex items-center gap-2">
                         <RefreshCw className="h-4 w-4 shrink-0" />
                         <span>Следующий вариант</span>
-                        <span className="text-xs text-neutral-500">
+                        <span className="text-xs text-[var(--mp-tx2)]">
                           {currentVariant} / {totalVariants}
                         </span>
                       </span>
@@ -290,7 +289,7 @@ export function RecommendationCard({
                   onClick={onAddToPlan}
                   size="sm"
                   className={cn(
-                    "row-start-1 h-9 min-w-0 self-start rounded-full px-6 text-sm font-medium",
+                    "row-start-1 h-11 w-full min-w-0 self-start rounded-xl border-[1.5px] border-[var(--mp-line-strong)] bg-transparent px-4 text-[14.5px] font-bold text-[var(--mp-tx)] shadow-none hover:border-[var(--mp-tx)] hover:bg-transparent",
                     showVariantControls ? "col-start-2" : "col-start-1",
                   )}
                 >
@@ -298,7 +297,7 @@ export function RecommendationCard({
                   Добавить в план
                 </Button>
                 {noMoreAlternatives && showVariantControls ? (
-                  <p className="col-start-1 row-start-2 w-full min-w-0 text-center text-xs leading-tight text-neutral-400">
+                  <p className="col-start-1 row-start-2 w-full min-w-0 text-center text-xs leading-tight text-[var(--mp-tx2)]">
                     только этот вариант
                   </p>
                 ) : null}

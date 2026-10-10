@@ -3,7 +3,6 @@ import { Metadata } from "next";
 import { getPublishedPageBySlug } from "@/lib/pages/service";
 import { PageType } from "@prisma/client";
 import { sanitizeRichContent } from "@/components/content/richContentHtml";
-import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
 type PageProps = {
@@ -48,10 +47,6 @@ export default async function PublicPage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mb-4 md:mb-0">
-          <MobileSmartBackButton />
-        </div>
-
         {/* Header */}
         <header className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">

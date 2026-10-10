@@ -11,11 +11,8 @@ import {
   useState,
 } from "react";
 import { usePathname } from "next/navigation";
-import { Sparkles, ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
+import { ArrowRight, Bell, Info, Infinity as InfinityIcon, Monitor, Repeat2, Search, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { peachPrimaryCtaLinkClassName } from "@/lib/peachPrimaryCtaLink";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { toast } from "@/lib/toast";
@@ -31,6 +28,7 @@ import { buildAuthUrl } from "@/lib/auth/redirectTo";
 import { getOrCreateAnonymousId } from "@/lib/anonymous/clientAnonymousId";
 import { RecommendationCard } from "./RecommendationCard";
 import { MyPlanHeader } from "./MyPlanHeader";
+import { PlanScreenHead } from "./v3/PlanScreenHead";
 import type { PlanItemWithActivity } from "../types/event";
 import type { MyPlanIdea } from "../hooks/useMyPlan";
 import { normalizePlanSuggestions } from "../lib/planSuggestions";
@@ -38,23 +36,7 @@ import type { MyPlanGuestPanelPhase } from "./guestMyPlanTypes";
 
 type GuestSlot = GuestPlanSlot;
 
-const SLOT_LABEL: Record<GuestSlot, string> = {
-  morning: "Утро",
-  afternoon: "День",
-  evening: "Вечер",
-};
-
 const KID_AGE_GROUPS = AGE_GROUPS.filter((g) => g.value !== "18+");
-
-function formatRemainingGenerationsRu(n: number): string {
-  if (n <= 0) return "";
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 14) return `Осталось ${n} подборок`;
-  if (mod10 === 1) return `Остался ${n} подбор`;
-  if (mod10 >= 2 && mod10 <= 4) return `Осталось ${n} подбора`;
-  return `Осталось ${n} подборок`;
-}
 
 function addDaysIso(iso: string, days: number): string {
   const [y, m, d] = iso.split("-").map(Number);
@@ -63,31 +45,6 @@ function addDaysIso(iso: string, days: number): string {
   const mm = String(dt.getMonth() + 1).padStart(2, "0");
   const dd = String(dt.getDate()).padStart(2, "0");
   return `${yy}-${mm}-${dd}`;
-}
-
-/** Одна дата в подписи: «5 мая» */
-function formatRuGuestDayMonth(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(y, (m ?? 1) - 1, d ?? 1, 12, 0, 0);
-  return dt.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
-}
-
-/** Диапазон сб–вс для «выходные»: «5–6 мая» или через месяц «30 июня – 1 июля» */
-function formatRuGuestWeekendRange(saturdayIso: string): string {
-  const sundayIso = addDaysIso(saturdayIso, 1);
-  const [y0, m0, d0] = saturdayIso.split("-").map(Number);
-  const [y1, m1, d1] = sundayIso.split("-").map(Number);
-  const dt0 = new Date(y0, (m0 ?? 1) - 1, d0 ?? 1, 12, 0, 0);
-  const dt1 = new Date(y1, (m1 ?? 1) - 1, d1 ?? 1, 12, 0, 0);
-  const monthLong = (d: Date) =>
-    d.toLocaleDateString("ru-RU", { month: "long" });
-  if (
-    dt0.getMonth() === dt1.getMonth() &&
-    dt0.getFullYear() === dt1.getFullYear()
-  ) {
-    return `${dt0.getDate()}–${dt1.getDate()} ${monthLong(dt0)}`;
-  }
-  return `${dt0.getDate()} ${monthLong(dt0)} – ${dt1.getDate()} ${monthLong(dt1)}`;
 }
 
 function upcomingSaturdayIso(fromIso: string): string {
@@ -161,6 +118,10 @@ export function GuestMyPlanPanel({
 
   const [phase, setPhase] = useState<MyPlanGuestPanelPhase>(() => "empty");
   const [authGateVisible, setAuthGateVisible] = useState(false);
+  /** «Подборки закончились» и шторка входа при «Сохранить план». */
+  const [showOut, setShowOut] = useState(false);
+  const [saveSheetOpen, setSaveSheetOpen] = useState(false);
+  const [refetchForWeekend, setRefetchForWeekend] = useState(false);
 
   const [freeSearch, setFreeSearch] = useState(false);
   const [goAdult, setGoAdult] = useState(true);
@@ -203,23 +164,6 @@ export function GuestMyPlanPanel({
     if (whenChoice === "tomorrow") return addDaysIso(todayIso, 1);
     return upcomingSaturdayIso(todayIso);
   }, [todayIso, whenChoice]);
-
-  const generatedPlanHeading = useMemo(() => {
-    if (whenChoice === "today") {
-      return "Вот что мы подобрали для вас на сегодня";
-    }
-    if (whenChoice === "tomorrow") {
-      return "Вот что мы подобрали для вас на завтра";
-    }
-    return "Вот что мы подобрали для вас на выходные";
-  }, [whenChoice]);
-
-  const generatedPlanDateLine = useMemo(() => {
-    if (whenChoice === "weekend") {
-      return formatRuGuestWeekendRange(resolvedTargetDate);
-    }
-    return formatRuGuestDayMonth(resolvedTargetDate);
-  }, [whenChoice, resolvedTargetDate]);
 
   useLayoutEffect(() => {
     const anon = getOrCreateAnonymousId();
@@ -431,12 +375,13 @@ export function GuestMyPlanPanel({
 
   const handleAddScenarioToPlan = useCallback(
     async (slot: GuestSlot, activity: NonNullable<MyPlanIdea["activity"]>) => {
-      const item = activityToPlanItem(resolvedTargetDate, slot, activity);
-      setCommittedBySlot((prev) => ({ ...prev, [slot]: item }));
-      setScenarioSlots((rows) => rows.filter((r) => r.slot !== slot));
-      toast.success(`Добавлено в ${SLOT_LABEL[slot]}`);
-      setPhase("engaged");
-      setAuthGateVisible(true);
+      // Карточка остаётся в выдаче («В плане»); если слот уже занят другим событием — берём свободный, чтобы ничего не затереть.
+      const order: GuestSlot[] = ["morning", "afternoon", "evening"];
+      const target = committedRef.current[slot]
+        ? (order.find((sk) => !committedRef.current[sk]) ?? slot)
+        : slot;
+      const item = activityToPlanItem(resolvedTargetDate, target, activity);
+      setCommittedBySlot((prev) => ({ ...prev, [target]: item }));
       recordEngagement();
     },
     [recordEngagement, resolvedTargetDate],
@@ -471,686 +416,412 @@ export function GuestMyPlanPanel({
   const loginHref = buildAuthUrl({ redirectTo: nextAuthHref });
   const registerHref = buildAuthUrl({ mode: "register", redirectTo: nextAuthHref });
 
-  const whoChips = useMemo(
-    (): ChipItem[] => [
-      {
-        id: "adult",
-        label: "Я",
-        active: !freeSearch && goAdult,
-        onClick: () => {
-          setFreeSearch(false);
-          setGoAdult(true);
-          setKidRanges([]);
-        },
-      },
-      {
-        id: "kids",
-        label: "Дети",
-        active: !freeSearch && !goAdult,
-        onClick: () => {
-          setFreeSearch(false);
-          setGoAdult(false);
-        },
-      },
-      {
-        id: "free",
-        label: "Свободный поиск",
-        active: freeSearch,
-        onClick: () => {
-          setFreeSearch(true);
-          setGoAdult(false);
-          setKidRanges([]);
-        },
-      },
-    ],
-    [freeSearch, goAdult],
+  const slotsOrder: GuestSlot[] = ["morning", "afternoon", "evening"];
+  const committedList = slotsOrder
+    .map((sk) => ({ sk, item: committedBySlot[sk] }))
+    .filter((x): x is { sk: GuestSlot; item: PlanItemWithActivity } => Boolean(x.item?.activity));
+  const committedCount = committedList.length;
+  const quotaBlocked = guestQuotaBlocked || guestRemainingGenerations === 0;
+
+  /** Экран v3 выводится из сохранённой фазы черновика — формат хранения не менялся. */
+  const screen: "quiz" | "results" | "empty" | "draft" | "out" = showOut
+    ? "out"
+    : phase === "engaged"
+      ? "draft"
+      : phase === "generated"
+        ? scenarioSlots.length === 0 && !loadingScenario
+          ? quotaBlocked
+            ? "out"
+            : "empty"
+          : "results"
+        : "quiz";
+
+  const shortDay = (iso: string) =>
+    new Date(`${iso}T12:00:00`)
+      .toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" })
+      .replace(/\./g, "");
+  const WHEN_OPTIONS: Array<{ key: "today" | "tomorrow" | "weekend"; label: string; sub: string }> = [
+    { key: "today", label: "Сегодня", sub: shortDay(todayIso) },
+    { key: "tomorrow", label: "Завтра", sub: shortDay(addDaysIso(todayIso, 1)) },
+    {
+      key: "weekend",
+      label: "Выходные",
+      sub: (() => {
+        const sat = upcomingSaturdayIso(todayIso);
+        const [, m0, d0] = sat.split("-").map(Number);
+        const [, m1, d1] = addDaysIso(sat, 1).split("-").map(Number);
+        return m0 === m1 ? `сб–вс, ${d0}–${d1}` : `сб–вс`;
+      })(),
+    },
+  ];
+  const WHO_OPTIONS: Array<{ key: "kids" | "me" | "any"; label: string }> = [
+    { key: "kids", label: "С детьми" },
+    { key: "me", label: "Для себя" },
+    { key: "any", label: "Без разницы" },
+  ];
+  const whoKey: "kids" | "me" | "any" = freeSearch ? "any" : goAdult ? "me" : "kids";
+  const pickWho = (key: "kids" | "me" | "any") => {
+    setFreeSearch(key === "any");
+    setGoAdult(key === "me");
+    if (key !== "kids") setKidRanges([]);
+  };
+  const MOOD_OPTIONS: Array<{ key: "calm" | "active" | "any"; label: string }> = [
+    { key: "calm", label: "Спокойно" },
+    { key: "active", label: "Активно" },
+    { key: "any", label: "Без разницы" },
+  ];
+  const MOOD_TEXT = { calm: "спокойно", active: "активно", any: "любое настроение" } as const;
+  const summaryText = (() => {
+    const who =
+      whoKey === "kids"
+        ? `С детьми ${KID_AGE_GROUPS.filter((g) => kidRanges.includes(g.value)).map((g) => g.label).join(", ")}`.trim()
+        : whoKey === "me"
+          ? "Для себя"
+          : "С кем угодно";
+    const w = WHEN_OPTIONS.find((o) => o.key === whenChoice)!;
+    return `${who} · ${w.label}, ${w.sub} · ${MOOD_TEXT[formatChoice]}`;
+  })();
+  const quizValid = !(whoKey === "kids" && kidRanges.length === 0);
+
+  useEffect(() => {
+    if (!refetchForWeekend || whenChoice !== "weekend") return;
+    setRefetchForWeekend(false);
+    void fetchScenario({ showGeneratedShellFirst: true });
+  }, [refetchForWeekend, whenChoice, fetchScenario]);
+
+  const runQuiz = () => {
+    if (!guestCanGenerateMore) {
+      setShowOut(true);
+      return;
+    }
+    void fetchScenario({ showGeneratedShellFirst: true });
+  };
+
+  const chipClass = (on: boolean) =>
+    cn(
+      "inline-flex h-11 items-center gap-1.5 rounded-full border px-4 text-[15px] font-semibold transition-colors",
+      on
+        ? "border-[var(--mp-tx)] bg-[var(--mp-tx)] text-white"
+        : "border-[var(--mp-line)] bg-[var(--mp-card)] text-[var(--mp-tx)] hover:border-[var(--mp-line-strong)]",
+    );
+  const primaryBtn =
+    "flex h-[54px] w-full items-center justify-center gap-2 rounded-2xl bg-[var(--mp-ac)] text-base font-bold text-white transition-colors hover:bg-[var(--mp-ac-dark)] disabled:bg-[#E6E0D9] disabled:text-[#6F6A65]";
+  const quietBtn =
+    "flex min-h-11 w-full items-center justify-center gap-[7px] rounded-xl text-[15px] font-bold text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)]";
+
+  const benefit = (icon: React.ReactNode, text: React.ReactNode) => (
+    <div className="flex items-center gap-[13px] py-2 text-[15px] font-semibold leading-[1.35] text-[var(--mp-tx)]">
+      <span className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[13px] border border-[var(--mp-line)] bg-[var(--mp-card)] text-[var(--mp-ac)]">
+        {icon}
+      </span>
+      {text}
+    </div>
   );
 
-  const kidAgeChips = useMemo(
-    (): ChipItem[] =>
-      KID_AGE_GROUPS.map((g) => ({
-        id: g.value,
-        label: g.label,
-        active: kidRanges.includes(g.value),
-        onClick: () => {
-          setKidRanges((prev) =>
-            prev.includes(g.value)
-              ? prev.filter((x) => x !== g.value)
-              : [...prev, g.value],
-          );
-        },
-      })),
-    [kidRanges],
-  );
+  const resultCards = scenarioSlots.map((row) => {
+    const committed = committedList.find((c) => c.item.activityId === row.activity.id);
+    const item = committed?.item ?? activityToPlanItem(resolvedTargetDate, row.slot, row.activity);
+    return (
+      <RecommendationCard
+        key={`${row.slot}-${row.activity.id}`}
+        item={item}
+        isInPlan={Boolean(committed)}
+        onAddToPlan={() => void handleAddScenarioToPlan(row.slot, row.activity)}
+        onRemoveFromPlan={() => committed && handleRemoveCommitted(committed.sk)}
+      />
+    );
+  });
 
-  const whenChips = useMemo(
-    (): ChipItem[] =>
-      (
-        [
-          ["today", "Сегодня"],
-          ["tomorrow", "Завтра"],
-          ["weekend", "Выходные"],
-        ] as const
-      ).map(([key, label]) => ({
-        id: key,
-        label,
-        active: whenChoice === key,
-        onClick: () => setWhenChoice(key),
-      })),
-    [whenChoice],
-  );
+  let head: React.ReactNode;
+  let body: React.ReactNode;
+  let footer: React.ReactNode = null;
 
-  const formatChips = useMemo(
-    (): ChipItem[] =>
-      (
-        [
-          ["calm", "Спокойно"],
-          ["active", "Активно"],
-          ["any", "Не важно"],
-        ] as const
-      ).map(([key, label]) => ({
-        id: key,
-        label,
-        active: formatChoice === key,
-        onClick: () => setFormatChoice(key),
-      })),
-    [formatChoice],
-  );
-
-  const renderAuthGate = () =>
-    authGateVisible ? (
-      <div
-        style={{
-          position: "relative", overflow: "hidden",
-          padding: "22px 20px 20px",
-          background: "linear-gradient(135deg, #FFE8DC, #FFF1E5)",
-          border: "1px solid rgba(232,106,58,.25)",
-          borderRadius: 20,
-          display: "flex", flexDirection: "column", gap: 12,
-        }}
-      >
-        <span style={{
-          position: "absolute", top: -40, right: -30, width: 140, height: 140, borderRadius: 99,
-          background: "radial-gradient(circle, rgba(232,106,58,.2), transparent 65%)",
-          pointerEvents: "none",
-        }}/>
-        <h4
-          className="font-display"
-          style={{
-            margin: 0, fontSize: 22, fontWeight: 400, lineHeight: 1.05, letterSpacing: "-.02em",
-            color: "#141210", position: "relative", zIndex: 1,
-          }}
-        >
-          Сохраним ваш план<br/>и&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>подберём ещё</em>
-        </h4>
-        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: "#3A332B", position: "relative", zIndex: 1 }}>
-          Войдите, чтобы сохранить план и продолжить подбирать варианты.
+  if (screen === "quiz") {
+    head = <MyPlanHeader onClose={onRequestClose} compact={!isDesktop} />;
+    body = (
+      <>
+        <p className="mb-[22px] text-[15px] leading-[1.5] text-[var(--mp-tx2)]">
+          Подберём, куда сходить. Три вопроса — и&nbsp;покажем варианты из&nbsp;афиши.
         </p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, position: "relative", zIndex: 1 }}>
-          <Link
-            href={loginHref}
-            style={{
-              height: 42, padding: "0 20px", borderRadius: 99,
-              background: "linear-gradient(180deg, #FBA77B, #E86A3A)",
-              color: "#fff", fontSize: 13, fontWeight: 600, textDecoration: "none",
-              display: "inline-flex", alignItems: "center", gap: 6,
-              boxShadow: "0 8px 20px -6px rgba(232,106,58,.45)",
-            }}
-          >
-            Войти →
-          </Link>
-          <Link
-            href={registerHref}
-            style={{
-              height: 42, padding: "0 16px", borderRadius: 99,
-              background: "transparent", color: "#141210",
-              border: "1px solid rgba(20,18,16,.18)",
-              fontSize: 13, fontWeight: 500, textDecoration: "none",
-              display: "inline-flex", alignItems: "center",
-            }}
-          >
-            Регистрация
-          </Link>
-        </div>
-      </div>
-    ) : null;
-
-  const renderScenarioBlocks = (opts: { showRegenerateCta: boolean }) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {(["morning", "afternoon", "evening"] as const).map((slotKey) => {
-        const row = scenarioSlots.find((s) => s.slot === slotKey);
-        if (!row) return null;
-        const item = activityToPlanItem(resolvedTargetDate, row.slot, row.activity);
-        return (
-          <div key={`${slotKey}-${row.activity.id}`} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span
-              className="font-mono uppercase"
-              style={{ fontSize: 10, letterSpacing: ".14em", color: "rgba(20,18,16,.55)" }}
-            >
-              {SLOT_LABEL[slotKey]}
-            </span>
-            <RecommendationCard
-              item={item}
-              onAddToPlan={() => void handleAddScenarioToPlan(row.slot, row.activity)}
-            />
+        <div className="mb-[26px]">
+          <div className="mb-[11px] text-[17px] font-bold tracking-[-.01em] text-[var(--mp-tx)]">С кем идёте?</div>
+          <div className="flex flex-wrap gap-2">
+            {WHO_OPTIONS.map((o) => (
+              <button key={o.key} type="button" aria-pressed={whoKey === o.key} onClick={() => pickWho(o.key)} className={chipClass(whoKey === o.key)}>
+                {o.label}
+              </button>
+            ))}
           </div>
-        );
-      })}
-
-      {opts.showRegenerateCta ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {guestQuotaBlocked || guestRemainingGenerations === 0 ? (
-            <div
-              style={{
-                position: "relative", overflow: "hidden",
-                padding: "20px 18px",
-                background: "linear-gradient(135deg, #FFE8DC, #FFF1E5)",
-                border: "1px solid rgba(232,106,58,.25)",
-                borderRadius: 18,
-                display: "flex", flexDirection: "column", gap: 10,
-              }}
-            >
-              <p
-                className="font-display"
-                style={{ margin: 0, fontSize: 20, fontWeight: 400, lineHeight: 1.05, letterSpacing: "-.02em", color: "#141210" }}
-              >
-                Сохраним ваш план<br/>и&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>подберём ещё</em>
-              </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                <Link
-                  href={loginHref}
-                  style={{
-                    height: 40, padding: "0 18px", borderRadius: 99,
-                    background: "linear-gradient(180deg, #FBA77B, #E86A3A)",
-                    color: "#fff", fontSize: 13, fontWeight: 600, textDecoration: "none",
-                    display: "inline-flex", alignItems: "center",
-                    boxShadow: "0 8px 20px -6px rgba(232,106,58,.45)",
-                  }}
-                >Войти →</Link>
-                <Link
-                  href={registerHref}
-                  style={{
-                    height: 40, padding: "0 16px", borderRadius: 99,
-                    border: "1px solid rgba(20,18,16,.18)",
-                    background: "transparent", color: "#141210",
-                    fontSize: 13, fontWeight: 500, textDecoration: "none",
-                    display: "inline-flex", alignItems: "center",
-                  }}
-                >Регистрация</Link>
+          {whoKey === "kids" ? (
+            <div className="mt-3 rounded-2xl bg-[var(--mp-soft)] p-3">
+              <span className="mb-[9px] block text-[13px] font-medium text-[var(--mp-tx2)]">Возраст детей — можно несколько</span>
+              <div className="flex flex-wrap gap-2">
+                {KID_AGE_GROUPS.map((g) => {
+                  const on = kidRanges.includes(g.value);
+                  return (
+                    <button
+                      key={g.value}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setKidRanges((prev) => (on ? prev.filter((x) => x !== g.value) : [...prev, g.value]))}
+                      className={chipClass(on)}
+                    >
+                      {g.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          ) : (
-            <>
+          ) : null}
+        </div>
+        <div className="mb-[26px]">
+          <div className="mb-[11px] text-[17px] font-bold tracking-[-.01em] text-[var(--mp-tx)]">Когда?</div>
+          <div className="grid grid-cols-3 gap-2">
+            {WHEN_OPTIONS.map((o) => {
+              const on = whenChoice === o.key;
+              return (
+                <button
+                  key={o.key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setWhenChoice(o.key)}
+                  className={cn(
+                    "flex min-h-[66px] flex-col items-start justify-center rounded-2xl border px-3 py-2.5 text-left transition-colors",
+                    on ? "border-[var(--mp-tx)] bg-[var(--mp-tx)] text-white" : "border-[var(--mp-line)] bg-[var(--mp-card)] hover:border-[var(--mp-line-strong)]",
+                  )}
+                >
+                  <b className="text-[15px] font-bold">{o.label}</b>
+                  <span className={cn("mt-0.5 text-[12.5px]", on ? "text-white/80" : "text-[var(--mp-tx2)]")}>{o.sub}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div>
+          <div className="mb-[11px] text-[17px] font-bold tracking-[-.01em] text-[var(--mp-tx)]">Какое настроение?</div>
+          <div className="flex flex-wrap gap-2">
+            {MOOD_OPTIONS.map((o) => (
+              <button key={o.key} type="button" aria-pressed={formatChoice === o.key} onClick={() => setFormatChoice(o.key)} className={chipClass(formatChoice === o.key)}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </>
+    );
+    footer = (
+      <>
+        <button type="button" className={primaryBtn} disabled={!quizValid || loadingScenario} onClick={runQuiz}>
+          {loadingScenario ? "Подбираем…" : "Показать варианты"}
+        </button>
+        {guestRemainingGenerations === 1 ? (
+          <p className="mt-2.5 text-center text-[13.5px] text-[var(--mp-tx2)]">Осталась последняя бесплатная подборка</p>
+        ) : null}
+      </>
+    );
+  } else if (screen === "results") {
+    const isLoadingEmpty = loadingScenario && scenarioSlots.length === 0;
+    head = <MyPlanHeader onClose={onRequestClose} compact={!isDesktop} />;
+    body = (
+      <>
+        <div className="mb-[18px] flex items-center gap-2 rounded-[14px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-2 pl-3.5 pr-1">
+          <span className="flex-1 text-[13.5px] leading-[1.4] text-[var(--mp-tx2)]">{summaryText}</span>
+          <button type="button" onClick={() => setPhase("onboarding")} className="min-h-11 rounded-xl px-3 text-sm font-bold text-[var(--mp-ac-dark)]">
+            Изменить
+          </button>
+        </div>
+        {isLoadingEmpty ? (
+          <div className="space-y-2.5" aria-busy>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-[136px] animate-pulse rounded-[18px] border border-[var(--mp-line)] bg-[var(--mp-card)]" />
+            ))}
+          </div>
+        ) : (
+          <>
+            <h3 className="mb-3.5 text-[22px] font-bold leading-[1.2] tracking-[-.02em] text-[var(--mp-tx)]">
+              Нашли {scenarioSlots.length} {scenarioSlots.length === 1 ? "вариант" : scenarioSlots.length < 5 ? "варианта" : "вариантов"}
+            </h3>
+            <div className="space-y-2.5">{resultCards}</div>
+            {guestCanGenerateMore ? (
+              <button type="button" className={cn(quietBtn, "mt-2")} disabled={loadingScenario} onClick={handleRegenerate}>
+                <Repeat2 className="h-[17px] w-[17px]" aria-hidden />
+                Показать другие варианты
+              </button>
+            ) : null}
+          </>
+        )}
+      </>
+    );
+    if (committedCount > 0) {
+      footer = (
+        <button type="button" className={primaryBtn} onClick={() => setPhase("engaged")}>
+          В плане: {committedCount}
+          <span className="opacity-55">·</span>
+          Дальше
+          <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+        </button>
+      );
+    }
+  } else if (screen === "empty") {
+    const kind = formatChoice === "active" ? "Активных занятий" : formatChoice === "calm" ? "Спокойных занятий" : "Подходящих событий";
+    const whenText = whenChoice === "today" ? "сегодня" : whenChoice === "tomorrow" ? "завтра" : "на выходные";
+    const ages = KID_AGE_GROUPS.filter((g) => kidRanges.includes(g.value)).map((g) => g.label);
+    head = <PlanScreenHead back="Ответы" onBack={() => setPhase("onboarding")} />;
+    body = (
+      <div className="px-2 pt-11 text-center">
+        <span className="mx-auto mb-[22px] flex h-[76px] w-[76px] items-center justify-center rounded-full bg-[var(--mp-soft)] text-[var(--mp-tx2)]">
+          <Search className="h-[30px] w-[30px]" strokeWidth={1.6} aria-hidden />
+        </span>
+        <h3 className="text-[23px] font-bold leading-[1.2] tracking-[-.02em] text-[var(--mp-tx)]">
+          {whenText.charAt(0).toUpperCase() + whenText.slice(1)} подходящего не&nbsp;нашлось
+        </h3>
+        <p className="mx-auto mt-3 max-w-[300px] text-[15px] leading-[1.55] text-[var(--mp-tx2)]">
+          {kind}
+          {ages.length > 0 ? ` для детей ${ages.join(", ")}` : ""} {whenText} в&nbsp;афише нет. В&nbsp;будни их&nbsp;обычно меньше, чем в&nbsp;выходные.
+        </p>
+      </div>
+    );
+    footer = (
+      <>
+        {whenChoice !== "weekend" ? (
+          <button
+            type="button"
+            className={primaryBtn}
+            onClick={() => {
+              setWhenChoice("weekend");
+              setRefetchForWeekend(true);
+            }}
+          >
+            Посмотреть на выходные
+          </button>
+        ) : (
+          <button type="button" className={primaryBtn} onClick={() => setPhase("onboarding")}>
+            Изменить ответы
+          </button>
+        )}
+        {whenChoice !== "weekend" ? (
+          <button type="button" className={quietBtn} onClick={() => setPhase("onboarding")}>
+            Изменить ответы
+          </button>
+        ) : null}
+      </>
+    );
+  } else if (screen === "draft") {
+    head = <PlanScreenHead back="Варианты" onBack={() => setPhase("generated")} />;
+    body = (
+      <>
+        <h3 className="mb-3.5 text-[22px] font-bold leading-[1.2] tracking-[-.02em] text-[var(--mp-tx)]">Ваш план</h3>
+        <div className="mb-4 flex items-start gap-2.5 rounded-[14px] bg-[var(--mp-soft)] px-3.5 py-3 text-[13.5px] leading-[1.45] text-[var(--mp-tx2)]">
+          <Info className="mt-px h-[18px] w-[18px] shrink-0" aria-hidden />
+          <span>Пока сохранён только в&nbsp;этом браузере. Войдите, чтобы он&nbsp;не&nbsp;потерялся.</span>
+        </div>
+        {committedList.length === 0 ? (
+          <p className="text-[15px] leading-[1.5] text-[var(--mp-tx2)]">Здесь пусто. Вернитесь к&nbsp;вариантам и&nbsp;добавьте то, что нравится.</p>
+        ) : (
+          committedList.map(({ sk, item }) => (
+            <div key={sk} className="mb-2 flex items-center gap-3 rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] py-2.5 pl-3 pr-1.5">
+              <div className="min-w-0 flex-1">
+                <div className="line-clamp-2 text-[15px] font-bold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">
+                  {item.title || item.activity?.title}
+                </div>
+                <div className="mt-0.5 text-[13px] text-[var(--mp-tx2)]">{summaryDateLine(item)}</div>
+              </div>
               <button
                 type="button"
-                onClick={handleRegenerate}
-                disabled={loadingScenario || !guestCanGenerateMore}
-                style={{
-                  width: "100%", height: 46, borderRadius: 99,
-                  border: "1px solid rgba(232,106,58,.45)",
-                  background: "transparent", color: "#C24E22",
-                  fontSize: 14, fontWeight: 500, cursor: "pointer",
-                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  transition: "border-color .15s",
-                  fontFamily: "inherit",
-                  opacity: (loadingScenario || !guestCanGenerateMore) ? 0.5 : 1,
-                }}
+                aria-label="Убрать"
+                onClick={() => handleRemoveCommitted(sk)}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--mp-tx2)] transition-colors hover:bg-[var(--mp-soft)] hover:text-[var(--mp-tx)]"
               >
-                <Sparkles size={14}/> Ещё варианты
+                <X className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
               </button>
-              <p
-                className="font-mono uppercase text-center"
-                style={{ margin: 0, fontSize: 10, letterSpacing: ".1em", color: "rgba(20,18,16,.55)" }}
-              >
-                {guestRemainingGenerations === 0
-                  ? "● Генерации закончились · войдите, чтобы продолжить"
-                  : `● ${formatRemainingGenerationsRu(guestRemainingGenerations ?? 3)} · затем войдите, чтобы продолжить`
-                }
-              </p>
-            </>
-          )}
+            </div>
+          ))
+        )}
+      </>
+    );
+    footer = (
+      <button type="button" className={primaryBtn} disabled={committedList.length === 0} onClick={() => setSaveSheetOpen(true)}>
+        Сохранить план
+      </button>
+    );
+  } else {
+    head = <MyPlanHeader onClose={onRequestClose} compact={!isDesktop} />;
+    body = (
+      <>
+        <div className="mb-2 mt-4 text-[13.5px] font-semibold text-[var(--mp-tx2)]">Вы попробовали 3 подборки — столько доступно без входа</div>
+        <h3 className="mb-[22px] text-[30px] font-bold leading-[1.12] tracking-[-.03em] text-[var(--mp-tx)]">
+          С&nbsp;аккаунтом подбирать{" "}
+          <em className="font-display font-medium text-[var(--mp-ac)]" style={{ fontStyle: "italic" }}>проще</em>
+        </h3>
+        {benefit(<InfinityIcon className="h-5 w-5" aria-hidden />, "Подборки без ограничений")}
+        {benefit(<Users className="h-5 w-5" aria-hidden />, "Точнее — запомним возраст детей")}
+        {benefit(<Bell className="h-5 w-5" aria-hidden />, <>Напомним о&nbsp;событиях вовремя</>)}
+        {benefit(<Monitor className="h-5 w-5" aria-hidden />, <>Один план для семьи на&nbsp;телефоне и&nbsp;компьютере</>)}
+        <div className="mt-[18px] flex items-start gap-2.5 rounded-[14px] bg-[var(--mp-soft)] px-3.5 py-3 text-[13.5px] leading-[1.45] text-[var(--mp-tx2)]">
+          <Repeat2 className="mt-px h-[18px] w-[18px] shrink-0" aria-hidden />
+          <span>
+            {committedCount > 0
+              ? `Ваш план (${committedCount} ${committedCount === 1 ? "событие" : committedCount < 5 ? "события" : "событий"}) перенесётся в аккаунт.`
+              : "Всё выбранное перенесётся в аккаунт."}
+          </span>
+        </div>
+      </>
+    );
+    footer = (
+      <>
+        <Link href={registerHref} className={cn(primaryBtn, "no-underline")}>
+          Создать аккаунт бесплатно
+        </Link>
+        <Link href={loginHref} className={cn(quietBtn, "no-underline")}>
+          Уже есть аккаунт?&nbsp;<span className="text-[var(--mp-ac-dark)]">Войти</span>
+        </Link>
+      </>
+    );
+  }
+
+  return (
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[var(--mp-bg)]">
+      <div className="flex-shrink-0" style={isDesktop ? { position: "sticky", top: 0, zIndex: 20 } : undefined}>
+        {head}
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-1 md:px-8">{body}</div>
+      {footer ? (
+        <div className="shrink-0 border-t border-[var(--mp-line)] bg-[var(--mp-bg)] px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 md:px-8">
+          {footer}
+        </div>
+      ) : null}
+      {saveSheetOpen ? (
+        <div className="absolute inset-0 z-30 flex items-end bg-[rgba(29,27,25,.4)]" onClick={() => setSaveSheetOpen(false)}>
+          <div
+            role="dialog"
+            aria-label="Сохраним ваш план"
+            className="w-full rounded-t-3xl bg-[var(--mp-bg)] px-5 pb-[max(1.75rem,env(safe-area-inset-bottom))] pt-2"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="mx-auto mb-4 block h-[5px] w-[38px] rounded-full bg-[#D3CBC2]" />
+            <h3 className="mb-1.5 text-[23px] font-bold leading-[1.2] tracking-[-.02em] text-[var(--mp-tx)]">Сохраним ваш план</h3>
+            <p className="mb-2.5 text-[15px] leading-[1.5] text-[var(--mp-tx2)]">Войдите — и&nbsp;план будет с&nbsp;вами везде.</p>
+            {benefit(<Monitor className="h-5 w-5" aria-hidden />, <>Откроется на&nbsp;любом устройстве</>)}
+            {benefit(<Bell className="h-5 w-5" aria-hidden />, <>Напомним о&nbsp;событиях вовремя</>)}
+            {benefit(<Repeat2 className="h-5 w-5" aria-hidden />, <>Всё выбранное перенесём сами</>)}
+            <Link href={loginHref} className={cn(primaryBtn, "mt-4 no-underline")}>
+              Войти или создать аккаунт
+            </Link>
+            <button type="button" className={quietBtn} onClick={() => setSaveSheetOpen(false)}>
+              Позже
+            </button>
+          </div>
         </div>
       ) : null}
     </div>
   );
+}
 
-  const renderGenerated = () => {
-    const isLoadingEmpty = loadingScenario && scenarioSlots.length === 0;
-    const isEmptyNotLoading = !loadingScenario && scenarioSlots.length === 0;
-    // Quota-blocked gate is already rendered inside renderScenarioBlocks — don't duplicate it
-    const quotaBlocked = guestQuotaBlocked || guestRemainingGenerations === 0;
-
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <div>
-          <h3
-            className="font-display"
-            style={{ margin: 0, fontSize: 26, fontWeight: 400, lineHeight: 1.05, letterSpacing: "-.02em", color: "#141210" }}
-          >
-            {whenChoice === "today"
-              ? <>Вот что мы подобрали на&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>сегодня</em></>
-              : whenChoice === "tomorrow"
-                ? <>Вот что мы подобрали на&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>завтра</em></>
-                : <>Вот что мы подобрали на&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>выходные</em></>
-            }
-          </h3>
-          <p
-            className="font-mono uppercase"
-            style={{ marginTop: 6, fontSize: 11, letterSpacing: ".08em", color: "rgba(20,18,16,.55)" }}
-          >
-            {generatedPlanDateLine}
-          </p>
-        </div>
-
-        {isLoadingEmpty ? (
-          /* Skeleton while fetching */
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {(["morning", "afternoon", "evening"] as const).map((sk) => (
-              <div key={sk} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ height: 10, width: 48, borderRadius: 4, background: "rgba(20,18,16,.08)", animation: "pulse 1.5s ease-in-out infinite" }}/>
-                <div style={{ height: 140, borderRadius: 20, background: "rgba(20,18,16,.05)", animation: "pulse 1.5s ease-in-out infinite" }}/>
-              </div>
-            ))}
-          </div>
-        ) : isEmptyNotLoading && quotaBlocked ? (
-          /* Quota exhausted & no cards */
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <AuthGateCard />
-            <p
-              className="font-mono uppercase text-center"
-              style={{ margin: 0, fontSize: 10, letterSpacing: ".1em", color: "rgba(20,18,16,.55)" }}
-            >
-              ● Генерации закончились · войдите, чтобы продолжить
-            </p>
-          </div>
-        ) : isEmptyNotLoading && !quotaBlocked ? (
-          /* Restored to generated phase with empty slots — offer to retry */
-          <div style={{ paddingTop: 4 }}>
-            <GuestPrimaryBtn onClick={() => void fetchScenario()} fullWidth>
-              Подобрать варианты <ArrowRight size={14}/>
-            </GuestPrimaryBtn>
-          </div>
-        ) : (
-          /* Normal: cards available */
-          renderScenarioBlocks({ showRegenerateCta: true })
-        )}
-
-        {/* Engagement auth gate — only when not already showing quota-blocked gate */}
-        {authGateVisible && !quotaBlocked ? renderAuthGate() : null}
-      </div>
-    );
-  };
-
-  const renderEngaged = () => {
-    const slotsOrder: GuestSlot[] = ["morning", "afternoon", "evening"];
-    const committedCount = slotsOrder.filter((sk) => committedBySlot[sk]?.activity).length;
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <h3
-          className="font-display"
-          style={{ margin: 0, fontSize: 26, fontWeight: 400, lineHeight: 1.05, letterSpacing: "-.02em", color: "#141210" }}
-        >
-          {committedCount >= 2
-            ? <>Ваш план <em style={{ fontStyle: "italic", color: "#C24E22" }}>готов!</em></>
-            : <>Ваш план <em style={{ fontStyle: "italic", color: "#C24E22" }}>почти готов</em></>
-          }
-        </h3>
-
-        {guestQuotaBlocked || guestRemainingGenerations === 0 ? <AuthGateCard /> : null}
-
-        {slotsOrder.map((sk) => {
-          const item = committedBySlot[sk];
-          if (!item?.activity) return null;
-          return (
-            <div key={`committed-${sk}`} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <span
-                className="font-mono uppercase"
-                style={{ fontSize: 10, letterSpacing: ".14em", color: "rgba(20,18,16,.55)" }}
-              >
-                {SLOT_LABEL[sk]}
-              </span>
-              <RecommendationCard
-                item={item}
-                isInPlan
-                onRemoveFromPlan={() => handleRemoveCommitted(sk)}
-              />
-            </div>
-          );
-        })}
-
-        {scenarioSlots.length > 0 ? (
-          <div style={{ borderTop: "1px solid rgba(20,18,16,.10)", paddingTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-            <span
-              className="font-mono uppercase"
-              style={{ fontSize: 11, letterSpacing: ".12em", color: "rgba(20,18,16,.55)" }}
-            >
-              Ещё идеи на этот день
-            </span>
-            {renderScenarioBlocks({ showRegenerateCta: false })}
-          </div>
-        ) : null}
-
-        {/* Engagement gate: only when not already showing quota-blocked gate */}
-        {authGateVisible && !(guestQuotaBlocked || guestRemainingGenerations === 0) ? renderAuthGate() : null}
-      </div>
-    );
-  };
-
-  /* ── Chip helper ── */
-  const GuestChipGroup = ({
-    label,
-    items,
-  }: {
-    label: string;
-    items: Array<{ id: string; label: React.ReactNode; active?: boolean; onClick?: () => void }>;
-  }) => (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-      <span
-        className="font-mono uppercase"
-        style={{ fontSize: 11, letterSpacing: ".14em", color: "rgba(20,18,16,.55)" }}
-      >
-        {label}
-      </span>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
-        {items.map((chip) => (
-          <button
-            key={chip.id}
-            type="button"
-            onClick={chip.onClick}
-            style={{
-              height: 40, padding: "0 20px", borderRadius: 99,
-              background: chip.active === true ? "#FFE8DC" : "#FAF7F1",
-              border: chip.active === true ? "1px solid transparent" : "1px solid rgba(20,18,16,.10)",
-              color: chip.active === true ? "#C24E22" : "#141210",
-              fontSize: 14, fontWeight: chip.active === true ? 600 : 500,
-              cursor: "pointer", transition: "all .15s",
-              fontFamily: "inherit",
-              display: "inline-flex", alignItems: "center",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {chip.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
-  /* ── Primary CTA ── */
-  const GuestPrimaryBtn = ({
-    children,
-    onClick,
-    disabled,
-    fullWidth,
-  }: {
-    children: React.ReactNode;
-    onClick?: () => void;
-    disabled?: boolean;
-    fullWidth?: boolean;
-  }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        width: fullWidth ? "100%" : undefined,
-        height: 54, padding: "0 28px", borderRadius: 99,
-        background: disabled
-          ? "rgba(232,106,58,.4)"
-          : "linear-gradient(180deg, #FBA77B, #E86A3A)",
-        color: "#fff",
-        fontSize: 15, fontWeight: 600, letterSpacing: "-.005em",
-        display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10,
-        cursor: disabled ? "not-allowed" : "pointer", border: 0,
-        boxShadow: disabled ? "none" : "0 14px 32px -10px rgba(232,106,58,.5)",
-        transition: "filter .2s, box-shadow .2s",
-        fontFamily: "inherit",
-      }}
-    >
-      {children}
-    </button>
-  );
-
-  /* ── Auth gate card (reusable) ── */
-  const AuthGateCard = () => (
-    <div
-      style={{
-        position: "relative", overflow: "hidden",
-        padding: "22px 20px 20px",
-        background: "linear-gradient(135deg, #FFE8DC, #FFF1E5)",
-        border: "1px solid rgba(232,106,58,.25)",
-        borderRadius: 20,
-        display: "flex", flexDirection: "column", gap: 12,
-      }}
-    >
-      <span style={{
-        position: "absolute", top: -40, right: -30, width: 140, height: 140, borderRadius: 99,
-        background: "radial-gradient(circle, rgba(232,106,58,.2), transparent 65%)",
-        pointerEvents: "none",
-      }}/>
-      <h4
-        className="font-display"
-        style={{
-          margin: 0, fontSize: 24, fontWeight: 400, lineHeight: 1.05, letterSpacing: "-.02em",
-          color: "#141210", position: "relative", zIndex: 1,
-        }}
-      >
-        Сохраним ваш план<br/>и&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>подберём ещё</em>
-      </h4>
-      <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: "#3A332B", position: "relative", zIndex: 1 }}>
-        Войдите, чтобы сохранить план, получать напоминания и продолжить подбирать варианты.
-      </p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, position: "relative", zIndex: 1 }}>
-        <Link
-          href={loginHref}
-          style={{
-            height: 46, padding: "0 22px", borderRadius: 99,
-            background: "linear-gradient(180deg, #FBA77B, #E86A3A)",
-            color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none",
-            display: "inline-flex", alignItems: "center", gap: 8,
-            boxShadow: "0 10px 24px -8px rgba(232,106,58,.45)",
-          }}
-        >
-          Войти →
-        </Link>
-        <Link
-          href={registerHref}
-          style={{
-            height: 46, padding: "0 18px", borderRadius: 99,
-            background: "transparent", color: "#141210",
-            border: "1px solid rgba(20,18,16,.18)",
-            fontSize: 14, fontWeight: 500, textDecoration: "none",
-            display: "inline-flex", alignItems: "center",
-          }}
-        >
-          Регистрация
-        </Link>
-      </div>
-    </div>
-  );
-
-  const body = (() => {
-    switch (phase) {
-      /* ── Step 1: Hook ── */
-      case "empty":
-        return (
-          <div
-            className="flex flex-col items-center text-center"
-            style={{ gap: 20, padding: "8px 4px 16px" }}
-          >
-            <h3
-              style={{
-                margin: 0,
-                fontFamily: "var(--font-display)",
-                fontSize: 36,
-                fontWeight: 400, lineHeight: 1.05, letterSpacing: "-.01em",
-                color: "#141210", maxWidth: 360,
-              }}
-            >
-              Соберём план<br/>
-              на&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>сегодня</em>
-              {" "}за&nbsp;<span style={{ fontFamily: "var(--font-display)" }}>10</span>&nbsp;секунд
-            </h3>
-
-            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: "rgba(20,18,16,.55)", maxWidth: 320 }}>
-              Подберём активности под&nbsp;вас и&nbsp;вашего ребёнка — без анкет и&nbsp;регистрации.
-            </p>
-
-            <GuestPrimaryBtn onClick={() => setPhase("onboarding")} fullWidth>
-              <Sparkles size={14}/> Реши за меня <ArrowRight size={14}/>
-            </GuestPrimaryBtn>
-
-            {/* Trust line */}
-            <div
-              className="font-mono uppercase flex items-center gap-3"
-              style={{ fontSize: 10, letterSpacing: ".1em", color: "rgba(20,18,16,.55)" }}
-            >
-              <span className="inline-flex items-center gap-1.5">
-                <span style={{ width: 5, height: 5, borderRadius: 99, background: "#E86A3A", display: "inline-block" }}/>
-                без регистрации
-              </span>
-              <span style={{ width: 3, height: 3, borderRadius: 99, background: "rgba(20,18,16,.4)", display: "inline-block" }}/>
-              <span>3 подбора бесплатно</span>
-            </div>
-
-            <Link
-              href={loginHref}
-              style={{ fontSize: 13, color: "rgba(20,18,16,.55)", textDecoration: "underline", textUnderlineOffset: 3 }}
-            >
-              Я сама подберу →
-            </Link>
-          </div>
-        );
-
-      /* ── Step 2: Filters / Onboarding ── */
-      case "onboarding":
-        return (
-          <div className="flex flex-col" style={{ gap: 22 }}>
-            <GuestChipGroup label="Кто идёт" items={whoChips}/>
-
-            {!freeSearch && !goAdult ? (
-              <GuestChipGroup label="Возраст" items={kidAgeChips}/>
-            ) : null}
-
-            <GuestChipGroup label="Когда" items={whenChips}/>
-            <GuestChipGroup label="Формат" items={formatChips}/>
-
-            <div style={{ paddingTop: 4, display: "flex", flexDirection: "column", gap: 10 }}>
-              {guestQuotaBlocked || guestRemainingGenerations === 0 ? (
-                <>
-                  <AuthGateCard/>
-                  <p
-                    className="font-mono uppercase text-center"
-                    style={{ margin: 0, fontSize: 10, letterSpacing: ".1em", color: "rgba(20,18,16,.55)" }}
-                  >
-                    ● Генерации закончились · войдите, чтобы продолжить
-                  </p>
-                </>
-              ) : (
-                <GuestPrimaryBtn
-                  onClick={() => void fetchScenario({ showGeneratedShellFirst: true })}
-                  disabled={loadingScenario || !guestCanGenerateMore}
-                  fullWidth
-                >
-                  {loadingScenario ? "Подбираем…" : <>Найди варианты <ArrowRight size={14}/></>}
-                </GuestPrimaryBtn>
-              )}
-            </div>
-          </div>
-        );
-
-      case "generated":
-        return renderGenerated();
-      case "engaged":
-        return renderEngaged();
-      default:
-        return null;
-    }
-  })();
-
-  /* ── Step dots ── */
-  const stepIdx = phase === "empty" ? 0 : phase === "onboarding" ? 1 : 2;
-  const StepDots = () => (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          style={{
-            width: i === stepIdx ? 20 : 6,
-            height: 6,
-            borderRadius: 99,
-            background: i === stepIdx ? "#E86A3A" : i < stepIdx ? "#141210" : "rgba(20,18,16,.18)",
-            transition: "all .25s",
-            display: "inline-block",
-            flexShrink: 0,
-          }}
-        />
-      ))}
-    </div>
-  );
-
-  /* ── Footer nav ── */
-  const footerBack = phase === "generated" || phase === "engaged"
-    ? { label: "← Изменить", action: () => setPhase("onboarding") }
-    : phase === "onboarding"
-      ? { label: "← Назад", action: () => setPhase("empty") }
-      : null;
-
-  return (
-    <div className="flex h-full min-h-0 flex-col" style={{ background: "#F6F2EA" }}>
-      {/* Header */}
-      <div
-        className="flex-shrink-0"
-        style={isDesktop ? { position: "sticky", top: 0, zIndex: 20 } : {}}
-      >
-        <MyPlanHeader onClose={onRequestClose} compact={!isDesktop} />
-      </div>
-
-      {/* Scrollable body */}
-      <div
-        className="flex-1 overflow-y-auto"
-        style={{
-          background: "#F6F2EA",
-          padding: isDesktop
-            ? "24px 32px 16px"
-            : "20px 20px 16px",
-        }}
-      >
-        {body}
-      </div>
-
-      {/* Footer nav: back + step dots */}
-      {phase !== "empty" && (
-        <div
-          className="flex-shrink-0"
-          style={{
-            borderTop: "1px solid rgba(20,18,16,.10)",
-            background: "#F6F2EA",
-            padding: "12px 20px calc(12px + env(safe-area-inset-bottom))",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          {footerBack ? (
-            <button
-              type="button"
-              onClick={footerBack.action}
-              style={{
-                fontSize: 13, color: "rgba(20,18,16,.55)",
-                background: "transparent", border: 0, cursor: "pointer",
-                fontFamily: "inherit", padding: 0,
-              }}
-            >
-              {footerBack.label}
-            </button>
-          ) : (
-            <span/>
-          )}
-          <StepDots/>
-          <span style={{ visibility: "hidden", fontSize: 13 }}>x</span>
-        </div>
-      )}
-    </div>
-  );
+function summaryDateLine(item: PlanItemWithActivity): string {
+  const src = item.startsAt ?? (item.date ? new Date(`${item.date}T12:00:00`) : null);
+  if (!src) return "";
+  const d = src instanceof Date ? src : new Date(src);
+  if (Number.isNaN(d.getTime())) return "";
+  const day = d.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" }).replace(/\./g, "");
+  return item.activity?.ageLabel ? `${day} · ${item.activity.ageLabel}` : day;
 }

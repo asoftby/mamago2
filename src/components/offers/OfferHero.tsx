@@ -79,7 +79,7 @@ export function OfferHero({
           {/* Breadcrumbs */}
           <nav
             aria-label="Breadcrumb"
-            className="flex flex-wrap items-center gap-1.5 text-[13px] text-[rgba(20,18,16,0.45)]"
+            className="hidden flex-wrap items-center gap-1.5 text-[13px] text-[rgba(20,18,16,0.45)] lg:flex"
           >
             <Link href="/" className="hover:text-[#3A332B] transition-colors">Главная</Link>
             <span aria-hidden="true">›</span>

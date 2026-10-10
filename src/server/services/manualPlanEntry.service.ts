@@ -4,7 +4,7 @@ import { getLocalDateKey, localWallClockToUtc } from "@/lib/date/localDateKey";
 import type { PlanOwner } from "@/server/services/planOwner";
 import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 import { buildPlanCardPresentation } from "@/features/my-plan/lib/planPagePresentation";
-import { activePlanScopeFor, childScopeFor, familyIdForWrite } from "@/server/family/familyAccess";
+import { activeFamilyUserIds, activePlanScopeFor, childScopeFor, familyIdForWrite } from "@/server/family/familyAccess";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import type { PlanBookingState } from "@/server/family/planBookingPure";
 import {
@@ -20,6 +20,8 @@ const LOCATION_MAX = 240;
 const NOTES_MAX = 2_000;
 const TAG_MAX = 32;
 const TAG_COUNT_MAX = 12;
+/** Допустимые значения «за сколько напомнить» (укладываются в окно джоба напоминаний, 180 мин). */
+export const REMINDER_LEAD_MINUTES_OPTIONS = [15, 60, 120] as const;
 export const FAMILY_CALENDAR_MAX_RANGE_DAYS = 42;
 
 export class ManualPlanEntryError extends Error {
@@ -47,6 +49,10 @@ export type ManualPlanEntryInput = {
   /** Ключ категории (planItemCategory). Не передан при создании → определяется по названию. */
   category?: string | null;
   reminderEnabled?: boolean;
+  /** За сколько минут напомнить; null/не передан — по общему расписанию уведомлений. Нужен startsAt. */
+  reminderLeadMinutes?: number | null;
+  /** Взрослый член семьи, на кого дело. Не сочетается с childId. */
+  assigneeUserId?: string | null;
 };
 
 export type ManualPlanEntryPatch = Partial<ManualPlanEntryInput>;
@@ -119,6 +125,8 @@ const calendarItemSelect = {
   tags: true,
   category: true,
   reminderEnabled: true,
+  reminderLeadMinutes: true,
+  assigneeUserId: true,
   activityId: true,
   coverImageUrl: true,
   createdAt: true,
@@ -146,6 +154,8 @@ export type FamilyCalendarItemDto = {
   title: string | null;
   childId: string | null;
   childName: string | null;
+  assigneeUserId: string | null;
+  reminderLeadMinutes: number | null;
   locationText: string | null;
   notes: string | null;
   tags: string[];
@@ -263,6 +273,28 @@ function normalizeChildId(value: unknown): string | null {
   return value;
 }
 
+function normalizeReminderLeadMinutes(value: unknown): number | null {
+  if (value == null) return null;
+  if (typeof value !== "number" || !(REMINDER_LEAD_MINUTES_OPTIONS as readonly number[]).includes(value)) {
+    throw new ManualPlanEntryError("INVALID_INPUT", "invalid_reminder_lead");
+  }
+  return value;
+}
+
+function normalizeAssigneeUserId(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string" || value.length > 128) {
+    throw new ManualPlanEntryError("INVALID_INPUT", "invalid_assignee");
+  }
+  return value;
+}
+
+async function assertFamilyAssignee(owner: PlanOwner, assigneeUserId: string | null): Promise<void> {
+  if (!assigneeUserId) return;
+  const memberIds = await activeFamilyUserIds(owner.userId);
+  if (!memberIds.includes(assigneeUserId)) throw new ManualPlanEntryError("NOT_FOUND", "assignee_not_found");
+}
+
 async function assertOwnedChild(owner: PlanOwner, childId: string | null): Promise<void> {
   if (!childId) return;
   const child = await prisma.child.findFirst({
@@ -286,10 +318,17 @@ export async function createManualPlanEntry(owner: PlanOwner, input: ManualPlanE
   const title = normalizeTitle(input.title);
   const childId = normalizeChildId(input.childId);
   await assertOwnedChild(owner, childId);
+  const assigneeUserId = normalizeAssigneeUserId(input.assigneeUserId);
+  if (assigneeUserId && childId) throw new ManualPlanEntryError("INVALID_INPUT", "assignee_and_child");
+  await assertFamilyAssignee(owner, assigneeUserId);
   const startsAt = parseWallClock(input.date, input.startsAt, "starts_at");
   const endsAt = parseWallClock(input.date, input.endsAt, "ends_at");
   const dueAt = parseWallClock(input.date, input.dueAt, "due_at");
   assertTimeOrder(startsAt, endsAt);
+  const reminderLeadMinutes = normalizeReminderLeadMinutes(input.reminderLeadMinutes);
+  if (reminderLeadMinutes != null && (!startsAt || input.reminderEnabled !== true)) {
+    throw new ManualPlanEntryError("INVALID_INPUT", "reminder_lead_requires_time");
+  }
 
   return prisma.planItem.create({
     data: {
@@ -299,6 +338,7 @@ export async function createManualPlanEntry(owner: PlanOwner, input: ManualPlanE
       entryType,
       title,
       childId,
+      assigneeUserId,
       date: input.date,
       startsAt,
       endsAt,
@@ -309,6 +349,7 @@ export async function createManualPlanEntry(owner: PlanOwner, input: ManualPlanE
       tags: normalizePlanNoteTags(input.tags),
       category: normalizePlanItemCategory(input.category, title),
       reminderEnabled: input.reminderEnabled === true,
+      reminderLeadMinutes,
     },
     select: calendarItemSelect,
   });
@@ -340,6 +381,12 @@ export async function updateManualPlanEntry(
   if (patch.entryType !== undefined) assertEntryType(patch.entryType);
   const childId = patch.childId === undefined ? current.childId : normalizeChildId(patch.childId);
   await assertOwnedChild(owner, childId ?? null);
+  // Смена исполнителя на ребёнка без явного assigneeUserId снимает взрослого исполнителя.
+  const assigneeUserId = patch.assigneeUserId === undefined
+    ? (patch.childId !== undefined && childId ? null : current.assigneeUserId)
+    : normalizeAssigneeUserId(patch.assigneeUserId);
+  if (assigneeUserId && childId) throw new ManualPlanEntryError("INVALID_INPUT", "assignee_and_child");
+  await assertFamilyAssignee(owner, assigneeUserId ?? null);
 
   const startsAt = patch.startsAt === undefined
     ? (date === current.date ? current.startsAt : parseWallClock(date, wallClock(current.startsAt), "starts_at"))
@@ -351,6 +398,17 @@ export async function updateManualPlanEntry(
     ? (date === current.date ? current.dueAt : parseWallClock(date, wallClock(current.dueAt), "due_at"))
     : parseWallClock(date, patch.dueAt, "due_at");
   assertTimeOrder(startsAt, endsAt);
+  const reminderEnabled = patch.reminderEnabled === undefined ? current.reminderEnabled === true : patch.reminderEnabled === true;
+  const requestedLeadMinutes = patch.reminderLeadMinutes === undefined
+    ? current.reminderLeadMinutes
+    : normalizeReminderLeadMinutes(patch.reminderLeadMinutes);
+  const leadApplicable = Boolean(startsAt) && reminderEnabled;
+  // Явно присланное время напоминания без времени/включённого напоминания — ошибка;
+  // сохранённое ранее значение при выключении напоминания или снятии времени просто сбрасывается.
+  if (patch.reminderLeadMinutes !== undefined && requestedLeadMinutes != null && !leadApplicable) {
+    throw new ManualPlanEntryError("INVALID_INPUT", "reminder_lead_requires_time");
+  }
+  const reminderLeadMinutes = leadApplicable ? requestedLeadMinutes : null;
 
   const result = await prisma.planItem.updateMany({
     where: { id: current.id, ...(await activePlanScopeFor(owner.userId)), source: PlanItemSource.MANUAL, status: "CONFIRMED", updatedAt: expected },
@@ -359,6 +417,12 @@ export async function updateManualPlanEntry(
       ...(patch.entryType === undefined ? {} : { entryType: patch.entryType }),
       ...(patch.title === undefined ? {} : { title: normalizeTitle(patch.title) }),
       ...(patch.childId === undefined ? {} : { childId: childId ?? null }),
+      ...(patch.assigneeUserId === undefined && assigneeUserId === current.assigneeUserId
+        ? {}
+        : { assigneeUserId: assigneeUserId ?? null }),
+      ...(patch.reminderLeadMinutes === undefined && reminderLeadMinutes === current.reminderLeadMinutes
+        ? {}
+        : { reminderLeadMinutes }),
       ...(patch.date === undefined ? {} : { date }),
       ...(patch.startsAt === undefined && patch.date === undefined ? {} : { startsAt }),
       ...(patch.endsAt === undefined && patch.date === undefined ? {} : { endsAt }),
@@ -465,6 +529,8 @@ export function toFamilyCalendarItemDto(row: CalendarRow, authorName: string | n
     title: row.title,
     childId: row.childId,
     childName: row.child?.name?.trim() || null,
+    assigneeUserId: row.assigneeUserId,
+    reminderLeadMinutes: row.reminderLeadMinutes,
     locationText: row.locationText,
     notes: row.notes,
     tags: row.tags,

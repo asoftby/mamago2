@@ -2,7 +2,7 @@
 
 import "@/styles/event-page.css";
 import { useEffect, useRef, useState } from "react";
-import { Heart, Phone } from "lucide-react";
+import { Heart, Phone, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BYN_SYMBOL, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
@@ -10,7 +10,8 @@ import type { EventPageData } from "@/lib/event/eventPageTypes";
 import { EventBreadcrumbs } from "./EventBreadcrumbs";
 import { OwnerEditDropdown } from "./OwnerEditDropdown";
 import { PlaceInfoRow } from "@/components/shared/PlaceInfoRow";
-import { SidebarCard, SidebarCardTopSection, SidebarCardShare } from "@/components/shared/SidebarCard";
+import { SidebarCard, SidebarCardTopSection } from "@/components/shared/SidebarCard";
+import { ShareModal } from "@/components/shared/ShareModal";
 import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
 import { CallActionButton } from "@/components/shared/CallActionButton";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
@@ -109,6 +110,7 @@ export function EventDecisionPanel({
   const subtitleRef = useRef<HTMLDivElement>(null);
   const cd = useCountdown(sessionTargetDate);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   /* Reveal animations */
   useEffect(() => {
@@ -129,12 +131,6 @@ export function EventDecisionPanel({
 
   const { head, tail } = splitTitle(data.title);
 
-  const planLabel = isPlanned
-    ? planDate
-      ? `В плане на ${new Date(`${planDate}T12:00:00`).toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })}`
-      : "В плане ✓"
-    : data.cta.planLabel;
-
   const venueName = data.venue?.name ?? venueShort;
   const venueAddress = data.venue?.address;
   const venueMetro = data.venue?.metro;
@@ -144,7 +140,7 @@ export function EventDecisionPanel({
       {/* Breadcrumbs */}
       <EventBreadcrumbs
         items={data.breadcrumbs}
-        className="hidden text-[13px] text-[rgba(20,18,16,0.55)] md:flex"
+        className="hidden text-[13px] text-[rgba(20,18,16,0.55)] lg:flex"
       />
 
       {/* Kicker: category pill + age + format caps */}
@@ -171,7 +167,33 @@ export function EventDecisionPanel({
             {data.factChips[0].label}
           </span>
         )}
+        {/* Desktop: «Сохранить» и «Поделиться» справа от категории (на мобильном — иконки в хедере). */}
+        <div className="ml-auto hidden items-center gap-5 lg:flex">
+          <button
+            type="button"
+            onClick={onPlan}
+            aria-pressed={isPlanned}
+            className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
+          >
+            <Heart size={18} strokeWidth={1.75} className={isPlanned ? "fill-[#E86A3A] text-[#E86A3A]" : ""} aria-hidden />
+            {isPlanned ? "Сохранено" : "Сохранить"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
+          >
+            <Share2 size={18} strokeWidth={1.75} aria-hidden />
+            Поделиться
+          </button>
+        </div>
       </div>
+      <ShareModal
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        url={typeof window !== "undefined" ? window.location.href : ""}
+        title={data.title}
+      />
 
       {/* Editorial display title */}
       <h1
@@ -339,28 +361,6 @@ export function EventDecisionPanel({
               <span className="sr-only">Позвонить</span>
             </CallActionButton>
           )}
-
-          <button
-            type="button"
-            onClick={onPlan}
-            aria-label={isPlanned ? planLabel : "Добавить в план"}
-            className={cn(
-              "flex h-14 shrink-0 items-center justify-center rounded-full border transition-colors",
-              (data.cta.purchaseUrl || data.cta.simpleBooking) ? "w-14" : "flex-1 gap-2 px-4 text-[16px] font-semibold",
-              isPlanned
-                ? "border-[#E86A3A] bg-[#FFE8DC] text-[#E86A3A]"
-                : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.45)] hover:border-[#141210] hover:text-[#141210]",
-            )}
-          >
-            <Heart
-              size={20}
-              strokeWidth={1.75}
-              className={isPlanned ? "fill-[#E86A3A]" : ""}
-            />
-            {!(data.cta.purchaseUrl || data.cta.simpleBooking) && (
-              <span>{isPlanned ? planLabel : "Сохранить"}</span>
-            )}
-          </button>
         </div>
 
 
@@ -384,13 +384,6 @@ export function EventDecisionPanel({
             />
           </SidebarCardTopSection>
         )}
-
-        {/* Share */}
-        <SidebarCardTopSection mt={20} pt={20}>
-          <div className="flex justify-end">
-            <SidebarCardShare title={data.title} />
-          </div>
-        </SidebarCardTopSection>
       </SidebarCard>
 
 

@@ -32,7 +32,7 @@ assert.match(
 );
 assert.match(
   publicLayout,
-  /<div className=\{cn\(hasMobilePlanWidget \? MOBILE_MAIN_BOTTOM/,
+  /<div className=\{cn\("bg-\[#F6F2EA\]", hasMobilePlanWidget \? MOBILE_MAIN_BOTTOM/,
   "Footer wrapper must keep the single mobile bottom-nav clearance",
 );
 assert.doesNotMatch(
@@ -86,13 +86,8 @@ assert.match(
 
 assert.match(
   myPlanHeader,
-  /width: compact \? 44 : 40/,
-  "My Plan compact close button must be 44px wide",
-);
-assert.match(
-  myPlanHeader,
-  /height: compact \? 44 : 40/,
-  "My Plan compact close button must be 44px high",
+  /flex h-11 w-11 shrink-0 items-center justify-center rounded-full/,
+  "My Plan close button must be a 44px touch target (h-11 w-11)",
 );
 
 assert.match(

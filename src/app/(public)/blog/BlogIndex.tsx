@@ -98,7 +98,7 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
 
             <h1
               className="font-serif m-0 leading-[.94] tracking-[-0.03em]"
-              style={{ fontSize: "clamp(56px, 9vw, 124px)" }}
+              style={{ fontSize: "clamp(28px, 4.5vw, 62px)" }}
             >
               Обзоры{" "}
               <span className="italic text-primary">и статьи</span>

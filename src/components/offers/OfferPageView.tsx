@@ -11,7 +11,6 @@ import { OfferPlace } from "./OfferPlace";
 import { OfferPromoCta } from "./OfferPromoCta";
 import { CampShiftBookingOverlay } from "./CampShiftBookingOverlay";
 import { EventStickyActionBar } from "@/components/event-page/EventStickyActionBar";
-import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import type { OfferPageData, OfferScheduleItem, ShiftCtaContext } from "@/lib/offer/offerPageTypes";
 import {
   SaveToPlanModal,
@@ -26,6 +25,7 @@ import { FaqSection } from "@/components/public/FaqSection";
 import { DirectRequestCta } from "@/components/direct/DirectRequestCta";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
+import { useRegisterHeaderSaveAction } from "@/contexts/PublicationIntentContext";
 import { shouldFetchOwnSaveStatus } from "@/features/save/saveStatusFetchGuard";
 
 export interface OfferDirectCtaInfo {
@@ -320,16 +320,13 @@ export function OfferPageView({
   }, [data.id, persistLocalSave, saveTargetShift?.shiftId]);
 
   const isSaved = isIdeaSaved || Boolean(localSave);
+  useRegisterHeaderSaveAction(isSaved, handleSave, data.title, { entityNoun: "предложением" });
   const isPlanSaved = localSave?.kind === "plan";
   const planDate = localSave?.kind === "plan" ? localSave.dateISO ?? null : null;
 
   return (
     <main className="ep-surface min-h-screen">
       <div className="mx-auto max-w-[1200px] space-y-16 px-4 py-8 sm:px-6 lg:space-y-24 lg:px-8 lg:py-12">
-        <div className="mb-4 md:mb-0">
-          <MobileSmartBackButton fallbackHref={getCityHomeHref(data.citySlug)} />
-        </div>
-
         <OfferHero
           data={data}
           canEditOffer={canEditOffer}

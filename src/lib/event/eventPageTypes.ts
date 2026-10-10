@@ -84,6 +84,10 @@ export type EventPageCtaConfig = {
   simpleBooking?: EventSimpleBookingData;
   /** Контактные телефоны события (свои или унаследованные от площадки). */
   phones?: NormalizedPhone[];
+  /** Сайт события (из контактов мастера или площадки). */
+  website?: { href: string; value: string };
+  /** Соцсети события (из контактов мастера или площадки). */
+  socialLinks?: Array<{ label: string; href: string; value: string }>;
 };
 
 export type EventPageSimilar = {

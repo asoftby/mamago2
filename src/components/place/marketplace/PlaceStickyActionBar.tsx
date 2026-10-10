@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PlaceSaveHeart } from "@/features/save/PlaceSaveHeart";
 import type { NormalizedPlacePhone } from "@/lib/place/placePhones";
 import { PlacePhoneActionButton } from "@/components/place/PlacePhoneActions";
 
 export interface PlaceStickyActionBarProps {
   ctaRef?: React.RefObject<HTMLElement | null>;
   statusLabel?: string;
+  /** Цвет статуса: открыто — зелёный, закрыто — красный; без значения — акцентный оранжевый. */
+  statusTone?: "open" | "closed";
   addressLine?: string;
   detailLine?: string;
   phones: NormalizedPlacePhone[];
@@ -25,13 +26,12 @@ export interface PlaceStickyActionBarProps {
 export function PlaceStickyActionBar({
   ctaRef,
   statusLabel,
+  statusTone,
   addressLine,
   detailLine,
   phones,
   placeId,
-  placeSlug,
   placeTitle,
-  coverImageUrl,
   className,
   directSlot,
 }: PlaceStickyActionBarProps) {
@@ -82,20 +82,26 @@ export function PlaceStickyActionBar({
       aria-hidden={!ctaPassed}
     >
       <div className={cn("min-w-0 flex-1", hasThreeActions && "hidden sm:block")}>
-        {(statusLabel || addressLine) && (
-          <div className="truncate font-mono text-[10px] uppercase tracking-[0.1em]">
-            {statusLabel && <span className="text-[#E86A3A]">{statusLabel}</span>}
-            {statusLabel && addressLine && (
-              <span className="text-[rgba(20,18,16,0.55)]"> · {addressLine}</span>
-            )}
-            {!statusLabel && addressLine && (
-              <span className="text-[rgba(20,18,16,0.55)]">{addressLine}</span>
-            )}
+        {detailLine && (
+          <div className="truncate font-sans text-[18px] font-normal leading-tight tracking-[-0.03em] text-[#141210]">
+            {detailLine}
           </div>
         )}
-        {detailLine && (
-          <div className="mt-0.5 truncate font-sans text-[18px] font-normal leading-tight tracking-[-0.03em] text-[#141210]">
-            {detailLine}
+        {(addressLine || statusLabel) && (
+          <div className="mt-0.5 flex min-w-0 items-center gap-2 text-[12px] leading-tight text-[rgba(20,18,16,0.55)]">
+            {addressLine && <span className="min-w-0 truncate">{addressLine}</span>}
+            {statusLabel && (
+              <span
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-1.5 font-medium",
+                  statusTone === "open" && "text-[#1F8A5B]",
+                  statusTone === "closed" && "text-[#E5322D]",
+                )}
+              >
+                {statusTone && <span aria-hidden className="h-[7px] w-[7px] shrink-0 rounded-full bg-current" />}
+                {statusLabel}
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -115,16 +121,6 @@ export function PlaceStickyActionBar({
           <span className={cn(hasThreeActions && "sr-only sm:not-sr-only")}>Позвонить</span>
         </PlacePhoneActionButton>
       )}
-
-      <PlaceSaveHeart
-        placeId={placeId}
-        placeSlug={placeSlug}
-        placeTitle={placeTitle}
-        coverImageUrl={coverImageUrl}
-        source="place-detail-sticky"
-        className="h-[46px] w-[46px]"
-        iconClassName="h-4 w-4"
-      />
     </div>
   );
 }

@@ -54,6 +54,7 @@ export function ArticleDetailActions({
         coverImageUrl={coverImageUrl}
         variant="labeled"
         source="detail"
+        registerInHeader
       />
       <button
         type="button"

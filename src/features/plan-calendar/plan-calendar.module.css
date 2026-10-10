@@ -64,6 +64,8 @@ button.monthLabel:hover { color: var(--plan-ink); }
   white-space: nowrap;
 }
 .todayPill:disabled { color: var(--plan-faint); cursor: default; }
+/* Выбран не сегодняшний день — «Сегодня» подсвечена оранжевой обводкой как подсказка вернуться. */
+.todayPillAway { border-color: var(--plan-accent, var(--primary)); }
 
 .row { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .rowCompact { gap: 6px; }

@@ -13,6 +13,7 @@ type CityHomeSectionProps = SectionHeaderProps & {
 
 export function CityHomeSection({
   title,
+  titleCitySlug,
   subtitle,
   actionLabel,
   actionHref,
@@ -27,6 +28,7 @@ export function CityHomeSection({
     <section className={cn("space-y-0", className)}>
       <SectionHeader
         title={title}
+        titleCitySlug={titleCitySlug}
         subtitle={subtitle}
         actionLabel={actionLabel}
         actionHref={actionHref}

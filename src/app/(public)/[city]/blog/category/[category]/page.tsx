@@ -5,6 +5,7 @@ import { BlogPagination } from "../../../../blog/BlogPagination";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import {
   listCityBlogCategoryArticles,
+  listCityBlogCategoryFacets,
   listPopulatedCityBlogCategories,
   resolveCityBlogCategory,
 } from "@/server/article/cityBlogCategories";
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ city: string; category: string }>;
-  searchParams: Promise<{ page?: string | string[] }>;
+  searchParams: Promise<{ page?: string | string[]; tag?: string | string[] }>;
 };
 
 function parsePage(value: string | string[] | undefined): number {
@@ -67,14 +68,22 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
   if (!category) notFound();
 
   const requestedPage = parsePage(query.page);
+  const rawTag = Array.isArray(query.tag) ? query.tag[0] : query.tag;
+  const facets = await listCityBlogCategoryFacets(city, category);
+  // Неизвестный slug темы игнорируем — показываем весь раздел.
+  const activeTag = facets.tags.find((tag) => tag.slug === rawTag) ?? null;
   const [journal, categories] = await Promise.all([
-    listCityBlogCategoryArticles(city, category.id, requestedPage),
+    listCityBlogCategoryArticles(city, category.id, requestedPage, undefined, { tagSlug: activeTag?.slug ?? null }),
     listPopulatedCityBlogCategories(city),
   ]);
   if (requestedPage > journal.totalPages && journal.total > 0) notFound();
 
   const cityName = getCityDisplayName(city.slug);
-  const basePath = categoryPath(city.slug, category.slug);
+  const categoryBasePath = categoryPath(city.slug, category.slug);
+  const basePath = activeTag ? `${categoryBasePath}?tag=${encodeURIComponent(activeTag.slug)}` : categoryBasePath;
+  const chipBase = "shrink-0 rounded-full border px-4 py-2 text-sm transition-colors";
+  const chipIdle = "border-border hover:border-foreground/40";
+  const chipActive = "border-foreground bg-foreground font-semibold text-background";
 
   return (
     <main className="site-wrap px-6 py-10 sm:px-7 md:py-14">
@@ -108,6 +117,50 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
               }
             >
               {item.name}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+
+      {facets.subcategories.length > 0 ? (
+        <nav className="no-scrollbar mb-4 flex gap-2 overflow-x-auto pb-1" aria-label="Подкатегории">
+          <Link
+            href={categoryPath(city.slug, facets.root.slug)}
+            aria-current={!category.parentId ? "page" : undefined}
+            className={`${chipBase} ${!category.parentId ? chipActive : chipIdle}`}
+          >
+            Все {facets.root.name.toLowerCase()}
+          </Link>
+          {facets.subcategories.map((item) => (
+            <Link
+              key={item.id}
+              href={categoryPath(city.slug, item.slug)}
+              aria-current={item.id === category.id ? "page" : undefined}
+              className={`${chipBase} ${item.id === category.id ? chipActive : chipIdle}`}
+            >
+              {item.name}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+
+      {facets.tags.length > 0 ? (
+        <nav className="no-scrollbar mb-8 flex gap-2 overflow-x-auto pb-1" aria-label="Темы раздела">
+          <Link
+            href={categoryBasePath}
+            aria-current={!activeTag ? "page" : undefined}
+            className={`${chipBase} ${!activeTag ? "border-primary bg-primary/10 font-semibold text-primary" : chipIdle}`}
+          >
+            Все темы
+          </Link>
+          {facets.tags.map((tag) => (
+            <Link
+              key={tag.id}
+              href={`${categoryBasePath}?tag=${encodeURIComponent(tag.slug)}`}
+              aria-current={activeTag?.slug === tag.slug ? "page" : undefined}
+              className={`${chipBase} ${activeTag?.slug === tag.slug ? "border-primary bg-primary/10 font-semibold text-primary" : chipIdle}`}
+            >
+              {tag.name}
             </Link>
           ))}
         </nav>

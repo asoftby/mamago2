@@ -1,7 +1,6 @@
 "use client";
 
 import { ArrowRight, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface PlanStickyCounterProps {
   count: number;
@@ -11,52 +10,39 @@ interface PlanStickyCounterProps {
 }
 
 /**
- * Единственная обратная связь на «Добавить в план» — залипающий счётчик, не тост.
- * Пустой план → компонент не рендерит ничего. Живёт вне скролла результатов
- * (пиннится, как MyPlanHeader), не привязан к слою (виден и до, и после выдачи).
+ * Нижняя панель плана. Главное действие — поле-кнопка «Что нужно сделать?»
+ * (открывает экран «Новое дело»), ссылка «Весь план» — тихая. Живёт вне скролла.
  */
 export function PlanStickyCounter({ count, onClick, compact = false, onAdd }: PlanStickyCounterProps) {
-  if (!compact && count <= 0) return null;
-
-  if (compact) {
-    return (
-      <div className="flex-shrink-0 border-t border-[rgba(20,18,16,.10)] bg-[#FAF7F1] px-4 py-3 pb-[max(.75rem,env(safe-area-inset-bottom))]">
-        <div className="grid grid-cols-[1fr_1.15fr] gap-2.5">
-          <button
-            type="button"
-            onClick={onAdd}
-            className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-hover"
-          >
-            <Plus className="h-4 w-4" />
-            Добавить
-          </button>
-          <button
-            type="button"
-            onClick={onClick}
-            className="flex min-h-12 items-center justify-center gap-2 rounded-full border border-[rgba(20,18,16,.16)] bg-white px-4 text-sm font-semibold text-[#141210]"
-          >
-            Весь план
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (!onAdd && count <= 0) return null;
 
   return (
     <div
-      className={cn(
-        "flex-shrink-0 border-t border-[rgba(20,18,16,.10)] bg-[#FAF7F1]",
-        compact ? "px-5 py-3" : "px-6 py-3.5",
-      )}
+      className={
+        "flex-shrink-0 border-t border-[var(--mp-line)] bg-[var(--mp-bg)] pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] " +
+        (compact ? "px-5" : "px-8")
+      }
     >
+      {onAdd ? (
+        <button
+          type="button"
+          onClick={onAdd}
+          className="flex h-[54px] w-full items-center gap-2.5 rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] px-4 text-left text-base font-medium text-[#6F6A65] transition-colors hover:border-[var(--mp-line-strong)]"
+        >
+          <Plus className="h-5 w-5 text-[var(--mp-ac)]" strokeWidth={2} aria-hidden />
+          Что нужно сделать?
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={onClick}
-        className="flex w-full items-center justify-between text-sm font-semibold text-[#141210] transition-opacity hover:opacity-70"
+        className={
+          "flex w-full items-center justify-center gap-1.5 text-[15px] font-bold text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)] " +
+          (onAdd ? "mt-1 min-h-11" : "min-h-11")
+        }
       >
-        <span>В плане: {count}</span>
-        <ArrowRight className="h-4 w-4" />
+        {count > 0 ? `Весь план · ${count}` : "Весь план"}
+        <ArrowRight className="h-4 w-4" aria-hidden />
       </button>
     </div>
   );

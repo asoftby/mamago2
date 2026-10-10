@@ -11,9 +11,9 @@ import { useNavigationReloadDebug } from "@/hooks/useNavigationReloadDebug";
 import { NotificationSurfaceBootstrap } from "@/features/notifications/NotificationSurfaceBootstrap";
 import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 
-/** Виджет «Мой план» (64px) + отступ от низа 12px + зазор 24px + safe-area. */
+/** Плашка «Мой план» (56px) + отступ от низа 12px + небольшой зазор + safe-area. */
 const MOBILE_MAIN_BOTTOM =
-  "pb-[calc(6.25rem+env(safe-area-inset-bottom))] lg:pb-0";
+  "pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0";
 
 function isPublishedPublicSource(pathname: string): boolean {
   return !(
@@ -120,7 +120,8 @@ export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <div className={cn(hasMobilePlanWidget ? MOBILE_MAIN_BOTTOM : "pb-0 lg:pb-0")}>
+      {/* Подложка под отступом — того же цвета, что футер, иначе под ним остаётся белая полоса. */}
+      <div className={cn("bg-[#F6F2EA]", hasMobilePlanWidget ? MOBILE_MAIN_BOTTOM : "pb-0 lg:pb-0")}>
         <PublicFooter withStickyCtaClearance={hideBottomBar} />
       </div>
 

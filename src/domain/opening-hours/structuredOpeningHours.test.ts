@@ -80,3 +80,20 @@ test("rejects malformed times and unsupported overnight ranges", () => {
     rules: [{ dayOfWeek: "FRI", isOpen: true, allDay: false, intervals: [{ startTime: "9:00", endTime: "18:00" }] }],
   }));
 });
+
+test("status detail: closes at / opens later today / opens tomorrow", () => {
+  const value = openingHoursFromRelational(source);
+  // Пн 10:30 по Минску — открыто, закрытие в 13:00
+  assert.equal(getOpeningStatus(value, new Date("2026-08-31T07:30:00.000Z")).statusDetail, "закроется в 13:00");
+  // Пн 13:30 по Минску — перерыв, откроется в 14:00
+  assert.equal(getOpeningStatus(value, new Date("2026-08-31T10:30:00.000Z")).statusDetail, "откроется в 14:00");
+  // Вс 15:00 по Минску — выходной, откроется завтра в 09:00
+  assert.equal(getOpeningStatus(value, new Date("2026-08-30T12:00:00.000Z")).statusDetail, "откроется завтра в 09:00");
+});
+
+test("short status for the place card: «до …» when open, «с …» when closed", () => {
+  const value = openingHoursFromRelational(source);
+  assert.equal(getOpeningStatus(value, new Date("2026-08-31T07:30:00.000Z")).statusShort, "до 13:00");
+  assert.equal(getOpeningStatus(value, new Date("2026-08-31T10:30:00.000Z")).statusShort, "с 14:00");
+  assert.equal(getOpeningStatus(value, new Date("2026-08-30T12:00:00.000Z")).statusShort, "с 09:00");
+});

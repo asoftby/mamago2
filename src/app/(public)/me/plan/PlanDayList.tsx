@@ -166,23 +166,16 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
               marginRight: "auto",
             }}
           >
-            Добавьте запись или перешлите сообщение боту.
+            Посмотрите, куда можно пойти в этот день.
           </p>
           <div style={{ display: "inline-flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-            <button
-              type="button"
-              onClick={onAddManual}
-              className="min-h-[50px] rounded-full bg-primary px-5 text-sm font-semibold text-white"
-            >
-              + Добавить
-            </button>
             <Link
               href="/minsk"
               style={{
                 display: "inline-flex", alignItems: "center", gap: 8,
                 height: 50, padding: "0 22px", borderRadius: 999,
                 fontWeight: 600, fontSize: 14,
-                background: "#E86A3A", color: "#fff",
+                background: "var(--primary)", color: "#fff",
                 border: "1px solid transparent",
                 transition: "background .18s",
                 textDecoration: "none",

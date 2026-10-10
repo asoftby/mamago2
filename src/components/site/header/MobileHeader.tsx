@@ -3,7 +3,7 @@
 /**
  * Хедер для viewport **< lg** — одна строка (48px).
  * Discovery: лого/«←» · чип «🧭 Минск · Я и Степан» (вход в поиск) · 🔔 · 👤. Кнопка ⚙ фильтров — в строке заголовка раздела.
- * Landing (посадочные): «←» · ♡ · поделиться · 🔔 · 👤.
+ * Landing (любая публикация): «←» · «поделиться» · «сохранить» (если страница его регистрирует).
  * Скролл вниз → хедер уезжает через transform (без layout shift), скролл вверх → возвращается.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils";
 import { MobileSearchEntry } from "@/components/mobile/MobileSearchEntry";
 import { MobileSearchSheet } from "@/components/mobile/MobileSearchSheet";
 import { NavIconButton } from "@/components/mobile/NavIconButton";
-import { MOBILE_HEADER_ROW_HEIGHT } from "@/components/mobile/mobile-control-geometry";
 import {
   getIntentFromPath,
   getDiscoveryIntentForPublicationPath,
@@ -23,7 +22,7 @@ import {
 } from "@/lib/intent";
 import { getSiteHeaderVariant } from "@/lib/site/siteHeaderVariant";
 import { useCity } from "@/contexts/CityContext";
-import { usePublicationIntent } from "@/contexts/PublicationIntentContext";
+import { useHeaderSaveAction, usePublicationIntent } from "@/contexts/PublicationIntentContext";
 import { useArticleGeoLabel } from "@/contexts/ArticleGeoLabelContext";
 import { useHeaderScrolled } from "@/hooks/useHeaderScrolled";
 import { useScrollDirection } from "@/hooks/useScrollDirection";
@@ -31,10 +30,21 @@ import { useBranding } from "@/contexts/BrandingContext";
 import { OPEN_MOBILE_SEARCH_EVENT } from "@/lib/mobile/openMobileSearchEvent";
 import { OPEN_PUBLIC_SEARCH_EVENT } from "@/lib/search/openPublicSearchEvent";
 import { MobileHeaderActions } from "./MobileHeaderActions";
+import { MobileEventActions } from "./MobileEventActions";
 import { MobileHeaderBackButton } from "./MobileHeaderBackButton";
-import { MobileLandingActions } from "./MobileLandingActions";
 
 const HEADER_BG = "bg-[#F6F2EA]";
+
+/** Слово в заголовке модалки шеринга для страниц, которые не зарегистрировали своё. */
+function shareNounForPath(pathname: string): string | undefined {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.includes("places")) return "местом";
+  if (segments.includes("offers")) return "предложением";
+  if (segments.includes("routes")) return "маршрутом";
+  if (segments.includes("blog") || segments[0] === "preview") return "статьёй";
+  if (segments.includes("events") || segments.includes("activity")) return "событием";
+  return "страницей";
+}
 
 export function MobileHeader() {
   const [isSearchSheetOpen, setIsSearchSheetOpen] = useState(false);
@@ -55,6 +65,7 @@ export function MobileHeader() {
 
   const routeIntent = getIntentFromPath(pathname);
   const publicationIntent = usePublicationIntent();
+  const saveAction = useHeaderSaveAction();
   const isPublicationPage = isPublicationDetailPath(pathname);
   /** Intent из pathname, чтобы SSR и первый клиентский кадр совпадали (контекст публикации заполняется позже в useEffect). */
   const intentFromPathForPublication = getDiscoveryIntentForPublicationPath(pathname);
@@ -80,7 +91,8 @@ export function MobileHeader() {
   const cityHubOnly = isPublicationPage || isJournalRoute;
   const isLanding = getSiteHeaderVariant(pathname) === "landing";
   /** Корневые страницы города (хаб, витрины, подборки) — лого; внутренние — «←». */
-  const isRootPage = !isLanding && pathname.split("/").filter(Boolean).length <= 2;
+  const pathSegments = pathname.split("/").filter(Boolean);
+  const isRootPage = !isLanding && pathSegments.length <= 2 && pathSegments[0] !== "page";
   const homeHref = `/${displayCity}`;
 
   useEffect(() => {
@@ -135,13 +147,12 @@ export function MobileHeader() {
       >
         <div
           ref={row1Ref}
-          className={cn("flex min-w-0 items-center gap-2 px-3", MOBILE_HEADER_ROW_HEIGHT)}
+          className={cn("flex min-w-0 items-center gap-2 px-3", "h-14")}
         >
           {leading}
           {isLanding ? (
             <div className="ml-auto flex shrink-0 items-center gap-2">
-              <MobileLandingActions />
-              <MobileHeaderActions />
+              <MobileEventActions saveAction={saveAction} fallbackNoun={shareNounForPath(pathname)} />
             </div>
           ) : (
             <>
@@ -152,7 +163,7 @@ export function MobileHeader() {
                 citySlug={displayCity}
                 currentIntent={displayIntent}
                 locationLabelOverride={articleGeoLabel}
-                className="!h-11"
+                className="!h-12"
               />
               <MobileHeaderActions />
             </>

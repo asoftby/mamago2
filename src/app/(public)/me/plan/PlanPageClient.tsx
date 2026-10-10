@@ -20,6 +20,7 @@ import {
 import { PastPlanArchive } from "./PastPlanArchive";
 import type { PastPlanEntry } from "@/server/services/experience/pastPlanEntries.service";
 import { ManualPlanEntryDialog } from "./ManualPlanEntryDialog";
+import { PlanNewTaskDialog } from "./PlanNewTaskDialog";
 import { addDays, monthName, startOfWeek, todayKey } from "@/lib/date/dateKey";
 import {
   shouldFetchCalendarWeek,
@@ -317,8 +318,14 @@ export function PlanPageClient({
   const [loadingWeek, setLoadingWeek] = useState<string | null>(null);
   const [calendarFilter, setCalendarFilter] = useState<FamilyCalendarFilter>("all");
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
+  const [newTaskOpen, setNewTaskOpen] = useState(false);
   const [editingManualItem, setEditingManualItem] = useState<SerializedPlanItem | null>(null);
   const [overviewOpen, setOverviewOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(pastEntriesPage > 0);
+  // Pagination links can navigate directly to the archive, including after a reload.
+  useEffect(() => {
+    if (searchParams.has("historyPage")) setArchiveOpen(true);
+  }, [searchParams]);
   const familyUi = showFamilyUi(familyView);
   const [scope, setScope] = useState<PlanScopeFilter>("all");
 
@@ -447,8 +454,7 @@ export function PlanPageClient({
   };
 
   const openCreate = () => {
-    setEditingManualItem(null);
-    setManualDialogOpen(true);
+    setNewTaskOpen(true);
   };
 
   const openEdit = (item: SerializedPlanItem) => {
@@ -534,48 +540,48 @@ export function PlanPageClient({
           </div>
 
           <div className="flex flex-col items-end">
-            <button
-              type="button"
-              onClick={() => weekItems.length > 0 && setOverviewOpen(true)}
-              disabled={weekItems.length === 0}
-              aria-label={weekItems.length > 0 ? "Открыть обзор недели" : "На этой неделе план пока пуст"}
-              style={{
-                padding: "16px 18px",
-                background: "#FAF7F1",
-                border: "1px solid rgba(20,18,16,.10)",
-                borderRadius: 14,
-                width: "100%",
-                maxWidth: 320,
-                textAlign: "left",
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-                cursor: weekItems.length > 0 ? "pointer" : "default",
-                transition: "border-color .18s, transform .18s",
-              }}
-              onMouseEnter={(event) => {
-                if (weekItems.length > 0) {
-                  event.currentTarget.style.borderColor = "rgba(20,18,16,.32)";
-                  event.currentTarget.style.transform = "translateY(-2px)";
-                }
-              }}
-              onMouseLeave={(event) => {
-                event.currentTarget.style.borderColor = "rgba(20,18,16,.10)";
-                event.currentTarget.style.transform = "none";
-              }}
+            <div
+              className="w-full max-w-[320px] overflow-hidden rounded-[14px] border border-[rgba(20,18,16,.10)] bg-[#FAF7F1]"
             >
-              <span className="font-mono text-[11px] uppercase tracking-[.12em] text-[#6B6258]">
-                На этой неделе
-              </span>
-              <span className="font-sans text-[27px] font-semibold leading-tight text-[#141210]">
-                {weekItems.length} {pluralizeEvents(weekItems.length)}
-              </span>
-              {weekItems.length > 0 && (
-                <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-[#C24E22]">
-                  Посмотреть все <span aria-hidden="true">→</span>
+              <button
+                type="button"
+                onClick={() => weekItems.length > 0 && setOverviewOpen(true)}
+                disabled={weekItems.length === 0}
+                aria-label={weekItems.length > 0 ? "Открыть обзор недели" : "На этой неделе план пока пуст"}
+                className="flex w-full flex-col gap-2 px-[18px] py-4 text-left transition-colors enabled:hover:bg-white/60 disabled:cursor-default"
+              >
+                <span className="font-mono text-[11px] uppercase tracking-[.12em] text-[#6B6258]">
+                  На этой неделе
                 </span>
-              )}
-            </button>
+                <span className="font-sans text-[27px] font-semibold leading-tight text-[#141210]">
+                  {weekItems.length} {pluralizeEvents(weekItems.length)}
+                </span>
+                {weekItems.length > 0 && (
+                  <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-primary">
+                    Посмотреть все <span aria-hidden="true">→</span>
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                aria-controls="past-plan-history"
+                aria-expanded={archiveOpen}
+                onClick={() => {
+                  setArchiveOpen(true);
+                  window.requestAnimationFrame(() => {
+                    window.requestAnimationFrame(() => {
+                      document.getElementById("past-plan-history")?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start",
+                      });
+                    });
+                  });
+                }}
+                className="flex min-h-11 w-full items-center justify-between border-t border-[rgba(20,18,16,.10)] px-[18px] py-2 text-left text-sm font-semibold text-primary transition-colors hover:bg-white/60"
+              >
+                Архив событий <span aria-hidden="true">→</span>
+              </button>
+            </div>
           </div>
         </div>
       </Container>
@@ -586,7 +592,15 @@ export function PlanPageClient({
           candidates={experienceCandidates}
           recentExperiences={recentExperiences}
         />
-        <PastPlanArchive entries={pastEntries} hasNext={pastEntriesHasNext} page={pastEntriesPage} selectedDate={selectedDate} />
+        {archiveOpen && (
+          <PastPlanArchive
+            entries={pastEntries}
+            hasNext={pastEntriesHasNext}
+            page={pastEntriesPage}
+            selectedDate={selectedDate}
+            onClose={() => setArchiveOpen(false)}
+          />
+        )}
       </Container>
 
       {familyUi && (
@@ -685,6 +699,18 @@ export function PlanPageClient({
         onOpenDay={(date) => {
           selectDate(date);
           setOverviewOpen(false);
+        }}
+      />
+
+      <PlanNewTaskDialog
+        open={newTaskOpen}
+        onOpenChange={setNewTaskOpen}
+        date={selectedDate}
+        familyChildren={familyChildren}
+        onSaved={(date) => {
+          setNewTaskOpen(false);
+          invalidatePlanDayMarkers();
+          selectDate(date);
         }}
       />
 

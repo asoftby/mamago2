@@ -168,8 +168,11 @@ export function MobileSearch({
     [searchText, onResultNavigate],
   );
 
-  /** Как в разделах discovery: табы видны в idle даже до выбора раздела (хаб города). */
-  const showIntentRow = searchState === "idle";
+  /**
+   * Табы разделов видны всегда, пока не набран запрос (idle и focused): поле поиска в фокусе при
+   * открытии шита, и если скрывать разделы, пользователь их не находит. Хаб города — до выбора раздела.
+   */
+  const showIntentRow = searchState !== "typing";
 
   const showPopularBlock =
     searchState === "focused" && queryTrim.length < 2;

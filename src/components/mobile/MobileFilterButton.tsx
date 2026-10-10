@@ -6,6 +6,7 @@ import { useRefinementFilters } from "@/contexts/RefinementFiltersContext";
 import type { Intent } from "@/lib/intent";
 import { useSecondaryFiltersFromUrl } from "@/features/filters/discovery/useSecondaryFiltersFromUrl";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
+import { getEventRefinementCount } from "@/components/discovery/EventAdvancedFilters";
 
 interface MobileFilterButtonProps {
   intent?: Intent | string;
@@ -16,8 +17,10 @@ export function MobileFilterButton({ intent, className }: MobileFilterButtonProp
   const { setIsOpen, setCurrentIntent } = useRefinementFilters();
   const safeIntent = intent as Intent | null;
   const { activeCount: secondaryActiveCount } = useSecondaryFiltersFromUrl(safeIntent);
-  const { derived } = useDiscoveryFilters();
-  const activeCount = safeIntent === "kuda" ? derived.activeCount : secondaryActiveCount;
+  const { applied } = useDiscoveryFilters();
+  // «Куда пойти»: бейдж считает только уточнения из модалки (категория, жанр, формат, цена).
+  // Дата, возраст («Для всех» / дети из профиля), город и район — контекст шапки и бейдж не зажигают.
+  const activeCount = safeIntent === "kuda" ? getEventRefinementCount(applied) : secondaryActiveCount;
 
   const handleClick = () => {
     if (intent) {

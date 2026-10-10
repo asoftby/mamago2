@@ -6,6 +6,11 @@ import { RouteCard } from "@/components/routes/RouteCard";
 import { DiscoveryActivitiesGrid } from "@/components/discovery/DiscoveryActivitiesGrid";
 import { Intent } from "@/lib/intent";
 import { H1 } from "@/components/ui/typography";
+import { CityTitle } from "@/components/ui/CityTitle";
+
+/** Заголовок раздела — serif 400/30px; город выделяется курсивом (CityTitle). */
+const DISCOVERY_TITLE_CLASS =
+  "px-1 font-serif text-[30px] font-normal leading-[1.1] tracking-[-0.03em]";
 import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { formatCityTitle } from "@/lib/city/cityDisplayNames";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
@@ -129,7 +134,7 @@ export function CityDiscoveryShell({
       <main className="min-h-screen bg-white pb-20">
         <Container className="pt-6 space-y-6">
           <div className="flex items-start justify-between">
-            <H1 className="px-1">{pageTitle}</H1>
+            <H1 className={DISCOVERY_TITLE_CLASS}><CityTitle title={pageTitle} citySlug={city} /></H1>
             <div className="flex shrink-0 items-center gap-2">
               {filterButton}
               <Link
@@ -166,7 +171,7 @@ export function CityDiscoveryShell({
       <main className="min-h-screen bg-white pb-20">
         <Container className="pt-10 space-y-6">
           <div className="flex items-start justify-between gap-3">
-            <H1 className="px-1">{pageTitle}</H1>
+            <H1 className={DISCOVERY_TITLE_CLASS}><CityTitle title={pageTitle} citySlug={city} /></H1>
             {filterButton}
           </div>
 
@@ -182,7 +187,7 @@ export function CityDiscoveryShell({
     <main className="min-h-screen bg-white pb-20">
       <Container className="pt-10 space-y-6">
         <div className="flex items-start justify-between gap-3">
-          <H1 className="px-1">{pageTitle}</H1>
+          <H1 className={DISCOVERY_TITLE_CLASS}><CityTitle title={pageTitle} citySlug={city} /></H1>
           {filterButton}
         </div>
         {intent === "kuda" ? <EventQuickFilters /> : null}

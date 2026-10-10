@@ -32,7 +32,6 @@ import { loadArticleMvpBySlugPublic, loadRelatedBreakingNews } from "@/lib/artic
 import { ArticleMvpView } from "@/components/article/mvp/ArticleMvpView";
 import { BreakingNewsView } from "@/components/article/mvp/BreakingNewsView";
 import { ContinuousArticleReader } from "@/components/article/continuous/ContinuousArticleReader";
-import { MobileSmartBackButton } from "@/components/shared/MobileSmartBackButton";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import {
   incrementPublishedArticleViews,
@@ -545,9 +544,6 @@ export default async function ArticlePage({
 
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12 md:py-16">
-      <div className="mb-4 md:mb-0">
-        <MobileSmartBackButton />
-      </div>
       {"_seo" in article && article._seo?.id ? (
         <AnalyticsDetailBeacon
           entityType="ARTICLE"

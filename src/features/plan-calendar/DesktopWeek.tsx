@@ -56,7 +56,7 @@ export function DesktopWeek({ value, variant, markers, minDate, maxDate, calenda
             <button type="button" className={styles.textNav} onClick={() => shiftWeek(1)} disabled={!canShiftForward}>след →</button>
           </>
         )}
-        <button type="button" className={styles.todayPill} onClick={goToday} disabled={todayDisabled}>Сегодня</button>
+        <button type="button" className={`${styles.todayPill}${value !== today ? ` ${styles.todayPillAway}` : ""}`} onClick={goToday} disabled={todayDisabled}>Сегодня</button>
       </div>
 
       {monthOpen && (

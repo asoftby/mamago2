@@ -97,6 +97,10 @@ export type PlanItemWithActivity = {
   /** Ключ категории ручного пункта (planItemCategory); null у каталожных. */
   category?: string | null;
   reminderEnabled?: boolean | null;
+  /** За сколько минут напомнить; null = по общему расписанию уведомлений. */
+  reminderLeadMinutes?: number | null;
+  /** Взрослый член семьи, на кого ручное дело; null = не задано. */
+  assigneeUserId?: string | null;
   /** Family Core: audience + version for edit-conflict checks (persisted rows). */
   visibility?: PlanVisibility;
   updatedAt?: Date;

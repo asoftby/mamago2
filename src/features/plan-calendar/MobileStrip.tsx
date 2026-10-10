@@ -173,7 +173,7 @@ export function MobileStrip({ value, markers, minDate, maxDate, calendar, onVisi
         <span className={styles.rule} />
         <button
           type="button"
-          className={styles.todayPill}
+          className={`${styles.todayPill}${value !== today ? ` ${styles.todayPillAway}` : ""}`}
           onClick={goToday}
           disabled={value === today && todayVisible}
         >
