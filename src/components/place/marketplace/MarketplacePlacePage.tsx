@@ -424,7 +424,7 @@ function MetaStrip({ items, isOpenNow }: { items: Array<[string, string, string]
             </div>
             <div style={{ fontSize: 17, fontWeight: 500, letterSpacing: "-.01em", color: "#141210", display: "flex", alignItems: "center", gap: 6 }}>
               {label === "Часы" && isOpenNow != null && (
-                <span style={{ fontSize: 14, color: isOpenNow ? "#1F8A5B" : "#C24E22", flexShrink: 0, lineHeight: 1 }}>●</span>
+                <span style={{ fontSize: 7, color: isOpenNow ? "#1F8A5B" : "#C24E22", flexShrink: 0, lineHeight: 1 }}>●</span>
               )}
               {value}
             </div>

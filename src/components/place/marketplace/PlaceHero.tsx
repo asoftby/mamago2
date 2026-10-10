@@ -191,7 +191,7 @@ export function PlaceHero({
                   fontWeight: 600,
                 }}
               >
-                ● {categoryLabel}
+                {categoryLabel}
               </span>
             )}
             {district && (
@@ -296,9 +296,9 @@ export function PlaceHero({
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontFamily: "var(--font-mono, monospace)", textTransform: "uppercase", fontSize: 11, letterSpacing: ".14em", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: isOpenNow == null ? "rgba(20,18,16,.45)" : isOpenNow ? "#1F8A5B" : "#C24E22" }}>
                       {isOpenNow != null
-                        ? `● ${isOpenNow ? "Открыто" : "Закрыто"}`
+                        ? (isOpenNow ? "Открыто" : "Закрыто")
                         : summaryPrimary
-                          ? `● ${summaryPrimary}`
+                          ? summaryPrimary
                           : title}
                     </div>
                     {hoursDetail && (

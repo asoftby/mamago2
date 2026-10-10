@@ -27,34 +27,24 @@ export function PlaceEventsSection({ activities, citySlug }: PlaceEventsSectionP
         className="events-wrap mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-7"
         id="events"
       >
-        <div
+        {/* Кикер: линия на всю ширину блока */}
+        <div className="kicker-row" style={{ marginBottom: 14 }}>
+          <span className="text-kicker">Афиша</span>
+          <span className="kicker-line" />
+        </div>
+        <h2
           style={{
-            display: "flex",
-            alignItems: "flex-end",
+            fontSize: 30,
+            margin: 0,
             marginBottom: 34,
-            gap: 16,
-            flexWrap: "wrap",
+            letterSpacing: "-.02em",
+            color: "#141210",
+            fontFamily: "var(--font-sans)",
+            fontWeight: 400,
           }}
         >
-          <div>
-            <div className="kicker-row" style={{ marginBottom: 14 }}>
-              <span className="text-kicker">Афиша</span>
-              <span className="kicker-line" style={{ width: 120 }} />
-            </div>
-            <h2
-              style={{
-                fontSize: 30,
-                margin: 0,
-                letterSpacing: "-.02em",
-                color: "#141210",
-                fontFamily: "var(--font-sans)",
-                fontWeight: 400,
-              }}
-            >
-              События в этом месте
-            </h2>
-          </div>
-        </div>
+          События в этом месте
+        </h2>
 
         <HorizontalCardRow>
           {activities.slice(0, 4).map((activity) => (
