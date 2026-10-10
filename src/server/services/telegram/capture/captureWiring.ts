@@ -23,6 +23,7 @@ import type { InboxProcessor } from "./inboxProcessor";
 import { createInboxIntake, type IntakeNotifier, type IntakeResult } from "./inboxIntake.service";
 import { getTelegramCaptureClient } from "./telegramCaptureClient";
 import type { ParsedCapture } from "./telegramUpdateParser";
+import { CAPTURE_PROCESSING_REPLIES } from "./captureReplies";
 
 /** Everything the webhook needs for the capture path; injectable in tests. */
 export type CaptureRoutingDeps = {
@@ -47,6 +48,37 @@ function createNotifier(): IntakeNotifier {
     },
     async typing(chatId) {
       await getTelegramCaptureClient().sendChatAction(chatId, "typing");
+    },
+    async progress(chatId, partKind) {
+      try {
+        const sent = await new TelegramChannel().sendMessage({
+          chatId: String(chatId),
+          text: CAPTURE_PROCESSING_REPLIES[partKind],
+        });
+        return sent.message_id;
+      } catch {
+        console.error("[telegram:capture] code=PROGRESS_SEND_FAILED");
+        return null;
+      }
+    },
+    async failed(chatId, messageId, text) {
+      if (messageId !== null) {
+        try {
+          await new TelegramChannel().editMessageText({
+            chatId: String(chatId),
+            messageId,
+            text,
+          });
+          return;
+        } catch {
+          console.error("[telegram:capture] code=FAILURE_STATUS_EDIT_FAILED");
+        }
+      }
+      try {
+        await new TelegramChannel().sendMessage({ chatId: String(chatId), text });
+      } catch {
+        console.error("[telegram:capture] code=FAILURE_REPLY_FAILED");
+      }
     },
   };
 }
