@@ -2,7 +2,7 @@
 
 /**
  * Хедер для viewport **< lg** — одна строка (48px).
- * Discovery: лого/«←» · чип «🧭 Минск · Я и Степан» (вход в поиск) · ⚙ фильтры (на категориях) · 🔔 · 👤.
+ * Discovery: лого/«←» · чип «🧭 Минск · Я и Степан» (вход в поиск) · 🔔 · 👤. Кнопка ⚙ фильтров — в строке заголовка раздела.
  * Landing (посадочные): «←» · ♡ · поделиться · 🔔 · 👤.
  * Скролл вниз → хедер уезжает через transform (без layout shift), скролл вверх → возвращается.
  */
@@ -11,12 +11,10 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { MobileSearchEntry } from "@/components/mobile/MobileSearchEntry";
 import { MobileSearchSheet } from "@/components/mobile/MobileSearchSheet";
-import { MobileFilterButton } from "@/components/mobile/MobileFilterButton";
 import { NavIconButton } from "@/components/mobile/NavIconButton";
 import { MOBILE_HEADER_ROW_HEIGHT } from "@/components/mobile/mobile-control-geometry";
 import {
   getIntentFromPath,
-  getCityFromPath,
   getDiscoveryIntentForPublicationPath,
   getDiscoveryIntentForMePath,
   isCityHubPath,
@@ -29,7 +27,6 @@ import { usePublicationIntent } from "@/contexts/PublicationIntentContext";
 import { useArticleGeoLabel } from "@/contexts/ArticleGeoLabelContext";
 import { useHeaderScrolled } from "@/hooks/useHeaderScrolled";
 import { useScrollDirection } from "@/hooks/useScrollDirection";
-import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { useBranding } from "@/contexts/BrandingContext";
 import { OPEN_MOBILE_SEARCH_EVENT } from "@/lib/mobile/openMobileSearchEvent";
 import { OPEN_PUBLIC_SEARCH_EVENT } from "@/lib/search/openPublicSearchEvent";
@@ -68,7 +65,6 @@ export function MobileHeader() {
     intentFromPathForPublication ??
     intentFromMe ??
     null;
-  const currentCity = getCityFromPath(pathname);
   const isJournalRoute = isJournalPath(pathname);
   const { citySlug } = useCity();
   const isCityHubRoute = isCityHubPath(pathname);
@@ -80,12 +76,6 @@ export function MobileHeader() {
   const displayIntent = isJournalRoute
     ? "journal"
     : searchIntent ?? (isCityHubRoute ? undefined : "kuda");
-
-  const isDiscoveryPage = searchIntent !== null && currentCity !== null;
-  const showFilterButton =
-    getSiteHeaderVariant(pathname) !== "landing" &&
-    isDiscoveryPage &&
-    !!searchIntent && DISCOVERY_INTENT_CONFIG[searchIntent].hasFilters;
 
   const cityHubOnly = isPublicationPage || isJournalRoute;
   const isLanding = getSiteHeaderVariant(pathname) === "landing";
@@ -164,9 +154,6 @@ export function MobileHeader() {
                 locationLabelOverride={articleGeoLabel}
                 className="!h-11"
               />
-              {showFilterButton && searchIntent ? (
-                <MobileFilterButton intent={searchIntent} className="h-11 w-11" />
-              ) : null}
               <MobileHeaderActions />
             </>
           )}

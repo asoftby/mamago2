@@ -18,6 +18,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useOptionalDiscoveryBudgetConfig } from "@/features/filters/discovery/discoveryBudgetContext";
 import { EventQuickFilters } from "@/components/discovery/EventQuickFilters";
+import { MobileFilterButton } from "@/components/mobile/MobileFilterButton";
 
 function BirthdayQuickStartBanner({ city }: { city: string }) {
   return (
@@ -106,6 +107,13 @@ export function CityDiscoveryShell({
     (pageTitleOverride ?? formatCityTitle(intentConfig.titleTemplate, city)) +
     whenPresetPageTitleSuffix(applied);
 
+  /** Мобильная (< lg) кнопка ⚙ фильтров справа от заголовка раздела. */
+  const filterButton = intentConfig.hasFilters ? (
+    <div className="shrink-0 lg:hidden">
+      <MobileFilterButton intent={intent} className="h-11 w-11" />
+    </div>
+  ) : null;
+
   useEffect(() => {
     budgetCtx?.setBudgetConfig(budgetConfig ?? null);
     return () => {
@@ -122,13 +130,16 @@ export function CityDiscoveryShell({
         <Container className="pt-6 space-y-6">
           <div className="flex items-start justify-between">
             <H1 className="px-1">{pageTitle}</H1>
-            <Link
-              href="/routes/new"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-neutral-900 text-white text-sm font-semibold hover:bg-neutral-700 transition-colors shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              Создать
-            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+              {filterButton}
+              <Link
+                href="/routes/new"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-neutral-900 text-white text-sm font-semibold hover:bg-neutral-700 transition-colors shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                Создать
+              </Link>
+            </div>
           </div>
 
           {routes.length === 0 && (
@@ -154,8 +165,9 @@ export function CityDiscoveryShell({
     return (
       <main className="min-h-screen bg-white pb-20">
         <Container className="pt-10 space-y-6">
-          <div className="space-y-4">
+          <div className="flex items-start justify-between gap-3">
             <H1 className="px-1">{pageTitle}</H1>
+            {filterButton}
           </div>
 
           <BirthdayQuickStartBanner city={city} />
@@ -169,8 +181,9 @@ export function CityDiscoveryShell({
   return (
     <main className="min-h-screen bg-white pb-20">
       <Container className="pt-10 space-y-6">
-        <div className="space-y-4">
+        <div className="flex items-start justify-between gap-3">
           <H1 className="px-1">{pageTitle}</H1>
+          {filterButton}
         </div>
         {intent === "kuda" ? <EventQuickFilters /> : null}
         {intent === "classes" && classChips && activeClassChipSlug ? (
