@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { ShareSheet } from "@/components/routes/ShareSheet";
+import { useRegisterHeaderSaveAction } from "@/contexts/PublicationIntentContext";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { toast } from "@/lib/toast";
@@ -292,6 +293,7 @@ export function RouteDetailClient({ route }: Props) {
   const actionBlockRef = useRef<HTMLDivElement>(null);
   const stickyBarRef = useRef<HTMLDivElement>(null);
   const { isAuthenticated, user } = useAuthMe();
+  useRegisterHeaderSaveAction(inPlan, () => !inPlan && setPlanOpen(true), route.title, { entityNoun: "маршрутом" });
 
   // Снимаем фокус при скрытии sticky bar
   useEffect(() => {

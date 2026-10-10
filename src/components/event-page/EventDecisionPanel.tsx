@@ -140,7 +140,7 @@ export function EventDecisionPanel({
       {/* Breadcrumbs */}
       <EventBreadcrumbs
         items={data.breadcrumbs}
-        className="hidden text-[13px] text-[rgba(20,18,16,0.55)] md:flex"
+        className="hidden text-[13px] text-[rgba(20,18,16,0.55)] lg:flex"
       />
 
       {/* Kicker: category pill + age + format caps */}

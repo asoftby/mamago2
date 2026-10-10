@@ -1001,7 +1001,7 @@ export function BreakingNewsView({
       )}
 
       <div className="mx-auto w-full max-w-3xl px-4 pb-4 pt-7 sm:px-6">
-        <ArticleBreadcrumbs title={title} homeHref={cityHomeHref} journalHref={journalHref} />
+        <ArticleBreadcrumbs title={title} homeHref={cityHomeHref} journalHref={journalHref} className="hidden lg:block" />
       </div>
       <NewsHero
         articleId={articleId}

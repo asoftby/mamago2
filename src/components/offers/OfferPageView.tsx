@@ -25,6 +25,7 @@ import { FaqSection } from "@/components/public/FaqSection";
 import { DirectRequestCta } from "@/components/direct/DirectRequestCta";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
+import { useRegisterHeaderSaveAction } from "@/contexts/PublicationIntentContext";
 import { shouldFetchOwnSaveStatus } from "@/features/save/saveStatusFetchGuard";
 
 export interface OfferDirectCtaInfo {
@@ -319,6 +320,7 @@ export function OfferPageView({
   }, [data.id, persistLocalSave, saveTargetShift?.shiftId]);
 
   const isSaved = isIdeaSaved || Boolean(localSave);
+  useRegisterHeaderSaveAction(isSaved, handleSave, data.title, { entityNoun: "предложением" });
   const isPlanSaved = localSave?.kind === "plan";
   const planDate = localSave?.kind === "plan" ? localSave.dateISO ?? null : null;
 

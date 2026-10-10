@@ -166,7 +166,7 @@ export function ArticleMvpView({
           title={title}
           homeHref={cityHomeHref}
           journalHref={journalHref}
-          className="mb-6"
+          className="mb-6 hidden lg:block"
         />
         <ArticleHeader
           title={title}

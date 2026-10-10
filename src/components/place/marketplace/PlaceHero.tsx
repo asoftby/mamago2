@@ -1,6 +1,6 @@
 "use client";
 
-import { Instagram, Phone, Share2 } from "lucide-react";
+import { Instagram, Link2, Phone, Share2 } from "lucide-react";
 import { useState } from "react";
 import { ShareModal } from "@/components/shared/ShareModal";
 import { PlaceSaveHeart } from "@/features/save/PlaceSaveHeart";
@@ -146,9 +146,8 @@ export function PlaceHero({
     >
       {/* Breadcrumbs */}
       <div
-        className="breadcrumbs mx-auto w-full max-w-[1200px] px-4 pb-2.5 pt-5 sm:px-6 lg:px-7"
+        className="breadcrumbs mx-auto w-full max-w-[1200px] px-4 pb-2.5 pt-5 sm:px-6 lg:px-7 hidden lg:flex"
         style={{
-          display: "flex",
           gap: 8,
           alignItems: "center",
           color: "rgba(20,18,16,.55)",
@@ -409,9 +408,10 @@ export function PlaceHero({
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => trackCta("website")}
-                      className="min-w-0 truncate text-[14px] text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
+                      className="inline-flex min-w-0 items-center gap-1.5 text-[14px] text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
                     >
-                      {websiteDisplay}
+                      <Link2 size={16} strokeWidth={1.75} className="shrink-0" aria-hidden />
+                      <span className="truncate">{websiteDisplay}</span>
                     </a>
                   )}
                 </div>
