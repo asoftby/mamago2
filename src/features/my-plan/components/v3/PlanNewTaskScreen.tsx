@@ -6,7 +6,6 @@ import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { detectPlanItemCategory } from "../../lib/planItemCategory";
-import { PlanScreenHead } from "./PlanScreenHead";
 import {
   PLAN_CHIP,
   PLAN_CHIP_DISABLED,
@@ -151,12 +150,26 @@ export function PlanNewTaskScreen({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
-      <PlanScreenHead back="План" onBack={onBack} />
+      {/* Заголовок модалки со стрелкой «назад» (возврат в план). */}
+      <div className="flex min-h-14 shrink-0 items-center px-4 pt-2 md:px-8">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Назад в план"
+          className={cn(
+            "mp-font-display -ml-2 inline-flex min-h-11 items-center gap-1 rounded-xl pl-1 pr-3 text-[28px] font-normal leading-[1.1] tracking-[-.02em] text-[var(--mp-tx)]",
+            "transition-colors hover:bg-[var(--mp-soft)]",
+            PLAN_FOCUS,
+          )}
+        >
+          <ChevronLeft className="h-6 w-6 shrink-0" strokeWidth={2} aria-hidden />
+          <span>
+            Новое <em className="font-medium italic text-[var(--mp-ac)]">дело</em>
+          </span>
+        </button>
+      </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 md:px-8">
-        <h2 className="mp-font-display mb-3 mt-1 text-[28px] font-normal leading-[1.1] tracking-[-.02em] text-[var(--mp-tx)]">
-          Новое{" "}
-          <em className="font-medium italic text-[var(--mp-ac)]">дело</em>
-        </h2>
+        <div className="mb-[22px] mt-1">
         <label className="block">
           <span className="sr-only">Что нужно сделать</span>
           <textarea
@@ -174,9 +187,10 @@ export function PlanNewTaskScreen({
             )}
           />
         </label>
-        <div className="mb-[18px] mt-2 flex items-center gap-[7px] border-b border-[var(--mp-line)] pb-4 text-[13px] text-[var(--mp-tx2)] md:hidden">
+        <div className="mt-2 flex items-center gap-[7px] border-b border-[var(--mp-line)] pb-4 text-[13px] text-[var(--mp-tx2)] md:hidden">
           <Mic className="h-[15px] w-[15px]" aria-hidden />
           Удобнее голосом — нажмите микрофон на&nbsp;клавиатуре
+        </div>
         </div>
 
         <div className="mb-[22px]">
