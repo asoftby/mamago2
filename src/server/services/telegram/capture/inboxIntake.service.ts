@@ -289,7 +289,7 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
         where: { id: inboxItemId, cardMessageId: -1 },
         data: { cardMessageId: null },
       });
-      logCode("PROGRESS_SEND_FAILED", "capture");
+      console.error("[inbox-intake] code=PROGRESS_SEND_FAILED");
     }
   }
 
@@ -324,7 +324,11 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
     stored: Extract<IntakeOutcome, { status: "stored" }>,
   ): Promise<void> {
     try {
-      await announceProgress(stored.inboxItemId, capture);
+      try {
+        await announceProgress(stored.inboxItemId, capture);
+      } catch {
+        console.error("[inbox-intake] code=PROGRESS_UPDATE_FAILED");
+      }
       if (stored.isAlbumPart) {
         const wait = Math.max(0, stored.debounceUntil.getTime() - now().getTime()) + jitter();
         await sleep(wait);
@@ -332,7 +336,11 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
       if (!(await claim(stored.inboxItemId))) return;
 
       await numberInboxParts(db, stored.inboxItemId);
-      await notifier.typing(capture.chatId);
+      try {
+        await notifier.typing(capture.chatId);
+      } catch {
+        console.error("[inbox-intake] code=TYPING_SEND_FAILED");
+      }
       try {
         await processor.process(stored.inboxItemId);
       } catch {
