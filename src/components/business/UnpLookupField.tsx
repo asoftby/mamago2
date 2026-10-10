@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 type LookupResult = {
   legalName: string | null;
@@ -16,6 +17,7 @@ interface UnpLookupFieldProps {
   required?: boolean;
   disabled?: boolean;
   placeholder?: string;
+  inputClassName?: string;
   helperText?: string;
   fieldError?: string;
   debounceMs?: number;
@@ -32,6 +34,7 @@ export function UnpLookupField({
   required = false,
   disabled = false,
   placeholder = "123456789",
+  inputClassName,
   helperText = "9 цифр",
   fieldError,
   debounceMs = 700,
@@ -162,7 +165,7 @@ export function UnpLookupField({
           onBlur={handleBlur}
           pattern="[0-9]{9}"
           maxLength={9}
-          className="pr-10"
+          className={cn("pr-10", inputClassName)}
           placeholder={placeholder}
           inputMode="numeric"
           disabled={disabled}
