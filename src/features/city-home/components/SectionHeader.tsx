@@ -67,7 +67,7 @@ export function SectionHeader({
 
   const titleNode = titleCitySlug ? <CityTitle title={title} citySlug={titleCitySlug} /> : title;
   const titleStyle = titleCitySlug
-    ? { fontFamily: "var(--font-serif)", fontWeight: 400, fontSize: 30, letterSpacing: "-0.03em" }
+    ? { fontFamily: "var(--font-serif)", fontWeight: 600, fontSize: 30, letterSpacing: "-0.03em" }
     : { fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 30, letterSpacing: "-1px" };
 
   const actionLink = showAction ? (

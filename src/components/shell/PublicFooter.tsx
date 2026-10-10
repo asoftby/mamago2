@@ -34,7 +34,7 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           {/* Column 1 */}
           <div className="flex flex-col gap-4">
-            <h3 className="text-foreground" style={{ fontFamily: "var(--font-serif)", fontWeight: 400, fontSize: 22, letterSpacing: "-0.02em" }}>Проект</h3>
+            <h3 className="text-foreground" style={{ fontFamily: "var(--font-serif)", fontWeight: 600, fontSize: 20, letterSpacing: "-0.02em" }}>Проект</h3>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
               <a
                 href="https://probusiness.io/experience/12467-bylo-mnogo-oshibok-noluchshe-delat-chem-sidet-nameste-ichego-to-zhdat-muzh-izhena-poshli-protiv-mass-marketa-irazvivayut-biznes-nasemeynom-dosuge.html"
@@ -49,7 +49,7 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
 
           {/* Column 2 */}
           <div className="flex flex-col gap-4">
-            <h3 className="text-foreground" style={{ fontFamily: "var(--font-serif)", fontWeight: 400, fontSize: 22, letterSpacing: "-0.02em" }}>Партнёрам</h3>
+            <h3 className="text-foreground" style={{ fontFamily: "var(--font-serif)", fontWeight: 600, fontSize: 20, letterSpacing: "-0.02em" }}>Партнёрам</h3>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
               <Link href="/business/onboarding" className="hover:text-primary transition-colors">Бизнес-аккаунт</Link>
             </div>
@@ -57,7 +57,7 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
 
           {/* Column 3 */}
           <div className="flex flex-col gap-4">
-            <h3 className="text-foreground" style={{ fontFamily: "var(--font-serif)", fontWeight: 400, fontSize: 22, letterSpacing: "-0.02em" }}>Помощь</h3>
+            <h3 className="text-foreground" style={{ fontFamily: "var(--font-serif)", fontWeight: 600, fontSize: 20, letterSpacing: "-0.02em" }}>Помощь</h3>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
               <a
                 href="https://t.me/shapovalovalexey"
@@ -72,7 +72,7 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
 
           {/* Column 4 */}
           <div className="flex flex-col gap-4">
-            <h3 className="text-foreground" style={{ fontFamily: "var(--font-serif)", fontWeight: 400, fontSize: 22, letterSpacing: "-0.02em" }}>Информация</h3>
+            <h3 className="text-foreground" style={{ fontFamily: "var(--font-serif)", fontWeight: 600, fontSize: 20, letterSpacing: "-0.02em" }}>Информация</h3>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
               <Link href="#" className="hover:text-primary transition-colors">Политика конфиденциальности</Link>
               <Link href="#" className="hover:text-primary transition-colors">Пользовательское соглашение</Link>
