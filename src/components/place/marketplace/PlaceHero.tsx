@@ -72,6 +72,7 @@ export function PlaceHero({
   rating,
   reviewCount,
   isOpenNow,
+  hoursStatusDetail,
   hoursStatusShort,
   breadcrumbItems,
   directSlot,
@@ -284,15 +285,21 @@ export function PlaceHero({
                   <div style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 16, lineHeight: 1.25, color: "#141210", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {title}
                   </div>
-                  <div style={{ marginTop: 3, display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 8, rowGap: 2, fontSize: 13, color: "rgba(20,18,16,.55)", lineHeight: 1.35 }}>
-                    {address && <span>{address}</span>}
-                    {isOpenNow != null && (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontWeight: 500, color: isOpenNow ? "#1F8A5B" : "#C24E22" }}>
-                        <span aria-hidden style={{ width: 7, height: 7, borderRadius: 99, background: "currentColor", flexShrink: 0 }} />
-                        {hoursStatusShort ?? (isOpenNow ? "Открыто" : "Закрыто")}
+                  {address && (
+                    <div style={{ marginTop: 3, fontSize: 13, color: "rgba(20,18,16,.55)", lineHeight: 1.35 }}>{address}</div>
+                  )}
+                  {isOpenNow != null && (
+                    <div style={{ marginTop: 3, display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, lineHeight: 1.35, color: isOpenNow ? "#1F8A5B" : "#C24E22" }}>
+                      <span aria-hidden style={{ width: 7, height: 7, borderRadius: 99, background: "currentColor", flexShrink: 0 }} />
+                      <span>
+                        {isOpenNow
+                          ? hoursStatusShort ? `Сейчас открыто ${hoursStatusShort}` : "Сейчас открыто"
+                          : hoursStatusDetail
+                            ? hoursStatusDetail.charAt(0).toUpperCase() + hoursStatusDetail.slice(1)
+                            : "Сейчас закрыто"}
                       </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
