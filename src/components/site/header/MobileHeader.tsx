@@ -1,11 +1,10 @@
 "use client";
 
 /**
- * Хедер для viewport **< lg**.
- * Discovery: два ряда. Ряд 1 (48px) — лого/«←» слева, 🔔 и 👤 справа; ряд 2 — плашка поиска
- * «Куда сходить?» (+ ⚙ фильтры на категориях). Landing (посадочные): один ряд — «←», ♡, поделиться, 🔔, 👤.
- * Скролл вниз → ряд 1 уезжает через transform (без layout shift), ряд 2 остаётся прилипшим;
- * скролл вверх → возвращается. На landing при скролле вниз уезжает весь хедер.
+ * Хедер для viewport **< lg** — одна строка (48px).
+ * Discovery: лого/«←» · чип «🧭 Минск · Я и Степан» (вход в поиск) · ⚙ фильтры (на категориях) · 🔔 · 👤.
+ * Landing (посадочные): «←» · ♡ · поделиться · 🔔 · 👤.
+ * Скролл вниз → хедер уезжает через transform (без layout shift), скролл вверх → возвращается.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -14,10 +13,7 @@ import { MobileSearchEntry } from "@/components/mobile/MobileSearchEntry";
 import { MobileSearchSheet } from "@/components/mobile/MobileSearchSheet";
 import { MobileFilterButton } from "@/components/mobile/MobileFilterButton";
 import { NavIconButton } from "@/components/mobile/NavIconButton";
-import {
-  MOBILE_HEADER_ROW1_COLLAPSE,
-  MOBILE_HEADER_ROW_HEIGHT,
-} from "@/components/mobile/mobile-control-geometry";
+import { MOBILE_HEADER_ROW_HEIGHT } from "@/components/mobile/mobile-control-geometry";
 import {
   getIntentFromPath,
   getCityFromPath,
@@ -136,79 +132,46 @@ export function MobileHeader() {
 
   return (
     <>
-      {isLanding ? (
-        <header
-          data-header-shell
-          inert={collapsed}
-          className={cn(
-            "sticky top-0 z-50 w-full border-b border-[#EBEBEB] pt-[env(safe-area-inset-top)] text-foreground antialiased",
-            HEADER_BG,
-            "transition-[transform,box-shadow] duration-[220ms] ease-out motion-reduce:transition-none",
-            collapsed && "-translate-y-full",
-            isScrolled && !collapsed && "shadow-[0_4px_20px_rgba(0,0,0,0.08)]",
-          )}
+      <header
+        data-header-shell
+        inert={collapsed}
+        className={cn(
+          "sticky top-0 z-50 w-full border-b border-[#EBEBEB] pt-[env(safe-area-inset-top)] text-foreground antialiased",
+          HEADER_BG,
+          "transition-[transform,box-shadow] duration-[220ms] ease-out motion-reduce:transition-none",
+          collapsed && "-translate-y-full",
+          isScrolled && !collapsed && "shadow-[0_4px_20px_rgba(0,0,0,0.08)]",
+        )}
+      >
+        <div
+          ref={row1Ref}
+          className={cn("flex min-w-0 items-center gap-2 px-3", MOBILE_HEADER_ROW_HEIGHT)}
         >
-          <div
-            ref={row1Ref}
-            className={cn("flex min-w-0 items-center justify-between gap-2 px-3", MOBILE_HEADER_ROW_HEIGHT)}
-          >
-            {leading}
-            <div className="flex shrink-0 items-center gap-2">
+          {leading}
+          {isLanding ? (
+            <div className="ml-auto flex shrink-0 items-center gap-2">
               <MobileLandingActions />
               <MobileHeaderActions />
             </div>
-          </div>
-        </header>
-      ) : (
-        <header
-          data-header-shell
-          className="pointer-events-none sticky top-0 z-50 w-full pt-[env(safe-area-inset-top)] text-foreground antialiased"
-        >
-          {/* Зона под вырезом/статус-баром не двигается: ряд 1 уезжает под неё. */}
-          <div
-            aria-hidden
-            className={cn("pointer-events-auto absolute inset-x-0 top-0 z-20 h-[env(safe-area-inset-top)]", HEADER_BG)}
-          />
-          <div
-            className={cn(
-              "pointer-events-auto transform-gpu transition-transform duration-[220ms] ease-out motion-reduce:transition-none",
-              collapsed && MOBILE_HEADER_ROW1_COLLAPSE,
-            )}
-          >
-            <div
-              ref={row1Ref}
-              inert={collapsed}
-              className={cn(
-                "flex min-w-0 items-center justify-between gap-2 px-3",
-                MOBILE_HEADER_ROW_HEIGHT,
-                HEADER_BG,
-              )}
-            >
-              {leading}
-              <MobileHeaderActions />
-            </div>
-            <div
-              className={cn(
-                "flex min-w-0 items-center gap-2 border-b border-[#EBEBEB] px-3 py-1.5 transition-shadow duration-200 motion-reduce:transition-none",
-                HEADER_BG,
-                collapsed && "shadow-[0_4px_16px_rgba(0,0,0,0.08)]",
-              )}
-            >
+          ) : (
+            <>
               <MobileSearchEntry
-                variant="bar"
+                variant="chip"
                 cityHubOnly={cityHubOnly}
                 onSearchClick={() => setIsSearchSheetOpen(true)}
                 citySlug={displayCity}
                 currentIntent={displayIntent}
                 locationLabelOverride={articleGeoLabel}
+                className="!h-11"
               />
               {showFilterButton && searchIntent ? (
                 <MobileFilterButton intent={searchIntent} className="h-11 w-11" />
               ) : null}
-            </div>
-          </div>
-        </header>
-      )}
+              <MobileHeaderActions />
+            </>
+          )}
+        </div>
+      </header>
 
       <MobileSearchSheet
         isOpen={isSearchSheetOpen}

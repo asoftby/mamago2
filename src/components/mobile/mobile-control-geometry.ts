@@ -11,12 +11,10 @@ export const MOBILE_DISCOVERY_FIELD_CHROME =
   "border border-gray-200 bg-white shadow-sm";
 
 /**
- * Верхний ряд мобильного хедера (лого/«←», 🔔, 👤) — 48px; ряд поиска под ним — 56px.
- * Литералы (не шаблоны) — чтобы Tailwind увидел классы.
+ * Мобильный хедер — одна строка 48px. Литералы (не шаблоны) — чтобы Tailwind увидел классы.
  */
 export const MOBILE_HEADER_ROW_HEIGHT = "h-12";
-export const MOBILE_HEADER_ROW1_COLLAPSE = "-translate-y-12";
-/** Sticky-отступ для элементов под хедером: высота одного (верхнего) ряда. */
+/** Sticky-отступ для элементов под хедером. */
 export const MOBILE_HEADER_STICKY_TOP = "top-12";
 
 /** Белые непрозрачные плавающие контролы (виджет, 🔔, 👤, чип хедера): тонкая серая граница, без тени. */
