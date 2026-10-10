@@ -82,30 +82,26 @@ export function PlaceStickyActionBar({
       aria-hidden={!ctaPassed}
     >
       <div className={cn("min-w-0 flex-1", hasThreeActions && "hidden sm:block")}>
-        {(statusLabel || addressLine) && (
-          <div className="truncate font-mono text-[10px] uppercase tracking-[0.1em]">
+        {detailLine && (
+          <div className="truncate font-sans text-[18px] font-normal leading-tight tracking-[-0.03em] text-[#141210]">
+            {detailLine}
+          </div>
+        )}
+        {(addressLine || statusLabel) && (
+          <div className="mt-0.5 flex min-w-0 items-center gap-2 text-[12px] leading-tight text-[rgba(20,18,16,0.55)]">
+            {addressLine && <span className="min-w-0 truncate">{addressLine}</span>}
             {statusLabel && (
               <span
                 className={cn(
+                  "inline-flex shrink-0 items-center gap-1.5 font-medium",
                   statusTone === "open" && "text-[#1F8A5B]",
                   statusTone === "closed" && "text-[#E5322D]",
-                  !statusTone && "text-[#E86A3A]",
                 )}
               >
+                {statusTone && <span aria-hidden className="h-[7px] w-[7px] shrink-0 rounded-full bg-current" />}
                 {statusLabel}
               </span>
             )}
-            {statusLabel && addressLine && (
-              <span className="text-[rgba(20,18,16,0.55)]"> · {addressLine}</span>
-            )}
-            {!statusLabel && addressLine && (
-              <span className="text-[rgba(20,18,16,0.55)]">{addressLine}</span>
-            )}
-          </div>
-        )}
-        {detailLine && (
-          <div className="mt-0.5 truncate font-sans text-[18px] font-normal leading-tight tracking-[-0.03em] text-[#141210]">
-            {detailLine}
           </div>
         )}
       </div>

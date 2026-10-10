@@ -171,27 +171,12 @@ export function MarketplacePlacePage({
   if (place.metro) metaItems.push(["Метро", place.metro, String(metaItems.length + 1).padStart(2, "0")]);
   if (place.district && metaItems.length < 5) metaItems.push(["Район", place.district, String(metaItems.length + 1).padStart(2, "0")]);
 
-  const summaryPrimary = place.workingHoursSummary
-    ?.split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)[0];
   const stickyAddressLine = place.address?.trim() || undefined;
-  const stickyStatusLabel = (() => {
-    if (place.isOpenNow != null) {
-      const status = place.isOpenNow ? "Открыто" : "Закрыто";
-      if (place.hoursStatusDetail) return `${status} · ${place.hoursStatusDetail}`;
-      return place.todayHoursText
-        ? `${status} · сегодня ${place.todayHoursText}`
-        : status;
-    }
-    if (summaryPrimary) {
-      return summaryPrimary.split("•")[0]?.trim() || summaryPrimary;
-    }
-    if (!stickyAddressLine) {
-      return [place.city, place.district].filter(Boolean).join(" · ") || undefined;
-    }
-    return undefined;
-  })();
+  // Нижняя плашка: название, ниже адрес и (если известно) точка статуса с «до 18:00» / «с 09:00».
+  const stickyStatusLabel =
+    place.isOpenNow != null
+      ? place.hoursStatusShort ?? (place.isOpenNow ? "Открыто" : "Закрыто")
+      : undefined;
   const stickyDetailLine = place.title;
 
   return (
@@ -336,7 +321,7 @@ export function MarketplacePlacePage({
         ctaRef={ctaRef}
         statusLabel={stickyStatusLabel}
         statusTone={place.isOpenNow == null ? undefined : place.isOpenNow ? "open" : "closed"}
-        addressLine={stickyStatusLabel && place.isOpenNow != null ? undefined : stickyAddressLine}
+        addressLine={stickyAddressLine}
         detailLine={stickyDetailLine}
         phones={place.phones}
         placeId={place.id}
@@ -426,9 +411,6 @@ function MetaStrip({ items, isOpenNow }: { items: Array<[string, string, string]
               </span>
             </div>
             <div style={{ fontSize: 17, fontWeight: 500, letterSpacing: "-.01em", color: "#141210", display: "flex", alignItems: "center", gap: 6 }}>
-              {label === "Часы" && isOpenNow != null && (
-                <span style={{ fontSize: 7, color: isOpenNow ? "#1F8A5B" : "#E5322D", flexShrink: 0, lineHeight: 1 }}>●</span>
-              )}
               <span style={label === "Часы" && isOpenNow != null ? { color: isOpenNow ? "#1F8A5B" : "#E5322D" } : undefined}>
                 {value}
               </span>
