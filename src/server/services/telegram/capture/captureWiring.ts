@@ -61,6 +61,7 @@ export function createDefaultCaptureProcessor(): InboxProcessor {
     telegram: getTelegramCaptureClient(),
     models: () => readCaptureModelConfig(),
     presenter,
+    notifier: createNotifier(),
     context: {
       db: prismaBase,
       city: {
