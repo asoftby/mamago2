@@ -9,6 +9,7 @@ export type InboxCallbackAction = "add" | "edit" | "replace" | "no" | "dup" | "u
 export type DecodedCallback =
   | { kind: "inbox"; action: InboxCallbackAction; inboxItemId: string }
   | { kind: "inbox_child"; inboxItemId: string; childId: string }
+  | { kind: "inbox_target"; inboxItemId: string; target: "me" | "all" }
   | { kind: "requirement_done"; requirementId: string };
 
 const INBOX_ACTIONS: readonly InboxCallbackAction[] = ["add", "edit", "replace", "no", "dup", "upd", "new"];
@@ -31,6 +32,10 @@ export function encodeCallback(decoded: DecodedCallback): string {
       assertId(decoded.childId, "childId");
       data = `inb:child:${decoded.inboxItemId}:${decoded.childId}`;
       break;
+    case "inbox_target":
+      assertId(decoded.inboxItemId, "inboxItemId");
+      data = `inb:target:${decoded.inboxItemId}:${decoded.target}`;
+      break;
     case "requirement_done":
       assertId(decoded.requirementId, "requirementId");
       data = `req:done:${decoded.requirementId}`;
@@ -47,6 +52,10 @@ export function decodeCallback(data: string | null | undefined): DecodedCallback
   const parts = data.split(":");
 
   if (parts[0] === "inb") {
+    if (parts[1] === "target") {
+      if (parts.length !== 4 || !parts[2] || (parts[3] !== "me" && parts[3] !== "all")) return null;
+      return { kind: "inbox_target", inboxItemId: parts[2], target: parts[3] };
+    }
     if (parts[1] === "child") {
       if (parts.length !== 4 || !parts[2] || !parts[3]) return null;
       return { kind: "inbox_child", inboxItemId: parts[2], childId: parts[3] };

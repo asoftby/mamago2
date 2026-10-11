@@ -10,7 +10,13 @@ import type { DecodedCallback } from "./callbackCodec";
 import { CaptureDraftSchema } from "./captureDraft.schema";
 import type { ParsedCallback } from "./telegramUpdateParser";
 import type { CaptureCardPresenter } from "./captureCardPresenter";
-import { CAPTURE_REPLACE_TEXT_RULE } from "./captureReplies";
+import {
+  CAPTURE_REPLACE_TEXT_RULE,
+  CAPTURE_TARGET_ALL_RULE,
+  CAPTURE_TARGET_CHILD_RULE,
+  CAPTURE_TARGET_ME_RULE,
+  CAPTURE_TARGET_RULES,
+} from "./captureReplies";
 
 export type CaptureCallbackChannel = {
   answerCallbackQuery(input: {
@@ -63,52 +69,52 @@ export function createCaptureCallbackService(deps: {
     });
   }
 
-  async function selectChild(
+  async function selectTarget(
     owner: PlanOwner,
     inboxItemId: string,
-    childId: string,
+    target: { kind: "child"; childId: string } | { kind: "me" | "all" },
   ): Promise<boolean> {
-    const child = await deps.db.child.findFirst({
-      where: { id: childId, ...(await childScopeFor(owner.userId)) },
-      select: { id: true },
-    });
-    if (!child) return false;
+    if (target.kind === "child") {
+      const child = await deps.db.child.findFirst({
+        where: { id: target.childId, ...(await childScopeFor(owner.userId)) },
+        select: { id: true },
+      });
+      if (!child) return false;
+    }
 
     const item = await deps.db.inboxItem.findFirst({
-      where: {
-        id: inboxItemId,
-        userId: owner.userId,
-        status: "DRAFT_READY",
-      },
-      select: { draft: true, ruleCodes: true },
+      where: { id: inboxItemId, userId: owner.userId, status: "DRAFT_READY" },
+      select: { draft: true, draftVersion: true, ruleCodes: true },
     });
     if (!item) return false;
 
     const parsed = CaptureDraftSchema.safeParse(item.draft);
-    if (!parsed.success) return false;
+    if (!parsed.success || parsed.data.intent !== "CREATE" || parsed.data.entries.length === 0) return false;
 
     const draft = structuredClone(parsed.data);
     for (const entry of draft.entries) {
-      if (!entry.child.childId) {
-        entry.child.childId = childId;
-        entry.child.state = "stated";
-      }
+      entry.child.childId = target.kind === "child" ? target.childId : null;
+      entry.child.raw = null;
+      entry.child.state = target.kind === "child" ? "stated" : "missing";
     }
 
+    const targetCode = target.kind === "child"
+      ? CAPTURE_TARGET_CHILD_RULE
+      : target.kind === "me" ? CAPTURE_TARGET_ME_RULE : CAPTURE_TARGET_ALL_RULE;
     const updated = await deps.db.inboxItem.updateMany({
       where: {
         id: inboxItemId,
         userId: owner.userId,
         status: "DRAFT_READY",
+        draftVersion: item.draftVersion,
       },
       data: {
         draft: draft as unknown as Prisma.InputJsonValue,
         draftVersion: { increment: 1 },
-        ruleCodes: item.ruleCodes.filter((code) => code !== "CHILD_ASKED"),
+        ruleCodes: [...item.ruleCodes.filter((code) => !CAPTURE_TARGET_RULES.includes(code as typeof CAPTURE_TARGET_RULES[number]) && code !== "CHILD_ASKED"), targetCode],
       },
     });
     if (updated.count !== 1) return false;
-
     await deps.presenter.present(inboxItemId);
     return true;
   }
@@ -128,16 +134,18 @@ export function createCaptureCallbackService(deps: {
       }
 
       if (decoded.kind === "inbox_child") {
-        const ok = await selectChild(
-          owner,
-          decoded.inboxItemId,
-          decoded.childId,
-        );
+        const ok = await selectTarget(owner, decoded.inboxItemId, { kind: "child", childId: decoded.childId });
         await answer(
           parsed.callbackQueryId,
           ok ? "Готово" : "Черновик уже недоступен",
           !ok,
         );
+        return;
+      }
+
+      if (decoded.kind === "inbox_target") {
+        const ok = await selectTarget(owner, decoded.inboxItemId, { kind: decoded.target });
+        await answer(parsed.callbackQueryId, ok ? "Готово" : "Черновик уже недоступен", !ok);
         return;
       }
 
@@ -158,9 +166,11 @@ export function createCaptureCallbackService(deps: {
           const duplicate =
             error instanceof PlanEntryError &&
             error.code === "DUPLICATE_REQUIRES_CONFIRMATION";
+          const needsTarget =
+            error instanceof PlanEntryError && error.code === "TARGET_NOT_SELECTED";
           await answer(
             parsed.callbackQueryId,
-            duplicate ? "Похоже, это уже в плане" : "Не удалось добавить",
+            needsTarget ? "Сначала выберите: Я, ребёнок или Для всех" : duplicate ? "Похоже, это уже в плане" : "Не удалось добавить",
             true,
           );
         }

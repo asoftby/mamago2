@@ -17,15 +17,18 @@ const inboxIds: string[] = [];
 async function seedInbox(over: {
   id: string;
   duplicate?: boolean;
+  target?: "child" | "me" | "all" | null;
 }) {
+  const target = over.target === undefined ? "child" : over.target;
+  const targetCode = target === "me" ? "CAPTURE_TARGET_ME"
+    : target === "all" ? "CAPTURE_TARGET_ALL"
+    : target === "child" ? "CAPTURE_TARGET_CHILD" : null;
   const value = draft({
     entries: [
       entry({
-        child: {
-          childId,
-          raw: "Тая",
-          state: "stated",
-        },
+        child: target === "child"
+          ? { childId, raw: "Тая", state: "stated" }
+          : { childId: null, raw: null, state: "missing" },
         location: {
           value: "Музей",
           placeId: null,
@@ -70,7 +73,7 @@ async function seedInbox(over: {
       intent: "CREATE",
       draft: value as unknown as Prisma.InputJsonValue,
       draftVersion: 1,
-      ruleCodes: over.duplicate ? ["DUPLICATE_FOUND"] : [],
+      ruleCodes: [...(over.duplicate ? ["DUPLICATE_FOUND"] : []), ...(targetCode ? [targetCode] : [])],
       purgeAfter: new Date("2026-10-13T12:00:00.000Z"),
       parts: {
         create: {
@@ -171,4 +174,33 @@ test("duplicate draft needs explicit add-anyway confirmation", async () => {
     await db.planItem.count({ where: { inboxItemId: inboxId } }),
     1,
   );
+});
+
+test("Telegram capture saves adult and whole-family targets distinctly", async () => {
+  const me = `pr4-${run}-me`;
+  const all = `pr4-${run}-all`;
+  await seedInbox({ id: me, target: "me" });
+  await seedInbox({ id: all, target: "all" });
+  await createFromDraft({ userId }, me);
+  await createFromDraft({ userId }, all);
+  const [mine, family] = await Promise.all([
+    db.planItem.findFirstOrThrow({ where: { inboxItemId: me } }),
+    db.planItem.findFirstOrThrow({ where: { inboxItemId: all } }),
+  ]);
+  assert.equal(mine.assigneeUserId, userId);
+  assert.equal(mine.childId, null);
+  assert.equal(family.assigneeUserId, null);
+  assert.equal(family.childId, null);
+  assert.equal(mine.visibility, "FAMILY");
+  assert.equal(family.visibility, "FAMILY");
+});
+
+test("Telegram draft cannot be added before choosing a family member", async () => {
+  const unselected = `pr4-${run}-unselected`;
+  await seedInbox({ id: unselected, target: null });
+  await assert.rejects(
+    () => createFromDraft({ userId }, unselected),
+    (error: unknown) => error instanceof PlanEntryError && error.code === "TARGET_NOT_SELECTED",
+  );
+  assert.equal((await db.inboxItem.findUniqueOrThrow({ where: { id: unselected } })).status, "DRAFT_READY");
 });

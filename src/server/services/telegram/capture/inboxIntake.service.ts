@@ -383,6 +383,9 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
       }
       if (outcome.status !== "stored") return { outcome, afterResponse: null };
 
+      // Acknowledge immediately, before the HTTP response and before LLM work.
+      // The card later edits this same Telegram message; the CAS prevents album duplicates.
+      await announceProgress(outcome.inboxItemId, capture);
       return { outcome, afterResponse: () => processWhenReady(owner, capture, outcome) };
     },
 

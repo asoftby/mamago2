@@ -62,7 +62,7 @@ export const FIXTURES: Fixture[] = [
           requirements: [pay("сдать 15 BYN", "2026-10-07T00:00:00+03:00", 15), bring("вода")],
         }),
       ]),
-    expect: { intent: "CREATE", entryTypes: ["EVENT"], ruleCodes: ["CHILD_INFERRED"], requirements: 2 },
+    expect: { intent: "CREATE", entryTypes: ["EVENT"], ruleCodes: [], requirements: 2 },
   },
   {
     name: "school trip for a named child",
@@ -142,7 +142,7 @@ export const FIXTURES: Fixture[] = [
           startsAt: { value: "2026-10-14T16:00:00+03:00", state: "stated", basis: null },
         }),
       ]),
-    expect: { intent: "CREATE", entryTypes: ["EVENT"], ruleCodes: ["CHILD_ASKED"], childId: () => null },
+    expect: { intent: "CREATE", entryTypes: ["EVENT"], ruleCodes: [], childId: () => null },
   },
   {
     name: "event for a specific child",
@@ -258,7 +258,7 @@ export const FIXTURES: Fixture[] = [
         changes: [{ field: "startsAt", from: "2026-10-09T09:30:00+03:00", to: "2026-10-09T10:30:00+03:00" }],
       },
     }),
-    expect: { intent: "UPDATE", entryTypes: ["EVENT"], ruleCodes: ["CHILD_INFERRED"], matched: (ids) => ids.existingExcursion },
+    expect: { intent: "UPDATE", entryTypes: ["EVENT"], ruleCodes: [], matched: (ids) => ids.existingExcursion },
   },
   {
     name: "cancellation of an earlier added event",
@@ -271,7 +271,7 @@ export const FIXTURES: Fixture[] = [
       entries: [entry()],
       match: { candidatePlanItemId: ids.existingExcursion, changes: [] },
     }),
-    expect: { intent: "CANCEL", entryTypes: ["EVENT"], ruleCodes: ["CHILD_INFERRED"], matched: (ids) => ids.existingExcursion },
+    expect: { intent: "CANCEL", entryTypes: ["EVENT"], ruleCodes: [], matched: (ids) => ids.existingExcursion },
   },
   {
     name: "message without an actionable item",
@@ -289,7 +289,7 @@ export const FIXTURES: Fixture[] = [
     anchorAt: "2026-10-06T10:00:00Z",
     anchorIsForward: true,
     model: () => create([entry()]),
-    expect: { intent: "CREATE", entryTypes: ["EVENT"], ruleCodes: ["CHILD_INFERRED", "DUPLICATE_FOUND"] },
+    expect: { intent: "CREATE", entryTypes: ["EVENT"], ruleCodes: ["DUPLICATE_FOUND"] },
   },
   {
     name: "screenshot (photo only, anchored at the message date)",
@@ -337,7 +337,7 @@ export const FIXTURES: Fixture[] = [
     expect: {
       intent: "CANCEL",
       entryTypes: ["EVENT"],
-      ruleCodes: ["MATCH_ID_REJECTED", "MATCH_NO_CANDIDATE", "CHILD_INFERRED"],
+      ruleCodes: ["MATCH_ID_REJECTED", "MATCH_NO_CANDIDATE"],
       matched: () => null,
     },
   },

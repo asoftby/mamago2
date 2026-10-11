@@ -44,21 +44,21 @@ test("a missing field never keeps a value, and a valueless stated field becomes 
   assert.equal(result.draft.entries[0]!.endsAt.state, "missing");
 });
 
-test("child: 0 children leaves null, 1 child is inferred, 2+ children asks", () => {
+test("child: no automatic selection even if family has only one child", () => {
   const input = draft();
   const zero = applyPostLlmRules(input, none);
   assert.equal(zero.draft.entries[0]!.child.childId, null);
   assert.deepEqual(zero.ruleCodes, []);
 
   const one = applyPostLlmRules(input, { ...none, children: [taya] });
-  assert.equal(one.draft.entries[0]!.child.childId, "child-taya");
-  assert.equal(one.draft.entries[0]!.child.state, "inferred");
-  assert.deepEqual(one.ruleCodes, ["CHILD_INFERRED"]);
+  assert.equal(one.draft.entries[0]!.child.childId, null);
+  assert.equal(one.draft.entries[0]!.child.state, "missing");
+  assert.deepEqual(one.ruleCodes, []);
 
   const many = applyPostLlmRules(input, { ...none, children: [taya, styopa] });
   assert.equal(many.draft.entries[0]!.child.childId, null);
   assert.equal(many.draft.entries[0]!.child.state, "missing");
-  assert.deepEqual(many.ruleCodes, ["CHILD_ASKED"]);
+  assert.deepEqual(many.ruleCodes, []);
 });
 
 test("a stated child that belongs to the owner is kept; a foreign child id is rejected", () => {
@@ -70,7 +70,7 @@ test("a stated child that belongs to the owner is kept; a foreign child id is re
   const foreign = draft({ entries: [entry({ child: { childId: "someone-elses-child", raw: null, state: "stated" } })] });
   const rejected = applyPostLlmRules(foreign, { ...none, children: [taya, styopa] });
   assert.equal(rejected.draft.entries[0]!.child.childId, null);
-  assert.deepEqual(rejected.ruleCodes, ["CHILD_ID_REJECTED", "CHILD_ASKED"]);
+  assert.deepEqual(rejected.ruleCodes, ["CHILD_ID_REJECTED"]);
 });
 
 test("a named child that cannot be mapped with 2+ children asks instead of guessing", () => {

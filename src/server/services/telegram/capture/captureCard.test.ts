@@ -49,7 +49,7 @@ test("CREATE card renders add/edit/no callbacks and inferred markers", () => {
   assert.match(card.text, /взять воду/);
   assert.deepEqual(
     card.replyMarkup?.inline_keyboard.flat().map((button) => button.callback_data),
-    ["inb:add:inbox-1", "inb:edit:inbox-1", "inb:replace:inbox-1", "inb:no:inbox-1"],
+    ["inb:target:inbox-1:me", "inb:child:inbox-1:child-1", "inb:target:inbox-1:all", "inb:add:inbox-1", "inb:edit:inbox-1", "inb:replace:inbox-1", "inb:no:inbox-1"],
   );
 });
 
@@ -64,7 +64,7 @@ test("duplicate card never silently creates a second item", () => {
   assert.match(card.text, /уже в плане/);
   assert.deepEqual(
     card.replyMarkup?.inline_keyboard.flat().map((button) => button.callback_data),
-    ["inb:no:inbox-2", "inb:dup:inbox-2", "inb:edit:inbox-2", "inb:replace:inbox-2"],
+    ["inb:target:inbox-2:me", "inb:target:inbox-2:all", "inb:no:inbox-2", "inb:dup:inbox-2", "inb:edit:inbox-2", "inb:replace:inbox-2"],
   );
 });
 
