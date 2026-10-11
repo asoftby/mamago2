@@ -62,6 +62,18 @@ export function Step1Type({ data, onChange, isEditable }: Step1TypeProps) {
 
   const handleCategoryChange = (category: OfferCreationCategory) => {
     setExpandedCategory(category.key);
+    if (category.options.length > 1) {
+      // On mobile the four main cards can take more than one screen. Bring
+      // the newly revealed choices into view instead of leaving them below the fold.
+      window.requestAnimationFrame(() => {
+        document.getElementById("offer-creation-format")?.scrollIntoView({
+          block: "nearest",
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "auto"
+            : "smooth",
+        });
+      });
+    }
     if (category.options.length === 1) {
       handleTypeChange(category.options[0].value);
     } else if (selectedCategory?.key !== category.key && data.productType) {

@@ -29,7 +29,7 @@ export const OFFER_CREATION_CATEGORIES: readonly OfferCreationCategory[] = [
       {
         value: "PLACE_VISIT",
         label: "Посещение места",
-        description: "Режим работы, билеты и условия посещения укажете дальше.",
+        description: "Стоимость и условия посещения укажете дальше.",
       },
     ],
   },
