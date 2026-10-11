@@ -13,13 +13,13 @@ import { cn } from "@/lib/utils";
 const STICKY_CTA_FOOTER_PAD =
   "pb-[calc(46px+1.25rem+45px+env(safe-area-inset-bottom))]";
 
-/** Заголовок колонки — служебная метка в стиле категории на карточке события (mono, uppercase). Контраст ≥ 4.5:1 на #F6F2EA. */
+/** Заголовок колонки — sans 14px, с заглавной буквы, серый. Контраст ≥ 4.5:1 на #F6F2EA. */
 const FOOTER_HEADING_CLASS =
-  "text-[19px] font-medium text-[rgba(20,18,16,0.55)]";
+  "text-[14px] font-medium text-[rgba(20,18,16,0.55)]";
 
-/** Ссылка колонки — главный текст: sans 20px, тёмнее серого, hover-подчёркивание, focus-ring, цель ≥ 44px на мобильном. */
+/** Ссылка колонки — главный текст: sans 15px, тёмнее серого, hover-подчёркивание, focus-ring, цель ≥ 44px на мобильном. */
 const FOOTER_LINK_CLASS =
-  "flex min-h-11 items-center rounded-sm text-[20px] leading-[1.35] text-[#3A332B] transition-colors md:min-h-0 " +
+  "flex min-h-11 items-center rounded-sm text-[15px] leading-[1.35] text-[#3A332B] transition-colors md:min-h-0 " +
   "hover:text-[#141210] hover:underline hover:underline-offset-4 " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#F6F2EA]";
 
