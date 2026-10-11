@@ -23,7 +23,7 @@ const source = readFileSync("src/app/api/business/events/[id]/route.ts", "utf8")
 
 assert.match(
   source,
-  /sessions:\s*{\s*orderBy:\s*{\s*startsAt:\s*"asc"\s*},\s*select:\s*{\s*startsAt:\s*true,\s*source:\s*true\s*},?\s*}/,
+  /sessions:\s*{\s*orderBy:\s*{\s*startsAt:\s*"asc"\s*},\s*select:\s*{\s*startsAt:\s*true,\s*source:\s*true,\s*title:\s*true\s*},?\s*}/,
   "the sessions fetch must select `source` so imported sessions can be detected",
 );
 

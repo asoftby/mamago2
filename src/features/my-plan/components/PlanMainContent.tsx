@@ -36,7 +36,7 @@ import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
 import { PlanDayBar } from "./v3/PlanDayBar";
 import { PlanMoveSheet, canMovePlanItem } from "./v3/PlanMoveSheet";
 import { fetchPlanExperienceFeed, type PlanExperienceFeed } from "./v3/planExperienceApi";
-import { History } from "lucide-react";
+import { History, ListChecks } from "lucide-react";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
@@ -1146,17 +1146,33 @@ export function PlanMainContent({
     );
   };
 
+  const renderAllPlanLink = () => (
+    <button
+      type="button"
+      onClick={handleOpenPlanPage}
+      className="flex min-h-11 w-full items-center justify-center gap-[7px] rounded-xl text-[15px] font-bold text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)]"
+    >
+      <ListChecks className="h-[17px] w-[17px]" aria-hidden />
+      {totalPlannedCount > 0 ? `Весь план · ${totalPlannedCount}` : "Весь план"}
+    </button>
+  );
+
   /** Past days: records only — no recommendations, decision fork or scenario CTA. */
   const renderPastDay = (compact: boolean) =>
-    isPendingDateHydration ? null : dayPartSections.length > 0 ? (
-      renderDayPlanSection(compact)
-    ) : (
-      <p
-        role="status"
-        className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-center text-[15px] leading-6 text-[var(--mp-tx2)]"
-      >
-        В этот день записей не было
-      </p>
+    isPendingDateHydration ? null : (
+      <div className="space-y-3">
+        {dayPartSections.length > 0 ? (
+          renderDayPlanSection(compact)
+        ) : (
+          <p
+            role="status"
+            className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-center text-[15px] leading-6 text-[var(--mp-tx2)]"
+          >
+            В этот день записей не было
+          </p>
+        )}
+        {totalPlannedCount > 0 ? renderAllPlanLink() : null}
+      </div>
     );
 
   const renderRecommendationArea = (compact: boolean) => {
@@ -1251,14 +1267,17 @@ export function PlanMainContent({
           }
         />
       ) : null}
-      <button
-        type="button"
-        onClick={() => setScreen("visits")}
-        className="flex min-h-11 w-full items-center justify-center gap-[7px] rounded-xl text-[15px] font-bold text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)]"
-      >
-        <History className="h-[17px] w-[17px]" aria-hidden />
-        Где мы уже были
-      </button>
+      <div className="space-y-1">
+        <button
+          type="button"
+          onClick={() => setScreen("visits")}
+          className="flex min-h-11 w-full items-center justify-center gap-[7px] rounded-xl text-[15px] font-bold text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)]"
+        >
+          <History className="h-[17px] w-[17px]" aria-hidden />
+          Где мы уже были
+        </button>
+        {renderAllPlanLink()}
+      </div>
     </div>
   );
 
@@ -1352,8 +1371,6 @@ export function PlanMainContent({
         </div>
 
         <PlanStickyCounter
-          count={totalPlannedCount}
-          onClick={handleOpenPlanPage}
           onAdd={isPastDay ? undefined : () => setScreen("new")}
         />
 
@@ -1451,8 +1468,6 @@ export function PlanMainContent({
       </div>
 
       <PlanStickyCounter
-        count={totalPlannedCount}
-        onClick={handleOpenPlanPage}
         onAdd={isPastDay ? undefined : () => setScreen("new")}
         compact
       />

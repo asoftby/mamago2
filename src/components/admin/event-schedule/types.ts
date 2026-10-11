@@ -17,6 +17,8 @@ export interface EventScheduleItem {
   recurrenceInterval: number;
   recurrenceUnit: RecurrenceUnit;
   recurrenceUntil: string | null;
+  /** Что показывают на сеансе (необязательно, до 120 символов) */
+  title?: string | null;
   isCollapsed?: boolean;
 }
 

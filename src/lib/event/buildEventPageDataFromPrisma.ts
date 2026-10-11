@@ -21,6 +21,7 @@ import { getNormalizedPhones, type NormalizedPhone } from "@/lib/phones/normaliz
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { resolveCanonicalCta } from "@/lib/cta-platform";
 import { decorateStoredTicketLink } from "@/lib/abws/saleframeUrl";
+import { normalizeSessionTitle } from "@/lib/event/sessionTitle";
 
 const FALLBACK_POSTER = "/og-default.jpg";
 
@@ -58,7 +59,7 @@ export type ActivityForEventPageInput = {
     width?: number | null;
     height?: number | null;
   }>;
-  sessions: Array<{ id: string; startsAt: Date; isSaleOpen?: boolean | null }>;
+  sessions: Array<{ id: string; startsAt: Date; isSaleOpen?: boolean | null; title?: string | null }>;
   /** Контактные телефоны события (собственные, до фоллбэка на площадку) */
   phone?: string | null;
   phoneLabel?: string | null;
@@ -558,6 +559,7 @@ export function buildEventPageDataFromPrismaActivity(
   const sessions: EventPageData["sessions"] = activity.sessions.map((s) => ({
     id: s.id,
     startsAt: s.startsAt.toISOString(),
+    ...(normalizeSessionTitle(s.title) ? { title: normalizeSessionTitle(s.title)! } : {}),
   }));
 
   const plainDesc = activity.description

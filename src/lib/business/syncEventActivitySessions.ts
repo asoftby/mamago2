@@ -29,12 +29,13 @@ export function eventSessionScheduleFingerprint(scheduleJson: unknown): string {
  * Europe/Minsk wall clock, so ambient server timezone must never participate.
  */
 export function eventSessionFingerprintFromStoredSessions(
-  sessions: { startsAt: Date }[],
+  sessions: { startsAt: Date; title?: string | null }[],
 ): string {
   const occurrences = sessions
     .map((session) => ({
       date: getLocalDateKey(session.startsAt),
       startTime: formatHHMM(session.startsAt),
+      ...(session.title ? { title: session.title } : {}),
     }))
     .sort((a, b) =>
       a.date === b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date),
@@ -55,7 +56,7 @@ export async function activitySessionsMatchScheduleJson(
   const rows = await prisma.activitySession.findMany({
     where: { activityId },
     orderBy: { startsAt: "asc" },
-    select: { startsAt: true },
+    select: { startsAt: true, title: true },
   });
   return fromJson === eventSessionFingerprintFromStoredSessions(rows);
 }
@@ -148,12 +149,21 @@ export async function replaceActivitySessionsFromScheduleJson(
   const startsAtList = occurrences.map((occurrence) =>
     localWallClockToUtc(occurrence.date, occurrence.startTime),
   );
+  const titleByInstant = new Map(
+    occurrences.map((occurrence, index) => [
+      startsAtList[index]!.toISOString(),
+      occurrence.title ?? null,
+    ]),
+  );
 
   const createStarted = isServerSavePerfEnabled() ? performance.now() : 0;
   await prisma.activitySession.createMany({
     data: startsAtList.map((startsAt) => ({
       activityId,
       startsAt,
+      ...(titleByInstant.get(startsAt.toISOString())
+        ? { title: titleByInstant.get(startsAt.toISOString()) }
+        : {}),
       ...(metadataByInstant.get(startsAt.toISOString()) ?? {}),
     })),
   });

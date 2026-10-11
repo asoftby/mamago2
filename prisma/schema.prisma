@@ -1372,6 +1372,8 @@ model ActivitySession {
   priceMaxCents   Int?
   isSaleOpen      Boolean?
   withdrawnAt     DateTime?
+  /// Что показывают на конкретном сеансе (формат кинопоказов), до 120 символов.
+  title           String?          @db.VarChar(120)
   activity        Activity         @relation(fields: [activityId], references: [id], onDelete: Cascade)
   bookingRequests BookingRequest[]
 

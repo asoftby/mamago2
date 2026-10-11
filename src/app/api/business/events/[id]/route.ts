@@ -245,7 +245,7 @@ export async function PATCH(
         },
         sessions: {
           orderBy: { startsAt: "asc" },
-          select: { startsAt: true, source: true },
+          select: { startsAt: true, source: true, title: true },
         },
       },
     });
