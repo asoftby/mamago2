@@ -1,6 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 import { CookieSettingsFooterLink } from "@/components/shell/CookieSettingsFooterLink";
+import { FooterLogoLink } from "@/components/shell/FooterLogoLink";
 import { FooterSocialLinks } from "@/components/shell/FooterSocialLinks";
 import {
   FOOTER_META_TEXT_CLASS,
@@ -94,14 +94,7 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
         {/* Bottom: строка 1 — лого слева, соцсети справа; строка 2 — копирайт по центру */}
         <div className="flex flex-col gap-2 pt-8 border-t">
           <div className="flex w-full flex-col items-center gap-3 min-[769px]:grid min-[769px]:grid-cols-[1fr_auto_1fr]">
-            <Image
-              src="/logomamago.webp"
-              alt="mamaGo"
-              width={176}
-              height={44}
-              className="h-[1.925rem] w-auto shrink-0 min-[769px]:justify-self-start"
-              priority={false}
-            />
+            <FooterLogoLink />
             <FooterPrimaryNavigation />
             <div className="flex shrink-0 justify-center min-[769px]:justify-self-end">
               <FooterSocialLinks />
