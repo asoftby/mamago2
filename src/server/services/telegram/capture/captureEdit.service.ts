@@ -37,7 +37,7 @@ import type { CaptureCardPresenter } from "./captureCardPresenter";
 import type { ParsedCapture } from "./telegramUpdateParser";
 import { CAPTURE_LIMITS } from "./captureLimits";
 import { CAPTURE_REPLIES, CAPTURE_REPLACE_TEXT_RULE, CAPTURE_EDIT_ACCEPTED_REPLY } from "./captureReplies";
-import { applyOwnerCorrection, parseOwnerOnlyCorrection, retainTargetRules } from "./captureEditTarget";
+import { applyOwnerCorrection, parseOwnerOnlyCorrection, reconcileEditedTarget } from "./captureEditTarget";
 import { resolveCaptureEditAnchor } from "./captureEditAnchor";
 
 type Usage = {
@@ -399,10 +399,18 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
       }
     }
 
+    const target = replacingText
+      ? { draft: rules.draft, targetRules: [] }
+      : reconcileEditedTarget({
+          previous: current.data,
+          updated: rules.draft,
+          previousRules: snapshot.ruleCodes,
+          instruction,
+        });
     return {
       ok: true,
-      draft: rules.draft,
-      ruleCodes: [...new Set(ruleCodes)],
+      draft: target.draft,
+      ruleCodes: [...new Set([...ruleCodes, ...target.targetRules])],
       escalated,
       usage,
     };
@@ -443,9 +451,6 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
       const preserved = snapshot.ruleCodes.filter((code) =>
         PRESERVED_INTAKE_RULES.has(code),
       );
-      if (!snapshot.ruleCodes.includes(CAPTURE_REPLACE_TEXT_RULE) && retainTargetRules(result.ruleCodes).length === 0) {
-        preserved.push(...retainTargetRules(snapshot.ruleCodes));
-      }
       const updated = await deps.db.inboxItem.updateMany({
         where: {
           id: snapshot.id,
