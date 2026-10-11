@@ -317,6 +317,35 @@ export function Step2Placements({
             />
           </div>
 
+          <div className="space-y-3 rounded-2xl border border-border/70 bg-white/60 p-4">
+            <Label>Какие услуги уже включены в пакет?</Label>
+            <p className="text-sm text-muted-foreground">
+              Отметьте включённые услуги. После подключения реального подбора конструктор учтёт их, чтобы избежать повторной оплаты.
+              Цены отдельных услуг в составе пакета здесь не задаются.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {partyCategoryGroups.flatMap((group) => group.options)
+                .filter((option) => option.value !== "PROGRAM" && option.value !== "OTHER")
+                .map((option) => (
+                  <label key={option.value} className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={(data.birthdayDetails.includedCategories ?? []).includes(option.value)}
+                      onCheckedChange={(checked) => {
+                        const current = data.birthdayDetails.includedCategories ?? [];
+                        updateBirthdayDetails({
+                          includedCategories: checked === true
+                            ? Array.from(new Set([...current, option.value]))
+                            : current.filter((category) => category !== option.value),
+                        });
+                      }}
+                      disabled={!isEditable}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="birthdayProgram">Описание программы</Label>
             <Textarea

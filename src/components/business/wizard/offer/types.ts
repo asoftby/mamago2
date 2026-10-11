@@ -95,6 +95,12 @@ export interface OfferFormData {
     included: string;
     program: string;
     note: string;
+    /** Structured category coverage of a PARTY_PACKAGE; descriptive, not vendor bookings. */
+    includedCategories: PartyCategory[];
+    /** Direct payment to performer: deposit amount/percentage and timing. */
+    prepaymentTerms: string;
+    /** Cancellation/refund rules agreed between customer and performer. */
+    cancellationTerms: string;
   };
   
   // Legacy fields (for backward compatibility)

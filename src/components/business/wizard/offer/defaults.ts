@@ -27,6 +27,9 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
       included: "",
       program: "",
       note: "",
+      includedCategories: [],
+      prepaymentTerms: "",
+      cancellationTerms: "",
     },
     
     // Legacy fields (for backward compatibility)
