@@ -4,6 +4,7 @@
  */
 
 import type { NormalizedPhone } from "@/lib/phones/normalizePhones";
+import type { OfferProductType } from "@/lib/offers/offer-types/registry";
 import type { FaqItem } from "@/lib/faq/faqItems";
 import type { CanonicalCtaObject } from "@/lib/cta-platform";
 
@@ -107,6 +108,7 @@ export type OfferCtaType =
 export interface OfferPageData {
   id: string;
   offerType: OfferType;
+  productType?: OfferProductType | null;
   citySlug: string;
   slug: string;
   title: string;

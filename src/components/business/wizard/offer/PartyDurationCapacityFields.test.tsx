@@ -3,7 +3,6 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getDefaultFormData } from "./defaults";
 import { Step2Placements } from "./steps/Step2Placements";
-import { Step4Conditions } from "./steps/Step4Conditions";
 import {
   PARTY_DURATION_PRESETS,
   PartyDurationCapacityFields,
@@ -56,8 +55,7 @@ for (const productType of ["PARTY_PACKAGE", "PARTY_SERVICE"] as const) {
   data.productType = productType;
   data.birthdayDetails.durationMinutes = 90;
   data.requestedPlacements = ["BIRTHDAY"];
-  const component = productType === "PARTY_PACKAGE" ? Step2Placements : Step4Conditions;
-  const html = renderToStaticMarkup(createElement(component, {
+  const html = renderToStaticMarkup(createElement(Step2Placements, {
     data,
     onChange: () => undefined,
     isEditable: true,

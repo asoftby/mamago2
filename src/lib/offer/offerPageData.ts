@@ -437,6 +437,7 @@ async function buildOfferPageDataFromOffer(
     shortDescription: offer.description?.substring(0, 160).replace(/<[^>]*>/g, "") || "",
     description: offer.description || "",
     offerType,
+    productType: offer.productType ?? null,
     
     media: {
       posterUrl: offer.coverImage || "",

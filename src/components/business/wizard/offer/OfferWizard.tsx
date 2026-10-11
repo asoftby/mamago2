@@ -288,7 +288,7 @@ export function OfferWizard({
   });
   
   // Get steps based on current offer type
-  const steps = getStepsForOfferType(formData.offerWizardType);
+  const steps = getStepsForOfferType(formData.offerWizardType, formData.productType);
   const totalSteps = steps.length;
   
   // Current step key (not number)
@@ -297,7 +297,7 @@ export function OfferWizard({
       return "type";
     }
     const fd = mapOfferToFormData(offer);
-    const initialSteps = getStepsForOfferType(fd.offerWizardType);
+    const initialSteps = getStepsForOfferType(fd.offerWizardType, fd.productType);
     const idx = Math.min(initialStepNumber, initialSteps.length) - 1;
     return initialSteps[idx]?.key ?? "type";
   });
@@ -341,11 +341,11 @@ export function OfferWizard({
 
   // Normalize current step if offer type changes
   useEffect(() => {
-    const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey);
+    const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey, formData.productType);
     if (currentStepNum === null) {
       setCurrentStepKey("type");
     }
-  }, [formData.offerWizardType, currentStepKey]);
+  }, [formData.offerWizardType, formData.productType, currentStepKey]);
   
   // Дочистка черновика старого формата (до useWizardDraft): не восстанавливаем,
   // формат и ключ несовместимы
@@ -441,7 +441,7 @@ export function OfferWizard({
     }
     setFormData(nextFormData);
     setCompletedSteps(normalizeWizardCompletedSteps(restored.completedSteps));
-    const nextSteps = getStepsForOfferType(nextFormData.offerWizardType);
+    const nextSteps = getStepsForOfferType(nextFormData.offerWizardType, nextFormData.productType);
     setCurrentStepKey(
       nextSteps.some((s) => s.key === restored.currentStep)
         ? restored.currentStep
@@ -528,14 +528,14 @@ export function OfferWizard({
       return;
     }
     markStepCompleted(currentStepKey);
-    const nextKey = getNextStepKey(formData.offerWizardType, currentStepKey);
+    const nextKey = getNextStepKey(formData.offerWizardType, currentStepKey, formData.productType);
     if (nextKey) {
       setCurrentStepKey(nextKey);
     }
   };
 
   const handlePrev = () => {
-    const prevKey = getPreviousStepKey(formData.offerWizardType, currentStepKey);
+    const prevKey = getPreviousStepKey(formData.offerWizardType, currentStepKey, formData.productType);
     if (prevKey) {
       setCurrentStepKey(prevKey);
     } else {
@@ -818,7 +818,7 @@ export function OfferWizard({
     }
   };
 
-  const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey) || 1;
+  const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey, formData.productType) || 1;
   const canNext = currentStepKey !== "review" && currentStepNum < totalSteps;
   const canPrev = true;
   const isReviewStep = currentStepKey === "review";

@@ -8,9 +8,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { AGE_OPTIONS } from "@/lib/config/ages";
 import { RichDescriptionEditor } from "@/components/editor/RichDescriptionEditor";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { AdditionalPlacements } from "../components/AdditionalPlacements";
+import { FaqStep } from "../../shared/FaqStep";
 import { AiDescriptionAssistant } from "@/components/ai/AiDescriptionAssistant";
 import type { OfferFormData } from "../types";
-import { getRichTextLength } from "@/lib/richtext/utils";
+import { getRichTextLength, createExcerpt } from "@/lib/richtext/utils";
 import {
   StructuredDiscoverySignalPicker,
   type GroupConfig,
@@ -68,6 +73,8 @@ const DEFAULT_OFFER_CHARACTERISTIC_GROUPS: GroupConfig[] = [
 
 export function Step2Information({ data, onChange, isEditable }: Step2InformationProps) {
   const isCampOffer = data.offerWizardType === "CAMP";
+  const isClassOffer = data.productType === "ONE_TIME_ACTIVITY" || data.productType === "REGULAR_ACTIVITY";
+  const [moreOpen, setMoreOpen] = useState(false);
   const [signalGroups, setSignalGroups] = useState<SignalGroup[] | null>(null);
 
   useEffect(() => {
@@ -98,9 +105,8 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
 
   const characteristicGroupConfigs = useMemo(
     () =>
-      isCampOffer
-        ? [...CAMP_OFFER_DISCOVERY_PICKER_CONFIGS]
-        : DEFAULT_OFFER_CHARACTERISTIC_GROUPS,
+      (isCampOffer ? [...CAMP_OFFER_DISCOVERY_PICKER_CONFIGS] : DEFAULT_OFFER_CHARACTERISTIC_GROUPS)
+        .map((group) => ({ ...group, required: false, min: undefined })),
     [isCampOffer],
   );
 
@@ -123,7 +129,17 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
   };
 
   const handleFullDescriptionChange = (html: string) => {
-    onChange({ description: html });
+    // A single customer-facing description is enough for first publication.
+    // Keep hand-edited short descriptions unchanged; auto-create only empty
+    // ones or summaries previously generated from the old rich description.
+    const oldAutoSummary = createExcerpt(data.description, 117);
+    const autoUpdateSummary =
+      !data.shortDescription.trim() ||
+      data.shortDescription === oldAutoSummary;
+    onChange({
+      description: html,
+      ...(autoUpdateSummary ? { shortDescription: createExcerpt(html, 117) } : {}),
+    });
   };
 
   const handleAgeGroupsChange = (ageKey: string) => {
@@ -144,9 +160,9 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold mb-2">Публичная информация</h2>
-        <p className="text-muted-foreground">
-          Как предложение будет выглядеть в каталоге для пользователей
+        <h2 className="text-xl font-semibold mb-2">Расскажите о предложении</h2>
+        <p className="text-sm text-muted-foreground">
+          Эти данные увидят родители.
         </p>
       </div>
 
@@ -167,38 +183,10 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
         </p>
       </div>
 
-      {/* Short Description */}
-      <div className="space-y-2">
-        <Label htmlFor="description">
-          {isCampOffer ? "Описание программы" : "Краткое описание"} <span className="text-red-500">*</span>
-        </Label>
-        <Textarea
-          id="description"
-          placeholder={isCampOffer ? "Расскажите, чему дети научатся, как проходит программа и кому она подходит" : "Опишите кратко суть предложения, что получит клиент..."}
-          value={data.shortDescription}
-          onChange={handleDescriptionChange}
-          disabled={!isEditable}
-          rows={3}
-          className={!isShortDescriptionValid ? "border-red-500" : ""}
-        />
-        <div className="flex justify-between text-xs">
-          <p className={!isShortDescriptionValid ? "text-red-500" : "text-muted-foreground"}>
-            {shortDescriptionLength < 10
-              ? "Минимум 10 символов"
-              : isCampOffer
-                ? "Краткое описание программы для превью"
-                : "Краткое описание для превью в каталоге"}
-          </p>
-          <p className={`${remainingChars < 0 ? "text-red-500" : "text-muted-foreground"}`}>
-            {remainingChars} символов осталось
-          </p>
-        </div>
-      </div>
-
       {/* Full Description */}
       <div className="space-y-2">
         <Label>
-          Подробное описание <span className="text-red-500">*</span>
+          Описание <span className="text-red-500">*</span>
         </Label>
         <AiDescriptionAssistant
           entityType="offer"
@@ -247,16 +235,12 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
         <RichDescriptionEditor
           value={data.description || ""}
           onChange={handleFullDescriptionChange}
-          placeholder="Расскажите подробнее о предложении — что входит, как проходит, что особенного..."
+          placeholder="Расскажите, что вы предлагаете, кому подойдёт и как всё проходит..."
           disabled={!isEditable}
           minHeight={200}
           error={!isDetailedDescriptionValid ? "Минимум 20 символов видимого текста" : undefined}
         />
-        <p className={`text-xs ${!isDetailedDescriptionValid ? "text-red-500" : "text-muted-foreground"}`}>
-          {!isDetailedDescriptionValid
-            ? "Минимум 20 символов видимого текста"
-            : "Полное описание для страницы предложения. Используйте форматирование для лучшей читаемости."}
-        </p>
+        <p className="text-xs text-muted-foreground">Краткое описание для каталога составим из этого текста автоматически.</p>
       </div>
 
       {/* Camp Program Type (only for CAMP) */}
@@ -314,14 +298,21 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
         </p>
       </div>
 
+      <Collapsible open={moreOpen} onOpenChange={setMoreOpen}>
+        <CollapsibleTrigger asChild>
+          <button type="button" className="flex w-full items-center justify-between rounded-xl border border-border/70 bg-muted/20 px-4 py-3 text-left text-sm font-medium">
+            Дополнительно
+            <ChevronDown aria-hidden="true" className={cn("size-4 transition-transform", moreOpen && "rotate-180")} />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-5 pt-4">
       {characteristicGroups && characteristicGroups.length > 0 ? (
         <div className="space-y-4">
           <div>
             <h3 className="text-lg font-semibold mb-1">Характеристики предложения</h3>
             <p className="text-sm text-muted-foreground">
-              {isCampOffer
-                ? "Помогают родителям понять формат, условия и кому подойдёт программа"
-                : "Помогают пользователям найти это предложение в каталоге"}
+              Что подходит именно для вашего предложения?
             </p>
           </div>
 
@@ -336,19 +327,53 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
         </div>
       ) : null}
 
-      <div className="space-y-3">
-        <div>
-          <h3 className="text-lg font-semibold mb-1">Чипы витрины «Занятия»</h3>
-          <p className="text-sm text-muted-foreground">
-            Помогают показать предложение в конкретных категориях на странице занятий. Без выбора предложение останется только в чипе «Все».
+      {/* Editable summary for businesses that want to override the generated excerpt. */}
+      <div className="space-y-2">
+        <Label htmlFor="description">
+          Краткое описание для каталога
+        </Label>
+        <Textarea
+          id="description"
+          placeholder={isCampOffer ? "Расскажите, чему дети научатся, как проходит программа и кому она подходит" : "Опишите кратко суть предложения, что получит клиент..."}
+          value={data.shortDescription}
+          onChange={handleDescriptionChange}
+          disabled={!isEditable}
+          rows={3}
+          className={!isShortDescriptionValid ? "border-red-500" : ""}
+        />
+        <div className="flex justify-between text-xs">
+          <p className={!isShortDescriptionValid ? "text-red-500" : "text-muted-foreground"}>
+            {shortDescriptionLength < 10
+              ? "Минимум 10 символов"
+              : isCampOffer
+                ? "Краткое описание программы для превью"
+                : "Краткое описание для превью в каталоге"}
+          </p>
+          <p className={`${remainingChars < 0 ? "text-red-500" : "text-muted-foreground"}`}>
+            {remainingChars} символов осталось
           </p>
         </div>
-        <OfferClassChipPicker
-          value={data.classChipSlugs ?? []}
-          onChange={(classChipSlugs) => onChange({ classChipSlugs })}
-          disabled={!isEditable}
-        />
       </div>
+
+          <AdditionalPlacements data={data} onChange={onChange} isEditable={isEditable} />
+          <FaqStep
+            kind="offer"
+            value={data.faqItems}
+            onChange={(faqItems) => onChange({ faqItems })}
+          />
+          {isClassOffer && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold">Разделы занятий</h3>
+              <OfferClassChipPicker
+                value={data.classChipSlugs ?? []}
+                onChange={(classChipSlugs) => onChange({ classChipSlugs })}
+                disabled={!isEditable}
+              />
+            </div>
+          )}
+        </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

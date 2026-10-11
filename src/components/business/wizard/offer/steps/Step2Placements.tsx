@@ -1,346 +1,216 @@
-import { Badge } from "@/components/ui/badge";
+"use client";
+
+import { useState } from "react";
+import { Check, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { StableCardSelector } from "@/components/ui/stable-card-selector";
 import { Textarea } from "@/components/ui/textarea";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { AdditionalPlacements } from "../components/AdditionalPlacements";
 import { PartyDurationCapacityFields } from "../components/PartyDurationCapacityFields";
-import type {
-  BirthdayLocationType,
-  OfferFormData,
-  OfferPlacementKey,
-  OfferPlacementStatus,
-  PartyCategory,
-} from "../types";
+import type { BirthdayLocationType, OfferFormData, PartyCategory, PartyOccasion } from "../types";
 
 interface Step2PlacementsProps {
   data: OfferFormData;
   onChange: (
-    updates:
-      | Partial<OfferFormData>
-      | ((prev: OfferFormData) => Partial<OfferFormData>),
+    updates: Partial<OfferFormData> | ((prev: OfferFormData) => Partial<OfferFormData>),
   ) => void;
   isEditable: boolean;
 }
 
-const placementOptions: Array<{
-  key: OfferPlacementKey;
-  label: string;
-  description: string;
-}> = [
-  {
-    key: "WHERE_TO_GO",
-    label: "Просто сходить с ребёнком",
-    description: "Подойдёт как идея для семейного визита или досуга.",
-  },
-  {
-    key: "CLASSES",
-    label: "Записаться на занятие",
-    description: "Есть отдельные условия для обучения, записи или регулярного посещения.",
-  },
-  {
-    key: "BIRTHDAY",
-    label: "Организовать праздник",
-    description: "Предложение реально подходит для дня рождения или другого детского праздника.",
-  },
-  {
-    key: "CAMPS",
-    label: "Каникулы / смена",
-    description: "Есть самостоятельные условия для смен, лагеря или интенсивной программы.",
-  },
+const LOCATION_OPTIONS: Array<{ value: BirthdayLocationType; label: string }> = [
+  { value: "ON_SITE", label: "У нас" },
+  { value: "OFF_SITE", label: "С выездом" },
+  { value: "BOTH", label: "И там, и там" },
 ];
 
-const placementStatusLabel: Record<OfferPlacementStatus, string> = {
-  REQUESTED: "на проверке",
-  APPROVED: "одобрено",
-  REJECTED: "отклонено",
-};
-
-const birthdayLocationOptions = [
-  { value: "ON_SITE" as const, label: "У нас", description: "Праздник проходит на вашей площадке." },
-  { value: "OFF_SITE" as const, label: "С выездом", description: "Вы приезжаете к клиенту или на стороннюю площадку." },
-  { value: "BOTH" as const, label: "Оба варианта", description: "Можно провести и у вас, и на выезде." },
+const SERVICE_OPTIONS: Array<{ value: PartyCategory; label: string }> = [
+  { value: "VENUE", label: "Площадка / зал" },
+  { value: "ANIMATOR", label: "Аниматор / ведущий" },
+  { value: "SHOW", label: "Шоу" },
+  { value: "MASTER_CLASS", label: "Мастер-класс" },
+  { value: "CAKE", label: "Торт / сладкий стол" },
+  { value: "FOOD", label: "Еда / кейтеринг" },
+  { value: "DECOR", label: "Декор" },
+  { value: "PHOTO", label: "Фото / видео" },
+  { value: "PROGRAM", label: "Программа праздника" },
+  { value: "OTHER", label: "Другое" },
 ];
 
-/** Категория услуги для PARTY_SERVICE, сгруппированная по смыслу (StableCardSelector групп не умеет — рисуем 5 отдельных селекторов с общим value). */
-const partyCategoryGroups: Array<{
-  groupLabel: string;
-  options: Array<{ value: PartyCategory; label: string; description: string }>;
-}> = [
-  {
-    groupLabel: "Пространство",
-    options: [
-      { value: "VENUE", label: "Площадка / аренда", description: "Локация, пространство или отдельный зал для праздника." },
-    ],
-  },
-  {
-    groupLabel: "Развлечение",
-    options: [
-      { value: "ANIMATOR", label: "Аниматор / ведущий", description: "Ведущий, герой, аниматор или интерактив." },
-      { value: "SHOW", label: "Шоу / программа", description: "Научное, музыкальное, тематическое или игровое шоу." },
-      { value: "MASTER_CLASS", label: "Мастер-класс", description: "Творческий или образовательный формат для праздника." },
-    ],
-  },
-  {
-    groupLabel: "Еда",
-    options: [
-      { value: "CAKE", label: "Торт / сладкий стол", description: "Кондитерский или сладкий блок праздника." },
-      { value: "FOOD", label: "Еда / кейтеринг", description: "Фуршет, закуски, catering или праздничное меню." },
-    ],
-  },
-  {
-    groupLabel: "Медиа и декор",
-    options: [
-      { value: "DECOR", label: "Декор", description: "Украшение пространства, фотозона, шары и оформление." },
-      { value: "PHOTO", label: "Фото / видео", description: "Съёмка, фотограф, видеограф или контент-пакет." },
-    ],
-  },
-  {
-    groupLabel: "Под ключ",
-    options: [
-      { value: "PROGRAM", label: "Праздник под ключ", description: "Полный пакет с программой и организацией." },
-      { value: "OTHER", label: "Другое", description: "Нестандартный формат, который тоже релевантен празднику." },
-    ],
-  },
-];
+export function Step2Placements({ data, onChange, isEditable }: Step2PlacementsProps) {
+  const isService = data.productType === "PARTY_SERVICE";
+  const isPackage = data.productType === "PARTY_PACKAGE";
+  const birthday = data.birthdayDetails;
+  const [showMore, setShowMore] = useState(false);
+  const hasAdditionalData = Boolean(
+    birthday.program.trim() || birthday.note.trim() || birthday.includedCategories.length ||
+    birthday.prepaymentTerms.trim() || birthday.cancellationTerms.trim() ||
+    data.occasions.length || data.requestedPlacements.length > 1,
+  );
+  const moreOpen = showMore;
 
-export function Step2Placements({
-  data,
-  onChange,
-  isEditable,
-}: Step2PlacementsProps) {
-  const hasBirthdayPlacement = data.requestedPlacements.includes("BIRTHDAY");
-  const isPartyService = data.productType === "PARTY_SERVICE";
-  const isPartyPackage = data.productType === "PARTY_PACKAGE";
-
-  const togglePlacement = (key: OfferPlacementKey, checked: boolean) => {
-    onChange((prev) => {
-      const nextRequestedPlacements = checked
-        ? Array.from(new Set([...prev.requestedPlacements, key]))
-        : prev.requestedPlacements.filter((item) => item !== key);
-
-      return {
-        requestedPlacements: nextRequestedPlacements,
-      };
-    });
-  };
-
-  const updateBirthdayDetails = (
-    patch: Partial<OfferFormData["birthdayDetails"]>,
-  ) => {
-    onChange((prev) => ({
-      birthdayDetails: {
-        ...prev.birthdayDetails,
-        ...patch,
-      },
-    }));
+  const updateBirthdayDetails = (patch: Partial<OfferFormData["birthdayDetails"]>) => {
+    onChange((prev) => ({ birthdayDetails: { ...prev.birthdayDetails, ...patch } }));
   };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-xl font-semibold mb-2">
-          Что вы предлагаете?
-        </h2>
-        <p className="text-muted-foreground">
-          Выберите сценарии — это поможет родителям найти ваше предложение
-          в нужном разделе. Финальное размещение проверит модератор.
-        </p>
+    <div className="space-y-6">
+      <div className="space-y-1">
+        <h2 className="text-xl font-semibold text-foreground">{isService ? "Об услуге" : "О празднике"}</h2>
+        <p className="text-sm text-muted-foreground">Укажите основные условия. Остальное — по желанию.</p>
       </div>
 
-      <div className="space-y-3">
-        {placementOptions.map((option) => {
-          const isChecked = data.requestedPlacements.includes(option.key);
-          const placementStatus = data.placementStatuses[option.key];
-
-          return (
-            <label
-              key={option.key}
-              className={`flex cursor-pointer items-start gap-4 rounded-2xl border p-4 transition-colors ${
-                isChecked
-                  ? "border-[#EF8759] bg-orange-50"
-                  : "border-border hover:border-gray-300"
-              } ${!isEditable ? "cursor-not-allowed opacity-70" : ""}`}
-            >
-              <Checkbox
-                checked={isChecked}
+      {isService && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Какая услуга? <span className="text-destructive">*</span></p>
+          <div role="group" aria-label="Вид услуги" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {SERVICE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
                 disabled={!isEditable}
-                onCheckedChange={(checked) =>
-                  togglePlacement(option.key, checked === true)
-                }
-                className="mt-1"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-foreground">{option.label}</span>
-                  {placementStatus ? (
-                    <Badge variant="outline" className="text-xs">
-                      {placementStatusLabel[placementStatus]}
-                    </Badge>
-                  ) : null}
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {option.description}
-                </p>
-              </div>
-            </label>
-          );
-        })}
-      </div>
-
-      {isPartyService ? (
-        <div className="space-y-6 rounded-3xl border border-[#EF8759]/30 bg-orange-50/60 p-5">
-          <div>
-            <h3 className="text-lg font-semibold">Услуга для праздника</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Категория и формат проведения помогут родителям и модератору
-              понять, что именно вы предлагаете.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <Label>Категория услуги <span className="text-red-500">*</span></Label>
-            {partyCategoryGroups.map((group) => (
-              <div key={group.groupLabel} className="space-y-2">
-                <Label className="text-sm font-normal text-muted-foreground">
-                  {group.groupLabel}
-                </Label>
-                <StableCardSelector<PartyCategory>
-                  value={data.partyCategory}
-                  onValueChange={(partyCategory) => onChange({ partyCategory })}
-                  options={group.options}
-                  isEditable={isEditable}
-                  className="grid gap-3 md:grid-cols-2"
-                />
-              </div>
+                aria-pressed={data.partyCategory === option.value}
+                onClick={() => onChange({ partyCategory: option.value })}
+                className={cn(
+                  "min-h-11 rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60",
+                  data.partyCategory === option.value
+                    ? "border-[#EF8759] bg-[#EF8759]/10 font-medium"
+                    : "border-border bg-card hover:border-[#EF8759]/70",
+                )}
+              >
+                {option.label}
+              </button>
             ))}
           </div>
-
-          <div className="space-y-2">
-            <Label>Формат проведения <span className="text-red-500">*</span></Label>
-            <StableCardSelector<BirthdayLocationType>
-              value={data.birthdayDetails.locationType}
-              onValueChange={(locationType) => updateBirthdayDetails({ locationType })}
-              options={birthdayLocationOptions}
-              isEditable={isEditable}
-              className="grid gap-3 md:grid-cols-3"
-            />
-          </div>
-
-          <div className="rounded-2xl border border-border/70 bg-white/60 p-4 text-sm text-muted-foreground">
-            Длительность, цена, что входит, описание и важные условия — на
-            следующих шагах («Условия» и «Цена»).
-          </div>
         </div>
-      ) : null}
+      )}
 
-      {isPartyPackage ? (
-        <div className="space-y-6 rounded-3xl border border-[#EF8759]/30 bg-orange-50/60 p-5">
-          <div>
-            <h3 className="text-lg font-semibold">Условия для праздника</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Заполните базовые условия, чтобы модератор и родители понимали,
-              как именно предложение работает в сценарии праздника.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Формат проведения</Label>
-            <StableCardSelector<BirthdayLocationType>
-              value={data.birthdayDetails.locationType}
-              onValueChange={(locationType) => updateBirthdayDetails({ locationType })}
-              options={birthdayLocationOptions}
-              isEditable={isEditable}
-              className="grid gap-3 md:grid-cols-3"
-            />
-          </div>
-
-          <PartyDurationCapacityFields
-            idPrefix="birthday-package"
-            details={data.birthdayDetails}
-            onChange={updateBirthdayDetails}
-            isEditable={isEditable}
-          />
-
-          <div className="space-y-2">
-            <Label htmlFor="birthdayIncluded">
-              Что входит <span className="text-red-500">*</span>
-            </Label>
-            <Textarea
-              id="birthdayIncluded"
-              value={data.birthdayDetails.included}
-              onChange={(e) =>
-                updateBirthdayDetails({ included: e.target.value })
-              }
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Где проходит? <span className="text-destructive">*</span></p>
+        <div role="group" aria-label="Где проходит" className="grid grid-cols-3 gap-2">
+          {LOCATION_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={birthday.locationType === option.value}
               disabled={!isEditable}
-              rows={4}
-              placeholder="Например: аренда зала, ведущий, базовый декор, музыка..."
-            />
-          </div>
+              onClick={() => updateBirthdayDetails({ locationType: option.value })}
+              className={cn(
+                "flex min-h-11 items-center justify-center gap-1 rounded-xl border px-2 py-2 text-center text-sm transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60",
+                birthday.locationType === option.value
+                  ? "border-[#EF8759] bg-[#EF8759]/10 font-medium"
+                  : "border-border bg-card hover:border-[#EF8759]/70",
+              )}
+            >
+              {birthday.locationType === option.value && <Check aria-hidden="true" className="size-3.5 shrink-0" />}
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-          <div className="space-y-3 rounded-2xl border border-border/70 bg-white/60 p-4">
-            <Label>Какие услуги уже включены в пакет?</Label>
-            <p className="text-sm text-muted-foreground">
-              Отметьте включённые услуги. После подключения реального подбора конструктор учтёт их, чтобы избежать повторной оплаты.
-              Цены отдельных услуг в составе пакета здесь не задаются.
-            </p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {partyCategoryGroups.flatMap((group) => group.options)
-                .filter((option) => option.value !== "PROGRAM" && option.value !== "OTHER")
-                .map((option) => (
-                  <label key={option.value} className="flex items-center gap-2 text-sm">
+      <PartyDurationCapacityFields
+        idPrefix={isService ? "party-service" : "party-package"}
+        details={birthday}
+        onChange={updateBirthdayDetails}
+        isEditable={isEditable}
+      />
+
+      <div className="space-y-2">
+        <Label htmlFor="party-included">Что входит? <span className="text-destructive">*</span></Label>
+        <Textarea
+          id="party-included"
+          value={birthday.included}
+          onChange={(event) => updateBirthdayDetails({ included: event.target.value })}
+          disabled={!isEditable}
+          rows={3}
+          placeholder={isService ? "Например: час работы аниматора, реквизит" : "Например: аренда зала, ведущий, музыка, украшение"}
+        />
+        {!birthday.included.trim() && birthday.program.trim() && (
+          <p className="text-xs text-muted-foreground">Описание уже есть в дополнительных сведениях.</p>
+        )}
+      </div>
+
+      <Collapsible open={moreOpen} onOpenChange={setShowMore}>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-xl border border-border/70 bg-muted/20 px-4 py-3 text-left text-sm font-medium hover:bg-muted/40"
+          >
+            Дополнительно{hasAdditionalData ? " · заполнено" : ""}
+            <ChevronDown aria-hidden="true" className={cn("size-4 transition-transform", moreOpen && "rotate-180")} />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-5 pt-4">
+          {isPackage && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Состав готового пакета</p>
+              <p className="text-xs text-muted-foreground">Отметьте услуги, которые входят в цену.</p>
+              <div className="grid grid-cols-2 gap-3">
+                {SERVICE_OPTIONS.filter((option) => option.value !== "PROGRAM" && option.value !== "OTHER").map((option) => (
+                  <label key={option.value} className="flex cursor-pointer items-center gap-2 text-sm">
                     <Checkbox
-                      checked={(data.birthdayDetails.includedCategories ?? []).includes(option.value)}
-                      onCheckedChange={(checked) => {
-                        const current = data.birthdayDetails.includedCategories ?? [];
-                        updateBirthdayDetails({
-                          includedCategories: checked === true
-                            ? Array.from(new Set([...current, option.value]))
-                            : current.filter((category) => category !== option.value),
-                        });
-                      }}
+                      checked={birthday.includedCategories.includes(option.value)}
                       disabled={!isEditable}
+                      onCheckedChange={(checked) => {
+                        const list = checked === true
+                          ? Array.from(new Set([...birthday.includedCategories, option.value]))
+                          : birthday.includedCategories.filter((value) => value !== option.value);
+                        updateBirthdayDetails({ includedCategories: list });
+                      }}
                     />
                     <span>{option.label}</span>
                   </label>
                 ))}
+              </div>
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="party-program">Программа праздника</Label>
+            <Textarea id="party-program" rows={3} value={birthday.program}
+              onChange={(event) => updateBirthdayDetails({ program: event.target.value })}
+              disabled={!isEditable} placeholder="Если нужна отдельная программа по этапам" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="party-note">Особые условия</Label>
+            <Textarea id="party-note" rows={2} value={birthday.note}
+              onChange={(event) => updateBirthdayDetails({ note: event.target.value })}
+              disabled={!isEditable} placeholder="Например: стоимость выезда за город" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="party-prepayment">Предоплата</Label>
+            <Textarea id="party-prepayment" rows={2} value={birthday.prepaymentTerms}
+              onChange={(event) => updateBirthdayDetails({ prepaymentTerms: event.target.value })}
+              disabled={!isEditable} placeholder="Например: 30% после подтверждения" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="party-cancellation">Отмена и возврат</Label>
+            <Textarea id="party-cancellation" rows={2} value={birthday.cancellationTerms}
+              onChange={(event) => updateBirthdayDetails({ cancellationTerms: event.target.value })}
+              disabled={!isEditable} placeholder="Например: возврат при отмене за 7 дней" />
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Другие поводы</p>
+            <div className="flex flex-wrap gap-4">
+              {([{ key: "BIRTHDAY", label: "День рождения" }, { key: "GRADUATION", label: "Выпускной" }] as Array<{ key: PartyOccasion; label: string }>).map((occasion) => (
+                <label key={occasion.key} className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={data.occasions.includes(occasion.key)} disabled={!isEditable}
+                    onCheckedChange={(checked) => onChange({ occasions: checked === true
+                      ? Array.from(new Set([...data.occasions, occasion.key]))
+                      : data.occasions.filter((key) => key !== occasion.key) })} />
+                  {occasion.label}
+                </label>
+              ))}
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="birthdayProgram">Описание программы</Label>
-            <Textarea
-              id="birthdayProgram"
-              value={data.birthdayDetails.program}
-              onChange={(e) =>
-                updateBirthdayDetails({ program: e.target.value })
-              }
-              disabled={!isEditable}
-              rows={4}
-              placeholder="Коротко опишите, как проходит праздник или услуга."
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="birthdayNote">Важные условия</Label>
-            <Textarea
-              id="birthdayNote"
-              value={data.birthdayDetails.note}
-              onChange={(e) => updateBirthdayDetails({ note: e.target.value })}
-              disabled={!isEditable}
-              rows={3}
-              placeholder="Например: доплата за выезд, минимальный заказ, ограничения по возрасту."
-            />
-          </div>
+          <AdditionalPlacements data={data} onChange={onChange} isEditable={isEditable} />
         </div>
-      ) : null}
-
-      {hasBirthdayPlacement && !isPartyService && !isPartyPackage ? (
-        <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 text-sm text-muted-foreground">
-          Отметка «Организовать праздник» поможет родителям найти это
-          предложение в разделе праздников — дополнительные поля для этого
-          сценария не нужны.
-        </div>
-      ) : null}
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }
