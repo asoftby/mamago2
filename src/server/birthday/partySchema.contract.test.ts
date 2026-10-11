@@ -23,6 +23,8 @@ assert.match(sql, /EXCLUDE USING gist/);
 assert.match(sql, /tsrange\("blockStart", "blockEnd", '\[\)'\)/);
 assert.match(sql, /CREATE EXTENSION IF NOT EXISTS btree_gist/);
 assert.match(sql, /AvailabilityRule_valid_interval/);
+assert.match(sql, /PartyQuote_one_active_per_request/);
+assert.match(sql, /BookingRequest_one_confirmed_per_party_item/);
 assert.match(sql, /CalendarBlock_valid_interval/);
 assert.doesNotMatch(sql, /DROP TABLE|DROP COLUMN|TRUNCATE|DELETE FROM/i);
 console.log("partySchema.contract.test.ts: OK");

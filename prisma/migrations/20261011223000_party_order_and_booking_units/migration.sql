@@ -441,3 +441,15 @@ ALTER TABLE "BookingAllocation"
     tsrange("blockStart", "blockEnd", '[)') WITH &&
   )
   WHERE ("status" IN ('HELD', 'CONFIRMED'));
+
+-- Exactly one actively negotiated offer per request; older quote versions
+-- remain immutable records with SUPERSEDED status.
+CREATE UNIQUE INDEX "PartyQuote_one_active_per_request"
+  ON "PartyQuote" ("bookingRequestId")
+  WHERE "status" = 'ACTIVE';
+
+-- Only one confirmed performer may be attached to a party item.
+-- This complements PartyOrderItem.confirmedBookingRequestId @unique.
+CREATE UNIQUE INDEX "BookingRequest_one_confirmed_per_party_item"
+  ON "BookingRequest" ("partyOrderItemId")
+  WHERE "kind" = 'PARTY' AND "partyStage" = 'CONFIRMED';
