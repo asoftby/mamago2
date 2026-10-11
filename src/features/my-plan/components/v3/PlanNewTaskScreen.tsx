@@ -89,7 +89,7 @@ export function PlanNewTaskScreen({
   const [lead, setLead] = useState<number | null>(
     editItem?.startsAt && editItem.reminderEnabled ? (editItem.reminderLeadMinutes ?? null) : null,
   );
-  const [leadTouched, setLeadTouched] = useState(Boolean(editItem));
+  const [leadTouched, setLeadTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const timeRef = useRef<HTMLInputElement>(null);
 
@@ -143,13 +143,27 @@ export function PlanNewTaskScreen({
         reminderEnabled: timed && lead !== null,
         reminderLeadMinutes: timed ? lead : null,
       };
+      // Перенос: нетронутое напоминание (в т.ч. «по умолчанию», lead = null) не перезаписываем.
+      const moveFields = editItem
+        ? (() => {
+            const { reminderEnabled, reminderLeadMinutes, ...rest } = fields;
+            const keepReminder = timed && !leadTouched && Boolean(editItem.startsAt);
+            const startChanged = !timed || time !== (editItem.startsAt ? formatHHMM(editItem.startsAt) : "");
+            return {
+              ...rest,
+              ...(keepReminder ? {} : { reminderEnabled, reminderLeadMinutes }),
+              // Старый конец не совпадёт с новым началом — сбрасываем.
+              ...(editItem.endsAt && startChanged ? { endsAt: null } : {}),
+            };
+          })()
+        : fields;
       const response = editItem
         ? await fetch(`/api/plan/manual/${editItem.id}`, {
             method: "PATCH",
             headers: { "content-type": "application/json" },
             credentials: "include",
             body: JSON.stringify({
-              ...fields,
+              ...moveFields,
               expectedUpdatedAt: new Date(editItem.updatedAt ?? Date.now()).toISOString(),
             }),
           })
@@ -163,6 +177,13 @@ export function PlanNewTaskScreen({
               category: detectPlanItemCategory(text.trim()),
             }),
           });
+      if (editItem && response.status === 409) {
+        // Заметку успели изменить — обновляем план и выходим, чтобы не повторять устаревшую версию.
+        requestPlanRefetchForDate(editItem.date);
+        toast.error("Заметка изменилась", { description: "Обновили план — попробуйте перенести ещё раз" });
+        onBack();
+        return;
+      }
       if (!response.ok) throw new Error("save_failed");
       if (editItem) requestPlanRefetchForDate(editItem.date);
       requestPlanRefetchForDate(day);
