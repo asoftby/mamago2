@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { StableCardSelector } from "@/components/ui/stable-card-selector";
+import { PartyDurationCapacityFields } from "../components/PartyDurationCapacityFields";
 import type { OfferFormData, PlaceAmenityKey, PartyOccasion } from "../types";
 
 interface Step4ConditionsProps {
@@ -143,50 +144,12 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
   /** PARTY_SERVICE: длительность/вместимость/описательные поля — перенесены сюда со шага «Сценарии». */
   const renderServiceDetailFields = () => (
     <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-2">
-          <Label htmlFor="serviceDuration">Длительность, минут</Label>
-          <Input
-            id="serviceDuration"
-            inputMode="numeric"
-            value={data.birthdayDetails.durationMinutes ?? ""}
-            onChange={(e) =>
-              updateBirthdayDetails({
-                durationMinutes: e.target.value ? Number(e.target.value) : null,
-              })
-            }
-            disabled={!isEditable}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="serviceMinChildren">Минимум детей</Label>
-          <Input
-            id="serviceMinChildren"
-            inputMode="numeric"
-            value={data.birthdayDetails.minChildren ?? ""}
-            onChange={(e) =>
-              updateBirthdayDetails({
-                minChildren: e.target.value ? Number(e.target.value) : null,
-              })
-            }
-            disabled={!isEditable}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="serviceMaxChildren">Максимум детей</Label>
-          <Input
-            id="serviceMaxChildren"
-            inputMode="numeric"
-            value={data.birthdayDetails.maxChildren ?? ""}
-            onChange={(e) =>
-              updateBirthdayDetails({
-                maxChildren: e.target.value ? Number(e.target.value) : null,
-              })
-            }
-            disabled={!isEditable}
-          />
-        </div>
-      </div>
+      <PartyDurationCapacityFields
+        idPrefix="birthday-service"
+        details={data.birthdayDetails}
+        onChange={updateBirthdayDetails}
+        isEditable={isEditable}
+      />
 
       <div className="space-y-2">
         <Label htmlFor="serviceIncluded">

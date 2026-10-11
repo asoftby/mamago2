@@ -1,9 +1,9 @@
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StableCardSelector } from "@/components/ui/stable-card-selector";
 import { Textarea } from "@/components/ui/textarea";
+import { PartyDurationCapacityFields } from "../components/PartyDurationCapacityFields";
 import type {
   BirthdayLocationType,
   OfferFormData,
@@ -254,52 +254,12 @@ export function Step2Placements({
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="birthdayDuration">Длительность, минут</Label>
-              <Input
-                id="birthdayDuration"
-                inputMode="numeric"
-                value={data.birthdayDetails.durationMinutes ?? ""}
-                onChange={(e) =>
-                  updateBirthdayDetails({
-                    durationMinutes: e.target.value
-                      ? Number(e.target.value)
-                      : null,
-                  })
-                }
-                disabled={!isEditable}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="birthdayMinChildren">Минимум детей</Label>
-              <Input
-                id="birthdayMinChildren"
-                inputMode="numeric"
-                value={data.birthdayDetails.minChildren ?? ""}
-                onChange={(e) =>
-                  updateBirthdayDetails({
-                    minChildren: e.target.value ? Number(e.target.value) : null,
-                  })
-                }
-                disabled={!isEditable}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="birthdayMaxChildren">Максимум детей</Label>
-              <Input
-                id="birthdayMaxChildren"
-                inputMode="numeric"
-                value={data.birthdayDetails.maxChildren ?? ""}
-                onChange={(e) =>
-                  updateBirthdayDetails({
-                    maxChildren: e.target.value ? Number(e.target.value) : null,
-                  })
-                }
-                disabled={!isEditable}
-              />
-            </div>
-          </div>
+          <PartyDurationCapacityFields
+            idPrefix="birthday-package"
+            details={data.birthdayDetails}
+            onChange={updateBirthdayDetails}
+            isEditable={isEditable}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="birthdayIncluded">
