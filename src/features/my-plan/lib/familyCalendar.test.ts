@@ -50,6 +50,7 @@ test("one presentation adapter renders manual, catalog, and Telegram sources saf
   });
   assert.equal(adultEntry.typeLabel, "Из Telegram");
   assert.equal(adultEntry.personLabel, "Взрослые");
+  assert.equal(adultEntry.canEdit, true);
 });
 
 test("family filters distinguish all, family, and each child", () => {

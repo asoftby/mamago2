@@ -1309,8 +1309,9 @@ export function PlanMainContent({
     );
   }
 
-  // Своя заметка переносится той же формой, что и «Новое дело»; события каталога — шторкой с доступными датами.
-  const movingNote = movingItem?.source === "MANUAL" ? movingItem : null;
+  // Свои дела и записи Telegram используют одну форму даты/времени; каталог — расписание.
+  const movingNote = movingItem?.source === "MANUAL" || movingItem?.source === "TELEGRAM_FORWARD"
+    ? movingItem : null;
   if (movingNote) {
     return (
       <PlanNewTaskScreen

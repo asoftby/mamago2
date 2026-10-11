@@ -126,13 +126,7 @@ export function renderCaptureCard(
   }
 
   const duplicate = ruleCodes.includes("DUPLICATE_FOUND");
-  const header = duplicate
-    ? "Похоже, это уже в плане"
-    : draft.entries.length > 1
-      ? "Нашёл несколько пунктов"
-      : draft.entries[0]!.entryType === "TASK"
-        ? "Нашёл задачу"
-        : "Нашёл событие";
+  const header = duplicate ? "Похоже, это уже в плане" : "Вот что получилось:";
 
   const target = ruleCodes.includes(CAPTURE_TARGET_ME_RULE)
     ? "Я"

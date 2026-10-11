@@ -38,13 +38,18 @@ test("My Plan uses bounded calendar ranges, URL date state, cached weeks, and vi
   assert.match(week, /Сегодня/);
 });
 
-test("manual actions stay manual-only and Telegram remains non-editable", () => {
+test("manual and Telegram records can be edited through source-scoped endpoints", () => {
   const card = read("src/app/(public)/me/plan/PlanItemCard.tsx");
   const presentation = read("src/features/my-plan/lib/familyCalendar.ts");
-  assert.match(presentation, /canEdit:\s*item\.source === "MANUAL"/);
+  assert.match(presentation, /canEdit:\s*item\.source === "MANUAL" \|\| item\.source === "TELEGRAM_FORWARD"/);
   assert.match(card, /item\.source !== "TELEGRAM_FORWARD"/);
   assert.match(card, /\/api\/plan\/manual\//);
   assert.match(card, /presentation\.canEdit/);
+  const dialog = read("src/app/(public)/me/plan/ManualPlanEntryDialog.tsx");
+  assert.match(dialog, /item\.source === "TELEGRAM_FORWARD" \? "telegram" : "manual"/);
+  const route = read("src/app/api/plan/telegram/[id]/route.ts");
+  assert.match(route, /updateTelegramPlanEntry/);
+  assert.doesNotMatch(route, /source:\s*body/);
 });
 
 test("manual edit and cancel send version and refresh after a conflict", () => {

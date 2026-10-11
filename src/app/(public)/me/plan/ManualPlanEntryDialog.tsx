@@ -64,25 +64,28 @@ export function ManualPlanEntryDialog({
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(item ? `/api/plan/manual/${item.id}` : "/api/plan/manual", {
-        method: item ? "PATCH" : "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          title,
-          childId: childId || null,
-          date: entryDate,
-          startsAt: startsAt || null,
-          endsAt: endsAt || null,
-          locationText: locationText || null,
-          notes: notes || null,
-          tags: tagsText
-            .split(",")
-            .map((tag) => tag.trim().replace(/^#+/, "").trim())
-            .filter(Boolean),
-          reminderEnabled: reminderEnabled && Boolean(startsAt),
-          ...(item ? { expectedUpdatedAt: item.updatedAt } : {}),
-        }),
-      });
+      const response = await fetch(
+        item ? `/api/plan/${item.source === "TELEGRAM_FORWARD" ? "telegram" : "manual"}/${item.id}` : "/api/plan/manual",
+        {
+          method: item ? "PATCH" : "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            title,
+            childId: childId || null,
+            date: entryDate,
+            startsAt: startsAt || null,
+            endsAt: endsAt || null,
+            locationText: locationText || null,
+            notes: notes || null,
+            tags: tagsText
+              .split(",")
+              .map((tag) => tag.trim().replace(/^#+/, "").trim())
+              .filter(Boolean),
+            reminderEnabled: reminderEnabled && Boolean(startsAt),
+            ...(item ? { expectedUpdatedAt: item.updatedAt } : {}),
+          }),
+        },
+      );
       const payload = await response.json() as { item?: SerializedPlanItem; error?: string };
       if (response.status === 409) {
         onConflict();
@@ -105,7 +108,7 @@ export function ManualPlanEntryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] w-[calc(100vw-1.5rem)] max-w-lg overflow-y-auto rounded-2xl p-0 sm:w-full">
         <DialogHeader className="border-b px-5 py-4 text-left">
-          <DialogTitle>{item ? "Изменить заметку" : "Добавить в план"}</DialogTitle>
+          <DialogTitle>{item ? "Изменить запись" : "Добавить в план"}</DialogTitle>
           <DialogDescription>Запишите то, что нужно сделать или не забыть</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4 px-5 pb-5 pt-4">

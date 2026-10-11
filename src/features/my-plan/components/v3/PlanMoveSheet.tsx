@@ -8,18 +8,12 @@ import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
 import { toast } from "@/lib/toast";
 import type { PlanItemWithActivity } from "../../types/event";
+export { canMovePlanItem } from "../../lib/planMoveEligibility";
 
 /** Заметке доступны любые даты — берём ближайшие два месяца, остальное листается в «Показать все даты». */
 const NOTE_DATE_HORIZON_DAYS = 60;
 
 type SessionsByDate = Record<string, Array<{ id: string; time: string }>>;
-
-/** Можно ли перенести запись: событие каталога (по расписанию) или своя заметка. */
-export function canMovePlanItem(item: PlanItemWithActivity): boolean {
-  if (item.routeId || item.planRouteSlug || item.placeId || item.planPlaceSlug || item.articleId) return false;
-  if (item.source === "MANUAL") return true;
-  return Boolean(item.activityId);
-}
 
 function formatMovedTo(dateISO: string): string {
   return new Date(`${dateISO}T12:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
