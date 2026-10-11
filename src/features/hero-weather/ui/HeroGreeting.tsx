@@ -70,11 +70,8 @@ function buildRangeSentence(snapshot: WeatherSnapshot): string | null {
   const basePrefix = cityName ? `Сегодня в ${cityName}` : "Сегодня";
 
   if (min && max) {
-    if (snapshot.outdoorScore === "GOOD_FOR_OUTDOOR") {
-      return `${basePrefix} от ${min} до ${max} — хороший день для прогулки.`;
-    }
-    if (snapshot.outdoorScore === "BAD_FOR_OUTDOOR") {
-      return `${basePrefix} от ${min} до ${max} — лучше выбирать места в помещении.`;
+    if (snapshot.outdoorScore === "GOOD_FOR_OUTDOOR" || snapshot.outdoorScore === "BAD_FOR_OUTDOOR") {
+      return `${basePrefix} от ${min} до ${max}.`;
     }
     if ((snapshot.precipitationProbability ?? 0) >= 30) {
       return `${basePrefix} от ${min} до ${max}, возможен дождь.`;
