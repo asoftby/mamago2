@@ -41,6 +41,8 @@ export const serviceDetails = z.object({
   included: z.string().optional(),
   note: z.string().optional(),
   durationMinutes: z.number().int().nonnegative().optional(),
+  prepaymentTerms: z.string().optional(),
+  cancellationTerms: z.string().optional(),
 });
 
 // PARTY_PACKAGE — праздник под ключ
@@ -51,6 +53,11 @@ export const packageDetails = z.object({
   childrenCount: z.string().optional(),
   duration: z.string().optional(),
   placeId: z.string().optional(),
+  includedCategories: z.array(z.enum(["VENUE", "ANIMATOR", "SHOW", "MASTER_CLASS", "CAKE", "FOOD", "DECOR", "PHOTO", "PROGRAM", "OTHER"])).optional(),
+  prepaymentTerms: z.string().optional(),
+  cancellationTerms: z.string().optional(),
+  note: z.string().optional(),
+  durationMinutes: z.number().int().nonnegative().optional(),
 });
 
 export type PlaceDetails = z.infer<typeof placeDetails>;

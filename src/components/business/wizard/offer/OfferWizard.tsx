@@ -425,7 +425,16 @@ export function OfferWizard({
     const restored = draft.restoreDraft();
     if (!restored) return;
     const defaults = getDefaultFormData(defaultPlaceId ?? null);
-    const nextFormData = { ...defaults, ...restored.formData };
+    // Restore nested party fields from older draft schema versions without
+    // losing defaults added to the wizard later.
+    const nextFormData = {
+      ...defaults,
+      ...restored.formData,
+      birthdayDetails: {
+        ...defaults.birthdayDetails,
+        ...(restored.formData?.birthdayDetails ?? {}),
+      },
+    };
     if (!nextFormData.placeId && defaultPlaceId) {
       nextFormData.placeId = defaultPlaceId;
     }

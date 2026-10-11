@@ -296,6 +296,38 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
           {renderOccasionsSection()}
         </div>
       ) : null}
+
+      {data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE" ? (
+        <div className="space-y-4 rounded-2xl border border-border/70 p-4">
+          <h3 className="font-semibold">Оплата и отмена</h3>
+          <p className="text-sm text-muted-foreground">
+            Клиент рассчитывается напрямую с вами. Укажите условия до отправки заявки,
+            чтобы родитель знал о предоплате и возвратах.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="partyPrepaymentTerms">Предоплата и порядок расчёта</Label>
+            <Textarea
+              id="partyPrepaymentTerms"
+              value={data.birthdayDetails.prepaymentTerms}
+              onChange={(e) => updateBirthdayDetails({ prepaymentTerms: e.target.value })}
+              disabled={!isEditable}
+              rows={2}
+              placeholder="Например: 30% после подтверждения, остаток в день праздника. Или: без предоплаты."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="partyCancellationTerms">Отмена заказа и возврат предоплаты</Label>
+            <Textarea
+              id="partyCancellationTerms"
+              value={data.birthdayDetails.cancellationTerms}
+              onChange={(e) => updateBirthdayDetails({ cancellationTerms: e.target.value })}
+              disabled={!isEditable}
+              rows={2}
+              placeholder="Например: возврат предоплаты при отмене не позднее чем за 7 дней."
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -62,15 +62,31 @@ function parseServiceDetailsFromDb(details: unknown): {
   included: string;
   note: string;
   durationMinutes: number | null;
+  prepaymentTerms: string;
+  cancellationTerms: string;
+  includedCategories: PartyCategory[];
 } {
   const parsed = serviceDetailsSchema.safeParse(details);
-  if (!parsed.success) return { program: "", included: "", note: "", durationMinutes: null };
-  const d = parsed.data;
+  const d = parsed.success ? parsed.data : null;
+  const raw = details && typeof details === "object" && !Array.isArray(details)
+    ? details as Record<string, unknown>
+    : {};
+  const acceptedCategories = new Set<PartyCategory>([
+    "VENUE", "ANIMATOR", "SHOW", "MASTER_CLASS", "CAKE",
+    "FOOD", "DECOR", "PHOTO", "PROGRAM", "OTHER",
+  ]);
   return {
-    program: d.program ?? "",
-    included: d.included ?? "",
-    note: d.note ?? "",
-    durationMinutes: d.durationMinutes ?? null,
+    program: d?.program ?? "",
+    included: d?.included ?? "",
+    note: d?.note ?? "",
+    durationMinutes: d?.durationMinutes ?? null,
+    prepaymentTerms: d?.prepaymentTerms ?? "",
+    cancellationTerms: d?.cancellationTerms ?? "",
+    includedCategories: Array.isArray(raw.includedCategories)
+      ? raw.includedCategories.filter(
+        (item): item is PartyCategory => typeof item === "string" && acceptedCategories.has(item as PartyCategory),
+      )
+      : [],
   };
 }
 
@@ -690,6 +706,11 @@ function buildTypeDetails(data: OfferFormData): Record<string, unknown> | undefi
     if (bd.program.trim()) result.program = bd.program.trim();
     if (bd.included.trim()) result.included = bd.included.trim();
     if (bd.note.trim()) result.note = bd.note.trim();
+    if (bd.prepaymentTerms?.trim()) result.prepaymentTerms = bd.prepaymentTerms.trim();
+    if (bd.cancellationTerms?.trim()) result.cancellationTerms = bd.cancellationTerms.trim();
+    if (data.productType === "PARTY_PACKAGE" && (bd.includedCategories?.length ?? 0) > 0) {
+      result.includedCategories = bd.includedCategories;
+    }
     return Object.keys(result).length > 0 ? result : undefined;
   }
   return undefined;
@@ -1010,6 +1031,9 @@ export function mapOfferToFormData(offer: {
       included: usesPartyColumns ? (serviceDetails?.included ?? "") : "",
       program: usesPartyColumns ? (serviceDetails?.program ?? "") : "",
       note: usesPartyColumns ? (serviceDetails?.note ?? "") : "",
+      includedCategories: isPartyPackage ? (serviceDetails?.includedCategories ?? []) : [],
+      prepaymentTerms: usesPartyColumns ? (serviceDetails?.prepaymentTerms ?? "") : "",
+      cancellationTerms: usesPartyColumns ? (serviceDetails?.cancellationTerms ?? "") : "",
     },
     // PARTY_SERVICE only: partyCategory from canon Offer.category. PARTY_PACKAGE has no single category.
     partyCategory: isPartyService ? (offer.category ?? null) : null,
