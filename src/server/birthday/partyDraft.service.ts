@@ -1,4 +1,4 @@
-import { PartyCategory, PartyOrderStatus, Prisma } from "@prisma/client";
+import { PartyCategory, PartyOrderStatus, Prisma, type OfferProductType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
@@ -46,7 +46,7 @@ export async function readPartyOrder(ownerUserId: string, partyId: string) {
 
 type CatalogOffer = {
   id: string;
-  productType: "PARTY_SERVICE" | "PARTY_PACKAGE" | null;
+  productType: OfferProductType | null;
   category: PartyCategory | null;
   priceFrom: number | null;
   currency: string;
@@ -114,6 +114,9 @@ export async function updatePartyDraft(
 
   const selectionChange = input.anchorOfferId !== undefined;
   const newMode = input.venueMode ?? existing.venueMode;
+  if (input.venueMode && input.venueMode !== existing.venueMode && !selectionChange) {
+    throw new PartyApiError(422, "При смене формата выберите основное предложение заново");
+  }
   let anchor: CatalogOffer | null = null;
   let addons: CatalogOffer[] = [];
   if (selectionChange && input.anchorOfferId) {
