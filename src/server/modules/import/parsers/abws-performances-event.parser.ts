@@ -388,6 +388,19 @@ export function parseAbwsResponseBody(body: string): AbwsPerformanceItem[] {
   throw new Error(`Unrecognized ABWS response shape: ${typeof parsed}`);
 }
 
+/**
+ * Never write a raw upstream response to the log: an error payload may echo
+ * the authenticated query URL. Retain a short preview with key values masked.
+ */
+export function abwsSafeBodyPreview(body: string, apiKey: string, maxChars = 500): string {
+  const encodedKey = encodeURIComponent(apiKey);
+  const prefix = body.slice(0, maxChars + Math.max(apiKey.length, encodedKey.length));
+  return prefix
+    .replaceAll(encodedKey, "[REDACTED]")
+    .replaceAll(apiKey, "[REDACTED]")
+    .slice(0, maxChars);
+}
+
 export async function fetchAbwsPerformances(source: ImportSource): Promise<AbwsPerformanceItem[]> {
   const apiKey = process.env.ABWS_KEY;
   if (!apiKey) {
@@ -418,7 +431,7 @@ export async function fetchAbwsPerformances(source: ImportSource): Promise<AbwsP
     url: loggableUrl,
     status: response.status,
     bodyLength: response.html.length,
-    bodyPreview: response.html.slice(0, 500),
+    bodyPreview: abwsSafeBodyPreview(response.html, apiKey),
   });
 
   try {
@@ -427,7 +440,8 @@ export async function fetchAbwsPerformances(source: ImportSource): Promise<AbwsP
     console.error("[import.abws] failed to parse response body", {
       url: loggableUrl,
       status: response.status,
-      body: response.html,
+      bodyLength: response.html.length,
+      bodyPreview: abwsSafeBodyPreview(response.html, apiKey, 1_000),
     });
     throw err;
   }

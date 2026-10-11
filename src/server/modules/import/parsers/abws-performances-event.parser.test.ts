@@ -9,6 +9,7 @@
 import assert from "node:assert/strict";
 
 import {
+  abwsSafeBodyPreview,
   dedupeKey,
   filterCategoryTypeIds,
   filterItemsByCategoryTypeIdAllowlist,
@@ -81,6 +82,16 @@ const multiVenueFixture: AbwsPerformanceItem = {
     { ...singleVenueFixture.sessions[1], id: 1743173, object: { id: 777, city: { slug: "brest" } } },
   ],
 };
+
+// API error messages may reflect their original authenticated URL.
+{
+  const token = "fake-abws-secret-for-tests";
+  const sample = `error requesting ?key=${token}&distributor_company_id=550`;
+  assert.ok(!abwsSafeBodyPreview(sample, token).includes(token));
+  assert.ok(abwsSafeBodyPreview(sample, token).includes("[REDACTED]"));
+  const encoded = encodeURIComponent("secret?with special characters");
+  assert.ok(!abwsSafeBodyPreview(`url ?key=${encoded}`, "secret?with special characters").includes(encoded));
+}
 
 // ── isSingleVenue ────────────────────────────────────────────────────────
 assert.equal(isSingleVenue(singleVenueFixture.sessions), true);
