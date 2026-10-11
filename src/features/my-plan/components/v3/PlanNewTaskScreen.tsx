@@ -193,8 +193,8 @@ export function PlanNewTaskScreen({
             placeholder="Что нужно сделать?"
             className={cn(
               "mp-font-ui block w-full resize-none rounded-2xl border border-[var(--mp-chip-line)] bg-white px-4 py-3",
-              "text-[20px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)] caret-[var(--mp-ac)]",
-              "outline-none transition-shadow placeholder:font-medium placeholder:text-[#6B665F]",
+              "text-[20px] font-normal leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)] caret-[var(--mp-ac)]",
+              "outline-none transition-shadow placeholder:font-normal placeholder:text-[#6B665F]",
               "focus:border-[var(--mp-tx)] focus:shadow-[0_0_0_3px_rgba(29,27,25,.08)]",
             )}
           />
@@ -306,10 +306,10 @@ export function PlanNewTaskScreen({
               const on = whoId === p.id;
               return (
                 <button key={p.id || "family"} type="button" aria-pressed={on} onClick={() => setWhoId(p.id)} className={cn("flex min-w-11 flex-col items-center gap-[7px] rounded-2xl", PLAN_FOCUS)}>
-                  <span className={cn("relative flex h-[62px] w-[62px] items-center justify-center rounded-full border-2 text-[21px] font-extrabold transition-colors", on ? "border-[var(--mp-tx)] bg-white" : "border-transparent bg-[var(--mp-soft)] hover:border-[var(--mp-line-strong)]")}>
+                  <span className={cn("relative flex h-[62px] w-[62px] items-center justify-center rounded-full border-2 text-[21px] font-extrabold transition-colors", "text-[var(--mp-ac)]", on ? "border-[var(--mp-ac)] bg-[var(--mp-soft)]" : "border-transparent bg-[var(--mp-soft)] hover:border-[var(--mp-line-strong)]")}>
                     {p.id === "" ? <Users className="h-6 w-6" aria-hidden /> : displayName(p).trim().charAt(0).toUpperCase()}
                     {on ? (
-                      <span className="absolute -bottom-[3px] -right-[3px] flex h-[23px] w-[23px] items-center justify-center rounded-full border-2 border-[var(--mp-bg)] bg-[var(--mp-tx)] text-white">
+                      <span className="absolute -bottom-[3px] -right-[3px] flex h-[23px] w-[23px] items-center justify-center rounded-full border-2 border-[var(--mp-bg)] bg-[var(--mp-ac)] text-white">
                         <Check className="h-3 w-3" strokeWidth={2.8} aria-hidden />
                       </span>
                     ) : null}

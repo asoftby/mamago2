@@ -47,7 +47,7 @@ export function SaveFlowContainer({
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="sm:max-w-md p-0 gap-0 overflow-hidden rounded-3xl border-neutral-200"
+          className="z-[80] sm:max-w-md p-0 gap-0 overflow-hidden rounded-3xl border-neutral-200"
           showCloseButton={showCloseButton}
           aria-describedby={undefined}
           style={{ background: "#FFFFFF" }}
@@ -68,7 +68,7 @@ export function SaveFlowContainer({
         side="bottom"
         showCloseButton={showCloseButton}
         className={cn(
-          "fixed inset-x-0 bottom-0 flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden rounded-t-3xl border-t p-0 shadow-2xl",
+          "fixed inset-x-0 bottom-0 z-[80] flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden rounded-t-3xl border-t p-0 shadow-2xl",
         )}
         style={{ background: "#FFFFFF", borderTopColor: "rgba(20,18,16,.10)" }}
       >

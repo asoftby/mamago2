@@ -11,7 +11,7 @@ function typeLabel(item: PlanItemWithActivity): string {
   if (item.activity) return activityTypeLabelRu(item.activity.type);
   if (item.planRouteSlug || item.routeId) return "Маршрут";
   if (item.planPlaceSlug || item.placeId) return "Место";
-  return "Активность";
+  return item.source === "MANUAL" ? "Моя заметка" : "Активность";
 }
 
 function dateTimeLabel(item: PlanItemWithActivity): string {
