@@ -5,7 +5,9 @@ import { Bell, ChevronLeft, ChevronRight, Check, Clock3, Mic, Users } from "luci
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { formatHHMM } from "@/lib/formatters/date";
 import { detectPlanItemCategory } from "../../lib/planItemCategory";
+import type { PlanItemWithActivity } from "../../types/event";
 import {
   PLAN_CHIP,
   PLAN_CHIP_DISABLED,
@@ -53,17 +55,22 @@ const SECTION_LABEL = "mp-font-ui mb-[9px] text-[15px] font-bold text-[var(--mp-
 /**
  * «Новое дело» в той же шторке: текст → когда → время → для кого → напомнить.
  * Сохраняет через существующий POST /api/plan/manual (без разбора текста и тегов).
+ * С `editItem` — режим «Перенести» своей заметки: та же форма, предзаполненная,
+ * сохранение через PATCH /api/plan/manual/:id.
  */
 export function PlanNewTaskScreen({
   todayIso,
   initialDate,
   people,
+  editItem,
   onBack,
   onSaved,
 }: {
   todayIso: string;
   initialDate: string;
   people: PlanNewTaskPerson[];
+  /** Своя заметка, которую переносят (режим редактирования). */
+  editItem?: PlanItemWithActivity | null;
   onBack: () => void;
   onSaved: (date: string) => void;
 }) {
@@ -71,15 +78,18 @@ export function PlanNewTaskScreen({
   /** Взрослый в профиле выводится как «Я» (как в «Мой план»), а не логином; остальные — по имени. */
   const firstAdultId = useMemo(() => people.find((p) => p.kind === "adult")?.id ?? null, [people]);
   const initialWhen = initialDate === todayIso ? "today" : initialDate === tomorrowIso ? "tomorrow" : "other";
-  const [text, setText] = useState("");
+  const isMove = Boolean(editItem);
+  const [text, setText] = useState(editItem?.title ?? "");
   const [when, setWhen] = useState<"today" | "tomorrow" | "other">(initialWhen);
   const [pickedDate, setPickedDate] = useState<string | null>(initialWhen === "other" ? initialDate : null);
-  const [timed, setTimed] = useState(false);
-  const [time, setTime] = useState("");
+  const [timed, setTimed] = useState(Boolean(editItem?.startsAt));
+  const [time, setTime] = useState(editItem?.startsAt ? formatHHMM(editItem.startsAt) : "");
   /** "" = вся семья; иначе id персоны (ребёнок → childId, взрослый → assigneeUserId). */
-  const [whoId, setWhoId] = useState<string>("");
-  const [lead, setLead] = useState<number | null>(null);
-  const [leadTouched, setLeadTouched] = useState(false);
+  const [whoId, setWhoId] = useState<string>(editItem?.childId ?? editItem?.assigneeUserId ?? "");
+  const [lead, setLead] = useState<number | null>(
+    editItem?.startsAt && editItem.reminderEnabled ? (editItem.reminderLeadMinutes ?? null) : null,
+  );
+  const [leadTouched, setLeadTouched] = useState(Boolean(editItem));
   const [saving, setSaving] = useState(false);
   const timeRef = useRef<HTMLInputElement>(null);
 
@@ -105,7 +115,9 @@ export function PlanNewTaskScreen({
       ? "Выберите день"
       : timed && !timeValid
         ? "Укажите время"
-        : "Добавить в план";
+        : isMove
+          ? "Перенести"
+          : "Добавить в план";
 
   function enableTime() {
     setTimed(true);
@@ -122,28 +134,44 @@ export function PlanNewTaskScreen({
     const who = people.find((p) => p.id === whoId) ?? null;
     setSaving(true);
     try {
-      const response = await fetch("/api/plan/manual", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          title: text.trim(),
-          date: day,
-          startsAt: timed ? time : null,
-          childId: who?.kind === "child" ? who.id : null,
-          assigneeUserId: who?.kind === "adult" ? who.id : null,
-          tags: [],
-          category: detectPlanItemCategory(text.trim()),
-          reminderEnabled: timed && lead !== null,
-          reminderLeadMinutes: timed ? lead : null,
-        }),
-      });
+      const fields = {
+        title: text.trim(),
+        date: day,
+        startsAt: timed ? time : null,
+        childId: who?.kind === "child" ? who.id : null,
+        assigneeUserId: who?.kind === "adult" ? who.id : null,
+        reminderEnabled: timed && lead !== null,
+        reminderLeadMinutes: timed ? lead : null,
+      };
+      const response = editItem
+        ? await fetch(`/api/plan/manual/${editItem.id}`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              ...fields,
+              expectedUpdatedAt: new Date(editItem.updatedAt ?? Date.now()).toISOString(),
+            }),
+          })
+        : await fetch("/api/plan/manual", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              ...fields,
+              tags: [],
+              category: detectPlanItemCategory(text.trim()),
+            }),
+          });
       if (!response.ok) throw new Error("save_failed");
+      if (editItem) requestPlanRefetchForDate(editItem.date);
       requestPlanRefetchForDate(day);
-      toast.success(`Добавили на ${when === "other" ? longDay(day) : whenWord}`);
+      toast.success(
+        `${isMove ? "Перенесли" : "Добавили"} на ${when === "other" ? longDay(day) : whenWord}`,
+      );
       onSaved(day);
     } catch {
-      toast.error("Не удалось сохранить");
+      toast.error(isMove ? "Не получилось перенести" : "Не удалось сохранить");
     } finally {
       setSaving(false);
     }
@@ -151,13 +179,13 @@ export function PlanNewTaskScreen({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
-      <PlanScreenTitleHead title={<>Новое <em>дело</em></>} onBack={onBack} />
+      <PlanScreenTitleHead title={isMove ? <>Перенести <em>дело</em></> : <>Новое <em>дело</em></>} onBack={onBack} />
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 md:px-8">
         <div className="mb-[22px] mt-1">
         <label className="block">
           <span className="sr-only">Что нужно сделать</span>
           <textarea
-            autoFocus
+            autoFocus={!isMove}
             rows={2}
             maxLength={160}
             value={text}

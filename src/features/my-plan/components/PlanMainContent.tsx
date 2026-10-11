@@ -1150,7 +1150,7 @@ export function PlanMainContent({
     <button
       type="button"
       onClick={handleOpenPlanPage}
-      className="flex min-h-11 w-full items-center justify-center gap-[7px] rounded-xl text-[15px] font-bold text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)]"
+      className="flex h-12 w-full items-center justify-center gap-[7px] rounded-2xl border border-[var(--mp-line-strong)] bg-transparent text-[15px] font-bold text-[var(--mp-tx)] transition-colors hover:bg-[var(--mp-soft)]"
     >
       <ListChecks className="h-[17px] w-[17px]" aria-hidden />
       {totalPlannedCount > 0 ? `Весь план · ${totalPlannedCount}` : "Весь план"}
@@ -1304,6 +1304,28 @@ export function PlanMainContent({
         onSaved={(date) => {
           onChangeDate?.(date);
           setScreen("plan");
+        }}
+      />
+    );
+  }
+
+  // Своя заметка переносится той же формой, что и «Новое дело»; события каталога — шторкой с доступными датами.
+  const movingNote = movingItem?.source === "MANUAL" ? movingItem : null;
+  if (movingNote) {
+    return (
+      <PlanNewTaskScreen
+        todayIso={todayKey}
+        initialDate={movingNote.date < todayKey ? todayKey : movingNote.date}
+        editItem={movingNote}
+        people={personas.map((persona) => ({
+          id: persona.id,
+          name: persona.displayName?.trim() || (persona.kind === "adult" ? "Я" : ""),
+          kind: persona.kind,
+        }))}
+        onBack={() => setMovingItem(null)}
+        onSaved={(date) => {
+          setMovingItem(null);
+          onChangeDate?.(date);
         }}
       />
     );

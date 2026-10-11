@@ -467,7 +467,7 @@ export function EventScheduleCard({
           {isTitleOpen || item.title ? (
             <div className="space-y-2">
               <Label htmlFor={`title-${item.id}`} className="text-sm font-medium text-gray-900">
-                Что показываем / название сеанса
+                Дополнительная информация
               </Label>
               <Input
                 id={`title-${item.id}`}
@@ -475,10 +475,8 @@ export function EventScheduleCard({
                 value={item.title ?? ""}
                 maxLength={SESSION_TITLE_MAX_LENGTH}
                 disabled={disabled}
-                placeholder="Например: Коралина в стране кошмаров"
                 onChange={(e) => handleUpdate({ title: e.target.value })}
               />
-              <p className="text-xs text-gray-500">Если на разных сеансах разная программа</p>
             </div>
           ) : !disabled ? (
             <button
@@ -486,7 +484,7 @@ export function EventScheduleCard({
               onClick={() => setIsTitleOpen(true)}
               className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
             >
-              + Название сеанса
+              + Дополнительная информация
             </button>
           ) : null}
 
