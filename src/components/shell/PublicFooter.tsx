@@ -15,7 +15,7 @@ const STICKY_CTA_FOOTER_PAD =
 
 /** Заголовок колонки — служебная метка в стиле категории на карточке события (mono, uppercase). Контраст ≥ 4.5:1 на #F6F2EA. */
 const FOOTER_HEADING_CLASS =
-  "font-mono text-[12px] font-medium uppercase tracking-[0.1em] text-[rgba(20,18,16,0.68)]";
+  "text-[14px] font-medium uppercase tracking-[0.1em] text-[rgba(20,18,16,0.55)]";
 
 /** Ссылка колонки — главный текст: sans 15px, тёмнее серого, hover-подчёркивание, focus-ring, цель ≥ 44px на мобильном. */
 const FOOTER_LINK_CLASS =
