@@ -9,6 +9,7 @@
 import assert from "node:assert/strict";
 
 import {
+  ABWS_FETCH_OPTIONS,
   dedupeKey,
   filterCategoryTypeIds,
   filterItemsByCategoryTypeIdAllowlist,
@@ -81,6 +82,10 @@ const multiVenueFixture: AbwsPerformanceItem = {
     { ...singleVenueFixture.sessions[1], id: 1743173, object: { id: 777, city: { slug: "brest" } } },
   ],
 };
+
+// The full ABWS JSON catalog is ~13 MiB and must bypass the generic 5 MiB HTML cap.
+assert.ok(ABWS_FETCH_OPTIONS.maxBytes > 13 * 1024 * 1024);
+assert.ok(ABWS_FETCH_OPTIONS.maxBytes <= 32 * 1024 * 1024);
 
 // ── isSingleVenue ────────────────────────────────────────────────────────
 assert.equal(isSingleVenue(singleVenueFixture.sessions), true);
