@@ -5289,3 +5289,16 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Reason deferred: прошедшие дни стали доступны в виджете (просмотр «что было вчера»), но блок рекомендаций/подборок и сценария дня не адаптирован под прошлое.
 - Acceptance criteria: для даты < сегодня виджет показывает только записи; рекомендации/подборки/сценарий скрыты.
 - Source: feat/plan-calendar-20261007.
+
+## [BACKLOG-185] Сохранить идентификаторы CAMP OfferSession при редактировании смен
+
+- Status: BLOCKED
+- Priority: P1
+- Area: Offers / Booking
+- Added: 2026-10-12
+- Reason deferred: первый PR ТЗ 2 добавляет только схему; резервирование мест появится в третьем последовательном PR после #526.
+- Context: `projectCampSessions` сейчас удаляет все строки `OfferSession` и создаёт новые из `Offer.campSessions`. После появления `BookingRequest.offerSessionId` такое редактирование обнулит связь заявки с сеансом из-за `ON DELETE SET NULL`.
+- Current state: схема в draft PR #532, commit `a07736cf55e8a699e5ef55eca87da08ed899755c` поверх PR #526.
+- Dependencies: merge #526 и PR 1–2 ТЗ 2; исправить до включения `reserveSlot` для CAMP.
+- Acceptance criteria: синхронизация CAMP сохраняет ID сеансов с заявками или запрещает изменение/удаление таких сеансов с понятной ошибкой; тест покрывает редактирование смены при существующей заявке.
+- Source: дизайн-review ТЗ 2, PR #532.

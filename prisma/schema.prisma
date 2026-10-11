@@ -2431,6 +2431,7 @@ model Offer {
   bookingMode    BookingMode?
   bookingPhone   String?
   bookingNote    String?
+  offerBooking   OfferBooking?
 
   // Gallery images (JSON array of URLs)
   galleryImages Json? @default("[]")
@@ -2561,12 +2562,71 @@ model OfferSession {
   startAt  DateTime
   endAt    DateTime
   capacity Int?
+  title String?
+  isCancelled Boolean @default(false)
+  bookingRequests BookingRequest[]
   /// Числовая цена (для бюджет-фильтра)
   price    Decimal? @db.Decimal(10, 2)
 
   @@index([offerId])
+  @@unique([offerId, startAt])
   @@index([startAt, endAt])
   @@index([price])
+}
+
+enum ScheduleKind {
+  OPENING_HOURS
+  RECURRING_SESSIONS
+  DATED_SESSIONS
+  ON_REQUEST_WINDOWS
+  SHIFTS
+}
+
+enum ExternalLinkKind {
+  WEBSITE
+  TICKETS
+}
+
+/// Operational booking settings are outside moderated OfferRevision content.
+model OfferBooking {
+  id String @id @default(cuid())
+  offerId String @unique
+  scheduleKind ScheduleKind?
+  timezone String @default("Europe/Minsk")
+  durationMin Int?
+  bufferMin Int @default(0)
+  capacity Int?
+  leadTimeHours Int @default(24)
+  horizonDays Int @default(60)
+  externalKind ExternalLinkKind?
+  externalUrl String?
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  rules OfferScheduleRule[]
+  exceptions OfferScheduleException[]
+}
+
+/// Group sessions have no BookingUnit; resource windows remain in AvailabilityRule.
+model OfferScheduleRule {
+  id String @id @default(cuid())
+  offerBookingId String
+  weekday Int
+  startMinutes Int
+  endMinutes Int
+  validFrom DateTime? @db.Date
+  validTo DateTime? @db.Date
+  capacity Int?
+  offerBooking OfferBooking @relation(fields: [offerBookingId], references: [id], onDelete: Cascade)
+
+  @@unique([offerBookingId, weekday, startMinutes, endMinutes, validFrom])
+}
+
+model OfferScheduleException {
+  id String @id @default(cuid())
+  offerBookingId String
+  date DateTime @db.Date
+  offerBooking OfferBooking @relation(fields: [offerBookingId], references: [id], onDelete: Cascade)
+
+  @@unique([offerBookingId, date])
 }
 
 /// Состав пакета «Праздник под ключ» (реляционный, не JSON).
@@ -5588,6 +5648,7 @@ model BookingAllocation {
 /// Статус заявки на запись
 enum BookingStatus {
   NEW
+  EXPIRED
   CONFIRMED
   REJECTED
   CANCELLED
@@ -5596,6 +5657,8 @@ enum BookingStatus {
 
 /// Режим записи для публикации
 enum BookingMode {
+  NONE
+  EXTERNAL
   REQUEST_ONLY // Заявка без выбора даты/времени
   USE_PUBLICATION_DATES // Выбор даты из диапазона (для Offer)
   USE_PUBLICATION_SLOTS // Выбор конкретного слота (для Activity)
@@ -5615,6 +5678,11 @@ model BookingRequest {
 
   // Выбранные дата/слот
   selectedSessionId String? // Для Activity (ссылка на ActivitySession)
+  offerSessionId String? // Для OfferSession; selectedSessionId remains ActivitySession-only
+  startsAt DateTime?
+  endsAt DateTime?
+  seats Int @default(1)
+  holdUntil DateTime?
   requestedDate     DateTime? // Snapshot для Offer или общий fallback
   requestedTime     String? // Snapshot времени (HH:MM)
 
@@ -5678,6 +5746,7 @@ model BookingRequest {
   offer        Offer?            @relation(fields: [offerId], references: [id], onDelete: SetNull)
   place        Place?            @relation(fields: [placeId], references: [id], onDelete: SetNull)
   session      ActivitySession?  @relation(fields: [selectedSessionId], references: [id], onDelete: SetNull)
+  offerSession OfferSession? @relation(fields: [offerSessionId], references: [id], onDelete: SetNull)
   activities   BookingActivity[]
   feedback     BookingFeedback?
   directThread DirectThread?
@@ -5694,6 +5763,7 @@ model BookingRequest {
   @@index([offerId])
   @@index([placeId])
   @@index([selectedSessionId])
+  @@index([offerSessionId, status, holdUntil])
   @@index([campShiftId])
   @@index([planItemId])
   @@index([status])

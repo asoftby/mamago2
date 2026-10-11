@@ -196,7 +196,7 @@ function inferLegacyOfferCtaFields(offer: {
   productType?: OfferProductType | null;
   kind: OfferKind;
   bookingEnabled?: boolean | null;
-  bookingMode?: "REQUEST_ONLY" | "USE_PUBLICATION_DATES" | "USE_PUBLICATION_SLOTS" | null;
+  bookingMode?: "NONE" | "REQUEST_ONLY" | "EXTERNAL" | "USE_PUBLICATION_DATES" | "USE_PUBLICATION_SLOTS" | null;
   bookingPhone?: string | null;
   bookingNote?: string | null;
   contactWebsite?: string | null;
@@ -946,7 +946,7 @@ export function mapOfferToFormData(offer: {
   contactPhone3Label?: string | null;
   contactWebsite?: string | null;
   bookingEnabled?: boolean | null;
-  bookingMode?: "REQUEST_ONLY" | "USE_PUBLICATION_DATES" | "USE_PUBLICATION_SLOTS" | null;
+  bookingMode?: "NONE" | "REQUEST_ONLY" | "EXTERNAL" | "USE_PUBLICATION_DATES" | "USE_PUBLICATION_SLOTS" | null;
   bookingPhone?: string | null;
   bookingNote?: string | null;
   contactSocialLinks?: unknown;
