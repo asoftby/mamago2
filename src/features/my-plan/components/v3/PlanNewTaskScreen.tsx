@@ -5,7 +5,9 @@ import { Bell, ChevronLeft, ChevronRight, Check, Clock3, Mic, Users } from "luci
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { formatHHMM } from "@/lib/formatters/date";
 import { detectPlanItemCategory } from "../../lib/planItemCategory";
+import type { PlanItemWithActivity } from "../../types/event";
 import {
   PLAN_CHIP,
   PLAN_CHIP_DISABLED,
@@ -53,17 +55,22 @@ const SECTION_LABEL = "mp-font-ui mb-[9px] text-[15px] font-bold text-[var(--mp-
 /**
  * «Новое дело» в той же шторке: текст → когда → время → для кого → напомнить.
  * Сохраняет через существующий POST /api/plan/manual (без разбора текста и тегов).
+ * С `editItem` — режим «Перенести» своей заметки: та же форма, предзаполненная,
+ * сохранение через PATCH /api/plan/manual/:id.
  */
 export function PlanNewTaskScreen({
   todayIso,
   initialDate,
   people,
+  editItem,
   onBack,
   onSaved,
 }: {
   todayIso: string;
   initialDate: string;
   people: PlanNewTaskPerson[];
+  /** Своя заметка, которую переносят (режим редактирования). */
+  editItem?: PlanItemWithActivity | null;
   onBack: () => void;
   onSaved: (date: string) => void;
 }) {
@@ -71,14 +78,17 @@ export function PlanNewTaskScreen({
   /** Взрослый в профиле выводится как «Я» (как в «Мой план»), а не логином; остальные — по имени. */
   const firstAdultId = useMemo(() => people.find((p) => p.kind === "adult")?.id ?? null, [people]);
   const initialWhen = initialDate === todayIso ? "today" : initialDate === tomorrowIso ? "tomorrow" : "other";
-  const [text, setText] = useState("");
+  const isMove = Boolean(editItem);
+  const [text, setText] = useState(editItem?.title ?? "");
   const [when, setWhen] = useState<"today" | "tomorrow" | "other">(initialWhen);
   const [pickedDate, setPickedDate] = useState<string | null>(initialWhen === "other" ? initialDate : null);
-  const [timed, setTimed] = useState(false);
-  const [time, setTime] = useState("");
+  const [timed, setTimed] = useState(Boolean(editItem?.startsAt));
+  const [time, setTime] = useState(editItem?.startsAt ? formatHHMM(editItem.startsAt) : "");
   /** "" = вся семья; иначе id персоны (ребёнок → childId, взрослый → assigneeUserId). */
-  const [whoId, setWhoId] = useState<string>("");
-  const [lead, setLead] = useState<number | null>(null);
+  const [whoId, setWhoId] = useState<string>(editItem?.childId ?? editItem?.assigneeUserId ?? "");
+  const [lead, setLead] = useState<number | null>(
+    editItem?.startsAt && editItem.reminderEnabled ? (editItem.reminderLeadMinutes ?? null) : null,
+  );
   const [leadTouched, setLeadTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const timeRef = useRef<HTMLInputElement>(null);
@@ -105,7 +115,9 @@ export function PlanNewTaskScreen({
       ? "Выберите день"
       : timed && !timeValid
         ? "Укажите время"
-        : "Добавить в план";
+        : isMove
+          ? "Перенести"
+          : "Добавить в план";
 
   function enableTime() {
     setTimed(true);
@@ -122,28 +134,65 @@ export function PlanNewTaskScreen({
     const who = people.find((p) => p.id === whoId) ?? null;
     setSaving(true);
     try {
-      const response = await fetch("/api/plan/manual", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          title: text.trim(),
-          date: day,
-          startsAt: timed ? time : null,
-          childId: who?.kind === "child" ? who.id : null,
-          assigneeUserId: who?.kind === "adult" ? who.id : null,
-          tags: [],
-          category: detectPlanItemCategory(text.trim()),
-          reminderEnabled: timed && lead !== null,
-          reminderLeadMinutes: timed ? lead : null,
-        }),
-      });
+      const fields = {
+        title: text.trim(),
+        date: day,
+        startsAt: timed ? time : null,
+        childId: who?.kind === "child" ? who.id : null,
+        assigneeUserId: who?.kind === "adult" ? who.id : null,
+        reminderEnabled: timed && lead !== null,
+        reminderLeadMinutes: timed ? lead : null,
+      };
+      // Перенос: нетронутое напоминание (в т.ч. «по умолчанию», lead = null) не перезаписываем.
+      const moveFields = editItem
+        ? (() => {
+            const { reminderEnabled, reminderLeadMinutes, ...rest } = fields;
+            const keepReminder = timed && !leadTouched && Boolean(editItem.startsAt);
+            const startChanged = !timed || time !== (editItem.startsAt ? formatHHMM(editItem.startsAt) : "");
+            return {
+              ...rest,
+              ...(keepReminder ? {} : { reminderEnabled, reminderLeadMinutes }),
+              // Старый конец не совпадёт с новым началом — сбрасываем.
+              ...(editItem.endsAt && startChanged ? { endsAt: null } : {}),
+            };
+          })()
+        : fields;
+      const response = editItem
+        ? await fetch(`/api/plan/manual/${editItem.id}`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              ...moveFields,
+              expectedUpdatedAt: new Date(editItem.updatedAt ?? Date.now()).toISOString(),
+            }),
+          })
+        : await fetch("/api/plan/manual", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              ...fields,
+              tags: [],
+              category: detectPlanItemCategory(text.trim()),
+            }),
+          });
+      if (editItem && response.status === 409) {
+        // Заметку успели изменить — обновляем план и выходим, чтобы не повторять устаревшую версию.
+        requestPlanRefetchForDate(editItem.date);
+        toast.error("Заметка изменилась", { description: "Обновили план — попробуйте перенести ещё раз" });
+        onBack();
+        return;
+      }
       if (!response.ok) throw new Error("save_failed");
+      if (editItem) requestPlanRefetchForDate(editItem.date);
       requestPlanRefetchForDate(day);
-      toast.success(`Добавили на ${when === "other" ? longDay(day) : whenWord}`);
+      toast.success(
+        `${isMove ? "Перенесли" : "Добавили"} на ${when === "other" ? longDay(day) : whenWord}`,
+      );
       onSaved(day);
     } catch {
-      toast.error("Не удалось сохранить");
+      toast.error(isMove ? "Не получилось перенести" : "Не удалось сохранить");
     } finally {
       setSaving(false);
     }
@@ -151,13 +200,13 @@ export function PlanNewTaskScreen({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
-      <PlanScreenTitleHead title={<>Новое <em>дело</em></>} onBack={onBack} />
+      <PlanScreenTitleHead title={isMove ? <>Перенести <em>дело</em></> : <>Новое <em>дело</em></>} onBack={onBack} />
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 md:px-8">
         <div className="mb-[22px] mt-1">
         <label className="block">
           <span className="sr-only">Что нужно сделать</span>
           <textarea
-            autoFocus
+            autoFocus={!isMove}
             rows={2}
             maxLength={160}
             value={text}
@@ -165,8 +214,8 @@ export function PlanNewTaskScreen({
             placeholder="Что нужно сделать?"
             className={cn(
               "mp-font-ui block w-full resize-none rounded-2xl border border-[var(--mp-chip-line)] bg-white px-4 py-3",
-              "text-[20px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)] caret-[var(--mp-ac)]",
-              "outline-none transition-shadow placeholder:font-medium placeholder:text-[#6B665F]",
+              "text-[20px] font-normal leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)] caret-[var(--mp-ac)]",
+              "outline-none transition-shadow placeholder:font-normal placeholder:text-[#6B665F]",
               "focus:border-[var(--mp-tx)] focus:shadow-[0_0_0_3px_rgba(29,27,25,.08)]",
             )}
           />
@@ -278,10 +327,10 @@ export function PlanNewTaskScreen({
               const on = whoId === p.id;
               return (
                 <button key={p.id || "family"} type="button" aria-pressed={on} onClick={() => setWhoId(p.id)} className={cn("flex min-w-11 flex-col items-center gap-[7px] rounded-2xl", PLAN_FOCUS)}>
-                  <span className={cn("relative flex h-[62px] w-[62px] items-center justify-center rounded-full border-2 text-[21px] font-extrabold transition-colors", on ? "border-[var(--mp-tx)] bg-white" : "border-transparent bg-[var(--mp-soft)] hover:border-[var(--mp-line-strong)]")}>
+                  <span className={cn("relative flex h-[62px] w-[62px] items-center justify-center rounded-full border-2 text-[21px] font-extrabold transition-colors", "text-[var(--mp-ac)]", on ? "border-[var(--mp-ac)] bg-[var(--mp-soft)]" : "border-transparent bg-[var(--mp-soft)] hover:border-[var(--mp-line-strong)]")}>
                     {p.id === "" ? <Users className="h-6 w-6" aria-hidden /> : displayName(p).trim().charAt(0).toUpperCase()}
                     {on ? (
-                      <span className="absolute -bottom-[3px] -right-[3px] flex h-[23px] w-[23px] items-center justify-center rounded-full border-2 border-[var(--mp-bg)] bg-[var(--mp-tx)] text-white">
+                      <span className="absolute -bottom-[3px] -right-[3px] flex h-[23px] w-[23px] items-center justify-center rounded-full border-2 border-[var(--mp-bg)] bg-[var(--mp-ac)] text-white">
                         <Check className="h-3 w-3" strokeWidth={2.8} aria-hidden />
                       </span>
                     ) : null}

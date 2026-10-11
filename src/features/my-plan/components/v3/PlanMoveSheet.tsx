@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
@@ -118,7 +119,19 @@ export function PlanMoveSheet({
   }
 
   return (
-    <SaveActivityFlowAdaptive
+    <>
+      {/* Затемняем «Мой план» под шторкой переноса, чтобы акцент был на ней. */}
+      {typeof document !== "undefined"
+        ? createPortal(
+            <div
+              aria-hidden
+              onClick={onClose}
+              className="fixed inset-0 z-[75] bg-black/45 pointer-events-auto"
+            />,
+            document.body,
+          )
+        : null}
+      <SaveActivityFlowAdaptive
       open
       onOpenChange={(open) => {
         if (!open) onClose();
@@ -134,5 +147,6 @@ export function PlanMoveSheet({
       source="my_plan_move"
       onPersist={persist}
     />
+    </>
   );
 }

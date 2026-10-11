@@ -17,7 +17,7 @@ export function PlanStickyCounter({ compact = false, onAdd }: PlanStickyCounterP
   return (
     <div
       className={
-        "flex-shrink-0 border-t border-[var(--mp-line)] bg-[var(--mp-bg)] pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] " +
+        "flex-shrink-0 bg-[var(--mp-tx)] pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] " +
         (compact ? "px-5" : "px-8")
       }
     >
