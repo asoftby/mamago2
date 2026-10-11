@@ -56,13 +56,15 @@ type CatalogOffer = {
 };
 
 /** Fetch all selected offers using the same public visibility and approved BIRTHDAY placement. */
-export async function verifyPartyOffers(citySlug: string, offerIds: string[]): Promise<Map<string, CatalogOffer>> {
+export async function verifyPartyOffers(
+  citySlug: string, offerIds: string[], tx?: Prisma.TransactionClient,
+): Promise<Map<string, CatalogOffer>> {
   const city = await findCityBySlug(citySlug, { select: { id: true }, isActive: true });
   if (!city) throw new PartyApiError(422, "Город не найден");
   if (new Set(offerIds).size !== offerIds.length) {
     throw new PartyApiError(422, "Повторяющиеся услуги");
   }
-  const rows = await prisma.offer.findMany({
+  const rows = await (tx ?? prisma).offer.findMany({
     where: { AND: [
       { id: { in: offerIds } },
       getPublicPublishedOfferWhere(),

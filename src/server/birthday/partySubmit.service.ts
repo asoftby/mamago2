@@ -85,6 +85,13 @@ export async function submitPartyAnchor(
       throw new PartyApiError(409, "Заказ изменён или уже отправлен");
     }
 
+    // Re-check publication under the submitting transaction: client snapshots
+    // and the preflight query cannot authorize a currently withdrawn offer.
+    const checked = await verifyPartyOffers(party.citySlug, [anchor.offerId], tx);
+    if (checked.get(anchor.offerId)?.place?.ownerBusinessId !== anchor.businessId) {
+      throw new PartyApiError(422, "Выбранный исполнитель больше не доступен");
+    }
+
     const request = await tx.bookingRequest.create({
       data: {
         businessId: anchor.businessId,
