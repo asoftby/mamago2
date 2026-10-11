@@ -113,14 +113,14 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
   // Group sessions by date: { "YYYY-MM-DD": [{ id, time: "HH:mm" }, ...] }
   // Single source of truth — counts are derived from this in the modal.
   const planSessionsByDate = useMemo(() => {
-    const map: Record<string, Array<{ id: string; time: string }>> = {};
+    const map: Record<string, Array<{ id: string; time: string; title?: string }>> = {};
     for (const session of sessions) {
       if (!session.startsAt) continue;
       const d = new Date(session.startsAt);
       const iso = getLocalDateKey(d);
       const time = formatHHMM(d);
       if (!map[iso]) map[iso] = [];
-      map[iso].push({ id: session.id, time });
+      map[iso].push({ id: session.id, time, ...(session.title ? { title: session.title } : {}) });
     }
     return map;
   }, [sessions]);

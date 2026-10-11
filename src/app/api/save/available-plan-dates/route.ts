@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
         sessions: {
           where: { startsAt: { gte: now }, withdrawnAt: null },
           orderBy: { startsAt: "asc" },
-          select: { id: true, startsAt: true },
+          select: { id: true, startsAt: true, title: true },
         },
       },
     });
@@ -41,11 +41,15 @@ export async function GET(request: NextRequest) {
     }
 
     const unique = new Set<string>();
-    const sessionsByDate: Record<string, Array<{ id: string; time: string }>> = {};
+    const sessionsByDate: Record<string, Array<{ id: string; time: string; title?: string }>> = {};
     for (const s of activity.sessions) {
       const key = getLocalDateKey(s.startsAt);
       unique.add(key);
-      (sessionsByDate[key] ??= []).push({ id: s.id, time: formatHHMM(s.startsAt) });
+      (sessionsByDate[key] ??= []).push({
+        id: s.id,
+        time: formatHHMM(s.startsAt),
+        ...(s.title ? { title: s.title } : {}),
+      });
     }
 
     const dates = Array.from(unique).sort();

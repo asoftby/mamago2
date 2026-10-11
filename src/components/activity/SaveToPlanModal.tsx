@@ -49,7 +49,7 @@ export type SaveScenario =
        * Session slots per date: { "YYYY-MM-DD": [{ id, time: "HH:mm" }, ...] }
        * Used to render time chips. Session counts are derived from this.
        */
-      eventPlanSessionsByDate?: Record<string, Array<{ id: string; time: string }>>;
+      eventPlanSessionsByDate?: Record<string, Array<{ id: string; time: string; title?: string }>>;
       /**
        * Entity has no date semantics (e.g. Article) — render idea-only UI,
        * no calendar/date-slider/"or without date" ever, regardless of any
@@ -369,7 +369,7 @@ function currentHHMM(): string {
  */
 function defaultSessionId(
   iso: string,
-  sessions: Array<{ id: string; time: string }> | undefined,
+  sessions: Array<{ id: string; time: string; title?: string }> | undefined,
 ): string | null {
   if (!sessions || sessions.length === 0) return null;
   if (sessions.length === 1) return sessions[0]!.id;
@@ -510,7 +510,7 @@ function ClockIcon({ size = 14, color = "currentColor" }: { size?: number; color
 }
 
 interface TimeChipRowProps {
-  sessions: Array<{ id: string; time: string }>;
+  sessions: Array<{ id: string; time: string; title?: string }>;
   selectedId: string | null;
   onSelect: (id: string) => void;
 }
@@ -771,7 +771,7 @@ function DateSliderView({
   onConfirm: (iso: string, sessionId: string | null) => void; onIdea?: () => void;
   /** Подпись кнопки подтверждения; по умолчанию «Сохранить». */
   confirmLabel?: string;
-  sessionsByDate?: Record<string, Array<{ id: string; time: string }>>;
+  sessionsByDate?: Record<string, Array<{ id: string; time: string; title?: string }>>;
 }) {
   const [selISO, setSelISO] = React.useState<string>(options[0] ?? "");
   const [selectedSessionId, setSelectedSessionId] = React.useState<string | null>(() =>
@@ -804,6 +804,10 @@ function DateSliderView({
   // HH:mm of the selected session (for ConfirmBar display)
   const selectedTime = selectedSessionId
     ? (currentSessions.find((s) => s.id === selectedSessionId)?.time ?? null)
+    : null;
+  // Название выбранного сеанса дописывается к названию события через точку
+  const selectedSessionTitle = selectedSessionId
+    ? (currentSessions.find((s) => s.id === selectedSessionId)?.title?.trim() || null)
     : null;
 
   return (
@@ -845,7 +849,9 @@ function DateSliderView({
               <span style={{ color: C.line2 }}>·</span>
             </>
           )}
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{title}</span>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+            {selectedSessionTitle ? `${title.replace(/\.+$/, "")}. ${selectedSessionTitle}` : title}
+          </span>
         </p>
 
         {/* Month label + session count */}
