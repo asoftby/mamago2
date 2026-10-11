@@ -26,7 +26,8 @@ export async function getPublicBirthdayCatalog(citySlug: string): Promise<Birthd
     take: 100,
   });
   return offers.flatMap((offer): BirthdayCatalogItem[] => {
-    if (!offer.productType || !offer.placeId || !offer.place?.ownerBusiness) return [];
+    if ((offer.productType !== "PARTY_SERVICE" && offer.productType !== "PARTY_PACKAGE") ||
+        !offer.placeId || !offer.place?.ownerBusiness) return [];
     if (offer.productType === "PARTY_SERVICE" && !offer.category) return [];
     const details = offer.productType === "PARTY_PACKAGE"
       ? extractPartyDetails(offer.details, offer.components)
