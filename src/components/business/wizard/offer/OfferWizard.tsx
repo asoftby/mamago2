@@ -32,6 +32,7 @@ import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-na
 
 import type { OfferFormData, OfferWizardMode, OfferWizardStepKey } from "./types";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
+import { getOfferTypeSelection } from "./offerTypeChoices";
 import { validateForSubmit, type ValidationResult } from "./validation";
 import {
   getStepsForOfferType,
@@ -326,17 +327,17 @@ export function OfferWizard({
     });
   }, [formData]);
 
-  // Смена типа предложения после прохождения шагов: набор шагов меняется,
-  // старые отметки недостоверны — сбрасываем полностью.
-  const prevWizardTypeRef = useRef(formData.offerWizardType);
+  // Смена любого persisted-типа (даже SINGLE → SINGLE) сбрасывает прогресс:
+  // проверки и обязательные поля могут отличаться внутри одного wizardType.
+  const prevProductTypeRef = useRef(formData.productType);
   useEffect(() => {
-    if (prevWizardTypeRef.current !== formData.offerWizardType) {
-      if (prevWizardTypeRef.current !== null) {
+    if (prevProductTypeRef.current !== formData.productType) {
+      if (prevProductTypeRef.current !== null) {
         setCompletedSteps([]);
       }
-      prevWizardTypeRef.current = formData.offerWizardType;
+      prevProductTypeRef.current = formData.productType;
     }
-  }, [formData.offerWizardType]);
+  }, [formData.productType]);
 
   // Normalize current step if offer type changes
   useEffect(() => {
@@ -462,9 +463,12 @@ export function OfferWizard({
   // Auto-determine intent and CTA
   useEffect(() => {
     if (formData.offerKind) {
-      const intent =
-        formData.offerKind === "course"
-          ? formData.durationType === "recurring"
+      // Persisted productType is authoritative. Legacy offerKind alone
+      // misclassified visits as birthdays and camp programs as one-off visits.
+      const intent = formData.productType
+        ? getOfferTypeSelection(formData.productType).intent
+        : formData.offerKind === "course"
+          ? formData.durationType === "recurring" || formData.durationType === "camp"
             ? "занятия"
             : "куда_пойти"
           : "день_рождения";
@@ -480,7 +484,7 @@ export function OfferWizard({
         setFormData(prev => ({ ...prev, ctaType: suggestedCTA }));
       }
     }
-  }, [formData.ctaType, formData.durationType, formData.intent, formData.offerKind]);
+  }, [formData.ctaType, formData.durationType, formData.intent, formData.offerKind, formData.productType]);
 
   const handleChange = useCallback(
     (

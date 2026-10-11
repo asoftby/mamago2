@@ -84,8 +84,8 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
 
   const baseSteps: Record<OfferWizardStepKey, Omit<OfferWizardStepDef, "key">> = {
     type: {
-      title: "Что вы хотите добавить?",
-      description: "Выберите формат предложения, который точнее всего описывает ваш продукт.",
+      title: "Что вы хотите предложить семьям?",
+      description: "Выберите подходящий вариант. Детали уточним дальше.",
       shortLabel: "Формат",
     },
     placements: {
