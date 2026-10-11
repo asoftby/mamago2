@@ -52,7 +52,7 @@ export function buildFamilyCalendarItemPresentation(
     personLabel: item.childId ? (item.childName ?? "Ребёнок") : "Взрослые",
     locationLabel: isCatalog ? catalogLocation : item.locationText,
     isCatalog,
-    canEdit: item.source === "MANUAL",
+    canEdit: item.source === "MANUAL" || item.source === "TELEGRAM_FORWARD",
   };
 }
 

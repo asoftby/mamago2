@@ -8,6 +8,7 @@ import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
 import { toast } from "@/lib/toast";
+import { formatHHMM } from "@/lib/formatters/date";
 import type { PlanItemWithActivity } from "../types/event";
 import { resolvePlanItemCategory, type PlanItemCategoryKey } from "../lib/planItemCategory";
 import { PlanItemCategoryPicker, PlanItemCategoryTile } from "./PlanItemCategoryIcon";
@@ -61,9 +62,7 @@ export function PlanItemRow({ item, onRemove, onMove, participantLabel }: PlanIt
   // Тап по карточке: событие mamaGo → его страница; свой пункт → страница плана на этот день.
   const openHref = activityDetailHref ?? (isManual ? `/me/plan?date=${item.date}` : null);
 
-  const time = item.startsAt
-    ? new Date(item.startsAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
-    : null;
+  const time = item.startsAt ? formatHHMM(item.startsAt) : null;
 
   const poster = item.activity?.coverImageUrl ?? item.coverImageUrl;
   const isCatalogEvent = planItemVisualKind(item) === "event";

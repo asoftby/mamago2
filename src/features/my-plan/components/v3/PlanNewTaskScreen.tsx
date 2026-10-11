@@ -55,8 +55,8 @@ const SECTION_LABEL = "mp-font-ui mb-[9px] text-[15px] font-bold text-[var(--mp-
 /**
  * «Новое дело» в той же шторке: текст → когда → время → для кого → напомнить.
  * Сохраняет через существующий POST /api/plan/manual (без разбора текста и тегов).
- * С `editItem` — режим «Перенести» своей заметки: та же форма, предзаполненная,
- * сохранение через PATCH /api/plan/manual/:id.
+ * С `editItem` — перенос своей заметки или записи Telegram: та же форма,
+ * предзаполненная, PATCH на endpoint соответствующего источника.
  */
 export function PlanNewTaskScreen({
   todayIso,
@@ -69,7 +69,7 @@ export function PlanNewTaskScreen({
   todayIso: string;
   initialDate: string;
   people: PlanNewTaskPerson[];
-  /** Своя заметка, которую переносят (режим редактирования). */
+  /** Своя заметка или запись бота, которую переносят (режим редактирования). */
   editItem?: PlanItemWithActivity | null;
   onBack: () => void;
   onSaved: (date: string) => void;
@@ -158,7 +158,7 @@ export function PlanNewTaskScreen({
           })()
         : fields;
       const response = editItem
-        ? await fetch(`/api/plan/manual/${editItem.id}`, {
+        ? await fetch(`/api/plan/${editItem.source === "TELEGRAM_FORWARD" ? "telegram" : "manual"}/${editItem.id}`, {
             method: "PATCH",
             headers: { "content-type": "application/json" },
             credentials: "include",

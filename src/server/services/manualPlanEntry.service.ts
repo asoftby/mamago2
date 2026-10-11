@@ -355,23 +355,25 @@ export async function createManualPlanEntry(owner: PlanOwner, input: ManualPlanE
   });
 }
 
-export async function updateManualPlanEntry(
+/** Only server-side wrappers select a source; clients cannot edit it or change provenance. */
+async function updateEditablePlanEntry(
   owner: PlanOwner,
   planItemId: string,
   patch: ManualPlanEntryPatch,
   expectedUpdatedAt: string,
+  source: "MANUAL" | "TELEGRAM_FORWARD",
 ) {
   const expected = expectedVersion(expectedUpdatedAt);
   const current = await prisma.planItem.findFirst({
     where: {
       id: planItemId,
       ...(await activePlanScopeFor(owner.userId)),
-      source: PlanItemSource.MANUAL,
+      source,
       status: "CONFIRMED",
     },
     select: calendarItemSelect,
   });
-  if (!current) throw new ManualPlanEntryError("NOT_FOUND", "manual_item_not_found");
+  if (!current) throw new ManualPlanEntryError("NOT_FOUND", "editable_item_not_found");
   if (current.updatedAt.getTime() !== expected.getTime()) {
     throw new ManualPlanEntryError("CONFLICT", "conflict");
   }
@@ -411,7 +413,7 @@ export async function updateManualPlanEntry(
   const reminderLeadMinutes = leadApplicable ? requestedLeadMinutes : null;
 
   const result = await prisma.planItem.updateMany({
-    where: { id: current.id, ...(await activePlanScopeFor(owner.userId)), source: PlanItemSource.MANUAL, status: "CONFIRMED", updatedAt: expected },
+    where: { id: current.id, ...(await activePlanScopeFor(owner.userId)), source, status: "CONFIRMED", updatedAt: expected },
     data: {
       updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)),
       ...(patch.entryType === undefined ? {} : { entryType: patch.entryType }),
@@ -450,8 +452,29 @@ export async function updateManualPlanEntry(
     });
   }
   const updated = await prisma.planItem.findUnique({ where: { id: current.id }, select: calendarItemSelect });
-  if (!updated) throw new ManualPlanEntryError("NOT_FOUND", "manual_item_not_found");
+  if (!updated) throw new ManualPlanEntryError("NOT_FOUND", "editable_item_not_found");
   return updated;
+}
+
+export async function updateManualPlanEntry(
+  owner: PlanOwner,
+  planItemId: string,
+  patch: ManualPlanEntryPatch,
+  expectedUpdatedAt: string,
+) {
+  return updateEditablePlanEntry(owner, planItemId, patch, expectedUpdatedAt, PlanItemSource.MANUAL);
+}
+
+/** Update only the extracted PlanItem, not its InboxItem or Telegram message. */
+export async function updateTelegramPlanEntry(
+  owner: PlanOwner,
+  planItemId: string,
+  patch: Pick<ManualPlanEntryPatch,
+    "title" | "date" | "startsAt" | "endsAt" | "childId" | "assigneeUserId"
+    | "reminderEnabled" | "reminderLeadMinutes" | "locationText" | "notes" | "tags">,
+  expectedUpdatedAt: string,
+) {
+  return updateEditablePlanEntry(owner, planItemId, patch, expectedUpdatedAt, PlanItemSource.TELEGRAM_FORWARD);
 }
 
 export async function cancelManualPlanEntry(owner: PlanOwner, planItemId: string, expectedUpdatedAt: string): Promise<void> {

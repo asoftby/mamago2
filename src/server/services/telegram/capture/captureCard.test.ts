@@ -43,7 +43,7 @@ test("CREATE card renders add/edit/no callbacks and inferred markers", () => {
     new Map([["child-1", "Тая"]]),
   );
 
-  assert.match(card.text, /Нашёл событие/);
+  assert.match(card.text, /^Вот что получилось:/);
   assert.match(card.text, /⚠️/);
   assert.match(card.text, /Тая/);
   assert.match(card.text, /взять воду/);
@@ -106,4 +106,17 @@ test("a screenshot interpreted as UPDATE still allows full text replacement", ()
     card.replyMarkup?.inline_keyboard.flat().map((button) => button.callback_data),
     ["inb:replace:inbox-update", "inb:no:inbox-update"],
   );
+});
+
+
+test("single task, event and multiple entries use the same calm preview heading", () => {
+  for (const entries of [
+    [entry({ entryType: "EVENT" })],
+    [entry({ entryType: "TASK" })],
+    [entry({ entryType: "TASK" }), entry({ entryType: "EVENT" })],
+  ]) {
+    const card = renderCaptureCard("heading-test", draft({ entries }), [], new Map());
+    assert.match(card.text, /^Вот что получилось:/);
+    assert.doesNotMatch(card.text, /Нашёл (событие|задачу)/);
+  }
 });
