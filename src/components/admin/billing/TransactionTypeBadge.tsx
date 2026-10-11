@@ -16,6 +16,8 @@ export function TransactionTypeBadge({ type }: TransactionTypeBadgeProps) {
     BONUS_CREDIT: { label: "Бонус", className: "bg-green-100 text-green-700" },
     MANUAL_ADJUSTMENT: { label: "Корректировка", className: "bg-gray-100 text-gray-700" },
     CORRECTION: { label: "Исправление", className: "bg-gray-100 text-gray-700" },
+    COMMISSION_REVERSAL: { label: "Сторно комиссии", className: "bg-red-100 text-red-700" },
+    PENALTY_CHARGE: { label: "Неустойка", className: "bg-amber-100 text-amber-800" },
   };
 
   const { label, className } = config[type] || { label: type, className: "bg-gray-100 text-gray-700" };
