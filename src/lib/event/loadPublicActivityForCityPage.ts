@@ -219,6 +219,7 @@ export async function loadPublicActivityForCityPage(
       id: s.id,
       startsAt: s.startsAt,
       isSaleOpen: s.isSaleOpen,
+      title: s.title,
     })),
     schemaStartDate,
     place: place

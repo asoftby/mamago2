@@ -11,6 +11,8 @@ export interface SessionCardProps {
   isNearest?: boolean;
   /** Основная строка — дата или название смены */
   title: string;
+  /** Что показывают на сеансе (формат кинопоказов); между датой и подзаголовком */
+  sessionTitle?: string;
   /** Вспомогательная строка — время, цена (может содержать React-узлы, напр. SVG-иконку валюты) */
   subtitle?: ReactNode;
   /** Дополнительный контент — описание, акция, важные условия */
@@ -29,6 +31,7 @@ export function SessionCard({
   kicker,
   isNearest,
   title,
+  sessionTitle,
   subtitle,
   details,
   primaryLabel,
@@ -77,6 +80,11 @@ export function SessionCard({
           <div className="mt-1 text-[20px] font-semibold leading-tight tracking-[-0.01em] text-[#141210]">
             {title}
           </div>
+          {sessionTitle ? (
+            <div className="mt-1.5 line-clamp-2 text-[15px] font-medium leading-snug text-[#141210] sm:text-[16px]">
+              {sessionTitle}
+            </div>
+          ) : null}
           {subtitle && (
             <div
               className="mt-1.5 text-[13px] text-[rgba(20,18,16,0.55)]"
@@ -89,7 +97,7 @@ export function SessionCard({
         </div>
 
         {/* CTA column */}
-        <div className="ml-auto flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3 sm:ml-auto">
           {primaryLabel && (
             primaryDisabled ? (
               <button

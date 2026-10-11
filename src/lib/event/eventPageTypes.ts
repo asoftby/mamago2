@@ -19,6 +19,8 @@ export type EventPageSession = {
   id: string;
   /** ISO 8601 */
   startsAt: string;
+  /** Название сеанса (что показывают), если задано */
+  title?: string;
 };
 
 export type EventPageMedia = {

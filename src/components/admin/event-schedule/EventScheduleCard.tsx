@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { SESSION_TITLE_MAX_LENGTH } from "@/lib/event/sessionTitle";
 import { resolveScheduleItemTimeOrder } from "@/lib/event/scheduleItemTimeOrder";
 import { formatLocalPlanDate } from "@/lib/date/localDateKey";
 import type { EventScheduleItem, EventScheduleCardProps } from "./types";
@@ -54,6 +55,7 @@ export function EventScheduleCard({
   const [isCollapsed, setIsCollapsed] = useState(item.isCollapsed || false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isUntilPickerOpen, setIsUntilPickerOpen] = useState(false);
+  const [isTitleOpen, setIsTitleOpen] = useState(Boolean(item.title?.trim()));
   
   // Temporary state for date range selection in multi-day mode
   const [tempStartDate, setTempStartDate] = useState<Date | null>(null);
@@ -266,6 +268,7 @@ export function EventScheduleCard({
             {item.date || "Дата не выбрана"}
             {item.allDay ? " (весь день)" : ` ${item.startTime} - ${item.endTime}`}
           </p>
+          {item.title?.trim() ? <p className="text-gray-900">{item.title.trim()}</p> : null}
           {item.recurringEnabled && (
             <p className="text-xs text-primary">
               Повторяется каждые {item.recurrenceInterval} {item.recurrenceUnit}
@@ -459,6 +462,33 @@ export function EventScheduleCard({
               </div>
             </div>
           )}
+
+          {/* Session title (optional, collapsed by default) */}
+          {isTitleOpen || item.title ? (
+            <div className="space-y-2">
+              <Label htmlFor={`title-${item.id}`} className="text-sm font-medium text-gray-900">
+                Что показываем / название сеанса
+              </Label>
+              <Input
+                id={`title-${item.id}`}
+                type="text"
+                value={item.title ?? ""}
+                maxLength={SESSION_TITLE_MAX_LENGTH}
+                disabled={disabled}
+                placeholder="Например: Коралина в стране кошмаров"
+                onChange={(e) => handleUpdate({ title: e.target.value })}
+              />
+              <p className="text-xs text-gray-500">Если на разных сеансах разная программа</p>
+            </div>
+          ) : !disabled ? (
+            <button
+              type="button"
+              onClick={() => setIsTitleOpen(true)}
+              className="-my-2 inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
+            >
+              + Название сеанса
+            </button>
+          ) : null}
 
           {/* Recurring Switch */}
           <div className="flex items-center justify-between pt-2 border-t border-gray-100">

@@ -1,5 +1,6 @@
 import { addDaysLocal } from "@/lib/date/localDateKey";
 import { expandScheduleItemDates, isLocalDateString } from "./expandScheduleItemDates";
+import { normalizeSessionTitle } from "./sessionTitle";
 
 export type ScheduleJsonLike = {
   dates?: unknown;
@@ -13,6 +14,8 @@ export type ScheduleJsonLike = {
 export type ScheduleOccurrence = {
   date: string;
   startTime: string;
+  /** Название сеанса (формат кинопоказов). Ключ отсутствует, если названия нет. */
+  title?: string;
 };
 
 type RecurrenceUnit = "day" | "week" | "month" | "year";
@@ -21,6 +24,7 @@ type ScheduleItemLike = {
   date?: unknown;
   dateEnd?: unknown;
   startTime?: unknown;
+  title?: unknown;
   recurringEnabled?: unknown;
   recurrenceInterval?: unknown;
   recurrenceUnit?: unknown;
@@ -103,6 +107,9 @@ function expandScheduleItemOccurrences(
   if (baseDates.length === 0) return [];
 
   const startTime = normalizeStartTime(item.startTime, fallbackStartTime);
+  const title = normalizeSessionTitle(item.title);
+  const withTitle = (date: string): ScheduleOccurrence =>
+    title ? { date, startTime, title } : { date, startTime };
   const baseStart = baseDates[0]!;
   const baseEnd = baseDates[baseDates.length - 1]!;
 
@@ -113,7 +120,7 @@ function expandScheduleItemOccurrences(
   const recurring = item.recurringEnabled === true && recurrenceUnit !== null && recurrenceUntil !== null;
 
   if (!recurring) {
-    return baseDates.map((date) => ({ date, startTime }));
+    return baseDates.map(withTitle);
   }
 
   const interval = normalizeRecurrenceInterval(item.recurrenceInterval);
@@ -127,7 +134,7 @@ function expandScheduleItemOccurrences(
     const periodEnd = addDaysLocal(periodStart, spanDays);
     const effectiveEnd = periodEnd <= recurrenceUntil ? periodEnd : recurrenceUntil;
     const periodDates = expandScheduleItemDates([{ date: periodStart, dateEnd: effectiveEnd }]);
-    occurrences.push(...periodDates.map((date) => ({ date, startTime })));
+    occurrences.push(...periodDates.map(withTitle));
   }
 
   return occurrences;

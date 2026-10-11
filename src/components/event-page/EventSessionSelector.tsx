@@ -105,6 +105,7 @@ export function EventSessionSelector({
             kicker={getDayLabel(s.startsAt)}
             isNearest={isFirst}
             title={getDateLabel(s.startsAt)}
+            sessionTitle={s.title}
             subtitle={subtitle}
             primaryLabel={hasAction ? (purchaseUrl ? buyLabel : "Записаться") : undefined}
             primaryHref={purchaseUrl}
