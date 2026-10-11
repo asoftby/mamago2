@@ -70,6 +70,9 @@ model User {
   businessInvitesSent               BusinessInvite[]                 @relation("BusinessInviteInviter")
   businessMemberships               BusinessMember[]
   bookingRequests                   BookingRequest[]
+  partyOrders PartyOrder[] @relation("PartyOrderOwner")
+  partyQuotesResponded PartyQuote[] @relation("PartyQuoteResponder")
+  partyQuotesDecided PartyQuote[] @relation("PartyQuoteDecider")
   bookingFeedbacks                  BookingFeedback[]
   reviewedBusinessVerifications     BusinessVerificationLog[]        @relation("ReviewedBy")
   children                          Child[]
@@ -387,6 +390,7 @@ model Family {
   planItems   PlanItem[]
   invites     FamilyInvite[]
   consents    ConsentRecord[]
+  partyOrders PartyOrder[]
 }
 
 /// Членство взрослого в семье. Инварианты — partial unique индексы в миграции:
@@ -1421,6 +1425,8 @@ model Business {
   activities              Activity[]                    @relation("ActivityBusiness")
   billingAccount          BillingAccount?
   bookingRequests         BookingRequest[]
+  partyOrderItems PartyOrderItem[]
+  bookingUnits BookingUnit[]
   owner                   User                          @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   contracts               BusinessContract[]
   commercialCounterparty  CommercialCounterparty?
@@ -1662,6 +1668,7 @@ model Place {
 
   activities      Activity[]          @relation("PlaceActivities")
   bookingRequests BookingRequest[]
+  bookingUnits BookingUnit[]
   eventVenues     EventVenue[]
   importedRecords ImportedRecord[]    @relation("ImportedRecordPlace")
   offers          Offer[]
@@ -2488,6 +2495,8 @@ model Offer {
 
   boosts          Boost[]
   bookingRequests BookingRequest[]
+  partyOrderItems PartyOrderItem[]
+  bookingUnitOffers BookingUnitOffer[]
   offerIdeas      OfferIdea[]
   archivedBy      User?              @relation("OfferArchiver", fields: [archivedByUserId], references: [id])
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])
@@ -2574,6 +2583,8 @@ model PackageComponent {
   isOptional    Boolean       @default(false)
   priceDelta    Decimal?      @db.Decimal(10, 2)
   position      Int
+
+  partyOrderItems PartyOrderItem[]
 
   @@index([packageId, position])
 }
@@ -5262,6 +5273,318 @@ enum PublicationType {
   PLACE
 }
 
+// Birthday MVP v1.2: additive party ordering and availability schema.
+enum PartyVenueMode {
+  VENUE
+  PACKAGE
+  HOME
+  OUTDOOR
+}
+enum PartyOrderStatus {
+  DRAFT
+  ANCHOR_PENDING
+  NEEDS_ALTERNATIVE
+  ANCHOR_CONFIRMED
+  CANCELLED
+}
+enum PartyItemRole {
+  ANCHOR
+  STANDALONE
+  INCLUDED
+  ADDON
+}
+enum PartyItemStatus {
+  PLANNED
+  REQUESTED
+  NEEDS_DECISION
+  CONFIRMED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+enum BookingKind {
+  STANDARD
+  PARTY
+}
+enum PartyRequestStage {
+  SENT
+  QUOTED
+  AWAITING_RECONFIRM
+  DECLINED
+  EXPIRED
+  NOT_ACCEPTED
+  CONFIRMED
+  CANCELLED
+}
+enum PartyCloseReason {
+  BUSINESS_DECLINED
+  EXPIRED
+  NOT_SELECTED
+  CUSTOMER_CANCELLED
+  BUSINESS_CANCELLED
+}
+enum QuoteType {
+  AS_REQUESTED
+  MODIFIED
+  DECLINED
+}
+enum QuoteStatus {
+  ACTIVE
+  ACCEPTED
+  REJECTED
+  SUPERSEDED
+  EXPIRED
+  WITHDRAWN
+}
+enum DeclineReason {
+  DATE_BUSY
+  BUDGET
+  FORMAT
+  NOT_ENOUGH_TIME
+  OTHER
+}
+enum PartyOutboxStatus {
+  PENDING
+  SENT
+  FAILED
+}
+enum BookingUnitStatus {
+  ACTIVE
+  INACTIVE
+}
+enum BookingUnitType {
+  EXCLUSIVE
+}
+enum AvailabilityExceptionKind {
+  CLOSED
+  OPEN_OVERRIDE
+}
+enum CalendarBlockSource {
+  MANUAL
+  EXTERNAL
+}
+enum BookingAllocationStatus {
+  HELD
+  CONFIRMED
+  RELEASED
+  EXPIRED
+}
+
+model PartyOrder {
+  id String @id @default(cuid())
+  ownerUserId String
+  familyId String?
+  citySlug String
+  venueMode PartyVenueMode
+  eventDate DateTime? @db.Date
+  timeFrom String?
+  timeTo String?
+  childrenCount Int?
+  adultsCount Int?
+  childAge Int?
+  childName String?
+  budgetByn Decimal? @db.Decimal(10, 2)
+  contactName String?
+  contactPhone String?
+  status PartyOrderStatus @default(DRAFT)
+  version Int @default(0)
+  submitKey String? @unique
+  submittedAt DateTime?
+  cancelledAt DateTime?
+  planItemId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner User @relation("PartyOrderOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  family Family? @relation(fields: [familyId], references: [id], onDelete: SetNull)
+  items PartyOrderItem[]
+
+  @@index([ownerUserId, status])
+  @@index([familyId])
+  @@index([citySlug, eventDate])
+}
+
+model PartyOrderItem {
+  id String @id @default(cuid())
+  partyOrderId String
+  category PartyCategory
+  offerId String?
+  businessId String?
+  packageComponentId String?
+  role PartyItemRole
+  parentItemId String?
+  offerPriceSnapshot Decimal? @db.Decimal(10, 2)
+  note String?
+  status PartyItemStatus @default(PLANNED)
+  confirmedBookingRequestId String? @unique
+  position Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  partyOrder PartyOrder @relation(fields: [partyOrderId], references: [id], onDelete: Cascade)
+  offer Offer? @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  business Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  packageComponent PackageComponent? @relation(fields: [packageComponentId], references: [id], onDelete: SetNull)
+  parentItem PartyOrderItem? @relation("PartyItemComponents", fields: [parentItemId], references: [id], onDelete: SetNull)
+  includedItems PartyOrderItem[] @relation("PartyItemComponents")
+  requests BookingRequest[] @relation("PartyItemRequests")
+  confirmedBooking BookingRequest? @relation("ConfirmedPartyBooking", fields: [confirmedBookingRequestId], references: [id], onDelete: SetNull)
+
+  @@index([partyOrderId, position])
+  @@index([offerId])
+  @@index([businessId])
+  @@index([parentItemId])
+}
+
+model PartyQuote {
+  id String @id @default(cuid())
+  bookingRequestId String
+  version Int
+  type QuoteType
+  priceByn Decimal? @db.Decimal(10, 2)
+  includes String?
+  durationMinutes Int?
+  prepaymentTerms String?
+  cancellationTerms String?
+  changeReason String?
+  declineReason DeclineReason?
+  declineComment String?
+  validUntil DateTime?
+  status QuoteStatus @default(ACTIVE)
+  respondedByUserId String
+  decidedAt DateTime?
+  decidedByUserId String?
+  idempotencyKey String
+  bookingUnitId String?
+  serviceStart DateTime?
+  serviceEnd DateTime?
+  createdAt DateTime @default(now())
+
+  bookingRequest BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  respondedBy User @relation("PartyQuoteResponder", fields: [respondedByUserId], references: [id], onDelete: Restrict)
+  decidedBy User? @relation("PartyQuoteDecider", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+  bookingUnit BookingUnit? @relation(fields: [bookingUnitId], references: [id], onDelete: Restrict)
+  allocation BookingAllocation?
+
+  @@unique([bookingRequestId, version])
+  @@unique([bookingRequestId, idempotencyKey])
+  @@index([bookingUnitId, serviceStart, serviceEnd])
+  @@index([status, validUntil])
+}
+
+model PartyOutbox {
+  id String @id @default(cuid())
+  eventType String
+  aggregateId String
+  payload Json
+  dedupeKey String @unique
+  status PartyOutboxStatus @default(PENDING)
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, nextAttemptAt])
+}
+
+model BookingUnit {
+  id String @id @default(cuid())
+  businessId String
+  placeId String?
+  name String
+  timezone String @default("Europe/Minsk")
+  capacity Int?
+  prepMinutes Int @default(0)
+  cleanupMinutes Int @default(0)
+  minDurationMinutes Int?
+  stepMinutes Int @default(30)
+  type BookingUnitType @default(EXCLUSIVE)
+  status BookingUnitStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  place Place? @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  offers BookingUnitOffer[]
+  rules AvailabilityRule[]
+  exceptions AvailabilityException[]
+  blocks CalendarBlock[]
+  allocations BookingAllocation[]
+  quotes PartyQuote[]
+
+  @@index([businessId, status])
+  @@index([placeId])
+}
+
+model BookingUnitOffer {
+  bookingUnitId String
+  offerId String
+  bookingUnit BookingUnit @relation(fields: [bookingUnitId], references: [id], onDelete: Cascade)
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@id([bookingUnitId, offerId])
+  @@index([offerId])
+}
+
+model AvailabilityRule {
+  id String @id @default(cuid())
+  bookingUnitId String
+  // ISO weekday: 1=Monday, 7=Sunday. Multiple intervals are allowed.
+  weekday Int
+  startMinutes Int
+  endMinutes Int
+  bookingUnit BookingUnit @relation(fields: [bookingUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingUnitId, weekday, startMinutes, endMinutes])
+}
+
+model AvailabilityException {
+  id String @id @default(cuid())
+  bookingUnitId String
+  date DateTime @db.Date
+  kind AvailabilityExceptionKind
+  startMinutes Int?
+  endMinutes Int?
+  bookingUnit BookingUnit @relation(fields: [bookingUnitId], references: [id], onDelete: Cascade)
+
+  @@index([bookingUnitId, date])
+}
+
+model CalendarBlock {
+  id String @id @default(cuid())
+  bookingUnitId String
+  blockStart DateTime
+  blockEnd DateTime
+  source CalendarBlockSource @default(MANUAL)
+  externalRef String?
+  note String?
+  createdAt DateTime @default(now())
+  bookingUnit BookingUnit @relation(fields: [bookingUnitId], references: [id], onDelete: Cascade)
+
+  @@index([bookingUnitId, blockStart, blockEnd])
+  @@index([source, externalRef])
+}
+
+model BookingAllocation {
+  id String @id @default(cuid())
+  bookingUnitId String
+  bookingRequestId String
+  partyQuoteId String? @unique
+  blockStart DateTime
+  blockEnd DateTime
+  status BookingAllocationStatus @default(HELD)
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bookingUnit BookingUnit @relation(fields: [bookingUnitId], references: [id], onDelete: Cascade)
+  bookingRequest BookingRequest @relation(fields: [bookingRequestId], references: [id], onDelete: Cascade)
+  quote PartyQuote? @relation(fields: [partyQuoteId], references: [id], onDelete: SetNull)
+
+  @@index([bookingUnitId, status, blockStart, blockEnd])
+  @@index([bookingRequestId])
+}
+
 /// Статус заявки на запись
 enum BookingStatus {
   NEW
@@ -5305,9 +5628,9 @@ model BookingRequest {
   /// Дата окончания смены (snapshot)
   campShiftDateTo   DateTime?
 
-  // Данные клиента
-  customerName    String
-  customerPhone   String
+  // STANDARD contacts stay mandatory via DB CHECK; PARTY contacts are revealed only after confirmation.
+  customerName    String?
+  customerPhone   String?
   customerEmail   String?
   customerComment String?
 
@@ -5318,6 +5641,12 @@ model BookingRequest {
   // Количество
   adultsCount   Int @default(1)
   childrenCount Int @default(0)
+
+  kind BookingKind @default(STANDARD)
+  partyOrderItemId String?
+  partyStage PartyRequestStage?
+  partyCloseReason PartyCloseReason?
+  responseDueAt DateTime?
 
   // Статус
   status BookingStatus @default(NEW)
@@ -5352,7 +5681,13 @@ model BookingRequest {
   activities   BookingActivity[]
   feedback     BookingFeedback?
   directThread DirectThread?
+  partyOrderItem PartyOrderItem? @relation("PartyItemRequests", fields: [partyOrderItemId], references: [id], onDelete: SetNull)
+  partyQuotes PartyQuote[]
+  allocations BookingAllocation[]
+  confirmedForPartyItem PartyOrderItem? @relation("ConfirmedPartyBooking")
 
+  @@index([kind, businessId, partyStage])
+  @@index([partyOrderItemId])
   @@index([businessId])
   @@index([userId])
   @@index([activityId])
@@ -5374,12 +5709,18 @@ enum BookingActivityType {
   STATUS_CHANGED
   PHONE_CLICKED
   COMMENT_ADDED
+  QUOTE_SENT
+  QUOTE_ACCEPTED
+  QUOTE_REJECTED
+  REQUEST_EXPIRED
+  REQUEST_WITHDRAWN
 }
 
 /// Актор события: бизнес или система
 enum BookingActivityActorType {
   BUSINESS
   SYSTEM
+  CUSTOMER
 }
 
 /// История событий по заявке (timeline)
