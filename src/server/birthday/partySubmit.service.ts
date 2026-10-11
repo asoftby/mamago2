@@ -61,6 +61,16 @@ export async function submitPartyAnchor(
     throw new PartyApiError(422, "Основная услуга не соответствует формату праздника");
   }
 
+  // Capture narrowed values before the async transaction callback: TypeScript
+  // correctly regards nullable Prisma model fields as potentially mutable.
+  const anchorOfferId = anchor.offerId;
+  const anchorBusinessId = anchor.businessId;
+  const eventDate = party.eventDate;
+  const partyTimeFrom = party.timeFrom;
+  const partyTimeTo = party.timeTo;
+  const childrenCount = party.childrenCount;
+  const adultsCount = party.adultsCount;
+
   return prisma.$transaction(async (tx) => {
     // Claim the transition before any side effects. A second submit cannot
     // create another BookingRequest even if it arrives concurrently.
@@ -87,27 +97,27 @@ export async function submitPartyAnchor(
 
     // Re-check publication under the submitting transaction: client snapshots
     // and the preflight query cannot authorize a currently withdrawn offer.
-    const checked = await verifyPartyOffers(party.citySlug, [anchor.offerId], tx);
-    if (checked.get(anchor.offerId)?.place?.ownerBusinessId !== anchor.businessId) {
+    const checked = await verifyPartyOffers(party.citySlug, [anchorOfferId], tx);
+    if (checked.get(anchorOfferId)?.place?.ownerBusinessId !== anchorBusinessId) {
       throw new PartyApiError(422, "Выбранный исполнитель больше не доступен");
     }
 
     const request = await tx.bookingRequest.create({
       data: {
-        businessId: anchor.businessId,
+        businessId: anchorBusinessId,
         userId: ownerUserId,
         publicationType: "OFFER",
-        offerId: anchor.offerId,
+        offerId: anchorOfferId,
         kind: "PARTY",
         partyOrderItemId: anchor.id,
         partyStage: "SENT",
         status: "NEW",
-        requestedDate: party.eventDate,
-        requestedTime: party.timeFrom,
+        requestedDate: eventDate,
+        requestedTime: partyTimeFrom,
         customerName: null,
         customerPhone: null,
-        adultsCount: party.adultsCount,
-        childrenCount: party.childrenCount,
+        adultsCount: adultsCount,
+        childrenCount: childrenCount,
         childAge: party.childAge,
         customerComment: anchor.note,
         responseDueAt,
@@ -133,14 +143,14 @@ export async function submitPartyAnchor(
         dedupeKey: "party:" + request.id + ":sent",
         payload: {
           requestId: request.id,
-          businessId: anchor.businessId,
+          businessId: anchorBusinessId,
           partyOrderId: partyId,
           category: anchor.category,
-          eventDate: party.eventDate.toISOString().slice(0, 10),
-          timeFrom: party.timeFrom,
-          timeTo: party.timeTo,
-          childrenCount: party.childrenCount,
-          adultsCount: party.adultsCount,
+          eventDate: eventDate.toISOString().slice(0, 10),
+          timeFrom: partyTimeFrom,
+          timeTo: partyTimeTo,
+          childrenCount: childrenCount,
+          adultsCount: adultsCount,
         },
       },
     });
