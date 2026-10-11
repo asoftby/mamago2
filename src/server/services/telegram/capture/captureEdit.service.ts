@@ -36,7 +36,8 @@ import {
 import type { CaptureCardPresenter } from "./captureCardPresenter";
 import type { ParsedCapture } from "./telegramUpdateParser";
 import { CAPTURE_LIMITS } from "./captureLimits";
-import { CAPTURE_REPLIES, CAPTURE_REPLACE_TEXT_RULE } from "./captureReplies";
+import { CAPTURE_REPLIES, CAPTURE_REPLACE_TEXT_RULE, CAPTURE_EDIT_ACCEPTED_REPLY } from "./captureReplies";
+import { applyOwnerCorrection, parseOwnerOnlyCorrection, retainTargetRules } from "./captureEditTarget";
 import { resolveCaptureEditAnchor } from "./captureEditAnchor";
 
 type Usage = {
@@ -244,12 +245,26 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
     const current = CaptureDraftSchema.safeParse(snapshot.draft);
     if (!current.success) return { ok: false, code: "EDIT_INVALID_DRAFT" };
 
+    const replacingText = snapshot.ruleCodes.includes(CAPTURE_REPLACE_TEXT_RULE);
+    if (!replacingText && current.data.intent === "CREATE") {
+      const ownerCorrection = parseOwnerOnlyCorrection(instruction);
+      if (ownerCorrection) {
+        const changed = applyOwnerCorrection(current.data, ownerCorrection);
+        return {
+          ok: true,
+          draft: changed.draft,
+          ruleCodes: [changed.ruleCode],
+          escalated: false,
+          usage: { model: null, tokensIn: null, tokensOut: null },
+        };
+      }
+    }
+
     const models = deps.models();
     if (!models.fast) return { ok: false, code: "CAPTURE_MODEL_NOT_CONFIGURED" };
 
     // Full-text correction replaces the screenshot interpretation. Field edits
     // keep the existing draft and only apply the requested change.
-    const replacingText = snapshot.ruleCodes.includes(CAPTURE_REPLACE_TEXT_RULE);
     const contextText = replacingText
       ? instruction
       : [
@@ -393,6 +408,17 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
     };
   }
 
+  async function reopenEdit(snapshot: EditSnapshot): Promise<void> {
+    try {
+      await deps.db.inboxItem.updateMany({
+        where: { id: snapshot.id, userId: snapshot.userId, status: "DRAFT_READY", draftVersion: snapshot.draftVersion },
+        data: { awaitingEditUntil: new Date(now().getTime() + 10 * 60_000) },
+      });
+    } catch {
+      safeLog("EDIT_REOPEN_FAILED", snapshot.id, snapshot.userId);
+    }
+  }
+
   async function processEdit(
     snapshot: EditSnapshot,
     capture: ParsedCapture,
@@ -404,6 +430,7 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
       const result = await runModel(snapshot, capture.text, capture);
       if (!result.ok) {
         safeLog(result.code, snapshot.id, snapshot.userId);
+        await reopenEdit(snapshot);
         await deps.notifier.reply(
           capture.chatId,
           snapshot.ruleCodes.includes(CAPTURE_REPLACE_TEXT_RULE)
@@ -416,6 +443,9 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
       const preserved = snapshot.ruleCodes.filter((code) =>
         PRESERVED_INTAKE_RULES.has(code),
       );
+      if (!snapshot.ruleCodes.includes(CAPTURE_REPLACE_TEXT_RULE) && retainTargetRules(result.ruleCodes).length === 0) {
+        preserved.push(...retainTargetRules(snapshot.ruleCodes));
+      }
       const updated = await deps.db.inboxItem.updateMany({
         where: {
           id: snapshot.id,
@@ -453,6 +483,7 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
       await deps.presenter.present(snapshot.id);
     } catch {
       safeLog("EDIT_PROCESSOR_ERROR", snapshot.id, snapshot.userId);
+      await reopenEdit(snapshot);
       await deps.notifier.reply(
         capture.chatId,
         snapshot.ruleCodes.includes(CAPTURE_REPLACE_TEXT_RULE)
@@ -506,6 +537,8 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
       }
       if (!snapshot) return null;
 
+      // Inform the user as soon as the edit is claimed, not after model processing.
+      await deps.notifier.reply(capture.chatId, CAPTURE_EDIT_ACCEPTED_REPLY);
       return {
         handled: true,
         afterResponse: () => processEdit(snapshot, capture),

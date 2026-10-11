@@ -13,9 +13,20 @@ export const CAPTURE_REPLACE_TEXT_RULE = "CAPTURE_REPLACE_TEXT_AWAITING";
 
 /** One user-facing status per accepted capture; later replaced with the preview. */
 export const CAPTURE_PROCESSING_REPLIES = {
-  TEXT: "Получила сообщение! Разбираю даты и детали. Перед добавлением покажу всё на проверку.",
-  PHOTO: "Получила скриншот! Разбираю даты и детали. Перед добавлением покажу всё на проверку.",
+  TEXT: "Сообщение получено, разбираю, в течение минуты сброшу на проверку",
+  PHOTO: "Сообщение получено, разбираю, в течение минуты сброшу на проверку",
 } as const;
+
+/** Stored with the draft; no schema change and no untrusted user-supplied IDs. */
+export const CAPTURE_TARGET_ME_RULE = "CAPTURE_TARGET_ME";
+export const CAPTURE_TARGET_ALL_RULE = "CAPTURE_TARGET_ALL";
+export const CAPTURE_TARGET_CHILD_RULE = "CAPTURE_TARGET_CHILD";
+export const CAPTURE_TARGET_RULES = [
+  CAPTURE_TARGET_ME_RULE,
+  CAPTURE_TARGET_ALL_RULE,
+  CAPTURE_TARGET_CHILD_RULE,
+] as const;
+export const CAPTURE_EDIT_ACCEPTED_REPLY = "Правки приняты, вношу изменения";
 
 export const CAPTURE_PROCESSING_FAILED_TEXT =
   "Не получилось распознать сообщение. Отправьте его ещё раз или напишите название, дату и время текстом.";

@@ -83,13 +83,8 @@ export function applyPostLlmRules(input: CaptureDraft, context: RuleContext): Ru
     }
     if (entry.child.childId === null && entry.child.raw === null) {
       entry.child.state = "missing";
-      if (context.children.length === 1) {
-        entry.child.childId = context.children[0]!.id;
-        entry.child.state = "inferred";
-        addCode(ruleCodes, RULE_CODES.childInferred);
-      } else if (context.children.length >= 2) {
-        addCode(ruleCodes, RULE_CODES.childAsked);
-      }
+      // Never silently assign a parent's own message to their only child.
+      // The preview always provides explicit family-member buttons.
     } else if (entry.child.childId === null && context.children.length >= 2) {
       // A child was named but could not be mapped to one of the owner's children.
       addCode(ruleCodes, RULE_CODES.childAsked);

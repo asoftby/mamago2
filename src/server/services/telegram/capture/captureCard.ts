@@ -1,5 +1,6 @@
 import { encodeCallback } from "./callbackCodec";
 import type { CaptureDraft, CaptureEntry } from "./captureDraft.schema";
+import { CAPTURE_TARGET_ALL_RULE, CAPTURE_TARGET_CHILD_RULE, CAPTURE_TARGET_ME_RULE } from "./captureReplies";
 
 export type CaptureCard = {
   text: string;
@@ -133,16 +134,35 @@ export function renderCaptureCard(
         ? "Нашёл задачу"
         : "Нашёл событие";
 
+  const target = ruleCodes.includes(CAPTURE_TARGET_ME_RULE)
+    ? "Я"
+    : ruleCodes.includes(CAPTURE_TARGET_ALL_RULE)
+      ? "Для всех"
+      : ruleCodes.includes(CAPTURE_TARGET_CHILD_RULE)
+        ? childNames.get(draft.entries[0]?.child.childId ?? "") ?? "Ребёнок"
+        : null;
+  const choices = [
+    { text: `${target === "Я" ? "✓ " : ""}Я`, callback_data: encodeCallback({ kind: "inbox_target", target: "me", inboxItemId }) },
+    ...[...childNames.entries()].map(([childId, name]) => ({
+      text: `${target === name ? "✓ " : ""}${name}`,
+      callback_data: encodeCallback({ kind: "inbox_child", inboxItemId, childId }),
+    })),
+    { text: `${target === "Для всех" ? "✓ " : ""}Для всех`, callback_data: encodeCallback({ kind: "inbox_target", target: "all", inboxItemId }) },
+  ];
+  const targetRows = [];
+  for (let i = 0; i < choices.length; i += 3) targetRows.push(choices.slice(i, i + 3));
+
   const body = draft.entries.flatMap((entry, index) => [
     ...(index ? ["", "—"] : []),
     ...entryLines(entry, childNames),
   ]);
 
   return {
-    text: [header, "", ...body].join("\n"),
+    text: [header, "", ...body, "", `Для кого: ${target ?? "выберите перед добавлением"}`].join("\n"),
     replyMarkup: duplicate
       ? {
           inline_keyboard: [
+            ...targetRows,
             [
               {
                 text: "Уже добавлено",
@@ -169,6 +189,7 @@ export function renderCaptureCard(
         }
       : {
           inline_keyboard: [
+            ...targetRows,
             [
               {
                 text: "Добавить в план",

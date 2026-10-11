@@ -511,7 +511,7 @@ test("existing rule codes (for example ALBUM_TRUNCATED) are kept next to new one
   await h.processor.process(item.id);
   const saved = await reload(item.id);
   assert.ok(saved.ruleCodes.includes("ALBUM_TRUNCATED"));
-  assert.ok(saved.ruleCodes.includes("CHILD_INFERRED"));
+  assert.ok(!saved.ruleCodes.includes("CHILD_INFERRED"));
 });
 
 test("nothing from the message, model output, files or tokens reaches the logs or InboxItem.error", async () => {

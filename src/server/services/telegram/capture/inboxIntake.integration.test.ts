@@ -525,6 +525,8 @@ test("accepted text has one processing acknowledgment whose message is reused fo
   });
   const incoming = capture();
   const first = await h.intake.receive(owner, "DEV", incoming);
+  // Receipt is immediate: no model call / deferred task required for the acknowledgment.
+  assert.deepEqual(acknowledged, [{ chatId: 4242, partKind: "TEXT" }]);
   const replay = await h.intake.receive(owner, "DEV", incoming);
   assert.equal(replay.outcome.status, "duplicate");
   assert.ok(first.afterResponse);

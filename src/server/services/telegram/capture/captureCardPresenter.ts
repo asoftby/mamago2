@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { childScopeFor } from "@/server/family/familyAccess";
 import { CaptureDraftSchema } from "./captureDraft.schema";
-import { renderCaptureCard, renderChildChoiceCard } from "./captureCard";
+import { renderCaptureCard } from "./captureCard";
 
 export type CaptureCardChannel = {
   sendMessage(input: {
@@ -50,25 +50,12 @@ export function createCaptureCardPresenter(deps: {
         orderBy: { createdAt: "asc" },
       });
 
-      const missingChild = parsed.data.entries.some(
-        (entry) => entry.child.childId === null,
+      const card = renderCaptureCard(
+        item.id,
+        parsed.data,
+        item.ruleCodes,
+        new Map(children.map((child) => [child.id, child.name?.trim() || "Ребёнок"])),
       );
-      const card =
-        item.ruleCodes.includes("CHILD_ASKED") &&
-        missingChild &&
-        children.length >= 2
-          ? renderChildChoiceCard(item.id, children)
-          : renderCaptureCard(
-              item.id,
-              parsed.data,
-              item.ruleCodes,
-              new Map(
-                children.map((child) => [
-                  child.id,
-                  child.name?.trim() || "Ребёнок",
-                ]),
-              ),
-            );
 
       const chatId = item.telegramChatId.toString();
 

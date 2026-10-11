@@ -3,6 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { childScopeFor, familyIdForWrite } from "@/server/family/familyAccess";
 import type { PlanOwner } from "@/server/services/planOwner";
+import {
+  CAPTURE_TARGET_ALL_RULE,
+  CAPTURE_TARGET_CHILD_RULE,
+  CAPTURE_TARGET_ME_RULE,
+} from "@/server/services/telegram/capture/captureReplies";
 import { CaptureDraftSchema, type CaptureDraft, type CaptureEntry } from "@/server/services/telegram/capture/captureDraft.schema";
 
 export type CreateFromDraftResult =
@@ -15,7 +20,8 @@ export class PlanEntryError extends Error {
       | "NOT_FOUND"
       | "INVALID_DRAFT"
       | "DUPLICATE_REQUIRES_CONFIRMATION"
-      | "CHILD_NOT_SELECTED",
+      | "CHILD_NOT_SELECTED"
+      | "TARGET_NOT_SELECTED",
   ) {
     super(code);
   }
@@ -80,6 +86,7 @@ function planData(
   inboxItemId: string,
   entry: CaptureEntry,
   places: Map<string, string>,
+  target: "me" | "all" | "child",
 ): Prisma.PlanItemCreateArgs["data"] {
   const startsAt = asDate(entry.startsAt.value);
   const dueAt = asDate(entry.dueAt.value);
@@ -97,7 +104,8 @@ function planData(
     source: PlanItemSource.TELEGRAM_FORWARD,
     entryType: entry.entryType as PlanEntryType,
     title: entry.title.value.trim() || null,
-    childId: entry.child.childId,
+    childId: target === "child" ? entry.child.childId : null,
+    assigneeUserId: target === "me" ? owner.userId : null,
     date: getLocalDateKey(dateSource, "Europe/Minsk"),
     startsAt,
     arriveAt: asDate(entry.arriveAt.value),
@@ -138,7 +146,17 @@ export async function createFromDraft(
     throw new PlanEntryError("DUPLICATE_REQUIRES_CONFIRMATION");
   }
 
+  const target = item.ruleCodes.includes(CAPTURE_TARGET_ME_RULE)
+    ? "me"
+    : item.ruleCodes.includes(CAPTURE_TARGET_ALL_RULE)
+      ? "all"
+      : item.ruleCodes.includes(CAPTURE_TARGET_CHILD_RULE) ? "child" : null;
+  if (!target) throw new PlanEntryError("TARGET_NOT_SELECTED");
+
   const draft = assertActionableDraft(item.draft);
+  if (target === "child" && draft.entries.some((entry) => !entry.child.childId)) {
+    throw new PlanEntryError("CHILD_NOT_SELECTED");
+  }
   await assertChildren(owner, draft);
   const places = await canonicalPlaces(draft);
   const familyId = await familyIdForWrite(owner.userId);
@@ -155,7 +173,7 @@ export async function createFromDraft(
     const planItemIds: string[] = [];
     for (const entry of draft.entries) {
       const created = await tx.planItem.create({
-        data: planData(owner, familyId, inboxItemId, entry, places),
+        data: planData(owner, familyId, inboxItemId, entry, places, target),
         select: { id: true },
       });
       planItemIds.push(created.id);
