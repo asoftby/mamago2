@@ -13,9 +13,9 @@ import { cn } from "@/lib/utils";
 const STICKY_CTA_FOOTER_PAD =
   "pb-[calc(46px+1.25rem+45px+env(safe-area-inset-bottom))]";
 
-/** Заголовок колонки — sans 14px, с заглавной буквы, серый. Контраст ≥ 4.5:1 на #F6F2EA. */
+/** Заголовок колонки — sans 14px, с заглавной буквы, серый. Сознательно светлее порога 4.5:1 (решение дизайна). */
 const FOOTER_HEADING_CLASS =
-  "text-[14px] font-medium text-[rgba(20,18,16,0.68)]";
+  "text-[14px] font-normal text-[rgba(20,18,16,0.5)]";
 
 /** Ссылка колонки — главный текст: sans 15px, тёмнее серого, hover-подчёркивание, focus-ring, цель ≥ 44px на мобильном. */
 const FOOTER_LINK_CLASS =
