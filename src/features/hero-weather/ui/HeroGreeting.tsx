@@ -74,7 +74,7 @@ function buildRangeSentence(snapshot: WeatherSnapshot): string | null {
       return `${basePrefix} от ${min} до ${max} — хороший день для прогулки.`;
     }
     if (snapshot.outdoorScore === "BAD_FOR_OUTDOOR") {
-      return `${basePrefix} от ${min} до ${max} — лучше выбирать места в помещении.`;
+      return `${basePrefix} от ${min} до ${max}.`;
     }
     if ((snapshot.precipitationProbability ?? 0) >= 30) {
       return `${basePrefix} от ${min} до ${max}, возможен дождь.`;
