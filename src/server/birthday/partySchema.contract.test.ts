@@ -26,5 +26,14 @@ assert.match(sql, /AvailabilityRule_valid_interval/);
 assert.match(sql, /PartyQuote_one_active_per_request/);
 assert.match(sql, /BookingRequest_one_confirmed_per_party_item/);
 assert.match(sql, /CalendarBlock_valid_interval/);
+// Legacy clients must not leak PARTY rows through STANDARD booking endpoints.
+for (const [file, guard] of [
+  ["src/server/services/booking/bookingQuery.service.ts", "kind: BookingKind.STANDARD"],
+  ["src/server/services/booking/bookingStale.service.ts", 'kind: "STANDARD"'],
+  ["src/server/services/booking/adminOrders.service.ts", 'kind: "STANDARD"'],
+  ["src/server/services/booking/parentBookings.service.ts", 'kind: "STANDARD"'],
+]) {
+  assert.ok(readFileSync(file, "utf8").includes(guard), "Missing legacy booking guard: " + file);
+}
 assert.doesNotMatch(sql, /DROP TABLE|DROP COLUMN|TRUNCATE|DELETE FROM/i);
 console.log("partySchema.contract.test.ts: OK");

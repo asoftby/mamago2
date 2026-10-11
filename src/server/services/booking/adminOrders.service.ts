@@ -147,7 +147,7 @@ function normalizeDateEnd(date: Date) {
 function buildOrdersWhere(filters: Omit<AdminOrdersFilters, "page" | "limit" | "status"> & {
   status?: BookingStatus;
 }): Prisma.BookingRequestWhereInput {
-  const and: Prisma.BookingRequestWhereInput[] = [];
+  const and: Prisma.BookingRequestWhereInput[] = [{ kind: "STANDARD" }];
 
   if (filters.status) {
     and.push({ status: filters.status });
@@ -245,8 +245,8 @@ function mapAdminOrder(
     createdAt: booking.createdAt.toISOString(),
     updatedAt: booking.updatedAt.toISOString(),
     status: booking.status,
-    customerName: booking.customerName,
-    customerPhone: booking.customerPhone,
+    customerName: booking.customerName ?? "",
+    customerPhone: booking.customerPhone ?? "",
     customerEmail: booking.customerEmail,
     business: {
       id: booking.business.id,

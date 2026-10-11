@@ -160,6 +160,7 @@ export async function runBookingStaleNotificationJob(): Promise<BookingStaleJobR
     // Find all stale bookings
     const staleBookings = await prisma.bookingRequest.findMany({
       where: {
+        kind: "STANDARD",
         OR: [
           // NEW без ответа > 24ч
           {
@@ -214,7 +215,7 @@ export async function runBookingStaleNotificationJob(): Promise<BookingStaleJobR
           ? "BOOKING_STALE"
           : "BOOKING_NEEDS_ATTENTION";
 
-        const body = buildStaleBody(staleType, booking.customerName, staleHours);
+        const body = buildStaleBody(staleType, booking.customerName ?? "", staleHours);
         const title =
           staleType === "BOOKING_STALE"
             ? "Заявка ждёт ответа"
