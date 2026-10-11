@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 
 import {
   ABWS_FETCH_OPTIONS,
+  abwsSafeBodyPreview,
   dedupeKey,
   filterCategoryTypeIds,
   filterItemsByCategoryTypeIdAllowlist,
@@ -86,6 +87,15 @@ const multiVenueFixture: AbwsPerformanceItem = {
 // The full ABWS JSON catalog is ~13 MiB and must bypass the generic 5 MiB HTML cap.
 assert.ok(ABWS_FETCH_OPTIONS.maxBytes > 13 * 1024 * 1024);
 assert.ok(ABWS_FETCH_OPTIONS.maxBytes <= 32 * 1024 * 1024);
+// API error messages may reflect their original authenticated URL.
+{
+  const token = "fake-abws-secret-for-tests";
+  const sample = `error requesting ?key=${token}&distributor_company_id=550`;
+  assert.ok(!abwsSafeBodyPreview(sample, token).includes(token));
+  assert.ok(abwsSafeBodyPreview(sample, token).includes("[REDACTED]"));
+  const encoded = encodeURIComponent("secret?with special characters");
+  assert.ok(!abwsSafeBodyPreview(`url ?key=${encoded}`, "secret?with special characters").includes(encoded));
+}
 
 // ── isSingleVenue ────────────────────────────────────────────────────────
 assert.equal(isSingleVenue(singleVenueFixture.sessions), true);

@@ -78,8 +78,30 @@ function nodeHeadersToRecord(headers: http.IncomingHttpHeaders): Record<string, 
   return record;
 }
 
+/**
+ * Logs and import errors must never expose credentials or query tokens.
+ * Keep only the origin/path and whether a query was present; the actual
+ * transport request continues to use the original, unmodified URL.
+ */
+export function redactFetchUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}${parsed.search ? "?[REDACTED]" : ""}`;
+  } catch {
+    return "[invalid URL]";
+  }
+}
+
+function redactDiagnosticUrls(message: string): string {
+  return message.replace(/https?:\/\/[^\s"'<>]+/gi, (candidate) => {
+    const trailing = candidate.match(/[),;.]+$/)?.[0] ?? "";
+    const cleanCandidate = trailing ? candidate.slice(0, -trailing.length) : candidate;
+    return `${redactFetchUrl(cleanCandidate)}${trailing}`;
+  });
+}
+
 function buildStatusErrorMessage(url: string, status: number, statusText: string) {
-  return `Failed to load ${url} (status ${status}${statusText ? ` ${statusText}` : ""})`;
+  return `Failed to load ${redactFetchUrl(url)} (status ${status}${statusText ? ` ${redactDiagnosticUrls(statusText)}` : ""})`;
 }
 
 function readErrorField(error: unknown, key: string): unknown {
@@ -121,11 +143,11 @@ export function describeFetchError(error: unknown): string {
     current = cause;
   }
 
-  return parts.length > 0 ? parts.join("; ") : String(error);
+  return redactDiagnosticUrls(parts.length > 0 ? parts.join("; ") : String(error));
 }
 
 function buildNetworkErrorMessage(url: string, error: unknown) {
-  return `Failed to load ${url} (network error: ${describeFetchError(error)})`;
+  return `Failed to load ${redactFetchUrl(url)} (network error: ${describeFetchError(error)})`;
 }
 
 function hasHttpStatus(error: unknown): error is Error & { httpStatus: number } {
@@ -445,7 +467,8 @@ export async function fetchBinary(
     if (hasHttpStatus(error)) throw error;
     throw Object.assign(new Error(buildNetworkErrorMessage(url, error)), {
       httpStatus: 502,
-      cause: error,
+      // Never propagate the raw nested error; it may contain a credentialed URL.
+      cause: new Error(describeFetchError(error)),
     });
   } finally {
     if (timer) clearTimeout(timer);
@@ -499,11 +522,16 @@ export async function fetchHtml(
         headers: response.headers,
       };
     } catch (error) {
-      const normalizedError =
-        error instanceof Error ? error : new Error(buildNetworkErrorMessage(url, error));
+      // Do not retain untrusted raw causes in ImportRun errors or logs.
+      const safeMessage = redactDiagnosticUrls(
+        error instanceof Error ? error.message : buildNetworkErrorMessage(url, error),
+      );
+      const normalizedError = Object.assign(new Error(safeMessage), {
+        ...(hasHttpStatus(error) ? { httpStatus: error.httpStatus } : {}),
+      });
 
       console.warn("[import.fetchHtml] request failed", {
-        url,
+        url: redactFetchUrl(url),
         attempt,
         error: describeFetchError(error),
       });
@@ -515,7 +543,7 @@ export async function fetchHtml(
     }
   }
 
-  const fallbackMessage = lastError?.message ?? `Failed to load ${url} (unknown error)`;
+  const fallbackMessage = lastError?.message ?? `Failed to load ${redactFetchUrl(url)} (unknown error)`;
   throw Object.assign(new Error(fallbackMessage), {
     cause: lastError ?? undefined,
     ...(hasHttpStatus(lastError) ? { httpStatus: lastError.httpStatus } : {}),
