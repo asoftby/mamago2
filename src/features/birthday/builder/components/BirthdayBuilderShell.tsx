@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useMemo } from "react";
 import { useBirthdayBuilderWithGate } from "../hooks/useBirthdayBuilderWithGate";
 import { useBirthdayAgeSignals } from "../hooks/useBirthdayAgeSignals";
 import { BirthdayAgeSignalHydration } from "./BirthdayAgeSignalHydration";
@@ -11,6 +12,12 @@ import { StepWhen } from "./steps/StepWhen";
 import { StepWho } from "./steps/StepWho";
 import { StepFormat } from "./steps/StepFormat";
 import { StepPick } from "./steps/StepPick";
+import { StepReview } from "./steps/StepReview";
+import { useRealBirthdayCatalog } from "../hooks/useRealBirthdayCatalog";
+import { matchesBirthdayRequirements } from "../lib/realCatalog";
+import {
+  catalogPriceSummary, eligibleAddons, hasValidCatalogAnchor, selectedCatalogOffers,
+} from "../lib/catalogSelection";
 import { BuilderProgressDots } from "./BuilderProgressDots";
 import { BuilderSummaryBar } from "./BuilderSummaryBar";
 import type { BuilderStep } from "../types/builder";
@@ -19,7 +26,7 @@ const NEXT_LABELS: Partial<Record<BuilderStep, string>> = {
   when: "Далее — для кого",
   who: "Далее — формат",
   format: "Далее — подбор",
-  pick: "Далее — готово",
+  pick: "Далее — обзор",
 };
 
 function canProceedFromStep(
@@ -34,7 +41,7 @@ function canProceedFromStep(
     case "format":
       return Boolean(state.quiz.placeType) && Boolean(state.quiz.budgetGroup);
     case "pick":
-      return Boolean(state.selection.selectedBaseId);
+      return false; // Checked against the verified published catalog below.
     default:
       return true;
   }
@@ -73,12 +80,47 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
     selectedAgeLabel: state.quiz.selectedAgeLabel,
   });
 
-  // PR 1: catalog and booking persistence are not connected yet.
-  // Never derive prices, availability or successful bookings from demo IDs.
-  const totalPrice = 0;
-  const overBudget = false;
-  const canNext = currentStep !== "pick" && currentStep !== "done" &&
-    canProceedFromStep(currentStep, state);
+  const catalog = useRealBirthdayCatalog(citySlug);
+  const maxBudget = state.quiz.budgetGroup === "up300" ? 300
+    : state.quiz.budgetGroup === "300-600" ? 600
+    : state.quiz.budgetGroup === "600-1000" ? 1000 : null;
+
+  const ageMonths = useMemo(() => {
+    const dob = state.quiz.partyForChild?.birthDateIso;
+    const partyDate = state.quiz.dateRangeFrom;
+    if (!dob || !partyDate) return null;
+    const birth = new Date(dob + "T00:00:00Z");
+    const party = new Date(partyDate + "T00:00:00Z");
+    if (Number.isNaN(birth.valueOf()) || Number.isNaN(party.valueOf())) return null;
+    const fullMonths = (party.getUTCFullYear() - birth.getUTCFullYear()) * 12 +
+      (party.getUTCMonth() - birth.getUTCMonth());
+    return Math.max(0, fullMonths - Number(party.getUTCDate() < birth.getUTCDate()));
+  }, [state.quiz.partyForChild?.birthDateIso, state.quiz.dateRangeFrom]);
+
+  const visibleOffers = useMemo(() => catalog.offers.filter((offer) =>
+    matchesBirthdayRequirements(offer, { ageMonths, maxBudget: offer.currency === "BYN" ? maxBudget : null })),
+    [catalog.offers, ageMonths, maxBudget]);
+
+  const validBase = hasValidCatalogAnchor(
+    visibleOffers, state.selection.selectedBaseId, state.quiz.placeType,
+  );
+  const selectedOffers = useMemo(() => {
+    if (!validBase) return [];
+    const allowedAddonIds = new Set(eligibleAddons(
+      visibleOffers, state.selection.selectedBaseId, state.quiz.placeType,
+    ).map((offer) => offer.id));
+    return selectedCatalogOffers(
+      visibleOffers, state.selection.selectedBaseId,
+      state.selection.selectedAddonIds.filter((id) => allowedAddonIds.has(id)),
+    );
+  }, [visibleOffers, state.selection.selectedBaseId, state.selection.selectedAddonIds, state.quiz.placeType, validBase]);
+
+  const prices = catalogPriceSummary(selectedOffers);
+  const totalPrice = prices.minimumByn;
+  const overBudget = maxBudget != null && totalPrice > maxBudget;
+  const canNext = currentStep === "pick"
+    ? catalog.status === "ready" && validBase
+    : currentStep !== "done" && canProceedFromStep(currentStep, state);
   const nextLabel = NEXT_LABELS[currentStep] ?? "Далее";
 
   return (
@@ -176,8 +218,22 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
           {currentStep === "when" && <StepWhen builder={builder} />}
           {currentStep === "who" && <StepWho builder={builder} ageSignals={ageSignals} />}
           {currentStep === "format" && <StepFormat builder={builder} />}
-          {currentStep === "pick" && <StepPick citySlug={citySlug} />}
-          {currentStep === "done" && <StepPick citySlug={citySlug} />}
+          {currentStep === "pick" && (
+            <StepPick
+              citySlug={citySlug}
+              offers={visibleOffers}
+              allOfferCount={catalog.offers.length}
+              loading={catalog.status === "loading"}
+              error={catalog.error}
+              onRetry={catalog.retry}
+              placeType={state.quiz.placeType}
+              selectedBaseId={state.selection.selectedBaseId}
+              selectedAddonIds={state.selection.selectedAddonIds}
+              onSelectBase={builder.selectBase}
+              onToggleAddon={builder.toggleAddon}
+            />
+          )}
+          {currentStep === "done" && <StepReview offers={selectedOffers} />}
         </main>
 
         {/* Summary sticky bar */}

@@ -145,7 +145,7 @@ export function BuilderSummaryBar({
                   fontWeight: overBudget ? 700 : 500,
                 }}
               >
-                {Math.round(totalPrice)} <BelarusianRubleIcon />{overBudget ? " ● превышен бюджет" : ""}
+                От {Math.round(totalPrice)} <BelarusianRubleIcon />{overBudget ? " ● превышен бюджет" : ""}
               </span>
               {!overBudget && (
                 <span style={{ color: "#1F8A5B" }}>●</span>
