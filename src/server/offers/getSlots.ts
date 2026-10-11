@@ -1,15 +1,20 @@
 import prisma from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { calculateSlots, type GetSlotsInput, type Slot, type SlotSnapshot } from "./slotAvailability";
 
 const dateKey = (date: Date) => date.toISOString().slice(0, 10);
 
 /** Read-only availability preview. A reservation must recheck inside its transaction. */
-export async function getSlots(input: GetSlotsInput): Promise<Slot[]> {
-  const offer = await prisma.offer.findUnique({
+export async function loadSlotSnapshot(
+  input: GetSlotsInput,
+  db: Prisma.TransactionClient = prisma,
+): Promise<SlotSnapshot | null> {
+  const offer = await db.offer.findUnique({
     where: { id: input.offerId },
     select: {
       bookingEnabled: true,
       bookingMode: true,
+      campPlacesCount: true,
       openingHoursId: true,
       inheritPlaceOpeningHours: true,
       place: { select: { openingHoursId: true } },
@@ -20,24 +25,24 @@ export async function getSlots(input: GetSlotsInput): Promise<Slot[]> {
   });
   const booking = offer?.offerBooking;
   if (!offer?.bookingEnabled || !booking ||
-      (offer.bookingMode !== "USE_PUBLICATION_DATES" && offer.bookingMode !== "USE_PUBLICATION_SLOTS")) return [];
+      (offer.bookingMode !== "USE_PUBLICATION_DATES" && offer.bookingMode !== "USE_PUBLICATION_SLOTS")) return null;
 
   const openingHoursId = offer.inheritPlaceOpeningHours
     ? offer.place?.openingHoursId
     : offer.openingHoursId;
   const [sessions, requests, links, hours] = await Promise.all([
-    prisma.offerSession.findMany({
+    db.offerSession.findMany({
       where: { offerId: input.offerId, startAt: { lt: input.to }, endAt: { gt: input.from } },
       select: { id: true, startAt: true, endAt: true, capacity: true, isCancelled: true },
     }),
-    prisma.bookingRequest.findMany({
+    db.bookingRequest.findMany({
       where: { offerId: input.offerId, status: { in: ["NEW", "CONFIRMED"] } },
       select: {
         offerSessionId: true, startsAt: true, seats: true, status: true, holdUntil: true,
         campShiftDateFrom: true, campShiftDateTo: true, childrenCount: true,
       },
     }),
-    prisma.bookingUnitOffer.findMany({
+    db.bookingUnitOffer.findMany({
       where: { offerId: input.offerId, bookingUnit: { status: "ACTIVE", type: "EXCLUSIVE" } },
       include: {
         bookingUnit: {
@@ -51,7 +56,7 @@ export async function getSlots(input: GetSlotsInput): Promise<Slot[]> {
       },
     }),
     openingHoursId && booking.scheduleKind === "OPENING_HOURS"
-      ? prisma.openingHours.findUnique({
+      ? db.openingHours.findUnique({
           where: { id: openingHoursId },
           include: { rules: { include: { intervals: true } }, exceptions: { include: { intervals: true } } },
         })
@@ -66,7 +71,7 @@ export async function getSlots(input: GetSlotsInput): Promise<Slot[]> {
     horizonDays: booking.horizonDays,
     durationMin: booking.durationMin,
     bufferMin: booking.bufferMin,
-    capacity: booking.capacity,
+    capacity: booking.capacity ?? (booking.scheduleKind === "SHIFTS" ? offer.campPlacesCount : null),
     rules: booking.rules.map((rule) => ({
       weekday: rule.weekday,
       startMinutes: rule.startMinutes,
@@ -119,5 +124,11 @@ export async function getSlots(input: GetSlotsInput): Promise<Slot[]> {
       })),
     })),
   };
-  return calculateSlots(snapshot, input);
+  return snapshot;
+}
+
+/** Read-only availability preview; reserveSlot calls this inside its transaction. */
+export async function getSlots(input: GetSlotsInput): Promise<Slot[]> {
+  const snapshot = await loadSlotSnapshot(input);
+  return snapshot ? calculateSlots(snapshot, input) : [];
 }

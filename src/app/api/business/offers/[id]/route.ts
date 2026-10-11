@@ -574,9 +574,11 @@ export async function PATCH(
         requestedPlacementsProvided: data.requestedPlacements !== undefined,
       });
 
-      // CAMP: rebuild OfferSession projection from current campSessions canon
-      // (clears all rows when isCampOffer is false, e.g. type switched away from CAMP)
-      await projectCampSessions(tx, id, isCampOffer ? nextCampSessions : []);
+      // Only CAMP edits own this projection. Other schedule kinds also use
+      // OfferSession, so a regular offer edit must not erase their sessions.
+      if (isCampOffer || existingOffer.productType === "CAMP") {
+        await projectCampSessions(tx, id, isCampOffer ? nextCampSessions : []);
+      }
 
       return tx.offer.findUniqueOrThrow({
         where: { id },
