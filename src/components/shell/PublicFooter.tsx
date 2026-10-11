@@ -15,11 +15,11 @@ const STICKY_CTA_FOOTER_PAD =
 
 /** Заголовок колонки — служебная метка в стиле категории на карточке события (mono, uppercase). Контраст ≥ 4.5:1 на #F6F2EA. */
 const FOOTER_HEADING_CLASS =
-  "text-[14px] font-medium uppercase tracking-[0.1em] text-[rgba(20,18,16,0.55)]";
+  "text-[19px] font-medium text-[rgba(20,18,16,0.55)]";
 
-/** Ссылка колонки — главный текст: sans 15px, тёмнее серого, hover-подчёркивание, focus-ring, цель ≥ 44px на мобильном. */
+/** Ссылка колонки — главный текст: sans 20px, тёмнее серого, hover-подчёркивание, focus-ring, цель ≥ 44px на мобильном. */
 const FOOTER_LINK_CLASS =
-  "flex min-h-11 items-center rounded-sm text-[15px] leading-[1.35] text-[#3A332B] transition-colors md:min-h-0 " +
+  "flex min-h-11 items-center rounded-sm text-[20px] leading-[1.35] text-[#3A332B] transition-colors md:min-h-0 " +
   "hover:text-[#141210] hover:underline hover:underline-offset-4 " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#F6F2EA]";
 
