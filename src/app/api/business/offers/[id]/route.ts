@@ -7,6 +7,7 @@ import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
+import { liveOfferComparableOverlay } from "@/lib/offers/offerLiveComparable";
 import { isValidOfferPhone } from "@/lib/offers/offerPhone";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { getCampSessionPriceValues } from "@/lib/offers/campPricing";
@@ -89,11 +90,11 @@ const updateOfferSchema = z.object({
   priceCaption: z.string().optional(),
   promotionDetails: z.string().optional(),
   pricingMode: z.enum(["SINGLE", "MULTIPLE"]).optional(),
-  singlePrice: z.number().optional(),
+  singlePrice: z.number().finite().nonnegative().optional(),
   singlePriceLabel: z.string().optional(),
   pricingOptions: z.array(z.object({
     title: z.string(),
-    price: z.number(),
+    price: z.number().finite().nonnegative(),
     oldPrice: z.number().optional(),
     description: z.string().optional(),
   })).optional(),
@@ -589,7 +590,12 @@ export async function PATCH(
           campTextsChanged = campResult.contentChanged;
         }
 
-        const changedColumns = collectChangedOfferColumns(updateRecord, liveRecord);
+        // Сравниваем с живыми значениями в том виде, в каком их получает форма (нормализация rich text,
+        // синтез из старых полей), иначе неизменённый снимок выглядит как правка контента.
+        const changedColumns = collectChangedOfferColumns(updateRecord, {
+          ...liveRecord,
+          ...liveOfferComparableOverlay(live),
+        });
 
         // `priceText`: «от N BYN», выведенное из чисел, — операционная правка; произвольная подпись
         // (из `priceCaption`) — контент. Переименовываем только первый случай.
