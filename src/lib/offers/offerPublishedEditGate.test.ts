@@ -119,6 +119,19 @@ assert.equal(classifyOfferColumn("somethingNew"), "content");
   assert.deepEqual(d.operationalColumns, ["priceFrom"]);
 }
 
+// Смена типа: выведенные из неё цена/смены уходят вместе с типом (forceContentColumns)
+{
+  const d = decidePublishedOfferEdit({
+    role: "BUSINESS_OWNER",
+    currentStatus: "PUBLISHED",
+    changedColumns: ["campProgramType", "priceFrom", "priceItems", "campSessions", "contactPhone"],
+    forceContentColumns: ["priceFrom", "priceItems", "campSessions"],
+  });
+  assert.equal(d.blocked, true);
+  assert.deepEqual(d.contentColumns, ["campProgramType", "priceFrom", "priceItems", "campSessions"]);
+  assert.deepEqual(d.operationalColumns, ["contactPhone"]);
+}
+
 // Ничего не изменилось → не блокируется
 assert.equal(
   decidePublishedOfferEdit({ role: "BUSINESS_OWNER", currentStatus: "PUBLISHED", changedColumns: [] }).blocked,

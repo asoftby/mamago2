@@ -751,11 +751,12 @@ export function OfferWizard({
       draft.markClean();
       showSuccessModal({
         kind: "offer",
-        outcome: canDirectPublish
-          ? isPublishedEditMode
-            ? "changes_published"
-            : "published"
-          : "submitted",
+        // Опубликованный оффер: принятые правки уже живые (контент, если был, уйдёт модератору отдельно).
+        outcome: isPublishedEditMode
+          ? "changes_published"
+          : canDirectPublish
+            ? "published"
+            : "submitted",
         id: offerId,
         isEdit: mode === "edit",
         slug: offer?.slug ?? null,

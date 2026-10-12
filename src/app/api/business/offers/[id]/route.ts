@@ -618,11 +618,21 @@ export async function PATCH(
           return typeof value === "string" && value.trim() !== "" && !isValidOfferPhone(value);
         });
 
+        // Смена типа предложения (в т.ч. на/с лагеря) — контент. Всё, что из неё выведено (цена из смен,
+        // смены, тип/вид), уходит вместе с ней: иначе живая карточка получит цену и смены нового типа
+        // при прежнем типе.
+        const TYPE_SWITCH_COLUMNS = ["productType", "kind", "campProgramType"];
+        const TYPE_DERIVED_COLUMNS = ["priceFrom", "priceTo", "priceMode", "priceItems", "priceText", "campSessions"];
+        const typeSwitched = TYPE_SWITCH_COLUMNS.some((column) => changedColumns.includes(column));
+        const typeDerivedColumns = typeSwitched
+          ? TYPE_DERIVED_COLUMNS.filter((column) => changedColumns.includes(column))
+          : [];
+
         const decision = decidePublishedOfferEdit({
           role: user.role,
           currentStatus: live.status,
           changedColumns,
-          forceContentColumns: invalidPhoneColumns,
+          forceContentColumns: [...invalidPhoneColumns, ...typeDerivedColumns],
         });
 
         if (live.status === "PUBLISHED") {
