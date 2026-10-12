@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   applyCampSessionTexts,
+  applyRevisionToOffer,
   buildRevisionDiffRows,
   buildRevisionProposal,
   isRevisionPseudoColumn,
@@ -97,5 +98,26 @@ assert.equal(isRevisionPseudoColumn("categoryIds"), true);
 assert.equal(isRevisionPseudoColumn("title"), false);
 assert.equal(toRevisionJsonValue(undefined), null);
 assert.deepEqual(toRevisionJsonValue({ a: [1, 2] }), { a: [1, 2] });
+
+// Оффер глазами автора: его предложенные значения поверх живых, операционное остаётся живым
+{
+  const offer = {
+    title: "Живое",
+    description: "Описание",
+    placements: [{ key: "CLASSES", status: "APPROVED" }],
+    campSessions: [{ id: "s1", title: "Июнь", dateFrom: "2026-06-03", priceOverride: "550" }],
+  };
+  const merged = applyRevisionToOffer(offer, {
+    title: "Моё новое",
+    requestedPlacements: ["CLASSES", "WHERE_TO_GO"],
+    campSessionTexts: [{ id: "s1", title: "Июнь (моё)", dateFrom: "2026-01-01", priceOverride: "1" }],
+  });
+  assert.equal(merged.title, "Моё новое");
+  assert.equal(merged.description, "Описание");
+  assert.deepEqual(merged.placements, [{ key: "CLASSES", status: "APPROVED" }, { key: "WHERE_TO_GO", status: "REQUESTED" }]);
+  assert.deepEqual(merged.campSessions, [{ id: "s1", title: "Июнь (моё)", dateFrom: "2026-06-03", priceOverride: "550" }]);
+  assert.equal(applyRevisionToOffer(offer, null), offer);
+  assert.equal(offer.title, "Живое", "исходный объект не мутируется");
+}
 
 console.log("offerRevisionPayload tests passed");

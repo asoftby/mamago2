@@ -1284,6 +1284,8 @@ export async function notifyAdminsPublicationSubmitted(params: {
   publicationId: string;
   publicationTitle: string;
   submittedAt?: Date;
+  /** Куда ведёт уведомление (по умолчанию — общая очередь модерации). */
+  actionUrl?: string;
 }) {
   const admins = await prisma.user.findMany({
     where: { role: "ADMIN" },
@@ -1312,7 +1314,7 @@ export async function notifyAdminsPublicationSubmitted(params: {
         itemId: moderationItemId,
         notificationTitle: "Новая публикация на модерации",
         itemTitle: `${label}: «${params.publicationTitle}»`,
-        actionUrl: "/admin/moderation/queue",
+        actionUrl: params.actionUrl ?? "/admin/moderation/queue",
       }),
     ),
   );

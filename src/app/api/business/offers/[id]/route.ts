@@ -561,7 +561,8 @@ export async function PATCH(
       campProjection: { isCamp: boolean; sessions: unknown } | null;
       /** Создана новая ожидающая ревизия (а не обновлена существующая) — уведомляем админов. */
       revisionCreated: boolean;
-    } = { skipRequestedPlacements: false, moderationNotice: null, journal: null, campProjection: null, revisionCreated: false };
+      revisionId: string | null;
+    } = { skipRequestedPlacements: false, moderationNotice: null, journal: null, campProjection: null, revisionCreated: false, revisionId: null };
 
     const gateApplies = !canPublishContentDirectly(user.role);
 
@@ -677,6 +678,7 @@ export async function PATCH(
             live: liveRecord as Record<string, unknown> & { updatedAt?: Date },
           });
           gate.revisionCreated = saved.created;
+          gate.revisionId = saved.revisionId;
 
           if (visibleContent.length > 0) {
             gate.moderationNotice = {
@@ -808,6 +810,19 @@ export async function PATCH(
         });
       } catch (error) {
         console.error("[offer-update] admin moderation notification failed:", error);
+      }
+    }
+    // Новая ревизия опубликованного оффера (не обновление существующей) — зовём админов на модерацию.
+    if (gate.revisionCreated) {
+      try {
+        await notifyAdminsPublicationSubmitted({
+          publicationType: "OFFER",
+          publicationId: offer.id,
+          publicationTitle: `${offer.title} — правки опубликованного`,
+          actionUrl: gate.revisionId ? `/admin/content/offers/revisions/${gate.revisionId}` : undefined,
+        });
+      } catch (error) {
+        console.error("[offer-update] admin revision notification failed:", error);
       }
     }
     timer.mark("notifications");

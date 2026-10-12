@@ -146,3 +146,33 @@ export function buildRevisionDiffRows(
     after,
   }));
 }
+
+/**
+ * Оффер глазами автора: живая строка + его ожидающие правки. Нужен редактору партнёра, чтобы он видел
+ * свои предложенные значения, а не «откатившееся» живое. Модератору/админу это не применяют.
+ */
+export function applyRevisionToOffer<T extends Record<string, unknown>>(
+  offer: T,
+  payload: OfferRevisionPayload | null | undefined,
+): T {
+  if (!payload) return offer;
+  const next: Record<string, unknown> = { ...offer };
+
+  for (const [column, value] of Object.entries(payload)) {
+    if (!isRevisionPseudoColumn(column)) next[column] = value;
+  }
+
+  if ("requestedPlacements" in payload && Array.isArray(payload.requestedPlacements)) {
+    const live = Array.isArray(offer.placements)
+      ? (offer.placements as Array<{ key: string; status?: string | null }>)
+      : [];
+    const keys = payload.requestedPlacements as string[];
+    next.placements = keys.map((key) => live.find((placement) => placement.key === key) ?? { key, status: "REQUESTED" });
+  }
+
+  if ("campSessionTexts" in payload) {
+    next.campSessions = applyCampSessionTexts(offer.campSessions, payload.campSessionTexts);
+  }
+
+  return next as T;
+}

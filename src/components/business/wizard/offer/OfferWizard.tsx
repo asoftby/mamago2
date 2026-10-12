@@ -31,6 +31,7 @@ import { useWizardDraft } from "@/hooks/useWizardDraft";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
 
 import type { OfferFormData, OfferWizardMode, OfferWizardStepKey } from "./types";
+import { describeContentColumns } from "@/lib/offers/offerPublishedEditGate";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
 import { getOfferTypeSelection } from "./offerTypeChoices";
 import { validateForSubmit, type ValidationResult } from "./validation";
@@ -105,6 +106,8 @@ interface OfferWizardProps {
   /** 1-based шаг в мастере (из query `?step=`). Только для `mode="edit"`. */
   initialStepNumber?: number;
   ctaStepEnabled?: boolean;
+  /** Колонки ожидающей ревизии опубликованного оффера (правки автора ждут модерации). */
+  pendingRevisionFields?: string[];
 }
 
 /** Ключ автосейва до миграции на useWizardDraft — подчищается на mount */
@@ -268,6 +271,7 @@ export function OfferWizard({
   returnTo,
   initialStepNumber,
   ctaStepEnabled,
+  pendingRevisionFields,
 }: OfferWizardProps) {
   const router = useRouter();
   const surface: ContentEditorSurface = editorSurface ?? "business";
@@ -588,12 +592,9 @@ export function OfferWizard({
         if (saved?.updatedAt) {
           setEntityUpdatedAtIso(new Date(saved.updatedAt).toISOString());
         }
-        if (saved?.moderationNotice?.message) {
-          // Сервер не принял контентные правки опубликованного предложения: форма остаётся «грязной»
-          // (предупреждение при уходе, черновик не теряется), а не выглядит сохранённой.
-          toast.info(saved.moderationNotice.message);
-          return;
-        }
+        // Контентные правки опубликованного предложения сервер сохранил как ревизию (ждёт модерации),
+        // операционные применил сразу — форма считается сохранённой.
+        if (saved?.moderationNotice?.message) toast.info(saved.moderationNotice.message);
         setBaselineFormJson(JSON.stringify(formData));
         draft.markClean();
       } else {
@@ -742,21 +743,20 @@ export function OfferWizard({
         payload: updatePayload,
       });
 
-      if (submitted?.moderationNotice?.message) {
-        // Ревизий пока нет: контентные правки не сохранены, поэтому «отправлено»/«опубликовано» не показываем.
-        toast.info(submitted.moderationNotice.message);
-        return;
-      }
+      if (submitted?.moderationNotice?.message) toast.info(submitted.moderationNotice.message);
+      const revisionSentToModeration = Boolean(submitted?.moderationNotice);
       setBaselineFormJson(JSON.stringify(formData));
       draft.markClean();
       showSuccessModal({
         kind: "offer",
         // Опубликованный оффер: принятые правки уже живые (контент, если был, уйдёт модератору отдельно).
-        outcome: isPublishedEditMode
-          ? "changes_published"
-          : canDirectPublish
-            ? "published"
-            : "submitted",
+        outcome: revisionSentToModeration
+          ? "submitted"
+          : isPublishedEditMode
+            ? "changes_published"
+            : canDirectPublish
+              ? "published"
+              : "submitted",
         id: offerId,
         isEdit: mode === "edit",
         slug: offer?.slug ?? null,
@@ -961,6 +961,15 @@ export function OfferWizard({
         </div>
       )}
 
+      {pendingRevisionFields && pendingRevisionFields.length > 0 ? (
+        <p
+          role="status"
+          className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          Правки ждут модерации: {describeContentColumns(pendingRevisionFields)}. На сайте пока прежняя версия;
+          здесь показаны ваши предложенные значения.
+        </p>
+      ) : null}
       <FormPrimaryContentCard>{renderStep()}</FormPrimaryContentCard>
 
       <FormStickyActionBar

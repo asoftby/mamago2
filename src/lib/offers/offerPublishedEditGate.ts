@@ -169,12 +169,12 @@ export function describeContentColumns(columns: readonly string[]): string {
   return labels.join(", ");
 }
 
-/** Сообщение партнёру: что ушло на поддержку и что сохранено сразу. */
+/** Сообщение партнёру: что ушло на модерацию и что сохранено сразу. */
 export function buildModerationNoticeMessage(params: {
   contentColumns: readonly string[];
   operationalColumns: readonly string[];
 }): string {
-  const first = `Текст и фото опубликованного предложения пока меняются через поддержку: ${describeContentColumns(params.contentColumns)}.`;
+  const first = `Текст и фото опубликованного предложения проходят модерацию: ${describeContentColumns(params.contentColumns)}. До решения на сайте прежняя версия.`;
   return params.operationalColumns.length > 0
     ? `${first} Цены, расписание и контакты сохранены`
     : first;

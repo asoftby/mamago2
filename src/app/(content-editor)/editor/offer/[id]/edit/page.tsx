@@ -1,3 +1,4 @@
+import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
@@ -47,7 +48,9 @@ export default async function EditorEditOfferPage({
       ? parseInt(stepParam.trim(), 10)
       : undefined;
 
-  const { offer, offerForWizard } = await loadOfferForWizard(id);
+  const { offer, offerForWizard, pendingRevision } = await loadOfferForWizard(id, {
+    viewerEditsLive: canPublishContentDirectly(user.role),
+  });
 
   if (!offer || !offerForWizard) {
     notFound();
@@ -122,6 +125,7 @@ export default async function EditorEditOfferPage({
         contentEditorNav={nav}
         returnTo={returnTo}
         initialStepNumber={initialStepNumber}
+        pendingRevisionFields={pendingRevision?.fields}
         ctaStepEnabled={ctaStepEnabled}
       />
     </ContentEditorChrome>

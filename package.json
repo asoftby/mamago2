@@ -180,6 +180,7 @@
     "test:public-edit-permissions": "tsx src/lib/permissions/publicEditPermissions.test.ts",
     "test:offer-description-placements": "tsx src/components/business/wizard/offer/descriptionPlacements.contract.test.ts",
     "test:offer-phone": "tsx src/lib/offers/offerPhone.test.ts",
+    "test:offer-revision-integration": "NODE_OPTIONS=--conditions=react-server tsx --test src/server/offers/offerRevision.integration.test.ts",
     "test:session-title": "tsx src/lib/event/sessionTitle.test.ts",
     "test:similar-events-persona": "tsx src/components/event-page/similarEventsPersonaFilter.test.ts",
     "test:recommendation-narrow-exposures": "tsx --test src/server/services/recommendations/narrowRunExposures.integration.test.ts",
