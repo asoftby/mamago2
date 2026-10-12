@@ -33,6 +33,9 @@ import { notifyAdminsPublicationSubmitted } from "@/server/services/notification
 import { offerStatusRequiresPlace } from "@/lib/offers/offerPlaceRequirement";
 import {
   OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
+  collectChangedOfferColumns,
+  decidePublishedOfferEdit,
+  offerValuesEqual,
   shouldBlockPublishedOfferEdit,
 } from "@/lib/offers/offerPublishedEditGate";
 import {
@@ -274,24 +277,13 @@ export async function PATCH(
       return NextResponse.json({ error: "Offer not found" }, { status: 404 });
     }
 
-    // Гейт до любой записи в БД и любых сайдэффектов (slug, media, projections):
-    // прямая правка PUBLISHED-оффера минует модерацию — content leak.
-    if (
-      shouldBlockPublishedOfferEdit({
-        role: user.role,
-        currentStatus: existingOffer.status,
-      })
-    ) {
-      return NextResponse.json(
-        {
-          error: OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
-          message: "Опубликованное предложение нельзя изменить напрямую",
-          description:
-            "Изменения опубликованных предложений проходят модерацию",
-        },
-        { status: 403 },
-      );
-    }
+    // Опубликованный оффер у не-админа проверяется по полям (см. offerPublishedEditGate):
+    // контентные изменения требуют модерации, операционные применяются сразу и пишутся в журнал.
+    // Решение принимается ниже, когда известен итоговый набор колонок, но до любой записи в БД.
+    const fieldwiseGate = shouldBlockPublishedOfferEdit({
+      role: user.role,
+      currentStatus: existingOffer.status,
+    });
 
     const updateData: Prisma.OfferUpdateInput = {};
 
@@ -564,11 +556,79 @@ export async function PATCH(
       }
     }
 
+    let operationalJournal: { columns: string[]; before: Record<string, unknown>; after: Record<string, unknown> } | null = null;
+    if (fieldwiseGate) {
+      const live = await prisma.offer.findUniqueOrThrow({ where: { id } });
+      const changedColumns = collectChangedOfferColumns(
+        updateData as Record<string, unknown>,
+        live as unknown as Record<string, unknown>,
+      );
+      if (data.requestedPlacements !== undefined) {
+        const currentPlacements = await prisma.offerPlacement.findMany({
+          where: { offerId: id },
+          select: { key: true },
+        });
+        const current = currentPlacements.map((placement) => placement.key).sort();
+        const next = [...new Set(data.requestedPlacements)].sort();
+        if (!offerValuesEqual(current, next)) changedColumns.push("requestedPlacements");
+      }
+      const decision = decidePublishedOfferEdit({
+        role: user.role,
+        currentStatus: existingOffer.status,
+        changedColumns,
+      });
+      if (decision.blocked) {
+        return NextResponse.json(
+          {
+            error: OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
+            message: "Опубликованное предложение нельзя изменить напрямую",
+            description:
+              "Изменения текста, фото, категорий и других данных карточки опубликованного предложения проходят модерацию",
+            fields: decision.contentColumns,
+          },
+          { status: 403 },
+        );
+      }
+      if (decision.operationalColumns.length > 0) {
+        const toJournal = (value: unknown) =>
+          value !== null && typeof value === "object" && value.constructor?.name === "DbNull"
+            ? null
+            : JSON.parse(JSON.stringify(value ?? null));
+        operationalJournal = {
+          columns: decision.operationalColumns,
+          before: Object.fromEntries(
+            decision.operationalColumns.map((column) => [column, toJournal((live as Record<string, unknown>)[column])]),
+          ),
+          after: Object.fromEntries(
+            decision.operationalColumns.map((column) => [
+              column,
+              toJournal((updateData as Record<string, unknown>)[column]),
+            ]),
+          ),
+        };
+      }
+    }
+
     const offer = await prisma.$transaction(async (tx) => {
       await tx.offer.update({
         where: { id },
         data: updateData,
       });
+
+      if (operationalJournal) {
+        await tx.adminAuditLog.create({
+          data: {
+            actorId: user.id,
+            actorRole: user.role,
+            action: "offer.operational_edit",
+            entityType: "Offer",
+            entityId: id,
+            before: operationalJournal.before as Prisma.InputJsonValue,
+            after: operationalJournal.after as Prisma.InputJsonValue,
+            metadata: { columns: operationalJournal.columns, status: existingOffer.status },
+          },
+        });
+      }
 
       await syncOfferPersistenceLayer({
         db: tx,
