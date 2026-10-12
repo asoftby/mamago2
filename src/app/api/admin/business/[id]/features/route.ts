@@ -32,16 +32,22 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const existing = await prisma.business.findUnique({ where: { id }, select: { features: true } });
-    if (!existing) {
+    // Чтение и запись — одной транзакцией с блокировкой строки: параллельные патчи разных
+    // ключей не затирают друг друга (иначе побеждает последняя запись всего JSON).
+    const updated = await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<Array<{ features: unknown }>>`
+        SELECT "features" FROM "Business" WHERE "id" = ${id} FOR UPDATE
+      `;
+      if (rows.length === 0) return null;
+      return tx.business.update({
+        where: { id },
+        data: { features: mergeBusinessFeatures(rows[0]!.features, patch) },
+        select: { features: true },
+      });
+    });
+    if (!updated) {
       return NextResponse.json({ ok: false, error: "Бизнес не найден" }, { status: 404 });
     }
-
-    const updated = await prisma.business.update({
-      where: { id },
-      data: { features: mergeBusinessFeatures(existing.features, patch) },
-      select: { features: true },
-    });
 
     return NextResponse.json({ ok: true, features: parseBusinessFeatures(updated.features) });
   } catch (error) {
