@@ -71,6 +71,7 @@ const updateOfferSchema = z.object({
   }).optional(),
   title: z.string().min(1).optional(),
   shortDescription: z.string().min(1).optional(),
+  description: z.string().optional(),
   agePolicy: z.nativeEnum(AgePolicy).optional(),
   ageMinMonths: z.number().nullable().optional(),
   ageMaxMonths: z.number().nullable().optional(),
@@ -381,7 +382,12 @@ export async function PATCH(
     }
     
     if (data.title !== undefined) updateData.title = data.title;
-    if (data.shortDescription !== undefined) updateData.description = data.shortDescription;
+    // Основное описание (rich text) — в Offer.description; краткое — только если полного нет.
+    if (data.description !== undefined && data.description.trim()) {
+      updateData.description = data.description;
+    } else if (data.shortDescription !== undefined) {
+      updateData.description = data.shortDescription;
+    }
     if (data.agePolicy !== undefined || data.ageMinMonths !== undefined || data.ageMaxMonths !== undefined) {
       const normalizedAge = normalizeAgePolicy({
         agePolicy: data.agePolicy ?? existingOffer.agePolicy,

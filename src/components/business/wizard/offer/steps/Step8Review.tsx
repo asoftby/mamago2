@@ -17,7 +17,7 @@ interface Step8ReviewProps {
 }
 
 export function Step8Review({ data, isSubmitting, onGoToStep, validation }: Step8ReviewProps) {
-  const steps = getStepsForOfferType(data.offerWizardType);
+  const steps = getStepsForOfferType(data.offerWizardType, data.productType);
   
   // Calculate completion stats (exclude review step itself)
   const contentSteps = steps.filter(s => s.key !== "review");
@@ -37,7 +37,7 @@ export function Step8Review({ data, isSubmitting, onGoToStep, validation }: Step
   const validationErrors = Array.from(new Set(validation.errors));
 
   const handleGoToStep = (stepKey: OfferWizardStepKey) => {
-    const stepNum = getStepNumber(data.offerWizardType, stepKey);
+    const stepNum = getStepNumber(data.offerWizardType, stepKey, data.productType);
     if (stepNum !== null) {
       onGoToStep(stepNum);
     }

@@ -32,6 +32,7 @@ import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-na
 
 import type { OfferFormData, OfferWizardMode, OfferWizardStepKey } from "./types";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
+import { getOfferTypeSelection } from "./offerTypeChoices";
 import { validateForSubmit, type ValidationResult } from "./validation";
 import {
   getStepsForOfferType,
@@ -287,7 +288,7 @@ export function OfferWizard({
   });
   
   // Get steps based on current offer type
-  const steps = getStepsForOfferType(formData.offerWizardType);
+  const steps = getStepsForOfferType(formData.offerWizardType, formData.productType);
   const totalSteps = steps.length;
   
   // Current step key (not number)
@@ -296,7 +297,7 @@ export function OfferWizard({
       return "type";
     }
     const fd = mapOfferToFormData(offer);
-    const initialSteps = getStepsForOfferType(fd.offerWizardType);
+    const initialSteps = getStepsForOfferType(fd.offerWizardType, fd.productType);
     const idx = Math.min(initialStepNumber, initialSteps.length) - 1;
     return initialSteps[idx]?.key ?? "type";
   });
@@ -326,25 +327,25 @@ export function OfferWizard({
     });
   }, [formData]);
 
-  // Смена типа предложения после прохождения шагов: набор шагов меняется,
-  // старые отметки недостоверны — сбрасываем полностью.
-  const prevWizardTypeRef = useRef(formData.offerWizardType);
+  // Смена любого persisted-типа (даже SINGLE → SINGLE) сбрасывает прогресс:
+  // проверки и обязательные поля могут отличаться внутри одного wizardType.
+  const prevProductTypeRef = useRef(formData.productType);
   useEffect(() => {
-    if (prevWizardTypeRef.current !== formData.offerWizardType) {
-      if (prevWizardTypeRef.current !== null) {
+    if (prevProductTypeRef.current !== formData.productType) {
+      if (prevProductTypeRef.current !== null) {
         setCompletedSteps([]);
       }
-      prevWizardTypeRef.current = formData.offerWizardType;
+      prevProductTypeRef.current = formData.productType;
     }
-  }, [formData.offerWizardType]);
+  }, [formData.productType]);
 
   // Normalize current step if offer type changes
   useEffect(() => {
-    const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey);
+    const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey, formData.productType);
     if (currentStepNum === null) {
       setCurrentStepKey("type");
     }
-  }, [formData.offerWizardType, currentStepKey]);
+  }, [formData.offerWizardType, formData.productType, currentStepKey]);
   
   // Дочистка черновика старого формата (до useWizardDraft): не восстанавливаем,
   // формат и ключ несовместимы
@@ -440,7 +441,7 @@ export function OfferWizard({
     }
     setFormData(nextFormData);
     setCompletedSteps(normalizeWizardCompletedSteps(restored.completedSteps));
-    const nextSteps = getStepsForOfferType(nextFormData.offerWizardType);
+    const nextSteps = getStepsForOfferType(nextFormData.offerWizardType, nextFormData.productType);
     setCurrentStepKey(
       nextSteps.some((s) => s.key === restored.currentStep)
         ? restored.currentStep
@@ -462,9 +463,12 @@ export function OfferWizard({
   // Auto-determine intent and CTA
   useEffect(() => {
     if (formData.offerKind) {
-      const intent =
-        formData.offerKind === "course"
-          ? formData.durationType === "recurring"
+      // Persisted productType is authoritative. Legacy offerKind alone
+      // misclassified visits as birthdays and camp programs as one-off visits.
+      const intent = formData.productType
+        ? getOfferTypeSelection(formData.productType).intent
+        : formData.offerKind === "course"
+          ? formData.durationType === "recurring" || formData.durationType === "camp"
             ? "занятия"
             : "куда_пойти"
           : "день_рождения";
@@ -480,7 +484,7 @@ export function OfferWizard({
         setFormData(prev => ({ ...prev, ctaType: suggestedCTA }));
       }
     }
-  }, [formData.ctaType, formData.durationType, formData.intent, formData.offerKind]);
+  }, [formData.ctaType, formData.durationType, formData.intent, formData.offerKind, formData.productType]);
 
   const handleChange = useCallback(
     (
@@ -524,14 +528,14 @@ export function OfferWizard({
       return;
     }
     markStepCompleted(currentStepKey);
-    const nextKey = getNextStepKey(formData.offerWizardType, currentStepKey);
+    const nextKey = getNextStepKey(formData.offerWizardType, currentStepKey, formData.productType);
     if (nextKey) {
       setCurrentStepKey(nextKey);
     }
   };
 
   const handlePrev = () => {
-    const prevKey = getPreviousStepKey(formData.offerWizardType, currentStepKey);
+    const prevKey = getPreviousStepKey(formData.offerWizardType, currentStepKey, formData.productType);
     if (prevKey) {
       setCurrentStepKey(prevKey);
     } else {
@@ -814,7 +818,7 @@ export function OfferWizard({
     }
   };
 
-  const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey) || 1;
+  const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey, formData.productType) || 1;
   const canNext = currentStepKey !== "review" && currentStepNum < totalSteps;
   const canPrev = true;
   const isReviewStep = currentStepKey === "review";

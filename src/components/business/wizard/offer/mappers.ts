@@ -342,6 +342,25 @@ function inferRequestedPlacementsFromForm(
   }
 }
 
+/** Основной раздел типа обязателен: старые офферы могли сохраниться без него — добавляем, остальное не трогаем. */
+export function ensurePrimaryPlacements(
+  current: OfferPlacementKey[],
+  productType: OfferProductType | undefined,
+): OfferPlacementKey[] {
+  if (current.length === 0) return defaultRequestedPlacementsForProductType(productType);
+  const missing = defaultRequestedPlacementsForProductType(productType).filter(
+    (key) => !current.includes(key),
+  );
+  return missing.length > 0 ? [...current, ...missing] : current;
+}
+
+/** Краткое описание ≤ 120 символов из основного описания (в БД хранится одно поле `Offer.description`). */
+export function shortDescriptionFromDescription(description: string | null | undefined): string {
+  if (!description) return "";
+  const plain = createExcerpt(description, 120);
+  return plain.length <= 120 ? plain : createExcerpt(description, 117);
+}
+
 function defaultRequestedPlacementsForProductType(
   productType: OfferProductType | undefined,
 ): OfferPlacementKey[] {
@@ -1016,10 +1035,7 @@ export function mapOfferToFormData(offer: {
     ...defaults,
     offerWizardType: inferredWizardType,
     productType,
-    requestedPlacements:
-      requestedPlacements.length > 0
-        ? requestedPlacements
-        : defaultRequestedPlacementsForProductType(productType),
+    requestedPlacements: ensurePrimaryPlacements(requestedPlacements, productType),
     placementStatuses,
     // birthdayDetails: PARTY_SERVICE/PARTY_PACKAGE canon lives on Offer columns/details JSON;
     // the plain BIRTHDAY-checkbox case (non-party types) has no extra fields to persist.
@@ -1056,7 +1072,7 @@ export function mapOfferToFormData(offer: {
     placeId: offer.placeId ?? null,
     placeTitle: offer.place?.title ?? "",
     title: offer.title,
-    shortDescription: offer.description ?? "",
+    shortDescription: shortDescriptionFromDescription(offer.description),
     description: normalizeRichTextEditorValue(offer.description),
     ageGroups: monthsToAgeGroups(offer.ageMinMonths, offer.ageMaxMonths),
     agePolicy: offer.agePolicy,
