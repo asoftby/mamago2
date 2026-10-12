@@ -71,6 +71,7 @@ const updateOfferSchema = z.object({
   }).optional(),
   title: z.string().min(1).optional(),
   shortDescription: z.string().min(1).optional(),
+  description: z.string().optional(),
   agePolicy: z.nativeEnum(AgePolicy).optional(),
   ageMinMonths: z.number().nullable().optional(),
   ageMaxMonths: z.number().nullable().optional(),
