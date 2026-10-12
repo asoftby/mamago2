@@ -434,7 +434,7 @@ function mapRow(raw: {
 
 export async function getParentBookings(userId: string): Promise<ParentBookingsResult> {
   const rows = await prisma.bookingRequest.findMany({
-    where: { userId },
+    where: { userId, kind: "STANDARD" },
     select: PARENT_BOOKING_SELECT,
     orderBy: { createdAt: "desc" },
     take: 100,

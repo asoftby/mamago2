@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Bell, Building2, Lock, Mail, Shield, Smartphone, User } from "lucide-react";
 import { SettingsLinkRow } from "@/components/settings/SettingsLinkRow";
 import { maskPhoneForDisplay } from "@/lib/phone/display";
-import { buildSettingsSectionHref } from "@/lib/settings/registry";
+import { buildSettingsHomeHref, buildSettingsSectionHref } from "@/lib/settings/registry";
 import { getVisibleSettingsSectionsByGroup } from "@/lib/settings/visibility";
 import type { SettingsContext, SettingsSectionId } from "@/lib/settings/types";
 
@@ -97,7 +97,7 @@ export function SettingsHomeClient({ context }: { context: SettingsContext }) {
       {context.surfaceScope === "BUSINESS" ? (
         <CardSection title="Аккаунт">
           <SettingsLinkRow
-            href="/settings/account?from=business"
+            href={`${buildSettingsHomeHref("BUSINESS")}/account`}
             icon={Shield}
             label="Аккаунт и безопасность"
             description="Имя, вход, пароль, телефон и конфиденциальность"

@@ -28,9 +28,8 @@ function normalizeCampSessionForProjection(raw: unknown): NormalizedCampSession 
 }
 
 /**
- * Rebuilds the OfferSession queryable projection from the canonical campSessions JSON.
- * campSessions remains the source of truth (read by booking + 6 other consumers) —
- * this projection is fully derived and safe to delete/recreate on every save.
+ * Reconciles OfferSession from the canonical campSessions JSON.
+ * Session IDs must survive edits once BookingRequest.offerSessionId points at them.
  * Sessions without both dateFrom/dateTo are skipped (startAt/endAt are NOT NULL).
  */
 export async function projectCampSessions(
@@ -38,8 +37,6 @@ export async function projectCampSessions(
   offerId: string,
   campSessions: unknown,
 ) {
-  await db.offerSession.deleteMany({ where: { offerId } });
-
   const sessions = Array.isArray(campSessions) ? campSessions : [];
   const rows = sessions
     .map(normalizeCampSessionForProjection)
@@ -52,7 +49,29 @@ export async function projectCampSessions(
       price: parseCampSessionPrice(s.priceOverride) ?? null,
     }));
 
-  if (rows.length > 0) {
-    await db.offerSession.createMany({ data: rows });
+  const keepStarts = new Set<number>();
+  for (const row of rows) {
+    const start = row.startAt.getTime();
+    if (keepStarts.has(start)) continue;
+    keepStarts.add(start);
+    await db.offerSession.upsert({
+      where: { offerId_startAt: { offerId, startAt: row.startAt } },
+      create: row,
+      update: { endAt: row.endAt, capacity: row.capacity, price: row.price, isCancelled: false },
+    });
+  }
+
+  const existing = await db.offerSession.findMany({
+    where: { offerId },
+    select: { id: true, startAt: true, _count: { select: { bookingRequests: true } } },
+  });
+  const stale = existing.filter((row) => !keepStarts.has(row.startAt.getTime()));
+  const unbookedIds = stale.filter((row) => row._count.bookingRequests === 0).map((row) => row.id);
+  const bookedIds = stale.filter((row) => row._count.bookingRequests > 0).map((row) => row.id);
+  if (unbookedIds.length > 0) {
+    await db.offerSession.deleteMany({ where: { id: { in: unbookedIds } } });
+  }
+  if (bookedIds.length > 0) {
+    await db.offerSession.updateMany({ where: { id: { in: bookedIds } }, data: { isCancelled: true } });
   }
 }

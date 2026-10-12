@@ -83,6 +83,7 @@ export async function getStaleBookings(businessId: string): Promise<StaleBooking
   const rows = await prisma.bookingRequest.findMany({
     where: {
       businessId,
+      kind: "STANDARD",
       OR: [
         // NEW без ответа > 24ч
         {
@@ -116,7 +117,7 @@ export async function getStaleBookings(businessId: string): Promise<StaleBooking
     return {
       id: r.id,
       status: r.status,
-      customerName: r.customerName,
+      customerName: r.customerName ?? "",
       staleHours,
       staleType: isNew ? "BOOKING_STALE" : "BOOKING_NEEDS_ATTENTION",
     };

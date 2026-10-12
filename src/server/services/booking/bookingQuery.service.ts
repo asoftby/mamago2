@@ -5,7 +5,7 @@
 
 import prisma from "@/lib/prisma";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
-import { BookingStatus, Prisma } from "@prisma/client";
+import { BookingKind, BookingStatus, Prisma } from "@prisma/client";
 import { buildBookingDisplay } from "./booking.formatters";
 import type { BookingDisplay } from "./booking.types";
 import { recordStatusChanged } from "./bookingActivity.service";
@@ -205,8 +205,8 @@ function mapBooking(raw: {
   campShiftTitle: string | null;
   campShiftDateFrom: Date | null;
   campShiftDateTo: Date | null;
-  customerName: string;
-  customerPhone: string;
+  customerName: string | null;
+  customerPhone: string | null;
   customerEmail: string | null;
   customerComment: string | null;
   childName: string | null;
@@ -237,7 +237,7 @@ function mapBooking(raw: {
     place: raw.place,
     childName: raw.childName,
     childAge: raw.childAge,
-    customerName: raw.customerName,
+    customerName: raw.customerName ?? "",
     requestedDate,
     requestedTime: raw.requestedTime,
     session,
@@ -264,8 +264,8 @@ function mapBooking(raw: {
     campShiftDateFrom,
     campShiftDateTo,
 
-    customerName: raw.customerName,
-    customerPhone: raw.customerPhone,
+    customerName: raw.customerName ?? "",
+    customerPhone: raw.customerPhone ?? "",
     customerEmail: raw.customerEmail,
     customerComment: raw.customerComment,
 
@@ -307,6 +307,7 @@ export async function getBusinessBookings(
 
   const baseWhere = {
     businessId,
+    kind: BookingKind.STANDARD,
     ...(dateFilter ?? {}),
   };
 
@@ -360,6 +361,7 @@ export async function getBusinessBookings(
     const weekRows = await prisma.bookingRequest.findMany({
       where: {
         businessId,
+        kind: BookingKind.STANDARD,
         createdAt: { gte: weekStart, lt: weekEnd },
       },
       select: { createdAt: true, status: true },
@@ -429,6 +431,7 @@ export async function updateBookingStatus(
     select: {
       id: true,
       businessId: true,
+      kind: true,
       status: true,
       createdAt: true,
       firstResponseAt: true,
@@ -446,6 +449,11 @@ export async function updateBookingStatus(
   // 2. Проверяем владельца
   if (existing.businessId !== businessId) {
     throw new BookingOwnershipError();
+  }
+
+  // Existing STANDARD status buttons cannot change PARTY proposals or calendar holds.
+  if (existing.kind !== BookingKind.STANDARD) {
+    throw new BookingStatusTransitionError(existing.status, newStatus);
   }
 
   // 3. Проверяем допустимость перехода

@@ -18,6 +18,7 @@ export type StatusTone = {
 /** Статус брони → лейбл и цвета пилюли (цвета из дизайн-токенов). */
 export const STATUS_TONE: Record<BookingStatus, StatusTone> = {
   NEW: { label: "Заявка отправлена", color: "var(--warn)", bg: "var(--warn-bg)", dot: "●" },
+  EXPIRED: { label: "Срок заявки истёк", color: "var(--ink-3)", bg: "rgba(20,18,16,.07)", dot: "✕" },
   CONFIRMED: { label: "Подтверждена", color: "var(--ok)", bg: "var(--ok-bg)", dot: "●" },
   COMPLETED: { label: "Завершено", color: "var(--ink-3)", bg: "rgba(20,18,16,.07)", dot: "✓" },
   REJECTED: { label: "Отклонена", color: "var(--hot)", bg: "var(--hot-bg)", dot: "✕" },
