@@ -23,18 +23,18 @@ export const OFFER_OPERATIONAL_COLUMNS: ReadonlySet<string> = new Set([
   "priceTo",
   "priceMode",
   "priceItems",
-  "priceText",
+  // `priceText` — производный от чисел («от N BYN») — операционный только в этой форме; произвольная
+  // подпись (из `priceCaption`) — контент: роут переименовывает такое изменение в `priceTextDerived`.
+  "priceTextDerived",
   // `priceCaption` — rich-text («что входит», условия) → контент, модерируется.
   // смены (даты, цена, места)
   "campSessions",
   // телефоны и способ связи
   "contactSource",
+  // Номера — операционные; подписи к ним (`contactPhone*Label`) — произвольный текст → контент.
   "contactPhone",
-  "contactPhoneLabel",
   "contactPhone2",
-  "contactPhone2Label",
   "contactPhone3",
-  "contactPhone3Label",
   // предоплата, отмена, зона выезда (колонки появятся с шагом «Условия»)
   "prepaymentTerms",
   "cancellationTerms",
@@ -146,6 +146,10 @@ const CONTENT_COLUMN_LABELS: Record<string, string> = {
   occasions: "поводы",
   contactWebsite: "ссылки",
   priceCaption: "подпись к цене",
+  priceText: "подпись к цене",
+  contactPhoneLabel: "подписи к телефонам",
+  contactPhone2Label: "подписи к телефонам",
+  contactPhone3Label: "подписи к телефонам",
   contactSocialLinks: "ссылки",
   requestedPlacements: "разделы каталога",
   campSessionTexts: "тексты смен",
@@ -184,6 +188,14 @@ export const CAMP_SESSION_OPERATIONAL_KEYS: ReadonlySet<string> = new Set([
 
 type CampSessionEntry = Record<string, unknown>;
 
+/** `null`, `undefined` и sentinel-значения Prisma (`DbNull` / `JsonNull`). */
+function isNullLike(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  if (typeof value !== "object") return false;
+  const name = (value as { constructor?: { name?: string } }).constructor?.name;
+  return name === "DbNull" || name === "JsonNull" || name === "AnyNull";
+}
+
 function asSessionList(value: unknown): CampSessionEntry[] {
   return Array.isArray(value)
     ? value.filter((item): item is CampSessionEntry => item !== null && typeof item === "object")
@@ -203,7 +215,7 @@ export function mergeCampSessionsForPublished(
   next: unknown,
 ): { merged: CampSessionEntry[]; contentChanged: boolean } {
   const liveList = asSessionList(live);
-  if (next === null || next === undefined) {
+  if (isNullLike(next)) {
     // Полностью стереть смены опубликованного лагеря через прямую правку нельзя.
     return { merged: liveList, contentChanged: liveList.length > 0 };
   }

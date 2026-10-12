@@ -70,6 +70,11 @@ assert.equal(canPublishContentDirectly("BUSINESS_OWNER"), false);
 // неизвестная колонка — контент (по умолчанию не обходит модерацию)
 assert.equal(classifyOfferColumn("priceFrom"), "operational");
 assert.equal(classifyOfferColumn("priceCaption"), "content");
+assert.equal(classifyOfferColumn("priceText"), "content");
+assert.equal(classifyOfferColumn("priceTextDerived"), "operational");
+assert.equal(classifyOfferColumn("contactPhoneLabel"), "content");
+assert.equal(classifyOfferColumn("contactPhone2Label"), "content");
+assert.equal(classifyOfferColumn("contactPhone3Label"), "content");
 assert.equal(classifyOfferColumn("campSessions"), "operational");
 assert.equal(classifyOfferColumn("contactPhone2"), "operational");
 assert.equal(classifyOfferColumn("wizardCompletedSteps"), "service");
@@ -194,6 +199,11 @@ assert.equal(
   const d = mergeCampSessionsForPublished(live, []);
   assert.equal(d.contentChanged, false);
   assert.deepEqual(d.merged, []);
+  // sentinel Prisma (DbNull) = «стереть смены»: тоже нельзя
+  class DbNull {}
+  const h = mergeCampSessionsForPublished(live, new DbNull());
+  assert.equal(h.contentChanged, true);
+  assert.deepEqual(h.merged, live);
   // стереть все смены нельзя
   const e = mergeCampSessionsForPublished(live, null);
   assert.equal(e.contentChanged, true);

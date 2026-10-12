@@ -554,7 +554,9 @@ export async function PATCH(
       skipRequestedPlacements: boolean;
       moderationNotice: { message: string; fields: string[]; code: string } | null;
       journal: { columns: string[]; before: Record<string, unknown>; after: Record<string, unknown> } | null;
-    } = { skipRequestedPlacements: false, moderationNotice: null, journal: null };
+      /** Для опубликованного оффера проекция смен строится из итоговых данных, а не из payload. */
+      campProjection: { isCamp: boolean; sessions: unknown } | null;
+    } = { skipRequestedPlacements: false, moderationNotice: null, journal: null, campProjection: null };
 
     const gateApplies = !canPublishContentDirectly(user.role);
 
@@ -575,6 +577,20 @@ export async function PATCH(
         }
 
         const changedColumns = collectChangedOfferColumns(updateRecord, liveRecord);
+
+        // `priceText`: «от N BYN», выведенное из чисел, — операционная правка; произвольная подпись
+        // (из `priceCaption`) — контент. Переименовываем только первый случай.
+        const priceTextIndex = changedColumns.indexOf("priceText");
+        if (priceTextIndex >= 0) {
+          const toNumber = (value: unknown): number | null =>
+            value === null || value === undefined ? null : Number(String(value));
+          const effectivePriceFrom = toNumber("priceFrom" in updateRecord ? updateRecord.priceFrom : live.priceFrom);
+          const derivedPriceText = effectivePriceFrom != null ? formatPriceFrom(effectivePriceFrom) : null;
+          if (offerValuesEqual(updateRecord.priceText, derivedPriceText)) {
+            changedColumns[priceTextIndex] = "priceTextDerived";
+          }
+        }
+
         if (campTextsChanged) changedColumns.push("campSessionTexts");
         if (live.status === "PUBLISHED" && data.requestedPlacements !== undefined) {
           const currentPlacements = await tx.offerPlacement.findMany({
@@ -591,6 +607,14 @@ export async function PATCH(
           currentStatus: live.status,
           changedColumns,
         });
+
+        if (live.status === "PUBLISHED") {
+          // Тип «лагерь» у опубликованного оффера не меняется (смена типа — контент), смены — из итоговых данных.
+          gate.campProjection = {
+            isCamp: Boolean(live.campProgramType),
+            sessions: "campSessions" in updateRecord ? updateRecord.campSessions : live.campSessions,
+          };
+        }
 
         if (decision.blocked) {
           // Контент опубликованного оффера до модерации не меняем: контентные колонки отбрасываем,
@@ -610,6 +634,7 @@ export async function PATCH(
         }
 
         if (decision.operationalColumns.length > 0) {
+          const actualColumn = (column: string) => (column === "priceTextDerived" ? "priceText" : column);
           const toJournal = (value: unknown) =>
             value !== null && typeof value === "object" && value.constructor?.name === "DbNull"
               ? null
@@ -617,10 +642,10 @@ export async function PATCH(
           gate.journal = {
             columns: decision.operationalColumns,
             before: Object.fromEntries(
-              decision.operationalColumns.map((column) => [column, toJournal(liveRecord[column])]),
+              decision.operationalColumns.map((column) => [actualColumn(column), toJournal(liveRecord[actualColumn(column)])]),
             ),
             after: Object.fromEntries(
-              decision.operationalColumns.map((column) => [column, toJournal(updateRecord[column])]),
+              decision.operationalColumns.map((column) => [actualColumn(column), toJournal(updateRecord[actualColumn(column)])]),
             ),
           };
         }
@@ -658,8 +683,13 @@ export async function PATCH(
 
       // Only CAMP edits own this projection. Other schedule kinds also use
       // OfferSession, so a regular offer edit must not erase their sessions.
-      if (isCampOffer || existingOffer.productType === "CAMP") {
-        await projectCampSessions(tx, id, isCampOffer ? nextCampSessions : []);
+      const campProjection = gate.campProjection ?? { isCamp: isCampOffer, sessions: nextCampSessions };
+      if (campProjection.isCamp || existingOffer.productType === "CAMP") {
+        await projectCampSessions(
+          tx,
+          id,
+          (campProjection.isCamp ? campProjection.sessions : []) as Parameters<typeof projectCampSessions>[2],
+        );
       }
 
       return tx.offer.findUniqueOrThrow({
