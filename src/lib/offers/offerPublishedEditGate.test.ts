@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import {
+  buildModerationNoticeMessage,
   classifyOfferColumn,
+  describeContentColumns,
   collectChangedOfferColumns,
   decidePublishedOfferEdit,
   offerValuesEqual,
@@ -140,6 +142,18 @@ assert.deepEqual(
     { title: "A", priceFrom: 15, galleryImages: ["x"], details: undefined },
   ),
   ["priceFrom"],
+);
+
+// Сообщение партнёру
+assert.equal(describeContentColumns(["coverImage", "galleryImages", "title"]), "фото, название");
+assert.equal(describeContentColumns(["somethingNew"]), "другие данные карточки");
+assert.equal(
+  buildModerationNoticeMessage({ contentColumns: ["title", "galleryImages"], operationalColumns: ["priceFrom"] }),
+  "Текст и фото опубликованного предложения пока меняются через поддержку: название, фото. Цены, расписание и контакты сохранены",
+);
+assert.equal(
+  buildModerationNoticeMessage({ contentColumns: ["description"], operationalColumns: [] }),
+  "Текст и фото опубликованного предложения пока меняются через поддержку: описание.",
 );
 
 console.log("offerPublishedEditGate tests passed");

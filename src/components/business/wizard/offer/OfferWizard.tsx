@@ -577,7 +577,10 @@ export function OfferWizard({
         });
 
         // Сервер сохранил правки: локальный черновик не нужен, dirty-база — текущее состояние
-        const saved = await parseOfferMutationResponse<{ updatedAt?: string }>(response, {
+        const saved = await parseOfferMutationResponse<{
+          updatedAt?: string;
+          moderationNotice?: { message: string };
+        }>(response, {
           fallbackMessage: "Failed to update draft",
           operation: "update draft",
           payload,
@@ -585,6 +588,7 @@ export function OfferWizard({
         if (saved?.updatedAt) {
           setEntityUpdatedAtIso(new Date(saved.updatedAt).toISOString());
         }
+        if (saved?.moderationNotice?.message) toast.info(saved.moderationNotice.message);
         setBaselineFormJson(JSON.stringify(formData));
         draft.markClean();
       } else {
@@ -729,12 +733,13 @@ export function OfferWizard({
         body: JSON.stringify(updatePayload),
       });
 
-      await parseOfferMutationResponse(response, {
+      const submitted = await parseOfferMutationResponse<{ moderationNotice?: { message: string } }>(response, {
         fallbackMessage: "Failed to submit offer",
         operation: "submit offer",
         payload: updatePayload,
       });
 
+      if (submitted?.moderationNotice?.message) toast.info(submitted.moderationNotice.message);
       setBaselineFormJson(JSON.stringify(formData));
       draft.markClean();
       showSuccessModal({

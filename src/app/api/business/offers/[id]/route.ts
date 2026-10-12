@@ -34,6 +34,7 @@ import { offerStatusRequiresPlace } from "@/lib/offers/offerPlaceRequirement";
 import {
   OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
   collectChangedOfferColumns,
+  buildModerationNoticeMessage,
   decidePublishedOfferEdit,
   offerValuesEqual,
   shouldBlockPublishedOfferEdit,
@@ -556,6 +557,8 @@ export async function PATCH(
       }
     }
 
+    let skipRequestedPlacements = false;
+    let moderationNotice: { message: string; fields: string[]; code: string } | null = null;
     let operationalJournal: { columns: string[]; before: Record<string, unknown>; after: Record<string, unknown> } | null = null;
     if (fieldwiseGate) {
       const live = await prisma.offer.findUniqueOrThrow({ where: { id } });
@@ -578,16 +581,23 @@ export async function PATCH(
         changedColumns,
       });
       if (decision.blocked) {
-        return NextResponse.json(
-          {
-            error: OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
-            message: "Опубликованное предложение нельзя изменить напрямую",
-            description:
-              "Изменения текста, фото, категорий и других данных карточки опубликованного предложения проходят модерацию",
-            fields: decision.contentColumns,
-          },
-          { status: 403 },
-        );
+        // Контент опубликованного оффера до модерации не меняем: отбрасываем контентные колонки,
+        // операционные (цены, расписание, контакты) сохраняем и сообщаем партнёру, что осталось за поддержкой.
+        for (const column of decision.contentColumns) {
+          if (column === "requestedPlacements") {
+            skipRequestedPlacements = true;
+          } else {
+            delete (updateData as Record<string, unknown>)[column];
+          }
+        }
+        moderationNotice = {
+          message: buildModerationNoticeMessage({
+            contentColumns: decision.contentColumns,
+            operationalColumns: decision.operationalColumns,
+          }),
+          fields: decision.contentColumns,
+          code: OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
+        };
       }
       if (decision.operationalColumns.length > 0) {
         const toJournal = (value: unknown) =>
@@ -636,8 +646,8 @@ export async function PATCH(
         actorUserId: user.id,
         productType,
         requestedPlacementsStrategy: "preserve_if_missing",
-        requestedPlacements: data.requestedPlacements,
-        requestedPlacementsProvided: data.requestedPlacements !== undefined,
+        requestedPlacements: skipRequestedPlacements ? undefined : data.requestedPlacements,
+        requestedPlacementsProvided: !skipRequestedPlacements && data.requestedPlacements !== undefined,
       });
 
       // Only CAMP edits own this projection. Other schedule kinds also use
@@ -726,7 +736,7 @@ export async function PATCH(
     timer.mark("response");
     timer.log({ status: offer.status });
 
-    return NextResponse.json(offer);
+    return NextResponse.json(moderationNotice ? { ...offer, moderationNotice } : offer);
 
   } catch (error) {
     timer.log({ error: 1 });

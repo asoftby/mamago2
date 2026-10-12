@@ -132,3 +132,37 @@ export function shouldBlockPublishedOfferEdit(params: {
     changedColumns: params.changedColumns,
   }).blocked;
 }
+
+const CONTENT_COLUMN_LABELS: Record<string, string> = {
+  title: "название",
+  description: "описание",
+  coverImage: "фото",
+  galleryImages: "фото",
+  videoUrl: "видео",
+  faqItems: "частые вопросы",
+  classChipSlugs: "категории",
+  category: "категория",
+  discoverySignalIds: "интересы",
+  occasions: "поводы",
+  contactWebsite: "ссылки",
+  contactSocialLinks: "ссылки",
+  requestedPlacements: "разделы каталога",
+  status: "статус публикации",
+};
+
+/** Человеческое перечисление контентных полей для сообщения партнёру. */
+export function describeContentColumns(columns: readonly string[]): string {
+  const labels = [...new Set(columns.map((column) => CONTENT_COLUMN_LABELS[column] ?? "другие данные карточки"))];
+  return labels.join(", ");
+}
+
+/** Сообщение партнёру: что ушло на поддержку и что сохранено сразу. */
+export function buildModerationNoticeMessage(params: {
+  contentColumns: readonly string[];
+  operationalColumns: readonly string[];
+}): string {
+  const first = `Текст и фото опубликованного предложения пока меняются через поддержку: ${describeContentColumns(params.contentColumns)}.`;
+  return params.operationalColumns.length > 0
+    ? `${first} Цены, расписание и контакты сохранены`
+    : first;
+}
