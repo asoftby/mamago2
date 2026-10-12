@@ -428,7 +428,8 @@ select.in{appearance:auto}
 @media (prefers-reduced-motion:no-preference){ .chip,.opt,.btn,.dc,.mod{transition:background-color .15s,border-color .15s,box-shadow .15s} }
 </style>
 
-<div class="top">
+<!-- ВАЖНО: списки интересов и категорий в этом прототипе условные. В реализации — 13 SYSTEM_INTERESTS (src/lib/config/interests.ts) и категории из решений фазы 0 (DECISIONS-phase0.md, п. 5–6). -->
+<div class="top" data-note="interests-categories-conditional">
   <div class="wrap">
     <div class="top-row">
       <button class="back" type="button" aria-label="Назад">←<span class="hide-m">&nbsp;Назад</span></button>
@@ -449,6 +450,7 @@ select.in{appearance:auto}
     <span class="pill">Гибкий показ: «почти подходит» вместо «нет мест»</span>
     <span class="pill">Цена живёт рядом со временем и записью</span>
     <span class="pill">Услуги из общей библиотеки</span>
+    <span class="pill">Список интересов и категорий условный</span>
     <span class="pill">Одно правило цены для всех форматов</span>
     <span class="pill">Промо с днями, временем и датами</span>
   </div>
@@ -533,7 +535,7 @@ const S = {
   step:4, tried:{}, showChanges:true, selDay:null, openMod:'hall', libOpen:false,
   format:'party', partySub:'package', classKind:'regular',
   cls:{
-    trial:{on:true,price:'15'},
+    trial:{on:true,price:'15'}, trialDate:null,
     tariffs:[{type:'single',name:'Разовое занятие',price:'25',count:'1',days:''},{type:'pass',name:'Абонемент на 8 занятий',price:'160',count:'8',days:'30'},{type:'month',name:'Месяц занятий',price:'140',count:'',days:''}],
     teachers:[{id:'p1',name:'Анна Ковалёва',about:'Художник-педагог, 8 лет работает с детьми'},{id:'p2',name:'Ирина Лис',about:'Иллюстратор, ведёт старшие группы'}],
     groups:[
@@ -648,7 +650,8 @@ function quote(){
     const T=S.cls.tariffs, isTrial=S.cls.trial.on&&S.cls.selTariff<0, t=isTrial?{name:'Пробное занятие',price:S.cls.trial.price}:(T[Math.max(0,Math.min(S.cls.selTariff,T.length-1))]||T[0]), m=LIB.lesson, kids=c.guests||1, base=num(t&&t.price)*kids;
     lines.push([(t?t.name:'Тариф')+(kids>1?' × '+kids:''),base]);
     const g=S.cls.groups[Math.min(S.cls.selGroup,S.cls.groups.length-1)];
-    const wsave=S.calc.when; if(g&&S.classKind!=='once'){ for(let k=1,dd=new Date(TODAY);k<30;k++){ dd.setDate(dd.getDate()+1); if(g.days.includes(wdi(dd))){ S.calc._gw={d:iso(dd),wd:wdi(dd),t:g.time}; break; } } }
+    /* Дата для акций: пробное — выбранная дата пробного (по умолчанию первая); разовое/абонемент/месяц/курс — первое занятие группы после старта, с учётом дат курса и закрытых дней */
+    S.calc._gw=null; if(g&&S.classKind!=='once'){ const ds=nextLessonDates(g,{limit:3}); const pick=isTrial?(ds.includes(S.cls.trialDate)?S.cls.trialDate:ds[0]):ds[0]; if(pick) S.calc._gw={d:pick,wd:wdi(new Date(pick+'T12:00:00')),t:g.time}; }
     const pr=applyPromos([{m,amount:base}]); lines.push(...pr.lines);
     return {total:base-pr.disc, lines, promo:pr};
   }
@@ -678,6 +681,19 @@ function quote(){
 /* ---------- промо ---------- */
 const TODAY = new Date(2026,9,12);
 const fmtD = v => v ? v.slice(8)+'.'+v.slice(5,7) : '';
+/* Единая функция дат занятий группы — для дат пробного И для дат, по которым считаются акции.
+   Даты строго после `from` (по умолчанию сегодня), в дни недели группы, не раньше старта группы (status 'soon'),
+   в пределах дат курса (kind 'course'), без закрытых дней студии. */
+function nextLessonDates(g, o){ o=o||{}; const out=[]; if(!g) return out;
+  const kind=o.kind!==undefined?o.kind:S.classKind, course=o.course||S.cls.course, closed=o.closed||S.closed, limit=o.limit||3;
+  for(let i=0,d=new Date(o.from||TODAY); i<(o.horizon||120)&&out.length<limit; i++,d.setDate(d.getDate()+1)){
+    if(i===0) continue; const x=iso(d);
+    if(!g.days.includes(wdi(d))) continue;
+    if(g.status==='soon'&&g.start&&x<g.start) continue;
+    if(kind==='course'&&(x<course.dFrom||x>course.dTo)) continue;
+    if(closed.includes(x)) continue;
+    out.push(x); }
+  return out; }
 function daysLabel(d){ const a=[...d].sort((x,y)=>x-y); if(a.length===7) return ''; if(a.join()==='0,1,2,3,4') return 'будни'; if(a.join()==='5,6') return 'выходные';
   if(a.length>2 && a.every((x,i)=>!i||x===a[i-1]+1)) return WD[a[0]]+'–'+WD[a[a.length-1]]; return a.map(x=>WD[x]).join(', '); }
 function promoValue(pr){ return pr.type==='percent'?'−'+num(pr.value)+'%':pr.type==='amount'?'−'+num(pr.value)+' BYN':'Подарок: '+(pr.gift||'…'); }
@@ -1241,14 +1257,14 @@ function classPreview(){
   const trialChip=C.trial.on?`<button type="button" class="chip sm${trialSel?' on':''}" data-a="selTariff" data-v="-1">${num(C.trial.price)>0?'Пробное · '+byn(num(C.trial.price)):'Пробное · бесплатно'}</button>`:'';
   if(S.classKind==='once') return `<div class="pm-h">Ближайшие даты</div><div class="chips">${S.sched.dates.map(x=>`<span class="chip sm">${fmtD(x.date)} · ${x.time}</span>`).join('')}</div>
     <div class="pm-h">Цена</div><div class="chips">${trialChip}${T.map((x,i)=>`<button type="button" class="chip sm${!trialSel&&i===Math.max(0,C.selTariff)?' on':''}" data-a="selTariff" data-v="${i}">${esc(x.name)} · ${byn(num(x.price))}</button>`).join('')}</div>`;
-  const next=[]; if(g){ for(let i=0,d=new Date(TODAY);i<30&&next.length<3;i++,d.setDate(d.getDate()+1)){ const x=iso(d); if(i===0) continue; if(!g.days.includes(wdi(d))) continue; if(g.status==='soon'&&g.start&&x<g.start) continue; if(S.classKind==='course'&&(x<C.course.dFrom||x>C.course.dTo)) continue; if(S.closed.includes(x)) continue; next.push(WD[wdi(d)]+' '+fmtD(x)); } }
+  const nextIso=nextLessonDates(g,{limit:3}), selTrial=nextIso.includes(C.trialDate)?C.trialDate:nextIso[0], next=nextIso.map(x=>({x,label:WD[wdi(new Date(x+'T12:00:00'))]+' '+fmtD(x)}));
   return `<div class="pm-h">Группа</div>
     <div class="glist">${G.map((x,i)=>{const st=groupStatus(x);return `<button type="button" class="gopt${i===C.selGroup?' on':''}" data-a="selGroup" data-v="${i}"><span class="go-t"><b>${esc(ageL(x))} · ${esc(levelL(x.level).toLowerCase())}</b><small>${x.days.slice().sort().map(d=>WD[d]).join(', ')} ${x.time} · ${esc(teacherName(x.teacher))}</small></span><span class="gst ${st[1]}">${st[0]}</span></button>`;}).join('')}</div>
     ${S.classKind==='course'&&g?`<div class="pv-cond">Курс ${fmtD(C.course.dFrom)} – ${fmtD(C.course.dTo)} · ${courseLessons(g)} занятий по ${LIB.lesson.dur.min} мин</div>`:''}
     <div class="pm-h">Как платить</div>
     <div class="chips">${trialChip}${T.map((x,i)=>`<button type="button" class="chip sm${!trialSel&&i===Math.max(0,C.selTariff)?' on':''}" data-a="selTariff" data-v="${i}">${esc(x.type==='single'?'Разовое':x.type==='pass'?'Абонемент '+x.count:x.type==='month'?'Месяц':'Курс')} · ${byn(num(x.price))}</button>`).join('')}</div>
     ${t&&perLesson(t)?`<div class="pv-cond">${perLesson(t)}${t.type==='pass'&&t.days?' · действует '+t.days+' дней':''}</div>`:''}
-    ${trialSel&&next.length&&g&&groupStatus(g)[1]!=='full'?`<div class="pm-h">Пробное — ближайшие даты</div><div class="chips">${next.map((x,k)=>`<span class="chip sm${k===0?' on':''}">${x} · ${g.time}</span>`).join('')}</div>`:''}
+    ${trialSel&&next.length&&g&&groupStatus(g)[1]!=='full'?`<div class="pm-h">Пробное — ближайшие даты</div><div class="chips">${next.map(n=>`<button type="button" class="chip sm${n.x===selTrial?' on':''}" data-a="trialDate" data-v="${n.x}">${n.label} · ${g.time}</button>`).join('')}</div>`:''}
     ${g&&S.classKind!=='once'?`<div class="pv-cond">📍 ${esc(g.branch)}${C.bring?' · с собой: '+esc(C.bring):''}</div>`:''}`;
 }
 function preview(){
@@ -1338,6 +1354,7 @@ document.addEventListener('click',e=>{
     case 'pDel': { const id=S.cls.teachers[i].id; S.cls.teachers.splice(i,1); S.cls.groups.forEach(g=>{ if(g.teacher===id) g.teacher=S.cls.teachers[0].id; }); break; }
     case 'selGroup': S.cls.selGroup=+v; renderPreview(); return;
     case 'selTariff': S.cls.selTariff=+v; renderPreview(); return;
+    case 'trialDate': S.cls.trialDate=v; renderPreview(); return;
     case 'clsMiss': S.cls.miss=v; break;
     case 'clsFreeze': S.cls.freeze=v; break;
     case 'clsJoin': S.cls.join=v; break;
