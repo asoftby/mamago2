@@ -1422,6 +1422,8 @@ model Business {
   unpLastCheckedAt        DateTime?
   /// Показ контента бизнеса пользователям (отдельно от верификации)
   operationalStatus       BusinessOperationalStatus     @default(ACTIVE)
+  /// Включаемые по бизнесу функции (BusinessFeatures в src/lib/business/businessFeatures.ts); отсутствующий ключ = выключено
+  features                Json                          @default("{}")
   activities              Activity[]                    @relation("ActivityBusiness")
   billingAccount          BillingAccount?
   bookingRequests         BookingRequest[]
