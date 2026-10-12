@@ -8,18 +8,27 @@
  */
 
 import type { ReviewSection } from "../shared/types";
-import type { OfferWizardType, OfferWizardStepKey, OfferFormData, OfferProductType } from "./types";
+import type {
+  OfferWizardType,
+  OfferWizardStepKey,
+  OfferWizardVariant,
+  OfferFormData,
+  OfferProductType,
+} from "./types";
 import { validatePublicationAccess } from "@/features/publication-access";
 import { showCampLodgingFormFields } from "./campOfferModel";
 import { isOfferContactsComplete } from "./contacts";
+import {
+  type OfferWizardStepDef,
+  V2_STEPS,
+  getV2StepMembers,
+  isV2CompositeStepKey,
+  v2StepDefWithoutKey,
+} from "./offerWizardV2Steps";
+export type { OfferWizardStepDef } from "./offerWizardV2Steps";
+export { V2_STEPS, V2_STEP_KEYS, getV2StepMembers, isV2CompositeStepKey } from "./offerWizardV2Steps";
 import { getRichTextLength } from "@/lib/richtext/utils";
 
-export interface OfferWizardStepDef {
-  key: OfferWizardStepKey;
-  title: string;
-  description: string;
-  shortLabel: string;
-}
 
 /** Все возможные ключи шагов мастера (для нормализации данных из БД/localStorage). */
 export const ALL_OFFER_WIZARD_STEP_KEYS: OfferWizardStepKey[] = [
@@ -33,6 +42,10 @@ export const ALL_OFFER_WIZARD_STEP_KEYS: OfferWizardStepKey[] = [
   "price",
   "contacts",
   "faq",
+  "about",
+  "services",
+  "schedule",
+  "terms",
   "review",
 ];
 
@@ -75,8 +88,10 @@ export function buildReviewSections(_data: OfferFormData): ReviewSection[] {
 export function getStepsForOfferType(
   type: OfferWizardType | null,
   productType?: OfferProductType | null,
+  variant: OfferWizardVariant = "v1",
 ): OfferWizardStepDef[] {
   if (!type) return [];
+  if (variant === "v2") return V2_STEPS;
 
   const priceStepTitle = type === "CAMP" ? "Участие" : "Цена";
   const priceStepDescription =
@@ -141,6 +156,11 @@ export function getStepsForOfferType(
       description: "Проверка и отправка на модерацию",
       shortLabel: "Проверка",
     },
+    // Ключи нового мастера в v1-последовательности не используются, но Record требует полноты.
+    about: v2StepDefWithoutKey("about"),
+    services: v2StepDefWithoutKey("services"),
+    schedule: v2StepDefWithoutKey("schedule"),
+    terms: v2StepDefWithoutKey("terms"),
   };
 
   let stepKeys: OfferWizardStepKey[] = [];
@@ -195,8 +215,9 @@ export function getStepNumber(
   type: OfferWizardType | null,
   stepKey: OfferWizardStepKey,
   productType?: OfferProductType | null,
+  variant: OfferWizardVariant = "v1",
 ): number | null {
-  const steps = getStepsForOfferType(type, productType);
+  const steps = getStepsForOfferType(type, productType, variant);
   const index = steps.findIndex((s) => s.key === stepKey);
   return index >= 0 ? index + 1 : null;
 }
@@ -204,8 +225,12 @@ export function getStepNumber(
 /**
  * Get total number of steps for a given offer type (including review)
  */
-export function getTotalStepsForType(type: OfferWizardType | null, productType?: OfferProductType | null): number {
-  return getStepsForOfferType(type, productType).length;
+export function getTotalStepsForType(
+  type: OfferWizardType | null,
+  productType?: OfferProductType | null,
+  variant: OfferWizardVariant = "v1",
+): number {
+  return getStepsForOfferType(type, productType, variant).length;
 }
 
 /**
@@ -215,8 +240,9 @@ export function getStepDefByKey(
   type: OfferWizardType | null,
   stepKey: OfferWizardStepKey,
   productType?: OfferProductType | null,
+  variant: OfferWizardVariant = "v1",
 ): OfferWizardStepDef | null {
-  const steps = getStepsForOfferType(type, productType);
+  const steps = getStepsForOfferType(type, productType, variant);
   return steps.find((s) => s.key === stepKey) || null;
 }
 
@@ -227,8 +253,9 @@ export function shouldShowStep(
   type: OfferWizardType | null,
   stepKey: OfferWizardStepKey,
   productType?: OfferProductType | null,
+  variant: OfferWizardVariant = "v1",
 ): boolean {
-  return getStepNumber(type, stepKey, productType) !== null;
+  return getStepNumber(type, stepKey, productType, variant) !== null;
 }
 
 /**
@@ -238,8 +265,9 @@ export function getNextStepKey(
   type: OfferWizardType | null,
   currentStepKey: OfferWizardStepKey,
   productType?: OfferProductType | null,
+  variant: OfferWizardVariant = "v1",
 ): OfferWizardStepKey | null {
-  const steps = getStepsForOfferType(type, productType);
+  const steps = getStepsForOfferType(type, productType, variant);
   const currentIndex = steps.findIndex((s) => s.key === currentStepKey);
   if (currentIndex >= 0 && currentIndex < steps.length - 1) {
     return steps[currentIndex + 1].key;
@@ -254,8 +282,9 @@ export function getPreviousStepKey(
   type: OfferWizardType | null,
   currentStepKey: OfferWizardStepKey,
   productType?: OfferProductType | null,
+  variant: OfferWizardVariant = "v1",
 ): OfferWizardStepKey | null {
-  const steps = getStepsForOfferType(type, productType);
+  const steps = getStepsForOfferType(type, productType, variant);
   const currentIndex = steps.findIndex((s) => s.key === currentStepKey);
   if (currentIndex > 0) {
     return steps[currentIndex - 1].key;
@@ -270,6 +299,10 @@ export function isStepComplete(
   stepKey: OfferWizardStepKey,
   data: OfferFormData
 ): boolean {
+  if (isV2CompositeStepKey(stepKey)) {
+    return getV2StepMembers(stepKey, data).every((member) => isStepComplete(member, data));
+  }
+
   const detailedDescriptionLength = getRichTextLength(data.description || "");
 
   switch (stepKey) {
@@ -430,6 +463,10 @@ export function getMissingFieldsForStep(
   stepKey: OfferWizardStepKey,
   data: OfferFormData
 ): string[] {
+  if (isV2CompositeStepKey(stepKey)) {
+    return getV2StepMembers(stepKey, data).flatMap((member) => getMissingFieldsForStep(member, data));
+  }
+
   const missing: string[] = [];
   const detailedDescriptionLength = getRichTextLength(data.description || "");
 
