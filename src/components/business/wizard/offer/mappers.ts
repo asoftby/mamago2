@@ -684,6 +684,7 @@ export function buildOfferCreatePayload(
     discoverySignalIds: data.signalIds,
     classChipSlugs: data.classChipSlugs,
     categoryIds: data.categoryIds,
+    interestSlugs: data.interestSlugs,
     wizardCompletedSteps: opts?.wizardCompletedSteps,
     faqItems: normalizeFaqItems(data.faqItems),
     status: opts?.status ?? "DRAFT",
@@ -889,6 +890,7 @@ export function buildOfferUpdatePayload(
     discoverySignalIds: data.signalIds,
     classChipSlugs: data.classChipSlugs,
     categoryIds: data.categoryIds,
+    interestSlugs: data.interestSlugs,
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
@@ -937,6 +939,7 @@ export function mapOfferToFormData(offer: {
   discoverySignalIds?: string[];
   classChipSlugs?: string[];
   categoryLinks?: Array<{ categoryId: string; sortOrder: number }> | null;
+  interestSlugs?: string[] | null;
   // Camp fields
   campProgramType?: string | null;
   campSessions?: unknown;
@@ -1126,6 +1129,7 @@ export function mapOfferToFormData(offer: {
     ...legacyCtaFields,
     signalIds: offer.discoverySignalIds ?? [],
     classChipSlugs: offer.classChipSlugs ?? [],
+    interestSlugs: offer.interestSlugs ?? [],
     categoryIds: [...(offer.categoryLinks ?? [])]
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((link) => link.categoryId),

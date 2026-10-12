@@ -24,6 +24,7 @@ import {
   mapProductTypeToLegacyKind,
 } from "@/lib/offers/offerPersistenceCompatibility";
 import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
+import { checkInterestSlugs } from "@/lib/offers/offerInterests";
 import { OfferCategoriesError, syncOfferCategories } from "@/server/offers/offerCategories";
 import { projectCampSessions } from "@/server/offers/campSessionProjection";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
@@ -113,6 +114,8 @@ const createOfferSchema = z.object({
   faqItems: z.array(z.record(z.string(), z.unknown())).nullish(),
   /** Категории предложения (до 3, справочник зависит от формата). */
   categoryIds: z.array(z.string()).max(3).optional(),
+  /** Интересы ребёнка (до 5), slug из SYSTEM_INTERESTS. */
+  interestSlugs: z.array(z.string()).max(5).optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).default("DRAFT"),
   discoverySignalIds: z.array(z.string()).default([]),
   classChipSlugs: z.array(z.string()).default([]),
@@ -168,6 +171,20 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const data = createOfferSchema.parse(body);
+    const interestsCheck =
+      data.interestSlugs !== undefined ? checkInterestSlugs(data.interestSlugs) : null;
+    if (interestsCheck && !interestsCheck.ok) {
+      return NextResponse.json(
+        {
+          error:
+            interestsCheck.reason === "TOO_MANY"
+              ? "Можно выбрать не больше 5 интересов"
+              : "Выбраны неизвестные интересы",
+          code: "INVALID_OFFER_INTERESTS",
+        },
+        { status: 400 },
+      );
+    }
     const faqItems = normalizeFaqItems(data.faqItems);
     timer.mark("validate");
 
@@ -348,6 +365,7 @@ export async function POST(request: NextRequest) {
             title: data.title,
             // Основное описание (rich text) — в Offer.description; краткое — только если полного нет.
             description: data.description?.trim() ? data.description : data.shortDescription,
+            ...(interestsCheck?.ok ? { interestSlugs: interestsCheck.slugs } : {}),
             coverImage: data.coverImage,
             galleryImages: data.gallery ?? [],
             videoUrl: data.videoUrl,
