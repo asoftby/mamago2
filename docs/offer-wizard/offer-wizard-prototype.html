@@ -1,0 +1,1447 @@
+<title>Мастер предложений mamaGo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: кабинет — форма слева, живая карточка с калькулятором цены справа; на телефоне карточка под формой */
+:root{
+  --bg:#F7F6F4; --surface:#FFFFFF; --sunk:#F2EFEB; --line:#E7E2DC; --line-strong:#D6CFC7;
+  --fg:#1E1A17; --muted:#6F665E; --faint:#A39A91;
+  --accent:#EA6A2E; --accent-soft:#FDEEE5; --accent-fg:#FFFFFF; --accent-ink:#B9471A;
+  --ok:#2F8A57; --ok-soft:#E5F3EA; --warn:#9A6A00; --warn-soft:#FFF5D6; --bad:#C2362B; --bad-soft:#FBE7E5;
+  --new:#3B5BDB; --new-soft:#E8EDFF;
+  --font:"Golos Text", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --r:12px; --r-sm:8px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#151311; --surface:#1E1B18; --sunk:#26221E; --line:#332E29; --line-strong:#453E37;
+  --fg:#F2EEEA; --muted:#B0A69C; --faint:#7D746B;
+  --accent:#F2814A; --accent-soft:#3A2418; --accent-fg:#1A0F09; --accent-ink:#F7A27A;
+  --ok:#5BC488; --ok-soft:#173224; --warn:#E3B341; --warn-soft:#352A0E; --bad:#F07368; --bad-soft:#3A1916;
+  --new:#8EA5FF; --new-soft:#1E2547; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#151311; --surface:#1E1B18; --sunk:#26221E; --line:#332E29; --line-strong:#453E37;
+  --fg:#F2EEEA; --muted:#B0A69C; --faint:#7D746B;
+  --accent:#F2814A; --accent-soft:#3A2418; --accent-fg:#1A0F09; --accent-ink:#F7A27A;
+  --ok:#5BC488; --ok-soft:#173224; --warn:#E3B341; --warn-soft:#352A0E; --bad:#F07368; --bad-soft:#3A1916;
+  --new:#8EA5FF; --new-soft:#1E2547; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.5;margin:0}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3,h4{text-wrap:balance;margin:0;line-height:1.25}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:16px}
+
+.top{background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.top-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:12px}
+.back{color:var(--muted);font-size:14px;background:none;border:0;padding:0;cursor:pointer}
+.top h1{font-size:18px;font-weight:600}
+.tag{font-size:12px;color:var(--muted);background:var(--sunk);padding:2px 8px;border-radius:99px}
+.spacer{flex:1}
+.saved{font-size:13px;color:var(--ok)}
+.toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer;user-select:none}
+.toggle input{accent-color:var(--new);width:16px;height:16px}
+
+.stepper{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding-block:4px 12px}
+.st{background:none;border:0;padding:6px 4px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0;text-align:left}
+.st .bar{height:4px;width:100%;border-radius:99px;background:var(--line)}
+.st.done .bar,.st.cur .bar{background:var(--accent)}
+.st span{font-size:12.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.st.done span,.st.cur span{color:var(--fg)}
+.st.cur span{font-weight:600}
+.st .n{font-variant-numeric:tabular-nums;color:var(--faint);margin-right:4px}
+
+.cmp{display:flex;gap:8px;flex-wrap:wrap;padding-block:14px 0}
+.pill{font-size:12.5px;padding:4px 10px;border-radius:99px;background:var(--new-soft);color:var(--new);font-weight:500}
+
+.main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;padding-block:20px 120px;align-items:start}
+@media (max-width:940px){ .main{grid-template-columns:minmax(0,1fr)} }
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:24px;min-width:0}
+@media (max-width:520px){ .card{padding:16px} }
+.card>h2{font-size:21px;font-weight:600}
+.lead{color:var(--muted);margin:6px 0 0;font-size:14.5px}
+.stack{display:flex;flex-direction:column;gap:22px;margin-top:22px}
+.stack.tight{gap:14px;margin-top:0}
+
+.changes{border:1px dashed var(--new);background:var(--new-soft);border-radius:var(--r-sm);padding:12px 14px;margin-top:16px}
+.changes b{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--new)}
+.changes ul{margin:6px 0 0;padding-left:18px;font-size:13.5px}
+.changes li+li{margin-top:2px}
+
+.f{display:flex;flex-direction:column;gap:7px;min-width:0}
+.lbl{font-weight:600;font-size:14px}
+.lbl .req{color:var(--accent)}
+.lbl .opt{font-weight:400;color:var(--faint);font-size:13px;margin-left:4px}
+.hint{font-size:13px;color:var(--muted)}
+.err{font-size:13px;color:var(--bad)}
+.in,.ta,.sel{width:100%;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r-sm);padding:9px 12px;min-width:0}
+.ta{min-height:96px;resize:vertical}
+.in.bad,.ta.bad{border-color:var(--bad);background:var(--bad-soft)}
+.in:focus,.ta:focus,.sel:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.unit{position:relative}
+.unit .in{padding-right:56px}
+.unit i{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-style:normal;font-size:12.5px;color:var(--faint);pointer-events:none}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line-strong);background:var(--surface);border-radius:99px;padding:7px 14px;cursor:pointer;font-size:14px;white-space:nowrap}
+.chip:hover{border-color:var(--accent)}
+.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink);font-weight:500}
+.chip.sm{padding:5px 10px;font-size:13px}
+
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.opts.four{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.opt{border:1px solid var(--line);border-radius:var(--r);padding:16px;background:var(--surface);cursor:pointer;text-align:left;display:flex;gap:12px;align-items:flex-start;min-width:0}
+.opt:hover{border-color:var(--line-strong)}
+.opt.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:var(--accent-soft)}
+.opt .ic{flex:none;width:40px;height:40px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
+.opt.on .ic{background:var(--surface)}
+.opt h3{font-size:15.5px;font-weight:600}
+.opt p{margin:4px 0 0;font-size:13.5px;color:var(--muted)}
+.opts.four .opt{padding:12px;flex-direction:column;gap:8px}
+.opts.four .opt .ic{width:32px;height:32px}
+.opts.four .opt h3{font-size:14.5px}
+.opts.four .opt p{font-size:12.5px}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:99px;background:var(--new-soft);color:var(--new);margin-left:6px;vertical-align:1px}
+
+.ck{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}
+.ck input{accent-color:var(--accent);width:17px;height:17px}
+.photos{display:flex;gap:10px;flex-wrap:wrap}
+.ph{width:96px;aspect-ratio:4/3;border-radius:var(--r-sm);background:linear-gradient(135deg,var(--accent-soft),var(--sunk));border:1px solid var(--line);display:grid;place-items:center;color:var(--faint);font-size:12px;max-width:100%}
+.ph.add{border-style:dashed;background:var(--surface);cursor:pointer;color:var(--muted)}
+
+details.more{border-top:1px solid var(--line);padding-top:16px}
+details.more>summary{cursor:pointer;font-weight:600;list-style:none}
+details.more>summary::-webkit-details-marker{display:none}
+details.more>summary::before{content:"+ "; color:var(--accent)}
+details.more[open]>summary::before{content:"− "}
+details.more .stack{margin-top:16px}
+
+.sub{border:1px solid var(--line);border-radius:var(--r);padding:16px;background:var(--sunk);display:flex;flex-direction:column;gap:14px;min-width:0}
+.sub h4{font-size:14.5px}
+
+/* modules */
+.sec-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.sec-h h3{font-size:17px;font-weight:600}
+.mods{display:flex;flex-direction:column;gap:10px}
+.mod{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);min-width:0}
+.mod.open{border-color:var(--line-strong);box-shadow:0 1px 0 var(--line)}
+.mod-h{display:grid;grid-template-columns:36px minmax(0,1fr) auto 32px;align-items:start;gap:12px;padding:12px 10px 12px 14px;cursor:pointer}
+.mod-h .mod-ic{margin-top:2px}
+.mod-h .x{width:32px;height:32px;padding:0;display:grid;place-items:center;border-radius:8px;font-size:15px}
+.mod-h .x:hover{background:var(--bad-soft)}
+.mod-side{display:flex;flex-direction:column;align-items:flex-end;gap:6px;padding-top:2px}
+.mod-ic{flex:none;width:36px;height:36px;border-radius:9px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:13px}
+.mod-t{min-width:0}
+.mod-t b{display:block;font-weight:600;font-size:15px}
+.mod-t>span{display:block;font-size:13px;color:var(--muted)}
+.mod-price{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.role{border:1px solid var(--line-strong);border-radius:99px;padding:5px 10px;font-size:12.5px;background:var(--surface);cursor:pointer}
+.role.req{background:var(--sunk)}
+.role.incl{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.role.opt{background:var(--new-soft);color:var(--new);border-color:transparent}
+.shared{font-size:11.5px;color:var(--faint)}
+.mod-b{border-top:1px solid var(--line);padding:16px 14px;display:flex;flex-direction:column;gap:18px}
+.grp{display:flex;flex-direction:column;gap:10px}
+.grp-t{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.formula{font-size:13px;background:var(--sunk);border-radius:var(--r-sm);padding:10px 12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.formula b{color:var(--fg)}
+.addrow{display:flex;gap:8px;flex-wrap:wrap}
+.addbtn{background:none;border:1px dashed var(--line-strong);border-radius:var(--r-sm);padding:8px 14px;cursor:pointer;color:var(--accent-ink);font-weight:500}
+.lib{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:6px}
+.lib-i{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;cursor:pointer;width:100%;background:none;border:0;text-align:left}
+.lib-i:hover{background:var(--sunk)}
+.lib-i .mod-t b{font-size:14px}
+.pkg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end}
+.sum{font-size:13.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.sum b{color:var(--fg)}
+
+.hours{display:flex;flex-direction:column;gap:6px}
+.hr{display:grid;grid-template-columns:52px 1fr;align-items:center;gap:10px}
+.hr .tm{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.hr .tm .in{width:96px;padding:6px 8px}
+.daybtn{border:1px solid var(--line-strong);background:var(--surface);border-radius:6px;padding:5px 0;width:52px;cursor:pointer;font-size:13px}
+.daybtn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.closed{font-size:13px;color:var(--faint)}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:12px;display:flex;flex-direction:column;gap:10px}
+.item-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.item-row .f{flex:1 1 110px}
+.x{background:none;border:0;color:var(--faint);cursor:pointer;padding:6px;font-size:13px}
+.x:hover{color:var(--bad)}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.dc{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 2px;text-align:center;cursor:pointer;min-width:0}
+.dc .w{font-size:11px;color:var(--faint);text-transform:uppercase}
+.dc .d{font-weight:600;font-variant-numeric:tabular-nums}
+.dc .c{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dc.has{border-color:var(--accent)} .dc.has .c{color:var(--accent-ink)}
+.dc.off{opacity:.45;cursor:default}
+.dc.sel{background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent)}
+.slots{display:flex;gap:6px;flex-wrap:wrap}
+.slot{font-size:13px;padding:5px 10px;border-radius:6px;background:var(--surface);border:1px solid var(--line-strong);font-variant-numeric:tabular-nums}
+
+.note{font-size:13.5px;padding:10px 12px;border-radius:var(--r-sm);background:var(--warn-soft);color:var(--warn)}
+.note.ok{background:var(--ok-soft);color:var(--ok)}
+.note.info{background:var(--new-soft);color:var(--new)}
+
+.nav{display:flex;justify-content:space-between;gap:12px;margin-top:24px;flex-wrap:wrap}
+.btn{border:1px solid var(--line-strong);background:var(--surface);border-radius:10px;padding:11px 20px;font-weight:600;cursor:pointer}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn:disabled{opacity:.4;cursor:default}
+
+.rv{display:flex;flex-direction:column;gap:8px}
+.rv-i{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-sm);background:var(--sunk);font-size:14px;flex-wrap:wrap}
+.rv-i .dot{width:8px;height:8px;border-radius:99px;flex:none}
+.rv-i.bad .dot{background:var(--bad)} .rv-i.good .dot{background:var(--ok)}
+.rv-i a{margin-left:auto;color:var(--accent-ink);font-weight:500;cursor:pointer;text-decoration:underline}
+
+.aside{position:sticky;top:calc(env(safe-area-inset-top,0px) + 128px);display:flex;flex-direction:column;gap:12px;min-width:0}
+@media (max-width:940px){ .aside{position:static} }
+.cap{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.pv{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.pv-img{aspect-ratio:16/9;background:linear-gradient(140deg,#F6B48C 0%,#EA6A2E 55%,#B9471A 100%);position:relative;max-width:100%}
+.pv-img .fmt{position:absolute;left:12px;top:12px;background:rgba(255,255,255,.92);color:#1E1A17;font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px}
+.pv-b{padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px}
+.pv-b h3{font-size:17px;font-weight:600}
+.pv-meta{display:flex;flex-wrap:wrap;gap:6px}
+.pv-meta span{font-size:12px;background:var(--sunk);color:var(--muted);padding:2px 8px;border-radius:99px}
+.pv-short{font-size:13.5px;color:var(--muted);margin:0}
+.calc{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:10px}
+.calc-r{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13.5px}
+.step-n{display:flex;align-items:center;gap:6px}
+.step-n button{width:28px;height:28px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);cursor:pointer;font-weight:700}
+.step-n b{min-width:24px;text-align:center;font-variant-numeric:tabular-nums}
+.pm{display:flex;flex-direction:column;gap:4px}
+.pm label{display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer}
+.pm label{align-items:flex-start}
+.pm input{margin-top:3px}
+.pm-t{display:flex;flex-direction:column;min-width:0;margin-left:0!important;color:var(--fg)!important;font-size:13.5px!important}
+.pm-t small{font-size:12px;color:var(--muted);line-height:1.35;margin-top:1px}
+.pm label.lock .pm-t{color:var(--muted)!important}
+.pm-h{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600;margin-top:4px}
+.mod-desc{display:block;font-size:12.5px!important;color:var(--faint)!important;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pm label>span:last-child{margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
+.pm label.lock{cursor:default;color:var(--muted)}
+.pm input{accent-color:var(--accent)}
+.brk{font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:2px;font-variant-numeric:tabular-nums}
+.brk div{display:flex;justify-content:space-between;gap:8px}
+.total{display:flex;justify-content:space-between;align-items:baseline;border-top:1px dashed var(--line-strong);padding-top:8px}
+.total b{font-size:20px;font-variant-numeric:tabular-nums}
+.promo{font-size:12.5px;color:var(--ok);background:var(--ok-soft);padding:4px 8px;border-radius:6px}
+.pv-cond{font-size:12.5px;color:var(--muted)}
+.pv-cta{background:var(--accent);color:var(--accent-fg);border:0;border-radius:10px;padding:11px;font-weight:600;width:100%}
+.pv-contacts{font-size:13px;color:var(--muted)}
+.row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:560px){ .row3{grid-template-columns:repeat(2,minmax(0,1fr))} .row3 .dpwrap{grid-column:1/-1} .tcard .row3{grid-template-columns:repeat(3,minmax(0,1fr))} .tcard .row3 .unit .in{padding-right:30px} .tcard .row3 .unit i{right:8px} }
+.dpwrap{position:relative}
+.drbtn{display:flex;align-items:center;gap:8px;text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden}
+.drbtn span{overflow:hidden;text-overflow:ellipsis}
+.drbtn svg{color:var(--accent);flex:none}
+.drbtn.empty span{color:var(--faint)}
+.dp{position:absolute;top:100%;right:0;z-index:10;margin-top:6px;width:300px;max-width:calc(100vw - 32px);border:1px solid var(--line-strong);border-radius:var(--r);background:var(--surface);padding:12px;display:flex;flex-direction:column;gap:8px;box-shadow:0 6px 20px rgba(0,0,0,.08)}
+.dp-h{display:flex;align-items:center;justify-content:space-between}
+.dp-nav{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-size:16px}
+.dp-g{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.dp-w{font-size:11px;color:var(--faint);text-align:center;padding:2px 0}
+.dp-d{aspect-ratio:1;border:0;background:none;border-radius:8px;cursor:pointer;font-variant-numeric:tabular-nums;font-size:13.5px}
+.dp-d:hover:not(:disabled){background:var(--sunk)}
+.dp-d:disabled{color:var(--faint);opacity:.5;cursor:default}
+.dp-d.today{box-shadow:inset 0 0 0 1px var(--line-strong)}
+.dp-d.in{background:var(--accent-soft);border-radius:0;color:var(--accent-ink)}
+.dp-d.edge{background:var(--accent);color:var(--accent-fg);font-weight:600}
+.dp-f{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.dp-f .hint{flex:1}
+.shift-pv{border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:var(--sunk)}
+.shift-pv b{font-size:14.5px}
+.ph.sm{width:72px;position:relative}
+.ph-x{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:99px;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:10px;cursor:pointer;display:grid;place-items:center;padding:0}
+.mod-ic.th{border:1px solid var(--line)}
+.pm-th{flex:none;width:34px;height:34px;border-radius:7px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:12px;font-weight:700;margin-left:0!important}
+.mod-pp{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-top:1px dashed var(--line);background:var(--sunk);border-radius:0 0 var(--r) var(--r)}
+.mod.open .mod-pp{border-radius:0}
+.mod-pp label{font-size:13px;font-weight:600}
+.pp-in{width:120px}
+.pp-in .in{padding:6px 44px 6px 10px;font-weight:700;font-variant-numeric:tabular-nums}
+.pp-sep{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pp-d{color:var(--ok);font-weight:600}
+.pp-up{color:var(--warn);font-weight:600}
+.pm-s{color:var(--faint);font-size:11.5px}
+.pkg-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.pkg-sum>div{display:flex;flex-direction:column;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px}
+.pkg-sum b{font-size:18px;font-variant-numeric:tabular-nums}
+.pk-row{display:grid;grid-template-columns:36px minmax(0,1fr) auto auto auto 32px;align-items:center;gap:10px;padding:10px 10px 10px 14px}
+.pk-row .mod-t b{font-size:14.5px}
+.pk-row .mod-t>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-ch{font-style:normal;color:var(--accent-ink)}
+.pk-price{display:flex;flex-direction:column;align-items:flex-end;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.2}
+.pk-price s{font-size:12px;color:var(--faint)}
+.pk-edit{display:flex;align-items:center;gap:6px;background:none;border:1px solid var(--line-strong);border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;white-space:nowrap}
+.pk-edit:hover{border-color:var(--accent)}
+.chev{width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);margin-top:-3px}
+.chev.up{transform:rotate(-135deg);margin-top:3px}
+.pk-row .x{width:32px;height:32px;padding:0;display:grid;place-items:center;border-radius:8px}
+.pk-row .x:hover{background:var(--bad-soft)}
+.mod.new{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok)}
+.pk-added{font-size:12.5px;color:var(--ok);background:var(--ok-soft);padding:6px 14px;border-top:1px solid var(--line)}
+.ovr{font-size:12px;color:var(--accent-ink)}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent-ink);text-decoration:underline;cursor:pointer;font-size:12px}
+.base-card{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;background:var(--sunk)}
+.base-l{display:flex;gap:10px;align-items:flex-start;min-width:0;flex:1 1 240px}
+.base-ed{border:1px dashed var(--line-strong);border-radius:var(--r-sm)}
+@media (max-width:640px){
+  .pk-row{grid-template-columns:36px minmax(0,1fr) auto 32px;row-gap:8px}
+  .pk-row .role{grid-column:2;justify-self:start}
+  .pk-row .pk-price{grid-column:3;grid-row:1}
+  .pk-row .pk-edit{grid-column:3;grid-row:2;justify-self:end}
+  .pk-row .x{grid-column:4;grid-row:1}
+}
+@media (prefers-reduced-motion:no-preference){ .mod.new{animation:flash 1.2s ease-out} @keyframes flash{from{background:var(--ok-soft)}to{background:var(--surface)}} }
+.calcard{border:1px solid var(--line-strong);border-radius:var(--r);background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.calcard-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.calcard-h svg{color:var(--accent)}
+.calcard-l{font-variant-numeric:tabular-nums;font-size:14px}
+.calcard-f{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
+.calcard-f .hint{flex:1 1 220px}
+.sch{border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px;background:var(--surface)}
+.sch-h{display:flex;align-items:center;gap:10px}
+.sch-h h3{font-size:16.5px;font-weight:600}
+.sch-n{width:26px;height:26px;border-radius:99px;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;font-size:13px;font-weight:700;flex:none}
+.wk{display:flex;gap:6px;flex-wrap:wrap}
+.wk .daybtn{width:auto;min-width:44px;padding:7px 10px}
+.cp{max-width:320px;border:1px solid var(--line);border-radius:var(--r);padding:10px}
+.dp-d.closed-d{background:var(--bad-soft);color:var(--bad);font-weight:600;text-decoration:line-through}
+.chip-x{background:none;border:0;padding:0 0 0 4px;cursor:pointer;color:inherit;font-size:11px}
+.bar-w{display:flex;flex-direction:column;gap:6px}
+.bar-l{font-size:13px;font-weight:600}
+.dbar{position:relative;height:44px;border-radius:8px;background:var(--sunk);border:1px solid var(--line);overflow:hidden}
+.blk{position:absolute;top:4px;bottom:4px;background:var(--accent);color:var(--accent-fg);border-radius:6px;font-size:11.5px;font-weight:600;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;font-variant-numeric:tabular-nums}
+.buf{position:absolute;top:4px;bottom:4px;background:repeating-linear-gradient(45deg,var(--line-strong) 0 3px,transparent 3px 7px);border-radius:4px}
+.ticks{position:relative;height:14px}
+.tk{position:absolute;transform:translateX(-50%);font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums}
+.dc .pdot{display:inline-block;width:6px;height:6px;border-radius:99px;background:var(--warn);margin-left:3px;vertical-align:1px}
+.dc.part{border-color:var(--warn)}
+.lane{display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center}
+.lane-l{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lane-b{position:relative;height:22px;border-radius:6px;background:var(--sunk);border:1px dashed var(--line-strong)}
+.lane-on{position:absolute;top:2px;bottom:2px;border-radius:4px;background:var(--new-soft);color:var(--new);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden}
+.lane-off{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--faint)}
+.ticks{margin-left:0}
+.pbox{border:1px solid var(--warn);background:var(--warn-soft);color:var(--fg);border-radius:var(--r-sm);padding:10px 12px;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.pbox b{color:var(--warn)}
+.pbox.ack{border-color:var(--new);background:var(--new-soft)}
+.pbox.ack b{color:var(--new)}
+.pb-act{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.pb-act .chip{white-space:normal;text-align:left}
+.pm-tm{font-style:normal;font-size:11.5px;color:var(--new);margin-left:6px;font-variant-numeric:tabular-nums}
+.pk-ctl{display:contents}
+.aside-h{display:flex;align-items:center;justify-content:space-between}
+.sheet-x{display:none}
+.step-m{display:none}
+.mbar{display:none}
+@media (max-width:940px){
+  .aside{position:fixed!important;inset:0;top:0!important;z-index:40;background:rgba(20,16,12,.45);display:none;flex-direction:column;justify-content:flex-end;align-items:stretch;padding:0;gap:0}
+  .aside.open{display:flex}
+  .aside-in{background:var(--bg);width:100%;max-height:90vh;max-height:90dvh;overflow:auto;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px}
+  .sheet-x{display:grid;place-items:center;width:36px;height:36px;border-radius:99px;border:1px solid var(--line-strong);background:var(--surface);cursor:pointer}
+  body.noscroll{overflow:hidden}
+  .mbar{display:grid;grid-template-columns:48px 1fr auto;gap:8px;position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
+  .mbar .btn{padding:11px 14px}
+  .mb-pv{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+  .mb-pv span{font-weight:500;color:var(--muted)}
+  .mb-pv b{font-variant-numeric:tabular-nums}
+  .card .nav{display:none}
+  .main{padding-block:12px 110px}
+}
+@media (max-width:640px){
+  body{font-size:15px}
+  .hide-m{display:none!important}
+  .top-row{padding-block:8px;gap:8px}
+  .top h1{font-size:16px}
+  .stepper{gap:3px;padding-block:2px 6px}
+  .st{padding:4px 0}
+  .st span{display:none}
+  .step-m{display:block;font-size:13px;color:var(--muted);padding-bottom:10px}
+  .step-m b{color:var(--fg)}
+  .cmp{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+  .cmp .pill{white-space:nowrap}
+  .card{padding:16px;border-radius:14px}
+  .card>h2{font-size:19px}
+  .in,.ta,.sel{font-size:16px}
+  .chip{min-height:36px}
+  .chip.sm{min-height:34px}
+  .opts{grid-template-columns:1fr}
+  .opts.four{grid-template-columns:1fr 1fr}
+  .opts.four .opt{padding:10px}
+  .opt{padding:14px}
+  .sch{padding:14px 12px}
+  .sub{padding:12px}
+  .row{grid-template-columns:1fr 1fr}
+  .row>.f:only-child{grid-column:1/-1}
+  .item-row .f{flex:1 1 40%}
+  .hr{grid-template-columns:46px 1fr}
+  .daybtn{width:46px}
+  .wk .daybtn{min-width:40px;padding:8px 6px;flex:1 1 0}
+  .wk{gap:4px;flex-wrap:nowrap}
+  .hr .tm .in{width:auto;flex:1 1 0;min-width:0}
+  .dp{left:0;right:auto}
+  .lane{grid-template-columns:80px 1fr}
+  .pk-row{grid-template-columns:36px minmax(0,1fr) 32px;row-gap:8px;padding:10px 8px 10px 12px}
+  .pk-row .mod-t>span{white-space:normal}
+  .pk-edit-t{display:none}
+  .pk-edit{width:36px;height:34px;justify-content:center;padding:0}
+  .row.stack-m{grid-template-columns:1fr}
+  .lane{grid-template-columns:1fr;gap:3px}
+  .pk-row .x{grid-column:3;grid-row:1}
+  .pk-ctl{grid-column:1/-1;display:flex;flex-wrap:nowrap;align-items:center;gap:8px;padding-left:46px;min-width:0}
+  .pk-ctl .role{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pk-ctl .pk-edit{flex:none}
+  .pk-ctl .pk-price{flex-direction:column;align-items:flex-end;gap:0;margin-left:auto;flex:none}
+  .pk-row .role{font-size:12px;padding:5px 9px}
+  .mod-h{grid-template-columns:36px minmax(0,1fr) auto;padding:12px 10px}
+  .mod-h>span:last-child:empty{display:none}
+  .mod-b{padding:14px 12px}
+  .mod-pp{padding:10px 12px}
+  .calc-r{flex-wrap:wrap}
+  .calc-r .sel{max-width:100%!important;width:100%!important}
+  .pkg-sum{grid-template-columns:1fr 1fr}
+  .pkg-sum>div:last-child{grid-column:1/-1}
+  .photos{gap:8px}
+  .base-card .chip{width:100%}
+  .rv-i a{margin-left:0}
+  .dc .c{font-size:10px}
+  .cal{gap:4px}
+}
+.gst{font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:99px;white-space:nowrap;flex:none}
+.gst.open{background:var(--ok-soft);color:var(--ok)}
+.gst.full{background:var(--warn-soft);color:var(--warn)}
+.gst.soon{background:var(--new-soft);color:var(--new)}
+.glist{display:flex;flex-direction:column;gap:6px}
+.gopt{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--surface);cursor:pointer;text-align:left;width:100%}
+.gopt.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:var(--accent-soft)}
+.go-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.go-t b{font-size:13.5px}
+.go-t small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub.trial{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 35%,transparent)}
+.sub.trial .ck b{font-size:15px}
+.tch{display:flex;gap:10px;align-items:flex-start}
+.tcard .formula,.gcard .hint{margin-top:-2px}
+select.in{appearance:auto}
+.side-note{font-size:12.5px;color:var(--muted);margin:0}
+@media (prefers-reduced-motion:no-preference){ .chip,.opt,.btn,.dc,.mod{transition:background-color .15s,border-color .15s,box-shadow .15s} }
+</style>
+
+<div class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <button class="back" type="button" aria-label="Назад">←<span class="hide-m">&nbsp;Назад</span></button>
+      <h1>Новое предложение</h1><span class="tag hide-m">Кабинет · прототип</span>
+      <span class="spacer"></span>
+      <label class="toggle"><input type="checkbox" id="showChanges" checked> <span class="hide-m">Показать</span>&nbsp;изменения</label>
+      <span class="saved hide-m">✓ Черновик сохранён</span>
+    </div>
+    <nav class="stepper" id="stepper" aria-label="Шаги"></nav>
+    <div class="step-m" id="stepM"></div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="cmp" id="cmp">
+    <span class="pill">6 шагов вместо 7</span>
+    <span class="pill">Расписание — отдельный шаг</span>
+    <span class="pill">Гибкий показ: «почти подходит» вместо «нет мест»</span>
+    <span class="pill">Цена живёт рядом со временем и записью</span>
+    <span class="pill">Услуги из общей библиотеки</span>
+    <span class="pill">Одно правило цены для всех форматов</span>
+    <span class="pill">Промо с днями, временем и датами</span>
+  </div>
+  <div class="main">
+    <section style="min-width:0"><div class="card" id="form"></div></section>
+    <aside class="aside" id="aside"><div class="aside-in">
+      <div class="aside-h"><div class="cap">Так увидят родители</div><button type="button" class="sheet-x" data-a="sheet" aria-label="Закрыть">✕</button></div>
+      <div id="preview"></div>
+      <p class="side-note">Калькулятор в карточке работает: меняйте время, часы, детей и состав. Все данные — пример.</p>
+    </div></aside>
+  </div>
+</div>
+
+<div class="mbar" id="mbar"></div>
+<script>
+const ICON = {
+  place:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
+  class:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/></svg>',
+  party:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20l5-14 9 9z"/><path d="M14 4l1 2M19 6l-2 1M20 11l-2-.5"/></svg>',
+  camp:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  none:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16M14 6l6 6-6 6"/></svg>',
+  request:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v11H8l-4 4z"/></svg>',
+  schedule:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  external:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>'
+};
+const FORMATS = {
+  place:{t:'Посещение места',d:'Игровая комната, музей, батутный центр, аренда площадки.',short:'Место'},
+  class:{t:'Занятия и мастер-классы',d:'Разовые занятия, кружки, секции, курсы.',short:'Занятие'},
+  party:{t:'Дни рождения и праздники',d:'Аниматоры, шоу, торты, готовые программы.',short:'Праздник'},
+  camp:{t:'Лагеря и каникулы',d:'Городские лагеря, смены, программы на каникулы.',short:'Лагерь'}
+};
+const STEPS_BASE = ['Что предлагаете','О предложении','Услуги и цены','Расписание','Условия и контакты','Проверка'];
+const steps = () => S.format==='class'?['Что предлагаете','О предложении','Тарифы и цены','Группы и расписание','Условия и контакты','Проверка']:STEPS_BASE;
+const STEPS = STEPS_BASE;
+const WD = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const AGES = ['0–1','1–3','3–5','5–7','7–9','9–12','12–14','14–16','16–18'];
+const PREPAY = [['none','Без предоплаты'],['30','30%'],['50','50%'],['100','100%']];
+const CANCEL = [['24h','Бесплатно за 24 ч'],['48h','За 48 ч'],['7d','За 7 дней'],['nr','Без возврата']];
+const MODEDEF = {place:'schedule',class:'schedule',party:'schedule',camp:'request'};
+const CATS = {
+  place:['Игровая комната','Батутный центр','Музей','Зоопарк','Бассейн и аквапарк','Квест','Семейное кафе','Площадка для праздников'],
+  class:['Рисование','Музыка','Танцы','Спорт','Робототехника','Иностранные языки','Шахматы','Театр','Кулинария','Подготовка к школе'],
+  party:['Аниматоры','Шоу-программа','Площадка','Торты и сладкое','Фото и видео','Декор','Кейтеринг','Мастер-класс'],
+  camp:['Городской лагерь','Выездной лагерь','Спортивный','Языковой','IT и робототехника','Творческий']
+};
+const INTERESTS = ['Творчество','Спорт','Наука','Техника и роботы','Природа и животные','Музыка','Танцы','Театр','Языки','Приключения','Кулинария','Настольные игры','Книги','Конструирование','Активный отдых','Малыши и сенсорика'];
+const WDL=['понедельник','вторник','среду','четверг','пятницу','субботу','воскресенье'];
+const SAMPLES={
+  party:{title:'Праздник «В джунглях»',desc:'Два часа приключений в тематическом зале: квест с аниматором, шоу мыльных пузырей и чаепитие с тортом. Подойдёт для дня рождения в группе до 20 детей.'},
+  class:{title:'Студия рисования «Палитра»',desc:'Рисуем гуашью, акварелью и пастелью в маленьких группах по возрасту. Учимся видеть цвет и форму, каждый ребёнок уносит готовую работу. Все материалы студии.'},
+  place:{title:'Игровая «Остров»',desc:'Лабиринт на три уровня, батут и сухой бассейн. Отдельная зона для малышей до 3 лет, кафе для родителей.'},
+  camp:{title:'Лагерь «Юные изобретатели»',desc:'Городской и выездной лагерь для 7–12 лет: робототехника, физика на практике, экскурсии и командные проекты.'}
+};
+const TTYPES=[['single','Разовое'],['pass','Абонемент'],['month','Помесячно'],['course','Весь курс']];
+const LEVELS=[['beg','Начинающие'],['adv','Продолжающие'],['any','Любой уровень']];
+const GSTAT=[['open','Идёт набор'],['full','Мест нет — лист ожидания'],['soon','Старт с даты']];
+const ROLES = {req:'Обязательный',incl:'Включён, можно убрать',opt:'По желанию'};
+
+/* Библиотека модулей бизнеса: один модуль — во многих предложениях и в конструкторе */
+const LIB = {
+  hall:{id:'hall',photos:3,desc:'Тематический зал 60 м² с лианами, домиком на дереве и зоной для чаепития.',name:'Зал «Джунгли»',ic:'З',res:'Зал «Джунгли»',stretch:true,used:3,
+    dur:{type:'min',min:120,step:60},price:{basis:'order',base:200,extra:70,guests:true,incl:10,per:12,max:20},promos:[{type:'percent',value:'10',gift:'',on:'visit',days:[0,1,2,3,4],from:'15:00',to:'17:00',dFrom:'',dTo:''}]},
+  anim:{id:'anim',avail:{own:true,days:[5,6],from:'12:00',to:'20:00'},photos:2,desc:'Ведущая в костюме исследователя: квест по джунглям, игры и конкурсы под возраст детей.',name:'Аниматор Маша',ic:'А',res:'Аниматор Маша',used:4,
+    dur:{type:'min',min:120,step:60},price:{basis:'order',base:120,extra:50,guests:false,incl:'',per:'',max:''},promos:[]},
+  show:{id:'show',photos:1,desc:'Гигантские пузыри, пузырь вокруг именинника и дым внутри пузырей.',name:'Шоу мыльных пузырей',ic:'Ш',res:'Шоумен Олег',used:2,
+    dur:{type:'fixed',min:30,step:30},price:{basis:'order',base:60,extra:'',guests:false,incl:'',per:'',max:''},promos:[]},
+  cake:{id:'cake',photos:2,desc:'Бисквитный торт с декором в стиле праздника, начинка на выбор из трёх.',name:'Торт 2 кг',ic:'Т',res:'',used:5,
+    dur:{type:'none',min:0,step:0},price:{basis:'order',base:80,extra:'',guests:false,incl:'',per:'',max:''},promos:[]},
+  photo:{id:'photo',photos:1,desc:'Репортажная съёмка, 100+ обработанных фото через 5 дней.',name:'Фотограф',ic:'Ф',res:'Фотограф Ира',used:1,
+    dur:{type:'min',min:60,step:60},price:{basis:'order',base:90,extra:60,guests:false,incl:'',per:'',max:''},promos:[{type:'gift',value:'',gift:'Видео-нарезка',on:'visit',days:[0,1,2,3,4,5,6],from:'',to:'',dFrom:'',dTo:''}]},
+  pinata:{id:'pinata',photos:0,desc:'Пиньята в форме обезьянки, наполнена конфетами и сюрпризами.',name:'Пиньята',ic:'П',res:'',used:1,
+    dur:{type:'none',min:0,step:0},price:{basis:'order',base:45,extra:'',guests:false,incl:'',per:'',max:''},promos:[]},
+  play:{id:'play',photos:2,desc:'Игровая с лабиринтом, батутом и сухим бассейном, вся площадка только для вас.',name:'Аренда игровой',ic:'И',res:'Игровая «Остров»',stretch:true,used:2,
+    dur:{type:'min',min:120,step:60},price:{basis:'order',base:150,extra:50,guests:true,incl:10,per:10,max:25},promos:[{type:'percent',value:'15',gift:'',on:'visit',days:[0,1,2,3],from:'',to:'',dFrom:'2026-10-12',dTo:'2026-10-31'}]},
+  lesson:{id:'lesson',photos:1,desc:'Рисуем гуашью и акварелью, каждый ребёнок уносит готовую работу.',name:'Занятие по рисованию',ic:'Р',res:'Студия',used:1,
+    dur:{type:'fixed',min:60,step:60},price:{basis:'child',base:25,extra:'',guests:false,incl:'',per:'',max:10},promos:[{type:'amount',value:'5',gift:'',on:'visit',days:[5,6],from:'10:00',to:'13:00',dFrom:'',dTo:''}]},
+  shift:{id:'shift',photos:0,desc:'Путёвка на смену городского или выездного лагеря.',name:'Путёвка в лагерь',ic:'С',res:'',used:1,
+    dur:{type:'none',min:0,step:0,shifts:true},price:{basis:'child',base:450,extra:'',guests:false,incl:'',per:'',max:20},promos:[{type:'percent',value:'10',gift:'',on:'booking',days:[0,1,2,3,4,5,6],from:'',to:'',dFrom:'',dTo:'2026-10-18'}]}
+};
+
+const S = {
+  step:4, tried:{}, showChanges:true, selDay:null, openMod:'hall', libOpen:false,
+  format:'party', partySub:'package', classKind:'regular',
+  cls:{
+    trial:{on:true,price:'15'},
+    tariffs:[{type:'single',name:'Разовое занятие',price:'25',count:'1',days:''},{type:'pass',name:'Абонемент на 8 занятий',price:'160',count:'8',days:'30'},{type:'month',name:'Месяц занятий',price:'140',count:'',days:''}],
+    teachers:[{id:'p1',name:'Анна Ковалёва',about:'Художник-педагог, 8 лет работает с детьми'},{id:'p2',name:'Ирина Лис',about:'Иллюстратор, ведёт старшие группы'}],
+    groups:[
+      {age:'4–5',level:'beg',teacher:'p1',days:[0,2],time:'17:30',seats:'8',taken:'5',status:'open',start:'',branch:'ул. Немига, 5'},
+      {age:'6–8',level:'beg',teacher:'p2',days:[1,3],time:'18:00',seats:'10',taken:'10',status:'full',start:'',branch:'ул. Немига, 5'},
+      {age:'9–12',level:'adv',teacher:'p2',days:[5],time:'11:00',seats:'10',taken:'3',status:'soon',start:'2026-10-24',branch:'пр-т Независимости, 44'}],
+    course:{dFrom:'2026-10-19',dTo:'2026-12-14'},
+    miss:'transfer', freeze:'2w', join:'yes', bring:'Фартук или старая футболка',
+    selGroup:0, selTariff:-1
+  },
+  title:'Праздник «В джунглях»',
+  desc:'Два часа приключений в тематическом зале: квест с аниматором, шоу мыльных пузырей и чаепитие с тортом. Подойдёт для дня рождения в группе до 20 детей.',
+  ages:['3–5','5–7'], anyAge:false, cats:{party:['Шоу-программа','Площадка'],place:['Игровая комната'],class:['Рисование'],camp:['Городской лагерь']}, interests:['Приключения','Творчество','Природа и животные'], photos:3, short:'', where:'venue', campType:'city',
+  catalog:[], occasions:['bday'],
+  mode:'schedule', extKind:'site', url:'',
+  items:{
+    party_package:[{id:'hall',role:'req',pp:'170',place:'any'},{id:'anim',role:'incl',pp:'90',place:'any',note:''},{id:'show',role:'incl',pp:'40',place:'any'},{id:'cake',role:'incl',pp:'50'},{id:'photo',role:'opt',pp:'70'},{id:'pinata',role:'opt',pp:''}],
+    party_service:[{id:'anim',role:'req'}],
+    place:[{id:'play',role:'req'}], class:[{id:'lesson',role:'req'}], camp:[{id:'shift',role:'req'}]
+  },
+  prepay:'30', cancel:'7d', phone:'+375 29 123-45-67', address:'Минск, пр-т Победителей, 9', outsideZone:'Минск и до 20 км', lead:'24', startMode:'flex', startStep:30, sameHours:true, closed:['2026-10-18','2026-11-07'], cMonth:'2026-10',
+  calc:{mins:null, guests:null, off:[], on:[]},
+  sched:{
+    place:WD.map((_,i)=>({on:true,from:'10:00',to:i>4?'22:00':'21:00'})),
+    party:WD.map((_,i)=>({on:i>=4,from:i>=5?'10:00':'15:00',to:'21:00'})),
+    sessions:[{days:[1,3],time:'17:30',seats:'10'},{days:[5],time:'11:00',seats:'10'}],
+    dates:[{date:'2026-10-17',time:'12:00',seats:'10'},{date:'2026-10-24',time:'12:00',seats:'10'}],
+    shifts:[
+      {name:'«Юные изобретатели»',dFrom:'2026-10-26',dTo:'2026-10-30',seats:'20',price:'450',
+       program:'Каждый день — новый проект: роботы, ракеты на воде, электрические схемы. В пятницу — выставка для родителей.',
+       includes:'Трёхразовое питание, материалы, экскурсия в Парк высоких технологий',base:'Минск, ул. Купревича, 1'},
+      {name:'«Снежная академия»',dFrom:'2026-12-29',dTo:'2027-01-04',seats:'24',price:'780',
+       program:'Зимняя смена на природе: лыжи, снежные квесты, вечерние посиделки у камина, новогодний карнавал.',
+       includes:'Проживание, 5-разовое питание, трансфер из Минска, страховка',base:'База «Лесная», д. Ратомка, Минский р-н'}],
+    buffer:30
+  }
+};
+
+const CHANGES = {
+  1:['Экран выбора формата не меняется.','Добавлена категория внутри формата: до 3, обязательна.','Подтип праздника и тип занятия выбираются здесь же.'],
+  2:['Добавлены интересы ребёнка: по ним предложение попадает в персональные подборки.','Фото переехали сюда, отдельного шага «Фото» нет.','Состав, длительность и количество детей ушли в услуги на шаге 3.','Краткое описание необязательно и не горит красным до ввода.','Разделы каталога, поводы и вопросы — один раз, в «Дополнительно».','Убран дубль #nokids; «Любой» снимает конкретные возрасты.'],
+  3:['Для занятий: пробное — отдельная галочка; тарифы — разовое, абонемент, помесячно, весь курс; цена за занятие считается сама.','Цена, время и промо — в одной карточке услуги.','Услуги берутся из библиотеки бизнеса: аниматор заведён один раз и работает в пакетах и в конструкторе.','Одно правило цены: минимум, доп. часы, включённые гости, доплата за гостя, максимум.','Промо — структурное: скидка % или BYN, или подарок; дни недели, время, даты; по дате праздника или по дате бронирования.','Добавленная из базы услуга показывается одной строкой: фото, название, время, роль, цена в празднике. «Изменить» раскрывает настройки только для праздника, общие данные — отдельно, с предупреждением.','Праздник = услуги из «Моих услуг» с ролями и своей ценой в празднике; цена праздника = сумма этих цен, выгода против отдельного заказа видна бизнесу и семье.',],
+  5:['Отдельный шаг «Контакты» и блок «Другой способ связи» убраны: всё здесь.','Предоплата и отмена — чипы вместо свободного текста.'],
+  6:['Список того, что мешает публикации, со ссылкой на нужный шаг.'],
+  4:['Для занятий: группы по возрасту и уровню с педагогом, днями, местами и статусом набора; педагоги — общая база.','Расписание — отдельный шаг для любого предложения: режим работы, выходные и особые дни, как записываются.','Простой режим работы: дни + одно время; «разное время по дням» — по желанию.','Наглядная полоса дня: видно, какие слоты получат родители.','У услуги может быть своё расписание: если она не успевает, праздник показывается с пометкой «почти подходит», а не скрывается.','Контроль броней и заявок — в Календаре кабинета.']
+};
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toMin = t => { const [h,m]=String(t||'0:0').split(':').map(Number); return (h||0)*60+(m||0); };
+const fmtMin = m => String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const hrs = m => { const h=m/60; return (Number.isInteger(h)?h:h.toFixed(1).replace('.',','))+' ч'; };
+const byn = n => Math.round(n)+' BYN';
+const num = v => +String(v).replace(',','.')||0;
+
+/* ---------- модули и цена ---------- */
+const key = () => S.format==='party' ? 'party_'+S.partySub : S.format;
+const items = () => S.items[key()];
+const isPkg = () => key()==='party_package';
+const main = () => { const it=items().find(x=>LIB[x.id].stretch)||items()[0]; return it?LIB[it.id]:null; };
+
+function modPrice(m, mins, guests){
+  const p=m.price; let v=num(p.base);
+  if(p.basis==='child') return v*Math.max(1,guests||1);
+  if(m.dur.type==='min' && mins>m.dur.min && num(p.extra)) v+=Math.ceil((mins-m.dur.min)/m.dur.step)*num(p.extra);
+  if(p.guests && guests>num(p.incl)) v+=(guests-num(p.incl))*num(p.per);
+  return v;
+}
+function shiftDays(sh){ if(!sh.dFrom||!sh.dTo) return 0; return Math.round((new Date(sh.dTo)-new Date(sh.dFrom))/864e5)+1; }
+function shiftDur(sh){ const n=shiftDays(sh); if(!n) return ''; const dw=n%10===1&&n%100!==11?'день':[2,3,4].includes(n%10)&&![12,13,14].includes(n%100)?'дня':'дней';
+  const nn=n-1, nw=nn%10===1&&nn%100!==11?'ночь':[2,3,4].includes(nn%10)&&![12,13,14].includes(nn%100)?'ночи':'ночей';
+  return n+' '+dw+(S.campType==='out'&&nn>0?' / '+nn+' '+nw:''); }
+function shiftDates(sh){ return sh.dFrom&&sh.dTo?(sh.dFrom===sh.dTo?fmtD(sh.dFrom):fmtD(sh.dFrom)+' – '+fmtD(sh.dTo)):'даты не выбраны'; }
+function curShift(){ const w=curWhen(); const sh=S.sched.shifts; return (w&&w.shift!=null?sh[w.shift]:sh[0])||null; }
+const HUES=[18,32,140,200,265,330];
+function thumbBg(m,j=0){ const h=(HUES[(m.id.charCodeAt(0)+j)%HUES.length]); return `background:linear-gradient(135deg,hsl(${h} 70% 72%),hsl(${(h+25)%360} 65% 52%))`; }
+function thumb(m,cls){ return m.photos?`<span class="${cls} th" style="${thumbBg(m)}"></span>`:`<span class="${cls}">${esc((m.name||'+').trim().charAt(0).toUpperCase())}</span>`; }
+function durLabel(m){
+  if(m.dur.shifts){ const n=S.sched.shifts.length; return n+' '+(n===1?'смена':n<5?'смены':'смен'); }
+  if(m.dur.type==='none') return 'без времени';
+  if(m.dur.days) return m.dur.days+' дней';
+  if(m.dur.type==='fixed') return m.dur.min+' мин';
+  return 'от '+hrs(m.dur.min);
+}
+function priceLabel(m){
+  const p=m.price;
+  if(m.dur.shifts){ const ps=S.sched.shifts.map(x=>num(x.price)).filter(x=>x>0); return (ps.length?'от '+byn(Math.min(...ps)):byn(num(p.base)))+' за смену'; }
+  let s=byn(num(p.base));
+  if(p.basis==='child') s+=' за ребёнка';
+  else if(m.dur.type==='min') s+=' за '+hrs(m.dur.min);
+  return s;
+}
+function modSummary(m){
+  const p=m.price, a=[durLabel(m)];
+  if(m.dur.type==='min'&&num(p.extra)) a.push('+'+num(p.extra)+' за доп. '+(m.dur.step===60?'час':m.dur.step+' мин'));
+  if(p.guests) a.push('до '+p.incl+' детей, +'+p.per+'/ребёнок');
+  if(num(p.max)) a.push('макс. '+p.max);
+  return a.join(' · ');
+}
+/* значения калькулятора по умолчанию */
+function calcDefaults(){
+  const m=main(); if(!m) return {mins:0,guests:1};
+  const g = m.price.guests ? num(m.price.incl) : (m.price.basis==='child'?1:(S.format==='party'?10:1));
+  return {mins:m.dur.min, guests:g};
+}
+function cur(){ const d=calcDefaults(); return {mins:S.calc.mins??d.mins, guests:S.calc.guests??d.guests}; }
+function quote(){
+  const d=calcDefaults(), c=cur(), lines=[];
+  const its=items();
+  const minsFor=(m,mins)=>m.stretch?mins:m.dur.min;
+  if(S.format==='class'){
+    const T=S.cls.tariffs, isTrial=S.cls.trial.on&&S.cls.selTariff<0, t=isTrial?{name:'Пробное занятие',price:S.cls.trial.price}:(T[Math.max(0,Math.min(S.cls.selTariff,T.length-1))]||T[0]), m=LIB.lesson, kids=c.guests||1, base=num(t&&t.price)*kids;
+    lines.push([(t?t.name:'Тариф')+(kids>1?' × '+kids:''),base]);
+    const g=S.cls.groups[Math.min(S.cls.selGroup,S.cls.groups.length-1)];
+    const wsave=S.calc.when; if(g&&S.classKind!=='once'){ for(let k=1,dd=new Date(TODAY);k<30;k++){ dd.setDate(dd.getDate()+1); if(g.days.includes(wdi(dd))){ S.calc._gw={d:iso(dd),wd:wdi(dd),t:g.time}; break; } } }
+    const pr=applyPromos([{m,amount:base}]); lines.push(...pr.lines);
+    return {total:base-pr.disc, lines, promo:pr};
+  }
+  if(!isPkg()){
+    let m=LIB[its[0].id];
+    if(m.dur.shifts){ const sh=curShift(); if(sh){ m={...m,name:'Смена '+sh.name,price:{...m.price,base:num(sh.price)||m.price.base}}; } }
+    const base=modPrice(m,m.dur.min,m.price.basis==='child'?c.guests:d.guests), tot=modPrice(m,minsFor(m,c.mins),c.guests);
+    lines.push([m.price.basis==='child'?m.name+' × '+c.guests:m.name+(m.dur.type==='min'?' · '+hrs(m.dur.min):''), base]);
+    if(m.dur.type==='min'&&c.mins>m.dur.min) lines.push(['Доп. время '+hrs(c.mins-m.dur.min), modPrice(m,c.mins,d.guests)-modPrice(m,m.dur.min,d.guests)]);
+    if(m.price.guests&&c.guests>num(m.price.incl)) lines.push([(c.guests-num(m.price.incl))+' ребёнка сверх '+m.price.incl, (c.guests-num(m.price.incl))*num(m.price.per)]);
+    const pr=applyPromos([{m,amount:tot}]); lines.push(...pr.lines);
+    return {total:tot-pr.disc, lines, promo:pr};
+  }
+  const core=its.filter(x=>x.role!=='opt'), sums=pkgSums();
+  let total=sums.inPkg, sep=sums.sep; lines.push(['Праздник: '+core.length+' '+(core.length<5?'услуги':'услуг'),sums.inPkg]); const portions=[];
+  for(const x of core){ const m=effMod(x), pb=ppBase(x), b0=priceAt(m,pb,m.dur.min,d.guests);
+    if(x.role==='incl' && S.calc.off.includes(x.id)){ total-=b0; sep-=modPrice(m,m.dur.min,d.guests); lines.push(['Без: '+m.name,-b0]); continue; }
+    const delta=priceAt(m,pb,minsFor(m,c.mins),c.guests)-b0;
+    sep+=modPrice(m,minsFor(m,c.mins),c.guests)-modPrice(m,m.dur.min,d.guests);
+    portions.push({m,amount:b0+Math.max(0,delta)});
+    if(delta>0){ total+=delta; lines.push([m.name+': '+(c.mins>m.dur.min&&m.stretch?'+'+hrs(c.mins-m.dur.min):'')+(m.price.guests&&c.guests>num(m.price.incl)?' +'+(c.guests-num(m.price.incl))+' детей':''),delta]); }
+  }
+  for(const x of its.filter(x=>x.role==='opt'&&S.calc.on.includes(x.id))){ const m=effMod(x); const v=priceAt(m,ppBase(x),m.dur.min,c.guests); total+=v; sep+=modPrice(m,m.dur.min,c.guests); lines.push(['+ '+m.name,v]); portions.push({m,amount:v}); }
+  const pr=applyPromos(portions); lines.push(...pr.lines); total-=pr.disc;
+  return {total, lines, baseline:sums.inPkg, separate:sep, promo:pr};
+}
+/* ---------- промо ---------- */
+const TODAY = new Date(2026,9,12);
+const fmtD = v => v ? v.slice(8)+'.'+v.slice(5,7) : '';
+function daysLabel(d){ const a=[...d].sort((x,y)=>x-y); if(a.length===7) return ''; if(a.join()==='0,1,2,3,4') return 'будни'; if(a.join()==='5,6') return 'выходные';
+  if(a.length>2 && a.every((x,i)=>!i||x===a[i-1]+1)) return WD[a[0]]+'–'+WD[a[a.length-1]]; return a.map(x=>WD[x]).join(', '); }
+function promoValue(pr){ return pr.type==='percent'?'−'+num(pr.value)+'%':pr.type==='amount'?'−'+num(pr.value)+' BYN':'Подарок: '+(pr.gift||'…'); }
+function promoWhen(pr){
+  if(pr.on==='booking'){ if(pr.dFrom&&pr.dFrom===pr.dTo) return 'при бронировании '+fmtD(pr.dFrom); return 'при бронировании'+(pr.dFrom?' с '+fmtD(pr.dFrom):'')+(pr.dTo?' до '+fmtD(pr.dTo):''); }
+  const a=[]; const dl=daysLabel(pr.days); if(dl) a.push(dl); if(pr.from&&pr.to) a.push(pr.from+'–'+pr.to);
+  if(pr.dFrom&&pr.dTo) a.push(pr.dFrom===pr.dTo?fmtD(pr.dFrom):fmtD(pr.dFrom)+'–'+fmtD(pr.dTo)); else if(pr.dTo) a.push('до '+fmtD(pr.dTo)); else if(pr.dFrom) a.push('с '+fmtD(pr.dFrom));
+  return a.join(', ')||'всегда';
+}
+function promoMatches(pr, w){
+  if(pr.on==='booking'){ const x=iso(TODAY); return (!pr.dFrom||x>=pr.dFrom)&&(!pr.dTo||x<=pr.dTo); }
+  if(!w) return false;
+  const x=w.d;
+  if(!pr.days.includes(w.wd)) return false;
+  if(pr.from&&pr.to&&w.t && !(toMin(w.t)>=toMin(pr.from)&&toMin(w.t)<toMin(pr.to))) return false;
+  if(pr.dFrom&&x<pr.dFrom) return false; if(pr.dTo&&x>pr.dTo) return false;
+  return true;
+}
+function whenOptions(){
+  if(S.format==='camp') return S.sched.shifts.map((sh,k)=>sh.dFrom?{shift:k,t:'',d:sh.dFrom,wd:wdi(new Date(sh.dFrom)),label:(sh.name||'Смена '+(k+1))+' · '+shiftDates(sh)}:null).filter(Boolean);
+  const out=[]; days14().forEach((d,i)=>{ const s=slotsFor(d,i); s.list.forEach((x,k)=>{ const t=x==='смена'?'':x.split(/[–·]/)[0].trim(); const stat=s.stats?s.stats[k]:null; if(out.length<60) out.push({i,t,d:iso(d),wd:wdi(d),stat,label:WD[wdi(d)]+' '+d.getDate()+'.'+String(d.getMonth()+1).padStart(2,'0')+(t?' · '+t:'')+(stat&&stat.st==='partial'?' · с пометкой':'')}); }); }); return out; }
+function curWhen(){ if(S.format==='class'&&S.classKind!=='once') return S.calc._gw||null; const o=whenOptions(); if(!o.length) return null; const k=S.calc.when; return o.find(x=>k&&(k.shift!=null?x.shift===k.shift:(x.i===k.i&&x.t===k.t)))||o[0]; }
+/* применяет лучшую подходящую акцию к доле каждой услуги; акции не суммируются */
+function applyPromos(portions){
+  const w=curWhen(), res={disc:0,lines:[],gifts:[],missed:[]};
+  for(const {m,amount} of portions){
+    const ps=(m.promos||[]).filter(pr=>pr.type==='gift'?pr.gift:num(pr.value)>0);
+    let best=null,bestV=0;
+    for(const pr of ps){ if(!promoMatches(pr,w)){ res.missed.push({m,pr}); continue; }
+      if(pr.type==='gift'){ res.gifts.push({m,pr}); continue; }
+      const v=pr.type==='percent'?amount*num(pr.value)/100:Math.min(num(pr.value),amount);
+      if(v>bestV){bestV=v;best=pr;} }
+    if(best){ const v=Math.round(bestV); res.disc+=v; res.lines.push(['Акция: '+m.name+' '+promoValue(best),-v]); }
+  }
+  return res;
+}
+function effMod(x){ const m=LIB[x.id]; return String(x.dur??'').trim()!==''&&m.dur.type!=='none'?{...m,dur:{...m.dur,min:num(x.dur)}}:m; }
+function ppBase(x){ const m=LIB[x.id]; return String(x.pp??'').trim()!==''?num(x.pp):num(m.price.base); }
+function priceAt(m,base,mins,guests){ return modPrice({...m,price:{...m.price,base}},mins,guests); }
+function pkgSums(){ const d=calcDefaults(); const core=items().filter(x=>x.role!=='opt');
+  const inPkg=core.reduce((a,x)=>{const m=effMod(x);return a+priceAt(m,ppBase(x),m.dur.min,d.guests);},0);
+  const sep=core.reduce((a,x)=>{const m=effMod(x);return a+modPrice(m,m.dur.min,d.guests);},0);
+  return {inPkg,sep}; }
+function maxGuests(){ const m=main(); return m&&num(m.price.max)?num(m.price.max):40; }
+
+/* ---------- validation ---------- */
+function problems(){
+  const p=[];
+  if(!(S.cats[S.format]||[]).length) p.push({s:1,k:'cat',t:'Категория'});
+  if(!S.title.trim()) p.push({s:2,k:'title',t:'Название'});
+  if(S.desc.trim().length<20) p.push({s:2,k:'desc',t:'Описание (от 20 символов)'});
+  if(!items().length) p.push({s:3,k:'mods',t:'Добавьте хотя бы одну услугу'});
+  if(S.format==='camp'){ const sh=S.sched.shifts;
+    if(!sh.length) p.push({s:4,k:'sched',t:'Добавьте хотя бы одну смену'});
+    if(sh.some(x=>!x.name.trim()||!x.dFrom||!x.dTo||!(num(x.price)>0))) p.push({s:4,k:'sched',t:'У каждой смены нужны название, даты и цена'}); }
+  if(S.format==='class'){
+    if(!S.cls.tariffs.some(t=>num(t.price)>0)) p.push({s:3,k:'tariffs',t:'Хотя бы один тариф с ценой'});
+    if(S.classKind!=='once'&&!S.cls.groups.some(g=>g.days.length&&g.time)) p.push({s:4,k:'sched',t:'Хотя бы одна группа с днями и временем'});
+    if(S.classKind==='course'&&!(S.cls.course.dFrom&&S.cls.course.dTo)) p.push({s:4,k:'sched',t:'Даты курса'});
+  }
+  if(S.format!=='class'&&items().some(x=>!String(LIB[x.id].name).trim())) p.push({s:3,k:'mods',t:'У каждой услуги нужно название'});
+  if(S.format!=='class'&&items().some(x=>!(num(LIB[x.id].price.base)>0))) p.push({s:3,k:'mods',t:'У каждой услуги нужна цена'});
+  if(isPkg() && items().some(x=>!(ppBase(x)>0))) p.push({s:3,k:'mods',t:'У каждой услуги нужна цена в празднике'});
+  if(S.mode==='external' && !/^https?:\/\/\S+\.\S+/.test(S.url)) p.push({s:4,k:'url',t:'Ссылка на внешний сайт'});
+  if(S.mode==='schedule' && slotCount()===0) p.push({s:4,k:'sched',t:'В расписании нет ни одного свободного времени'});
+  if(!S.phone.trim()) p.push({s:5,k:'phone',t:'Телефон'});
+  return p;
+}
+const bad = k => S.tried[S.step] && problems().some(x=>x.k===k && x.s===S.step);
+
+/* ---------- расписание и слоты ---------- */
+const BASE = new Date(2026,9,12);
+const days14 = () => Array.from({length:14},(_,i)=>{const d=new Date(BASE);d.setDate(d.getDate()+i);return d;});
+const iso = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const wdi = d => (d.getDay()+6)%7;
+function starts(open,close,dur,minDur,buf,step,fixed){
+  const out=[];
+  if(fixed){ for(let t=open;t+dur<=close;t+=dur+buf) out.push(t); return out; }
+  const tight=(close-open)<dur+buf+minDur; // второй праздник не поместится — обрезки неизбежны, показываем все старты
+  for(let t=open;t+dur<=close;t+=step){
+    if(tight){ out.push(t); continue; }
+    const before=t-open, afterFree=close-(t+dur+buf);
+    const okB = before===0 || before>=minDur+buf;
+    const okA = t+dur+buf>=close || afterFree>=minDur;
+    if(okB&&okA) out.push(t);
+  }
+  return out;
+}
+function availSummary(av){ return daysLabel(av.days)||'каждый день'; }
+function svcFit(x,d,t,dur){
+  const m=effMod(x), av=m.avail; if(!av||!av.own) return {ok:true};
+  const need=m.dur.type==='none'?0:(m.stretch?dur:m.dur.min); if(!need) return {ok:true};
+  const w=wdi(d);
+  if(!av.days.includes(w)) return {ok:false,room:0,need,reason:m.name+' не работает в '+WDL[w]};
+  const a=Math.max(t,toMin(av.from)), b=Math.min(t+dur,toMin(av.to)), room=Math.max(0,b-a), pl=x.place||'any';
+  if(room>=need){
+    const s0=pl==='start'?t:pl==='end'?t+dur-need:a;
+    if(s0>=a&&s0+need<=b) return {ok:true,from:s0,to:s0+need};
+    return {ok:false,room,need,reason:m.name+' работает '+av.from+'–'+av.to+(pl==='start'?', а по плану — в начале праздника':', а по плану — в конце праздника')};
+  }
+  if(room<=0) return {ok:false,room:0,need,reason:m.name+' работает '+av.from+'–'+av.to};
+  return {ok:false,room,need,reason:m.name+(toMin(av.to)<t+dur?' до '+av.to:' с '+av.from)+' — '+hrs(room)+' вместо '+hrs(need)};
+}
+function slotStatus(d,t,dur){
+  if(S.format!=='party') return {st:'full',issues:[],times:[]};
+  const act=items().filter(x=>(x.role!=='opt'&&!S.calc.off.includes(x.id))||(x.role==='opt'&&S.calc.on.includes(x.id)));
+  const issues=[], times=[];
+  for(const x of act){ const r=svcFit(x,d,t,dur); if(!r.ok){ if(x.role==='req') return {st:'hidden',issues:[],times:[]}; issues.push({x,...r}); } else if(r.from!=null) times.push({x,from:r.from,to:r.to}); }
+  return {st:issues.length?'partial':'full',issues,times};
+}
+function slotsFor(d,i){
+  if(S.format!=='camp'&&S.closed.includes(iso(d))) return {list:[],closed:true};
+  if((i===0&&+S.lead>=24)||(i<=1&&+S.lead>=48)) return {off:true,list:[]};
+  const w=wdi(d), sc=S.sched;
+  if(S.format==='place'||S.format==='party'){ const h=(S.format==='place'?sc.place:sc.party)[w]; if(!h.on) return {list:[]};
+    const m=main(), dur=cur().mins||m.dur.min||120, buf=+sc.buffer||0;
+    const ts=starts(toMin(h.from),toMin(h.to),dur,m.dur.min||dur,buf,+S.startStep||30,S.startMode==='fixed');
+    const st=ts.map(t=>slotStatus(d,t,dur)), keep=ts.map((t,k)=>st[k].st!=='hidden');
+    return {list:ts.filter((_,k)=>keep[k]).map(t=>fmtMin(t)+'–'+fmtMin(t+dur)),stats:st.filter((_,k)=>keep[k]),hiddenN:keep.filter(x=>!x).length}; }
+  if(S.format==='class'){
+    if(S.classKind!=='once'){ const x=iso(d), C=S.cls;
+      if(S.classKind==='course'&&(!C.course.dFrom||x<C.course.dFrom||x>C.course.dTo)) return {list:[]};
+      return {list:C.groups.filter(g=>g.days.includes(w)&&g.time&&!(g.status==='soon'&&g.start&&x<g.start)).map(g=>g.time+' · '+ageL(g)+' · '+(groupStatus(g)[1]==='full'?'лист ожидания':free(g)+' мест'))}; }
+    return {list:sc.dates.filter(s=>s.date===iso(d)).map(s=>s.time+' · '+s.seats+' мест')};
+  }
+  if(S.format==='camp'){ const x=iso(d); const sh=sc.shifts.find(s=>s.dFrom&&s.dTo&&x>=s.dFrom&&x<=s.dTo); return {list:sh?['смена']:[],label:sh?'смена':''}; }
+  return {list:[]};
+}
+const slotCount = () => days14().reduce((a,d,i)=>a+slotsFor(d,i).list.length,0);
+
+/* ---------- UI helpers ---------- */
+const chip = (on,act,val,label,sm) => `<button type="button" class="chip${sm?' sm':''}${on?' on':''}" data-a="${act}" data-v="${esc(val)}">${label}</button>`;
+const field = (lbl,inner,{req,opt,hint,err}={}) => `<div class="f"><div class="lbl">${lbl}${req?' <span class="req">*</span>':''}</div>${inner}${err?`<div class="err">${err}</div>`:hint?`<div class="hint">${hint}</div>`:''}</div>`;
+const inp = (k,ph,extra='') => `<input class="in${bad(k)?' bad':''}" id="f-${k}" data-k="${k}" value="${esc(S[k])}" placeholder="${ph}" ${extra}>`;
+const minp = (id,path,val,unit,ph='') => `<div class="unit"><input class="in" data-m="${id}" data-p="${path}" value="${esc(val)}" placeholder="${ph}" inputmode="decimal"><i>${unit}</i></div>`;
+const changes = n => S.showChanges?`<div class="changes"><b>Что изменилось</b><ul>${CHANGES[n].map(c=>`<li>${c}</li>`).join('')}</ul></div>`:'';
+
+/* ---------- шаги ---------- */
+function step1(){
+  return `<h2>Что вы хотите предложить семьям?</h2><p class="lead">Выберите формат. Детали уточним дальше.</p>${changes(1)}
+  <div class="stack">
+    <div class="opts">${Object.entries(FORMATS).map(([k,f])=>`<button type="button" class="opt${S.format===k?' on':''}" data-a="format" data-v="${k}"><span class="ic">${ICON[k]}</span><span><h3>${f.t}</h3><p>${f.d}</p></span></button>`).join('')}</div>
+    ${S.format==='party'?`<div class="sub"><h4>Что вы предлагаете?</h4><div class="opts">
+      <button type="button" class="opt${S.partySub==='service'?' on':''}" data-a="partySub" data-v="service"><span><h3>Отдельную услугу</h3><p>Аниматор, фотограф, торт, шоу или площадка.</p></span></button>
+      <button type="button" class="opt${S.partySub==='package'?' on':''}" data-a="partySub" data-v="package"><span><h3>Готовую программу</h3><p>Пакет из нескольких услуг. Родители смогут убрать или добавить услуги.</p></span></button></div></div>`:''}
+    <div class="sub"><h4>Категория <span class="req" style="color:var(--accent)">*</span></h4>
+      <div class="chips">${CATS[S.format].map(c=>chip((S.cats[S.format]||[]).includes(c),'cat',c,c,true)).join('')}</div>
+      ${bad('cat')?'<div class="err">Выберите хотя бы одну категорию</div>':'<div class="hint">Где искать предложение в каталоге. Можно выбрать до 3.</div>'}</div>
+    ${S.format==='class'?`<div class="sub"><h4>Как проходят занятия?</h4><div class="opts">
+      <button type="button" class="opt${S.classKind==='regular'?' on':''}" data-a="classKind" data-v="regular"><span><h3>Регулярные занятия</h3><p>Кружок или секция: группы по дням недели, абонементы, пробное.</p></span></button>
+      <button type="button" class="opt${S.classKind==='course'?' on':''}" data-a="classKind" data-v="course"><span><h3>Курс с началом и концом</h3><p>Набор на конкретные даты: 8 недель, 12 занятий, итоговое событие.</p></span></button>
+      <button type="button" class="opt${S.classKind==='once'?' on':''}" data-a="classKind" data-v="once"><span><h3>Разовый мастер-класс</h3><p>Отдельные даты, запись на конкретное занятие.</p></span></button></div></div>`:''}
+  </div>`;
+}
+
+function step2(){
+  const own={place:'go',class:'class',party:'party',camp:'camp'}[S.format];
+  return `<h2>О предложении</h2><p class="lead">Эти данные увидят родители.</p>${changes(2)}
+  <div class="stack">
+    ${field('Название',inp('title','Например: Пробное занятие по рисованию'),{req:true,err:bad('title')?'Добавьте название, чтобы родители поняли, что вы предлагаете':''})}
+    ${field('Фото',`<div class="photos">${Array.from({length:S.photos},(_,i)=>`<div class="ph">фото ${i+1}</div>`).join('')}<button type="button" class="ph add" data-a="photo">+ добавить</button></div>`,{hint:'Первое фото станет обложкой. До 10 фото.'})}
+    ${field('Описание',`<div class="chips" style="margin-bottom:4px"><button type="button" class="chip sm" data-a="ai">✦ Сгенерировать с AI</button></div><textarea class="ta${bad('desc')?' bad':''}" id="f-desc" data-k="desc" style="min-height:120px" placeholder="Расскажите, что вы предлагаете, кому подойдёт и как всё проходит">${esc(S.desc)}</textarea>`,{req:true,err:bad('desc')?'Опишите предложение хотя бы в 20 символов':'Краткое описание для каталога составим из этого текста.'})}
+    ${field('Интересы ребёнка',`<div class="chips">${INTERESTS.map(x=>chip(S.interests.includes(x),'interest',x,x,true)).join('')}</div><div class="chips"><button type="button" class="chip sm" data-a="aiInt">✦ Подобрать по описанию</button></div>`,{hint:'По интересам mamaGo предлагает ваше предложение семьям, у которых ребёнок увлекается этим. До 5.'})}
+    ${field('Для какого возраста',`<div class="chips">${chip(S.anyAge,'anyAge','1','Любой')}${AGES.map(a=>chip(!S.anyAge&&S.ages.includes(a),'age',a,a)).join('')}${chip(!S.anyAge&&S.ages.includes('nokids'),'age','nokids','#nokids')}</div>`)}
+    ${S.format==='party'?field('Где проходит?',`<div class="chips">${chip(S.where==='venue','where','venue','У нас')}${chip(S.where==='outside','where','outside','С выездом')}${chip(S.where==='both','where','both','И там, и там')}</div>`,{req:true}):''}
+    ${S.format==='camp'?field('Формат лагеря',`<div class="chips">${chip(S.campType==='city','campType','city','Городской')}${chip(S.campType==='out','campType','out','Выездной')}</div>`):''}
+    <details class="more"><summary>Дополнительно</summary><div class="stack">
+      ${field('Краткое описание для каталога',`<textarea class="ta" data-k="short" style="min-height:64px" maxlength="120" placeholder="Оставьте пустым, и мы возьмём начало описания">${esc(S.short)}</textarea>`,{opt:true})}
+      ${field('Показывать также в разделах',`<div class="chips">${[['go','Куда пойти'],['class','Занятия'],['party','Праздники'],['camp','Лагеря']].filter(([k])=>k!==own).map(([k,l])=>chip(S.catalog.includes(k),'catalog',k,l,true)).join('')}</div>`)}
+      ${field('Подходит для поводов',`<div class="chips">${chip(S.occasions.includes('bday'),'occ','bday','День рождения',true)}${chip(S.occasions.includes('grad'),'occ','grad','Выпускной',true)}${chip(S.occasions.includes('ny'),'occ','ny','Новый год',true)}</div>`)}
+      ${field('Частые вопросы',`<button type="button" class="addbtn">+ Добавить вопрос</button>`,{opt:true})}
+    </div></details>
+  </div>`;
+}
+
+function hoursEditor(rows,key,offLabel){
+  return `<div class="hours">${rows.map((h,i)=>`<div class="hr"><button type="button" class="daybtn${h.on?' on':''}" data-a="dayToggle" data-key="${key}" data-v="${i}">${WD[i]}</button>
+    <div class="tm">${h.on?`<input class="in" type="time" data-hk="${key}" data-i="${i}" data-f="from" value="${h.from}"> – <input class="in" type="time" data-hk="${key}" data-i="${i}" data-f="to" value="${h.to}">`:`<span class="closed">${offLabel}</span>`}</div></div>`).join('')}</div>`;
+}
+function shiftsEditor(){
+  const sh=S.sched.shifts;
+  return `<div class="lbl">Смены</div>${sh.map((x,k)=>`<div class="item">
+    <div class="item-row" style="align-items:center"><b style="flex:1">${esc(x.name)||'<span style="color:var(--faint)">Новая смена</span>'}<span class="hint" style="font-weight:400"> · ${shiftDates(x)}${shiftDays(x)?' · '+shiftDur(x):''}</span></b><button type="button" class="x" data-a="delRow" data-arr="shifts" data-i="${k}">Удалить</button></div>
+    ${field('Название смены',`<input class="in" data-arr="shifts" data-i="${k}" data-f="name" value="${esc(x.name)}" placeholder="Например: «Юные изобретатели»">`,{req:true})}
+    <div class="row3">
+      <div class="f dpwrap" style="grid-column:span 2"><div class="lbl">Даты смены <span class="req" style="color:var(--accent)">*</span></div>${rangePicker('shift',k,x,'shift','Выберите даты')}</div>
+      ${field('Продолжительность',`<div class="in" style="background:var(--sunk);color:${shiftDays(x)?'var(--fg)':'var(--faint)'}">${shiftDur(x)||'—'}</div>`,{hint:'Считается по датам'})}
+    </div>
+    <div class="row">${field('Цена за смену',`<div class="unit"><input class="in" data-arr="shifts" data-i="${k}" data-f="price" value="${esc(x.price)}" inputmode="decimal"><i>BYN</i></div>`,{req:true})}${field('Мест',`<div class="unit"><input class="in" data-arr="shifts" data-i="${k}" data-f="seats" value="${esc(x.seats)}" inputmode="numeric"><i>детей</i></div>`)}</div>
+    ${field('Программа смены',`<textarea class="ta" style="min-height:72px" data-arr="shifts" data-i="${k}" data-f="program" placeholder="Чем будут заниматься дети: темы дней, экскурсии, итоговое событие">${esc(x.program)}</textarea>`)}
+    ${field('Что входит в стоимость',`<input class="in" data-arr="shifts" data-i="${k}" data-f="includes" value="${esc(x.includes)}" placeholder="Например: питание, материалы, трансфер, страховка">`)}
+    ${field('Локация базы',`<input class="in" data-arr="shifts" data-i="${k}" data-f="base" value="${esc(x.base)}" placeholder="Адрес или название базы">`,{hint:'Если у смен разные базы, укажите свою для каждой.'})}
+  </div>`).join('')}
+  <button type="button" class="addbtn" data-a="addRow" data-arr="shifts">+ Добавить смену</button>`;
+}
+function hoursSummary(rows){
+  const g=[]; rows.forEach((h,i)=>{ const k=h.on?h.from+'–'+h.to:''; const last=g[g.length-1]; if(last&&last.k===k&&last.to===i-1) last.to=i; else g.push({k,from:i,to:i}); });
+  return g.filter(x=>x.k).map(x=>(x.from===x.to?WD[x.from]:WD[x.from]+'–'+WD[x.to])+' '+x.k).join(' · ')||'не заданы';
+}
+function calCard(title,lines,res){
+  return `<div class="calcard"><div class="calcard-h">${ICON.schedule}<b>${title}</b><span class="tag">из Календаря</span></div>
+    ${lines.map(l=>`<div class="calcard-l">${l}</div>`).join('')}
+    <div class="calcard-f"><span class="hint">${res?'Ресурсы: '+esc(res)+'. ':''}Брони из предложений, конструктора и ручные записи видны там же.</span><button type="button" class="chip sm" data-a="noop">Открыть Календарь ↗</button></div></div>`;
+}
+function scheduleBlock(){
+  const sc=S.sched; let ed='';
+  const res=items().map(x=>LIB[x.id].res).filter(Boolean).join(', ');
+  if(S.format==='place'||S.format==='party'){
+    ed=calCard(S.format==='place'?'Часы работы площадки':'Когда принимаете праздники',[hoursSummary(S.format==='place'?sc.place:sc.party)],res)+`
+    ${field('Как родители выбирают время',`<div class="chips">${chip(S.startMode==='flex','startMode','flex','Свободное время начала')}${chip(S.startMode==='fixed','startMode','fixed','Фиксированные сеансы')}</div>`,{hint:S.startMode==='flex'?'Родитель выбирает длительность, потом время начала. Не показываем варианты, после которых остаются окна короче минимального праздника.':'Сетка сеансов: длительность + уборка, без выбора длительности. Подходит для игровых и сеансов.'})}
+    <div class="row">
+      ${field('Уборка после',`<div class="chips">${[0,15,30,60].map(m=>chip(+sc.buffer===m,'buffer',m,m?m+' мин':'Нет',true)).join('')}</div>`)}
+      ${S.startMode==='flex'?field('Начало каждые',`<div class="chips">${[15,30,60].map(m=>chip(+S.startStep===m,'startStep',m,m+' мин',true)).join('')}</div>`):''}
+    </div>`;
+  }
+  if(S.format==='class'&&S.classKind==='regular') ed=calCard('Сеансы группы',sc.sessions.map(x=>x.days.map(d=>WD[d]).join(', ')+' '+x.time+' · '+x.seats+' мест'),res);
+  if(S.format==='class'&&S.classKind==='once') ed=calCard('Даты занятий',sc.dates.map(x=>fmtD(x.date)+' '+x.time+' · '+x.seats+' мест'),res);
+
+  const ds=days14(), cs=ds.map((d,i)=>slotsFor(d,i));
+  if(S.selDay==null||!cs[S.selDay]||cs[S.selDay].off||!cs[S.selDay].list.length) S.selDay=cs.findIndex(c=>!c.off&&c.list.length);
+  const sel=S.selDay>=0?cs[S.selDay]:null;
+  return `${ed}
+    ${field('Бронь не позднее чем за',`<div class="chips">${[['2','2 часа'],['24','24 часа'],['48','48 часов']].map(([v,l])=>chip(S.lead===v,'lead',v,l,true)).join('')}</div>`)}
+    <div class="lbl">Так увидят родители: 2 недели${S.format==='party'||S.format==='place'?' · длительность '+hrs(cur().mins)+(S.startMode==='flex'?' (меняйте в карточке справа)':''):''}</div>
+    <div class="cal">${ds.map((d,i)=>{const c=cs[i],n=c.list.length;return `<button type="button" class="dc${c.off?' off':''}${n?' has':''}${S.selDay===i?' sel':''}" data-a="day" data-v="${i}" ${c.off?'disabled':''}><div class="w">${WD[wdi(d)]}</div><div class="d">${d.getDate()}</div><div class="c">${c.off?'поздно':n?(c.label||n):'—'}</div></button>`;}).join('')}</div>
+    ${sel&&sel.list.length&&S.format!=='camp'?`<div class="slots">${sel.list.slice(0,10).map(s=>`<span class="slot">${s}</span>`).join('')}</div>`:''}
+    ${slotCount()===0?`<div class="note">Нет ни одного свободного времени. Проверьте дни и часы.</div>`:''}`;
+}
+
+function moduleEditor(m,it){
+  const p=m.price, id=m.id;
+  const timeGrp = m.dur.shifts?`<div class="hint">Длительность считается по датам каждой смены.</div>`: m.dur.type==='none'?`<div class="hint">Без времени: например, торт или пиньята.</div>`:
+    `<div class="chips">${chip(m.dur.type==='fixed','durType:'+id,'fixed','Фиксированная',true)}${chip(m.dur.type==='min','durType:'+id,'min','Минимум + продление',true)}</div>
+     <div class="row">${field(m.dur.type==='min'?'Минимум':'Длительность',minp(id,'dur.min',m.dur.min,'мин'))}${m.dur.type==='min'?field('Шаг продления',minp(id,'dur.step',m.dur.step,'мин')):''}</div>`;
+  const priceGrp = m.dur.shifts ? `<div class="hint">Цена задаётся в каждой смене, за одного ребёнка.</div>${m.promos?'':''}` : `
+    <div class="chips">${chip(p.basis==='order','basis:'+id,'order','За заказ',true)}${chip(p.basis==='child','basis:'+id,'child','За ребёнка',true)}</div>
+    <div class="row">${field(p.basis==='child'?'Цена за ребёнка':(m.dur.type==='min'?'Цена за минимум':'Цена'),minp(id,'price.base',p.base,'BYN'),{req:true})}
+      ${m.dur.type==='min'&&p.basis==='order'?field('Каждый доп. '+(m.dur.step===60?'час':m.dur.step+' мин'),minp(id,'price.extra',p.extra,'BYN','0'),{hint:num(p.base)&&num(p.extra)&&m.dur.min?'Ставка минимума '+Math.round(num(p.base)/(m.dur.min/m.dur.step))+' → доп. '+num(p.extra)+(num(p.extra)<num(p.base)/(m.dur.min/m.dur.step)?' (скидка '+Math.round(100-100*num(p.extra)/(num(p.base)/(m.dur.min/m.dur.step)))+'%)':''):''}):''}</div>
+    ${p.basis==='order'?`<label class="ck"><input type="checkbox" data-a="guests" data-v="${id}" ${p.guests?'checked':''}> Цена зависит от количества гостей</label>
+    ${p.guests?`<div class="row">${field('Включено в цену',minp(id,'price.incl',p.incl,'детей'))}${field('Доплата за каждого',minp(id,'price.per',p.per,'BYN'))}${field('Максимум',minp(id,'price.max',p.max,'детей'))}</div>`:''}`
+    :`<div class="row">${field('Максимум',minp(id,'price.max',p.max,'детей'))}</div>`}
+    <div class="formula">Пример: ${m.dur.type==='min'?hrs(m.dur.min+m.dur.step)+', ':''}${p.guests?(num(p.incl)+4)+' детей':p.basis==='child'?'3 ребёнка':''} → <b>${byn(modPrice(m,m.dur.min+(m.dur.type==='min'?m.dur.step:0),p.guests?num(p.incl)+4:3))}</b></div>`;
+  const isMain = m===main();
+  const bookGrp = m.dur.shifts ? `<div class="hint">Смены, даты и программа — на шаге «Расписание».</div>` : isMain ? `<div class="hint">Когда работаете и как записываются — на шаге «Расписание».${m.res?' Занимает: <b>'+esc(m.res)+'</b>.':''}</div>` :
+    m.res ? `<div class="hint">Занимает: <b>${esc(m.res)}</b>. Занятость общая для всех предложений и конструктора праздников — двойной брони не будет.</div>` :
+    `<div class="hint">Ничего не занимает, доступен всегда.</div>`;
+  const removeGrp = '';
+  return `<div class="mod-b">
+    <div class="grp"><div class="grp-t">Основное</div>
+      <div class="stack tight">${field('Название услуги',`<input class="in" id="name-${id}" data-m="${id}" data-p="name" value="${esc(m.name)}" placeholder="Например: Аниматор, Торт 2 кг, Аренда зала">`,{req:true})}
+      ${field('Фото услуги',`<div class="photos">${Array.from({length:m.photos||0},(_,j)=>`<div class="ph sm" style="${thumbBg(m,j)}"><button type="button" class="ph-x" data-a="svcPhotoDel" data-v="${id}" aria-label="Удалить фото">✕</button></div>`).join('')}${(m.photos||0)<5?`<button type="button" class="ph sm add" data-a="svcPhoto" data-v="${id}">+ фото</button>`:''}</div>`,{hint:'Первое фото — обложка услуги в составе пакета и среди доп. услуг. До 5 фото.'})}
+      ${field('Описание',`<textarea class="ta" style="min-height:64px" data-m="${id}" data-p="desc" maxlength="200" placeholder="Что именно получит семья: формат, что входит, результат">${esc(m.desc||'')}</textarea>`,{hint:'Родители видят его в составе пакета и при выборе доп. услуг. До 200 символов.'})}
+      ${field('Кто или что занято',`<input class="in" data-m="${id}" data-p="res" value="${esc(m.res)}" placeholder="Например: Зал «Джунгли», Аниматор Маша">`,{opt:true,hint:'Нужно, чтобы не было двойной брони.'})}</div></div>
+    <div class="grp"><div class="grp-t">Время</div>${timeGrp}</div>
+    <div class="grp"><div class="grp-t">Цена</div>${priceGrp}</div>
+    <div class="grp"><div class="grp-t">${m.dur.shifts?'Смены':'Запись'+(isMain&&S.mode==='schedule'?' и расписание':'')}</div>${bookGrp}</div>
+    ${m.dur.type!=='none'&&!m.dur.shifts?`<div class="grp"><div class="grp-t">Когда доступна</div>
+      <div class="chips">${chip(!(m.avail&&m.avail.own),'avMode:'+id,'offer','Как у предложения',true)}${chip(!!(m.avail&&m.avail.own),'avMode:'+id,'own','Своё расписание',true)}</div>
+      ${m.avail&&m.avail.own?`<div class="wk">${WD.map((w,d)=>`<button type="button" class="daybtn${m.avail.days.includes(d)?' on':''}" data-a="avDay" data-m="${id}" data-v="${d}">${w}</button>`).join('')}</div>
+      <div class="row3"><div class="f"><div class="lbl">с</div><input class="in" type="time" data-av="${id}" data-f="from" value="${m.avail.from}"></div><div class="f"><div class="lbl">до</div><input class="in" type="time" data-av="${id}" data-f="to" value="${m.avail.to}"></div><div></div></div>
+      <div class="hint">Если праздник выходит за это время, родители увидят его с пометкой и смогут оставить заявку, убрать услугу или выбрать другое время.</div>`:'<div class="hint">Услуга доступна всегда, когда работает предложение.</div>'}</div>`:''}
+    <div class="grp"><div class="grp-t">Промо</div>${promoEditor(m)}</div>
+    ${removeGrp}
+    <div class="hint">Услуга из библиотеки: используется в ${m.used} ${m.used===1?'предложении':'предложениях'}. Изменения цены и времени применятся везде.</div>
+  </div>`;
+}
+
+const MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+function dpTarget(){ return S.dp.kind==='shift'?S.sched.shifts[S.dp.i]:S.dp.kind==='course'?S.cls.course:LIB[S.dp.m].promos[S.dp.i]; }
+function rangePicker(id,k,pr,kind='promo',empty='Любые даты'){
+  const open=S.dp&&S.dp.kind===kind&&S.dp.m===id&&S.dp.i===k;
+  const label=pr.dFrom&&pr.dTo?(pr.dFrom===pr.dTo?fmtD(pr.dFrom):fmtD(pr.dFrom)+' – '+fmtD(pr.dTo)):pr.dFrom?'с '+fmtD(pr.dFrom):empty;
+  let cal='';
+  if(open){
+    const [y,mo]=S.dp.month.split('-').map(Number), first=new Date(y,mo-1,1), off=(first.getDay()+6)%7, n=new Date(y,mo,0).getDate();
+    const cells=[]; for(let j=0;j<off;j++) cells.push('<span></span>');
+    for(let d=1;d<=n;d++){ const v=y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      const edge=v===pr.dFrom||v===pr.dTo, inR=pr.dFrom&&pr.dTo&&v>pr.dFrom&&v<pr.dTo, past=v<iso(TODAY);
+      cells.push(`<button type="button" class="dp-d${edge?' edge':''}${inR?' in':''}${v===iso(TODAY)?' today':''}" data-a="dpPick" data-v="${v}" ${past?'disabled':''}>${d}</button>`); }
+    cal=`<div class="dp"><div class="dp-h"><button type="button" class="dp-nav" data-a="dpMonth" data-v="-1" aria-label="Предыдущий месяц">‹</button><b>${MONTHS[mo-1]} ${y}</b><button type="button" class="dp-nav" data-a="dpMonth" data-v="1" aria-label="Следующий месяц">›</button></div>
+      <div class="dp-g">${WD.map(w=>`<span class="dp-w">${w}</span>`).join('')}${cells.join('')}</div>
+      <div class="dp-f"><span class="hint">${pr.dFrom&&!pr.dTo?'Выберите последний день':'Выберите первый и последний день'}</span><button type="button" class="x" data-a="dpClear">Сбросить</button><button type="button" class="chip sm on" data-a="dpClose">Готово</button></div></div>`;
+  }
+  return `<button type="button" class="in drbtn${pr.dFrom?'':' empty'}" data-a="dpOpen" data-kind="${kind}" data-m="${id}" data-i="${k}">${ICON.schedule} <span>${label}</span></button>${cal}`;
+}
+function promoEditor(m){
+  const id=m.id, ps=m.promos;
+  return `${ps.map((pr,k)=>`<div class="item">
+    <div class="item-row" style="align-items:center"><b style="flex:1">${esc(promoValue(pr))}<span class="hint" style="font-weight:400"> · ${esc(promoWhen(pr))}</span></b><button type="button" class="x" data-a="prDel" data-m="${id}" data-i="${k}">Удалить</button></div>
+    <div class="chips">${[['percent','Скидка, %'],['amount','Скидка, BYN'],['gift','Подарок']].map(([v,l])=>`<button type="button" class="chip sm${pr.type===v?' on':''}" data-a="prSet" data-m="${id}" data-i="${k}" data-f="type" data-v="${v}">${l}</button>`).join('')}</div>
+    ${pr.type==='gift'?field('Что дарите',`<input class="in" data-pr="${id}" data-i="${k}" data-f="gift" value="${esc(pr.gift)}" placeholder="Например: видео-нарезка">`):
+      `<div class="row">${field(pr.type==='percent'?'Скидка':'Сумма скидки',`<div class="unit"><input class="in" data-pr="${id}" data-i="${k}" data-f="value" value="${esc(pr.value)}" inputmode="decimal"><i>${pr.type==='percent'?'%':'BYN'}</i></div>`)}<div></div></div>`}
+    ${field('Считать по дате',`<div class="chips">${[['visit','праздника / посещения'],['booking','бронирования']].map(([v,l])=>`<button type="button" class="chip sm${pr.on===v?' on':''}" data-a="prSet" data-m="${id}" data-i="${k}" data-f="on" data-v="${v}">${l}</button>`).join('')}</div>`,{hint:pr.on==='booking'?'Раннее бронирование: скидка, если бронируют в указанные даты.':'Скидка действует, если праздник или визит попадает в условия ниже.'})}
+    ${pr.on==='visit'?field('Дни недели',`<div class="chips">${WD.map((w,d)=>`<button type="button" class="chip sm${pr.days.includes(d)?' on':''}" data-a="prDay" data-m="${id}" data-i="${k}" data-v="${d}">${w}</button>`).join('')}</div>`):''}
+    <div class="row3">
+      ${pr.on==='visit'?field('Время с',`<input class="in" type="time" data-pr="${id}" data-i="${k}" data-f="from" value="${pr.from}">`)+field('до',`<input class="in" type="time" data-pr="${id}" data-i="${k}" data-f="to" value="${pr.to}">`):''}
+      <div class="f dpwrap"><div class="lbl">${pr.on==='booking'?'Когда бронируют':'Даты действия'}</div>${rangePicker(id,k,pr)}</div>
+    </div>
+  </div>`).join('')}
+  ${ps.length<3?`<button type="button" class="addbtn" data-a="prAdd" data-m="${id}">+ Добавить акцию</button>`:''}
+  <div class="hint">Если подходит несколько акций, применяется самая выгодная. Акции не суммируются.</div>`;
+}
+
+const ovr=(on,label,act,i)=>on?`<span class="ovr">изменено для праздника · <button type="button" class="linkbtn" data-a="${act}" data-i="${i}">вернуть: ${label}</button></span>`:'';
+function pkgRow(it,i,its){
+  const m=LIB[it.id], e=effMod(it), open=S.openMod===m.id, pb=ppBase(it), sepP=num(m.price.base);
+  const hasNew=S.justAdded===m.id;
+  const meta=[durLabel(e)]; if(m.res) meta.push(m.res);
+  const changed=[String(it.pp??'').trim()!==''&&num(it.pp)!==sepP?'цена':'' ,String(it.dur??'').trim()!==''?'время':'',it.note?'комментарий':''].filter(Boolean);
+  return `<div class="mod pk${open?' open':''}${hasNew?' new':''}">
+    <div class="pk-row">
+      ${thumb(m,'mod-ic')}
+      <div class="mod-t"><b>${esc(m.name)||'<span style="color:var(--faint)">Новая услуга</span>'}</b><span>${esc(meta.join(' · '))}${changed.length?` · <em class="pk-ch">своё: ${changed.join(', ')}</em>`:''}</span></div>
+      <div class="pk-ctl"><button type="button" class="role ${it.role}" data-a="role" data-v="${i}" title="Нажмите, чтобы сменить роль">${ROLES[it.role]}</button>
+      <div class="pk-price"><b>${it.role==='opt'?'+':''}${byn(pb)}</b>${pb<sepP?`<s>${byn(sepP)}</s>`:''}</div>
+      <button type="button" class="pk-edit" data-a="openMod" data-v="${m.id}" aria-expanded="${open}" aria-label="${open?'Свернуть':'Изменить'}"><span class="pk-edit-t">${open?'Свернуть':'Изменить'}</span><span class="chev${open?' up':''}"></span></button></div>
+      ${its.length>1?`<button type="button" class="x" data-a="rmMod" data-v="${i}" aria-label="Убрать из праздника" title="Убрать из праздника">✕</button>`:'<span></span>'}
+    </div>
+    ${hasNew?`<div class="pk-added">Добавлено из «Моих услуг». Цена и время как в базе — при необходимости измените для этого праздника.</div>`:''}
+    ${open?pkgEditor(m,it,i):''}
+  </div>`;
+}
+function pkgEditor(m,it,i){
+  const e=effMod(it), sepP=num(m.price.base), unit=m.price.basis==='child'?'за ребёнка':m.dur.type==='min'?'за '+hrs(e.dur.min):'за заказ';
+  const full=S.editBase===m.id;
+  return `<div class="mod-b">
+    <div class="grp"><div class="grp-t">Только в этом празднике</div>
+      ${field('Роль в празднике',`<div class="chips">${Object.entries(ROLES).map(([k,l])=>`<button type="button" class="chip sm${it.role===k?' on':''}" data-a="setRole" data-i="${i}" data-v="${k}">${l}</button>`).join('')}</div>`)}
+      <div class="row">
+        ${field('Цена в празднике, '+unit,`<div class="unit"><input class="in" id="pp-${m.id}" data-pp="${i}" value="${esc(it.pp)}" placeholder="${sepP}" inputmode="decimal"><i>BYN</i></div>${ovr(String(it.pp??'').trim()!==''&&num(it.pp)!==sepP,byn(sepP),'resetPp',i)}`,{hint:String(it.pp??'').trim()!==''||1?'Отдельно — '+byn(sepP)+(num(it.pp)&&num(it.pp)<sepP?', выгода '+Math.round(100-100*num(it.pp)/sepP)+'%':''):''})}
+        ${m.dur.type!=='none'&&!m.dur.shifts?field('Время в празднике',`<div class="unit"><input class="in" data-pdur="${i}" value="${esc(it.dur??'')}" placeholder="${m.dur.min}" inputmode="numeric"><i>мин</i></div>${ovr(String(it.dur??'').trim()!=='',m.dur.min+' мин','resetDur',i)}`,{hint:m.dur.type==='min'?'Продление — по правилам услуги: +'+num(m.price.extra)+' BYN за '+(m.dur.step===60?'час':m.dur.step+' мин'):''}):''}
+      </div>
+      ${m.dur.type!=='none'&&!m.stretch?field('Когда внутри праздника',`<div class="chips">${[['any','В любое время'],['start','В начале'],['end','В конце']].map(([v,l])=>`<button type="button" class="chip sm${(it.place||'any')===v?' on':''}" data-a="setPlace" data-i="${i}" data-v="${v}">${l}</button>`).join('')}</div>`,{hint:'«В любое время» — подберём, когда исполнитель свободен. Например, аниматор с 18:00 до 20:00, если работает до 20:00.'}):''}
+      ${field('Комментарий для этого праздника',`<input class="in" data-pnote="${i}" value="${esc(it.note||'')}" placeholder="Например: аниматор в костюме исследователя джунглей">`,{hint:'Родители увидят его под описанием услуги в этом празднике.'})}
+    </div>
+    <div class="grp"><div class="grp-t">Общие данные услуги</div>
+      <div class="base-card">
+        <div class="base-l">${thumb(m,'mod-ic')}<div class="mod-t"><b>${esc(m.name)}</b><span>${esc(modSummary(m))} · ${esc(priceLabel(m))}</span>${m.desc?`<span class="mod-desc" style="white-space:normal">${esc(m.desc)}</span>`:''}</div></div>
+        <button type="button" class="chip sm" data-a="editBase" data-v="${m.id}">${full?'Скрыть':'Редактировать в базе'}</button>
+      </div>
+      ${full?`<div class="note">Изменения применятся во всех местах, где используется услуга: ${m.used} ${m.used===1?'предложение':m.used<5?'предложения':'предложений'}${m.res?' и конструктор праздников':''}. Чтобы изменить только здесь, используйте поля выше.</div>${moduleEditor(m,it).replace(/^<div class="mod-b">/,'<div class="mod-b base-ed">')}`:''}
+    </div>
+  </div>`;
+}
+function ppStrip(m,it,i){
+  const sepP=num(m.price.base), pb=ppBase(it), diff=sepP?Math.round(100-100*pb/sepP):0;
+  const unit=m.price.basis==='child'?' за ребёнка':m.dur.type==='min'?' за '+hrs(m.dur.min):'';
+  return `<div class="mod-pp"><label for="pp-${m.id}">${it.role==='opt'?'Цена доп. услуги в этом празднике':'Цена в этом празднике'}</label>
+    <div class="unit pp-in"><input class="in" id="pp-${m.id}" data-pp="${i}" value="${esc(it.pp)}" placeholder="${sepP||''}" inputmode="decimal"><i>BYN</i></div>
+    <span class="pp-sep">${unit?unit.trim()+' · ':''}отдельно <s>${byn(sepP)}</s>${diff>0?` <b class="pp-d">−${diff}%</b>`:diff<0?` <b class="pp-up">+${-diff}%</b>`:''}</span></div>`;
+}
+const teacherName = id => (S.cls.teachers.find(t=>t.id===id)||{}).name||'—';
+const ageL = g => g.age?g.age+' лет':'любой возраст';
+const levelL = v => (LEVELS.find(x=>x[0]===v)||['',''])[1];
+const free = g => Math.max(0,num(g.seats)-num(g.taken));
+function groupTitle(g){ return ageL(g)+' · '+(g.days.length?g.days.slice().sort().map(d=>WD[d]).join(', '):'дни не выбраны')+' '+g.time; }
+function groupStatus(g){ if(g.status==='full'||free(g)===0) return ['лист ожидания','full']; if(g.status==='soon'&&g.start) return ['старт '+fmtD(g.start),'soon']; return [free(g)+' '+(free(g)===1?'место':free(g)<5?'места':'мест'),'open']; }
+function courseLessons(g){ const c=S.cls.course; if(!c.dFrom||!c.dTo) return 0; let n=0; for(let d=new Date(c.dFrom);d<=new Date(c.dTo);d.setDate(d.getDate()+1)) if(g.days.includes((d.getDay()+6)%7)) n++; return n; }
+function perLesson(t){ const single=S.cls.tariffs.find(x=>x.type==='single'); const c=t.type==='pass'?num(t.count):t.type==='month'?(S.cls.groups[0]?S.cls.groups[0].days.length*4:4):t.type==='course'?(S.cls.groups[0]?courseLessons(S.cls.groups[0]):0):0;
+  if(!c||!num(t.price)) return ''; const pl=Math.round(num(t.price)/c); const sp=single?num(single.price):0; return '≈ '+pl+' BYN за занятие'+(sp&&pl<sp?' · −'+Math.round(100-100*pl/sp)+'% к разовому':''); }
+function classStep3(){
+  const L=LIB.lesson, T=S.cls.tariffs;
+  const types=S.classKind==='once'?TTYPES.filter(x=>x[0]==='single'):S.classKind==='course'?TTYPES.filter(x=>x[0]!=='month'):TTYPES.filter(x=>x[0]!=='course');
+  return `<h2>Тарифы и цены</h2><p class="lead">Сколько стоит занятие и как можно платить. Родители увидят все варианты и выберут сами.</p>${changes(3)}
+  <div class="stack">
+    ${field('Длительность занятия',`<div class="chips">${[45,60,90,120].map(m=>`<button type="button" class="chip sm${L.dur.min===m?' on':''}" data-a="lessonDur" data-v="${m}">${m} мин</button>`).join('')}</div>`)}
+    <div class="sub trial"><label class="ck"><input type="checkbox" data-a="trialOn" ${S.cls.trial.on?'checked':''}> <b>Есть пробное занятие</b></label>
+      ${S.cls.trial.on?`<div class="row3">${field('Цена пробного',`<div class="unit"><input class="in" data-trial="price" value="${esc(S.cls.trial.price)}" inputmode="decimal" placeholder="0"><i>BYN</i></div>`,{hint:num(S.cls.trial.price)>0?'Один раз на ребёнка':'0 — бесплатно, один раз на ребёнка'})}</div>
+      <div class="hint">Главная кнопка на карточке станет «Записаться на пробное». Это самый частый первый шаг семьи — заявок будет больше.</div>`:'<div class="hint">Без пробного родители оставляют заявку сразу в группу.</div>'}</div>
+    <div class="sec-h"><h3>Тарифы</h3><span class="hint">${T.length} ${T.length===1?'вариант':T.length<5?'варианта':'вариантов'}</span></div>
+    <div class="mods">${T.map((t,i)=>`<div class="item tcard">
+      <div class="item-row" style="align-items:center"><b style="flex:1">${esc(t.name)||'Новый тариф'} <span class="hint" style="font-weight:400">· ${byn(num(t.price))}</span></b>${T.length>1?`<button type="button" class="x" data-a="tDel" data-i="${i}" aria-label="Удалить тариф">✕</button>`:''}</div>
+      <div class="chips">${types.map(([v,l])=>`<button type="button" class="chip sm${t.type===v?' on':''}" data-a="tType" data-i="${i}" data-v="${v}">${l}</button>`).join('')}</div>
+      ${field('Название',`<input class="in" data-t="${i}" data-f="name" value="${esc(t.name)}" placeholder="Например: Абонемент на 8 занятий">`)}
+      <div class="row3">${field(t.type==='month'?'За месяц':t.type==='course'?'За курс':t.type==='pass'?'Цена':'Цена',`<div class="unit"><input class="in" data-t="${i}" data-f="price" value="${esc(t.price)}" inputmode="decimal"><i>BYN</i></div>`,{req:true})}
+        ${t.type==='pass'?field('Занятий',`<div class="unit"><input class="in" data-t="${i}" data-f="count" value="${esc(t.count)}" inputmode="numeric"><i>шт</i></div>`)+field('Действует',`<div class="unit"><input class="in" data-t="${i}" data-f="days" value="${esc(t.days)}" inputmode="numeric"><i>дн</i></div>`):''}</div>
+      ${perLesson(t)?`<div class="formula">${perLesson(t)}</div>`:''}
+    </div>`).join('')}</div>
+    ${bad('tariffs')?'<div class="err">Нужен хотя бы один тариф с ценой</div>':''}
+    <div class="addrow"><button type="button" class="addbtn" data-a="tAdd">+ Добавить тариф</button></div>
+    <details class="more"${L.promos.length?' open':''}><summary>Акции</summary><div class="stack">${promoEditor(L)}</div></details>
+  </div>`;
+}
+function groupsEditor(){
+  const C=S.cls, G=C.groups;
+  return `${S.classKind==='course'?`<div class="row3"><div class="f dpwrap" style="grid-column:span 2"><div class="lbl">Даты курса <span class="req" style="color:var(--accent)">*</span></div>${rangePicker('course',0,C.course,'course','Выберите даты')}</div><div></div></div>`:''}
+  ${G.map((g,i)=>{const st=groupStatus(g);return `<div class="item gcard">
+    <div class="item-row" style="align-items:center"><b style="flex:1;min-width:0">${esc(groupTitle(g))}</b><span class="gst ${st[1]}">${st[0]}</span>${G.length>1?`<button type="button" class="x" data-a="gDel" data-i="${i}" aria-label="Удалить группу">✕</button>`:''}</div>
+    <div class="row">${field('Возраст',`<div class="unit"><input class="in" data-g="${i}" data-f="age" value="${esc(g.age)}" placeholder="4–5"><i>лет</i></div>`)}
+      ${field('Педагог',`<select class="in" data-g="${i}" data-f="teacher">${C.teachers.map(t=>`<option value="${t.id}" ${g.teacher===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}</select>`)}</div>
+    ${field('Уровень',`<div class="chips">${LEVELS.map(([v,l])=>`<button type="button" class="chip sm${g.level===v?' on':''}" data-a="gLevel" data-i="${i}" data-v="${v}">${l}</button>`).join('')}</div>`)}
+    ${field('Дни',`<div class="wk">${WD.map((w,d)=>`<button type="button" class="daybtn${g.days.includes(d)?' on':''}" data-a="gDay" data-i="${i}" data-v="${d}">${w}</button>`).join('')}</div>`)}
+    <div class="row3">${field('Начало',`<input class="in" type="time" data-g="${i}" data-f="time" value="${g.time}">`)}${field('Мест',`<input class="in" data-g="${i}" data-f="seats" value="${esc(g.seats)}" inputmode="numeric">`)}${field('Уже занято',`<input class="in" data-g="${i}" data-f="taken" value="${esc(g.taken)}" inputmode="numeric">`)}</div>
+    <div class="hint">${LIB.lesson.dur.min} мин · ${S.classKind==='course'&&courseLessons(g)?courseLessons(g)+' занятий за курс · ':''}свободно ${free(g)}. Занятые места обновятся сами, когда записи пойдут через mamaGo.</div>
+    ${field('Набор',`<div class="chips">${GSTAT.map(([v,l])=>`<button type="button" class="chip sm${g.status===v?' on':''}" data-a="gStatus" data-i="${i}" data-v="${v}">${l}</button>`).join('')}</div>${g.status==='soon'?`<input class="in" type="date" data-g="${i}" data-f="start" value="${g.start}" style="max-width:200px;margin-top:6px">`:''}`)}
+    ${field('Где проходит',`<input class="in" data-g="${i}" data-f="branch" value="${esc(g.branch)}" placeholder="Адрес или «онлайн»">`)}
+  </div>`;}).join('')}
+  <button type="button" class="addbtn" data-a="gAdd">+ Добавить группу</button>
+  <div class="sub"><h4>Педагоги</h4>
+    ${C.teachers.map((t,i)=>`<div class="tch">${thumb({id:t.id,photos:1,name:t.name},'mod-ic')}<div class="stack tight" style="flex:1;min-width:0">
+      <input class="in" data-tc="${i}" data-f="name" value="${esc(t.name)}" placeholder="Имя и фамилия">
+      <input class="in" data-tc="${i}" data-f="about" value="${esc(t.about)}" placeholder="Опыт, специализация"></div>${C.teachers.length>1?`<button type="button" class="x" data-a="pDel" data-i="${i}" aria-label="Удалить педагога">✕</button>`:''}</div>`).join('')}
+    <button type="button" class="addbtn" data-a="pAdd">+ Добавить педагога</button>
+    <div class="hint">Педагоги общие для всех ваших занятий. Родители часто выбирают именно педагога — добавьте фото и пару слов об опыте.</div>
+  </div>`;
+}
+function step3(){
+  if(S.format==='class') return classStep3();
+  const M=[['none','Без записи','Приходят сами'],['request','По заявке','Вы связываетесь'],['schedule','По расписанию','Выбор даты и времени'],['external','Ссылка','Ваш сайт или билеты']];
+  const its=items(), pkg=isPkg();
+  const lib=Object.values(LIB).filter(m=>!its.some(x=>x.id===m.id) && (S.format==='party'? ['hall','anim','show','cake','photo','pinata'].includes(m.id):true));
+  const q=pkg?quote():null;
+  return `<h2>Услуги и цены</h2><p class="lead">${pkg?'Соберите праздник из своих услуг и задайте цены.':'Что входит, сколько длится и сколько стоит.'}</p>${changes(3)}
+  <div class="stack">
+
+    <div class="sec-h"><h3>${pkg?'Состав пакета':'Цена и время'}</h3>${pkg?`<span class="hint">${its.length} ${its.length<5?'услуги':'услуг'}</span>`:''}</div>
+    ${pkg?`<div class="mods">${its.map((it,i)=>pkgRow(it,i,its)).join('')}</div>`:`<div class="mods">${its.map((it,i)=>{const m=LIB[it.id], open=S.openMod===m.id;
+      return `<div class="mod${open?' open':''}"><div class="mod-h" data-a="openMod" data-v="${m.id}">
+        ${thumb(m,'mod-ic')}
+        <span class="mod-t"><b id="mt-${m.id}">${esc(m.name)||'<span style="color:var(--faint)">Новая услуга</span>'}</b><span>${modSummary(m)}</span>${m.desc?`<span class="mod-desc">${esc(m.desc)}</span>`:''}</span>
+        <span class="mod-side">${pkg?'':`<span class="mod-price">${priceLabel(m)}</span>`}${pkg?`<button type="button" class="role ${it.role}" data-a="role" data-v="${i}" title="Нажмите, чтобы сменить роль">${ROLES[it.role]}</button>`:''}</span>
+        ${pkg&&its.length>1?`<button type="button" class="x" data-a="rmMod" data-v="${i}" aria-label="Убрать из пакета" title="Убрать из пакета">✕</button>`:'<span></span>'}
+      </div>${open?moduleEditor(m,it):''}</div>`;}).join('')}</div>`}
+    ${bad('mods')?'<div class="err">У каждой услуги должны быть название и цена</div>':''}
+    ${pkg||S.format==='party'?`<div class="addrow"><button type="button" class="addbtn" data-a="libOpen">+ Добавить из моих услуг</button><button type="button" class="addbtn" data-a="newMod">+ Создать новую услугу</button></div>
+      ${S.libOpen?`<div class="lib">${lib.length?lib.map(m=>`<button type="button" class="lib-i" data-a="addMod" data-v="${m.id}">${thumb(m,'mod-ic')}<span class="mod-t"><b>${esc(m.name)}</b><span>${modSummary(m)}</span>${m.desc?`<span class="mod-desc">${esc(m.desc)}</span>`:''}</span><span class="mod-price">${priceLabel(m)}</span></button>`).join(''):'<div class="hint" style="padding:8px">Все услуги уже добавлены.</div>'}</div>`:''}`:''}
+
+    ${pkg?(()=>{const sm=pkgSums(), save=sm.sep-sm.inPkg; return `<div class="sub"><h4>Цена праздника</h4>
+      <div class="pkg-sum"><div><span class="hint">В празднике</span><b>${byn(sm.inPkg)}</b></div><div><span class="hint">Если заказывать отдельно</span><b><s>${byn(sm.sep)}</s></b></div><div><span class="hint">Выгода семьи</span><b class="pp-d">${save>0?byn(save)+' · '+Math.round(100*save/sm.sep)+'%':'—'}</b></div></div>
+      <div class="hint">Цена праздника — сумма цен услуг в этом празднике. Если родитель убирает услугу, цена уменьшается ровно на её цену в празднике. Доп. услуги добавляются по их цене в празднике. Продление и доплата за гостей — по правилам услуги.</div>
+    </div>`;})():''}
+  </div>`;
+}
+
+const PRESETS=[['Каждый день',[0,1,2,3,4,5,6]],['Будни',[0,1,2,3,4]],['Выходные',[5,6]]];
+function hkey(){ return S.format==='place'?'place':'party'; }
+function workHours(){
+  const k=hkey(), rows=S.sched[k], on=rows.map((h,i)=>h.on?i:-1).filter(i=>i>=0), f=rows.find(h=>h.on)||{from:'10:00',to:'20:00'};
+  if(S.sameHours) return `
+    <div class="chips">${PRESETS.map(([l,d])=>chip(on.join()===d.join(),'preset',d.join(),l,true)).join('')}</div>
+    <div class="wk">${WD.map((w,i)=>`<button type="button" class="daybtn${rows[i].on?' on':''}" data-a="dayToggle" data-key="${k}" data-v="${i}">${w}</button>`).join('')}</div>
+    <div class="row3"><div class="f"><div class="lbl">с</div><input class="in" type="time" data-same="from" value="${f.from}"></div><div class="f"><div class="lbl">до</div><input class="in" type="time" data-same="to" value="${f.to}"></div><div></div></div>
+    <button type="button" class="linkbtn" data-a="sameHours">В разные дни разное время</button>`;
+  return `${hoursEditor(rows,k,'выходной')}<button type="button" class="linkbtn" data-a="sameHours">Одинаковое время во все дни</button>`;
+}
+function sessionsEditor(){
+  const sc=S.sched;
+  if(S.classKind==='regular') return `${sc.sessions.map((x,i)=>`<div class="item"><div class="wk">${WD.map((w,d)=>`<button type="button" class="daybtn${x.days.includes(d)?' on':''}" data-a="sessDay" data-i="${i}" data-v="${d}">${w}</button>`).join('')}</div>
+      <div class="item-row">${field('Начало',`<input class="in" type="time" data-arr="sessions" data-i="${i}" data-f="time" value="${x.time}">`)}${field('Мест в группе',`<input class="in" data-arr="sessions" data-i="${i}" data-f="seats" value="${esc(x.seats)}" inputmode="numeric">`)}<button type="button" class="x" data-a="delRow" data-arr="sessions" data-i="${i}">Удалить</button></div></div>`).join('')}
+    <button type="button" class="addbtn" data-a="addRow" data-arr="sessions">+ Добавить время занятия</button>`;
+  return `${sc.dates.map((x,i)=>`<div class="item"><div class="item-row">${field('Дата',`<input class="in" type="date" data-arr="dates" data-i="${i}" data-f="date" value="${x.date}">`)}${field('Начало',`<input class="in" type="time" data-arr="dates" data-i="${i}" data-f="time" value="${x.time}">`)}${field('Мест',`<input class="in" data-arr="dates" data-i="${i}" data-f="seats" value="${esc(x.seats)}">`)}<button type="button" class="x" data-a="delRow" data-arr="dates" data-i="${i}">Удалить</button></div></div>`).join('')}
+    <button type="button" class="addbtn" data-a="addRow" data-arr="dates">+ Добавить дату</button>`;
+}
+function closedPicker(){
+  const [y,mo]=S.cMonth.split('-').map(Number), first=new Date(y,mo-1,1), off=(first.getDay()+6)%7, n=new Date(y,mo,0).getDate();
+  const cells=[]; for(let j=0;j<off;j++) cells.push('<span></span>');
+  for(let d=1;d<=n;d++){ const v=y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0'), past=v<iso(TODAY), c=S.closed.includes(v);
+    cells.push(`<button type="button" class="dp-d${c?' closed-d':''}${v===iso(TODAY)?' today':''}" data-a="closeDay" data-v="${v}" ${past?'disabled':''} aria-pressed="${c}">${d}</button>`); }
+  return `<div class="cp"><div class="dp-h"><button type="button" class="dp-nav" data-a="cMonth" data-v="-1" aria-label="Предыдущий месяц">‹</button><b>${MONTHS[mo-1]} ${y}</b><button type="button" class="dp-nav" data-a="cMonth" data-v="1" aria-label="Следующий месяц">›</button></div>
+    <div class="dp-g">${WD.map(w=>`<span class="dp-w">${w}</span>`).join('')}${cells.join('')}</div></div>
+    <div class="chips">${S.closed.slice().sort().map(v=>`<span class="chip sm on">${fmtD(v)} <button type="button" class="chip-x" data-a="closeDay" data-v="${v}" aria-label="Открыть день">✕</button></span>`).join('')||'<span class="hint">Нет закрытых дней</span>'}</div>`;
+}
+function ownServices(){ return items().filter(x=>LIB[x.id].avail&&LIB[x.id].avail.own); }
+function ownWarn(){ const o=ownServices(); if(!o.length) return '';
+  return `<div class="note">${o.map(x=>{const a=LIB[x.id].avail;return `<b>${esc(LIB[x.id].name)}</b> работает ${availSummary(a)} ${a.from}–${a.to}`;}).join('<br>')}.<br>В другое время праздник всё равно покажется родителям — с пометкой «почти подходит». Заявки не теряются.</div>`; }
+function dayBar(){
+  const ds=days14(); let i=S.selDay; const c=i>=0?slotsFor(ds[i],i):null;
+  if(!c||!c.list.length||!(S.format==='party'||S.format==='place')) return '';
+  const h=S.sched[hkey()][wdi(ds[i])], a=toMin(h.from), b=toMin(h.to), span=b-a, buf=+S.sched.buffer||0;
+  const st=c.list.map(x=>toMin(x.split('–')[0])), dur=toMin(c.list[0].split('–')[1])-st[0];
+  const blocks=[]; let last=-1; for(const t of st){ if(t>=last){ blocks.push(t); last=t+dur+buf; } }
+  const pct=v=>((v-a)/span*100).toFixed(2)+'%';
+  const ticks=[]; for(let t=Math.ceil(a/60)*60;t<=b;t+=60) ticks.push(`<span class="tk" style="left:${pct(t)}">${t/60}</span>`);
+  return `<div class="bar-w"><div class="bar-l">${WD[wdi(ds[i])]} ${ds[i].getDate()}.${String(ds[i].getMonth()+1).padStart(2,'0')} · ${h.from}–${h.to}</div>
+    <div class="dbar">${blocks.map(t=>`<span class="blk" style="left:${pct(t)};width:${(dur/span*100).toFixed(2)}%">${fmtMin(t)}–${fmtMin(t+dur)}</span>${buf&&t+dur<b?`<span class="buf" style="left:${pct(t+dur)};width:${(Math.min(buf,b-t-dur)/span*100).toFixed(2)}%"></span>`:''}`).join('')}</div>
+    ${ownServices().map(x=>{const mm=LIB[x.id],av=mm.avail,on=av.days.includes(wdi(ds[i])),fa=Math.max(a,toMin(av.from)),fb=Math.min(b,toMin(av.to));
+      return `<div class="lane"><span class="lane-l">${esc(mm.name)}</span><div class="lane-b">${on&&fb>fa?`<span class="lane-on" style="left:${pct(fa)};width:${((fb-fa)/span*100).toFixed(2)}%">${av.from}–${av.to}</span>`:'<span class="lane-off">не работает</span>'}</div></div>`;}).join('')}
+    <div class="ticks">${ticks.join('')}</div>
+    ${S.startMode==='flex'?`<div class="hint">Пример расстановки. Можно начать в: ${st.map(fmtMin).join(', ')}</div>`:''}</div>`;
+}
+function step4(){
+  const sc=S.sched, f=S.format, hp=f==='party'||f==='place';
+  const M=[['none','Без записи','Приходят в часы работы'],['request','По заявке','Вы связываетесь сами'],['schedule','Онлайн-запись',f==='class'?'Выбирают группу и дату пробного':'Выбирают свободное время'],['external','Своя ссылка','Ваш сайт или билеты']];
+  const ds=days14(), cs=ds.map((d,i)=>slotsFor(d,i));
+  if(S.selDay==null||!cs[S.selDay]||cs[S.selDay].off||!cs[S.selDay].list.length) S.selDay=cs.findIndex(c=>!c.off&&c.list.length);
+  const sel=S.selDay>=0?cs[S.selDay]:null, m=main();
+  const durs=m&&m.dur.type==='min'?[0,1,2,3,4].map(k=>m.dur.min+k*m.dur.step).filter(v=>v<=360):[];
+  return `<h2>Расписание</h2><p class="lead">Когда вы работаете и как к вам записываются. Это первое, что проверяют родители.</p>${changes(4)}
+  <div class="stack">
+    <div class="sch"><div class="sch-h"><span class="sch-n">1</span><h3>${f==='camp'?'Смены':f==='class'?(S.classKind==='once'?'Даты мастер-классов':'Группы'):f==='party'?'Когда принимаете праздники':'Режим работы'}</h3></div>
+      ${f==='camp'?shiftsEditor():f==='class'?(S.classKind==='once'?sessionsEditor():groupsEditor()):workHours()}</div>
+
+    ${f!=='camp'?`<div class="sch"><div class="sch-h"><span class="sch-n">2</span><h3>Выходные и особые дни</h3></div>
+      <div class="hint">Нажмите на дату, чтобы закрыть её. Праздники, санитарные дни, отпуск.</div>${closedPicker()}</div>`:''}
+
+    <div class="sch"><div class="sch-h"><span class="sch-n">${f==='camp'?2:3}</span><h3>Как к вам записываются</h3></div>
+      <div class="opts four">${M.map(([k,t,d])=>`<button type="button" class="opt${S.mode===k?' on':''}" data-a="mode" data-v="${k}"><span class="ic">${ICON[k]}</span><span><h3>${t}</h3><p>${d}</p></span></button>`).join('')}</div>
+      ${S.mode==='external'?`<div class="row">${field('Куда ведёт кнопка',`<div class="chips">${chip(S.extKind==='site','extKind','site','Сайт')}${chip(S.extKind==='tickets','extKind','tickets','Билеты')}</div>`)}${field('Ссылка',inp('url','https://example.com','inputmode="url"'),{req:true,err:bad('url')?'Вставьте ссылку целиком, начиная с https://':''})}</div>`:''}
+      ${S.mode==='schedule'&&hp?`
+        <div class="opts">
+          <button type="button" class="opt${S.startMode==='fixed'?' on':''}" data-a="startMode" data-v="fixed"><span><h3>Готовые слоты</h3><p>Одинаковые сеансы подряд: 10:00–12:00, 12:30–14:30… Просто и привычно.</p></span></button>
+          <button type="button" class="opt${S.startMode==='flex'?' on':''}" data-a="startMode" data-v="flex"><span><h3>Родитель выбирает длительность</h3><p>Сначала «на сколько часов», потом время начала. Для праздников на 3–6 часов.</p></span></button>
+        </div>
+        <div class="row stack-m">
+          ${field('Уборка между',`<div class="chips">${[0,15,30,60].map(v=>chip(+sc.buffer===v,'buffer',v,v?v+' мин':'Нет',true)).join('')}</div>`)}
+          ${field('Бронь не позднее чем за',`<div class="chips">${[['2','2 ч'],['24','24 ч'],['48','48 ч']].map(([v,l])=>chip(S.lead===v,'lead',v,l,true)).join('')}</div>`)}
+        </div>`:''}
+      ${S.mode==='schedule'&&!hp?field('Бронь не позднее чем за',`<div class="chips">${[['2','2 ч'],['24','24 ч'],['48','48 ч']].map(([v,l])=>chip(S.lead===v,'lead',v,l,true)).join('')}</div>`):''}
+      ${S.mode==='request'?`<div class="note ok">Родитель выбирает желаемую дату в пределах режима работы и отправляет заявку. Вы подтверждаете в Календаре.</div>`:''}
+      ${S.mode==='none'?`<div class="note ok">Кнопки записи нет. Родители видят режим работы и закрытые дни.</div>`:''}
+    </div>
+
+    ${S.mode==='schedule'||S.mode==='request'?`<div class="sch"><div class="sch-h"><span class="sch-n">${f==='camp'?3:4}</span><h3>Так увидят родители</h3></div>
+      ${hp&&S.startMode==='flex'&&S.mode==='schedule'&&durs.length?field('Длительность праздника',`<div class="chips">${durs.map(v=>chip(cur().mins===v,'cMins',v,hrs(v),true)).join('')}</div>`):''}
+      <div class="cal">${ds.map((d,i)=>{const c=cs[i],n=c.list.length;const pn=(c.stats||[]).filter(x=>x.st==='partial').length; return `<button type="button" class="dc${c.off||c.closed?' off':''}${n?' has':''}${pn&&pn===n?' part':''}${S.selDay===i?' sel':''}" data-a="day" data-v="${i}" ${c.off||c.closed?'disabled':''}><div class="w">${WD[wdi(d)]}</div><div class="d">${d.getDate()}</div><div class="c">${c.closed?'закрыто':c.off?'поздно':n?(c.label||n)+(pn?'<i class="pdot"></i>':''):'—'}</div></button>`;}).join('')}</div>
+      ${S.mode==='schedule'?dayBar():''}
+      ${S.mode==='schedule'&&f==='party'?ownWarn():''}
+      ${sel&&sel.list.length&&S.mode==='schedule'&&!hp&&f!=='camp'?`<div class="slots">${sel.list.map(x=>`<span class="slot">${x}</span>`).join('')}</div>`:''}
+      ${S.mode==='schedule'&&slotCount()===0?`<div class="note">Нет ни одного свободного времени. Проверьте дни и часы.</div>`:''}
+    </div>`:''}
+    <div class="note info">Брони, заявки и закрытие отдельных часов — в Календаре кабинета. Здесь задаётся обычное расписание.</div>
+  </div>`;
+}
+function step5(){
+  return `<h2>Условия и контакты</h2><p class="lead">Общие правила для всего предложения.</p>${changes(5)}
+  <div class="stack">
+    ${S.mode!=='none'?`${field('Предоплата',`<div class="chips">${PREPAY.map(([v,l])=>chip(S.prepay===v,'prepay',v,l,true)).join('')}</div>`)}
+    ${field('Отмена и возврат',`<div class="chips">${CANCEL.map(([v,l])=>chip(S.cancel===v,'cancel',v,l,true)).join('')}</div>`)}`:'<div class="note ok">Без записи предоплата и отмена не нужны.</div>'}
+    ${S.format==='class'?`<div class="sub"><h4>Правила занятий</h4>
+      ${field('Пропущенное занятие',`<div class="chips">${[['transfer','Переносим'],['note','Переносим по справке'],['no','Не переносим']].map(([v,l])=>chip(S.cls.miss===v,'clsMiss',v,l,true)).join('')}</div>`)}
+      ${S.classKind!=='once'?field('Заморозка абонемента',`<div class="chips">${[['no','Нет'],['2w','До 2 недель'],['1m','До месяца']].map(([v,l])=>chip(S.cls.freeze===v,'clsFreeze',v,l,true)).join('')}</div>`):''}
+      ${S.classKind==='course'?field('Присоединиться после старта',`<div class="chips">${[['yes','Можно, с перерасчётом'],['no','Нельзя']].map(([v,l])=>chip(S.cls.join===v,'clsJoin',v,l,true)).join('')}</div>`):''}
+      ${field('Что взять с собой',`<input class="in" data-cls="bring" value="${esc(S.cls.bring)}" placeholder="Например: сменная обувь, фартук">`)}
+    </div>`:''}
+    <div class="sub"><h4>Контакты</h4>
+      <div class="row">${field('Телефон',inp('phone','+375 29 123-45-67','inputmode="tel"'),{req:true,err:bad('phone')?'Добавьте телефон для связи':''})}${field('Сайт',`<input class="in" placeholder="https://">`,{opt:true})}</div>
+      ${S.format==='party'&&S.where!=='venue'?field('Зона выезда',inp('outsideZone','Например: Минск и до 20 км')):''}
+      ${!(S.format==='party'&&S.where==='outside')?field('Адрес',inp('address','Город, улица, дом')):''}
+    </div>
+  </div>`;
+}
+
+function step6(){
+  const p=problems(), q=quote();
+  const ok=[['Формат',FORMATS[S.format].t+(S.format==='party'?(isPkg()?', пакет':', услуга'):'')],[S.format==='class'?'Тарифы':'Услуги',S.format==='class'?S.cls.tariffs.map(t=>t.name+' '+num(t.price)+' BYN').join(', ')+(S.classKind!=='once'?' · групп: '+S.cls.groups.length:''):items().map(x=>LIB[x.id].name).join(', ')],['Запись',{none:'Без записи',request:'По заявке',schedule:'По расписанию, '+slotCount()+' вариантов за 2 недели',external:'Внешняя ссылка'}[S.mode]],['Цена','от '+byn(q.total)]];
+  return `<h2>Проверка</h2><p class="lead">Проверьте карточку справа и отправьте на модерацию.</p>${changes(6)}
+  <div class="stack">
+    ${p.length?`<div class="f"><div class="lbl">Осталось заполнить</div><div class="rv">${p.map(x=>`<div class="rv-i bad"><span class="dot"></span>${x.t}<a data-a="go" data-v="${x.s}">Шаг ${x.s}</a></div>`).join('')}</div></div>`:`<div class="note ok">Всё готово к публикации.</div>`}
+    <div class="f"><div class="lbl">Коротко</div><div class="rv">${ok.map(([a,b])=>`<div class="rv-i good"><span class="dot"></span><b>${a}:</b>&nbsp;${esc(b)}</div>`).join('')}</div></div>
+    <div class="note info">Услуги, цены и расписание можно менять без повторной модерации. Модерацию проходят только название, описание и фото.</div>
+  </div>`;
+}
+
+/* ---------- превью с калькулятором ---------- */
+function classCta(btn){ if(S.mode==='external'||S.mode==='none') return btn; const C=S.cls, g=C.groups[Math.min(C.selGroup,C.groups.length-1)];
+  if(S.classKind!=='once'&&g&&groupStatus(g)[1]==='full') return 'Встать в лист ожидания';
+  if(C.trial.on&&C.selTariff<0) return num(C.trial.price)>0?'Записаться на пробное · '+byn(num(C.trial.price)):'Записаться на бесплатное пробное';
+  return S.classKind==='once'?'Записаться':'Оставить заявку в группу'; }
+function classPreview(){
+  const C=S.cls, G=C.groups, g=G[Math.min(C.selGroup,G.length-1)], T=C.tariffs, trialSel=C.trial.on&&C.selTariff<0, t=trialSel?{type:'trial',price:C.trial.price}:T[Math.max(0,Math.min(C.selTariff,T.length-1))];
+  const trialChip=C.trial.on?`<button type="button" class="chip sm${trialSel?' on':''}" data-a="selTariff" data-v="-1">${num(C.trial.price)>0?'Пробное · '+byn(num(C.trial.price)):'Пробное · бесплатно'}</button>`:'';
+  if(S.classKind==='once') return `<div class="pm-h">Ближайшие даты</div><div class="chips">${S.sched.dates.map(x=>`<span class="chip sm">${fmtD(x.date)} · ${x.time}</span>`).join('')}</div>
+    <div class="pm-h">Цена</div><div class="chips">${trialChip}${T.map((x,i)=>`<button type="button" class="chip sm${!trialSel&&i===Math.max(0,C.selTariff)?' on':''}" data-a="selTariff" data-v="${i}">${esc(x.name)} · ${byn(num(x.price))}</button>`).join('')}</div>`;
+  const next=[]; if(g){ for(let i=0,d=new Date(TODAY);i<30&&next.length<3;i++,d.setDate(d.getDate()+1)){ const x=iso(d); if(i===0) continue; if(!g.days.includes(wdi(d))) continue; if(g.status==='soon'&&g.start&&x<g.start) continue; if(S.classKind==='course'&&(x<C.course.dFrom||x>C.course.dTo)) continue; if(S.closed.includes(x)) continue; next.push(WD[wdi(d)]+' '+fmtD(x)); } }
+  return `<div class="pm-h">Группа</div>
+    <div class="glist">${G.map((x,i)=>{const st=groupStatus(x);return `<button type="button" class="gopt${i===C.selGroup?' on':''}" data-a="selGroup" data-v="${i}"><span class="go-t"><b>${esc(ageL(x))} · ${esc(levelL(x.level).toLowerCase())}</b><small>${x.days.slice().sort().map(d=>WD[d]).join(', ')} ${x.time} · ${esc(teacherName(x.teacher))}</small></span><span class="gst ${st[1]}">${st[0]}</span></button>`;}).join('')}</div>
+    ${S.classKind==='course'&&g?`<div class="pv-cond">Курс ${fmtD(C.course.dFrom)} – ${fmtD(C.course.dTo)} · ${courseLessons(g)} занятий по ${LIB.lesson.dur.min} мин</div>`:''}
+    <div class="pm-h">Как платить</div>
+    <div class="chips">${trialChip}${T.map((x,i)=>`<button type="button" class="chip sm${!trialSel&&i===Math.max(0,C.selTariff)?' on':''}" data-a="selTariff" data-v="${i}">${esc(x.type==='single'?'Разовое':x.type==='pass'?'Абонемент '+x.count:x.type==='month'?'Месяц':'Курс')} · ${byn(num(x.price))}</button>`).join('')}</div>
+    ${t&&perLesson(t)?`<div class="pv-cond">${perLesson(t)}${t.type==='pass'&&t.days?' · действует '+t.days+' дней':''}</div>`:''}
+    ${trialSel&&next.length&&g&&groupStatus(g)[1]!=='full'?`<div class="pm-h">Пробное — ближайшие даты</div><div class="chips">${next.map((x,k)=>`<span class="chip sm${k===0?' on':''}">${x} · ${g.time}</span>`).join('')}</div>`:''}
+    ${g&&S.classKind!=='once'?`<div class="pv-cond">📍 ${esc(g.branch)}${C.bring?' · с собой: '+esc(C.bring):''}</div>`:''}`;
+}
+function preview(){
+  const its=items(), m=main(), c=cur(), q=quote(), pkg=isPkg();
+  const btn={none:null,request:'Оставить заявку',schedule:'Выбрать дату и время',external:S.extKind==='tickets'?'Купить билет':'Перейти на сайт'}[S.mode];
+  const ages=S.anyAge?['любой возраст']:S.ages.map(a=>a==='nokids'?'#nokids':a+' лет');
+  const short=(S.short.trim()||S.desc.trim()).slice(0,110)+((!S.short.trim()&&S.desc.length>110)?'…':'');
+  const meta=[...(S.cats[S.format]||[]).slice(0,2),...ages]; if(S.format==='party') meta.push({venue:'у нас',outside:'с выездом',both:'у нас или с выездом'}[S.where]);
+  const canStretch = m && m.dur.type==='min' && (m.stretch||!pkg) && !(S.mode==='schedule'&&S.startMode==='fixed'&&(S.format==='party'||S.format==='place'));
+  const showGuests = m && (m.price.guests || m.price.basis==='child' || pkg);
+  const gLabel = m&&m.price.basis==='child'?'Детей':'Гостей-детей';
+  const wo=whenOptions(), w=curWhen();
+  const cond=[]; if(S.mode!=='none'){ const pp=PREPAY.find(x=>x[0]===S.prepay), cc=CANCEL.find(x=>x[0]===S.cancel); cond.push(pp[0]==='none'?'без предоплаты':'предоплата '+pp[1]); cond.push(cc[1].toLowerCase()); }
+  return `<div class="pv"><div class="pv-img"><span class="fmt">${FORMATS[S.format].short}</span></div><div class="pv-b">
+    <h3>${esc(S.title)||'<span style="color:var(--faint)">Название</span>'}</h3>
+    <div class="pv-meta">${meta.filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join('')}</div>
+    <p class="pv-short">${esc(short)}</p>
+    ${S.format==='camp'&&curShift()?(()=>{const sh=curShift();return `<div class="shift-pv"><b>${esc(sh.name||'Смена')}</b><div class="pv-meta"><span>${shiftDates(sh)}</span>${shiftDays(sh)?`<span>${shiftDur(sh)}</span>`:''}${sh.seats?`<span>${esc(sh.seats)} мест</span>`:''}</div>
+      ${sh.base?`<div class="pv-cond">📍 ${esc(sh.base)}</div>`:''}${sh.program?`<p class="pv-short">${esc(sh.program)}</p>`:''}${sh.includes?`<div class="pv-cond"><b>Входит:</b> ${esc(sh.includes)}</div>`:''}</div>`;})():''}
+    <div class="calc">
+      ${S.format==='class'?classPreview():''}
+      ${S.format!=='class'&&wo.length?`<div class="calc-r"><span>Когда</span><select class="sel" style="width:auto;max-width:62%;padding:5px 8px" data-when="1">${wo.map((o,k)=>`<option value="${k}" ${w&&o.i===w.i&&o.t===w.t&&o.shift===w.shift?'selected':''}>${o.label}</option>`).join('')}</select></div>`:''}
+      ${canStretch&&S.format!=='class'?`<div class="calc-r"><span>Длительность</span><span class="chips">${[0,1,2].map(k=>{const v=m.dur.min+k*m.dur.step;return chip(c.mins===v,'cMins',v,hrs(v),true);}).join('')}</span></div>`:''}
+      ${showGuests&&S.format!=='class'?`<div class="calc-r"><span>${gLabel}${m&&num(m.price.max)?` <span class="hint">(макс. ${m.price.max})</span>`:''}</span><span class="step-n"><button type="button" data-a="cG" data-v="-1" aria-label="Меньше">−</button><b>${c.guests}</b><button type="button" data-a="cG" data-v="1" aria-label="Больше">+</button></span></div>`:''}
+      ${pkg?`<div class="pm"><div class="pm-h">Состав пакета</div>${its.filter(x=>x.role!=='opt').concat([{sep:1}]).concat(its.filter(x=>x.role==='opt')).map(x=>{ if(x.sep) return its.some(y=>y.role==='opt')?'<div class="pm-h">Доп. услуги</div>':''; const mm=LIB[x.id];
+        if(x.role==='req') return `<label class="lock"><input type="checkbox" checked disabled> ${thumb(mm,'pm-th')}<span class="pm-t">${esc(mm.name)}${(()=>{const tm=w&&w.stat&&w.stat.times.find(z=>z.x.id===x.id);return tm&&S.mode==='schedule'?`<em class="pm-tm">${fmtMin(tm.from)}–${fmtMin(tm.to)}</em>`:'';})()}${x.note?`<small>${esc(x.note)}</small>`:mm.desc?`<small>${esc(mm.desc)}</small>`:''}</span><span>в пакете</span></label>`;
+        if(x.role==='incl') return `<label><input type="checkbox" data-a="cOff" data-v="${x.id}" ${S.calc.off.includes(x.id)?'':'checked'}> ${thumb(mm,'pm-th')}<span class="pm-t">${esc(mm.name)}${(()=>{const tm=w&&w.stat&&w.stat.times.find(z=>z.x.id===x.id);return tm&&S.mode==='schedule'?`<em class="pm-tm">${fmtMin(tm.from)}–${fmtMin(tm.to)}</em>`:'';})()}${x.note?`<small>${esc(x.note)}</small>`:mm.desc?`<small>${esc(mm.desc)}</small>`:''}</span><span>в пакете</span></label>`;
+        return `<label><input type="checkbox" data-a="cOn" data-v="${x.id}" ${S.calc.on.includes(x.id)?'checked':''}> ${thumb(mm,'pm-th')}<span class="pm-t">${esc(mm.name)}${(()=>{const tm=w&&w.stat&&w.stat.times.find(z=>z.x.id===x.id);return tm&&S.mode==='schedule'?`<em class="pm-tm">${fmtMin(tm.from)}–${fmtMin(tm.to)}</em>`:'';})()}${x.note?`<small>${esc(x.note)}</small>`:mm.desc?`<small>${esc(mm.desc)}</small>`:''}</span><span>+${byn(priceAt(mm,ppBase(x),mm.dur.min,c.guests))}${ppBase(x)<num(mm.price.base)?` <s class="pm-s">${byn(modPrice(mm,mm.dur.min,c.guests))}</s>`:''}</span></label>`;}).join('')}</div>`:''}
+      ${(()=>{ const st=w&&w.stat; if(!st||st.st!=='partial'||S.mode!=='schedule') return '';
+        const o=whenOptions(), k=o.findIndex(x=>x.i===w.i&&x.t===w.t), nf=o.slice(k+1).concat(o.slice(0,k)).find(x=>!x.stat||x.stat.st==='full');
+        return `<div class="pbox${S.ack?' ack':''}"><b>${S.ack?'Отправим как заявку':'Почти подходит'}</b>${st.issues.map(z=>`<div>${esc(z.reason)}</div>`).join('')}
+          ${S.ack?'<div class="hint">Бизнес подтвердит детали и свяжется с вами.</div>':`<div class="pb-act"><button type="button" class="chip sm on" data-a="ackPartial">Оставить так</button>${st.issues.map(z=>z.x.role==='incl'?`<button type="button" class="chip sm" data-a="cOff" data-v="${z.x.id}">Убрать: ${esc(LIB[z.x.id].name)} −${byn(ppBase(z.x))}</button>`:z.x.role==='opt'?`<button type="button" class="chip sm" data-a="cOn" data-v="${z.x.id}">Убрать: ${esc(LIB[z.x.id].name)}</button>`:'').join('')}${nf?`<button type="button" class="chip sm" data-a="nearestFull">${esc(nf.label.replace(' · с пометкой',''))} — всё доступно</button>`:''}</div>`}</div>`; })()}
+      ${q.lines.length>1?`<div class="brk">${q.lines.map(([t,v])=>`<div><span>${esc(t)}</span><span>${v<0?'−':''}${byn(Math.abs(v))}</span></div>`).join('')}</div>`:''}
+      <div class="total"><span>Итого</span><b>${byn(q.total)}</b></div>
+      ${pkg&&q.separate>q.total?`<div class="promo">Выгоднее, чем заказывать отдельно: ${byn(q.separate)} → ${byn(q.total)}</div>`:''}
+      ${q.promo.gifts.map(g=>`<div class="promo">${esc(g.m.name)}: ${esc(promoValue(g.pr))}</div>`).join('')}
+      ${q.promo.missed.slice(0,2).map(g=>`<div class="pv-cond">Акция на ${esc(g.m.name)} ${esc(promoValue(g.pr))}: ${esc(promoWhen(g.pr))}</div>`).join('')}
+    </div>
+    ${cond.length?`<div class="pv-cond">${cond.join(' · ')}</div>`:''}
+    ${btn?`<button class="pv-cta" type="button" tabindex="-1">${S.format==='class'?classCta(btn):S.mode==='schedule'&&w&&w.stat&&w.stat.st==='partial'?'Отправить заявку':btn}</button>`:''}
+    ${S.format==='class'&&S.mode!=='none'&&S.mode!=='external'?`<div class="pv-cond">Оплата — на месте, напрямую студии. Заявка бесплатная и ни к чему не обязывает.</div>`:''}
+    <div class="pv-contacts">${esc(S.address)} · ${esc(S.phone)}</div>
+  </div></div>`;
+}
+
+/* ---------- render ---------- */
+function renderStepper(){ $('#stepper').innerHTML=steps().map((t,i)=>{const n=i+1;return `<button type="button" class="st${n<S.step?' done':''}${n===S.step?' cur':''}" data-a="go" data-v="${n}"><div class="bar"></div><span><span class="n">${n}</span>${t}</span></button>`;}).join(''); }
+function render(){
+  renderStepper();
+  $('#form').innerHTML=[step1,step2,step3,step4,step5,step6][S.step-1]()+`<div class="nav"><button type="button" class="btn" data-a="prev" ${S.step===1?'disabled':''}>Назад</button><button type="button" class="btn pri" data-a="next">${S.step===6?'Отправить на модерацию':'Далее'}</button></div>`;
+  $('#cmp').hidden=!S.showChanges;
+  $('#stepM').innerHTML=`Шаг ${S.step} из 6 · <b>${steps()[S.step-1]}</b>`;
+  renderPreview();
+  if(S.focusName){ const f=document.getElementById('name-'+S.focusName); S.focusName=null; if(f){ f.focus(); f.scrollIntoView({block:'center'}); } }
+}
+function renderPreview(){ $('#preview').innerHTML=preview(); const q=quote();
+  $('#mbar').innerHTML=`<button type="button" class="btn" data-a="prev" ${S.step===1?'disabled':''} aria-label="Назад">←</button><button type="button" class="btn mb-pv" data-a="sheet"><span>Карточка</span><b>${byn(q.total)}</b></button><button type="button" class="btn pri" data-a="next">${S.step===6?'Отправить':'Далее'}</button>`; }
+function resetCalc(){ S.calc={mins:null,guests:null,off:[],on:[]}; S.selDay=null; }
+function setPath(o,path,v){ const k=path.split('.'); let t=o; for(let i=0;i<k.length-1;i++) t=t[k[i]]; const last=k[k.length-1]; t[last]=['min','step'].includes(last)?(num(v)||0):v; }
+
+let newCount=0;
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-a]'); if(!b||b.disabled) return;
+  let a=b.dataset.a; const v=b.dataset.v, i=+b.dataset.i;
+  let mid=null; if(a.includes(':')){ [a,mid]=a.split(':'); }
+  const tgl=(arr,x)=>{const k=arr.indexOf(x); k<0?arr.push(x):arr.splice(k,1);};
+  const its=items();
+  switch(a){
+    case 'format': if(S.format!==v){ if(S.title===SAMPLES[S.format].title){S.title=SAMPLES[v].title;S.desc=SAMPLES[v].desc;} S.format=v; S.mode=MODEDEF[v]; resetCalc(); S.openMod=main()?.id;} break;
+    case 'cat': { const a=S.cats[S.format]=S.cats[S.format]||[]; const k=a.indexOf(v); if(k>=0) a.splice(k,1); else if(a.length<3) a.push(v); break; }
+    case 'interest': { const k=S.interests.indexOf(v); if(k>=0) S.interests.splice(k,1); else if(S.interests.length<5) S.interests.push(v); break; }
+    case 'aiInt': { const t=(S.title+' '+S.desc).toLowerCase(); const map=[['квест','Приключения'],['джунгл','Природа и животные'],['шоу','Театр'],['рисова','Творчество'],['торт','Кулинария'],['танц','Танцы'],['музык','Музыка'],['робот','Техника и роботы'],['спорт','Спорт'],['англ','Языки']];
+      const pick=[...new Set(map.filter(([k])=>t.includes(k)).map(x=>x[1]))].slice(0,5); if(pick.length) S.interests=pick; break; }
+    case 'partySub': S.partySub=v; resetCalc(); S.openMod=main()?.id; break;
+    case 'classKind': S.classKind=v; S.selDay=null; S.cls.selTariff=S.cls.trial.on?-1:0; if(v==='course'&&!S.cls.tariffs.some(t=>t.type==='course')) S.cls.tariffs.push({type:'course',name:'Весь курс',price:'300',count:'',days:''}); break;
+    case 'trialOn': S.cls.trial.on=!S.cls.trial.on; S.cls.selTariff=S.cls.trial.on?-1:0; break;
+    case 'lessonDur': LIB.lesson.dur.min=+v; break;
+    case 'tType': { const t=S.cls.tariffs[i]; t.type=v; const nm={single:'Разовое занятие',pass:'Абонемент на 8 занятий',month:'Месяц занятий',course:'Весь курс'}; t.name=nm[v]; if(v==='pass'){t.count=t.count||'8';t.days=t.days||'30';} break; }
+    case 'tAdd': S.cls.tariffs.push({type:'pass',name:'Абонемент на 4 занятия',price:'',count:'4',days:'30'}); break;
+    case 'tDel': S.cls.tariffs.splice(i,1); S.cls.selTariff=0; break;
+    case 'gAdd': S.cls.groups.push({age:'',level:'beg',teacher:S.cls.teachers[0].id,days:[],time:'17:00',seats:'10',taken:'0',status:'open',start:'',branch:S.cls.groups[0]?S.cls.groups[0].branch:''}); break;
+    case 'gDel': S.cls.groups.splice(i,1); S.cls.selGroup=0; break;
+    case 'gDay': tgl(S.cls.groups[i].days,+v); S.selDay=null; break;
+    case 'gLevel': S.cls.groups[i].level=v; break;
+    case 'gStatus': S.cls.groups[i].status=v; break;
+    case 'pAdd': S.cls.teachers.push({id:'p'+Date.now(),name:'',about:''}); break;
+    case 'pDel': { const id=S.cls.teachers[i].id; S.cls.teachers.splice(i,1); S.cls.groups.forEach(g=>{ if(g.teacher===id) g.teacher=S.cls.teachers[0].id; }); break; }
+    case 'selGroup': S.cls.selGroup=+v; renderPreview(); return;
+    case 'selTariff': S.cls.selTariff=+v; renderPreview(); return;
+    case 'clsMiss': S.cls.miss=v; break;
+    case 'clsFreeze': S.cls.freeze=v; break;
+    case 'clsJoin': S.cls.join=v; break;
+    case 'where': S.where=v; break;
+    case 'campType': S.campType=v; break;
+    case 'anyAge': S.anyAge=!S.anyAge; if(S.anyAge) S.ages=[]; break;
+    case 'age': S.anyAge=false; tgl(S.ages,v); break;
+    case 'catalog': tgl(S.catalog,v); break;
+    case 'occ': tgl(S.occasions,v); break;
+    case 'photo': if(S.photos<10) S.photos++; break;
+    case 'ai': S.desc='Два часа приключений в тематическом зале «Джунгли»: квест с аниматором, шоу мыльных пузырей и чаепитие с тортом. Малышам — сказка и игры, школьникам — командный квест. До 20 детей.'; break;
+    case 'mode': S.mode=v; S.selDay=null; break;
+    case 'extKind': S.extKind=v; break;
+    case 'openMod': if(e.target.closest('.role,.x')&&!b.classList.contains('pk-edit')) return; S.openMod=S.openMod===v?null:v; S.justAdded=null; if(S.openMod!==S.editBase) S.editBase=null; break;
+    case 'setRole': items()[i].role=v; break;
+    case 'resetPp': items()[i].pp=''; break;
+    case 'resetDur': items()[i].dur=''; break;
+    case 'editBase': S.editBase=S.editBase===v?null:v; break;
+    case 'role': { const order=['incl','opt','req']; const it=its[+v]; it.role=order[(order.indexOf(it.role)+1)%3]; S.calc.off=S.calc.off.filter(x=>x!==it.id); S.calc.on=S.calc.on.filter(x=>x!==it.id); break; }
+    case 'rmMod': its.splice(+v,1); break;
+    case 'libOpen': S.libOpen=!S.libOpen; break;
+    case 'addMod': its.push({id:v,role:isPkg()?'opt':'req',pp:''}); S.libOpen=false; if(isPkg()){ S.justAdded=v; S.openMod=null; } else S.openMod=v; break;
+    case 'newMod': { const id='new'+(++newCount); LIB[id]={id,photos:0,desc:'',name:'',ic:'+',res:'',used:1,dur:{type:'fixed',min:60,step:60},price:{basis:'order',base:'',extra:'',guests:false,incl:'',per:'',max:''},promos:[]}; its.push({id,role:isPkg()?'opt':'req',pp:''}); S.openMod=id; S.focusName=id; S.editBase=id; break; }
+    case 'durType': LIB[mid].dur.type=v; break;
+    case 'basis': LIB[mid].price.basis=v; resetCalc(); break;
+    case 'guests': LIB[v].price.guests=!LIB[v].price.guests; if(LIB[v].price.guests&&!LIB[v].price.incl){LIB[v].price.incl=10;LIB[v].price.per=10;LIB[v].price.max=20;} resetCalc(); break;
+    case 'dpOpen': { const kind=b.dataset.kind; const pr=kind==='shift'?S.sched.shifts[i]:kind==='course'?S.cls.course:LIB[b.dataset.m].promos[i]; if(S.dp&&S.dp.kind===kind&&S.dp.m===b.dataset.m&&S.dp.i===i){S.dp=null;break;} S.dp={kind,m:b.dataset.m,i,month:(pr.dFrom||iso(TODAY)).slice(0,7)}; break; }
+    case 'dpMonth': { let [y,mo]=S.dp.month.split('-').map(Number); mo+=+v; if(mo<1){mo=12;y--;} if(mo>12){mo=1;y++;} S.dp.month=y+'-'+String(mo).padStart(2,'0'); break; }
+    case 'dpPick': { const pr=dpTarget();
+      if(!pr.dFrom||pr.dTo){ pr.dFrom=v; pr.dTo=''; }
+      else if(v<pr.dFrom){ pr.dFrom=v; }
+      else { pr.dTo=v; S.dp=null; }
+      break; }
+    case 'dpClear': { const pr=dpTarget(); pr.dFrom=''; pr.dTo=''; break; }
+    case 'dpClose': { const pr=dpTarget(); if(pr.dFrom&&!pr.dTo) pr.dTo=pr.dFrom; S.dp=null; break; }
+    case 'prAdd': LIB[b.dataset.m].promos.push({type:'percent',value:'10',gift:'',on:'visit',days:[0,1,2,3,4,5,6],from:'',to:'',dFrom:'',dTo:''}); break;
+    case 'prDel': LIB[b.dataset.m].promos.splice(i,1); break;
+    case 'prSet': LIB[b.dataset.m].promos[i][b.dataset.f]=v; break;
+    case 'prDay': tgl(LIB[b.dataset.m].promos[i].days,+v); break;
+    case 'svcPhoto': if((LIB[v].photos||0)<5) LIB[v].photos=(LIB[v].photos||0)+1; break;
+    case 'svcPhotoDel': if(LIB[v].photos>0) LIB[v].photos--; break;
+    case 'dayToggle': { const rows=S.sched[b.dataset.key], f=rows.find(h=>h.on); rows[+v].on=!rows[+v].on; if(S.sameHours&&f&&rows[+v].on){rows[+v].from=f.from;rows[+v].to=f.to;} S.selDay=null; break; }
+    case 'sessDay': tgl(S.sched.sessions[i].days,+v); break;
+    case 'addRow': { const arr=b.dataset.arr; S.sched[arr].push(arr==='sessions'?{days:[],time:'18:00',seats:'10'}:arr==='dates'?{date:'2026-10-25',time:'12:00',seats:'10'}:{name:'',dFrom:'',dTo:'',seats:'20',price:'',program:'',includes:'',base:''}); break; }
+    case 'delRow': S.sched[b.dataset.arr].splice(i,1); break;
+    case 'preset': { const d=v.split(',').map(Number), k=hkey(), rows=S.sched[k], f=rows.find(h=>h.on)||{from:'10:00',to:'20:00'}; rows.forEach((h,j)=>{h.on=d.includes(j); if(h.on){h.from=f.from;h.to=f.to;}}); S.selDay=null; break; }
+    case 'sameHours': { S.sameHours=!S.sameHours; if(S.sameHours){ const rows=S.sched[hkey()], f=rows.find(h=>h.on); if(f) rows.forEach(h=>{h.from=f.from;h.to=f.to;}); } break; }
+    case 'closeDay': { const k=S.closed.indexOf(v); k>=0?S.closed.splice(k,1):S.closed.push(v); S.selDay=null; break; }
+    case 'cMonth': { let [y,mo]=S.cMonth.split('-').map(Number); mo+=+v; if(mo<1){mo=12;y--;} if(mo>12){mo=1;y++;} S.cMonth=y+'-'+String(mo).padStart(2,'0'); break; }
+    case 'avMode': { const m=LIB[mid]; if(v==='own'){ m.avail=m.avail||{days:[0,1,2,3,4,5,6],from:'10:00',to:'20:00'}; m.avail.own=true; } else if(m.avail) m.avail.own=false; S.selDay=null; break; }
+    case 'avDay': { const a=LIB[b.dataset.m].avail; tgl(a.days,+v); S.selDay=null; break; }
+    case 'setPlace': items()[i].place=v; break;
+    case 'ackPartial': S.ack=true; renderPreview(); return;
+    case 'nearestFull': { const o=whenOptions(), cw=curWhen(); const k=o.findIndex(x=>cw&&x.i===cw.i&&x.t===cw.t); const nf=o.slice(k+1).concat(o.slice(0,k)).find(x=>!x.stat||x.stat.st==='full'); if(nf){ S.calc.when=nf; S.ack=false; } renderPreview(); return; }
+    case 'sheet': S.sheet=!S.sheet; document.getElementById('aside').classList.toggle('open',S.sheet); document.body.classList.toggle('noscroll',S.sheet); return;
+    case 'startMode': S.startMode=v; if(v==='fixed') S.calc.mins=null; S.selDay=null; break;
+    case 'startStep': S.startStep=+v; S.selDay=null; break;
+    case 'buffer': S.sched.buffer=+v; break;
+    case 'day': S.selDay=+v; break;
+    case 'lead': S.lead=v; S.selDay=null; break;
+    case 'prepay': S.prepay=v; break;
+    case 'cancel': S.cancel=v; break;
+    case 'cMins': S.calc.mins=+v; S.selDay=null; break;
+    case 'cG': { const c=cur(); S.calc.guests=Math.max(1,Math.min(maxGuests(),c.guests+(+v))); break; }
+    case 'cOff': tgl(S.calc.off,v); S.ack=false; S.selDay=null; if(S.step===3||S.step===4) render(); else renderPreview(); return;
+    case 'cOn': tgl(S.calc.on,v); S.ack=false; if(S.step===4) render(); else renderPreview(); return;
+    case 'go': S.step=+v; window.scrollTo({top:0}); break;
+    case 'prev': if(S.step>1){S.step--; window.scrollTo({top:0});} break;
+    case 'next': {
+      if(S.step===6){ if(problems().length){S.tried[6]=true; break;} $('#form').innerHTML=`<h2>Отправлено на модерацию</h2><p class="lead">Обычно проверяем в течение рабочего дня. Услуги, цены и расписание меняются без повторной модерации.</p><div class="nav"><button type="button" class="btn" data-a="go" data-v="1">К началу</button></div>`; return; }
+      const own=problems().filter(x=>x.s===S.step);
+      if(own.length){ S.tried[S.step]=true; render(); const f=document.getElementById('f-'+own[0].k); if(f) f.focus(); return; }
+      S.step++; window.scrollTo({top:0}); break;
+    }
+    default: return;
+  }
+  render();
+});
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.dataset.k){ S[t.dataset.k]=t.value; if(t.classList.contains('bad')&&!problems().some(x=>x.k===t.dataset.k)) t.classList.remove('bad'); renderPreview(); return; }
+  if(t.dataset.m){ setPath(LIB[t.dataset.m],t.dataset.p,t.value); if(t.dataset.p==='name'){ const h=document.getElementById('mt-'+t.dataset.m); if(h) h.textContent=t.value||'Новая услуга'; } renderPreview(); return; }
+  if(t.dataset.arr){ S.sched[t.dataset.arr][+t.dataset.i][t.dataset.f]=t.value; renderPreview(); return; }
+  if(t.dataset.t!=null){ S.cls.tariffs[+t.dataset.t][t.dataset.f]=t.value; renderPreview(); return; }
+  if(t.dataset.g!=null){ S.cls.groups[+t.dataset.g][t.dataset.f]=t.value; renderPreview(); return; }
+  if(t.dataset.tc!=null){ S.cls.teachers[+t.dataset.tc][t.dataset.f]=t.value; renderPreview(); return; }
+  if(t.dataset.trial){ S.cls.trial[t.dataset.trial]=t.value; renderPreview(); return; }
+  if(t.dataset.cls){ S.cls[t.dataset.cls]=t.value; renderPreview(); return; }
+  if(t.dataset.pr){ LIB[t.dataset.pr].promos[+t.dataset.i][t.dataset.f]=t.value; renderPreview(); return; }
+  if(t.dataset.pp!=null){ items()[+t.dataset.pp].pp=t.value; renderPreview(); return; }
+  if(t.dataset.pdur!=null){ items()[+t.dataset.pdur].dur=t.value; renderPreview(); return; }
+  if(t.dataset.pnote!=null){ items()[+t.dataset.pnote].note=t.value; renderPreview(); return; }
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.dataset.trial){ render(); return; }
+  if(t.dataset.m||t.dataset.pr||t.dataset.t!=null||t.dataset.g!=null||t.dataset.tc!=null){ S.selDay=null; render(); return; }
+  if(t.dataset.when){ S.calc.when=whenOptions()[+t.value]; S.ack=false; renderPreview(); return; }
+  if(t.dataset.pp!=null||t.dataset.pdur!=null||t.dataset.pnote!=null){ render(); return; }
+  if(t.dataset.av){ LIB[t.dataset.av].avail[t.dataset.f]=t.value; S.selDay=null; render(); return; }
+  if(t.dataset.same){ S.sched[hkey()].forEach(h=>{ h[t.dataset.same]=t.value; }); S.selDay=null; render(); return; }
+  if(t.dataset.hk){ S.sched[t.dataset.hk][+t.dataset.i][t.dataset.f]=t.value; render(); return; }
+  if(t.dataset.arr){ S.sched[t.dataset.arr][+t.dataset.i][t.dataset.f]=t.value; render(); return; }
+});
+$('#showChanges').addEventListener('change',e=>{S.showChanges=e.target.checked; render();});
+render();
+</script>
