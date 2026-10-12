@@ -7,7 +7,6 @@
  */
 
 import { Building2, FileText } from "lucide-react";
-import { redirect } from "next/navigation";
 import { ProfileSettingsClient } from "@/app/(public)/me/settings/profile/ProfileSettingsClient";
 import { NotificationPreferencesClient } from "@/app/(public)/me/settings/notifications/NotificationPreferencesClient";
 import { BusinessNotificationSettingsClient } from "@/app/business/(protected)/settings/notifications/BusinessNotificationSettingsClient";
@@ -17,6 +16,7 @@ import { ChangePasswordForm } from "@/app/settings/password/ChangePasswordForm";
 import { PhoneSettingsClient } from "@/app/settings/phone/PhoneSettingsClient";
 import { PrivacySettingsClient } from "@/app/settings/privacy/PrivacySettingsClient";
 import { NotificationSettingsTable } from "@/components/business/notifications/NotificationSettingsTable";
+import { BusinessAccountHub } from "@/components/settings/BusinessAccountHub";
 import { SettingsScaffold } from "@/components/settings/SettingsScaffold";
 import { buildSettingsHomeHref } from "@/lib/settings/registry";
 import { requireSettingsContext } from "@/lib/settings/resolveSettingsContext";
@@ -42,6 +42,16 @@ export async function renderSettingsPage(surfaceScope: SettingsScope = "USER") {
       currentSectionId="home"
     >
       <SettingsHomeClient context={context} />
+    </SettingsScaffold>
+  );
+}
+
+export async function renderAccountHubPage(surfaceScope: SettingsScope = "BUSINESS") {
+  const context = await requireSettingsContext({ requestedScope: surfaceScope });
+
+  return (
+    <SettingsScaffold context={context} title="Аккаунт и безопасность" maxWidthClassName="max-w-2xl">
+      <BusinessAccountHub context={context} />
     </SettingsScaffold>
   );
 }
@@ -126,7 +136,13 @@ export async function renderCompanySettingsPage(surfaceScope: SettingsScope = "U
   const business = context.businessContext;
 
   if (!business) {
-    redirect(buildSettingsHomeHref(context.surfaceScope));
+    return (
+      <SettingsScaffold context={context} title="Компания" currentSectionId="company">
+        <div className="rounded-2xl border border-neutral-100 bg-white p-6 text-sm text-neutral-600 shadow-sm">
+          К этому аккаунту не привязана компания, поэтому реквизиты показывать нечего.
+        </div>
+      </SettingsScaffold>
+    );
   }
 
   return (
