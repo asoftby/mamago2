@@ -23,4 +23,6 @@ if [ "$remote_name" = "origin" ] && [ "$branch" = "dev" ]; then
   fi
 fi
 
+sh scripts/git/check-next-cache.sh || exit 1
+
 pnpm check:push
