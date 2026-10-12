@@ -3,6 +3,7 @@ import {
   buildModerationNoticeMessage,
   classifyOfferColumn,
   describeContentColumns,
+  mergeCampSessionsForPublished,
   collectChangedOfferColumns,
   decidePublishedOfferEdit,
   offerValuesEqual,
@@ -155,5 +156,37 @@ assert.equal(
   buildModerationNoticeMessage({ contentColumns: ["description"], operationalColumns: [] }),
   "Текст и фото опубликованного предложения пока меняются через поддержку: описание.",
 );
+
+// Смены лагеря: даты/цена/места — сразу, тексты смен — нет
+{
+  const live = [{ id: "s1", title: "Июнь", description: "Описание", dateFrom: "2026-06-01", priceOverride: "500" }];
+  // партнёр меняет цену и даты, текст не трогает
+  const a = mergeCampSessionsForPublished(live, [
+    { id: "s1", title: "Июнь", description: "Описание", dateFrom: "2026-06-03", priceOverride: "550" },
+  ]);
+  assert.equal(a.contentChanged, false);
+  assert.deepEqual(a.merged, [{ id: "s1", title: "Июнь", description: "Описание", dateFrom: "2026-06-03", priceOverride: "550" }]);
+  // партнёр меняет цену и текст: цена применяется, текст остаётся прежним, контент отмечен
+  const b = mergeCampSessionsForPublished(live, [
+    { id: "s1", title: "Новое название", description: "Новый текст", dateFrom: "2026-06-01", priceOverride: "600" },
+  ]);
+  assert.equal(b.contentChanged, true);
+  assert.deepEqual(b.merged, [{ id: "s1", title: "Июнь", description: "Описание", dateFrom: "2026-06-01", priceOverride: "600" }]);
+  // новая смена: операционные поля применяются, её текст отбрасывается
+  const c = mergeCampSessionsForPublished(live, [
+    live[0],
+    { id: "s2", title: "Август", dateFrom: "2026-08-01", priceOverride: "700" },
+  ]);
+  assert.equal(c.contentChanged, true);
+  assert.deepEqual(c.merged[1], { id: "s2", dateFrom: "2026-08-01", priceOverride: "700" });
+  // удаление смены — операционная правка
+  const d = mergeCampSessionsForPublished(live, []);
+  assert.equal(d.contentChanged, false);
+  assert.deepEqual(d.merged, []);
+  // стереть все смены нельзя
+  const e = mergeCampSessionsForPublished(live, null);
+  assert.equal(e.contentChanged, true);
+  assert.deepEqual(e.merged, live);
+}
 
 console.log("offerPublishedEditGate tests passed");

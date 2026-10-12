@@ -147,6 +147,7 @@ const CONTENT_COLUMN_LABELS: Record<string, string> = {
   contactWebsite: "ссылки",
   contactSocialLinks: "ссылки",
   requestedPlacements: "разделы каталога",
+  campSessionTexts: "тексты смен",
   status: "статус публикации",
 };
 
@@ -165,4 +166,67 @@ export function buildModerationNoticeMessage(params: {
   return params.operationalColumns.length > 0
     ? `${first} Цены, расписание и контакты сохранены`
     : first;
+}
+
+/** Поля смены лагеря, которые партнёр правит сразу: даты, время, места, цена. Остальное в смене — контент. */
+export const CAMP_SESSION_OPERATIONAL_KEYS: ReadonlySet<string> = new Set([
+  "id",
+  "sortOrder",
+  "dateFrom",
+  "dateTo",
+  "timeFrom",
+  "timeTo",
+  "capacity",
+  "spotsLeft",
+  "priceOverride",
+]);
+
+type CampSessionEntry = Record<string, unknown>;
+
+function asSessionList(value: unknown): CampSessionEntry[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is CampSessionEntry => item !== null && typeof item === "object")
+    : [];
+}
+
+/**
+ * Опубликованный лагерь: `campSessions` — смесь операционных полей (даты, цена, места) и текста
+ * (название, описание, акция, возраст, тип смены). Операционные поля берём из нового значения,
+ * контентные — из живого (для новой смены контентных полей нет). `contentChanged` — партнёр
+ * пытался изменить контент смен, это уйдёт на модерацию (в ревизию), а не в живую строку.
+ *
+ * Смены сопоставляются по `id`, без `id` — по позиции. Удаление смены — операционная правка.
+ */
+export function mergeCampSessionsForPublished(
+  live: unknown,
+  next: unknown,
+): { merged: CampSessionEntry[]; contentChanged: boolean } {
+  const liveList = asSessionList(live);
+  if (next === null || next === undefined) {
+    // Полностью стереть смены опубликованного лагеря через прямую правку нельзя.
+    return { merged: liveList, contentChanged: liveList.length > 0 };
+  }
+
+  const nextList = asSessionList(next);
+  const liveById = new Map(
+    liveList.filter((item) => typeof item.id === "string").map((item) => [item.id as string, item]),
+  );
+  let contentChanged = false;
+
+  const merged = nextList.map((item, index) => {
+    const match =
+      typeof item.id === "string" && liveById.has(item.id) ? liveById.get(item.id)! : liveList[index];
+    const base: CampSessionEntry = match ? { ...match } : {};
+
+    for (const [key, value] of Object.entries(item)) {
+      if (CAMP_SESSION_OPERATIONAL_KEYS.has(key)) {
+        base[key] = value;
+      } else if (!offerValuesEqual(value, match?.[key])) {
+        contentChanged = true;
+      }
+    }
+    return base;
+  });
+
+  return { merged, contentChanged };
 }

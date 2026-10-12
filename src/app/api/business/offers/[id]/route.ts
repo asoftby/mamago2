@@ -36,8 +36,8 @@ import {
   collectChangedOfferColumns,
   buildModerationNoticeMessage,
   decidePublishedOfferEdit,
+  mergeCampSessionsForPublished,
   offerValuesEqual,
-  shouldBlockPublishedOfferEdit,
 } from "@/lib/offers/offerPublishedEditGate";
 import {
   assertContentLifecycleOperationAllowed,
@@ -277,14 +277,6 @@ export async function PATCH(
     if (!existingOffer || !(await canManagePlaceAsync(user, existingOffer.place))) {
       return NextResponse.json({ error: "Offer not found" }, { status: 404 });
     }
-
-    // Опубликованный оффер у не-админа проверяется по полям (см. offerPublishedEditGate):
-    // контентные изменения требуют модерации, операционные применяются сразу и пишутся в журнал.
-    // Решение принимается ниже, когда известен итоговый набор колонок, но до любой записи в БД.
-    const fieldwiseGate = shouldBlockPublishedOfferEdit({
-      role: user.role,
-      currentStatus: existingOffer.status,
-    });
 
     const updateData: Prisma.OfferUpdateInput = {};
 
@@ -557,75 +549,89 @@ export async function PATCH(
       }
     }
 
-    let skipRequestedPlacements = false;
-    let moderationNotice: { message: string; fields: string[]; code: string } | null = null;
-    let operationalJournal: { columns: string[]; before: Record<string, unknown>; after: Record<string, unknown> } | null = null;
-    if (fieldwiseGate) {
-      const live = await prisma.offer.findUniqueOrThrow({ where: { id } });
-      const changedColumns = collectChangedOfferColumns(
-        updateData as Record<string, unknown>,
-        live as unknown as Record<string, unknown>,
-      );
-      if (data.requestedPlacements !== undefined) {
-        const currentPlacements = await prisma.offerPlacement.findMany({
-          where: { offerId: id },
-          select: { key: true },
-        });
-        const current = currentPlacements.map((placement) => placement.key).sort();
-        const next = [...new Set(data.requestedPlacements)].sort();
-        if (!offerValuesEqual(current, next)) changedColumns.push("requestedPlacements");
-      }
-      const decision = decidePublishedOfferEdit({
-        role: user.role,
-        currentStatus: existingOffer.status,
-        changedColumns,
-      });
-      if (decision.blocked) {
-        // Контент опубликованного оффера до модерации не меняем: отбрасываем контентные колонки,
-        // операционные (цены, расписание, контакты) сохраняем и сообщаем партнёру, что осталось за поддержкой.
-        for (const column of decision.contentColumns) {
-          if (column === "requestedPlacements") {
-            skipRequestedPlacements = true;
-          } else {
-            delete (updateData as Record<string, unknown>)[column];
-          }
-        }
-        moderationNotice = {
-          message: buildModerationNoticeMessage({
-            contentColumns: decision.contentColumns,
-            operationalColumns: decision.operationalColumns,
-          }),
-          fields: decision.contentColumns,
-          code: OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
-        };
-      }
-      if (decision.operationalColumns.length > 0) {
-        const toJournal = (value: unknown) =>
-          value !== null && typeof value === "object" && value.constructor?.name === "DbNull"
-            ? null
-            : JSON.parse(JSON.stringify(value ?? null));
-        operationalJournal = {
-          columns: decision.operationalColumns,
-          before: Object.fromEntries(
-            decision.operationalColumns.map((column) => [column, toJournal((live as Record<string, unknown>)[column])]),
-          ),
-          after: Object.fromEntries(
-            decision.operationalColumns.map((column) => [
-              column,
-              toJournal((updateData as Record<string, unknown>)[column]),
-            ]),
-          ),
-        };
-      }
-    }
+    // Результат проверки опубликованного оффера по полям (заполняется внутри транзакции).
+    const gate: {
+      skipRequestedPlacements: boolean;
+      moderationNotice: { message: string; fields: string[]; code: string } | null;
+      journal: { columns: string[]; before: Record<string, unknown>; after: Record<string, unknown> } | null;
+    } = { skipRequestedPlacements: false, moderationNotice: null, journal: null };
+
+    const gateApplies = !canPublishContentDirectly(user.role);
 
     const offer = await prisma.$transaction(async (tx) => {
+      if (gateApplies) {
+        // Сравнение с живой строкой и запись — один снимок: блокируем строку, чтобы правка админа
+        // между чтением и записью не была перезаписана устаревшим контентом из payload мастера.
+        await tx.$queryRaw`SELECT "id" FROM "Offer" WHERE "id" = ${id} FOR UPDATE`;
+        const live = await tx.offer.findUniqueOrThrow({ where: { id } });
+        const liveRecord = live as unknown as Record<string, unknown>;
+        const updateRecord = updateData as Record<string, unknown>;
+
+        let campTextsChanged = false;
+        if (live.status === "PUBLISHED" && "campSessions" in updateRecord) {
+          const campResult = mergeCampSessionsForPublished(live.campSessions, updateRecord.campSessions);
+          updateRecord.campSessions = campResult.merged as unknown as Prisma.InputJsonValue;
+          campTextsChanged = campResult.contentChanged;
+        }
+
+        const changedColumns = collectChangedOfferColumns(updateRecord, liveRecord);
+        if (campTextsChanged) changedColumns.push("campSessionTexts");
+        if (live.status === "PUBLISHED" && data.requestedPlacements !== undefined) {
+          const currentPlacements = await tx.offerPlacement.findMany({
+            where: { offerId: id },
+            select: { key: true },
+          });
+          const current = currentPlacements.map((placement) => placement.key).sort();
+          const next = [...new Set(data.requestedPlacements)].sort();
+          if (!offerValuesEqual(current, next)) changedColumns.push("requestedPlacements");
+        }
+
+        const decision = decidePublishedOfferEdit({
+          role: user.role,
+          currentStatus: live.status,
+          changedColumns,
+        });
+
+        if (decision.blocked) {
+          // Контент опубликованного оффера до модерации не меняем: контентные колонки отбрасываем,
+          // операционные (цены, расписание, контакты) сохраняем и говорим партнёру, что осталось за поддержкой.
+          for (const column of decision.contentColumns) {
+            if (column === "requestedPlacements") gate.skipRequestedPlacements = true;
+            else delete updateRecord[column];
+          }
+          gate.moderationNotice = {
+            message: buildModerationNoticeMessage({
+              contentColumns: decision.contentColumns,
+              operationalColumns: decision.operationalColumns,
+            }),
+            fields: decision.contentColumns,
+            code: OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
+          };
+        }
+
+        if (decision.operationalColumns.length > 0) {
+          const toJournal = (value: unknown) =>
+            value !== null && typeof value === "object" && value.constructor?.name === "DbNull"
+              ? null
+              : JSON.parse(JSON.stringify(value ?? null));
+          gate.journal = {
+            columns: decision.operationalColumns,
+            before: Object.fromEntries(
+              decision.operationalColumns.map((column) => [column, toJournal(liveRecord[column])]),
+            ),
+            after: Object.fromEntries(
+              decision.operationalColumns.map((column) => [column, toJournal(updateRecord[column])]),
+            ),
+          };
+        }
+      }
+
       await tx.offer.update({
         where: { id },
         data: updateData,
       });
 
-      if (operationalJournal) {
+      if (gate.journal) {
         await tx.adminAuditLog.create({
           data: {
             actorId: user.id,
@@ -633,9 +639,9 @@ export async function PATCH(
             action: "offer.operational_edit",
             entityType: "Offer",
             entityId: id,
-            before: operationalJournal.before as Prisma.InputJsonValue,
-            after: operationalJournal.after as Prisma.InputJsonValue,
-            metadata: { columns: operationalJournal.columns, status: existingOffer.status },
+            before: gate.journal.before as Prisma.InputJsonValue,
+            after: gate.journal.after as Prisma.InputJsonValue,
+            metadata: { columns: gate.journal.columns, status: existingOffer.status },
           },
         });
       }
@@ -646,8 +652,8 @@ export async function PATCH(
         actorUserId: user.id,
         productType,
         requestedPlacementsStrategy: "preserve_if_missing",
-        requestedPlacements: skipRequestedPlacements ? undefined : data.requestedPlacements,
-        requestedPlacementsProvided: !skipRequestedPlacements && data.requestedPlacements !== undefined,
+        requestedPlacements: gate.skipRequestedPlacements ? undefined : data.requestedPlacements,
+        requestedPlacementsProvided: !gate.skipRequestedPlacements && data.requestedPlacements !== undefined,
       });
 
       // Only CAMP edits own this projection. Other schedule kinds also use
@@ -736,7 +742,7 @@ export async function PATCH(
     timer.mark("response");
     timer.log({ status: offer.status });
 
-    return NextResponse.json(moderationNotice ? { ...offer, moderationNotice } : offer);
+    return NextResponse.json(gate.moderationNotice ? { ...offer, moderationNotice: gate.moderationNotice } : offer);
 
   } catch (error) {
     timer.log({ error: 1 });
