@@ -68,6 +68,7 @@ const createOfferSchema = z.object({
   kind: z.enum(["VISIT", "CLASS", "PARTY", "EVENT_TICKET"]),
   title: z.string().min(1),
   shortDescription: z.string().min(1),
+  description: z.string().optional(),
   agePolicy: z.nativeEnum(AgePolicy),
   ageMinMonths: z.number().nullable().optional(),
   ageMaxMonths: z.number().nullable().optional(),
