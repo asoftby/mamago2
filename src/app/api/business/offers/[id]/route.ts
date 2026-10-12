@@ -661,14 +661,6 @@ export async function PATCH(
           throw new OfferStaleSnapshotError();
         }
 
-        if (live.status === "PUBLISHED") {
-          // Тип «лагерь» у опубликованного оффера не меняется (смена типа — контент), смены — из итоговых данных.
-          gate.campProjection = {
-            isCamp: Boolean(live.campProgramType),
-            sessions: "campSessions" in updateRecord ? updateRecord.campSessions : live.campSessions,
-          };
-        }
-
         if (decision.blocked) {
           // Контент опубликованного оффера до модерации не меняем: контентные колонки отбрасываем,
           // операционные (цены, расписание, контакты) сохраняем и говорим партнёру, что осталось за поддержкой.
@@ -683,6 +675,16 @@ export async function PATCH(
             }),
             fields: decision.contentColumns,
             code: OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
+          };
+        }
+
+        if (live.status === "PUBLISHED") {
+          // Тип «лагерь» у опубликованного оффера не меняется (смена типа — контент). Проекция смен строится
+          // из принятых данных — после отбрасывания контентных колонок: если `campSessions` ушла вместе со
+          // сменой типа, проекция берёт живые смены, а не присланные.
+          gate.campProjection = {
+            isCamp: Boolean(live.campProgramType),
+            sessions: "campSessions" in updateRecord ? updateRecord.campSessions : live.campSessions,
           };
         }
 

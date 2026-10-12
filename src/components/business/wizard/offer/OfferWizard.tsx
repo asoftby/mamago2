@@ -736,12 +736,17 @@ export function OfferWizard({
         body: JSON.stringify({ ...updatePayload, expectedUpdatedAt: entityUpdatedAtIso ?? undefined }),
       });
 
-      const submitted = await parseOfferMutationResponse<{ moderationNotice?: { message: string } }>(response, {
+      const submitted = await parseOfferMutationResponse<{
+        updatedAt?: string;
+        moderationNotice?: { message: string };
+      }>(response, {
         fallbackMessage: "Failed to submit offer",
         operation: "submit offer",
         payload: updatePayload,
       });
 
+      // Версия для защиты от устаревшего снимка: после успешной записи следующая правка идёт от неё.
+      if (submitted?.updatedAt) setEntityUpdatedAtIso(new Date(submitted.updatedAt).toISOString());
       if (submitted?.moderationNotice?.message) {
         // Ревизий пока нет: контентные правки не сохранены, поэтому «отправлено»/«опубликовано» не показываем.
         toast.info(submitted.moderationNotice.message);
