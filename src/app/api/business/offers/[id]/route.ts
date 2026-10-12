@@ -7,6 +7,7 @@ import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
+import { isValidOfferPhone } from "@/lib/offers/offerPhone";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { getCampSessionPriceValues } from "@/lib/offers/campPricing";
 import { normalizePublicationPrice } from "@/domain/pricing/normalizedPrice";
@@ -569,6 +570,13 @@ export async function PATCH(
         const liveRecord = live as unknown as Record<string, unknown>;
         const updateRecord = updateData as Record<string, unknown>;
 
+        // «Отправка на модерацию» из мастера добавляет к payload синтетический `status: PENDING`.
+        // Для опубликованного оффера не-админа это не правка автора: опубликованное не снимаем с
+        // публикации и не показываем ложное «контент отклонён».
+        if (live.status === "PUBLISHED" && updateRecord.status === "PENDING") {
+          delete updateRecord.status;
+        }
+
         let campTextsChanged = false;
         if (live.status === "PUBLISHED" && "campSessions" in updateRecord) {
           const campResult = mergeCampSessionsForPublished(live.campSessions, updateRecord.campSessions);
@@ -602,10 +610,19 @@ export async function PATCH(
           if (!offerValuesEqual(current, next)) changedColumns.push("requestedPlacements");
         }
 
+        // Номера телефонов — операционные, только пока это действительно номер: произвольный текст
+        // в поле «телефон» показывается публично, поэтому такое значение уходит в контент.
+        const invalidPhoneColumns = ["contactPhone", "contactPhone2", "contactPhone3"].filter((column) => {
+          if (!changedColumns.includes(column)) return false;
+          const value = updateRecord[column];
+          return typeof value === "string" && value.trim() !== "" && !isValidOfferPhone(value);
+        });
+
         const decision = decidePublishedOfferEdit({
           role: user.role,
           currentStatus: live.status,
           changedColumns,
+          forceContentColumns: invalidPhoneColumns,
         });
 
         if (live.status === "PUBLISHED") {

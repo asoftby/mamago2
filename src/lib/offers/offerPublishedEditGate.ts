@@ -96,6 +96,8 @@ export function decidePublishedOfferEdit(params: {
   role: Role;
   currentStatus: OfferStatus;
   changedColumns: readonly string[];
+  /** Колонки, которые считаем контентом независимо от списка (например, «телефон» с произвольным текстом). */
+  forceContentColumns?: readonly string[];
 }): PublishedOfferEditDecision {
   const contentColumns: string[] = [];
   const operationalColumns: string[] = [];
@@ -106,7 +108,7 @@ export function decidePublishedOfferEdit(params: {
   }
 
   for (const column of params.changedColumns) {
-    const kind = classifyOfferColumn(column);
+    const kind = params.forceContentColumns?.includes(column) ? "content" : classifyOfferColumn(column);
     if (kind === "content") contentColumns.push(column);
     else if (kind === "operational") operationalColumns.push(column);
   }

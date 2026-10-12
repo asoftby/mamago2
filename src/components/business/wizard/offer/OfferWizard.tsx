@@ -640,10 +640,8 @@ export function OfferWizard({
 
       showSuccessModal({
         kind: "offer",
-        outcome:
-          canDirectPublish && mode === "edit" && isPublishedEditMode
-            ? "changes_published"
-            : "draft_saved",
+        // Опубликованный оффер: принятые операционные правки (цены, расписание, контакты) уже живые.
+        outcome: mode === "edit" && isPublishedEditMode ? "changes_published" : "draft_saved",
         id: offerId!,
         isEdit: true,
         slug: offer?.slug ?? null,

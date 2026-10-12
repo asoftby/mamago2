@@ -106,6 +106,19 @@ assert.equal(classifyOfferColumn("somethingNew"), "content");
   assert.deepEqual(d.contentColumns, ["title"]);
 }
 
+// forceContentColumns: «телефон» с произвольным текстом считается контентом
+{
+  const d = decidePublishedOfferEdit({
+    role: "BUSINESS_OWNER",
+    currentStatus: "PUBLISHED",
+    changedColumns: ["contactPhone", "priceFrom"],
+    forceContentColumns: ["contactPhone"],
+  });
+  assert.equal(d.blocked, true);
+  assert.deepEqual(d.contentColumns, ["contactPhone"]);
+  assert.deepEqual(d.operationalColumns, ["priceFrom"]);
+}
+
 // Ничего не изменилось → не блокируется
 assert.equal(
   decidePublishedOfferEdit({ role: "BUSINESS_OWNER", currentStatus: "PUBLISHED", changedColumns: [] }).blocked,
