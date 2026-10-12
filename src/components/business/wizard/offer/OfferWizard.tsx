@@ -327,10 +327,10 @@ export function OfferWizard({
   // навсегда — обратно только через «Далее» на этом шаге.
   useEffect(() => {
     setCompletedSteps((prev) => {
-      const next = prev.filter((key) => isStepComplete(key, formData));
+      const next = prev.filter((key) => isStepComplete(key, formData, variant));
       return next.length === prev.length ? prev : next;
     });
-  }, [formData]);
+  }, [formData, variant]);
 
   // Смена любого persisted-типа (даже SINGLE → SINGLE) сбрасывает прогресс:
   // проверки и обязательные поля могут отличаться внутри одного wizardType.
@@ -523,8 +523,8 @@ export function OfferWizard({
   // Navigation by step key
   const handleNext = () => {
     // Шаг помечается completed только здесь — после успешной валидации по «Далее»
-    if (!isStepComplete(currentStepKey, formData)) {
-      const missing = getMissingFieldsForStep(currentStepKey, formData);
+    if (!isStepComplete(currentStepKey, formData, variant)) {
+      const missing = getMissingFieldsForStep(currentStepKey, formData, variant);
       toast.error(
         missing.length > 0
           ? `Заполните: ${missing.join(", ")}`
@@ -663,7 +663,7 @@ export function OfferWizard({
   // Submit for moderation
   const handleSubmit = async () => {
     if (isSubmitting) return;
-    const validation = validateForSubmit(formData);
+    const validation = validateForSubmit(formData, variant);
     
     if (!validation.isComplete) {
       toast.error(validation.errors[0] || "Заполните все обязательные поля");
@@ -795,7 +795,7 @@ export function OfferWizard({
     const renderBlock = (key: OfferWizardStepKey): React.ReactNode => {
       switch (key) {
         case "type":
-          return <Step1Type {...commonProps} />;
+          return <Step1Type {...commonProps} showCategories={variant === "v2"} />;
         case "placements":
           return <Step2Placements {...commonProps} />;
         case "details":
@@ -861,14 +861,14 @@ export function OfferWizard({
   const isChoosingOfferType = currentStepKey === "type" && !formData.productType;
 
   const submitValidation: ValidationResult = isReviewStep
-    ? validateForSubmit(formData)
+    ? validateForSubmit(formData, variant)
     : { isValid: true, isComplete: true, errors: [], warnings: [] };
 
   // Эффективный статус: шаг пройден через «Далее» И его данные всё ещё валидны.
   // «Проверка» — только когда эффективно завершены все предыдущие шаги.
   const progressSteps = useMemo(() => {
     const isEffectivelyCompleted = (key: OfferWizardStepKey): boolean => {
-      if (!completedSteps.includes(key) || !isStepComplete(key, formData)) {
+      if (!completedSteps.includes(key) || !isStepComplete(key, formData, variant)) {
         return false;
       }
       if (key === "review") {
@@ -891,7 +891,7 @@ export function OfferWizard({
         !isPublishedEditMode &&
         !effective[idx] && idx + 1 !== currentStepNum && idx !== firstIncompleteIdx,
     }));
-  }, [completedSteps, currentStepNum, formData, isPublishedEditMode, steps]);
+  }, [completedSteps, currentStepNum, formData, isPublishedEditMode, steps, variant]);
 
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
   const actionLabels = useMemo(() => {

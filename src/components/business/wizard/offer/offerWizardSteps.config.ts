@@ -297,17 +297,23 @@ export function getPreviousStepKey(
  */
 export function isStepComplete(
   stepKey: OfferWizardStepKey,
-  data: OfferFormData
+  data: OfferFormData,
+  variant: OfferWizardVariant = "v1",
 ): boolean {
   if (isV2CompositeStepKey(stepKey)) {
-    return getV2StepMembers(stepKey, data).every((member) => isStepComplete(member, data));
+    return getV2StepMembers(stepKey, data).every((member) => isStepComplete(member, data, variant));
   }
 
   const detailedDescriptionLength = getRichTextLength(data.description || "");
 
   switch (stepKey) {
     case "type":
-      return !!data.offerWizardType && !!data.productType;
+      // Новый мастер: категория обязательна (хотя бы одна).
+      return (
+        !!data.offerWizardType &&
+        !!data.productType &&
+        (variant !== "v2" || data.categoryIds.length > 0)
+      );
 
     case "placements":
       if (data.requestedPlacements.length === 0) return false;
@@ -461,10 +467,11 @@ export function isStepComplete(
  */
 export function getMissingFieldsForStep(
   stepKey: OfferWizardStepKey,
-  data: OfferFormData
+  data: OfferFormData,
+  variant: OfferWizardVariant = "v1",
 ): string[] {
   if (isV2CompositeStepKey(stepKey)) {
-    return getV2StepMembers(stepKey, data).flatMap((member) => getMissingFieldsForStep(member, data));
+    return getV2StepMembers(stepKey, data).flatMap((member) => getMissingFieldsForStep(member, data, variant));
   }
 
   const missing: string[] = [];
@@ -473,6 +480,7 @@ export function getMissingFieldsForStep(
   switch (stepKey) {
     case "type":
       if (!data.productType) missing.push("Формат предложения");
+      else if (variant === "v2" && data.categoryIds.length === 0) missing.push("Категория");
       break;
 
     case "placements":

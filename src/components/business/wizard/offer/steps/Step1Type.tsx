@@ -9,6 +9,7 @@ import {
   Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { OfferCategoryPicker } from "../components/OfferCategoryPicker";
 import type { LucideIcon } from "lucide-react";
 import type { OfferFormData, OfferProductType } from "../types";
 import {
@@ -27,6 +28,8 @@ interface Step1TypeProps {
       | ((prev: OfferFormData) => Partial<OfferFormData>),
   ) => void;
   isEditable: boolean;
+  /** Новый мастер: показывать выбор категорий после выбора формата. */
+  showCategories?: boolean;
 }
 
 const icons: Record<OfferCreationCategoryKey, LucideIcon> = {
@@ -36,7 +39,7 @@ const icons: Record<OfferCreationCategoryKey, LucideIcon> = {
   camps: CalendarRange,
 };
 
-export function Step1Type({ data, onChange, isEditable }: Step1TypeProps) {
+export function Step1Type({ data, onChange, isEditable, showCategories = false }: Step1TypeProps) {
   // Remember an expanded category before its subtype has been selected.
   // Once a subtype is chosen, productType remains the source of truth (also on edit/restore).
   const [expandedCategory, setExpandedCategory] = useState<OfferCreationCategoryKey | null>(null);
@@ -51,6 +54,8 @@ export function Step1Type({ data, onChange, isEditable }: Step1TypeProps) {
     const selection = getOfferTypeSelection(productType);
     onChange((prev) => ({
       ...selection,
+      // Категории зависят от формата: при смене формата выбор сбрасывается.
+      categoryIds: [],
       serviceType: null,
       locationType: null,
       classFormat:
@@ -86,6 +91,7 @@ export function Step1Type({ data, onChange, isEditable }: Step1TypeProps) {
         durationType: null,
         intent: null,
         requestedPlacements: [],
+        categoryIds: [],
       });
     }
   };
@@ -183,6 +189,15 @@ export function Step1Type({ data, onChange, isEditable }: Step1TypeProps) {
             })}
           </div>
         </section>
+      )}
+
+      {showCategories && data.productType && (
+        <OfferCategoryPicker
+          productType={data.productType}
+          value={data.categoryIds}
+          onChange={(categoryIds) => onChange({ categoryIds })}
+          isEditable={isEditable}
+        />
       )}
     </div>
   );

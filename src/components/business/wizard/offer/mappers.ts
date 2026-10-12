@@ -683,6 +683,7 @@ export function buildOfferCreatePayload(
       })),
     discoverySignalIds: data.signalIds,
     classChipSlugs: data.classChipSlugs,
+    categoryIds: data.categoryIds,
     wizardCompletedSteps: opts?.wizardCompletedSteps,
     faqItems: normalizeFaqItems(data.faqItems),
     status: opts?.status ?? "DRAFT",
@@ -887,6 +888,7 @@ export function buildOfferUpdatePayload(
       })),
     discoverySignalIds: data.signalIds,
     classChipSlugs: data.classChipSlugs,
+    categoryIds: data.categoryIds,
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
@@ -934,6 +936,7 @@ export function mapOfferToFormData(offer: {
   agePolicy: import("@prisma/client").AgePolicy;
   discoverySignalIds?: string[];
   classChipSlugs?: string[];
+  categoryLinks?: Array<{ categoryId: string; sortOrder: number }> | null;
   // Camp fields
   campProgramType?: string | null;
   campSessions?: unknown;
@@ -1123,6 +1126,9 @@ export function mapOfferToFormData(offer: {
     ...legacyCtaFields,
     signalIds: offer.discoverySignalIds ?? [],
     classChipSlugs: offer.classChipSlugs ?? [],
+    categoryIds: [...(offer.categoryLinks ?? [])]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((link) => link.categoryId),
     placeVisitDetails: parsePlaceVisitDetailsFromDb(offer.details),
     ...(productType === "ONE_TIME_ACTIVITY" || productType === "REGULAR_ACTIVITY"
       ? parseActivityDetailsFromDb(offer.details)

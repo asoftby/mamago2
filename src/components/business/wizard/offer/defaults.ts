@@ -117,6 +117,7 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     // Signals (DISCOVERY domain, entityType=OFFER)
     signalIds: [],
     classChipSlugs: [],
+    categoryIds: [],
     
     // PLACE_VISIT type-specific details
     placeVisitDetails: {

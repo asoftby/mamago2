@@ -1026,6 +1026,7 @@ model EventCategory {
   filterPlacements     DiscoveryFilterPlacement[]
   articles             Article[]                    @relation("ArticleCategory")
   articleAdditionalLinks ArticleCategoryLink[]      @relation("ArticleAdditionalCategory")
+  offerCategories      OfferCategory[]
 
   @@unique([publicationType, slug])
   @@index([sortOrder])
@@ -2504,6 +2505,7 @@ model Offer {
   archivedBy      User?              @relation("OfferArchiver", fields: [archivedByUserId], references: [id])
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])
   placements      OfferPlacement[]
+  categoryLinks   OfferCategory[]
   place           Place?             @relation(fields: [placeId], references: [id], onDelete: Cascade)
   city            City?              @relation("OfferCity", fields: [cityId], references: [id])
   slugHistory     OfferSlugHistory[]
@@ -2529,6 +2531,23 @@ model Offer {
   // Party-filter indexes (Phase 3b-1)
   @@index([category])
   @@index([minChildren, maxChildren])
+}
+
+/// Категории предложения (до 3, обязательна хотя бы одна в новом мастере).
+/// Справочник — EventCategory: для праздников/лагерей/занятий publicationType=OFFER
+/// (slug с префиксом формата: party-*, camp-*, class-*), для «Место/посещение» — корневые PLACE.
+model OfferCategory {
+  id         String        @id @default(cuid())
+  offerId    String
+  categoryId String
+  sortOrder  Int           @default(0)
+  createdAt  DateTime      @default(now())
+  offer      Offer         @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  category   EventCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@unique([offerId, categoryId])
+  @@index([offerId, sortOrder])
+  @@index([categoryId])
 }
 
 model OfferPlacement {

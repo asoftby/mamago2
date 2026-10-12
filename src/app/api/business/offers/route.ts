@@ -24,6 +24,7 @@ import {
   mapProductTypeToLegacyKind,
 } from "@/lib/offers/offerPersistenceCompatibility";
 import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
+import { OfferCategoriesError, syncOfferCategories } from "@/server/offers/offerCategories";
 import { projectCampSessions } from "@/server/offers/campSessionProjection";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
@@ -110,6 +111,8 @@ const createOfferSchema = z.object({
     }),
   ).optional(),
   faqItems: z.array(z.record(z.string(), z.unknown())).nullish(),
+  /** Категории предложения (до 3, справочник зависит от формата). */
+  categoryIds: z.array(z.string()).max(3).optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).default("DRAFT"),
   discoverySignalIds: z.array(z.string()).default([]),
   classChipSlugs: z.array(z.string()).default([]),
@@ -418,6 +421,15 @@ export async function POST(request: NextRequest) {
           requestedPlacements: data.requestedPlacements,
         });
 
+        if (data.categoryIds !== undefined) {
+          await syncOfferCategories({
+            db: tx,
+            offerId: createdOffer.id,
+            productType,
+            categoryIds: data.categoryIds,
+          });
+        }
+
         // CAMP: project campSessions JSON (canon) into queryable OfferSession rows
         if (data.campProgramType) {
           await projectCampSessions(tx, createdOffer.id, data.campSessions);
@@ -499,6 +511,19 @@ export async function POST(request: NextRequest) {
     timer.log({ error: 1 });
     console.error("Create offer error:", error);
     
+    if (error instanceof OfferCategoriesError) {
+      return NextResponse.json(
+        {
+          error:
+            error.code === "TOO_MANY"
+              ? "Можно выбрать не больше 3 категорий"
+              : "Выбраны категории, которые не подходят для этого формата",
+          code: "INVALID_OFFER_CATEGORIES",
+        },
+        { status: 400 },
+      );
+    }
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         formatZodErrorResponse(error),
