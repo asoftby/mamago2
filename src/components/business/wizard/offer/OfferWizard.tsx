@@ -573,7 +573,7 @@ export function OfferWizard({
         const response = await fetch(`/api/business/offers/${offerId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ ...payload, expectedUpdatedAt: entityUpdatedAtIso ?? undefined }),
         });
 
         // Сервер сохранил правки: локальный черновик не нужен, dirty-база — текущее состояние
@@ -733,7 +733,7 @@ export function OfferWizard({
       const response = await fetch(`/api/business/offers/${offerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatePayload),
+        body: JSON.stringify({ ...updatePayload, expectedUpdatedAt: entityUpdatedAtIso ?? undefined }),
       });
 
       const submitted = await parseOfferMutationResponse<{ moderationNotice?: { message: string } }>(response, {

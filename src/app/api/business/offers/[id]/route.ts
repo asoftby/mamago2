@@ -117,6 +117,8 @@ const updateOfferSchema = z.object({
     }),
   ).optional(),
   faqItems: z.array(z.record(z.string(), z.unknown())).nullish(),
+  /** Версия оффера (`updatedAt`), на которой клиент построил форму: защита от записи устаревшего снимка. */
+  expectedUpdatedAt: z.string().optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
   discoverySignalIds: z.array(z.string()).optional(),
   classChipSlugs: z.array(z.string()).optional(),
@@ -208,6 +210,9 @@ export async function GET(
 }
 
 // Re-trigger build for schema updates
+/** Оффер изменили после загрузки редактора, а владелец сохраняет операционные значения. */
+class OfferStaleSnapshotError extends Error {}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -622,7 +627,15 @@ export async function PATCH(
         // смены, тип/вид), уходит вместе с ней: иначе живая карточка получит цену и смены нового типа
         // при прежнем типе.
         const TYPE_SWITCH_COLUMNS = ["productType", "kind", "campProgramType"];
-        const TYPE_DERIVED_COLUMNS = ["priceFrom", "priceTo", "priceMode", "priceItems", "priceText", "campSessions"];
+        const TYPE_DERIVED_COLUMNS = [
+          "priceFrom",
+          "priceTo",
+          "priceMode",
+          "priceItems",
+          "priceText",
+          "priceTextDerived",
+          "campSessions",
+        ];
         const typeSwitched = TYPE_SWITCH_COLUMNS.some((column) => changedColumns.includes(column));
         const typeDerivedColumns = typeSwitched
           ? TYPE_DERIVED_COLUMNS.filter((column) => changedColumns.includes(column))
@@ -634,6 +647,19 @@ export async function PATCH(
           changedColumns,
           forceContentColumns: [...invalidPhoneColumns, ...typeDerivedColumns],
         });
+
+        // Устаревший снимок формы: оффер изменили после загрузки редактора (например, админ поправил цену),
+        // а владелец сохраняет операционные значения. Мы не знаем, какие из них он правил сам, поэтому
+        // не перезаписываем чужие правки — просим обновить страницу. Контентные правки конфликта не создают
+        // (они уходят в ревизию).
+        if (
+          live.status === "PUBLISHED" &&
+          decision.operationalColumns.length > 0 &&
+          data.expectedUpdatedAt &&
+          new Date(data.expectedUpdatedAt).getTime() !== live.updatedAt.getTime()
+        ) {
+          throw new OfferStaleSnapshotError();
+        }
 
         if (live.status === "PUBLISHED") {
           // Тип «лагерь» у опубликованного оффера не меняется (смена типа — контент), смены — из итоговых данных.
@@ -804,6 +830,18 @@ export async function PATCH(
   } catch (error) {
     timer.log({ error: 1 });
     console.error("Update offer error:", error);
+
+    if (error instanceof OfferStaleSnapshotError) {
+      return NextResponse.json(
+        {
+          error: "OFFER_STALE_SNAPSHOT",
+          code: "OFFER_STALE_SNAPSHOT",
+          message: "Предложение изменили, пока вы его редактировали",
+          description: "Обновите страницу, чтобы не затереть чужие правки цен, расписания и контактов, и повторите изменения.",
+        },
+        { status: 409 },
+      );
+    }
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
