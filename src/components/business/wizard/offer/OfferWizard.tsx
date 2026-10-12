@@ -588,7 +588,12 @@ export function OfferWizard({
         if (saved?.updatedAt) {
           setEntityUpdatedAtIso(new Date(saved.updatedAt).toISOString());
         }
-        if (saved?.moderationNotice?.message) toast.info(saved.moderationNotice.message);
+        if (saved?.moderationNotice?.message) {
+          // Сервер не принял контентные правки опубликованного предложения: форма остаётся «грязной»
+          // (предупреждение при уходе, черновик не теряется), а не выглядит сохранённой.
+          toast.info(saved.moderationNotice.message);
+          return;
+        }
         setBaselineFormJson(JSON.stringify(formData));
         draft.markClean();
       } else {
@@ -739,7 +744,11 @@ export function OfferWizard({
         payload: updatePayload,
       });
 
-      if (submitted?.moderationNotice?.message) toast.info(submitted.moderationNotice.message);
+      if (submitted?.moderationNotice?.message) {
+        // Ревизий пока нет: контентные правки не сохранены, поэтому «отправлено»/«опубликовано» не показываем.
+        toast.info(submitted.moderationNotice.message);
+        return;
+      }
       setBaselineFormJson(JSON.stringify(formData));
       draft.markClean();
       showSuccessModal({

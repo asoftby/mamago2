@@ -24,7 +24,7 @@ export const OFFER_OPERATIONAL_COLUMNS: ReadonlySet<string> = new Set([
   "priceMode",
   "priceItems",
   "priceText",
-  "priceCaption",
+  // `priceCaption` — rich-text («что входит», условия) → контент, модерируется.
   // смены (даты, цена, места)
   "campSessions",
   // телефоны и способ связи
@@ -145,6 +145,7 @@ const CONTENT_COLUMN_LABELS: Record<string, string> = {
   discoverySignalIds: "интересы",
   occasions: "поводы",
   contactWebsite: "ссылки",
+  priceCaption: "подпись к цене",
   contactSocialLinks: "ссылки",
   requestedPlacements: "разделы каталога",
   campSessionTexts: "тексты смен",
@@ -214,8 +215,9 @@ export function mergeCampSessionsForPublished(
   let contentChanged = false;
 
   const merged = nextList.map((item, index) => {
+    // Неизвестный `id` — новая смена (пустая основа); по позиции сопоставляем только смены без `id`.
     const match =
-      typeof item.id === "string" && liveById.has(item.id) ? liveById.get(item.id)! : liveList[index];
+      typeof item.id === "string" ? liveById.get(item.id) : liveList[index];
     const base: CampSessionEntry = match ? { ...match } : {};
 
     for (const [key, value] of Object.entries(item)) {

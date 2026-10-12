@@ -69,6 +69,7 @@ assert.equal(canPublishContentDirectly("BUSINESS_OWNER"), false);
 // Классификация колонок: цены/телефоны/смены — операционные; текст и медиа — контент;
 // неизвестная колонка — контент (по умолчанию не обходит модерацию)
 assert.equal(classifyOfferColumn("priceFrom"), "operational");
+assert.equal(classifyOfferColumn("priceCaption"), "content");
 assert.equal(classifyOfferColumn("campSessions"), "operational");
 assert.equal(classifyOfferColumn("contactPhone2"), "operational");
 assert.equal(classifyOfferColumn("wizardCompletedSteps"), "service");
@@ -179,6 +180,16 @@ assert.equal(
   ]);
   assert.equal(c.contentChanged, true);
   assert.deepEqual(c.merged[1], { id: "s2", dateFrom: "2026-08-01", priceOverride: "700" });
+  // смена с неизвестным id не наследует контент чужой смены по позиции
+  const f = mergeCampSessionsForPublished(live, [
+    { id: "other", title: "Замена", dateFrom: "2026-07-01", priceOverride: "450" },
+  ]);
+  assert.equal(f.contentChanged, true);
+  assert.deepEqual(f.merged, [{ id: "other", dateFrom: "2026-07-01", priceOverride: "450" }]);
+  // смена без id сопоставляется по позиции
+  const g = mergeCampSessionsForPublished(live, [{ title: "Июнь", description: "Описание", priceOverride: "520" }]);
+  assert.equal(g.contentChanged, false);
+  assert.equal((g.merged[0] as { title?: string }).title, "Июнь");
   // удаление смены — операционная правка
   const d = mergeCampSessionsForPublished(live, []);
   assert.equal(d.contentChanged, false);
