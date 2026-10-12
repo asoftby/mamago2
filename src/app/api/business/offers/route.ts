@@ -342,7 +342,8 @@ export async function POST(request: NextRequest) {
             contactWebsite: data.contactWebsite,
             contactSocialLinks: data.contactSocialLinks as Prisma.InputJsonValue | undefined,
             title: data.title,
-            description: data.shortDescription,
+            // Основное описание (rich text) — в Offer.description; краткое — только если полного нет.
+            description: data.description?.trim() ? data.description : data.shortDescription,
             coverImage: data.coverImage,
             galleryImages: data.gallery ?? [],
             videoUrl: data.videoUrl,
