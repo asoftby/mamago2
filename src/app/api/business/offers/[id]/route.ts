@@ -7,6 +7,8 @@ import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
+import { buildRevisionProposal } from "@/lib/offers/offerRevisionPayload";
+import { savePendingOfferRevision } from "@/server/offers/offerRevision.service";
 import { isValidOfferPhone } from "@/lib/offers/offerPhone";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { getCampSessionPriceValues } from "@/lib/offers/campPricing";
@@ -557,7 +559,9 @@ export async function PATCH(
       journal: { columns: string[]; before: Record<string, unknown>; after: Record<string, unknown> } | null;
       /** Для опубликованного оффера проекция смен строится из итоговых данных, а не из payload. */
       campProjection: { isCamp: boolean; sessions: unknown } | null;
-    } = { skipRequestedPlacements: false, moderationNotice: null, journal: null, campProjection: null };
+      /** Создана новая ожидающая ревизия (а не обновлена существующая) — уведомляем админов. */
+      revisionCreated: boolean;
+    } = { skipRequestedPlacements: false, moderationNotice: null, journal: null, campProjection: null, revisionCreated: false };
 
     const gateApplies = !canPublishContentDirectly(user.role);
 
@@ -576,6 +580,12 @@ export async function PATCH(
         if (live.status === "PUBLISHED" && updateRecord.status === "PENDING") {
           delete updateRecord.status;
         }
+
+        // Колонки, присутствовавшие в запросе (до отбрасывания), и исходные смены: нужны для пересчёта ревизии.
+        const presentColumns = Object.keys(updateRecord).filter((column) => column !== "status");
+        const proposedCampSessions = updateRecord.campSessions;
+        if ("campSessions" in updateRecord) presentColumns.push("campSessionTexts");
+        if (data.requestedPlacements !== undefined) presentColumns.push("requestedPlacements");
 
         let campTextsChanged = false;
         if (live.status === "PUBLISHED" && "campSessions" in updateRecord) {
@@ -633,21 +643,41 @@ export async function PATCH(
           };
         }
 
-        if (decision.blocked) {
-          // Контент опубликованного оффера до модерации не меняем: контентные колонки отбрасываем,
-          // операционные (цены, расписание, контакты) сохраняем и говорим партнёру, что осталось за поддержкой.
+        if (live.status === "PUBLISHED") {
+          // Контентные правки не пишем в живую строку, а кладём в ожидающую ревизию (ушедшую на модерацию).
+          // Операционные (цены, расписание, контакты) уже в updateData и применяются сразу.
+          const visibleContent = decision.contentColumns.filter((column) => column !== "status");
+          const proposalValues: Record<string, unknown> = {};
+          for (const column of visibleContent) {
+            if (column === "requestedPlacements") proposalValues[column] = data.requestedPlacements;
+            else if (column === "campSessionTexts") proposalValues[column] = proposedCampSessions;
+            else proposalValues[column] = updateRecord[column];
+          }
+
           for (const column of decision.contentColumns) {
             if (column === "requestedPlacements") gate.skipRequestedPlacements = true;
             else delete updateRecord[column];
           }
-          gate.moderationNotice = {
-            message: buildModerationNoticeMessage({
-              contentColumns: decision.contentColumns,
-              operationalColumns: decision.operationalColumns,
-            }),
-            fields: decision.contentColumns,
-            code: OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
-          };
+
+          const saved = await savePendingOfferRevision(tx, {
+            offerId: id,
+            authorId: user.id,
+            proposal: buildRevisionProposal(visibleContent, proposalValues),
+            presentColumns,
+            live: liveRecord as Record<string, unknown> & { updatedAt?: Date },
+          });
+          gate.revisionCreated = saved.created;
+
+          if (visibleContent.length > 0) {
+            gate.moderationNotice = {
+              message: buildModerationNoticeMessage({
+                contentColumns: visibleContent,
+                operationalColumns: decision.operationalColumns,
+              }),
+              fields: visibleContent,
+              code: OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
+            };
+          }
         }
 
         if (decision.operationalColumns.length > 0) {

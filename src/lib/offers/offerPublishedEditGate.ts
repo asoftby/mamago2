@@ -135,7 +135,7 @@ export function shouldBlockPublishedOfferEdit(params: {
   }).blocked;
 }
 
-const CONTENT_COLUMN_LABELS: Record<string, string> = {
+export const CONTENT_COLUMN_LABELS: Record<string, string> = {
   title: "название",
   description: "описание",
   coverImage: "фото",
@@ -157,6 +157,11 @@ const CONTENT_COLUMN_LABELS: Record<string, string> = {
   campSessionTexts: "тексты смен",
   status: "статус публикации",
 };
+
+/** Название контентного поля для партнёра и модератора. */
+export function labelForContentColumn(column: string): string {
+  return CONTENT_COLUMN_LABELS[column] ?? "другие данные карточки";
+}
 
 /** Человеческое перечисление контентных полей для сообщения партнёру. */
 export function describeContentColumns(columns: readonly string[]): string {

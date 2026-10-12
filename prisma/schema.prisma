@@ -104,6 +104,8 @@ model User {
   businessAccessRequests            BusinessAccessRequest[]          @relation("BusinessAccessRequester")
   reviewedBusinessAccessRequests    BusinessAccessRequest[]          @relation("BusinessAccessRequestReviewedBy")
   placeRevisions                    PlaceRevision[]                  @relation("PlaceRevisionReviewer")
+  offerRevisionsAuthored            OfferRevision[]                  @relation("OfferRevisionAuthor")
+  offerRevisionsReviewed            OfferRevision[]                  @relation("OfferRevisionReviewer")
   planItems                         PlanItem[]                       @relation("PlanItemOwner")
   assignedPlanItems                 PlanItem[]                       @relation("PlanItemAssignee")
   inboxItems                        InboxItem[]
@@ -2504,6 +2506,7 @@ model Offer {
   archivedBy      User?              @relation("OfferArchiver", fields: [archivedByUserId], references: [id])
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])
   placements      OfferPlacement[]
+  revisions       OfferRevision[]
   place           Place?             @relation(fields: [placeId], references: [id], onDelete: Cascade)
   city            City?              @relation("OfferCity", fields: [cityId], references: [id])
   slugHistory     OfferSlugHistory[]
@@ -2529,6 +2532,37 @@ model Offer {
   // Party-filter indexes (Phase 3b-1)
   @@index([category])
   @@index([minChildren, maxChildren])
+}
+
+/// Ревизия опубликованного оффера: контентные правки партнёра (текст, фото, категории и т.п.), которые
+/// не попадают в живую строку до решения модератора. `payload` — предлагаемые значения по колонкам Offer
+/// (+ псевдоколонки: requestedPlacements, categoryIds, campSessionTexts). Одна PENDING-ревизия на оффер.
+model OfferRevision {
+  id               String              @id @default(cuid())
+  offerId          String
+  authorId         String?
+  status           OfferRevisionStatus @default(PENDING)
+  payload          Json
+  changedFields    String[]
+  /// Offer.updatedAt на момент первой записи ревизии — чтобы показать модератору, что оффер менялся позже.
+  baseOfferUpdatedAt DateTime?
+  moderatorComment String?
+  reviewedAt       DateTime?
+  reviewedById     String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  offer            Offer               @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  author           User?               @relation("OfferRevisionAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  reviewedBy       User?               @relation("OfferRevisionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([offerId, status])
+  @@index([status, createdAt])
+}
+
+enum OfferRevisionStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model OfferPlacement {
