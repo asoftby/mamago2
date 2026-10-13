@@ -33,7 +33,7 @@ const INBOX_SELECT = {
   place: { select: { id: true, title: true } },
   partyOrderItem: { select: {
     id: true, partyOrderId: true,
-    partyOrder: { select: { eventDate: true, timeFrom: true } },
+    partyOrder: { select: { eventDate: true, timeFrom: true, timeTo: true } },
   } },
   partyQuotes: {
     orderBy: { version: "desc" as const },
@@ -45,7 +45,11 @@ const INBOX_SELECT = {
 type InboxRow = Prisma.BookingRequestGetPayload<{ select: typeof INBOX_SELECT }>;
 
 function serviceEnd(row: InboxRow): Date | null {
-  return row.endsAt ??
+  const party = row.partyOrderItem?.partyOrder;
+  const partyEnd = party?.eventDate && party.timeTo
+    ? new Date(party.eventDate.toISOString().slice(0, 10) + "T" + party.timeTo + ":00+03:00")
+    : null;
+  return row.endsAt ?? partyEnd ??
     row.offerSession?.endAt ??
     minskEndOfDay(row.campShiftDateTo ?? row.requestedDate ??
       row.partyOrderItem?.partyOrder.eventDate ?? row.session?.startsAt ??
