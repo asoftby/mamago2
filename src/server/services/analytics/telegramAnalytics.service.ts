@@ -83,14 +83,29 @@ export async function getTelegramFamilyAnalytics(
         createdAt: { gte: start, lte: end },
         inboxItemId: { not: null },
       },
-      select: { userId: true, createdAt: true },
+      select: { userId: true, createdAt: true, inboxItemId: true },
     }),
   ]);
+
+  // PlanItem.inboxItemId is intentionally a plain ID without a Prisma relation.
+  // Attribute additions only to inbox records from this Telegram environment,
+  // otherwise DEV analytics can accidentally count PROD bot activity.
+  const matchingInboxIds = await prisma.inboxItem.findMany({
+    where: {
+      environment,
+      id: { in: planAdds.flatMap((item) => item.inboxItemId ? [item.inboxItemId] : []) },
+    },
+    select: { id: true },
+  });
+  const allowedInboxIds = new Set(matchingInboxIds.map((item) => item.id));
+  const scopedPlanAdds = planAdds.filter(
+    (item) => item.inboxItemId && allowedInboxIds.has(item.inboxItemId),
+  );
 
   const daysByUser = new Map<string, Set<string>>();
   const usersWithDrafts = new Set<string>();
   const usersConfirmed = new Set<string>();
-  const usersAdded = new Set(planAdds.map((item) => item.userId));
+  const usersAdded = new Set(scopedPlanAdds.map((item) => item.userId));
   const errors = new Map<string, number>();
   const daily = new Map(daysBetween(start, end).map((date) => [
     date,
@@ -143,7 +158,7 @@ export async function getTelegramFamilyAnalytics(
     }
   }
 
-  for (const item of planAdds) {
+  for (const item of scopedPlanAdds) {
     const bucket = daily.get(minskDateKey(item.createdAt));
     if (bucket) bucket.addedToPlan += 1;
   }
@@ -162,7 +177,7 @@ export async function getTelegramFamilyAnalytics(
     usersWithDrafts: usersWithDrafts.size,
     confirmedUsers: usersConfirmed.size,
     addedPlanUsers: usersAdded.size,
-    addedPlanItems: planAdds.length,
+    addedPlanItems: scopedPlanAdds.length,
     draftsPrepared,
     confirmedMessages,
     failedMessages,
