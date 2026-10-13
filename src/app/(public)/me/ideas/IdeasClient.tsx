@@ -207,14 +207,16 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
     [filter, ideas, collectionFilter, memberships],
   );
 
-  const tabItems = useMemo(
-    () =>
-      FILTERS.map((tab) => ({
-        ...tab,
-        count: counts[tab.value],
-      })),
-    [counts],
-  );
+  // Tab counts must be scoped to the selected collection, not all ideas.
+  const tabItems = useMemo(() => {
+    const scoped = ideas.filter((idea) => visibleInCollection(idea, collectionFilter, memberships));
+    const scopedCounts: Record<Filter, number> = {
+      ALL: scoped.length,
+      UNPLANNED: scoped.filter((idea) => !idea.isPlanned && idea.activity.temporalState !== "PAST").length,
+      PLANNED: scoped.filter((idea) => idea.isPlanned).length,
+    };
+    return FILTERS.map((tab) => ({ ...tab, count: scopedCounts[tab.value] }));
+  }, [ideas, collectionFilter, memberships]);
 
   function handlePlanned(ideaId: string, date: string): void {
     setIdeas((prev) =>
