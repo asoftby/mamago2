@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
-import { BookingsPageClient } from "./BookingsPageClient";
+import { BookingsHubClient } from "./BookingsHubClient";
 
 export default async function BusinessBookingsPage() {
   const routing = await getCurrentRequestRoutingContext();
@@ -24,9 +24,9 @@ export default async function BusinessBookingsPage() {
       <BusinessSectionHeader
         eyebrow="КАБИНЕТ"
         title="Записи и заказы"
-        description="Заявки от клиентов по вашим событиям, местам и предложениям"
+        description="Заявки на запись и предложения по праздникам"
       />
-      <BookingsPageClient />
+      <BookingsHubClient />
     </div>
   );
 }
