@@ -393,10 +393,15 @@ export function parseAbwsResponseBody(body: string): AbwsPerformanceItem[] {
  * the authenticated query URL. Retain a short preview with key values masked.
  */
 export function abwsSafeBodyPreview(body: string, apiKey: string, maxChars = 500): string {
-  const encodedKey = encodeURIComponent(apiKey);
-  const prefix = body.slice(0, maxChars + Math.max(apiKey.length, encodedKey.length));
+  // Match the encoding of the actual outbound url.searchParams.set("key", apiKey).
+  // encodeURIComponent differs for spaces (+ vs %20), ~, !, quotes and brackets.
+  const serializedKey = new URLSearchParams({ key: apiKey }).toString().slice("key=".length);
+  const uriEncodedKey = encodeURIComponent(apiKey);
+  const longestKey = Math.max(apiKey.length, serializedKey.length, uriEncodedKey.length);
+  const prefix = body.slice(0, maxChars + longestKey);
   return prefix
-    .replaceAll(encodedKey, "[REDACTED]")
+    .replaceAll(serializedKey, "[REDACTED]")
+    .replaceAll(uriEncodedKey, "[REDACTED]")
     .replaceAll(apiKey, "[REDACTED]")
     .slice(0, maxChars);
 }
