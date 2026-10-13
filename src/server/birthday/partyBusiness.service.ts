@@ -115,6 +115,22 @@ export async function replyToPartyRequest(params: {
   const declined = input.type === "DECLINED";
 
   return prisma.$transaction(async (tx) => {
+    // Serialize against cancellation/changes to the parent party. This order
+    // guard must be inside the same transaction as the quote and activity.
+    const orderClaim = await tx.partyOrder.updateMany({
+      where: {
+        id: order.id,
+        status: { in: [PartyOrderStatus.ANCHOR_PENDING, PartyOrderStatus.ANCHOR_CONFIRMED] },
+      },
+      data: {
+        version: { increment: 1 },
+        ...(item.role === "ANCHOR" ? {
+          status: declined ? PartyOrderStatus.NEEDS_ALTERNATIVE : PartyOrderStatus.ANCHOR_PENDING,
+        } : {}),
+      },
+    });
+    if (orderClaim.count !== 1) throw new PartyApiError(409, "Праздник уже изменён");
+
     // Compare-and-swap prevents two concurrent replies from both producing quotes.
     const claimed = await tx.bookingRequest.updateMany({
       where: {
@@ -167,17 +183,6 @@ export async function replyToPartyRequest(params: {
       where: { id: item.id },
       data: { status: declined ? PartyItemStatus.DECLINED : PartyItemStatus.NEEDS_DECISION },
     });
-    if (item.role === "ANCHOR") {
-      await tx.partyOrder.updateMany({
-        where: { id: order.id, status: { in: [
-          PartyOrderStatus.ANCHOR_PENDING, PartyOrderStatus.ANCHOR_CONFIRMED,
-        ] } },
-        data: {
-          status: declined ? PartyOrderStatus.NEEDS_ALTERNATIVE : PartyOrderStatus.ANCHOR_PENDING,
-          version: { increment: 1 },
-        },
-      });
-    }
     await tx.bookingActivity.create({
       data: {
         bookingId: requestId,
