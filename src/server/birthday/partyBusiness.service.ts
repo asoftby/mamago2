@@ -2,6 +2,7 @@ import { BookingKind, BookingStatus, PartyItemStatus, PartyOrderStatus, Prisma }
 import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt } from "./partyDraft.validation";
 import { isPartyAttentionStage, type PartyBusinessReply } from "./partyBusiness.validation";
+import { redactPartyContacts } from "./partyPrivacy";
 
 export async function listBusinessPartyRequests(businessId: string, onlyAttention = false) {
   const where: Prisma.BookingRequestWhereInput = {
@@ -15,7 +16,7 @@ export async function listBusinessPartyRequests(businessId: string, onlyAttentio
         id: true, partyStage: true, status: true, createdAt: true,
         responseDueAt: true, firstResponseAt: true,
         requestedDate: true, requestedTime: true, adultsCount: true, childrenCount: true,
-        childAge: true, customerComment: true,
+        childAge: true,
         offer: { select: { id: true, title: true } },
         partyOrderItem: {
           select: {
@@ -48,7 +49,15 @@ export async function listBusinessPartyRequests(businessId: string, onlyAttentio
   ]);
   // Deliberately do not select parent contactName/contactPhone/childName,
   // user relation, or private attachments. Business sees a service brief only.
-  return { items: rows, attentionCount };
+  return {
+    items: rows.map((row) => ({
+      ...row,
+      partyOrderItem: row.partyOrderItem
+        ? { ...row.partyOrderItem, note: redactPartyContacts(row.partyOrderItem.note) }
+        : null,
+    })),
+    attentionCount,
+  };
 }
 
 export async function replyToPartyRequest(params: {

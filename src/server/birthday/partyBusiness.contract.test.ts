@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { isPartyAttentionStage, partyBusinessReplySchema } from "./partyBusiness.validation";
+import { redactPartyContacts } from "./partyPrivacy";
 
 const base = { expectedStage: "SENT", expectedQuoteVersion: 0 };
 const good = {
@@ -20,6 +21,8 @@ assert.equal(partyBusinessReplySchema.safeParse({ ...base, type: "DECLINED", dec
 assert.equal(partyBusinessReplySchema.safeParse({
   ...base, type: "DECLINED", declineReason: "OTHER", declineComment: "Недоступно",
 }).success, true);
+assert.equal(redactPartyContacts("Звоните +375 29 123-45-67, email test@example.com, tg @my_family"), "Звоните [контакт скрыт], email [контакт скрыт], tg [контакт скрыт]");
+assert.equal(redactPartyContacts("Праздник 20 октября, 2 часа"), "Праздник 20 октября, 2 часа");
 assert.equal(isPartyAttentionStage("SENT"), true);
 assert.equal(isPartyAttentionStage("AWAITING_RECONFIRM"), true);
 for (const stage of ["QUOTED", "CONFIRMED", "DECLINED", "EXPIRED", "CANCELLED", null]) {
