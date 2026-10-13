@@ -59,7 +59,7 @@ export async function resolveExpiredPartyQuote(input: {
   const order = item?.partyOrder;
   if (!quote || !item || !order || !order.eventDate || !order.timeFrom ||
       existing.partyStage !== "QUOTED" || existing.status !== BookingStatus.NEW ||
-      ![PartyOrderStatus.ANCHOR_PENDING, PartyOrderStatus.ANCHOR_CONFIRMED].includes(order.status) ||
+      (order.status !== PartyOrderStatus.ANCHOR_PENDING && order.status !== PartyOrderStatus.ANCHOR_CONFIRMED) ||
       quote.version !== resolution.expectedQuoteVersion ||
       !quote.validUntil || quote.validUntil > new Date() ||
       quote.status !== "ACTIVE" || quote.type === "DECLINED" || !quote.priceByn || !quote.includes) {

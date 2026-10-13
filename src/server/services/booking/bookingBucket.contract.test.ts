@@ -64,7 +64,7 @@ for (const [stage, status] of terminal) {
 for (const stage of Object.values(PartyRequestStage)) {
   for (const status of Object.values(BookingStatus)) {
     const canonical =
-      [PartyRequestStage.SENT, PartyRequestStage.QUOTED, PartyRequestStage.AWAITING_RECONFIRM].includes(stage)
+      (stage === PartyRequestStage.SENT || stage === PartyRequestStage.QUOTED || stage === PartyRequestStage.AWAITING_RECONFIRM)
         ? BookingStatus.NEW
         : stage === PartyRequestStage.CONFIRMED ? BookingStatus.CONFIRMED
         : stage === PartyRequestStage.DECLINED ? BookingStatus.REJECTED
