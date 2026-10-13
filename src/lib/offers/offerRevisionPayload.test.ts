@@ -116,6 +116,19 @@ assert.deepEqual(toRevisionJsonValue({ a: [1, 2] }), { a: [1, 2] });
   assert.equal(merged.description, "Описание");
   assert.deepEqual(merged.placements, [{ key: "CLASSES", status: "APPROVED" }, { key: "WHERE_TO_GO", status: "REQUESTED" }]);
   assert.deepEqual(merged.campSessions, [{ id: "s1", title: "Июнь (моё)", dateFrom: "2026-06-03", priceOverride: "550" }]);
+  // категории и место (placeId) — как данные формы, а не Prisma-синтаксис
+  const withCategories = applyRevisionToOffer(offer, { categoryIds: ["c2", "c1"], placeId: "place-2" });
+  assert.deepEqual((withCategories as Record<string, unknown>).categoryLinks, [
+    { categoryId: "c2", sortOrder: 0 },
+    { categoryId: "c1", sortOrder: 1 },
+  ]);
+  assert.equal((withCategories as Record<string, unknown>).placeId, "place-2");
+  // смены целиком (смена типа): берутся как есть, тексты поверх живых не накладываются
+  const withSessions = applyRevisionToOffer(offer, {
+    campSessions: [{ id: "n1", title: "Новая", dateFrom: "2026-08-01" }],
+    campSessionTexts: [{ id: "n1", title: "Новая" }],
+  });
+  assert.deepEqual(withSessions.campSessions, [{ id: "n1", title: "Новая", dateFrom: "2026-08-01" }]);
   assert.equal(applyRevisionToOffer(offer, null), offer);
   assert.equal(offer.title, "Живое", "исходный объект не мутируется");
 }

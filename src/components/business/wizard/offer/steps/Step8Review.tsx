@@ -6,22 +6,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2, Edit } from "lucide-react";
 import { getStepsForOfferType, isStepComplete, getMissingFieldsForStep, getStepNumber } from "../offerWizardSteps.config";
-import type { OfferFormData, OfferWizardStepKey } from "../types";
+import type { OfferFormData, OfferWizardStepKey, OfferWizardVariant } from "../types";
 import type { ValidationResult } from "../validation";
 
 interface Step8ReviewProps {
+  /** Вариант мастера: определяет набор шагов в списке проверки. */
+  variant?: OfferWizardVariant;
   data: OfferFormData;
   isSubmitting: boolean;
   onGoToStep: (step: number) => void;
   validation: ValidationResult;
 }
 
-export function Step8Review({ data, isSubmitting, onGoToStep, validation }: Step8ReviewProps) {
-  const steps = getStepsForOfferType(data.offerWizardType, data.productType);
+export function Step8Review({ data, isSubmitting, onGoToStep, validation, variant = "v1" }: Step8ReviewProps) {
+  const steps = getStepsForOfferType(data.offerWizardType, data.productType, variant);
   
   // Calculate completion stats (exclude review step itself)
   const contentSteps = steps.filter(s => s.key !== "review");
-  const completedSteps = contentSteps.filter(s => isStepComplete(s.key, data)).length;
+  const completedSteps = contentSteps.filter(s => isStepComplete(s.key, data, variant)).length;
   const completionPercentage = contentSteps.length > 0 
     ? Math.round((completedSteps / contentSteps.length) * 100)
     : 0;
@@ -29,7 +31,7 @@ export function Step8Review({ data, isSubmitting, onGoToStep, validation }: Step
   // Get all missing fields
   const allMissingFields: string[] = [];
   contentSteps.forEach(step => {
-    const missing = getMissingFieldsForStep(step.key, data);
+    const missing = getMissingFieldsForStep(step.key, data, variant);
     allMissingFields.push(...missing);
   });
   
@@ -37,7 +39,7 @@ export function Step8Review({ data, isSubmitting, onGoToStep, validation }: Step
   const validationErrors = Array.from(new Set(validation.errors));
 
   const handleGoToStep = (stepKey: OfferWizardStepKey) => {
-    const stepNum = getStepNumber(data.offerWizardType, stepKey, data.productType);
+    const stepNum = getStepNumber(data.offerWizardType, stepKey, data.productType, variant);
     if (stepNum !== null) {
       onGoToStep(stepNum);
     }
@@ -129,8 +131,8 @@ export function Step8Review({ data, isSubmitting, onGoToStep, validation }: Step
         <h3 className="font-medium">Проверка по шагам</h3>
         {contentSteps.map((step, idx) => {
           const stepNum = idx + 1;
-          const isComplete = isStepComplete(step.key, data);
-          const missingFields = getMissingFieldsForStep(step.key, data);
+          const isComplete = isStepComplete(step.key, data, variant);
+          const missingFields = getMissingFieldsForStep(step.key, data, variant);
           
           return (
             <Card key={step.key} className={isComplete ? "border-green-200" : "border-gray-200"}>

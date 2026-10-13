@@ -155,6 +155,14 @@ export const CONTENT_COLUMN_LABELS: Record<string, string> = {
   contactSocialLinks: "ссылки",
   requestedPlacements: "разделы каталога",
   campSessionTexts: "тексты смен",
+  categoryIds: "категории",
+  interestSlugs: "интересы",
+  place: "место",
+  placeId: "место",
+  campSessions: "смены лагеря",
+  productType: "тип предложения",
+  kind: "тип предложения",
+  campProgramType: "тип предложения",
   status: "статус публикации",
 };
 

@@ -20,9 +20,13 @@ const adminId = `rev-admin-${run}`;
 let businessId = "";
 let placeId = "";
 const offerIds: string[] = [];
+const extraPlaceIds: string[] = [];
+const categoryIds: string[] = [];
 
 after(async () => {
   if (offerIds.length) await db.offer.deleteMany({ where: { id: { in: offerIds } } });
+  if (categoryIds.length) await db.eventCategory.deleteMany({ where: { id: { in: categoryIds } } });
+  if (extraPlaceIds.length) await db.place.deleteMany({ where: { id: { in: extraPlaceIds } } });
   await db.notification.deleteMany({ where: { userId: { in: [ownerId, adminId] } } });
   await db.adminAuditLog.deleteMany({ where: { actorId: adminId } });
   if (placeId) await db.place.delete({ where: { id: placeId } });
@@ -132,7 +136,7 @@ test("approve applies content, camp texts keep live dates and price, and notifie
   );
   const revision = await db.offerRevision.findFirstOrThrow({ where: { offerId: offer.id, status: "PENDING" } });
 
-  await approveOfferRevision(revision.id, adminId);
+  await approveOfferRevision(revision.id, adminId, "ADMIN");
 
   const live = await db.offer.findUniqueOrThrow({ where: { id: offer.id } });
   assert.equal(live.title, "Одобренное название");
@@ -150,7 +154,7 @@ test("approve applies content, camp texts keep live dates and price, and notifie
   assert.ok(await db.adminAuditLog.findFirst({ where: { entityId: offer.id, action: "offer.revision_approved" } }));
 
   // повторное решение по закрытой ревизии невозможно
-  await assert.rejects(approveOfferRevision(revision.id, adminId), (error: unknown) =>
+  await assert.rejects(approveOfferRevision(revision.id, adminId, "ADMIN"), (error: unknown) =>
     error instanceof OfferRevisionError && error.code === "NOT_PENDING",
   );
 });
@@ -160,7 +164,7 @@ test("reject keeps the live offer and stores the moderator comment", async () =>
   await save(offer.id, { title: "Отклонённое" }, ["title"]);
   const revision = await db.offerRevision.findFirstOrThrow({ where: { offerId: offer.id, status: "PENDING" } });
 
-  await rejectOfferRevision(revision.id, adminId, "Нужны другие фото");
+  await rejectOfferRevision(revision.id, adminId, "ADMIN", "Нужны другие фото");
 
   const live = await db.offer.findUniqueOrThrow({ where: { id: offer.id } });
   assert.equal(live.title, `Live title ${run}`);
@@ -168,4 +172,75 @@ test("reject keeps the live offer and stores the moderator comment", async () =>
   assert.equal(closed.status, "REJECTED");
   assert.equal(closed.moderatorComment, "Нужны другие фото");
   assert.ok(await db.notification.findFirst({ where: { userId: ownerId, entityId: offer.id, title: "Правки не приняты" } }));
+});
+
+test("approve applies categories, interests and a place change from the revision", async () => {
+  const offer = await db.offer.create({
+    data: { kind: "SERVICE", productType: "PARTY_PACKAGE", title: `Party ${run}`, placeId: (await publishedOffer()).placeId, status: "PUBLISHED" },
+  });
+  offerIds.push(offer.id);
+  const category = await db.eventCategory.create({
+    data: { nameRu: `Кат ${run}`, nameEn: `Cat ${run}`, slug: `party-rev-${run}`, publicationType: "OFFER", isActive: true },
+  });
+  categoryIds.push(category.id);
+  const otherPlace = await db.place.create({
+    data: {
+      title: `Other place ${run}`, shortDesc: "Other", createdByUserId: ownerId, ownerBusinessId: businessId,
+      activityTypes: [], ageTags: [], visitFormats: [],
+    },
+  });
+  extraPlaceIds.push(otherPlace.id);
+
+  await save(offer.id, { categoryIds: [category.id], interestSlugs: ["sport", "music"], placeId: otherPlace.id }, ["categoryIds", "interestSlugs", "placeId"]);
+  const revision = await db.offerRevision.findFirstOrThrow({ where: { offerId: offer.id, status: "PENDING" } });
+  assert.deepEqual(revision.changedFields.sort(), ["categoryIds", "interestSlugs", "placeId"]);
+
+  // до решения живая строка не менялась
+  const before = await db.offer.findUniqueOrThrow({ where: { id: offer.id } });
+  assert.deepEqual(before.interestSlugs, []);
+  assert.equal(await db.offerCategory.count({ where: { offerId: offer.id } }), 0);
+
+  await approveOfferRevision(revision.id, adminId, "MODERATOR");
+
+  const live = await db.offer.findUniqueOrThrow({ where: { id: offer.id } });
+  assert.deepEqual(live.interestSlugs, ["sport", "music"]);
+  assert.equal(live.placeId, otherPlace.id);
+  const links = await db.offerCategory.findMany({ where: { offerId: offer.id } });
+  assert.deepEqual(links.map((link) => link.categoryId), [category.id]);
+
+  // аудит фиксирует реальную роль модератора
+  const audit = await db.adminAuditLog.findFirstOrThrow({ where: { entityId: offer.id, action: "offer.revision_approved" } });
+  assert.equal(audit.actorRole, "MODERATOR");
+});
+
+test("approving a type switch to camp keeps the proposed sessions, switching back clears them", async () => {
+  const offer = await publishedOffer();
+  await db.offer.update({ where: { id: offer.id }, data: { campSessions: [] } });
+
+  const proposedSessions = [
+    { id: "n1", title: "Новая смена", description: "Текст", dateFrom: "2026-08-03", dateTo: "2026-08-10", priceOverride: "700" },
+  ];
+  await save(
+    offer.id,
+    { productType: "CAMP", campProgramType: "городской", campSessions: proposedSessions },
+    ["productType", "campProgramType", "campSessions"],
+  );
+  const toCamp = await db.offerRevision.findFirstOrThrow({ where: { offerId: offer.id, status: "PENDING" } });
+  await approveOfferRevision(toCamp.id, adminId, "ADMIN");
+
+  let live = await db.offer.findUniqueOrThrow({ where: { id: offer.id } });
+  assert.equal(live.productType, "CAMP");
+  assert.deepEqual(live.campSessions, proposedSessions, "proposed sessions are saved, not an empty list");
+  assert.equal(await db.offerSession.count({ where: { offerId: offer.id } }), 1, "OfferSession projected from the approved sessions");
+
+  // обратно на обычный тип: смены и проекция очищаются
+  await save(offer.id, { productType: "ONE_TIME_ACTIVITY", campProgramType: null, campSessions: null }, ["productType", "campProgramType", "campSessions"]);
+  const back = await db.offerRevision.findFirstOrThrow({ where: { offerId: offer.id, status: "PENDING" } });
+  await approveOfferRevision(back.id, adminId, "ADMIN");
+
+  live = await db.offer.findUniqueOrThrow({ where: { id: offer.id } });
+  assert.equal(live.productType, "ONE_TIME_ACTIVITY");
+  assert.equal(live.campProgramType, null);
+  assert.equal(live.campSessions, null);
+  assert.equal(await db.offerSession.count({ where: { offerId: offer.id } }), 0, "OfferSession cleared with the camp type");
 });

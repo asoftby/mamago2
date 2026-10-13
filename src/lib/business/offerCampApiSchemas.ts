@@ -29,6 +29,10 @@ export const campMealKeySchema = z.enum(["breakfast", "lunch", "dinner", "snacks
 
 /** Ключ шага мастера предложения (Offer.wizardCompletedSteps) */
 export const offerWizardStepKeySchema = z.enum([
+  "about",
+  "services",
+  "schedule",
+  "terms",
   "type",
   "placements",
   "details",

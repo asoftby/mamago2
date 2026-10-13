@@ -35,8 +35,8 @@ export async function POST(
   try {
     const result =
       action === "APPROVE"
-        ? await approveOfferRevision(id, auth.id)
-        : await rejectOfferRevision(id, auth.id, comment);
+        ? await approveOfferRevision(id, auth.id, auth.role)
+        : await rejectOfferRevision(id, auth.id, auth.role, comment);
     return NextResponse.json({ success: true, action, offerId: result.offerId });
   } catch (error) {
     if (error instanceof OfferRevisionError) {

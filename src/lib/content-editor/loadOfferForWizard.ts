@@ -26,6 +26,9 @@ export async function loadOfferForWizard(offerId: string, options?: { viewerEdit
       placements: {
         orderBy: { createdAt: "asc" },
       },
+      categoryLinks: {
+        orderBy: { sortOrder: "asc" },
+      },
       openingHours: {
         include: {
           rules: {
@@ -58,9 +61,25 @@ export async function loadOfferForWizard(offerId: string, options?: { viewerEdit
         select: { id: true, payload: true, changedFields: true },
       });
 
-  const offerForWizard = pendingRevision
+  let offerForWizard = pendingRevision
     ? applyRevisionToOffer(offer, pendingRevision.payload as OfferRevisionPayload)
     : offer;
+
+  // Ожидающая смена места: форме нужны данные нового места (название, город), а не только placeId.
+  const pendingPlaceId = (pendingRevision?.payload as OfferRevisionPayload | undefined)?.placeId;
+  if (typeof pendingPlaceId === "string" && pendingPlaceId !== offer.placeId) {
+    const place = await prisma.place.findUnique({
+      where: { id: pendingPlaceId },
+      select: {
+        id: true,
+        createdByUserId: true,
+        ownerBusinessId: true,
+        title: true,
+        city: { select: { slug: true } },
+      },
+    });
+    if (place) offerForWizard = { ...offerForWizard, placeId: place.id, place };
+  }
 
   return {
     offer,

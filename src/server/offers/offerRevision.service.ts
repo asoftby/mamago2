@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import type { OfferRevision } from "@prisma/client";
+import type { OfferRevision, Role } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import {
   applyCampSessionTexts,
@@ -9,6 +9,7 @@ import {
   type OfferRevisionPayload,
 } from "@/lib/offers/offerRevisionPayload";
 import { projectCampSessions } from "@/server/offers/campSessionProjection";
+import { syncOfferCategories } from "@/server/offers/offerCategories";
 import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 import { syncOfferHomeStoryPlacements } from "@/server/stories/homeStoryItems";
@@ -109,7 +110,7 @@ async function lockPendingRevision(tx: Tx, revisionId: string) {
 }
 
 /** Применить ревизию к живому офферу и закрыть её как одобренную. */
-export async function approveOfferRevision(revisionId: string, reviewerId: string) {
+export async function approveOfferRevision(revisionId: string, reviewerId: string, reviewerRole: Role) {
   const result = await prisma.$transaction(async (tx) => {
     const revision = await lockPendingRevision(tx, revisionId);
     const payload = revision.payload as OfferRevisionPayload;
@@ -122,14 +123,29 @@ export async function approveOfferRevision(revisionId: string, reviewerId: strin
         value === null && OFFER_JSON_COLUMNS.has(column) ? Prisma.DbNull : value;
     }
 
+    // Смены: при смене типа на/с лагеря ревизия несёт смены целиком (`campSessions`) — берём их как есть;
+    // иначе (`campSessionTexts`) накладываем только тексты на живые смены (даты/цена/места остаются живыми).
     let nextCampSessions: unknown = live.campSessions;
-    if ("campSessionTexts" in payload) {
+    if ("campSessions" in payload) {
+      nextCampSessions = payload.campSessions;
+    } else if ("campSessionTexts" in payload) {
       nextCampSessions = applyCampSessionTexts(live.campSessions, payload.campSessionTexts);
       data.campSessions = nextCampSessions;
     }
+    const approvedProductType =
+      ("productType" in payload ? (payload.productType as typeof live.productType) : live.productType) ?? null;
 
     if (Object.keys(data).length > 0) {
       await tx.offer.update({ where: { id: live.id }, data: data as Prisma.OfferUpdateInput });
+    }
+
+    if ("categoryIds" in payload) {
+      await syncOfferCategories({
+        db: tx,
+        offerId: live.id,
+        productType: approvedProductType,
+        categoryIds: payload.categoryIds,
+      });
     }
 
     if ("requestedPlacements" in payload) {
@@ -137,7 +153,7 @@ export async function approveOfferRevision(revisionId: string, reviewerId: strin
         db: tx,
         offerId: live.id,
         actorUserId: reviewerId,
-        productType: live.productType ?? "ONE_TIME_ACTIVITY",
+        productType: approvedProductType ?? "ONE_TIME_ACTIVITY",
         requestedPlacementsStrategy: "preserve_if_missing",
         requestedPlacements: Array.isArray(payload.requestedPlacements)
           ? (payload.requestedPlacements as string[])
@@ -151,8 +167,11 @@ export async function approveOfferRevision(revisionId: string, reviewerId: strin
         throw new OfferRevisionError("UNSUPPORTED_COLUMN", column);
       }
     }
-    if ("campSessionTexts" in payload && live.campProgramType) {
-      await projectCampSessions(tx, live.id, nextCampSessions);
+    // Проекция смен строится из одобренного типа: на лагерь — из принятых смен, с лагеря — очищается.
+    const approvedIsCamp =
+      "campProgramType" in payload ? Boolean(payload.campProgramType) : Boolean(live.campProgramType);
+    if (approvedIsCamp || live.campProgramType) {
+      await projectCampSessions(tx, live.id, approvedIsCamp ? nextCampSessions : []);
     }
 
     const before = Object.fromEntries(
@@ -165,7 +184,7 @@ export async function approveOfferRevision(revisionId: string, reviewerId: strin
     await tx.adminAuditLog.create({
       data: {
         actorId: reviewerId,
-        actorRole: "ADMIN",
+        actorRole: reviewerRole,
         action: "offer.revision_approved",
         entityType: "Offer",
         entityId: live.id,
@@ -190,14 +209,24 @@ export async function approveOfferRevision(revisionId: string, reviewerId: strin
   } catch (error) {
     console.error(`[offer-revision] story placements sync failed for ${result.offerId}:`, error);
   }
+  // Решение уже зафиксировано: сбой уведомления не должен превращать успех в ошибку (повтор дал бы NOT_PENDING).
   if (result.authorId) {
-    await notifyOfferRevisionApproved(result.offerId, result.title, result.authorId);
+    try {
+      await notifyOfferRevisionApproved(result.offerId, result.title, result.authorId);
+    } catch (error) {
+      console.error(`[offer-revision] approval notification failed for ${result.offerId}:`, error);
+    }
   }
   return { offerId: result.offerId };
 }
 
 /** Отклонить ревизию с комментарием модератора. Живой оффер не меняется. */
-export async function rejectOfferRevision(revisionId: string, reviewerId: string, comment: string) {
+export async function rejectOfferRevision(
+  revisionId: string,
+  reviewerId: string,
+  reviewerRole: Role,
+  comment: string,
+) {
   const result = await prisma.$transaction(async (tx) => {
     const revision = await lockPendingRevision(tx, revisionId);
     const offer = await tx.offer.findUniqueOrThrow({
@@ -216,7 +245,7 @@ export async function rejectOfferRevision(revisionId: string, reviewerId: string
     await tx.adminAuditLog.create({
       data: {
         actorId: reviewerId,
-        actorRole: "ADMIN",
+        actorRole: reviewerRole,
         action: "offer.revision_rejected",
         entityType: "Offer",
         entityId: offer.id,
@@ -228,7 +257,11 @@ export async function rejectOfferRevision(revisionId: string, reviewerId: string
   });
 
   if (result.authorId) {
-    await notifyOfferRevisionRejected(result.offer.id, result.offer.title, result.authorId, comment);
+    try {
+      await notifyOfferRevisionRejected(result.offer.id, result.offer.title, result.authorId, comment);
+    } catch (error) {
+      console.error(`[offer-revision] rejection notification failed for ${result.offer.id}:`, error);
+    }
   }
   return { offerId: result.offer.id };
 }
@@ -238,4 +271,8 @@ function jsonSafe(value: unknown): unknown {
 }
 
 /** Псевдоколонки, которые умеет применять эта реализация. Новая псевдоколонка = новый обработчик в `approveOfferRevision`. */
-const SUPPORTED_PSEUDO_COLUMNS: ReadonlySet<string> = new Set(["requestedPlacements", "campSessionTexts"]);
+const SUPPORTED_PSEUDO_COLUMNS: ReadonlySet<string> = new Set([
+  "requestedPlacements",
+  "campSessionTexts",
+  "categoryIds",
+]);

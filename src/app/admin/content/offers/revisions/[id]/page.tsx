@@ -21,7 +21,12 @@ export default async function OfferRevisionPage({ params }: { params: Promise<{ 
   const revision = await prisma.offerRevision.findUnique({
     where: { id },
     include: {
-      offer: { include: { placements: { select: { key: true } } } },
+      offer: {
+        include: {
+          placements: { select: { key: true } },
+          categoryLinks: { orderBy: { sortOrder: "asc" }, select: { categoryId: true } },
+        },
+      },
       author: { select: { email: true, displayName: true } },
     },
   });
@@ -34,8 +39,40 @@ export default async function OfferRevisionPage({ params }: { params: Promise<{ 
     {
       requestedPlacements: revision.offer.placements.map((placement) => placement.key),
       campSessionTexts: revision.offer.campSessions,
+      categoryIds: revision.offer.categoryLinks.map((link) => link.categoryId),
     },
   );
+
+  // Категории и место показываем названиями, а не id.
+  const categoryRow = rows.find((row) => row.column === "categoryIds");
+  const categoryIds = [
+    ...((categoryRow?.before as string[] | null) ?? []),
+    ...((categoryRow?.after as string[] | null) ?? []),
+  ];
+  const placeRow = rows.find((row) => row.column === "placeId");
+  const [categories, places] = await Promise.all([
+    categoryIds.length > 0
+      ? prisma.eventCategory.findMany({ where: { id: { in: categoryIds } }, select: { id: true, nameRu: true } })
+      : Promise.resolve([]),
+    placeRow
+      ? prisma.place.findMany({
+          where: { id: { in: [revision.offer.placeId, payload.placeId].filter((v): v is string => typeof v === "string") } },
+          select: { id: true, title: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const categoryName = new Map(categories.map((category) => [category.id, category.nameRu]));
+  const placeTitle = new Map(places.map((place) => [place.id, place.title]));
+  for (const row of rows) {
+    if (row.column === "categoryIds") {
+      row.before = ((row.before as string[] | null) ?? []).map((id) => categoryName.get(id) ?? id).join(", ");
+      row.after = ((row.after as string[] | null) ?? []).map((id) => categoryName.get(id) ?? id).join(", ");
+    }
+    if (row.column === "placeId") {
+      row.before = placeTitle.get(revision.offer.placeId ?? "") ?? revision.offer.placeId;
+      row.after = placeTitle.get(String(row.after)) ?? row.after;
+    }
+  }
   const offerChangedSince =
     revision.baseOfferUpdatedAt && revision.offer.updatedAt > revision.baseOfferUpdatedAt;
   const isPending = revision.status === "PENDING";

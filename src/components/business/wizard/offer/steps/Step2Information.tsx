@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { AGE_OPTIONS } from "@/lib/config/ages";
+import { SYSTEM_INTERESTS } from "@/lib/config/interests";
+import { MAX_OFFER_INTERESTS } from "@/lib/offers/offerInterests";
 import { RichDescriptionEditor } from "@/components/editor/RichDescriptionEditor";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
@@ -30,6 +32,8 @@ interface Step2InformationProps {
   data: OfferFormData;
   onChange: (updates: Partial<OfferFormData>) => void;
   isEditable: boolean;
+  /** Новый мастер: интересы ребёнка и возраст без дубля #nokids. */
+  v2?: boolean;
 }
 
 const DEFAULT_OFFER_CHARACTERISTIC_GROUPS: GroupConfig[] = [
@@ -71,7 +75,7 @@ const DEFAULT_OFFER_CHARACTERISTIC_GROUPS: GroupConfig[] = [
   },
 ];
 
-export function Step2Information({ data, onChange, isEditable }: Step2InformationProps) {
+export function Step2Information({ data, onChange, isEditable, v2 = false }: Step2InformationProps) {
   const isCampOffer = data.offerWizardType === "CAMP";
   const isClassOffer = data.productType === "ONE_TIME_ACTIVITY" || data.productType === "REGULAR_ACTIVITY";
   const [moreOpen, setMoreOpen] = useState(false);
@@ -276,6 +280,35 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
         </div>
       )}
 
+      {/* Child interests (new wizard) */}
+      {v2 && (
+        <div className="space-y-2">
+          <Label>Интересы ребёнка</Label>
+          <ChipsRow
+            layout="wrap"
+            aria-label="Интересы ребёнка"
+            items={SYSTEM_INTERESTS.map((interest): ChipItem => {
+              const active = data.interestSlugs.includes(interest.slug);
+              return {
+                id: interest.slug,
+                label: interest.label,
+                active,
+                disabled: !isEditable || (!active && data.interestSlugs.length >= MAX_OFFER_INTERESTS),
+                onClick: () =>
+                  onChange({
+                    interestSlugs: active
+                      ? data.interestSlugs.filter((slug) => slug !== interest.slug)
+                      : [...data.interestSlugs, interest.slug],
+                  }),
+              };
+            })}
+          />
+          <p className="text-xs text-muted-foreground">
+            По интересам mamaGo предлагает ваше предложение семьям, у которых ребёнок увлекается этим. До {MAX_OFFER_INTERESTS}.
+          </p>
+        </div>
+      )}
+
       {/* Age Groups */}
       <div className="space-y-2">
         <Label>Возрастные группы</Label>
@@ -283,7 +316,10 @@ export function Step2Information({ data, onChange, isEditable }: Step2Informatio
           layout="masonry"
           items={[
             { id: "unrestricted", label: "Любой", active: data.agePolicy === AgePolicy.UNRESTRICTED, disabled: !isEditable, onClick: () => onChange({ agePolicy: AgePolicy.UNRESTRICTED, ageGroups: [] }) },
-            ...AGE_OPTIONS.map((ageOption): ChipItem => ({
+            ...AGE_OPTIONS
+              // В новом мастере «18+» — это один чип #nokids ниже, без дубля из справочника возрастов.
+              .filter((ageOption) => !(v2 && ageOption.key === "18+"))
+              .map((ageOption): ChipItem => ({
             id: ageOption.key,
             label: ageOption.shortLabel,
             active: (data.ageGroups || []).includes(ageOption.key),

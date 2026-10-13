@@ -1028,6 +1028,7 @@ model EventCategory {
   filterPlacements     DiscoveryFilterPlacement[]
   articles             Article[]                    @relation("ArticleCategory")
   articleAdditionalLinks ArticleCategoryLink[]      @relation("ArticleAdditionalCategory")
+  offerCategories      OfferCategory[]
 
   @@unique([publicationType, slug])
   @@index([sortOrder])
@@ -2426,6 +2427,8 @@ model Offer {
   discoverySignalIds       String[]             @default([])
   /// Чипы публичной витрины /[city]/classes
   classChipSlugs           String[]             @default([])
+  /// Интересы ребёнка (до 5): slug из SYSTEM_INTERESTS (src/lib/config/interests.ts).
+  interestSlugs            String[]             @default([])
   /// Шаги мастера, явно завершённые пользователем через «Далее» (OfferWizardStepKey)
   wizardCompletedSteps     String[]             @default([])
   faqItems                 Json?
@@ -2507,6 +2510,7 @@ model Offer {
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])
   placements      OfferPlacement[]
   revisions       OfferRevision[]
+  categoryLinks   OfferCategory[]
   place           Place?             @relation(fields: [placeId], references: [id], onDelete: Cascade)
   city            City?              @relation("OfferCity", fields: [cityId], references: [id])
   slugHistory     OfferSlugHistory[]
@@ -2563,6 +2567,23 @@ enum OfferRevisionStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+/// Категории предложения (до 3, обязательна хотя бы одна в новом мастере).
+/// Справочник — EventCategory: для праздников/лагерей/занятий publicationType=OFFER
+/// (slug с префиксом формата: party-*, camp-*, class-*), для «Место/посещение» — корневые PLACE.
+model OfferCategory {
+  id         String        @id @default(cuid())
+  offerId    String
+  categoryId String
+  sortOrder  Int           @default(0)
+  createdAt  DateTime      @default(now())
+  offer      Offer         @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  category   EventCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@unique([offerId, categoryId])
+  @@index([offerId, sortOrder])
+  @@index([categoryId])
 }
 
 model OfferPlacement {

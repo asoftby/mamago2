@@ -170,7 +170,11 @@ export function applyRevisionToOffer<T extends Record<string, unknown>>(
     next.placements = keys.map((key) => live.find((placement) => placement.key === key) ?? { key, status: "REQUESTED" });
   }
 
-  if ("campSessionTexts" in payload) {
+  if ("categoryIds" in payload && Array.isArray(payload.categoryIds)) {
+    next.categoryLinks = (payload.categoryIds as string[]).map((categoryId, sortOrder) => ({ categoryId, sortOrder }));
+  }
+
+  if ("campSessionTexts" in payload && !("campSessions" in payload)) {
     next.campSessions = applyCampSessionTexts(offer.campSessions, payload.campSessionTexts);
   }
 
