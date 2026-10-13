@@ -65,7 +65,7 @@ async function main() {
   created.business = business.id;
   await db.businessMember.create({ data: { businessId: business.id, userId: owner.id, role: "OWNER", isActive: true } }).catch(() => null);
   const place = await db.place.create({
-    data: { title: `Smoke place ${run}`, shortDesc: "Smoke", createdByUserId: owner.id, ownerBusinessId: business.id, cityId: city.id, activityTypes: [], ageTags: [], visitFormats: [] },
+    data: { title: `Smoke place ${run}`, shortDesc: "Smoke", createdByUserId: owner.id, ownerBusinessId: business.id, cityId: city.id, status: "PUBLISHED", activityTypes: [], ageTags: [], visitFormats: [] },
   });
   created.place = place.id;
   const cookie = await login(ownerEmail);
@@ -81,7 +81,7 @@ async function main() {
     const id = createJson!.id!;
     created.offers.push(id);
 
-    const editor = await fetch(`${BASE}/editor/offer/${id}/edit`, { headers: { cookie } });
+    const editor = await fetch(`${BASE}/editor/offer/${id}/edit`, { headers: { cookie }, redirect: "manual" });
     assert.equal(editor.status, 200, `${productType} editor -> ${editor.status}`);
 
     // публикуем напрямую (как модератор) и проверяем публичную карточку
@@ -107,9 +107,16 @@ async function main() {
     assert.equal(after.status, "PUBLISHED", `${productType} stays published`);
     assert.ok(after.description?.includes("Описание оффера для смоука"), `${productType} live description unchanged`);
     assert.ok(revision && revision.changedFields.includes("description"), `${productType} description went to a revision`);
-    const priceApplied = productType === "CAMP" ? "n/a (camp price derives from sessions)" : Number(after.priceFrom) === 77;
-    results.push(`${productType}: create OK, editor 200, public 200, price ${priceApplied === true ? "applied" : priceApplied}, revision [${revision!.changedFields.join(", ")}]`);
-    if (productType !== "CAMP") assert.equal(Number(after.priceFrom), 77, `${productType} price applied immediately`);
+    // CAMP uses the session-level override, other offer types use priceFrom.
+    if (productType === "CAMP") {
+      const sessions = after.campSessions;
+      assert.ok(Array.isArray(sessions) && sessions.length > 0, "CAMP sessions persisted");
+      const firstSession = sessions[0] as { priceOverride?: string | number | null };
+      assert.equal(Number(firstSession.priceOverride), 77, "CAMP session price applied immediately");
+    } else {
+      assert.equal(Number(after.priceFrom), 77, `${productType} price applied immediately`);
+    }
+    results.push(`${productType}: create OK, editor 200, public 200, price applied, revision [${revision!.changedFields.join(", ")}]`);
   }
 
   console.log(results.join("\n"));
