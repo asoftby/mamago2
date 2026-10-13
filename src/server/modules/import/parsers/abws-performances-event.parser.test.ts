@@ -91,6 +91,18 @@ const multiVenueFixture: AbwsPerformanceItem = {
   assert.ok(abwsSafeBodyPreview(sample, token).includes("[REDACTED]"));
   const encoded = encodeURIComponent("secret?with special characters");
   assert.ok(!abwsSafeBodyPreview(`url ?key=${encoded}`, "secret?with special characters").includes(encoded));
+
+  // The request uses URLSearchParams, whose encoding differs from encodeURIComponent.
+  const specialKey = "secret ~!'() +&?";
+  const actualUrl = new URL("https://webgate.24guru.by/api/v3/sync/data/performances");
+  actualUrl.searchParams.set("key", specialKey);
+  actualUrl.searchParams.set("distributor_company_id", "550");
+  const serializedKey = actualUrl.searchParams.get("key") && actualUrl.search.slice(5).split("&")[0];
+  assert.ok(serializedKey);
+  const preview = abwsSafeBodyPreview(`upstream error requesting ${actualUrl.toString()}`, specialKey);
+  assert.ok(!preview.includes(serializedKey), "no serialized query credential in logs");
+  assert.ok(!preview.includes(specialKey), "no raw credential in logs");
+  assert.ok(preview.includes("[REDACTED]"));
 }
 
 // ── isSingleVenue ────────────────────────────────────────────────────────
