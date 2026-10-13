@@ -972,7 +972,9 @@ export function PlanMainContent({
   }, [dayItems, addedSuggestionActivityIds]);
 
   const scenarioCtaState = useMemo(
-    () => resolveScenarioCtaState(totalPlannedCount, scenarioStatusByDate?.[selectedDate]),
+    () => process.env.NEXT_PUBLIC_ENABLE_LEGACY_DAY_SCENARIO === "true"
+      ? resolveScenarioCtaState(totalPlannedCount, scenarioStatusByDate?.[selectedDate])
+      : "hidden" as const,
     [totalPlannedCount, scenarioStatusByDate, selectedDate],
   );
   const scenarioCtaLabel = resolveScenarioCtaLabel(scenarioCtaState);
