@@ -155,6 +155,7 @@
     "test:idea-collections": "tsx src/lib/ideas/ideaCollectionsMigration.contract.test.ts",
     "test:idea-collections-api": "tsx src/server/services/ideaCollections.http.test.ts",
     "test:idea-collections-api-integration": "NODE_OPTIONS=--conditions=react-server tsx src/server/services/ideaCollections.integration.test.ts",
+    "test:idea-collections-routes-integration": "NODE_OPTIONS=--conditions=react-server tsx src/app/api/collections/collections.routes.integration.test.ts",
     "test:plan-owner": "tsx src/server/services/planOwner.test.ts",
     "test:my-plan-default-participants": "tsx src/features/my-plan/lib/resolveDefaultParticipants.test.ts",
     "test:my-plan-age-range-selection": "tsx src/features/my-plan/lib/ageRangeSelection.test.ts",

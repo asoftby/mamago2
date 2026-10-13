@@ -313,7 +313,7 @@ async function loadCovers(collectionIds: string[]): Promise<Map<string, string[]
   for (const idea of offerIdeas) byIdeaRow.set(idea.id, idea.offer?.coverImage ?? null);
   for (const idea of routeIdeas) byIdeaRow.set(idea.id, idea.route?.coverImageUrl ?? null);
   for (const idea of articleIdeas) byIdeaRow.set(idea.id, idea.article?.heroImage ?? null);
-  // PlaceIdea: у Place нет единственного поля обложки — без картинки в коллаже.
+  // TODO(ideas-collections PR4): PlaceIdea без обложки — у Place нет единого поля; взять первое фото из медиа места.
 
   for (const row of rows) {
     const ideaRowId = row.ideaId ?? row.offerIdeaId ?? row.routeIdeaId ?? row.articleIdeaId;
