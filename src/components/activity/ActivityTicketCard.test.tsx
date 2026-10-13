@@ -43,5 +43,18 @@ assert.ok(html.includes("Детский центр"), "venue is rendered");
 assert.ok(html.includes("Минск, улица Примерная, 10"), "address is rendered");
 assert.ok(html.includes("Бесплатно"), "free label is rendered");
 assert.ok(html.includes("Обложка отсутствует"), "missing image uses the project placeholder pattern");
+assert.ok(html.includes("border-dashed"), "price section keeps the ticket perforation");
+
+const imageHtml = renderToStaticMarkup(
+  <ActivityTicketCard
+    source={{
+      title: "Событие с обложкой",
+      imageUrl: "https://example.com/cover.jpg",
+      priceMode: "UNKNOWN",
+    }}
+  />,
+);
+assert.ok(imageHtml.includes("absolute inset-0 -z-20 h-full w-full object-cover object-center"), "cover fills the full ticket");
+assert.ok(!imageHtml.includes("Бесплатно"), "an unknown price is never rendered as free");
 
 console.log("ActivityTicketCard tests: OK");

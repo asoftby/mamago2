@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { MapPin } from "lucide-react";
 
 export type ActivityTicketPriceMode = "FREE" | "FROM" | "EXACT" | "UNKNOWN";
 
@@ -78,47 +77,58 @@ export function ActivityTicketCard({ source }: { source: ActivityTicketSource })
   return (
     <article
       aria-label={`Информация: ${ticket.title}`}
-      className="relative flex min-h-[94px] w-full min-w-0 overflow-hidden rounded-[18px] bg-[#FAF1E5] text-[#141210]"
+      className="relative isolate flex min-h-[112px] w-full min-w-0 overflow-hidden rounded-[20px] bg-[#726d65] text-white shadow-[0_12px_30px_rgba(20,18,16,0.18)]"
     >
-      <div className="absolute -left-2 top-1/2 z-10 h-4 w-4 -translate-y-1/2 rounded-full bg-white" aria-hidden />
-      <div className="absolute -right-2 top-1/2 z-10 h-4 w-4 -translate-y-1/2 rounded-full bg-white" aria-hidden />
+      {ticket.imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- ticket sources may use external media hosts.
+        <img
+          src={ticket.imageUrl}
+          alt=""
+          className="absolute inset-0 -z-20 h-full w-full object-cover object-center"
+        />
+      ) : (
+        <div
+          className="absolute inset-0 -z-20"
+          aria-label="Обложка отсутствует"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 78% 18%, rgba(236,132,83,.72), transparent 38%), linear-gradient(135deg, #71655d 0%, #413b38 54%, #262321 100%)",
+          }}
+        />
+      )}
+      <div
+        className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(16,14,13,.84)_0%,rgba(16,14,13,.67)_50%,rgba(16,14,13,.32)_100%)]"
+        aria-hidden
+      />
 
-      <div className="m-2 mr-0 h-[78px] w-[70px] shrink-0 overflow-hidden rounded-[12px] bg-[#EDE8DF] sm:w-[76px]">
-        {ticket.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- ticket sources may use external media hosts.
-          <img src={ticket.imageUrl} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <div
-            className="h-full w-full"
-            aria-label="Обложка отсутствует"
-            style={{
-              backgroundImage:
-                "repeating-linear-gradient(-45deg, transparent, transparent 9px, rgba(20,18,16,0.07) 9px, rgba(20,18,16,0.07) 10px)",
-            }}
-          />
-        )}
-      </div>
+      <div className="absolute -left-2.5 top-1/2 z-20 h-5 w-5 -translate-y-1/2 rounded-full bg-white" aria-hidden />
+      <div className="absolute -right-2.5 top-1/2 z-20 h-5 w-5 -translate-y-1/2 rounded-full bg-white" aria-hidden />
 
-      <div className="flex min-w-0 flex-1 flex-col justify-center px-3 py-2.5 sm:px-3.5">
-        <h3 className="line-clamp-2 text-[13px] font-semibold leading-[1.25] tracking-[-0.01em] sm:text-[14px]">
+      <div className="flex min-w-0 flex-1 flex-col justify-center py-4 pl-5 pr-3 sm:pl-6 sm:pr-4">
+        <h3 className="line-clamp-2 text-[15px] font-semibold leading-[1.2] tracking-[-0.015em] drop-shadow-[0_1px_2px_rgba(0,0,0,.35)] sm:text-[16px]">
           {ticket.title}
         </h3>
-        {ticket.venue ? <p className="mt-1 truncate text-[11px] leading-[1.25] text-[rgba(20,18,16,.62)]">{ticket.venue}</p> : null}
+        {ticket.venue ? (
+          <p className="mt-2 truncate text-[11px] font-medium leading-[1.2] text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,.35)] sm:text-[12px]">
+            {ticket.venue}
+          </p>
+        ) : null}
         {ticket.address ? (
-          <p className="mt-1 flex min-w-0 items-center gap-1 text-[10px] leading-[1.2] text-[rgba(20,18,16,.52)]">
-            <MapPin className="h-3 w-3 shrink-0 text-[#E86A3A]" aria-hidden />
-            <span className="truncate">{ticket.address}</span>
+          <p className="mt-1 min-w-0 text-[10px] leading-[1.2] text-white/75 drop-shadow-[0_1px_2px_rgba(0,0,0,.4)] sm:text-[11px]">
+            <span className="block truncate">{ticket.address}</span>
           </p>
         ) : null}
       </div>
 
-      <div className="relative flex w-[48px] shrink-0 items-center justify-center border-l border-dashed border-[rgba(20,18,16,.22)] sm:w-[56px]">
+      <div className="relative flex w-[58px] shrink-0 items-center justify-center border-l border-dashed border-white/75 bg-black/10 sm:w-[64px]">
         {ticket.price?.kind === "free" ? (
-          <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.08em] text-[#C24E22] [writing-mode:vertical-rl] rotate-180">
+          <span className="rotate-180 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.12em] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.5)] [writing-mode:vertical-rl]">
             Бесплатно
           </span>
         ) : ticket.price ? (
-          <span className="px-1 text-center text-[11px] font-semibold leading-[1.15]">{ticket.price.label}</span>
+          <span className="px-1.5 text-center text-[11px] font-semibold leading-[1.15] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.5)] sm:text-[12px]">
+            {ticket.price.label}
+          </span>
         ) : null}
       </div>
     </article>

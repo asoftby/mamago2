@@ -837,7 +837,7 @@ function DateSliderView({
           напомнить.
         </h2>
 
-        <div style={{ marginTop: 23, marginBottom: 28 }}>
+        <div style={{ marginTop: 38, marginBottom: 38 }}>
           <ActivityTicketCard
             source={{
               ...(ticket ?? { title }),
