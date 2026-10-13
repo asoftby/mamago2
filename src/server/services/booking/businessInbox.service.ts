@@ -62,7 +62,7 @@ function mapDecision(row: InboxRow, now: Date) {
     quoteStatus: row.partyQuotes[0]?.status ?? null,
     quoteValidUntil: row.partyQuotes[0]?.validUntil ?? null,
   }, now);
-  return { row, decision, serviceEndsAt: date };
+  return { row, createdAt: row.createdAt, decision, serviceEndsAt: date };
 }
 
 function emptyCounts() {
