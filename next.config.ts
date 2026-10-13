@@ -73,6 +73,8 @@ const nextConfig: NextConfig = {
   // No-trailing-slash policy: canonical URLs never end with `/`.
   // Incoming requests with a trailing slash are redirected (301) by middleware.
   trailingSlash: false,
+  // Изолированная папка сборки (pre-push gate): сборка не трогает кэш работающего `next dev`.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
 
   // В dev React Compiler сильно раздувает время компиляции страниц (десятки секунд TTFB).
   // В production оставляем включённым.
