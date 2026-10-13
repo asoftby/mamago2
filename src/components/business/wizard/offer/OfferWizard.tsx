@@ -578,17 +578,26 @@ export function OfferWizard({
         const response = await fetch(`/api/business/offers/${offerId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ ...payload, expectedUpdatedAt: entityUpdatedAtIso ?? undefined }),
         });
 
         // Сервер сохранил правки: локальный черновик не нужен, dirty-база — текущее состояние
-        const saved = await parseOfferMutationResponse<{ updatedAt?: string }>(response, {
+        const saved = await parseOfferMutationResponse<{
+          updatedAt?: string;
+          moderationNotice?: { message: string };
+        }>(response, {
           fallbackMessage: "Failed to update draft",
           operation: "update draft",
           payload,
         });
         if (saved?.updatedAt) {
           setEntityUpdatedAtIso(new Date(saved.updatedAt).toISOString());
+        }
+        if (saved?.moderationNotice?.message) {
+          // Сервер не принял контентные правки опубликованного предложения: форма остаётся «грязной»
+          // (предупреждение при уходе, черновик не теряется), а не выглядит сохранённой.
+          toast.info(saved.moderationNotice.message);
+          return;
         }
         setBaselineFormJson(JSON.stringify(formData));
         draft.markClean();
@@ -636,10 +645,8 @@ export function OfferWizard({
 
       showSuccessModal({
         kind: "offer",
-        outcome:
-          canDirectPublish && mode === "edit" && isPublishedEditMode
-            ? "changes_published"
-            : "draft_saved",
+        // Опубликованный оффер: принятые операционные правки (цены, расписание, контакты) уже живые.
+        outcome: mode === "edit" && isPublishedEditMode ? "changes_published" : "draft_saved",
         id: offerId!,
         isEdit: true,
         slug: offer?.slug ?? null,
@@ -731,24 +738,35 @@ export function OfferWizard({
       const response = await fetch(`/api/business/offers/${offerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatePayload),
+        body: JSON.stringify({ ...updatePayload, expectedUpdatedAt: entityUpdatedAtIso ?? undefined }),
       });
 
-      await parseOfferMutationResponse(response, {
+      const submitted = await parseOfferMutationResponse<{
+        updatedAt?: string;
+        moderationNotice?: { message: string };
+      }>(response, {
         fallbackMessage: "Failed to submit offer",
         operation: "submit offer",
         payload: updatePayload,
       });
 
+      // Версия для защиты от устаревшего снимка: после успешной записи следующая правка идёт от неё.
+      if (submitted?.updatedAt) setEntityUpdatedAtIso(new Date(submitted.updatedAt).toISOString());
+      if (submitted?.moderationNotice?.message) {
+        // Ревизий пока нет: контентные правки не сохранены, поэтому «отправлено»/«опубликовано» не показываем.
+        toast.info(submitted.moderationNotice.message);
+        return;
+      }
       setBaselineFormJson(JSON.stringify(formData));
       draft.markClean();
       showSuccessModal({
         kind: "offer",
-        outcome: canDirectPublish
-          ? isPublishedEditMode
-            ? "changes_published"
-            : "published"
-          : "submitted",
+        // Опубликованный оффер: принятые правки уже живые (контент, если был, уйдёт модератору отдельно).
+        outcome: isPublishedEditMode
+          ? "changes_published"
+          : canDirectPublish
+            ? "published"
+            : "submitted",
         id: offerId,
         isEdit: mode === "edit",
         slug: offer?.slug ?? null,
@@ -797,7 +815,7 @@ export function OfferWizard({
         case "type":
           return <Step1Type {...commonProps} showCategories={variant === "v2"} />;
         case "placements":
-          return <Step2Placements {...commonProps} />;
+          return <Step2Placements {...commonProps} showAdditionalPlacements={variant !== "v2"} />;
         case "details":
           return <Step2Information {...commonProps} v2={variant === "v2"} />;
         case "photo":
@@ -834,7 +852,8 @@ export function OfferWizard({
         currentStepKey === "terms")
     ) {
       const members = getV2StepMembers(currentStepKey, formData);
-      const blocks: OfferWizardStepKey[] = currentStepKey === "about" ? [...members, "faq"] : members;
+      // FAQ уже внутри «Дополнительно» блока «Детали» — отдельный блок не добавляем (иначе два редактора на одном состоянии).
+      const blocks: OfferWizardStepKey[] = members;
       if (blocks.length === 0) {
         return (
           <p className="text-sm text-muted-foreground">
