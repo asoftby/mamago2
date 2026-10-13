@@ -214,6 +214,7 @@ export function SaveHeart({
         scenario={{
           kind: "quickdate",
           title: activityTitle,
+          ticket: { title: activityTitle, imageUrl: coverImageUrl },
           eventPlanDateISO: normalizedEventPlanDateISO,
           eventPlanDateEndISO: eventPlanDateEndISO ?? undefined,
           eventPlanDateOptions: eventPlanDateOptions,

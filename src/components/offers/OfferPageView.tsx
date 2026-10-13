@@ -208,10 +208,25 @@ export function OfferPageView({
     return {
       kind: "quickdate",
       title: target?.title || data.title,
+      ticket: {
+        title: target?.title || data.title,
+        imageUrl: data.media.posterUrl || data.media.gallery[0]?.url,
+        venue: data.place?.name,
+        address: data.place?.address,
+        priceMode: data.pricing.mode === "FREE"
+          ? "FREE"
+          : data.pricing.mode === "FROM"
+            ? "FROM"
+            : data.pricing.mode === "EXACT"
+              ? "EXACT"
+              : "UNKNOWN",
+        priceValue: target?.price || data.pricing.priceFrom || data.pricing.singlePrice || data.pricing.priceDisplay,
+        priceLabel: target?.price || stickyPriceLabel,
+      },
       eventPlanDateISO: targetIso ?? undefined,
       eventPlanDateOptions: targetIso ? [targetIso] : shiftDateOptions,
     };
-  }, [data.title, saveTargetShift, shiftDateOptions]);
+  }, [data, saveTargetShift, shiftDateOptions, stickyPriceLabel]);
 
   const openBookingForShift = useCallback((ctx: ShiftCtaContext) => {
     setBookingShift(ctx);

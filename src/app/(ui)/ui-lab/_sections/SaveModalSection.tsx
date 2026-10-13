@@ -20,6 +20,13 @@ const ARTICLE_SCENARIO: SaveScenario = {
 const ACTIVITY_SCENARIO: SaveScenario = {
   kind: "quickdate",
   title: ACTIVITY_TITLE,
+  ticket: {
+    title: ACTIVITY_TITLE,
+    imageUrl: "/og-default.jpg",
+    venue: "Творческая студия «Глина»",
+    address: "Минск, ул. Октябрьская, 16",
+    priceMode: "FREE",
+  },
   eventPlanDateOptions: [
     "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04",
     "2026-09-05", "2026-09-06", "2026-09-07", "2026-09-08",
