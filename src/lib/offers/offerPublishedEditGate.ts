@@ -56,7 +56,7 @@ export function classifyOfferColumn(column: string): OfferColumnKind {
 }
 
 /** Prisma `DbNull`/`JsonNull` и пустые значения сравниваем как «нет значения». */
-function normalizeForCompare(value: unknown): unknown {
+export function normalizeForCompare(value: unknown): unknown {
   if (value === undefined || value === null) return null;
   if (typeof value === "string") return value.trim() === "" ? null : value.trim();
   if (Array.isArray(value)) return value;

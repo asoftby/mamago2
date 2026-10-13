@@ -34,6 +34,7 @@ import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { formatZodErrorResponse } from "@/lib/validation/zodErrorResponse";
 import { shouldRejectUnlinkedPlaceForOfferMutation } from "@/lib/offers/offerLinkedBusinessAccess";
 import { notifyAdminsPublicationSubmitted } from "@/server/services/notification.service";
+import { offerOperationalVersion } from "@/lib/offers/offerOperationalVersion";
 import { buildRevisionProposal } from "@/lib/offers/offerRevisionPayload";
 import { savePendingOfferRevision } from "@/server/offers/offerRevision.service";
 import { offerStatusRequiresPlace } from "@/lib/offers/offerPlaceRequirement";
@@ -124,8 +125,8 @@ const updateOfferSchema = z.object({
   faqItems: z.array(z.record(z.string(), z.unknown())).nullish(),
   categoryIds: z.array(z.string()).max(3).optional(),
   interestSlugs: z.array(z.string()).max(5).optional(),
-  /** Версия оффера (`updatedAt`), на которой клиент построил форму: защита от записи устаревшего снимка. */
-  expectedUpdatedAt: z.string().optional(),
+  /** Версия операционных данных, на которой клиент построил форму (`offerOperationalVersion`): защита от записи устаревшего снимка. */
+  expectedOperationalVersion: z.string().optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
   discoverySignalIds: z.array(z.string()).optional(),
   classChipSlugs: z.array(z.string()).optional(),
@@ -707,15 +708,16 @@ export async function PATCH(
           forceContentColumns: [...invalidPhoneColumns, ...typeDerivedColumns],
         });
 
-        // Устаревший снимок формы: оффер изменили после загрузки редактора (например, админ поправил цену),
-        // а владелец сохраняет операционные значения. Мы не знаем, какие из них он правил сам, поэтому
-        // не перезаписываем чужие правки — просим обновить страницу. Контентные правки конфликта не создают
-        // (они уходят в ревизию).
+        // Устаревший снимок формы: цены/смены/телефоны изменили после загрузки редактора (например, админ
+        // поправил цену), а владелец сохраняет операционные значения. Мы не знаем, какие из них он правил
+        // сам, поэтому не перезаписываем чужие правки — просим обновить страницу. Версия — хэш значений,
+        // а не `updatedAt` (фоновые задачи двигают его без правок данных). Контент конфликта не создаёт
+        // (он уходит в ревизию).
         if (
           live.status === "PUBLISHED" &&
           decision.operationalColumns.length > 0 &&
-          data.expectedUpdatedAt &&
-          new Date(data.expectedUpdatedAt).getTime() !== live.updatedAt.getTime()
+          data.expectedOperationalVersion &&
+          data.expectedOperationalVersion !== offerOperationalVersion(liveRecord)
         ) {
           throw new OfferStaleSnapshotError();
         }
@@ -936,7 +938,15 @@ export async function PATCH(
     timer.mark("response");
     timer.log({ status: offer.status });
 
-    return NextResponse.json(gate.moderationNotice ? { ...offer, moderationNotice: gate.moderationNotice } : offer);
+    // Свежая версия операционных данных — форма отправляет её со следующим сохранением.
+    const freshRow = await prisma.offer.findUnique({ where: { id } });
+    const operationalVersion = freshRow ? offerOperationalVersion(freshRow as unknown as Record<string, unknown>) : undefined;
+
+    return NextResponse.json({
+      ...offer,
+      operationalVersion,
+      ...(gate.moderationNotice ? { moderationNotice: gate.moderationNotice } : {}),
+    });
 
   } catch (error) {
     timer.log({ error: 1 });

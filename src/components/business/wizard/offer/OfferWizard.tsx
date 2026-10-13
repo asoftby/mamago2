@@ -111,6 +111,8 @@ interface OfferWizardProps {
   newWizard?: boolean;
   /** Колонки ожидающей ревизии опубликованного оффера (правки автора ждут модерации). */
   pendingRevisionFields?: string[];
+  /** Версия операционных данных оффера на момент загрузки редактора (защита от записи устаревшего снимка). */
+  operationalVersion?: string;
 }
 
 /** Ключ автосейва до миграции на useWizardDraft — подчищается на mount */
@@ -276,6 +278,7 @@ export function OfferWizard({
   ctaStepEnabled,
   newWizard = false,
   pendingRevisionFields,
+  operationalVersion: initialOperationalVersion,
 }: OfferWizardProps) {
   const variant: OfferWizardVariant = newWizard ? "v2" : "v1";
   const router = useRouter();
@@ -397,6 +400,9 @@ export function OfferWizard({
   );
   const formJson = useMemo(() => JSON.stringify(formData), [formData]);
   const isDirty = formJson !== baselineFormJson;
+
+  /** Версия операционных данных, на которой построена форма; обновляется из ответа каждого PATCH. */
+  const [operationalVersion, setOperationalVersion] = useState<string | undefined>(initialOperationalVersion);
 
   /** updatedAt оффера, которому соответствует baseline (обновляется после PATCH) */
   const [entityUpdatedAtIso, setEntityUpdatedAtIso] = useState<string | null>(() =>
@@ -582,18 +588,20 @@ export function OfferWizard({
         const response = await fetch(`/api/business/offers/${offerId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...payload, expectedUpdatedAt: entityUpdatedAtIso ?? undefined }),
+          body: JSON.stringify({ ...payload, expectedOperationalVersion: operationalVersion }),
         });
 
         // Сервер сохранил правки: локальный черновик не нужен, dirty-база — текущее состояние
         const saved = await parseOfferMutationResponse<{
           updatedAt?: string;
+          operationalVersion?: string;
           moderationNotice?: { message: string };
         }>(response, {
           fallbackMessage: "Failed to update draft",
           operation: "update draft",
           payload,
         });
+        if (saved?.operationalVersion) setOperationalVersion(saved.operationalVersion);
         if (saved?.updatedAt) {
           setEntityUpdatedAtIso(new Date(saved.updatedAt).toISOString());
         }
@@ -739,11 +747,12 @@ export function OfferWizard({
       const response = await fetch(`/api/business/offers/${offerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...updatePayload, expectedUpdatedAt: entityUpdatedAtIso ?? undefined }),
+        body: JSON.stringify({ ...updatePayload, expectedOperationalVersion: operationalVersion }),
       });
 
       const submitted = await parseOfferMutationResponse<{
         updatedAt?: string;
+        operationalVersion?: string;
         moderationNotice?: { message: string };
       }>(response, {
         fallbackMessage: "Failed to submit offer",
@@ -753,6 +762,7 @@ export function OfferWizard({
 
       // Версия для защиты от устаревшего снимка: после успешной записи следующая правка идёт от неё.
       if (submitted?.updatedAt) setEntityUpdatedAtIso(new Date(submitted.updatedAt).toISOString());
+      if (submitted?.operationalVersion) setOperationalVersion(submitted.operationalVersion);
       if (submitted?.moderationNotice?.message) toast.info(submitted.moderationNotice.message);
       const revisionSentToModeration = Boolean(submitted?.moderationNotice);
       setBaselineFormJson(JSON.stringify(formData));

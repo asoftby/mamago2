@@ -1,3 +1,4 @@
+import { offerOperationalVersion } from "@/lib/offers/offerOperationalVersion";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -136,6 +137,7 @@ export default async function EditorEditOfferPage({
         returnTo={returnTo}
         initialStepNumber={initialStepNumber}
         pendingRevisionFields={pendingRevision?.fields}
+        operationalVersion={offerOperationalVersion(offer as unknown as Record<string, unknown>)}
         ctaStepEnabled={ctaStepEnabled}
         newWizard={isBusinessFeatureEnabled(offerBusiness, "newOfferWizard")}
       />
