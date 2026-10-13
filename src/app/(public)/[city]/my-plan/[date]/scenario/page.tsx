@@ -71,6 +71,7 @@ function activityCoords(activity: {
 export default async function DayScenarioPage({ params }: PageProps) {
   const { city: citySlug, date } = await params;
 
+  if (process.env.NEXT_PUBLIC_ENABLE_LEGACY_DAY_SCENARIO !== "true") notFound();
   if (!DATE_PATTERN.test(date)) notFound();
 
   const user = await getCurrentUser();

@@ -222,6 +222,7 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
       activeClassChipSlug={activeClassChipSlug}
       budgetConfig={budgetConfig}
       pageTitleOverride={pageTitleOverride}
+      weekendPlannerEnabled={intent === "kuda" && user?.role === "ADMIN"}
     />
   );
 }
