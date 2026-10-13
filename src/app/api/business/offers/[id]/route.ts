@@ -34,6 +34,9 @@ import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { formatZodErrorResponse } from "@/lib/validation/zodErrorResponse";
 import { shouldRejectUnlinkedPlaceForOfferMutation } from "@/lib/offers/offerLinkedBusinessAccess";
 import { notifyAdminsPublicationSubmitted } from "@/server/services/notification.service";
+import { offerOperationalVersion } from "@/lib/offers/offerOperationalVersion";
+import { buildRevisionProposal } from "@/lib/offers/offerRevisionPayload";
+import { savePendingOfferRevision } from "@/server/offers/offerRevision.service";
 import { offerStatusRequiresPlace } from "@/lib/offers/offerPlaceRequirement";
 import {
   OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
@@ -122,8 +125,8 @@ const updateOfferSchema = z.object({
   faqItems: z.array(z.record(z.string(), z.unknown())).nullish(),
   categoryIds: z.array(z.string()).max(3).optional(),
   interestSlugs: z.array(z.string()).max(5).optional(),
-  /** Версия оффера (`updatedAt`), на которой клиент построил форму: защита от записи устаревшего снимка. */
-  expectedUpdatedAt: z.string().optional(),
+  /** Версия операционных данных, на которой клиент построил форму (`offerOperationalVersion`): защита от записи устаревшего снимка. */
+  expectedOperationalVersion: z.string().optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
   discoverySignalIds: z.array(z.string()).optional(),
   classChipSlugs: z.array(z.string()).optional(),
@@ -582,7 +585,19 @@ export async function PATCH(
       journal: { columns: string[]; before: Record<string, unknown>; after: Record<string, unknown> } | null;
       /** Для опубликованного оффера проекция смен строится из итоговых данных, а не из payload. */
       campProjection: { isCamp: boolean; sessions: unknown } | null;
-    } = { skipRequestedPlacements: false, moderationNotice: null, journal: null, campProjection: null };
+      skipCategories: boolean;
+      /** Создана новая ожидающая ревизия (а не обновлена существующая) — уведомляем админов. */
+      revisionCreated: boolean;
+      revisionId: string | null;
+    } = {
+      skipRequestedPlacements: false,
+      moderationNotice: null,
+      journal: null,
+      campProjection: null,
+      skipCategories: false,
+      revisionCreated: false,
+      revisionId: null,
+    };
 
     const gateApplies = !canPublishContentDirectly(user.role);
 
@@ -601,6 +616,16 @@ export async function PATCH(
         if (live.status === "PUBLISHED" && updateRecord.status === "PENDING") {
           delete updateRecord.status;
         }
+
+        // Колонки, присутствовавшие в запросе (до отбрасывания), и исходные смены: нужны для пересчёта ревизии.
+        const presentColumns = Object.keys(updateRecord).filter(
+          (column) => column !== "status" && column !== "place",
+        );
+        const proposedCampSessions = updateRecord.campSessions;
+        if ("campSessions" in updateRecord) presentColumns.push("campSessionTexts");
+        if (data.requestedPlacements !== undefined) presentColumns.push("requestedPlacements");
+        if (data.categoryIds !== undefined) presentColumns.push("categoryIds");
+        if (data.selectedPlace?.id) presentColumns.push("placeId");
 
         let campTextsChanged = false;
         if (live.status === "PUBLISHED" && "campSessions" in updateRecord) {
@@ -640,6 +665,16 @@ export async function PATCH(
           if (!offerValuesEqual(current, next)) changedColumns.push("requestedPlacements");
         }
 
+        if (live.status === "PUBLISHED" && data.categoryIds !== undefined) {
+          const currentCategories = await tx.offerCategory.findMany({
+            where: { offerId: id },
+            select: { categoryId: true },
+          });
+          const current = currentCategories.map((row) => row.categoryId).sort();
+          const next = [...new Set(data.categoryIds)].sort();
+          if (!offerValuesEqual(current, next)) changedColumns.push("categoryIds");
+        }
+
         // Номера телефонов — операционные, только пока это действительно номер: произвольный текст
         // в поле «телефон» показывается публично, поэтому такое значение уходит в контент.
         const invalidPhoneColumns = ["contactPhone", "contactPhone2", "contactPhone3"].filter((column) => {
@@ -673,34 +708,66 @@ export async function PATCH(
           forceContentColumns: [...invalidPhoneColumns, ...typeDerivedColumns],
         });
 
-        // Устаревший снимок формы: оффер изменили после загрузки редактора (например, админ поправил цену),
-        // а владелец сохраняет операционные значения. Мы не знаем, какие из них он правил сам, поэтому
-        // не перезаписываем чужие правки — просим обновить страницу. Контентные правки конфликта не создают
-        // (они уходят в ревизию).
+        // Устаревший снимок формы: цены/смены/телефоны изменили после загрузки редактора (например, админ
+        // поправил цену), а владелец сохраняет операционные значения. Мы не знаем, какие из них он правил
+        // сам, поэтому не перезаписываем чужие правки — просим обновить страницу. Версия — хэш значений,
+        // а не `updatedAt` (фоновые задачи двигают его без правок данных). Контент конфликта не создаёт
+        // (он уходит в ревизию).
         if (
           live.status === "PUBLISHED" &&
           decision.operationalColumns.length > 0 &&
-          data.expectedUpdatedAt &&
-          new Date(data.expectedUpdatedAt).getTime() !== live.updatedAt.getTime()
+          data.expectedOperationalVersion &&
+          data.expectedOperationalVersion !== offerOperationalVersion(liveRecord)
         ) {
           throw new OfferStaleSnapshotError();
         }
 
-        if (decision.blocked) {
-          // Контент опубликованного оффера до модерации не меняем: контентные колонки отбрасываем,
-          // операционные (цены, расписание, контакты) сохраняем и говорим партнёру, что осталось за поддержкой.
+        if (live.status === "PUBLISHED") {
+          // Контентные правки не пишем в живую строку, а кладём в ожидающую ревизию (ушедшую на модерацию).
+          // Операционные (цены, расписание, контакты) уже в updateData и применяются сразу.
+          let visibleContent = decision.contentColumns.filter((column) => column !== "status");
+          // Смена места в updateData — Prisma-синтаксис (`place.connect`); в ревизии хранится `placeId`.
+          visibleContent = visibleContent.map((column) => (column === "place" ? "placeId" : column));
+          // Смена типа на/с лагеря: смены уходят в ревизию целиком (`campSessions`), отдельные тексты не нужны.
+          if (visibleContent.includes("campSessions")) {
+            visibleContent = visibleContent.filter((column) => column !== "campSessionTexts");
+          }
+
+          const proposalValues: Record<string, unknown> = {};
+          for (const column of visibleContent) {
+            if (column === "requestedPlacements") proposalValues[column] = data.requestedPlacements;
+            else if (column === "categoryIds") proposalValues[column] = data.categoryIds;
+            else if (column === "placeId") proposalValues[column] = data.selectedPlace?.id;
+            else if (column === "campSessionTexts" || column === "campSessions") proposalValues[column] = proposedCampSessions;
+            else proposalValues[column] = updateRecord[column];
+          }
+
           for (const column of decision.contentColumns) {
             if (column === "requestedPlacements") gate.skipRequestedPlacements = true;
+            else if (column === "categoryIds") gate.skipCategories = true;
             else delete updateRecord[column];
           }
-          gate.moderationNotice = {
-            message: buildModerationNoticeMessage({
-              contentColumns: decision.contentColumns,
-              operationalColumns: decision.operationalColumns,
-            }),
-            fields: decision.contentColumns,
-            code: OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
-          };
+
+          const saved = await savePendingOfferRevision(tx, {
+            offerId: id,
+            authorId: user.id,
+            proposal: buildRevisionProposal(visibleContent, proposalValues),
+            presentColumns,
+            live: { ...liveRecord, ...liveOfferComparableOverlay(live) } as Record<string, unknown> & { updatedAt?: Date },
+          });
+          gate.revisionCreated = saved.created;
+          gate.revisionId = saved.revisionId;
+
+          if (visibleContent.length > 0) {
+            gate.moderationNotice = {
+              message: buildModerationNoticeMessage({
+                contentColumns: visibleContent,
+                operationalColumns: decision.operationalColumns,
+              }),
+              fields: visibleContent,
+              code: OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
+            };
+          }
         }
 
         if (live.status === "PUBLISHED") {
@@ -762,7 +829,9 @@ export async function PATCH(
       });
 
       if (data.categoryIds !== undefined) {
-        await syncOfferCategories({ db: tx, offerId: id, productType, categoryIds: data.categoryIds });
+        if (!gate.skipCategories) {
+          await syncOfferCategories({ db: tx, offerId: id, productType, categoryIds: data.categoryIds });
+        }
       }
 
       // Only CAMP edits own this projection. Other schedule kinds also use
@@ -837,6 +906,19 @@ export async function PATCH(
         console.error("[offer-update] admin moderation notification failed:", error);
       }
     }
+    // Новая ревизия опубликованного оффера (не обновление существующей) — зовём админов на модерацию.
+    if (gate.revisionCreated) {
+      try {
+        await notifyAdminsPublicationSubmitted({
+          publicationType: "OFFER",
+          publicationId: offer.id,
+          publicationTitle: `${offer.title} — правки опубликованного`,
+          actionUrl: gate.revisionId ? `/admin/content/offers/revisions/${gate.revisionId}` : undefined,
+        });
+      } catch (error) {
+        console.error("[offer-update] admin revision notification failed:", error);
+      }
+    }
     timer.mark("notifications");
 
     // Sync media usage if cover or gallery changed (don't block on errors)
@@ -856,7 +938,15 @@ export async function PATCH(
     timer.mark("response");
     timer.log({ status: offer.status });
 
-    return NextResponse.json(gate.moderationNotice ? { ...offer, moderationNotice: gate.moderationNotice } : offer);
+    // Свежая версия операционных данных — форма отправляет её со следующим сохранением.
+    const freshRow = await prisma.offer.findUnique({ where: { id } });
+    const operationalVersion = freshRow ? offerOperationalVersion(freshRow as unknown as Record<string, unknown>) : undefined;
+
+    return NextResponse.json({
+      ...offer,
+      operationalVersion,
+      ...(gate.moderationNotice ? { moderationNotice: gate.moderationNotice } : {}),
+    });
 
   } catch (error) {
     timer.log({ error: 1 });

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import prisma from "@/lib/prisma";
 import { OfferStatus, Prisma } from "@prisma/client";
@@ -359,9 +360,10 @@ export default async function ModerationOffersPage({
 }) {
   const params = await searchParams;
 
-  const [offersResult, cities] = await Promise.all([
+  const [offersResult, cities, pendingRevisionCount] = await Promise.all([
     getOffers(params),
     getModerationFilterCities(),
+    prisma.offerRevision.count({ where: { status: "PENDING" } }),
   ]);
   const { items: offers, pagination } = offersResult;
 
@@ -402,6 +404,12 @@ export default async function ModerationOffersPage({
             Предложения (OfferStatus) — те же фильтры по городу; статусы как у мест по смыслу
           </p>
         </div>
+        <Link
+          href="/admin/content/offers/revisions"
+          className="text-sm font-medium underline underline-offset-4"
+        >
+          Правки опубликованных{pendingRevisionCount > 0 ? ` (${pendingRevisionCount})` : ""}
+        </Link>
       </div>
 
       <ModerationListFilters

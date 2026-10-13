@@ -598,6 +598,35 @@ export async function notifyOfferRejected(
   });
 }
 
+/** Правка опубликованного предложения одобрена модератором и применена. */
+export async function notifyOfferRevisionApproved(offerId: string, offerName: string, ownerId: string) {
+  return createNotification({
+    userId: ownerId,
+    type: "OFFER_APPROVED",
+    title: "Правки опубликованы",
+    body: `Изменения в предложении «${offerName}» прошли модерацию и уже видны пользователям mamaGo.`,
+    entityType: "OFFER",
+    entityId: offerId,
+  });
+}
+
+/** Правка опубликованного предложения отклонена: живая версия осталась прежней. */
+export async function notifyOfferRevisionRejected(
+  offerId: string,
+  offerName: string,
+  ownerId: string,
+  moderatorComment: string,
+) {
+  return createNotification({
+    userId: ownerId,
+    type: "OFFER_REJECTED",
+    title: "Правки не приняты",
+    body: `Изменения в предложении «${offerName}» не прошли модерацию, опубликованная версия осталась прежней. ${moderatorComment}`,
+    entityType: "OFFER",
+    entityId: offerId,
+  });
+}
+
 // ── BUSINESS VERIFICATION ─────────────────────────────────────────────────────
 
 /**
@@ -1255,6 +1284,8 @@ export async function notifyAdminsPublicationSubmitted(params: {
   publicationId: string;
   publicationTitle: string;
   submittedAt?: Date;
+  /** Куда ведёт уведомление (по умолчанию — общая очередь модерации). */
+  actionUrl?: string;
 }) {
   const admins = await prisma.user.findMany({
     where: { role: "ADMIN" },
@@ -1283,7 +1314,7 @@ export async function notifyAdminsPublicationSubmitted(params: {
         itemId: moderationItemId,
         notificationTitle: "Новая публикация на модерации",
         itemTitle: `${label}: «${params.publicationTitle}»`,
-        actionUrl: "/admin/moderation/queue",
+        actionUrl: params.actionUrl ?? "/admin/moderation/queue",
       }),
     ),
   );

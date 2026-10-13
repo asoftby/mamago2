@@ -182,11 +182,11 @@ assert.equal(describeContentColumns(["coverImage", "galleryImages", "title"]), "
 assert.equal(describeContentColumns(["somethingNew"]), "другие данные карточки");
 assert.equal(
   buildModerationNoticeMessage({ contentColumns: ["title", "galleryImages"], operationalColumns: ["priceFrom"] }),
-  "Текст и фото опубликованного предложения пока меняются через поддержку: название, фото. Цены, расписание и контакты сохранены",
+  "Текст и фото опубликованного предложения проходят модерацию: название, фото. До решения на сайте прежняя версия. Цены, расписание и контакты сохранены",
 );
 assert.equal(
   buildModerationNoticeMessage({ contentColumns: ["description"], operationalColumns: [] }),
-  "Текст и фото опубликованного предложения пока меняются через поддержку: описание.",
+  "Текст и фото опубликованного предложения проходят модерацию: описание. До решения на сайте прежняя версия.",
 );
 
 // Смены лагеря: даты/цена/места — сразу, тексты смен — нет

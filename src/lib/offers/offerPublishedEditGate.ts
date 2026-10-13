@@ -56,7 +56,7 @@ export function classifyOfferColumn(column: string): OfferColumnKind {
 }
 
 /** Prisma `DbNull`/`JsonNull` и пустые значения сравниваем как «нет значения». */
-function normalizeForCompare(value: unknown): unknown {
+export function normalizeForCompare(value: unknown): unknown {
   if (value === undefined || value === null) return null;
   if (typeof value === "string") return value.trim() === "" ? null : value.trim();
   if (Array.isArray(value)) return value;
@@ -135,7 +135,7 @@ export function shouldBlockPublishedOfferEdit(params: {
   }).blocked;
 }
 
-const CONTENT_COLUMN_LABELS: Record<string, string> = {
+export const CONTENT_COLUMN_LABELS: Record<string, string> = {
   title: "название",
   description: "описание",
   coverImage: "фото",
@@ -155,8 +155,21 @@ const CONTENT_COLUMN_LABELS: Record<string, string> = {
   contactSocialLinks: "ссылки",
   requestedPlacements: "разделы каталога",
   campSessionTexts: "тексты смен",
+  categoryIds: "категории",
+  interestSlugs: "интересы",
+  place: "место",
+  placeId: "место",
+  campSessions: "смены лагеря",
+  productType: "тип предложения",
+  kind: "тип предложения",
+  campProgramType: "тип предложения",
   status: "статус публикации",
 };
+
+/** Название контентного поля для партнёра и модератора. */
+export function labelForContentColumn(column: string): string {
+  return CONTENT_COLUMN_LABELS[column] ?? "другие данные карточки";
+}
 
 /** Человеческое перечисление контентных полей для сообщения партнёру. */
 export function describeContentColumns(columns: readonly string[]): string {
@@ -164,12 +177,12 @@ export function describeContentColumns(columns: readonly string[]): string {
   return labels.join(", ");
 }
 
-/** Сообщение партнёру: что ушло на поддержку и что сохранено сразу. */
+/** Сообщение партнёру: что ушло на модерацию и что сохранено сразу. */
 export function buildModerationNoticeMessage(params: {
   contentColumns: readonly string[];
   operationalColumns: readonly string[];
 }): string {
-  const first = `Текст и фото опубликованного предложения пока меняются через поддержку: ${describeContentColumns(params.contentColumns)}.`;
+  const first = `Текст и фото опубликованного предложения проходят модерацию: ${describeContentColumns(params.contentColumns)}. До решения на сайте прежняя версия.`;
   return params.operationalColumns.length > 0
     ? `${first} Цены, расписание и контакты сохранены`
     : first;
