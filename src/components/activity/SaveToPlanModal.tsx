@@ -18,6 +18,10 @@ import {
   getPlanReminderLabelFromPlanItem,
   PLAN_REMINDER_LABELS,
 } from "@/lib/plan/getPlanReminderLabel";
+import {
+  ActivityTicketCard,
+  type ActivityTicketSource,
+} from "@/components/activity/ActivityTicketCard";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -61,6 +65,8 @@ export type SaveScenario =
        * но без «в идеи» и с кнопкой «Перенести».
        */
       moveMode?: boolean;
+      /** Unified display data for the informational ticket above the date picker. */
+      ticket?: ActivityTicketSource;
     };
 
 export type SaveToPlanResult =
@@ -764,10 +770,10 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
 
 // ─── Date Slider View (Variant B) ─────────────────────────────────────────────
 function DateSliderView({
-  options, title, category,
+  options, title, ticket,
   onConfirm, onIdea, sessionsByDate, confirmLabel,
 }: {
-  options: string[]; title: string; category?: string;
+  options: string[]; title: string; ticket?: ActivityTicketSource;
   onConfirm: (iso: string, sessionId: string | null) => void; onIdea?: () => void;
   /** Подпись кнопки подтверждения; по умолчанию «Сохранить». */
   confirmLabel?: string;
@@ -831,28 +837,16 @@ function DateSliderView({
           напомнить.
         </h2>
 
-        {/* Event context line */}
-        <p style={{
-          marginTop: 8, marginBottom: 18, fontSize: 13, color: C.ink3,
-          display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const,
-        }}>
-          {category && (
-            <>
-              <span style={{
-                fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const,
-                fontSize: 11, letterSpacing: ".14em", color: C.accentDeep,
-                display: "inline-flex", alignItems: "center", gap: 6,
-              }}>
-                <span style={{ width: 6, height: 6, borderRadius: 99, background: C.accent }} />
-                {category}
-              </span>
-              <span style={{ color: C.line2 }}>·</span>
-            </>
-          )}
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
-            {selectedSessionTitle ? `${title.replace(/\.+$/, "")}. ${selectedSessionTitle}` : title}
-          </span>
-        </p>
+        <div style={{ marginTop: 23, marginBottom: 28 }}>
+          <ActivityTicketCard
+            source={{
+              ...(ticket ?? { title }),
+              title: selectedSessionTitle
+                ? `${title.replace(/\.+$/, "")}. ${selectedSessionTitle}`
+                : (ticket?.title ?? title),
+            }}
+          />
+        </div>
 
         {/* Month label + session count */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -1744,6 +1738,7 @@ function PickerBodyInner({
       <DateSliderView
         options={sliderOptions}
         title={scenario.title}
+        ticket={scenario.ticket}
         sessionsByDate={sessionsByDate}
         onConfirm={(iso, sessionId) => onCommit({ action: "plan", dateISO: iso, timeSlotId: sessionId ?? null })}
         onIdea={scenario.moveMode ? undefined : () => onCommit({ action: "ideas" })}

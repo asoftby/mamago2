@@ -450,6 +450,7 @@ async function buildOfferPageDataFromOffer(
     metaGrid,
     
     pricing: {
+      priceMode: offer.priceMode,
       mode: pricingMode,
       singlePrice: effectivePriceFrom != null ? formatPrice(effectivePriceFrom) : undefined,
       priceCaption:
