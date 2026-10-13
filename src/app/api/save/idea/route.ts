@@ -15,6 +15,12 @@ import {
   removeOfferIdea,
   removePlaceIdea,
 } from "@/server/services/idea.service";
+import {
+  addIdeaToCollections,
+  assertCollectionsOwned,
+  type IdeaTarget,
+} from "@/server/services/ideaCollections.service";
+import { ideaCollectionErrorResponse } from "@/server/services/ideaCollections.http";
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,11 +30,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { activityId, offerId, placeId, articleId } = body as {
+    const { activityId, offerId, placeId, articleId, collectionIds } = body as {
       activityId?: string;
       offerId?: string;
       placeId?: string;
       articleId?: string;
+      /** Опционально: сразу положить сохранённую идею в эти коллекции. */
+      collectionIds?: string[];
     };
 
     if (!activityId && !offerId && !placeId && !articleId) {
@@ -38,8 +46,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const wantedCollectionIds = Array.isArray(collectionIds)
+      ? collectionIds.filter((id): id is string => typeof id === "string" && id.length > 0)
+      : [];
+    // Чужие/несуществующие коллекции → 404 ДО записи идеи, чтобы не оставлять побочный эффект.
+    if (wantedCollectionIds.length > 0) {
+      await assertCollectionsOwned(prisma, user.id, wantedCollectionIds);
+    }
+    const saveTarget: IdeaTarget = articleId
+      ? { kind: "ARTICLE", id: articleId }
+      : placeId
+        ? { kind: "PLACE", id: placeId }
+        : activityId
+          ? { kind: "ACTIVITY", id: activityId }
+          : { kind: "OFFER", id: offerId! };
+    const attachToCollections = async () => {
+      if (wantedCollectionIds.length > 0) {
+        await addIdeaToCollections(user.id, saveTarget, wantedCollectionIds);
+      }
+    };
+
     if (articleId) {
       const idea = await addArticleIdea(user.id, articleId);
+      await attachToCollections();
       const article = await prisma.article.findUnique({
         where: { id: articleId },
         select: { cityId: true },
@@ -60,6 +89,7 @@ export async function POST(request: NextRequest) {
 
     if (placeId) {
       const idea = await addPlaceIdea(user.id, placeId);
+      await attachToCollections();
       const place = await prisma.place.findUnique({
         where: { id: placeId },
         select: { cityId: true },
@@ -80,6 +110,7 @@ export async function POST(request: NextRequest) {
 
     if (activityId) {
       const idea = await addIdea(user.id, activityId);
+      await attachToCollections();
 
       const cityId = await getActivityCityIdForAnalytics(activityId);
       const sessionRowId = await getSessionRowIdFromCookies();
@@ -98,6 +129,7 @@ export async function POST(request: NextRequest) {
     }
 
     const idea = await addOfferIdea(user.id, offerId!);
+    await attachToCollections();
     const offer = await prisma.offer.findUnique({
       where: { id: offerId! },
       select: {
@@ -118,6 +150,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, idea });
   } catch (error) {
+    const collectionError = ideaCollectionErrorResponse(error);
+    if (collectionError) return collectionError;
     if (error instanceof Error && error.message === "offer_ideas_unsupported") {
       return NextResponse.json(
         { error: "Offer ideas storage is not available yet" },
