@@ -15,6 +15,11 @@ import {
   removeOfferIdea,
   removePlaceIdea,
 } from "@/server/services/idea.service";
+import {
+  saveIdeaWithCollections,
+  type IdeaTarget,
+} from "@/server/services/ideaCollections.service";
+import { ideaCollectionErrorResponse } from "@/server/services/ideaCollections.http";
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,11 +29,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { activityId, offerId, placeId, articleId } = body as {
+    const { activityId, offerId, placeId, articleId, collectionIds } = body as {
       activityId?: string;
       offerId?: string;
       placeId?: string;
       articleId?: string;
+      /** Опционально: сразу положить сохранённую идею в эти коллекции. */
+      collectionIds?: string[];
     };
 
     if (!activityId && !offerId && !placeId && !articleId) {
@@ -38,8 +45,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const wantedCollectionIds = Array.isArray(collectionIds)
+      ? collectionIds.filter((id): id is string => typeof id === "string" && id.length > 0)
+      : [];
+    const saveTarget: IdeaTarget = articleId
+      ? { kind: "ARTICLE", id: articleId }
+      : placeId
+        ? { kind: "PLACE", id: placeId }
+        : activityId
+          ? { kind: "ACTIVITY", id: activityId }
+          : { kind: "OFFER", id: offerId! };
+    // With collections, saving + membership is one transaction, not two.
+    const save = async () => {
+      if (wantedCollectionIds.length > 0) {
+        return saveIdeaWithCollections(user.id, saveTarget, wantedCollectionIds);
+      }
+      if (articleId) return addArticleIdea(user.id, articleId);
+      if (placeId) return addPlaceIdea(user.id, placeId);
+      if (activityId) return addIdea(user.id, activityId);
+      return addOfferIdea(user.id, offerId!);
+    };
+
     if (articleId) {
-      const idea = await addArticleIdea(user.id, articleId);
+      const idea = await save();
       const article = await prisma.article.findUnique({
         where: { id: articleId },
         select: { cityId: true },
@@ -59,7 +87,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (placeId) {
-      const idea = await addPlaceIdea(user.id, placeId);
+      const idea = await save();
       const place = await prisma.place.findUnique({
         where: { id: placeId },
         select: { cityId: true },
@@ -79,7 +107,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (activityId) {
-      const idea = await addIdea(user.id, activityId);
+      const idea = await save();
 
       const cityId = await getActivityCityIdForAnalytics(activityId);
       const sessionRowId = await getSessionRowIdFromCookies();
@@ -97,7 +125,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, idea });
     }
 
-    const idea = await addOfferIdea(user.id, offerId!);
+    const idea = await save();
     const offer = await prisma.offer.findUnique({
       where: { id: offerId! },
       select: {
@@ -118,6 +146,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, idea });
   } catch (error) {
+    const collectionError = ideaCollectionErrorResponse(error);
+    if (collectionError) return collectionError;
     if (error instanceof Error && error.message === "offer_ideas_unsupported") {
       return NextResponse.json(
         { error: "Offer ideas storage is not available yet" },
