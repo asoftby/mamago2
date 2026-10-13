@@ -82,6 +82,7 @@ model User {
   consentRecords                    ConsentRecord[]
   contentEdits                      ContentEditLog[]                 @relation("ContentEditor")
   ideas                             Idea[]
+  collections                       Collection[]
   assignedImprovementRequests       ImprovementRequest[]             @relation("ImprovementRequestAssignee")
   createdImprovementRequests        ImprovementRequest[]             @relation("ImprovementRequestCreator")
   uploadedMediaAssets               MediaAsset[]
@@ -517,6 +518,7 @@ model Idea {
   activityId String
   createdAt  DateTime @default(now())
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collectionItems CollectionItem[]
 
   @@unique([userId, activityId])
   @@index([userId])
@@ -828,6 +830,7 @@ model RouteIdea {
   createdAt DateTime @default(now())
   route     Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collectionItems CollectionItem[]
 
   @@unique([userId, routeId])
   @@index([userId])
@@ -2714,6 +2717,7 @@ model OfferIdea {
   createdAt DateTime @default(now())
   offer     Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collectionItems CollectionItem[]
 
   @@unique([userId, offerId])
   @@index([userId])
@@ -2728,6 +2732,7 @@ model PlaceIdea {
   createdAt DateTime @default(now())
   place     Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collectionItems CollectionItem[]
 
   @@unique([userId, placeId])
   @@index([userId])
@@ -2742,6 +2747,7 @@ model ArticleIdea {
   createdAt DateTime @default(now())
   article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collectionItems CollectionItem[]
 
   @@unique([userId, articleId])
   @@index([userId])
@@ -6626,4 +6632,49 @@ model ReleaseEvent {
 
   @@unique([buildId, processStartedAt])
   @@index([detectedAt(sort: Desc)])
+}
+
+/// Пользовательская коллекция («доска») в «Моих идеях». Только личная; для
+/// семейного профиля позже добавится nullable familyId.
+/// Уникальность (userId, lower(title)) — expression-индекс в SQL миграции
+/// (в schema.prisma невыразим).
+model Collection {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String           @db.VarChar(60)
+  sort      Int              @default(0)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CollectionItem[]
+
+  @@index([userId, sort])
+}
+
+/// Принадлежность сохранённой идеи коллекции (many-to-many). Полиморфно: ровно
+/// один из *IdeaId не null (CHECK в SQL), уникальность (collectionId, <fk>)
+/// на каждый тип — partial unique индексы в SQL миграции.
+/// «Без коллекции» не хранится: это идеи без записей CollectionItem.
+model CollectionItem {
+  id            String       @id @default(cuid())
+  collectionId  String
+  ideaId        String?
+  offerIdeaId   String?
+  routeIdeaId   String?
+  placeIdeaId   String?
+  articleIdeaId String?
+  addedAt       DateTime     @default(now())
+  collection    Collection   @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  idea          Idea?        @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  offerIdea     OfferIdea?   @relation(fields: [offerIdeaId], references: [id], onDelete: Cascade)
+  routeIdea     RouteIdea?   @relation(fields: [routeIdeaId], references: [id], onDelete: Cascade)
+  placeIdea     PlaceIdea?   @relation(fields: [placeIdeaId], references: [id], onDelete: Cascade)
+  articleIdea   ArticleIdea? @relation(fields: [articleIdeaId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId, addedAt])
+  @@index([ideaId])
+  @@index([offerIdeaId])
+  @@index([routeIdeaId])
+  @@index([placeIdeaId])
+  @@index([articleIdeaId])
 }
