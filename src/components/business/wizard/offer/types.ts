@@ -202,6 +202,8 @@ export interface OfferFormData {
   classChipSlugs: string[];
   /** Категории предложения (до 3, обязательна хотя бы одна в новом мастере). */
   categoryIds: string[];
+  /** Интересы ребёнка (до 5): slug из SYSTEM_INTERESTS. */
+  interestSlugs: string[];
   
   // PLACE_VISIT type-specific details (written to Offer.details JSON)
   placeVisitDetails: {

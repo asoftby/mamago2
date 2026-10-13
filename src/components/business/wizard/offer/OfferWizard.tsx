@@ -817,7 +817,7 @@ export function OfferWizard({
         case "placements":
           return <Step2Placements {...commonProps} showAdditionalPlacements={variant !== "v2"} />;
         case "details":
-          return <Step2Information {...commonProps} />;
+          return <Step2Information {...commonProps} v2={variant === "v2"} />;
         case "photo":
           return <Step3Media {...commonProps} wizardSessionId={wizardSessionId} />;
         case "conditions":

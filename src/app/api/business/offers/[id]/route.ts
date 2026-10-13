@@ -25,6 +25,7 @@ import {
   inferOfferProductType,
   mapProductTypeToLegacyKind,
 } from "@/lib/offers/offerPersistenceCompatibility";
+import { checkInterestSlugs } from "@/lib/offers/offerInterests";
 import { OfferCategoriesError, syncOfferCategories } from "@/server/offers/offerCategories";
 import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
 import { projectCampSessions } from "@/server/offers/campSessionProjection";
@@ -120,6 +121,7 @@ const updateOfferSchema = z.object({
   ).optional(),
   faqItems: z.array(z.record(z.string(), z.unknown())).nullish(),
   categoryIds: z.array(z.string()).max(3).optional(),
+  interestSlugs: z.array(z.string()).max(5).optional(),
   /** Версия оффера (`updatedAt`), на которой клиент построил форму: защита от записи устаревшего снимка. */
   expectedUpdatedAt: z.string().optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
@@ -253,6 +255,20 @@ export async function PATCH(
     }
 
     const data = updateOfferSchema.parse(body);
+    const interestsCheck =
+      data.interestSlugs !== undefined ? checkInterestSlugs(data.interestSlugs) : null;
+    if (interestsCheck && !interestsCheck.ok) {
+      return NextResponse.json(
+        {
+          error:
+            interestsCheck.reason === "TOO_MANY"
+              ? "Можно выбрать не больше 5 интересов"
+              : "Выбраны неизвестные интересы",
+          code: "INVALID_OFFER_INTERESTS",
+        },
+        { status: 400 },
+      );
+    }
     const faqItems = data.faqItems !== undefined ? normalizeFaqItems(data.faqItems) : undefined;
     timer.mark("validate");
 
@@ -392,6 +408,7 @@ export async function PATCH(
       updateData.ageMinMonths = normalizedAge.ageMinMonths;
       updateData.ageMaxMonths = normalizedAge.ageMaxMonths;
     }
+    if (interestsCheck?.ok) updateData.interestSlugs = interestsCheck.slugs;
     if (data.coverImage !== undefined) updateData.coverImage = data.coverImage;
     if (data.gallery !== undefined) updateData.galleryImages = data.gallery;
     if (data.videoUrl !== undefined) updateData.videoUrl = data.videoUrl;
