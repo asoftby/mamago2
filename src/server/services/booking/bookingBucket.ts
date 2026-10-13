@@ -59,7 +59,7 @@ export function bookingBucket(input: BookingBucketInput, now = new Date()): Book
     const stage = input.partyStage!;
     if (stage === "SENT" || stage === "AWAITING_RECONFIRM") {
       if (input.responseDueAt && input.responseDueAt.getTime() <= time) return archive();
-      return action(stage === "SENT" ? "RESPOND" : "RECONFIRM", input.responseDueAt ?? null);
+      return action(stage === "SENT" ? "RESPOND" : "RECONFIRM", input.responseDueAt ?? input.serviceEndsAt ?? null);
     }
     if (stage === "QUOTED") {
       if (input.serviceEndsAt && input.serviceEndsAt.getTime() <= time) return archive();
@@ -72,7 +72,7 @@ export function bookingBucket(input: BookingBucketInput, now = new Date()): Book
     }
     if (stage !== "CONFIRMED") return archive();
   } else {
-    if (input.status === "NEW") return action("RESPOND", null);
+    if (input.status === "NEW") return action("RESPOND", input.serviceEndsAt ?? null);
     if (input.status !== "CONFIRMED") return archive();
   }
   const dateKnown = input.hasServiceDate ?? Boolean(input.serviceEndsAt);
