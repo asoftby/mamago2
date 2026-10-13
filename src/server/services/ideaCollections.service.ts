@@ -137,7 +137,8 @@ export async function addIdeaToCollections(
 /**
  * Atomically save an idea and attach it to the selected owned collections.
  * A deleted/foreign collection must never leave a saved idea behind after 404.
- * Row locks hold ownership valid until the transaction commits; deletion
+ * Exclusive row locks hold ownership valid until commit and prevent
+ * concurrent row-lock upgrade deadlocks when updatedAt is changed; deletion
  * cannot interleave between the validation and membership insertion.
  */
 export async function saveIdeaWithCollections(
@@ -151,7 +152,7 @@ export async function saveIdeaWithCollections(
     const locked = await tx.$queryRaw<Array<{ id: string }>>`
       SELECT "id" FROM "Collection"
       WHERE "userId" = ${userId} AND "id" IN (${Prisma.join(ids)})
-      FOR SHARE
+      FOR UPDATE
     `;
     if (locked.length !== ids.length) throw new IdeaCollectionError("COLLECTION_NOT_FOUND");
 
