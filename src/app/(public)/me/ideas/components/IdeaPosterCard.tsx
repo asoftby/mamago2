@@ -18,6 +18,7 @@ type IdeaPosterCardProps = {
   isRemoving: boolean;
   onSchedule: () => void;
   onRemove: () => void;
+  onCollection?: () => void;
 };
 
 /** Same "от X" vs "X" heuristic already duplicated in ActivityCard.tsx and page.tsx for discovery cards. */
@@ -39,6 +40,7 @@ export function IdeaPosterCard({
   isRemoving,
   onSchedule,
   onRemove,
+  onCollection,
 }: IdeaPosterCardProps) {
   const activity = idea.activity;
   const href = activity.publicHref ?? "#";
@@ -227,6 +229,7 @@ export function IdeaPosterCard({
         publicHref={activity.publicHref ?? null}
         onSchedule={onSchedule}
         onRemove={onRemove}
+        onCollection={onCollection}
         isScheduling={isScheduling}
         isRemoving={isRemoving}
       />
