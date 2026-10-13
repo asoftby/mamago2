@@ -21,6 +21,16 @@ max_kb=$((max_gb * 1024 * 1024))
 
 dir_kb() { du -sk "$1" 2>/dev/null | awk '{print $1}'; }
 
+# Is a `next dev` running from THIS worktree? Other task worktrees may legitimately run their own
+# dev servers; only a server whose working directory is this checkout uses this `.next`.
+dev_running_here() {
+  for pid in $(pgrep -f "next dev" 2>/dev/null); do
+    cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)"
+    [ "$cwd" = "$root" ] && return 0
+  done
+  return 1
+}
+
 # The gate directory is ours: drop it when oversized so every build stays within the heap limit.
 if [ -d "$gate_dir" ]; then
   gate_kb="$(dir_kb "$gate_dir")"
@@ -36,8 +46,8 @@ if [ "${SKIP_NEXT_CACHE_CHECK:-}" != "1" ] && [ -d .next ]; then
   if [ -n "$dev_kb" ] && [ "$dev_kb" -gt "$max_kb" ]; then
     dev_gb=$(awk -v kb="$dev_kb" 'BEGIN { printf "%.1f", kb / 1048576 }')
     echo "[pre-push] note: .next is ${dev_gb} GB. The gate builds in $gate_dir, so this push is unaffected."
-    if pgrep -f "next dev" >/dev/null 2>&1; then
-      echo "[pre-push] A 'next dev' is running — do NOT delete .next under it; stop the dev server first."
+    if dev_running_here; then
+      echo "[pre-push] A 'next dev' is running in this worktree — do NOT delete .next under it; stop that dev server first."
     else
       echo "[pre-push] To reclaim space later: rm -rf .next"
     fi
