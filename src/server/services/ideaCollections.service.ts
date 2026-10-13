@@ -134,6 +134,71 @@ export async function addIdeaToCollections(
   });
 }
 
+/**
+ * Atomically save an idea and attach it to the selected owned collections.
+ * A deleted/foreign collection must never leave a saved idea behind after 404.
+ * Row locks hold ownership valid until the transaction commits; deletion
+ * cannot interleave between the validation and membership insertion.
+ */
+export async function saveIdeaWithCollections(
+  userId: string,
+  target: IdeaTarget,
+  collectionIds: string[],
+) {
+  return prisma.$transaction(async (tx) => {
+    const ids = await assertCollectionsOwned(tx, userId, collectionIds);
+    if (ids.length === 0) throw new IdeaCollectionError("COLLECTION_NOT_FOUND");
+    const locked = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "Collection"
+      WHERE "userId" = ${userId} AND "id" IN (${Prisma.join(ids)})
+      FOR SHARE
+    `;
+    if (locked.length !== ids.length) throw new IdeaCollectionError("COLLECTION_NOT_FOUND");
+
+    const where = { userId };
+    let saved;
+    switch (target.kind) {
+      case "ACTIVITY":
+        saved = await tx.idea.upsert({
+          where: { userId_activityId: { ...where, activityId: target.id } },
+          create: { ...where, activityId: target.id }, update: {},
+        });
+        break;
+      case "OFFER":
+        saved = await tx.offerIdea.upsert({
+          where: { userId_offerId: { ...where, offerId: target.id } },
+          create: { ...where, offerId: target.id }, update: {},
+        });
+        break;
+      case "ROUTE":
+        saved = await tx.routeIdea.upsert({
+          where: { userId_routeId: { ...where, routeId: target.id } },
+          create: { ...where, routeId: target.id }, update: {},
+        });
+        break;
+      case "PLACE":
+        saved = await tx.placeIdea.upsert({
+          where: { userId_placeId: { ...where, placeId: target.id } },
+          create: { ...where, placeId: target.id }, update: {},
+        });
+        break;
+      case "ARTICLE":
+        saved = await tx.articleIdea.upsert({
+          where: { userId_articleId: { ...where, articleId: target.id } },
+          create: { ...where, articleId: target.id }, update: {},
+        });
+        break;
+    }
+    const fk = FK_FIELD[target.kind];
+    await tx.collectionItem.createMany({
+      data: ids.map((collectionId) => ({ collectionId, [fk]: saved.id }) as Prisma.CollectionItemCreateManyInput),
+      skipDuplicates: true,
+    });
+    await tx.collection.updateMany({ where: { id: { in: ids }, userId }, data: { updatedAt: new Date() } });
+    return saved;
+  });
+}
+
 /** Задаёт ПОЛНЫЙ набор коллекций идеи («В коллекцию», перенос). Возвращает итоговый набор. */
 export async function setIdeaCollections(
   userId: string,
@@ -141,6 +206,9 @@ export async function setIdeaCollections(
   collectionIds: string[],
 ): Promise<string[]> {
   return prisma.$transaction(async (tx) => {
+    // Serialize replacement of the full membership set for one saved idea.
+    // Without a lock concurrent PUT [A] / PUT [B] may incorrectly leave [A,B].
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`idea-collections:${userId}:${target.kind}:${target.id}`}))`;
     const wanted = await assertCollectionsOwned(tx, userId, collectionIds);
     const ideaRowId = await requireIdeaRowId(tx, userId, target);
     const fk = FK_FIELD[target.kind];

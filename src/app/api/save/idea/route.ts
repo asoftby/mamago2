@@ -16,8 +16,7 @@ import {
   removePlaceIdea,
 } from "@/server/services/idea.service";
 import {
-  addIdeaToCollections,
-  assertCollectionsOwned,
+  saveIdeaWithCollections,
   type IdeaTarget,
 } from "@/server/services/ideaCollections.service";
 import { ideaCollectionErrorResponse } from "@/server/services/ideaCollections.http";
@@ -49,10 +48,6 @@ export async function POST(request: NextRequest) {
     const wantedCollectionIds = Array.isArray(collectionIds)
       ? collectionIds.filter((id): id is string => typeof id === "string" && id.length > 0)
       : [];
-    // Чужие/несуществующие коллекции → 404 ДО записи идеи, чтобы не оставлять побочный эффект.
-    if (wantedCollectionIds.length > 0) {
-      await assertCollectionsOwned(prisma, user.id, wantedCollectionIds);
-    }
     const saveTarget: IdeaTarget = articleId
       ? { kind: "ARTICLE", id: articleId }
       : placeId
@@ -60,15 +55,19 @@ export async function POST(request: NextRequest) {
         : activityId
           ? { kind: "ACTIVITY", id: activityId }
           : { kind: "OFFER", id: offerId! };
-    const attachToCollections = async () => {
+    // With collections, saving + membership is one transaction, not two.
+    const save = async () => {
       if (wantedCollectionIds.length > 0) {
-        await addIdeaToCollections(user.id, saveTarget, wantedCollectionIds);
+        return saveIdeaWithCollections(user.id, saveTarget, wantedCollectionIds);
       }
+      if (articleId) return addArticleIdea(user.id, articleId);
+      if (placeId) return addPlaceIdea(user.id, placeId);
+      if (activityId) return addIdea(user.id, activityId);
+      return addOfferIdea(user.id, offerId!);
     };
 
     if (articleId) {
-      const idea = await addArticleIdea(user.id, articleId);
-      await attachToCollections();
+      const idea = await save();
       const article = await prisma.article.findUnique({
         where: { id: articleId },
         select: { cityId: true },
@@ -88,8 +87,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (placeId) {
-      const idea = await addPlaceIdea(user.id, placeId);
-      await attachToCollections();
+      const idea = await save();
       const place = await prisma.place.findUnique({
         where: { id: placeId },
         select: { cityId: true },
@@ -109,8 +107,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (activityId) {
-      const idea = await addIdea(user.id, activityId);
-      await attachToCollections();
+      const idea = await save();
 
       const cityId = await getActivityCityIdForAnalytics(activityId);
       const sessionRowId = await getSessionRowIdFromCookies();
@@ -128,8 +125,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, idea });
     }
 
-    const idea = await addOfferIdea(user.id, offerId!);
-    await attachToCollections();
+    const idea = await save();
     const offer = await prisma.offer.findUnique({
       where: { id: offerId! },
       select: {

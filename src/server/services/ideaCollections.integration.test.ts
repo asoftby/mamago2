@@ -11,6 +11,7 @@ import {
   listCollections,
   renameCollection,
   setIdeaCollections,
+  saveIdeaWithCollections,
 } from "./ideaCollections.service";
 
 const marker = randomUUID();
@@ -81,9 +82,29 @@ async function main() {
     await addIdeaToCollections(alice, aliceIdea, [aliceCol.id]);
     assert.equal(await prisma.collectionItem.count({ where: { collectionId: aliceCol.id } }), 1);
 
+    // Concurrent full-set updates must not accidentally union the two sets.
+    await Promise.all([
+      setIdeaCollections(alice, aliceIdea, [aliceCol.id]),
+      setIdeaCollections(alice, aliceIdea, [second.id]),
+    ]);
+    const afterConcurrentPut = await getIdeaCollectionIds(alice, aliceIdea);
+    assert.equal(afterConcurrentPut.length, 1);
+    assert.ok([aliceCol.id, second.id].includes(afterConcurrentPut[0]!));
+    await setIdeaCollections(alice, aliceIdea, [aliceCol.id]);
+
+    // Invalid collection atomically rolls back the new saved idea.
+    const newTarget = activity("atomic-save");
+    await assert.rejects(
+      saveIdeaWithCollections(alice, newTarget, [bobCol.id]),
+      expectCode("COLLECTION_NOT_FOUND"),
+    );
+    assert.equal(await prisma.idea.count({ where: { userId: alice, activityId: newTarget.id } }), 0);
+    await saveIdeaWithCollections(alice, newTarget, [aliceCol.id]);
+    assert.deepEqual(await getIdeaCollectionIds(alice, newTarget), [aliceCol.id]);
+
     // --- list: count aggregate, own data only
     const listed = await listCollections(alice);
-    assert.equal(listed.find((c) => c.id === aliceCol.id)?.count, 1);
+    assert.equal(listed.find((c) => c.id === aliceCol.id)?.count, 2);
     assert.equal(listed.find((c) => c.id === second.id)?.count, 0);
 
     // --- duplicates -> 409 (case-insensitive), other users unaffected
