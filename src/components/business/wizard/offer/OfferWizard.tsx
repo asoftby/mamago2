@@ -30,7 +30,7 @@ import { useWizardSession } from "@/hooks/useWizardSession";
 import { useWizardDraft } from "@/hooks/useWizardDraft";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
 
-import type { OfferFormData, OfferWizardMode, OfferWizardStepKey } from "./types";
+import type { OfferFormData, OfferWizardMode, OfferWizardStepKey, OfferWizardVariant } from "./types";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
 import { getOfferTypeSelection } from "./offerTypeChoices";
 import { validateForSubmit, type ValidationResult } from "./validation";
@@ -43,6 +43,7 @@ import {
   getPreviousStepKey,
   normalizeWizardCompletedSteps,
   ALL_OFFER_WIZARD_STEP_KEYS,
+  getV2StepMembers,
 } from "./offerWizardSteps.config";
 import {
   buildOfferCreatePayload,
@@ -105,6 +106,8 @@ interface OfferWizardProps {
   /** 1-based шаг в мастере (из query `?step=`). Только для `mode="edit"`. */
   initialStepNumber?: number;
   ctaStepEnabled?: boolean;
+  /** Новый мастер из 6 шагов (Business.features.newOfferWizard). */
+  newWizard?: boolean;
 }
 
 /** Ключ автосейва до миграции на useWizardDraft — подчищается на mount */
@@ -268,7 +271,9 @@ export function OfferWizard({
   returnTo,
   initialStepNumber,
   ctaStepEnabled,
+  newWizard = false,
 }: OfferWizardProps) {
+  const variant: OfferWizardVariant = newWizard ? "v2" : "v1";
   const router = useRouter();
   const surface: ContentEditorSurface = editorSurface ?? "business";
   const nav: ContentEditorNav = {
@@ -288,7 +293,7 @@ export function OfferWizard({
   });
   
   // Get steps based on current offer type
-  const steps = getStepsForOfferType(formData.offerWizardType, formData.productType);
+  const steps = getStepsForOfferType(formData.offerWizardType, formData.productType, variant);
   const totalSteps = steps.length;
   
   // Current step key (not number)
@@ -297,7 +302,7 @@ export function OfferWizard({
       return "type";
     }
     const fd = mapOfferToFormData(offer);
-    const initialSteps = getStepsForOfferType(fd.offerWizardType, fd.productType);
+    const initialSteps = getStepsForOfferType(fd.offerWizardType, fd.productType, variant);
     const idx = Math.min(initialStepNumber, initialSteps.length) - 1;
     return initialSteps[idx]?.key ?? "type";
   });
@@ -341,11 +346,11 @@ export function OfferWizard({
 
   // Normalize current step if offer type changes
   useEffect(() => {
-    const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey, formData.productType);
+    const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey, formData.productType, variant);
     if (currentStepNum === null) {
       setCurrentStepKey("type");
     }
-  }, [formData.offerWizardType, formData.productType, currentStepKey]);
+  }, [formData.offerWizardType, formData.productType, currentStepKey, variant]);
   
   // Дочистка черновика старого формата (до useWizardDraft): не восстанавливаем,
   // формат и ключ несовместимы
@@ -441,7 +446,7 @@ export function OfferWizard({
     }
     setFormData(nextFormData);
     setCompletedSteps(normalizeWizardCompletedSteps(restored.completedSteps));
-    const nextSteps = getStepsForOfferType(nextFormData.offerWizardType, nextFormData.productType);
+    const nextSteps = getStepsForOfferType(nextFormData.offerWizardType, nextFormData.productType, variant);
     setCurrentStepKey(
       nextSteps.some((s) => s.key === restored.currentStep)
         ? restored.currentStep
@@ -528,14 +533,14 @@ export function OfferWizard({
       return;
     }
     markStepCompleted(currentStepKey);
-    const nextKey = getNextStepKey(formData.offerWizardType, currentStepKey, formData.productType);
+    const nextKey = getNextStepKey(formData.offerWizardType, currentStepKey, formData.productType, variant);
     if (nextKey) {
       setCurrentStepKey(nextKey);
     }
   };
 
   const handlePrev = () => {
-    const prevKey = getPreviousStepKey(formData.offerWizardType, currentStepKey, formData.productType);
+    const prevKey = getPreviousStepKey(formData.offerWizardType, currentStepKey, formData.productType, variant);
     if (prevKey) {
       setCurrentStepKey(prevKey);
     } else {
@@ -793,6 +798,7 @@ export function OfferWizard({
           isSubmitting={isSubmitting}
           onGoToStep={handleGoToStep}
           validation={submitValidation}
+          variant={variant}
         />
       );
     }
@@ -804,39 +810,70 @@ export function OfferWizard({
       ctaStepEnabled,
     };
     
-    switch (currentStepKey) {
-      case "type":
-        return <Step1Type {...commonProps} />;
-      case "placements":
-        return <Step2Placements {...commonProps} />;
-      case "details":
-        return <Step2Information {...commonProps} />;
-      case "photo":
-        return <Step3Media {...commonProps} wizardSessionId={wizardSessionId} />;
-      case "conditions":
-        return <Step4Conditions {...commonProps} />;
-      case "campSchedule":
-        return <Step4CampSchedule {...commonProps} />;
-      case "accommodation":
-        return <Step5Accommodation {...commonProps} />;
-      case "price":
-        return <Step5Pricing {...commonProps} />;
-      case "contacts":
-        return <Step6Contacts {...commonProps} />;
-      case "faq":
+    const renderBlock = (key: OfferWizardStepKey): React.ReactNode => {
+      switch (key) {
+        case "type":
+          return <Step1Type {...commonProps} />;
+        case "placements":
+          return <Step2Placements {...commonProps} showAdditionalPlacements={variant !== "v2"} />;
+        case "details":
+          return <Step2Information {...commonProps} />;
+        case "photo":
+          return <Step3Media {...commonProps} wizardSessionId={wizardSessionId} />;
+        case "conditions":
+          return <Step4Conditions {...commonProps} />;
+        case "campSchedule":
+          return <Step4CampSchedule {...commonProps} />;
+        case "accommodation":
+          return <Step5Accommodation {...commonProps} />;
+        case "price":
+          return <Step5Pricing {...commonProps} />;
+        case "contacts":
+          return <Step6Contacts {...commonProps} />;
+        case "faq":
+          return (
+            <FaqStep
+              kind="offer"
+              value={formData.faqItems}
+              onChange={(faqItems) => handleChange({ faqItems })}
+            />
+          );
+        default:
+          return null;
+      }
+    };
+
+    // Новый мастер: шаг собран из существующих блоков (поля переезжают в следующих PR).
+    if (
+      variant === "v2" &&
+      (currentStepKey === "about" ||
+        currentStepKey === "services" ||
+        currentStepKey === "schedule" ||
+        currentStepKey === "terms")
+    ) {
+      const members = getV2StepMembers(currentStepKey, formData);
+      // FAQ уже внутри «Дополнительно» блока «Детали» — отдельный блок не добавляем (иначе два редактора на одном состоянии).
+      const blocks: OfferWizardStepKey[] = members;
+      if (blocks.length === 0) {
         return (
-          <FaqStep
-            kind="offer"
-            value={formData.faqItems}
-            onChange={(faqItems) => handleChange({ faqItems })}
-          />
+          <p className="text-sm text-muted-foreground">
+            Расписание для этого формата появится на следующем этапе.
+          </p>
         );
-      default:
-        return null;
+      }
+      return (
+        <div className="space-y-10">
+          {blocks.map((key) => (
+            <div key={key}>{renderBlock(key)}</div>
+          ))}
+        </div>
+      );
     }
+
+    return renderBlock(currentStepKey);
   };
 
-  const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey, formData.productType) || 1;
+  const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey, formData.productType, variant) || 1;
   const canNext = currentStepKey !== "review" && currentStepNum < totalSteps;
   const canPrev = true;
   const isReviewStep = currentStepKey === "review";

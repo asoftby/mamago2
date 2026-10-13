@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { OfferWizard } from "@/components/business/wizard/offer/OfferWizard";
 import { isOfferCtaStepFeatureEnabled } from "@/components/business/wizard/offer/ctaStepFeatureFlag";
+import { isBusinessFeatureEnabled } from "@/lib/business/businessFeatures";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
   defaultEditorNav,
@@ -102,6 +103,15 @@ export default async function EditorEditOfferPage({
   });
   const ctaStepEnabled = isOfferCtaStepFeatureEnabled(process.env);
 
+  // Флаг нового мастера — у бизнеса, которому принадлежит редактируемое предложение (место), а не у
+  // бизнеса пользователя: менеджер чужого бизнеса и владелец нескольких бизнесов видят мастер своего оффера.
+  const offerBusiness = offer.place?.ownerBusinessId
+    ? await prisma.business.findUnique({
+        where: { id: offer.place.ownerBusinessId },
+        select: { features: true },
+      })
+    : null;
+
   return (
     <ContentEditorChrome
       title="Новое предложение"
@@ -123,6 +133,7 @@ export default async function EditorEditOfferPage({
         returnTo={returnTo}
         initialStepNumber={initialStepNumber}
         ctaStepEnabled={ctaStepEnabled}
+        newWizard={isBusinessFeatureEnabled(offerBusiness, "newOfferWizard")}
       />
     </ContentEditorChrome>
   );

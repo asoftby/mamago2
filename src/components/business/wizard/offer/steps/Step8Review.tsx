@@ -6,18 +6,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2, Edit } from "lucide-react";
 import { getStepsForOfferType, isStepComplete, getMissingFieldsForStep, getStepNumber } from "../offerWizardSteps.config";
-import type { OfferFormData, OfferWizardStepKey } from "../types";
+import type { OfferFormData, OfferWizardStepKey, OfferWizardVariant } from "../types";
 import type { ValidationResult } from "../validation";
 
 interface Step8ReviewProps {
+  /** Вариант мастера: определяет набор шагов в списке проверки. */
+  variant?: OfferWizardVariant;
   data: OfferFormData;
   isSubmitting: boolean;
   onGoToStep: (step: number) => void;
   validation: ValidationResult;
 }
 
-export function Step8Review({ data, isSubmitting, onGoToStep, validation }: Step8ReviewProps) {
-  const steps = getStepsForOfferType(data.offerWizardType, data.productType);
+export function Step8Review({ data, isSubmitting, onGoToStep, validation, variant = "v1" }: Step8ReviewProps) {
+  const steps = getStepsForOfferType(data.offerWizardType, data.productType, variant);
   
   // Calculate completion stats (exclude review step itself)
   const contentSteps = steps.filter(s => s.key !== "review");
@@ -37,7 +39,7 @@ export function Step8Review({ data, isSubmitting, onGoToStep, validation }: Step
   const validationErrors = Array.from(new Set(validation.errors));
 
   const handleGoToStep = (stepKey: OfferWizardStepKey) => {
-    const stepNum = getStepNumber(data.offerWizardType, stepKey, data.productType);
+    const stepNum = getStepNumber(data.offerWizardType, stepKey, data.productType, variant);
     if (stepNum !== null) {
       onGoToStep(stepNum);
     }

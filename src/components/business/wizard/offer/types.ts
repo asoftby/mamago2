@@ -74,7 +74,15 @@ export type OfferWizardStepKey =
   | "price"
   | "contacts"
   | "faq"
+  // Новый мастер (6 шагов, флаг Business.features.newOfferWizard)
+  | "about"
+  | "services"
+  | "schedule"
+  | "terms"
   | "review";
+
+/** Вариант мастера: v1 — текущий, v2 — новый мастер из 6 шагов за флагом. */
+export type OfferWizardVariant = "v1" | "v2";
 
 /**
  * Complete Offer Form Data
