@@ -200,6 +200,8 @@ export interface OfferFormData {
   signalIds: string[];
   /** Привязка к чипам публичной витрины /[city]/classes. */
   classChipSlugs: string[];
+  /** Категории предложения (до 3, обязательна хотя бы одна в новом мастере). */
+  categoryIds: string[];
   
   // PLACE_VISIT type-specific details (written to Offer.details JSON)
   placeVisitDetails: {

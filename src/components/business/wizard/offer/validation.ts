@@ -1,7 +1,7 @@
 // Offer Wizard Validation
 // Inherits Event Wizard architecture 1-to-1
 
-import type { OfferFormData } from "./types";
+import type { OfferFormData, OfferWizardVariant } from "./types";
 import { getStepsForOfferType } from "./offerWizardSteps.config";
 import { validatePublicationAccess } from "@/features/publication-access";
 import { showCampLodgingFormFields } from "./campOfferModel";
@@ -480,7 +480,10 @@ function validateBookingSettings(booking: OfferFormData["bookingSettings"]): boo
 /**
  * Final validation for submit (strict)
  */
-export function validateForSubmit(data: OfferFormData): ValidationResult {
+export function validateForSubmit(
+  data: OfferFormData,
+  variant: OfferWizardVariant = "v1",
+): ValidationResult {
   const allErrors: string[] = [];
   const allWarnings: string[] = [];
   const steps = getStepsForOfferType(data.offerWizardType, data.productType).filter(
@@ -528,6 +531,11 @@ export function validateForSubmit(data: OfferFormData): ValidationResult {
 
     allErrors.push(...result.errors);
     allWarnings.push(...result.warnings);
+  }
+
+  // Новый мастер: категория обязательна (хотя бы одна).
+  if (variant === "v2" && data.productType && data.categoryIds.length === 0) {
+    allErrors.push("Выберите хотя бы одну категорию");
   }
 
   return {

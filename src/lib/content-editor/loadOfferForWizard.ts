@@ -24,6 +24,9 @@ export async function loadOfferForWizard(offerId: string) {
       placements: {
         orderBy: { createdAt: "asc" },
       },
+      categoryLinks: {
+        orderBy: { sortOrder: "asc" },
+      },
       openingHours: {
         include: {
           rules: {

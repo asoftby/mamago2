@@ -25,6 +25,7 @@ import {
   inferOfferProductType,
   mapProductTypeToLegacyKind,
 } from "@/lib/offers/offerPersistenceCompatibility";
+import { OfferCategoriesError, syncOfferCategories } from "@/server/offers/offerCategories";
 import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
 import { projectCampSessions } from "@/server/offers/campSessionProjection";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
@@ -118,6 +119,7 @@ const updateOfferSchema = z.object({
     }),
   ).optional(),
   faqItems: z.array(z.record(z.string(), z.unknown())).nullish(),
+  categoryIds: z.array(z.string()).max(3).optional(),
   /** Версия оффера (`updatedAt`), на которой клиент построил форму: защита от записи устаревшего снимка. */
   expectedUpdatedAt: z.string().optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
@@ -742,6 +744,10 @@ export async function PATCH(
         requestedPlacementsProvided: !gate.skipRequestedPlacements && data.requestedPlacements !== undefined,
       });
 
+      if (data.categoryIds !== undefined) {
+        await syncOfferCategories({ db: tx, offerId: id, productType, categoryIds: data.categoryIds });
+      }
+
       // Only CAMP edits own this projection. Other schedule kinds also use
       // OfferSession, so a regular offer edit must not erase their sessions.
       const campProjection = gate.campProjection ?? { isCamp: isCampOffer, sessions: nextCampSessions };
@@ -838,6 +844,19 @@ export async function PATCH(
   } catch (error) {
     timer.log({ error: 1 });
     console.error("Update offer error:", error);
+
+    if (error instanceof OfferCategoriesError) {
+      return NextResponse.json(
+        {
+          error:
+            error.code === "TOO_MANY"
+              ? "Можно выбрать не больше 3 категорий"
+              : "Выбраны категории, которые не подходят для этого формата",
+          code: "INVALID_OFFER_CATEGORIES",
+        },
+        { status: 400 },
+      );
+    }
 
     if (error instanceof OfferStaleSnapshotError) {
       return NextResponse.json(

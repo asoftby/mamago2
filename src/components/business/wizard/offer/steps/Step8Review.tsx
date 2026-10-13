@@ -23,7 +23,7 @@ export function Step8Review({ data, isSubmitting, onGoToStep, validation, varian
   
   // Calculate completion stats (exclude review step itself)
   const contentSteps = steps.filter(s => s.key !== "review");
-  const completedSteps = contentSteps.filter(s => isStepComplete(s.key, data)).length;
+  const completedSteps = contentSteps.filter(s => isStepComplete(s.key, data, variant)).length;
   const completionPercentage = contentSteps.length > 0 
     ? Math.round((completedSteps / contentSteps.length) * 100)
     : 0;
@@ -31,7 +31,7 @@ export function Step8Review({ data, isSubmitting, onGoToStep, validation, varian
   // Get all missing fields
   const allMissingFields: string[] = [];
   contentSteps.forEach(step => {
-    const missing = getMissingFieldsForStep(step.key, data);
+    const missing = getMissingFieldsForStep(step.key, data, variant);
     allMissingFields.push(...missing);
   });
   
@@ -131,8 +131,8 @@ export function Step8Review({ data, isSubmitting, onGoToStep, validation, varian
         <h3 className="font-medium">Проверка по шагам</h3>
         {contentSteps.map((step, idx) => {
           const stepNum = idx + 1;
-          const isComplete = isStepComplete(step.key, data);
-          const missingFields = getMissingFieldsForStep(step.key, data);
+          const isComplete = isStepComplete(step.key, data, variant);
+          const missingFields = getMissingFieldsForStep(step.key, data, variant);
           
           return (
             <Card key={step.key} className={isComplete ? "border-green-200" : "border-gray-200"}>
