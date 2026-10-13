@@ -154,6 +154,8 @@ export interface OfferPageData {
   metaGrid: OfferMetaItem[];
 
   pricing: {
+    /** Canonical publication price semantics from Offer.priceMode. */
+    priceMode?: "FREE" | "EXACT" | "FROM" | "RANGE" | "NONE" | "UNKNOWN" | "ON_REQUEST";
     priceFrom?: string;
     singlePrice?: string;
     priceCaption?: string;

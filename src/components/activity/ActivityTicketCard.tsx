@@ -31,9 +31,9 @@ function clean(value?: string | null): string | null {
 
 function numericPrice(value?: number | string | null): string | null {
   if (typeof value === "number") return Number.isFinite(value) && value > 0 ? String(value) : null;
-  const match = value?.replace(",", ".").match(/\d+(?:\.\d+)?/);
+  const match = value?.match(/\d[\d\s\u00a0\u202f]*(?:[.,]\d+)?/);
   if (!match) return null;
-  const number = Number(match[0]);
+  const number = Number(match[0].replace(/[\s\u00a0\u202f]/g, "").replace(",", "."));
   if (!Number.isFinite(number) || number <= 0) return null;
   return Number.isInteger(number) ? String(number) : String(number).replace(".", ",");
 }
@@ -52,7 +52,7 @@ export function adaptActivityTicket(source: ActivityTicketSource): ActivityTicke
 
   const label = clean(source.priceLabel);
   const labelSaysFree = label ? /^(бесплатно|free)$/i.test(label) : false;
-  const labelSaysFrom = label ? /^от\s/i.test(label) : false;
+  const labelSaysFrom = label ? /^от\s/i.test(label) || /\d\s*[–—-]\s*\d/.test(label) : false;
   const amount = numericPrice(source.priceValue) ?? numericPrice(label);
   const price = labelSaysFree
     ? { kind: "free" as const, label: "Бесплатно" as const }

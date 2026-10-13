@@ -213,11 +213,13 @@ export function OfferPageView({
         imageUrl: data.media.posterUrl || data.media.gallery[0]?.url,
         venue: data.place?.name,
         address: data.place?.address,
-        priceMode: data.pricing.mode === "FREE"
+        priceMode: target?.price
+          ? "EXACT"
+          : data.pricing.priceMode === "FREE"
           ? "FREE"
-          : data.pricing.mode === "FROM"
+          : data.pricing.priceMode === "FROM" || data.pricing.priceMode === "RANGE"
             ? "FROM"
-            : data.pricing.mode === "EXACT"
+            : data.pricing.priceMode === "EXACT"
               ? "EXACT"
               : "UNKNOWN",
         priceValue: target?.price || data.pricing.priceFrom || data.pricing.singlePrice || data.pricing.priceDisplay,

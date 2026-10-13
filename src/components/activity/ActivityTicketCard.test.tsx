@@ -14,6 +14,14 @@ assert.deepEqual(adaptActivityTicket({ title: "Предложение", priceMod
   kind: "paid",
   label: "45 Br",
 });
+assert.deepEqual(adaptActivityTicket({ title: "Группированная цена", priceMode: "EXACT", priceLabel: "1 200,00 BYN" }).price, {
+  kind: "paid",
+  label: "1200 Br",
+});
+assert.deepEqual(adaptActivityTicket({ title: "Диапазон", priceLabel: "1 200–1 500 BYN" }).price, {
+  kind: "paid",
+  label: "от 1200 Br",
+});
 assert.equal(adaptActivityTicket({ title: "Неизвестная цена" }).price, null);
 assert.equal(
   adaptActivityTicket({ title: "Ноль не означает бесплатно", priceMode: "UNKNOWN", priceValue: 0 }).price,
