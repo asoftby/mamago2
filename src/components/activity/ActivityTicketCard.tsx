@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { BYN_SYMBOL } from "@/lib/formatters/format-price";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 
 export type ActivityTicketPriceMode = "FREE" | "FROM" | "EXACT" | "UNKNOWN";
 
@@ -56,11 +58,11 @@ export function adaptActivityTicket(source: ActivityTicketSource): ActivityTicke
   const price = labelSaysFree
     ? { kind: "free" as const, label: "Бесплатно" as const }
     : amount && (mode === "FROM" || labelSaysFrom)
-      ? { kind: "paid" as const, label: `от ${amount} Br` }
+      ? { kind: "paid" as const, label: `от ${amount} ${BYN_SYMBOL}` }
       : amount && mode !== "UNKNOWN"
-        ? { kind: "paid" as const, label: `${amount} Br` }
+        ? { kind: "paid" as const, label: `${amount} ${BYN_SYMBOL}` }
         : amount && label
-          ? { kind: "paid" as const, label: `${amount} Br` }
+          ? { kind: "paid" as const, label: `${amount} ${BYN_SYMBOL}` }
           : null;
 
   return {
@@ -77,7 +79,13 @@ export function ActivityTicketCard({ source }: { source: ActivityTicketSource })
   return (
     <article
       aria-label={`Информация: ${ticket.title}`}
-      className="relative isolate flex min-h-[112px] w-full min-w-0 overflow-hidden rounded-[20px] bg-[#726d65] text-white shadow-[0_12px_30px_rgba(20,18,16,0.18)]"
+      className="relative isolate flex min-h-[128px] w-full min-w-0 overflow-hidden rounded-[20px] bg-[#726d65] text-white shadow-[0_12px_30px_rgba(20,18,16,0.18)]"
+      // A real alpha mask cuts the paper notches out of the entire ticket (image and overlay),
+      // so the surrounding modal remains visible instead of covering the image with white circles.
+      style={{
+        maskImage: "radial-gradient(circle 10px at left center, transparent 9.5px, black 10.5px), radial-gradient(circle 10px at right center, transparent 9.5px, black 10.5px)",
+        maskComposite: "intersect",
+      }}
     >
       {ticket.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- ticket sources may use external media hosts.
@@ -101,9 +109,6 @@ export function ActivityTicketCard({ source }: { source: ActivityTicketSource })
         aria-hidden
       />
 
-      <div className="absolute -left-2.5 top-1/2 z-20 h-5 w-5 -translate-y-1/2 rounded-full bg-white" aria-hidden />
-      <div className="absolute -right-2.5 top-1/2 z-20 h-5 w-5 -translate-y-1/2 rounded-full bg-white" aria-hidden />
-
       <div className="flex min-w-0 flex-1 flex-col justify-center py-4 pl-5 pr-3 sm:pl-6 sm:pr-4">
         <h3 className="line-clamp-2 text-[15px] font-semibold leading-[1.2] tracking-[-0.015em] drop-shadow-[0_1px_2px_rgba(0,0,0,.35)] sm:text-[16px]">
           {ticket.title}
@@ -120,14 +125,14 @@ export function ActivityTicketCard({ source }: { source: ActivityTicketSource })
         ) : null}
       </div>
 
-      <div className="relative flex w-[58px] shrink-0 items-center justify-center border-l border-dashed border-white/75 bg-black/10 sm:w-[64px]">
+      <div className="relative flex w-[74px] shrink-0 items-center justify-center border-l border-dashed border-white/80 bg-black/10 sm:w-[86px]">
         {ticket.price?.kind === "free" ? (
           <span className="rotate-180 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.12em] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.5)] [writing-mode:vertical-rl]">
             Бесплатно
           </span>
         ) : ticket.price ? (
           <span className="px-1.5 text-center text-[11px] font-semibold leading-[1.15] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.5)] sm:text-[12px]">
-            {ticket.price.label}
+            {renderCurrencyText(ticket.price.label, { iconSize: "sm" })}
           </span>
         ) : null}
       </div>
