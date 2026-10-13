@@ -83,11 +83,11 @@ const createOfferSchema = z.object({
   priceCaption: z.string().optional(),
   promotionDetails: z.string().optional(),
   pricingMode: z.enum(["SINGLE", "MULTIPLE"]),
-  singlePrice: z.number().optional(),
+  singlePrice: z.number().finite().nonnegative().optional(),
   singlePriceLabel: z.string().optional(),
   pricingOptions: z.array(z.object({
     title: z.string(),
-    price: z.number(),
+    price: z.number().finite().nonnegative(),
     oldPrice: z.number().optional(),
     description: z.string().optional(),
   })).default([]),

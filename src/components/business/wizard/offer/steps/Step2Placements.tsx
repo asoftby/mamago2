@@ -17,6 +17,8 @@ interface Step2PlacementsProps {
     updates: Partial<OfferFormData> | ((prev: OfferFormData) => Partial<OfferFormData>),
   ) => void;
   isEditable: boolean;
+  /** Новый мастер: блок «другие разделы каталога» показывает «О предложении» один раз, здесь он скрыт. */
+  showAdditionalPlacements?: boolean;
 }
 
 const LOCATION_OPTIONS: Array<{ value: BirthdayLocationType; label: string }> = [
@@ -38,7 +40,12 @@ const SERVICE_OPTIONS: Array<{ value: PartyCategory; label: string }> = [
   { value: "OTHER", label: "Другое" },
 ];
 
-export function Step2Placements({ data, onChange, isEditable }: Step2PlacementsProps) {
+export function Step2Placements({
+  data,
+  onChange,
+  isEditable,
+  showAdditionalPlacements = true,
+}: Step2PlacementsProps) {
   const isService = data.productType === "PARTY_SERVICE";
   const isPackage = data.productType === "PARTY_PACKAGE";
   const birthday = data.birthdayDetails;
@@ -207,7 +214,9 @@ export function Step2Placements({ data, onChange, isEditable }: Step2PlacementsP
               ))}
             </div>
           </div>
-          <AdditionalPlacements data={data} onChange={onChange} isEditable={isEditable} />
+          {showAdditionalPlacements ? (
+            <AdditionalPlacements data={data} onChange={onChange} isEditable={isEditable} />
+          ) : null}
         </div>
         </CollapsibleContent>
       </Collapsible>
