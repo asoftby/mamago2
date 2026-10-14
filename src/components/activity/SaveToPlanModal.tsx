@@ -819,12 +819,12 @@ function DateSliderView({
     <>
       <div className="px-6 pb-5 pt-0 sm:pt-4">
         {/* Center the label in the same 40px row as the modal close button. */}
-        <div className="mb-1 flex h-10 -translate-y-1 items-center justify-center px-11 sm:translate-y-0">
+        <div className="mb-1 flex h-10 -translate-y-1 items-center justify-start sm:translate-y-0">
           <span style={{
             fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const,
             fontSize: 10, letterSpacing: ".14em", color: C.accentDeep,
             whiteSpace: "nowrap",
-          }}>● сохранить активность</span>
+          }}>сохранить активность</span>
         </div>
 
         {/* Heading */}
@@ -838,7 +838,7 @@ function DateSliderView({
           напомнить.
         </h2>
 
-        <div style={{ marginTop: 23, marginBottom: 23 }}>
+        <div style={{ marginTop: 18, marginBottom: 18 }}>
           <ActivityTicketCard
             source={{
               ...(ticket ?? { title }),
