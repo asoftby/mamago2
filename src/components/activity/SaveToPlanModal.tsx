@@ -817,13 +817,15 @@ function DateSliderView({
 
   return (
     <>
-      <div style={{ padding: "24px 24px 20px" }}>
-        {/* Kicker */}
-        <span style={{
-          fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const,
-          fontSize: 10, letterSpacing: ".14em", color: C.accentDeep,
-          display: "inline-block", marginBottom: 12,
-        }}>● сохранить активность</span>
+      <div className="px-6 pb-5 pt-0 sm:pt-4">
+        {/* Center the label in the same 40px row as the modal close button. */}
+        <div className="mb-1 flex h-10 -translate-y-1 items-center justify-center px-11 sm:translate-y-0">
+          <span style={{
+            fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const,
+            fontSize: 10, letterSpacing: ".14em", color: C.accentDeep,
+            whiteSpace: "nowrap",
+          }}>● сохранить активность</span>
+        </div>
 
         {/* Heading */}
         <h2 style={{
@@ -836,7 +838,7 @@ function DateSliderView({
           напомнить.
         </h2>
 
-        <div style={{ marginTop: 28, marginBottom: 28 }}>
+        <div style={{ marginTop: 23, marginBottom: 23 }}>
           <ActivityTicketCard
             source={{
               ...(ticket ?? { title }),
