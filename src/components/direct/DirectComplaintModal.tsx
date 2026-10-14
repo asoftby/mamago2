@@ -78,9 +78,9 @@ export function DirectComplaintModal({ open, onOpenChange, threadId }: Props) {
                   onClick={() => setReason(r.value)}
                   style={{
                     height: 46, padding: "0 16px", borderRadius: 14, textAlign: "left",
-                    border: `1.5px solid ${reason === r.value ? "#E86A3A" : "rgba(20,18,16,.10)"}`,
-                    background: reason === r.value ? "#FFE8DC" : "#FAF7F1",
-                    color: reason === r.value ? "#C24E22" : "#141210",
+                    border: `1.5px solid ${reason === r.value ? "var(--primary)" : "rgba(20,18,16,.10)"}`,
+                    background: reason === r.value ? "var(--brand-soft)" : "#FAF7F1",
+                    color: reason === r.value ? "var(--primary)" : "#141210",
                     fontSize: 14, fontWeight: 500, cursor: "pointer",
                   }}
                 >
@@ -116,7 +116,7 @@ export function DirectComplaintModal({ open, onOpenChange, threadId }: Props) {
                 disabled={!reason || phase === "submitting"}
                 style={{
                   flex: 1, height: 46, borderRadius: 99, border: 0,
-                  background: !reason || phase === "submitting" ? "rgba(20,18,16,.18)" : "#E86A3A",
+                  background: !reason || phase === "submitting" ? "rgba(20,18,16,.18)" : "var(--primary)",
                   color: !reason || phase === "submitting" ? "rgba(20,18,16,.45)" : "#fff",
                   fontSize: 14, fontWeight: 600, cursor: !reason || phase === "submitting" ? "default" : "pointer",
                 }}

@@ -256,7 +256,7 @@ function ScenarioRow({
       style={{
         background: "#fff",
         borderRadius: 14,
-        border: `1px solid ${conflict ? "rgba(232,106,58,.35)" : "rgba(20,18,16,.08)"}`,
+        border: `1px solid ${conflict ? "rgba(239,135,89,.35)" : "rgba(20,18,16,.08)"}`,
         overflow: "hidden",
         transition: "border-color .15s",
       }}
@@ -270,7 +270,7 @@ function ScenarioRow({
             fontSize: 9,
             letterSpacing: ".14em",
             textTransform: "uppercase",
-            color: "#C24E22",
+            color: "var(--primary)",
             marginBottom: 3,
           }}>
             {TAG_LABEL[item.tag] ?? item.tag}
@@ -326,8 +326,8 @@ function ScenarioRow({
           gap: 6,
           padding: "7px 10px",
           borderRadius: 8,
-          background: "rgba(232,106,58,.08)",
-          color: "#C24E22",
+          background: "rgba(239,135,89,.08)",
+          color: "var(--primary)",
           fontSize: 12,
         }}>
           <WarnIcon />
@@ -372,7 +372,7 @@ function ScenarioRow({
                     }`,
                     background:
                       selectedVenueBookingDurationHours === durationHours
-                        ? "#E86A3A"
+                        ? "var(--primary)"
                         : "#fff",
                     color:
                       selectedVenueBookingDurationHours === durationHours
@@ -511,7 +511,7 @@ export function StepDone({
         fontSize: 11,
         letterSpacing: ".14em",
         textTransform: "uppercase",
-        color: "#C24E22",
+        color: "var(--primary)",
       }}>
         ● Шаг 5 · готово
       </span>
@@ -527,7 +527,7 @@ export function StepDone({
         color: "#141210",
       }}>
         Праздник{" "}
-        <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#E86A3A" }}>собран</span>{" "}
+        <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>собран</span>{" "}
         🎉
       </h2>
 
@@ -596,7 +596,7 @@ export function StepDone({
                 style={{
                   padding: "8px 14px",
                   borderRadius: 99,
-                  background: selectedTime === t ? "#E86A3A" : "#fff",
+                  background: selectedTime === t ? "var(--primary)" : "#fff",
                   color: selectedTime === t ? "#fff" : "#3A332B",
                   border: `1px solid ${selectedTime === t ? "transparent" : "rgba(20,18,16,.10)"}`,
                   fontFamily: "var(--font-mono, ui-monospace)",
@@ -694,7 +694,7 @@ export function StepDone({
             borderRadius: 999,
             border: 0,
             cursor: summaryItems.length === 0 ? "default" : "pointer",
-            background: summaryItems.length === 0 ? "rgba(20,18,16,.18)" : "#E86A3A",
+            background: summaryItems.length === 0 ? "rgba(20,18,16,.18)" : "var(--primary)",
             color: "#fff",
             transition: "background .2s",
           }}

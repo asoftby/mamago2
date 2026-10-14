@@ -66,9 +66,8 @@ export function SectionHeader({
   const inlineTitleAndAction = (useIconButton || useInlineText) && !subtitle;
 
   const titleNode = titleCitySlug ? <CityTitle title={title} citySlug={titleCitySlug} /> : title;
-  const titleStyle = titleCitySlug
-    ? { fontFamily: "var(--font-serif)", fontWeight: 400, fontSize: 30, letterSpacing: "-0.03em" }
-    : { fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 30, letterSpacing: "-1px" };
+  // Every city-home block heading uses the same PT Serif typeface.
+  const titleStyle = { fontFamily: "var(--font-pt-serif)", fontWeight: 400, fontSize: 30, letterSpacing: "-0.03em" };
 
   const actionLink = showAction ? (
     useInlineText ? (

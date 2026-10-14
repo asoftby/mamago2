@@ -239,8 +239,8 @@ function ReviewCard({
               height: 36,
               flexShrink: 0,
               borderRadius: 99,
-              background: "#FFE8DC",
-              color: "#C24E22",
+              background: "var(--brand-soft)",
+              color: "var(--primary)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -276,7 +276,7 @@ function ReviewCard({
             </div>
           </div>
         </div>
-        <div style={{ color: "#E86A3A", letterSpacing: ".05em", fontSize: 13, flexShrink: 0 }}>
+        <div style={{ color: "var(--primary)", letterSpacing: ".05em", fontSize: 13, flexShrink: 0 }}>
           {"★".repeat(Math.min(review.rating, 5))}
         </div>
       </div>

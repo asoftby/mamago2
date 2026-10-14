@@ -502,7 +502,7 @@ function WorkingHoursSection({ summary }: { summary: string }) {
             {isOpen ? (
               <>Открыто <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#1F8A5B" }}>сейчас</em></>
             ) : (
-              <>Режим <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>работы</em></>
+              <>Режим <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>работы</em></>
             )}
           </h2>
           {leftStatusText ? (
@@ -540,7 +540,7 @@ function WorkingHoursSection({ summary }: { summary: string }) {
                       padding: "14px 4px",
                       borderBottom: "1px solid rgba(20,18,16,.10)",
                       background: isToday
-                        ? "linear-gradient(90deg, rgba(232,106,58,.08) 0%, transparent 40%)"
+                        ? "linear-gradient(90deg, rgba(239,135,89,.08) 0%, transparent 40%)"
                         : "transparent",
                     }}
                   >
@@ -554,7 +554,7 @@ function WorkingHoursSection({ summary }: { summary: string }) {
                             fontSize: 10,
                             letterSpacing: ".12em",
                             textTransform: "uppercase",
-                            color: "#C24E22",
+                            color: "var(--primary)",
                           }}
                         >
                           сегодня

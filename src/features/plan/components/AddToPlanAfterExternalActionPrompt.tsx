@@ -25,7 +25,7 @@ function PromptBody({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#FFE8DC] text-[#EF8759]">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-soft text-[#EF8759]">
           <CalendarDays className="h-5 w-5" />
         </div>
         <div className="min-w-0">

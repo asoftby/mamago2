@@ -35,7 +35,7 @@ export function CtaStepPreview({
         <CardContent className="space-y-4 px-5 py-5">
           <div
             aria-hidden="true"
-            className="inline-flex min-h-14 min-w-[220px] items-center justify-center rounded-full bg-[#e86a3a] px-6 text-sm font-semibold text-white shadow-[0_14px_32px_-12px_rgba(232,106,58,0.55)]"
+            className="inline-flex min-h-14 min-w-[220px] items-center justify-center rounded-full bg-primary px-6 text-sm font-semibold text-white shadow-[0_14px_32px_-12px_rgba(239,135,89,0.55)]"
           >
             {canonicalCta.primaryLabel}
           </div>
@@ -52,9 +52,9 @@ export function CtaStepPreview({
                     className="flex min-h-11 items-center gap-3 rounded-2xl border border-border/80 bg-background px-4 py-3 text-sm text-foreground"
                   >
                     {item.channel === "PHONE" ? (
-                      <Phone className="h-4 w-4 shrink-0 text-[#e86a3a]" aria-hidden />
+                      <Phone className="h-4 w-4 shrink-0 text-primary" aria-hidden />
                     ) : (
-                      <ExternalLink className="h-4 w-4 shrink-0 text-[#e86a3a]" aria-hidden />
+                      <ExternalLink className="h-4 w-4 shrink-0 text-primary" aria-hidden />
                     )}
                     <span className="font-medium">{item.label || fallbackLabel(item.channel)}</span>
                     <span className="text-muted-foreground">{item.value}</span>

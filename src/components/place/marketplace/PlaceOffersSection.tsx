@@ -57,7 +57,7 @@ export function PlaceOffersSection({
           }}
         >
           Чему{" "}
-          <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>
+          <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>
             научим
           </em>
         </h2>
@@ -138,7 +138,7 @@ function OfferCardEditorial({ offer, href }: { offer: Offer; href: string }) {
               height: 26,
               padding: "0 10px",
               borderRadius: 999,
-              background: "#E86A3A",
+              background: "var(--primary)",
               color: "#fff",
               fontSize: 11,
               fontWeight: 600,

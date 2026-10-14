@@ -84,7 +84,7 @@ function EventMarquee({ items }: { items: string[] }) {
         {row.map((t, i) => (
           <span key={i} className="inline-flex items-center gap-[18px] px-[18px]">
             <span style={{ opacity: 0.55 }}>{t}</span>
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#E86A3A]" />
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />
           </span>
         ))}
       </div>
@@ -283,7 +283,7 @@ function EventFinalCta({
             Не пропустите
             <br />
             это{" "}
-            <span className="italic text-[#C24E22]">событие</span>.
+            <span className="italic text-primary">событие</span>.
           </h2>
           <p className="mx-auto mt-6 max-w-[520px] text-[19px] leading-[1.5] text-[#3A332B]">
             Купите билет за&nbsp;2&nbsp;минуты или отложите в&nbsp;план — мы&nbsp;напомним вечером накануне.
@@ -295,7 +295,7 @@ function EventFinalCta({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={onBuy}
-                className="inline-flex h-16 items-center gap-2 rounded-full bg-[#E86A3A] px-7 text-[17px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px"
+                className="inline-flex h-16 items-center gap-2 rounded-full bg-primary px-7 text-[17px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px"
               >
                 {buyLabel}&nbsp;{renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })}
               </a>

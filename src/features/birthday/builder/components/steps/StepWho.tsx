@@ -96,7 +96,7 @@ export function StepWho({ builder, ageSignals }: Props) {
           fontSize: 11,
           letterSpacing: ".14em",
           textTransform: "uppercase",
-          color: "#C24E22",
+          color: "var(--primary)",
         }}
       >
         ● Шаг 2 · для кого
@@ -120,7 +120,7 @@ export function StepWho({ builder, ageSignals }: Props) {
             fontFamily: "var(--font-editorial)",
             fontStyle: "italic",
             fontWeight: 400,
-            color: "#E86A3A",
+            color: "var(--primary)",
           }}
         >
           именинник
@@ -207,9 +207,9 @@ export function StepWho({ builder, ageSignals }: Props) {
                   justifyContent: "center",
                   gap: 4,
                   flexDirection: "column",
-                  background: isSelected ? "#FFE8DC" : "#FAF7F1",
-                  border: `1px solid ${isSelected ? "#E86A3A" : "rgba(20,18,16,.10)"}`,
-                  color: isSelected ? "#C24E22" : "#141210",
+                  background: isSelected ? "var(--brand-soft)" : "#FAF7F1",
+                  border: `1px solid ${isSelected ? "var(--primary)" : "rgba(20,18,16,.10)"}`,
+                  color: isSelected ? "var(--primary)" : "#141210",
                   fontSize: 14,
                   fontWeight: 500,
                   cursor: "pointer",

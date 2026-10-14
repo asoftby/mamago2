@@ -125,9 +125,9 @@ export function BuilderSummaryBar({
           }}
         >
           {dateText ? (
-            <span style={{ color: "#C24E22", fontWeight: 500 }}>● {dateText}</span>
+            <span style={{ color: "var(--primary)", fontWeight: 500 }}>● {dateText}</span>
           ) : (
-            <span style={{ color: "#C24E22", fontWeight: 500 }}>● выберите дату</span>
+            <span style={{ color: "var(--primary)", fontWeight: 500 }}>● выберите дату</span>
           )}
 
           {parts.map((p, i) => (
@@ -203,7 +203,7 @@ export function BuilderSummaryBar({
                 height: 48,
                 padding: "0 22px",
                 borderRadius: 999,
-                background: canNext ? "#E86A3A" : "rgba(20,18,16,.18)",
+                background: canNext ? "var(--primary)" : "rgba(20,18,16,.18)",
                 color: "#fff",
                 border: 0,
                 fontSize: 15,

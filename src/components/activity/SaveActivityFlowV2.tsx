@@ -135,7 +135,7 @@ export function SaveActivityFlowV2({
     <div className="flex flex-col">
       <style>{`
         .stp-opt:hover:not(:disabled) { background: #fff !important; border-color: #141210 !important; transform: translateX(2px); }
-        .stp-opt:hover:not(:disabled) .stp-arr { transform: translateX(4px); color: #C24E22 !important; }
+        .stp-opt:hover:not(:disabled) .stp-arr { transform: translateX(4px); color: var(--primary) !important; }
       `}</style>
       {phase === "select" && (
         <div style={{ position: "relative" }}>

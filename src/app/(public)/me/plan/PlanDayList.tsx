@@ -51,7 +51,7 @@ function ScenarioCta({
           gap: 6,
           fontSize: 13,
           fontWeight: 600,
-          color: scenarioStatus === "changed" ? "#B45309" : "#C24E22",
+          color: scenarioStatus === "changed" ? "#B45309" : "var(--primary)",
           textDecoration: "none",
           whiteSpace: "nowrap",
         }}

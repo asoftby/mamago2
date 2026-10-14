@@ -46,7 +46,7 @@ export function SessionCard({
       className={cn(
         "relative overflow-hidden rounded-[18px] border px-6 py-5 transition-colors",
         isNearest
-          ? "border-[rgba(232,106,58,0.25)] bg-gradient-to-b from-[#FFE8DC] to-[#FAF7F1]"
+          ? "border-[rgba(239,135,89,0.25)] bg-gradient-to-b from-brand-soft to-[#FAF7F1]"
           : "border-[rgba(20,18,16,0.10)] bg-[#FAF7F1]",
       )}
     >
@@ -66,11 +66,11 @@ export function SessionCard({
               )}
               {isNearest && (
                 <span
-                  className="flex items-center gap-[5px] text-[10px] font-medium uppercase tracking-[0.1em] text-[#E86A3A]"
+                  className="flex items-center gap-[5px] text-[10px] font-medium uppercase tracking-[0.1em] text-primary"
                   style={{ fontFamily: "Menlo, monospace" }}
                 >
                   {kicker && (
-                    <span className="inline-block h-[3px] w-[3px] rounded-full bg-[#E86A3A]" />
+                    <span className="inline-block h-[3px] w-[3px] rounded-full bg-primary" />
                   )}
                   ближайший
                 </span>
@@ -113,7 +113,7 @@ export function SessionCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={onPrimary}
-                className="inline-flex h-14 items-center gap-2 rounded-full bg-[#E86A3A] px-6 text-[15px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+                className="inline-flex h-14 items-center gap-2 rounded-full bg-primary px-6 text-[15px] font-semibold text-white transition-colors hover:bg-primary active:translate-y-px"
               >
                 {primaryLabel} →
               </a>
@@ -121,7 +121,7 @@ export function SessionCard({
               <button
                 type="button"
                 onClick={onPrimary}
-                className="inline-flex h-14 items-center gap-2 rounded-full bg-[#E86A3A] px-6 text-[15px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+                className="inline-flex h-14 items-center gap-2 rounded-full bg-primary px-6 text-[15px] font-semibold text-white transition-colors hover:bg-primary active:translate-y-px"
               >
                 {primaryLabel}
               </button>
@@ -135,11 +135,11 @@ export function SessionCard({
               className={cn(
                 "flex h-14 w-14 shrink-0 items-center justify-center rounded-full border transition-colors",
                 isPlanned
-                  ? "border-[#E86A3A] bg-[#FFE8DC] text-[#E86A3A]"
+                  ? "border-primary bg-brand-soft text-primary"
                   : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.45)] hover:border-[#141210] hover:text-[#141210]",
               )}
             >
-              <Heart size={20} strokeWidth={1.75} className={isPlanned ? "fill-[#E86A3A]" : ""} />
+              <Heart size={20} strokeWidth={1.75} className={isPlanned ? "fill-primary" : ""} />
             </button>
           )}
         </div>

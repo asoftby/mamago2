@@ -12,7 +12,7 @@ import { CityHomeAllLink } from "@/features/city-home/components/SectionHeader";
 import { useCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
-import { formatRuShortDayMonth, formatRuShortDayMonthRange } from "@/lib/formatters/date";
+import { formatRuShortDayMonthRange, formatRuCustomDateRangeTitle } from "@/lib/formatters/date";
 import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
 import { getActivityFormatLabel } from "@/domain/activities/activity-format";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
@@ -62,16 +62,6 @@ function buildKudaSectionTitle(input: {
     return `Куда пойти на выходных ${cityPart}`;
   }
 
-  if (input.dateFrom && input.dateTo) {
-    const range = formatRuShortDayMonthRange(input.dateFrom, input.dateTo);
-    return range ? `Куда пойти ${range} ${cityPart}` : `Куда пойти ${cityPart}`;
-  }
-
-  if (input.dateFrom) {
-    const dateLabel = formatRuShortDayMonth(input.dateFrom);
-    return dateLabel ? `Куда пойти ${dateLabel} ${cityPart}` : `Куда пойти ${cityPart}`;
-  }
-
   return `Куда пойти ${cityPart}`;
 }
 
@@ -89,10 +79,12 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
     selectedPersonaIds: family?.selectedPersonaIds ?? [],
     personas: family?.personas ?? [],
   });
-  const title = buildMainTitle({
-    baseTitle,
-    audienceLabel,
-  });
+  const customDates = applied.whenPreset
+    ? ""
+    : formatRuCustomDateRangeTitle(applied.dateFrom, applied.dateTo);
+  const title = customDates
+    ? `Куда пойти ${audienceLabel ? `${audienceLabel} ` : ""}${getCityLocativePhrase(citySlug)} ${customDates}`
+    : buildMainTitle({ baseTitle, audienceLabel });
   const preview = useMemo(
     () =>
       applyPersonaRanking(activities, {
@@ -317,7 +309,7 @@ export function CityHomeJournalSection({
                 className={cn(
                   "relative w-full aspect-square rounded-xl mb-3 overflow-hidden bg-gradient-to-br",
                   [
-                    "from-[#F2C8A7] to-[#E89460]",
+                    "from-primary/10 to-primary/25",
                     "from-[#CDE3D6] to-[#9CC1AC]",
                     "from-[#F6D567] to-[#E8B935]",
                     "from-[#E6DBC8] to-[#C9BCA0]",
@@ -353,7 +345,7 @@ export function CityHomeJournalSection({
                   {a.readTime} мин.
                 </p>
               </div>
-              <p className="line-clamp-3 text-sm font-semibold leading-snug text-neutral-900 transition-colors duration-150 group-hover:text-[#C24E22]">
+              <p className="line-clamp-3 text-sm font-semibold leading-snug text-neutral-900 transition-colors duration-150 group-hover:text-primary">
                 {a.title}
               </p>
             </Link>

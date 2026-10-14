@@ -33,9 +33,9 @@ const C = {
   ink3: "rgba(20,18,16,.55)",
   line: "rgba(20,18,16,.10)",
   line2: "rgba(20,18,16,.18)",
-  accent: "#E86A3A",
-  accentDeep: "#C24E22",
-  accentSoft: "#FFE8DC",
+  accent: "var(--primary)",
+  accentDeep: "var(--primary)",
+  accentSoft: "var(--brand-soft)",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
