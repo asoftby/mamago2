@@ -31,6 +31,15 @@ import { ABWS_DISTRIBUTOR_COMPANY_ID } from "@/lib/abws/saleframeUrl";
 const PARSER_KEY = "abws-performances-event";
 const DEFAULT_API_URL = "https://webgate.24guru.by/api/v3/sync/data/performances";
 
+// ABWS serves the full catalog (~13 MiB), not an HTML page. Keep the generic
+// 5 MiB HTML cap in fetchHtml unchanged and allow up to 30 MiB for this API.
+export const ABWS_FETCH_OPTIONS = {
+  headers: { Accept: "application/json" },
+  timeoutMs: 30_000,
+  retries: 2,
+  maxBytes: 30 * 1024 * 1024,
+} as const;
+
 // ── Raw ABWS API shapes (best-effort — unconfirmed fields marked below) ────
 
 export interface AbwsPerformanceType {
@@ -403,11 +412,7 @@ export async function fetchAbwsPerformances(source: ImportSource): Promise<AbwsP
 
   const loggableUrl = `${url.origin}${url.pathname}?distributor_company_id=${ABWS_DISTRIBUTOR_COMPANY_ID}&key=***`;
 
-  const response = await fetchHtml(url.toString(), {
-    headers: { Accept: "application/json" },
-    timeoutMs: 30_000,
-    retries: 2,
-  });
+  const response = await fetchHtml(url.toString(), ABWS_FETCH_OPTIONS);
 
   // Per the ABWS wiki: log HTTP status + body on every call. The full body
   // is ~13MB for the real catalog, so log a bounded preview rather than the

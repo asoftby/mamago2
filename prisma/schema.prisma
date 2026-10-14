@@ -82,6 +82,7 @@ model User {
   consentRecords                    ConsentRecord[]
   contentEdits                      ContentEditLog[]                 @relation("ContentEditor")
   ideas                             Idea[]
+  collections                       Collection[]
   assignedImprovementRequests       ImprovementRequest[]             @relation("ImprovementRequestAssignee")
   createdImprovementRequests        ImprovementRequest[]             @relation("ImprovementRequestCreator")
   uploadedMediaAssets               MediaAsset[]
@@ -104,6 +105,8 @@ model User {
   businessAccessRequests            BusinessAccessRequest[]          @relation("BusinessAccessRequester")
   reviewedBusinessAccessRequests    BusinessAccessRequest[]          @relation("BusinessAccessRequestReviewedBy")
   placeRevisions                    PlaceRevision[]                  @relation("PlaceRevisionReviewer")
+  offerRevisionsAuthored            OfferRevision[]                  @relation("OfferRevisionAuthor")
+  offerRevisionsReviewed            OfferRevision[]                  @relation("OfferRevisionReviewer")
   planItems                         PlanItem[]                       @relation("PlanItemOwner")
   assignedPlanItems                 PlanItem[]                       @relation("PlanItemAssignee")
   inboxItems                        InboxItem[]
@@ -515,6 +518,7 @@ model Idea {
   activityId String
   createdAt  DateTime @default(now())
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collectionItems CollectionItem[]
 
   @@unique([userId, activityId])
   @@index([userId])
@@ -826,6 +830,7 @@ model RouteIdea {
   createdAt DateTime @default(now())
   route     Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collectionItems CollectionItem[]
 
   @@unique([userId, routeId])
   @@index([userId])
@@ -1026,6 +1031,7 @@ model EventCategory {
   filterPlacements     DiscoveryFilterPlacement[]
   articles             Article[]                    @relation("ArticleCategory")
   articleAdditionalLinks ArticleCategoryLink[]      @relation("ArticleAdditionalCategory")
+  offerCategories      OfferCategory[]
 
   @@unique([publicationType, slug])
   @@index([sortOrder])
@@ -1422,6 +1428,8 @@ model Business {
   unpLastCheckedAt        DateTime?
   /// Показ контента бизнеса пользователям (отдельно от верификации)
   operationalStatus       BusinessOperationalStatus     @default(ACTIVE)
+  /// Включаемые по бизнесу функции (BusinessFeatures в src/lib/business/businessFeatures.ts); отсутствующий ключ = выключено
+  features                Json                          @default("{}")
   activities              Activity[]                    @relation("ActivityBusiness")
   billingAccount          BillingAccount?
   bookingRequests         BookingRequest[]
@@ -2422,6 +2430,8 @@ model Offer {
   discoverySignalIds       String[]             @default([])
   /// Чипы публичной витрины /[city]/classes
   classChipSlugs           String[]             @default([])
+  /// Интересы ребёнка (до 5): slug из SYSTEM_INTERESTS (src/lib/config/interests.ts).
+  interestSlugs            String[]             @default([])
   /// Шаги мастера, явно завершённые пользователем через «Далее» (OfferWizardStepKey)
   wizardCompletedSteps     String[]             @default([])
   faqItems                 Json?
@@ -2431,6 +2441,7 @@ model Offer {
   bookingMode    BookingMode?
   bookingPhone   String?
   bookingNote    String?
+  offerBooking   OfferBooking?
 
   // Gallery images (JSON array of URLs)
   galleryImages Json? @default("[]")
@@ -2501,6 +2512,8 @@ model Offer {
   archivedBy      User?              @relation("OfferArchiver", fields: [archivedByUserId], references: [id])
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])
   placements      OfferPlacement[]
+  revisions       OfferRevision[]
+  categoryLinks   OfferCategory[]
   place           Place?             @relation(fields: [placeId], references: [id], onDelete: Cascade)
   city            City?              @relation("OfferCity", fields: [cityId], references: [id])
   slugHistory     OfferSlugHistory[]
@@ -2526,6 +2539,54 @@ model Offer {
   // Party-filter indexes (Phase 3b-1)
   @@index([category])
   @@index([minChildren, maxChildren])
+}
+
+/// Ревизия опубликованного оффера: контентные правки партнёра (текст, фото, категории и т.п.), которые
+/// не попадают в живую строку до решения модератора. `payload` — предлагаемые значения по колонкам Offer
+/// (+ псевдоколонки: requestedPlacements, categoryIds, campSessionTexts). Одна PENDING-ревизия на оффер.
+model OfferRevision {
+  id               String              @id @default(cuid())
+  offerId          String
+  authorId         String?
+  status           OfferRevisionStatus @default(PENDING)
+  payload          Json
+  changedFields    String[]
+  /// Offer.updatedAt на момент первой записи ревизии — чтобы показать модератору, что оффер менялся позже.
+  baseOfferUpdatedAt DateTime?
+  moderatorComment String?
+  reviewedAt       DateTime?
+  reviewedById     String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  offer            Offer               @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  author           User?               @relation("OfferRevisionAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  reviewedBy       User?               @relation("OfferRevisionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([offerId, status])
+  @@index([status, createdAt])
+}
+
+enum OfferRevisionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// Категории предложения (до 3, обязательна хотя бы одна в новом мастере).
+/// Справочник — EventCategory: для праздников/лагерей/занятий publicationType=OFFER
+/// (slug с префиксом формата: party-*, camp-*, class-*), для «Место/посещение» — корневые PLACE.
+model OfferCategory {
+  id         String        @id @default(cuid())
+  offerId    String
+  categoryId String
+  sortOrder  Int           @default(0)
+  createdAt  DateTime      @default(now())
+  offer      Offer         @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  category   EventCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@unique([offerId, categoryId])
+  @@index([offerId, sortOrder])
+  @@index([categoryId])
 }
 
 model OfferPlacement {
@@ -2561,12 +2622,71 @@ model OfferSession {
   startAt  DateTime
   endAt    DateTime
   capacity Int?
+  title String?
+  isCancelled Boolean @default(false)
+  bookingRequests BookingRequest[]
   /// Числовая цена (для бюджет-фильтра)
   price    Decimal? @db.Decimal(10, 2)
 
   @@index([offerId])
+  @@unique([offerId, startAt])
   @@index([startAt, endAt])
   @@index([price])
+}
+
+enum ScheduleKind {
+  OPENING_HOURS
+  RECURRING_SESSIONS
+  DATED_SESSIONS
+  ON_REQUEST_WINDOWS
+  SHIFTS
+}
+
+enum ExternalLinkKind {
+  WEBSITE
+  TICKETS
+}
+
+/// Operational booking settings are outside moderated OfferRevision content.
+model OfferBooking {
+  id String @id @default(cuid())
+  offerId String @unique
+  scheduleKind ScheduleKind?
+  timezone String @default("Europe/Minsk")
+  durationMin Int?
+  bufferMin Int @default(0)
+  capacity Int?
+  leadTimeHours Int @default(24)
+  horizonDays Int @default(60)
+  externalKind ExternalLinkKind?
+  externalUrl String?
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  rules OfferScheduleRule[]
+  exceptions OfferScheduleException[]
+}
+
+/// Group sessions have no BookingUnit; resource windows remain in AvailabilityRule.
+model OfferScheduleRule {
+  id String @id @default(cuid())
+  offerBookingId String
+  weekday Int
+  startMinutes Int
+  endMinutes Int
+  validFrom DateTime? @db.Date
+  validTo DateTime? @db.Date
+  capacity Int?
+  offerBooking OfferBooking @relation(fields: [offerBookingId], references: [id], onDelete: Cascade)
+
+  @@unique([offerBookingId, weekday, startMinutes, endMinutes, validFrom])
+}
+
+model OfferScheduleException {
+  id String @id @default(cuid())
+  offerBookingId String
+  date DateTime @db.Date
+  offerBooking OfferBooking @relation(fields: [offerBookingId], references: [id], onDelete: Cascade)
+
+  @@unique([offerBookingId, date])
 }
 
 /// Состав пакета «Праздник под ключ» (реляционный, не JSON).
@@ -2597,6 +2717,7 @@ model OfferIdea {
   createdAt DateTime @default(now())
   offer     Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collectionItems CollectionItem[]
 
   @@unique([userId, offerId])
   @@index([userId])
@@ -2611,6 +2732,7 @@ model PlaceIdea {
   createdAt DateTime @default(now())
   place     Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collectionItems CollectionItem[]
 
   @@unique([userId, placeId])
   @@index([userId])
@@ -2625,6 +2747,7 @@ model ArticleIdea {
   createdAt DateTime @default(now())
   article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collectionItems CollectionItem[]
 
   @@unique([userId, articleId])
   @@index([userId])
@@ -5588,6 +5711,7 @@ model BookingAllocation {
 /// Статус заявки на запись
 enum BookingStatus {
   NEW
+  EXPIRED
   CONFIRMED
   REJECTED
   CANCELLED
@@ -5596,6 +5720,8 @@ enum BookingStatus {
 
 /// Режим записи для публикации
 enum BookingMode {
+  NONE
+  EXTERNAL
   REQUEST_ONLY // Заявка без выбора даты/времени
   USE_PUBLICATION_DATES // Выбор даты из диапазона (для Offer)
   USE_PUBLICATION_SLOTS // Выбор конкретного слота (для Activity)
@@ -5615,6 +5741,11 @@ model BookingRequest {
 
   // Выбранные дата/слот
   selectedSessionId String? // Для Activity (ссылка на ActivitySession)
+  offerSessionId String? // Для OfferSession; selectedSessionId remains ActivitySession-only
+  startsAt DateTime?
+  endsAt DateTime?
+  seats Int @default(1)
+  holdUntil DateTime?
   requestedDate     DateTime? // Snapshot для Offer или общий fallback
   requestedTime     String? // Snapshot времени (HH:MM)
 
@@ -5678,6 +5809,7 @@ model BookingRequest {
   offer        Offer?            @relation(fields: [offerId], references: [id], onDelete: SetNull)
   place        Place?            @relation(fields: [placeId], references: [id], onDelete: SetNull)
   session      ActivitySession?  @relation(fields: [selectedSessionId], references: [id], onDelete: SetNull)
+  offerSession OfferSession? @relation(fields: [offerSessionId], references: [id], onDelete: SetNull)
   activities   BookingActivity[]
   feedback     BookingFeedback?
   directThread DirectThread?
@@ -5694,6 +5826,7 @@ model BookingRequest {
   @@index([offerId])
   @@index([placeId])
   @@index([selectedSessionId])
+  @@index([offerSessionId, status, holdUntil])
   @@index([campShiftId])
   @@index([planItemId])
   @@index([status])
@@ -6499,4 +6632,49 @@ model ReleaseEvent {
 
   @@unique([buildId, processStartedAt])
   @@index([detectedAt(sort: Desc)])
+}
+
+/// Пользовательская коллекция («доска») в «Моих идеях». Только личная; для
+/// семейного профиля позже добавится nullable familyId.
+/// Уникальность (userId, lower(title)) — expression-индекс в SQL миграции
+/// (в schema.prisma невыразим).
+model Collection {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String           @db.VarChar(60)
+  sort      Int              @default(0)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CollectionItem[]
+
+  @@index([userId, sort])
+}
+
+/// Принадлежность сохранённой идеи коллекции (many-to-many). Полиморфно: ровно
+/// один из *IdeaId не null (CHECK в SQL), уникальность (collectionId, <fk>)
+/// на каждый тип — partial unique индексы в SQL миграции.
+/// «Без коллекции» не хранится: это идеи без записей CollectionItem.
+model CollectionItem {
+  id            String       @id @default(cuid())
+  collectionId  String
+  ideaId        String?
+  offerIdeaId   String?
+  routeIdeaId   String?
+  placeIdeaId   String?
+  articleIdeaId String?
+  addedAt       DateTime     @default(now())
+  collection    Collection   @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  idea          Idea?        @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  offerIdea     OfferIdea?   @relation(fields: [offerIdeaId], references: [id], onDelete: Cascade)
+  routeIdea     RouteIdea?   @relation(fields: [routeIdeaId], references: [id], onDelete: Cascade)
+  placeIdea     PlaceIdea?   @relation(fields: [placeIdeaId], references: [id], onDelete: Cascade)
+  articleIdea   ArticleIdea? @relation(fields: [articleIdeaId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId, addedAt])
+  @@index([ideaId])
+  @@index([offerIdeaId])
+  @@index([routeIdeaId])
+  @@index([placeIdeaId])
+  @@index([articleIdeaId])
 }

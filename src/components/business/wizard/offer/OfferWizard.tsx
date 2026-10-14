@@ -30,8 +30,10 @@ import { useWizardSession } from "@/hooks/useWizardSession";
 import { useWizardDraft } from "@/hooks/useWizardDraft";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
 
-import type { OfferFormData, OfferWizardMode, OfferWizardStepKey } from "./types";
+import type { OfferFormData, OfferWizardMode, OfferWizardStepKey, OfferWizardVariant } from "./types";
+import { describeContentColumns } from "@/lib/offers/offerPublishedEditGate";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
+import { getOfferTypeSelection } from "./offerTypeChoices";
 import { validateForSubmit, type ValidationResult } from "./validation";
 import {
   getStepsForOfferType,
@@ -42,6 +44,7 @@ import {
   getPreviousStepKey,
   normalizeWizardCompletedSteps,
   ALL_OFFER_WIZARD_STEP_KEYS,
+  getV2StepMembers,
 } from "./offerWizardSteps.config";
 import {
   buildOfferCreatePayload,
@@ -104,6 +107,12 @@ interface OfferWizardProps {
   /** 1-based шаг в мастере (из query `?step=`). Только для `mode="edit"`. */
   initialStepNumber?: number;
   ctaStepEnabled?: boolean;
+  /** Новый мастер из 6 шагов (Business.features.newOfferWizard). */
+  newWizard?: boolean;
+  /** Колонки ожидающей ревизии опубликованного оффера (правки автора ждут модерации). */
+  pendingRevisionFields?: string[];
+  /** Версия операционных данных оффера на момент загрузки редактора (защита от записи устаревшего снимка). */
+  operationalVersion?: string;
 }
 
 /** Ключ автосейва до миграции на useWizardDraft — подчищается на mount */
@@ -267,7 +276,11 @@ export function OfferWizard({
   returnTo,
   initialStepNumber,
   ctaStepEnabled,
+  newWizard = false,
+  pendingRevisionFields,
+  operationalVersion: initialOperationalVersion,
 }: OfferWizardProps) {
+  const variant: OfferWizardVariant = newWizard ? "v2" : "v1";
   const router = useRouter();
   const surface: ContentEditorSurface = editorSurface ?? "business";
   const nav: ContentEditorNav = {
@@ -287,7 +300,7 @@ export function OfferWizard({
   });
   
   // Get steps based on current offer type
-  const steps = getStepsForOfferType(formData.offerWizardType);
+  const steps = getStepsForOfferType(formData.offerWizardType, formData.productType, variant);
   const totalSteps = steps.length;
   
   // Current step key (not number)
@@ -296,7 +309,7 @@ export function OfferWizard({
       return "type";
     }
     const fd = mapOfferToFormData(offer);
-    const initialSteps = getStepsForOfferType(fd.offerWizardType);
+    const initialSteps = getStepsForOfferType(fd.offerWizardType, fd.productType, variant);
     const idx = Math.min(initialStepNumber, initialSteps.length) - 1;
     return initialSteps[idx]?.key ?? "type";
   });
@@ -321,30 +334,30 @@ export function OfferWizard({
   // навсегда — обратно только через «Далее» на этом шаге.
   useEffect(() => {
     setCompletedSteps((prev) => {
-      const next = prev.filter((key) => isStepComplete(key, formData));
+      const next = prev.filter((key) => isStepComplete(key, formData, variant));
       return next.length === prev.length ? prev : next;
     });
-  }, [formData]);
+  }, [formData, variant]);
 
-  // Смена типа предложения после прохождения шагов: набор шагов меняется,
-  // старые отметки недостоверны — сбрасываем полностью.
-  const prevWizardTypeRef = useRef(formData.offerWizardType);
+  // Смена любого persisted-типа (даже SINGLE → SINGLE) сбрасывает прогресс:
+  // проверки и обязательные поля могут отличаться внутри одного wizardType.
+  const prevProductTypeRef = useRef(formData.productType);
   useEffect(() => {
-    if (prevWizardTypeRef.current !== formData.offerWizardType) {
-      if (prevWizardTypeRef.current !== null) {
+    if (prevProductTypeRef.current !== formData.productType) {
+      if (prevProductTypeRef.current !== null) {
         setCompletedSteps([]);
       }
-      prevWizardTypeRef.current = formData.offerWizardType;
+      prevProductTypeRef.current = formData.productType;
     }
-  }, [formData.offerWizardType]);
+  }, [formData.productType]);
 
   // Normalize current step if offer type changes
   useEffect(() => {
-    const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey);
+    const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey, formData.productType, variant);
     if (currentStepNum === null) {
       setCurrentStepKey("type");
     }
-  }, [formData.offerWizardType, currentStepKey]);
+  }, [formData.offerWizardType, formData.productType, currentStepKey, variant]);
   
   // Дочистка черновика старого формата (до useWizardDraft): не восстанавливаем,
   // формат и ключ несовместимы
@@ -387,6 +400,9 @@ export function OfferWizard({
   );
   const formJson = useMemo(() => JSON.stringify(formData), [formData]);
   const isDirty = formJson !== baselineFormJson;
+
+  /** Версия операционных данных, на которой построена форма; обновляется из ответа каждого PATCH. */
+  const [operationalVersion, setOperationalVersion] = useState<string | undefined>(initialOperationalVersion);
 
   /** updatedAt оффера, которому соответствует baseline (обновляется после PATCH) */
   const [entityUpdatedAtIso, setEntityUpdatedAtIso] = useState<string | null>(() =>
@@ -440,7 +456,7 @@ export function OfferWizard({
     }
     setFormData(nextFormData);
     setCompletedSteps(normalizeWizardCompletedSteps(restored.completedSteps));
-    const nextSteps = getStepsForOfferType(nextFormData.offerWizardType);
+    const nextSteps = getStepsForOfferType(nextFormData.offerWizardType, nextFormData.productType, variant);
     setCurrentStepKey(
       nextSteps.some((s) => s.key === restored.currentStep)
         ? restored.currentStep
@@ -462,9 +478,12 @@ export function OfferWizard({
   // Auto-determine intent and CTA
   useEffect(() => {
     if (formData.offerKind) {
-      const intent =
-        formData.offerKind === "course"
-          ? formData.durationType === "recurring"
+      // Persisted productType is authoritative. Legacy offerKind alone
+      // misclassified visits as birthdays and camp programs as one-off visits.
+      const intent = formData.productType
+        ? getOfferTypeSelection(formData.productType).intent
+        : formData.offerKind === "course"
+          ? formData.durationType === "recurring" || formData.durationType === "camp"
             ? "занятия"
             : "куда_пойти"
           : "день_рождения";
@@ -480,7 +499,7 @@ export function OfferWizard({
         setFormData(prev => ({ ...prev, ctaType: suggestedCTA }));
       }
     }
-  }, [formData.ctaType, formData.durationType, formData.intent, formData.offerKind]);
+  }, [formData.ctaType, formData.durationType, formData.intent, formData.offerKind, formData.productType]);
 
   const handleChange = useCallback(
     (
@@ -514,8 +533,8 @@ export function OfferWizard({
   // Navigation by step key
   const handleNext = () => {
     // Шаг помечается completed только здесь — после успешной валидации по «Далее»
-    if (!isStepComplete(currentStepKey, formData)) {
-      const missing = getMissingFieldsForStep(currentStepKey, formData);
+    if (!isStepComplete(currentStepKey, formData, variant)) {
+      const missing = getMissingFieldsForStep(currentStepKey, formData, variant);
       toast.error(
         missing.length > 0
           ? `Заполните: ${missing.join(", ")}`
@@ -524,14 +543,14 @@ export function OfferWizard({
       return;
     }
     markStepCompleted(currentStepKey);
-    const nextKey = getNextStepKey(formData.offerWizardType, currentStepKey);
+    const nextKey = getNextStepKey(formData.offerWizardType, currentStepKey, formData.productType, variant);
     if (nextKey) {
       setCurrentStepKey(nextKey);
     }
   };
 
   const handlePrev = () => {
-    const prevKey = getPreviousStepKey(formData.offerWizardType, currentStepKey);
+    const prevKey = getPreviousStepKey(formData.offerWizardType, currentStepKey, formData.productType, variant);
     if (prevKey) {
       setCurrentStepKey(prevKey);
     } else {
@@ -569,18 +588,26 @@ export function OfferWizard({
         const response = await fetch(`/api/business/offers/${offerId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ ...payload, expectedOperationalVersion: operationalVersion }),
         });
 
         // Сервер сохранил правки: локальный черновик не нужен, dirty-база — текущее состояние
-        const saved = await parseOfferMutationResponse<{ updatedAt?: string }>(response, {
+        const saved = await parseOfferMutationResponse<{
+          updatedAt?: string;
+          operationalVersion?: string;
+          moderationNotice?: { message: string };
+        }>(response, {
           fallbackMessage: "Failed to update draft",
           operation: "update draft",
           payload,
         });
+        if (saved?.operationalVersion) setOperationalVersion(saved.operationalVersion);
         if (saved?.updatedAt) {
           setEntityUpdatedAtIso(new Date(saved.updatedAt).toISOString());
         }
+        // Контентные правки опубликованного предложения сервер сохранил как ревизию (ждёт модерации),
+        // операционные применил сразу — форма считается сохранённой.
+        if (saved?.moderationNotice?.message) toast.info(saved.moderationNotice.message);
         setBaselineFormJson(JSON.stringify(formData));
         draft.markClean();
       } else {
@@ -627,10 +654,8 @@ export function OfferWizard({
 
       showSuccessModal({
         kind: "offer",
-        outcome:
-          canDirectPublish && mode === "edit" && isPublishedEditMode
-            ? "changes_published"
-            : "draft_saved",
+        // Опубликованный оффер: принятые операционные правки (цены, расписание, контакты) уже живые.
+        outcome: mode === "edit" && isPublishedEditMode ? "changes_published" : "draft_saved",
         id: offerId!,
         isEdit: true,
         slug: offer?.slug ?? null,
@@ -654,7 +679,7 @@ export function OfferWizard({
   // Submit for moderation
   const handleSubmit = async () => {
     if (isSubmitting) return;
-    const validation = validateForSubmit(formData);
+    const validation = validateForSubmit(formData, variant);
     
     if (!validation.isComplete) {
       toast.error(validation.errors[0] || "Заполните все обязательные поля");
@@ -722,24 +747,36 @@ export function OfferWizard({
       const response = await fetch(`/api/business/offers/${offerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatePayload),
+        body: JSON.stringify({ ...updatePayload, expectedOperationalVersion: operationalVersion }),
       });
 
-      await parseOfferMutationResponse(response, {
+      const submitted = await parseOfferMutationResponse<{
+        updatedAt?: string;
+        operationalVersion?: string;
+        moderationNotice?: { message: string };
+      }>(response, {
         fallbackMessage: "Failed to submit offer",
         operation: "submit offer",
         payload: updatePayload,
       });
 
+      // Версия для защиты от устаревшего снимка: после успешной записи следующая правка идёт от неё.
+      if (submitted?.updatedAt) setEntityUpdatedAtIso(new Date(submitted.updatedAt).toISOString());
+      if (submitted?.operationalVersion) setOperationalVersion(submitted.operationalVersion);
+      if (submitted?.moderationNotice?.message) toast.info(submitted.moderationNotice.message);
+      const revisionSentToModeration = Boolean(submitted?.moderationNotice);
       setBaselineFormJson(JSON.stringify(formData));
       draft.markClean();
       showSuccessModal({
         kind: "offer",
-        outcome: canDirectPublish
-          ? isPublishedEditMode
+        // Опубликованный оффер: принятые правки уже живые (контент, если был, уйдёт модератору отдельно).
+        outcome: revisionSentToModeration
+          ? "submitted"
+          : isPublishedEditMode
             ? "changes_published"
-            : "published"
-          : "submitted",
+            : canDirectPublish
+              ? "published"
+              : "submitted",
         id: offerId,
         isEdit: mode === "edit",
         slug: offer?.slug ?? null,
@@ -771,6 +808,7 @@ export function OfferWizard({
           isSubmitting={isSubmitting}
           onGoToStep={handleGoToStep}
           validation={submitValidation}
+          variant={variant}
         />
       );
     }
@@ -782,53 +820,84 @@ export function OfferWizard({
       ctaStepEnabled,
     };
     
-    switch (currentStepKey) {
-      case "type":
-        return <Step1Type {...commonProps} />;
-      case "placements":
-        return <Step2Placements {...commonProps} />;
-      case "details":
-        return <Step2Information {...commonProps} />;
-      case "photo":
-        return <Step3Media {...commonProps} wizardSessionId={wizardSessionId} />;
-      case "conditions":
-        return <Step4Conditions {...commonProps} />;
-      case "campSchedule":
-        return <Step4CampSchedule {...commonProps} />;
-      case "accommodation":
-        return <Step5Accommodation {...commonProps} />;
-      case "price":
-        return <Step5Pricing {...commonProps} />;
-      case "contacts":
-        return <Step6Contacts {...commonProps} />;
-      case "faq":
+    const renderBlock = (key: OfferWizardStepKey): React.ReactNode => {
+      switch (key) {
+        case "type":
+          return <Step1Type {...commonProps} showCategories={variant === "v2"} />;
+        case "placements":
+          return <Step2Placements {...commonProps} showAdditionalPlacements={variant !== "v2"} />;
+        case "details":
+          return <Step2Information {...commonProps} v2={variant === "v2"} />;
+        case "photo":
+          return <Step3Media {...commonProps} wizardSessionId={wizardSessionId} />;
+        case "conditions":
+          return <Step4Conditions {...commonProps} />;
+        case "campSchedule":
+          return <Step4CampSchedule {...commonProps} />;
+        case "accommodation":
+          return <Step5Accommodation {...commonProps} />;
+        case "price":
+          return <Step5Pricing {...commonProps} />;
+        case "contacts":
+          return <Step6Contacts {...commonProps} />;
+        case "faq":
+          return (
+            <FaqStep
+              kind="offer"
+              value={formData.faqItems}
+              onChange={(faqItems) => handleChange({ faqItems })}
+            />
+          );
+        default:
+          return null;
+      }
+    };
+
+    // Новый мастер: шаг собран из существующих блоков (поля переезжают в следующих PR).
+    if (
+      variant === "v2" &&
+      (currentStepKey === "about" ||
+        currentStepKey === "services" ||
+        currentStepKey === "schedule" ||
+        currentStepKey === "terms")
+    ) {
+      const members = getV2StepMembers(currentStepKey, formData);
+      // FAQ уже внутри «Дополнительно» блока «Детали» — отдельный блок не добавляем (иначе два редактора на одном состоянии).
+      const blocks: OfferWizardStepKey[] = members;
+      if (blocks.length === 0) {
         return (
-          <FaqStep
-            kind="offer"
-            value={formData.faqItems}
-            onChange={(faqItems) => handleChange({ faqItems })}
-          />
+          <p className="text-sm text-muted-foreground">
+            Расписание для этого формата появится на следующем этапе.
+          </p>
         );
-      default:
-        return null;
+      }
+      return (
+        <div className="space-y-10">
+          {blocks.map((key) => (
+            <div key={key}>{renderBlock(key)}</div>
+          ))}
+        </div>
+      );
     }
+
+    return renderBlock(currentStepKey);
   };
 
-  const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey) || 1;
+  const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey, formData.productType, variant) || 1;
   const canNext = currentStepKey !== "review" && currentStepNum < totalSteps;
   const canPrev = true;
   const isReviewStep = currentStepKey === "review";
   const isChoosingOfferType = currentStepKey === "type" && !formData.productType;
 
   const submitValidation: ValidationResult = isReviewStep
-    ? validateForSubmit(formData)
+    ? validateForSubmit(formData, variant)
     : { isValid: true, isComplete: true, errors: [], warnings: [] };
 
   // Эффективный статус: шаг пройден через «Далее» И его данные всё ещё валидны.
   // «Проверка» — только когда эффективно завершены все предыдущие шаги.
   const progressSteps = useMemo(() => {
     const isEffectivelyCompleted = (key: OfferWizardStepKey): boolean => {
-      if (!completedSteps.includes(key) || !isStepComplete(key, formData)) {
+      if (!completedSteps.includes(key) || !isStepComplete(key, formData, variant)) {
         return false;
       }
       if (key === "review") {
@@ -851,7 +920,7 @@ export function OfferWizard({
         !isPublishedEditMode &&
         !effective[idx] && idx + 1 !== currentStepNum && idx !== firstIncompleteIdx,
     }));
-  }, [completedSteps, currentStepNum, formData, isPublishedEditMode, steps]);
+  }, [completedSteps, currentStepNum, formData, isPublishedEditMode, steps, variant]);
 
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
   const actionLabels = useMemo(() => {
@@ -944,6 +1013,15 @@ export function OfferWizard({
         </div>
       )}
 
+      {pendingRevisionFields && pendingRevisionFields.length > 0 ? (
+        <p
+          role="status"
+          className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          Правки ждут модерации: {describeContentColumns(pendingRevisionFields)}. На сайте пока прежняя версия;
+          здесь показаны ваши предложенные значения.
+        </p>
+      ) : null}
       <FormPrimaryContentCard>{renderStep()}</FormPrimaryContentCard>
 
       <FormStickyActionBar

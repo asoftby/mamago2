@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarPlus, Check, ExternalLink, Trash2 } from "lucide-react";
+import { CalendarPlus, Check, ExternalLink, FolderPlus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { C } from "../theme";
@@ -13,6 +13,7 @@ type IdeaCardActionsProps = {
   publicHref?: string | null;
   onSchedule?: () => void;
   onRemove?: () => void;
+  onCollection?: () => void;
   isScheduling?: boolean;
   isRemoving?: boolean;
   disabled?: boolean;
@@ -25,6 +26,7 @@ export function IdeaCardActions({
   publicHref,
   onSchedule,
   onRemove,
+  onCollection,
   isScheduling = false,
   isRemoving = false,
   disabled = false,
@@ -70,6 +72,21 @@ export function IdeaCardActions({
         </Button>
       )}
 
+      {onCollection && (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          onClick={onCollection}
+          disabled={disabled}
+          aria-label="В коллекцию"
+          title="В коллекцию"
+          className="size-[46px] shrink-0 rounded-full border bg-transparent shadow-none transition-colors"
+          style={{ borderColor: C.line2, color: C.accentDeep }}
+        >
+          <FolderPlus className="size-5" />
+        </Button>
+      )}
       <Button
         type="button"
         variant="outline"

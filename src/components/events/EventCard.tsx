@@ -169,6 +169,7 @@ export function EventCard({
           activityId={id}
           activityTitle={title}
           coverImageUrl={imageUrl}
+          ticket={{ priceLabel }}
           eventPlanDateISO={saveMeta.dateISO ?? null}
           eventPlanDateEndISO={saveMeta.dateEndISO ?? null}
           source={saveMeta.source}

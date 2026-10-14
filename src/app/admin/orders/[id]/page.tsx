@@ -14,6 +14,7 @@ import type { OrderFinancials } from "@/server/services/booking/adminOrders.serv
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
   NEW: "Новая",
+  EXPIRED: "Истекла",
   CONFIRMED: "Подтверждена",
   REJECTED: "Отклонена",
   CANCELLED: "Отменена",
@@ -22,6 +23,7 @@ const STATUS_LABELS: Record<BookingStatus, string> = {
 
 const STATUS_BADGE_CLASS: Record<BookingStatus, string> = {
   NEW: "border-blue-200 bg-blue-50 text-blue-700",
+  EXPIRED: "border-stone-200 bg-stone-100 text-stone-700",
   CONFIRMED: "border-emerald-200 bg-emerald-50 text-emerald-700",
   REJECTED: "border-red-200 bg-red-50 text-red-700",
   CANCELLED: "border-stone-200 bg-stone-100 text-stone-700",

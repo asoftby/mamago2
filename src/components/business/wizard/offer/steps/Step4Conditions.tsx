@@ -4,9 +4,8 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
 import { StableCardSelector } from "@/components/ui/stable-card-selector";
-import type { OfferFormData, PlaceAmenityKey, PartyOccasion } from "../types";
+import type { OfferFormData, PlaceAmenityKey } from "../types";
 
 interface Step4ConditionsProps {
   data: OfferFormData;
@@ -134,138 +133,12 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
     </div>
   );
 
-  const updateBirthdayDetails = (
-    patch: Partial<OfferFormData["birthdayDetails"]>,
-  ) => {
-    onChange({ birthdayDetails: { ...data.birthdayDetails, ...patch } });
-  };
-
-  /** PARTY_SERVICE: длительность/вместимость/описательные поля — перенесены сюда со шага «Сценарии». */
-  const renderServiceDetailFields = () => (
-    <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-2">
-          <Label htmlFor="serviceDuration">Длительность, минут</Label>
-          <Input
-            id="serviceDuration"
-            inputMode="numeric"
-            value={data.birthdayDetails.durationMinutes ?? ""}
-            onChange={(e) =>
-              updateBirthdayDetails({
-                durationMinutes: e.target.value ? Number(e.target.value) : null,
-              })
-            }
-            disabled={!isEditable}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="serviceMinChildren">Минимум детей</Label>
-          <Input
-            id="serviceMinChildren"
-            inputMode="numeric"
-            value={data.birthdayDetails.minChildren ?? ""}
-            onChange={(e) =>
-              updateBirthdayDetails({
-                minChildren: e.target.value ? Number(e.target.value) : null,
-              })
-            }
-            disabled={!isEditable}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="serviceMaxChildren">Максимум детей</Label>
-          <Input
-            id="serviceMaxChildren"
-            inputMode="numeric"
-            value={data.birthdayDetails.maxChildren ?? ""}
-            onChange={(e) =>
-              updateBirthdayDetails({
-                maxChildren: e.target.value ? Number(e.target.value) : null,
-              })
-            }
-            disabled={!isEditable}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="serviceIncluded">
-          Что входит <span className="text-red-500">*</span>
-        </Label>
-        <Textarea
-          id="serviceIncluded"
-          value={data.birthdayDetails.included}
-          onChange={(e) => updateBirthdayDetails({ included: e.target.value })}
-          disabled={!isEditable}
-          rows={4}
-          placeholder="Например: аренда зала, ведущий, базовый декор, музыка..."
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="serviceProgram">Описание программы</Label>
-        <Textarea
-          id="serviceProgram"
-          value={data.birthdayDetails.program}
-          onChange={(e) => updateBirthdayDetails({ program: e.target.value })}
-          disabled={!isEditable}
-          rows={4}
-          placeholder="Коротко опишите, как проходит праздник или услуга."
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="serviceNote">Важные условия</Label>
-        <Textarea
-          id="serviceNote"
-          value={data.birthdayDetails.note}
-          onChange={(e) => updateBirthdayDetails({ note: e.target.value })}
-          disabled={!isEditable}
-          rows={3}
-          placeholder="Например: доплата за выезд, минимальный заказ, ограничения по возрасту."
-        />
-      </div>
-    </div>
-  );
-
-  const OCCASION_OPTIONS: { key: PartyOccasion; label: string }[] = [
-    { key: "BIRTHDAY", label: "День рождения" },
-    { key: "GRADUATION", label: "Выпускной" },
-  ];
-
-  const renderOccasionsSection = () => {
-    const toggleOccasion = (key: PartyOccasion, checked: boolean) => {
-      const next = checked
-        ? Array.from(new Set([...data.occasions, key]))
-        : data.occasions.filter((o) => o !== key);
-      onChange({ occasions: next });
-    };
-
-    return (
-      <div className="space-y-2">
-        <Label>Для каких праздников подходит</Label>
-        <div className="flex flex-wrap gap-4">
-          {OCCASION_OPTIONS.map(({ key, label }) => (
-            <label key={key} className="flex items-center gap-2 cursor-pointer">
-              <Checkbox
-                checked={data.occasions.includes(key)}
-                onCheckedChange={(checked) => toggleOccasion(key, checked === true)}
-                disabled={!isEditable}
-              />
-              <span className="text-sm">{label}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold mb-2">Формат и условия</h2>
         <p className="text-muted-foreground">
-          Детали предложения в зависимости от выбранного типа
+          Укажите условия, которые помогут родителям спланировать посещение.
         </p>
       </div>
 
@@ -279,55 +152,6 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
 
       {isVisitProduct ? renderPlaceVisitFields() : null}
 
-      {data.productType === "PARTY_SERVICE" ? (
-        <div className="space-y-4">
-          {renderServiceDetailFields()}
-          {renderOccasionsSection()}
-        </div>
-      ) : null}
-
-      {data.productType === "PARTY_PACKAGE" ? (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 text-sm text-muted-foreground">
-            Основные условия для праздника уже задаются на шаге со сценариями
-            размещения. Здесь можно оставить дополнительные пояснения в общем
-            описании и блоке цены.
-          </div>
-          {renderOccasionsSection()}
-        </div>
-      ) : null}
-
-      {data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE" ? (
-        <div className="space-y-4 rounded-2xl border border-border/70 p-4">
-          <h3 className="font-semibold">Оплата и отмена</h3>
-          <p className="text-sm text-muted-foreground">
-            Клиент рассчитывается напрямую с вами. Укажите условия до отправки заявки,
-            чтобы родитель знал о предоплате и возвратах.
-          </p>
-          <div className="space-y-2">
-            <Label htmlFor="partyPrepaymentTerms">Предоплата и порядок расчёта</Label>
-            <Textarea
-              id="partyPrepaymentTerms"
-              value={data.birthdayDetails.prepaymentTerms}
-              onChange={(e) => updateBirthdayDetails({ prepaymentTerms: e.target.value })}
-              disabled={!isEditable}
-              rows={2}
-              placeholder="Например: 30% после подтверждения, остаток в день праздника. Или: без предоплаты."
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="partyCancellationTerms">Отмена заказа и возврат предоплаты</Label>
-            <Textarea
-              id="partyCancellationTerms"
-              value={data.birthdayDetails.cancellationTerms}
-              onChange={(e) => updateBirthdayDetails({ cancellationTerms: e.target.value })}
-              disabled={!isEditable}
-              rows={2}
-              placeholder="Например: возврат предоплаты при отмене не позднее чем за 7 дней."
-            />
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

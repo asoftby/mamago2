@@ -37,7 +37,7 @@ function ScenarioCta({
 }) {
   const state = resolveScenarioCtaState(itemCount, scenarioStatus);
   const label = resolveScenarioCtaLabel(state);
-  if (!label) return null;
+  if (!label || process.env.NEXT_PUBLIC_ENABLE_LEGACY_DAY_SCENARIO !== "true") return null;
 
   const href = `/minsk/my-plan/${date}/scenario`;
 

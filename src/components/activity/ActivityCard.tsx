@@ -195,6 +195,7 @@ export function ActivityCard(props: AdapterProps) {
                   activityId={base.id}
                   activityTitle={base.title}
                   coverImageUrl={base.image}
+                  ticket={{ priceLabel: base.priceText }}
                   eventPlanDateISO={base.saveMeta?.dateISO ?? null}
                   eventPlanDateEndISO={base.saveMeta?.dateEndISO ?? activityDateEnd}
                   source={base.saveMeta?.source}
@@ -292,6 +293,7 @@ export function ActivityCard(props: AdapterProps) {
             activityId={base.id}
             activityTitle={base.title}
             coverImageUrl={base.image}
+            ticket={{ priceLabel: base.priceText }}
             eventPlanDateISO={base.saveMeta?.dateISO ?? null}
             eventPlanDateEndISO={base.saveMeta?.dateEndISO ?? activityDateEnd}
             source={base.saveMeta?.source}

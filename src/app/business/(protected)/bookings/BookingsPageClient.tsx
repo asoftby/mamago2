@@ -84,6 +84,15 @@ const STATUS_META: Record<
     dotClass: "bg-blue-500",
     icon: Clock3,
   },
+  EXPIRED: {
+    label: "Истекла",
+    shortLabel: "Истекла",
+    chipClass: "bg-stone-100 text-stone-600 ring-1 ring-inset ring-stone-200",
+    railClass: "bg-stone-300",
+    metricClass: "text-stone-600",
+    dotClass: "bg-stone-300",
+    icon: CircleX,
+  },
   CONFIRMED: {
     label: "Подтверждена",
     shortLabel: "Подтверждена",
@@ -130,6 +139,7 @@ const SORT_OPTIONS: Array<{ value: SortMode; label: string }> = [
 const STATUS_FILTER_PARAM: Record<StatusFilter, string> = {
   all: "all",
   NEW: "new",
+  EXPIRED: "expired",
   CONFIRMED: "confirmed",
   COMPLETED: "completed",
   REJECTED: "cancelled",
@@ -219,6 +229,7 @@ function formatTime(dateIso: string): string {
 function parseStatusFilterParam(value: string | null): StatusFilter | null {
   if (!value || value === "all") return "all";
   if (value === "new") return BookingStatus.NEW;
+  if (value === "expired") return BookingStatus.EXPIRED;
   if (value === "confirmed") return BookingStatus.CONFIRMED;
   if (value === "completed") return BookingStatus.COMPLETED;
   if (value === "cancelled") return BookingStatus.REJECTED;
@@ -379,6 +390,9 @@ function getParticipantLabel(booking: BusinessBookingItem): string | null {
 }
 
 function getHistoryLabel(booking: BusinessBookingItem): string {
+  if (booking.status === BookingStatus.EXPIRED) {
+    return "Срок подтверждения заявки истёк.";
+  }
   if (booking.status === BookingStatus.CONFIRMED) {
     return "Заявка подтверждена и ожидает проведения.";
   }
@@ -1388,6 +1402,7 @@ function BookingListItem({
             booking.status === BookingStatus.COMPLETED && "bg-stone-100 text-stone-500",
             booking.status === BookingStatus.REJECTED && "bg-orange-50 text-orange-500",
             booking.status === BookingStatus.CANCELLED && "bg-stone-100 text-stone-500",
+            booking.status === BookingStatus.EXPIRED && "bg-stone-100 text-stone-500",
           )}
         >
           <CalendarDays className="h-7 w-7" />

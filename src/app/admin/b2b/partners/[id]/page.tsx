@@ -4,6 +4,8 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { redirect, notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { BusinessVisibilityControl } from "@/components/admin/business/BusinessVisibilityControl";
+import { BusinessFeaturesControl } from "@/components/admin/business/BusinessFeaturesControl";
+import { parseBusinessFeatures } from "@/lib/business/businessFeatures";
 import { UnpVerificationSection } from "@/components/admin/business/UnpVerificationSection";
 import { normalizeBusinessVisibilityStatus } from "@/lib/business/businessStatusModel";
 import { BusinessDangerZonePlaceholder } from "@/components/admin/business/BusinessDangerZonePlaceholder";
@@ -747,6 +749,11 @@ export default async function PartnerDetailPage({
             businessId={business.id}
             readOnly={user.role !== "ADMIN"}
             initialVisibilityStatus={visibility}
+          />
+          <BusinessFeaturesControl
+            businessId={business.id}
+            readOnly={user.role !== "ADMIN"}
+            initialFeatures={parseBusinessFeatures(business.features)}
           />
           <BusinessDangerZonePlaceholder />
         </div>
