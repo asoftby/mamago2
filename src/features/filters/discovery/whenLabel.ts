@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { formatRuCustomDateRangeTitle } from "@/lib/formatters/date";
 import { ru } from "date-fns/locale";
 import { type WhenPreset } from "./filters.store";
 import { computePresetRange, todayKeyIn, type QuickFilterPreset } from "./quickFilterPresets";
@@ -97,6 +98,9 @@ export function whenPresetPageTitleSuffix(filters: {
   if (filters.whenPreset === "TODAY") return " сегодня";
   if (filters.whenPreset === "TOMORROW") return " завтра";
   if (filters.whenPreset === "WEEKEND") return " на выходных";
-  if (filters.dateFrom) return ` — ${whenLabel(filters)}`;
+  if (filters.dateFrom) {
+    const range = formatRuCustomDateRangeTitle(filters.dateFrom, filters.dateTo);
+    return range ? ` ${range}` : "";
+  }
   return "";
 }
