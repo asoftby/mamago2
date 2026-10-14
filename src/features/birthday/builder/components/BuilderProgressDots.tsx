@@ -27,7 +27,7 @@ export function BuilderProgressDots({ currentStep }: { currentStep: BuilderStep 
               borderRadius: 99,
               background:
                 i === idx
-                  ? "#E86A3A"
+                  ? "var(--primary)"
                   : i < idx
                     ? "#141210"
                     : "rgba(20,18,16,.18)",

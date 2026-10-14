@@ -159,7 +159,7 @@ export function PlaceSaveHeart({
           <Heart
             size={18}
             strokeWidth={1.75}
-            className={cn(isSaved && "fill-[#E86A3A] text-[#E86A3A]", iconClassName)}
+            className={cn(isSaved && "fill-primary text-primary", iconClassName)}
             aria-hidden
           />
           {isSaved ? "Сохранено" : "Сохранить"}
@@ -173,7 +173,7 @@ export function PlaceSaveHeart({
           className={cn(
             "flex h-14 w-14 shrink-0 items-center justify-center rounded-full border transition-all",
             isSaved
-              ? "border-[#E86A3A] bg-[#FFE8DC] text-[#C24E22]"
+              ? "border-primary bg-brand-soft text-primary"
               : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.45)] hover:border-[#141210] hover:text-[#141210]",
             isLoading && "cursor-not-allowed opacity-50",
             className,
