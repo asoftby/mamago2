@@ -635,7 +635,6 @@ function ConfirmBar({ iso, time, onConfirm, label = "Сохранить" }: { is
         onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = "none"; }}
       >
         {label}
-        <ArrowIcon size={14} color="#fff" />
       </button>
     </div>
   );

@@ -203,6 +203,7 @@ export function IdeaPosterCard({
               offerId={idea.ideaType === "OFFER" ? activity.id : undefined}
               activityTitle={activity.title}
               coverImageUrl={activity.coverImageUrl}
+              ticket={{ venue: activity.placeTitle, address: activity.addressLabel, priceLabel }}
               eventPlanDateISO={activity.dateStart ?? null}
               eventPlanDateEndISO={activity.dateEnd ?? null}
               source="ideas"
