@@ -278,7 +278,7 @@ export function EventSimpleBookingModal({
             }}>
               <span style={{
                 width: 34, height: 34, borderRadius: 10,
-                background: "var(--brand-soft)", color: "var(--primary)",
+                background: "var(--brand-soft)", color: "var(--text-main)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 16, flexShrink: 0,
               }}>✱</span>
@@ -431,7 +431,7 @@ export function EventSimpleBookingModal({
               width: "100%", height: 56, borderRadius: 99,
               background: phase === "submitting" || !valid
                 ? "rgba(20,18,16,.18)"
-                : "linear-gradient(180deg, var(--brand-soft), var(--primary))",
+                : "linear-gradient(180deg, var(--primary), var(--primary-hover))",
               color: phase === "submitting" || !valid ? "rgba(20,18,16,.45)" : "#fff",
               fontSize: 15, fontWeight: 600, letterSpacing: ".005em",
               border: 0, cursor: phase === "submitting" || !valid ? "default" : "pointer",
