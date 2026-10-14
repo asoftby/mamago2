@@ -2,7 +2,8 @@
 // Inherits Event Wizard architecture 1-to-1
 
 import type { OfferFormData, OfferWizardVariant } from "./types";
-import { getStepsForOfferType } from "./offerWizardSteps.config";
+import { getStepsForOfferType, getV2StepMembers } from "./offerWizardSteps.config";
+import { getScheduleMissingFields } from "@/lib/offers/offerSchedule";
 import { validatePublicationAccess } from "@/features/publication-access";
 import { showCampLodgingFormFields } from "./campOfferModel";
 import { isOfferContactsComplete, isValidPhone, isValidUrl } from "./contacts";
@@ -249,7 +250,7 @@ function validateStep4(data: OfferFormData): ValidationResult {
 /**
  * Step 5: Pricing and participation
  */
-function validateStep5(data: OfferFormData): ValidationResult {
+function validateStep5(data: OfferFormData, requireLegacyAction = true): ValidationResult {
   const pricingErrors: string[] = [];
   const participationErrors: string[] = [];
   const warnings: string[] = [];
@@ -280,7 +281,9 @@ function validateStep5(data: OfferFormData): ValidationResult {
     }
   }
 
-  if (data.publicationAccess) {
+  if (!requireLegacyAction) {
+    // В v2 запись валидируется отдельно на шаге «Расписание».
+  } else if (data.publicationAccess) {
     const result = validatePublicationAccess(data.publicationAccess);
     participationErrors.push(...Object.values(result.errors));
   } else if (!data.ctaType) {
@@ -313,9 +316,9 @@ function validateStep5(data: OfferFormData): ValidationResult {
         ((data.pricingMode === "single" && data.singlePrice.trim()) ||
          (data.pricingMode === "multiple" && data.pricingOptions.length > 0 &&
           data.pricingOptions.every(opt => opt.title.trim() && opt.price.trim()))))) &&
-    (data.publicationAccess
+    (!requireLegacyAction || (data.publicationAccess
       ? validatePublicationAccess(data.publicationAccess).valid
-      : Boolean(data.ctaType))
+      : Boolean(data.ctaType)))
   );
 
   return {
@@ -486,14 +489,17 @@ export function validateForSubmit(
 ): ValidationResult {
   const allErrors: string[] = [];
   const allWarnings: string[] = [];
-  const steps = getStepsForOfferType(data.offerWizardType, data.productType).filter(
+  const steps = getStepsForOfferType(data.offerWizardType, data.productType, variant).filter(
     (step) => step.key !== "review",
   );
 
   for (const step of steps) {
+    const members = variant === "v2" ? (getV2StepMembers(step.key, data).length
+      ? getV2StepMembers(step.key, data) : [step.key]) : [step.key];
+    for (const member of members) {
     let result: ValidationResult;
 
-    switch (step.key) {
+    switch (member) {
       case "type":
         result = validateStep1(data);
         break;
@@ -516,8 +522,16 @@ export function validateForSubmit(
         result = validateAccommodationStep(data);
         break;
       case "price":
-        result = validateStep5(data);
+        result = validateStep5(data, variant !== "v2");
         break;
+      case "openingHours":
+      case "bookingMethod": {
+        const missing = getScheduleMissingFields(data.schedule, data.productType).filter((field) =>
+          member === "openingHours" ? field === "Дни работы" : field !== "Дни работы",
+        );
+        result = { isValid: missing.length === 0, isComplete: missing.length === 0, errors: missing, warnings: [] };
+        break;
+      }
       case "contacts":
         result = validateStep6(data);
         break;
@@ -531,6 +545,7 @@ export function validateForSubmit(
 
     allErrors.push(...result.errors);
     allWarnings.push(...result.warnings);
+    }
   }
 
   // Новый мастер: категория обязательна (хотя бы одна).

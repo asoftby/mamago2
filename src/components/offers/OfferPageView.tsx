@@ -248,6 +248,12 @@ export function OfferPageView({
       citySlug: data.citySlug,
       meta: { source: "detail", targetAction: "primary" },
     });
+    if (data.hasPrimaryAction === false) return;
+    if (data.resolvedCta?.actionKind === "EXTERNAL") {
+      const url = data.resolvedCta.externalTarget?.href;
+      if (url && typeof window !== "undefined") window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
     if (onPrimary) {
       onPrimary();
       return;
@@ -266,7 +272,19 @@ export function OfferPageView({
     if (phone && typeof window !== "undefined") {
       window.location.href = `tel:${phone}`;
     }
-  }, [data.citySlug, data.cta.phone, data.cta.phones, data.id, onPrimary, openBookingForShift, shiftOptions]);
+  }, [data.citySlug, data.cta.phone, data.cta.phones, data.hasPrimaryAction, data.id, data.resolvedCta, onPrimary, openBookingForShift, shiftOptions]);
+
+  const handleStickyPrimary = useCallback(() => {
+    // Sticky bar renders a real external anchor; the browser follows it.
+    // Do not open a second tab from the shared click handler.
+    if (data.resolvedCta?.actionKind === "EXTERNAL") {
+      void postAnalyticsEvent({ eventType: "CTA_CLICK", entityType: "OFFER",
+        entityId: data.id, vertical: "CITY", citySlug: data.citySlug,
+        meta: { source: "detail", targetAction: "external" } });
+      return;
+    }
+    handlePrimary();
+  }, [data.citySlug, data.id, data.resolvedCta, handlePrimary]);
 
   const handleSave = useCallback(() => {
     if (onSave) {
@@ -277,12 +295,16 @@ export function OfferPageView({
   }, [onSave, openSaveForShift]);
 
   const handleShiftCta = useCallback((ctx: ShiftCtaContext) => {
+    if (data.hasPrimaryAction === false || data.resolvedCta?.actionKind === "EXTERNAL") {
+      handlePrimary();
+      return;
+    }
     if (onShiftCta) {
       onShiftCta(ctx);
       return;
     }
     openBookingForShift(ctx);
-  }, [onShiftCta, openBookingForShift]);
+  }, [data.hasPrimaryAction, data.resolvedCta, handlePrimary, onShiftCta, openBookingForShift]);
 
   const handleItemCta = useCallback(() => {
     handlePrimary();
@@ -355,7 +377,7 @@ export function OfferPageView({
           onSave={handleSave}
           ctaRef={ctaRef}
           directSlot={
-            direct && (
+            direct && data.hasPrimaryAction !== false && data.resolvedCta?.actionKind !== "EXTERNAL" && (
               <DirectRequestCta
                 publicationRef={{ publicationType: "OFFER", offerId: direct.offerId }}
                 publicationTitle={direct.publicationTitle}
@@ -369,6 +391,21 @@ export function OfferPageView({
         />
 
         <OfferEditorialInsights data={data} />
+
+        {data.openingHours && (
+          <section aria-label="Режим работы предложения" className="border-y border-gray-200 py-5">
+            <h2 className="mb-3 text-lg font-semibold">Режим работы</h2>
+            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-700">
+              {data.openingHours.lines.map((line) => <span key={line}>{line}</span>)}
+            </div>
+            {data.openingHours.closedDates.length > 0 && (
+              <p className="mt-3 text-sm text-gray-500">
+                Выходные даты: {data.openingHours.closedDates.map((date) =>
+                  date.split("-").reverse().join(".")).join(", ")}
+              </p>
+            )}
+          </section>
+        )}
 
         <OfferAccordion data={data} />
 
@@ -402,7 +439,7 @@ export function OfferPageView({
           </>
         ) : null}
 
-        {data.promoCta && <OfferPromoCta {...data.promoCta} onPrimary={handlePrimary} />}
+        {data.hasPrimaryAction !== false && data.promoCta && <OfferPromoCta {...data.promoCta} onPrimary={handlePrimary} />}
       </div>
 
       <EventStickyActionBar
@@ -410,7 +447,10 @@ export function OfferPageView({
         sessionLine={stickySessionLine}
         priceLabel={stickyPriceLabel}
         primaryLabel={data.cta.primaryLabel}
-        onPrimary={handlePrimary}
+        primaryHref={data.resolvedCta?.actionKind === "EXTERNAL"
+          ? data.resolvedCta.externalTarget?.href : undefined}
+        hasPurchaseUrl={data.hasPrimaryAction !== false}
+        onPrimary={handleStickyPrimary}
         isPrimaryLoading={isPrimaryLoading}
         onPlan={handleSave}
         isPlanned={isSaved}

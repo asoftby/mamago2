@@ -254,6 +254,37 @@ export function buildScheduleInput(
   return input;
 }
 
+/** PATCH only changed schedule subfields. Editing booking must not rewrite stale hours
+ * and editing an unrelated section must not rewrite either relation. */
+export function buildChangedScheduleInput(
+  current: OfferScheduleForm,
+  previous: OfferScheduleForm,
+  productType: string | null | undefined,
+): OfferScheduleInput | undefined {
+  const full = buildScheduleInput(current, productType);
+  const bookingChanged = current.bookingMethod !== previous.bookingMethod ||
+    (current.bookingMethod === "EXTERNAL" &&
+      (current.externalKind !== previous.externalKind ||
+        current.externalUrl.trim() !== previous.externalUrl.trim()));
+  const hoursChanged = current.hoursSource !== previous.hoursSource ||
+    JSON.stringify(current.hours) !== JSON.stringify(previous.hours) ||
+    JSON.stringify(normalizeClosedDates(current.closedDates)) !==
+      JSON.stringify(normalizeClosedDates(previous.closedDates));
+  const patch: OfferScheduleInput = {};
+  if (bookingChanged && full.bookingMethod) {
+    patch.bookingMethod = full.bookingMethod;
+    patch.external = full.external;
+  }
+  if (hoursChanged) {
+    if (full.hours) patch.hours = full.hours;
+    else if (offerUsesClosedDays(productType) && previous.closedDates.length > 0) {
+      // Clearing the last closed date must remove previously saved exceptions.
+      patch.hours = { source: "own", data: current.hours, closedDates: [] };
+    }
+  }
+  return Object.keys(patch).length ? patch : undefined;
+}
+
 // ── валидация шага ──────────────────────────────────────────────────────────
 
 export function getScheduleMissingFields(

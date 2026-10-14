@@ -19,6 +19,7 @@ import type { PublicationAccess } from "@/features/publication-access";
 import {
   bookingMethodFromColumns,
   buildScheduleInput,
+  buildChangedScheduleInput,
   defaultOfferHours,
   defaultOfferSchedule,
   normalizeClosedDates,
@@ -833,6 +834,7 @@ export function buildOfferUpdatePayload(
     wizardCompletedSteps?: string[];
     /** Новый мастер: отправлять шаг «Расписание». Старый мастер расписание не трогает. */
     includeSchedule?: boolean;
+    previousSchedule?: OfferScheduleForm;
   }
 ) {
   const pricingMode = data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
@@ -905,7 +907,9 @@ export function buildOfferUpdatePayload(
     classChipSlugs: data.classChipSlugs,
     categoryIds: data.categoryIds,
     interestSlugs: data.interestSlugs,
-    ...(opts?.includeSchedule ? { schedule: buildScheduleInput(data.schedule, productType) } : {}),
+    ...(opts?.includeSchedule ? { schedule: opts.previousSchedule
+      ? buildChangedScheduleInput(data.schedule, opts.previousSchedule, productType)
+      : buildScheduleInput(data.schedule, productType) } : {}),
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,

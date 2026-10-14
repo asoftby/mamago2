@@ -26,11 +26,24 @@ export interface OfferCtaLegacyInput {
     | "USE_PUBLICATION_SLOTS"
     | string
     | null;
+  bookingExternalUrl?: string | null;
+  bookingExternalKind?: "WEBSITE" | "TICKETS" | null;
   bookingPhone?: string | null;
   bookingNote?: string | null;
 }
 
 function fromBookingSettings(input: OfferCtaLegacyInput): CanonicalCtaSeed | null {
+  if (input.bookingMode === "NONE") {
+    return { actionKind: "DISCOVER", sourceEntityType: "OFFER", sourceEntityId: input.id,
+      primaryLabel: "Запись не требуется", availability: "UNAVAILABLE", availabilityReason: "Booking disabled" };
+  }
+  if (input.bookingMode === "EXTERNAL") {
+    const target = createUrlTarget(input.bookingExternalUrl ?? "");
+    return { actionKind: "EXTERNAL", sourceEntityType: "OFFER", sourceEntityId: input.id,
+      primaryLabel: input.bookingExternalKind === "TICKETS" ? "Купить билет" : "Записаться",
+      externalTarget: target, availability: target ? "AVAILABLE" : "UNAVAILABLE",
+      availabilityReason: target ? undefined : "Missing external booking URL" };
+  }
   if (!input.bookingEnabled) return null;
 
   const contactFallback =

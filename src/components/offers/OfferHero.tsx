@@ -448,14 +448,14 @@ function BookingCard({
         {p.promoUntil && <BookingCountdown until={p.promoUntil} />}
 
         <div ref={ctaRef as React.RefObject<HTMLDivElement>} className="mt-6 flex items-center gap-3">
-          <Button
+          {data.hasPrimaryAction !== false && <Button
             onClick={onPrimary}
             disabled={isPrimaryLoading}
             className="h-14 flex-1 rounded-full bg-[#E86A3A] text-[15px] font-semibold text-white shadow-none transition-colors hover:bg-[#C24E22]"
           >
             <CalendarDays className="mr-2 h-4 w-4 shrink-0" />
             {isPrimaryLoading ? "Загрузка..." : data.cta.primaryLabel}
-          </Button>
+          </Button>}
           <button
             type="button"
             aria-label={isSaved ? "Сохранено" : "Сохранить"}

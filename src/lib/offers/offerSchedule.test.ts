@@ -3,6 +3,7 @@ import {
   bookingColumnsForMethod,
   bookingMethodFromColumns,
   buildScheduleInput,
+  buildChangedScheduleInput,
   defaultOfferSchedule,
   getScheduleMissingFields,
   hoursFromSimple,
@@ -106,3 +107,22 @@ assert.equal(
 );
 
 console.log("offerSchedule.test.ts: ok");
+
+// Concurrent edit safety: changing the booking mode must not resend stale hours.
+const base = defaultOfferSchedule();
+base.bookingMethod = "NONE";
+base.hoursSource = "own";
+base.hours = hoursFromSimple({ days: ["MON"], from: "09:00", to: "18:00" });
+const next = structuredClone(base);
+next.bookingMethod = "REQUEST_ONLY";
+assert.deepEqual(buildChangedScheduleInput(next, base, "PLACE_VISIT"), {
+  bookingMethod: "REQUEST_ONLY", external: null,
+});
+assert.equal(buildChangedScheduleInput(base, base, "PLACE_VISIT"), undefined);
+const updatedHours = structuredClone(base);
+updatedHours.closedDates = ["2026-11-07"];
+assert.equal(buildChangedScheduleInput(updatedHours, base, "PLACE_VISIT")?.bookingMethod, undefined);
+assert.equal(buildChangedScheduleInput(updatedHours, base, "PLACE_VISIT")?.hours?.source, "own");
+const cleared = structuredClone(updatedHours);
+cleared.closedDates = [];
+assert.equal(buildChangedScheduleInput(cleared, updatedHours, "REGULAR_ACTIVITY")?.hours?.source, "own");
