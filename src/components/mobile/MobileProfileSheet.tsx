@@ -79,7 +79,7 @@ export function MobileProfileSheet({
     <NavUserIcon
       className={cn(
         "h-5 w-5 transition-colors duration-200",
-        isProfileActive ? "text-[#C24E22]" : "text-gray-400",
+        isProfileActive ? "text-primary" : "text-gray-400",
       )}
     />
   ) : (

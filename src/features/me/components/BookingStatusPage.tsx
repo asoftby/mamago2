@@ -292,7 +292,7 @@ function AlternativeCard({
             textTransform: "uppercase",
             fontSize: 10,
             letterSpacing: ".14em",
-            color: "#C24E22",
+            color: "var(--primary)",
           }}
         >
           ● {category}
@@ -671,7 +671,7 @@ function PageHeader({
           textTransform: "uppercase",
           fontSize: 11,
           letterSpacing: ".14em",
-          color: "#C24E22",
+          color: "var(--primary)",
           marginBottom: 16,
         }}
       >
@@ -690,7 +690,7 @@ function PageHeader({
         }}
       >
         Сценарий{" "}
-        <em style={{ color: "#C24E22", fontStyle: "italic" }}>праздника</em>
+        <em style={{ color: "var(--primary)", fontStyle: "italic" }}>праздника</em>
       </h1>
 
       <p

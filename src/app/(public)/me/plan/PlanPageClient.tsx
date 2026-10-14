@@ -172,7 +172,7 @@ function IdeasSidebar({ ideas }: { ideas: SerializedIdea[] }) {
         <div style={{ flex: 1, height: 1, background: "rgba(20,18,16,.10)" }} />
         <Link
           href="/me/ideas"
-          style={{ fontSize: 12, color: "#C24E22", fontWeight: 600, whiteSpace: "nowrap" }}
+          style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600, whiteSpace: "nowrap" }}
         >
           Все →
         </Link>
@@ -269,8 +269,8 @@ function IdeasSidebar({ ideas }: { ideas: SerializedIdea[] }) {
       <div style={{
         padding: "16px 18px",
         borderRadius: 14,
-        background: "linear-gradient(135deg, #FFE8DC, #FFF1E5)",
-        border: "1px solid rgba(232,106,58,.2)",
+        background: "linear-gradient(135deg, var(--brand-soft), #FFF1E5)",
+        border: "1px solid rgba(239,135,89,.2)",
         display: "flex",
         flexDirection: "column",
         gap: 6,
@@ -279,7 +279,7 @@ function IdeasSidebar({ ideas }: { ideas: SerializedIdea[] }) {
           className="font-display"
           style={{ fontSize: 18, lineHeight: 1.15, letterSpacing: "-.01em", color: "#141210" }}
         >
-          Перенесите <span style={{ fontStyle: "italic", color: "#C24E22" }}>идею</span> в&nbsp;план
+          Перенесите <span style={{ fontStyle: "italic", color: "var(--primary)" }}>идею</span> в&nbsp;план
         </span>
         <span style={{ fontSize: 12, color: "#3A332B" }}>Один клик — и&nbsp;мы&nbsp;напомним накануне</span>
       </div>
