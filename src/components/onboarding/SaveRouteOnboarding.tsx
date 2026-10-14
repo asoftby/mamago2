@@ -112,6 +112,7 @@ export function SaveRouteOnboarding({
       open={open}
       onOpenChange={onOpenChange}
       isAuthenticated={false}
+      collectionTarget={{ routeId }}
       scenario={{ kind: "quickdate", title: routeTitle }}
       onPersist={handlePersist}
       nextHref={nextHref}
