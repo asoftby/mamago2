@@ -1,13 +1,16 @@
 "use client";
 
+import { SaveActivityHeader } from "./SaveActivityHeader";
+import type { ActivityTicketSource } from "./ActivityTicketCard";
 import { CollectionCover } from "@/components/ideas/CollectionCover";
 import * as React from "react";
-import { ArrowLeft, Check, FolderHeart, Plus } from "lucide-react";
+import { ArrowLeft, Check, Plus } from "lucide-react";
 import type { IdeaCollectionSelection, IdeaCollectionTarget } from "@/features/save/persistIdeaCollectionSelection";
 
 type Collection = { id: string; title: string; count: number; covers?: string[] };
 type Props = {
   title: string;
+  ticket?: ActivityTicketSource;
   isIdea: boolean;
   target?: IdeaCollectionTarget;
   onBack: () => void;
@@ -16,7 +19,7 @@ type Props = {
 
 /** The second slide of the shared Save dialog. An idea belongs to My Ideas
  * whether it has zero, one or several collection memberships. */
-export function IdeaCollectionStep({ title, isIdea, target, onBack, onApply }: Props) {
+export function IdeaCollectionStep({ title, ticket, isIdea, target, onBack, onApply }: Props) {
   const [collections, setCollections] = React.useState<Collection[]>([]);
   const [selected, setSelected] = React.useState<string[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -79,16 +82,11 @@ export function IdeaCollectionStep({ title, isIdea, target, onBack, onApply }: P
           .stp-collection-slide { animation: stp-collection-enter .26s ease-out both; }
         }
       `}</style>
-      <div className="shrink-0 px-6 pt-5">
-        <button type="button" className="mb-3 inline-flex min-h-9 items-center gap-2 text-[13px] font-medium text-[#6F6860] hover:text-[#141210]" onClick={onBack}>
+      <div className="shrink-0 px-6 pt-0 sm:pt-4">
+        <SaveActivityHeader heading="Куда сохранить" ticket={ticket ?? { title }} />
+        <button type="button" className="inline-flex min-h-9 items-center gap-2 text-[13px] font-medium text-[#6F6860] hover:text-[#141210]" onClick={onBack}>
           <ArrowLeft className="size-4" /> Назад
         </button>
-        <div className="mb-2 flex items-center gap-2 text-primary">
-          <FolderHeart className="size-[19px]" />
-          <span className="font-mono text-[10px] uppercase tracking-[.12em]">Мои идеи · шаг 2</span>
-        </div>
-        <h2 className="text-[28px] font-semibold leading-[1.07] tracking-[-.025em]">Куда сохранить?</h2>
-        <p className="mt-2 line-clamp-2 text-[13px] text-[#706A65]">{title}</p>
       </div>
       <div className="mt-4 max-h-[min(45vh,350px)] min-h-0 flex-1 space-y-2 overflow-y-auto px-6 pb-3">
         <button type="button" className="flex min-h-[60px] w-full items-center gap-3 rounded-2xl border border-[rgba(20,18,16,.14)] bg-[#FAF7F1] px-4 text-left hover:border-primary" onClick={() => void submit(true)} disabled={submitting || (isIdea && loadError)}>

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { SaveActivityHeader } from "@/components/activity/SaveActivityHeader";
 import { IdeaCollectionStep } from "@/components/activity/IdeaCollectionStep";
 import type { IdeaCollectionTarget, IdeaCollectionSelection } from "@/features/save/persistIdeaCollectionSelection";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -21,7 +22,6 @@ import {
   PLAN_REMINDER_LABELS,
 } from "@/lib/plan/getPlanReminderLabel";
 import {
-  ActivityTicketCard,
   type ActivityTicketSource,
 } from "@/components/activity/ActivityTicketCard";
 
@@ -824,36 +824,15 @@ function DateSliderView({
   return (
     <>
       <div className="px-6 pb-5 pt-0 sm:pt-4">
-        {/* Center the label in the same 40px row as the modal close button. */}
-        <div className="mb-1 flex h-10 -translate-y-1 items-center justify-start sm:translate-y-0">
-          <span style={{
-            fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const,
-            fontSize: 10, letterSpacing: ".14em", color: C.accentDeep,
-            whiteSpace: "nowrap",
-          }}>сохранить активность</span>
-        </div>
-
-        {/* Heading */}
-        <h2 style={{
-          margin: "0 0 8px",
-          fontFamily: "var(--font-sans)",
-          fontSize: 30, lineHeight: 1.02, letterSpacing: "-.02em", fontWeight: 400,
-        }}>
-          В какой{" "}
-          <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>день</span>{" "}
-          напомнить.
-        </h2>
-
-        <div style={{ marginTop: 18, marginBottom: 18 }}>
-          <ActivityTicketCard
-            source={{
-              ...(ticket ?? { title }),
-              title: selectedSessionTitle
-                ? `${title.replace(/\.+$/, "")}. ${selectedSessionTitle}`
-                : (ticket?.title ?? title),
-            }}
-          />
-        </div>
+        <SaveActivityHeader
+          heading={<>В какой{" "}<span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>день</span>{" "}напомнить.</>}
+          ticket={{
+            ...(ticket ?? { title }),
+            title: selectedSessionTitle
+              ? `${title.replace(/\.+$/, "")}. ${selectedSessionTitle}`
+              : (ticket?.title ?? title),
+          }}
+        />
 
         {/* Month label + session count */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -1684,6 +1663,7 @@ function PickerBodyInner({
     return (
       <IdeaCollectionStep
         title={scenario.title}
+        ticket={scenario.kind === "quickdate" ? scenario.ticket : undefined}
         isIdea={isIdea}
         target={collectionTarget}
         onBack={() => setView("main")}
