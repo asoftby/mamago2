@@ -13,14 +13,14 @@ import { cn } from "@/lib/utils";
 const STICKY_CTA_FOOTER_PAD =
   "pb-[calc(46px+1.25rem+45px+env(safe-area-inset-bottom))]";
 
-/** Заголовок колонки — sans 14px, с заглавной буквы, серый. Сознательно светлее порога 4.5:1 (решение дизайна). */
+/** Заголовок колонки — тёмный текст того же цвета, что раньше был у ссылок. */
 const FOOTER_HEADING_CLASS =
-  "text-[14px] font-normal text-[rgba(20,18,16,0.5)]";
+  "text-[14px] font-normal text-[#3A332B]";
 
-/** Ссылка колонки — главный текст: sans 15px, тёмнее серого, hover-подчёркивание, focus-ring, цель ≥ 44px на мобильном. */
+/** Ссылки — прежний серый цвет заголовков, 14px; при наведении primary без подчёркивания. */
 const FOOTER_LINK_CLASS =
-  "flex min-h-11 items-center rounded-sm text-[15px] leading-[1.35] text-[#3A332B] transition-colors md:min-h-0 " +
-  "hover:text-[#141210] hover:underline hover:underline-offset-4 " +
+  "flex min-h-11 items-center rounded-sm text-[14px] leading-[1.35] text-[rgba(20,18,16,0.5)] no-underline transition-colors md:min-h-0 " +
+  "hover:text-primary hover:no-underline " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#F6F2EA]";
 
 type PublicFooterProps = {

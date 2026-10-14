@@ -11,6 +11,12 @@ assert.doesNotMatch(
   "Journal must not be rendered inside the Project footer column",
 );
 
+// Column heading/link palette is deliberately inverted from the previous footer.
+assert.match(footerSource, /const FOOTER_HEADING_CLASS =\s*"text-\[14px\] font-normal text-\[#3A332B\]"/, "Section titles use the former dark link color");
+assert.match(footerSource, /const FOOTER_LINK_CLASS =[\s\S]*?text-\[14px\][\s\S]*?text-\[rgba\(20,18,16,0\.5\)\]/, "All footer subcategory links use 14px and the former gray heading color");
+assert.match(footerSource, /hover:text-primary hover:no-underline/, "Footer links change to primary without underline on hover");
+assert.doesNotMatch(footerSource, /hover:underline(?:\s|\b)/, "Footer links do not underline on hover");
+
 assert.match(
   footerSource,
   /<CookieSettingsFooterLink[^>]*\/>/,
