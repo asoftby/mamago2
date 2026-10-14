@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { formatHHMM } from "@/lib/formatters/date";
+import { resolveActivityTicketLocation } from "@/lib/plan/activityTicketLocation";
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,6 +31,7 @@ export async function GET(request: NextRequest) {
       select: {
         // The save heart is also shown in catalogue cards. Return ticket details
         // with the existing date request instead of adding another API call.
+        format: true,
         priceMode: true,
         priceFrom: true,
         priceText: true,
@@ -38,6 +40,7 @@ export async function GET(request: NextRequest) {
         },
         venue: {
           select: {
+            kind: true,
             title: true,
             addressLine: true,
             place: { select: { title: true, formattedAddr: true, shortAddress: true, customAddress: true } },
@@ -68,16 +71,13 @@ export async function GET(request: NextRequest) {
     }
 
     const dates = Array.from(unique).sort();
-    const venuePlace = activity.venue?.place;
-    const place = activity.place;
+    const ticketLocation = resolveActivityTicketLocation(activity);
     const mode = activity.priceMode;
     return NextResponse.json({
       dates,
       sessionsByDate,
       ticket: {
-        venue: venuePlace?.title ?? activity.venue?.title ?? place?.title ?? null,
-        address: activity.venue?.addressLine ?? venuePlace?.formattedAddr ?? venuePlace?.customAddress
-          ?? venuePlace?.shortAddress ?? place?.formattedAddr ?? place?.customAddress ?? place?.shortAddress ?? null,
+        ...ticketLocation,
         // Match public event page legacy pricing: zero means free, a positive
         // priceFrom without an explicit mode is the minimum entry price.
         priceMode: mode === "RANGE" ? "FROM" :
