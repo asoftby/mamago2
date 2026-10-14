@@ -12,7 +12,7 @@ import { CityHomeAllLink } from "@/features/city-home/components/SectionHeader";
 import { useCity } from "@/contexts/CityContext";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
-import { formatRuShortDayMonth, formatRuShortDayMonthRange } from "@/lib/formatters/date";
+import { formatRuShortDayMonthRange, formatRuCustomDateRangeTitle } from "@/lib/formatters/date";
 import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
 import { getActivityFormatLabel } from "@/domain/activities/activity-format";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
@@ -62,16 +62,6 @@ function buildKudaSectionTitle(input: {
     return `Куда пойти на выходных ${cityPart}`;
   }
 
-  if (input.dateFrom && input.dateTo) {
-    const range = formatRuShortDayMonthRange(input.dateFrom, input.dateTo);
-    return range ? `Куда пойти ${range} ${cityPart}` : `Куда пойти ${cityPart}`;
-  }
-
-  if (input.dateFrom) {
-    const dateLabel = formatRuShortDayMonth(input.dateFrom);
-    return dateLabel ? `Куда пойти ${dateLabel} ${cityPart}` : `Куда пойти ${cityPart}`;
-  }
-
   return `Куда пойти ${cityPart}`;
 }
 
@@ -89,10 +79,12 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
     selectedPersonaIds: family?.selectedPersonaIds ?? [],
     personas: family?.personas ?? [],
   });
-  const title = buildMainTitle({
-    baseTitle,
-    audienceLabel,
-  });
+  const customDates = applied.whenPreset
+    ? ""
+    : formatRuCustomDateRangeTitle(applied.dateFrom, applied.dateTo);
+  const title = customDates
+    ? `Куда пойти ${audienceLabel ? `${audienceLabel} ` : ""}${getCityLocativePhrase(citySlug)} ${customDates}`
+    : buildMainTitle({ baseTitle, audienceLabel });
   const preview = useMemo(
     () =>
       applyPersonaRanking(activities, {
