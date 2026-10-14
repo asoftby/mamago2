@@ -17,9 +17,9 @@ const STICKY_CTA_FOOTER_PAD =
 const FOOTER_HEADING_CLASS =
   "text-[14px] font-normal text-[#3A332B]";
 
-/** Ссылки — прежний серый цвет заголовков, 14px; при наведении primary без подчёркивания. */
+/** Ссылки — серый оттенок прежних заголовков, усиленный до WCAG AA (≥4.5:1), 14px. */
 const FOOTER_LINK_CLASS =
-  "flex min-h-11 items-center rounded-sm text-[14px] leading-[1.35] text-[rgba(20,18,16,0.5)] no-underline transition-colors md:min-h-0 " +
+  "flex min-h-11 items-center rounded-sm text-[14px] leading-[1.35] text-[rgba(20,18,16,0.6)] no-underline transition-colors md:min-h-0 " +
   "hover:text-primary hover:no-underline " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-[#F6F2EA]";
 
