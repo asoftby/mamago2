@@ -352,6 +352,9 @@ export function EventCardHorizontal({
         onOpenChange={setStatisticsOpen}
         title={activity.title}
         entityLabel="события"
+        entityType="EVENT"
+        entityId={activity.id}
+        publicationCreatedAt={activity.createdAt}
         metrics={activity.metrics}
         promotionPeriods={activity.promotionPerformance?.periods}
         repeatPromotionHref="/dashboard"
