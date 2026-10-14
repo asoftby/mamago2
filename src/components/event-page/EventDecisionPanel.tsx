@@ -152,7 +152,7 @@ export function EventDecisionPanel({
         )}
       >
         {data.categoryLabel && (
-          <span className="inline-flex h-7 items-center rounded-full bg-[#FFE8DC] px-3 text-[12px] font-semibold text-[#E86A3A]">
+          <span className="inline-flex h-7 items-center rounded-full bg-brand-soft px-3 text-[12px] font-semibold text-primary">
             {data.categoryLabel}
           </span>
         )}
@@ -175,7 +175,7 @@ export function EventDecisionPanel({
             aria-pressed={isPlanned}
             className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
           >
-            <Heart size={18} strokeWidth={1.75} className={isPlanned ? "fill-[#E86A3A] text-[#E86A3A]" : ""} aria-hidden />
+            <Heart size={18} strokeWidth={1.75} className={isPlanned ? "fill-primary text-primary" : ""} aria-hidden />
             {isPlanned ? "Сохранено" : "Сохранить"}
           </button>
           <button
@@ -325,7 +325,7 @@ export function EventDecisionPanel({
               target="_blank"
               rel="noopener noreferrer"
               onClick={onBuy}
-              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-[#E86A3A] text-[16px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-primary text-[16px] font-semibold text-white transition-colors hover:bg-primary active:translate-y-px"
             >
               {data.cta.buyLabel}
             </a>
@@ -335,7 +335,7 @@ export function EventDecisionPanel({
             <button
               type="button"
               onClick={() => setBookingOpen(true)}
-              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-[#E86A3A] text-[16px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-primary text-[16px] font-semibold text-white transition-colors hover:bg-primary active:translate-y-px"
             >
               Записаться
             </button>

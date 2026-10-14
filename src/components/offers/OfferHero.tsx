@@ -100,7 +100,7 @@ export function OfferHero({
 
           {/* Kicker pills */}
           <div className="flex flex-wrap items-center gap-2.5">
-            <span className="inline-flex h-7 items-center rounded-full bg-[#FFE8DC] px-3 text-[12px] font-semibold text-[#E86A3A]">
+            <span className="inline-flex h-7 items-center rounded-full bg-brand-soft px-3 text-[12px] font-semibold text-primary">
               ● {badgeLabel}
             </span>
             {data.metaGrid.slice(0, 1).map((item) => (
@@ -440,7 +440,7 @@ function BookingCard({
         {/* ── Promo text (old price moved to price block) ── */}
         {p.promotionText && (
           <div className="mb-5 flex flex-wrap items-center gap-2 text-[13px]">
-            <span className="font-semibold text-[#C24E22]">{p.promotionText}</span>
+            <span className="font-semibold text-primary">{p.promotionText}</span>
           </div>
         )}
 
@@ -451,7 +451,7 @@ function BookingCard({
           {data.hasPrimaryAction !== false && <Button
             onClick={onPrimary}
             disabled={isPrimaryLoading}
-            className="h-14 flex-1 rounded-full bg-[#E86A3A] text-[15px] font-semibold text-white shadow-none transition-colors hover:bg-[#C24E22]"
+            className="h-14 flex-1 rounded-full bg-primary text-[15px] font-semibold text-white shadow-none transition-colors hover:bg-primary"
           >
             <CalendarDays className="mr-2 h-4 w-4 shrink-0" />
             {isPrimaryLoading ? "Загрузка..." : data.cta.primaryLabel}
@@ -463,7 +463,7 @@ function BookingCard({
             className={cn(
               "flex h-14 w-14 shrink-0 items-center justify-center rounded-full border transition-all",
               isSaved
-                ? "border-[#E86A3A] bg-[#FFE8DC] text-[#E86A3A]"
+                ? "border-primary bg-brand-soft text-primary"
                 : "border-[rgba(20,18,16,0.18)] bg-transparent text-[rgba(20,18,16,0.55)] hover:bg-[#FAF7F1] hover:text-[#3A332B]",
             )}
           >
@@ -489,7 +489,7 @@ function BookingCard({
             <div className="space-y-3">
               {p.discounts!.map((d, i) => (
                 <div key={i} className="flex items-start gap-5 text-[13px] leading-[1.5]">
-                  <span className="min-w-[58px] shrink-0 font-mono text-[14px] font-bold tracking-[-0.02em] text-[#C24E22]">
+                  <span className="min-w-[58px] shrink-0 font-mono text-[14px] font-bold tracking-[-0.02em] text-primary">
                     {d.rate}
                   </span>
                   <span className="pt-0.5 text-[14px] text-[#3A332B]">{d.label}</span>
@@ -504,7 +504,7 @@ function BookingCard({
             {data.averageRating != null ? (
               <div className="flex items-center gap-2">
                 <span className="font-mono text-[13px] text-[rgba(20,18,16,0.55)]">
-                  <span className="text-[16px] text-[#E86A3A]">★</span> {data.averageRating.toFixed(1)}
+                  <span className="text-[16px] text-primary">★</span> {data.averageRating.toFixed(1)}
                 </span>
                 {data.reviewsCount != null && data.reviewsCount > 0 && (
                   <>
@@ -512,7 +512,7 @@ function BookingCard({
                     <a
                       href="#reviews"
                       className="font-mono text-[13px] text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
-                      style={{ textDecoration: "underline", textDecorationStyle: "dashed", textDecorationColor: "#E86A3A", textUnderlineOffset: "3px" }}
+                      style={{ textDecoration: "underline", textDecorationStyle: "dashed", textDecorationColor: "var(--primary)", textUnderlineOffset: "3px" }}
                     >
                       {pluralReviews(data.reviewsCount)}
                     </a>
