@@ -212,7 +212,7 @@ export function BusinessPublicationCard({
                 {typeChip}
                 {statusRow}
               </div>
-            ) : null
+            ) : null}
 
             {/* Title */}
             {titleHref ? (
@@ -274,7 +274,7 @@ export function BusinessPublicationCard({
               </p>
             ) : null}
           </div>
-        ) : null
+        ) : null}
       </div>
 
       {/* ── Bottom action bar ── */}
