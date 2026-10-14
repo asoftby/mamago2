@@ -134,7 +134,7 @@ function FilterGroup<K extends keyof FilterState>({
                 height: 42, padding: "0 22px", borderRadius: 99,
                 background: isOn ? "var(--brand-soft)" : "#FAF7F1",
                 border: isOn ? "1px solid transparent" : "1px solid rgba(20,18,16,.10)",
-                color: isOn ? "var(--primary)" : "#141210",
+                color: isOn ? "var(--text-main)" : "#141210",
                 fontSize: 15, fontWeight: isOn ? 600 : 500,
                 cursor: "pointer", transition: "all .15s",
                 fontFamily: "inherit",
@@ -178,7 +178,7 @@ function Step1({ onNext, loginHref }: { onNext: () => void; loginHref: string })
           className="font-mono inline-flex items-center gap-2 uppercase"
           style={{
             padding: "6px 12px", borderRadius: 99,
-            background: "var(--brand-soft)", color: "var(--primary)",
+            background: "var(--brand-soft)", color: "var(--text-main)",
             fontSize: 10, fontWeight: 600, letterSpacing: ".14em",
           }}
         >
@@ -211,7 +211,7 @@ function Step1({ onNext, loginHref }: { onNext: () => void; loginHref: string })
           style={{
             width: "100%", maxWidth: 340, height: 60, fontSize: 16,
             borderRadius: 99,
-            background: "linear-gradient(180deg, var(--brand-soft), var(--primary))",
+            background: "linear-gradient(180deg, var(--primary), var(--primary-hover))",
             color: "#fff",
             fontWeight: 600, letterSpacing: "-.005em",
             display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10,
@@ -304,7 +304,7 @@ function Step2({
           style={{
             width: "100%", height: 58, fontSize: 16,
             borderRadius: 99,
-            background: "linear-gradient(180deg, var(--brand-soft), var(--primary))",
+            background: "linear-gradient(180deg, var(--primary), var(--primary-hover))",
             color: "#fff",
             fontWeight: 600,
             display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
@@ -466,7 +466,7 @@ function Step3({
                 : {
                     height: 44, padding: "0 18px", fontSize: 13, alignSelf: "center",
                     borderRadius: 99,
-                    background: "linear-gradient(180deg, var(--brand-soft), var(--primary))",
+                    background: "linear-gradient(180deg, var(--primary), var(--primary-hover))",
                     color: "#fff", border: 0,
                     fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8,
                     boxShadow: "0 10px 24px -8px rgba(239,135,89,.5)",
@@ -616,7 +616,7 @@ function Step4({
               className="inline-flex items-center gap-2.5"
               style={{
                 height: 50, padding: "0 26px", borderRadius: 99,
-                background: "linear-gradient(180deg, var(--brand-soft), var(--primary))",
+                background: "linear-gradient(180deg, var(--primary), var(--primary-hover))",
                 color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none",
                 boxShadow: "0 14px 32px -10px rgba(239,135,89,.55)",
               }}
