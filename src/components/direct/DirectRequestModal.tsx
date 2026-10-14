@@ -194,7 +194,7 @@ export function DirectRequestModal({
               href={threadHref}
               style={{
                 height: 50, padding: "0 26px", borderRadius: 99, display: "inline-flex", alignItems: "center", gap: 8,
-                background: "linear-gradient(180deg, var(--brand-soft), var(--primary))", color: "#fff", fontSize: 15, fontWeight: 600,
+                background: "linear-gradient(180deg, var(--primary), var(--primary-hover))", color: "#fff", fontSize: 15, fontWeight: 600,
                 textDecoration: "none", boxShadow: "0 14px 32px -10px rgba(239,135,89,.55)",
               }}
             >
@@ -266,7 +266,7 @@ export function DirectRequestModal({
             form="direct-request-form" type="submit" disabled={phase === "submitting"}
             style={{
               width: "100%", height: 56, borderRadius: 99,
-              background: phase === "submitting" ? "rgba(20,18,16,.18)" : "linear-gradient(180deg, var(--brand-soft), var(--primary))",
+              background: phase === "submitting" ? "rgba(20,18,16,.18)" : "linear-gradient(180deg, var(--primary), var(--primary-hover))",
               color: phase === "submitting" ? "rgba(20,18,16,.45)" : "#fff",
               fontSize: 15, fontWeight: 600, letterSpacing: ".005em", border: 0,
               cursor: phase === "submitting" ? "default" : "pointer",
