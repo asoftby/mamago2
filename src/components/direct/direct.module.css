@@ -15,9 +15,9 @@
   --ink-3: rgba(20, 18, 16, 0.55);
   --line: rgba(20, 18, 16, 0.1);
   --line-2: rgba(20, 18, 16, 0.18);
-  --accent: #e86a3a;
-  --accent-deep: #c24e22;
-  --accent-soft: #ffe8dc;
+  --accent: var(--primary);
+  --accent-deep: var(--primary);
+  --accent-soft: var(--brand-soft);
   --ok: #1f8a5b;
   --ok-bg: rgba(31, 138, 91, 0.1);
   --warn: #a66207;
@@ -568,7 +568,7 @@
   margin-top: 22px;
   padding: 24px;
   background: var(--accent-soft);
-  border: 1px solid rgba(232, 106, 58, 0.25);
+  border: 1px solid rgba(239,135,89, 0.25);
   border-radius: 20px;
   text-align: center;
 }
