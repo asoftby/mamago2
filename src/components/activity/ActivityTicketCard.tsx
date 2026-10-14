@@ -30,6 +30,36 @@ function clean(value?: string | null): string | null {
   return normalized || null;
 }
 
+/**
+ * Short, readable ticket address. Google Places may return street first with
+ * region and postcode, or city first with the building number separated.
+ * Only normalize addresses where both street and city can be identified;
+ * preserve unknown / free-form addresses instead of losing information.
+ */
+export function formatTicketAddress(value?: string | null): string | null {
+  const address = clean(value);
+  if (!address) return null;
+  const parts = address.split(",").map((part) => part.trim()).filter(Boolean);
+  const streetPattern = /^(?:ул\.?|улица|пр-?т\.?|проспект|пер\.?|переулок|пл\.?|площадь|б-р|бульвар|наб\.?|набережная|ш\.?|шоссе|проезд|тракт)\s+/i;
+  const cityPattern = /^(?:(?:г\.?|город)\s*)?([А-ЯЁ][а-яё]+(?:[\s-][А-ЯЁа-яё]+)*)$/;
+  const asCity = (part: string): string | null => {
+    if (/область|район|республика|край|улица|проспект/i.test(part)) return null;
+    return part.match(cityPattern)?.[1] ?? null;
+  };
+
+  const streetFirst = streetPattern.test(parts[0] ?? "");
+  const city = streetFirst
+    ? asCity(parts[1] ?? "") ?? (/^\d/.test(parts[1] ?? "") ? asCity(parts[2] ?? "") : null)
+    : asCity(parts[0] ?? "");
+  const street = streetFirst ? parts[0] : parts[1];
+  if (!city || !street || !streetPattern.test(street)) return address;
+
+  const normalizedStreet = street.replace(/\s+(\d+[а-яёa-z]?(?:[/-]\d+[а-яёa-z]?)?)$/i, ", $1");
+  const housePart = streetFirst ? null : (/^\d/.test(parts[2] ?? "") ? parts[2] : null);
+  const streetAndHouse = housePart ? `${normalizedStreet}, ${housePart}` : normalizedStreet;
+  return `г. ${city}, ${streetAndHouse}`;
+}
+
 function numericPrice(value?: number | string | null): string | null {
   if (typeof value === "number") return Number.isFinite(value) && value > 0 ? String(value) : null;
   const match = value?.match(/\d[\d\s\u00a0\u202f]*(?:[.,]\d+)?/);
@@ -46,7 +76,7 @@ export function adaptActivityTicket(source: ActivityTicketSource): ActivityTicke
       title: source.title,
       imageUrl: clean(source.imageUrl),
       venue: clean(source.venue),
-      address: clean(source.address),
+      address: formatTicketAddress(source.address),
       price: { kind: "free", label: "Бесплатно" },
     };
   }
@@ -71,7 +101,7 @@ export function adaptActivityTicket(source: ActivityTicketSource): ActivityTicke
     title: source.title,
     imageUrl: clean(source.imageUrl),
     venue: clean(source.venue),
-    address: clean(source.address),
+    address: formatTicketAddress(source.address),
     price,
   };
 }
