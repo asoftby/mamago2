@@ -516,8 +516,9 @@ export function EventPageView({
           if (!res.ok) throw new Error("plan_remove_failed");
           toast.success("Убрано из плана");
         }
-      } catch {
+      } catch (error) {
         toast.error("Не получилось выполнить действие", { description: "Попробуйте еще раз" });
+        throw error;
       } finally {
         setIsPrimaryLoading(false);
       }
