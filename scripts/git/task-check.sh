@@ -69,10 +69,9 @@ if ! command -v pnpm >/dev/null 2>&1; then
   exit 6
 fi
 
-if [ ! -d node_modules ]; then
-  echo "[task-check] node_modules missing; installing from lockfile."
-  pnpm install --frozen-lockfile
-fi
+# Own node_modules + Prisma Client generated from this worktree's schema; fails on a
+# node_modules symlink pointing outside the worktree.
+sh scripts/git/worktree-deps.sh ensure
 
 echo "[task-check] Running pnpm check:push"
 pnpm check:push

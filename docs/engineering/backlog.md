@@ -5347,3 +5347,21 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Added: 2026-10-13
 - Reason deferred: у агента нет учётных данных DEV; локально сценарий закрыт скриптами `scripts/dev/smoke-offer-types.ts` и `scripts/dev/smoke-offer-published-edit.ts` (только локальная БД).
 - Next: прогнать чек-лист вручную на DEV (создание каждого типа, правка опубликованного: цена сразу / описание в ревизию, решение админа «было/стало», публичная карточка) и записать результат.
+
+## [BACKLOG-191] Существующие worktree с symlink на node_modules
+
+- Status: OPEN
+- Priority: P2
+- Area: Engineering / workflow
+- Added: 2026-10-14
+- Reason deferred: чужие активные worktree нельзя менять автоматически; новое правило (own node_modules + Prisma Client) действует для новых worktree и проверяется push-gate.
+- Next: владельцы пересоздают: `rm node_modules && sh scripts/git/worktree-deps.sh install` в каждом worktree; список — `sh scripts/git/worktree-deps.sh list-symlinks`.
+
+## [BACKLOG-192] task-workflow.test.sh падает на проверке пути с апострофом
+
+- Status: OPEN
+- Priority: P3
+- Area: Engineering / workflow
+- Added: 2026-10-14
+- Reason deferred: падение pre-existing (воспроизводится на чистом `origin/dev` a6f9256f на macOS), не связано с worktree-deps; последний кейс теста (`install-shell-shortcuts.sh` + путь с `'`) не проходит локально.
+- Next: разобраться, почему `MAMAGO_REPO` не round-trip'ится локально (shell/окружение) и починить тест или установщик.
