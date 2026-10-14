@@ -13,7 +13,6 @@ import { IdeasCollectionsBar } from "./components/IdeasCollectionsBar";
 import { IdeasCollectionDialog } from "./components/IdeasCollectionDialog";
 import {
   ALL_IDEAS,
-  WITHOUT_COLLECTION,
   collectionTarget,
   updateCollectionCounts,
   visibleInCollection,
@@ -184,17 +183,6 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
     }
   }
 
-  const counts = useMemo(
-    () => ({
-      ALL: ideas.length,
-      UNPLANNED: ideas.filter(
-        (idea) => !idea.isPlanned && idea.activity.temporalState !== "PAST",
-      ).length,
-      PLANNED: ideas.filter((idea) => idea.isPlanned).length,
-    }),
-    [ideas],
-  );
-
   const filtered = useMemo(
     () =>
       ideas.filter((idea) => {
@@ -277,14 +265,12 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <IdeasHeader
-        totalCount={ideas.length}
-        plannedCount={counts.PLANNED}
-        unplannedCount={counts.UNPLANNED}
-      />
+      <IdeasHeader />
 
       <IdeasCollectionsBar
         collections={collections}
+        ideas={ideas}
+        memberships={memberships}
         selected={collectionFilter}
         total={ideas.length}
         withoutCount={withoutCount}

@@ -1,5 +1,6 @@
 "use client";
 
+import { CollectionCover } from "@/components/ideas/CollectionCover";
 import { useState } from "react";
 import { Check, FolderHeart, Plus, Trash2 } from "lucide-react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -98,6 +99,7 @@ function Inner({ mode, collection, ideaTitle, collections, initialSelection, onA
                 return (
                   <label key={item.id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-2.5"
                     style={{ borderColor: checked ? C.accent : C.line2, background: checked ? C.accentSoft : "#fff" }}>
+                    <CollectionCover covers={item.covers} className="size-14 shrink-0 rounded-xl" />
                     <Checkbox checked={checked} aria-label={item.title}
                       onCheckedChange={(value) => setSelected((current) => value === true ? [...new Set([...current, item.id])] : current.filter((id) => id !== item.id))}
                     />

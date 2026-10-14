@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
 import { useMemo } from "react";
 import { EventCard, activityMockToEventCard, EVENT_CARD_SHELL } from "@/components/events";
+import { JournalCard } from "@/components/content-cards/JournalCard";
 import { OfferCard } from "@/components/offers/OfferCard";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { CityHomeSection } from "@/features/city-home/components/CityHomeSection";
@@ -29,7 +28,6 @@ import {
   buildMainTitle,
 } from "@/features/city-home/lib/audiencePersonalization";
 import { applyPersonaRanking } from "@/features/city-home/lib/personaRanking";
-import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 
 const cardShell = EVENT_CARD_SHELL;
 const kudaCardShell = EVENT_CARD_SHELL;
@@ -38,9 +36,7 @@ const HOME_PERSONALIZED_PREVIEW_TAKE = 8;
 const ARTICLE_CARD_SHELL =
   "shrink-0 snap-start w-[44vw] min-w-[160px] max-w-[230px] sm:max-w-[250px] " +
   "lg:w-[calc((100%-6rem)/5)] lg:max-w-none";
-const ARTICLE_CARD_IMAGE_SIZES =
-  "(min-width: 1200px) 208px, (min-width: 1024px) calc((100vw - 160px) / 5), " +
-  "(min-width: 568px) 250px, 44vw";
+
 
 function buildKudaSectionTitle(input: {
   citySlug: string;
@@ -309,54 +305,8 @@ export function CityHomeJournalSection({
             citySlug={citySlug}
             meta={{ section: "journal", position: index }}
           >
-            <Link
-              href={a.href}
-              className="block rounded-2xl bg-white p-3 hover:bg-neutral-50/80 transition-colors group"
-            >
-              <div
-                className={cn(
-                  "relative w-full aspect-square rounded-xl mb-3 overflow-hidden bg-gradient-to-br",
-                  [
-                    "from-[#F2C8A7] to-[#E89460]",
-                    "from-[#CDE3D6] to-[#9CC1AC]",
-                    "from-[#F6D567] to-[#E8B935]",
-                    "from-[#E6DBC8] to-[#C9BCA0]",
-                  ][index % 4],
-                )}
-              >
-                {a.coverImageUrl && canOptimizeWithNextImage(a.coverImageUrl) ? (
-                  <Image
-                    src={a.coverImageUrl}
-                    alt={a.title}
-                    fill
-                    sizes={ARTICLE_CARD_IMAGE_SIZES}
-                    className="object-cover"
-                  />
-                ) : a.coverImageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- unknown external hosts are intentionally outside the Next/Image allowlist.
-                  <img
-                    src={a.coverImageUrl}
-                    alt={a.title}
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
-                ) : null}
-              </div>
-              <div className="mb-1.5 flex items-center gap-2">
-                {a.category && (
-                  <p className="min-w-0 truncate font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
-                    {a.category.name}
-                  </p>
-                )}
-                <p className="ml-auto flex shrink-0 items-center gap-1 font-mono text-[11px] text-[rgba(20,18,16,0.55)]">
-                  <span aria-hidden="true">~</span>
-                  {a.readTime} мин.
-                </p>
-              </div>
-              <p className="line-clamp-3 text-sm font-semibold leading-snug text-neutral-900 transition-colors duration-150 group-hover:text-[#C24E22]">
-                {a.title}
-              </p>
-            </Link>
+            <JournalCard href={a.href} title={a.title} imageUrl={a.coverImageUrl}
+              categoryLabel={a.category?.name} readTime={a.readTime} tone={index} />
           </AnalyticsCardViewTracker>
             {/* Heart overlay — mirrors the Link's own padding + cover box so it anchors to the cover, not the outer card */}
             <div className="pointer-events-none absolute inset-0 p-3">

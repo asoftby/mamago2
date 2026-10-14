@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { PromotionPeriod } from "@/server/services/promotion/boostPerformance.service";
+import { StatisticsRangeCalendar } from "./StatisticsRangeCalendar";
 import { PromotionResultsSection } from "./PromotionResultsSection";
 
 export type PublicationMetrics = {
@@ -100,6 +101,7 @@ export function PublicationStatisticsDialog({
   const [period, setPeriod] = useState<BusinessStatsPeriod>("today");
   const minDate = publicationCreatedAt ? minskDateKey(new Date(publicationCreatedAt)) : "2000-01-01";
   const todayDate = minskDateKey(new Date());
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [fromDate, setFromDate] = useState(minDate);
   const [toDate, setToDate] = useState(todayDate);
   const customValid = period !== "custom"
@@ -190,7 +192,7 @@ export function PublicationStatisticsDialog({
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setPeriod(item.id)}
+                  onClick={() => { if (item.id === "custom") setCalendarOpen(true); else { setCalendarOpen(false); setPeriod(item.id); } }}
                   aria-pressed={period === item.id}
                   className={cn(
                     "rounded-full border px-3 py-2 text-xs font-medium transition-colors",
@@ -203,39 +205,12 @@ export function PublicationStatisticsDialog({
                 </button>
               ))}
             </div>
-            {period === "custom" ? (
-              <div className="mt-3 flex flex-wrap items-end gap-3">
-                <label className="grid gap-1 text-xs font-medium text-stone-600">
-                  С
-                  <input
-                    aria-label="Начало периода"
-                    type="date"
-                    min={minDate}
-                    max={todayDate}
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="h-10 rounded-xl border border-stone-200 bg-white px-3 text-sm text-stone-800"
-                  />
-                </label>
-                <label className="grid gap-1 text-xs font-medium text-stone-600">
-                  По
-                  <input
-                    aria-label="Конец периода"
-                    type="date"
-                    min={minDate}
-                    max={todayDate}
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="h-10 rounded-xl border border-stone-200 bg-white px-3 text-sm text-stone-800"
-                  />
-                </label>
-                {!customValid ? (
-                  <p role="alert" className="text-xs text-red-600">
-                    Период должен быть не раньше создания публикации и не позже сегодняшнего дня.
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
+            {calendarOpen ? (
+              <StatisticsRangeCalendar key={`${entityId}-${minDate}`} min={minDate} max={todayDate}
+                from={fromDate < minDate ? minDate : fromDate} to={toDate}
+                onCancel={() => setCalendarOpen(false)}
+                onApply={(from, to) => { setFromDate(from); setToDate(to); setPeriod("custom"); setCalendarOpen(false); }} />
+            ) : period === "custom" ? <p className="mt-3 text-sm text-stone-600">{fromDate} — {toDate}</p> : null}
             <p className="mt-2 text-xs text-stone-500">
               Время Минска. Неделя — последние 7 дней, месяц — последние 30 дней.
             </p>

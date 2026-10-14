@@ -1,10 +1,11 @@
 "use client";
 
+import { CollectionCover } from "@/components/ideas/CollectionCover";
 import * as React from "react";
 import { ArrowLeft, Check, FolderHeart, Plus } from "lucide-react";
 import type { IdeaCollectionSelection, IdeaCollectionTarget } from "@/features/save/persistIdeaCollectionSelection";
 
-type Collection = { id: string; title: string; count: number };
+type Collection = { id: string; title: string; count: number; covers?: string[] };
 type Props = {
   title: string;
   isIdea: boolean;
@@ -107,6 +108,7 @@ export function IdeaCollectionStep({ title, isIdea, target, onBack, onApply }: P
               const checked = selected.includes(item.id);
               return (
                 <label key={item.id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-2.5" style={{ background: checked ? "color-mix(in srgb, var(--primary) 10%, white)" : "#fff", borderColor: checked ? "var(--primary)" : "rgba(20,18,16,.16)" }}>
+                  <CollectionCover covers={item.covers} className="size-14 shrink-0 rounded-xl" />
                   <input type="checkbox" className="size-4 accent-primary" checked={checked} onChange={(e) => setSelected((value) => e.target.checked ? [...new Set([...value, item.id])] : value.filter((id) => id !== item.id))} aria-label={item.title} />
                   <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{item.title}</span>
                   <span className="text-[12px] text-[#706A65]">{item.count}</span>
