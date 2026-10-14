@@ -196,8 +196,8 @@ export function RangeCalendar({ range, setRange }: RangeCalendarProps) {
               style={{
                 aspectRatio: "1/1",
                 borderRadius: end ? 14 : 10,
-                border: today && !end ? "1.5px solid #E86A3A" : "1px solid transparent",
-                background: end ? "#141210" : mid ? "#FFE8DC" : "transparent",
+                border: today && !end ? "1.5px solid var(--primary)" : "1px solid transparent",
+                background: end ? "#141210" : mid ? "var(--brand-soft)" : "transparent",
                 color: end ? "#FAF7F1" : "#141210",
                 fontFamily: "var(--font-mono, ui-monospace)",
                 fontSize: 16,
