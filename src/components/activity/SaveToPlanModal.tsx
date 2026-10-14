@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { IdeaCollectionStep } from "@/components/activity/IdeaCollectionStep";
+import type { IdeaCollectionTarget, IdeaCollectionSelection } from "@/features/save/persistIdeaCollectionSelection";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -77,7 +79,7 @@ export type SaveToPlanResult =
       /** Family Core M4c: set only when the "Видно семье" switch was shown; absent = default (shared). */
       visibility?: "PRIVATE" | "FAMILY";
     }
-  | { action: "ideas" }
+  | ({ action: "ideas" } & IdeaCollectionSelection)
   | { action: "remove-idea" }
   | { action: "remove-plan"; planItemId: string }
   | { action: "cancel" };
@@ -92,6 +94,7 @@ export interface SaveToPlanModalProps {
   planDate?: string | null;
   planStartsAt?: string | null;
   source?: string;
+  collectionTarget?: IdeaCollectionTarget;
 }
 
 export interface SaveToPlanPickerBodyProps {
@@ -103,6 +106,7 @@ export interface SaveToPlanPickerBodyProps {
   planStartsAt?: string | null;
   planItemId?: string | null;
   source?: string;
+  collectionTarget?: IdeaCollectionTarget;
   /** Закрыть контейнер */
   onClose?: () => void;
   /**
@@ -1105,8 +1109,8 @@ function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onRe
 }
 
 // ─── Already in ideas state (VariantEIdeas) ───────────────────────────────────
-function InIdeasView({ onRemoveIdea, onSchedule, dateOptions }: {
-  onRemoveIdea: () => void; onSchedule: (iso: string) => void; dateOptions: string[];
+function InIdeasView({ onRemoveIdea, onSchedule, onCollections, dateOptions }: {
+  onRemoveIdea: () => void; onSchedule: (iso: string) => void; onCollections: () => void; dateOptions: string[];
 }) {
   const [removed, setRemoved] = React.useState(false);
   const [pickerOpen, setPickerOpen] = React.useState(false);
@@ -1143,6 +1147,8 @@ function InIdeasView({ onRemoveIdea, onSchedule, dateOptions }: {
           </span>
         </div>
       )}
+
+      {!removed && <button type="button" className="mb-4 inline-flex min-h-10 items-center gap-2 rounded-full border border-[rgba(20,18,16,.18)] px-4 text-[13px] font-semibold hover:border-[#141210]" onClick={onCollections}><BookmarkIcon size={15} /> В коллекцию</button>}
 
       {/* Idea entry */}
       {!removed ? (
@@ -1551,6 +1557,7 @@ function IdeaOnlyView({ title, isIdea, onIdea, onRemoveIdea }: {
           }}>
             Все мои идеи <ExternalLinkIcon size={13} color="#FAF7F1" />
           </button>
+          <button type="button" onClick={onIdea} className="h-[46px] flex-1 rounded-full border border-[rgba(20,18,16,.18)] px-3 text-[13px] font-semibold">В коллекцию</button>
         </div>
       </div>
     );
@@ -1637,9 +1644,9 @@ export function SaveToPlanPickerBody(props: SaveToPlanPickerBodyProps) {
 function PickerBodyInner({
   scenario, onCommit, isIdea = false, inPlan = false,
   planDate = null, planStartsAt = null, planItemId = null,
-  source, onClose,
+  source, onClose, collectionTarget,
 }: SaveToPlanPickerBodyProps) {
-  const [view, setView] = React.useState<"main" | "calendar">("main");
+  const [view, setView] = React.useState<"main" | "calendar" | "collections">("main");
   const [replanMode, setReplanMode] = React.useState(false);
 
   const todayISO = getLocalDateKey();
@@ -1663,12 +1670,29 @@ function PickerBodyInner({
 
   const upcomingOptions = normalizedOptions.filter((d) => d >= todayISO);
 
+  const handleSelection = (result: SaveToPlanResult) => {
+    if (result.action === "ideas") setView("collections");
+    else onCommit(result);
+  };
+
+  if (view === "collections") {
+    return (
+      <IdeaCollectionStep
+        title={scenario.title}
+        isIdea={isIdea}
+        target={collectionTarget}
+        onBack={() => setView("main")}
+        onApply={(selection) => onCommit({ action: "ideas", ...selection })}
+      />
+    );
+  }
+
   if (!isQuickdate) {
     return (
       <ConfirmView
         scenario={scenario as Extract<SaveScenario, { kind: "confirm" | "timeslots" }>}
         isIdea={isIdea} inPlan={inPlan} planDate={planDate}
-        onCommit={onCommit}
+        onCommit={handleSelection}
       />
     );
   }
@@ -1680,7 +1704,7 @@ function PickerBodyInner({
       <IdeaOnlyView
         title={scenario.title}
         isIdea={isIdea}
-        onIdea={() => onCommit({ action: "ideas" })}
+        onIdea={() => setView("collections")}
         onRemoveIdea={() => onCommit({ action: "remove-idea" })}
       />
     );
@@ -1716,6 +1740,7 @@ function PickerBodyInner({
       <InIdeasView
         onRemoveIdea={() => onCommit({ action: "remove-idea" })}
         onSchedule={(iso) => onCommit({ action: "plan", dateISO: iso, timeSlotId: null })}
+        onCollections={() => setView("collections")}
         dateOptions={upcomingOptions}
       />
     );
@@ -1742,7 +1767,7 @@ function PickerBodyInner({
         ticket={scenario.ticket}
         sessionsByDate={sessionsByDate}
         onConfirm={(iso, sessionId) => onCommit({ action: "plan", dateISO: iso, timeSlotId: sessionId ?? null })}
-        onIdea={scenario.moveMode ? undefined : () => onCommit({ action: "ideas" })}
+        onIdea={scenario.moveMode ? undefined : () => setView("collections")}
         confirmLabel={scenario.moveMode ? "Перенести" : undefined}
       />
     </div>
@@ -1753,7 +1778,7 @@ function PickerBodyInner({
 interface ModalContentProps extends SaveToPlanModalProps { onClose: () => void; }
 
 function ModalContent(props: ModalContentProps) {
-  const { onConfirm, onClose, scenario, isIdea, inPlan, planDate, planStartsAt, source } = props;
+  const { onConfirm, onClose, scenario, isIdea, inPlan, planDate, planStartsAt, source, collectionTarget } = props;
   return (
     <>
       <style>{`
@@ -1768,6 +1793,7 @@ function ModalContent(props: ModalContentProps) {
           planDate={planDate}
           planStartsAt={planStartsAt}
           source={source}
+          collectionTarget={collectionTarget}
           onCommit={(result) => {
             if (result.action === "plan") toastPlan(result.dateISO);
             else if (result.action === "ideas") toastIdea();
