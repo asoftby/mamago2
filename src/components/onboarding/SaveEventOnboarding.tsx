@@ -108,6 +108,7 @@ export function SaveEventOnboarding({
       open={open}
       onOpenChange={onOpenChange}
       isAuthenticated={false}
+      collectionTarget={{ activityId }}
       scenario={{ kind: "quickdate", title: activityTitle }}
       onPersist={handlePersist}
       nextHref={nextHref}

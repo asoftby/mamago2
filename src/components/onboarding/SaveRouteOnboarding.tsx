@@ -72,9 +72,9 @@ export function SaveRouteOnboarding({
             date: result.dateISO,
           });
         } else if (result.action === "ideas") {
-          const res = await apiFetch("/api/save/idea", {
+          const res = await apiFetch("/api/ideas/routes", {
             method: "POST",
-            body: JSON.stringify({ activityId: routeId }),
+            body: JSON.stringify({ routeId, routeSlug }),
           });
           if (!res.ok) throw new Error("idea_save_failed");
           
@@ -112,6 +112,7 @@ export function SaveRouteOnboarding({
       open={open}
       onOpenChange={onOpenChange}
       isAuthenticated={false}
+      collectionTarget={{ routeId }}
       scenario={{ kind: "quickdate", title: routeTitle }}
       onPersist={handlePersist}
       nextHref={nextHref}

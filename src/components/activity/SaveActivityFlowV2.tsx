@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { toast } from "@/lib/toast";
+import { persistIdeaCollectionSelection, type IdeaCollectionTarget } from "@/features/save/persistIdeaCollectionSelection";
 import { CheckCircle2 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -23,6 +25,7 @@ export type SaveActivityFlowV2Props = {
   planStartsAt?: string | null;
   onPersist: (result: SaveToPlanResult) => Promise<void>;
   nextHref?: string;
+  collectionTarget?: IdeaCollectionTarget;
 };
 
 type Phase = "select" | "auth" | "success";
@@ -67,6 +70,7 @@ export function SaveActivityFlowV2({
   planStartsAt = null,
   onPersist,
   nextHref,
+  collectionTarget,
 }: SaveActivityFlowV2Props) {
   const { pendingIntent, clearPendingIntent } = useSaveIntent();
   const [phase, setPhase] = React.useState<Phase>("select");
@@ -89,8 +93,16 @@ export function SaveActivityFlowV2({
     async (result: SaveToPlanResult) => {
       if (result.action === "cancel") return;
       await onPersist(result);
+      if (result.action === "ideas") {
+        try {
+          await persistIdeaCollectionSelection(result, collectionTarget);
+        } catch (error) {
+          toast.error("Идея сохранена, но коллекцию обновить не удалось.");
+          throw error;
+        }
+      }
     },
-    [onPersist],
+    [onPersist, collectionTarget],
   );
 
   const handleCommit = React.useCallback(
@@ -147,6 +159,7 @@ export function SaveActivityFlowV2({
             planDate={planDate}
             planStartsAt={planStartsAt}
             onCommit={handleCommit}
+            collectionTarget={collectionTarget}
             onClose={() => onOpenChange(false)}
           />
         </div>
