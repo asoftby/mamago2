@@ -47,7 +47,7 @@ const VARIANT = {
     desc: "text-sky-800/75",
   },
   brand: {
-    tint: "from-[#FFE8DC]/90 via-white/65 to-[#FFF5F0]/55",
+    tint: "from-brand-soft/90 via-white/65 to-brand-soft/55",
     glow: "from-[#EF8759]/22 via-transparent to-transparent",
     iconWrap: "bg-[#EF8759]",
     title: "text-neutral-900",
