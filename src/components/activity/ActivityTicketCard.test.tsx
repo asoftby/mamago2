@@ -47,6 +47,8 @@ assert.ok(html.includes("Минск, улица Примерная, 10"), "addre
 assert.ok(html.includes("Бесплатно"), "free label is rendered");
 assert.ok(html.includes("Обложка отсутствует"), "missing image uses the project placeholder pattern");
 assert.ok(html.includes("border-dashed"), "price section keeps the ticket perforation");
+assert.ok(html.includes("min-h-[112px]"), "ticket has a compact 112px minimum height");
+assert.ok(html.includes("py-3"), "vertical ticket padding is compact while content remains legible");
 assert.ok(html.includes("mask-image:") && html.includes("mask-composite:intersect"), "side notches mask the entire ticket transparently");
 assert.ok(!html.includes("-left-2.5") && !html.includes("-right-2.5"), "old white circle overlays are removed");
 
@@ -73,6 +75,7 @@ const saveModal = readFileSync(join(process.cwd(), "src/components/activity/Save
 const confirmBar = saveModal.split("function ConfirmBar(")[1]?.split("// ─── All-dates drawer")[0];
 assert.ok(confirmBar?.includes("{label}"), "save action keeps its label");
 assert.ok(!confirmBar?.includes("<ArrowIcon"), "Save button has no arrow");
+assert.ok(saveModal.includes("marginTop: 28, marginBottom: 28"), "ticket spacing is reduced by 10px on both sides");
 
 
 console.log("ActivityTicketCard tests: OK");
