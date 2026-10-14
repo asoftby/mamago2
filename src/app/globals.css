@@ -201,10 +201,10 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 
   /* Brand */
   --brand: #EF8759;
-  --brand-hover: #E07848;
-  --brand-active: #C85F35;
+  --brand-hover: var(--brand);
+  --brand-active: var(--brand);
   --brand-soft: #FFF2EB;
-  --brand-soft-hover: #FFE8DC;
+  --brand-soft-hover: var(--brand-soft);
   --brand-muted: #FAF7F1;
 
   /* Primary action */
@@ -335,8 +335,8 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   --plan-line: rgba(20, 18, 16, 0.1);
   --plan-muted: rgba(20, 18, 16, 0.55);
   --plan-faint: rgba(20, 18, 16, 0.35);
-  --plan-accent: #e86a3a; /* fills: dots, today ring; owned by "Family" */
-  --plan-accent-ink: #c24e22; /* text on light backgrounds */
+  --plan-accent: var(--primary); /* fills: dots, today ring; owned by "Family" */
+  --plan-accent-ink: var(--primary); /* text on light backgrounds */
   --plan-on-ink: #faf7f1;
   /* Child dot palette (deterministic by childId); orange is reserved for Family */
   --plan-child-1: #2f8f83;
@@ -354,8 +354,8 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   --plan-line: rgba(250, 247, 241, 0.14);
   --plan-muted: rgba(250, 247, 241, 0.6);
   --plan-faint: rgba(250, 247, 241, 0.38);
-  --plan-accent: #f07f52;
-  --plan-accent-ink: #f59a74;
+  --plan-accent: var(--primary);
+  --plan-accent-ink: var(--primary);
   --plan-on-ink: #141210;
   --plan-child-1: #4fb3a5;
   --plan-child-2: #6e95ee;

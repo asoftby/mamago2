@@ -17,22 +17,22 @@ export function CityBirthdayCtaBlock({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[34px] border border-[#ffd8c4]",
-        "bg-[radial-gradient(circle_at_top_left,_rgba(255,216,196,0.42),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(255,181,138,0.24),_transparent_34%),linear-gradient(135deg,_#fffaf5_0%,_#fff6ef_45%,_#fff9f6_100%)]",
-        "px-6 py-6 shadow-[0_28px_70px_rgba(245,140,90,0.18),inset_0_1px_0_rgba(255,255,255,0.9)] sm:px-8 sm:py-7",
+        "relative overflow-hidden rounded-[34px] border border-primary/20",
+        "bg-gradient-to-br from-primary/10 via-white to-primary/5",
+        "px-6 py-6 shadow-[0_28px_70px_rgba(0,0,0,0.08)] sm:px-8 sm:py-7",
         className,
       )}
     >
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-40 bg-[radial-gradient(circle,_rgba(255,201,167,0.22),_transparent_68%)] blur-2xl" />
-      <div className="pointer-events-none absolute -right-12 top-1/2 h-36 w-36 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,_rgba(255,170,120,0.28),_transparent_70%)] blur-3xl" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-40 bg-primary/10 blur-2xl" />
+      <div className="pointer-events-none absolute -right-12 top-1/2 h-36 w-36 -translate-y-1/2 rounded-full bg-primary/10 blur-3xl" />
 
       <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
         <div className="flex min-w-0 items-center gap-5">
           <div
             className={cn(
               "flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-[21px]",
-              "border border-[#ffd8c4] bg-[linear-gradient(180deg,_rgba(255,255,255,0.92)_0%,_rgba(255,241,232,0.96)_100%)] text-[#ff8a5b]",
-              "shadow-[inset_0_2px_3px_rgba(255,255,255,0.9),0_16px_28px_rgba(255,166,116,0.24)]",
+              "border border-primary/20 bg-primary/5 text-primary",
+              "shadow-[inset_0_2px_3px_rgba(255,255,255,0.9)]",
             )}
           >
             <Cake className="h-[33px] w-[33px]" aria-hidden />
@@ -40,7 +40,7 @@ export function CityBirthdayCtaBlock({
           <div className="min-w-0">
             <h2 className="max-w-none text-[15px] tracking-[-0.04em] text-neutral-900 sm:leading-[1.1]" style={{ fontFamily: "var(--font-pt-serif)", fontWeight: 400, fontSize: 32 }}>
               Организовать День Рождения{" "}
-              <em style={{ fontStyle: "italic", color: "#E86A3A", fontWeight: 400, fontFamily: "var(--font-editorial)", fontSize: 32, letterSpacing: "-0.5px" }}>за <span style={{ fontFamily: "var(--font-display)" }}>10</span> минут</em>
+              <em style={{ fontStyle: "italic", color: "var(--primary)", fontWeight: 400, fontFamily: "var(--font-editorial)", fontSize: 32, letterSpacing: "-0.5px" }}>за <span style={{ fontFamily: "var(--font-display)" }}>10</span> минут</em>
             </h2>
             <p className="mt-3 max-w-2xl text-[14px] leading-[150%] text-neutral-600 sm:text-[14px]">
               Площадка, анимация, торт, декор и другие штуковины — в одном конструкторе легко и просто

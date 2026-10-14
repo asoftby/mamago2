@@ -167,7 +167,7 @@ export function PlaceSidebarCard({
               onClick={handleFavorite}
             >
               <Heart
-                className={`mr-1.5 h-3.5 w-3.5 ${isFavorite ? "fill-[#ff8a5b] text-[#ff8a5b]" : ""}`}
+                className={`mr-1.5 h-3.5 w-3.5 ${isFavorite ? "fill-primary text-primary" : ""}`}
               />
               {isFavorite ? "Сохранено" : "Сохранить"}
             </Button>
