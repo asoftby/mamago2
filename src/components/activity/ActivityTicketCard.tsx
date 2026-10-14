@@ -79,7 +79,7 @@ export function ActivityTicketCard({ source }: { source: ActivityTicketSource })
   return (
     <article
       aria-label={`Информация: ${ticket.title}`}
-      className="relative isolate flex min-h-[128px] w-full min-w-0 overflow-hidden rounded-[20px] bg-[#726d65] text-white shadow-[0_12px_30px_rgba(20,18,16,0.18)]"
+      className="relative isolate flex min-h-[112px] w-full min-w-0 overflow-hidden rounded-[20px] bg-[#726d65] text-white shadow-[0_12px_30px_rgba(20,18,16,0.18)]"
       // A real alpha mask cuts the paper notches out of the entire ticket (image and overlay),
       // so the surrounding modal remains visible instead of covering the image with white circles.
       style={{
@@ -109,12 +109,12 @@ export function ActivityTicketCard({ source }: { source: ActivityTicketSource })
         aria-hidden
       />
 
-      <div className="flex min-w-0 flex-1 flex-col justify-center py-4 pl-5 pr-3 sm:pl-6 sm:pr-4">
+      <div className="flex min-w-0 flex-1 flex-col justify-center py-3 pl-5 pr-3 sm:pl-6 sm:pr-4">
         <h3 className="line-clamp-2 text-[15px] font-semibold leading-[1.2] tracking-[-0.015em] drop-shadow-[0_1px_2px_rgba(0,0,0,.35)] sm:text-[16px]">
           {ticket.title}
         </h3>
         {ticket.venue ? (
-          <p className="mt-2 truncate text-[11px] font-medium leading-[1.2] text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,.35)] sm:text-[12px]">
+          <p className="mt-1.5 truncate text-[11px] font-medium leading-[1.2] text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,.35)] sm:text-[12px]">
             {ticket.venue}
           </p>
         ) : null}
@@ -125,7 +125,7 @@ export function ActivityTicketCard({ source }: { source: ActivityTicketSource })
         ) : null}
       </div>
 
-      <div className="relative flex w-[74px] shrink-0 items-center justify-center border-l border-dashed border-white/80 bg-black/10 sm:w-[86px]">
+      <div className="relative flex w-[68px] shrink-0 items-center justify-center border-l border-dashed border-white/80 bg-black/10 sm:w-[78px]">
         {ticket.price?.kind === "free" ? (
           <span className="rotate-180 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.12em] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.5)] [writing-mode:vertical-rl]">
             Бесплатно
