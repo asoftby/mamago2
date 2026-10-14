@@ -114,6 +114,8 @@ export interface SaveToPlanPickerBodyProps {
    * где `result.visibility` реально передаётся на сервер, иначе выбор будет молча проигнорирован.
    */
   showVisibilityToggle?: boolean;
+  /** Internal: prevent the family-plan switch from appearing on the collections slide. */
+  onCollectionStepChange?: (active: boolean) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1600,12 +1602,14 @@ export function SaveToPlanPickerBody(props: SaveToPlanPickerBodyProps) {
   const { showVisibilityToggle = false, onCommit, inPlan = false, planDate = null } = props;
   const sharedPlan = useFamilySharedPlan(showVisibilityToggle);
   const [visibleToFamily, setVisibleToFamily] = React.useState(true);
+  const [collectionStep, setCollectionStep] = React.useState(false);
   // The switch applies to NEW plan items; an item already in the plan keeps its audience.
   const toggleActive = sharedPlan && !(inPlan && planDate);
   return (
     <>
       <PickerBodyInner
         {...props}
+        onCollectionStepChange={setCollectionStep}
         onCommit={(result) =>
           onCommit(
             toggleActive && result.action === "plan"
@@ -1614,7 +1618,7 @@ export function SaveToPlanPickerBody(props: SaveToPlanPickerBodyProps) {
           )
         }
       />
-      {toggleActive && (
+      {toggleActive && !collectionStep && (
         <label
           className="flex items-center justify-between gap-3 px-6 pb-5 pt-1 text-[14px]"
           style={{ color: C.ink2 }}
@@ -1644,9 +1648,10 @@ export function SaveToPlanPickerBody(props: SaveToPlanPickerBodyProps) {
 function PickerBodyInner({
   scenario, onCommit, isIdea = false, inPlan = false,
   planDate = null, planStartsAt = null, planItemId = null,
-  source, onClose, collectionTarget,
+  source, onClose, collectionTarget, onCollectionStepChange,
 }: SaveToPlanPickerBodyProps) {
   const [view, setView] = React.useState<"main" | "calendar" | "collections">("main");
+  React.useEffect(() => { onCollectionStepChange?.(view === "collections"); }, [view, onCollectionStepChange]);
   const [replanMode, setReplanMode] = React.useState(false);
 
   const todayISO = getLocalDateKey();
