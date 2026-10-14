@@ -1,3 +1,4 @@
+import { ptSerifHome } from "@/lib/fonts";
 import { Suspense } from "react";
 import { Container } from "@/components/ui/Container";
 import { StoriesSection } from "@/features/stories/components/StoriesSection";
@@ -224,7 +225,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
 
         {!hasHomeContent ? (
           <section className="rounded-3xl border border-dashed bg-muted/30 px-5 py-6 sm:px-6">
-            <h2 className="text-xl font-semibold text-foreground">
+            <h2 className="text-xl font-normal text-foreground" style={{ fontFamily: ptSerifHome.style.fontFamily }}>
               В {getCityNominativeName(city.slug)} пока нет опубликованного контента
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">

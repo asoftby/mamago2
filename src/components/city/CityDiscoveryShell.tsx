@@ -14,7 +14,7 @@ const DISCOVERY_TITLE_CLASS =
 import { DISCOVERY_INTENT_CONFIG } from "@/lib/discovery/discoveryIntentConfig";
 import { formatCityTitle } from "@/lib/city/cityDisplayNames";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
-import { whenPresetPageTitleSuffix } from "@/features/filters/discovery/whenLabel";
+import { kudaDateRangeTitleSuffix, whenPresetPageTitleSuffix } from "@/features/filters/discovery/whenLabel";
 import { ClassesChipBar } from "./ClassesChipBar";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import type { ActivityMock } from "@/types/activity";
@@ -112,7 +112,7 @@ export function CityDiscoveryShell({
   const intentConfig = DISCOVERY_INTENT_CONFIG[intent];
   const pageTitle =
     (pageTitleOverride ?? formatCityTitle(intentConfig.titleTemplate, city)) +
-    whenPresetPageTitleSuffix(applied);
+    (intent === "kuda" ? kudaDateRangeTitleSuffix(applied) : whenPresetPageTitleSuffix(applied));
 
   /** Мобильная (< lg) кнопка ⚙ фильтров справа от заголовка раздела. */
   const filterButton = intentConfig.hasFilters ? (

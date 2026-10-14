@@ -1,5 +1,7 @@
 "use client";
 
+import { ptSerifHome } from "@/lib/fonts";
+
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { X } from "lucide-react";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
@@ -95,7 +97,7 @@ export function FamilyActivationBanner() {
         </button>
 
         <div className="space-y-3 pr-1">
-          <h2 className="text-base leading-snug text-neutral-900 sm:text-lg" style={{ fontFamily: "var(--font-sans)", fontWeight: 600 }}>
+          <h2 className="text-base leading-snug text-neutral-900 sm:text-lg" style={{ fontFamily: ptSerifHome.style.fontFamily, fontWeight: 400 }}>
             Подберём идеи для вашей семьи
           </h2>
           <p className="text-sm leading-relaxed text-neutral-600">
