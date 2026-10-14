@@ -26,6 +26,8 @@ export type { ProfileChildPayload } from "../lib/profileChildSelection";
 import { BUILDER_STEP_ORDER } from "../lib/stepOrder";
 import { birthdayOffers } from "../../data/birthdayOffers";
 import { revalidateAddons } from "../lib/compatibility";
+import { compatibleCatalogSelection } from "../lib/catalogSelection";
+import type { BirthdayCatalogItem } from "../lib/realCatalog";
 
 function mergeQuizDefaults(quiz: BirthdayBuilderState["quiz"]): BirthdayBuilderState["quiz"] {
   return {
@@ -303,11 +305,11 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
       // Toggle behavior: if clicking same placeType, unselect it
       const newPlaceType = s.quiz.placeType === placeType ? null : placeType;
 
-      // When switching to HOME/OUTDOOR, clear venue selection (no venue to show)
-      const newBaseId =
-        newPlaceType === "HOME" || newPlaceType === "OUTDOOR" ? null : s.selection.selectedBaseId;
-      const newBase = newBaseId
-        ? birthdayOffers.find((o) => o.id === newBaseId) || null
+      // Do not discard a still-compatible mobile package when switching formats.
+      // The real catalog reconciliation in BirthdayBuilderShell clears any
+      // incompatible base and add-ons once the catalog is ready.
+      const newBase = s.selection.selectedBaseId
+        ? birthdayOffers.find((o) => o.id === s.selection.selectedBaseId) || null
         : null;
 
       const conflicts = revalidateAddons(
@@ -320,7 +322,6 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
       return {
         ...s,
         quiz: { ...s.quiz, placeType: newPlaceType },
-        selection: { ...s.selection, selectedBaseId: newBaseId },
         validation: { conflicts },
       };
     });
@@ -385,6 +386,27 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
         validation: {
           conflicts,
         },
+      };
+    });
+  }, []);
+
+  /** Atomically prune invalid real-catalog selections, including a stale base. */
+  const pruneCatalogSelection = useCallback((
+    availableOffers: readonly BirthdayCatalogItem[],
+    placeType: PlaceType | null,
+  ) => {
+    setState((s) => {
+      // An earlier effect must never prune a newer location selection.
+      if (s.quiz.placeType !== placeType) return s;
+      const compatible = compatibleCatalogSelection(
+        availableOffers, s.selection.selectedBaseId, placeType, s.selection.selectedAddonIds,
+      );
+      if (compatible.selectedBaseId === s.selection.selectedBaseId &&
+          compatible.selectedAddonIds.length === s.selection.selectedAddonIds.length) return s;
+      return {
+        ...s,
+        selection: compatible,
+        validation: { conflicts: [] },
       };
     });
   }, []);
@@ -547,6 +569,7 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
     setPlaceType,
     
     // Selection actions
+    pruneCatalogSelection,
     selectBase,
     replaceBase,
     toggleAddon,

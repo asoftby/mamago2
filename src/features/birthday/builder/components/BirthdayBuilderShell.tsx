@@ -16,7 +16,8 @@ import { StepReview } from "./steps/StepReview";
 import { useRealBirthdayCatalog } from "../hooks/useRealBirthdayCatalog";
 import { matchesBirthdayRequirements } from "../lib/realCatalog";
 import {
-  catalogPriceSummary, compatibleAddonIds, eligibleAddons, hasValidCatalogAnchor, selectedCatalogOffers,
+  catalogPriceSummary, compatibleCatalogSelection, eligibleAddons, hasValidCatalogAnchor,
+  isLocationCompatible, selectedCatalogOffers,
 } from "../lib/catalogSelection";
 import { BuilderProgressDots } from "./BuilderProgressDots";
 import { BuilderSummaryBar } from "./BuilderSummaryBar";
@@ -105,11 +106,12 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
   const guests = GUESTS_RANGE[state.quiz.guestsGroup ?? ""] ?? null;
 
   const visibleOffers = useMemo(() => catalog.offers.filter((offer) =>
+    isLocationCompatible(offer, state.quiz.placeType) &&
     matchesBirthdayRequirements(offer, {
       ageMonths, maxBudget: offer.currency === "BYN" ? maxBudget : null,
       childrenMin: guests?.min, childrenMax: guests?.max,
     })),
-    [catalog.offers, ageMonths, maxBudget, guests?.min, guests?.max]);
+    [catalog.offers, state.quiz.placeType, ageMonths, maxBudget, guests?.min, guests?.max]);
 
   const validBase = hasValidCatalogAnchor(
     visibleOffers, state.selection.selectedBaseId, state.quiz.placeType,
@@ -125,17 +127,19 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
     );
   }, [visibleOffers, state.selection.selectedBaseId, state.selection.selectedAddonIds, state.quiz.placeType, validBase]);
 
-  // Persisted state must not keep add-ons that a replaced base made incompatible.
-  const { pruneAddons } = builder;
+  // Persisted selections must be pruned when a party format or base changes.
+  const { pruneCatalogSelection } = builder;
   useEffect(() => {
     if (catalog.status !== "ready") return;
-    const base = state.selection.selectedBaseId;
-    const kept = validBase
-      ? compatibleAddonIds(visibleOffers, base, state.quiz.placeType, state.selection.selectedAddonIds)
-      : [];
-    if (kept.length !== state.selection.selectedAddonIds.length) pruneAddons(kept);
-  }, [catalog.status, validBase, visibleOffers, state.selection.selectedBaseId,
-    state.selection.selectedAddonIds, state.quiz.placeType, pruneAddons]);
+    const compatible = compatibleCatalogSelection(
+      visibleOffers, state.selection.selectedBaseId, state.quiz.placeType, state.selection.selectedAddonIds,
+    );
+    if (compatible.selectedBaseId !== state.selection.selectedBaseId ||
+        compatible.selectedAddonIds.length !== state.selection.selectedAddonIds.length) {
+      pruneCatalogSelection(visibleOffers, state.quiz.placeType);
+    }
+  }, [catalog.status, visibleOffers, state.selection.selectedBaseId,
+    state.selection.selectedAddonIds, state.quiz.placeType, pruneCatalogSelection]);
 
   const prices = catalogPriceSummary(selectedOffers);
   const totalPrice = prices.minimumByn;

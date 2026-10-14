@@ -15,10 +15,31 @@ export function isVenueOffer(offer: BirthdayCatalogItem): boolean {
   return offer.productType === "PARTY_PACKAGE" || offer.category === "VENUE";
 }
 
+/**
+ * Match the party's location to where the business can deliver its offer.
+ * Missing legacy location data stays discoverable; base eligibility handles
+ * the stricter rule for unverified off-site packages.
+ */
+export function isLocationCompatible(
+  offer: Pick<BirthdayCatalogItem, "locationType">,
+  placeType: PlaceType | null,
+): boolean {
+  if (placeType == null || offer.locationType == null) return true;
+  if (offer.locationType === "BOTH") return true;
+  const onSite = placeType === "VENUE" || placeType === "PACKAGE";
+  return offer.locationType === (onSite ? "ON_SITE" : "OFF_SITE");
+}
+
 export function isAllowedBase(offer: BirthdayCatalogItem, placeType: PlaceType | null): boolean {
-  return placeType === "VENUE" || placeType === "PACKAGE"
-    ? isVenueOffer(offer)
-    : !isVenueOffer(offer);
+  if (!isLocationCompatible(offer, placeType)) return false;
+  if (placeType == null) return true;
+  if (placeType === "VENUE" || placeType === "PACKAGE") return isVenueOffer(offer);
+  // A mobile party package can anchor a home/outdoor celebration; an untyped
+  // legacy package must not be assumed mobile.
+  if (offer.productType === "PARTY_PACKAGE") {
+    return offer.locationType === "OFF_SITE" || offer.locationType === "BOTH";
+  }
+  return !isVenueOffer(offer);
 }
 
 export function hasValidCatalogAnchor(
@@ -47,10 +68,27 @@ export function eligibleAddons(
   const included = includedPackageCategories(offers, baseId);
   return offers.filter((offer) =>
     !isVenueOffer(offer) &&
+    isLocationCompatible(offer, placeType) &&
     offer.id !== baseId &&
     (placeType === "VENUE" || placeType === "PACKAGE" || placeType === "HOME" || placeType === "OUTDOOR") &&
     (offer.category == null || !included.has(offer.category))
   );
+}
+
+/** Calculate a persisted selection after the party format or available offers change. */
+export function compatibleCatalogSelection(
+  offers: readonly BirthdayCatalogItem[],
+  baseId: string | null,
+  placeType: PlaceType | null,
+  selectedAddonIds: readonly string[],
+): { selectedBaseId: string | null; selectedAddonIds: string[] } {
+  const selectedBaseId = hasValidCatalogAnchor(offers, baseId, placeType) ? baseId : null;
+  return {
+    selectedBaseId,
+    selectedAddonIds: selectedBaseId
+      ? compatibleAddonIds(offers, selectedBaseId, placeType, selectedAddonIds)
+      : [],
+  };
 }
 
 /** Lower bound only; an unknown price must never be displayed as zero. */

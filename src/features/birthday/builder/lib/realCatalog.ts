@@ -16,7 +16,7 @@ export type BirthdayCatalogItem = {
   ageMaxMonths: number | null;
   minChildren: number | null;
   maxChildren: number | null;
-  locationType: string | null;
+  locationType: "ON_SITE" | "OFF_SITE" | "BOTH" | null;
   includedCategories: PartyCategoryKey[];
   prepaymentTerms: string | null;
   cancellationTerms: string | null;

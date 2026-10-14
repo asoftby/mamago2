@@ -44,6 +44,16 @@ assert.match(markup, /Реальное пространство/);
 assert.match(markup, /Компания/);
 assert.match(markup, /От 350/);
 assert.doesNotMatch(markup, /4\.9|Подтверждено|Забронировано|Отправить заявку/);
+const mobileParty = {
+  ...packageOffer, id: "mobile-party", title: "Выездной праздник",
+  locationType: "OFF_SITE" as const,
+};
+const onSiteOnly = { ...offer, locationType: "ON_SITE" as const };
+const homeMarkup = renderToStaticMarkup(createElement(StepPick, {
+  ...baseProps, placeType: "HOME", offers: [onSiteOnly, mobileParty],
+}));
+assert.match(homeMarkup, /Выездной праздник/);
+assert.doesNotMatch(homeMarkup, /Реальное пространство/);
 const empty = renderToStaticMarkup(createElement(StepPick, { ...baseProps, offers: [], allOfferCount: 0 }));
 assert.match(empty, /нет опубликованных предложений/);
 const filtered = renderToStaticMarkup(createElement(StepPick, { ...baseProps, offers: [], allOfferCount: 4 }));

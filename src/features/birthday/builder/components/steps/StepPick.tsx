@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { BirthdayCatalogItem, PartyCategoryKey } from "../../lib/realCatalog";
 import type { PlaceType } from "../../types/builder";
-import { catalogPriceLabel, eligibleAddons, isVenueOffer } from "../../lib/catalogSelection";
+import { catalogPriceLabel, eligibleAddons, isAllowedBase } from "../../lib/catalogSelection";
 
 const GROUPS: { title: string; categories: PartyCategoryKey[] }[] = [
   { title: "Аниматоры и программы", categories: ["ANIMATOR", "SHOW", "MASTER_CLASS", "PROGRAM"] },
@@ -96,7 +96,7 @@ export function StepPick({
   selectedBaseId, selectedAddonIds, onSelectBase, onToggleAddon,
 }: Props) {
   const venueMode = placeType === "VENUE" || placeType === "PACKAGE";
-  const bases = offers.filter((offer) => venueMode ? isVenueOffer(offer) : !isVenueOffer(offer));
+  const bases = offers.filter((offer) => isAllowedBase(offer, placeType));
   const additions = eligibleAddons(offers, selectedBaseId, placeType);
 
   if (loading) return <section className="mx-auto max-w-3xl py-16 text-center"
@@ -126,7 +126,7 @@ export function StepPick({
     </section>
   );
 
-  const baseTitle = venueMode ? "Выберите площадку или готовый пакет" : "Выберите основную услугу";
+  const baseTitle = venueMode ? "Выберите площадку или готовый пакет" : "Выберите основную услугу или выездной пакет";
   return (
     <section className="space-y-9" aria-label="Реальные предложения для праздника">
       <header className="space-y-3">
