@@ -29,6 +29,11 @@ const NEXT_LABELS: Partial<Record<BuilderStep, string>> = {
   pick: "Далее — обзор",
 };
 
+const GUESTS_RANGE: Record<string, { min: number; max: number | null }> = {
+  up5: { min: 1, max: 5 }, "5-10": { min: 5, max: 10 },
+  "10-15": { min: 10, max: 15 }, "15plus": { min: 15, max: null },
+};
+
 function canProceedFromStep(
   step: BuilderStep,
   state: ReturnType<typeof useBirthdayBuilderWithGate>["state"]
@@ -97,9 +102,14 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
     return Math.max(0, fullMonths - Number(party.getUTCDate() < birth.getUTCDate()));
   }, [state.quiz.partyForChild?.birthDateIso, state.quiz.dateRangeFrom]);
 
+  const guests = GUESTS_RANGE[state.quiz.guestsGroup ?? ""] ?? null;
+
   const visibleOffers = useMemo(() => catalog.offers.filter((offer) =>
-    matchesBirthdayRequirements(offer, { ageMonths, maxBudget: offer.currency === "BYN" ? maxBudget : null })),
-    [catalog.offers, ageMonths, maxBudget]);
+    matchesBirthdayRequirements(offer, {
+      ageMonths, maxBudget: offer.currency === "BYN" ? maxBudget : null,
+      childrenMin: guests?.min, childrenMax: guests?.max,
+    })),
+    [catalog.offers, ageMonths, maxBudget, guests?.min, guests?.max]);
 
   const validBase = hasValidCatalogAnchor(
     visibleOffers, state.selection.selectedBaseId, state.quiz.placeType,

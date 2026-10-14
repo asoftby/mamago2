@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { extractPartyDetails, matchesBirthdayRequirements, type BirthdayCatalogItem } from "./realCatalog";
+import { catalogPriceLabel } from "./catalogSelection";
+import { extractPartyDetails, matchesBirthdayRequirements, publicPriceFrom, type BirthdayCatalogItem } from "./realCatalog";
 
 assert.deepEqual(extractPartyDetails({
   includedCategories: ["VENUE", "CAKE", "INJECTED", "CAKE"],
@@ -23,4 +24,19 @@ assert.equal(matchesBirthdayRequirements(offer, { children: 20 }), false);
 assert.equal(matchesBirthdayRequirements(offer, { maxBudget: 100 }), false);
 assert.equal(matchesBirthdayRequirements({ ...offer, priceFrom: null }, { maxBudget: 100 }), true);
 // Unknown price is retained as unknown (not zero), and is never claimed affordable.
+// Guest group is a range: capacity must overlap it.
+assert.equal(matchesBirthdayRequirements(offer, { childrenMin: 13, childrenMax: 15 }), false); // offer max 12
+assert.equal(matchesBirthdayRequirements(offer, { childrenMin: 1, childrenMax: 4 }), false); // offer min 5
+assert.equal(matchesBirthdayRequirements(offer, { childrenMin: 10, childrenMax: 15 }), true);
+assert.equal(matchesBirthdayRequirements({ ...offer, minChildren: null, maxChildren: null }, { childrenMin: 15, childrenMax: null }), true);
+// A stale number behind ON_REQUEST must not surface as a price; FREE is a real zero.
+assert.equal(publicPriceFrom("ON_REQUEST", 500), null);
+assert.equal(publicPriceFrom("UNKNOWN", 500), null);
+assert.equal(publicPriceFrom("FREE", null), 0);
+assert.equal(publicPriceFrom("FROM", 120), 120);
+assert.equal(publicPriceFrom("EXACT", -1), null);
+assert.equal(catalogPriceLabel({ priceFrom: 0, priceMode: "FREE", currency: "BYN" }), "Бесплатно");
+assert.equal(catalogPriceLabel({ priceFrom: null, priceMode: "ON_REQUEST", currency: "BYN" }), "Цена по запросу");
+assert.ok(catalogPriceLabel({ priceFrom: 90, priceMode: "FROM", currency: "BYN" }).startsWith("От "));
+assert.ok(!catalogPriceLabel({ priceFrom: 90, priceMode: "EXACT", currency: "BYN" }).startsWith("От "));
 console.log("realCatalog.test.ts: OK");

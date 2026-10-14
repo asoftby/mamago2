@@ -1,7 +1,7 @@
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
-import { extractPartyDetails, type BirthdayCatalogItem } from "@/features/birthday/builder/lib/realCatalog";
+import { extractPartyDetails, publicPriceFrom, type BirthdayCatalogItem } from "@/features/birthday/builder/lib/realCatalog";
 
 /** Real published offers with approved birthday placement only. No mock results. */
 export async function getPublicBirthdayCatalog(citySlug: string): Promise<BirthdayCatalogItem[] | null> {
@@ -43,7 +43,7 @@ export async function getPublicBirthdayCatalog(citySlug: string): Promise<Birthd
       businessId: offer.place.ownerBusiness.id,
       businessName: offer.place.ownerBusiness.name,
       coverImage: offer.coverImage,
-      priceFrom: offer.priceFrom !== null && Number.isFinite(offer.priceFrom) && offer.priceFrom >= 0 ? offer.priceFrom : null,
+      priceFrom: publicPriceFrom(offer.priceMode, offer.priceFrom),
       priceMode: offer.priceMode, currency: offer.currency,
       ageMinMonths: offer.ageMinMonths, ageMaxMonths: offer.ageMaxMonths,
       minChildren: offer.minChildren, maxChildren: offer.maxChildren,

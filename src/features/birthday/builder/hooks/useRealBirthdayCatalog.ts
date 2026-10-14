@@ -28,7 +28,10 @@ export function useRealBirthdayCatalog(citySlug: string) {
             !Array.isArray(body.offers)) {
           throw new Error("Сервер вернул некорректный каталог");
         }
-        const offers = body.offers.filter((entry: unknown): entry is BirthdayCatalogItem =>
+        const offers = body.offers.map((entry: unknown) => entry && typeof entry === "object"
+          ? { ...entry, includedCategories: Array.isArray((entry as { includedCategories?: unknown }).includedCategories)
+              ? (entry as { includedCategories: unknown[] }).includedCategories : [] }
+          : entry).filter((entry: unknown): entry is BirthdayCatalogItem =>
           Boolean(entry && typeof entry === "object" &&
             "id" in entry && typeof entry.id === "string" &&
             "title" in entry && typeof entry.title === "string" &&

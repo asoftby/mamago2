@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { BirthdayCatalogItem, PartyCategoryKey } from "../../lib/realCatalog";
 import type { PlaceType } from "../../types/builder";
-import { eligibleAddons, isVenueOffer } from "../../lib/catalogSelection";
+import { catalogPriceLabel, eligibleAddons, isVenueOffer } from "../../lib/catalogSelection";
 
 const GROUPS: { title: string; categories: PartyCategoryKey[] }[] = [
   { title: "Аниматоры и программы", categories: ["ANIMATOR", "SHOW", "MASTER_CLASS", "PROGRAM"] },
@@ -28,10 +28,7 @@ type Props = {
   onToggleAddon: (id: string) => void;
 };
 
-function priceLabel(offer: BirthdayCatalogItem) {
-  if (offer.priceFrom == null) return "Цена по запросу";
-  return "От " + offer.priceFrom.toLocaleString("ru-RU") + " " + offer.currency;
-}
+const priceLabel = catalogPriceLabel;
 
 function OfferCard({
   offer, selected, onToggle, type,

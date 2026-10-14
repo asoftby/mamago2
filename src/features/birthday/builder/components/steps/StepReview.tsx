@@ -1,7 +1,7 @@
 "use client";
 
 import type { BirthdayCatalogItem } from "../../lib/realCatalog";
-import { catalogPriceSummary } from "../../lib/catalogSelection";
+import { catalogPriceLabel, catalogPriceSummary } from "../../lib/catalogSelection";
 
 export function StepReview({ offers }: { offers: BirthdayCatalogItem[] }) {
   const total = catalogPriceSummary(offers);
@@ -28,7 +28,7 @@ export function StepReview({ offers }: { offers: BirthdayCatalogItem[] }) {
               )}
             </div>
             <div className="shrink-0 font-semibold">
-              {offer.priceFrom == null ? "По запросу" : "От " + offer.priceFrom.toLocaleString("ru-RU") + " " + offer.currency}
+              {catalogPriceLabel(offer)}
             </div>
           </div>
         ))}

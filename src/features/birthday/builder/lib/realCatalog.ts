@@ -43,6 +43,8 @@ export function extractPartyDetails(details: unknown, components: readonly {
 }
 export function matchesBirthdayRequirements(item: BirthdayCatalogItem, q: {
   ageMonths?: number | null; children?: number | null; maxBudget?: number | null;
+  /** Guest group as a range; the offer is kept when its capacity overlaps it. */
+  childrenMin?: number | null; childrenMax?: number | null;
 }): boolean {
   if (q.ageMonths != null && (
     (item.ageMinMonths != null && q.ageMonths < item.ageMinMonths) ||
@@ -52,6 +54,15 @@ export function matchesBirthdayRequirements(item: BirthdayCatalogItem, q: {
     (item.minChildren != null && q.children < item.minChildren) ||
     (item.maxChildren != null && q.children > item.maxChildren)
   )) return false;
+  if (q.childrenMin != null && item.maxChildren != null && item.maxChildren < q.childrenMin) return false;
+  if (q.childrenMax != null && item.minChildren != null && item.minChildren > q.childrenMax) return false;
   if (q.maxBudget != null && item.priceFrom != null && item.priceFrom > q.maxBudget) return false;
   return true;
+}
+
+/** ON_REQUEST / NONE / UNKNOWN keep a stale number in the DB; it must not surface as a price. */
+export function publicPriceFrom(priceMode: string, priceFrom: number | null): number | null {
+  if (priceMode === "FREE") return 0;
+  if (priceMode === "ON_REQUEST" || priceMode === "NONE" || priceMode === "UNKNOWN") return null;
+  return priceFrom !== null && Number.isFinite(priceFrom) && priceFrom >= 0 ? priceFrom : null;
 }
