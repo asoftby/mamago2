@@ -53,6 +53,7 @@ import {
 } from "./mappers";
 
 import { Step8Review } from "./steps/Step8Review";
+import { StepPaymentTerms } from "./steps/StepPaymentTerms";
 import { StepOpeningHours } from "./steps/StepOpeningHours";
 import { StepBookingMethod } from "./steps/StepBookingMethod";
 import { Step4CampSchedule } from "./steps/Step4CampSchedule";
@@ -592,6 +593,7 @@ export function OfferWizard({
           ...(mode === "edit" && canDirectPublish ? { status: "PUBLISHED" as const } : {}),
           wizardCompletedSteps: completedSteps,
           includeSchedule: variant === "v2" && scheduleChanged,
+          includeTerms: variant === "v2",
           previousSchedule: (JSON.parse(baselineFormJson) as OfferFormData).schedule,
         });
         const response = await fetch(`/api/business/offers/${offerId}`, {
@@ -629,6 +631,7 @@ export function OfferWizard({
           wizardCompletedSteps: completedSteps,
           createRequestId: draft.createRequestId,
           includeSchedule: variant === "v2" && scheduleChanged,
+          includeTerms: variant === "v2",
         });
         const response = await fetch("/api/business/offers", {
           method: "POST",
@@ -717,6 +720,7 @@ export function OfferWizard({
           wizardCompletedSteps: completedSteps,
           createRequestId: draft.createRequestId,
           includeSchedule: variant === "v2" && scheduleChanged,
+          includeTerms: variant === "v2",
         });
         const createResponse = await fetch("/api/business/offers", {
           method: "POST",
@@ -755,6 +759,7 @@ export function OfferWizard({
         status: canDirectPublish ? "PUBLISHED" : "PENDING",
         wizardCompletedSteps: completedSteps,
         includeSchedule: variant === "v2" && scheduleChanged,
+          includeTerms: variant === "v2",
         previousSchedule: (JSON.parse(baselineFormJson) as OfferFormData).schedule,
       });
       const response = await fetch(`/api/business/offers/${offerId}`, {
@@ -838,7 +843,7 @@ export function OfferWizard({
         case "type":
           return <Step1Type {...commonProps} showCategories={variant === "v2"} />;
         case "placements":
-          return <Step2Placements {...commonProps} showAdditionalPlacements={variant !== "v2"} />;
+          return <Step2Placements {...commonProps} showAdditionalPlacements={variant !== "v2"} showTerms={variant !== "v2"} />;
         case "details":
           return <Step2Information {...commonProps} v2={variant === "v2"} />;
         case "photo":
@@ -860,6 +865,8 @@ export function OfferWizard({
               externalUrlLocked={isPublishedEditMode && !canPublishContentDirectly(userRole)}
             />
           );
+        case "paymentTerms":
+          return <StepPaymentTerms {...commonProps} />;
         case "contacts":
           return <Step6Contacts {...commonProps} />;
         case "faq":

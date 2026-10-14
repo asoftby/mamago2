@@ -16,6 +16,7 @@ import {
   serviceDetails as serviceDetailsSchema,
 } from "@/lib/offers/offer-types/details-schemas";
 import type { PublicationAccess } from "@/features/publication-access";
+import { pickTermsValue, termsColumnValue } from "@/lib/offers/offerTerms";
 import {
   bookingMethodFromColumns,
   buildScheduleInput,
@@ -619,6 +620,8 @@ export function buildOfferCreatePayload(
     createRequestId?: string;
     /** Новый мастер: отправлять шаг «Расписание». Старый мастер расписание не трогает. */
     includeSchedule?: boolean;
+    /** Новый мастер: отправлять предоплату, отмену и зону выезда (колонки Offer). */
+    includeTerms?: boolean;
   }
 ) {
   if (!data.placeId) {
@@ -697,6 +700,7 @@ export function buildOfferCreatePayload(
     classChipSlugs: data.classChipSlugs,
     categoryIds: data.categoryIds,
     interestSlugs: data.interestSlugs,
+    ...(opts?.includeTerms ? termsPayload(data) : {}),
     ...(opts?.includeSchedule ? { schedule: buildScheduleInput(data.schedule, productType) } : {}),
     wizardCompletedSteps: opts?.wizardCompletedSteps,
     faqItems: normalizeFaqItems(data.faqItems),
@@ -704,7 +708,7 @@ export function buildOfferCreatePayload(
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
-    details: buildTypeDetails(data),
+    details: buildTypeDetails(opts?.includeTerms ? withTermsInPartyDetails(data) : data),
     // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write)
     ...(buildPartyFilterColumns(data) ?? {}),
     // Camp/accommodation-поля — только для лагерей; данные скрытых шагов
@@ -713,6 +717,31 @@ export function buildOfferCreatePayload(
   };
 
   return base;
+}
+
+/** Предоплата, отмена и зона выезда новых колонок Offer: пустое значение стирает колонку. */
+function termsPayload(data: OfferFormData) {
+  return {
+    prepaymentTerms: termsColumnValue(data.prepaymentTerms),
+    cancellationTerms: termsColumnValue(data.cancellationTerms),
+    serviceAreaText: termsColumnValue(data.serviceAreaText),
+  };
+}
+
+/**
+ * Каталог праздников читает условия из `details`, поэтому у party-оффера значения нового шага
+ * дублируются туда (копия, а не перенос — решение 7 фазы 0).
+ */
+function withTermsInPartyDetails(data: OfferFormData): OfferFormData {
+  if (data.productType !== "PARTY_SERVICE" && data.productType !== "PARTY_PACKAGE") return data;
+  return {
+    ...data,
+    birthdayDetails: {
+      ...data.birthdayDetails,
+      prepaymentTerms: data.prepaymentTerms,
+      cancellationTerms: data.cancellationTerms,
+    },
+  };
 }
 
 function buildTypeDetails(data: OfferFormData): Record<string, unknown> | undefined {
@@ -834,6 +863,8 @@ export function buildOfferUpdatePayload(
     wizardCompletedSteps?: string[];
     /** Новый мастер: отправлять шаг «Расписание». Старый мастер расписание не трогает. */
     includeSchedule?: boolean;
+    /** Новый мастер: отправлять предоплату, отмену и зону выезда (колонки Offer). */
+    includeTerms?: boolean;
     previousSchedule?: OfferScheduleForm;
   }
 ) {
@@ -907,13 +938,14 @@ export function buildOfferUpdatePayload(
     classChipSlugs: data.classChipSlugs,
     categoryIds: data.categoryIds,
     interestSlugs: data.interestSlugs,
+    ...(opts?.includeTerms ? termsPayload(data) : {}),
     ...(opts?.includeSchedule ? { schedule: opts.previousSchedule
       ? buildChangedScheduleInput(data.schedule, opts.previousSchedule, productType)
       : buildScheduleInput(data.schedule, productType) } : {}),
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
-    details: buildTypeDetails(data),
+    details: buildTypeDetails(opts?.includeTerms ? withTermsInPartyDetails(data) : data),
     // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write)
     ...(buildPartyFilterColumns(data) ?? {}),
     // CAMP — camp/accommodation-данные; иначе явные null (затирание в БД)
@@ -1018,6 +1050,9 @@ export function mapOfferToFormData(offer: {
   classChipSlugs?: string[];
   categoryLinks?: Array<{ categoryId: string; sortOrder: number }> | null;
   interestSlugs?: string[] | null;
+  prepaymentTerms?: string | null;
+  cancellationTerms?: string | null;
+  serviceAreaText?: string | null;
   // Camp fields
   campProgramType?: string | null;
   campSessions?: unknown;
@@ -1211,6 +1246,9 @@ export function mapOfferToFormData(offer: {
     signalIds: offer.discoverySignalIds ?? [],
     classChipSlugs: offer.classChipSlugs ?? [],
     interestSlugs: offer.interestSlugs ?? [],
+    prepaymentTerms: pickTermsValue(offer.prepaymentTerms, usesPartyColumns ? serviceDetails?.prepaymentTerms : null),
+    cancellationTerms: pickTermsValue(offer.cancellationTerms, usesPartyColumns ? serviceDetails?.cancellationTerms : null),
+    serviceAreaText: offer.serviceAreaText ?? "",
     schedule: scheduleFromOffer(offer),
     categoryIds: [...(offer.categoryLinks ?? [])]
       .sort((a, b) => a.sortOrder - b.sortOrder)

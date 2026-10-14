@@ -120,6 +120,9 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     classChipSlugs: [],
     categoryIds: [],
     interestSlugs: [],
+    prepaymentTerms: "",
+    cancellationTerms: "",
+    serviceAreaText: "",
     schedule: defaultOfferSchedule(),
     
     // PLACE_VISIT type-specific details

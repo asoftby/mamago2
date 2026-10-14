@@ -83,6 +83,7 @@ export type OfferWizardStepKey =
   // Блоки внутри составных шагов нового мастера (самостоятельными шагами не бывают)
   | "openingHours"
   | "bookingMethod"
+  | "paymentTerms"
   | "review";
 
 /** Вариант мастера: v1 — текущий, v2 — новый мастер из 6 шагов за флагом. */
@@ -208,6 +209,10 @@ export interface OfferFormData {
   categoryIds: string[];
   /** Интересы ребёнка (до 5): slug из SYSTEM_INTERESTS. */
   interestSlugs: string[];
+  /** Предоплата / отмена / зона выезда нового мастера (колонки Offer). Стандартная строка чипа или «Своё: …». */
+  prepaymentTerms: string;
+  cancellationTerms: string;
+  serviceAreaText: string;
   /** Шаг «Расписание» нового мастера: способ записи, режим работы, закрытые дни. */
   schedule: OfferScheduleForm;
   

@@ -19,6 +19,8 @@ interface Step2PlacementsProps {
   isEditable: boolean;
   /** Новый мастер: блок «другие разделы каталога» показывает «О предложении» один раз, здесь он скрыт. */
   showAdditionalPlacements?: boolean;
+  /** Предоплата и отмена: в новом мастере они на шаге «Условия и контакты». */
+  showTerms?: boolean;
 }
 
 const LOCATION_OPTIONS: Array<{ value: BirthdayLocationType; label: string }> = [
@@ -45,6 +47,7 @@ export function Step2Placements({
   onChange,
   isEditable,
   showAdditionalPlacements = true,
+  showTerms = true,
 }: Step2PlacementsProps) {
   const isService = data.productType === "PARTY_SERVICE";
   const isPackage = data.productType === "PARTY_PACKAGE";
@@ -52,7 +55,7 @@ export function Step2Placements({
   const [showMore, setShowMore] = useState(false);
   const hasAdditionalData = Boolean(
     birthday.program.trim() || birthday.note.trim() || birthday.includedCategories.length ||
-    birthday.prepaymentTerms.trim() || birthday.cancellationTerms.trim() ||
+    (showTerms && (birthday.prepaymentTerms.trim() || birthday.cancellationTerms.trim())) ||
     data.occasions.length || data.requestedPlacements.length > 1,
   );
   const moreOpen = showMore;
@@ -188,6 +191,8 @@ export function Step2Placements({
               onChange={(event) => updateBirthdayDetails({ note: event.target.value })}
               disabled={!isEditable} placeholder="Например: стоимость выезда за город" />
           </div>
+          {showTerms ? (
+            <>
           <div className="space-y-2">
             <Label htmlFor="party-prepayment">Предоплата</Label>
             <Textarea id="party-prepayment" rows={2} value={birthday.prepaymentTerms}
@@ -200,6 +205,8 @@ export function Step2Placements({
               onChange={(event) => updateBirthdayDetails({ cancellationTerms: event.target.value })}
               disabled={!isEditable} placeholder="Например: возврат при отмене за 7 дней" />
           </div>
+            </>
+          ) : null}
           <div className="space-y-2">
             <p className="text-sm font-medium">Другие поводы</p>
             <div className="flex flex-wrap gap-4">
