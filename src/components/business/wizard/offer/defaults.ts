@@ -1,6 +1,7 @@
 // Offer Wizard Defaults
 // Refactored for multi-type support (SINGLE, REGULAR, CAMP)
 
+import { defaultOfferSchedule } from "@/lib/offers/offerSchedule";
 import type { OfferFormData, SocialLink } from "./types";
 import { AgePolicy } from "@prisma/client";
 
@@ -119,6 +120,7 @@ export function getDefaultFormData(defaultPlaceId: string | null = null): OfferF
     classChipSlugs: [],
     categoryIds: [],
     interestSlugs: [],
+    schedule: defaultOfferSchedule(),
     
     // PLACE_VISIT type-specific details
     placeVisitDetails: {

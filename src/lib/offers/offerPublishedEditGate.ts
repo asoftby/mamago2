@@ -35,6 +35,10 @@ export const OFFER_OPERATIONAL_COLUMNS: ReadonlySet<string> = new Set([
   "contactPhone",
   "contactPhone2",
   "contactPhone3",
+  // способ записи и режим работы (шаг «Расписание»)
+  "bookingEnabled",
+  "bookingMode",
+  "inheritPlaceOpeningHours",
   // предоплата, отмена, зона выезда (колонки появятся с шагом «Условия»)
   "prepaymentTerms",
   "cancellationTerms",

@@ -29,6 +29,15 @@ import { checkInterestSlugs } from "@/lib/offers/offerInterests";
 import { OfferCategoriesError, syncOfferCategories } from "@/server/offers/offerCategories";
 import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
 import { projectCampSessions } from "@/server/offers/campSessionProjection";
+import { offerScheduleInputSchema } from "@/lib/offers/offerSchedule";
+import {
+  OfferExternalUrlRequiresModerationError,
+  OfferScheduleValidationError,
+  applyOfferSchedule,
+  assertScheduleValid,
+  scheduleOfferColumns,
+  snapshotOfferSchedule,
+} from "@/server/offers/offerSchedule.service";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { formatZodErrorResponse } from "@/lib/validation/zodErrorResponse";
@@ -127,6 +136,8 @@ const updateOfferSchema = z.object({
   interestSlugs: z.array(z.string()).max(5).optional(),
   /** Версия операционных данных, на которой клиент построил форму (`offerOperationalVersion`): защита от записи устаревшего снимка. */
   expectedOperationalVersion: z.string().optional(),
+  /** Шаг «Расписание» нового мастера: способ записи, режим работы, закрытые дни. */
+  schedule: offerScheduleInputSchema.optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
   discoverySignalIds: z.array(z.string()).optional(),
   classChipSlugs: z.array(z.string()).optional(),
@@ -578,6 +589,10 @@ export async function PATCH(
       }
     }
 
+    // Расписание: колонки записи идут через общую проверку по полям и журнал операционных правок.
+    assertScheduleValid(data.schedule);
+    Object.assign(updateData, scheduleOfferColumns(data.schedule));
+
     // Результат проверки опубликованного оффера по полям (заполняется внутри транзакции).
     const gate: {
       skipRequestedPlacements: boolean;
@@ -798,10 +813,37 @@ export async function PATCH(
         }
       }
 
+      const scheduleBefore =
+        data.schedule && gateApplies && existingOffer.status === "PUBLISHED"
+          ? await snapshotOfferSchedule(tx, id)
+          : null;
+
       await tx.offer.update({
         where: { id },
         data: updateData,
       });
+
+      await applyOfferSchedule({
+        db: tx,
+        offerId: id,
+        input: data.schedule,
+        externalUrlNeedsModeration: gateApplies && existingOffer.status === "PUBLISHED",
+      });
+
+      if (scheduleBefore) {
+        await tx.adminAuditLog.create({
+          data: {
+            actorId: user.id,
+            actorRole: user.role,
+            action: "offer.schedule_edit",
+            entityType: "Offer",
+            entityId: id,
+            before: scheduleBefore,
+            after: await snapshotOfferSchedule(tx, id),
+            metadata: { status: existingOffer.status },
+          },
+        });
+      }
 
       if (gate.journal) {
         await tx.adminAuditLog.create({
@@ -962,6 +1004,22 @@ export async function PATCH(
           code: "INVALID_OFFER_CATEGORIES",
         },
         { status: 400 },
+      );
+    }
+
+    if (error instanceof OfferScheduleValidationError) {
+      return NextResponse.json({ error: error.message, code: "INVALID_OFFER_SCHEDULE" }, { status: 400 });
+    }
+
+    if (error instanceof OfferExternalUrlRequiresModerationError) {
+      return NextResponse.json(
+        {
+          error: "OFFER_EXTERNAL_URL_REQUIRES_MODERATION",
+          code: "OFFER_EXTERNAL_URL_REQUIRES_MODERATION",
+          message: "Ссылку внешней записи опубликованного предложения нельзя изменить напрямую",
+          description: "Внешние ссылки проходят модерацию. Обратитесь в поддержку или выберите другой способ записи.",
+        },
+        { status: 403 },
       );
     }
 

@@ -6,7 +6,7 @@
 import type { OpeningHoursData, DayRule } from "@/components/openingHours";
 import type { OpeningHoursWithRelations } from "@/server/services/openingHours/openingHours.types";
 import type { Prisma } from "@prisma/client";
-import { ALL_DAYS } from "@/components/openingHours";
+import { ALL_DAYS } from "@/components/openingHours/openingHours.types";
 
 /**
  * Map database/domain model to UI state

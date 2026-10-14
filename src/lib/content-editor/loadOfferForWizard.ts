@@ -29,6 +29,9 @@ export async function loadOfferForWizard(offerId: string, options?: { viewerEdit
       categoryLinks: {
         orderBy: { sortOrder: "asc" },
       },
+      offerBooking: {
+        select: { externalKind: true, externalUrl: true },
+      },
       openingHours: {
         include: {
           rules: {

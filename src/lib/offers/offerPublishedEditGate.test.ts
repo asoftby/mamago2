@@ -72,6 +72,12 @@ assert.equal(classifyOfferColumn("priceFrom"), "operational");
 assert.equal(classifyOfferColumn("priceCaption"), "content");
 assert.equal(classifyOfferColumn("priceText"), "content");
 assert.equal(classifyOfferColumn("priceTextDerived"), "operational");
+// шаг «Расписание»: способ записи и режим работы применяются сразу
+assert.equal(classifyOfferColumn("bookingMode"), "operational");
+assert.equal(classifyOfferColumn("bookingEnabled"), "operational");
+assert.equal(classifyOfferColumn("inheritPlaceOpeningHours"), "operational");
+// ...а ссылка внешней записи (OfferBooking.externalUrl) в колонках Offer не живёт: её защищает сервис
+assert.equal(classifyOfferColumn("contactWebsite"), "content");
 assert.equal(classifyOfferColumn("contactPhoneLabel"), "content");
 assert.equal(classifyOfferColumn("contactPhone2Label"), "content");
 assert.equal(classifyOfferColumn("contactPhone3Label"), "content");
