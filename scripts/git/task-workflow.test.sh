@@ -20,6 +20,19 @@ quiet_git() {
   git "$@" >/dev/null 2>&1
 }
 
+# Stub pnpm: records calls so the test never touches the network or a real install.
+stub_bin="$tmp_root/bin"
+pnpm_log="$tmp_root/pnpm.log"
+mkdir -p "$stub_bin"
+cat > "$stub_bin/pnpm" <<'STUB'
+#!/usr/bin/env sh
+printf '%s\n' "$*" >> "$PNPM_STUB_LOG"
+STUB
+chmod +x "$stub_bin/pnpm"
+PATH="$stub_bin:$PATH"
+PNPM_STUB_LOG="$pnpm_log"
+export PATH PNPM_STUB_LOG
+
 git init --bare "$remote" >/dev/null
 quiet_git clone "$remote" "$canonical"
 
@@ -29,6 +42,7 @@ mkdir -p "$canonical/scripts/git"
 cp "$source_repo/scripts/git/session-start-gate.sh" "$canonical/scripts/git/session-start-gate.sh"
 cp "$source_repo/scripts/git/task-start.sh" "$canonical/scripts/git/task-start.sh"
 cp "$source_repo/scripts/git/task-sync.sh" "$canonical/scripts/git/task-sync.sh"
+cp "$source_repo/scripts/git/worktree-deps.sh" "$canonical/scripts/git/worktree-deps.sh"
 cp "$source_repo/scripts/git/install-shell-shortcuts.sh" "$canonical/scripts/git/install-shell-shortcuts.sh"
 printf 'init\n' > "$canonical/README.md"
 git -C "$canonical" add README.md scripts/git
@@ -48,6 +62,16 @@ first_worktree="$(cat "$canonical/.git/mamago-last-worktree")"
 }
 [ "$(git -C "$first_worktree" branch --show-current)" = "fix/demo-task-$(date +%Y%m%d)" ] || {
   echo "[task-workflow-test] task-start created an unexpected branch name" >&2
+  exit 1
+}
+
+# task-start must install deps and generate the client itself, never symlink node_modules.
+grep -qx 'install --frozen-lockfile' "$pnpm_log" && grep -qx 'exec prisma generate' "$pnpm_log" || {
+  echo "[task-workflow-test] task-start did not run pnpm install + prisma generate" >&2
+  exit 1
+}
+[ ! -L "$first_worktree/node_modules" ] || {
+  echo "[task-workflow-test] task-start must not symlink node_modules" >&2
   exit 1
 }
 
@@ -121,6 +145,41 @@ set -e
   echo "[task-workflow-test] overlapping task/dev files must stop automatic reconciliation" >&2
   exit 1
 }
+
+# Guard: a node_modules symlink pointing outside the worktree must fail; one inside is fine.
+mkdir -p "$tmp_root/shared-nm"
+ln -s "$tmp_root/shared-nm" "$second_worktree/node_modules"
+set +e
+(cd "$second_worktree" && sh scripts/git/worktree-deps.sh check >/dev/null 2>&1)
+symlink_status=$?
+set -e
+[ "$symlink_status" -eq 10 ] || {
+  echo "[task-workflow-test] external node_modules symlink must fail the guard" >&2
+  exit 1
+}
+rm "$second_worktree/node_modules"
+
+# Guard: stale generated client fails; fresh passes. Uses a fake @prisma/client + client.
+mkdir -p "$second_worktree/node_modules/@prisma/client" "$second_worktree/node_modules/.prisma/client" "$second_worktree/prisma"
+printf '{"name":"@prisma/client","main":"index.js"}\n' > "$second_worktree/node_modules/@prisma/client/package.json"
+printf '' > "$second_worktree/node_modules/@prisma/client/index.js"
+printf '' > "$second_worktree/node_modules/.prisma/client/index.js"
+printf 'x\n' > "$second_worktree/prisma/schema.prisma"
+touch -t 202001010000 "$second_worktree/node_modules/.prisma/client/index.js"
+set +e
+(cd "$second_worktree" && sh scripts/git/worktree-deps.sh check >/dev/null 2>&1)
+stale_status=$?
+set -e
+[ "$stale_status" -eq 12 ] || {
+  echo "[task-workflow-test] stale Prisma Client must fail the guard (got $stale_status)" >&2
+  exit 1
+}
+touch "$second_worktree/node_modules/.prisma/client/index.js"
+(cd "$second_worktree" && sh scripts/git/worktree-deps.sh check >/dev/null) || {
+  echo "[task-workflow-test] fresh Prisma Client must pass the guard" >&2
+  exit 1
+}
+rm -rf "$second_worktree/node_modules" "$second_worktree/prisma"
 
 mkdir -p "$home_dir"
 (

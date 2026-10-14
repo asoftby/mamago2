@@ -86,3 +86,16 @@ if ! git merge-base --is-ancestor origin/dev HEAD; then
 fi
 
 echo "[task-sync] PASS: task now contains current origin/dev ($(git rev-parse --short=12 origin/dev))."
+
+# The merge may have changed the Prisma schema or lockfile; refresh THIS worktree's own
+# node_modules / generated client so tsc and tests see the merged schema.
+changed_deps="$(git diff --name-only "$old_head"..HEAD -- 'prisma/*.prisma' pnpm-lock.yaml)"
+if [ -n "$changed_deps" ] && [ -f scripts/git/worktree-deps.sh ] && [ "${MAMAGO_SKIP_DEPS:-}" != "1" ]; then
+  echo "[task-sync] Schema/lockfile changed by the merge:"
+  printf '%s\n' "$changed_deps" | sed 's/^/  - /'
+  if printf '%s\n' "$changed_deps" | grep -qx 'pnpm-lock.yaml'; then
+    sh scripts/git/worktree-deps.sh install || exit 9
+  else
+    sh scripts/git/worktree-deps.sh generate || exit 9
+  fi
+fi

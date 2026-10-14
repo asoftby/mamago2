@@ -20,7 +20,7 @@ sh scripts/git/task-check.sh
 sh scripts/git/task-finish.sh
 ```
 
-`task-start.sh` wraps the freshness gate, captures exact `BASE_HEAD`, creates the isolated dated branch/worktree, and verifies its base. `task-sync.sh` automatically merges non-overlapping fresh `origin/dev` changes but stops when the same files changed on both sides. `task-check.sh` runs the shared push gate; task-specific tests are still required. `task-finish.sh` performs the final freshness/diff checks and normal push/PR handoff. Never bypass a safety stop. Human shortcuts `mgtask`, `mgcheck`, and `mgfinish` are documented in `docs/engineering/one-command-task-workflow.md`.
+`task-start.sh` wraps the freshness gate, captures exact `BASE_HEAD`, creates the isolated dated branch/worktree, and verifies its base. `task-sync.sh` automatically merges non-overlapping fresh `origin/dev` changes but stops when the same files changed on both sides. `task-check.sh` runs the shared push gate; task-specific tests are still required. `task-finish.sh` performs the final freshness/diff checks and normal push/PR handoff. Each worktree owns its `node_modules` and Prisma Client (`task-start.sh` runs `pnpm install --frozen-lockfile` + `prisma generate`; `task-sync.sh` regenerates when the schema changes). **Never symlink `node_modules` to another checkout** — the shared generated client makes `tsc` results random; the push gate fails on it (`scripts/git/worktree-deps.sh`). Never bypass a safety stop. Human shortcuts `mgtask`, `mgcheck`, and `mgfinish` are documented in `docs/engineering/one-command-task-workflow.md`.
 
 1. In the canonical `dev` checkout run:
 
