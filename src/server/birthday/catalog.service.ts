@@ -3,6 +3,10 @@ import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
 import { extractPartyDetails, publicPriceFrom, type BirthdayCatalogItem } from "@/features/birthday/builder/lib/realCatalog";
 
+// Bounded first page only: UI-specific age, guest, budget and location filters
+// run later in the builder. A 100-row cap could hide relevant offers before that.
+const BIRTHDAY_CATALOG_CAP = 500;
+
 /** Real published offers with approved birthday placement only. No mock results. */
 export async function getPublicBirthdayCatalog(citySlug: string): Promise<BirthdayCatalogItem[] | null> {
   const city = await findCityBySlug(citySlug, { select: { id: true }, isActive: true });
@@ -10,8 +14,12 @@ export async function getPublicBirthdayCatalog(citySlug: string): Promise<Birthd
   const offers = await prisma.offer.findMany({
     where: { AND: [
       getPublicPublishedOfferWhere(),
-      { place: { cityId: city.id } },
-      { productType: { in: ["PARTY_SERVICE", "PARTY_PACKAGE"] } },
+      // Exclude rows that cannot become a catalog card before applying the cap.
+      { place: { cityId: city.id, ownerBusiness: { isNot: null } } },
+      { OR: [
+        { productType: "PARTY_PACKAGE" },
+        { productType: "PARTY_SERVICE", category: { not: null } },
+      ] },
       { placements: { some: { key: "BIRTHDAY", status: "APPROVED" } } },
     ] },
     select: {
@@ -23,8 +31,14 @@ export async function getPublicBirthdayCatalog(citySlug: string): Promise<Birthd
       place: { select: { title: true, ownerBusiness: { select: { id: true, name: true } } } },
     },
     orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
-    take: 100,
+    take: BIRTHDAY_CATALOG_CAP,
   });
+  if (offers.length === BIRTHDAY_CATALOG_CAP) {
+    // A bounded result may have omitted later offers, even after stable DB filtering.
+    console.warn("[birthday/catalog] Offer cap reached; results may be truncated", {
+      citySlug, cap: BIRTHDAY_CATALOG_CAP,
+    });
+  }
   return offers.flatMap((offer): BirthdayCatalogItem[] => {
     if ((offer.productType !== "PARTY_SERVICE" && offer.productType !== "PARTY_PACKAGE") ||
         !offer.placeId || !offer.place?.ownerBusiness) return [];
