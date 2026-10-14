@@ -59,6 +59,8 @@ type BusinessPublicationCardProps = {
   footnote?: ReactNode;
   /** Метрики для правого блока */
   metrics?: BusinessPublicationMetrics | null;
+  /** What window these counters represent; never label lifetime totals as today. */
+  metricsPeriodLabel?: string;
   /** Совет / подсказка внизу карточки */
   tip?: { text: string; ctaLabel?: string; ctaHref?: string } | null;
   actions: ReactNode;
@@ -137,6 +139,7 @@ export function BusinessPublicationCard({
   createdLine,
   footnote,
   metrics,
+  metricsPeriodLabel,
   tip,
   actions,
   className,
@@ -203,9 +206,12 @@ export function BusinessPublicationCard({
           {avatarSlot}
 
           <div className="min-w-0 flex-1 space-y-1.5">
-            {/* Type chip */}
-            {typeChip ? (
-              <div className="flex items-center">{typeChip}</div>
+            {/* Type and status are peer pills above the publication name. */}
+            {(typeChip || statusRow) ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {typeChip}
+                {statusRow}
+              </div>
             ) : null}
 
             {/* Title */}
@@ -230,13 +236,6 @@ export function BusinessPublicationCard({
               </p>
             ) : null}
 
-            {/* Status row */}
-            {statusRow ? (
-              <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                {statusRow}
-              </div>
-            ) : null}
-
             {/* Footnote */}
             {footnote ? <div className="pt-0.5">{footnote}</div> : null}
           </div>
@@ -244,7 +243,8 @@ export function BusinessPublicationCard({
 
         {/* Right: metrics */}
         {hasMetrics ? (
-          <div className="flex shrink-0 gap-3 sm:self-center">
+          <div className="flex shrink-0 flex-col gap-1 sm:self-center"> 
+            <div className="flex gap-3">
             <MetricCell
               icon={<TrendingUp className="h-3.5 w-3.5" />}
               label="Просмотры"
@@ -267,6 +267,12 @@ export function BusinessPublicationCard({
                 type === "event" ? metrics!.planAddsDelta : metrics!.ctaClicksDelta
               }
             />
+            </div>
+            {metricsPeriodLabel ? (
+              <p className="text-center text-xs font-medium text-stone-500" aria-label={`Период статистики: ${metricsPeriodLabel}`}>
+                {metricsPeriodLabel}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>

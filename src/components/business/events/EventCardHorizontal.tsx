@@ -107,7 +107,7 @@ export function canShowEventArchiveAction(status: ContentStatus): boolean {
 function buildEventSubtitle(activity: Activity): string {
   const parts: string[] = [];
   if (activity.place?.title) {
-    parts.push(activity.place.title);
+    parts.push(`Где проходит: ${activity.place.title}`);
   }
   if (activity.nextOccurrenceAt) {
     parts.push(
@@ -248,7 +248,7 @@ export function EventCardHorizontal({
         placeholderIcon={Calendar}
         title={activity.title}
         typeChip={
-          <BusinessChip tone="muted" size="compact">
+          <BusinessChip tone="muted" size="default" className="text-stone-700">
             {activityTypeLabelRu(activity.type)}
           </BusinessChip>
         }
@@ -257,6 +257,7 @@ export function EventCardHorizontal({
         updatedLine={updatedLine}
         createdLine={createdLine}
         metrics={cardMetrics}
+        metricsPeriodLabel="За сегодня"
         actions={
           <>
             <button

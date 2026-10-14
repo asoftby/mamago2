@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { minskDateKey, parseMinskDay, businessPublicationDayRange, businessPublicationCustomRange } from "./publicationAnalyticsRange";
+const now = new Date("2026-10-14T18:00:00+03:00");
+assert.equal(minskDateKey(now), "2026-10-14");
+assert.equal(parseMinskDay("2026-10-14")?.toISOString(), "2026-10-13T21:00:00.000Z");
+assert.equal(parseMinskDay("2026-02-30"), null);
+assert.equal(businessPublicationDayRange("today", now).start.toISOString(), "2026-10-13T21:00:00.000Z");
+assert.equal(businessPublicationDayRange("yesterday", now).end.toISOString(), "2026-10-13T20:59:59.999Z");
+assert.equal(businessPublicationDayRange("week", now).start.toISOString(), "2026-10-07T21:00:00.000Z");
+assert.equal(businessPublicationDayRange("month", now).start.toISOString(), "2026-09-14T21:00:00.000Z");
+const custom = businessPublicationCustomRange({from: "2026-10-09", to: "2026-10-14", publishedAt: new Date("2026-10-10T12:00:00Z"), now});
+assert.equal(custom?.start.toISOString(), "2026-10-10T12:00:00.000Z");
+assert.equal(custom?.end.toISOString(), now.toISOString());
+assert.equal(businessPublicationCustomRange({from:"2026-10-15",to:"2026-10-14",publishedAt:new Date("2026-10-01"),now}),null);
+console.log("publicationAnalyticsRange.test: OK");

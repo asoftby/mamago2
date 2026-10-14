@@ -60,6 +60,9 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
+      - name: Business publication date analytics regressions
+        run: pnpm exec tsx src/lib/business/publicationAnalyticsRange.test.ts
+
       - name: Upload pipeline regressions
         run: pnpm test:upload-pipeline
 
