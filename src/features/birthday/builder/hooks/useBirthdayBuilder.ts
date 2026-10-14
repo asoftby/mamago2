@@ -389,6 +389,16 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
     });
   }, []);
 
+  /** Drops add-ons the real catalog no longer allows (base replaced, package already includes them). */
+  const pruneAddons = useCallback((allowedIds: readonly string[]) => {
+    setState((s) => {
+      const allowed = new Set(allowedIds);
+      const kept = s.selection.selectedAddonIds.filter((id) => allowed.has(id));
+      if (kept.length === s.selection.selectedAddonIds.length) return s;
+      return { ...s, selection: { ...s.selection, selectedAddonIds: kept } };
+    });
+  }, []);
+
   const removeSelectedOffer = useCallback((offerId: string) => {
     setState((s) => {
       // If removing base, clear it
@@ -540,6 +550,7 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
     selectBase,
     replaceBase,
     toggleAddon,
+    pruneAddons,
     removeSelectedOffer,
     revalidateSelection,
     

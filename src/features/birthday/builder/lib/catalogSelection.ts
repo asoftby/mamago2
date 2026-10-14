@@ -68,3 +68,14 @@ export function catalogPriceLabel(offer: Pick<BirthdayCatalogItem, "priceFrom" |
   const amount = offer.priceFrom.toLocaleString("ru-RU") + " " + offer.currency;
   return offer.priceMode === "EXACT" ? amount : "От " + amount;
 }
+
+/** Selected add-ons that are still allowed for the current base; the rest must leave the saved selection. */
+export function compatibleAddonIds(
+  offers: readonly BirthdayCatalogItem[],
+  baseId: string | null,
+  placeType: PlaceType | null,
+  selectedAddonIds: readonly string[],
+): string[] {
+  const allowed = new Set(eligibleAddons(offers, baseId, placeType).map((offer) => offer.id));
+  return selectedAddonIds.filter((id) => allowed.has(id));
+}

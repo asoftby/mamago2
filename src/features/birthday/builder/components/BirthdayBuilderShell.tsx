@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useBirthdayBuilderWithGate } from "../hooks/useBirthdayBuilderWithGate";
 import { useBirthdayAgeSignals } from "../hooks/useBirthdayAgeSignals";
 import { BirthdayAgeSignalHydration } from "./BirthdayAgeSignalHydration";
@@ -16,7 +16,7 @@ import { StepReview } from "./steps/StepReview";
 import { useRealBirthdayCatalog } from "../hooks/useRealBirthdayCatalog";
 import { matchesBirthdayRequirements } from "../lib/realCatalog";
 import {
-  catalogPriceSummary, eligibleAddons, hasValidCatalogAnchor, selectedCatalogOffers,
+  catalogPriceSummary, compatibleAddonIds, eligibleAddons, hasValidCatalogAnchor, selectedCatalogOffers,
 } from "../lib/catalogSelection";
 import { BuilderProgressDots } from "./BuilderProgressDots";
 import { BuilderSummaryBar } from "./BuilderSummaryBar";
@@ -124,6 +124,18 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
       state.selection.selectedAddonIds.filter((id) => allowedAddonIds.has(id)),
     );
   }, [visibleOffers, state.selection.selectedBaseId, state.selection.selectedAddonIds, state.quiz.placeType, validBase]);
+
+  // Persisted state must not keep add-ons that a replaced base made incompatible.
+  const { pruneAddons } = builder;
+  useEffect(() => {
+    if (catalog.status !== "ready") return;
+    const base = state.selection.selectedBaseId;
+    const kept = validBase
+      ? compatibleAddonIds(visibleOffers, base, state.quiz.placeType, state.selection.selectedAddonIds)
+      : [];
+    if (kept.length !== state.selection.selectedAddonIds.length) pruneAddons(kept);
+  }, [catalog.status, validBase, visibleOffers, state.selection.selectedBaseId,
+    state.selection.selectedAddonIds, state.quiz.placeType, pruneAddons]);
 
   const prices = catalogPriceSummary(selectedOffers);
   const totalPrice = prices.minimumByn;

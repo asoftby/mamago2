@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { catalogPriceLabel } from "./catalogSelection";
+import { catalogPriceLabel, compatibleAddonIds } from "./catalogSelection";
 import { extractPartyDetails, matchesBirthdayRequirements, publicPriceFrom, type BirthdayCatalogItem } from "./realCatalog";
 
 assert.deepEqual(extractPartyDetails({
@@ -39,4 +39,13 @@ assert.equal(catalogPriceLabel({ priceFrom: 0, priceMode: "FREE", currency: "BYN
 assert.equal(catalogPriceLabel({ priceFrom: null, priceMode: "ON_REQUEST", currency: "BYN" }), "Цена по запросу");
 assert.ok(catalogPriceLabel({ priceFrom: 90, priceMode: "FROM", currency: "BYN" }).startsWith("От "));
 assert.ok(!catalogPriceLabel({ priceFrom: 90, priceMode: "EXACT", currency: "BYN" }).startsWith("От "));
+// Replacing the base prunes add-ons the new package already includes (and venues).
+const venue = { ...offer, id: "v", category: "VENUE" as const };
+const pkg = { ...offer, id: "pk", productType: "PARTY_PACKAGE" as const, category: null, includedCategories: ["CAKE" as const] };
+const cakeAddon = { ...offer, id: "ck", category: "CAKE" as const };
+const showAddon = { ...offer, id: "sh", category: "SHOW" as const };
+const all = [venue, pkg, cakeAddon, showAddon];
+assert.deepEqual(compatibleAddonIds(all, "v", "VENUE", ["ck", "sh"]), ["ck", "sh"]);
+assert.deepEqual(compatibleAddonIds(all, "pk", "PACKAGE", ["ck", "sh"]), ["sh"]);
+assert.deepEqual(compatibleAddonIds(all, "pk", "PACKAGE", ["v", "gone"]), []);
 console.log("realCatalog.test.ts: OK");
