@@ -1,8 +1,11 @@
-import { PartyCategory, PartyOrderStatus, Prisma, type OfferProductType } from "@prisma/client";
+import { PartyCategory, PartyOrderStatus, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
 import { PartyApiError, type UpdatePartyDraft } from "./partyDraft.validation";
+import {
+  assertCompatibleSelection, includedCategories, offerPriceSnapshot, type CatalogOffer,
+} from "./partySelection";
 
 export async function createPartyDraft(ownerUserId: string, input: {
   citySlug: string; venueMode: "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR";
@@ -44,17 +47,6 @@ export async function readPartyOrder(ownerUserId: string, partyId: string) {
   return party;
 }
 
-type CatalogOffer = {
-  id: string;
-  productType: OfferProductType | null;
-  category: PartyCategory | null;
-  priceFrom: number | null;
-  currency: string;
-  details: Prisma.JsonValue | null;
-  components: { category: PartyCategory; isOptional: boolean }[];
-  place: { ownerBusinessId: string | null } | null;
-};
-
 /** Fetch all selected offers using the same public visibility and approved BIRTHDAY placement. */
 export async function verifyPartyOffers(
   citySlug: string, offerIds: string[], tx?: Prisma.TransactionClient,
@@ -73,7 +65,7 @@ export async function verifyPartyOffers(
       { placements: { some: { key: "BIRTHDAY", status: "APPROVED" } } },
     ] },
     select: {
-      id: true, productType: true, category: true, priceFrom: true,
+      id: true, productType: true, category: true, priceFrom: true, priceMode: true,
       currency: true, details: true,
       components: { select: { category: true, isOptional: true } },
       place: { select: { ownerBusinessId: true } },
@@ -85,21 +77,9 @@ export async function verifyPartyOffers(
   return new Map(rows.map((offer) => [offer.id, offer]));
 }
 
-function isVenueOffer(offer: CatalogOffer): boolean {
-  return offer.productType === "PARTY_PACKAGE" || offer.category === "VENUE";
-}
-
-function includedCategories(offer: CatalogOffer): PartyCategory[] {
-  if (offer.productType !== "PARTY_PACKAGE") return [];
-  const details = offer.details && typeof offer.details === "object" &&
-    !Array.isArray(offer.details) ? offer.details as Record<string, unknown> : {};
-  const included = Array.isArray(details.includedCategories) ? details.includedCategories : [];
-  const validCategories = new Set(Object.values(PartyCategory));
-  return [...new Set([
-    ...included.filter((v): v is PartyCategory => typeof v === "string" &&
-      validCategories.has(v as PartyCategory)),
-    ...offer.components.filter((v) => !v.isOptional).map((v) => v.category),
-  ])];
+function snapshotDecimal(offer: CatalogOffer): Prisma.Decimal | null {
+  const price = offerPriceSnapshot(offer);
+  return price == null ? null : new Prisma.Decimal(price);
 }
 
 export async function updatePartyDraft(
@@ -126,14 +106,8 @@ export async function updatePartyDraft(
     const verified = await verifyPartyOffers(existing.citySlug, ids);
     anchor = verified.get(input.anchorOfferId) ?? null;
     if (!anchor) throw new PartyApiError(422, "Основное предложение не найдено");
-    if ((newMode === "VENUE" || newMode === "PACKAGE") !== isVenueOffer(anchor)) {
-      throw new PartyApiError(422, "Основное предложение не соответствует формату");
-    }
     addons = (input.addonOfferIds ?? []).map((id) => verified.get(id)!);
-    const included = new Set(includedCategories(anchor));
-    if (addons.some((offer) => isVenueOffer(offer) || (offer.category && included.has(offer.category)))) {
-      throw new PartyApiError(422, "Дополнительная услуга уже входит в пакет или является площадкой");
-    }
+    assertCompatibleSelection(newMode, anchor, addons);
   } else if (selectionChange && input.addonOfferIds?.length) {
     throw new PartyApiError(422, "Для дополнительных услуг выберите основную");
   }
@@ -170,8 +144,7 @@ export async function updatePartyDraft(
           data: {
             partyOrderId: partyId, category: anchor.category ?? PartyCategory.OTHER,
             offerId: anchor.id, businessId, role: "ANCHOR",
-            offerPriceSnapshot: anchor.currency === "BYN" && anchor.priceFrom != null
-              ? new Prisma.Decimal(anchor.priceFrom) : null,
+            offerPriceSnapshot: snapshotDecimal(anchor),
             position: 0,
           },
         });
@@ -190,8 +163,7 @@ export async function updatePartyDraft(
               partyOrderId: partyId, category: addon.category ?? PartyCategory.OTHER,
               offerId: addon.id, businessId: addon.place?.ownerBusinessId,
               role: "STANDALONE",
-              offerPriceSnapshot: addon.currency === "BYN" && addon.priceFrom != null
-                ? new Prisma.Decimal(addon.priceFrom) : null,
+              offerPriceSnapshot: snapshotDecimal(addon),
               position: position++,
             },
           });

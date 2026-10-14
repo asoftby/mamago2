@@ -34,3 +34,28 @@ assert.match(read, /ownerUserId, status: "DRAFT", version/);
 assert.match(read, /getPublicPublishedOfferWhere/);
 assert.match(read, /key: "BIRTHDAY", status: "APPROVED"/);
 console.log("partyDraft.contract.test.ts: OK");
+
+import {
+  assertCompatibleSelection, offerPriceSnapshot, type CatalogOffer,
+} from "./partySelection";
+const base: CatalogOffer = {
+  id: "o", productType: "PARTY_SERVICE", category: "VENUE", priceFrom: 100, priceMode: "FROM",
+  currency: "BYN", details: null, components: [], place: { ownerBusinessId: "b" },
+};
+const pkg: CatalogOffer = { ...base, id: "pk", productType: "PARTY_PACKAGE", category: null,
+  details: { includedCategories: ["CAKE"] } };
+const cake: CatalogOffer = { ...base, id: "ck", category: "CAKE" };
+const show: CatalogOffer = { ...base, id: "sh", category: "SHOW" };
+assert.doesNotThrow(() => assertCompatibleSelection("VENUE", base, [cake, show]));
+assert.doesNotThrow(() => assertCompatibleSelection("PACKAGE", pkg, [show]));
+// A replaced base must not keep add-ons it already includes, venues, or itself.
+assert.throws(() => assertCompatibleSelection("PACKAGE", pkg, [cake]), PartyApiError);
+assert.throws(() => assertCompatibleSelection("VENUE", base, [{ ...base, id: "v2" }]), PartyApiError);
+assert.throws(() => assertCompatibleSelection("VENUE", base, [base]), PartyApiError);
+assert.throws(() => assertCompatibleSelection("HOME", base, []), PartyApiError); // venue anchor for a home party
+// Price snapshot honours priceMode: a stale number behind ON_REQUEST is never frozen as a price.
+assert.equal(offerPriceSnapshot({ priceFrom: 500, priceMode: "ON_REQUEST", currency: "BYN" }), null);
+assert.equal(offerPriceSnapshot({ priceFrom: null, priceMode: "FREE", currency: "BYN" }), 0);
+assert.equal(offerPriceSnapshot({ priceFrom: 80, priceMode: "EXACT", currency: "BYN" }), 80);
+assert.equal(offerPriceSnapshot({ priceFrom: 80, priceMode: "EXACT", currency: "USD" }), null);
+console.log("partySelection checks: OK");
