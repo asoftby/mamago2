@@ -99,3 +99,16 @@ export const ptSerif = localFont({
   preload: false,
   fallback: ["ui-serif", "serif"],
 });
+
+/** True PT Serif regular/bold for homepage headings. */
+export const ptSerifHome = localFont({
+  src: [
+    { path: "../../public/fonts/PT_Serif-Web-Regular.ttf", weight: "400", style: "normal" },
+    { path: "../../public/fonts/PT_Serif-Web-Bold.ttf", weight: "700", style: "normal" },
+    { path: "../../public/fonts/PT_Serif-Web-Italic.ttf", weight: "400", style: "italic" },
+    { path: "../../public/fonts/PT_Serif-Web-BoldItalic.ttf", weight: "700", style: "italic" },
+  ],
+  display: "swap",
+  preload: false,
+  fallback: ["Georgia", "ui-serif", "serif"],
+});

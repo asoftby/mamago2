@@ -1,3 +1,4 @@
+import { ptSerifHome } from "@/lib/fonts";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -34,7 +35,7 @@ export function BreakingNewsStrip({
   return (
     <section className={cn("space-y-4", className)}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-1">
-        <h2 className="text-lg font-semibold text-neutral-900 leading-tight tracking-tight">
+        <h2 className="text-lg font-normal text-neutral-900 leading-tight tracking-tight" style={{ fontFamily: ptSerifHome.style.fontFamily }}>
           Breaking News
         </h2>
         <Link

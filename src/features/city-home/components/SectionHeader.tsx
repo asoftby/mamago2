@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CityTitle } from "@/components/ui/CityTitle";
+import { ptSerifHome } from "@/lib/fonts";
 
 export type SectionHeaderProps = {
   title: string;
@@ -66,9 +67,7 @@ export function SectionHeader({
   const inlineTitleAndAction = (useIconButton || useInlineText) && !subtitle;
 
   const titleNode = titleCitySlug ? <CityTitle title={title} citySlug={titleCitySlug} /> : title;
-  const titleStyle = titleCitySlug
-    ? { fontFamily: "var(--font-serif)", fontWeight: 400, fontSize: 30, letterSpacing: "-0.03em" }
-    : { fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 30, letterSpacing: "-1px" };
+  const titleStyle = { fontFamily: ptSerifHome.style.fontFamily, fontWeight: 400, fontSize: 30, letterSpacing: "-0.03em" };
 
   const actionLink = showAction ? (
     useInlineText ? (

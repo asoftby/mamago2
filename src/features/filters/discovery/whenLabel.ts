@@ -100,3 +100,34 @@ export function whenPresetPageTitleSuffix(filters: {
   if (filters.dateFrom) return ` — ${whenLabel(filters)}`;
   return "";
 }
+
+/** Short user-selected date range for the /kuda heading. Civil dates are
+ * parsed without a timezone so server/browser headings cannot shift a day.
+ */
+const KUDA_MONTHS = ["янв.", "фев.", "мар.", "апр.", "мая", "июн.", "июл.", "авг.", "сен.", "окт.", "ноя.", "дек."] as const;
+function kudaCivilDate(value: string | null): { y: number; m: number; d: number; key: string } | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [y, m, d] = value.split("-").map(Number);
+  const utc = new Date(Date.UTC(y!, m! - 1, d!));
+  if (utc.getUTCFullYear() !== y || utc.getUTCMonth() + 1 !== m || utc.getUTCDate() !== d) return null;
+  return { y: y!, m: m!, d: d!, key: value };
+}
+
+/** Only manual ranges get the natural-language "с ... по ..." suffix. */
+export function kudaDateRangeTitleSuffix(filters: {
+  whenPreset: WhenPreset;
+  dateFrom: string | null;
+  dateTo: string | null;
+}): string {
+  if (filters.whenPreset) return whenPresetPageTitleSuffix(filters);
+  const from = kudaCivilDate(filters.dateFrom);
+  if (!from) return "";
+  const to = kudaCivilDate(filters.dateTo);
+  const first = `${from.d} ${KUDA_MONTHS[from.m - 1]}`;
+  if (!to || from.key === to.key || from.key > to.key) return ` ${first}`;
+  if (from.y !== to.y) {
+    return ` с ${first} ${from.y} по ${to.d} ${KUDA_MONTHS[to.m - 1]} ${to.y}`;
+  }
+  if (from.m === to.m) return ` с ${from.d} по ${to.d} ${KUDA_MONTHS[to.m - 1]}`;
+  return ` с ${first} по ${to.d} ${KUDA_MONTHS[to.m - 1]}`;
+}
