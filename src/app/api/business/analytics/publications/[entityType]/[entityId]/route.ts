@@ -86,8 +86,8 @@ export async function GET(
         ? await prisma.offer.findUnique({ where: { id: entityId }, select: { createdAt: true, publishedAt: true } })
         : await prisma.place.findUnique({ where: { id: entityId }, select: { createdAt: true } });
     if (!publication) return NextResponse.json({ error: "Publication not found" }, { status: 404 });
-    const firstAvailable = "publishedAt" in publication
-      ? (publication.publishedAt ?? publication.createdAt)
+    const firstAvailable: Date = "publishedAt" in publication && publication.publishedAt instanceof Date
+      ? publication.publishedAt
       : publication.createdAt;
 
     const requestedPeriod = sp.get("period");
@@ -114,7 +114,7 @@ export async function GET(
       : null;
     // Empty but valid windows must return zeroes, not expand to lifetime.
     const boundedRange = resolvedRange && resolvedRange.start > resolvedRange.end
-      ? { start: resolvedRange.end, end: resolvedRange.end }
+      ? { start: new Date(resolvedRange.end.getTime() + 1), end: resolvedRange.end }
       : resolvedRange;
 
     const data = await getPublicationAnalyticsDetail({
