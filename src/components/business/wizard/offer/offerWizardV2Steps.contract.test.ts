@@ -25,7 +25,12 @@ const V2_KEYS = ["type", "about", "services", "schedule", "terms", "review"];
   assert.deepEqual(getV2StepMembers("schedule", { ...base, productType: "PARTY_SERVICE" }), ["openingHours", "bookingMethod"]);
   assert.deepEqual(getV2StepMembers("schedule", { ...base, productType: "REGULAR_ACTIVITY" }), [
     "conditions",
-    "openingHours",
+    "classSchedule",
+    "bookingMethod",
+  ]);
+  assert.deepEqual(getV2StepMembers("schedule", { ...base, productType: "ONE_TIME_ACTIVITY" }), [
+    "conditions",
+    "classSchedule",
     "bookingMethod",
   ]);
   assert.deepEqual(getV2StepMembers("schedule", { ...base, productType: "PLACE_VISIT" }), [

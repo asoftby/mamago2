@@ -61,6 +61,10 @@ export interface CampSessionEntry {
   priceOverride: string;
   description: string;
   promotionDetails: string;
+  /** Что входит в смену (питание, материалы, экскурсии…) — новый мастер. */
+  includes: string;
+  /** Локация базы смены (адрес или название базы) — новый мастер. */
+  baseLocation: string;
 }
 
 /** Step keys for wizard */
@@ -82,6 +86,7 @@ export type OfferWizardStepKey =
   | "terms"
   // Блоки внутри составных шагов нового мастера (самостоятельными шагами не бывают)
   | "openingHours"
+  | "classSchedule"
   | "bookingMethod"
   | "review";
 
