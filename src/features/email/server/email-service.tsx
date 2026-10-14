@@ -389,13 +389,19 @@ export class EmailService {
         kind: "welcome",
         intendedTo: params.to,
         subject: override.subject ?? EMAIL_SUBJECTS.welcome,
+        // Preserve the premium welcome layout when content is edited in
+        // Communications → Scenarios. The scenario override controls text
+        // and subject; it cannot inject arbitrary layout or a different CTA.
         react: (
-          <TransactionalNotificationTemplate
-            title={override.subject ?? EMAIL_SUBJECTS.welcome}
-            body={toPlainText(override.body, 2000)}
-            bodyHtml={override.body}
-            ctaLabel="Открыть mamaGo"
+          <MamagoWelcomeTemplate
             ctaUrl={welcomeCtaUrl}
+            userName={params.userName}
+            introText={toPlainText(
+              override.body
+                .replace(/<br\s*\/?>/gi, "\n")
+                .replace(/<\/(?:p|div|li|h[2-4])>/gi, "\n"),
+              2000,
+            )}
           />
         ),
       });
@@ -406,7 +412,7 @@ export class EmailService {
       kind: "welcome",
       intendedTo: params.to,
       subject: EMAIL_SUBJECTS.welcome,
-      react: <MamagoWelcomeTemplate ctaUrl={params.ctaUrl} />,
+      react: <MamagoWelcomeTemplate ctaUrl={welcomeCtaUrl} userName={params.userName} />,
     });
   }
 
