@@ -342,7 +342,7 @@ export function StepConfirmation({ builder }: { builder: BuilderHook }) {
         <button
           type="button"
           onClick={resetBuilder}
-          className="rounded-xl bg-[#EF8759] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+          className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
         >
           Создать новый праздник
         </button>
@@ -368,8 +368,8 @@ export function StepConfirmation({ builder }: { builder: BuilderHook }) {
       </div>
 
       {hasConflicts && (
-        <div className="flex items-start gap-3 rounded-xl border border-orange-200 bg-orange-50 p-4">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#EF8759]" />
+        <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-brand-soft p-4">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
           <div className="min-w-0">
             <p className="text-sm font-semibold">Есть несовместимые позиции</p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -452,7 +452,7 @@ export function StepConfirmation({ builder }: { builder: BuilderHook }) {
                 id="party-time-start"
                 className={cn(
                   "w-full max-w-[200px] rounded-xl border border-border bg-background px-3 py-2.5 text-sm tabular-nums shadow-none",
-                  "h-auto min-h-[2.75rem] focus-visible:ring-2 focus-visible:ring-[#EF8759]/35",
+                  "h-auto min-h-[2.75rem] focus-visible:ring-2 focus-visible:ring-primary/35",
                 )}
               >
                 <SelectValue />
@@ -494,7 +494,7 @@ export function StepConfirmation({ builder }: { builder: BuilderHook }) {
                     className={cn(
                       "flex gap-4 py-3 first:pt-0 last:pb-0 transition-colors duration-300",
                       highlight &&
-                        "-mx-1 rounded-xl bg-[#EF8759]/[0.08] px-1 ring-1 ring-[#EF8759]/25",
+                        "-mx-1 rounded-xl bg-primary/[0.08] px-1 ring-1 ring-primary/25",
                     )}
                   >
                     <span className="w-14 shrink-0 text-sm font-semibold tabular-nums text-foreground">
@@ -580,7 +580,7 @@ export function StepConfirmation({ builder }: { builder: BuilderHook }) {
           className={cn(
             "w-full rounded-2xl px-4 py-4 text-base font-semibold transition-all",
             selectedCount > 0 && validOffers.length > 0
-              ? "bg-[#EF8759] text-white shadow-sm hover:bg-primary-hover"
+              ? "bg-primary text-white shadow-sm hover:bg-primary-hover"
               : "cursor-not-allowed bg-muted text-muted-foreground",
           )}
         >

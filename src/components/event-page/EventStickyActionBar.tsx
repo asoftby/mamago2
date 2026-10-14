@@ -90,7 +90,7 @@ export function EventStickyActionBar({
       <div className="mx-auto flex w-full max-w-[1200px] items-center gap-4 px-4 sm:px-6 lg:px-8">
         <div className="min-w-0 flex-1">
           {sessionLine && (
-            <p className="truncate font-mono text-[11px] uppercase tracking-[0.06em] text-[#E86A3A]">
+            <p className="truncate font-mono text-[11px] uppercase tracking-[0.06em] text-primary">
               {sessionLine}
             </p>
           )}
@@ -119,7 +119,7 @@ export function EventStickyActionBar({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={onPrimary}
-                className="inline-flex h-10 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover"
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover"
               >
                 {isPrimaryLoading ? (
                   <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -131,7 +131,7 @@ export function EventStickyActionBar({
               <button
                 type="button"
                 onClick={onBook}
-                className="inline-flex h-10 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover"
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover"
               >
                 Записаться
               </button>
@@ -147,14 +147,14 @@ export function EventStickyActionBar({
               className={cn(
                 "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors",
                 isPlanned
-                  ? "border-[#E86A3A] bg-[#FFE8DC] text-[#E86A3A]"
+                  ? "border-primary bg-brand-soft text-primary"
                   : "border-[rgba(20,18,16,0.18)] text-[rgba(20,18,16,0.45)] hover:border-[#141210] hover:text-[#141210]",
               )}
             >
               {isPlanLoading ? (
                 <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
               ) : (
-                <Heart size={16} strokeWidth={1.75} className={isPlanned ? "fill-[#E86A3A]" : ""} />
+                <Heart size={16} strokeWidth={1.75} className={isPlanned ? "fill-primary" : ""} />
               )}
             </button>
           )}
@@ -178,7 +178,7 @@ export function EventStickyActionBar({
     >
       <div className="flex-1 min-w-0">
         {sessionLine && (
-          <div className="truncate whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.1em] text-[#E86A3A]">
+          <div className="truncate whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.1em] text-primary">
             {sessionLine}
           </div>
         )}
@@ -227,7 +227,7 @@ export function EventStickyActionBar({
             target="_blank"
             rel="noopener noreferrer"
             onClick={onPrimary}
-            className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px"
+            className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full bg-primary px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px"
           >
             {isPrimaryLoading ? (
               <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -239,7 +239,7 @@ export function EventStickyActionBar({
           <button
             type="button"
             onClick={onBook}
-            className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full bg-[#E86A3A] px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px"
+            className="inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full bg-primary px-5 text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px"
           >
             Записаться
           </button>

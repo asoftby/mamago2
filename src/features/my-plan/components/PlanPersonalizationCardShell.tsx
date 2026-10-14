@@ -64,7 +64,7 @@ export function PlanPersonalizationTextAction({
     <button
       type="button"
       onClick={onClick}
-      className="text-sm font-medium text-[#EF8759] underline-offset-2 hover:underline"
+      className="text-sm font-medium text-primary underline-offset-2 hover:underline"
     >
       {label}
     </button>

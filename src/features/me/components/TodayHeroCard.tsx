@@ -26,8 +26,8 @@ export function TodayHeroCard({ todayItems, todayDate }: TodayHeroCardProps) {
 
           return (
             <div key={item.id} className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-xl bg-[#EF8759]/10 flex items-center justify-center shrink-0">
-                <CalendarDays className="h-4 w-4 text-[#EF8759]" />
+              <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <CalendarDays className="h-4 w-4 text-primary" />
               </div>
               <div className="min-w-0">
                 {time && <span className="text-xs text-neutral-400 mr-1.5">{time}</span>}
@@ -43,7 +43,7 @@ export function TodayHeroCard({ todayItems, todayDate }: TodayHeroCardProps) {
 
       <Link
         href={`/me/plan?date=${todayDate}`}
-        className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[#EF8759] hover:text-[#e8784a] transition-colors"
+        className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:text-primary transition-colors"
       >
         Открыть план →
       </Link>

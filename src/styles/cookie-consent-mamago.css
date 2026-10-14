@@ -14,10 +14,10 @@ html[data-cc-consent-known="1"] #mamago-cookie-shell {
 }
 
 #cc-main {
-  /* Бренд primary #EF8759 */
+  /* Бренд primary var(--primary) */
   --cc-bg: #ffffff;
-  --cc-primary-color: #ef8759;
-  --cc-primary-hover: #e0784a;
+  --cc-primary-color: var(--primary);
+  --cc-primary-hover: var(--primary);
   /* light-scheme задаёт тёмно-серый primary для кнопок — выравниваем с брендом */
   --cc-btn-primary-bg: var(--cc-primary-color);
   --cc-btn-primary-border-color: var(--cc-primary-color);

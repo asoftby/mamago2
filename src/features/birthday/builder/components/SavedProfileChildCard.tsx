@@ -60,9 +60,9 @@ export function SavedProfileChildCard({
       }}
       className={cn(
         "w-full rounded-2xl border px-4 py-3 text-left transition-colors outline-none",
-        "focus-visible:ring-2 focus-visible:ring-[#EF8759]/35 focus-visible:ring-offset-2",
+        "focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
         selected
-          ? "border-[#EF8759] bg-[#FFF7F3]"
+          ? "border-primary bg-[#FFF7F3]"
           : "border-zinc-200/90 bg-white hover:bg-zinc-50/80",
       )}
     >
@@ -82,9 +82,9 @@ export function SavedProfileChildCard({
             onEdit();
           }}
           className={cn(
-            "shrink-0 text-xs font-medium text-[#EF8759] underline-offset-2",
-            "hover:text-[#d9733f] hover:underline",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/30 rounded-sm",
+            "shrink-0 text-xs font-medium text-primary underline-offset-2",
+            "hover:text-primary hover:underline",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 rounded-sm",
           )}
         >
           Изменить данные

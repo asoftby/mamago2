@@ -115,7 +115,7 @@ export function PlanPersonalizationEditor({
           onClick: () => togglePreference(signal.id),
           className: cn(
             isSelected
-              ? "!border-[#EF8759] !bg-[#EF8759] !text-white shadow-sm"
+              ? "!border-primary !bg-primary !text-white shadow-sm"
               : isDisabled
                 ? "!cursor-not-allowed !border-neutral-200 !bg-neutral-50 !text-neutral-400"
                 : "!border-neutral-200 !bg-white !text-neutral-700 hover:!border-neutral-300",
@@ -139,7 +139,7 @@ export function PlanPersonalizationEditor({
         onClick: () => selectFormat(signal.id),
         className: cn(
           selectedLeisureFormatSignalId === signal.id
-            ? "!border-[#EF8759] !bg-[#EF8759] !text-white shadow-sm"
+            ? "!border-primary !bg-primary !text-white shadow-sm"
             : "!border-neutral-200 !bg-white !text-neutral-700 hover:!border-neutral-300",
         ),
       })),
@@ -211,7 +211,7 @@ export function PlanPersonalizationEditor({
           </div>
           <ChipsRow layout="wrap" aria-label="Предпочтения" items={preferenceChipItems} />
           {showPreferenceLimitHint ? (
-            <p className="text-[11px] leading-snug text-[#EF8759]">{PREFERENCE_LIMIT_HINT}</p>
+            <p className="text-[11px] leading-snug text-primary">{PREFERENCE_LIMIT_HINT}</p>
           ) : null}
         </div>
       ) : null}
@@ -232,8 +232,8 @@ export function PlanPersonalizationEditor({
           className={cn(
             "min-h-10 flex-1 rounded-full transition disabled:opacity-100",
             canApply && !saving
-              ? "bg-[#EF8759] text-white hover:bg-[#e97848]"
-              : "cursor-not-allowed bg-[#F5C3B0] text-white/80 hover:bg-[#F5C3B0]",
+              ? "bg-primary text-white hover:bg-[#e97848]"
+              : "cursor-not-allowed bg-brand-soft text-muted-foreground hover:bg-brand-soft",
           )}
           disabled={!canApply || saving}
           onClick={() => void handleApply()}

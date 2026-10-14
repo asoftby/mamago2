@@ -37,7 +37,7 @@ export function BirthdayPartyCard({ party, compact }: BirthdayPartyCardProps) {
       className={cn(
         "group flex items-center gap-3 sm:gap-4 rounded-2xl border border-neutral-100/90 bg-white",
         "shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200",
-        "hover:border-primary/20 hover:bg-orange-50/25 hover:shadow-[0_4px_20px_rgba(239,135,89,0.08)]",
+        "hover:border-primary/20 hover:bg-brand-soft/25 hover:shadow-[0_4px_20px_rgba(239,135,89,0.08)]",
         "active:scale-[0.99] active:bg-orange-50/35",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:ring-offset-2",
         compact ? "px-3.5 py-3.5 sm:px-4 sm:py-4" : "px-4 py-4 sm:px-5 sm:py-4",

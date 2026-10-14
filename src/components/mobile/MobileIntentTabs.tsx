@@ -98,7 +98,7 @@ function MobileIntentTabsContent({
                 
                 {/* Orange underline for active tab - matches text width */}
                 {isActive && (
-                  <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-[#EF8759] rounded-full transition-all duration-200" />
+                  <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-primary rounded-full transition-all duration-200" />
                 )}
               </span>
             </Link>

@@ -161,7 +161,7 @@ export function EventLocationMapModal({
             disabled={!tempPin}
             size="default"
             className="shrink-0 shadow-sm"
-            style={{ backgroundColor: "#EF8759" }}
+            style={{ backgroundColor: "var(--primary)" }}
           >
             Подтвердить точку
           </Button>
@@ -199,7 +199,7 @@ export function EventLocationMapModal({
           disabled={!tempPin}
           size="lg"
           className="pointer-events-auto shadow-xl"
-          style={{ backgroundColor: "#EF8759" }}
+          style={{ backgroundColor: "var(--primary)" }}
         >
           Подтвердить точку
         </Button>

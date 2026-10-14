@@ -135,7 +135,7 @@ function BannerShell({
               onClick={onCta}
               className={
                 ctaStyle === "primary"
-                  ? "inline-flex h-10 items-center rounded-full bg-[#EF8759] px-5 text-sm font-semibold text-white transition-all hover:bg-primary-hover active:scale-[0.97]"
+                  ? "inline-flex h-10 items-center rounded-full bg-primary px-5 text-sm font-semibold text-white transition-all hover:bg-primary-hover active:scale-[0.97]"
                   : "inline-flex h-9 items-start rounded-full border border-neutral-200 bg-white px-4 pt-[7px] text-sm font-medium text-neutral-700 transition-all hover:border-neutral-300 hover:bg-neutral-50 active:scale-[0.97]"
               }
             >
@@ -234,7 +234,7 @@ export function ActivationBannerHost() {
         exit="exit"
       >
         <BannerShell
-          icon={<Sparkles className="h-5 w-5 text-[#EF8759]" strokeWidth={1.75} />}
+          icon={<Sparkles className="h-5 w-5 text-primary" strokeWidth={1.75} />}
           title="Подберём идеи для вашей семьи"
           description="Соберём готовый сценарий дня — регистрация нужна только чтобы сохранить план"
           ctaLabel="Реши за меня"
@@ -258,7 +258,7 @@ export function ActivationBannerHost() {
             exit="exit"
           >
             <BannerShell
-              icon={<Users className="h-5 w-5 text-[#EF8759]" strokeWidth={1.75} />}
+              icon={<Users className="h-5 w-5 text-primary" strokeWidth={1.75} />}
               title="Подберём идеи для вашей семьи"
               description="Добавьте ребёнка — и получите персональные рекомендации и готовые планы"
               ctaLabel="Добавить ребёнка"
@@ -278,7 +278,7 @@ export function ActivationBannerHost() {
             exit="exit"
           >
             <BannerShell
-              icon={<Sparkles className="h-5 w-5 text-[#EF8759]" strokeWidth={1.75} />}
+              icon={<Sparkles className="h-5 w-5 text-primary" strokeWidth={1.75} />}
               title="Сделаем рекомендации ещё точнее"
               description="Добавьте информацию о себе — учтём формат отдыха, интересы и бюджет"
               ctaLabel="Настроить"

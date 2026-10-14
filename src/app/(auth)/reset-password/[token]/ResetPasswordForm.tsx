@@ -19,7 +19,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="h-12 w-full rounded-xl bg-[#EF8759] font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+      className="h-12 w-full rounded-xl bg-primary font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
     >
       {pending ? "Сохраняем..." : "Сохранить новый пароль"}
     </button>
@@ -43,7 +43,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
 
         <Link
           href="/forgot-password"
-          className="flex h-12 w-full items-center justify-center rounded-xl bg-[#EF8759] font-medium text-white transition-colors hover:bg-primary-hover"
+          className="flex h-12 w-full items-center justify-center rounded-xl bg-primary font-medium text-white transition-colors hover:bg-primary-hover"
         >
           Получить новую ссылку
         </Link>
@@ -87,7 +87,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
             autoComplete="new-password"
             aria-invalid={!state.ok && Boolean(state.fieldErrors?.password)}
             aria-describedby={!state.ok && state.fieldErrors?.password ? "password-error" : undefined}
-            className="h-12 w-full rounded-xl border border-neutral-200 bg-white px-4 text-sm transition-shadow placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#EF8759]"
+            className="h-12 w-full rounded-xl border border-neutral-200 bg-white px-4 text-sm transition-shadow placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder={`Не менее ${PASSWORD_MIN_LENGTH} символов`}
           />
           {!state.ok && state.fieldErrors?.password && (
@@ -116,7 +116,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
             aria-describedby={
               !state.ok && state.fieldErrors?.confirmPassword ? "confirm-password-error" : undefined
             }
-            className="h-12 w-full rounded-xl border border-neutral-200 bg-white px-4 text-sm transition-shadow placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#EF8759]"
+            className="h-12 w-full rounded-xl border border-neutral-200 bg-white px-4 text-sm transition-shadow placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder="Повторите новый пароль"
           />
           {!state.ok && state.fieldErrors?.confirmPassword && (

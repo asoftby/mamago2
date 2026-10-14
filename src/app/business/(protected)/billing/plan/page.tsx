@@ -51,7 +51,7 @@ export default async function BillingPlanPage() {
               {/* Left: Plan Info */}
               <div>
                 <div className="flex items-start gap-4 mb-6">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#EF8759] to-[#EF8759]/80 flex items-center justify-center flex-shrink-0">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0">
                     <Sparkles className="w-7 h-7 text-white" />
                   </div>
                   <div>
@@ -108,7 +108,7 @@ export default async function BillingPlanPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <button className="w-full px-4 py-2.5 bg-[#EF8759] text-white text-sm font-medium rounded-xl hover:bg-[#EF8759]/90 transition-colors">
+                  <button className="w-full px-4 py-2.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors">
                     Изменить тариф
                   </button>
                   <button className="w-full px-4 py-2.5 bg-white text-stone-700 text-sm font-medium border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors">

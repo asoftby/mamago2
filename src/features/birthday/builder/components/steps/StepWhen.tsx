@@ -46,7 +46,7 @@ export function StepWhen({ builder }: Props) {
           fontSize: 11,
           letterSpacing: ".14em",
           textTransform: "uppercase",
-          color: "#C24E22",
+          color: "var(--primary)",
         }}
       >
         ● Шаг 1 · сначала дата
@@ -65,7 +65,7 @@ export function StepWhen({ builder }: Props) {
         }}
       >
         Когда{" "}
-        <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#E86A3A" }}>планируете</span>
+        <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>планируете</span>
         <br />
         праздник?
       </h1>
@@ -88,7 +88,7 @@ export function StepWhen({ builder }: Props) {
         <div
           style={{
             padding: "16px 18px",
-            background: "#FFE8DC",
+            background: "var(--brand-soft)",
             borderRadius: 14,
           }}
         >
@@ -98,14 +98,14 @@ export function StepWhen({ builder }: Props) {
               fontSize: 11,
               letterSpacing: ".14em",
               textTransform: "uppercase",
-              color: "#C24E22",
+              color: "var(--primary)",
               marginBottom: 6,
             }}
           >
             ● как выбрать
           </div>
           {from && !to ? (
-            <div style={{ fontSize: 14, color: "#C24E22" }}>
+            <div style={{ fontSize: 14, color: "var(--primary)" }}>
               Теперь выберите дату окончания диапазона
             </div>
           ) : from && to ? (

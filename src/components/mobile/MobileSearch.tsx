@@ -325,7 +325,7 @@ export function MobileSearch({
                   );
                 })}
                 <div
-                  className="absolute bottom-0 h-[3px] rounded-full bg-[#EF8759] transition-all duration-300 ease-out"
+                  className="absolute bottom-0 h-[3px] rounded-full bg-primary transition-all duration-300 ease-out"
                   style={{
                     left: `${indicatorStyle.left}px`,
                     width: `${indicatorStyle.width}px`,

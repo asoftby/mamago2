@@ -80,7 +80,7 @@ export function WizardProgress({
               "select-none pb-2 pt-1 sm:min-w-[88px] sm:pb-3",
               isDisabled ? "cursor-not-allowed" : "cursor-pointer",
               "transition-colors duration-150",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/40 focus-visible:ring-offset-1",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1",
             )}
           >
             {/* Full text labels belong to tablet/desktop; mobile already names
@@ -90,9 +90,9 @@ export function WizardProgress({
               className={cn(
                 "hidden items-center gap-1 whitespace-nowrap text-xs font-medium transition-colors duration-150 sm:flex",
                 isActive
-                  ? "text-[#EF8759]"
+                  ? "text-primary"
                   : isDone
-                    ? "text-[#C96A3D] group-hover:text-[#A9532D]"
+                    ? "text-primary group-hover:text-primary"
                     : isOptionalEmpty
                       ? "text-gray-400 group-hover:text-gray-500"
                       : isDisabled
@@ -113,9 +113,9 @@ export function WizardProgress({
               className={cn(
                 "flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold transition-all duration-200 sm:h-5 sm:w-5 sm:text-[10px]",
                 isActive
-                  ? "bg-[#EF8759] text-white ring-2 ring-[#EF8759]/30"
+                  ? "bg-primary text-white ring-2 ring-primary/30"
                   : isDone
-                    ? "bg-[#EF8759] text-white"
+                    ? "bg-primary text-white"
                     : isOptionalEmpty
                       ? "border border-dashed border-gray-300 bg-transparent text-gray-400 group-hover:border-gray-400"
                       : isDisabled
@@ -131,9 +131,9 @@ export function WizardProgress({
               className={cn(
                 "absolute bottom-0 left-0 right-0 h-0.5 rounded-full transition-all duration-200",
                 isActive
-                  ? "bg-[#EF8759]"
+                  ? "bg-primary"
                   : isDone
-                    ? "bg-[#EF8759]/55"
+                    ? "bg-primary/55"
                     : "bg-gray-200 group-hover:bg-gray-300",
               )}
             />

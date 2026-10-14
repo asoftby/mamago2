@@ -97,7 +97,7 @@ export function OfferPromoCta({
       <h2 className="font-sans text-[52px] sm:text-[72px] lg:text-[96px] font-semibold tracking-[-0.03em] leading-[0.92] text-gray-900 mx-auto max-w-[900px]">
         {headlineParts.map((part, i) =>
           part.accent ? (
-            <em key={i} className="not-italic italic text-[#EF8759]">
+            <em key={i} className="not-italic italic text-primary">
               {part.text}
             </em>
           ) : (
@@ -118,7 +118,7 @@ export function OfferPromoCta({
         <button
           type="button"
           onClick={onPrimary}
-          className="inline-flex items-center gap-2 rounded-full bg-[#EF8759] px-7 py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover active:scale-[0.98]"
+          className="inline-flex items-center gap-2 rounded-full bg-primary px-7 py-3.5 text-[15px] font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover active:scale-[0.98]"
         >
           {primaryLabel} <span aria-hidden>→</span>
         </button>

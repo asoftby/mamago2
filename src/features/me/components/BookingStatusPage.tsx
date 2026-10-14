@@ -39,7 +39,7 @@ type PillVariant = "ok" | "warn" | "coral" | "hold" | "anchor";
 const PILL_STYLES: Record<PillVariant, React.CSSProperties> = {
   ok:     { background: "rgba(31,138,91,.10)",  color: "#1F8A5B" },
   warn:   { background: "rgba(133,79,11,.10)",   color: "#854F0B" },
-  coral:  { background: "#FAECE7",               color: "#993C1D" },
+  coral:  { background: "#FAECE7",               color: "var(--primary)" },
   hold:   { background: "rgba(20,18,16,.08)",    color: "rgba(20,18,16,.45)" },
   anchor: { background: "#141210",               color: "#FAF7F1" },
 };
@@ -120,7 +120,7 @@ function ProgressGrid({ items }: { items: ScenarioTimelineItem[] }) {
   }> = [
     { value: confirmed, label: "Подтверждено", color: "#1F8A5B", bg: "rgba(31,138,91,.10)" },
     { value: pending,   label: "Ожидаем",      color: "#854F0B", bg: "rgba(133,79,11,.10)" },
-    { value: declined,  label: "Нужна замена",  color: "#D85A30", bg: "#FAECE7" },
+    { value: declined,  label: "Нужна замена",  color: "var(--primary)", bg: "#FAECE7" },
     {
       value: hasPending ? `от ${confirmedTotal}` : total,
       label: <><BelarusianRubleIcon /> итого</>,
@@ -181,7 +181,7 @@ function ProgressGrid({ items }: { items: ScenarioTimelineItem[] }) {
 // ─── AlternativeCard ──────────────────────────────────────────────────────────
 
 const ALT_GRADIENTS = [
-  "linear-gradient(160deg, #F2C8A7, #E89460)",
+  "linear-gradient(160deg, var(--brand-soft), var(--primary))",
   "linear-gradient(160deg, #CDE3D6, #9CC1AC)",
   "linear-gradient(160deg, #F6D567, #E8B935)",
   "linear-gradient(160deg, #E6DBC8, #C9BCA0)",
@@ -292,7 +292,7 @@ function AlternativeCard({
             textTransform: "uppercase",
             fontSize: 10,
             letterSpacing: ".14em",
-            color: "#C24E22",
+            color: "var(--primary)",
           }}
         >
           ● {category}
@@ -355,7 +355,7 @@ function Replacements({
       style={{
         marginTop: 16,
         paddingTop: 16,
-        borderTop: "1px solid #F0997B",
+        borderTop: "1px solid var(--primary)",
       }}
     >
       <div
@@ -364,7 +364,7 @@ function Replacements({
           textTransform: "uppercase",
           fontSize: 10,
           letterSpacing: ".14em",
-          color: "#993C1D",
+          color: "var(--primary)",
           marginBottom: 12,
         }}
       >
@@ -395,7 +395,7 @@ function Replacements({
             width: "100%",
             height: 40,
             background: "transparent",
-            border: "1px dashed #F0997B",
+            border: "1px dashed var(--primary)",
             borderRadius: 12,
             cursor: "pointer",
             display: "flex",
@@ -403,7 +403,7 @@ function Replacements({
             justifyContent: "center",
             gap: 8,
             fontSize: 13,
-            color: "#993C1D",
+            color: "var(--primary)",
             fontWeight: 500,
           }}
         >
@@ -431,7 +431,7 @@ function VendorRow({
     <div
       style={{
         background: isDeclined ? "#FAECE7" : "#FAF7F1",
-        border: `1px solid ${isDeclined ? "#F0997B" : "rgba(20,18,16,.10)"}`,
+        border: `1px solid ${isDeclined ? "var(--primary)" : "rgba(20,18,16,.10)"}`,
         borderRadius: 18,
         padding: "20px 22px",
       }}
@@ -470,7 +470,7 @@ function VendorRow({
                   textTransform: "uppercase",
                   fontSize: 10,
                   letterSpacing: ".14em",
-                  color: "#D85A30",
+                  color: "var(--primary)",
                 }}
               >
                 ● {item.subtitle.split("·")[0].trim()}
@@ -488,7 +488,7 @@ function VendorRow({
               lineHeight: 1.1,
               letterSpacing: "-.015em",
               textDecoration: isDeclined ? "line-through" : "none",
-              color: isDeclined ? "#993C1D" : "#141210",
+              color: isDeclined ? "var(--primary)" : "#141210",
             }}
           >
             {item.title}
@@ -671,7 +671,7 @@ function PageHeader({
           textTransform: "uppercase",
           fontSize: 11,
           letterSpacing: ".14em",
-          color: "#C24E22",
+          color: "var(--primary)",
           marginBottom: 16,
         }}
       >
@@ -690,7 +690,7 @@ function PageHeader({
         }}
       >
         Сценарий{" "}
-        <em style={{ color: "#C24E22", fontStyle: "italic" }}>праздника</em>
+        <em style={{ color: "var(--primary)", fontStyle: "italic" }}>праздника</em>
       </h1>
 
       <p
@@ -826,7 +826,7 @@ function PageHeader({
                 alignItems: "center",
                 gap: 6,
                 fontSize: 13,
-                color: "#D85A30",
+                color: "var(--primary)",
                 fontWeight: 600,
               }}
             >
@@ -835,7 +835,7 @@ function PageHeader({
                   width: 8,
                   height: 8,
                   borderRadius: 99,
-                  background: "#D85A30",
+                  background: "var(--primary)",
                   flexShrink: 0,
                 }}
               />
@@ -1046,14 +1046,14 @@ function Footer({
               style={{
                 fontFamily: "var(--font-mono, ui-monospace, monospace)",
                 fontSize: 11,
-                color: "#D85A30",
+                color: "var(--primary)",
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 4,
                 whiteSpace: "nowrap",
               }}
             >
-              <span style={{ width: 6, height: 6, borderRadius: 99, background: "#D85A30", flexShrink: 0 }} />
+              <span style={{ width: 6, height: 6, borderRadius: 99, background: "var(--primary)", flexShrink: 0 }} />
               {declinedCount} отказ
             </span>
           )}
@@ -1240,7 +1240,7 @@ export function BookingStatusPage({ party, onBack }: BookingStatusPageProps) {
               const dotColor = isConfirmed
                 ? "#1F8A5B"
                 : isDeclined
-                ? "#D85A30"
+                ? "var(--primary)"
                 : item.status === "PENDING"
                 ? "#854F0B"
                 : "rgba(20,18,16,.18)";
@@ -1274,7 +1274,7 @@ export function BookingStatusPage({ party, onBack }: BookingStatusPageProps) {
                         background: isConfirmed
                           ? "#1F8A5B"
                           : isDeclined
-                          ? "#D85A30"
+                          ? "var(--primary)"
                           : "#FAF7F1",
                         border: `2px solid ${dotColor}`,
                         boxShadow: isConfirmed

@@ -89,7 +89,7 @@ export function ChildBirthFields({
       )}
       <button
         type="button"
-        className="text-sm font-medium text-[#EF8759] hover:underline"
+        className="text-sm font-medium text-primary hover:underline"
         onClick={() =>
           onChange(
             value.precision === "DAY"

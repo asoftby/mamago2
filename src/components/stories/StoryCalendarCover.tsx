@@ -33,7 +33,7 @@ export function StoryCalendarCover({ title, main, sub, onClick }: Props) {
         <div className="text-[38px] font-black leading-none text-[#1D2430] md:text-[48px]">
           {main}
         </div>
-        <div className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#EF8759] md:text-xs">
+        <div className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-primary md:text-xs">
           {sub}
         </div>
       </div>

@@ -79,7 +79,7 @@ export function MobileProfileSheet({
     <NavUserIcon
       className={cn(
         "h-5 w-5 transition-colors duration-200",
-        isProfileActive ? "text-[#C24E22]" : "text-gray-400",
+        isProfileActive ? "text-primary" : "text-gray-400",
       )}
     />
   ) : (
@@ -87,14 +87,14 @@ export function MobileProfileSheet({
       className={cn(
         "flex shrink-0 items-center justify-center rounded-full transition-colors duration-200",
         compact ? "h-9 w-9" : "h-[41px] w-[41px]",
-        isProfileActive ? "bg-[#EF8759]/12" : "bg-neutral-100/95",
+        isProfileActive ? "bg-primary/12" : "bg-neutral-100/95",
       )}
     >
       <NavUserIcon
         className={cn(
           "transition-colors duration-200",
           compact ? "h-[22px] w-[22px]" : "h-[26px] w-[26px]",
-          isProfileActive ? "text-[#EF8759]" : "text-neutral-500",
+          isProfileActive ? "text-primary" : "text-neutral-500",
         )}
       />
     </span>
@@ -135,7 +135,7 @@ export function MobileProfileSheet({
           {showBadge && (
             <span
               className={cn(
-                "absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EF8759] px-1 text-[10px] font-semibold leading-none text-white shadow-sm ring-2",
+                "absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-white shadow-sm ring-2",
                 chrome === "dark" ? "ring-neutral-900/95" : "ring-white/90",
               )}
               aria-hidden
@@ -180,7 +180,7 @@ export function MobileProfileSheet({
         {showBadge && (
           <span
             className={cn(
-              "absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EF8759] px-1 text-[10px] font-semibold leading-none text-white shadow-sm ring-2",
+              "absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-white shadow-sm ring-2",
               chrome === "dark" ? "ring-neutral-900/95" : "ring-white/90",
             )}
             aria-hidden

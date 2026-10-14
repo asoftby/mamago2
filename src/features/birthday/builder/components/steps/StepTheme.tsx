@@ -46,9 +46,9 @@ function ThemeChipButton({
         "relative rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 ease-out active:scale-[0.98]",
         "flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-2",
         selected
-          ? "border-[#EF8759]/80 bg-orange-50/90 shadow-sm ring-1 ring-[#EF8759]/25"
+          ? "border-primary/80 bg-brand-soft/90 shadow-sm ring-1 ring-primary/25"
           : showMatchBadge
-            ? "border-stone-200/90 bg-[#FFF9F6] text-foreground/90 hover:bg-[#FFF5F0] hover:border-stone-300/80"
+            ? "border-stone-200/90 bg-[#FFF9F6] text-foreground/90 hover:bg-brand-soft hover:border-stone-300/80"
             : "border-border/70 bg-white/80 text-foreground/90 hover:border-border hover:bg-muted/30",
       )}
     >

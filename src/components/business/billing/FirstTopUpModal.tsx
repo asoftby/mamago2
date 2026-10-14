@@ -90,8 +90,8 @@ export function FirstTopUpModal({ onClose }: FirstTopUpModalProps) {
               onClick={handleFillRequisites}
               className="
                 flex-1 px-4 py-3 rounded-xl font-medium
-                bg-[#EF8759] text-white
-                hover:bg-[#EF8759]/90 transition-colors
+                bg-primary text-white
+                hover:bg-primary/90 transition-colors
               "
             >
               Заполнить реквизиты

@@ -54,7 +54,7 @@ function ActivityIcon({ type }: { type: string }) {
     case "STATUS_CHANGED":
       return <CheckCircle2 className={cn(cls, "text-emerald-500")} />;
     case "PHONE_CLICKED":
-      return <Phone className={cn(cls, "text-[#EF8759]")} />;
+      return <Phone className={cn(cls, "text-primary")} />;
     case "COMMENT_ADDED":
       return <MessageSquare className={cn(cls, "text-stone-400")} />;
     default:

@@ -30,7 +30,7 @@ export function EventLocationMapPreview({ lat, lng, onOpenMap }: EventLocationMa
         onClick={onOpenMap}
         className="absolute bottom-4 right-4 rounded-full shadow-lg"
         size="sm"
-        style={{ backgroundColor: "#EF8759" }}
+        style={{ backgroundColor: "var(--primary)" }}
       >
         <Maximize2 className="mr-2 h-4 w-4" />
         Открыть карту

@@ -16,9 +16,9 @@ type Phase =
   | { step: "success" };
 
 const INPUT_CLASS =
-  "w-full h-12 px-4 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#EF8759] transition-shadow placeholder:text-neutral-400";
+  "w-full h-12 px-4 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition-shadow placeholder:text-neutral-400";
 const BUTTON_CLASS =
-  "w-full h-12 rounded-xl bg-[#EF8759] hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors";
+  "w-full h-12 rounded-xl bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium transition-colors";
 
 const BLOCKED_COPY: Record<Exclude<TokenStatus, "VALID">, { title: string; body: string }> = {
   EXPIRED: {

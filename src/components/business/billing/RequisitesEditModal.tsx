@@ -95,7 +95,7 @@ export function RequisitesEditModal({
                   type="text"
                   value={formData.legalName}
                   onChange={(e) => handleChange("legalName", e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EF8759] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder='ООО «Детский центр развития»'
                   required
                 />
@@ -109,7 +109,7 @@ export function RequisitesEditModal({
                   type="text"
                   value={formData.unp}
                   onChange={(e) => handleChange("unp", e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EF8759] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="123456789"
                   required
                 />
@@ -123,7 +123,7 @@ export function RequisitesEditModal({
                   type="text"
                   value={formData.legalAddress}
                   onChange={(e) => handleChange("legalAddress", e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EF8759] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="г. Минск, ул. Ленина, д. 1, оф. 101"
                 />
               </div>
@@ -148,7 +148,7 @@ export function RequisitesEditModal({
                   type="text"
                   value={formData.bankName}
                   onChange={(e) => handleChange("bankName", e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EF8759] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder='ОАО «Беларусбанк»'
                 />
               </div>
@@ -161,7 +161,7 @@ export function RequisitesEditModal({
                   type="text"
                   value={formData.bankCode}
                   onChange={(e) => handleChange("bankCode", e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EF8759] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="AKBBBY2X"
                 />
               </div>
@@ -174,7 +174,7 @@ export function RequisitesEditModal({
                   type="text"
                   value={formData.accountNumber}
                   onChange={(e) => handleChange("accountNumber", e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EF8759] focus:border-transparent font-mono"
+                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-mono"
                   placeholder="BY86AKBB30120000000000000933"
                 />
               </div>
@@ -199,7 +199,7 @@ export function RequisitesEditModal({
                   type="text"
                   value={formData.contactName}
                   onChange={(e) => handleChange("contactName", e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EF8759] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="Иванов Иван Иванович"
                 />
               </div>
@@ -212,7 +212,7 @@ export function RequisitesEditModal({
                   type="email"
                   value={formData.contactEmail}
                   onChange={(e) => handleChange("contactEmail", e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EF8759] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="ivanov@example.com"
                 />
               </div>
@@ -225,7 +225,7 @@ export function RequisitesEditModal({
                   type="tel"
                   value={formData.contactPhone}
                   onChange={(e) => handleChange("contactPhone", e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EF8759] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="+375 29 123 45 67"
                 />
               </div>
@@ -250,7 +250,7 @@ export function RequisitesEditModal({
                   type="text"
                   value={formData.signatoryName}
                   onChange={(e) => handleChange("signatoryName", e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EF8759] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="Петров Петр Петрович"
                 />
               </div>
@@ -265,7 +265,7 @@ export function RequisitesEditModal({
                   onChange={(e) =>
                     handleChange("signatoryPosition", e.target.value)
                   }
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EF8759] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="Директор"
                 />
               </div>
@@ -280,7 +280,7 @@ export function RequisitesEditModal({
                   onChange={(e) =>
                     handleChange("signatoryBasis", e.target.value)
                   }
-                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EF8759] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="Устав"
                 />
               </div>
@@ -298,7 +298,7 @@ export function RequisitesEditModal({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-sm font-medium text-white bg-[#EF8759] rounded-lg hover:bg-[#EF8759]/90 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors"
             >
               Сохранить
             </button>

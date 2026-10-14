@@ -132,7 +132,7 @@ export function SystemNotificationCard({
                 type="button"
                 size="xs"
                 disabled={loading || actionDisabled}
-                className="w-auto shrink-0 bg-[#EF8759] text-white hover:bg-[#e07040]"
+                className="w-auto shrink-0 bg-primary text-white hover:bg-primary"
                 onClick={onAction}
               >
                 {loading ? "Отправляем" : actionLabel}
@@ -154,7 +154,7 @@ export function SystemNotificationCard({
             type="button"
             size="sm"
             disabled={loading || actionDisabled}
-            className="w-full bg-[#EF8759] text-white hover:bg-[#e07040]"
+            className="w-full bg-primary text-white hover:bg-primary"
             onClick={onAction}
           >
             {loading ? "Отправляем" : actionLabel}

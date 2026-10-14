@@ -16,7 +16,7 @@ function PrimarySubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="h-12 w-full rounded-xl bg-[#EF8759] font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+      className="h-12 w-full rounded-xl bg-primary font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
     >
       {pending ? "Отправляем..." : "Отправить инструкции"}
     </button>
@@ -48,7 +48,7 @@ function ResendButton({ sentAt }: { sentAt: number }) {
     <button
       type="submit"
       disabled={disabled}
-      className="font-medium text-[#D96F43] transition-colors hover:text-primary-hover disabled:cursor-not-allowed disabled:text-neutral-400"
+      className="font-medium text-primary transition-colors hover:text-primary-hover disabled:cursor-not-allowed disabled:text-neutral-400"
     >
       {pending
         ? "Отправляем..."
@@ -83,7 +83,7 @@ export function ForgotPasswordForm() {
 
         <Link
           href="/login"
-          className="flex h-12 w-full items-center justify-center rounded-xl bg-[#EF8759] font-medium text-white transition-colors hover:bg-primary-hover"
+          className="flex h-12 w-full items-center justify-center rounded-xl bg-primary font-medium text-white transition-colors hover:bg-primary-hover"
         >
           Вернуться ко входу
         </Link>
@@ -121,7 +121,7 @@ export function ForgotPasswordForm() {
             placeholder="Email"
             aria-invalid={!state.ok && Boolean(state.fieldErrors?.email)}
             aria-describedby={!state.ok && state.fieldErrors?.email ? "forgot-email-error" : undefined}
-            className="h-12 w-full rounded-xl border border-neutral-200 bg-white px-4 text-sm transition-shadow placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#EF8759]"
+            className="h-12 w-full rounded-xl border border-neutral-200 bg-white px-4 text-sm transition-shadow placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary"
           />
           {!state.ok && state.fieldErrors?.email && (
             <p id="forgot-email-error" className="mt-1.5 text-sm text-red-500">

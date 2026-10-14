@@ -63,7 +63,7 @@ export function PlaceAboutSection({
             }}
           >
             Всё{" "}
-            <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#E86A3A" }}>
+            <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>
               о месте
             </em>
           </h2>

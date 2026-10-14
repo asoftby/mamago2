@@ -18,7 +18,7 @@ import {
 } from "./blogFilters";
 
 const TONES = [
-  "from-[#F2C8A7] to-[#E89460]",
+  "from-brand-soft to-primary",
   "from-[#CDE3D6] to-[#9CC1AC]",
   "from-[#F6D567] to-[#E8B935]",
   "from-[#E6DBC8] to-[#C9BCA0]",

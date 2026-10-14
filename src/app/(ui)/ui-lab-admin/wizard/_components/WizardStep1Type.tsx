@@ -59,9 +59,9 @@ export function WizardStep1Type({ value, onChange }: Props) {
               className={cn(
                 "w-full text-left rounded-xl border px-5 py-4 transition-all duration-150",
                 "flex items-start gap-4",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/40 focus-visible:ring-offset-2",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2",
                 isSelected
-                  ? "border-[#EF8759] bg-[#EF8759]/[0.06] shadow-sm"
+                  ? "border-primary bg-primary/[0.06] shadow-sm"
                   : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm hover:-translate-y-px",
               )}
             >
@@ -69,13 +69,13 @@ export function WizardStep1Type({ value, onChange }: Props) {
               <span
                 className={cn(
                   "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors",
-                  isSelected ? "bg-[#EF8759]/15" : "bg-gray-100",
+                  isSelected ? "bg-primary/15" : "bg-gray-100",
                 )}
               >
                 <Icon
                   className={cn(
                     "h-5 w-5 transition-colors",
-                    isSelected ? "text-[#EF8759]" : "text-gray-500",
+                    isSelected ? "text-primary" : "text-gray-500",
                   )}
                 />
               </span>
@@ -85,7 +85,7 @@ export function WizardStep1Type({ value, onChange }: Props) {
                 <span
                   className={cn(
                     "block font-semibold text-sm leading-snug mb-0.5",
-                    isSelected ? "text-[#EF8759]" : "text-gray-900",
+                    isSelected ? "text-primary" : "text-gray-900",
                   )}
                 >
                   {opt.label}
@@ -100,7 +100,7 @@ export function WizardStep1Type({ value, onChange }: Props) {
                 className={cn(
                   "mt-1 h-4 w-4 shrink-0 rounded-full border-2 transition-all",
                   isSelected
-                    ? "border-[#EF8759] bg-[#EF8759]"
+                    ? "border-primary bg-primary"
                     : "border-gray-300 bg-white",
                 )}
               />

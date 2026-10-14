@@ -53,7 +53,7 @@ export function LocationMetaList({
           )}
         >
           <span
-            className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#E86A3A]"
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
             aria-hidden
           />
           {item}

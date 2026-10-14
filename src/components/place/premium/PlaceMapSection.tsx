@@ -81,14 +81,14 @@ export function PlaceMapSection({
               <div
                 className={cn(
                   "flex h-14 w-14 items-center justify-center rounded-2xl border border-[#ffd8c4]",
-                  "bg-[linear-gradient(180deg,_rgba(255,255,255,0.92)_0%,_rgba(255,241,232,0.96)_100%)] text-[#EF8759]",
+                  "bg-[linear-gradient(180deg,_rgba(255,255,255,0.92)_0%,_rgba(255,241,232,0.96)_100%)] text-primary",
                   "shadow-[inset_0_2px_3px_rgba(255,255,255,0.9)]",
                 )}
               >
                 <MapPin className="h-7 w-7" />
               </div>
               <div>
-                <div className="mb-2 text-xs font-black uppercase tracking-[0.22em] text-[#EF8759]">
+                <div className="mb-2 text-xs font-black uppercase tracking-[0.22em] text-primary">
                   Адрес
                 </div>
                 <div className="text-2xl font-black leading-tight text-neutral-900">
@@ -109,11 +109,11 @@ export function PlaceMapSection({
                 className="h-12 justify-start rounded-2xl border border-[#ffd8c4] bg-white/70 font-semibold text-neutral-900 shadow-none hover:bg-white"
                 onClick={openInMaps}
               >
-                <MapPin className="mr-2 h-4 w-4 text-[#EF8759]" />
+                <MapPin className="mr-2 h-4 w-4 text-primary" />
                 Открыть карту
               </Button>
               <Button
-                className="h-12 justify-start rounded-2xl border border-[#ffb38a] bg-[linear-gradient(180deg,_#ffb185_0%,_#ff8f61_100%)] font-black text-white shadow-[0_12px_28px_rgba(255,146,93,0.28)] hover:opacity-[0.98]"
+                className="h-12 justify-start rounded-2xl border border-primary bg-[linear-gradient(180deg,_var(--primary)_0%,_var(--primary-hover)_100%)] font-black text-white shadow-[0_12px_28px_rgba(239,135,89,0.28)] hover:opacity-[0.98]"
                 onClick={getDirections}
               >
                 <Navigation className="mr-2 h-4 w-4" />
@@ -136,7 +136,7 @@ export function PlaceMapSection({
             ) : (
               <div className="absolute inset-0 rounded-b-[28px] bg-[#fffaf7] lg:rounded-none lg:rounded-r-[28px]">
                 <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,216,196,0.16)_23%,transparent_23%),linear-gradient(225deg,rgba(239,135,89,0.08)_23%,transparent_23%),linear-gradient(45deg,rgba(108,99,255,0.06)_23%,transparent_23%)] [background-size:52px_52px]" />
-                <div className="absolute left-1/2 top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#EF8759] shadow-[0_0_0_14px_rgba(239,135,89,0.14),0_10px_40px_rgba(239,135,89,0.35)]" />
+                <div className="absolute left-1/2 top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_0_14px_rgba(239,135,89,0.14),0_10px_40px_rgba(239,135,89,0.35)]" />
               </div>
             )}
           </div>
@@ -144,7 +144,7 @@ export function PlaceMapSection({
       </div>
 
       <div className="rounded-[28px] border border-[#ffd8c4] bg-white/72 p-6 shadow-[0_20px_70px_rgba(245,140,90,0.08)] backdrop-blur-xl">
-        <div className="mb-2 flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-[#EF8759]">
+        <div className="mb-2 flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-primary">
           <Route className="h-4 w-4" />
           Как добраться
         </div>

@@ -7,14 +7,14 @@ export const C = {
   ink3: "rgba(20,18,16,.55)",
   line: "rgba(20,18,16,.10)",
   line2: "rgba(20,18,16,.18)",
-  accent: "#E86A3A",
-  accentDeep: "#C24E22",
-  accentSoft: "#FFE8DC",
+  accent: "var(--primary)",
+  accentDeep: "var(--primary)",
+  accentSoft: "var(--brand-soft)",
 } as const;
 
 /** Poster fallback gradients for ideas without a cover image. */
 export const TONES = {
-  warm: "linear-gradient(160deg, #F2C8A7, #E89460)",
+  warm: "linear-gradient(160deg, var(--brand-soft), var(--primary))",
   sun: "linear-gradient(160deg, #F6D567, #E8B935)",
   soft: "linear-gradient(160deg, #E6DBC8, #C9BCA0)",
   mint: "linear-gradient(160deg, #CDE3D6, #9CC1AC)",

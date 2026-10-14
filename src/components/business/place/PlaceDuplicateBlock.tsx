@@ -47,7 +47,7 @@ export function PlaceDuplicateBlock({
           onClick={onClaimAccess}
           disabled={isLoading}
           className="w-full"
-          style={{ backgroundColor: "#EF8759" }}
+          style={{ backgroundColor: "var(--primary)" }}
         >
           Это моё место — запросить доступ
         </Button>

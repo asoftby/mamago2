@@ -20,7 +20,7 @@ interface ActivationNotice {
 }
 
 const inputClass =
-  "w-full h-11 px-4 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#EF8759] transition-shadow placeholder:text-neutral-400";
+  "w-full h-11 px-4 bg-white border border-neutral-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition-shadow placeholder:text-neutral-400";
 
 function isValidEmail(value: string): boolean {
   const v = value.trim();
@@ -381,7 +381,7 @@ export function CompactSaveAuthPanel({
           <button
             type="submit"
             disabled={loading}
-            className="h-11 w-full rounded-xl bg-[#EF8759] font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+            className="h-11 w-full rounded-xl bg-primary font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
           >
             {loading
               ? "Загрузка..."

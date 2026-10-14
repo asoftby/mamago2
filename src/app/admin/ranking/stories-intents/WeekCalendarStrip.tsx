@@ -290,7 +290,7 @@ export function WeekCalendarStrip({
                     <span style={{
                       position: "absolute", top: 4, right: 4,
                       width: 5, height: 5, borderRadius: 99,
-                      background: "#E86A3A",
+                      background: "var(--primary)",
                       boxShadow: "0 0 0 2px #FAF7F1",
                     }} />
                   )}

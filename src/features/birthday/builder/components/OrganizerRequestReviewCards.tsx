@@ -47,7 +47,7 @@ export function OrganizerRequestReviewCards({ rows, onEdit }: Props) {
             className={cn(
               "rounded-2xl border bg-white transition-[box-shadow,border-color]",
               isSelected
-                ? "border-[#EF8759]/45 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+                ? "border-primary/45 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
                 : "border-border/60",
             )}
           >
@@ -63,8 +63,8 @@ export function OrganizerRequestReviewCards({ rows, onEdit }: Props) {
                     className={cn(
                       "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors",
                       isSelected
-                        ? "border-[#EF8759] bg-[#EF8759]"
-                        : "border-border bg-white hover:border-[#EF8759]/50",
+                        ? "border-primary bg-primary"
+                        : "border-border bg-white hover:border-primary/50",
                     )}
                     aria-pressed={isSelected}
                     aria-label={
@@ -109,7 +109,7 @@ export function OrganizerRequestReviewCards({ rows, onEdit }: Props) {
                   <button
                     type="button"
                     onClick={() => toggleExpand(key)}
-                    className="inline-flex items-center gap-1 text-sm font-medium text-[#EF8759] hover:underline"
+                    className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
                   >
                     {expanded ? "Скрыть детали" : "Показать детали"}
                     <ChevronDown

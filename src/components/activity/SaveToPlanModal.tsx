@@ -34,9 +34,9 @@ const C = {
   ink3: "rgba(20,18,16,.55)",
   line: "rgba(20,18,16,.10)",
   line2: "rgba(20,18,16,.18)",
-  accent: "#E86A3A",
-  accentDeep: "#C24E22",
-  accentSoft: "#FFE8DC",
+  accent: "var(--primary)",
+  accentDeep: "var(--primary)",
+  accentSoft: "var(--brand-soft)",
   green: "#1F8A5B",
   greenBg: "rgba(31,138,91,.12)",
 } as const;
@@ -1191,8 +1191,8 @@ function InIdeasView({ onRemoveIdea, onSchedule, onCollections, dateOptions }: {
       {!removed && (
         <div style={{
           padding: "16px 18px", borderRadius: 16,
-          background: "linear-gradient(135deg, #FFE8DC, #FFF1E5)",
-          border: "1px solid rgba(232,106,58,.2)",
+          background: "linear-gradient(135deg, var(--brand-soft), #FFF1E5)",
+          border: "1px solid rgba(239,135,89,.2)",
           display: "flex", alignItems: "center", gap: 14, marginBottom: 18,
         }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -1788,7 +1788,7 @@ function ModalContent(props: ModalContentProps) {
     <>
       <style>{`
         .stp-opt:hover:not(:disabled) { background: #fff !important; border-color: #141210 !important; transform: translateX(2px); }
-        .stp-opt:hover:not(:disabled) .stp-arr { transform: translateX(4px); color: #C24E22 !important; }
+        .stp-opt:hover:not(:disabled) .stp-arr { transform: translateX(4px); color: var(--primary) !important; }
       `}</style>
       <div style={{ position: "relative" }}>
         <SaveToPlanPickerBody

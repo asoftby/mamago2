@@ -50,8 +50,8 @@ export function StoryModalActionCard({
                 className="rounded-full object-cover ring-1 ring-neutral-200 shrink-0"
               />
             ) : (
-              <div className="h-14 w-14 rounded-full bg-[#EF8759]/12 flex items-center justify-center shrink-0">
-                <span className="text-[18px] font-bold text-[#EF8759] leading-none">
+              <div className="h-14 w-14 rounded-full bg-primary/12 flex items-center justify-center shrink-0">
+                <span className="text-[18px] font-bold text-primary leading-none">
                   {item.businessName[0]}
                 </span>
               </div>

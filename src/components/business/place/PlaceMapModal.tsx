@@ -236,7 +236,7 @@ export function PlaceMapModal({
           disabled={!tempPin}
           size="lg"
           className="pointer-events-auto shadow-xl"
-          style={{ backgroundColor: "#EF8759" }}
+          style={{ backgroundColor: "var(--primary)" }}
         >
           Подтвердить точку
         </Button>

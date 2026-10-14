@@ -33,7 +33,7 @@ export default async function ResetPasswordPage({
 
             <Link
               href="/forgot-password"
-              className="flex h-12 w-full items-center justify-center rounded-xl bg-[#EF8759] font-medium text-white transition-colors hover:bg-primary-hover"
+              className="flex h-12 w-full items-center justify-center rounded-xl bg-primary font-medium text-white transition-colors hover:bg-primary-hover"
             >
               Получить новую ссылку
             </Link>

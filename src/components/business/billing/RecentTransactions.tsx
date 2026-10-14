@@ -47,8 +47,8 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
         <Link
           href={BUSINESS_BILLING_HISTORY_HREF}
           className="
-            inline-flex items-center gap-1 text-sm font-medium text-[#EF8759]
-            hover:text-[#EF8759]/80 transition-colors
+            inline-flex items-center gap-1 text-sm font-medium text-primary
+            hover:text-primary/80 transition-colors
           "
         >
           Все операции

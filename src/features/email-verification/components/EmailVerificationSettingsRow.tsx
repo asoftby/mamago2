@@ -62,7 +62,7 @@ export function EmailVerificationSettingsRow() {
           type="button"
           disabled={loading}
           onClick={() => void handleResend()}
-          className="shrink-0 text-sm font-medium text-[#EF8759] hover:text-[#e07848] disabled:opacity-50 transition"
+          className="shrink-0 text-sm font-medium text-primary hover:text-primary-hover disabled:opacity-50 transition"
         >
           {loading ? "Отправляем…" : "Отправить письмо"}
         </button>

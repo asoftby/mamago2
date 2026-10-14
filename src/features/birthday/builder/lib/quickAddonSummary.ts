@@ -301,6 +301,6 @@ export function quickAddonBadgeClassName(variant: QuickAddonBadgeVariant): strin
     variant === "fit" &&
       "border-border/50 bg-muted/40 text-muted-foreground",
     variant === "signal" &&
-      "border-[#EF8759]/20 bg-[#FFF7F3] text-[#7a4a32]",
+      "border-primary/20 bg-[#FFF7F3] text-[#7a4a32]",
   );
 }

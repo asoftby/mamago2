@@ -307,7 +307,7 @@ export function NotificationsPanel({
                   asChild
                   type="button"
                   variant="ghost"
-                  className="h-9 px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50 hover:text-[#EF8759]"
+                  className="h-9 px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50 hover:text-primary"
                 >
                   <Link href={notificationsPageHref} onClick={handleClosePanel}>
                     Смотреть все уведомления →

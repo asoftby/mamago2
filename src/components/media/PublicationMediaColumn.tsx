@@ -230,7 +230,7 @@ export function PublicationMediaColumn({
               <button
                 key={item.id}
                 type="button"
-                className="group relative aspect-[4/5] w-full shrink-0 snap-start overflow-hidden text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#EF8759]"
+                className="group relative aspect-[4/5] w-full shrink-0 snap-start overflow-hidden text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
                 onClick={() => setLightboxIndex(index)}
                 aria-label={
                   isVideo
@@ -315,7 +315,7 @@ export function PublicationMediaColumn({
                 className={cn(
                   "relative aspect-[4/5] w-24 shrink-0 overflow-hidden rounded-xl border-2 bg-[#E8E0D4]",
                   activeIndex === index
-                    ? "border-[#E86A3A]"
+                    ? "border-primary"
                     : "border-transparent",
                 )}
               >

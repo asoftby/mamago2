@@ -83,8 +83,8 @@ export function Step2Placements({
                   "min-h-11 rounded-xl border px-3 py-2 text-left text-sm transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60",
                   data.partyCategory === option.value
-                    ? "border-[#EF8759] bg-[#EF8759]/10 font-medium"
-                    : "border-border bg-card hover:border-[#EF8759]/70",
+                    ? "border-primary bg-primary/10 font-medium"
+                    : "border-border bg-card hover:border-primary/70",
                 )}
               >
                 {option.label}
@@ -108,8 +108,8 @@ export function Step2Placements({
                 "flex min-h-11 items-center justify-center gap-1 rounded-xl border px-2 py-2 text-center text-sm transition-colors",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60",
                 birthday.locationType === option.value
-                  ? "border-[#EF8759] bg-[#EF8759]/10 font-medium"
-                  : "border-border bg-card hover:border-[#EF8759]/70",
+                  ? "border-primary bg-primary/10 font-medium"
+                  : "border-border bg-card hover:border-primary/70",
               )}
             >
               {birthday.locationType === option.value && <Check aria-hidden="true" className="size-3.5 shrink-0" />}

@@ -48,7 +48,7 @@ function CountBadge({ count }: { count: number }) {
   const noun = count % 10 === 1 && count % 100 !== 11 ? "новое" : "новых";
   return (
     <span
-      className="absolute -bottom-1 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#EF8759] px-1.5 py-0.5 text-[9px] font-bold leading-none text-white shadow-sm ring-2 ring-white"
+      className="absolute -bottom-1 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold leading-none text-white shadow-sm ring-2 ring-white"
     >
       +{count} {noun}
     </span>
@@ -83,8 +83,8 @@ export function StoryRingItem({
       <div
         className={cn(
           "relative h-[87px] w-[87px] md:h-[104px] md:w-[104px] rounded-full p-[2px] transition-transform duration-150",
-          "group-active:scale-[0.93] group-focus-visible:ring-2 group-focus-visible:ring-[#EF8759]/50 group-focus-visible:ring-offset-2",
-          isSeen ? "bg-neutral-300" : "bg-[#EF8759]",
+          "group-active:scale-[0.93] group-focus-visible:ring-2 group-focus-visible:ring-primary/50 group-focus-visible:ring-offset-2",
+          isSeen ? "bg-neutral-300" : "bg-primary",
         )}
       >
         {/* 2px inset between brand ring and cover */}

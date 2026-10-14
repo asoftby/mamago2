@@ -2,7 +2,7 @@
 
 /* Align with form inputs + project primary focus */
 .onboarding-phone-wrap {
-  --PhoneInput-color--focus: var(--primary, #ef8759);
+  --PhoneInput-color--focus: var(--primary, var(--primary));
 }
 
 .onboarding-phone-wrap .PhoneInput {
@@ -15,7 +15,7 @@
 }
 
 .onboarding-phone-wrap .PhoneInput--focus {
-  outline: 2px solid var(--primary, #ef8759);
+  outline: 2px solid var(--primary, var(--primary));
   outline-offset: 0;
   border-color: transparent;
 }

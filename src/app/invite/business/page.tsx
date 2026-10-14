@@ -150,7 +150,7 @@ export default async function BusinessInviteAcceptPage({
             <p>Не тот email?</p>
             <Link
               href={supportHref}
-              className="inline-flex items-center gap-1 font-medium text-[#EF8759] transition-colors hover:text-[#E7794A]"
+              className="inline-flex items-center gap-1 font-medium text-primary transition-colors hover:text-primary"
             >
               Связаться с администратором
             </Link>
@@ -193,7 +193,7 @@ export default async function BusinessInviteAcceptPage({
               <p>Не тот email?</p>
               <Link
                 href={supportHref}
-                className="inline-flex items-center gap-1 font-medium text-[#EF8759] transition-colors hover:text-[#E7794A]"
+                className="inline-flex items-center gap-1 font-medium text-primary transition-colors hover:text-primary"
               >
                 Связаться с администратором
               </Link>

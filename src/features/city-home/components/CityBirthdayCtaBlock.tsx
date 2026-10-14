@@ -31,7 +31,7 @@ export function CityBirthdayCtaBlock({
           <div
             className={cn(
               "flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-[21px]",
-              "border border-[#ffd8c4] bg-[linear-gradient(180deg,_rgba(255,255,255,0.92)_0%,_rgba(255,241,232,0.96)_100%)] text-[#ff8a5b]",
+              "border border-[#ffd8c4] bg-[linear-gradient(180deg,_rgba(255,255,255,0.92)_0%,_rgba(255,241,232,0.96)_100%)] text-primary",
               "shadow-[inset_0_2px_3px_rgba(255,255,255,0.9),0_16px_28px_rgba(255,166,116,0.24)]",
             )}
           >
@@ -40,7 +40,7 @@ export function CityBirthdayCtaBlock({
           <div className="min-w-0">
             <h2 className="max-w-none text-[15px] tracking-[-0.04em] text-neutral-900 sm:leading-[1.1]" style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 32 }}>
               Организовать День Рождения{" "}
-              <em style={{ fontStyle: "italic", color: "#E86A3A", fontWeight: 400, fontFamily: "var(--font-editorial)", fontSize: 32, letterSpacing: "-0.5px" }}>за <span style={{ fontFamily: "var(--font-display)" }}>10</span> минут</em>
+              <em style={{ fontStyle: "italic", color: "var(--primary)", fontWeight: 400, fontFamily: "var(--font-editorial)", fontSize: 32, letterSpacing: "-0.5px" }}>за <span style={{ fontFamily: "var(--font-display)" }}>10</span> минут</em>
             </h2>
             <p className="mt-3 max-w-2xl text-[14px] leading-[150%] text-neutral-600 sm:text-[14px]">
               Площадка, анимация, торт, декор и другие штуковины — в одном конструкторе легко и просто

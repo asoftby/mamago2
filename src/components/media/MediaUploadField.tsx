@@ -464,9 +464,9 @@ export function MediaUploadField({
         className={cn(
           "group relative overflow-hidden rounded-2xl border bg-muted text-left transition focus:outline-none focus:ring-2 focus:ring-primary",
           alreadySelected && showUsageAccent
-            ? "cursor-not-allowed border-[#EF8759]"
+            ? "cursor-not-allowed border-primary"
             : usedElsewhere
-              ? "border-[#EF8759] hover:border-[#EF8759]"
+              ? "border-primary hover:border-primary"
             : disabledTile
               ? "cursor-not-allowed border-border opacity-45"
               : "border-gray-200 hover:border-primary/40",
@@ -488,7 +488,7 @@ export function MediaUploadField({
         />
         <div className="absolute inset-0 flex items-start justify-end p-2">
           {showUsageAccent ? (
-            <span className="flex items-center gap-1 rounded-full bg-[#EF8759] px-2 py-1 text-[11px] font-medium text-white shadow-sm">
+            <span className="flex items-center gap-1 rounded-full bg-primary px-2 py-1 text-[11px] font-medium text-white shadow-sm">
               <Check className="h-3.5 w-3.5" />
               {alreadySelected ? "Уже выбрано" : usageLabel}
             </span>

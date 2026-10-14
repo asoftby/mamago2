@@ -524,7 +524,7 @@ export function WhenSelect({
                   isPendingStart && !isPast && !isPresetActive && "bg-primary/20",
                   isPendingEnd && !isPast && !isPresetActive && "bg-primary/30",
                   // Специальная заливка для пресетов (такая же как у кнопок)
-                  isPresetActive && !isPast && "border-[#EF8759] bg-[#EF8759]/5 text-[#EF8759] font-medium"
+                  isPresetActive && !isPast && "border-primary bg-primary/5 text-primary font-medium"
                 )}
                 onClick={() => !isPast && handleDateClick(d)}
                 disabled={isPast}

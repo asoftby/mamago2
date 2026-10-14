@@ -144,7 +144,7 @@ function FamilyActivationAddChildForm({
                       className={cn(
                         "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                         on
-                          ? "border-[#EF8759] bg-[#EF8759]/10 text-neutral-900"
+                          ? "border-primary bg-primary/10 text-neutral-900"
                           : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300",
                       )}
                     >
@@ -167,7 +167,7 @@ function FamilyActivationAddChildForm({
       <div className="shrink-0 border-t border-neutral-100 bg-background px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <Button
           type="submit"
-          className="h-11 w-full bg-[#EF8759] text-white hover:bg-primary-hover"
+          className="h-11 w-full bg-primary text-white hover:bg-primary-hover"
           disabled={!canSave || isLoading}
         >
           {isLoading ? "Сохранение..." : "Сохранить"}

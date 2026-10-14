@@ -137,7 +137,7 @@ export function BookingCard({ booking, onStatusChange }: BookingCardProps) {
 
           {/* Subtitle from display (shift dates, event time, etc.) */}
           {display.subtitle && (
-            <div className="flex items-center gap-1.5 text-[13px] text-[#EF8759]">
+            <div className="flex items-center gap-1.5 text-[13px] text-primary">
               <CalendarDays className="h-3.5 w-3.5 shrink-0" />
               <span>{display.subtitle}</span>
             </div>
@@ -168,7 +168,7 @@ export function BookingCard({ booking, onStatusChange }: BookingCardProps) {
           <Phone className="h-4 w-4 shrink-0 text-stone-400" />
           <a
             href={`tel:${booking.customerPhone}`}
-            className="text-[14px] text-stone-700 hover:text-[#EF8759] transition-colors"
+            className="text-[14px] text-stone-700 hover:text-primary transition-colors"
           >
             {booking.customerPhone}
           </a>

@@ -112,8 +112,8 @@ export function HeroBalanceCard({
             onClick={onTopUp}
             className="
               inline-flex min-h-11 w-full items-center justify-center gap-2 px-6 py-3 md:w-auto
-              bg-[#EF8759] text-white font-medium rounded-xl
-              hover:bg-[#EF8759]/90 transition-colors
+              bg-primary text-white font-medium rounded-xl
+              hover:bg-primary/90 transition-colors
               shadow-sm hover:shadow-md
             "
           >

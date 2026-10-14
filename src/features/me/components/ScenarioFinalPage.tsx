@@ -47,7 +47,7 @@ function getStatusTone(status: PerformerStatus) {
     case "CONFIRMED":
       return "bg-[#EAF7E1] text-[#548B2F]";
     case "DECLINED":
-      return "bg-[#FFF0EC] text-[#E14D35]";
+      return "bg-[#FFF0EC] text-primary";
     case "PENDING":
       return "bg-[#F7F1E8] text-[#8A6A45]";
   }
@@ -180,7 +180,7 @@ export function AlternativePerformerCard({
       </div>
 
       <div className="space-y-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#EF8759]">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
           {alternative.category}
         </p>
         <h4 className="min-h-[44px] text-[15px] font-semibold leading-snug text-[#141210]">
@@ -399,7 +399,7 @@ export function ScenarioStatusSummary({
           Подтверждено {confirmedCount} из {party.confirmationTotal ?? confirmedCount} исполнителей
         </Badge>
         {declinedCount > 0 ? (
-          <Badge className="rounded-full border-0 bg-[#FFF1EE] px-3 py-1.5 text-[13px] font-medium text-[#D74532]">
+          <Badge className="rounded-full border-0 bg-[#FFF1EE] px-3 py-1.5 text-[13px] font-medium text-primary">
             <span className="mr-1.5 h-2 w-2 rounded-full bg-[#EF3D2F]" />
             {declinedCount} отказ
           </Badge>
@@ -437,7 +437,7 @@ export function ScenarioFooterBar({
             {confirmedLabel}
           </span>
           {declinedLabel ? (
-            <span className="inline-flex items-center gap-2 text-[#D74532]">
+            <span className="inline-flex items-center gap-2 text-primary">
               <span className="h-2 w-2 rounded-full bg-[#EF3D2F]" aria-hidden />
               {declinedLabel}
             </span>
@@ -557,7 +557,7 @@ export function ScenarioFinalPage({
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="mb-6">
-          <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-[#EF8759]">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-primary">
             • Заявки отправлены
           </p>
           <h1 className="mt-3 text-[42px] font-semibold leading-none tracking-[-0.03em] text-[#141210] sm:text-[64px]">

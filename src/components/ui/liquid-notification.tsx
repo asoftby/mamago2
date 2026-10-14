@@ -47,9 +47,9 @@ const VARIANT = {
     desc: "text-sky-800/75",
   },
   brand: {
-    tint: "from-[#FFE8DC]/90 via-white/65 to-[#FFF5F0]/55",
-    glow: "from-[#EF8759]/22 via-transparent to-transparent",
-    iconWrap: "bg-[#EF8759]",
+    tint: "from-brand-soft/90 via-white/65 to-brand-soft/55",
+    glow: "from-primary/22 via-transparent to-transparent",
+    iconWrap: "bg-primary",
     title: "text-neutral-900",
     desc: "text-neutral-600",
   },
@@ -140,7 +140,7 @@ export function LiquidNotification({
               "mt-2 inline-flex max-w-full items-center rounded-lg px-2 py-1 text-left text-xs font-semibold",
               "text-neutral-800 underline decoration-neutral-400/80 underline-offset-2",
               "transition-colors hover:text-neutral-950 hover:decoration-neutral-600",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/35 focus-visible:ring-offset-1",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-1",
             )}
           >
             {actionLabel}
@@ -160,7 +160,7 @@ export function LiquidNotification({
             "relative flex size-[27px] shrink-0 items-center justify-center rounded-full",
             "border border-white/60 bg-white/45 text-neutral-700 backdrop-blur-md",
             "shadow-sm transition-colors hover:bg-white/75 hover:text-neutral-900",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/40 focus-visible:ring-offset-1",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1",
           )}
         >
           <X className="size-3 shrink-0" strokeWidth={2} aria-hidden />

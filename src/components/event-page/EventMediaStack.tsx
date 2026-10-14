@@ -87,7 +87,7 @@ export function EventMediaStack({
             className="h-full w-full object-cover opacity-50 transition-opacity group-hover:opacity-70"
           />
           <div className="absolute inset-0 flex items-center justify-center bg-[rgba(20,18,16,0.18)]">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#FAF7F1] pl-1 text-[18px] text-[#C24E22] shadow-[0_10px_30px_rgba(0,0,0,0.25)] transition-transform group-hover:scale-110">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#FAF7F1] pl-1 text-[18px] text-primary shadow-[0_10px_30px_rgba(0,0,0,0.25)] transition-transform group-hover:scale-110">
               ▶
             </div>
           </div>

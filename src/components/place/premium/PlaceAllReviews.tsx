@@ -153,8 +153,8 @@ export function PlaceAllReviews({
           />
           <div className="rounded-[36px] border border-white/70 bg-white/65 p-12 text-center shadow-[0_28px_90px_rgba(17,19,34,0.08)] backdrop-blur-xl">
             <div className="max-w-md mx-auto space-y-4">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#EF8759]/18 to-[#6C63FF]/18">
-                <MessageSquarePlus className="h-8 w-8 text-[#EF8759]" />
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-primary/18 to-[#6C63FF]/18">
+                <MessageSquarePlus className="h-8 w-8 text-primary" />
               </div>
               <h3 className="text-2xl font-black text-[#0D1025]">
                 Пока нет отзывов
@@ -222,7 +222,7 @@ export function PlaceAllReviews({
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#EF8759]/20 to-[#6C63FF]/20">
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary/20 to-[#6C63FF]/20">
                     {review.authorAvatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -246,7 +246,7 @@ export function PlaceAllReviews({
                         className={`rounded-full px-2.5 py-1 text-[11px] font-black ${
                           review.source === "GOOGLE"
                             ? "bg-[#F1F4FF] text-[#5D6174]"
-                            : "bg-[#FFF0EA] text-[#EF8759]"
+                            : "bg-brand-soft text-primary"
                         }`}
                       >
                         {review.source === "GOOGLE" ? "Отзыв из Google" : "Отзыв mamaGo"}
@@ -260,7 +260,7 @@ export function PlaceAllReviews({
                             key={star}
                             className={`w-4 h-4 ${
                               star <= review.rating
-                                ? "fill-[#EF8759] text-[#EF8759]"
+                                ? "fill-primary text-primary"
                                 : "fill-[#E3E5EE] text-[#E3E5EE]"
                             }`}
                           />
@@ -279,7 +279,7 @@ export function PlaceAllReviews({
               {/* Review Text */}
               {displayText && (
                 <div className="space-y-2">
-                  <Quote className="h-7 w-7 text-[#EF8759]/45" />
+                  <Quote className="h-7 w-7 text-primary/45" />
                   <p className="whitespace-pre-line text-[15px] leading-8 text-[#555A70]">
                     {displayText}
                   </p>
@@ -287,7 +287,7 @@ export function PlaceAllReviews({
                   {hasLongText && (
                     <button
                       onClick={() => toggleExpanded(review.id)}
-                      className="text-sm font-black text-[#6C63FF] hover:text-[#EF8759]"
+                      className="text-sm font-black text-[#6C63FF] hover:text-primary"
                     >
                       {isExpanded ? "Свернуть" : "Читать полностью"}
                     </button>
@@ -296,7 +296,7 @@ export function PlaceAllReviews({
               )}
 
               {review.source === "MAMAGO" && review.ownerReplyText && (
-                <div className="ml-4 rounded-[22px] border border-[#EF8759]/16 bg-[#FFF6F1] p-4">
+                <div className="ml-4 rounded-[22px] border border-primary/16 bg-brand-soft p-4">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-black text-[#111322]">
@@ -365,7 +365,7 @@ function SectionHeader({
                   key={star}
                   className={`h-5 w-5 ${
                     star <= Math.round(averageRating)
-                      ? "fill-[#EF8759] text-[#EF8759]"
+                      ? "fill-primary text-primary"
                       : "fill-[#E3E5EE] text-[#E3E5EE]"
                   }`}
                 />

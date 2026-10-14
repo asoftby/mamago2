@@ -20,7 +20,7 @@ const PRODUCT_DOMAIN_BADGES: Record<NotificationProductDomain, NotificationProdu
   },
   BOOKINGS: {
     label: "Мои записи",
-    color: "bg-[#EF8759]/14 text-[#C65D2E] font-semibold",
+    color: "bg-primary/14 text-primary font-semibold",
   },
   PLAN: {
     label: "План",

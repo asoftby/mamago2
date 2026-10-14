@@ -139,7 +139,7 @@ export function DatePanel({ onClose, applied, actions, embedded = false }: DateP
                 className={cn(
                   "flex items-center justify-center p-3 rounded-xl border transition-colors text-sm font-medium",
                   applied.whenPreset === option.id.toUpperCase()
-                    ? "border-[#EF8759] bg-[#EF8759]/5 text-[#EF8759]"
+                    ? "border-primary bg-primary/5 text-primary"
                     : embedded
                       ? "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                       : "border-gray-200 hover:border-gray-300 hover:bg-gray-50",

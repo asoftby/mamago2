@@ -68,10 +68,10 @@ export function getNavIconButtonClassName({
       ? cn(
           MOBILE_FLOATING_CHROME,
           "active:scale-[0.98]",
-          isActive && "border-[#EF8759]/50",
+          isActive && "border-primary/50",
         )
       : isActive
-        ? "border-[#EF8759]/35 bg-white/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_14px_rgba(239,135,89,0.18)]"
+        ? "border-primary/35 bg-white/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_14px_rgba(239,135,89,0.18)]"
         : "border-white/70 bg-white/55 shadow-sm shadow-black/[0.04]",
     className,
   );
@@ -146,7 +146,7 @@ export function NavIconButton({
       {showBadge && (
         <span
           className={cn(
-            "absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#EF8759] px-1 text-[10px] font-semibold leading-none text-white shadow-sm ring-2",
+            "absolute -right-0.5 -top-0.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-white shadow-sm ring-2",
             chrome === "dark" ? "ring-neutral-900/95" : "ring-white/90",
           )}
           aria-hidden

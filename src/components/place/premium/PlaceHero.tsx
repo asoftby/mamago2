@@ -118,7 +118,7 @@ export function PlaceHero({
             {addressLine && (
               <div className="space-y-2">
                 <div className="flex items-start gap-2">
-                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#EF8759]" aria-hidden />
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
                   <div className="min-w-0 space-y-1">
                     <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#8D92A8]">
                       Адрес
@@ -165,7 +165,7 @@ export function PlaceHero({
             {workingHoursSummary?.trim() && (
               <div className="space-y-2">
                 <div className="flex items-start gap-2">
-                  <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[#EF8759]" aria-hidden />
+                  <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
                   <div className="min-w-0">
                     <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#8D92A8]">
                       График работы
@@ -184,14 +184,14 @@ export function PlaceHero({
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             {ratingLabel && (
               <span className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/60 px-4 py-2 text-sm font-bold text-[#303345] shadow-[0_14px_44px_rgba(108,99,255,0.11)] backdrop-blur-xl">
-                <Star className="h-4 w-4 fill-[#EF8759] text-[#EF8759]" />
+                <Star className="h-4 w-4 fill-primary text-primary" />
                 {ratingLabel}
               </span>
             )}
             {reviewCount != null && reviewCount > 0 && (
               <a
                 href="#reviews"
-                className="text-base font-normal leading-snug text-[#555A70] decoration-[#EF8759] decoration-dashed underline underline-offset-[5px] transition hover:text-[#303345]"
+                className="text-base font-normal leading-snug text-[#555A70] decoration-primary decoration-dashed underline underline-offset-[5px] transition hover:text-[#303345]"
               >
                 {reviewCount} отзывов
               </a>
@@ -208,7 +208,7 @@ export function PlaceHero({
       >
         <motion.div
           aria-hidden
-          className="absolute -left-8 top-8 h-32 w-32 rounded-full bg-[#EF8759]/30 blur-2xl"
+          className="absolute -left-8 top-8 h-32 w-32 rounded-full bg-primary/30 blur-2xl"
           animate={{ y: [0, 20, 0] }}
           transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
         />

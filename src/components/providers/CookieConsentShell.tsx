@@ -141,7 +141,7 @@ export function CookieConsentShell() {
             type="button"
             disabled={pending}
             onClick={() => handleAccept("all")}
-            className="inline-flex h-10 items-center justify-center rounded-lg bg-[#EF8759] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#e0784a] disabled:opacity-60"
+            className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-white transition-colors hover:bg-primary disabled:opacity-60"
           >
             {BANNER.acceptAll}
           </button>

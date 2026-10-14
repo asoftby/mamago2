@@ -88,7 +88,7 @@ export function PlanAudienceCompact({
               className={cn(
                 "relative z-10 inline-flex min-h-11 items-center rounded-full border px-3.5 py-2 text-sm font-semibold transition-all duration-200",
                 isActive
-                  ? "border-[#ffb38a] bg-[linear-gradient(180deg,_#ffb185_0%,_#ff8f61_100%)] text-white shadow-[0_8px_16px_rgba(255,146,93,0.3),inset_0_1px_0_rgba(255,255,255,0.4)] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_rgba(255,146,93,0.35),inset_0_1px_0_rgba(255,255,255,0.5)]"
+                  ? "border-primary bg-[linear-gradient(180deg,_var(--primary)_0%,_var(--primary-hover)_100%)] text-white shadow-[0_8px_16px_rgba(239,135,89,0.3),inset_0_1px_0_rgba(255,255,255,0.4)] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_rgba(239,135,89,0.35),inset_0_1px_0_rgba(255,255,255,0.5)]"
                   : "border-neutral-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f9f9f9_100%)] text-neutral-700 shadow-[0_4px_8px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] hover:-translate-y-0.5 hover:shadow-[0_6px_12px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,1)]",
               )}
             >
@@ -103,7 +103,7 @@ export function PlanAudienceCompact({
           className={cn(
             "relative z-10 inline-flex min-h-11 shrink-0 items-center rounded-full border px-3.5 py-2 text-sm font-semibold transition-all duration-200",
             isFreeMode
-              ? "border-[#ffb38a] bg-[linear-gradient(180deg,_#ffb185_0%,_#ff8f61_100%)] text-white shadow-[0_8px_16px_rgba(255,146,93,0.3),inset_0_1px_0_rgba(255,255,255,0.4)] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_rgba(255,146,93,0.35),inset_0_1px_0_rgba(255,255,255,0.5)]"
+              ? "border-primary bg-[linear-gradient(180deg,_var(--primary)_0%,_var(--primary-hover)_100%)] text-white shadow-[0_8px_16px_rgba(239,135,89,0.3),inset_0_1px_0_rgba(255,255,255,0.4)] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_rgba(239,135,89,0.35),inset_0_1px_0_rgba(255,255,255,0.5)]"
               : "border-neutral-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f9f9f9_100%)] text-neutral-700 shadow-[0_4px_8px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] hover:-translate-y-0.5 hover:shadow-[0_6px_12px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,1)]",
           )}
         >

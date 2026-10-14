@@ -123,18 +123,18 @@ export function Step1Type({ data, onChange, isEditable, showCategories = false }
               className={cn(
                 "w-full rounded-2xl border bg-card p-4 text-left transition-colors sm:p-5",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                "hover:border-[#EF8759]/70 disabled:cursor-not-allowed disabled:opacity-60",
-                isActive ? "border-[#EF8759] bg-[#EF8759]/5" : "border-border",
+                "hover:border-primary/70 disabled:cursor-not-allowed disabled:opacity-60",
+                isActive ? "border-primary bg-primary/5" : "border-border",
               )}
             >
               <div className="flex items-start gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#EF8759]/10 text-[#EF8759]">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Icon aria-hidden="true" className="size-5" />
                 </span>
                 <span className="min-w-0 flex-1 space-y-1">
                   <span className="flex items-center gap-2 text-base font-semibold text-foreground">
                     {category.label}
-                    {isChosen && <Check aria-hidden="true" className="size-4 shrink-0 text-[#EF8759]" />}
+                    {isChosen && <Check aria-hidden="true" className="size-4 shrink-0 text-primary" />}
                   </span>
                   <span className="block text-sm leading-relaxed text-muted-foreground">
                     {category.description}
@@ -173,13 +173,13 @@ export function Step1Type({ data, onChange, isEditable, showCategories = false }
                   className={cn(
                     "flex min-h-28 flex-col gap-1 rounded-xl border bg-card p-4 text-left transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                    "hover:border-[#EF8759]/70 disabled:cursor-not-allowed disabled:opacity-60",
-                    isSelected && "border-[#EF8759] bg-[#EF8759]/5",
+                    "hover:border-primary/70 disabled:cursor-not-allowed disabled:opacity-60",
+                    isSelected && "border-primary bg-primary/5",
                   )}
                 >
                   <span className="flex w-full items-center justify-between gap-2 font-medium text-foreground">
                     {option.label}
-                    {isSelected && <Check aria-hidden="true" className="size-4 shrink-0 text-[#EF8759]" />}
+                    {isSelected && <Check aria-hidden="true" className="size-4 shrink-0 text-primary" />}
                   </span>
                   <span className="text-sm leading-relaxed text-muted-foreground">
                     {option.description}

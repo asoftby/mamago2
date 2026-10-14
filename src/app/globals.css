@@ -335,8 +335,8 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   --plan-line: rgba(20, 18, 16, 0.1);
   --plan-muted: rgba(20, 18, 16, 0.55);
   --plan-faint: rgba(20, 18, 16, 0.35);
-  --plan-accent: #e86a3a; /* fills: dots, today ring; owned by "Family" */
-  --plan-accent-ink: #c24e22; /* text on light backgrounds */
+  --plan-accent: var(--primary); /* fills: dots, today ring; owned by "Family" */
+  --plan-accent-ink: var(--primary); /* text on light backgrounds */
   --plan-on-ink: #faf7f1;
   /* Child dot palette (deterministic by childId); orange is reserved for Family */
   --plan-child-1: #2f8f83;

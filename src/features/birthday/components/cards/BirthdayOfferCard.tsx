@@ -54,7 +54,7 @@ export function BirthdayOfferCard({
           sizes={compact ? (wide ? "160px" : "112px") : "(max-width: 640px) 100vw, 400px"}
         />
         {offer.isFeatured && !recommendation && (
-          <span className="absolute top-2 left-2 bg-[#EF8759] text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+          <span className="absolute top-2 left-2 bg-primary text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
             Топ
           </span>
         )}
@@ -113,7 +113,7 @@ export function BirthdayOfferCard({
             {!hideRequestCta && (
               <button
                 type="button"
-                className="flex-1 rounded-xl bg-[#EF8759] text-white text-sm font-medium py-2 hover:bg-[#e07848] transition-colors"
+                className="flex-1 rounded-xl bg-primary text-white text-sm font-medium py-2 hover:bg-primary-hover transition-colors"
                 onClick={() => onRequest?.(offer)}
               >
                 Оставить заявку

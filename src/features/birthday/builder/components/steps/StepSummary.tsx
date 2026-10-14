@@ -46,7 +46,7 @@ export function StepSummary({ builder }: { builder: BuilderHook }) {
         <div className="space-y-1 min-w-0">
           <div className="flex items-center gap-2">
             <CheckCircle2
-              className="h-5 w-5 shrink-0 text-[#EF8759]"
+              className="h-5 w-5 shrink-0 text-primary"
               aria-hidden
             />
             <h2 className="text-lg font-medium text-foreground/85">
@@ -62,8 +62,8 @@ export function StepSummary({ builder }: { builder: BuilderHook }) {
 
       {/* Conflicts banner */}
       {hasConflicts && (
-        <div className="rounded-xl bg-orange-50 border border-orange-200 p-4 flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-[#EF8759] shrink-0 mt-0.5" />
+        <div className="rounded-xl bg-brand-soft border border-primary/20 p-4 flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold">Есть несовместимые предложения</p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -109,17 +109,17 @@ export function StepSummary({ builder }: { builder: BuilderHook }) {
           <h3 className="text-sm font-semibold">Где празднуем?</h3>
           <div
             className={cn(
-              "relative rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50/50 p-6",
+              "relative rounded-2xl border-2 border-dashed border-primary/20 bg-brand-soft/50 p-6",
               "flex items-center gap-4"
             )}
           >
             {placeType === "HOME" ? (
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-100">
-                <Home className="h-6 w-6 text-[#EF8759]" />
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                <Home className="h-6 w-6 text-primary" />
               </div>
             ) : (
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-100">
-                <Trees className="h-6 w-6 text-[#EF8759]" />
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                <Trees className="h-6 w-6 text-primary" />
               </div>
             )}
             <div className="flex-1 min-w-0">

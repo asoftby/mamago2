@@ -32,8 +32,8 @@ export function LegalDocumentsBlock({ documents }: LegalDocumentsBlockProps) {
             className="flex items-center justify-between p-4 bg-stone-50 rounded-xl border border-stone-100 hover:border-stone-200 transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[#EF8759]/10 flex items-center justify-center">
-                <FileText className="w-5 h-5 text-[#EF8759]" />
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-primary" />
               </div>
               <div>
                 <p className="text-sm font-medium text-stone-950">

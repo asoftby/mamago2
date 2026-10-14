@@ -53,7 +53,7 @@ export function OfferReviews({ reviews, averageRating, totalCount }: OfferReview
         {reviews.length > 3 && (
           <button
             type="button"
-            className="text-[14px] font-semibold text-gray-700 underline underline-offset-4 decoration-gray-300 hover:decoration-[#EF8759] hover:text-[#C2522A] transition-colors whitespace-nowrap"
+            className="text-[14px] font-semibold text-gray-700 underline underline-offset-4 decoration-gray-300 hover:decoration-primary hover:text-primary transition-colors whitespace-nowrap"
           >
             Все отзывы →
           </button>
@@ -115,7 +115,7 @@ function ReviewCard({ review }: { review: OfferReview }) {
                 className="h-full w-full object-cover"
               />
             ) : (
-              <span className="text-[13px] font-bold text-[#C2522A]">{initials}</span>
+              <span className="text-[13px] font-bold text-primary">{initials}</span>
             )}
           </div>
           <div className="min-w-0">
@@ -132,7 +132,7 @@ function ReviewCard({ review }: { review: OfferReview }) {
               className={cn(
                 "h-3 w-3",
                 i < review.rating
-                  ? "fill-[#EF8759] text-[#EF8759]"
+                  ? "fill-primary text-primary"
                   : "fill-gray-100 text-gray-100",
               )}
             />

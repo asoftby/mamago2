@@ -599,7 +599,7 @@ export function RouteDetailClient({ route, canEdit }: Props) {
                 </>
               )}
               <div className="flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-[#EF8759] shrink-0" />
+                <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
                 <span className="text-xs font-medium text-neutral-700" style={{ fontFamily: "Menlo, monospace" }}>{route.stopsCount} точки</span>
               </div>
               <span className="text-neutral-300">|</span>

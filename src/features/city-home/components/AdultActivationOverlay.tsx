@@ -156,7 +156,7 @@ function AdultActivationForm({
                   className={cn(
                     "rounded-full px-4 py-2 text-sm font-medium transition-all",
                     selectedPrefs.includes(s.id)
-                      ? "bg-[#EF8759] text-white"
+                      ? "bg-primary text-white"
                       : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200",
                   )}
                 >
@@ -180,7 +180,7 @@ function AdultActivationForm({
                   className={cn(
                     "rounded-full px-4 py-2 text-sm font-medium transition-all",
                     selectedFormat === s.id
-                      ? "bg-[#EF8759] text-white"
+                      ? "bg-primary text-white"
                       : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200",
                   )}
                 >
@@ -198,7 +198,7 @@ function AdultActivationForm({
             Пропустить
           </Button>
           <Button
-            className="flex-1 rounded-2xl bg-[#EF8759] text-white hover:bg-primary-hover"
+            className="flex-1 rounded-2xl bg-primary text-white hover:bg-primary-hover"
             onClick={handleSave}
             disabled={saving || !canSave}
           >

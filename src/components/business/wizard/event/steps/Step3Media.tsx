@@ -1250,7 +1250,7 @@ export function Step3Media({
                       disabled={!interactive}
                       className={cn(
                         "group relative aspect-square overflow-hidden rounded-lg border bg-muted focus:outline-none focus:ring-2 focus:ring-primary",
-                        usedElsewhere || selectedInCurrentField ? "border-[#EF8759]" : "border-border",
+                        usedElsewhere || selectedInCurrentField ? "border-primary" : "border-border",
                         selected && interactive && "ring-2 ring-primary ring-offset-2",
                         !interactive && "cursor-not-allowed opacity-40",
                       )}
@@ -1266,7 +1266,7 @@ export function Step3Media({
                         </div>
                       ) : null}
                       {selectedInCurrentField || usedElsewhere ? (
-                        <span className="absolute right-1.5 top-1.5 flex items-center gap-1 rounded-full bg-[#EF8759] px-2 py-1 text-[11px] font-medium text-white shadow-sm">
+                        <span className="absolute right-1.5 top-1.5 flex items-center gap-1 rounded-full bg-primary px-2 py-1 text-[11px] font-medium text-white shadow-sm">
                           <Check className="h-3.5 w-3.5" />
                           {selectedInCurrentField ? "Уже выбрано" : "Используется"}
                         </span>

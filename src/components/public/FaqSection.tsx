@@ -40,7 +40,7 @@ export function FaqSection({ items, className }: FaqSectionProps) {
               fontFamily: "var(--font-editorial)",
               fontStyle: "italic",
               fontWeight: 400,
-              color: "#E86A3A",
+              color: "var(--primary)",
             }}
           >
             вопросы

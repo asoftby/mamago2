@@ -47,7 +47,7 @@ const T = {
   line2: "rgba(20,18,16,.16)",
   paper: "#FAF7F1",
   bg: "#F0EBE0",
-  accentDeep: "#C2522A",
+  accentDeep: "var(--primary)",
 } as const;
 
 export type ShareAnalyticsChannel = "telegram" | "whatsapp" | "copy" | "native";
