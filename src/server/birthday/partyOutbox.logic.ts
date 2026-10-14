@@ -79,6 +79,6 @@ export function inboxLinkedEventTypes(): PartyOutboxEventType[] {
   return ["PARTY_REQUEST_SENT"];
 }
 
-export function heldPartyOutboxEventTypes(env: { BUSINESS_BOOKINGS_INBOX_UI?: string }): PartyOutboxEventType[] {
+export function heldPartyOutboxEventTypes(env: Readonly<Record<string, string | undefined>>): PartyOutboxEventType[] {
   return env.BUSINESS_BOOKINGS_INBOX_UI === "true" ? [] : inboxLinkedEventTypes();
 }
