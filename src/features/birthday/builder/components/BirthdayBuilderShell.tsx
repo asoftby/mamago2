@@ -175,7 +175,7 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
           background: "#fff",
           color: "#141210",
           WebkitFontSmoothing: "antialiased",
-          paddingBottom: 92,
+          paddingBottom: 150, // room for the two-row summary bar on phones
         }}
       >
         {/* Top bar */}

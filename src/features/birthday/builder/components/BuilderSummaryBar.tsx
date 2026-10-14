@@ -101,15 +101,16 @@ export function BuilderSummaryBar({
           margin: "0 auto",
           display: "flex",
           alignItems: "center",
-          gap: 16,
-          padding: "14px 28px",
+          gap: 12,
+          flexWrap: "wrap", // phones: summary on its own row above the buttons
+          padding: "12px 16px",
           minHeight: 64,
         }}
       >
         {/* Left: summary text */}
         <div
           style={{
-            flex: 1,
+            flex: "1 1 240px",
             minWidth: 0,
             display: "flex",
             alignItems: "center",
@@ -155,7 +156,7 @@ export function BuilderSummaryBar({
         </div>
 
         {/* Right: nav buttons */}
-        <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+        <div style={{ display: "flex", gap: 10, flexShrink: 0, marginLeft: "auto" }}>
           {showBack && (
             <button
               type="button"
