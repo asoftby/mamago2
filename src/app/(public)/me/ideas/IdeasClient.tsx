@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { SaveToPlanModal } from "@/components/activity/SaveToPlanModal";
+import { persistIdeaCollectionSelection } from "@/features/save/persistIdeaCollectionSelection";
 import { toast } from "@/lib/toast";
 import type { IdeaItem, Filter } from "./types";
 import { IdeasHeader } from "./components/IdeasHeader";
@@ -346,11 +347,27 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
         inPlan={planningIdea?.isPlanned ?? false}
         planDate={planningIdea?.plannedDate ?? null}
         source="ideas"
+        collectionTarget={planningIdea ? collectionTarget(planningIdea) : undefined}
         onConfirm={(result) => {
           if (result.action === "plan" && result.dateISO && planModalId) {
             handlePlanned(planModalId, result.dateISO);
           } else if (result.action === "remove-idea" && planningIdea) {
             void handleRemove(planningIdea, { silentSuccess: true });
+          } else if (result.action === "ideas" && planningIdea) {
+            const idea = planningIdea;
+            const target = collectionTarget(idea);
+            void persistIdeaCollectionSelection(result, target)
+              .then(async () => {
+                const response = await fetch("/api/save/idea/collections?" + new URLSearchParams(target), { cache: "no-store" });
+                if (response.ok) {
+                  const json = (await response.json()) as { collectionIds?: string[] };
+                  if (Array.isArray(json.collectionIds)) {
+                    setMemberships((current) => ({ ...current, [idea.id]: json.collectionIds ?? [] }));
+                  }
+                }
+                await refreshCollections();
+              })
+              .catch(() => toast.error("Не удалось обновить коллекцию"));
           }
           setPlanModalId(null);
         }}
