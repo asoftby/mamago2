@@ -57,7 +57,7 @@ export function IdeasHeader({ totalCount, plannedCount, unplannedCount }: IdeasH
             className="font-mono text-[11px] uppercase tracking-[0.14em]"
             style={{ color: C.accentDeep }}
           >
-            ● в коллекции
+            ● сохранено в идеях
           </span>
           <span
             className="text-[30px] leading-none tracking-[-0.02em]"

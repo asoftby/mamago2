@@ -1,7 +1,7 @@
 // Offer Wizard Validation
 // Inherits Event Wizard architecture 1-to-1
 
-import type { OfferFormData } from "./types";
+import type { OfferFormData, OfferWizardVariant } from "./types";
 import { getStepsForOfferType } from "./offerWizardSteps.config";
 import { validatePublicationAccess } from "@/features/publication-access";
 import { showCampLodgingFormFields } from "./campOfferModel";
@@ -106,16 +106,15 @@ function validatePlacementsStep(data: OfferFormData): ValidationResult {
   // included/program/note) via real Offer columns + details JSON. The plain
   // "Организовать праздник" checkbox on other product types has no extra
   // fields to fill, so no extra requirements apply there.
-  if (
-    data.requestedPlacements.includes("BIRTHDAY") &&
-    (data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE")
-  ) {
-    if (
-      !data.birthdayDetails.included.trim() &&
-      !data.birthdayDetails.program.trim() &&
-      !data.birthdayDetails.note.trim()
-    ) {
-      errors.push("Укажите, что входит, или опишите программу праздника");
+  if (data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE") {
+    if (!data.birthdayDetails.locationType) {
+      errors.push("Укажите, где проходит праздник");
+    }
+    if (data.productType === "PARTY_SERVICE" && !data.partyCategory) {
+      errors.push("Выберите вид услуги");
+    }
+    if (!data.birthdayDetails.included.trim() && !data.birthdayDetails.program.trim()) {
+      errors.push("Укажите, что входит в предложение");
     }
   }
 
@@ -133,7 +132,7 @@ function validatePlacementsStep(data: OfferFormData): ValidationResult {
 function validateStep2(data: OfferFormData): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
-  const signalIdsOptional = data.productType === "PARTY_SERVICE";
+
 
   if (data.offerWizardType === "CAMP") {
     if (!data.campProgramType) {
@@ -161,21 +160,8 @@ function validateStep2(data: OfferFormData): ValidationResult {
     warnings.push("Рекомендуется указать возрастные группы");
   }
 
-  // Validate Discovery Signals (structured groups)
-  const signalIds = data.signalIds ?? [];
-
-  if (data.offerWizardType !== "CAMP" && !signalIdsOptional) {
-    // Basic validation: check if signals are selected
-    if (signalIds.length === 0) {
-      errors.push("Выберите характеристики предложения (активность, формат, участие)");
-    } else {
-      // More specific validation would require loading signal definitions
-      // For now, we rely on the UI component to enforce min/max
-      if (signalIds.length < 3) {
-        warnings.push("Рекомендуется выбрать минимум 3 характеристики (по одной из каждой обязательной группы)");
-      }
-    }
-  }
+  // Discovery signals are optional enrichment: their absence cannot block a
+  // business from publishing a clear, complete offer.
 
   const campProgramOk =
     data.offerWizardType !== "CAMP" || Boolean(data.campProgramType);
@@ -185,7 +171,7 @@ function validateStep2(data: OfferFormData): ValidationResult {
     data.title.trim().length >= 3 &&
     data.shortDescription.trim().length >= 10 &&
     data.shortDescription.length <= 120 &&
-    (data.offerWizardType === "CAMP" || signalIdsOptional || signalIds.length >= 3)
+    getRichTextLength(data.description || "") >= 20
   );
 
   return {
@@ -494,10 +480,13 @@ function validateBookingSettings(booking: OfferFormData["bookingSettings"]): boo
 /**
  * Final validation for submit (strict)
  */
-export function validateForSubmit(data: OfferFormData): ValidationResult {
+export function validateForSubmit(
+  data: OfferFormData,
+  variant: OfferWizardVariant = "v1",
+): ValidationResult {
   const allErrors: string[] = [];
   const allWarnings: string[] = [];
-  const steps = getStepsForOfferType(data.offerWizardType).filter(
+  const steps = getStepsForOfferType(data.offerWizardType, data.productType).filter(
     (step) => step.key !== "review",
   );
 
@@ -542,6 +531,11 @@ export function validateForSubmit(data: OfferFormData): ValidationResult {
 
     allErrors.push(...result.errors);
     allWarnings.push(...result.warnings);
+  }
+
+  // Новый мастер: категория обязательна (хотя бы одна).
+  if (variant === "v2" && data.productType && data.categoryIds.length === 0) {
+    allErrors.push("Выберите хотя бы одну категорию");
   }
 
   return {

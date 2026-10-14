@@ -206,6 +206,7 @@ export function ArticleSaveHeart({
         scenario={{
           kind: "quickdate",
           title: articleTitle,
+          ticket: { title: articleTitle, imageUrl: coverImageUrl },
           ideaOnly: true,
         }}
         source={source}

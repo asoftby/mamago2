@@ -1,3 +1,4 @@
+import { isValidOfferPhone } from "@/lib/offers/offerPhone";
 import type { OfferFormData } from "./types";
 
 function isValidUrl(url: string): boolean {
@@ -10,8 +11,7 @@ function isValidUrl(url: string): boolean {
 }
 
 function isValidPhone(phone: string): boolean {
-  const phoneRegex = /^[\d\s\+\-\(\)]+$/;
-  return phoneRegex.test(phone) && phone.replace(/\D/g, "").length >= 9;
+  return isValidOfferPhone(phone);
 }
 
 export function isOfferManualContactsValid(data: OfferFormData): boolean {

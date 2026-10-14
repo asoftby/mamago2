@@ -93,6 +93,7 @@ interface CityDiscoveryShellProps {
   budgetConfig?: BudgetConfig;
   /** SEO-specific visible heading for dedicated discovery hubs. */
   pageTitleOverride?: string;
+  weekendPlannerEnabled?: boolean;
 }
 
 export function CityDiscoveryShell({
@@ -104,6 +105,7 @@ export function CityDiscoveryShell({
   activeClassChipSlug,
   budgetConfig,
   pageTitleOverride,
+  weekendPlannerEnabled = false,
 }: CityDiscoveryShellProps) {
   const { applied } = useDiscoveryFilters();
   const budgetCtx = useOptionalDiscoveryBudgetConfig();
@@ -190,6 +192,16 @@ export function CityDiscoveryShell({
           <H1 className={DISCOVERY_TITLE_CLASS}><CityTitle title={pageTitle} citySlug={city} /></H1>
           {filterButton}
         </div>
+        {intent === "kuda" && weekendPlannerEnabled ? (
+          <section className="flex flex-col gap-4 rounded-3xl border border-emerald-100 bg-[#effaf4] p-5 sm:flex-row sm:items-center sm:justify-between" aria-label="Подбор выходного">
+            <div>
+              <span className="text-xs font-medium uppercase tracking-wide text-emerald-700">Тест для администратора</span>
+              <h2 className="mt-1 font-serif text-2xl font-semibold text-slate-900">Соберём ваш выходной?</h2>
+              <p className="mt-1 max-w-md text-sm text-slate-600">Подберём реальные места и события с учётом интересов семьи и ваших планов.</p>
+            </div>
+            <Link href={`/${city}/weekend`} className="inline-flex shrink-0 justify-center rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800">Подобрать мой выходной →</Link>
+          </section>
+        ) : null}
         {intent === "kuda" ? <EventQuickFilters /> : null}
         {intent === "classes" && classChips && activeClassChipSlug ? (
           <ClassesChipBar chips={classChips} activeChipSlug={activeClassChipSlug} />

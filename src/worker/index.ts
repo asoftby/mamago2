@@ -23,12 +23,14 @@ import { persistDetectorResult } from "@/server/ops/persistDetectorResult";
 import { observeReleaseEvent } from "@/server/ops/releaseEvent";
 import { runOperationsRetentionWithLock } from "@/server/ops/retention/retentionRun";
 import { buildSnapshot } from "@/server/ops/snapshot/buildSnapshot";
+import { expireOfferHolds } from "@/server/offers/expireOfferHolds";
 import type { Detector, DetectorContext, DetectorResult } from "@/server/ops/types";
 import { createWorkerContext, disposeWorkerContext, type WorkerContext } from "./context";
 import { Scheduler } from "./scheduler";
 
 const SNAPSHOT_INTERVAL_MS = 60_000;
 const RETENTION_INTERVAL_MS = 86_400_000;
+const OFFER_HOLD_EXPIRY_INTERVAL_MS = 5 * 60_000;
 /**
  * Deterministic per-collector startup stagger, so nine collectors don't
  * all open their first DB round-trip in the same tick as the seven
@@ -82,6 +84,17 @@ function wireScheduler(
   collectorLocks: Map<string, GlobalLock>,
   retentionLock: GlobalLock,
 ): void {
+  scheduler.scheduleRepeating({
+    name: "offers.expire_holds",
+    intervalMs: OFFER_HOLD_EXPIRY_INTERVAL_MS,
+    run: async () => {
+      const expired = await expireOfferHolds(ctx.prisma);
+      if (expired.requests || expired.allocations) {
+        console.log(`[worker] expired offer holds requests=${expired.requests} allocations=${expired.allocations}`);
+      }
+    },
+  });
+
   scheduler.scheduleRepeating({
     name: "operations.snapshot_builder",
     intervalMs: SNAPSHOT_INTERVAL_MS,
