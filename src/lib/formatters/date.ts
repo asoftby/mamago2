@@ -99,6 +99,37 @@ export function formatRuShortDayMonthRange(
   }
 }
 
+/** Compact and grammatically correct Russian range for a custom heading.
+ * Same month: «с 21 по 25 окт.»; different months: «с 21 окт. по 25 ноя.».
+ * For a single date, returns «21 окт.». Do not parse YYYY-MM-DD as a UTC
+ * instant: these are civil dates, independent of the user's timezone.
+ */
+export function formatRuCustomDateRangeTitle(
+  dateFrom: string | null,
+  dateTo: string | null,
+): string {
+  const parse = (key: string | null): { day: number; month: number; year: number } | null => {
+    if (!key || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
+    const [year, month, day] = key.split("-").map(Number);
+    if (!year || !month || !day) return null;
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+    return { year, month, day };
+  };
+  const from = parse(dateFrom);
+  if (!from) return "";
+  const to = parse(dateTo);
+  const start = `${from.day} ${RU_MONTH_SHORT[from.month - 1]}`;
+  if (!to || (from.year === to.year && from.month === to.month && from.day === to.day)) return start;
+
+  const fromYear = from.year !== to.year ? ` ${from.year}` : "";
+  const toYear = from.year !== to.year ? ` ${to.year}` : "";
+  if (from.year === to.year && from.month === to.month) {
+    return `с ${from.day} по ${to.day} ${RU_MONTH_SHORT[from.month - 1]}`;
+  }
+  return `с ${start}${fromYear} по ${to.day} ${RU_MONTH_SHORT[to.month - 1]}${toYear}`;
+}
+
 /**
  * Format a Date or ISO string as HH:mm in the explicit product timezone.
  * This is intentionally not the viewer/browser timezone: event schedules are
