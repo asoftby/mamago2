@@ -4,7 +4,7 @@ import { PartyOutboxStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { dispatchDelivery } from "@/server/services/notificationDelivery.service";
 import {
-  isPartyOutboxEventType, partyNotificationId, partyOutboxBackoff, partyOutboxCopy,
+  heldPartyOutboxEventTypes, isPartyOutboxEventType, partyNotificationId, partyOutboxBackoff, partyOutboxCopy,
 } from "./partyOutbox.logic";
 
 const MAX_ATTEMPTS = 5;
@@ -154,6 +154,8 @@ export async function dispatchPartyOutbox(batchSize = 20) {
       status: { in: ["PENDING", "FAILED"] },
       nextAttemptAt: { lte: new Date() },
       attempts: { lt: MAX_ATTEMPTS },
+      // Held until the business inbox UI exists; the event is kept, not discarded.
+      eventType: { notIn: heldPartyOutboxEventTypes(process.env) },
     },
     orderBy: { createdAt: "asc" },
     take: Math.min(50, Math.max(1, batchSize)),

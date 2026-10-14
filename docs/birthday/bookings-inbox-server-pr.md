@@ -78,3 +78,5 @@ No changes to existing standard business-bookings API and UI until UI PR.
    pagination/aggregates; do not impose a silent 100-row counting limit.
 6. PR #529 integration, schema migration smoke/DEV gate, multi-business E2E,
    and completion of PR6 parent acceptance remain prerequisites for release.
+
+7. **Outbox gate:** `PARTY_REQUEST_SENT` (links to `/business/bookings?tab=action&kind=party`) is held in PENDING by the worker until `BUSINESS_BOOKINGS_INBOX_UI=true`. Set it only together with the unified-inbox UI release; held events are delivered afterwards. Customer-facing events link to `/me/birthdays` and are not gated.

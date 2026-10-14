@@ -70,3 +70,15 @@ export function partyOutboxCopy(params: {
       };
   }
 }
+
+/**
+ * Events whose notification links into the unified business inbox stay PENDING (never dropped)
+ * until the inbox UI is released and BUSINESS_BOOKINGS_INBOX_UI=true is set.
+ */
+export function inboxLinkedEventTypes(): PartyOutboxEventType[] {
+  return ["PARTY_REQUEST_SENT"];
+}
+
+export function heldPartyOutboxEventTypes(env: { BUSINESS_BOOKINGS_INBOX_UI?: string }): PartyOutboxEventType[] {
+  return env.BUSINESS_BOOKINGS_INBOX_UI === "true" ? [] : inboxLinkedEventTypes();
+}
