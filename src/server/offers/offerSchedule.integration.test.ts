@@ -188,3 +188,119 @@ test("NONE и EXTERNAL не создают BookingRequest, REQUEST_ONLY созд
   await createPublicBooking({ ...input, publicationId: requestOffer });
   assert.equal(await db.bookingRequest.count({ where: { offerId: requestOffer } }), 1);
 });
+
+const classInput = (overrides: Record<string, unknown> = {}) => ({
+  classSchedule: {
+    kind: "recurring" as const,
+    durationMin: 60,
+    groups: [
+      { days: [2, 4], time: "17:30", seats: 8 },
+      { days: [6], time: "11:00", seats: null },
+    ],
+    dates: [],
+    period: { from: "2026-10-19", to: "2026-12-14" },
+    closedDates: ["2026-11-07"],
+    ...overrides,
+  },
+});
+
+test("регулярные занятия: правила по дням, период курса и закрытые дни в OfferScheduleException", async () => {
+  const offerId = await newOffer({ productType: "REGULAR_ACTIVITY" });
+  await db.$transaction((tx) =>
+    applyOfferSchedule({ db: tx, offerId, input: classInput(), externalUrlNeedsModeration: false }),
+  );
+  const booking = await db.offerBooking.findUniqueOrThrow({
+    where: { offerId },
+    include: { rules: true, exceptions: true },
+  });
+  assert.equal(booking.scheduleKind, "RECURRING_SESSIONS");
+  assert.equal(booking.durationMin, 60);
+  assert.deepEqual(
+    booking.rules.map((rule) => [rule.weekday, rule.startMinutes, rule.endMinutes, rule.capacity]).sort(),
+    [
+      [2, 1050, 1110, 8],
+      [4, 1050, 1110, 8],
+      [6, 660, 720, null],
+    ],
+  );
+  assert.ok(booking.rules.every((rule) => rule.validFrom?.toISOString().startsWith("2026-10-19")));
+  assert.ok(booking.rules.every((rule) => rule.validTo?.toISOString().startsWith("2026-12-14")));
+  assert.deepEqual(booking.exceptions.map((item) => item.date.toISOString().slice(0, 10)), ["2026-11-07"]);
+  // закрытые дни занятий не создают OpeningHours
+  assert.equal((await db.offer.findUniqueOrThrow({ where: { id: offerId } })).openingHoursId, null);
+
+  // повторное сохранение заменяет правила и закрытые дни, не плодя дубли
+  await db.$transaction((tx) =>
+    applyOfferSchedule({
+      db: tx,
+      offerId,
+      input: classInput({ groups: [{ days: [1], time: "09:00", seats: 5 }], period: null, closedDates: [] }),
+      externalUrlNeedsModeration: false,
+    }),
+  );
+  const after = await db.offerBooking.findUniqueOrThrow({ where: { offerId }, include: { rules: true, exceptions: true } });
+  assert.deepEqual(after.rules.map((rule) => [rule.weekday, rule.startMinutes, rule.validFrom]), [[1, 540, null]]);
+  assert.equal(after.exceptions.length, 0);
+});
+
+test("разовые занятия: OfferSession по датам в часовом поясе Минска, занятые сессии не удаляются", async () => {
+  const offerId = await newOffer({ productType: "ONE_TIME_ACTIVITY" });
+  const input = (dates: Array<{ date: string; time: string; seats: number | null }>) => ({
+    classSchedule: { kind: "dated" as const, durationMin: 90, groups: [], dates, period: null, closedDates: [] },
+  });
+  await db.$transaction((tx) =>
+    applyOfferSchedule({
+      db: tx,
+      offerId,
+      input: input([
+        { date: "2026-10-17", time: "12:00", seats: 10 },
+        { date: "2026-10-24", time: "12:00", seats: null },
+      ]),
+      externalUrlNeedsModeration: false,
+    }),
+  );
+  const sessions = await db.offerSession.findMany({ where: { offerId }, orderBy: { startAt: "asc" } });
+  assert.equal((await db.offerBooking.findUniqueOrThrow({ where: { offerId } })).scheduleKind, "DATED_SESSIONS");
+  // 12:00 по Минску (UTC+3) = 09:00 UTC, занятие 90 минут
+  assert.deepEqual(sessions.map((row) => row.startAt.toISOString()), ["2026-10-17T09:00:00.000Z", "2026-10-24T09:00:00.000Z"]);
+  assert.deepEqual(sessions.map((row) => row.endAt.toISOString()), ["2026-10-17T10:30:00.000Z", "2026-10-24T10:30:00.000Z"]);
+  assert.deepEqual(sessions.map((row) => row.capacity), [10, null]);
+
+  // на первую дату есть заявка: при удалении даты из расписания сессия отменяется, а не удаляется
+  await db.bookingRequest.create({
+    data: {
+      businessId,
+      publicationType: "OFFER",
+      offerId,
+      offerSessionId: sessions[0].id,
+      customerName: "Parent",
+      customerPhone: "+375291112233",
+    },
+  });
+  await db.$transaction((tx) =>
+    applyOfferSchedule({
+      db: tx,
+      offerId,
+      input: input([{ date: "2026-10-31", time: "12:00", seats: 6 }]),
+      externalUrlNeedsModeration: false,
+    }),
+  );
+  const rows = await db.offerSession.findMany({ where: { offerId }, orderBy: { startAt: "asc" } });
+  assert.deepEqual(
+    rows.map((row) => [row.startAt.toISOString().slice(0, 10), row.isCancelled]),
+    [
+      ["2026-10-17", true],
+      ["2026-10-31", false],
+    ],
+  );
+});
+
+test("расписание занятий не меняет способ записи", async () => {
+  const offerId = await newOffer({ productType: "REGULAR_ACTIVITY", bookingEnabled: true, bookingMode: "REQUEST_ONLY" });
+  await db.$transaction((tx) =>
+    applyOfferSchedule({ db: tx, offerId, input: classInput(), externalUrlNeedsModeration: false }),
+  );
+  const offer = await db.offer.findUniqueOrThrow({ where: { id: offerId } });
+  assert.equal(offer.bookingEnabled, true);
+  assert.equal(offer.bookingMode, "REQUEST_ONLY");
+});

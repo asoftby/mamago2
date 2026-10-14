@@ -70,9 +70,19 @@ assert.equal(buildScheduleInput(form, "CAMP").external, null);
 
 // закрытые дни у занятия создают собственный график; график места не меняется, пока дней нет
 const classForm = defaultOfferSchedule();
+// занятия: без длительности расписание не отправляется; закрытые дни не попадают в OpeningHours
 assert.deepEqual(buildScheduleInput(classForm, "REGULAR_ACTIVITY"), {});
 classForm.closedDates = ["2026-10-18"];
-assert.equal(buildScheduleInput(classForm, "REGULAR_ACTIVITY").hours?.source, "own");
+classForm.classSchedule.groups = [{ id: "g1", days: [2, 4], time: "17:30", seats: "8" }];
+assert.equal(buildScheduleInput(classForm, "REGULAR_ACTIVITY").hours, undefined);
+assert.deepEqual(buildScheduleInput(classForm, "REGULAR_ACTIVITY", "60 минут").classSchedule, {
+  kind: "recurring",
+  durationMin: 60,
+  groups: [{ days: [2, 4], time: "17:30", seats: 8 }],
+  dates: [],
+  period: null,
+  closedDates: ["2026-10-18"],
+});
 
 // прежний режим записи: bookingMethod не отправляется
 const legacy = defaultOfferSchedule();
@@ -125,4 +135,13 @@ assert.equal(buildChangedScheduleInput(updatedHours, base, "PLACE_VISIT")?.booki
 assert.equal(buildChangedScheduleInput(updatedHours, base, "PLACE_VISIT")?.hours?.source, "own");
 const cleared = structuredClone(updatedHours);
 cleared.closedDates = [];
-assert.equal(buildChangedScheduleInput(cleared, updatedHours, "REGULAR_ACTIVITY")?.hours?.source, "own");
+// занятия: снятие последней закрытой даты уходит как classSchedule с пустым списком
+const classPrev = defaultOfferSchedule();
+classPrev.classSchedule.groups = [{ id: "g1", days: [1], time: "10:00", seats: "" }];
+classPrev.closedDates = ["2026-11-07"];
+const classNext = structuredClone(classPrev);
+classNext.closedDates = [];
+assert.deepEqual(buildChangedScheduleInput(classNext, classPrev, "REGULAR_ACTIVITY", "45 мин", "45 мин")?.classSchedule?.closedDates, []);
+assert.equal(buildChangedScheduleInput(classPrev, classPrev, "REGULAR_ACTIVITY", "45 мин", "45 мин"), undefined);
+// смена длительности пересчитывает концы занятий: расписание уходит заново
+assert.equal(buildChangedScheduleInput(classPrev, classPrev, "REGULAR_ACTIVITY", "90 мин", "45 мин")?.classSchedule?.durationMin, 90);

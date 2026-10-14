@@ -5,8 +5,6 @@ import { Label } from "@/components/ui/label";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 import { StableCardSelector } from "@/components/ui/stable-card-selector";
 import {
-  offerUsesClosedDays,
-  offerUsesOpeningHours,
   validateExternalUrl,
   type OfferBookingMethod,
   type OfferExternalKind,
@@ -31,7 +29,8 @@ const LEGACY_LABELS: Record<NonNullable<OfferScheduleForm["legacyBookingMode"]>,
 export function StepBookingMethod({ data, onChange, isEditable, externalUrlLocked = false }: StepBookingMethodProps) {
   const schedule = data.schedule;
   const update = (patch: Partial<OfferScheduleForm>) => onChange({ schedule: { ...schedule, ...patch } });
-  const number = offerUsesOpeningHours(data.productType) ? 3 : offerUsesClosedDays(data.productType) ? 2 : 1;
+  // Место, праздник и занятия: два блока расписания перед способом записи; у лагеря — смены на своём блоке выше.
+  const number = data.productType === "CAMP" ? 1 : 3;
   const urlError = schedule.bookingMethod === "EXTERNAL" ? validateExternalUrl(schedule.externalUrl) : null;
 
   const kindChips: ChipItem[] = (
