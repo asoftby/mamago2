@@ -693,6 +693,7 @@ export function RouteDetailClient({ route, canEdit }: Props) {
         open={planOpen}
         onOpenChange={setPlanOpen}
         isAuthenticated={isAuthenticated}
+        collectionTarget={{ routeId: route.id }}
         scenario={{ kind: "quickdate", title: route.title }}
         onPersist={handlePersist}
       />
