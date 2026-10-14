@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
+import { toast } from "@/lib/toast";
+import { persistIdeaCollectionSelection } from "@/features/save/persistIdeaCollectionSelection";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { SaveToPlanModal } from "@/components/activity/SaveToPlanModal";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
@@ -35,6 +37,23 @@ function RecommendationCard({
   const [saving, setSaving] = useState(false);
 
   const handleConfirm = async (result: SaveToPlanResult) => {
+    if (result.action === "ideas") {
+      setSaving(true);
+      try {
+        const response = await fetch("/api/save/idea", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ activityId: activity.id }),
+        });
+        if (!response.ok) throw new Error("idea_save_failed");
+        await persistIdeaCollectionSelection(result, { activityId: activity.id });
+      } catch {
+        toast.error("Не удалось сохранить идею в выбранную коллекцию");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
     if (result.action !== "plan") return;
     setSaving(true);
     try {
@@ -131,6 +150,7 @@ function RecommendationCard({
           open={modalOpen}
           onOpenChange={setModalOpen}
           scenario={{ kind: "quickdate", title: activity.title }}
+          collectionTarget={{ activityId: activity.id }}
           onConfirm={handleConfirm}
         />
       </>
