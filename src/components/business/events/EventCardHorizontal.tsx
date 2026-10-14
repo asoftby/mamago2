@@ -1,6 +1,6 @@
 "use client";
 
-import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -117,7 +117,7 @@ function buildEventSubtitle(activity: Activity): string {
     );
   }
   if (activity.priceText) {
-    parts.push(normalizeUiCurrencyText(activity.priceText));
+    parts.push(formatPrice(activity.priceText));
   } else if (activity.priceFrom != null) {
     parts.push(formatPriceFrom(activity.priceFrom, { hideZero: true }));
   }
@@ -239,7 +239,7 @@ export function EventCardHorizontal({
         updatedLine={updatedLine}
         createdLine={createdLine}
         metrics={cardMetrics}
-        metricsPeriodLabel="За сегодня"
+        metricsPeriodLabel="сегодня"
         actions={
           <>
             <button

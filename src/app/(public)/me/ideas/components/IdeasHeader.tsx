@@ -1,24 +1,7 @@
 import Link from "next/link";
 import { C } from "../theme";
 
-type IdeasHeaderProps = {
-  totalCount: number;
-  plannedCount: number;
-  unplannedCount: number;
-};
-
-function formatIdeasCount(count: number): string {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-
-  if (mod10 === 1 && mod100 !== 11) return `${count} идея`;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return `${count} идеи`;
-  }
-  return `${count} идей`;
-}
-
-export function IdeasHeader({ totalCount, plannedCount, unplannedCount }: IdeasHeaderProps) {
+export function IdeasHeader() {
   return (
     <div>
       <div
@@ -49,29 +32,6 @@ export function IdeasHeader({ totalCount, plannedCount, unplannedCount }: IdeasH
           </p>
         </div>
 
-        <div
-          className="inline-flex w-fit flex-col gap-1 rounded-2xl border px-4 py-3 text-right sm:min-w-[220px]"
-          style={{ borderColor: C.line, background: C.paper }}
-        >
-          <span
-            className="font-mono text-[11px] uppercase tracking-[0.14em]"
-            style={{ color: C.accentDeep }}
-          >
-            ● сохранено в идеях
-          </span>
-          <span
-            className="text-[30px] leading-none tracking-[-0.02em]"
-            style={{ fontFamily: "var(--font-display)", fontWeight: 400, color: C.ink }}
-          >
-            {formatIdeasCount(totalCount)}
-          </span>
-          <span
-            className="font-mono text-[11px] uppercase tracking-[0.06em]"
-            style={{ color: C.ink3 }}
-          >
-            ● {unplannedCount} без даты · {plannedCount} в плане
-          </span>
-        </div>
       </section>
     </div>
   );
