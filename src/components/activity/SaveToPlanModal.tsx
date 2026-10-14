@@ -1664,6 +1664,10 @@ function PickerBodyInner({
       <IdeaCollectionStep
         title={scenario.title}
         ticket={scenario.kind === "quickdate" ? scenario.ticket : undefined}
+        kicker={isIdeaOnly || collectionTarget?.articleId ? "сохранить статью"
+          : collectionTarget?.routeId ? "сохранить маршрут"
+          : collectionTarget?.placeId ? "сохранить место"
+          : collectionTarget?.offerId ? "сохранить предложение" : "сохранить активность"}
         isIdea={isIdea}
         target={collectionTarget}
         onBack={() => setView("main")}

@@ -11,6 +11,7 @@ type Collection = { id: string; title: string; count: number; covers?: string[] 
 type Props = {
   title: string;
   ticket?: ActivityTicketSource;
+  kicker?: string;
   isIdea: boolean;
   target?: IdeaCollectionTarget;
   onBack: () => void;
@@ -19,7 +20,7 @@ type Props = {
 
 /** The second slide of the shared Save dialog. An idea belongs to My Ideas
  * whether it has zero, one or several collection memberships. */
-export function IdeaCollectionStep({ title, ticket, isIdea, target, onBack, onApply }: Props) {
+export function IdeaCollectionStep({ title, ticket, kicker, isIdea, target, onBack, onApply }: Props) {
   const [collections, setCollections] = React.useState<Collection[]>([]);
   const [selected, setSelected] = React.useState<string[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -75,7 +76,7 @@ export function IdeaCollectionStep({ title, ticket, isIdea, target, onBack, onAp
   };
 
   return (
-    <div className="stp-collection-slide flex min-h-[315px] flex-col text-[#141210]" aria-label="Шаг 2. Выбор коллекции">
+    <div className="stp-collection-slide max-h-[85dvh] overflow-y-auto text-[#141210]" aria-label="Шаг 2. Выбор коллекции">
       <style>{`
         @keyframes stp-collection-enter { from { transform: translateX(48px); opacity: .45; } to { transform: translateX(0); opacity: 1; } }
         @media (prefers-reduced-motion: no-preference) {
@@ -83,7 +84,7 @@ export function IdeaCollectionStep({ title, ticket, isIdea, target, onBack, onAp
         }
       `}</style>
       <div className="shrink-0 px-6 pt-0 sm:pt-4">
-        <SaveActivityHeader heading="Куда сохранить" ticket={ticket ?? { title }} />
+        <SaveActivityHeader heading="Куда сохранить" ticket={ticket ?? { title }} kicker={kicker} />
         <button type="button" className="inline-flex min-h-9 items-center gap-2 text-[13px] font-medium text-[#6F6860] hover:text-[#141210]" onClick={onBack}>
           <ArrowLeft className="size-4" /> Назад
         </button>

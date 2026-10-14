@@ -99,7 +99,7 @@ assert.ok(confirmBar?.includes("{label}"), "save action keeps its label");
 assert.ok(!confirmBar?.includes("<ArrowIcon"), "Save button has no arrow");
 assert.ok(saveHeader.includes("marginTop: 18, marginBottom: 18"), "ticket outside spacing decreases another 5px on both sides");
 assert.ok(saveHeader.includes('className="mb-1 flex h-10 -translate-y-1 items-center justify-start sm:translate-y-0"'), "header label is left-aligned");
-assert.ok(saveHeader.includes(">сохранить активность</span>"), "kicker has no bullet");
+assert.ok(saveHeader.includes('kicker = "сохранить активность"'), "kicker has no bullet");
 assert.ok(!saveHeader.includes("● сохранить активность"), "kicker bullet is removed");
 assert.ok(saveModal.includes('className="px-6 pb-5 pt-0 sm:pt-4"'), "mobile and desktop header labels align with close button");
 

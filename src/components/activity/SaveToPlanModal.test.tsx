@@ -8,6 +8,7 @@
  *
  * Run: npx tsx src/components/activity/SaveToPlanModal.test.tsx
  */
+import { IdeaCollectionStep } from "./IdeaCollectionStep";
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
@@ -128,6 +129,18 @@ const activityScenario: SaveScenario = {
   const html = render({ scenario: activityScenario, isIdea: true, inPlan: false });
   assert.ok(html.includes("Готовы"), "plan-upsell nudge unaffected for activities");
   assert.ok(html.includes("Запланировать"), "schedule-from-idea action unaffected for activities");
+}
+
+// The article collection slide retains its entity label and scrolls as a whole
+// on short desktop viewports, keeping the footer reachable.
+{
+  const html = renderToStaticMarkup(<IdeaCollectionStep title="Статья" kicker="сохранить статью"
+    isIdea={false} onBack={() => {}} onApply={() => {}} />);
+  assert.ok(html.includes("сохранить статью"));
+  assert.ok(!html.includes("сохранить активность"));
+  assert.ok(html.includes("Куда сохранить"));
+  assert.ok(html.includes("max-h-[85dvh] overflow-y-auto"));
+  assert.ok(html.includes("Без коллекции"));
 }
 
 console.log("SaveToPlanModal (Article ideaOnly vs Activity regression) tests: OK");
