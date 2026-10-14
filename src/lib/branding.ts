@@ -19,8 +19,8 @@ export interface BrandingConfig {
 const DEFAULTS: BrandingConfig = {
   logoAssetId: null,
   faviconAssetId: null,
-  colorPrimary: "var(--primary)",
-  colorAccent: "var(--primary)",
+  colorPrimary: "#EF8759",
+  colorAccent: "#EF8759",
   colorBackground: "#FFFFFF",
   colorSurface: "#FAFAF9",
   colorText: "#1A1410",
