@@ -203,6 +203,7 @@ export function ArticleSaveHeart({
         open={flowOpen}
         onOpenChange={setFlowOpen}
         isAuthenticated={isAuthenticated}
+        collectionTarget={{ articleId }}
         scenario={{
           kind: "quickdate",
           title: articleTitle,
