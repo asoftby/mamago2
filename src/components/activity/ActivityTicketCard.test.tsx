@@ -12,18 +12,26 @@ assert.deepEqual(adaptActivityTicket({ title: "Событие", priceMode: "FREE
 assert.deepEqual(adaptActivityTicket({ title: "Занятие", priceMode: "FROM", priceValue: 45 }).price, {
   kind: "paid",
   label: `от 45 ${BYN_SYMBOL}`,
+  amount: "45",
+  isFrom: true,
 });
 assert.deepEqual(adaptActivityTicket({ title: "Предложение", priceMode: "EXACT", priceValue: "45 BYN" }).price, {
   kind: "paid",
   label: `45 ${BYN_SYMBOL}`,
+  amount: "45",
+  isFrom: false,
 });
 assert.deepEqual(adaptActivityTicket({ title: "Группированная цена", priceMode: "EXACT", priceLabel: "1 200,00 BYN" }).price, {
   kind: "paid",
   label: `1200 ${BYN_SYMBOL}`,
+  amount: "1200",
+  isFrom: false,
 });
 assert.deepEqual(adaptActivityTicket({ title: "Диапазон", priceLabel: "1 200–1 500 BYN" }).price, {
   kind: "paid",
   label: `от 1200 ${BYN_SYMBOL}`,
+  amount: "1200",
+  isFrom: true,
 });
 assert.equal(adaptActivityTicket({ title: "Неизвестная цена" }).price, null);
 assert.equal(
@@ -68,14 +76,29 @@ const paidHtml = renderToStaticMarkup(
   <ActivityTicketCard source={{ title: "Спектакль", venue: "Дворец культуры", address: "Минск, ул. Ленина, 10", priceMode: "FROM", priceValue: 40 }} />,
 );
 assert.ok(paidHtml.includes("Дворец культуры") && paidHtml.includes("Минск, ул. Ленина, 10"));
-assert.ok(paidHtml.includes("от 40"), "a known price appears on the right of the perforation");
-assert.ok(paidHtml.includes('aria-label="бел. руб."'), "the amount uses the official Belarusian ruble icon");
+assert.ok(paidHtml.includes('>от</span>'), "the from prefix is rendered on its own line");
+assert.ok(paidHtml.includes('text-[26px]') && paidHtml.includes('>40</span>'), "the amount is prominently rendered on the second line");
+assert.ok(paidHtml.includes('text-[12px]') && paidHtml.includes('aria-label="бел. руб."'), "the official BYN sign is the same small size as 'от'");
+assert.ok(!paidHtml.includes(`от 40 ${BYN_SYMBOL}`), "the ticket does not render a flat price string");
+
+const exactHtml = renderToStaticMarkup(
+  <ActivityTicketCard source={{ title: "Билет", priceMode: "EXACT", priceValue: 30 }} />,
+);
+assert.ok(exactHtml.includes('>30</span>'), "an exact paid amount is still large");
+assert.ok(!exactHtml.includes('>от</span>'), "an exact price is never mislabeled as from");
+
+const widePriceHtml = renderToStaticMarkup(
+  <ActivityTicketCard source={{ title: "Событие", priceMode: "FROM", priceValue: 1200 }} />,
+);
+assert.ok(widePriceHtml.includes('text-[20px]'), "a four-digit price fits in the narrow price area");
 
 const saveModal = readFileSync(join(process.cwd(), "src/components/activity/SaveToPlanModal.tsx"), "utf8");
 const confirmBar = saveModal.split("function ConfirmBar(")[1]?.split("// ─── All-dates drawer")[0];
 assert.ok(confirmBar?.includes("{label}"), "save action keeps its label");
 assert.ok(!confirmBar?.includes("<ArrowIcon"), "Save button has no arrow");
-assert.ok(saveModal.includes("marginTop: 28, marginBottom: 28"), "ticket spacing is reduced by 10px on both sides");
+assert.ok(saveModal.includes("marginTop: 23, marginBottom: 23"), "ticket outside spacing decreases another 5px on both sides");
+assert.ok(saveModal.includes('className="mb-1 flex h-10 -translate-y-1 items-center justify-center px-11 sm:translate-y-0"'), "header label is horizontally centered in a 40px close-button row");
+assert.ok(saveModal.includes('className="px-6 pb-5 pt-0 sm:pt-4"'), "mobile and desktop header labels align with close button");
 
 
 console.log("ActivityTicketCard tests: OK");

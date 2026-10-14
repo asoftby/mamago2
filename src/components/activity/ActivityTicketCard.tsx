@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { BYN_SYMBOL } from "@/lib/formatters/format-price";
-import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 
 export type ActivityTicketPriceMode = "FREE" | "FROM" | "EXACT" | "UNKNOWN";
 
@@ -22,7 +22,7 @@ export type ActivityTicketViewModel = {
   imageUrl: string | null;
   venue: string | null;
   address: string | null;
-  price: { kind: "free"; label: "Бесплатно" } | { kind: "paid"; label: string } | null;
+  price: { kind: "free"; label: "Бесплатно" } | { kind: "paid"; label: string; amount: string; isFrom: boolean } | null;
 };
 
 function clean(value?: string | null): string | null {
@@ -55,15 +55,17 @@ export function adaptActivityTicket(source: ActivityTicketSource): ActivityTicke
   const labelSaysFree = label ? /^(бесплатно|free)$/i.test(label) : false;
   const labelSaysFrom = label ? /^от\s/i.test(label) || /\d\s*[–—-]\s*\d/.test(label) : false;
   const amount = numericPrice(source.priceValue) ?? numericPrice(label);
+  const isFrom = mode === "FROM" || labelSaysFrom;
   const price = labelSaysFree
     ? { kind: "free" as const, label: "Бесплатно" as const }
-    : amount && (mode === "FROM" || labelSaysFrom)
-      ? { kind: "paid" as const, label: `от ${amount} ${BYN_SYMBOL}` }
-      : amount && mode !== "UNKNOWN"
-        ? { kind: "paid" as const, label: `${amount} ${BYN_SYMBOL}` }
-        : amount && label
-          ? { kind: "paid" as const, label: `${amount} ${BYN_SYMBOL}` }
-          : null;
+    : amount && (mode !== "UNKNOWN" || label)
+      ? {
+          kind: "paid" as const,
+          label: `${isFrom ? "от " : ""}${amount} ${BYN_SYMBOL}`,
+          amount,
+          isFrom,
+        }
+      : null;
 
   return {
     title: source.title,
@@ -130,10 +132,22 @@ export function ActivityTicketCard({ source }: { source: ActivityTicketSource })
           <span className="rotate-180 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.12em] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.5)] [writing-mode:vertical-rl]">
             Бесплатно
           </span>
-        ) : ticket.price ? (
-          <span className="px-1.5 text-center text-[11px] font-semibold leading-[1.15] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.5)] sm:text-[12px]">
-            {renderCurrencyText(ticket.price.label, { iconSize: "sm" })}
-          </span>
+        ) : ticket.price?.kind === "paid" ? (
+          <div className="flex min-w-0 flex-col items-center justify-center gap-0.5 px-1 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.5)]">
+            {ticket.price.isFrom ? (
+              <span className="text-[12px] font-medium leading-none">от</span>
+            ) : null}
+            <span className="inline-flex items-end justify-center gap-[3px] whitespace-nowrap leading-none">
+              <span className={
+                ticket.price.amount.length <= 2 ? "text-[26px] font-semibold tracking-tight" :
+                ticket.price.amount.length <= 4 ? "text-[20px] font-semibold tracking-tight" :
+                "text-[14px] font-semibold tracking-tight"
+              }>{ticket.price.amount}</span>
+              <span className="mb-[2px] text-[12px] leading-none">
+                <BelarusianRubleIcon size="default" />
+              </span>
+            </span>
+          </div>
         ) : null}
       </div>
     </article>
