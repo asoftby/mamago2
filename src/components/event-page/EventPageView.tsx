@@ -804,6 +804,7 @@ export function EventPageView({
         open={saveModalOpen}
         onOpenChange={setSaveModalOpen}
         isAuthenticated={isAuthenticated}
+        collectionTarget={{ activityId: data.id }}
         scenario={saveQuickdateScenario}
         onPersist={handleSaveToPlanConfirm}
         showVisibilityToggle
