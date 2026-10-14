@@ -11,7 +11,6 @@ import type { DayOfWeek } from "@prisma/client";
 import {
   DAYS_ORDER,
   hoursFromSimple,
-  offerUsesClosedDays,
   offerUsesOpeningHours,
   simpleFromHours,
   type OfferScheduleForm,
@@ -41,7 +40,8 @@ function sameDays(a: readonly DayOfWeek[], b: readonly DayOfWeek[]): boolean {
 export function StepOpeningHours({ data, onChange, isEditable }: StepOpeningHoursProps) {
   const schedule = data.schedule;
   const showHours = offerUsesOpeningHours(data.productType);
-  const showClosedDays = offerUsesClosedDays(data.productType);
+  // Закрытые дни занятий — в блоке расписания занятий (OfferScheduleException), здесь только место и праздники.
+  const showClosedDays = showHours;
   const own = schedule.hoursSource === "own";
 
   const simple = useMemo(() => simpleFromHours(schedule.hours), [schedule.hours]);
@@ -162,13 +162,13 @@ export function StepOpeningHours({ data, onChange, isEditable }: StepOpeningHour
         <section className="space-y-3" aria-labelledby="schedule-closed-title">
           <div>
             <h3 id="schedule-closed-title" className="text-base font-semibold">
-              {showHours ? "2. " : "1. "}Выходные и особые дни
+              2. Выходные и особые дни
             </h3>
             <p className="text-sm text-muted-foreground">
               Нажмите на дату, чтобы закрыть её. Повторное нажатие снова откроет день.
             </p>
           </div>
-          {showHours && !own ? (
+          {!own ? (
             <p className="rounded-xl border border-border/70 bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">
               Чтобы закрывать отдельные дни, выберите «Свой график».
             </p>

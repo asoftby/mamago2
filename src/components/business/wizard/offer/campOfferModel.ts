@@ -1,3 +1,4 @@
+import { parseCampSessionPrice } from "@/lib/offers/campPricing";
 import type { CampLodgingTypeKey, CampMealKey, CampSessionEntry, CampSessionKind, OfferFormData } from "./types";
 
 export function newCampSessionId(): string {
@@ -24,6 +25,8 @@ export function createEmptyCampSession(sortOrder: number): CampSessionEntry {
     priceOverride: "",
     description: "",
     promotionDetails: "",
+    includes: "",
+    baseLocation: "",
   };
 }
 
@@ -93,6 +96,8 @@ export function normalizeCampSessionRecord(raw: unknown, index: number): CampSes
     description: typeof o.description === "string" ? o.description : "",
     promotionDetails:
       typeof o.promotionDetails === "string" ? o.promotionDetails : "",
+    includes: typeof o.includes === "string" ? o.includes : "",
+    baseLocation: typeof o.baseLocation === "string" ? o.baseLocation : "",
   };
 }
 
@@ -162,4 +167,47 @@ export function normalizeCampMealsFromDb(raw: unknown): CampMealKey[] {
   if (!Array.isArray(raw)) return [];
   const allowed: CampMealKey[] = ["breakfast", "lunch", "dinner", "snacks"];
   return raw.filter((x): x is CampMealKey => typeof x === "string" && allowed.includes(x as CampMealKey));
+}
+
+/** Чего не хватает смене в новом мастере (название, даты, цена). */
+export function getCampShiftMissingFields(session: CampSessionEntry): string[] {
+  const missing: string[] = [];
+  if (session.title.trim().length < 2) missing.push("Название");
+  if (!session.dateFrom || !session.dateTo) missing.push("Даты");
+  else if (session.dateFrom > session.dateTo) missing.push("Даты (конец раньше начала)");
+  if (parseCampSessionPrice(session.priceOverride) === null) missing.push("Цена");
+  return missing;
+}
+
+/**
+ * Продолжительность смены по датам: дни включают оба края; ночи считаем для выездных смен
+ * (проживание), иначе `nights` = 0. `null`, пока даты не заданы или перепутаны.
+ */
+export function campShiftDuration(
+  dateFrom: string | null,
+  dateTo: string | null,
+  residential: boolean,
+): { days: number; nights: number } | null {
+  if (!dateFrom || !dateTo) return null;
+  const from = Date.parse(`${dateFrom}T00:00:00Z`);
+  const to = Date.parse(`${dateTo}T00:00:00Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return null;
+  const days = Math.round((to - from) / 86_400_000) + 1;
+  return { days, nights: residential ? Math.max(0, days - 1) : 0 };
+}
+
+function pluralRu(n: number, one: string, few: string, many: string): string {
+  const mod100 = n % 100;
+  const mod10 = n % 10;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+}
+
+export function formatCampShiftDuration(duration: { days: number; nights: number }): string {
+  const days = `${duration.days} ${pluralRu(duration.days, "день", "дня", "дней")}`;
+  return duration.nights > 0
+    ? `${days} · ${duration.nights} ${pluralRu(duration.nights, "ночь", "ночи", "ночей")}`
+    : days;
 }
