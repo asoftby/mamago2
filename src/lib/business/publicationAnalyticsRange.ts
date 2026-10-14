@@ -6,7 +6,7 @@ export function minskDateKey(at: Date): string {
   return new Date(at.getTime() + MINSK_OFFSET_MS).toISOString().slice(0, 10);
 }
 export function parseMinskDay(value: string): Date | null {
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const [y, m, d] = value.split("-").map(Number);
   const utc = new Date(Date.UTC(y!, m! - 1, d!));
   if (utc.getUTCFullYear() !== y || utc.getUTCMonth() !== m! - 1 || utc.getUTCDate() !== d) return null;
