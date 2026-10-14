@@ -91,8 +91,8 @@ export function MobileLocationPanel({
           onClick={() => setCityPickerOpen((open) => !open)}
           className={cn(
             "flex w-full items-center gap-3 rounded-2xl border bg-white px-4 py-3 text-left shadow-sm transition-colors",
-            "border-[#EF8759]/25 hover:border-[#EF8759]/40",
-            cityPickerOpen && "border-[#EF8759]/35",
+            "border-primary/25 hover:border-primary/40",
+            cityPickerOpen && "border-primary/35",
           )}
           aria-expanded={cityPickerOpen}
           aria-haspopup="listbox"

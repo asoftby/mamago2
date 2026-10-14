@@ -40,7 +40,7 @@ export function MobileSearchHeroRow({
       className={cn(
         "flex items-center gap-2 rounded-2xl border bg-white px-3 py-2 shadow-sm transition-[box-shadow,border-color,ring] duration-200",
         focused
-          ? "border-[#EF8759]/40 shadow-md ring-2 ring-[#EF8759]/25"
+          ? "border-primary/40 shadow-md ring-2 ring-primary/25"
           : "border-neutral-200",
         className,
       )}

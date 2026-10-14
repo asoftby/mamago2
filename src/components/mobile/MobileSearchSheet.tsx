@@ -1071,7 +1071,7 @@ export function MobileSearchSheet({
           <button
             type="button"
             onClick={handleBottomPrimaryClick}
-            className="min-w-[10rem] shrink-0 rounded-xl bg-[#EF8759] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-primary-hover active:scale-[0.98]"
+            className="min-w-[10rem] shrink-0 rounded-xl bg-primary px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-primary-hover active:scale-[0.98]"
           >
             {bottomPrimaryLabel}
           </button>

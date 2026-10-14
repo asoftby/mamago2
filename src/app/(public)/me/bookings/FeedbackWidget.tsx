@@ -76,7 +76,7 @@ export function FeedbackWidget({ bookingId, onSubmitted }: Props) {
               setExpanded(true);
             }}
             onMouseEnter={() => setHovered(star)}
-            className="p-0.5 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759] focus-visible:ring-offset-1 rounded"
+            className="p-0.5 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 rounded"
           >
             <Star
               className={cn(
@@ -99,14 +99,14 @@ export function FeedbackWidget({ bookingId, onSubmitted }: Props) {
             placeholder="Расскажите подробнее (необязательно)"
             maxLength={1000}
             rows={2}
-            className="w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-[13px] text-neutral-800 placeholder:text-neutral-400 focus:border-[#EF8759] focus:bg-white focus:outline-none transition-colors"
+            className="w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-[13px] text-neutral-800 placeholder:text-neutral-400 focus:border-primary focus:bg-white focus:outline-none transition-colors"
           />
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleSubmit}
               disabled={state === "submitting"}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#EF8759] px-4 text-[13px] font-semibold text-white transition-all hover:bg-primary-hover disabled:opacity-60"
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-primary px-4 text-[13px] font-semibold text-white transition-all hover:bg-primary-hover disabled:opacity-60"
             >
               {state === "submitting" ? (
                 <>

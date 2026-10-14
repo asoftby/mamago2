@@ -361,7 +361,7 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
       className={cn(
         "group flex w-full min-w-0 rounded-lg px-1 py-1.5 -mx-1 text-left transition-colors",
         "min-h-[44px] cursor-pointer hover:bg-black/[0.04] active:bg-black/[0.06]",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/35 focus-visible:ring-offset-2",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
         isEmptySummary ? "items-start" : "items-start sm:items-center"
       )}
     >
@@ -379,7 +379,7 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
           <span
             className={cn(
               "min-w-0 flex-1 flex flex-col gap-1 sm:hidden text-[13px] text-foreground/90 tabular-nums",
-              "underline decoration-dashed decoration-[#EF8759] underline-offset-[4px]",
+              "underline decoration-dashed decoration-primary underline-offset-[4px]",
             )}
           >
             <span className="flex flex-wrap items-center gap-x-1 min-w-0">
@@ -436,7 +436,7 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
           <span
             className={cn(
               "hidden sm:block min-w-0 flex-1 truncate text-sm text-foreground/90 tabular-nums",
-              "underline decoration-dashed decoration-[#EF8759] underline-offset-[4px]",
+              "underline decoration-dashed decoration-primary underline-offset-[4px]",
             )}
           >
             {partyForChild && (
@@ -592,7 +592,7 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
                               "text-[11px] font-medium text-muted-foreground shrink-0 mt-0.5",
                               "px-1.5 py-0.5 rounded-md -mr-1",
                               "hover:text-foreground transition-colors",
-                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/30 focus-visible:ring-offset-1"
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-1"
                             )}
                             aria-label="Сбросить все параметры"
                           >
@@ -633,7 +633,7 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
                           "text-[11px] font-medium text-muted-foreground shrink-0 mt-0.5",
                           "px-1.5 py-0.5 rounded-md -mr-1",
                           "hover:text-foreground transition-colors",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/30 focus-visible:ring-offset-1"
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-1"
                         )}
                         aria-label="Сбросить все параметры"
                       >
@@ -657,7 +657,7 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
                   "bg-zinc-100 text-sm font-semibold text-zinc-600 transition-colors",
                   "hover:bg-zinc-200/90 hover:text-zinc-800",
                   "active:scale-[0.98]",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/40 focus-visible:ring-offset-2"
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
                 )}
               >
                 <ArrowLeft className="h-4 w-4 shrink-0" strokeWidth={2} />
@@ -672,10 +672,10 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
                 disabled={forwardBlock.disabled}
                 className={cn(
                   "min-h-[44px] rounded-lg px-5 sm:px-6 text-sm font-semibold transition-colors",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/40 focus-visible:ring-offset-2",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2",
                   "disabled:opacity-50 disabled:pointer-events-none",
                   forwardBlock.isPrimary
-                    ? "bg-[#EF8759] text-white hover:bg-primary-hover shadow-sm"
+                    ? "bg-primary text-white hover:bg-primary-hover shadow-sm"
                     : "border border-border bg-white text-foreground hover:bg-muted/50"
                 )}
               >

@@ -36,8 +36,8 @@ function OfferCard({
   const [detailsOpen, setDetailsOpen] = useState(false);
   return (
     <article className={"overflow-hidden rounded-2xl border bg-white transition-shadow " +
-      (selected ? "border-orange-600 shadow-md" : "border-stone-200 hover:shadow-sm")}>
-      <div className="relative h-36 bg-gradient-to-br from-orange-100 via-stone-100 to-stone-200">
+      (selected ? "border-primary shadow-md" : "border-stone-200 hover:shadow-sm")}>
+      <div className="relative h-36 bg-gradient-to-br from-brand-soft via-stone-100 to-stone-200">
         {offer.coverImage ? (
           <Image src={offer.coverImage} alt="" fill sizes="(max-width: 768px) 100vw, 320px"
             className="object-cover" unoptimized />
@@ -61,7 +61,7 @@ function OfferCard({
           <span className="font-semibold text-stone-900">{priceLabel(offer)}</span>
           <button type="button" onClick={onToggle} aria-pressed={selected}
             className={"rounded-full px-4 py-2 text-sm font-semibold " +
-              (selected ? "bg-stone-900 text-white" : "bg-orange-600 text-white")}>
+              (selected ? "bg-stone-900 text-white" : "bg-primary text-white")}>
             {selected ? "Выбрано" : type === "base" ? "Выбрать основу" : "Добавить"}
           </button>
         </div>
@@ -130,7 +130,7 @@ export function StepPick({
   return (
     <section className="space-y-9" aria-label="Реальные предложения для праздника">
       <header className="space-y-3">
-        <p className="text-xs uppercase tracking-widest text-orange-700">Шаг 4 · подбор услуг</p>
+        <p className="text-xs uppercase tracking-widest text-primary">Шаг 4 · подбор услуг</p>
         <h2 className="text-3xl font-semibold leading-tight sm:text-5xl">Соберите ваш праздник</h2>
         <p className="max-w-2xl text-stone-600">
           Только опубликованные предложения бизнеса. Цены предварительные;
@@ -167,7 +167,7 @@ export function StepPick({
           </div>
         );
       })}
-      <p className="rounded-xl bg-orange-50 p-4 text-sm text-stone-700">
+      <p className="rounded-xl bg-brand-soft p-4 text-sm text-stone-700">
         Важно: выбор предложения не означает бронирование. Заявка будет отправлена только после запуска оформления заказа.
       </p>
     </section>

@@ -49,7 +49,7 @@ export function WizardStep3Cover({ coverUrl, onChange }: Props) {
         <div
           className={cn(
             "flex min-h-[200px] flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50/80 px-6 py-10 text-center transition-colors",
-            !uploading && "hover:border-[#EF8759]/40 hover:bg-orange-50/30",
+            !uploading && "hover:border-primary/40 hover:bg-brand-soft/30",
           )}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
           onDrop={(e) => {

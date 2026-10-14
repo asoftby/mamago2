@@ -60,7 +60,7 @@ function StatCell({
       <span
         className={cn(
           "text-[15px] font-bold leading-none tabular-nums",
-          highlight ? "text-[#EF8759]" : "text-stone-800",
+          highlight ? "text-primary" : "text-stone-800",
         )}
       >
         {value}

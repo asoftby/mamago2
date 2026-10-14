@@ -21,7 +21,7 @@ export function BuilderProgress({ currentStep, className = "" }: BuilderProgress
             key={i}
             className={cn(
               "h-2 w-2 shrink-0 rounded-full transition-all duration-200",
-              i + 1 <= current ? "bg-[#EF8759]" : "bg-border"
+              i + 1 <= current ? "bg-primary" : "bg-border"
             )}
           />
         ))}

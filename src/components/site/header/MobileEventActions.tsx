@@ -37,7 +37,7 @@ export function MobileEventActions({
           className={buttonClass}
         >
           <Heart
-            className={cn("h-5 w-5", saveAction.saved ? "fill-[#E86A3A] text-[#E86A3A]" : "text-gray-400")}
+            className={cn("h-5 w-5", saveAction.saved ? "fill-primary text-primary" : "text-gray-400")}
             strokeWidth={1.75}
             aria-hidden
           />

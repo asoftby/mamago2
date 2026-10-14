@@ -122,7 +122,7 @@ export function NotificationListItem({
             </p>
           </div>
           {isUnread ? (
-            <span className="mt-0.5 shrink-0 rounded-full bg-[#EF8759]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#C65D2E]">
+            <span className="mt-0.5 shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
               Новое
             </span>
           ) : null}
@@ -146,7 +146,7 @@ export function NotificationListItem({
         "transition-colors hover:bg-gray-50/90",
         compact ? "px-4 py-3" : "p-4",
         isUnread
-          ? "border-l-[3px] border-[#EF8759] bg-[#FFF8F4]"
+          ? "border-l-[3px] border-primary bg-[#FFF8F4]"
           : "border-l border-transparent bg-white",
         notification.isPinned && isUnread && "bg-amber-50/50",
       )}

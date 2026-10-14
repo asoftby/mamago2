@@ -78,7 +78,7 @@ export function ActivityCard({
       <div className={cn("flex h-full flex-col", cardPadding)}>
         <Link
           href={item.href}
-          className="block rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759] focus-visible:ring-offset-2"
+          className="block rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           <div className={cn("min-w-0", isHorizontal && "grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]")}>
             <div className="w-full">
@@ -103,7 +103,7 @@ export function ActivityCard({
                 </div>
 
                 {item.isSaved ? (
-                  <div className="absolute right-3 top-3 flex size-11 items-center justify-center rounded-full bg-[rgba(255,248,242,0.94)] text-[#EF8759] shadow-[0_8px_20px_rgba(20,18,16,0.12)] backdrop-blur-md">
+                  <div className="absolute right-3 top-3 flex size-11 items-center justify-center rounded-full bg-[rgba(255,248,242,0.94)] text-primary shadow-[0_8px_20px_rgba(20,18,16,0.12)] backdrop-blur-md">
                     <Heart className="size-4 fill-current" />
                   </div>
                 ) : null}
@@ -117,7 +117,7 @@ export function ActivityCard({
                           "rounded-full border-0 px-3 py-1 text-[11px] font-medium shadow-[0_8px_20px_rgba(20,18,16,0.1)] backdrop-blur-md",
                           chip === "Прошло" && "bg-[rgba(52,48,44,0.72)] text-white",
                           chip === "В плане" && "bg-[rgba(237,248,241,0.94)] text-[#2B7A58]",
-                          chip === "В идеях" && "bg-[rgba(255,248,242,0.92)] text-[#C86A3E]",
+                          chip === "В идеях" && "bg-[rgba(255,248,242,0.92)] text-primary",
                           chip !== "Прошло" &&
                             chip !== "В плане" &&
                             chip !== "В идеях" &&

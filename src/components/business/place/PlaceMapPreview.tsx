@@ -41,11 +41,11 @@ export function PlaceMapPreview({ lat, lng, onOpenMap, actionLabel = "Откры
         markerContent.className = "relative";
         markerContent.innerHTML = `
           <div class="relative">
-            <div class="absolute left-1/2 top-full -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border-3 border-[#EF8759] animate-mg-pulse"></div>
+            <div class="absolute left-1/2 top-full -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border-3 border-primary animate-mg-pulse"></div>
             <svg width="40" height="52" viewBox="0 0 40 52" fill="none">
-              <path d="M20 0C8.954 0 0 8.954 0 20c0 14 20 32 20 32s20-18 20-32C40 8.954 31.046 0 20 0z" fill="#EF8759"/>
+              <path d="M20 0C8.954 0 0 8.954 0 20c0 14 20 32 20 32s20-18 20-32C40 8.954 31.046 0 20 0z" fill="var(--primary)"/>
               <path d="M20 2C10.059 2 2 10.059 2 20c0 12.5 18 29 18 29s18-16.5 18-29C38 10.059 29.941 2 20 2z" fill="white"/>
-              <path d="M20 4C11.163 4 4 11.163 4 20c0 11 16 26 16 26s16-15 16-26C36 11.163 28.837 4 20 4z" fill="#EF8759"/>
+              <path d="M20 4C11.163 4 4 11.163 4 20c0 11 16 26 16 26s16-15 16-26C36 11.163 28.837 4 20 4z" fill="var(--primary)"/>
               <circle cx="20" cy="20" r="6" fill="white"/>
             </svg>
           </div>
@@ -135,7 +135,7 @@ export function PlaceMapPreview({ lat, lng, onOpenMap, actionLabel = "Откры
         onClick={onOpenMap}
         className="absolute bottom-4 right-4 rounded-full shadow-lg"
         size="sm"
-        style={{ backgroundColor: "#EF8759" }}
+        style={{ backgroundColor: "var(--primary)" }}
       >
         <Maximize2 className="h-4 w-4 mr-2" />
         {actionLabel}

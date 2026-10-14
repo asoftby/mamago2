@@ -115,7 +115,7 @@ export function PremiumPlacePage({
     <div className="relative min-h-screen bg-[radial-gradient(circle_at_18%_8%,rgba(239,135,89,0.18),transparent_28%),radial-gradient(circle_at_82%_10%,rgba(108,99,255,0.18),transparent_32%),linear-gradient(135deg,#ffffff_0%,#F7F7FB_48%,#F3F0FF_100%)] text-[#111322]">
       <motion.div
         aria-hidden
-        className="pointer-events-none absolute left-[-120px] top-24 h-80 w-80 rounded-full bg-[#EF8759]/20 blur-3xl"
+        className="pointer-events-none absolute left-[-120px] top-24 h-80 w-80 rounded-full bg-primary/20 blur-3xl"
         animate={{ y: [0, 28, 0], scale: [1, 1.08, 1] }}
         transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
       />
@@ -358,7 +358,7 @@ function MobileAction({
 }) {
   const className = `flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-black ${
     primary
-      ? "bg-gradient-to-r from-[#EF8759] to-[#6C63FF] text-white shadow-[0_12px_30px_rgba(108,99,255,0.28)]"
+      ? "bg-gradient-to-r from-primary to-[#6C63FF] text-white shadow-[0_12px_30px_rgba(108,99,255,0.28)]"
       : "bg-white/80 text-[#17192A]"
   }`;
   const content = (

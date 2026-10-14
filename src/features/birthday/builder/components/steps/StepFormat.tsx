@@ -75,8 +75,8 @@ function OptionRow({
           height: 24,
           borderRadius: 99,
           flexShrink: 0,
-          border: `1.5px solid ${selected ? "#E86A3A" : "rgba(20,18,16,.18)"}`,
-          background: selected ? "#E86A3A" : "transparent",
+          border: `1.5px solid ${selected ? "var(--primary)" : "rgba(20,18,16,.18)"}`,
+          background: selected ? "var(--primary)" : "transparent",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -104,7 +104,7 @@ export function StepFormat({ builder }: Props) {
           fontSize: 11,
           letterSpacing: ".14em",
           textTransform: "uppercase",
-          color: "#C24E22",
+          color: "var(--primary)",
         }}
       >
         ● Шаг 3 · формат и бюджет
@@ -123,7 +123,7 @@ export function StepFormat({ builder }: Props) {
         }}
       >
         Где и за{" "}
-        <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#E86A3A" }}>сколько</span>?
+        <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>сколько</span>?
       </h2>
 
       <div

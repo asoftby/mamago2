@@ -82,7 +82,7 @@ export function AgePanel({
       active,
       disabled: readOnly,
       className: isAuto
-        ? "ring-1 ring-[#EF8759]/30 bg-[#EF8759]/8 text-neutral-800 border-gray-200/80"
+        ? "ring-1 ring-primary/30 bg-primary/8 text-neutral-800 border-gray-200/80"
         : undefined,
       onClick: () => handleAgeToggle(ageGroup.value),
     };

@@ -15,9 +15,9 @@ export function BirthdayQuizProgress({ currentStep, totalSteps }: BirthdayQuizPr
             className={[
               "h-1.5 rounded-full transition-all duration-300",
               i < currentStep
-                ? "bg-[#EF8759] w-6"
+                ? "bg-primary w-6"
                 : i === currentStep - 1
-                ? "bg-[#EF8759] w-8"
+                ? "bg-primary w-8"
                 : "bg-border w-4",
             ].join(" ")}
           />

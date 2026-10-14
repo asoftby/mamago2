@@ -71,7 +71,7 @@ export function PlanRecommendationsBlock({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[1.75rem] bg-[#FFF5F0]",
+        "relative overflow-hidden rounded-[1.75rem] bg-brand-soft",
         "shadow-[0_1px_0_rgba(239,135,89,0.08),0_8px_32px_-8px_rgba(239,135,89,0.12)]",
       )}
     >
@@ -84,7 +84,7 @@ export function PlanRecommendationsBlock({
           className="animate-mg-plan-ai-border-spin absolute left-1/2 top-1/2 aspect-square w-[240%] max-w-none sm:w-[220%]"
           style={{
             background:
-              "conic-gradient(from 0deg, #FFF8F4 0deg, #FFE8DC 36deg, rgba(239,135,89,0.42) 72deg, #FFEFE6 108deg, #FFD4C4 162deg, rgba(255,200,180,0.5) 216deg, #FFF5F0 270deg, #FFE4D4 306deg, #FFF8F4 360deg)",
+              "conic-gradient(from 0deg, #FFF8F4 0deg, var(--brand-soft) 36deg, rgba(239,135,89,0.42) 72deg, #FFEFE6 108deg, #FFD4C4 162deg, rgba(255,200,180,0.5) 216deg, var(--brand-soft) 270deg, #FFE4D4 306deg, #FFF8F4 360deg)",
           }}
         />
       </div>

@@ -183,7 +183,7 @@ export function getConfirmationProgressUi(party: UserBirthdayParty): Confirmatio
     showBar: true,
     fillPct,
     trackClass: "bg-orange-100/90",
-    fillClass: "bg-[#EF8759]",
+    fillClass: "bg-primary",
     label: countLabel,
     labelClass: "text-orange-900/85",
   };

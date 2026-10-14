@@ -33,7 +33,7 @@ export function RoutesEmptyState({ variant }: RoutesEmptyStateProps) {
   return (
     <div className="rounded-[30px] border border-[rgba(20,18,16,0.07)] bg-white px-6 py-12 text-center shadow-[0_16px_36px_rgba(20,18,16,0.05)] sm:px-10 sm:py-16">
       <div className="mx-auto flex max-w-xl flex-col items-center space-y-5">
-        <div className="flex size-16 items-center justify-center rounded-full bg-[#FFF1E8] text-[#EF8759]">
+        <div className="flex size-16 items-center justify-center rounded-full bg-brand-soft text-primary">
           <Icon className="size-7" />
         </div>
         <div className="space-y-2">
@@ -48,7 +48,7 @@ export function RoutesEmptyState({ variant }: RoutesEmptyStateProps) {
         {variant === "INITIAL" ? (
           <Button
             asChild
-            className="mt-2 h-11 rounded-full bg-[#EF8759] px-5 text-white hover:bg-[#E07848]"
+            className="mt-2 h-11 rounded-full bg-primary px-5 text-white hover:bg-primary-hover"
           >
             <Link href="/routes/new">
               <Plus className="w-4 h-4 mr-2" />

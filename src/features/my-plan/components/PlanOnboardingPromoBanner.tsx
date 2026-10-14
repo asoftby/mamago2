@@ -47,7 +47,7 @@ export function PlanOnboardingPromoBanner({
       className={cn(
         "rounded-2xl border p-4 shadow-sm",
         isChild
-          ? "border-[#EF8759]/30 bg-[#EF8759]/5"
+          ? "border-primary/30 bg-primary/5"
           : "border-[rgba(20,18,16,.10)] bg-[#FAF7F1]",
       )}
     >
@@ -55,11 +55,11 @@ export function PlanOnboardingPromoBanner({
         <div
           className={cn(
             "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-            isChild ? "bg-[#EF8759]/10" : "bg-neutral-900/[0.06]",
+            isChild ? "bg-primary/10" : "bg-neutral-900/[0.06]",
           )}
         >
           {isChild ? (
-            <Baby className="h-5 w-5 text-[#EF8759]" aria-hidden />
+            <Baby className="h-5 w-5 text-primary" aria-hidden />
           ) : (
             <UserRound className="h-5 w-5 text-neutral-700" aria-hidden />
           )}
@@ -76,7 +76,7 @@ export function PlanOnboardingPromoBanner({
               className={cn(
                 "rounded-full px-4 py-2 text-sm font-medium transition-colors",
                 isChild
-                  ? "bg-[#EF8759] text-white hover:bg-primary-hover"
+                  ? "bg-primary text-white hover:bg-primary-hover"
                   : "bg-neutral-900 text-white hover:bg-neutral-800",
               )}
             >

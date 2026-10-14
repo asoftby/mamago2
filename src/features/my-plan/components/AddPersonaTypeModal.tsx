@@ -53,8 +53,8 @@ export function AddPersonaTypeModal({
           }}
           className="flex w-full items-center gap-4 rounded-2xl border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-neutral-300 hover:bg-neutral-50"
         >
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#EF8759]/10">
-            <Baby className="h-6 w-6 text-[#EF8759]" />
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10">
+            <Baby className="h-6 w-6 text-primary" />
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-semibold text-neutral-900">Ребёнок</h3>

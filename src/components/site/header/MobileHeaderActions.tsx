@@ -55,7 +55,7 @@ export function MobileHeaderActions() {
           <NavBellIcon
             className={cn(
               "h-5 w-5 transition-colors duration-200",
-              isNotificationsActive || displayUnreadCount > 0 ? "text-[#C24E22]" : "text-gray-400",
+              isNotificationsActive || displayUnreadCount > 0 ? "text-primary" : "text-gray-400",
             )}
           />
           {displayUnreadCount > 0 && (

@@ -63,7 +63,7 @@ export function PlanSuggestionsSheet({
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 shrink-0 text-[#EF8759]" />
+              <Sparkles className="h-5 w-5 shrink-0 text-primary" />
               <h2 className="text-lg font-semibold text-neutral-900">
                 Подобрать для {slotLabel.toLowerCase()}
               </h2>
@@ -146,7 +146,7 @@ export function PlanSuggestionsSheet({
               onAddToPlan(suggestionItem);
               onOpenChange(false);
             }}
-            className="h-12 w-full bg-[#EF8759] text-base font-semibold hover:bg-primary-hover"
+            className="h-12 w-full bg-primary text-base font-semibold hover:bg-primary-hover"
           >
             Добавить в план
           </Button>

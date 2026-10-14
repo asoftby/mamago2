@@ -123,7 +123,7 @@ export function FirstTopUpModal({ onClose, onSuccess }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <Wallet className="w-5 h-5 text-[#EF8759]" />
+            <Wallet className="w-5 h-5 text-primary" />
             <h2 className="text-xl font-bold text-gray-900">Пополнить баланс</h2>
           </div>
           <button
@@ -151,7 +151,7 @@ export function FirstTopUpModal({ onClose, onSuccess }: Props) {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Поиск по названию или email..."
-                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#EF8759] focus:border-[#EF8759]"
+                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
 
@@ -173,7 +173,7 @@ export function FirstTopUpModal({ onClose, onSuccess }: Props) {
                       onClick={() => setSelectedBusiness(business)}
                       className={`w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors border-b border-gray-200 last:border-b-0 ${
                         selectedBusiness?.id === business.id
-                          ? "bg-[#EF8759]/10 border-l-4 border-l-[#EF8759]"
+                          ? "bg-primary/10 border-l-4 border-l-primary"
                           : ""
                       }`}
                     >
@@ -231,7 +231,7 @@ export function FirstTopUpModal({ onClose, onSuccess }: Props) {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#EF8759] focus:border-[#EF8759]"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="100.00"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
@@ -250,7 +250,7 @@ export function FirstTopUpModal({ onClose, onSuccess }: Props) {
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#EF8759] focus:border-[#EF8759]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
                 placeholder="Пополнение баланса mamaGo"
               />
               <p className="mt-1 text-xs text-gray-500">
@@ -268,7 +268,7 @@ export function FirstTopUpModal({ onClose, onSuccess }: Props) {
                 onChange={(e) => setNote(e.target.value)}
                 required
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#EF8759] focus:border-[#EF8759]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
                 placeholder="Например: Оплата по счёту №123"
               />
               <p className="mt-1 text-xs text-gray-500">
@@ -298,7 +298,7 @@ export function FirstTopUpModal({ onClose, onSuccess }: Props) {
             type="submit"
             onClick={handleSubmit}
             disabled={loading || !selectedBusiness}
-            className="flex-1 px-4 py-2 bg-[#EF8759] text-white rounded-md hover:bg-[#EF8759]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Пополнение..." : "Пополнить"}
           </button>

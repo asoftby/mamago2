@@ -103,11 +103,11 @@ export function AddRemoveButton({
       onPointerLeave={() => setIsHovered(false)}
       className={cn(
         "flex items-center justify-center font-semibold transition-all duration-150",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759] focus-visible:ring-offset-2",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
         "active:scale-[0.98]",
         sizeClasses[size],
         selected && !showHoverRemove
-          ? "bg-[#EF8759] text-white"
+          ? "bg-primary text-white"
           : showHoverRemove
             ? "bg-amber-50 border-2 border-amber-300 text-amber-800 hover:bg-amber-100"
             : "bg-white border border-border text-foreground hover:border-border-brand hover:bg-brand-soft",

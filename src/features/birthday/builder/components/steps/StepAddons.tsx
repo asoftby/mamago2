@@ -102,8 +102,8 @@ export function StepAddons({ builder }: { builder: BuilderHook }) {
 
       {/* Conflicts banner */}
       {hasConflicts && (
-        <div className="rounded-xl bg-orange-50 border border-orange-200 p-4 flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-[#EF8759] shrink-0 mt-0.5" />
+        <div className="rounded-xl bg-brand-soft border border-primary/20 p-4 flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground">
               Некоторые предложения несовместимы с выбранной площадкой
@@ -122,12 +122,12 @@ export function StepAddons({ builder }: { builder: BuilderHook }) {
         {hasVenueRecommended && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-[#EF8759]" />
+              <Sparkles className="h-4 w-4 text-primary" />
               <h4 className="text-sm font-semibold text-foreground">
                 Рекомендуем для выбранного места
               </h4>
             </div>
-            <div className="rounded-xl border-2 border-orange-200 bg-orange-50/30 p-4">
+            <div className="rounded-xl border-2 border-primary/20 bg-brand-soft/30 p-4">
               <div className="flex flex-col gap-4">
                 {recommendedOffers.map((offer) => {
                   const isSelected = selectedAddonIds.includes(offer.id);
@@ -138,7 +138,7 @@ export function StepAddons({ builder }: { builder: BuilderHook }) {
                       key={offer.id}
                       className={cn(
                         "relative rounded-2xl transition-all group",
-                        isSelected && !isConflicted && "border-[#EF8759]/60 bg-orange-50/20",
+                        isSelected && !isConflicted && "border-primary/60 bg-brand-soft/20",
                         isConflicted && "ring-2 ring-red-500 ring-offset-2 opacity-60"
                       )}
                     >
@@ -212,7 +212,7 @@ export function StepAddons({ builder }: { builder: BuilderHook }) {
                   key={offer.id}
                   className={cn(
                     "relative rounded-2xl transition-all",
-                    isSelected && !isConflicted && "border-[#EF8759]/60 bg-orange-50/20",
+                    isSelected && !isConflicted && "border-primary/60 bg-brand-soft/20",
                     isConflicted && "ring-2 ring-red-500 ring-offset-2 opacity-60"
                   )}
                 >

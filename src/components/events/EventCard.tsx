@@ -152,7 +152,7 @@ export function EventCard({
         {/* Text */}
         <div className="mt-3 flex flex-col gap-1 px-0.5">
           {categoryLabel && <EventCardCategoryLabel label={categoryLabel} />}
-          <div className="line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors duration-150 group-hover:text-[#C24E22]">
+          <div className="line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors duration-150 group-hover:text-primary">
             {title}
           </div>
           {metaLabel && (

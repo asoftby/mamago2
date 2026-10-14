@@ -71,7 +71,7 @@ export function ChildCard({ child, onClick }: ChildCardProps) {
               <Badge
                 key={interest.interestSlug}
                 variant="secondary"
-                className="text-xs h-6 px-2 bg-[#EF8759]/10 text-[#EF8759] border-[#EF8759]/20"
+                className="text-xs h-6 px-2 bg-primary/10 text-primary border-primary/20"
               >
                 {getInterestLabel(interests, interest.interestSlug)}
               </Badge>

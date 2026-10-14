@@ -4,7 +4,7 @@
  * BreakingNewsView — editorial Breaking News article page.
  *
  * Design: mamaGo 2.0 / News page.html (exported from Claude Design).
- * Palette: cream #F6F2EA · paper #FAF7F1 · ink #141210 · accent #E86A3A · breaking #D6342B
+ * Palette: cream #F6F2EA · paper #FAF7F1 · ink #141210 · accent var(--primary) · breaking #D6342B
  * Fonts: project primary sans for UI and display · editorial serif · system mono
  */
 
@@ -43,9 +43,9 @@ const C = {
   ink3: "rgba(20,18,16,.55)",
   line: "rgba(20,18,16,.10)",
   line2: "rgba(20,18,16,.18)",
-  accent: "#E86A3A",
-  accentDeep: "#C24E22",
-  accentSoft: "#FFE8DC",
+  accent: "var(--primary)",
+  accentDeep: "var(--primary)",
+  accentSoft: "var(--brand-soft)",
   breaking: "#D6342B",
   white: "#FAF7F1",
 } as const;
@@ -704,7 +704,7 @@ function LinkedEntityCard({
                   background: C.accent, color: "#fff",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 20,
-                  boxShadow: `0 0 0 12px rgba(232,106,58,.18), 0 12px 28px rgba(20,18,16,.18)`,
+                  boxShadow: `0 0 0 12px rgba(239,135,89,.18), 0 12px 28px rgba(20,18,16,.18)`,
                 }}>
                   📍
                 </div>
@@ -801,7 +801,7 @@ function LinkedEntityCard({
 
 const RELATED_TONES = [
   "linear-gradient(160deg, #E6DBC8, #C9BCA0)",
-  "linear-gradient(160deg, #F2C8A7, #E89460)",
+  "linear-gradient(160deg, var(--brand-soft), var(--primary))",
   "linear-gradient(160deg, #CDE3D6, #9CC1AC)",
 ];
 

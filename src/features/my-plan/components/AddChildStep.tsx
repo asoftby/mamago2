@@ -141,7 +141,7 @@ export function AddChildStep({ submitting, serverError, onSubmit }: AddChildStep
                       className={cn(
                         "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                         on
-                          ? "border-[#EF8759] bg-[#EF8759]/10 text-neutral-900"
+                          ? "border-primary bg-primary/10 text-neutral-900"
                           : "border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300",
                       )}
                     >

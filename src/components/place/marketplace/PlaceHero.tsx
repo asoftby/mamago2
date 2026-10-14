@@ -169,8 +169,8 @@ export function PlaceHero({
                   height: 28,
                   padding: "0 12px",
                   borderRadius: 999,
-                  background: "#FFE8DC",
-                  color: "#E86A3A",
+                  background: "var(--brand-soft)",
+                  color: "var(--primary)",
                   fontSize: 12,
                   fontWeight: 600,
                 }}
@@ -268,7 +268,7 @@ export function PlaceHero({
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   {/* Logo circle */}
-                  <div style={{ width: 44, height: 44, borderRadius: 99, overflow: "hidden", flexShrink: 0, background: "#E86A3A", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 99, overflow: "hidden", flexShrink: 0, background: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {logoUrl ? (
                       isAppMediaUrl(logoUrl) ? (
                         <img src={logoUrl} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -318,7 +318,7 @@ export function PlaceHero({
                   <PlacePhoneActionButton
                     phones={phones}
                     placeTitle={title}
-                    className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-[#EF8759] text-[15px] font-semibold text-white transition-colors hover:bg-[#E86A3A]"
+                    className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-primary text-[15px] font-semibold text-white transition-colors hover:bg-primary"
                     onClick={() => trackCta("call")}
                   >
                     <Phone className="h-4 w-4 shrink-0" />
@@ -342,13 +342,13 @@ export function PlaceHero({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[13px] text-[rgba(20,18,16,0.55)]">
-                      <span className="text-[16px] text-[#E86A3A]">★</span> {rating.toFixed(1)}
+                      <span className="text-[16px] text-primary">★</span> {rating.toFixed(1)}
                     </span>
                     <span className="font-mono text-[13px] text-[rgba(20,18,16,0.55)]">· </span>
                     <a
                       href="#reviews"
                       className="font-mono text-[13px] text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
-                      style={{ textDecoration: "underline", textDecorationStyle: "dashed", textDecorationColor: "#E86A3A", textUnderlineOffset: "3px" }}
+                      style={{ textDecoration: "underline", textDecorationStyle: "dashed", textDecorationColor: "var(--primary)", textUnderlineOffset: "3px" }}
                     >
                       {reviewCount} {reviewCount === 1 ? "отзыв" : reviewCount >= 2 && reviewCount <= 4 ? "отзыва" : "отзывов"}
                     </a>

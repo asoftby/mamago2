@@ -122,7 +122,7 @@ export function PlanOverviewDialog({
                         type="button"
                         onClick={() => onOpenDay(date)}
                         className="text-[12px] font-medium"
-                        style={{ color: "#C24E22" }}
+                        style={{ color: "var(--primary)" }}
                       >
                         Открыть день →
                       </button>

@@ -19,7 +19,7 @@ function formatRoutesCount(count: number): string {
 export function RoutesHeader({ totalCount }: RoutesHeaderProps) {
   return (
     <section className="relative overflow-hidden rounded-[32px] border border-[rgba(20,18,16,0.06)] bg-white px-5 py-6 shadow-[0_18px_40px_rgba(20,18,16,0.05)] sm:px-8 sm:py-8">
-      <div className="pointer-events-none absolute right-[-32px] top-[-48px] h-32 w-32 rounded-full bg-[#EF8759]/10 blur-3xl" />
+      <div className="pointer-events-none absolute right-[-32px] top-[-48px] h-32 w-32 rounded-full bg-primary/10 blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-40px] left-[-24px] h-28 w-28 rounded-full bg-[#F4E7D8] blur-3xl" />
 
       <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -33,7 +33,7 @@ export function RoutesHeader({ totalCount }: RoutesHeaderProps) {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="inline-flex w-fit items-center rounded-full border border-[#EF8759]/15 bg-[#FFF5EE] px-4 py-2 text-sm font-medium text-[#C65D2E]">
+          <div className="inline-flex w-fit items-center rounded-full border border-primary/15 bg-[#FFF5EE] px-4 py-2 text-sm font-medium text-primary">
             {formatRoutesCount(totalCount)}
           </div>
           <Link

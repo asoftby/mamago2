@@ -36,7 +36,7 @@ function ChipButton({
             "flex w-full min-h-[3.5rem] items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm font-medium transition-colors",
             "disabled:pointer-events-none disabled:opacity-50",
             isActive
-              ? "border-[#EF8759] bg-[#EF8759]/5 text-[#EF8759]"
+              ? "border-primary bg-primary/5 text-primary"
               : "border-gray-200 bg-white text-gray-900 hover:border-gray-300 hover:bg-gray-50",
             it.className,
           )}
@@ -44,10 +44,10 @@ function ChipButton({
           <span
             className={cn(
               "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-              isActive ? "bg-[#EF8759]/10" : "bg-gray-100",
+              isActive ? "bg-primary/10" : "bg-gray-100",
             )}
           >
-            <span className={cn(isActive ? "text-[#EF8759]" : "text-gray-600")}>
+            <span className={cn(isActive ? "text-primary" : "text-gray-600")}>
               {it.icon}
             </span>
           </span>
@@ -62,7 +62,7 @@ function ChipButton({
         onClick={it.onClick}
         className={cn(
           "inline-flex max-w-full shrink-0 items-center justify-center rounded-full border px-5 py-2.5 text-sm font-medium text-gray-900 transition-colors",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/35 focus-visible:ring-offset-2",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2",
           "disabled:pointer-events-none disabled:opacity-50",
           isActive
             ? "border-transparent bg-[#F8C4B4]"

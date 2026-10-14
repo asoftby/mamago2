@@ -260,8 +260,8 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
             disabled={!isEditable}
             className={`rounded-2xl border bg-white p-4 text-left transition-colors ${
               data.contactSource === "manual"
-                ? "border-[#EF8759] ring-2 ring-[#EF8759]/15"
-                : "border-border hover:border-[#EF8759]/50"
+                ? "border-primary ring-2 ring-primary/15"
+                : "border-border hover:border-primary/50"
             } ${!isEditable ? "opacity-60 cursor-not-allowed" : ""}`}
           >
             <div className="font-medium text-foreground">Ввести вручную</div>
@@ -276,8 +276,8 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
             disabled={!isEditable}
             className={`rounded-2xl border bg-white p-4 text-left transition-colors ${
               data.contactSource === "place"
-                ? "border-[#EF8759] ring-2 ring-[#EF8759]/15"
-                : "border-border hover:border-[#EF8759]/50"
+                ? "border-primary ring-2 ring-primary/15"
+                : "border-border hover:border-primary/50"
             } ${!isEditable ? "opacity-60 cursor-not-allowed" : ""}`}
           >
             <div className="font-medium text-foreground">Использовать контакты места</div>
@@ -305,7 +305,7 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
                   <Button
                     type="button"
                     size="sm"
-                    className="bg-[#EF8759] text-white hover:bg-[#e37443]"
+                    className="bg-primary text-white hover:bg-primary"
                     onClick={handleUsePlaceContacts}
                   >
                     Использовать данные места
@@ -349,7 +349,7 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
             {isEditable ? (
               <Button
                 type="button"
-                className="bg-[#EF8759] text-white hover:bg-[#e37443]"
+                className="bg-primary text-white hover:bg-primary"
                 onClick={() => setIsPickerOpen((prev) => !prev)}
               >
                 Выбрать место

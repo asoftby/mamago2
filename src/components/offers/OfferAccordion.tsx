@@ -92,7 +92,7 @@ function AccordionRow({
               fontSize: 10,
               letterSpacing: ".14em",
               textTransform: "uppercase",
-              color: isOpen ? "#C24E22" : "rgba(20,18,16,0.45)",
+              color: isOpen ? "var(--primary)" : "rgba(20,18,16,0.45)",
               minWidth: 24,
               flexShrink: 0,
             }}
@@ -211,7 +211,7 @@ function DayScheduleContent({ items }: { items: NonNullable<OfferPageData["daySc
                   fontSize: 13,
                   fontWeight: 500,
                   letterSpacing: ".02em",
-                  color: item.accent ? "#C24E22" : "#141210",
+                  color: item.accent ? "var(--primary)" : "#141210",
                   width: 48,
                   textAlign: "left",
                 }}>
@@ -226,9 +226,9 @@ function DayScheduleContent({ items }: { items: NonNullable<OfferPageData["daySc
                 width: item.accent ? 10 : 7,
                 height: item.accent ? 10 : 7,
                 borderRadius: 99,
-                background: item.accent ? "#E86A3A" : "#141210",
+                background: item.accent ? "var(--primary)" : "#141210",
                 border: "2px solid #FAF7F1",
-                boxShadow: item.accent ? "0 0 0 3px rgba(232,106,58,0.18)" : "none",
+                boxShadow: item.accent ? "0 0 0 3px rgba(239,135,89,0.18)" : "none",
                 zIndex: 1,
               }} />
             </div>

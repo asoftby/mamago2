@@ -58,7 +58,7 @@ export function PlanNeedsAgeQuestion({ onConfirm, onCancel, compact = false }: P
           type="button"
           disabled={selected.length === 0}
           onClick={() => onConfirm(selected)}
-          className="rounded-full bg-[#EF8759] px-5 py-2 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
         >
           Готово
         </button>

@@ -59,7 +59,7 @@ export function NetworkPlaceLogo({ name, logoUrl }: NetworkPlaceLogoProps) {
             fontStyle: "italic",
             fontWeight: 600,
             fontSize: 24,
-            color: "#E86A3A",
+            color: "var(--primary)",
           }}
         >
           {monogram}

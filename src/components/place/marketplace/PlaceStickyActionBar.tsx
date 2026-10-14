@@ -113,7 +113,7 @@ export function PlaceStickyActionBar({
           phones={phones}
           placeTitle={placeTitle}
           className={cn(
-            "inline-flex h-[46px] shrink-0 items-center justify-center gap-2 rounded-full bg-[#E86A3A] text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px",
+            "inline-flex h-[46px] shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-[14px] font-semibold text-white transition-colors hover:bg-primary-hover active:translate-y-px",
             hasThreeActions ? "w-[46px] px-0 sm:w-auto sm:px-5" : "px-5",
           )}
         >

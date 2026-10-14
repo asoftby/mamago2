@@ -136,7 +136,7 @@ export function StepPlace({ builder }: { builder: BuilderHook }) {
                   className={cn(
                     "flex flex-col rounded-2xl border bg-white shadow-sm overflow-hidden transition-all relative",
                     isSelected
-                      ? "border-[#EF8759]/60 bg-orange-50/20"
+                      ? "border-primary/60 bg-brand-soft/20"
                       : "border-black/[0.06] hover:shadow-md hover:border-black/[0.08]"
                   )}
                 >
@@ -160,7 +160,7 @@ export function StepPlace({ builder }: { builder: BuilderHook }) {
                         sizes="(max-width: 640px) 100vw, 208px"
                       />
                       {offer.isFeatured && (
-                        <span className="absolute top-3 left-3 bg-[#EF8759] text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                        <span className="absolute top-3 left-3 bg-primary text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
                           Топ
                         </span>
                       )}
@@ -277,7 +277,7 @@ export function StepPlace({ builder }: { builder: BuilderHook }) {
                                     className={cn(
                                       "flex flex-col gap-2.5 rounded-xl border bg-white p-3 transition-all sm:flex-row sm:items-center sm:justify-between sm:gap-3",
                                       isAddonSelected
-                                        ? "border-[#EF8759]/60 bg-orange-50/20"
+                                        ? "border-primary/60 bg-brand-soft/20"
                                         : "border-border/60 hover:border-border"
                                     )}
                                   >
@@ -305,8 +305,8 @@ export function StepPlace({ builder }: { builder: BuilderHook }) {
                                         className={cn(
                                           "flex items-center justify-center font-semibold transition-all duration-150",
                                           "rounded-lg px-3 py-1.5 text-xs",
-                                          "bg-white border border-border text-foreground hover:border-[#EF8759] hover:bg-orange-50",
-                                          "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759] focus-visible:ring-offset-2",
+                                          "bg-white border border-border text-foreground hover:border-primary hover:bg-brand-soft",
+                                          "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
                                           "active:scale-[0.98]",
                                         )}
                                       >
@@ -339,7 +339,7 @@ export function StepPlace({ builder }: { builder: BuilderHook }) {
 
       {/* Info for HOME/OUTDOOR */}
       {(placeType === "HOME" || placeType === "OUTDOOR") && (
-        <div className="rounded-xl bg-orange-50 border border-orange-200 p-4">
+        <div className="rounded-xl bg-brand-soft border border-primary/20 p-4">
           <p className="text-sm text-foreground">
             {placeType === "HOME" 
               ? "Отлично! Мы подберём услуги, которые можно заказать на дом."

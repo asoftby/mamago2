@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useResendVerificationEmail } from "../hooks/useResendVerificationEmail";
 
-const ACCENT = "#EF8759";
+const ACCENT = "var(--primary)";
 
 type EmailVerificationGateProps = {
   open: boolean;

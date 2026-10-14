@@ -60,7 +60,7 @@ export function PlaceNetworkSection({ places }: PlaceNetworkSectionProps) {
                   fontFamily: "var(--font-editorial)",
                   fontStyle: "italic",
                   fontWeight: 400,
-                  color: "#E86A3A",
+                  color: "var(--primary)",
                 }}
               >
                 сети
@@ -97,8 +97,8 @@ export function PlaceNetworkSection({ places }: PlaceNetworkSectionProps) {
         }
         .network-card:hover {
           transform: translateY(-3px);
-          border-color: #E86A3A;
-          box-shadow: 0 14px 30px -18px rgba(232,106,58,.45);
+          border-color: var(--primary);
+          box-shadow: 0 14px 30px -18px rgba(239,135,89,.45);
         }
         @media (max-width: 900px) {
           .network-grid { grid-template-columns: repeat(2, 1fr) !important; }

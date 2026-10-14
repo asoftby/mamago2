@@ -55,7 +55,7 @@ export function PlaceContent({ description, features, amenities }: PlaceContentP
               whileHover={{ y: -5 }}
               className={`rounded-[32px] border border-white/70 bg-gradient-to-br ${item.gradient} p-6 shadow-[0_24px_80px_rgba(17,19,34,0.08)] backdrop-blur-xl`}
             >
-              <div className="mb-8 flex h-14 w-14 items-center justify-center rounded-3xl bg-white/75 text-[#EF8759] shadow-[0_14px_36px_rgba(17,19,34,0.08)]">
+              <div className="mb-8 flex h-14 w-14 items-center justify-center rounded-3xl bg-white/75 text-primary shadow-[0_14px_36px_rgba(17,19,34,0.08)]">
                 {item.icon}
               </div>
               <h3 className="text-xl font-black text-[#111322]">{item.title}</h3>
@@ -76,7 +76,7 @@ export function PlaceContent({ description, features, amenities }: PlaceContentP
                 key={amenity}
                 className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm font-bold text-[#303345]"
               >
-                <Check className="h-4 w-4 text-[#EF8759]" />
+                <Check className="h-4 w-4 text-primary" />
                 {amenity}
               </span>
             ))}
@@ -103,7 +103,7 @@ function buildFeatures(features?: string[], amenities?: string[]) {
     <BookOpen className="h-7 w-7" key="book" />,
   ];
   const gradients = [
-    "from-white/86 to-[#FFF0EA]/82",
+    "from-white/86 to-brand-soft/82",
     "from-white/86 to-[#F0EFFF]/82",
     "from-white/86 to-[#EEF7FF]/82",
     "from-white/86 to-[#F8F2FF]/82",

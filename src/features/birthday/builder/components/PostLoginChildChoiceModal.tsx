@@ -85,7 +85,7 @@ export function PostLoginChildChoiceModal({
               </Button>
               <Button
                 type="button"
-                className="order-1 sm:order-2 bg-[#EF8759] hover:bg-[#e07848]"
+                className="order-1 sm:order-2 bg-primary hover:bg-primary-hover"
                 onClick={handleUseChild}
               >
                 Использовать данные ребёнка
@@ -129,8 +129,8 @@ export function PostLoginChildChoiceModal({
                     className={cn(
                       "w-full rounded-xl border px-4 py-3 text-left text-sm transition-colors",
                       on
-                        ? "border-[#EF8759]/70 bg-orange-50/50 ring-1 ring-[#EF8759]/25"
-                        : "border-border/70 bg-white hover:border-[#EF8759]/35",
+                        ? "border-primary/70 bg-brand-soft/50 ring-1 ring-primary/25"
+                        : "border-border/70 bg-white hover:border-primary/35",
                     )}
                   >
                     <span className="font-medium text-foreground">{label}</span>
@@ -150,7 +150,7 @@ export function PostLoginChildChoiceModal({
               <Button
                 type="button"
                 disabled={!selectedId}
-                className="bg-[#EF8759] hover:bg-[#e07848] sm:min-w-[140px]"
+                className="bg-primary hover:bg-primary-hover sm:min-w-[140px]"
                 onClick={handleUseChild}
               >
                 Использовать

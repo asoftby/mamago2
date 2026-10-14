@@ -49,7 +49,7 @@ export function QuickTopUpBlock({ onGenerateInvoice, disabled = false }: QuickTo
               px-4 py-3 rounded-xl font-medium transition-all
               ${
                 selectedAmount === amount
-                  ? "bg-[#EF8759] text-white shadow-md"
+                  ? "bg-primary text-white shadow-md"
                   : "bg-stone-100 text-stone-700 hover:bg-stone-200"
               }
               ${disabled ? "opacity-50 cursor-not-allowed" : ""}
@@ -76,7 +76,7 @@ export function QuickTopUpBlock({ onGenerateInvoice, disabled = false }: QuickTo
             placeholder="Введите сумму"
             className="
               w-full px-4 py-3 pr-16 rounded-xl border border-stone-300
-              focus:ring-2 focus:ring-[#EF8759] focus:border-[#EF8759]
+              focus:ring-2 focus:ring-primary focus:border-primary
               disabled:opacity-50 disabled:cursor-not-allowed
             "
           />

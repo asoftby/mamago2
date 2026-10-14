@@ -105,7 +105,7 @@ function ChildPickerPanelSections({
           <p className="px-2 py-3 text-sm text-muted-foreground leading-relaxed">
             <Link
               href={loginHref}
-              className="font-medium text-[#EF8759] underline underline-offset-2 hover:text-[#d9733f]"
+              className="font-medium text-primary underline underline-offset-2 hover:text-primary"
             >
               Войдите в аккаунт
             </Link>
@@ -128,7 +128,7 @@ function ChildPickerPanelSections({
                     className={cn(
                       "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium transition-colors",
                       selected
-                        ? "bg-orange-50 text-foreground ring-1 ring-[#EF8759]/30"
+                        ? "bg-brand-soft text-foreground ring-1 ring-primary/30"
                         : "hover:bg-muted/60 active:bg-muted/80",
                     )}
                   >
@@ -138,7 +138,7 @@ function ChildPickerPanelSections({
                       aria-hidden
                     >
                       {selected ? (
-                        <Check className="h-5 w-5 text-[#EF8759]" />
+                        <Check className="h-5 w-5 text-primary" />
                       ) : null}
                     </span>
                   </button>
@@ -180,7 +180,7 @@ function ChildPickerPanelSections({
           onClick={onAdd}
           className={cn(
             "w-full rounded-xl border-2 border-dashed border-border py-3 text-sm font-semibold",
-            "text-muted-foreground hover:text-foreground hover:border-[#EF8759]/50 hover:bg-orange-50/20",
+            "text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-brand-soft/20",
             "transition-colors",
           )}
         >
@@ -745,7 +745,7 @@ function PartyForChildSectionInner({
             onClick={() => openAddModal()}
             className={cn(
               "w-full rounded-xl border-2 border-dashed border-border py-3 text-sm font-semibold",
-              "text-muted-foreground hover:text-foreground hover:border-[#EF8759]/50 hover:bg-orange-50/20",
+              "text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-brand-soft/20",
               "transition-colors",
             )}
           >
@@ -757,7 +757,7 @@ function PartyForChildSectionInner({
             onClick={openChildPicker}
             className={cn(
               "w-full rounded-xl border-2 border-dashed border-border px-4 py-3 text-sm font-semibold text-left",
-              "text-muted-foreground hover:text-foreground hover:border-[#EF8759]/50 hover:bg-orange-50/20",
+              "text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-brand-soft/20",
               "transition-colors",
             )}
           >
@@ -840,7 +840,7 @@ function PartyForChildSectionInner({
             </AlertDialogCancel>
             <AlertDialogAction
               type="button"
-              className="w-full min-w-0 whitespace-normal text-center bg-[#EF8759] text-white hover:bg-[#e07848]"
+              className="w-full min-w-0 whitespace-normal text-center bg-primary text-white hover:bg-primary-hover"
               disabled={savingProfile}
               onClick={(e) => {
                 e.preventDefault();
@@ -896,7 +896,7 @@ function PartyForChildSectionInner({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Например, Маша"
                 autoComplete="given-name"
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#EF8759]/30"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
             <div className="space-y-1.5">
@@ -936,8 +936,8 @@ function PartyForChildSectionInner({
                       className={cn(
                         "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
                         on
-                          ? "border-[#EF8759] bg-orange-50 text-[#c45a30]"
-                          : "border-border bg-white text-muted-foreground hover:border-[#EF8759]/40",
+                          ? "border-primary bg-brand-soft text-primary"
+                          : "border-border bg-white text-muted-foreground hover:border-primary/40",
                       )}
                     >
                       {it.label}
@@ -963,8 +963,8 @@ function PartyForChildSectionInner({
               type="button"
               onClick={handleModalDone}
               className={cn(
-                "order-1 sm:order-2 rounded-lg bg-[#EF8759] text-white px-5 py-2.5 text-sm font-semibold",
-                "hover:bg-[#e07848] disabled:opacity-50",
+                "order-1 sm:order-2 rounded-lg bg-primary text-white px-5 py-2.5 text-sm font-semibold",
+                "hover:bg-primary-hover disabled:opacity-50",
               )}
             >
               Готово

@@ -58,7 +58,7 @@ export function MobileMediaCarousel({
                 role="listitem"
                 onClick={() => setLightboxIndex(index)}
                 aria-label={isVideo ? `Открыть ${mediaLabel}` : `Открыть фото ${index + 1} из ${items.length}`}
-                className="group relative aspect-[4/5] w-full shrink-0 snap-start overflow-hidden bg-[#E8E0D4] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]"
+                className="group relative aspect-[4/5] w-full shrink-0 snap-start overflow-hidden bg-[#E8E0D4] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 {bgSrc ? (
                   // eslint-disable-next-line @next/next/no-img-element

@@ -16,7 +16,7 @@ function StarDisplay({ rating }: { rating: number }) {
           className={cn(
             "h-3.5 w-3.5",
             n <= Math.round(rating)
-              ? "fill-[#EF8759] text-[#EF8759]"
+              ? "fill-primary text-primary"
               : "fill-stone-100 text-stone-200",
           )}
         />

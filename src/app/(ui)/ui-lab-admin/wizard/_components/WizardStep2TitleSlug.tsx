@@ -73,7 +73,7 @@ export function WizardStep2TitleSlug({ title, slug, onTitleChange, onSlugChange 
             <button
               type="button"
               onClick={handleSlugReset}
-              className="text-xs text-[#EF8759] hover:underline"
+              className="text-xs text-primary hover:underline"
             >
               Сбросить к автоматическому
             </button>

@@ -358,7 +358,7 @@ function DiscoveryIntentTabsContent({
 
         {/* Animated Indicator */}
         <div
-          className="absolute bottom-0 h-[4px] rounded-full bg-[#EF8759] transition-all duration-300 ease-out pointer-events-none"
+          className="absolute bottom-0 h-[4px] rounded-full bg-primary transition-all duration-300 ease-out pointer-events-none"
           style={{
             left: `${indicatorStyle.left}px`,
             width: `${indicatorStyle.width}px`,

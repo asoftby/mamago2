@@ -139,7 +139,7 @@ export function LocationPanel({
                     className={cn(
                       "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-colors",
                       selected
-                        ? "bg-[#EF8759]/10 text-[#EF8759]"
+                        ? "bg-primary/10 text-primary"
                         : "text-gray-700 hover:bg-gray-50",
                     )}
                   >
@@ -148,7 +148,7 @@ export function LocationPanel({
                       <span className="text-xs text-gray-500">Весь город</span>
                     </span>
                     {selected ? (
-                      <Check className="h-4 w-4 shrink-0 text-[#EF8759]" aria-hidden />
+                      <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden />
                     ) : null}
                   </button>
                 );

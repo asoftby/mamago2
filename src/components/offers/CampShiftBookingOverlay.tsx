@@ -267,7 +267,7 @@ export function CampShiftBookingOverlay({
               type="submit"
               form="camp-shift-booking-form"
               disabled={isSubmitting || prefillLoading}
-              className="h-14 w-full rounded-[18px] bg-[#EF8759] text-[17px] font-bold text-white hover:bg-[#e07848] disabled:opacity-60"
+              className="h-14 w-full rounded-[18px] bg-primary text-[17px] font-bold text-white hover:bg-primary-hover disabled:opacity-60"
             >
               {isSubmitting ? (
                 <span className="flex items-center gap-2">
@@ -304,11 +304,11 @@ export function CampShiftBookingOverlay({
                   Быстро и просто — всего 1 минута!
                 </p>
               </div>
-              <div className="pointer-events-none absolute right-4 top-3 hidden items-end gap-2 text-[#EF8759] sm:flex">
+              <div className="pointer-events-none absolute right-4 top-3 hidden items-end gap-2 text-primary sm:flex">
                 <Cloud className="mb-10 h-6 w-6 text-[#F7D7C2]" />
                 <Trees className="h-20 w-20 text-[#E8A17D]" strokeWidth={1.6} />
-                <Tent className="h-20 w-20 text-[#EF8759]" strokeWidth={1.7} />
-                <Trees className="h-14 w-14 text-[#F1B390]" strokeWidth={1.6} />
+                <Tent className="h-20 w-20 text-primary" strokeWidth={1.7} />
+                <Trees className="h-14 w-14 text-brand-soft" strokeWidth={1.6} />
                 <SunMedium className="mb-12 h-8 w-8 text-[#F4B350]" strokeWidth={1.8} />
               </div>
             </div>
@@ -329,7 +329,7 @@ export function CampShiftBookingOverlay({
                   aria-expanded={shiftOptions.length > 1 ? shiftPickerOpen : undefined}
                   aria-label={shiftOptions.length > 1 ? "Выбрать другую смену" : undefined}
                 >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#FFF1E8] text-[#EF8759]">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-soft text-primary">
                     <CalendarDays className="h-6 w-6" />
                   </div>
                   <div className="min-w-0 flex-1 space-y-1">
@@ -349,17 +349,17 @@ export function CampShiftBookingOverlay({
                         </span>
                       ) : null}
                       {selectedShift.price ? (
-                        <span className="font-semibold text-[#D96534]">{selectedShift.price}</span>
+                        <span className="font-semibold text-primary">{selectedShift.price}</span>
                       ) : null}
                     </div>
                     {selectedShift.promotionDetails ? (
-                      <div className="rounded-2xl border border-[#F2D8CA] bg-[#FFF3EB] px-3 py-2 text-[13px] leading-5 text-[#B5562D]">
+                      <div className="rounded-2xl border border-[#F2D8CA] bg-[#FFF3EB] px-3 py-2 text-[13px] leading-5 text-primary">
                         {selectedShift.promotionDetails}
                       </div>
                     ) : null}
                   </div>
                   {shiftOptions.length > 1 ? (
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#F0DDD0] bg-white text-[#EF8759]">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#F0DDD0] bg-white text-primary">
                       {shiftPickerOpen ? (
                         <ChevronUp className="h-5 w-5" />
                       ) : (
@@ -389,8 +389,8 @@ export function CampShiftBookingOverlay({
                           className={cn(
                             "flex w-full items-start justify-between gap-3 rounded-[18px] border px-4 py-3 text-left transition-colors",
                             isActive
-                              ? "border-[#EF8759] bg-[#FFF4EC]"
-                              : "border-[#F1E5DA] bg-white hover:border-[#EF8759]/40 hover:bg-[#FFFAF6]",
+                              ? "border-primary bg-brand-soft"
+                              : "border-[#F1E5DA] bg-white hover:border-primary/40 hover:bg-[#FFFAF6]",
                           )}
                         >
                           <div className="min-w-0">
@@ -403,13 +403,13 @@ export function CampShiftBookingOverlay({
                               </div>
                             ) : null}
                             {option.promotionDetails ? (
-                              <div className="mt-2 rounded-2xl border border-[#F2D8CA] bg-[#FFF7F1] px-3 py-2 text-[12px] leading-5 text-[#B5562D]">
+                              <div className="mt-2 rounded-2xl border border-[#F2D8CA] bg-[#FFF7F1] px-3 py-2 text-[12px] leading-5 text-primary">
                                 {option.promotionDetails}
                               </div>
                             ) : null}
                           </div>
                           {option.price ? (
-                            <span className="shrink-0 text-[13px] font-semibold text-[#D96534]">
+                            <span className="shrink-0 text-[13px] font-semibold text-primary">
                               {option.price}
                             </span>
                           ) : null}
@@ -607,7 +607,7 @@ export function CampShiftBookingOverlay({
             </fieldset>
 
             <div className="flex items-center justify-center gap-2 rounded-2xl bg-[#FFF7F1] px-4 py-3 text-center text-[13px] text-neutral-500">
-              <Lock className="h-4 w-4 shrink-0 text-[#EF8759]" />
+              <Lock className="h-4 w-4 shrink-0 text-primary" />
               Ваши данные защищены и не передаются третьим лицам.
             </div>
           </form>
@@ -625,8 +625,8 @@ function SuccessScreen({
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-5 px-6 py-12 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#FFF1E8]">
-        <CheckCircle2 className="h-8 w-8 text-[#EF8759]" />
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-soft">
+        <CheckCircle2 className="h-8 w-8 text-primary" />
       </div>
 
       <div className="space-y-2">
@@ -640,7 +640,7 @@ function SuccessScreen({
         <Button
           type="button"
           onClick={onClose}
-          className="h-11 w-full rounded-2xl bg-[#EF8759] text-[14px] font-bold text-white hover:bg-[#e07848]"
+          className="h-11 w-full rounded-2xl bg-primary text-[14px] font-bold text-white hover:bg-primary-hover"
         >
           Закрыть
         </Button>
@@ -666,7 +666,7 @@ function Field({
 }) {
   return (
     <div className="grid grid-cols-[36px_minmax(0,1fr)] items-start gap-3 sm:grid-cols-[52px_minmax(0,1fr)] sm:gap-4">
-      <div className="flex justify-center pt-2 text-[#EF8759]">
+      <div className="flex justify-center pt-2 text-primary">
         {icon}
       </div>
       <label htmlFor={htmlFor} className="block space-y-2">
@@ -686,7 +686,7 @@ function Field({
 function inputCls(hasError: boolean) {
   return cn(
     "h-14 rounded-[18px] border border-[#E7DDD5] bg-white px-4 text-[16px]",
-    "placeholder:text-neutral-400 focus-visible:border-[#EF8759] focus-visible:ring-[#EF8759]/20",
+    "placeholder:text-neutral-400 focus-visible:border-primary focus-visible:ring-primary/20",
     hasError ? "border-red-300 bg-red-50/30 focus-visible:ring-red-200" : "",
   );
 }
@@ -694,7 +694,7 @@ function inputCls(hasError: boolean) {
 function selectCls(hasError = false) {
   return cn(
     "h-14 w-full rounded-[18px] border border-[#E7DDD5] bg-white px-4 text-[16px]",
-    "focus:border-[#EF8759] focus:ring-[#EF8759]/20",
+    "focus:border-primary focus:ring-primary/20",
     hasError ? "border-red-300 bg-red-50/30" : "",
   );
 }
@@ -702,7 +702,7 @@ function selectCls(hasError = false) {
 function textareaCls(hasError: boolean) {
   return cn(
     "min-h-[108px] rounded-[18px] border border-[#E7DDD5] bg-white px-4 py-3 text-[16px]",
-    "placeholder:text-neutral-400 focus-visible:border-[#EF8759] focus-visible:ring-[#EF8759]/20",
+    "placeholder:text-neutral-400 focus-visible:border-primary focus-visible:ring-primary/20",
     hasError ? "border-red-300 bg-red-50/30" : "",
   );
 }

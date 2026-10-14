@@ -50,14 +50,14 @@ function StarRating({
           onMouseEnter={() => onHover(n)}
           className={cn(
             "rounded p-0.5 transition-transform active:scale-90 disabled:pointer-events-none",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]/50",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
           )}
         >
           <Star
             className={cn(
               "h-8 w-8 transition-colors",
               n <= active
-                ? "fill-[#EF8759] text-[#EF8759]"
+                ? "fill-primary text-primary"
                 : "fill-stone-100 text-stone-300",
             )}
           />
@@ -180,7 +180,7 @@ export function BookingFeedbackCard({
         <p
           className={cn(
             "text-[13px] font-medium transition-colors h-5",
-            rating > 0 ? "text-[#EF8759]" : "text-stone-300",
+            rating > 0 ? "text-primary" : "text-stone-300",
           )}
         >
           {rating > 0 ? RATING_LABELS[rating] : "Выберите оценку"}
@@ -223,7 +223,7 @@ export function BookingFeedbackCard({
             "text-[13px] font-medium transition-colors",
             "disabled:pointer-events-none disabled:opacity-40",
             rating > 0
-              ? "bg-[#EF8759] text-white hover:bg-[#E07040]"
+              ? "bg-primary text-white hover:bg-primary"
               : "bg-stone-100 text-stone-400",
           )}
         >

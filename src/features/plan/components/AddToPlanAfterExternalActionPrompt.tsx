@@ -25,7 +25,7 @@ function PromptBody({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#FFE8DC] text-[#EF8759]">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-soft text-primary">
           <CalendarDays className="h-5 w-5" />
         </div>
         <div className="min-w-0">
@@ -41,7 +41,7 @@ function PromptBody({
         <Button
           type="button"
           onClick={onAddToPlan}
-          className="h-12 flex-1 rounded-full bg-[#EF8759] text-[15px] font-semibold text-white hover:bg-primary-hover"
+          className="h-12 flex-1 rounded-full bg-primary text-[15px] font-semibold text-white hover:bg-primary-hover"
         >
           Добавить в план
         </Button>

@@ -96,7 +96,7 @@ export function DocumentCard({ type, document }: DocumentCardProps) {
               href={doc.pdfUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#EF8759] rounded-lg hover:bg-[#EF8759]/90 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
               Скачать PDF

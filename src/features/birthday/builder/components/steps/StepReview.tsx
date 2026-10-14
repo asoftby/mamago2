@@ -9,7 +9,7 @@ export function StepReview({ offers }: { offers: BirthdayCatalogItem[] }) {
   return (
     <section className="mx-auto max-w-3xl space-y-7">
       <header className="space-y-3">
-        <p className="text-xs uppercase tracking-widest text-orange-700">Шаг 5 · предварительный план</p>
+        <p className="text-xs uppercase tracking-widest text-primary">Шаг 5 · предварительный план</p>
         <h2 className="text-3xl font-semibold sm:text-5xl">Вы выбрали услуги</h2>
         <p className="text-stone-600">
           Это предварительный подбор, а не оформленный заказ. Ни один исполнитель ещё не получил заявку;
@@ -42,7 +42,7 @@ export function StepReview({ offers }: { offers: BirthdayCatalogItem[] }) {
           <p className="mt-2 text-sm text-stone-600">Некоторые услуги рассчитываются индивидуально и в эту сумму не включены.</p>
         )}
       </div>
-      <div className="space-y-2 rounded-xl border border-orange-200 bg-orange-50 p-5">
+      <div className="space-y-2 rounded-xl border border-primary/20 bg-brand-soft p-5">
         <h3 className="font-semibold">Оформление заявок пока недоступно</h3>
         <p className="text-sm leading-6 text-stone-700">
           Мы подключаем сохранение праздника и согласование с исполнителями.

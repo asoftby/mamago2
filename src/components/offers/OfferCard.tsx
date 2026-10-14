@@ -96,7 +96,7 @@ export function OfferCard({
 
           {/* Promo badge — top right */}
           {promoBadge && (
-            <span className="absolute left-3 top-3 inline-flex h-7 max-w-[calc(100%-4.5rem)] items-center truncate rounded-full bg-[#E86A3A] px-3 text-[12px] font-semibold text-white shadow-[0_2px_8px_rgba(232,106,58,0.35)] sm:max-w-[calc(100%-3.75rem)]">
+            <span className="absolute left-3 top-3 inline-flex h-7 max-w-[calc(100%-4.5rem)] items-center truncate rounded-full bg-primary px-3 text-[12px] font-semibold text-white shadow-[0_2px_8px_rgba(239,135,89,0.35)] sm:max-w-[calc(100%-3.75rem)]">
               {promoBadge}
             </span>
           )}
@@ -116,7 +116,7 @@ export function OfferCard({
               {categoryLabel}
             </div>
           )}
-          <div className="line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors group-hover:text-[#C24E22]">
+          <div className="line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors group-hover:text-primary">
             {title}
           </div>
           {dateLabel && (

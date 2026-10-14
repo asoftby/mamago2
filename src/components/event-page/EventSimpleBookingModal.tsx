@@ -86,7 +86,7 @@ const fieldInputStyle: React.CSSProperties = {
   transition: "border-color .18s, box-shadow .18s",
   fontFamily: "inherit",
 };
-const focusStyle = (el: HTMLElement) => { el.style.borderColor = "#E86A3A"; el.style.boxShadow = "0 0 0 3px rgba(232,106,58,.12)"; };
+const focusStyle = (el: HTMLElement) => { el.style.borderColor = "var(--primary)"; el.style.boxShadow = "0 0 0 3px rgba(239,135,89,.12)"; };
 const blurStyle  = (el: HTMLElement) => { el.style.borderColor = "rgba(20,18,16,.10)"; el.style.boxShadow = "none"; };
 
 const FieldInput = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
@@ -114,7 +114,7 @@ function FieldWrap({ label, labelSuffix, error, children }: { label: string; lab
         {label}{labelSuffix && <span style={{ fontSize: 12, color: "rgba(20,18,16,.55)", fontWeight: 400, marginLeft: 4 }}>{labelSuffix}</span>}
       </label>
       {children}
-      {error && <p style={{ margin: 0, fontSize: 12, color: "#C24E22" }}>{error}</p>}
+      {error && <p style={{ margin: 0, fontSize: 12, color: "var(--danger)" }}>{error}</p>}
     </div>
   );
 }
@@ -210,7 +210,7 @@ export function EventSimpleBookingModal({
           </div>
           <div>
             <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontWeight: 400, fontSize: 32, lineHeight: 1, letterSpacing: "-.02em", color: "#141210" }}>
-              Вы <em style={{ fontStyle: "italic", color: "#C24E22" }}>записаны</em>!
+              Вы <em style={{ fontStyle: "italic", color: "var(--primary)" }}>записаны</em>!
             </h2>
             <p style={{ margin: "10px 0 0", fontSize: 14, color: "rgba(20,18,16,.55)", lineHeight: 1.55, maxWidth: 300 }}>
               Организатор свяжется с вами для подтверждения.
@@ -260,7 +260,7 @@ export function EventSimpleBookingModal({
           flexShrink: 0,
         }}>
           <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontWeight: 400, fontSize: 28, lineHeight: 1, letterSpacing: "-.02em", color: "#141210" }}>
-            Записаться <em style={{ fontStyle: "italic", color: "#C24E22" }}>на событие</em>
+            Записаться <em style={{ fontStyle: "italic", color: "var(--primary)" }}>на событие</em>
           </h2>
           <XBtn onClick={() => handleClose(false)} />
         </div>
@@ -278,7 +278,7 @@ export function EventSimpleBookingModal({
             }}>
               <span style={{
                 width: 34, height: 34, borderRadius: 10,
-                background: "#FFE8DC", color: "#C24E22",
+                background: "var(--brand-soft)", color: "var(--text-main)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 16, flexShrink: 0,
               }}>✱</span>
@@ -344,7 +344,7 @@ export function EventSimpleBookingModal({
                         {/* dots = number of slots */}
                         <span style={{ display: "flex", gap: 3, height: 5, alignItems: "center", marginTop: 1 }}>
                           {dg.slots.slice(0, 3).map((_, i) => (
-                            <span key={i} style={{ width: 3, height: 3, borderRadius: 99, background: isSel ? "rgba(250,247,241,.5)" : "#E86A3A" }} />
+                            <span key={i} style={{ width: 3, height: 3, borderRadius: 99, background: isSel ? "rgba(250,247,241,.5)" : "var(--primary)" }} />
                           ))}
                         </span>
                       </button>
@@ -372,7 +372,7 @@ export function EventSimpleBookingModal({
                             onClick={() => setTimeId(slot.id)}
                             style={{
                               height: 38, padding: "0 14px", borderRadius: 99,
-                              background: isSel ? "#E86A3A" : "#FAF7F1",
+                              background: isSel ? "var(--primary)" : "#FAF7F1",
                               color: isSel ? "#fff" : "#141210",
                               border: `1px solid ${isSel ? "transparent" : "rgba(20,18,16,.10)"}`,
                               fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 500,
@@ -384,7 +384,7 @@ export function EventSimpleBookingModal({
                           >
                             {slotTimeLabel(slot)}
                             {isLow && (
-                              <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: isSel ? "rgba(255,255,255,.7)" : "#C24E22", letterSpacing: ".06em", textTransform: "uppercase" }}>
+                              <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: isSel ? "rgba(255,255,255,.7)" : "var(--primary)", letterSpacing: ".06em", textTransform: "uppercase" }}>
                                 ● {slot.capacity} мест
                               </span>
                             )}
@@ -431,12 +431,12 @@ export function EventSimpleBookingModal({
               width: "100%", height: 56, borderRadius: 99,
               background: phase === "submitting" || !valid
                 ? "rgba(20,18,16,.18)"
-                : "linear-gradient(180deg, #FBA77B, #E86A3A)",
+                : "linear-gradient(180deg, var(--primary), var(--primary-hover))",
               color: phase === "submitting" || !valid ? "rgba(20,18,16,.45)" : "#fff",
               fontSize: 15, fontWeight: 600, letterSpacing: ".005em",
               border: 0, cursor: phase === "submitting" || !valid ? "default" : "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-              boxShadow: phase === "submitting" || !valid ? "none" : "0 18px 40px -12px rgba(232,106,58,.55)",
+              boxShadow: phase === "submitting" || !valid ? "none" : "0 18px 40px -12px rgba(239,135,89,.55)",
               transition: "box-shadow .2s, filter .2s",
               fontFamily: "inherit",
             }}

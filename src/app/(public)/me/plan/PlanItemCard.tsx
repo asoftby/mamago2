@@ -189,8 +189,8 @@ export function PlanItemCard({
             title={presentation.isCatalog ? "Событие" : "Заметка"}
             className="inline-flex h-7 w-7 items-center justify-center rounded-lg"
             style={{
-              color: presentation.isCatalog ? "#C24E22" : "#C98A19",
-              background: presentation.isCatalog ? "#FFF0EA" : "#FFF4D9",
+              color: presentation.isCatalog ? "var(--primary)" : "#C98A19",
+              background: presentation.isCatalog ? "var(--brand-soft)" : "#FFF4D9",
             }}
           >
             {presentation.isCatalog ? <CalendarDays size={14} /> : <StickyNote size={14} />}

@@ -75,7 +75,7 @@ export function RouteMapHero({
       fallbackPolylineRef.current = null;
     }
 
-    const strokeColor = mode === "walk" ? "#EF8759" : "#3B82F6";
+    const strokeColor = mode === "walk" ? "var(--primary)" : "#3B82F6";
 
     try {
       const directionsService = new google.maps.DirectionsService();

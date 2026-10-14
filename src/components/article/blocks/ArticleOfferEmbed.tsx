@@ -21,8 +21,8 @@ const T = {
   line:       "rgba(20,18,16,.10)",
   line2:      "rgba(20,18,16,.18)",
   lineWarm:   "#E7E0D7",
-  accent:     "#E86A3A",
-  accentDeep: "#C24E22",
+  accent:     "var(--primary)",
+  accentDeep: "var(--primary)",
   hot:        "#D6342B",   // promo-pill is RED, not orange
   titleAmber: "#FFC183",   // italic portion of title on hero
   mono:       "var(--font-mono, 'JetBrains Mono', ui-monospace, monospace)",
@@ -433,7 +433,7 @@ export function ArticleOfferEmbed({ card }: { card: ResolvedOfferEmbedCard }) {
                                     background: T.accent,
                                     flexShrink: 0,
                                     marginTop: 4,
-                                    boxShadow: `0 0 0 2px rgba(232,106,58,.18)`,
+                                    boxShadow: `0 0 0 2px rgba(239,135,89,.18)`,
                                   }} />
                                   {/* Vertical line */}
                                   {!isLast && (
@@ -441,7 +441,7 @@ export function ArticleOfferEmbed({ card }: { card: ResolvedOfferEmbedCard }) {
                                       width: 1.5,
                                       flex: 1,
                                       minHeight: 24,
-                                      background: `linear-gradient(to bottom, rgba(232,106,58,.3), rgba(232,106,58,.08))`,
+                                      background: `linear-gradient(to bottom, rgba(239,135,89,.3), rgba(239,135,89,.08))`,
                                       marginTop: 3,
                                     }} />
                                   )}
@@ -589,7 +589,7 @@ export function ArticleOfferEmbed({ card }: { card: ResolvedOfferEmbedCard }) {
                   <span style={{
                     display: "inline-flex", alignItems: "center",
                     height: 20, padding: "0 8px", borderRadius: 99,
-                    background: "rgba(232,106,58,.22)",
+                    background: "rgba(239,135,89,.22)",
                     color: T.accent,
                     fontFamily: T.mono,
                     fontSize: 10, fontWeight: 700,

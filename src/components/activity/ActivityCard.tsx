@@ -275,7 +275,7 @@ export function ActivityCard(props: AdapterProps) {
               {[base.badges[0], categoryLabel].filter(Boolean).join(" · ")}
             </div>
           )}
-          <div className="line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors duration-150 group-hover:text-[#C24E22]">
+          <div className="line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors duration-150 group-hover:text-primary">
             {base.title}
           </div>
           {metaText && (

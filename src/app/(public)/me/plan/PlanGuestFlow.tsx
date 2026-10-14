@@ -47,7 +47,7 @@ function StepDots({ idx, total }: { idx: number; total: number }) {
             width: i === idx ? 22 : 6,
             height: 6,
             borderRadius: 99,
-            background: i === idx ? "#E86A3A" : i < idx ? "#141210" : "rgba(20,18,16,.18)",
+            background: i === idx ? "var(--primary)" : i < idx ? "#141210" : "rgba(20,18,16,.18)",
             transition: "all .25s",
             flexShrink: 0,
             display: "inline-block",
@@ -73,7 +73,7 @@ function ModalHeader({ onClose }: { onClose?: () => void }) {
         className="font-display"
         style={{ margin: 0, fontSize: 32, lineHeight: 1, letterSpacing: "-.02em", color: "#141210" }}
       >
-        Мой <em style={{ fontStyle: "italic", color: "#C24E22" }}>план</em>
+        Мой <em style={{ fontStyle: "italic", color: "var(--primary)" }}>план</em>
       </h2>
       {onClose && (
         <button
@@ -132,9 +132,9 @@ function FilterGroup<K extends keyof FilterState>({
               onClick={() => onChange({ ...filters, [field]: o.key })}
               style={{
                 height: 42, padding: "0 22px", borderRadius: 99,
-                background: isOn ? "#FFE8DC" : "#FAF7F1",
+                background: isOn ? "var(--brand-soft)" : "#FAF7F1",
                 border: isOn ? "1px solid transparent" : "1px solid rgba(20,18,16,.10)",
-                color: isOn ? "#C24E22" : "#141210",
+                color: isOn ? "var(--text-main)" : "#141210",
                 fontSize: 15, fontWeight: isOn ? 600 : 500,
                 cursor: "pointer", transition: "all .15s",
                 fontFamily: "inherit",
@@ -178,7 +178,7 @@ function Step1({ onNext, loginHref }: { onNext: () => void; loginHref: string })
           className="font-mono inline-flex items-center gap-2 uppercase"
           style={{
             padding: "6px 12px", borderRadius: 99,
-            background: "#FFE8DC", color: "#C24E22",
+            background: "var(--brand-soft)", color: "var(--text-main)",
             fontSize: 10, fontWeight: 600, letterSpacing: ".14em",
           }}
         >
@@ -197,7 +197,7 @@ function Step1({ onNext, loginHref }: { onNext: () => void; loginHref: string })
           }}
         >
           Соберём план<br/>
-          на&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>сегодня</em>
+          на&nbsp;<em style={{ fontStyle: "italic", color: "var(--primary)" }}>сегодня</em>
           {" "}за&nbsp;10&nbsp;секунд
         </h3>
 
@@ -211,12 +211,12 @@ function Step1({ onNext, loginHref }: { onNext: () => void; loginHref: string })
           style={{
             width: "100%", maxWidth: 340, height: 60, fontSize: 16,
             borderRadius: 99,
-            background: "linear-gradient(180deg, #FBA77B, #E86A3A)",
+            background: "linear-gradient(180deg, var(--primary), var(--primary-hover))",
             color: "#fff",
             fontWeight: 600, letterSpacing: "-.005em",
             display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10,
             cursor: "pointer", border: 0,
-            boxShadow: "0 18px 40px -12px rgba(232,106,58,.6)",
+            boxShadow: "0 18px 40px -12px rgba(239,135,89,.6)",
             transition: "filter .2s, box-shadow .2s",
           }}
         >
@@ -229,7 +229,7 @@ function Step1({ onNext, loginHref }: { onNext: () => void; loginHref: string })
           style={{ marginTop: 8, fontSize: 10, letterSpacing: ".1em", color: "rgba(20,18,16,.55)" }}
         >
           <span className="inline-flex items-center gap-1.5">
-            <span style={{ width: 6, height: 6, borderRadius: 99, background: "#E86A3A", flexShrink: 0, display: "inline-block" }}/>
+            <span style={{ width: 6, height: 6, borderRadius: 99, background: "var(--primary)", flexShrink: 0, display: "inline-block" }}/>
             без регистрации
           </span>
           <span style={{ width: 3, height: 3, borderRadius: 99, background: "rgba(20,18,16,.55)", flexShrink: 0, display: "inline-block" }}/>
@@ -304,12 +304,12 @@ function Step2({
           style={{
             width: "100%", height: 58, fontSize: 16,
             borderRadius: 99,
-            background: "linear-gradient(180deg, #FBA77B, #E86A3A)",
+            background: "linear-gradient(180deg, var(--primary), var(--primary-hover))",
             color: "#fff",
             fontWeight: 600,
             display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
             cursor: "pointer", border: 0,
-            boxShadow: "0 18px 40px -12px rgba(232,106,58,.55)",
+            boxShadow: "0 18px 40px -12px rgba(239,135,89,.55)",
             marginTop: 6,
             fontFamily: "inherit",
           }}
@@ -374,7 +374,7 @@ function Step3({
             className="font-display"
             style={{ margin: 0, fontSize: 28, lineHeight: 1.05, letterSpacing: "-.02em", color: "#141210" }}
           >
-            Вот что мы подобрали для&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>вас</em>
+            Вот что мы подобрали для&nbsp;<em style={{ fontStyle: "italic", color: "var(--primary)" }}>вас</em>
           </h3>
           <div className="flex items-center gap-2" style={{ marginTop: 6 }}>
             <span style={{ fontSize: 14, color: "rgba(20,18,16,.55)" }}>{dateLabel}</span>
@@ -411,10 +411,10 @@ function Step3({
             style={{
               position: "absolute", top: -12, left: 18,
               padding: "5px 10px 5px 8px", borderRadius: 99,
-              background: "#fff", border: "1px solid rgba(232,106,58,.28)",
-              color: "#C24E22",
+              background: "#fff", border: "1px solid rgba(239,135,89,.28)",
+              color: "var(--primary)",
               fontSize: 10, fontWeight: 600, letterSpacing: ".12em",
-              boxShadow: "0 6px 16px -6px rgba(232,106,58,.35)",
+              boxShadow: "0 6px 16px -6px rgba(239,135,89,.35)",
               zIndex: 1,
             }}
           >
@@ -426,7 +426,7 @@ function Step3({
           <div
             style={{
               width: 96, height: 96, borderRadius: 14,
-              background: "linear-gradient(160deg, #F2C8A7, #E89460)",
+              background: "linear-gradient(160deg, var(--brand-soft), var(--primary))",
               position: "relative", overflow: "hidden", flexShrink: 0,
             }}
           >
@@ -445,7 +445,7 @@ function Step3({
               className="font-display"
               style={{ margin: 0, fontSize: 22, lineHeight: 1.08, letterSpacing: "-.015em", color: "#141210" }}
             >
-              Занятие в&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>Британской школе</em>
+              Занятие в&nbsp;<em style={{ fontStyle: "italic", color: "var(--primary)" }}>Британской школе</em>
             </h4>
             <span className="font-mono uppercase" style={{ fontSize: 11, color: "rgba(20,18,16,.55)", letterSpacing: ".04em" }}>
               ● Сегодня · 11:00 · Бесплатно
@@ -466,10 +466,10 @@ function Step3({
                 : {
                     height: 44, padding: "0 18px", fontSize: 13, alignSelf: "center",
                     borderRadius: 99,
-                    background: "linear-gradient(180deg, #FBA77B, #E86A3A)",
+                    background: "linear-gradient(180deg, var(--primary), var(--primary-hover))",
                     color: "#fff", border: 0,
                     fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8,
-                    boxShadow: "0 10px 24px -8px rgba(232,106,58,.5)",
+                    boxShadow: "0 10px 24px -8px rgba(239,135,89,.5)",
                     fontFamily: "inherit",
                   }
             }
@@ -485,8 +485,8 @@ function Step3({
             width: "100%", height: 50, fontSize: 14,
             borderRadius: 99,
             background: "transparent",
-            border: "1px solid rgba(232,106,58,.4)",
-            color: "#C24E22",
+            border: "1px solid rgba(239,135,89,.4)",
+            color: "var(--primary)",
             fontWeight: 500, cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             transition: "border-color .15s",
@@ -559,7 +559,7 @@ function Step4({
             className="font-display"
             style={{ margin: 0, fontSize: 28, lineHeight: 1.05, letterSpacing: "-.02em", color: "#141210" }}
           >
-            Вот что мы подобрали для&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>вас</em>
+            Вот что мы подобрали для&nbsp;<em style={{ fontStyle: "italic", color: "var(--primary)" }}>вас</em>
           </h3>
           <div style={{ marginTop: 6, fontSize: 14, color: "rgba(20,18,16,.55)" }}>
             {DAYS[d.getDay()]}, {d.getDate()} {MONTHS[d.getMonth()]}
@@ -571,15 +571,15 @@ function Step4({
           style={{
             position: "relative", overflow: "hidden",
             padding: "26px 24px 24px",
-            background: "linear-gradient(135deg, #FFE8DC, #FFF1E5)",
-            border: "1px solid rgba(232,106,58,.25)",
+            background: "linear-gradient(135deg, var(--brand-soft), #FFF1E5)",
+            border: "1px solid rgba(239,135,89,.25)",
             borderRadius: 20,
             display: "flex", flexDirection: "column", gap: 12,
           }}
         >
           <span style={{
             position: "absolute", top: -40, right: -30, width: 160, height: 160, borderRadius: 99,
-            background: "radial-gradient(circle, rgba(232,106,58,.22), transparent 65%)",
+            background: "radial-gradient(circle, rgba(239,135,89,.22), transparent 65%)",
             pointerEvents: "none",
           }}/>
 
@@ -587,7 +587,7 @@ function Step4({
             className="font-mono inline-flex items-center gap-1.5 uppercase self-start"
             style={{
               padding: "4px 10px", borderRadius: 99,
-              background: "#fff", color: "#C24E22",
+              background: "#fff", color: "var(--primary)",
               fontSize: 10, fontWeight: 600, letterSpacing: ".12em",
               position: "relative", zIndex: 1,
             }}
@@ -603,7 +603,7 @@ function Step4({
             }}
           >
             Сохраним ваш план<br/>
-            и&nbsp;<em style={{ fontStyle: "italic", color: "#C24E22" }}>подберём ещё</em>
+            и&nbsp;<em style={{ fontStyle: "italic", color: "var(--primary)" }}>подберём ещё</em>
           </h4>
 
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: "#3A332B", maxWidth: 380, position: "relative", zIndex: 1 }}>
@@ -616,9 +616,9 @@ function Step4({
               className="inline-flex items-center gap-2.5"
               style={{
                 height: 50, padding: "0 26px", borderRadius: 99,
-                background: "linear-gradient(180deg, #FBA77B, #E86A3A)",
+                background: "linear-gradient(180deg, var(--primary), var(--primary-hover))",
                 color: "#fff", fontSize: 14, fontWeight: 600, textDecoration: "none",
-                boxShadow: "0 14px 32px -10px rgba(232,106,58,.55)",
+                boxShadow: "0 14px 32px -10px rgba(239,135,89,.55)",
               }}
             >
               Войти <ArrowIcon/>
@@ -651,7 +651,7 @@ function Step4({
         >
           <span style={{
             width: 42, height: 42, borderRadius: 10,
-            background: "linear-gradient(160deg, #F2C8A7, #E89460)",
+            background: "linear-gradient(160deg, var(--brand-soft), var(--primary))",
             flexShrink: 0, display: "inline-block",
           }}/>
           <div style={{ flex: 1, minWidth: 0 }}>

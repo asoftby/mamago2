@@ -30,10 +30,10 @@ const TIER_CONFIG: Record<
   },
   GOLD: {
     label: "Золото",
-    barColor: "bg-[#EF8759]",
-    scoreColor: "text-[#C65D2E]",
-    borderColor: "border-[#EF8759]/30",
-    bgColor: "bg-[#EF8759]/5",
+    barColor: "bg-primary",
+    scoreColor: "text-primary",
+    borderColor: "border-primary/30",
+    bgColor: "bg-primary/5",
   },
 };
 
@@ -42,7 +42,7 @@ const TIER_CONFIG: Record<
 const BADGE_CHIP_CLASS: Record<ReputationBadgeType, string> = {
   FAST_RESPONSE:       "border-emerald-200 bg-emerald-50 text-emerald-700",
   CONFIRMS_MOST:       "border-blue-200 bg-blue-50 text-blue-700",
-  RELIABLE_ORGANIZER:  "border-[#EF8759]/30 bg-[#EF8759]/5 text-[#C65D2E]",
+  RELIABLE_ORGANIZER:  "border-primary/30 bg-primary/5 text-primary",
   ACTIVELY_PROCESSING: "border-violet-200 bg-violet-50 text-violet-700",
 };
 

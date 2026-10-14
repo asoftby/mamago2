@@ -44,7 +44,7 @@ const fieldInputStyle: React.CSSProperties = {
   transition: "border-color .18s, box-shadow .18s",
   fontFamily: "inherit",
 };
-const focusStyle = (el: HTMLElement) => { el.style.borderColor = "#E86A3A"; el.style.boxShadow = "0 0 0 3px rgba(232,106,58,.12)"; };
+const focusStyle = (el: HTMLElement) => { el.style.borderColor = "var(--primary)"; el.style.boxShadow = "0 0 0 3px rgba(239,135,89,.12)"; };
 const blurStyle = (el: HTMLElement) => { el.style.borderColor = "rgba(20,18,16,.10)"; el.style.boxShadow = "none"; };
 
 const FieldInput = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
@@ -68,7 +68,7 @@ function FieldWrap({ label, labelSuffix, error, children }: { label: string; lab
         {label}{labelSuffix && <span style={{ fontSize: 12, color: "rgba(20,18,16,.55)", fontWeight: 400, marginLeft: 4 }}>{labelSuffix}</span>}
       </label>
       {children}
-      {error && <p style={{ margin: 0, fontSize: 12, color: "#C24E22" }}>{error}</p>}
+      {error && <p style={{ margin: 0, fontSize: 12, color: "var(--danger)" }}>{error}</p>}
     </div>
   );
 }
@@ -182,7 +182,7 @@ export function DirectRequestModal({
 
           <div>
             <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontWeight: 400, fontSize: 32, lineHeight: 1, letterSpacing: "-.02em", color: "#141210" }}>
-              Заявка <em style={{ fontStyle: "italic", color: "#C24E22" }}>отправлена</em>!
+              Заявка <em style={{ fontStyle: "italic", color: "var(--primary)" }}>отправлена</em>!
             </h2>
             <p style={{ margin: "10px 0 0", fontSize: 14, color: "rgba(20,18,16,.55)", lineHeight: 1.55, maxWidth: 320 }}>
               Продолжить общение можно в личных сообщениях — {brandName} ответит там же.
@@ -194,8 +194,8 @@ export function DirectRequestModal({
               href={threadHref}
               style={{
                 height: 50, padding: "0 26px", borderRadius: 99, display: "inline-flex", alignItems: "center", gap: 8,
-                background: "linear-gradient(180deg, #FBA77B, #E86A3A)", color: "#fff", fontSize: 15, fontWeight: 600,
-                textDecoration: "none", boxShadow: "0 14px 32px -10px rgba(232,106,58,.55)",
+                background: "linear-gradient(180deg, var(--primary), var(--primary-hover))", color: "#fff", fontSize: 15, fontWeight: 600,
+                textDecoration: "none", boxShadow: "0 14px 32px -10px rgba(239,135,89,.55)",
               }}
             >
               Открыть сообщения <span aria-hidden>→</span>
@@ -218,7 +218,7 @@ export function DirectRequestModal({
       <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#F6F2EA", borderRadius: 24, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 22px 18px", borderBottom: "1px solid rgba(20,18,16,.10)", flexShrink: 0 }}>
           <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontWeight: 400, fontSize: 28, lineHeight: 1, letterSpacing: "-.02em", color: "#141210" }}>
-            Отправить <em style={{ fontStyle: "italic", color: "#C24E22" }}>заявку</em>
+            Отправить <em style={{ fontStyle: "italic", color: "var(--primary)" }}>заявку</em>
           </h2>
           <XBtn onClick={() => handleClose(false)} />
         </div>
@@ -266,12 +266,12 @@ export function DirectRequestModal({
             form="direct-request-form" type="submit" disabled={phase === "submitting"}
             style={{
               width: "100%", height: 56, borderRadius: 99,
-              background: phase === "submitting" ? "rgba(20,18,16,.18)" : "linear-gradient(180deg, #FBA77B, #E86A3A)",
+              background: phase === "submitting" ? "rgba(20,18,16,.18)" : "linear-gradient(180deg, var(--primary), var(--primary-hover))",
               color: phase === "submitting" ? "rgba(20,18,16,.45)" : "#fff",
               fontSize: 15, fontWeight: 600, letterSpacing: ".005em", border: 0,
               cursor: phase === "submitting" ? "default" : "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-              boxShadow: phase === "submitting" ? "none" : "0 18px 40px -12px rgba(232,106,58,.55)",
+              boxShadow: phase === "submitting" ? "none" : "0 18px 40px -12px rgba(239,135,89,.55)",
               fontFamily: "inherit",
             }}
           >

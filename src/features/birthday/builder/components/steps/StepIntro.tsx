@@ -88,8 +88,8 @@ export function StepIntro({ builder, signals }: StepIntroProps) {
                         "rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 ease-out",
                         "active:scale-[0.97]",
                         isSelected
-                          ? "bg-[#EF8759] text-white shadow-sm"
-                          : "border-2 border-border bg-white text-foreground hover:border-[#EF8759]/60 hover:bg-orange-50/50"
+                          ? "bg-primary text-white shadow-sm"
+                          : "border-2 border-border bg-white text-foreground hover:border-primary/60 hover:bg-brand-soft/50"
                       )}
                     >
                       {chipLabelForAgeOption(opt)}

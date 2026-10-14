@@ -66,8 +66,8 @@ export function PartyDurationCapacityFields({
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                   "disabled:cursor-not-allowed disabled:opacity-60",
                   selected
-                    ? "border-[#EF8759] bg-[#EF8759]/10 text-foreground"
-                    : "border-border bg-white text-foreground hover:border-[#EF8759]/70",
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border bg-white text-foreground hover:border-primary/70",
                 )}
               >
                 {duration} мин
@@ -87,8 +87,8 @@ export function PartyDurationCapacityFields({
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               "disabled:cursor-not-allowed disabled:opacity-60",
               isCustom
-                ? "border-[#EF8759] bg-[#EF8759]/10 text-foreground"
-                : "border-border bg-white text-foreground hover:border-[#EF8759]/70",
+                ? "border-primary bg-primary/10 text-foreground"
+                : "border-border bg-white text-foreground hover:border-primary/70",
             )}
           >
             Своя

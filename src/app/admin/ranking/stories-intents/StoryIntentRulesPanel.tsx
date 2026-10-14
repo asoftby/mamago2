@@ -138,7 +138,7 @@ export function StoryIntentRulesPanel() {
                       <button
                         onClick={() => save(intent)}
                         disabled={saving === intent.id}
-                        className="text-xs font-medium text-[#EF8759] hover:text-[#e8784a] disabled:opacity-40 transition-colors"
+                        className="text-xs font-medium text-primary hover:text-primary disabled:opacity-40 transition-colors"
                       >
                         {saving === intent.id ? "..." : "Сохранить"}
                       </button>

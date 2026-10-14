@@ -285,7 +285,7 @@ export function DirectThreadClient({ initialDetail }: Props) {
                 onClick={() => setRatingSubmitted(true)}
                 style={{
                   marginTop: 12, height: 40, padding: "0 20px", borderRadius: 99, border: 0,
-                  background: "#E86A3A", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  background: "var(--primary)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer",
                 }}
               >
                 Отправить оценку

@@ -28,8 +28,8 @@ const TONE_STYLES: Record<
   }
 > = {
   neutral: {
-    badgeClassName: "bg-[#EF8759]/12",
-    iconClassName: "text-[#EF8759]",
+    badgeClassName: "bg-primary/12",
+    iconClassName: "text-primary",
     eyebrowClassName: "text-[#A86143]",
   },
   warning: {
@@ -98,7 +98,7 @@ export function BusinessInviteStatusCard({
                 <Button
                   asChild
                   size="lg"
-                  className="h-12 w-full rounded-full bg-[#EF8759] px-6 text-base font-semibold text-white shadow-[0_14px_34px_rgba(239,135,89,0.28)] hover:bg-[#E7794A] sm:h-[52px]"
+                  className="h-12 w-full rounded-full bg-primary px-6 text-base font-semibold text-white shadow-[0_14px_34px_rgba(239,135,89,0.28)] hover:bg-primary sm:h-[52px]"
                 >
                   <Link href={primaryAction.href}>
                     {primaryAction.label}
@@ -110,7 +110,7 @@ export function BusinessInviteStatusCard({
                   <Button
                     type="submit"
                     size="lg"
-                    className="h-12 w-full rounded-full bg-[#EF8759] px-6 text-base font-semibold text-white shadow-[0_14px_34px_rgba(239,135,89,0.28)] hover:bg-[#E7794A] sm:h-[52px]"
+                    className="h-12 w-full rounded-full bg-primary px-6 text-base font-semibold text-white shadow-[0_14px_34px_rgba(239,135,89,0.28)] hover:bg-primary sm:h-[52px]"
                   >
                     {primaryAction.label}
                     <ArrowRight className="size-4" />

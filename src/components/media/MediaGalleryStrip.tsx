@@ -33,7 +33,7 @@ function Tile({
         "group relative overflow-hidden rounded-[16px] bg-[#E8E0D4]",
         "aspect-square w-full shrink-0",
         "transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF8759]",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
       )}
     >
       {/* Background image */}

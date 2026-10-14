@@ -91,7 +91,7 @@ function EmptySchedule({ onCta }: { onCta?: () => void }) {
       <p className="text-[16px] font-semibold text-gray-700">Расписание и стоимость уточняются</p>
       <p className="mt-1 text-[14px] text-gray-400">Оставьте заявку — мы свяжемся с вами</p>
       <Button
-        className="mt-5 h-11 rounded-full bg-[#EF8759] px-6 text-[14px] font-bold text-white hover:bg-primary-hover"
+        className="mt-5 h-11 rounded-full bg-primary px-6 text-[14px] font-bold text-white hover:bg-primary-hover"
         onClick={onCta}
       >
         Оставить заявку
@@ -189,7 +189,7 @@ function ShiftCard({
           </p>
         ) : null}
         {item.promotionDetails ? (
-          <div className="rounded-2xl border border-[#F2D8CA] bg-[#FFF3EB] px-3 py-2 text-[13px] leading-5 text-[#B5562D]">
+          <div className="rounded-2xl border border-[#F2D8CA] bg-[#FFF3EB] px-3 py-2 text-[13px] leading-5 text-primary">
             {item.promotionDetails}
           </div>
         ) : null}
@@ -255,7 +255,7 @@ function ClassesTable({
                   {item.ctaEnabled !== false && (
                     <Button
                       size="sm"
-                      className="h-9 rounded-full bg-[#EF8759] px-4 text-[13px] font-bold text-white hover:bg-primary-hover"
+                      className="h-9 rounded-full bg-primary px-4 text-[13px] font-bold text-white hover:bg-primary-hover"
                       onClick={() => onItemCta?.(item.id)}
                     >
                       {item.ctaLabel || "Записаться"}
@@ -298,7 +298,7 @@ function ClassesTable({
               {item.ctaEnabled !== false && (
                 <Button
                   size="sm"
-                  className="h-9 rounded-full bg-[#EF8759] px-4 text-[13px] font-bold text-white hover:bg-primary-hover"
+                  className="h-9 rounded-full bg-primary px-4 text-[13px] font-bold text-white hover:bg-primary-hover"
                   onClick={() => onItemCta?.(item.id)}
                 >
                   {item.ctaLabel || "Записаться"}

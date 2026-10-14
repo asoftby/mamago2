@@ -16,11 +16,11 @@ export function Toggle({
   "aria-label": ariaLabel,
 }: ToggleProps) {
   const enabledClass =
-    accent === "green" ? "bg-emerald-500" : "bg-[#EF8759]";
+    accent === "green" ? "bg-emerald-500" : "bg-primary";
   const focusClass =
     accent === "green"
       ? "focus-visible:ring-emerald-500"
-      : "focus-visible:ring-[#EF8759]";
+      : "focus-visible:ring-primary";
 
   return (
     <button

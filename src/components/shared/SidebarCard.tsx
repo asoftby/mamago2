@@ -110,8 +110,8 @@ export function SidebarCardAddressRow({
           height: 32,
           flexShrink: 0,
           borderRadius: 8,
-          background: "#FFE8DC",
-          color: "#C24E22",
+          background: "var(--brand-soft)",
+          color: "var(--primary)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -128,8 +128,8 @@ export function SidebarCardAddressRow({
         )}
         {(district || metro) && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", marginTop: 4, fontSize: 13, color: "#3A332B" }}>
-            {district && <span><span style={{ color: "#E86A3A" }}>●</span> {district} р-н</span>}
-            {metro && <span><span style={{ color: "#E86A3A" }}>●</span> ст. м. «{metro}»</span>}
+            {district && <span><span style={{ color: "var(--primary)" }}>●</span> {district} р-н</span>}
+            {metro && <span><span style={{ color: "var(--primary)" }}>●</span> ст. м. «{metro}»</span>}
           </div>
         )}
       </div>
@@ -271,7 +271,7 @@ export function SidebarCardSave({
     >
       <span
         style={{
-          color: saved ? "#E86A3A" : "inherit",
+          color: saved ? "var(--primary)" : "inherit",
           transform: saved ? "scale(1.15)" : "none",
           transition: "transform .25s",
           display: "inline-block",

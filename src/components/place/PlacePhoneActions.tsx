@@ -42,7 +42,7 @@ export function PlacePhoneList({
           href={phone.href}
           className="block rounded-2xl border border-[#ffd8c4] bg-white/70 px-3 py-2 text-left transition-colors hover:bg-white"
         >
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#C24E22]">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">
             {phone.label}
           </div>
           <div className="mt-1 text-sm font-medium text-neutral-900">{phone.value}</div>

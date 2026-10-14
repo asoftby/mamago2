@@ -27,8 +27,8 @@ export function RequisitesCard({ profile, onEdit }: RequisitesCardProps) {
       <div className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#EF8759]/10 flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-[#EF8759]" />
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-primary" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-stone-950">

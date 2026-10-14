@@ -51,7 +51,7 @@ export function StableCardSelector<T extends string>({
               className={cn(
                 "cursor-pointer transition-all duration-200 hover:shadow-md",
                 isSelected
-                  ? "ring-2 ring-[#EF8759] border-[#EF8759]"
+                  ? "ring-2 ring-primary border-primary"
                   : "hover:border-gray-300",
                 !isEditable && "cursor-default opacity-60"
               )}
@@ -63,7 +63,7 @@ export function StableCardSelector<T extends string>({
                     <Icon 
                       className={cn(
                         "w-6 h-6 mt-1 flex-shrink-0",
-                        isSelected ? "text-[#EF8759]" : "text-gray-600"
+                        isSelected ? "text-primary" : "text-gray-600"
                       )} 
                     />
                   )}
@@ -156,7 +156,7 @@ export function StableCardSelectorSmall<T extends string>({
               className={cn(
                 "cursor-pointer transition-all duration-200",
                 isSelected
-                  ? "ring-2 ring-[#EF8759] border-[#EF8759] bg-orange-50"
+                  ? "ring-2 ring-primary border-primary bg-orange-50"
                   : "hover:border-gray-300",
                 !isEditable && "cursor-default opacity-60"
               )}

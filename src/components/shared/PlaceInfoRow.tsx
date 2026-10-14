@@ -37,7 +37,7 @@ export function PlaceInfoRow({ name, logoUrl, address, district, metro, href }: 
           borderRadius: 99,
           overflow: "hidden",
           flexShrink: 0,
-          background: "#E86A3A",
+          background: "var(--primary)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",

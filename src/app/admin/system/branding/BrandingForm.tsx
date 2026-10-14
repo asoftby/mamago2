@@ -569,7 +569,7 @@ export function BrandingForm({ initial }: { initial: BrandingConfig }) {
       <button
         onClick={handleSave}
         disabled={saving}
-        className="h-10 px-6 rounded-2xl bg-[#EF8759] text-white text-sm font-semibold hover:bg-[#e8784a] disabled:opacity-40 transition-colors flex items-center gap-2"
+        className="h-10 px-6 rounded-2xl bg-primary text-white text-sm font-semibold hover:bg-primary disabled:opacity-40 transition-colors flex items-center gap-2"
       >
         {saving && <Loader2 className="h-4 w-4 animate-spin" />}
         {saving ? "Сохранение..." : "Сохранить"}

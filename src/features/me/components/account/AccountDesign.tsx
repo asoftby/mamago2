@@ -462,7 +462,7 @@ const CSS = `
   --bg:#ffffff; --paper:#FAF7F1; --ink:#141210;
   --ink-2:#3A332B; --ink-3:rgba(20,18,16,.55);
   --line:rgba(20,18,16,.10); --line-2:rgba(20,18,16,.18);
-  --accent:#E86A3A; --accent-deep:#C24E22; --accent-soft:#FFE8DC;
+  --accent:var(--primary); --accent-deep:var(--primary); --accent-soft:var(--brand-soft);
   --ok:#1F8A5B; --ok-bg:rgba(31,138,91,.10);
   --warn:#854F0B; --warn-bg:rgba(133,79,11,.10);
   --hot:#D6342B;

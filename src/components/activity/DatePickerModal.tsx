@@ -41,7 +41,7 @@ const C = {
   bg:       "#F5F0EA",
   card:     "#FFFFFF",
   dark:     "#1A1410",
-  orange:   "#E07A4E",
+  orange:   "var(--primary)",
   text:     "#1A1410",
   textSec:  "#9A8E84",
   border:   "#E8E0D4",

@@ -549,7 +549,7 @@ function StopEditor({
                     )}
                   />
                   {titleError ? (
-                    <p className="text-xs text-[#ef8855] mt-1.5 px-1">
+                    <p className="text-xs text-primary mt-1.5 px-1">
                       Добавьте название точки — без него маршрут нельзя опубликовать
                     </p>
                   ) : (
@@ -575,7 +575,7 @@ function StopEditor({
                   )}
                 />
                 {noteError && (
-                  <p className="text-xs text-[#ef8855] mt-1 px-1">
+                  <p className="text-xs text-primary mt-1 px-1">
                     Добавьте комментарий к точке
                   </p>
                 )}
@@ -851,7 +851,7 @@ function Step3({
         </Button>
       </div>
       {!canPublish && (
-        <p className="text-xs text-[#ef8855] text-center -mt-2">
+        <p className="text-xs text-primary text-center -mt-2">
           У некоторых точек не заполнено название — вернитесь назад и добавьте
           его (поле подсвечено).
         </p>

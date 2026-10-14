@@ -177,7 +177,7 @@ export function EventApplyPanel({
               <button
                 onClick={handleApply}
                 disabled={loading}
-                className="w-full rounded-xl px-5 py-3.5 text-sm font-semibold text-white bg-[#EF8759] hover:bg-[#e97b49] disabled:opacity-50 disabled:cursor-not-allowed transition-colors sm:w-auto"
+                className="w-full rounded-xl px-5 py-3.5 text-sm font-semibold text-white bg-primary hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors sm:w-auto"
               >
                 {loading ? "Добавляем…" : "Добавить в каталог"}
               </button>
@@ -204,7 +204,7 @@ export function EventApplyPanel({
                   type="button"
                   onClick={() => void handleModeration("APPROVE")}
                   disabled={moderationLoading !== null}
-                  className="w-full rounded-xl px-5 py-3.5 text-sm font-semibold text-white bg-[#EF8759] hover:bg-[#e97b49] disabled:opacity-50 disabled:cursor-not-allowed transition-colors sm:w-auto inline-flex items-center justify-center gap-2"
+                  className="w-full rounded-xl px-5 py-3.5 text-sm font-semibold text-white bg-primary hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors sm:w-auto inline-flex items-center justify-center gap-2"
                 >
                   {moderationLoading === "APPROVE" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   Опубликовать

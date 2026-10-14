@@ -12,8 +12,8 @@ export function RequisitesEmptyState({
   return (
     <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center shadow-sm">
       {/* Icon */}
-      <div className="w-16 h-16 rounded-2xl bg-[#EF8759]/10 flex items-center justify-center mx-auto mb-6">
-        <Building2 className="w-8 h-8 text-[#EF8759]" />
+      <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
+        <Building2 className="w-8 h-8 text-primary" />
       </div>
 
       {/* Title */}
@@ -68,7 +68,7 @@ export function RequisitesEmptyState({
       {/* CTA */}
       <button
         onClick={onFillRequisites}
-        className="inline-flex items-center gap-2 px-6 py-3 bg-[#EF8759] text-white text-sm font-medium rounded-xl hover:bg-[#EF8759]/90 transition-colors shadow-sm"
+        className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors shadow-sm"
       >
         <FileText className="w-4 h-4" />
         Заполнить реквизиты

@@ -90,7 +90,7 @@ export function BillingTabs() {
                 border-b-2 transition-colors whitespace-nowrap
                 ${
                   active
-                    ? "border-[#EF8759] text-[#EF8759]"
+                    ? "border-primary text-primary"
                     : "border-transparent text-stone-600 hover:text-stone-900 hover:border-stone-300"
                 }
               `}

@@ -21,18 +21,18 @@ function buildMapHtml(lat: number, lng: number): string {
   .pin-wrap{position:relative;width:48px;height:48px;display:flex;align-items:center;justify-content:center}
   .pin-ring{
     position:absolute;inset:0;border-radius:50%;
-    background:rgba(232,106,58,0.18);
+    background:rgba(239,135,89,0.18);
     animation:pulse-ring 2s ease-out infinite;
   }
   .pin-ring2{
     position:absolute;inset:8px;border-radius:50%;
-    background:rgba(232,106,58,0.28);
+    background:rgba(239,135,89,0.28);
     animation:pulse-ring 2s ease-out infinite 0.4s;
   }
   .pin-dot{
     width:16px;height:16px;border-radius:50%;
-    background:#E86A3A;
-    box-shadow:0 0 0 3px #fff,0 2px 10px rgba(232,106,58,0.55);
+    background:var(--primary);
+    box-shadow:0 0 0 3px #fff,0 2px 10px rgba(239,135,89,0.55);
     position:relative;z-index:1;
   }
   @keyframes pulse-ring{
@@ -182,7 +182,7 @@ export function LocationBlock({
                   borderRadius: 99,
                   overflow: "hidden",
                   flexShrink: 0,
-                  background: "#E86A3A",
+                  background: "var(--primary)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
