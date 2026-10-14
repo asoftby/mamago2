@@ -48,11 +48,11 @@ export function RouteCard({ route, className, analyticsCitySlug = "minsk" }: Pro
         action: { label: "Открыть план", onClick: () => router.push("/?myPlan=open") },
       });
     } else if (result.action === "ideas") {
-      const res = await fetch("/api/save/idea", {
+      const res = await fetch("/api/ideas/routes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ activityId: route.id }),
+        body: JSON.stringify({ routeId: route.id, routeSlug: route.slug }),
       });
       if (!res.ok) throw new Error("idea_save_failed");
       toast.success("Маршрут сохранён в идеи");
