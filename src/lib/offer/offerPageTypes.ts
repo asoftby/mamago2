@@ -189,6 +189,9 @@ export interface OfferPageData {
     instructions?: string;
   };
   resolvedCta?: CanonicalCtaObject;
+  /** Explicit no-booking/invalid external mode: do not render misleading CTAs. */
+  hasPrimaryAction?: boolean;
+  openingHours?: { lines: string[]; closedDates: string[] };
 
   schedule?: {
     type: "classes" | "shifts";

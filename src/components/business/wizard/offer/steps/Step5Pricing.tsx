@@ -31,6 +31,8 @@ interface Step5PricingProps {
   onChange: (updates: Partial<OfferFormData>) => void;
   isEditable: boolean;
   ctaStepEnabled?: boolean;
+  /** Новый мастер: способ записи выбирается на шаге «Расписание», здесь блока CTA нет. */
+  hideCta?: boolean;
 }
 
 function getPublicationAccessFromOffer(data: OfferFormData): PublicationAccess {
@@ -129,6 +131,7 @@ export function Step5Pricing({
   onChange,
   isEditable,
   ctaStepEnabled,
+  hideCta = false,
 }: Step5PricingProps) {
   const publicationAccess = useMemo(
     () => getPublicationAccessFromOffer(data),
@@ -153,6 +156,14 @@ export function Step5Pricing({
       }),
     );
   };
+
+  if (data.offerWizardType === "CAMP" && hideCta) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Цена лагеря задаётся в сменах — на шаге «Расписание».
+      </p>
+    );
+  }
 
   if (data.offerWizardType === "CAMP") {
     if (ctaRenderMode === "shared") {
@@ -528,7 +539,7 @@ export function Step5Pricing({
         </div>
       )}
 
-      {ctaRenderMode === "shared" ? (
+      {hideCta ? null : ctaRenderMode === "shared" ? (
         <CtaStep
           value={ctaStepValue}
           source={{

@@ -17,6 +17,16 @@ import {
 } from "@/lib/offers/offer-types/details-schemas";
 import type { PublicationAccess } from "@/features/publication-access";
 import {
+  bookingMethodFromColumns,
+  buildScheduleInput,
+  buildChangedScheduleInput,
+  defaultOfferHours,
+  defaultOfferSchedule,
+  normalizeClosedDates,
+  type OfferScheduleForm,
+} from "@/lib/offers/offerSchedule";
+import type { OpeningHoursData } from "@/components/openingHours/openingHours.types";
+import {
   createExcerpt,
   normalizeRichTextEditorValue,
   plainTextToRichTextHtml,
@@ -607,6 +617,8 @@ export function buildOfferCreatePayload(
     wizardCompletedSteps?: string[];
     /** Идемпотентность create: повтор запроса с тем же id не создаёт дубль */
     createRequestId?: string;
+    /** Новый мастер: отправлять шаг «Расписание». Старый мастер расписание не трогает. */
+    includeSchedule?: boolean;
   }
 ) {
   if (!data.placeId) {
@@ -685,6 +697,7 @@ export function buildOfferCreatePayload(
     classChipSlugs: data.classChipSlugs,
     categoryIds: data.categoryIds,
     interestSlugs: data.interestSlugs,
+    ...(opts?.includeSchedule ? { schedule: buildScheduleInput(data.schedule, productType) } : {}),
     wizardCompletedSteps: opts?.wizardCompletedSteps,
     faqItems: normalizeFaqItems(data.faqItems),
     status: opts?.status ?? "DRAFT",
@@ -819,6 +832,9 @@ export function buildOfferUpdatePayload(
   opts?: {
     status?: "DRAFT" | "PENDING" | "PUBLISHED";
     wizardCompletedSteps?: string[];
+    /** Новый мастер: отправлять шаг «Расписание». Старый мастер расписание не трогает. */
+    includeSchedule?: boolean;
+    previousSchedule?: OfferScheduleForm;
   }
 ) {
   const pricingMode = data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
@@ -891,6 +907,9 @@ export function buildOfferUpdatePayload(
     classChipSlugs: data.classChipSlugs,
     categoryIds: data.categoryIds,
     interestSlugs: data.interestSlugs,
+    ...(opts?.includeSchedule ? { schedule: opts.previousSchedule
+      ? buildChangedScheduleInput(data.schedule, opts.previousSchedule, productType)
+      : buildScheduleInput(data.schedule, productType) } : {}),
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
@@ -912,6 +931,65 @@ export function buildOfferUpdatePayload(
   }
 
   return payload;
+}
+
+type OfferOpeningHoursRow = {
+  mode: OpeningHoursData["mode"];
+  timezone?: string | null;
+  note?: string | null;
+  rules: Array<{
+    dayOfWeek: OpeningHoursData["rules"][number]["dayOfWeek"];
+    isOpen: boolean;
+    allDay: boolean;
+    intervals: Array<{ startTime: string; endTime: string; sortOrder?: number }>;
+  }>;
+  exceptions?: Array<{ date: string; isClosed: boolean; allDay: boolean }>;
+};
+
+/** Расписание формы из строки оффера. Прежние режимы записи остаются как есть (`legacyBookingMode`). */
+function scheduleFromOffer(offer: {
+  bookingEnabled?: boolean | null;
+  bookingMode?: string | null;
+  inheritPlaceOpeningHours?: boolean | null;
+  openingHours?: OfferOpeningHoursRow | null;
+  offerBooking?: { externalKind?: "WEBSITE" | "TICKETS" | null; externalUrl?: string | null } | null;
+}): OfferScheduleForm {
+  const base = defaultOfferSchedule();
+  const { method, legacy } = bookingMethodFromColumns(offer);
+  const own = offer.openingHours ?? null;
+  const hours: OpeningHoursData = own
+    ? {
+        mode: own.mode,
+        timezone: own.timezone || "Europe/Minsk",
+        note: own.note || undefined,
+        rules: defaultOfferHours().rules.map((empty) => {
+          const rule = own.rules.find((item) => item.dayOfWeek === empty.dayOfWeek);
+          return rule
+            ? {
+                dayOfWeek: rule.dayOfWeek,
+                isOpen: rule.isOpen,
+                allDay: rule.allDay,
+                intervals: [...rule.intervals]
+                  .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                  .map(({ startTime, endTime }) => ({ startTime, endTime })),
+              }
+            : empty;
+        }),
+      }
+    : base.hours;
+  return {
+    ...base,
+    bookingMethod: method,
+    legacyBookingMode: legacy,
+    externalKind: offer.offerBooking?.externalKind ?? "WEBSITE",
+    externalUrl: offer.offerBooking?.externalUrl ?? "",
+    // Свой график — только если оффер его не наследует от места и он реально есть.
+    hoursSource: own && offer.inheritPlaceOpeningHours === false ? "own" : "place",
+    hours,
+    closedDates: normalizeClosedDates(
+      (own?.exceptions ?? []).filter((item) => item.isClosed && item.allDay).map((item) => item.date),
+    ),
+  };
 }
 
 /** Map Prisma offer row to wizard form (fields stored in DB only). */
@@ -974,6 +1052,9 @@ export function mapOfferToFormData(offer: {
   bookingMode?: "NONE" | "REQUEST_ONLY" | "EXTERNAL" | "USE_PUBLICATION_DATES" | "USE_PUBLICATION_SLOTS" | null;
   bookingPhone?: string | null;
   bookingNote?: string | null;
+  inheritPlaceOpeningHours?: boolean | null;
+  openingHours?: OfferOpeningHoursRow | null;
+  offerBooking?: { externalKind?: "WEBSITE" | "TICKETS" | null; externalUrl?: string | null } | null;
   contactSocialLinks?: unknown;
   details?: unknown;
   // Phase 3b-1 party-filter columns (PARTY_SERVICE canon)
@@ -1130,6 +1211,7 @@ export function mapOfferToFormData(offer: {
     signalIds: offer.discoverySignalIds ?? [],
     classChipSlugs: offer.classChipSlugs ?? [],
     interestSlugs: offer.interestSlugs ?? [],
+    schedule: scheduleFromOffer(offer),
     categoryIds: [...(offer.categoryLinks ?? [])]
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((link) => link.categoryId),

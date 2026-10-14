@@ -4,6 +4,7 @@
 import type { PartyCategory, PartyOccasion } from "@prisma/client";
 import type { PublicationAccess } from "@/features/publication-access";
 import type { FaqItem } from "@/lib/faq/faqItems";
+import type { OfferScheduleForm } from "@/lib/offers/offerSchedule";
 
 export type { PartyCategory, PartyOccasion };
 
@@ -79,6 +80,9 @@ export type OfferWizardStepKey =
   | "services"
   | "schedule"
   | "terms"
+  // Блоки внутри составных шагов нового мастера (самостоятельными шагами не бывают)
+  | "openingHours"
+  | "bookingMethod"
   | "review";
 
 /** Вариант мастера: v1 — текущий, v2 — новый мастер из 6 шагов за флагом. */
@@ -204,6 +208,8 @@ export interface OfferFormData {
   categoryIds: string[];
   /** Интересы ребёнка (до 5): slug из SYSTEM_INTERESTS. */
   interestSlugs: string[];
+  /** Шаг «Расписание» нового мастера: способ записи, режим работы, закрытые дни. */
+  schedule: OfferScheduleForm;
   
   // PLACE_VISIT type-specific details (written to Offer.details JSON)
   placeVisitDetails: {

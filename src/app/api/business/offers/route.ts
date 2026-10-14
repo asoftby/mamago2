@@ -32,6 +32,13 @@ import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { formatZodErrorResponse } from "@/lib/validation/zodErrorResponse";
 import { shouldRejectUnlinkedPlaceForOfferMutation } from "@/lib/offers/offerLinkedBusinessAccess";
 import { notifyAdminsPublicationSubmitted } from "@/server/services/notification.service";
+import { offerScheduleInputSchema } from "@/lib/offers/offerSchedule";
+import {
+  OfferScheduleValidationError,
+  applyOfferSchedule,
+  assertScheduleValid,
+  scheduleOfferColumns,
+} from "@/server/offers/offerSchedule.service";
 
 const offerProductTypeSchema = z.enum([
   "PLACE_VISIT",
@@ -125,6 +132,8 @@ const createOfferSchema = z.object({
   requestedPlacements: z.array(offerPlacementKeySchema).optional(),
   /** Type-specific display details (Offer.details JSONB). Validated per productType client-side. */
   details: z.record(z.string(), z.unknown()).optional(),
+  /** Шаг «Расписание» нового мастера: способ записи, режим работы, закрытые дни. */
+  schedule: offerScheduleInputSchema.optional(),
   // PARTY_SERVICE filterable columns (Phase 3b-2)
   category: partyCategorySchema.nullable().optional(),
   partyLocationType: partyLocationTypeSchema.nullable().optional(),
@@ -346,6 +355,8 @@ export async function POST(request: NextRequest) {
         priceText = formatPriceFrom(priceFrom);
       }
 
+      assertScheduleValid(data.schedule);
+
       const offer = await prisma.$transaction(async (tx) => {
         const createdOffer = await tx.offer.create({
           data: {
@@ -362,6 +373,7 @@ export async function POST(request: NextRequest) {
             contactPhone3Label: data.contactPhone3Label,
             contactWebsite: data.contactWebsite,
             contactSocialLinks: data.contactSocialLinks as Prisma.InputJsonValue | undefined,
+            ...scheduleOfferColumns(data.schedule),
             title: data.title,
             // Основное описание (rich text) — в Offer.description; краткое — только если полного нет.
             description: data.description?.trim() ? data.description : data.shortDescription,
@@ -447,6 +459,13 @@ export async function POST(request: NextRequest) {
             categoryIds: data.categoryIds,
           });
         }
+
+        await applyOfferSchedule({
+          db: tx,
+          offerId: createdOffer.id,
+          input: data.schedule,
+          externalUrlNeedsModeration: false,
+        });
 
         // CAMP: project campSessions JSON (canon) into queryable OfferSession rows
         if (data.campProgramType) {
@@ -540,6 +559,10 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 },
       );
+    }
+
+    if (error instanceof OfferScheduleValidationError) {
+      return NextResponse.json({ error: error.message, code: "INVALID_OFFER_SCHEDULE" }, { status: 400 });
     }
 
     if (error instanceof z.ZodError) {

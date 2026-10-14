@@ -26,6 +26,8 @@ interface GetOfferPageDataParams {
 }
 
 const offerPageInclude = {
+  offerBooking: { select: { externalKind: true, externalUrl: true } },
+  openingHours: { include: { rules: { include: { intervals: true } }, exceptions: true } },
   place: {
     include: {
       city: true,
@@ -33,6 +35,7 @@ const offerPageInclude = {
       districtAuto: true,
       metroManual: true,
       metroAuto: true,
+      openingHours: { include: { rules: { include: { intervals: true } }, exceptions: true } },
       images: {
         select: { id: true, url: true, kind: true },
         orderBy: { sortOrder: "asc" as const },
@@ -330,7 +333,8 @@ async function buildOfferPageDataFromOffer(
   const scheduleItems: OfferScheduleItem[] = campSessionsRaw
     .map((session, index) => parseCampSession(session, index))
     .filter((session): session is OfferScheduleItem => session !== null)
-    .map((item) => ({ ...item, price: item.price ?? fallbackShiftPrice }));
+    .map((item) => ({ ...item, price: item.price ?? fallbackShiftPrice,
+      ctaEnabled: offer.bookingMode === "NONE" ? false : item.ctaEnabled }));
 
   // Map pricing
   const pricingMode = effectivePriceFrom != null ? "single" : "multiple";
@@ -381,11 +385,43 @@ async function buildOfferPageDataFromOffer(
     metaGrid.push({ id: "group", label: "Группа", value: `До ${offer.campGroupSize} человек` });
   }
 
+  // Effective schedule: own rules when selected, otherwise use the place's hours.
+  const effectiveHours = offer.inheritPlaceOpeningHours
+    ? offer.place?.openingHours
+    : offer.openingHours;
+  const dayNames: Record<string, string> = {
+    MON: "Пн", TUE: "Вт", WED: "Ср", THU: "Чт", FRI: "Пт", SAT: "Сб", SUN: "Вс",
+  };
+  const hoursLines = effectiveHours?.mode === "WEEKLY"
+    ? [...effectiveHours.rules]
+        .filter((rule) => rule.isOpen)
+        .sort((a, b) => Object.keys(dayNames).indexOf(a.dayOfWeek) - Object.keys(dayNames).indexOf(b.dayOfWeek))
+        .map((rule) => `${dayNames[rule.dayOfWeek]}: ${rule.allDay
+          ? "круглосуточно"
+          : [...rule.intervals].sort((a, b) => a.sortOrder - b.sortOrder).map((interval) => `${interval.startTime}–${interval.endTime}`).join(", ")}`)
+    : effectiveHours
+      ? [effectiveHours.mode === "ALWAYS_OPEN" ? "Круглосуточно"
+        : effectiveHours.mode === "BY_APPOINTMENT" ? "По предварительной записи"
+        : effectiveHours.note || "Временно закрыто"]
+      : [];
+  const openingHours = effectiveHours ? {
+    lines: hoursLines.length ? hoursLines : ["Нет рабочих дней"],
+    closedDates: effectiveHours.exceptions
+      .filter((exception) => exception.isClosed && exception.allDay)
+      .map((exception) => exception.date)
+      .sort(),
+  } : undefined;
+
   // Map CTA based on bookingMode or kind
   let ctaType: OfferCtaType = "отправить_заявку";
   let primaryLabel = "Оставить заявку";
   
-  if (offer.bookingEnabled && offer.bookingMode) {
+  if (offer.bookingMode === "EXTERNAL") {
+    ctaType = offer.offerBooking?.externalKind === "TICKETS" ? "купить_билет" : "записаться";
+    primaryLabel = offer.offerBooking?.externalKind === "TICKETS" ? "Купить билет" : "Записаться";
+  } else if (offer.bookingMode === "NONE") {
+    primaryLabel = "";
+  } else if (offer.bookingEnabled && offer.bookingMode) {
     switch (offer.bookingMode) {
       case "REQUEST_ONLY":
         ctaType = "записаться";
@@ -424,7 +460,9 @@ async function buildOfferPageDataFromOffer(
       secondaryLabel: "В план",
       phone: phones[0]?.value,
       phones,
-      link: offer.contactWebsite || offer.place?.website || undefined,
+      link: offer.bookingMode === "EXTERNAL"
+        ? offer.offerBooking?.externalUrl || undefined
+        : offer.bookingMode === "NONE" ? undefined : offer.contactWebsite || offer.place?.website || undefined,
       instructions: offer.bookingNote || undefined,
     };
   })();
@@ -448,6 +486,9 @@ async function buildOfferPageDataFromOffer(
     },
     
     metaGrid,
+    openingHours,
+    hasPrimaryAction: offer.bookingMode !== "NONE" &&
+      (offer.bookingMode !== "EXTERNAL" || Boolean(offer.offerBooking?.externalUrl)),
     
     pricing: {
       priceMode: offer.priceMode,
@@ -549,6 +590,8 @@ async function buildOfferPageDataFromOffer(
         ctaInstructions: cta.instructions,
         bookingEnabled: offer.bookingEnabled,
         bookingMode: offer.bookingMode,
+        bookingExternalUrl: offer.offerBooking?.externalUrl,
+        bookingExternalKind: offer.offerBooking?.externalKind,
         bookingPhone: offer.bookingPhone,
         bookingNote: offer.bookingNote,
       },

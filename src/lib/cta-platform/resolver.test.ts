@@ -192,3 +192,13 @@ const discoverStrategy = resolveExecutionStrategy(
 assert.equal(discoverStrategy.kind, "NO_RUNTIME");
 
 console.log("cta platform resolver tests: OK");
+
+const noBooking = OfferCtaAdapter.toCanonical({ id: "no-booking", bookingMode: "NONE", bookingEnabled: false, ctaType: "записаться" });
+assert.equal(noBooking.actionKind, "DISCOVER");
+assert.equal(noBooking.availability, "UNAVAILABLE");
+const externalBooking = OfferCtaAdapter.toCanonical({ id: "external-booking", bookingMode: "EXTERNAL", bookingEnabled: false, bookingExternalKind: "TICKETS", bookingExternalUrl: "https://tickets.example.by/offer" });
+assert.equal(externalBooking.actionKind, "EXTERNAL");
+assert.equal(externalBooking.externalTarget?.href, "https://tickets.example.by/offer");
+assert.equal(externalBooking.primaryLabel, "Купить билет");
+const brokenExternal = OfferCtaAdapter.toCanonical({ id: "broken-external", bookingMode: "EXTERNAL", bookingEnabled: false });
+assert.equal(brokenExternal.availability, "UNAVAILABLE");

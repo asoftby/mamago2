@@ -87,8 +87,10 @@ export function getV2StepMembers(
     case "services":
       return ["price"];
     case "schedule":
-      if (isCamp) return ["campSchedule", "accommodation"];
-      return isParty ? [] : ["conditions"];
+      if (isCamp) return ["campSchedule", "accommodation", "bookingMethod"];
+      return isParty
+        ? ["openingHours", "bookingMethod"]
+        : ["conditions", "openingHours", "bookingMethod"];
     case "terms":
       return ["contacts"];
     default:

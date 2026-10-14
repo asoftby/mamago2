@@ -18,6 +18,7 @@ import type {
 import { validatePublicationAccess } from "@/features/publication-access";
 import { showCampLodgingFormFields } from "./campOfferModel";
 import { isOfferContactsComplete } from "./contacts";
+import { getScheduleMissingFields } from "@/lib/offers/offerSchedule";
 import {
   type OfferWizardStepDef,
   V2_STEPS,
@@ -161,6 +162,8 @@ export function getStepsForOfferType(
     services: v2StepDefWithoutKey("services"),
     schedule: v2StepDefWithoutKey("schedule"),
     terms: v2StepDefWithoutKey("terms"),
+    openingHours: v2StepDefWithoutKey("schedule"),
+    bookingMethod: v2StepDefWithoutKey("schedule"),
   };
 
   let stepKeys: OfferWizardStepKey[] = [];
@@ -403,6 +406,9 @@ export function isStepComplete(
 
         if (!hasValidPricing) return false;
 
+        // Новый мастер: способ записи выбирается на шаге «Расписание».
+        if (variant === "v2") return true;
+
         if (data.publicationAccess) {
           return validatePublicationAccess(data.publicationAccess).valid;
         }
@@ -449,6 +455,14 @@ export function isStepComplete(
 
     case "contacts":
       return isOfferContactsComplete(data);
+
+    case "openingHours":
+      return !getScheduleMissingFields(data.schedule, data.productType).includes("Дни работы");
+
+    case "bookingMethod":
+      return !getScheduleMissingFields(data.schedule, data.productType).some(
+        (field) => field === "Способ записи" || field === "Ссылка для записи",
+      );
 
     case "faq":
       return true;
@@ -568,6 +582,16 @@ export function getMissingFieldsForStep(
       if (!data.placeId) missing.push("Место для предложения");
       break;
 
+    case "openingHours":
+      missing.push(...getScheduleMissingFields(data.schedule, data.productType).filter((field) => field === "Дни работы"));
+      break;
+
+    case "bookingMethod":
+      missing.push(
+        ...getScheduleMissingFields(data.schedule, data.productType).filter((field) => field !== "Дни работы"),
+      );
+      break;
+
     case "price":
       if (data.offerWizardType !== "CAMP") {
         if (!data.pricingMode) {
@@ -578,7 +602,9 @@ export function getMissingFieldsForStep(
           missing.push("Варианты цен");
         }
       }
-      if (data.publicationAccess) {
+      if (variant === "v2") {
+        // способ записи — на шаге «Расписание»
+      } else if (data.publicationAccess) {
         const validation = validatePublicationAccess(data.publicationAccess);
         missing.push(...Object.values(validation.errors));
       } else if (!data.ctaType) {

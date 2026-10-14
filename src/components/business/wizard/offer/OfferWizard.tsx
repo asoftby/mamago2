@@ -53,6 +53,8 @@ import {
 } from "./mappers";
 
 import { Step8Review } from "./steps/Step8Review";
+import { StepOpeningHours } from "./steps/StepOpeningHours";
+import { StepBookingMethod } from "./steps/StepBookingMethod";
 import { Step4CampSchedule } from "./steps/Step4CampSchedule";
 import { Step5Accommodation } from "./steps/Step5Accommodation";
 import { campImpliesLodging } from "./campOfferModel";
@@ -400,6 +402,11 @@ export function OfferWizard({
   );
   const formJson = useMemo(() => JSON.stringify(formData), [formData]);
   const isDirty = formJson !== baselineFormJson;
+  // Do not resend all related hours/exceptions when editing an unrelated field.
+  // The original schedule is tracked separately from the overall form dirty flag.
+  const scheduleChanged = mode !== "edit" ||
+    JSON.stringify(formData.schedule) !==
+    JSON.stringify((JSON.parse(baselineFormJson) as OfferFormData).schedule);
 
   /** Версия операционных данных, на которой построена форма; обновляется из ответа каждого PATCH. */
   const [operationalVersion, setOperationalVersion] = useState<string | undefined>(initialOperationalVersion);
@@ -584,6 +591,8 @@ export function OfferWizard({
         const payload = buildOfferUpdatePayload(formData, {
           ...(mode === "edit" && canDirectPublish ? { status: "PUBLISHED" as const } : {}),
           wizardCompletedSteps: completedSteps,
+          includeSchedule: variant === "v2" && scheduleChanged,
+          previousSchedule: (JSON.parse(baselineFormJson) as OfferFormData).schedule,
         });
         const response = await fetch(`/api/business/offers/${offerId}`, {
           method: "PATCH",
@@ -619,6 +628,7 @@ export function OfferWizard({
           status: "DRAFT",
           wizardCompletedSteps: completedSteps,
           createRequestId: draft.createRequestId,
+          includeSchedule: variant === "v2" && scheduleChanged,
         });
         const response = await fetch("/api/business/offers", {
           method: "POST",
@@ -706,6 +716,7 @@ export function OfferWizard({
           status: finalStatus,
           wizardCompletedSteps: completedSteps,
           createRequestId: draft.createRequestId,
+          includeSchedule: variant === "v2" && scheduleChanged,
         });
         const createResponse = await fetch("/api/business/offers", {
           method: "POST",
@@ -743,6 +754,8 @@ export function OfferWizard({
       const updatePayload = buildOfferUpdatePayload(formData, {
         status: canDirectPublish ? "PUBLISHED" : "PENDING",
         wizardCompletedSteps: completedSteps,
+        includeSchedule: variant === "v2" && scheduleChanged,
+        previousSchedule: (JSON.parse(baselineFormJson) as OfferFormData).schedule,
       });
       const response = await fetch(`/api/business/offers/${offerId}`, {
         method: "PATCH",
@@ -837,7 +850,16 @@ export function OfferWizard({
         case "accommodation":
           return <Step5Accommodation {...commonProps} />;
         case "price":
-          return <Step5Pricing {...commonProps} />;
+          return <Step5Pricing {...commonProps} hideCta={variant === "v2"} />;
+        case "openingHours":
+          return <StepOpeningHours {...commonProps} />;
+        case "bookingMethod":
+          return (
+            <StepBookingMethod
+              {...commonProps}
+              externalUrlLocked={isPublishedEditMode && !canPublishContentDirectly(userRole)}
+            />
+          );
         case "contacts":
           return <Step6Contacts {...commonProps} />;
         case "faq":

@@ -21,9 +21,18 @@ const V2_KEYS = ["type", "about", "services", "schedule", "terms", "review"];
   const base = getDefaultFormData(null);
   assert.deepEqual(getV2StepMembers("about", { ...base, productType: "ONE_TIME_ACTIVITY" }), ["details", "photo"]);
   assert.deepEqual(getV2StepMembers("about", { ...base, productType: "PARTY_PACKAGE" }), ["placements", "details", "photo"]);
-  assert.deepEqual(getV2StepMembers("schedule", { ...base, offerWizardType: "CAMP" }), ["campSchedule", "accommodation"]);
-  assert.deepEqual(getV2StepMembers("schedule", { ...base, productType: "PARTY_SERVICE" }), []);
-  assert.deepEqual(getV2StepMembers("schedule", { ...base, productType: "REGULAR_ACTIVITY" }), ["conditions"]);
+  assert.deepEqual(getV2StepMembers("schedule", { ...base, offerWizardType: "CAMP" }), ["campSchedule", "accommodation", "bookingMethod"]);
+  assert.deepEqual(getV2StepMembers("schedule", { ...base, productType: "PARTY_SERVICE" }), ["openingHours", "bookingMethod"]);
+  assert.deepEqual(getV2StepMembers("schedule", { ...base, productType: "REGULAR_ACTIVITY" }), [
+    "conditions",
+    "openingHours",
+    "bookingMethod",
+  ]);
+  assert.deepEqual(getV2StepMembers("schedule", { ...base, productType: "PLACE_VISIT" }), [
+    "conditions",
+    "openingHours",
+    "bookingMethod",
+  ]);
   assert.deepEqual(getV2StepMembers("services", base), ["price"]);
   assert.deepEqual(getV2StepMembers("terms", base), ["contacts"]);
 }
