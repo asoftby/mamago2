@@ -147,7 +147,7 @@ function normalizeDateEnd(date: Date) {
 function buildOrdersWhere(filters: Omit<AdminOrdersFilters, "page" | "limit" | "status"> & {
   status?: BookingStatus;
 }): Prisma.BookingRequestWhereInput {
-  const and: Prisma.BookingRequestWhereInput[] = [];
+  const and: Prisma.BookingRequestWhereInput[] = [{ kind: "STANDARD" }];
 
   if (filters.status) {
     and.push({ status: filters.status });
@@ -245,8 +245,8 @@ function mapAdminOrder(
     createdAt: booking.createdAt.toISOString(),
     updatedAt: booking.updatedAt.toISOString(),
     status: booking.status,
-    customerName: booking.customerName,
-    customerPhone: booking.customerPhone,
+    customerName: booking.customerName ?? "",
+    customerPhone: booking.customerPhone ?? "",
     customerEmail: booking.customerEmail,
     business: {
       id: booking.business.id,
@@ -381,11 +381,12 @@ export async function getAdminOrders(
   });
   const countsWhere = buildOrdersWhere(baseFilters);
 
-  const [rows, total, newCount, confirmedCount, rejectedCount, cancelledCount, completedCount] =
+  const [rows, total, newCount, expiredCount, confirmedCount, rejectedCount, cancelledCount, completedCount] =
     await prisma.$transaction([
     fetchAdminOrdersRows({ where, skip, take: limit }),
     prisma.bookingRequest.count({ where }),
     prisma.bookingRequest.count({ where: { ...countsWhere, status: "NEW" } }),
+    prisma.bookingRequest.count({ where: { ...countsWhere, status: "EXPIRED" } }),
     prisma.bookingRequest.count({ where: { ...countsWhere, status: "CONFIRMED" } }),
     prisma.bookingRequest.count({ where: { ...countsWhere, status: "REJECTED" } }),
     prisma.bookingRequest.count({ where: { ...countsWhere, status: "CANCELLED" } }),
@@ -400,6 +401,7 @@ export async function getAdminOrders(
     totalPages: Math.max(1, Math.ceil(total / limit)),
     statusCounts: {
       NEW: newCount,
+      EXPIRED: expiredCount,
       CONFIRMED: confirmedCount,
       REJECTED: rejectedCount,
       CANCELLED: cancelledCount,

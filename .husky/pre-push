@@ -23,4 +23,4 @@ if [ "$remote_name" = "origin" ] && [ "$branch" = "dev" ]; then
   fi
 fi
 
-pnpm check:push
+sh scripts/git/run-push-gate.sh

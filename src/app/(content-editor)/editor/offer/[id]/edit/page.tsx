@@ -1,8 +1,11 @@
+import { offerOperationalVersion } from "@/lib/offers/offerOperationalVersion";
+import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { OfferWizard } from "@/components/business/wizard/offer/OfferWizard";
 import { isOfferCtaStepFeatureEnabled } from "@/components/business/wizard/offer/ctaStepFeatureFlag";
+import { isBusinessFeatureEnabled } from "@/lib/business/businessFeatures";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
   defaultEditorNav,
@@ -47,7 +50,9 @@ export default async function EditorEditOfferPage({
       ? parseInt(stepParam.trim(), 10)
       : undefined;
 
-  const { offer, offerForWizard } = await loadOfferForWizard(id);
+  const { offer, offerForWizard, pendingRevision } = await loadOfferForWizard(id, {
+    viewerEditsLive: canPublishContentDirectly(user.role),
+  });
 
   if (!offer || !offerForWizard) {
     notFound();
@@ -102,6 +107,15 @@ export default async function EditorEditOfferPage({
   });
   const ctaStepEnabled = isOfferCtaStepFeatureEnabled(process.env);
 
+  // Флаг нового мастера — у бизнеса, которому принадлежит редактируемое предложение (место), а не у
+  // бизнеса пользователя: менеджер чужого бизнеса и владелец нескольких бизнесов видят мастер своего оффера.
+  const offerBusiness = offer.place?.ownerBusinessId
+    ? await prisma.business.findUnique({
+        where: { id: offer.place.ownerBusinessId },
+        select: { features: true },
+      })
+    : null;
+
   return (
     <ContentEditorChrome
       title="Новое предложение"
@@ -122,7 +136,10 @@ export default async function EditorEditOfferPage({
         contentEditorNav={nav}
         returnTo={returnTo}
         initialStepNumber={initialStepNumber}
+        pendingRevisionFields={pendingRevision?.fields}
+        operationalVersion={offerOperationalVersion(offer as unknown as Record<string, unknown>)}
         ctaStepEnabled={ctaStepEnabled}
+        newWizard={isBusinessFeatureEnabled(offerBusiness, "newOfferWizard")}
       />
     </ContentEditorChrome>
   );

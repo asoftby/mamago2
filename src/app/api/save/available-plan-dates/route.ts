@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { formatHHMM } from "@/lib/formatters/date";
+import { resolveActivityTicketLocation } from "@/lib/plan/activityTicketLocation";
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,6 +29,23 @@ export async function GET(request: NextRequest) {
         ],
       },
       select: {
+        // The save heart is also shown in catalogue cards. Return ticket details
+        // with the existing date request instead of adding another API call.
+        format: true,
+        priceMode: true,
+        priceFrom: true,
+        priceText: true,
+        place: {
+          select: { title: true, formattedAddr: true, shortAddress: true, customAddress: true },
+        },
+        venue: {
+          select: {
+            kind: true,
+            title: true,
+            addressLine: true,
+            place: { select: { title: true, formattedAddr: true, shortAddress: true, customAddress: true } },
+          },
+        },
         sessions: {
           where: { startsAt: { gte: now }, withdrawnAt: null },
           orderBy: { startsAt: "asc" },
@@ -53,7 +71,23 @@ export async function GET(request: NextRequest) {
     }
 
     const dates = Array.from(unique).sort();
-    return NextResponse.json({ dates, sessionsByDate });
+    const ticketLocation = resolveActivityTicketLocation(activity);
+    const mode = activity.priceMode;
+    return NextResponse.json({
+      dates,
+      sessionsByDate,
+      ticket: {
+        ...ticketLocation,
+        // Match public event page legacy pricing: zero means free, a positive
+        // priceFrom without an explicit mode is the minimum entry price.
+        priceMode: mode === "RANGE" ? "FROM" :
+          mode === "FREE" || mode === "FROM" || mode === "EXACT" ? mode :
+            mode === "UNKNOWN" && !activity.priceText && activity.priceFrom === 0 ? "FREE" :
+              mode === "UNKNOWN" && !activity.priceText && (activity.priceFrom ?? 0) > 0 ? "FROM" : "UNKNOWN",
+        priceValue: activity.priceFrom,
+        priceLabel: activity.priceText,
+      },
+    });
   } catch (error) {
     console.error("[save/available-plan-dates] GET failed", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

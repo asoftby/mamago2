@@ -8,18 +8,27 @@
  */
 
 import type { ReviewSection } from "../shared/types";
-import type { OfferWizardType, OfferWizardStepKey, OfferFormData } from "./types";
+import type {
+  OfferWizardType,
+  OfferWizardStepKey,
+  OfferWizardVariant,
+  OfferFormData,
+  OfferProductType,
+} from "./types";
 import { validatePublicationAccess } from "@/features/publication-access";
 import { showCampLodgingFormFields } from "./campOfferModel";
 import { isOfferContactsComplete } from "./contacts";
+import {
+  type OfferWizardStepDef,
+  V2_STEPS,
+  getV2StepMembers,
+  isV2CompositeStepKey,
+  v2StepDefWithoutKey,
+} from "./offerWizardV2Steps";
+export type { OfferWizardStepDef } from "./offerWizardV2Steps";
+export { V2_STEPS, V2_STEP_KEYS, getV2StepMembers, isV2CompositeStepKey } from "./offerWizardV2Steps";
 import { getRichTextLength } from "@/lib/richtext/utils";
 
-export interface OfferWizardStepDef {
-  key: OfferWizardStepKey;
-  title: string;
-  description: string;
-  shortLabel: string;
-}
 
 /** Все возможные ключи шагов мастера (для нормализации данных из БД/localStorage). */
 export const ALL_OFFER_WIZARD_STEP_KEYS: OfferWizardStepKey[] = [
@@ -33,6 +42,10 @@ export const ALL_OFFER_WIZARD_STEP_KEYS: OfferWizardStepKey[] = [
   "price",
   "contacts",
   "faq",
+  "about",
+  "services",
+  "schedule",
+  "terms",
   "review",
 ];
 
@@ -72,8 +85,13 @@ export function buildReviewSections(_data: OfferFormData): ReviewSection[] {
  * Step definitions for each offer type
  * Returns array of steps in order, with proper numbering
  */
-export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardStepDef[] {
+export function getStepsForOfferType(
+  type: OfferWizardType | null,
+  productType?: OfferProductType | null,
+  variant: OfferWizardVariant = "v1",
+): OfferWizardStepDef[] {
   if (!type) return [];
+  if (variant === "v2") return V2_STEPS;
 
   const priceStepTitle = type === "CAMP" ? "Участие" : "Цена";
   const priceStepDescription =
@@ -84,14 +102,14 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
 
   const baseSteps: Record<OfferWizardStepKey, Omit<OfferWizardStepDef, "key">> = {
     type: {
-      title: "Что вы хотите добавить?",
-      description: "Выберите формат предложения, который точнее всего описывает ваш продукт.",
+      title: "Что вы хотите предложить семьям?",
+      description: "Выберите подходящий вариант. Детали уточним дальше.",
       shortLabel: "Формат",
     },
     placements: {
-      title: "Что вы предлагаете?",
-      description: "Выберите сценарии — это поможет родителям найти ваше предложение в нужном разделе.",
-      shortLabel: "Сценарии",
+      title: "О празднике",
+      description: "Главные условия вашего предложения",
+      shortLabel: "Праздник",
     },
     details: {
       title: "Детали",
@@ -138,6 +156,11 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
       description: "Проверка и отправка на модерацию",
       shortLabel: "Проверка",
     },
+    // Ключи нового мастера в v1-последовательности не используются, но Record требует полноты.
+    about: v2StepDefWithoutKey("about"),
+    services: v2StepDefWithoutKey("services"),
+    schedule: v2StepDefWithoutKey("schedule"),
+    terms: v2StepDefWithoutKey("terms"),
   };
 
   let stepKeys: OfferWizardStepKey[] = [];
@@ -152,7 +175,6 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
       "conditions",
       "price",
       "contacts",
-      "faq",
       "review",
     ];
   } else if (type === "CAMP") {
@@ -166,9 +188,17 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
       "accommodation",
       "price",
       "contacts",
-      "faq",
       "review",
     ];
+  }
+
+  // Step 1 already assigns the primary placement. Do not ask businesses to
+  // choose their catalog again. Parties need one concise format/terms step.
+  if (productType) {
+    const isParty = productType === "PARTY_SERVICE" || productType === "PARTY_PACKAGE";
+    stepKeys = stepKeys.filter((key) =>
+      isParty ? key !== "conditions" : key !== "placements",
+    );
   }
 
   return stepKeys.map((key) => ({
@@ -183,9 +213,11 @@ export function getStepsForOfferType(type: OfferWizardType | null): OfferWizardS
  */
 export function getStepNumber(
   type: OfferWizardType | null,
-  stepKey: OfferWizardStepKey
+  stepKey: OfferWizardStepKey,
+  productType?: OfferProductType | null,
+  variant: OfferWizardVariant = "v1",
 ): number | null {
-  const steps = getStepsForOfferType(type);
+  const steps = getStepsForOfferType(type, productType, variant);
   const index = steps.findIndex((s) => s.key === stepKey);
   return index >= 0 ? index + 1 : null;
 }
@@ -193,8 +225,12 @@ export function getStepNumber(
 /**
  * Get total number of steps for a given offer type (including review)
  */
-export function getTotalStepsForType(type: OfferWizardType | null): number {
-  return getStepsForOfferType(type).length;
+export function getTotalStepsForType(
+  type: OfferWizardType | null,
+  productType?: OfferProductType | null,
+  variant: OfferWizardVariant = "v1",
+): number {
+  return getStepsForOfferType(type, productType, variant).length;
 }
 
 /**
@@ -202,9 +238,11 @@ export function getTotalStepsForType(type: OfferWizardType | null): number {
  */
 export function getStepDefByKey(
   type: OfferWizardType | null,
-  stepKey: OfferWizardStepKey
+  stepKey: OfferWizardStepKey,
+  productType?: OfferProductType | null,
+  variant: OfferWizardVariant = "v1",
 ): OfferWizardStepDef | null {
-  const steps = getStepsForOfferType(type);
+  const steps = getStepsForOfferType(type, productType, variant);
   return steps.find((s) => s.key === stepKey) || null;
 }
 
@@ -213,9 +251,11 @@ export function getStepDefByKey(
  */
 export function shouldShowStep(
   type: OfferWizardType | null,
-  stepKey: OfferWizardStepKey
+  stepKey: OfferWizardStepKey,
+  productType?: OfferProductType | null,
+  variant: OfferWizardVariant = "v1",
 ): boolean {
-  return getStepNumber(type, stepKey) !== null;
+  return getStepNumber(type, stepKey, productType, variant) !== null;
 }
 
 /**
@@ -223,9 +263,11 @@ export function shouldShowStep(
  */
 export function getNextStepKey(
   type: OfferWizardType | null,
-  currentStepKey: OfferWizardStepKey
+  currentStepKey: OfferWizardStepKey,
+  productType?: OfferProductType | null,
+  variant: OfferWizardVariant = "v1",
 ): OfferWizardStepKey | null {
-  const steps = getStepsForOfferType(type);
+  const steps = getStepsForOfferType(type, productType, variant);
   const currentIndex = steps.findIndex((s) => s.key === currentStepKey);
   if (currentIndex >= 0 && currentIndex < steps.length - 1) {
     return steps[currentIndex + 1].key;
@@ -238,9 +280,11 @@ export function getNextStepKey(
  */
 export function getPreviousStepKey(
   type: OfferWizardType | null,
-  currentStepKey: OfferWizardStepKey
+  currentStepKey: OfferWizardStepKey,
+  productType?: OfferProductType | null,
+  variant: OfferWizardVariant = "v1",
 ): OfferWizardStepKey | null {
-  const steps = getStepsForOfferType(type);
+  const steps = getStepsForOfferType(type, productType, variant);
   const currentIndex = steps.findIndex((s) => s.key === currentStepKey);
   if (currentIndex > 0) {
     return steps[currentIndex - 1].key;
@@ -253,19 +297,33 @@ export function getPreviousStepKey(
  */
 export function isStepComplete(
   stepKey: OfferWizardStepKey,
-  data: OfferFormData
+  data: OfferFormData,
+  variant: OfferWizardVariant = "v1",
 ): boolean {
+  if (isV2CompositeStepKey(stepKey)) {
+    return getV2StepMembers(stepKey, data).every((member) => isStepComplete(member, data, variant));
+  }
+
   const detailedDescriptionLength = getRichTextLength(data.description || "");
 
   switch (stepKey) {
     case "type":
-      return !!data.offerWizardType && !!data.productType;
+      // Новый мастер: категория обязательна (хотя бы одна).
+      return (
+        !!data.offerWizardType &&
+        !!data.productType &&
+        (variant !== "v2" || data.categoryIds.length > 0)
+      );
 
     case "placements":
       if (data.requestedPlacements.length === 0) return false;
       // PARTY_SERVICE: category + format only — duration/included/program/note moved to "conditions" (Phase 3c relayout).
       if (data.productType === "PARTY_SERVICE") {
-        return Boolean(data.partyCategory && data.birthdayDetails.locationType);
+        return Boolean(
+          data.partyCategory &&
+          data.birthdayDetails.locationType &&
+          (data.birthdayDetails.included.trim() || data.birthdayDetails.program.trim()),
+        );
       }
       // PARTY_PACKAGE: format + duration/included/program/note are filled here (no "conditions" sub-form for it).
       if (data.productType === "PARTY_PACKAGE") {
@@ -409,14 +467,20 @@ export function isStepComplete(
  */
 export function getMissingFieldsForStep(
   stepKey: OfferWizardStepKey,
-  data: OfferFormData
+  data: OfferFormData,
+  variant: OfferWizardVariant = "v1",
 ): string[] {
+  if (isV2CompositeStepKey(stepKey)) {
+    return getV2StepMembers(stepKey, data).flatMap((member) => getMissingFieldsForStep(member, data, variant));
+  }
+
   const missing: string[] = [];
   const detailedDescriptionLength = getRichTextLength(data.description || "");
 
   switch (stepKey) {
     case "type":
       if (!data.productType) missing.push("Формат предложения");
+      else if (variant === "v2" && data.categoryIds.length === 0) missing.push("Категория");
       break;
 
     case "placements":
@@ -426,7 +490,10 @@ export function getMissingFieldsForStep(
       // PARTY_SERVICE: category + format only — duration/included/program/note moved to "conditions" (Phase 3c relayout).
       if (data.productType === "PARTY_SERVICE") {
         if (!data.partyCategory) missing.push("Категория услуги");
-        if (!data.birthdayDetails.locationType) missing.push("Формат проведения");
+        if (!data.birthdayDetails.locationType) missing.push("Где проходит");
+        if (!data.birthdayDetails.included.trim() && !data.birthdayDetails.program.trim()) {
+          missing.push("Что входит");
+        }
         break;
       }
       // PARTY_PACKAGE: format + duration/included/program/note are filled here (no "conditions" sub-form for it).

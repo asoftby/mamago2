@@ -137,12 +137,19 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
     const base = {
       kind: "quickdate" as const,
       title: data.title,
+      ticket: {
+        title: data.title,
+        imageUrl: data.media.posterUrl,
+        venue: data.venue?.name,
+        address: data.venue?.address,
+        priceLabel: data.priceLabel,
+      },
       eventPlanDateOptions: availablePlanDates,
       eventPlanSessionsByDate: planSessionsByDate,
     };
     if (availablePlanDates.length !== 1) return base;
     return { ...base, eventPlanDateISO: availablePlanDates[0]! };
-  }, [availablePlanDates, data.title, planSessionsByDate]);
+  }, [availablePlanDates, data.media.posterUrl, data.priceLabel, data.title, data.venue, planSessionsByDate]);
 
   const loadSaveStatus = useCallback(async () => {
     if (!shouldFetchOwnSaveStatus(isAuthenticated)) {

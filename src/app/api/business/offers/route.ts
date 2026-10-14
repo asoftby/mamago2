@@ -24,6 +24,8 @@ import {
   mapProductTypeToLegacyKind,
 } from "@/lib/offers/offerPersistenceCompatibility";
 import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
+import { checkInterestSlugs } from "@/lib/offers/offerInterests";
+import { OfferCategoriesError, syncOfferCategories } from "@/server/offers/offerCategories";
 import { projectCampSessions } from "@/server/offers/campSessionProjection";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
 import { normalizeFaqItems } from "@/lib/faq/faqItems";
@@ -68,6 +70,7 @@ const createOfferSchema = z.object({
   kind: z.enum(["VISIT", "CLASS", "PARTY", "EVENT_TICKET"]),
   title: z.string().min(1),
   shortDescription: z.string().min(1),
+  description: z.string().optional(),
   agePolicy: z.nativeEnum(AgePolicy),
   ageMinMonths: z.number().nullable().optional(),
   ageMaxMonths: z.number().nullable().optional(),
@@ -81,11 +84,11 @@ const createOfferSchema = z.object({
   priceCaption: z.string().optional(),
   promotionDetails: z.string().optional(),
   pricingMode: z.enum(["SINGLE", "MULTIPLE"]),
-  singlePrice: z.number().optional(),
+  singlePrice: z.number().finite().nonnegative().optional(),
   singlePriceLabel: z.string().optional(),
   pricingOptions: z.array(z.object({
     title: z.string(),
-    price: z.number(),
+    price: z.number().finite().nonnegative(),
     oldPrice: z.number().optional(),
     description: z.string().optional(),
   })).default([]),
@@ -109,6 +112,10 @@ const createOfferSchema = z.object({
     }),
   ).optional(),
   faqItems: z.array(z.record(z.string(), z.unknown())).nullish(),
+  /** Категории предложения (до 3, справочник зависит от формата). */
+  categoryIds: z.array(z.string()).max(3).optional(),
+  /** Интересы ребёнка (до 5), slug из SYSTEM_INTERESTS. */
+  interestSlugs: z.array(z.string()).max(5).optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).default("DRAFT"),
   discoverySignalIds: z.array(z.string()).default([]),
   classChipSlugs: z.array(z.string()).default([]),
@@ -164,6 +171,20 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const data = createOfferSchema.parse(body);
+    const interestsCheck =
+      data.interestSlugs !== undefined ? checkInterestSlugs(data.interestSlugs) : null;
+    if (interestsCheck && !interestsCheck.ok) {
+      return NextResponse.json(
+        {
+          error:
+            interestsCheck.reason === "TOO_MANY"
+              ? "Можно выбрать не больше 5 интересов"
+              : "Выбраны неизвестные интересы",
+          code: "INVALID_OFFER_INTERESTS",
+        },
+        { status: 400 },
+      );
+    }
     const faqItems = normalizeFaqItems(data.faqItems);
     timer.mark("validate");
 
@@ -342,7 +363,9 @@ export async function POST(request: NextRequest) {
             contactWebsite: data.contactWebsite,
             contactSocialLinks: data.contactSocialLinks as Prisma.InputJsonValue | undefined,
             title: data.title,
-            description: data.shortDescription,
+            // Основное описание (rich text) — в Offer.description; краткое — только если полного нет.
+            description: data.description?.trim() ? data.description : data.shortDescription,
+            ...(interestsCheck?.ok ? { interestSlugs: interestsCheck.slugs } : {}),
             coverImage: data.coverImage,
             galleryImages: data.gallery ?? [],
             videoUrl: data.videoUrl,
@@ -415,6 +438,15 @@ export async function POST(request: NextRequest) {
           productType,
           requestedPlacements: data.requestedPlacements,
         });
+
+        if (data.categoryIds !== undefined) {
+          await syncOfferCategories({
+            db: tx,
+            offerId: createdOffer.id,
+            productType,
+            categoryIds: data.categoryIds,
+          });
+        }
 
         // CAMP: project campSessions JSON (canon) into queryable OfferSession rows
         if (data.campProgramType) {
@@ -497,6 +529,19 @@ export async function POST(request: NextRequest) {
     timer.log({ error: 1 });
     console.error("Create offer error:", error);
     
+    if (error instanceof OfferCategoriesError) {
+      return NextResponse.json(
+        {
+          error:
+            error.code === "TOO_MANY"
+              ? "Можно выбрать не больше 3 категорий"
+              : "Выбраны категории, которые не подходят для этого формата",
+          code: "INVALID_OFFER_CATEGORIES",
+        },
+        { status: 400 },
+      );
+    }
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         formatZodErrorResponse(error),

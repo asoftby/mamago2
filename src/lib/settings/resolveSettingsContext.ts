@@ -35,8 +35,11 @@ export async function resolveSettingsContext(
   const user = await getCurrentUser();
   if (!user) return null;
 
+  // Платформенные роли не имеют компании на USER/ADMIN-поверхностях, но на бизнес-поверхности
+  // защищённый layout пускает их как участников компании — резолвим её членство.
+  const isPlatformRole = user.role === "ADMIN" || user.role === "MODERATOR";
   const businessContext =
-    user.role === "ADMIN" || user.role === "MODERATOR"
+    isPlatformRole && options.requestedScope !== "BUSINESS"
       ? null
       : await resolveBusinessContext(user.id);
 

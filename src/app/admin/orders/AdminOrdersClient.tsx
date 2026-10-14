@@ -74,6 +74,7 @@ interface CityOption {
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
   NEW: "Новая",
+  EXPIRED: "Истекла",
   CONFIRMED: "Подтверждена",
   REJECTED: "Отклонена",
   CANCELLED: "Отменена",
@@ -82,6 +83,7 @@ const STATUS_LABELS: Record<BookingStatus, string> = {
 
 const STATUS_BADGE_CLASS: Record<BookingStatus, string> = {
   NEW: "border-blue-200 bg-blue-50 text-blue-700",
+  EXPIRED: "border-stone-200 bg-stone-100 text-stone-700",
   CONFIRMED: "border-emerald-200 bg-emerald-50 text-emerald-700",
   REJECTED: "border-red-200 bg-red-50 text-red-700",
   CANCELLED: "border-stone-200 bg-stone-100 text-stone-700",
@@ -99,6 +101,7 @@ const ENTITY_TYPE_LABELS: Record<EntityTypeFilter | "UNKNOWN", string> = {
 
 const DEFAULT_COUNTS: Record<BookingStatus, number> = {
   NEW: 0,
+  EXPIRED: 0,
   CONFIRMED: 0,
   REJECTED: 0,
   CANCELLED: 0,
@@ -243,6 +246,7 @@ export function AdminOrdersClient() {
         ),
       },
       { value: "NEW" as const, label: STATUS_LABELS.NEW, count: ordersData?.statusCounts.NEW ?? 0 },
+      { value: "EXPIRED" as const, label: STATUS_LABELS.EXPIRED, count: ordersData?.statusCounts.EXPIRED ?? 0 },
       {
         value: "CONFIRMED" as const,
         label: STATUS_LABELS.CONFIRMED,

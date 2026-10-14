@@ -14,6 +14,7 @@ import type { BusinessBookingItem } from "@/server/services/booking/bookingQuery
 
 const STATUS_LABEL: Record<BookingStatus, string> = {
   NEW: "Новая",
+  EXPIRED: "Истекла",
   CONFIRMED: "Подтверждена",
   REJECTED: "Отклонена",
   CANCELLED: "Отменена",
@@ -24,6 +25,7 @@ type ChipTone = "neutral" | "muted" | "accent" | "success" | "warning" | "danger
 
 const STATUS_TONE: Record<BookingStatus, ChipTone> = {
   NEW: "accent",
+  EXPIRED: "muted",
   CONFIRMED: "success",
   REJECTED: "danger",
   CANCELLED: "muted",

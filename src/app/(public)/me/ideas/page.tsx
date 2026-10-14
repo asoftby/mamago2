@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Container } from "@/components/ui/Container";
 import { IdeasClient } from "./IdeasClient";
 import type { IdeaItem } from "./types";
+import type { CollectionSummary, CollectionMemberships } from "./collectionState";
 import { getPlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import { listOfferIdeas } from "@/server/services/idea.service";
@@ -447,11 +448,53 @@ async function getUserIdeas(userId: string): Promise<IdeaItem[]> {
   );
 }
 
+/**
+ * Bulk-load collection memberships by saved-idea row id. This avoids one
+ * membership GET per poster, including asynchronously loaded article ideas.
+ * The CollectionItem DB constraint guarantees exactly one non-null FK.
+ */
+async function getUserCollections(userId: string): Promise<{
+  collections: CollectionSummary[];
+  memberships: CollectionMemberships;
+}> {
+  const rows = await prisma.collection.findMany({
+    where: { userId },
+    orderBy: [{ sort: "asc" }, { updatedAt: "desc" }],
+    select: {
+      id: true, title: true,
+      _count: { select: { items: true } },
+      items: {
+        select: {
+          ideaId: true,
+          offerIdeaId: true,
+          routeIdeaId: true,
+          placeIdeaId: true,
+          articleIdeaId: true,
+        },
+      },
+    },
+  });
+  const memberships: CollectionMemberships = {};
+  for (const row of rows) {
+    for (const item of row.items) {
+      const ideaId = item.ideaId ?? item.offerIdeaId ?? item.routeIdeaId ?? item.placeIdeaId ?? item.articleIdeaId;
+      if (ideaId) (memberships[ideaId] ??= []).push(row.id);
+    }
+  }
+  return {
+    collections: rows.map((row) => ({ id: row.id, title: row.title, count: row._count.items })),
+    memberships,
+  };
+}
+
 export default async function IdeasPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const ideas = await getUserIdeas(user.id);
+  const [ideas, { collections, memberships }] = await Promise.all([
+    getUserIdeas(user.id),
+    getUserCollections(user.id),
+  ]);
 
   return (
     <div
@@ -467,7 +510,7 @@ export default async function IdeasPage() {
         }}
       />
       <Container className="max-w-[1200px] px-4 pb-28 pt-6 sm:px-6 sm:pb-32 sm:pt-8 lg:px-8 lg:pt-10">
-        <IdeasClient initialIdeas={ideas} discoveryHref="/minsk" />
+        <IdeasClient initialIdeas={ideas} initialCollections={collections} initialMemberships={memberships} discoveryHref="/minsk" />
       </Container>
     </div>
   );

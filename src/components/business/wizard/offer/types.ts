@@ -74,7 +74,15 @@ export type OfferWizardStepKey =
   | "price"
   | "contacts"
   | "faq"
+  // Новый мастер (6 шагов, флаг Business.features.newOfferWizard)
+  | "about"
+  | "services"
+  | "schedule"
+  | "terms"
   | "review";
+
+/** Вариант мастера: v1 — текущий, v2 — новый мастер из 6 шагов за флагом. */
+export type OfferWizardVariant = "v1" | "v2";
 
 /**
  * Complete Offer Form Data
@@ -192,6 +200,10 @@ export interface OfferFormData {
   signalIds: string[];
   /** Привязка к чипам публичной витрины /[city]/classes. */
   classChipSlugs: string[];
+  /** Категории предложения (до 3, обязательна хотя бы одна в новом мастере). */
+  categoryIds: string[];
+  /** Интересы ребёнка (до 5): slug из SYSTEM_INTERESTS. */
+  interestSlugs: string[];
   
   // PLACE_VISIT type-specific details (written to Offer.details JSON)
   placeVisitDetails: {

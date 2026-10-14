@@ -108,7 +108,16 @@ export const NAV_ANALYTICS: AdminSidebarNavItem = {
       id: "analytics-detail",
       label: "Детальная аналитика",
       href: adminPath("/analytics"),
-      matchers: [{ type: "prefix", value: adminPath("/analytics") }],
+      matchers: [
+        { type: "exact", value: adminPath("/analytics") },
+        { type: "prefix", value: adminPath("/analytics/segments") },
+      ],
+    },
+    {
+      id: "analytics-telegram",
+      label: "Telegram-бот",
+      href: adminPath("/analytics/telegram"),
+      matchers: [{ type: "prefix", value: adminPath("/analytics/telegram") }],
     },
   ],
 };

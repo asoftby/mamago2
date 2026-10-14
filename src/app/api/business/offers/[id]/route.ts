@@ -7,6 +7,8 @@ import { normalizeAgePolicy } from "@/lib/age/agePolicy";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import { assignOfferSlugIfMissing } from "@/lib/slug/offerSlugService";
+import { liveOfferComparableOverlay } from "@/lib/offers/offerLiveComparable";
+import { isValidOfferPhone } from "@/lib/offers/offerPhone";
 import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { getCampSessionPriceValues } from "@/lib/offers/campPricing";
 import { normalizePublicationPrice } from "@/domain/pricing/normalizedPrice";
@@ -23,6 +25,8 @@ import {
   inferOfferProductType,
   mapProductTypeToLegacyKind,
 } from "@/lib/offers/offerPersistenceCompatibility";
+import { checkInterestSlugs } from "@/lib/offers/offerInterests";
+import { OfferCategoriesError, syncOfferCategories } from "@/server/offers/offerCategories";
 import { syncOfferPersistenceLayer } from "@/server/offers/offerPersistence";
 import { projectCampSessions } from "@/server/offers/campSessionProjection";
 import { syncOfferMediaUsage } from "@/server/services/media/media-usage.service";
@@ -30,10 +34,17 @@ import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import { formatZodErrorResponse } from "@/lib/validation/zodErrorResponse";
 import { shouldRejectUnlinkedPlaceForOfferMutation } from "@/lib/offers/offerLinkedBusinessAccess";
 import { notifyAdminsPublicationSubmitted } from "@/server/services/notification.service";
+import { offerOperationalVersion } from "@/lib/offers/offerOperationalVersion";
+import { buildRevisionProposal } from "@/lib/offers/offerRevisionPayload";
+import { savePendingOfferRevision } from "@/server/offers/offerRevision.service";
 import { offerStatusRequiresPlace } from "@/lib/offers/offerPlaceRequirement";
 import {
   OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
-  shouldBlockPublishedOfferEdit,
+  collectChangedOfferColumns,
+  buildModerationNoticeMessage,
+  decidePublishedOfferEdit,
+  mergeCampSessionsForPublished,
+  offerValuesEqual,
 } from "@/lib/offers/offerPublishedEditGate";
 import {
   assertContentLifecycleOperationAllowed,
@@ -71,6 +82,7 @@ const updateOfferSchema = z.object({
   }).optional(),
   title: z.string().min(1).optional(),
   shortDescription: z.string().min(1).optional(),
+  description: z.string().optional(),
   agePolicy: z.nativeEnum(AgePolicy).optional(),
   ageMinMonths: z.number().nullable().optional(),
   ageMaxMonths: z.number().nullable().optional(),
@@ -83,11 +95,11 @@ const updateOfferSchema = z.object({
   priceCaption: z.string().optional(),
   promotionDetails: z.string().optional(),
   pricingMode: z.enum(["SINGLE", "MULTIPLE"]).optional(),
-  singlePrice: z.number().optional(),
+  singlePrice: z.number().finite().nonnegative().optional(),
   singlePriceLabel: z.string().optional(),
   pricingOptions: z.array(z.object({
     title: z.string(),
-    price: z.number(),
+    price: z.number().finite().nonnegative(),
     oldPrice: z.number().optional(),
     description: z.string().optional(),
   })).optional(),
@@ -111,6 +123,10 @@ const updateOfferSchema = z.object({
     }),
   ).optional(),
   faqItems: z.array(z.record(z.string(), z.unknown())).nullish(),
+  categoryIds: z.array(z.string()).max(3).optional(),
+  interestSlugs: z.array(z.string()).max(5).optional(),
+  /** Версия операционных данных, на которой клиент построил форму (`offerOperationalVersion`): защита от записи устаревшего снимка. */
+  expectedOperationalVersion: z.string().optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).optional(),
   discoverySignalIds: z.array(z.string()).optional(),
   classChipSlugs: z.array(z.string()).optional(),
@@ -202,6 +218,9 @@ export async function GET(
 }
 
 // Re-trigger build for schema updates
+/** Оффер изменили после загрузки редактора, а владелец сохраняет операционные значения. */
+class OfferStaleSnapshotError extends Error {}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -239,6 +258,20 @@ export async function PATCH(
     }
 
     const data = updateOfferSchema.parse(body);
+    const interestsCheck =
+      data.interestSlugs !== undefined ? checkInterestSlugs(data.interestSlugs) : null;
+    if (interestsCheck && !interestsCheck.ok) {
+      return NextResponse.json(
+        {
+          error:
+            interestsCheck.reason === "TOO_MANY"
+              ? "Можно выбрать не больше 5 интересов"
+              : "Выбраны неизвестные интересы",
+          code: "INVALID_OFFER_INTERESTS",
+        },
+        { status: 400 },
+      );
+    }
     const faqItems = data.faqItems !== undefined ? normalizeFaqItems(data.faqItems) : undefined;
     timer.mark("validate");
 
@@ -271,25 +304,6 @@ export async function PATCH(
 
     if (!existingOffer || !(await canManagePlaceAsync(user, existingOffer.place))) {
       return NextResponse.json({ error: "Offer not found" }, { status: 404 });
-    }
-
-    // Гейт до любой записи в БД и любых сайдэффектов (slug, media, projections):
-    // прямая правка PUBLISHED-оффера минует модерацию — content leak.
-    if (
-      shouldBlockPublishedOfferEdit({
-        role: user.role,
-        currentStatus: existingOffer.status,
-      })
-    ) {
-      return NextResponse.json(
-        {
-          error: OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
-          message: "Опубликованное предложение нельзя изменить напрямую",
-          description:
-            "Изменения опубликованных предложений проходят модерацию",
-        },
-        { status: 403 },
-      );
     }
 
     const updateData: Prisma.OfferUpdateInput = {};
@@ -381,7 +395,12 @@ export async function PATCH(
     }
     
     if (data.title !== undefined) updateData.title = data.title;
-    if (data.shortDescription !== undefined) updateData.description = data.shortDescription;
+    // Основное описание (rich text) — в Offer.description; краткое — только если полного нет.
+    if (data.description !== undefined && data.description.trim()) {
+      updateData.description = data.description;
+    } else if (data.shortDescription !== undefined) {
+      updateData.description = data.shortDescription;
+    }
     if (data.agePolicy !== undefined || data.ageMinMonths !== undefined || data.ageMaxMonths !== undefined) {
       const normalizedAge = normalizeAgePolicy({
         agePolicy: data.agePolicy ?? existingOffer.agePolicy,
@@ -392,6 +411,7 @@ export async function PATCH(
       updateData.ageMinMonths = normalizedAge.ageMinMonths;
       updateData.ageMaxMonths = normalizedAge.ageMaxMonths;
     }
+    if (interestsCheck?.ok) updateData.interestSlugs = interestsCheck.slugs;
     if (data.coverImage !== undefined) updateData.coverImage = data.coverImage;
     if (data.gallery !== undefined) updateData.galleryImages = data.gallery;
     if (data.videoUrl !== undefined) updateData.videoUrl = data.videoUrl;
@@ -558,11 +578,245 @@ export async function PATCH(
       }
     }
 
+    // Результат проверки опубликованного оффера по полям (заполняется внутри транзакции).
+    const gate: {
+      skipRequestedPlacements: boolean;
+      moderationNotice: { message: string; fields: string[]; code: string } | null;
+      journal: { columns: string[]; before: Record<string, unknown>; after: Record<string, unknown> } | null;
+      /** Для опубликованного оффера проекция смен строится из итоговых данных, а не из payload. */
+      campProjection: { isCamp: boolean; sessions: unknown } | null;
+      skipCategories: boolean;
+      /** Создана новая ожидающая ревизия (а не обновлена существующая) — уведомляем админов. */
+      revisionCreated: boolean;
+      revisionId: string | null;
+    } = {
+      skipRequestedPlacements: false,
+      moderationNotice: null,
+      journal: null,
+      campProjection: null,
+      skipCategories: false,
+      revisionCreated: false,
+      revisionId: null,
+    };
+
+    const gateApplies = !canPublishContentDirectly(user.role);
+
     const offer = await prisma.$transaction(async (tx) => {
+      if (gateApplies) {
+        // Сравнение с живой строкой и запись — один снимок: блокируем строку, чтобы правка админа
+        // между чтением и записью не была перезаписана устаревшим контентом из payload мастера.
+        await tx.$queryRaw`SELECT "id" FROM "Offer" WHERE "id" = ${id} FOR UPDATE`;
+        const live = await tx.offer.findUniqueOrThrow({ where: { id } });
+        const liveRecord = live as unknown as Record<string, unknown>;
+        const updateRecord = updateData as Record<string, unknown>;
+
+        // «Отправка на модерацию» из мастера добавляет к payload синтетический `status: PENDING`.
+        // Для опубликованного оффера не-админа это не правка автора: опубликованное не снимаем с
+        // публикации и не показываем ложное «контент отклонён».
+        if (live.status === "PUBLISHED" && updateRecord.status === "PENDING") {
+          delete updateRecord.status;
+        }
+
+        // Колонки, присутствовавшие в запросе (до отбрасывания), и исходные смены: нужны для пересчёта ревизии.
+        const presentColumns = Object.keys(updateRecord).filter(
+          (column) => column !== "status" && column !== "place",
+        );
+        const proposedCampSessions = updateRecord.campSessions;
+        if ("campSessions" in updateRecord) presentColumns.push("campSessionTexts");
+        if (data.requestedPlacements !== undefined) presentColumns.push("requestedPlacements");
+        if (data.categoryIds !== undefined) presentColumns.push("categoryIds");
+        if (data.selectedPlace?.id) presentColumns.push("placeId");
+
+        let campTextsChanged = false;
+        if (live.status === "PUBLISHED" && "campSessions" in updateRecord) {
+          const campResult = mergeCampSessionsForPublished(live.campSessions, updateRecord.campSessions);
+          updateRecord.campSessions = campResult.merged as unknown as Prisma.InputJsonValue;
+          campTextsChanged = campResult.contentChanged;
+        }
+
+        // Сравниваем с живыми значениями в том виде, в каком их получает форма (нормализация rich text,
+        // синтез из старых полей), иначе неизменённый снимок выглядит как правка контента.
+        const changedColumns = collectChangedOfferColumns(updateRecord, {
+          ...liveRecord,
+          ...liveOfferComparableOverlay(live),
+        });
+
+        // `priceText`: «от N BYN», выведенное из чисел, — операционная правка; произвольная подпись
+        // (из `priceCaption`) — контент. Переименовываем только первый случай.
+        const priceTextIndex = changedColumns.indexOf("priceText");
+        if (priceTextIndex >= 0) {
+          const toNumber = (value: unknown): number | null =>
+            value === null || value === undefined ? null : Number(String(value));
+          const effectivePriceFrom = toNumber("priceFrom" in updateRecord ? updateRecord.priceFrom : live.priceFrom);
+          const derivedPriceText = effectivePriceFrom != null ? formatPriceFrom(effectivePriceFrom) : null;
+          if (offerValuesEqual(updateRecord.priceText, derivedPriceText)) {
+            changedColumns[priceTextIndex] = "priceTextDerived";
+          }
+        }
+
+        if (campTextsChanged) changedColumns.push("campSessionTexts");
+        if (live.status === "PUBLISHED" && data.requestedPlacements !== undefined) {
+          const currentPlacements = await tx.offerPlacement.findMany({
+            where: { offerId: id },
+            select: { key: true },
+          });
+          const current = currentPlacements.map((placement) => placement.key).sort();
+          const next = [...new Set(data.requestedPlacements)].sort();
+          if (!offerValuesEqual(current, next)) changedColumns.push("requestedPlacements");
+        }
+
+        if (live.status === "PUBLISHED" && data.categoryIds !== undefined) {
+          const currentCategories = await tx.offerCategory.findMany({
+            where: { offerId: id },
+            select: { categoryId: true },
+          });
+          const current = currentCategories.map((row) => row.categoryId).sort();
+          const next = [...new Set(data.categoryIds)].sort();
+          if (!offerValuesEqual(current, next)) changedColumns.push("categoryIds");
+        }
+
+        // Номера телефонов — операционные, только пока это действительно номер: произвольный текст
+        // в поле «телефон» показывается публично, поэтому такое значение уходит в контент.
+        const invalidPhoneColumns = ["contactPhone", "contactPhone2", "contactPhone3"].filter((column) => {
+          if (!changedColumns.includes(column)) return false;
+          const value = updateRecord[column];
+          return typeof value === "string" && value.trim() !== "" && !isValidOfferPhone(value);
+        });
+
+        // Смена типа предложения (в т.ч. на/с лагеря) — контент. Всё, что из неё выведено (цена из смен,
+        // смены, тип/вид), уходит вместе с ней: иначе живая карточка получит цену и смены нового типа
+        // при прежнем типе.
+        const TYPE_SWITCH_COLUMNS = ["productType", "kind", "campProgramType"];
+        const TYPE_DERIVED_COLUMNS = [
+          "priceFrom",
+          "priceTo",
+          "priceMode",
+          "priceItems",
+          "priceText",
+          "priceTextDerived",
+          "campSessions",
+        ];
+        const typeSwitched = TYPE_SWITCH_COLUMNS.some((column) => changedColumns.includes(column));
+        const typeDerivedColumns = typeSwitched
+          ? TYPE_DERIVED_COLUMNS.filter((column) => changedColumns.includes(column))
+          : [];
+
+        const decision = decidePublishedOfferEdit({
+          role: user.role,
+          currentStatus: live.status,
+          changedColumns,
+          forceContentColumns: [...invalidPhoneColumns, ...typeDerivedColumns],
+        });
+
+        // Устаревший снимок формы: цены/смены/телефоны изменили после загрузки редактора (например, админ
+        // поправил цену), а владелец сохраняет операционные значения. Мы не знаем, какие из них он правил
+        // сам, поэтому не перезаписываем чужие правки — просим обновить страницу. Версия — хэш значений,
+        // а не `updatedAt` (фоновые задачи двигают его без правок данных). Контент конфликта не создаёт
+        // (он уходит в ревизию).
+        if (
+          live.status === "PUBLISHED" &&
+          decision.operationalColumns.length > 0 &&
+          data.expectedOperationalVersion &&
+          data.expectedOperationalVersion !== offerOperationalVersion(liveRecord)
+        ) {
+          throw new OfferStaleSnapshotError();
+        }
+
+        if (live.status === "PUBLISHED") {
+          // Контентные правки не пишем в живую строку, а кладём в ожидающую ревизию (ушедшую на модерацию).
+          // Операционные (цены, расписание, контакты) уже в updateData и применяются сразу.
+          let visibleContent = decision.contentColumns.filter((column) => column !== "status");
+          // Смена места в updateData — Prisma-синтаксис (`place.connect`); в ревизии хранится `placeId`.
+          visibleContent = visibleContent.map((column) => (column === "place" ? "placeId" : column));
+          // Смена типа на/с лагеря: смены уходят в ревизию целиком (`campSessions`), отдельные тексты не нужны.
+          if (visibleContent.includes("campSessions")) {
+            visibleContent = visibleContent.filter((column) => column !== "campSessionTexts");
+          }
+
+          const proposalValues: Record<string, unknown> = {};
+          for (const column of visibleContent) {
+            if (column === "requestedPlacements") proposalValues[column] = data.requestedPlacements;
+            else if (column === "categoryIds") proposalValues[column] = data.categoryIds;
+            else if (column === "placeId") proposalValues[column] = data.selectedPlace?.id;
+            else if (column === "campSessionTexts" || column === "campSessions") proposalValues[column] = proposedCampSessions;
+            else proposalValues[column] = updateRecord[column];
+          }
+
+          for (const column of decision.contentColumns) {
+            if (column === "requestedPlacements") gate.skipRequestedPlacements = true;
+            else if (column === "categoryIds") gate.skipCategories = true;
+            else delete updateRecord[column];
+          }
+
+          const saved = await savePendingOfferRevision(tx, {
+            offerId: id,
+            authorId: user.id,
+            proposal: buildRevisionProposal(visibleContent, proposalValues),
+            presentColumns,
+            live: { ...liveRecord, ...liveOfferComparableOverlay(live) } as Record<string, unknown> & { updatedAt?: Date },
+          });
+          gate.revisionCreated = saved.created;
+          gate.revisionId = saved.revisionId;
+
+          if (visibleContent.length > 0) {
+            gate.moderationNotice = {
+              message: buildModerationNoticeMessage({
+                contentColumns: visibleContent,
+                operationalColumns: decision.operationalColumns,
+              }),
+              fields: visibleContent,
+              code: OFFER_PUBLISHED_REQUIRES_MODERATION_CODE,
+            };
+          }
+        }
+
+        if (live.status === "PUBLISHED") {
+          // Тип «лагерь» у опубликованного оффера не меняется (смена типа — контент). Проекция смен строится
+          // из принятых данных — после отбрасывания контентных колонок: если `campSessions` ушла вместе со
+          // сменой типа, проекция берёт живые смены, а не присланные.
+          gate.campProjection = {
+            isCamp: Boolean(live.campProgramType),
+            sessions: "campSessions" in updateRecord ? updateRecord.campSessions : live.campSessions,
+          };
+        }
+
+        if (decision.operationalColumns.length > 0) {
+          const actualColumn = (column: string) => (column === "priceTextDerived" ? "priceText" : column);
+          const toJournal = (value: unknown) =>
+            value !== null && typeof value === "object" && value.constructor?.name === "DbNull"
+              ? null
+              : JSON.parse(JSON.stringify(value ?? null));
+          gate.journal = {
+            columns: decision.operationalColumns,
+            before: Object.fromEntries(
+              decision.operationalColumns.map((column) => [actualColumn(column), toJournal(liveRecord[actualColumn(column)])]),
+            ),
+            after: Object.fromEntries(
+              decision.operationalColumns.map((column) => [actualColumn(column), toJournal(updateRecord[actualColumn(column)])]),
+            ),
+          };
+        }
+      }
+
       await tx.offer.update({
         where: { id },
         data: updateData,
       });
+
+      if (gate.journal) {
+        await tx.adminAuditLog.create({
+          data: {
+            actorId: user.id,
+            actorRole: user.role,
+            action: "offer.operational_edit",
+            entityType: "Offer",
+            entityId: id,
+            before: gate.journal.before as Prisma.InputJsonValue,
+            after: gate.journal.after as Prisma.InputJsonValue,
+            metadata: { columns: gate.journal.columns, status: existingOffer.status },
+          },
+        });
+      }
 
       await syncOfferPersistenceLayer({
         db: tx,
@@ -570,13 +824,26 @@ export async function PATCH(
         actorUserId: user.id,
         productType,
         requestedPlacementsStrategy: "preserve_if_missing",
-        requestedPlacements: data.requestedPlacements,
-        requestedPlacementsProvided: data.requestedPlacements !== undefined,
+        requestedPlacements: gate.skipRequestedPlacements ? undefined : data.requestedPlacements,
+        requestedPlacementsProvided: !gate.skipRequestedPlacements && data.requestedPlacements !== undefined,
       });
 
-      // CAMP: rebuild OfferSession projection from current campSessions canon
-      // (clears all rows when isCampOffer is false, e.g. type switched away from CAMP)
-      await projectCampSessions(tx, id, isCampOffer ? nextCampSessions : []);
+      if (data.categoryIds !== undefined) {
+        if (!gate.skipCategories) {
+          await syncOfferCategories({ db: tx, offerId: id, productType, categoryIds: data.categoryIds });
+        }
+      }
+
+      // Only CAMP edits own this projection. Other schedule kinds also use
+      // OfferSession, so a regular offer edit must not erase their sessions.
+      const campProjection = gate.campProjection ?? { isCamp: isCampOffer, sessions: nextCampSessions };
+      if (campProjection.isCamp || existingOffer.productType === "CAMP") {
+        await projectCampSessions(
+          tx,
+          id,
+          (campProjection.isCamp ? campProjection.sessions : []) as Parameters<typeof projectCampSessions>[2],
+        );
+      }
 
       return tx.offer.findUniqueOrThrow({
         where: { id },
@@ -639,6 +906,19 @@ export async function PATCH(
         console.error("[offer-update] admin moderation notification failed:", error);
       }
     }
+    // Новая ревизия опубликованного оффера (не обновление существующей) — зовём админов на модерацию.
+    if (gate.revisionCreated) {
+      try {
+        await notifyAdminsPublicationSubmitted({
+          publicationType: "OFFER",
+          publicationId: offer.id,
+          publicationTitle: `${offer.title} — правки опубликованного`,
+          actionUrl: gate.revisionId ? `/admin/content/offers/revisions/${gate.revisionId}` : undefined,
+        });
+      } catch (error) {
+        console.error("[offer-update] admin revision notification failed:", error);
+      }
+    }
     timer.mark("notifications");
 
     // Sync media usage if cover or gallery changed (don't block on errors)
@@ -658,11 +938,44 @@ export async function PATCH(
     timer.mark("response");
     timer.log({ status: offer.status });
 
-    return NextResponse.json(offer);
+    // Свежая версия операционных данных — форма отправляет её со следующим сохранением.
+    const freshRow = await prisma.offer.findUnique({ where: { id } });
+    const operationalVersion = freshRow ? offerOperationalVersion(freshRow as unknown as Record<string, unknown>) : undefined;
+
+    return NextResponse.json({
+      ...offer,
+      operationalVersion,
+      ...(gate.moderationNotice ? { moderationNotice: gate.moderationNotice } : {}),
+    });
 
   } catch (error) {
     timer.log({ error: 1 });
     console.error("Update offer error:", error);
+
+    if (error instanceof OfferCategoriesError) {
+      return NextResponse.json(
+        {
+          error:
+            error.code === "TOO_MANY"
+              ? "Можно выбрать не больше 3 категорий"
+              : "Выбраны категории, которые не подходят для этого формата",
+          code: "INVALID_OFFER_CATEGORIES",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (error instanceof OfferStaleSnapshotError) {
+      return NextResponse.json(
+        {
+          error: "OFFER_STALE_SNAPSHOT",
+          code: "OFFER_STALE_SNAPSHOT",
+          message: "Предложение изменили, пока вы его редактировали",
+          description: "Обновите страницу, чтобы не затереть чужие правки цен, расписания и контактов, и повторите изменения.",
+        },
+        { status: 409 },
+      );
+    }
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(

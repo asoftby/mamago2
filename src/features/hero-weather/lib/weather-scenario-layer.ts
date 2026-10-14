@@ -398,7 +398,7 @@ export function getWeatherCopy(input: WeatherCopyInput): string {
   const variant = weatherCopyVariant(input.scenario, input.timeOfDay, input.maxTemperatureC);
   const temp = formatSignedTemperature(input.maxTemperatureC);
   const tempPart = temp ? `, до ${temp}` : "";
-  return `${input.emoji} ${prefix} ${variant.condition}${tempPart} — ${variant.advice}`;
+  return `${input.emoji} ${prefix} ${variant.condition}${tempPart}.`;
 }
 
 export function getWeatherIconName(input: {

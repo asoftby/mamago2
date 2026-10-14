@@ -196,7 +196,7 @@ function inferLegacyOfferCtaFields(offer: {
   productType?: OfferProductType | null;
   kind: OfferKind;
   bookingEnabled?: boolean | null;
-  bookingMode?: "REQUEST_ONLY" | "USE_PUBLICATION_DATES" | "USE_PUBLICATION_SLOTS" | null;
+  bookingMode?: "NONE" | "REQUEST_ONLY" | "EXTERNAL" | "USE_PUBLICATION_DATES" | "USE_PUBLICATION_SLOTS" | null;
   bookingPhone?: string | null;
   bookingNote?: string | null;
   contactWebsite?: string | null;
@@ -340,6 +340,25 @@ function inferRequestedPlacementsFromForm(
     default:
       return undefined;
   }
+}
+
+/** Основной раздел типа обязателен: старые офферы могли сохраниться без него — добавляем, остальное не трогаем. */
+export function ensurePrimaryPlacements(
+  current: OfferPlacementKey[],
+  productType: OfferProductType | undefined,
+): OfferPlacementKey[] {
+  if (current.length === 0) return defaultRequestedPlacementsForProductType(productType);
+  const missing = defaultRequestedPlacementsForProductType(productType).filter(
+    (key) => !current.includes(key),
+  );
+  return missing.length > 0 ? [...current, ...missing] : current;
+}
+
+/** Краткое описание ≤ 120 символов из основного описания (в БД хранится одно поле `Offer.description`). */
+export function shortDescriptionFromDescription(description: string | null | undefined): string {
+  if (!description) return "";
+  const plain = createExcerpt(description, 120);
+  return plain.length <= 120 ? plain : createExcerpt(description, 117);
 }
 
 function defaultRequestedPlacementsForProductType(
@@ -664,6 +683,8 @@ export function buildOfferCreatePayload(
       })),
     discoverySignalIds: data.signalIds,
     classChipSlugs: data.classChipSlugs,
+    categoryIds: data.categoryIds,
+    interestSlugs: data.interestSlugs,
     wizardCompletedSteps: opts?.wizardCompletedSteps,
     faqItems: normalizeFaqItems(data.faqItems),
     status: opts?.status ?? "DRAFT",
@@ -868,6 +889,8 @@ export function buildOfferUpdatePayload(
       })),
     discoverySignalIds: data.signalIds,
     classChipSlugs: data.classChipSlugs,
+    categoryIds: data.categoryIds,
+    interestSlugs: data.interestSlugs,
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
@@ -915,6 +938,8 @@ export function mapOfferToFormData(offer: {
   agePolicy: import("@prisma/client").AgePolicy;
   discoverySignalIds?: string[];
   classChipSlugs?: string[];
+  categoryLinks?: Array<{ categoryId: string; sortOrder: number }> | null;
+  interestSlugs?: string[] | null;
   // Camp fields
   campProgramType?: string | null;
   campSessions?: unknown;
@@ -946,7 +971,7 @@ export function mapOfferToFormData(offer: {
   contactPhone3Label?: string | null;
   contactWebsite?: string | null;
   bookingEnabled?: boolean | null;
-  bookingMode?: "REQUEST_ONLY" | "USE_PUBLICATION_DATES" | "USE_PUBLICATION_SLOTS" | null;
+  bookingMode?: "NONE" | "REQUEST_ONLY" | "EXTERNAL" | "USE_PUBLICATION_DATES" | "USE_PUBLICATION_SLOTS" | null;
   bookingPhone?: string | null;
   bookingNote?: string | null;
   contactSocialLinks?: unknown;
@@ -1016,10 +1041,7 @@ export function mapOfferToFormData(offer: {
     ...defaults,
     offerWizardType: inferredWizardType,
     productType,
-    requestedPlacements:
-      requestedPlacements.length > 0
-        ? requestedPlacements
-        : defaultRequestedPlacementsForProductType(productType),
+    requestedPlacements: ensurePrimaryPlacements(requestedPlacements, productType),
     placementStatuses,
     // birthdayDetails: PARTY_SERVICE/PARTY_PACKAGE canon lives on Offer columns/details JSON;
     // the plain BIRTHDAY-checkbox case (non-party types) has no extra fields to persist.
@@ -1056,7 +1078,7 @@ export function mapOfferToFormData(offer: {
     placeId: offer.placeId ?? null,
     placeTitle: offer.place?.title ?? "",
     title: offer.title,
-    shortDescription: offer.description ?? "",
+    shortDescription: shortDescriptionFromDescription(offer.description),
     description: normalizeRichTextEditorValue(offer.description),
     ageGroups: monthsToAgeGroups(offer.ageMinMonths, offer.ageMaxMonths),
     agePolicy: offer.agePolicy,
@@ -1107,6 +1129,10 @@ export function mapOfferToFormData(offer: {
     ...legacyCtaFields,
     signalIds: offer.discoverySignalIds ?? [],
     classChipSlugs: offer.classChipSlugs ?? [],
+    interestSlugs: offer.interestSlugs ?? [],
+    categoryIds: [...(offer.categoryLinks ?? [])]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((link) => link.categoryId),
     placeVisitDetails: parsePlaceVisitDetailsFromDb(offer.details),
     ...(productType === "ONE_TIME_ACTIVITY" || productType === "REGULAR_ACTIVITY"
       ? parseActivityDetailsFromDb(offer.details)

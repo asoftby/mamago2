@@ -1,21 +1,24 @@
-// Step 1: Offer Type
-// Product type selector backed by persisted productType.
+"use client";
 
-import { Card, CardContent } from "@/components/ui/card";
+import { useState } from "react";
 import {
   CalendarRange,
   GraduationCap,
   MapPin,
   PartyPopper,
-  Repeat2,
-  Sparkles,
+  Check,
 } from "lucide-react";
-import type {
-  OfferFormData,
-  OfferPlacementKey,
-  OfferProductType,
-  OfferWizardType,
-} from "../types";
+import { cn } from "@/lib/utils";
+import { OfferCategoryPicker } from "../components/OfferCategoryPicker";
+import type { LucideIcon } from "lucide-react";
+import type { OfferFormData, OfferProductType } from "../types";
+import {
+  OFFER_CREATION_CATEGORIES,
+  getOfferCreationCategory,
+  getOfferTypeSelection,
+  type OfferCreationCategory,
+  type OfferCreationCategoryKey,
+} from "../offerTypeChoices";
 
 interface Step1TypeProps {
   data: OfferFormData;
@@ -25,70 +28,34 @@ interface Step1TypeProps {
       | ((prev: OfferFormData) => Partial<OfferFormData>),
   ) => void;
   isEditable: boolean;
+  /** Новый мастер: показывать выбор категорий после выбора формата. */
+  showCategories?: boolean;
 }
 
-export function Step1Type({ data, onChange, isEditable }: Step1TypeProps) {
-  const defaultPlacementByProductType: Record<OfferProductType, OfferPlacementKey> = {
-    PLACE_VISIT: "WHERE_TO_GO",
-    ONE_TIME_ACTIVITY: "WHERE_TO_GO",
-    REGULAR_ACTIVITY: "CLASSES",
-    CAMP: "CAMPS",
-    PARTY_SERVICE: "BIRTHDAY",
-    PARTY_PACKAGE: "BIRTHDAY",
-  };
+const icons: Record<OfferCreationCategoryKey, LucideIcon> = {
+  place: MapPin,
+  classes: GraduationCap,
+  parties: PartyPopper,
+  camps: CalendarRange,
+};
 
-  const wizardTypeByProductType: Record<OfferProductType, OfferWizardType> = {
-    PLACE_VISIT: "SINGLE",
-    ONE_TIME_ACTIVITY: "SINGLE",
-    REGULAR_ACTIVITY: "REGULAR",
-    CAMP: "CAMP",
-    PARTY_SERVICE: "SINGLE",
-    PARTY_PACKAGE: "SINGLE",
-  };
+export function Step1Type({ data, onChange, isEditable, showCategories = false }: Step1TypeProps) {
+  // Remember an expanded category before its subtype has been selected.
+  // Once a subtype is chosen, productType remains the source of truth (also on edit/restore).
+  const [expandedCategory, setExpandedCategory] = useState<OfferCreationCategoryKey | null>(null);
+  const selectedCategory = getOfferCreationCategory(data.productType);
+  const activeCategory =
+    OFFER_CREATION_CATEGORIES.find(
+      (category) => category.key === (expandedCategory ?? selectedCategory?.key),
+    ) ?? null;
 
   const handleTypeChange = (productType: OfferProductType) => {
-    const offerWizardType = wizardTypeByProductType[productType];
-    const defaultPlacement = defaultPlacementByProductType[productType];
-
-    const legacy =
-      productType === "CAMP"
-        ? {
-            offerKind: "course" as const,
-            durationType: "camp" as const,
-            intent: "занятия" as const,
-          }
-        : productType === "REGULAR_ACTIVITY"
-          ? {
-              offerKind: "course" as const,
-              durationType: "recurring" as const,
-              intent: "занятия" as const,
-            }
-          : productType === "ONE_TIME_ACTIVITY"
-            ? {
-                offerKind: "course" as const,
-                durationType: "single" as const,
-                intent: "куда_пойти" as const,
-              }
-            : productType === "PARTY_PACKAGE"
-              ? {
-                  offerKind: "birthday" as const,
-                  durationType: null,
-                  intent: "день_рождения" as const,
-                }
-              : {
-                  offerKind: "service" as const,
-                  durationType: null,
-                  intent:
-                    productType === "PARTY_SERVICE"
-                      ? ("день_рождения" as const)
-                      : ("куда_пойти" as const),
-                };
-
-    onChange((prev: OfferFormData) => ({
-      productType,
-      offerWizardType,
-      requestedPlacements: [defaultPlacement],
-      ...legacy,
+    if (data.productType === productType) return;
+    const selection = getOfferTypeSelection(productType);
+    onChange((prev) => ({
+      ...selection,
+      // Категории зависят от формата: при смене формата выбор сбрасывается.
+      categoryIds: [],
       serviceType: null,
       locationType: null,
       classFormat:
@@ -98,81 +65,140 @@ export function Step1Type({ data, onChange, isEditable }: Step1TypeProps) {
     }));
   };
 
-  const offerTypeOptions = [
-    {
-      value: "PLACE_VISIT" as const,
-      label: "Посещение места",
-      description:
-        "Игровая, батутный центр, музей, пространство, куда можно прийти с ребёнком.",
-      icon: MapPin,
-    },
-    {
-      value: "ONE_TIME_ACTIVITY" as const,
-      label: "Занятие / мастер-класс",
-      description: "Разовое занятие, мастер-класс, программа на один день.",
-      icon: GraduationCap,
-    },
-    {
-      value: "REGULAR_ACTIVITY" as const,
-      label: "Регулярная программа",
-      description: "Курс, секция, кружок или занятия по расписанию.",
-      icon: Repeat2,
-    },
-    {
-      value: "CAMP" as const,
-      label: "Лагерь / смена",
-      description: "Каникулы, городской лагерь, смены, интенсивы.",
-      icon: CalendarRange,
-    },
-    {
-      value: "PARTY_SERVICE" as const,
-      label: "Услуга для праздника",
-      description: "Аниматор, шоу, торт, декор, фото, еда или другая услуга.",
-      icon: Sparkles,
-    },
-    {
-      value: "PARTY_PACKAGE" as const,
-      label: "Праздник под ключ",
-      description: "Готовый пакет дня рождения или праздника.",
-      icon: PartyPopper,
-    },
-  ];
+  const handleCategoryChange = (category: OfferCreationCategory) => {
+    setExpandedCategory(category.key);
+    if (category.options.length > 1) {
+      // On mobile the four main cards can take more than one screen. Bring
+      // the newly revealed choices into view instead of leaving them below the fold.
+      window.requestAnimationFrame(() => {
+        document.getElementById("offer-creation-format")?.scrollIntoView({
+          block: "nearest",
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "auto"
+            : "smooth",
+        });
+      });
+    }
+    if (category.options.length === 1) {
+      handleTypeChange(category.options[0].value);
+    } else if (selectedCategory?.key !== category.key && data.productType) {
+      // Prevent continuing with the previously chosen productType while
+      // the user is choosing a different subtype.
+      onChange({
+        productType: null,
+        offerWizardType: null,
+        offerKind: null,
+        durationType: null,
+        intent: null,
+        requestedPlacements: [],
+        categoryIds: [],
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Что вы хотите добавить?</h2>
-        <p className="text-muted-foreground">
-          Persisted-тип предложения станет основой шагов мастера и сценариев размещения.
+      <div className="space-y-1">
+        <h2 className="text-xl font-semibold text-foreground">
+          Что вы хотите предложить семьям?
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Выберите подходящий вариант. Детали уточним дальше.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {offerTypeOptions.map((option) => {
-          const Icon = option.icon;
-          const isSelected = data.productType === option.value;
-          
+      <div className="grid gap-3 sm:grid-cols-2">
+        {OFFER_CREATION_CATEGORIES.map((category) => {
+          const Icon = icons[category.key];
+          const isActive = activeCategory?.key === category.key;
+          const isChosen = selectedCategory?.key === category.key;
           return (
-            <Card
-              key={option.value}
-              className={`cursor-pointer transition-all duration-200 ${
-                isSelected
-                  ? "ring-2 ring-[#EF8759] border-[#EF8759] bg-orange-50"
-                  : "hover:border-gray-300"
-              } ${!isEditable ? "opacity-50 cursor-not-allowed" : ""}`}
-              onClick={() => isEditable && handleTypeChange(option.value)}
+            <button
+              type="button"
+              key={category.key}
+              onClick={() => handleCategoryChange(category)}
+              disabled={!isEditable}
+              aria-pressed={isActive}
+              aria-controls={isActive && category.options.length > 1 ? "offer-creation-format" : undefined}
+              className={cn(
+                "w-full rounded-2xl border bg-card p-4 text-left transition-colors sm:p-5",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                "hover:border-[#EF8759]/70 disabled:cursor-not-allowed disabled:opacity-60",
+                isActive ? "border-[#EF8759] bg-[#EF8759]/5" : "border-border",
+              )}
             >
-              <CardContent className="p-6 text-center">
-                <Icon className="w-8 h-8 mx-auto mb-3 text-[#EF8759]" />
-                <h5 className="font-semibold mb-2 text-gray-900">{option.label}</h5>
-                <p className="text-sm text-muted-foreground">
-                  {option.description}
-                </p>
-              </CardContent>
-            </Card>
+              <div className="flex items-start gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#EF8759]/10 text-[#EF8759]">
+                  <Icon aria-hidden="true" className="size-5" />
+                </span>
+                <span className="min-w-0 flex-1 space-y-1">
+                  <span className="flex items-center gap-2 text-base font-semibold text-foreground">
+                    {category.label}
+                    {isChosen && <Check aria-hidden="true" className="size-4 shrink-0 text-[#EF8759]" />}
+                  </span>
+                  <span className="block text-sm leading-relaxed text-muted-foreground">
+                    {category.description}
+                  </span>
+                </span>
+              </div>
+            </button>
           );
         })}
       </div>
+
+      {activeCategory && activeCategory.options.length > 1 && (
+        <section
+          id="offer-creation-format"
+          className="space-y-4 rounded-2xl border border-border bg-muted/20 p-4 sm:p-5"
+          aria-label={activeCategory.question}
+        >
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold text-foreground">
+              {activeCategory.question}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Выберите один вариант, чтобы продолжить.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {activeCategory.options.map((option) => {
+              const isSelected = data.productType === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleTypeChange(option.value)}
+                  disabled={!isEditable}
+                  aria-pressed={isSelected}
+                  className={cn(
+                    "flex min-h-28 flex-col gap-1 rounded-xl border bg-card p-4 text-left transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    "hover:border-[#EF8759]/70 disabled:cursor-not-allowed disabled:opacity-60",
+                    isSelected && "border-[#EF8759] bg-[#EF8759]/5",
+                  )}
+                >
+                  <span className="flex w-full items-center justify-between gap-2 font-medium text-foreground">
+                    {option.label}
+                    {isSelected && <Check aria-hidden="true" className="size-4 shrink-0 text-[#EF8759]" />}
+                  </span>
+                  <span className="text-sm leading-relaxed text-muted-foreground">
+                    {option.description}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {showCategories && data.productType && (
+        <OfferCategoryPicker
+          productType={data.productType}
+          value={data.categoryIds}
+          onChange={(categoryIds) => onChange({ categoryIds })}
+          isEditable={isEditable}
+        />
+      )}
     </div>
   );
 }

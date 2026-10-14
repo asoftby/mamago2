@@ -6,6 +6,7 @@ import { Heart } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
+import type { ActivityTicketSource } from "@/components/activity/ActivityTicketCard";
 import { persistActivitySave } from "@/features/save/persistActivitySave";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
@@ -18,6 +19,8 @@ type SaveHeartProps = {
   offerId?: string;
   activityTitle: string;
   coverImageUrl?: string | null;
+  /** Public price/place metadata already available from the card, when present. */
+  ticket?: Partial<ActivityTicketSource>;
   /** Если известна единственная дата сеанса, показываем в модалке только её для «В план». */
   eventPlanDateISO?: string | null;
   /** Если активность длительная, используем конец диапазона для state-aware модалки. */
@@ -41,6 +44,7 @@ export function SaveHeart({
   offerId,
   activityTitle,
   coverImageUrl,
+  ticket,
   eventPlanDateISO,
   eventPlanDateEndISO,
   source,
@@ -53,6 +57,7 @@ export function SaveHeart({
   const [isLoading, setIsLoading] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [eventPlanDateOptions, setEventPlanDateOptions] = useState<string[]>([]);
+  const [eventTicket, setEventTicket] = useState<Partial<ActivityTicketSource>>({});
   const hasOpenedOnceRef = useRef(false);
   const [saveStatus, setSaveStatus] = useState({
     isIdea: false,
@@ -117,9 +122,11 @@ export function SaveHeart({
       try {
         const res = await fetch(`/api/save/available-plan-dates?activityId=${activityId}`);
         if (!res.ok) return;
-        const payload = (await res.json()) as { dates?: string[] };
+        const payload = (await res.json()) as { dates?: string[]; ticket?: Partial<ActivityTicketSource> };
         if (cancelled) return;
         setEventPlanDateOptions(Array.isArray(payload.dates) ? payload.dates : []);
+        // Only public events return details. An offer still uses its own supplied metadata.
+        setEventTicket(payload.ticket ?? {});
       } catch {
         if (!cancelled) setEventPlanDateOptions([]);
       }
@@ -214,6 +221,18 @@ export function SaveHeart({
         scenario={{
           kind: "quickdate",
           title: activityTitle,
+          ticket: {
+            ...eventTicket,
+            ...ticket,
+            title: activityTitle,
+            imageUrl: coverImageUrl ?? ticket?.imageUrl ?? null,
+            // Omitted fields should fall back to the activity response.
+            venue: ticket?.venue ?? eventTicket.venue,
+            address: ticket?.address ?? eventTicket.address,
+            priceMode: ticket?.priceMode ?? eventTicket.priceMode,
+            priceValue: ticket?.priceValue ?? eventTicket.priceValue,
+            priceLabel: ticket?.priceLabel ?? eventTicket.priceLabel,
+          },
           eventPlanDateISO: normalizedEventPlanDateISO,
           eventPlanDateEndISO: eventPlanDateEndISO ?? undefined,
           eventPlanDateOptions: eventPlanDateOptions,
