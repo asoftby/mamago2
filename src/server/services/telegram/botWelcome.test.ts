@@ -12,7 +12,7 @@ test("full text is for the allowlist, short text has no forwarding paragraph", (
 
 test("button points to /me/plan on a public https origin only", () => {
   assert.deepEqual(openPlanReplyMarkup("https://mamago.by"), {
-    inline_keyboard: [[{ text: "Открыть Мой план", url: "https://mamago.by/me/plan" }]],
+    inline_keyboard: [[{ text: "Открыть Мой план", web_app: { url: "https://mamago.by/telegram/open?next=%2Fme%2Fplan" } }]],
   });
   assert.equal(openPlanReplyMarkup("http://mamago.local:3000"), undefined);
   assert.equal(openPlanReplyMarkup("http://localhost:3000"), undefined);
