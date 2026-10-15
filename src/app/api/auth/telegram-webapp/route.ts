@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
+import { getCurrentUser } from "@/lib/auth/server";
 import { verifyTelegramWebAppInitData } from "@/lib/telegram/verifyWebAppInitData";
 import { getTelegramConfig } from "@/server/config/telegram.config";
 
@@ -17,6 +18,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "INVALID_CONTENT_TYPE" }, { status: 415, headers: noStore });
   }
 
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > 12_000) {
+    return NextResponse.json({ error: "INVALID_INIT_DATA" }, { status: 413, headers: noStore });
+  }
   const body = await request.json().catch(() => null);
   const initData = body && typeof body === "object" && typeof body.initData === "string"
     ? body.initData : null;
@@ -54,6 +59,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Avoid creating unlimited duplicate sessions when the right account is already active.
+    const current = await getCurrentUser();
+    if (current?.id === connection.userId) {
+      return NextResponse.json({ ok: true }, { headers: noStore });
+    }
     // An eligible linked account gets a fresh cookie, replacing any different
     // user session in this browser; the user's other sessions stay intact.
     const token = await createSession(connection.userId);
