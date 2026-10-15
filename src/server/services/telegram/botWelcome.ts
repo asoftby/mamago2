@@ -4,6 +4,7 @@ import type { TelegramEnvironment } from "@prisma/client";
 import { prismaBase } from "@/lib/prisma";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
 import type { TelegramReplyMarkup } from "./TelegramChannel";
+import { createTelegramLinkButton } from "@/lib/telegram/webAppButton";
 
 export const WELCOME_FULL_TEXT = [
   "✅ Telegram подключён к mamaGo. Привет! 👋",
@@ -57,7 +58,7 @@ export function openPlanReplyMarkup(baseUrl: string = getCanonicalPublicAppUrl()
   const host = url.hostname;
   const isLocal = host === "localhost" || host.endsWith(".local") || host.endsWith(".localhost") || host === "127.0.0.1";
   if (url.protocol !== "https:" || isLocal) return undefined;
-  return { inline_keyboard: [[{ text: OPEN_PLAN_BUTTON_TEXT, url: url.toString() }]] };
+  return { inline_keyboard: [[createTelegramLinkButton(OPEN_PLAN_BUTTON_TEXT, url.toString(), baseUrl)]] };
 }
 
 /** Persistence for "welcome sent once"; injectable for tests. */
