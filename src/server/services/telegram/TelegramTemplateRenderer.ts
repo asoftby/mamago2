@@ -7,6 +7,7 @@ import type {
   NotificationType,
 } from "@prisma/client";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
+import { createTelegramLinkButton } from "@/lib/telegram/webAppButton";
 import { getNotificationRegistryEntry } from "@/lib/notifications/notificationRegistry";
 import type { TelegramReplyMarkup } from "./TelegramChannel";
 
@@ -141,8 +142,7 @@ function buildReplyMarkup(
     inline_keyboard: [
       [
         {
-          text: registryEntry.ctaLabel,
-          url: absoluteUrl,
+          ...createTelegramLinkButton(registryEntry.ctaLabel, absoluteUrl, getPublicAppBaseUrl()),
         },
       ],
     ],
