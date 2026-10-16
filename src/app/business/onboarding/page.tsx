@@ -72,11 +72,15 @@ export default async function OnboardingPage() {
     await loadBusinessContactOtpClientState(user.id);
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="bg-white rounded-lg shadow p-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">
-          {isEditing ? "Редактировать профиль бизнеса" : "mamaGo Business"}
+    <div className="mx-auto max-w-2xl px-3 py-4 sm:px-0">
+      <div className="rounded-[28px] border border-stone-200 bg-white p-5 shadow-sm sm:p-8">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-stone-500">mamaGo Business</p>
+        <h1 className="mb-3 text-2xl font-semibold tracking-tight text-stone-950 sm:text-3xl">
+          {isEditing ? "Данные вашей компании" : "Расскажите о вашем бизнесе"}
         </h1>
+        <p className="mb-6 text-sm leading-relaxed text-stone-600">
+          После подтверждения компании вы сможете публиковать места, события и предложения для семей, а также отслеживать их результаты.
+        </p>
         
         <div className="space-y-6">
           {isEditing && verificationStatus === "REJECTED" && (
@@ -91,14 +95,20 @@ export default async function OnboardingPage() {
           )}
 
           {!isEditing && (
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-              <h2 className="text-lg font-semibold text-blue-900 mb-2">
-                Создайте профиль компании
-              </h2>
-              <p className="text-blue-700 text-sm">
-                Заполните данные ниже — после проверки вы сможете добавлять свои публикации
-                (места, события, предложения).
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+              <p className="text-sm font-semibold text-stone-900">Первый шаг — подтвердить компанию</p>
+              <p className="mt-1 text-sm leading-relaxed text-stone-600">
+                Укажите УНП, юридическое название и контактный номер. После отправки мы покажем статус заявки и познакомим с возможностями mamaGo.
               </p>
+            </div>
+          )}
+          {isEditing && verificationStatus === "NEEDS_INFO" && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="font-semibold text-amber-950">Нужно уточнить данные</p>
+              <p className="mt-1 text-sm text-amber-900">
+                Внесите исправления, которые запросил модератор, и отправьте форму повторно.
+              </p>
+              {existingBusiness?.reviewNote && <p className="mt-2 whitespace-pre-wrap text-sm text-amber-900">{existingBusiness.reviewNote}</p>}
             </div>
           )}
 
