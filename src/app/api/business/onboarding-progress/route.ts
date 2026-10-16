@@ -45,11 +45,11 @@ export async function POST(request: NextRequest) {
     create: {
       businessId: business.id,
       userId: user.id,
-      startedAt: now,
+      ...(action === "start" ? { startedAt: now } : {}),
       tourVersion: 1,
       ...patch,
     },
-    update: { startedAt: now, ...patch },
+    update: { ...(action === "start" ? { startedAt: now } : {}), ...patch },
   });
 
   return NextResponse.json({ ok: true }, { headers: noStore });
