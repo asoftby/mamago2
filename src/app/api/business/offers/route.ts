@@ -123,6 +123,10 @@ const createOfferSchema = z.object({
   categoryIds: z.array(z.string()).max(3).optional(),
   /** Интересы ребёнка (до 5), slug из SYSTEM_INTERESTS. */
   interestSlugs: z.array(z.string()).max(5).optional(),
+  /** Предоплата / отмена / зона выезда (новый мастер). Пустая строка и null стирают значение. */
+  prepaymentTerms: z.string().trim().max(500).nullable().optional(),
+  cancellationTerms: z.string().trim().max(500).nullable().optional(),
+  serviceAreaText: z.string().trim().max(200).nullable().optional(),
   status: z.enum(["DRAFT", "PENDING", "PUBLISHED"]).default("DRAFT"),
   discoverySignalIds: z.array(z.string()).default([]),
   classChipSlugs: z.array(z.string()).default([]),
@@ -378,6 +382,9 @@ export async function POST(request: NextRequest) {
             // Основное описание (rich text) — в Offer.description; краткое — только если полного нет.
             description: data.description?.trim() ? data.description : data.shortDescription,
             ...(interestsCheck?.ok ? { interestSlugs: interestsCheck.slugs } : {}),
+            prepaymentTerms: data.prepaymentTerms?.trim() || null,
+            cancellationTerms: data.cancellationTerms?.trim() || null,
+            serviceAreaText: data.serviceAreaText?.trim() || null,
             coverImage: data.coverImage,
             galleryImages: data.gallery ?? [],
             videoUrl: data.videoUrl,

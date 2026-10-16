@@ -34,7 +34,7 @@ const V2_KEYS = ["type", "about", "services", "schedule", "terms", "review"];
     "bookingMethod",
   ]);
   assert.deepEqual(getV2StepMembers("services", base), ["price"]);
-  assert.deepEqual(getV2StepMembers("terms", base), ["contacts"]);
+  assert.deepEqual(getV2StepMembers("terms", base), ["contacts", "paymentTerms"]);
 }
 
 console.log("offerWizardV2Steps contract tests passed");

@@ -2453,6 +2453,12 @@ model Offer {
   classChipSlugs           String[]             @default([])
   /// Интересы ребёнка (до 5): slug из SYSTEM_INTERESTS (src/lib/config/interests.ts).
   interestSlugs            String[]             @default([])
+  /// Предоплата: стандартная строка чипа («Предоплата 30%») либо «Своё: …». Копия значений party-оффера из details не трогается.
+  prepaymentTerms          String?
+  /// Отмена и возврат: стандартная строка чипа либо «Своё: …».
+  cancellationTerms        String?
+  /// Зона выезда (праздник с выездом), свободный короткий текст.
+  serviceAreaText          String?
   /// Шаги мастера, явно завершённые пользователем через «Далее» (OfferWizardStepKey)
   wizardCompletedSteps     String[]             @default([])
   faqItems                 Json?
