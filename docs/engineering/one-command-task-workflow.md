@@ -86,7 +86,7 @@ sh scripts/git/worktree-deps.sh list-symlinks  # read-only report of worktrees s
 
 - `task-start.sh` runs `install` in the new worktree (`MAMAGO_SKIP_DEPS=1` skips it; for tests only).
 - `task-sync.sh` regenerates the client when the merge from `origin/dev` changed `prisma/*.prisma`, and reinstalls when `pnpm-lock.yaml` changed.
-- `task-check.sh` runs `ensure`; `run-push-gate.sh` (the pre-push hook) runs `check` and refuses to push when `node_modules` is a symlink pointing outside the worktree (exit 10), is missing (11), or the generated client is older than `prisma/*.prisma` (12).
+- `task-check.sh` and `task-finish.sh` run `ensure`; `run-push-gate.sh` (the pre-push hook) runs `check` and refuses to push when `node_modules` is a symlink pointing outside the worktree (exit 10), is missing (11), or the schema/config/generated-client content fingerprint is missing or changed (12).
 - Migrating an existing worktree that uses a symlink: `rm node_modules && sh scripts/git/worktree-deps.sh install` (removes only the link). The scripts never do this automatically for you.
 
 ## Optional preflight
@@ -107,7 +107,7 @@ mgcheck
 6. shows the task-only diff file list;
 7. runs `git diff --check`;
 8. requires Node 22 and `pnpm`;
-9. `worktree-deps.sh ensure`: installs dependencies if the worktree has no `node_modules`, regenerates the Prisma Client if it is older than `prisma/*.prisma`, and fails if `node_modules` is a symlink pointing outside the worktree;
+9. `worktree-deps.sh ensure`: installs dependencies if the worktree has no `node_modules`, regenerates the Prisma Client if its schema/config/generated-client fingerprint is missing or changed, and fails if `node_modules` is a symlink pointing outside the worktree;
 10. runs `pnpm check:push`.
 
 Targeted tests required by the task are still the agent/developer's responsibility. `mgcheck` is the common repository gate, not a replacement for task-specific verification.

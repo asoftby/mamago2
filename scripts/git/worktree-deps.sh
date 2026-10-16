@@ -41,19 +41,11 @@ print_symlink_fix() {
   echo "  rm node_modules && sh scripts/git/worktree-deps.sh install" >&2
 }
 
-client_file() {
-  [ -d node_modules/@prisma/client ] || return 1
-  node -e "
-    try {
-      const c = require.resolve('@prisma/client', { paths: [process.cwd()] });
-      process.stdout.write(require.resolve('.prisma/client/index.js', { paths: [c] }));
-    } catch { process.exit(1); }
-  " 2>/dev/null
-}
 
 generate() {
   echo "$tag Generating Prisma Client from $repo_root/prisma"
   pnpm exec prisma generate
+  node scripts/git/worktree-fingerprint.cjs write
 }
 
 install() {
@@ -72,10 +64,11 @@ install() {
   generate
 }
 
-# Returns 0 when the generated client is missing or older than any prisma/*.prisma file.
+# Compare schema/config and generated JS/types contents, not timestamps.
+# A restored file can retain its mtime even when its schema has changed.
 client_stale() {
-  cf="$(client_file)" || return 0
-  [ -n "$(find prisma -maxdepth 1 -name '*.prisma' -newer "$cf" 2>/dev/null | head -1)" ]
+  if node scripts/git/worktree-fingerprint.cjs check; then return 1; fi
+  return 0
 }
 
 check() {
@@ -88,7 +81,7 @@ check() {
     exit 11
   fi
   if client_stale; then
-    echo "$tag STOP: generated Prisma Client is missing or older than prisma/*.prisma." >&2
+    echo "$tag STOP: generated Prisma Client or its schema fingerprint is missing or changed." >&2
     echo "$tag Run: sh scripts/git/worktree-deps.sh generate" >&2
     exit 12
   fi

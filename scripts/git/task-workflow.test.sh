@@ -8,6 +8,8 @@ if [ -z "$source_repo" ]; then
 fi
 
 tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/mamago-task-workflow.XXXXXX")"
+# macOS /var is a symlink; Git reports the physical /private/var path.
+tmp_root="$(cd "$tmp_root" && pwd -P)"
 trap 'rm -rf "$tmp_root"' EXIT HUP INT TERM
 
 remote="$tmp_root/remote.git"
@@ -27,6 +29,13 @@ mkdir -p "$stub_bin"
 cat > "$stub_bin/pnpm" <<'STUB'
 #!/usr/bin/env sh
 printf '%s\n' "$*" >> "$PNPM_STUB_LOG"
+if [ "$*" = 'exec prisma generate' ]; then
+  mkdir -p node_modules/@prisma/client node_modules/.prisma/client
+  printf '{"name":"@prisma/client","main":"index.js"}\n' > node_modules/@prisma/client/package.json
+  printf '' > node_modules/@prisma/client/index.js
+  printf '// generated client\n' > node_modules/.prisma/client/index.js
+  printf '// generated types\n' > node_modules/.prisma/client/index.d.ts
+fi
 STUB
 chmod +x "$stub_bin/pnpm"
 PATH="$stub_bin:$PATH"
@@ -43,9 +52,13 @@ cp "$source_repo/scripts/git/session-start-gate.sh" "$canonical/scripts/git/sess
 cp "$source_repo/scripts/git/task-start.sh" "$canonical/scripts/git/task-start.sh"
 cp "$source_repo/scripts/git/task-sync.sh" "$canonical/scripts/git/task-sync.sh"
 cp "$source_repo/scripts/git/worktree-deps.sh" "$canonical/scripts/git/worktree-deps.sh"
+cp "$source_repo/scripts/git/worktree-fingerprint.cjs" "$canonical/scripts/git/worktree-fingerprint.cjs"
 cp "$source_repo/scripts/git/install-shell-shortcuts.sh" "$canonical/scripts/git/install-shell-shortcuts.sh"
 printf 'init\n' > "$canonical/README.md"
-git -C "$canonical" add README.md scripts/git
+printf 'node_modules/\n' > "$canonical/.gitignore"
+mkdir -p "$canonical/prisma"
+printf '// schema fixture\n' > "$canonical/prisma/schema.prisma"
+git -C "$canonical" add README.md scripts/git .gitignore prisma
 git -C "$canonical" commit -m "test: initialize dev" >/dev/null
 git -C "$canonical" branch -M dev
 quiet_git -C "$canonical" push -u origin dev
@@ -148,6 +161,7 @@ set -e
 
 # Guard: a node_modules symlink pointing outside the worktree must fail; one inside is fine.
 mkdir -p "$tmp_root/shared-nm"
+rm -rf "$second_worktree/node_modules"
 ln -s "$tmp_root/shared-nm" "$second_worktree/node_modules"
 set +e
 (cd "$second_worktree" && sh scripts/git/worktree-deps.sh check >/dev/null 2>&1)
@@ -159,27 +173,33 @@ set -e
 }
 rm "$second_worktree/node_modules"
 
-# Guard: stale generated client fails; fresh passes. Uses a fake @prisma/client + client.
-mkdir -p "$second_worktree/node_modules/@prisma/client" "$second_worktree/node_modules/.prisma/client" "$second_worktree/prisma"
-printf '{"name":"@prisma/client","main":"index.js"}\n' > "$second_worktree/node_modules/@prisma/client/package.json"
-printf '' > "$second_worktree/node_modules/@prisma/client/index.js"
-printf '' > "$second_worktree/node_modules/.prisma/client/index.js"
-printf 'x\n' > "$second_worktree/prisma/schema.prisma"
-touch -t 202001010000 "$second_worktree/node_modules/.prisma/client/index.js"
+# Content-based guard catches schema changes even if a restore preserves mtime.
+(cd "$second_worktree" && sh scripts/git/worktree-deps.sh generate >/dev/null)
+(cd "$second_worktree" && sh scripts/git/worktree-deps.sh check >/dev/null)
+cp -p "$second_worktree/prisma/schema.prisma" "$tmp_root/original-schema"
+printf '// changed schema\n' > "$second_worktree/prisma/schema.prisma"
+touch -r "$tmp_root/original-schema" "$second_worktree/prisma/schema.prisma"
 set +e
 (cd "$second_worktree" && sh scripts/git/worktree-deps.sh check >/dev/null 2>&1)
 stale_status=$?
 set -e
 [ "$stale_status" -eq 12 ] || {
-  echo "[task-workflow-test] stale Prisma Client must fail the guard (got $stale_status)" >&2
+  echo "[task-workflow-test] changed schema with preserved mtime must fail (got $stale_status)" >&2
   exit 1
 }
-touch "$second_worktree/node_modules/.prisma/client/index.js"
-(cd "$second_worktree" && sh scripts/git/worktree-deps.sh check >/dev/null) || {
-  echo "[task-workflow-test] fresh Prisma Client must pass the guard" >&2
+(cd "$second_worktree" && sh scripts/git/worktree-deps.sh generate >/dev/null)
+(cd "$second_worktree" && sh scripts/git/worktree-deps.sh check >/dev/null)
+# Regenerating or replacing a shared client's JS/types must invalidate the guard.
+printf '// foreign generated types\n' >> "$second_worktree/node_modules/.prisma/client/index.d.ts"
+set +e
+(cd "$second_worktree" && sh scripts/git/worktree-deps.sh check >/dev/null 2>&1)
+foreign_status=$?
+set -e
+[ "$foreign_status" -eq 12 ] || {
+  echo "[task-workflow-test] changed generated client must fail (got $foreign_status)" >&2
   exit 1
 }
-rm -rf "$second_worktree/node_modules" "$second_worktree/prisma"
+rm -rf "$second_worktree/node_modules"
 
 mkdir -p "$home_dir"
 (
