@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 interface BusinessSurfaceCardProps {
   children: React.ReactNode;
   className?: string;
+  "data-business-tour"?: string;
   tone?: "default" | "warm" | "accent" | "success" | "dark";
 }
 
@@ -10,9 +11,11 @@ export function BusinessSurfaceCard({
   children,
   className,
   tone = "default",
+  "data-business-tour": tourAnchor,
 }: BusinessSurfaceCardProps) {
   return (
     <div
+      data-business-tour={tourAnchor}
       className={cn(
         "rounded-[28px] border p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_14px_36px_rgba(15,23,42,0.04)]",
         tone === "default" && "border-stone-200/80 bg-white",
