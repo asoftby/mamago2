@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { BusinessOnboardingSnapshot } from "@/lib/business/onboardingProgress";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
@@ -24,6 +25,8 @@ import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type DashboardData = {
+  onboarding: BusinessOnboardingSnapshot;
+  onboardingPublicHref: string | null;
   // Business identity
   businessName: string;
   legalName?: string | null;
@@ -468,8 +471,9 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
     router.replace(`${pathname}?${query.toString()}`, { scroll: false });
   }
 
-  // No publications → onboarding screen
-  const isOnboarding = data.totalPublications === 0;
+  // A business with published content is not forced back into onboarding.
+  // First-time businesses remain in the launchpad until they inspect their first public card.
+  const isOnboarding = data.onboarding.showLaunchpad;
 
   return (
     <div className="space-y-5">
