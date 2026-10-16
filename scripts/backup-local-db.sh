@@ -116,7 +116,7 @@ if ! docker exec "${CONTAINER_NAME}" pg_isready -h "${PG_EXEC_HOST}" -p "${PG_EX
 fi
 
 TIMESTAMP="$(date +"%Y-%m-%d-%H-%M-%S")"
-BACKUP_SQL="$(mktemp "${BACKUP_DIR}/mamago-local-${TIMESTAMP}.XXXXXX.sql")"
+BACKUP_SQL="$(mktemp "${BACKUP_DIR}/mamago-local-${TIMESTAMP}.sql.XXXXXX")"
 BACKUP_GZ="${BACKUP_SQL}.gz"
 
 echo "Creating backup from ${DB_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME} using container ${CONTAINER_NAME}..."
