@@ -134,7 +134,7 @@ for (const secondStart of [1020, 1080]) {
     validFrom: group.period?.from ?? null, validTo: group.period?.to ?? null,
   })));
   const expected = rules.map(({ capacity: _capacity, ...rule }) => rule);
-  const sorted = (rows: typeof expected) => rows.map(row => JSON.stringify(row)).sort();
+  const sorted = (rows: Array<{ weekday: number; startMinutes: number; validFrom: string | null; validTo: string | null }>) => rows.map(row => JSON.stringify(row)).sort();
   assert.deepEqual(sorted(actual), sorted(expected));
 }
 // Явный null группы означает отсутствие границ, а не общий период.
