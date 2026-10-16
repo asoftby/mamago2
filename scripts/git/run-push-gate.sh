@@ -15,6 +15,12 @@
 root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$root" || exit 1
 
+# Hard guard: node_modules must belong to this worktree and the Prisma Client must match
+# this worktree's schema, otherwise typecheck/build results are meaningless.
+if [ -f scripts/git/worktree-deps.sh ]; then
+  sh scripts/git/worktree-deps.sh check || exit 1
+fi
+
 gate_dir="${NEXT_DIST_DIR:-node_modules/.cache/next-gate}"
 max_gb="${NEXT_CACHE_MAX_GB:-6}"
 max_kb=$((max_gb * 1024 * 1024))

@@ -59,6 +59,12 @@ if ! command -v pnpm >/dev/null 2>&1; then
   exit 5
 fi
 
+# Keep the one-command finish path usable after a task edits its Prisma schema.
+# The pre-push hook still checks the resulting fingerprint before verification.
+if [ -f scripts/git/worktree-deps.sh ]; then
+  sh scripts/git/worktree-deps.sh ensure
+fi
+
 echo "[task-finish] Final task-only diff against origin/dev:"
 git diff --name-only origin/dev...HEAD | sed 's/^/  - /'
 

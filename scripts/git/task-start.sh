@@ -129,6 +129,18 @@ case "$common_git_dir" in
 esac
 printf '%s\n' "$worktree_path" > "$common_git_dir/mamago-last-worktree"
 
+# Every worktree gets its OWN node_modules and Prisma Client (never a symlink to another
+# checkout): a shared generated client makes tsc results depend on whichever schema was
+# generated last. pnpm's content-addressable store makes this fast.
+if [ "${MAMAGO_SKIP_DEPS:-}" != "1" ]; then
+  if ! (cd "$worktree_path" && sh scripts/git/worktree-deps.sh install); then
+    echo "[task-start] STOP: worktree created but dependency install / prisma generate failed." >&2
+    echo "[task-start] Fix and rerun in the worktree: sh scripts/git/worktree-deps.sh install" >&2
+    echo "[task-start] worktree=$worktree_path" >&2
+    exit 9
+  fi
+fi
+
 cat <<READY
 
 TASK READY
