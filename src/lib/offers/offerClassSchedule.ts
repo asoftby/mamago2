@@ -242,7 +242,7 @@ export function groupsFromRules(
       if (!existing.days.includes(rule.weekday)) existing.days.push(rule.weekday);
     } else {
       byKey.set(groupKey, {
-        id: newClassScheduleId(),
+        id: `group:${groupKey}`,
         days: [rule.weekday],
         time: minutesToTime(rule.startMinutes),
         seats: rule.capacity ? String(rule.capacity) : "",

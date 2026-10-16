@@ -28,7 +28,6 @@ import {
 import {
   defaultClassSchedule,
   groupsFromRules,
-  newClassScheduleId,
   offerIsClass,
 } from "@/lib/offers/offerClassSchedule";
 import type { OpeningHoursData } from "@/components/openingHours/openingHours.types";
@@ -1046,7 +1045,7 @@ function classScheduleFromOffer(offer: {
       }).formatToParts(new Date(session.startAt));
       const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "00";
       return {
-        id: newClassScheduleId(),
+        id: `session:${new Date(session.startAt).toISOString()}`,
         date: `${part("year")}-${part("month")}-${part("day")}`,
         time: `${part("hour")}:${part("minute")}`,
         seats: session.capacity ? String(session.capacity) : "",

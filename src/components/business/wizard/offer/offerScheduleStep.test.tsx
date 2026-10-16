@@ -1,3 +1,4 @@
+import { mapOfferToFormData } from "./mappers";
 import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -99,3 +100,17 @@ const endOnlyLabel = `… — ${new Date(2026, 11, 31).toLocaleDateString("ru-RU
 assert.ok(mixedHtml.includes(endOnlyLabel), "end-only period should display its date, not an empty placeholder");
 assert.equal((mixedHtml.match(/Без ограничения по датам/g) ?? []).length, 1);
 console.log("mixed class period display tests passed");
+
+const savedClass = {
+  kind: "SERVICE" as const, title: "Class", description: null, coverImage: null,
+  priceFrom: null, priceText: null, priceMode: "EXACT" as const,
+  ageMinMonths: null, ageMaxMonths: null,
+  agePolicy: "UNRESTRICTED" as const,
+  sessions: [{ startAt: "2026-11-01T09:00:00.000Z", capacity: 10 }],
+  offerBooking: { timezone: "Europe/Minsk", rules: [{ weekday: 1, startMinutes: 1020, capacity: 10 }] },
+};
+for (const productType of ["REGULAR_ACTIVITY", "ONE_TIME_ACTIVITY"] as const) {
+  const row = { ...savedClass, productType };
+  assert.deepEqual(mapOfferToFormData(row), mapOfferToFormData(row), `stable baseline: ${productType}`);
+}
+console.log("saved schedule baseline identity tests passed");

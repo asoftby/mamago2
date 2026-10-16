@@ -1,3 +1,4 @@
+import { publicOfferSessionWhere } from "@/lib/offers/publicOfferSessions";
 import { ActivityType, MediaEntityType } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
@@ -104,6 +105,7 @@ export async function loadStoryRailCandidatePool(input: {
       prisma.offerSession.findMany({
         where: {
           AND: [
+            publicOfferSessionWhere,
             offerSessionWhere,
             { offer: offerBase },
           ],

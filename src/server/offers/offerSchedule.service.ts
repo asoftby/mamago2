@@ -64,6 +64,8 @@ export interface ApplyOfferScheduleParams {
   input: OfferScheduleInput | undefined;
   /** Опубликованный оффер, который правит не сотрудник: ссылку менять напрямую нельзя. */
   externalUrlNeedsModeration: boolean;
+  /** Тип опубликованного оффера остаётся живым до одобрения ревизии. */
+  typeChangeRequiresModeration?: boolean;
 }
 
 /**
@@ -74,6 +76,9 @@ export interface ApplyOfferScheduleParams {
 export async function applyOfferSchedule(params: ApplyOfferScheduleParams): Promise<void> {
   const { db, offerId, input } = params;
   if (!input) return;
+  if (params.typeChangeRequiresModeration && Object.keys(input).length > 0) {
+    throw new OfferScheduleValidationError("Сначала отправьте смену типа предложения на модерацию без изменения расписания. Расписание нового типа можно настроить после одобрения.");
+  }
   assertScheduleValid(input);
 
   if (input.bookingMethod) {
@@ -212,7 +217,8 @@ async function applyClassSchedule(db: Db, offerId: string, schedule: ClassSchedu
     // Конфликтующие значения одного ключа отклоняем, а не выбираем первое молча.
     const seen = new Map<string, (typeof rows)[number]>();
     const unique = rows.filter((row) => {
-      const key = JSON.stringify([row.weekday, row.startMinutes, row.endMinutes, row.validFrom]);
+      const key = JSON.stringify([row.weekday, row.startMinutes, row.endMinutes, row.validFrom,
+        row.validFrom === null ? row.validTo : null]);
       const previous = seen.get(key);
       if (previous) {
         if (previous.capacity !== row.capacity || previous.validTo?.getTime() !== row.validTo?.getTime()) {
@@ -224,9 +230,13 @@ async function applyClassSchedule(db: Db, offerId: string, schedule: ClassSchedu
       return true;
     });
     if (unique.length > 0) await db.offerScheduleRule.createMany({ data: unique });
+    // Сохраняем историю и ссылки заявок, но прежние разовые даты больше не активны.
+    await db.offerSession.updateMany({ where: { offerId, isCancelled: false }, data: { isCancelled: true } });
     return;
   }
 
+  // Удаляем прежнее регулярное представление при переходе к разовым датам.
+  await db.offerScheduleRule.deleteMany({ where: { offerBookingId: booking.id } });
   // Разовые занятия — OfferSession по датам.
   const wanted = new Map<number, { startAt: Date; endAt: Date; capacity: number | null }>();
   for (const item of schedule.dates) {

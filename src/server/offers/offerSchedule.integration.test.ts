@@ -1,3 +1,4 @@
+import { publicOfferSessionWhere } from "@/lib/offers/publicOfferSessions";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
@@ -347,4 +348,52 @@ test("конфликтующие правила отклоняются без ч
   })), OfferScheduleValidationError);
   assert.deepEqual(await db.offerScheduleRule.findMany({ where: { offerBookingId: booking.id } }), before);
   assert.deepEqual(await db.offerScheduleException.findMany({ where: { offerBookingId: booking.id } }), exceptions);
+});
+
+test("смена типа на модерации не меняет живое расписание или операционные поля", async () => {
+  const offerId = await newOffer({ productType: "REGULAR_ACTIVITY", status: "PUBLISHED" });
+  await db.$transaction(tx => applyOfferSchedule({ db: tx, offerId, input: classInput(), externalUrlNeedsModeration: false }));
+  const before = await db.offerBooking.findUniqueOrThrow({ where: { offerId }, include: { rules: true, exceptions: true } });
+  await assert.rejects(db.$transaction(tx => applyOfferSchedule({
+    db: tx, offerId, externalUrlNeedsModeration: true, typeChangeRequiresModeration: true,
+    input: { classSchedule: { kind: "dated", durationMin: 60, groups: [], period: null, closedDates: [], dates: [{ date: "2026-11-01", time: "12:00", seats: 10 }] } },
+  })), OfferScheduleValidationError);
+  assert.deepEqual(await db.offerBooking.findUniqueOrThrow({ where: { offerId }, include: { rules: true, exceptions: true } }), before);
+  assert.equal(await db.offerSession.count({ where: { offerId } }), 0);
+  // A type-only revision has no schedule to apply and remains allowed.
+  await db.$transaction(tx => applyOfferSchedule({ db: tx, offerId, input: undefined, externalUrlNeedsModeration: true, typeChangeRequiresModeration: true }));
+});
+
+test("переход разовые → регулярные сохраняет заявки, но скрывает старые даты", async () => {
+  const offerId = await newOffer({ productType: "ONE_TIME_ACTIVITY" });
+  const session = await db.offerSession.create({ data: { offerId, startAt: new Date("2026-11-01T09:00Z"), endAt: new Date("2026-11-01T10:00Z") } });
+  const request = await db.bookingRequest.create({ data: { businessId, publicationType: "OFFER", offerId, offerSessionId: session.id, customerName: "Parent", customerPhone: "+375291112233" } });
+  await db.$transaction(tx => applyOfferSchedule({ db: tx, offerId, input: classInput(), externalUrlNeedsModeration: false }));
+  assert.equal((await db.offerSession.findUniqueOrThrow({ where: { id: session.id } })).isCancelled, true);
+  assert.equal((await db.bookingRequest.findUniqueOrThrow({ where: { id: request.id } })).offerSessionId, session.id);
+  assert.deepEqual(await db.offerSession.findMany({ where: { offerId, ...publicOfferSessionWhere } }), []);
+  // Returning to a dated schedule removes dormant recurring rules and revives the chosen date.
+  await db.$transaction(tx => applyOfferSchedule({ db: tx, offerId, externalUrlNeedsModeration: false, input: { classSchedule: {
+    kind: "dated", durationMin: 60, groups: [], period: null, closedDates: [], dates: [{ date: "2026-11-01", time: "12:00", seats: 10 }],
+  } } }));
+  const booking = await db.offerBooking.findUniqueOrThrow({ where: { offerId } });
+  assert.equal(await db.offerScheduleRule.count({ where: { offerBookingId: booking.id } }), 0);
+  const visible = await db.offerSession.findMany({ where: { offerId, ...publicOfferSessionWhere } });
+  assert.equal(visible.length, 1);
+  assert.equal(visible[0].id, session.id);
+  // A type-only approval must also hide historical dates before new rules are configured.
+  await db.offer.update({ where: { id: offerId }, data: { productType: "REGULAR_ACTIVITY" } });
+  assert.deepEqual(await db.offerSession.findMany({ where: { offerId, ...publicOfferSessionWhere } }), []);
+  await db.offer.update({ where: { id: offerId }, data: { productType: null } });
+  assert.equal(await db.offerSession.count({ where: { offerId, ...publicOfferSessionWhere } }), 1, "legacy offers remain visible");
+});
+
+test("одинаковое время с разными end-only периодами не теряется", async () => {
+  const offerId = await newOffer({ productType: "REGULAR_ACTIVITY" });
+  const groups = ["2026-10-31", "2026-11-30"].map(to => ({ days: [1], time: "17:00", seats: 10, period: { from: null, to } }));
+  await db.$transaction(tx => applyOfferSchedule({ db: tx, offerId, externalUrlNeedsModeration: false, input: { classSchedule: {
+    kind: "recurring", durationMin: 60, groups, dates: [], period: null, closedDates: [],
+  } } }));
+  const booking = await db.offerBooking.findUniqueOrThrow({ where: { offerId } });
+  assert.equal(await db.offerScheduleRule.count({ where: { offerBookingId: booking.id } }), 2);
 });

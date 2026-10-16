@@ -601,6 +601,7 @@ export async function PATCH(
       /** Для опубликованного оффера проекция смен строится из итоговых данных, а не из payload. */
       campProjection: { isCamp: boolean; sessions: unknown } | null;
       skipCategories: boolean;
+      scheduleTypeChangePending: boolean;
       /** Создана новая ожидающая ревизия (а не обновлена существующая) — уведомляем админов. */
       revisionCreated: boolean;
       revisionId: string | null;
@@ -610,6 +611,7 @@ export async function PATCH(
       journal: null,
       campProjection: null,
       skipCategories: false,
+      scheduleTypeChangePending: false,
       revisionCreated: false,
       revisionId: null,
     };
@@ -723,6 +725,9 @@ export async function PATCH(
           forceContentColumns: [...invalidPhoneColumns, ...typeDerivedColumns],
         });
 
+        gate.scheduleTypeChangePending = live.status === "PUBLISHED" &&
+          TYPE_SWITCH_COLUMNS.some(column => decision.contentColumns.includes(column));
+
         // Устаревший снимок формы: цены/смены/телефоны изменили после загрузки редактора (например, админ
         // поправил цену), а владелец сохраняет операционные значения. Мы не знаем, какие из них он правил
         // сам, поэтому не перезаписываем чужие правки — просим обновить страницу. Версия — хэш значений,
@@ -828,6 +833,7 @@ export async function PATCH(
         offerId: id,
         input: data.schedule,
         externalUrlNeedsModeration: gateApplies && existingOffer.status === "PUBLISHED",
+        typeChangeRequiresModeration: gate.scheduleTypeChangePending,
       });
 
       if (scheduleBefore) {

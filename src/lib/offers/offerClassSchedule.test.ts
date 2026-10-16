@@ -153,3 +153,10 @@ const invalidGroupPeriod = { ...defaultClassSchedule(), groups: [{
 }] };
 assert.ok(getClassScheduleMissingFields(invalidGroupPeriod, "REGULAR_ACTIVITY", "60").includes("Даты курса"));
 console.log("class period preservation regressions passed");
+
+// Restoration is deterministic: opening the editor twice must not create dirty state.
+const stableRules = [
+  { weekday: 1, startMinutes: 1020, capacity: 8, validFrom: "2026-10-01", validTo: "2026-10-31" },
+  { weekday: 3, startMinutes: 1020, capacity: 8, validFrom: "2026-10-01", validTo: "2026-10-31" },
+];
+assert.deepEqual(groupsFromRules(stableRules), groupsFromRules(stableRules));
