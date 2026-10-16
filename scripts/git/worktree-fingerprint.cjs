@@ -14,11 +14,16 @@ function digest(files) {
 
 try {
   const mode = process.argv[2];
-  if (!['write', 'check'].includes(mode)) throw new Error('Expected write or check');
+  if (!['write', 'check', 'ownership'].includes(mode)) throw new Error('Expected write, check or ownership');
   const root = fs.realpathSync(process.cwd());
   const modules = fs.realpathSync(path.join(root, 'node_modules'));
   if (!modules.startsWith(root + path.sep)) throw new Error('node_modules is outside this worktree');
   const entry = require.resolve('@prisma/client', { paths: [root] });
+  if (!fs.realpathSync(entry).startsWith(modules + path.sep)) {
+    throw new Error('Prisma package is outside this worktree');
+  }
+  // Check package ownership before the generator can write into its output.
+  if (mode === 'ownership') process.exit(0);
   const client = fs.realpathSync(require.resolve('.prisma/client/index.js', { paths: [entry] }));
   if (!client.startsWith(modules + path.sep)) {
     throw new Error('Generated Prisma Client is outside this worktree');
@@ -47,6 +52,6 @@ try {
     fs.renameSync(temporary, stamp);
   }
 } catch (error) {
-  if (process.argv[2] === 'write') console.error('[worktree-deps] Cannot fingerprint generated client:', error.message);
+  if (process.argv[2] !== 'check') console.error('[worktree-deps] Cannot fingerprint generated client:', error.message);
   process.exitCode = 1;
 }

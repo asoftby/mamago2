@@ -29,10 +29,11 @@ mkdir -p "$stub_bin"
 cat > "$stub_bin/pnpm" <<'STUB'
 #!/usr/bin/env sh
 printf '%s\n' "$*" >> "$PNPM_STUB_LOG"
+mkdir -p node_modules/@prisma/client
+printf '{"name":"@prisma/client","main":"index.js"}\n' > node_modules/@prisma/client/package.json
+printf '' > node_modules/@prisma/client/index.js
 if [ "$*" = 'exec prisma generate' ]; then
-  mkdir -p node_modules/@prisma/client node_modules/.prisma/client
-  printf '{"name":"@prisma/client","main":"index.js"}\n' > node_modules/@prisma/client/package.json
-  printf '' > node_modules/@prisma/client/index.js
+  mkdir -p node_modules/.prisma/client
   printf '// generated client\n' > node_modules/.prisma/client/index.js
   printf '// generated types\n' > node_modules/.prisma/client/index.d.ts
 fi
@@ -174,7 +175,7 @@ set -e
 rm "$second_worktree/node_modules"
 
 # Content-based guard catches schema changes even if a restore preserves mtime.
-(cd "$second_worktree" && sh scripts/git/worktree-deps.sh generate >/dev/null)
+(cd "$second_worktree" && sh scripts/git/worktree-deps.sh install >/dev/null)
 (cd "$second_worktree" && sh scripts/git/worktree-deps.sh check >/dev/null)
 cp -p "$second_worktree/prisma/schema.prisma" "$tmp_root/original-schema"
 printf '// changed schema\n' > "$second_worktree/prisma/schema.prisma"
@@ -189,6 +190,20 @@ set -e
 }
 (cd "$second_worktree" && sh scripts/git/worktree-deps.sh generate >/dev/null)
 (cd "$second_worktree" && sh scripts/git/worktree-deps.sh check >/dev/null)
+# A nested @prisma/client link must be rejected before invoking the generator.
+mv "$second_worktree/node_modules/@prisma/client" "$tmp_root/shared-prisma-package"
+ln -s "$tmp_root/shared-prisma-package" "$second_worktree/node_modules/@prisma/client"
+cp "$pnpm_log" "$tmp_root/pnpm-before-nested-link"
+set +e
+(cd "$second_worktree" && sh scripts/git/worktree-deps.sh generate >/dev/null 2>&1)
+nested_status=$?
+set -e
+[ "$nested_status" -ne 0 ] && cmp "$pnpm_log" "$tmp_root/pnpm-before-nested-link" || {
+  echo "[task-workflow-test] nested external client must stop before generation" >&2
+  exit 1
+}
+rm "$second_worktree/node_modules/@prisma/client"
+mv "$tmp_root/shared-prisma-package" "$second_worktree/node_modules/@prisma/client"
 # Regenerating or replacing a shared client's JS/types must invalidate the guard.
 printf '// foreign generated types\n' >> "$second_worktree/node_modules/.prisma/client/index.d.ts"
 set +e

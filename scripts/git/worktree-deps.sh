@@ -44,6 +44,7 @@ print_symlink_fix() {
 
 generate() {
   echo "$tag Generating Prisma Client from $repo_root/prisma"
+  node scripts/git/worktree-fingerprint.cjs ownership
   pnpm exec prisma generate
   node scripts/git/worktree-fingerprint.cjs write
 }
