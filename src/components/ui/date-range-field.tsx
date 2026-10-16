@@ -32,10 +32,10 @@ function dateToKey(date: Date): string {
 
 function formatRange(from: string | null, to: string | null): string | null {
   const start = keyToDate(from);
-  if (!start) return null;
   const end = keyToDate(to);
   const fmt = (date: Date, withYear: boolean) =>
     date.toLocaleDateString("ru-RU", { day: "numeric", month: "short", ...(withYear ? { year: "numeric" } : {}) });
+  if (!start) return end ? `… — ${fmt(end, true)}` : null;
   if (!end) return `${fmt(start, false)} — …`;
   const sameYear = start.getFullYear() === end.getFullYear();
   return `${fmt(start, !sameYear)} — ${fmt(end, true)}`;

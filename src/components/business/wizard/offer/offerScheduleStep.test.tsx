@@ -82,3 +82,20 @@ assert.ok(onceHtml.includes("Добавить дату"));
 assert.ok(!onceHtml.includes("Добавить группу"));
 
 console.log("offerScheduleStep tests passed");
+
+// У групп с разными периодами отображаются собственные даты, включая только конец.
+const mixed = form("REGULAR_ACTIVITY");
+mixed.classDuration = "60";
+mixed.schedule.classSchedule.groups = [
+  { id: "oct", days: [1], time: "17:00", seats: "10", period: { from: "2026-10-01", to: "2026-10-31" } },
+  { id: "nov", days: [1], time: "17:00", seats: "10", period: { from: "2026-11-01", to: "2026-11-30" } },
+  { id: "until", days: [3], time: "17:00", seats: "10", period: { from: null, to: "2026-12-31" } },
+  { id: "forever", days: [5], time: "17:00", seats: "10", period: null },
+];
+const mixedHtml = classHtml(mixed);
+for (const id of ["oct", "nov", "until", "forever"]) assert.ok(mixedHtml.includes(`id="class-period-${id}"`));
+assert.ok(!mixedHtml.includes('id="class-period"'));
+const endOnlyLabel = `… — ${new Date(2026, 11, 31).toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" })}`;
+assert.ok(mixedHtml.includes(endOnlyLabel), "end-only period should display its date, not an empty placeholder");
+assert.equal((mixedHtml.match(/Без ограничения по датам/g) ?? []).length, 1);
+console.log("mixed class period display tests passed");
