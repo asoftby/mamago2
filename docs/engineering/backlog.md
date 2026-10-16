@@ -5359,9 +5359,9 @@ distributor_company_id=550) и хотели бы уточнить несколь
 
 ## [BACKLOG-192] task-workflow.test.sh падает на проверке пути с апострофом
 
-- Status: OPEN
+- Status: DONE
 - Priority: P3
 - Area: Engineering / workflow
 - Added: 2026-10-14
 - Reason deferred: падение pre-existing (воспроизводится на чистом `origin/dev` a6f9256f на macOS), не связано с worktree-deps; последний кейс теста (`install-shell-shortcuts.sh` + путь с `'`) не проходит локально.
-- Next: разобраться, почему `MAMAGO_REPO` не round-trip'ится локально (shell/окружение) и починить тест или установщик.
+- Resolved: 2026-10-16. Тест нормализует временный корень через `pwd -P`: Git на macOS возвращает `/private/var`, тогда как TMPDIR может использовать `/var`. Установщик сохраняет путь корректно; регрессии с апострофом, изоляцией зависимостей и отпечатками содержимого проходят локально.
