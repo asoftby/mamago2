@@ -35,7 +35,9 @@ const isPending = (status: string) => status === "PENDING";
 
 export function businessPublicPath(item: BusinessOnboardingPublication): string | null {
   if (!item.slug || !isLive(item.status)) return null;
-  const section = item.kind === "place" ? "places" : item.kind === "offer" ? "offers" : "activity";
+  // Event URLs are city-scoped (/{city}/events/{slug}); resolve them on the server.
+  if (item.kind === "event") return null;
+  const section = item.kind === "place" ? "places" : "offers";
   return `/${section}/${encodeURIComponent(item.slug)}`;
 }
 
