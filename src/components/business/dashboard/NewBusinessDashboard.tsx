@@ -22,7 +22,7 @@ type Props = {
 export function NewBusinessDashboard({ data }: Props) {
   const { onboarding } = data;
   const [tourOpen, setTourOpen] = useState(false);
-  const [selected, setSelected] = useState<(typeof TYPES)[number]["id"]>("offer");
+  const [selected, setSelected] = useState<(typeof TYPES)[number]["id"]>("place");
   const [viewed, setViewed] = useState(false);
   const chosen = TYPES.find((type) => type.id === selected) ?? TYPES[2];
   const hasDraft = Boolean(onboarding.draft);
