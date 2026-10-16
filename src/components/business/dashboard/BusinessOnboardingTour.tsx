@@ -56,7 +56,9 @@ export function BusinessOnboardingTour({
 
   useEffect(() => {
     if (!open) return;
-    const target = document.querySelector<HTMLElement>(`[data-business-tour="${STEPS[index].anchor}"]`);
+    const target = Array.from(
+      document.querySelectorAll<HTMLElement>(`[data-business-tour="${STEPS[index].anchor}"]`),
+    ).find((element) => element.getClientRects().length > 0);
     target?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     target?.classList.add("outline", "outline-2", "outline-offset-4", "outline-primary");
     nextButton.current?.focus({ preventScroll: true });
