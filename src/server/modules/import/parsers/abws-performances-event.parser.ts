@@ -372,13 +372,16 @@ export function filterItemsByCategoryTypeIdAllowlist(
  * plausible shapes defensively and surface the real top-level keys in the
  * error if none match, so a live run can pin this down definitively.
  */
-export function parseAbwsResponseBody(body: string): AbwsPerformanceItem[] {
+export function parseAbwsResponseBody(body: string, apiKey?: string): AbwsPerformanceItem[] {
+  // JSON syntax diagnostics and unknown envelope keys can echo upstream secrets.
+  const safeError = (message: string) =>
+    new Error(apiKey ? abwsSafeBodyPreview(message, apiKey, 1_000) : message);
   let parsed: unknown;
   try {
     parsed = JSON.parse(body);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`ABWS response is not valid JSON: ${msg}`);
+  } catch {
+    // Engine syntax errors quote arbitrary input fragments, including partial keys.
+    throw new Error("ABWS response is not valid JSON");
   }
 
   if (Array.isArray(parsed)) return parsed as AbwsPerformanceItem[];
@@ -389,12 +392,30 @@ export function parseAbwsResponseBody(body: string): AbwsPerformanceItem[] {
       if (Array.isArray(value)) return value as AbwsPerformanceItem[];
     }
 
-    throw new Error(
+    throw safeError(
       `Unrecognized ABWS response envelope. Top-level keys: ${Object.keys(parsed).join(", ")}`,
     );
   }
 
-  throw new Error(`Unrecognized ABWS response shape: ${typeof parsed}`);
+  throw safeError(`Unrecognized ABWS response shape: ${typeof parsed}`);
+}
+
+/**
+ * Never write a raw upstream response to the log: an error payload may echo
+ * the authenticated query URL. Retain a short preview with key values masked.
+ */
+export function abwsSafeBodyPreview(body: string, apiKey: string, maxChars = 500): string {
+  // Match the encoding of the actual outbound url.searchParams.set("key", apiKey).
+  // encodeURIComponent differs for spaces (+ vs %20), ~, !, quotes and brackets.
+  const serializedKey = new URLSearchParams({ key: apiKey }).toString().slice("key=".length);
+  const uriEncodedKey = encodeURIComponent(apiKey);
+  const longestKey = Math.max(apiKey.length, serializedKey.length, uriEncodedKey.length);
+  const prefix = body.slice(0, maxChars + longestKey);
+  return prefix
+    .replaceAll(serializedKey, "[REDACTED]")
+    .replaceAll(uriEncodedKey, "[REDACTED]")
+    .replaceAll(apiKey, "[REDACTED]")
+    .slice(0, maxChars);
 }
 
 export async function fetchAbwsPerformances(source: ImportSource): Promise<AbwsPerformanceItem[]> {
@@ -416,23 +437,22 @@ export async function fetchAbwsPerformances(source: ImportSource): Promise<AbwsP
 
   // Per the ABWS wiki: log HTTP status + body on every call. The full body
   // is ~13MB for the real catalog, so log a bounded preview rather than the
-  // whole thing; full-length logging only kicks in on parse failure below,
-  // where the body is expected to be small (an error payload, not the
-  // catalog).
+  // whole thing. Parse failures also use a bounded, redacted preview.
   console.log("[import.abws] fetch complete", {
     url: loggableUrl,
     status: response.status,
     bodyLength: response.html.length,
-    bodyPreview: response.html.slice(0, 500),
+    bodyPreview: abwsSafeBodyPreview(response.html, apiKey),
   });
 
   try {
-    return parseAbwsResponseBody(response.html);
+    return parseAbwsResponseBody(response.html, apiKey);
   } catch (err) {
     console.error("[import.abws] failed to parse response body", {
       url: loggableUrl,
       status: response.status,
-      body: response.html,
+      bodyLength: response.html.length,
+      bodyPreview: abwsSafeBodyPreview(response.html, apiKey, 1_000),
     });
     throw err;
   }

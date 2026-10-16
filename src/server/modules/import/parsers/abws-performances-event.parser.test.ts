@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 
 import {
   ABWS_FETCH_OPTIONS,
+  abwsSafeBodyPreview,
   dedupeKey,
   filterCategoryTypeIds,
   filterItemsByCategoryTypeIdAllowlist,
@@ -86,6 +87,42 @@ const multiVenueFixture: AbwsPerformanceItem = {
 // The full ABWS JSON catalog is ~13 MiB and must bypass the generic 5 MiB HTML cap.
 assert.ok(ABWS_FETCH_OPTIONS.maxBytes > 13 * 1024 * 1024);
 assert.ok(ABWS_FETCH_OPTIONS.maxBytes <= 32 * 1024 * 1024);
+// API error messages may reflect their original authenticated URL.
+{
+  const token = "fake-abws-secret-for-tests";
+  const sample = `error requesting ?key=${token}&distributor_company_id=550`;
+  assert.ok(!abwsSafeBodyPreview(sample, token).includes(token));
+  assert.ok(abwsSafeBodyPreview(sample, token).includes("[REDACTED]"));
+  const encoded = encodeURIComponent("secret?with special characters");
+  assert.ok(!abwsSafeBodyPreview(`url ?key=${encoded}`, "secret?with special characters").includes(encoded));
+
+  // The request uses URLSearchParams, whose encoding differs from encodeURIComponent.
+  const specialKey = "secret ~!'() +&?";
+  const actualUrl = new URL("https://webgate.24guru.by/api/v3/sync/data/performances");
+  actualUrl.searchParams.set("key", specialKey);
+  actualUrl.searchParams.set("distributor_company_id", "550");
+  const serializedKey = actualUrl.searchParams.get("key") && actualUrl.search.slice(5).split("&")[0];
+  assert.ok(serializedKey);
+  const preview = abwsSafeBodyPreview(`upstream error requesting ${actualUrl.toString()}`, specialKey);
+  assert.ok(!preview.includes(serializedKey), "no serialized query credential in logs");
+  assert.ok(!preview.includes(specialKey), "no raw credential in logs");
+  assert.ok(preview.includes("[REDACTED]"));
+
+  for (const [body, key] of [
+    [token, token],
+    [JSON.stringify({ [token]: "upstream failure" }), token],
+    [JSON.stringify({ [serializedKey]: "upstream failure" }), specialKey],
+  ]) {
+    assert.throws(() => parseAbwsResponseBody(body, key), (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.ok(!error.message.includes(token));
+      assert.ok(!error.message.includes(specialKey));
+      assert.ok(!error.message.includes(serializedKey));
+      assert.match(error.message, /ABWS response is not valid JSON|Unrecognized ABWS response envelope/);
+      return true;
+    });
+  }
+}
 
 // ── isSingleVenue ────────────────────────────────────────────────────────
 assert.equal(isSingleVenue(singleVenueFixture.sessions), true);
