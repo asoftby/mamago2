@@ -204,6 +204,20 @@ set -e
 }
 rm "$second_worktree/node_modules/@prisma/client"
 mv "$tmp_root/shared-prisma-package" "$second_worktree/node_modules/@prisma/client"
+# The generated output directory is another possible nested external link.
+mv "$second_worktree/node_modules/.prisma/client" "$tmp_root/shared-generated-client"
+ln -s "$tmp_root/shared-generated-client" "$second_worktree/node_modules/.prisma/client"
+cp "$pnpm_log" "$tmp_root/pnpm-before-output-link"
+set +e
+(cd "$second_worktree" && sh scripts/git/worktree-deps.sh generate >/dev/null 2>&1)
+output_status=$?
+set -e
+[ "$output_status" -ne 0 ] && cmp "$pnpm_log" "$tmp_root/pnpm-before-output-link" || {
+  echo "[task-workflow-test] external generated output must stop before generation" >&2
+  exit 1
+}
+rm "$second_worktree/node_modules/.prisma/client"
+mv "$tmp_root/shared-generated-client" "$second_worktree/node_modules/.prisma/client"
 # Regenerating or replacing a shared client's JS/types must invalidate the guard.
 printf '// foreign generated types\n' >> "$second_worktree/node_modules/.prisma/client/index.d.ts"
 set +e

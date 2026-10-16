@@ -22,7 +22,14 @@ try {
   if (!fs.realpathSync(entry).startsWith(modules + path.sep)) {
     throw new Error('Prisma package is outside this worktree');
   }
-  // Check package ownership before the generator can write into its output.
+  // Prisma's default output sits beside its package. Check existing output
+  // ancestors too: .prisma/client may itself be a symlink to another checkout.
+  let outputAncestor = path.resolve(path.dirname(fs.realpathSync(entry)), '..', '..', '.prisma', 'client');
+  while (!fs.existsSync(outputAncestor)) outputAncestor = path.dirname(outputAncestor);
+  const outputReal = fs.realpathSync(outputAncestor);
+  if (outputReal !== modules && !outputReal.startsWith(modules + path.sep)) {
+    throw new Error('Generated client output is outside this worktree');
+  }
   if (mode === 'ownership') process.exit(0);
   const client = fs.realpathSync(require.resolve('.prisma/client/index.js', { paths: [entry] }));
   if (!client.startsWith(modules + path.sep)) {
