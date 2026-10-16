@@ -113,3 +113,43 @@ assert.equal(restored.periodTo, "2026-12-14");
 assert.deepEqual(groupsFromRules([]).groups, []);
 
 console.log("offerClassSchedule.test.ts: ok");
+
+// Разные периоды не сливаются ни при одинаковом, ни при разном времени.
+for (const secondStart of [1020, 1080]) {
+  const rules = [
+    { weekday: 1, startMinutes: 1020, capacity: 10, validFrom: "2026-10-01", validTo: "2026-10-31" },
+    { weekday: 1, startMinutes: secondStart, capacity: 10, validFrom: "2026-11-01", validTo: "2026-11-30" },
+    { weekday: 3, startMinutes: 1020, capacity: null, validFrom: null, validTo: null },
+    { weekday: 5, startMinutes: 1020, capacity: null, validFrom: "2026-12-01", validTo: null },
+  ];
+  const form = { ...defaultClassSchedule(), ...groupsFromRules(rules) };
+  assert.equal(form.groups.length, 4);
+  assert.equal(form.periodFrom, null);
+  assert.equal(form.periodTo, null);
+  // Правка мест не должна затрагивать даты остальных групп.
+  form.groups[0].seats = "12";
+  const input = classScheduleInputSchema.parse(buildClassScheduleInput(form, [], "REGULAR_ACTIVITY", "60"));
+  const actual = input.groups.flatMap(group => group.days.map(weekday => ({
+    weekday, startMinutes: Number(group.time.slice(0, 2)) * 60 + Number(group.time.slice(3)),
+    validFrom: group.period?.from ?? null, validTo: group.period?.to ?? null,
+  })));
+  const expected = rules.map(({ capacity: _capacity, ...rule }) => rule);
+  const sorted = (rows: typeof expected) => rows.map(row => JSON.stringify(row)).sort();
+  assert.deepEqual(sorted(actual), sorted(expected));
+}
+// Явный null группы означает отсутствие границ, а не общий период.
+const explicitUnbounded = classScheduleInputSchema.parse({
+  kind: "recurring", durationMin: 60, period: { from: "2026-10-01", to: "2026-10-31" },
+  groups: [{ days: [1], time: "17:00", seats: null, period: null }],
+});
+assert.equal(explicitUnbounded.groups[0].period, null);
+assert.equal(classScheduleInputSchema.safeParse({
+  kind: "recurring", durationMin: 60,
+  groups: [{ days: [1], time: "17:00", seats: 10, period: { from: "2026-11-30", to: "2026-11-01" } }],
+}).success, false);
+const invalidGroupPeriod = { ...defaultClassSchedule(), groups: [{
+  id: "bad-period", days: [1], time: "17:00", seats: "10",
+  period: { from: "2026-11-30", to: "2026-11-01" },
+}] };
+assert.ok(getClassScheduleMissingFields(invalidGroupPeriod, "REGULAR_ACTIVITY", "60").includes("Даты курса"));
+console.log("class period preservation regressions passed");

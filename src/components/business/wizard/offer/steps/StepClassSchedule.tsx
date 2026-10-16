@@ -50,6 +50,7 @@ export function StepClassSchedule({ data, onChange, isEditable }: StepClassSched
   const schedule = data.schedule;
   const classSchedule = schedule.classSchedule;
   const regular = data.productType === "REGULAR_ACTIVITY";
+  const separatePeriods = classSchedule.groups.some((group) => group.period !== undefined);
   const duration = parseClassDurationMinutes(data.classDuration);
 
   const update = (patch: Partial<ClassScheduleForm>) =>
@@ -136,6 +137,19 @@ export function StepClassSchedule({ data, onChange, isEditable }: StepClassSched
                       />
                     </div>
                   </div>
+                  {separatePeriods && (
+                    <div className="space-y-2">
+                      <Label htmlFor={`class-period-${group.id}`}>Даты курса группы (необязательно)</Label>
+                      <DateRangeField
+                        id={`class-period-${group.id}`}
+                        from={group.period === undefined ? classSchedule.periodFrom : group.period?.from ?? null}
+                        to={group.period === undefined ? classSchedule.periodTo : group.period?.to ?? null}
+                        placeholder="Без ограничения по датам"
+                        disabled={!isEditable}
+                        onChange={({ from, to }) => patchGroup(group.id, { period: { from, to } })}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -144,13 +158,13 @@ export function StepClassSchedule({ data, onChange, isEditable }: StepClassSched
               variant="outline"
               className="w-full rounded-xl border-dashed"
               disabled={!isEditable}
-              onClick={() => update({ groups: [...classSchedule.groups, emptyClassGroup()] })}
+              onClick={() => update({ groups: [...classSchedule.groups, { ...emptyClassGroup(), ...(separatePeriods ? { period: null } : {}) }] })}
             >
               <Plus className="mr-2 h-4 w-4" />
               Добавить группу
             </Button>
 
-            <div className="space-y-2">
+            {!separatePeriods && <div className="space-y-2">
               <Label htmlFor="class-period">Курс с началом и концом (необязательно)</Label>
               <DateRangeField
                 id="class-period"
@@ -163,7 +177,7 @@ export function StepClassSchedule({ data, onChange, isEditable }: StepClassSched
               <p className="text-sm text-muted-foreground">
                 Если занятия идут без конца, оставьте поле пустым.
               </p>
-            </div>
+            </div>}
           </div>
         ) : (
           <div className="space-y-4">

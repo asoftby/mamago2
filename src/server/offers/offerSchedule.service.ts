@@ -191,9 +191,11 @@ async function applyClassSchedule(db: Db, offerId: string, schedule: ClassSchedu
 
   if (schedule.kind === "recurring") {
     await db.offerScheduleRule.deleteMany({ where: { offerBookingId: booking.id } });
-    const validFrom = schedule.period?.from ? dateOnly(schedule.period.from) : null;
-    const validTo = schedule.period?.to ? dateOnly(schedule.period.to) : null;
+
     const rows = schedule.groups.flatMap((group) => {
+      const period = group.period === undefined ? schedule.period : group.period;
+      const validFrom = period?.from ? dateOnly(period.from) : null;
+      const validTo = period?.to ? dateOnly(period.to) : null;
       const start = timeToMinutes(group.time);
       if (start === null) return [];
       return [...new Set(group.days)].map((weekday) => ({
@@ -206,12 +208,19 @@ async function applyClassSchedule(db: Db, offerId: string, schedule: ClassSchedu
         capacity: group.seats,
       }));
     });
-    // Две группы с одинаковым временем в один день дали бы дубль уникального ключа.
-    const seen = new Set<string>();
+    // Разные периоды одного слота допустимы. Не теряем их при дедупликации.
+    // Конфликтующие значения одного ключа отклоняем, а не выбираем первое молча.
+    const seen = new Map<string, (typeof rows)[number]>();
     const unique = rows.filter((row) => {
-      const key = `${row.weekday}|${row.startMinutes}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
+      const key = JSON.stringify([row.weekday, row.startMinutes, row.endMinutes, row.validFrom]);
+      const previous = seen.get(key);
+      if (previous) {
+        if (previous.capacity !== row.capacity || previous.validTo?.getTime() !== row.validTo?.getTime()) {
+          throw new OfferScheduleValidationError("У групп с одинаковым началом курса различаются даты или число мест");
+        }
+        return false;
+      }
+      seen.set(key, row);
       return true;
     });
     if (unique.length > 0) await db.offerScheduleRule.createMany({ data: unique });

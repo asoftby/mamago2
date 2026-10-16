@@ -25,6 +25,8 @@ export interface ClassSessionGroup {
   days: number[];
   time: string;
   seats: string;
+  /** Отдельный период группы; undefined наследует общий период, null — без границ. */
+  period?: { from: string | null; to: string | null } | null;
 }
 
 /** Разовое занятие на конкретную дату. */
@@ -100,6 +102,10 @@ export function minutesToTime(minutes: number): string {
 // ── API-контракт ────────────────────────────────────────────────────────────
 
 const seatsSchema = z.number().int().min(1).max(1000).nullable();
+const periodSchema = z.object({
+  from: z.string().regex(DATE_RE).nullable(),
+  to: z.string().regex(DATE_RE).nullable(),
+}).nullable();
 
 export const classScheduleInputSchema = z
   .object({
@@ -111,6 +117,7 @@ export const classScheduleInputSchema = z
           days: z.array(z.number().int().min(1).max(7)).min(1).max(7),
           time: z.string().regex(TIME_RE),
           seats: seatsSchema,
+          period: periodSchema.optional(),
         }),
       )
       .max(30)
@@ -119,14 +126,15 @@ export const classScheduleInputSchema = z
       .array(z.object({ date: z.string().regex(DATE_RE), time: z.string().regex(TIME_RE), seats: seatsSchema }))
       .max(200)
       .default([]),
-    period: z
-      .object({ from: z.string().regex(DATE_RE).nullable(), to: z.string().regex(DATE_RE).nullable() })
-      .nullable()
-      .default(null),
+    period: periodSchema.default(null),
     closedDates: z.array(z.string().regex(DATE_RE)).max(366).default([]),
   })
   .superRefine((value, ctx) => {
     for (const [i, group] of value.groups.entries()) {
+      const period = group.period === undefined ? value.period : group.period;
+      if (period?.from && period.to && period.to < period.from) {
+        ctx.addIssue({ code: "custom", path: ["groups", i, "period"], message: "Конец курса раньше начала" });
+      }
       const start = timeToMinutes(group.time);
       if (start !== null && start + value.durationMin > 1440) {
         ctx.addIssue({ code: "custom", path: ["groups", i, "time"], message: "Занятие не должно заканчиваться после полуночи" });
@@ -164,7 +172,10 @@ export function buildClassScheduleInput(
       kind === "recurring"
         ? form.groups
             .filter((group) => group.days.length > 0 && TIME_RE.test(group.time))
-            .map((group) => ({ days: [...new Set(group.days)].sort(), time: group.time, seats: parseSeats(group.seats) }))
+            .map((group) => ({
+              days: [...new Set(group.days)].sort(), time: group.time, seats: parseSeats(group.seats),
+              ...(group.period !== undefined ? { period: group.period } : {}),
+            }))
         : [],
     dates:
       kind === "dated"
@@ -193,7 +204,9 @@ export function getClassScheduleMissingFields(
     if (duration !== null && valid.some((group) => (timeToMinutes(group.time) ?? 0) + duration > 1440)) {
       missing.push("Занятие заканчивается после полуночи");
     }
-    if (form.periodFrom && form.periodTo && form.periodTo < form.periodFrom) missing.push("Даты курса");
+    const periods = valid.map((group) => group.period === undefined
+      ? { from: form.periodFrom, to: form.periodTo } : group.period);
+    if (periods.some((period) => period?.from && period.to && period.to < period.from)) missing.push("Даты курса");
   } else {
     const valid = form.dates.filter((item) => DATE_RE.test(item.date) && TIME_RE.test(item.time));
     if (valid.length === 0) missing.push("Даты занятий");
@@ -218,9 +231,12 @@ export function groupsFromRules(
 ): { groups: ClassSessionGroup[]; periodFrom: string | null; periodTo: string | null } {
   const key = (value: Date | string | null | undefined) =>
     value ? (typeof value === "string" ? value : value.toISOString()).slice(0, 10) : null;
+  const periodKeys = new Set(rules.map((rule) => JSON.stringify([key(rule.validFrom), key(rule.validTo)])));
+  const separatePeriods = periodKeys.size > 1;
   const byKey = new Map<string, ClassSessionGroup>();
   for (const rule of [...rules].sort((a, b) => a.startMinutes - b.startMinutes || a.weekday - b.weekday)) {
-    const groupKey = `${rule.startMinutes}|${rule.capacity ?? ""}`;
+    const period = { from: key(rule.validFrom), to: key(rule.validTo) };
+    const groupKey = JSON.stringify([rule.startMinutes, rule.capacity, period.from, period.to]);
     const existing = byKey.get(groupKey);
     if (existing) {
       if (!existing.days.includes(rule.weekday)) existing.days.push(rule.weekday);
@@ -230,13 +246,14 @@ export function groupsFromRules(
         days: [rule.weekday],
         time: minutesToTime(rule.startMinutes),
         seats: rule.capacity ? String(rule.capacity) : "",
+        ...(separatePeriods ? { period } : {}),
       });
     }
   }
   const first = rules[0];
   return {
     groups: [...byKey.values()].map((group) => ({ ...group, days: [...group.days].sort() })),
-    periodFrom: key(first?.validFrom),
-    periodTo: key(first?.validTo),
+    periodFrom: separatePeriods ? null : key(first?.validFrom),
+    periodTo: separatePeriods ? null : key(first?.validTo),
   };
 }
