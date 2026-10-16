@@ -57,6 +57,9 @@ jobs:
 
       - name: Type check
         run: pnpm tsc --noEmit
+
+      - name: Business onboarding progress regressions
+        run: pnpm exec tsx src/lib/business/onboardingProgress.test.ts
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
