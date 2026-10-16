@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { BusinessOnboardingSnapshot } from "@/lib/business/onboardingProgress";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
@@ -15,6 +16,7 @@ import { DashboardActionStack } from "@/components/business/dashboard/DashboardA
 import { DashboardPeriodSwitcher } from "@/components/business/dashboard/DashboardPeriodSwitcher";
 import { DashboardOnboarding } from "@/components/business/dashboard/DashboardOnboarding";
 import { NewBusinessDashboard } from "@/components/business/dashboard/NewBusinessDashboard";
+import { BusinessOnboardingTour } from "@/components/business/dashboard/BusinessOnboardingTour";
 import { BusinessReputationBlock } from "@/components/business/dashboard/BusinessReputationBlock";
 import { DailyFreeBoostCard } from "@/components/business/dashboard/DailyFreeBoostCard";
 import { TableContainer } from "@/components/ui/table";
@@ -24,6 +26,8 @@ import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type DashboardData = {
+  onboarding: BusinessOnboardingSnapshot;
+  onboardingPublicHref: string | null;
   // Business identity
   businessName: string;
   legalName?: string | null;
@@ -447,6 +451,7 @@ interface DashboardClientProps {
 
 export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClientProps) {
   const [period, setPeriod] = useState<DashboardPeriod>(defaultPeriod);
+  const [tourOpen, setTourOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -468,18 +473,28 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
     router.replace(`${pathname}?${query.toString()}`, { scroll: false });
   }
 
-  // No publications → onboarding screen
-  const isOnboarding = data.totalPublications === 0;
+  // A business with published content is not forced back into onboarding.
+  // First-time businesses remain in the launchpad until they inspect their first public card.
+  const isOnboarding = data.onboarding.showLaunchpad;
 
   return (
     <div className="space-y-5">
       {/* Header: title + identity — always shown */}
-      <DashboardHeader
-        businessName={data.businessName}
-        legalName={data.legalName}
-        city={data.city}
-        settingsHref={data.hrefs.settings}
-      />
+      <div data-business-tour="intro">
+        <DashboardHeader
+          businessName={data.businessName}
+          legalName={data.legalName}
+          city={data.city}
+          settingsHref={data.hrefs.settings}
+        />
+      </div>
+      {!isOnboarding && (
+        <div className="flex justify-end">
+          <button type="button" onClick={() => setTourOpen(true)} className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">
+            Обзор кабинета
+          </button>
+        </div>
+      )}
 
       {isOnboarding ? (
         <NewBusinessDashboard data={data} />
@@ -498,10 +513,12 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
               depositHref={data.hrefs.deposit}
               promotionHref={data.hrefs.promotion}
             />}
-            <DashboardActionStack
-              promotionHref={data.hrefs.promotion}
-              hasPublications={data.totalPublications > 0}
-            />
+            <div data-business-tour="create">
+              <DashboardActionStack
+                promotionHref={data.hrefs.promotion}
+                hasPublications={data.totalPublications > 0}
+              />
+            </div>
             {BUSINESS_DASHBOARD_MVP.businessDailyFreeBoostUiEnabled && (
               <DailyFreeBoostCard data={data.dailyFreeBoost} />
             )}
@@ -519,7 +536,7 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
           />
 
           {/* KPI row — 2 cards */}
-          <section className="grid gap-4 sm:grid-cols-2">
+          <section data-business-tour="benefits" className="grid gap-4 sm:grid-cols-2">
             <PublicationsCard
               activePromotions={data.activePromotionCount}
               totalPublications={data.totalPublications}
@@ -554,10 +571,12 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
               depositHref={data.hrefs.deposit}
               promotionHref={data.hrefs.promotion}
             />}
-            <DashboardActionStack
-              promotionHref={data.hrefs.promotion}
-              hasPublications={data.totalPublications > 0}
-            />
+            <div data-business-tour="create">
+              <DashboardActionStack
+                promotionHref={data.hrefs.promotion}
+                hasPublications={data.totalPublications > 0}
+              />
+            </div>
             {BUSINESS_DASHBOARD_MVP.businessDailyFreeBoostUiEnabled && (
               <DailyFreeBoostCard data={data.dailyFreeBoost} />
             )}
@@ -567,6 +586,7 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
 
       </div>
       )}
+      {!isOnboarding && <BusinessOnboardingTour open={tourOpen} onClose={() => setTourOpen(false)} />}
     </div>
   );
 }

@@ -178,6 +178,7 @@ export async function getBusinessWorkspaceData(params: {
       select: {
         id: true,
         title: true,
+        slug: true,
         status: true,
         updatedAt: true,
       },
@@ -191,6 +192,7 @@ export async function getBusinessWorkspaceData(params: {
       select: {
         id: true,
         title: true,
+        slug: true,
         updatedAt: true,
         status: true,
         placeId: true,
@@ -207,6 +209,7 @@ export async function getBusinessWorkspaceData(params: {
       select: {
         id: true,
         title: true,
+        slug: true,
         updatedAt: true,
         status: true,
         placeId: true,

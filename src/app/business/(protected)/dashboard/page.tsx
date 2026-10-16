@@ -1,4 +1,11 @@
 import { getCurrentUser } from "@/lib/auth/server";
+import prisma from "@/lib/prisma";
+import { resolveCanonicalEventPublicPathById } from "@/lib/business/resolveCanonicalEventPublicPath";
+import {
+  buildBusinessOnboardingSnapshot,
+  businessPublicPath,
+  type BusinessOnboardingPublication,
+} from "@/lib/business/onboardingProgress";
 import { redirect } from "next/navigation";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { VerificationBanner } from "@/components/business/VerificationBanner";
@@ -72,6 +79,44 @@ export default async function BusinessDashboardPage({
     businessId: business.id,
   });
 
+  const onboardingStored = await prisma.businessOnboardingState.findUnique({
+    where: { businessId_userId: { businessId: business.id, userId: user.id } },
+    select: {
+      startedAt: true,
+      tourCompletedAt: true,
+      tourSkippedAt: true,
+      firstPublicViewedAt: true,
+    },
+  });
+  const publications: BusinessOnboardingPublication[] = [
+    ...workspace.places.map((item) => ({ ...item, kind: "place" as const })),
+    ...workspace.events.map((item) => ({ ...item, kind: "event" as const })),
+    ...workspace.offers.map((item) => ({ ...item, kind: "offer" as const })),
+  ];
+  const onboarding = buildBusinessOnboardingSnapshot(
+    publications,
+    onboardingStored
+      ? {
+          startedAt: onboardingStored.startedAt?.toISOString() ?? null,
+          tourCompletedAt: onboardingStored.tourCompletedAt?.toISOString() ?? null,
+          tourSkippedAt: onboardingStored.tourSkippedAt?.toISOString() ?? null,
+          firstPublicViewedAt: onboardingStored.firstPublicViewedAt?.toISOString() ?? null,
+        }
+      : null,
+  );
+  const firstPublicPath = onboarding.published
+    ? onboarding.published.kind === "event"
+      ? await resolveCanonicalEventPublicPathById(onboarding.published.id)
+      : businessPublicPath(onboarding.published)
+    : null;
+  const onboardingPublicHref = firstPublicPath
+    ? buildSurfaceRedirectDestination({
+        targetSurface: "public",
+        targetPath: firstPublicPath,
+        ...routing,
+      })
+    : null;
+
   const verificationStatus = business.verificationStatus as BusinessVerificationStatus;
 
   // ── hrefs ──────────────────────────────────────────────────────────────────
@@ -128,6 +173,8 @@ export default async function BusinessDashboardPage({
 
   // ── Dashboard data ─────────────────────────────────────────────────────────
   const dashboardData: DashboardData = {
+    onboarding,
+    onboardingPublicHref,
     businessName: business.name,
     legalName: business.legalName ?? null,
     city: null, // TODO: add city to Business model or derive from places
@@ -160,7 +207,7 @@ export default async function BusinessDashboardPage({
     hrefs: {
       deposit: href("/billing/deposit"),
       leads: href("/promotion"),
-      publications: href("/events"),
+      publications: href("/publications"),
       promotion: href("/promotion"),
       bookings: href("/notifications"),
       newPublication: href("/events"),

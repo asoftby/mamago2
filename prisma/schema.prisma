@@ -69,6 +69,7 @@ model User {
   business                          Business?
   businessInvitesSent               BusinessInvite[]                 @relation("BusinessInviteInviter")
   businessMemberships               BusinessMember[]
+  businessOnboardingStates          BusinessOnboardingState[]
   bookingRequests                   BookingRequest[]
   partyOrders PartyOrder[] @relation("PartyOrderOwner")
   partyQuotesResponded PartyQuote[] @relation("PartyQuoteResponder")
@@ -1440,6 +1441,7 @@ model Business {
   commercialCounterparty  CommercialCounterparty?
   invites                 BusinessInvite[]
   members                 BusinessMember[]
+  onboardingStates        BusinessOnboardingState[]
   placements              BusinessPlacement[]
   servicePlacements       BusinessServicePlacement[]
   verificationLogs        BusinessVerificationLog[]
@@ -1495,6 +1497,25 @@ model BusinessMember {
 
   @@unique([businessId, userId])
   @@index([businessId])
+  @@index([userId])
+}
+
+/// Прогресс знакомства с бизнес-кабинетом принадлежит участнику, а не компании.
+model BusinessOnboardingState {
+  id                    String   @id @default(cuid())
+  businessId            String
+  userId                String
+  startedAt             DateTime?
+  tourCompletedAt       DateTime?
+  tourSkippedAt         DateTime?
+  firstPublicViewedAt   DateTime?
+  tourVersion           Int      @default(1)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  business              Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, userId])
   @@index([userId])
 }
 
