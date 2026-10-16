@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
+import { resolveCanonicalEventPublicPathById } from "@/lib/business/resolveCanonicalEventPublicPath";
 import {
   buildBusinessOnboardingSnapshot,
   businessPublicPath,
@@ -104,7 +105,9 @@ export default async function BusinessDashboardPage({
       : null,
   );
   const firstPublicPath = onboarding.published
-    ? businessPublicPath(onboarding.published)
+    ? onboarding.published.kind === "event"
+      ? await resolveCanonicalEventPublicPathById(onboarding.published.id)
+      : businessPublicPath(onboarding.published)
     : null;
   const onboardingPublicHref = firstPublicPath
     ? buildSurfaceRedirectDestination({
