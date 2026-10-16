@@ -316,7 +316,7 @@ test("разные периоды одного слота переживают �
     { weekday: 5, startMinutes: 1020, endMinutes: 1080, capacity: 8, validFrom: null, validTo: new Date("2026-12-31Z") },
   ];
   await db.offerScheduleRule.createMany({ data: originals.map(rule => ({ ...rule, offerBookingId: booking.id })) });
-  const signature = (rules: typeof originals) => rules.map(rule => JSON.stringify({
+  const signature = (rules: Array<{ weekday: number; startMinutes: number; endMinutes: number; validFrom: Date | null; validTo: Date | null }>) => rules.map(rule => JSON.stringify({
     weekday: rule.weekday, startMinutes: rule.startMinutes, endMinutes: rule.endMinutes,
     validFrom: rule.validFrom?.toISOString().slice(0, 10) ?? null,
     validTo: rule.validTo?.toISOString().slice(0, 10) ?? null,
