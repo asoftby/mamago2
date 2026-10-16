@@ -35,6 +35,7 @@ assert.equal(newBusinessPublished.done, 3);
 assert.equal(businessPublicPath(published), "/offers/offer-1");
 assert.equal(businessPublicPath(draft), null);
 assert.equal(businessPublicPath(pending), null);
+assert.equal(businessPublicPath({ ...published, kind: "event" }), null, "events require a canonical city-scoped path");
 
 const finished = buildBusinessOnboardingSnapshot([published], {
   ...EMPTY,
