@@ -7,6 +7,7 @@ import {
   OfferScheduleValidationError,
   applyOfferSchedule,
 } from "./offerSchedule.service";
+import { buildClassScheduleInput, defaultClassSchedule, groupsFromRules } from "@/lib/offers/offerClassSchedule";
 import { hoursFromSimple } from "@/lib/offers/offerSchedule";
 import { BookingValidationError, createPublicBooking } from "@/server/services/booking/booking.service";
 
@@ -303,4 +304,47 @@ test("расписание занятий не меняет способ зап�
   const offer = await db.offer.findUniqueOrThrow({ where: { id: offerId } });
   assert.equal(offer.bookingEnabled, true);
   assert.equal(offer.bookingMode, "REQUEST_ONLY");
+});
+
+test("разные периоды одного слота переживают загрузку, изменение мест и повторное сохранение", async () => {
+  const offerId = await newOffer({ productType: "REGULAR_ACTIVITY" });
+  const booking = await db.offerBooking.create({ data: { offerId, scheduleKind: "RECURRING_SESSIONS", durationMin: 60 } });
+  const originals = [
+    { weekday: 1, startMinutes: 1020, endMinutes: 1080, capacity: 10, validFrom: new Date("2026-10-01Z"), validTo: new Date("2026-10-31Z") },
+    { weekday: 1, startMinutes: 1020, endMinutes: 1080, capacity: 10, validFrom: new Date("2026-11-01Z"), validTo: new Date("2026-11-30Z") },
+    { weekday: 3, startMinutes: 1080, endMinutes: 1140, capacity: null, validFrom: null, validTo: null },
+    { weekday: 5, startMinutes: 1020, endMinutes: 1080, capacity: 8, validFrom: null, validTo: new Date("2026-12-31Z") },
+  ];
+  await db.offerScheduleRule.createMany({ data: originals.map(rule => ({ ...rule, offerBookingId: booking.id })) });
+  const signature = (rules: typeof originals) => rules.map(rule => JSON.stringify({
+    weekday: rule.weekday, startMinutes: rule.startMinutes, endMinutes: rule.endMinutes,
+    validFrom: rule.validFrom?.toISOString().slice(0, 10) ?? null,
+    validTo: rule.validTo?.toISOString().slice(0, 10) ?? null,
+  })).sort();
+  for (let pass = 0; pass < 2; pass++) {
+    const stored = await db.offerScheduleRule.findMany({ where: { offerBookingId: booking.id } });
+    const form = { ...defaultClassSchedule(), ...groupsFromRules(stored) };
+    form.groups.find(group => group.period?.from === "2026-11-01")!.seats = "12";
+    const classSchedule = buildClassScheduleInput(form, [], "REGULAR_ACTIVITY", "60")!;
+    await db.$transaction(tx => applyOfferSchedule({ db: tx, offerId, input: { classSchedule }, externalUrlNeedsModeration: false }));
+    const saved = await db.offerScheduleRule.findMany({ where: { offerBookingId: booking.id } });
+    assert.deepEqual(signature(saved), signature(originals));
+    assert.equal(saved.find(rule => rule.validFrom?.toISOString().startsWith("2026-11-01"))?.capacity, 12);
+  }
+});
+
+test("конфликтующие правила отклоняются без частичной потери существующего расписания", async () => {
+  const offerId = await newOffer({ productType: "REGULAR_ACTIVITY" });
+  const first = { kind: "recurring" as const, durationMin: 60, dates: [], closedDates: ["2026-12-01"], period: null,
+    groups: [{ days: [1], time: "17:00", seats: 10, period: { from: "2026-10-01", to: "2026-10-31" } }] };
+  await db.$transaction(tx => applyOfferSchedule({ db: tx, offerId, input: { classSchedule: first }, externalUrlNeedsModeration: false }));
+  const booking = await db.offerBooking.findUniqueOrThrow({ where: { offerId } });
+  const before = await db.offerScheduleRule.findMany({ where: { offerBookingId: booking.id } });
+  const exceptions = await db.offerScheduleException.findMany({ where: { offerBookingId: booking.id } });
+  await assert.rejects(db.$transaction(tx => applyOfferSchedule({
+    db: tx, offerId, externalUrlNeedsModeration: false,
+    input: { classSchedule: { ...first, closedDates: [], groups: [first.groups[0], { ...first.groups[0], seats: 20 }] } },
+  })), OfferScheduleValidationError);
+  assert.deepEqual(await db.offerScheduleRule.findMany({ where: { offerBookingId: booking.id } }), before);
+  assert.deepEqual(await db.offerScheduleException.findMany({ where: { offerBookingId: booking.id } }), exceptions);
 });
