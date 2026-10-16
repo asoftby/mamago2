@@ -88,9 +88,11 @@ export function getV2StepMembers(
       return ["price"];
     case "schedule":
       if (isCamp) return ["campSchedule", "accommodation", "bookingMethod"];
-      return isParty
-        ? ["openingHours", "bookingMethod"]
-        : ["conditions", "openingHours", "bookingMethod"];
+      if (isParty) return ["openingHours", "bookingMethod"];
+      if (data.productType === "ONE_TIME_ACTIVITY" || data.productType === "REGULAR_ACTIVITY") {
+        return ["conditions", "classSchedule", "bookingMethod"];
+      }
+      return ["conditions", "openingHours", "bookingMethod"];
     case "terms":
       return ["contacts"];
     default:

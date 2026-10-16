@@ -1,3 +1,4 @@
+import { publicOfferSessionWhere } from "@/lib/offers/publicOfferSessions";
 import "server-only";
 
 import { unstable_cache, revalidateTag } from "next/cache";
@@ -131,7 +132,7 @@ export async function syncEventHomeStories(activityId: string) {
 
 export async function validateOfferSessionForManualPlacement(sessionId: string, cityId: string) {
   return prisma.offerSession.findFirst({
-    where: { id: sessionId, offer: { status: OfferStatus.PUBLISHED, OR: [{ cityId }, { place: { cityId } }] } },
+    where: { ...publicOfferSessionWhere, id: sessionId, offer: { status: OfferStatus.PUBLISHED, OR: [{ cityId }, { place: { cityId } }] } },
     select: {
       id: true, offerId: true, startAt: true, endAt: true,
       offer: { select: { title: true, description: true, slug: true, coverImage: true, cityId: true, place: { select: { cityId: true, city: { select: { slug: true } } } } } },
@@ -150,7 +151,7 @@ export async function syncOfferHomeStoryPlacements(offerId: string) {
     select: {
       id: true, status: true, title: true, description: true, slug: true, coverImage: true,
       cityId: true, place: { select: { cityId: true, city: { select: { slug: true } } } },
-      sessions: { select: { id: true, startAt: true, endAt: true } },
+      sessions: { where: publicOfferSessionWhere, select: { id: true, startAt: true, endAt: true } },
     },
   });
   const sessions = new Map(offer?.sessions.map((session) => [session.id, session]));

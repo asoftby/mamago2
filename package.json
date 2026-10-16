@@ -188,7 +188,7 @@
     "test:offer-revision-payload": "tsx src/lib/offers/offerRevisionPayload.test.ts",
     "test:offer-live-comparable": "tsx src/lib/offers/offerLiveComparable.test.ts",
     "test:offer-wizard-v2-steps": "tsx src/components/business/wizard/offer/offerWizardV2Steps.contract.test.ts && tsx src/components/business/wizard/offer/validation.final.test.ts",
-    "test:offer-schedule": "tsx src/lib/offers/offerSchedule.test.ts && tsx src/components/business/wizard/offer/offerScheduleStep.test.tsx",
+    "test:offer-schedule": "tsx src/lib/offers/offerSchedule.test.ts && tsx src/lib/offers/offerClassSchedule.test.ts && tsx src/components/business/wizard/offer/campShift.test.ts && tsx src/components/business/wizard/offer/offerScheduleStep.test.tsx",
     "test:offer-schedule-integration": "NODE_OPTIONS=--conditions=react-server tsx --test src/server/offers/offerSchedule.integration.test.ts",
     "test:offer-categories": "tsx src/lib/offers/offerCategories.test.ts",
     "test:offer-interests": "tsx src/lib/offers/offerInterests.test.ts",

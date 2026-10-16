@@ -1,4 +1,6 @@
 import type { Prisma } from "@prisma/client";
+import { timeToMinutes, type ClassScheduleInput } from "@/lib/offers/offerClassSchedule";
+import { localMinuteToUtc } from "./slotTime";
 import { mapToCreatePayload, mapToUpdatePayload, validateOpeningHours } from "@/lib/openingHours";
 import type { OpeningHoursData } from "@/components/openingHours/openingHours.types";
 import {
@@ -62,6 +64,8 @@ export interface ApplyOfferScheduleParams {
   input: OfferScheduleInput | undefined;
   /** Опубликованный оффер, который правит не сотрудник: ссылку менять напрямую нельзя. */
   externalUrlNeedsModeration: boolean;
+  /** Тип опубликованного оффера остаётся живым до одобрения ревизии. */
+  typeChangeRequiresModeration?: boolean;
 }
 
 /**
@@ -72,6 +76,9 @@ export interface ApplyOfferScheduleParams {
 export async function applyOfferSchedule(params: ApplyOfferScheduleParams): Promise<void> {
   const { db, offerId, input } = params;
   if (!input) return;
+  if (params.typeChangeRequiresModeration && Object.keys(input).length > 0) {
+    throw new OfferScheduleValidationError("Сначала отправьте смену типа предложения на модерацию без изменения расписания. Расписание нового типа можно настроить после одобрения.");
+  }
   assertScheduleValid(input);
 
   if (input.bookingMethod) {
@@ -92,6 +99,10 @@ export async function applyOfferSchedule(params: ApplyOfferScheduleParams): Prom
       });
     }
     // NONE / REQUEST_ONLY: ссылку не стираем — вернувшись к «Своей ссылке», партнёр найдёт прежнюю.
+  }
+
+  if (input.classSchedule) {
+    await applyClassSchedule(db, offerId, input.classSchedule);
   }
 
   if (input.hours?.source === "own") {
@@ -136,7 +147,17 @@ export async function snapshotOfferSchedule(db: Db, offerId: string): Promise<Pr
       bookingEnabled: true,
       bookingMode: true,
       inheritPlaceOpeningHours: true,
-      offerBooking: { select: { externalKind: true, externalUrl: true } },
+      offerBooking: {
+        select: {
+          externalKind: true,
+          externalUrl: true,
+          scheduleKind: true,
+          durationMin: true,
+          rules: { select: { weekday: true, startMinutes: true, capacity: true, validFrom: true, validTo: true } },
+          exceptions: { select: { date: true } },
+        },
+      },
+      sessions: { where: { isCancelled: false }, select: { startAt: true, capacity: true } },
       openingHours: {
         select: {
           mode: true,
@@ -147,4 +168,101 @@ export async function snapshotOfferSchedule(db: Db, offerId: string): Promise<Pr
     },
   });
   return JSON.parse(JSON.stringify(offer)) as Prisma.InputJsonValue;
+}
+
+const dateOnly = (key: string) => new Date(`${key}T00:00:00.000Z`);
+
+/**
+ * Расписание занятий: правила/сессии заменяются целиком по данным формы, но сессии, на которые уже есть
+ * заявки, не удаляются (их отменяют флагом), чтобы не оборвать `BookingRequest.offerSessionId`.
+ * Способ записи не трогаем: слоты онлайн-записи в фазе 1 скрыты.
+ */
+async function applyClassSchedule(db: Db, offerId: string, schedule: ClassScheduleInput): Promise<void> {
+  const scheduleKind = schedule.kind === "recurring" ? "RECURRING_SESSIONS" : "DATED_SESSIONS";
+  const booking = await db.offerBooking.upsert({
+    where: { offerId },
+    create: { offerId, scheduleKind, durationMin: schedule.durationMin },
+    update: { scheduleKind, durationMin: schedule.durationMin },
+    select: { id: true, timezone: true },
+  });
+
+  // Закрытые дни занятий — OfferScheduleException (решение 8 фазы 0).
+  await db.offerScheduleException.deleteMany({ where: { offerBookingId: booking.id } });
+  if (schedule.closedDates.length > 0) {
+    await db.offerScheduleException.createMany({
+      data: [...new Set(schedule.closedDates)].map((date) => ({ offerBookingId: booking.id, date: dateOnly(date) })),
+    });
+  }
+
+  if (schedule.kind === "recurring") {
+    await db.offerScheduleRule.deleteMany({ where: { offerBookingId: booking.id } });
+
+    const rows = schedule.groups.flatMap((group) => {
+      const period = group.period === undefined ? schedule.period : group.period;
+      const validFrom = period?.from ? dateOnly(period.from) : null;
+      const validTo = period?.to ? dateOnly(period.to) : null;
+      const start = timeToMinutes(group.time);
+      if (start === null) return [];
+      return [...new Set(group.days)].map((weekday) => ({
+        offerBookingId: booking.id,
+        weekday,
+        startMinutes: start,
+        endMinutes: start + schedule.durationMin,
+        validFrom,
+        validTo,
+        capacity: group.seats,
+      }));
+    });
+    // Разные периоды одного слота допустимы. Не теряем их при дедупликации.
+    // Конфликтующие значения одного ключа отклоняем, а не выбираем первое молча.
+    const seen = new Map<string, (typeof rows)[number]>();
+    const unique = rows.filter((row) => {
+      const key = JSON.stringify([row.weekday, row.startMinutes, row.endMinutes, row.validFrom,
+        row.validFrom === null ? row.validTo : null]);
+      const previous = seen.get(key);
+      if (previous) {
+        if (previous.capacity !== row.capacity || previous.validTo?.getTime() !== row.validTo?.getTime()) {
+          throw new OfferScheduleValidationError("У групп с одинаковым началом курса различаются даты или число мест");
+        }
+        return false;
+      }
+      seen.set(key, row);
+      return true;
+    });
+    if (unique.length > 0) await db.offerScheduleRule.createMany({ data: unique });
+    // Сохраняем историю и ссылки заявок, но прежние разовые даты больше не активны.
+    await db.offerSession.updateMany({ where: { offerId, isCancelled: false }, data: { isCancelled: true } });
+    return;
+  }
+
+  // Удаляем прежнее регулярное представление при переходе к разовым датам.
+  await db.offerScheduleRule.deleteMany({ where: { offerBookingId: booking.id } });
+  // Разовые занятия — OfferSession по датам.
+  const wanted = new Map<number, { startAt: Date; endAt: Date; capacity: number | null }>();
+  for (const item of schedule.dates) {
+    const start = timeToMinutes(item.time);
+    if (start === null) continue;
+    const startAt = localMinuteToUtc(item.date, start, booking.timezone);
+    const endAt = localMinuteToUtc(item.date, start + schedule.durationMin, booking.timezone);
+    if (!startAt || !endAt) throw new OfferScheduleValidationError("Некорректное время занятия");
+    wanted.set(startAt.getTime(), { startAt, endAt, capacity: item.seats });
+  }
+  for (const row of wanted.values()) {
+    await db.offerSession.upsert({
+      where: { offerId_startAt: { offerId, startAt: row.startAt } },
+      create: { offerId, ...row },
+      update: { endAt: row.endAt, capacity: row.capacity, isCancelled: false },
+    });
+  }
+  const existing = await db.offerSession.findMany({
+    where: { offerId },
+    select: { id: true, startAt: true, _count: { select: { bookingRequests: true } } },
+  });
+  const stale = existing.filter((row) => !wanted.has(row.startAt.getTime()));
+  const removable = stale.filter((row) => row._count.bookingRequests === 0).map((row) => row.id);
+  const booked = stale.filter((row) => row._count.bookingRequests > 0).map((row) => row.id);
+  if (removable.length > 0) await db.offerSession.deleteMany({ where: { id: { in: removable } } });
+  if (booked.length > 0) {
+    await db.offerSession.updateMany({ where: { id: { in: booked } }, data: { isCancelled: true } });
+  }
 }

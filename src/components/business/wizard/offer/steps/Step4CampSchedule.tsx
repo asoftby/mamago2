@@ -23,18 +23,34 @@ import { cn } from "@/lib/utils";
 import type { CampSessionEntry, CampSessionKind, OfferFormData } from "../types";
 import {
   CAMP_SESSION_KIND_LABELS,
+  campImpliesLodging,
+  campShiftDuration,
   createEmptyCampSession,
   formatCampShiftDateRangeRu,
+  formatCampShiftDuration,
+  getCampShiftMissingFields,
 } from "../campOfferModel";
+import { DateRangeField } from "@/components/ui/date-range-field";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Step4CampScheduleProps {
   data: OfferFormData;
   onChange: (updates: Partial<OfferFormData>) => void;
   isEditable: boolean;
+  /** Новый мастер: компактная карточка смены (название, даты одним полем, цена, места, программа, что входит, база). */
+  v2?: boolean;
 }
 
-export function Step4CampSchedule({ data, onChange, isEditable }: Step4CampScheduleProps) {
+function parseCount(value: string, fallback: number | null): number | null {
+  if (value === "") return null;
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+export function Step4CampSchedule({ data, onChange, isEditable, v2 = false }: Step4CampScheduleProps) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const residential = campImpliesLodging(data.campProgramType);
 
   const patchSession = (id: string, patch: Partial<CampSessionEntry>) => {
     onChange({
@@ -99,6 +115,258 @@ export function Step4CampSchedule({ data, onChange, isEditable }: Step4CampSched
           <div className="space-y-4">
             {data.campSessions.map((session) => {
               const rangeLabel = formatCampShiftDateRangeRu(session.dateFrom, session.dateTo);
+              if (v2) {
+                const duration = campShiftDuration(session.dateFrom, session.dateTo, residential);
+                const missing = touched[session.id] ? getCampShiftMissingFields(session) : [];
+                return (
+                  <Card
+                    key={session.id}
+                    data-session-id={session.id}
+                    className="overflow-hidden rounded-2xl border border-border/70 shadow-sm"
+                    onBlur={() => setTouched((prev) => ({ ...prev, [session.id]: true }))}
+                  >
+                    <CardContent className="space-y-4 p-4 sm:p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Смена</p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="shrink-0 text-destructive hover:text-destructive"
+                          onClick={() => handleRemoveSession(session.id)}
+                          disabled={!isEditable}
+                        >
+                          <Trash2 className="mr-1.5 h-4 w-4" />
+                          Удалить
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor={`title-${session.id}`}>
+                          Название <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id={`title-${session.id}`}
+                          placeholder="Например: «Юные изобретатели»"
+                          value={session.title}
+                          onChange={(e) => patchSession(session.id, { title: e.target.value })}
+                          disabled={!isEditable}
+                          aria-invalid={missing.includes("Название")}
+                          className="rounded-xl"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor={`dates-${session.id}`}>
+                          Даты смены <span className="text-red-500">*</span>
+                        </Label>
+                        <DateRangeField
+                          id={`dates-${session.id}`}
+                          from={session.dateFrom}
+                          to={session.dateTo}
+                          disabled={!isEditable}
+                          aria-invalid={missing.some((field) => field.startsWith("Даты"))}
+                          onChange={({ from, to }) => patchSession(session.id, { dateFrom: from, dateTo: to })}
+                        />
+                        {duration ? (
+                          <p className="text-sm text-muted-foreground">
+                            Продолжительность: {formatCampShiftDuration(duration)}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor={`price-${session.id}`}>
+                            Цена смены, BYN <span className="text-red-500">*</span>
+                          </Label>
+                          <Input
+                            id={`price-${session.id}`}
+                            inputMode="decimal"
+                            placeholder="450"
+                            value={session.priceOverride}
+                            onChange={(e) => patchSession(session.id, { priceOverride: e.target.value })}
+                            disabled={!isEditable}
+                            aria-invalid={missing.includes("Цена")}
+                            className="rounded-xl"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`cap-${session.id}`}>Мест</Label>
+                          <Input
+                            id={`cap-${session.id}`}
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            placeholder="20"
+                            value={session.capacity ?? ""}
+                            onChange={(e) =>
+                              patchSession(session.id, { capacity: parseCount(e.target.value, session.capacity) })
+                            }
+                            disabled={!isEditable}
+                            className="rounded-xl"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <WizardRichTextField
+                          label="Программа смены"
+                          helperText="Чем занимаются дети, чем эта смена отличается от других."
+                          value={session.description}
+                          onChange={(value) => patchSession(session.id, { description: value })}
+                          placeholder="Каждый день — новый проект…"
+                          disabled={!isEditable}
+                          minHeight={120}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor={`includes-${session.id}`}>Что входит в цену</Label>
+                        <Textarea
+                          id={`includes-${session.id}`}
+                          rows={2}
+                          placeholder="Питание, материалы, экскурсия, страховка…"
+                          value={session.includes}
+                          onChange={(e) => patchSession(session.id, { includes: e.target.value })}
+                          disabled={!isEditable}
+                          className="rounded-xl"
+                        />
+                      </div>
+
+                      {residential ? (
+                        <div className="space-y-2">
+                          <Label htmlFor={`base-${session.id}`}>Локация базы</Label>
+                          <Input
+                            id={`base-${session.id}`}
+                            placeholder="База «Лесная», д. Ратомка"
+                            value={session.baseLocation}
+                            onChange={(e) => patchSession(session.id, { baseLocation: e.target.value })}
+                            disabled={!isEditable}
+                            className="rounded-xl"
+                          />
+                        </div>
+                      ) : null}
+
+                      <Collapsible>
+                        <CollapsibleTrigger asChild>
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-between rounded-xl border border-border/60 px-3 py-2.5 text-left text-sm font-medium hover:bg-muted/40"
+                          >
+                            Время, возраст и акции смены
+                            <ChevronDown className="h-4 w-4 shrink-0" />
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="space-y-4 pt-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                              <div className="space-y-2">
+                                <Label htmlFor={`tf-${session.id}`}>Время начала</Label>
+                                <Input
+                                  id={`tf-${session.id}`}
+                                  type="time"
+                                  value={session.timeFrom ?? ""}
+                                  onChange={(e) => patchSession(session.id, { timeFrom: e.target.value || null })}
+                                  disabled={!isEditable}
+                                  className="rounded-xl"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor={`tt-${session.id}`}>Время окончания</Label>
+                                <Input
+                                  id={`tt-${session.id}`}
+                                  type="time"
+                                  value={session.timeTo ?? ""}
+                                  onChange={(e) => patchSession(session.id, { timeTo: e.target.value || null })}
+                                  disabled={!isEditable}
+                                  className="rounded-xl"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Тип</Label>
+                              <Select
+                                value={session.sessionKind}
+                                onValueChange={(v) => patchSession(session.id, { sessionKind: v as CampSessionKind })}
+                                disabled={!isEditable}
+                              >
+                                <SelectTrigger className="w-full rounded-xl">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {(Object.keys(CAMP_SESSION_KIND_LABELS) as CampSessionKind[]).map((k) => (
+                                    <SelectItem key={k} value={k}>
+                                      {CAMP_SESSION_KIND_LABELS[k]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                              <div className="space-y-2">
+                                <Label htmlFor={`agef-${session.id}`}>Возраст, от (лет)</Label>
+                                <Input
+                                  id={`agef-${session.id}`}
+                                  type="number"
+                                  inputMode="numeric"
+                                  min={0}
+                                  max={25}
+                                  value={session.ageFrom ?? ""}
+                                  onChange={(e) =>
+                                    patchSession(session.id, { ageFrom: parseCount(e.target.value, session.ageFrom) })
+                                  }
+                                  disabled={!isEditable}
+                                  className="rounded-xl"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor={`aget-${session.id}`}>Возраст, до (лет)</Label>
+                                <Input
+                                  id={`aget-${session.id}`}
+                                  type="number"
+                                  inputMode="numeric"
+                                  min={0}
+                                  max={25}
+                                  value={session.ageTo ?? ""}
+                                  onChange={(e) =>
+                                    patchSession(session.id, { ageTo: parseCount(e.target.value, session.ageTo) })
+                                  }
+                                  disabled={!isEditable}
+                                  className="rounded-xl"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`left-${session.id}`}>Осталось мест</Label>
+                              <Input
+                                id={`left-${session.id}`}
+                                type="number"
+                                inputMode="numeric"
+                                min={0}
+                                value={session.spotsLeft ?? ""}
+                                onChange={(e) =>
+                                  patchSession(session.id, { spotsLeft: parseCount(e.target.value, session.spotsLeft) })
+                                }
+                                disabled={!isEditable}
+                                className="rounded-xl"
+                              />
+                            </div>
+                            <WizardRichTextField
+                              label="Акционные данные"
+                              helperText="Например: скидка за раннее бронирование."
+                              value={session.promotionDetails}
+                              onChange={(value) => patchSession(session.id, { promotionDetails: value })}
+                              disabled={!isEditable}
+                              minHeight={100}
+                            />
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </CardContent>
+                  </Card>
+                );
+              }
               return (
                 <Card
                   key={session.id}

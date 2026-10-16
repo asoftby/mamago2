@@ -18,6 +18,8 @@ export const campSessionEntrySchema = z
     priceOverride: z.string().optional().nullable(),
     description: z.string().optional().nullable(),
     promotionDetails: z.string().optional().nullable(),
+    includes: z.string().optional().nullable(),
+    baseLocation: z.string().optional().nullable(),
   })
   .passthrough();
 
