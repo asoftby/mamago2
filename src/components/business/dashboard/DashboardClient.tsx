@@ -571,10 +571,12 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
               depositHref={data.hrefs.deposit}
               promotionHref={data.hrefs.promotion}
             />}
-            <DashboardActionStack
-              promotionHref={data.hrefs.promotion}
-              hasPublications={data.totalPublications > 0}
-            />
+            <div data-business-tour="create">
+              <DashboardActionStack
+                promotionHref={data.hrefs.promotion}
+                hasPublications={data.totalPublications > 0}
+              />
+            </div>
             {BUSINESS_DASHBOARD_MVP.businessDailyFreeBoostUiEnabled && (
               <DailyFreeBoostCard data={data.dailyFreeBoost} />
             )}
