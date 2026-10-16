@@ -107,6 +107,21 @@ assert.ok(ABWS_FETCH_OPTIONS.maxBytes <= 32 * 1024 * 1024);
   assert.ok(!preview.includes(serializedKey), "no serialized query credential in logs");
   assert.ok(!preview.includes(specialKey), "no raw credential in logs");
   assert.ok(preview.includes("[REDACTED]"));
+
+  for (const [body, key] of [
+    [token, token],
+    [JSON.stringify({ [token]: "upstream failure" }), token],
+    [JSON.stringify({ [serializedKey]: "upstream failure" }), specialKey],
+  ]) {
+    assert.throws(() => parseAbwsResponseBody(body, key), (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.ok(!error.message.includes(token));
+      assert.ok(!error.message.includes(specialKey));
+      assert.ok(!error.message.includes(serializedKey));
+      assert.match(error.message, /ABWS response is not valid JSON|Unrecognized ABWS response envelope/);
+      return true;
+    });
+  }
 }
 
 // ── isSingleVenue ────────────────────────────────────────────────────────
