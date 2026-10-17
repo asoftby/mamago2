@@ -206,6 +206,11 @@ export function MarketplacePlacePage({
         logoUrl={place.logoUrl}
         rating={displayRating}
         reviewCount={displayReviewCount}
+        reputationSummary={reputation ? {
+          mamaGoSignals: reputation.mamaGoSignals,
+          googleRating: reputation.google?.rating,
+          googleCount: reputation.google?.count,
+        } : undefined}
         categoryLabel={place.categoryLabel}
         city={place.city}
         district={place.district}
