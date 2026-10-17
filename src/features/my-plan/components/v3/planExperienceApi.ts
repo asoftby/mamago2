@@ -23,6 +23,7 @@ export type PlanExperienceFeed = {
   awaitingFeedback: PlanExperienceRow[];
   visits: PlanExperienceRow[];
   phoneVerified: boolean;
+  feedbackV1Enabled?: boolean;
 };
 
 export async function fetchPlanExperienceFeed(): Promise<PlanExperienceFeed | null> {
