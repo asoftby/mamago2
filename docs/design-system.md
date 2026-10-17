@@ -21,10 +21,20 @@
 | Status | `success`, `warning`, `danger` | Positive, pending, destructive |
 | Regular button radius | `--radius-button` | Currently 16px in globals.css; Button still uses `rounded-md` |
 | Card radius | `--radius-card` | Currently 20px in globals.css |
-| Typography | NT Somic UI; PT Serif for editorial headings | Follow current layout and typography components |
+| Typography | Google Sans for UI/body; PT Serif for editorial/italics; Menlo for monospaced details | `src/lib/fonts.ts`, `src/lib/typography.ts`, `globals.css` |
 | Spacing | Tailwind spacing and documented semantic component variants | Avoid one-off magic values |
 
 Do not copy the above colors as HEX: CSS tokens are canonical and may change.
+
+## Typography: approved families only
+
+The only approved UI typography families are **Google Sans, PT Serif, and Menlo**:
+
+- **Google Sans** — interface, body text, buttons, forms and navigation. Source: locally hosted `GoogleSans/*.woff2` via `next/font/local` (`--font-sans`).
+- **PT Serif** — editorial headings, display and italic emphasis. All four real PT Serif faces are loaded, including regular and bold (not Source Serif Pro). Source: `public/fonts/PT_Serif-Web-*.ttf` (`--font-serif` / `--font-display` / `--font-editorial`).
+- **Menlo** — monospace metadata, dates, numbers and code (`font-mono`). It is a system font; the OS's monospace replacement is expected where Menlo is missing.
+
+Do not introduce additional named font families, including NT Somic, Georgia, Roboto, Source Serif Pro, Inter, or JetBrains Mono, as brand/UI choices. Generic browser fallback stacks are allowed for accessibility and cross-platform rendering. Persisted legacy branding values are normalized on read; admin font settings offer only the approved three and reject other names on write. This does **not** require a DB migration.
 
 ## Controls: definitions and current differences
 
@@ -36,7 +46,7 @@ Do not copy the above colors as HEX: CSS tokens are canonical and may change.
 | `ChipsRow` | Group of choices; scroll, wrap or masonry | `src/components/ui/chips-row.tsx`; different sizes and legacy HEX colors | Shared choice primitive with layout-only variants; preserve horizontal scroll and age layouts |
 | `Badge` | Non-interactive metadata/status | `src/components/ui/badge.tsx` | Keep it informational; never substitute for selectable Chip |
 | `Input` / `Textarea` | Text entry | `src/components/ui/input.tsx` and `textarea.tsx` | Adopt common label, description, error, required, disabled states |
-| `Toggle` | Boolean switch | `src/components/ui/Toggle.tsx`; selected state hardcodes brand HEX | Replace legacy literal with semantic token after reviewing variants |
+| `CloseIcon` / `ModalCloseButton` | Close overlays/pages | `src/components/ui/close-icon.tsx` (single Lucide X) and `modal-close-button.tsx` (accessible button; 40/44px variants). Used by Dialog, Sheet, PageCloseButton, BottomSheet | Review context-specific surface/glass variants in UI Lab; never duplicate X glyph/stroke sizes in new close buttons |\n| `Toggle` | Boolean switch | `src/components/ui/Toggle.tsx`; selected state hardcodes brand HEX | Replace legacy literal with semantic token after reviewing variants |
 
 This matrix describes current code, not an approved replacement for all button heights. Do not globally switch `rounded-md` to `rounded-[16px]` without screenshot review.
 
