@@ -7,7 +7,7 @@ export function normalizeBrandFont(value: string | null | undefined, fallback: B
   return BRAND_FONTS.includes(value as BrandFont) ? (value as BrandFont) : fallback;
 }
 
-export function getBrandFontStack(font: BrandFont): string {
+export function getBrandFontStack(font: BrandFont | string): string {
   if (font === "PT Serif") return "var(--font-pt-serif), ui-serif, serif";
   if (font === "Menlo") return "Menlo, ui-monospace, SFMono-Regular, Monaco, Consolas, monospace";
   return "var(--font-google-sans), ui-sans-serif, system-ui, sans-serif";
