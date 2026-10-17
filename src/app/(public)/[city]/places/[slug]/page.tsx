@@ -42,6 +42,9 @@ import { normalizeFaqItems } from "@/lib/faq/faqItems";
 import type { StoredGoogleReview } from "@/types/google-places";
 import { resolveCanonicalCta } from "@/lib/cta-platform";
 import { createPlaceDetailPerf } from "@/server/place/placeDetailPerf";
+import { loadPlaceReputationOverview } from "@/server/services/feedback/placeReputation.service";
+import { loadLiveGooglePlaceReputation } from "@/server/services/feedback/googlePlaceReputation.service";
+import type { PlaceReputationOverview } from "@/lib/feedback/placeReputation";
 
 /**
  * `/{city}/places/{slug}` — the canonical Place detail page.
@@ -578,6 +581,26 @@ export default async function PlacePage({ params }: PlacePageProps) {
     : reviewStats._avg.rating || undefined;
   const totalReviewCount = reviewStats._count + (fallbackGoogleStats?.reviewCount ?? 0);
 
+  // New source-separated overview. Only query new tables after the foundation
+  // migration has been reviewed and the rollout flag is enabled.
+  let reputation: PlaceReputationOverview | undefined;
+  if (process.env.FEEDBACK_PLACE_REPUTATION_ENABLED === "1") {
+    try {
+      // Google data is fetched fresh behind its own usage/billing flag.
+      const liveGoogle = googleReviewsEnabled &&
+        process.env.FEEDBACK_GOOGLE_LIVE_ENABLED === "1" &&
+        place.googlePlaceId
+          ? await loadLiveGooglePlaceReputation(place.googlePlaceId)
+          : null;
+      reputation = await loadPlaceReputationOverview({
+        placeId: place.id,
+        google: liveGoogle,
+      });
+    } catch (error) {
+      console.error("[feedback] place reputation not ready; keeping legacy display", error);
+    }
+  }
+
   const currentUser = await getCurrentUser();
   const canShowPlaceEditor =
     currentUser != null &&
@@ -709,8 +732,8 @@ export default async function PlacePage({ params }: PlacePageProps) {
           phone: place.phone,
           website: place.website,
           instagramUrl: resolvedInstagramUrl,
-          rating: averageRating,
-          reviewCount: totalReviewCount,
+          rating: reputation ? undefined : averageRating,
+          reviewCount: reputation ? undefined : totalReviewCount,
           publicBaseUrl: publicBase,
         });
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(
@@ -732,8 +755,8 @@ export default async function PlacePage({ params }: PlacePageProps) {
     shortDesc: place.shortDesc,
     description: place.description || place.shortDesc,
     logoUrl: logoUrl ?? logoImage?.url,
-    rating: averageRating,
-    reviewCount: totalReviewCount,
+    rating: reputation ? undefined : averageRating,
+    reviewCount: reputation ? undefined : totalReviewCount,
 
     // Contact
     phones: placePhones,
@@ -821,6 +844,8 @@ export default async function PlacePage({ params }: PlacePageProps) {
         citySlug={placeCitySlug}
         offers={formattedOffers}
         reviews={combinedReviews}
+        reputation={reputation}
+        showCrossSourceTotal={process.env.FEEDBACK_COMBINED_GOOGLE_TOTAL_ENABLED === "1"}
         ownerEditPlaceId={canShowPlaceEditor ? place.id : undefined}
         relatedPlaces={relatedPlaces}
         direct={directCta}
