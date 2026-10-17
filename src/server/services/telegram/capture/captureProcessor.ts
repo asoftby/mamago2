@@ -123,16 +123,21 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
     if (!models.fast) return fail("CAPTURE_MODEL_NOT_CONFIGURED");
 
     const text = sourceText(item.parts);
+    const imagesStartedAt = Date.now();
     const imageDataUrls = await loadImages(item.parts);
+    const imageDownloadMs = Date.now() - imagesStartedAt;
     if (imageDataUrls === null) return fail("TELEGRAM_FILE_FAILED");
     if (!text && imageDataUrls.length === 0) return fail("PROCESSOR_ERROR");
 
     const owner = { userId: item.userId };
+    const contextStartedAt = Date.now();
     const context = await loadCaptureContext(deps.context, owner, {
       anchorAt: item.anchorAt,
       anchorIsForward: item.anchorIsForward,
       text,
     });
+    const contextMs = Date.now() - contextStartedAt;
+    console.log(`[capture-prepare] images=${imageDataUrls.length} imageDownloadMs=${imageDownloadMs} contextMs=${contextMs}`);
     const userParts = buildCaptureUserParts({ context, text, imageDataUrls, now: now() });
     const responseFormat: OpenRouterResponseFormat =
       models.responseFormat === "json_schema"
@@ -140,13 +145,16 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
         : { type: "json_object" };
 
     const attempt = async (model: string): Promise<Attempt> => {
+      const startedAt = Date.now();
       const response = await deps.openrouter.chat({
         model,
         systemPrompt: CAPTURE_SYSTEM_PROMPT,
         userParts,
         responseFormat,
       });
+      const modelMs = Date.now() - startedAt;
       if (!response.ok) {
+        console.log(`[capture-model] model=${model} durationMs=${modelMs} result=${response.code}`);
         // A non-retryable failure (not configured, auth/4xx) is final; retryable ones are retried once.
         return {
           kind: "infra",
@@ -157,6 +165,7 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
       }
       addUsage(usage, response.tokensIn, response.tokensOut, response.model);
       const parsed = parseCaptureDraft(response.content);
+      console.log(`[capture-model] model=${response.model} durationMs=${modelMs} result=${parsed.ok ? "PARSED" : parsed.code} tokensIn=${response.tokensIn ?? "-"} tokensOut=${response.tokensOut ?? "-"}`);
       return parsed.ok ? { kind: "parsed", draft: parsed.draft } : { kind: "invalid" };
     };
 
@@ -283,8 +292,10 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
         });
         logResult(item, "DRAFT_READY", null, result, startedAt);
         if (updated.count === 1 && deps.presenter) {
+          const deliveryStartedAt = Date.now();
           try {
             await deps.presenter.present(item.id);
+            console.log(`[capture-delivery] durationMs=${Date.now() - deliveryStartedAt}`);
           } catch {
             console.error(`[capture-processor] inboxItemId=${item.id} code=CARD_SEND_FAILED`);
           }

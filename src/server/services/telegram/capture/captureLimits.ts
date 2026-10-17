@@ -1,9 +1,13 @@
 /** Intake limits (forward-to-plan spec v1.3, section 13). One place on purpose. */
 export const CAPTURE_LIMITS = {
   maxTextChars: 4000,
-  maxPhotoBytes: 5 * 1024 * 1024,
-  maxPhotosPerItem: 5,
-  maxItemsPer24h: 30,
+  maxPhotoBytes: 3 * 1024 * 1024,
+  maxPhotosPerItem: 3,
+  /** Per-owner image quota across singles and albums (rolling 24h). */
+  maxPhotosPer24h: 6,
+  /** Bot-wide protection against many linked accounts (per environment, rolling 24h). */
+  maxItemsAcrossUsersPer24h: 1000,
+  maxItemsPer24h: 15,
   rateWindowMs: 24 * 60 * 60 * 1000,
   /** Album debounce: wait after the last update of a media group. */
   albumDebounceMs: 2500,

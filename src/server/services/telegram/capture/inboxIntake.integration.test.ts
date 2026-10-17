@@ -228,7 +228,7 @@ test("late album part after the claim starts a new item flagged ALBUM_LATE_PART"
   assert.deepEqual(firstItem.ruleCodes, []);
 });
 
-test("rate limit: 30 items in 24h blocks the next one; older items do not count", async () => {
+test("rate limit: daily user quota blocks the next item; older items do not count", async () => {
   const owner = await makeUser("rate");
   const h = makeIntake();
   const base = {
@@ -242,18 +242,18 @@ test("rate limit: 30 items in 24h blocks the next one; older items do not count"
     purgeAfter: new Date(Date.now() + 86_400_000),
   };
   await db.inboxItem.createMany({
-    data: Array.from({ length: 30 }, () => ({ ...base, createdAt: new Date(h.clock.t - 60_000) })),
+    data: Array.from({ length: CAPTURE_LIMITS.maxItemsPer24h }, () => ({ ...base, createdAt: new Date(h.clock.t - 60_000) })),
   });
 
   const blocked = await h.intake.receive(owner, "DEV", capture());
   assert.deepEqual(blocked.outcome, { status: "rejected", reason: "RATE_LIMITED" });
   assert.equal(blocked.afterResponse, null);
   assert.deepEqual(h.replies, [CAPTURE_REPLIES.rateLimited]);
-  assert.equal(await countItems(owner.userId), 30);
+  assert.equal(await countItems(owner.userId), CAPTURE_LIMITS.maxItemsPer24h);
 
   const albumBlocked = await h.intake.receive(owner, "DEV", photo("grp-rate"));
   assert.deepEqual(albumBlocked.outcome, { status: "rejected", reason: "RATE_LIMITED" });
-  assert.equal(await countItems(owner.userId), 30);
+  assert.equal(await countItems(owner.userId), CAPTURE_LIMITS.maxItemsPer24h);
 
   // Items older than the rolling window stop counting.
   h.clock.t += CAPTURE_LIMITS.rateWindowMs;
@@ -276,10 +276,10 @@ async function seedItems(userId: string, count: number, createdAt: Date): Promis
   });
 }
 
-test("rate limit is atomic: parallel updates at count=29 create exactly one item", async () => {
+test("rate limit is atomic: parallel updates at one below quota create exactly one item", async () => {
   const owner = await makeUser("rate-atomic");
   const h = makeIntake();
-  await seedItems(owner.userId, 29, new Date(h.clock.t - 60_000));
+  await seedItems(owner.userId, CAPTURE_LIMITS.maxItemsPer24h - 1, new Date(h.clock.t - 60_000));
 
   const results = await Promise.all(Array.from({ length: 8 }, () => h.intake.receive(owner, "DEV", capture())));
   const stored = results.filter((r) => r.outcome.status === "stored").length;
@@ -288,20 +288,20 @@ test("rate limit is atomic: parallel updates at count=29 create exactly one item
   ).length;
   assert.equal(stored, 1);
   assert.equal(rejected, 7);
-  assert.equal(await countItems(owner.userId), 30);
+  assert.equal(await countItems(owner.userId), CAPTURE_LIMITS.maxItemsPer24h);
   assert.deepEqual(h.replies, Array(7).fill(CAPTURE_REPLIES.rateLimited), "refusals are sent after the commit");
 });
 
-test("rate limit stays atomic when an album and singles of one user race at count=29", async () => {
+test("rate limit stays atomic when an album and singles race near quota", async () => {
   const owner = await makeUser("rate-mixed");
   const h = makeIntake();
-  await seedItems(owner.userId, 29, new Date(h.clock.t - 60_000));
+  await seedItems(owner.userId, CAPTURE_LIMITS.maxItemsPer24h - 1, new Date(h.clock.t - 60_000));
 
   const album = [photo("grp-mixed"), photo("grp-mixed"), photo("grp-mixed")];
   const singles = [capture(), capture(), capture()];
   const results = await Promise.all([...album, ...singles].map((c) => h.intake.receive(owner, "DEV", c)));
   assert.ok(results.every((r) => ["stored", "rejected", "truncated"].includes(r.outcome.status)));
-  assert.equal(await countItems(owner.userId), 30);
+  assert.equal(await countItems(owner.userId), CAPTURE_LIMITS.maxItemsPer24h);
 });
 
 test("an album and single updates of one user in parallel finish without deadlock", async () => {
@@ -405,18 +405,48 @@ test("a redelivered update does not wait for the user lock", async () => {
   await holder;
 });
 
-test("sixth photo is dropped with ALBUM_TRUNCATED set once", async () => {
+test("photos exceeding per-album quota are dropped with ALBUM_TRUNCATED set once", async () => {
   const owner = await makeUser("trunc");
   const h = makeIntake();
-  for (let i = 0; i < 5; i += 1) {
+  for (let i = 0; i < CAPTURE_LIMITS.maxPhotosPerItem; i += 1) {
     assert.equal((await h.intake.receive(owner, "DEV", photo("grp-trunc"))).outcome.status, "stored");
   }
   assert.equal((await h.intake.receive(owner, "DEV", photo("grp-trunc"))).outcome.status, "truncated");
   assert.equal((await h.intake.receive(owner, "DEV", photo("grp-trunc"))).outcome.status, "truncated");
   const item = await db.inboxItem.findFirstOrThrow({ where: { userId: owner.userId }, include: { parts: true } });
-  assert.equal(item.parts.length, 5);
+  assert.equal(item.parts.length, CAPTURE_LIMITS.maxPhotosPerItem);
   assert.deepEqual(item.ruleCodes, ["ALBUM_TRUNCATED"]);
   assert.equal(await countItems(owner.userId), 1);
+});
+
+test("bot-wide quota is atomic across distinct linked accounts", async () => {
+  const first = await makeUser("global-first");
+  const second = await makeUser("global-second");
+  const currentTime = Date.now();
+  const globalUsed = await db.inboxItem.count({
+    where: { environment: "DEV", createdAt: { gte: new Date(currentTime - CAPTURE_LIMITS.rateWindowMs) } },
+  });
+  const h = makeIntake({ globalItemsPer24hLimit: globalUsed + 2 });
+  const attempts = await Promise.all([
+    h.intake.receive(first, "DEV", capture()),
+    h.intake.receive(second, "DEV", capture()),
+    h.intake.receive(first, "DEV", capture()),
+  ]);
+  assert.equal(attempts.filter((r) => r.outcome.status === "stored").length, 2);
+  assert.equal(attempts.filter((r) => r.outcome.status === "rejected" && r.outcome.reason === "GLOBAL_RATE_LIMITED").length, 1);
+  assert.deepEqual(h.replies, [CAPTURE_REPLIES.globalRateLimited]);
+});
+
+test("daily photo quota blocks extra screenshots without blocking texts", async () => {
+  const owner = await makeUser("photo-day");
+  const h = makeIntake();
+  for (let i = 0; i < CAPTURE_LIMITS.maxPhotosPer24h; i += 1) {
+    assert.equal((await h.intake.receive(owner, "DEV", photo(`grp-day-${i}`))).outcome.status, "stored");
+  }
+  const denied = await h.intake.receive(owner, "DEV", photo("grp-day-extra"));
+  assert.deepEqual(denied.outcome, { status: "rejected", reason: "PHOTO_RATE_LIMITED" });
+  assert.equal((await h.intake.receive(owner, "DEV", capture())).outcome.status, "stored");
+  assert.deepEqual(h.replies, [CAPTURE_REPLIES.photoRateLimited]);
 });
 
 test("limits and unsupported content are rejected without a record", async () => {
