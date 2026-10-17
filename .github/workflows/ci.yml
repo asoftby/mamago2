@@ -37,6 +37,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: UI Lab access and route regressions
+        run: |
+          pnpm exec tsx src/lib/ui-lab/accessPolicy.test.ts
+          node --test scripts/ui-lab-route-contract.test.mjs
+          pnpm exec tsx src/lib/typography.test.ts
+          node --test scripts/typography-close-contract.test.mjs
+
       - name: Validate Prisma schema
         run: pnpm exec prisma validate
         env:

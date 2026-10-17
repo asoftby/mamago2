@@ -1,0 +1,48 @@
+name: Design System Inventory
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "scripts/design-system-audit.mjs"
+      - "scripts/design-system-audit.test.mjs"
+      - "scripts/ui-lab-route-contract.test.mjs"
+      - "src/lib/ui-lab/**"
+      - "docs/design-system.md"
+      - ".agents/skills/mamago-design-system/**"
+      - ".github/workflows/design-system-inventory.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Test audit heuristics
+        run: node --test scripts/design-system-audit.test.mjs
+
+      - name: Verify UI Lab routes and preview contract
+        run: node --test scripts/ui-lab-route-contract.test.mjs
+
+      - name: Generate inventory (informational)
+        run: node scripts/design-system-audit.mjs --out design-system-audit.md
+
+      - name: Summary
+        run: |
+          head -n 28 design-system-audit.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload complete report
+        uses: actions/upload-artifact@v4
+        with:
+          name: mamaGo-design-system-inventory
+          path: design-system-audit.md
+          retention-days: 7

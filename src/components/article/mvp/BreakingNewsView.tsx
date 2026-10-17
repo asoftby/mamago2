@@ -51,7 +51,7 @@ const C = {
 } as const;
 
 const FONT_DISPLAY = "var(--font-sans), ui-sans-serif, system-ui, sans-serif";
-const FONT_MONO = "ui-monospace, 'JetBrains Mono', monospace";
+const FONT_MONO = "var(--font-mono), Menlo, ui-monospace, monospace";
 
 // ─── Shared micro-styles ──────────────────────────────────────────────────────
 
