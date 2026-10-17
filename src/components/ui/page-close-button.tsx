@@ -50,7 +50,6 @@ export function PageCloseButton({
         "focus:outline-none focus:ring-2 focus:ring-[#EF8759]/30",
         className,
       )}
-    >
-    </ModalCloseButton>
+    />
   );
 }
