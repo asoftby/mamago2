@@ -75,3 +75,27 @@ The `/ui-lab` page (development only) contains **Design System — Foundation** 
 ## Definition of done for each migration PR
 
 Document the old and new variants, affected views, intentional exceptions, test results (types, lint and mobile/desktop visual), and updated UI Lab examples. Do not claim completion solely from string replacements or a green build.
+
+
+## UI Lab 2.0 — unified approval environment
+
+**URL:** `/ui-lab` on DEV with `APP_ENV=dev` (or local, staging, preview). The shared layout checks `getCurrentUser()` and permits ADMIN/MODERATOR only. `APP_ENV=production` and unknown environments fail closed; using only `NODE_ENV` would incorrectly block compiled DEV builds. The old `/ui-lab-admin` and its wizard route redirect into the unified lab and are guarded too.
+
+The shared navigation uses query tabs:
+
+- `?tab=foundations`: semantic colors, fonts, radii.
+- `?tab=components`: live component variants plus real responsive iframe preview (320/375/768/1200).
+- `?tab=patterns`: filter, modal, scheduling, form and wizard patterns.
+- `?tab=screens`: page-scale examples and linked card states.
+- `?tab=admin`: archived admin examples, **not** approved design standards.
+- `?tab=audit`: searchable explicit approval registry and CI inventory links.
+
+Preview routes `/ui-lab/preview`, `/ui-lab/cards` and `/ui-lab/wizard` inherit the same server-side access gate. Use `src/lib/ui-lab/catalog.ts` for the editorial status of each canonical component, not the rendering result or counts derived from stale metadata.
+
+**Approval states:** draft → review → approved → legacy. No status is changed to approved solely because the code renders.
+
+**Migration safeguards:** keep legacy sources and documentation until replacements are approved and their consumers migrated. The historical admin page contains deprecated colors and "single source of truth" notices: these are examples under review, not instructions to copy.
+
+**Access verification:** test unauthenticated and non-admin sessions on DEV, an authenticated ADMIN session on DEV, and a request to the same path on PROD (must 404). Also verify the old admin and wizard URLs do not bypass access checks. For visual verification check iframe sizes, Safari focus zoom, keyboard navigation, selected and disabled states.
+
+**Usage metadata:** `RenderSafe` must not invent 0 usages if the generated usage map is missing. Run `pnpm ui:audit` for source-import stats; the PR-level `Design System Inventory` action produces a separate read-only audit artifact.
