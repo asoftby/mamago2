@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { UiPrimitivesSection } from "./_sections/UiPrimitivesSection";
+import { DesignSystemFoundationSection } from "./_sections/DesignSystemFoundationSection";
 import { FiltersSection } from "./_sections/FiltersSection";
 import { DiscoverySection } from "./_sections/DiscoverySection";
 import { NavigationSection } from "./_sections/NavigationSection";
@@ -34,7 +35,7 @@ export default function UiLabPage() {
             Single page inventory of UI components. Fix visual issues by editing the SOURCE component file, not this page.
           </p>
           <div className="text-sm font-mono text-muted-foreground bg-muted/30 inline-block px-3 py-1.5 rounded border">
-            Run: <span className="font-bold text-foreground">pnpm ui:audit</span> to update usage stats
+            Run: <span className="font-bold text-foreground">pnpm ui:audit</span> for usage; <span className="font-bold text-foreground">pnpm ui:design-audit</span> for design-system patterns
           </div>
           <div>
             <Link
@@ -49,6 +50,7 @@ export default function UiLabPage() {
         <div className="space-y-16 pb-8 [&_section]:scroll-mt-36">
           <HeaderSection />
           <AccountDropdownSection />
+          <DesignSystemFoundationSection />
           <UiPrimitivesSection />
           <FiltersSection />
           <DiscoverySection />
