@@ -70,8 +70,7 @@ export function BottomSheet({
                   onClick={() => onOpenChange(false)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 bg-transparent shadow-none hover:bg-gray-200"
                   aria-label="Закрыть"
-                >
-                </ModalCloseButton>
+                />
               )}
             </>
           )}
