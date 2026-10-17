@@ -138,7 +138,7 @@ export function PlanFeedbackCard({
 
         {counted ? (
           <>
-            <span className="mt-3 inline-flex h-[34px] items-center gap-1.5 rounded-full bg-[#E6F0EA] px-3 text-[13.5px] font-bold text-[#2B6448]">
+            <span className="mt-3 inline-flex h-[34px] items-center gap-1.5 rounded-full bg-[var(--success-soft)] px-3 text-[13.5px] font-bold text-[var(--success-hover)]">
               <Check className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
               Визит засчитан
             </span>
@@ -148,7 +148,7 @@ export function PlanFeedbackCard({
                 onChange={(event) => setComment(event.target.value)}
                 maxLength={MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH}
                 placeholder="Пару слов? Можно пропустить"
-                className="h-12 min-w-0 flex-1 rounded-[14px] border border-[var(--mp-line)] bg-[var(--mp-bg)] px-3.5 text-[15px] text-[var(--mp-tx)] outline-none placeholder:text-[#6F6A65] focus:border-[var(--mp-line-strong)] focus:bg-white"
+                className="h-12 min-w-0 flex-1 rounded-[14px] border border-[var(--mp-line)] bg-[var(--mp-bg)] px-3.5 text-[15px] text-[var(--mp-tx)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--mp-line-strong)] focus:bg-white"
               />
               <button
                 type="button"

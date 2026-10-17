@@ -215,8 +215,8 @@ export function PlanNewTaskScreen({
             className={cn(
               "mp-font-ui block w-full resize-none rounded-2xl border border-[var(--mp-chip-line)] bg-white px-4 py-3",
               "text-[20px] font-normal leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)] caret-[var(--mp-ac)]",
-              "outline-none transition-shadow placeholder:font-normal placeholder:text-[#6B665F]",
-              "focus:border-[var(--mp-tx)] focus:shadow-[0_0_0_3px_rgba(29,27,25,.08)]",
+              "outline-none transition-shadow placeholder:font-normal placeholder:text-[var(--text-muted)]",
+              "focus:border-[var(--mp-tx)] focus:shadow-[0_0_0_3px_rgba(26,20,16,.08)]",
             )}
           />
         </label>
@@ -270,7 +270,7 @@ export function PlanNewTaskScreen({
                       disabled={disabled}
                       onClick={() => setPickedDate(value)}
                       className={cn(
-                        "h-11 rounded-xl text-[15px] font-bold tabular-nums transition-colors disabled:text-[#B5ADA5]",
+                        "h-11 rounded-xl text-[15px] font-bold tabular-nums transition-colors disabled:text-[var(--text-subtle)]",
                         on ? "bg-[var(--mp-tx)] text-white" : "hover:enabled:bg-[var(--mp-soft)]",
                         !on && !disabled && i % 7 > 4 && "text-[var(--mp-ac-dark)]",
                         value === todayIso && !on && "shadow-[inset_0_0_0_1.5px_var(--mp-tx)]",
@@ -313,7 +313,7 @@ export function PlanNewTaskScreen({
                   setTime(maskTime(event.target.value));
                   enableTime();
                 }}
-                className="w-[72px] border-0 bg-transparent p-0 text-base font-extrabold tabular-nums tracking-[.02em] text-[var(--mp-tx)] outline-none placeholder:font-semibold placeholder:text-[#6F6A65]"
+                className="w-[72px] border-0 bg-transparent p-0 text-base font-extrabold tabular-nums tracking-[.02em] text-[var(--mp-tx)] outline-none placeholder:font-semibold placeholder:text-[var(--text-muted)]"
               />
             </label>
           </div>
@@ -375,7 +375,7 @@ export function PlanNewTaskScreen({
           type="button"
           disabled={!can || saving}
           onClick={() => void submit()}
-          className={cn("mp-font-ui flex h-[54px] w-full items-center justify-center rounded-2xl bg-[var(--mp-ac)] text-base font-bold text-white transition-colors hover:bg-[var(--mp-ac-dark)] disabled:bg-[#E6E0D9] disabled:text-[#5F5A55]", PLAN_FOCUS)}
+          className={cn("mp-font-ui flex h-[54px] w-full items-center justify-center rounded-2xl bg-[var(--mp-ac)] text-base font-bold text-white transition-colors hover:bg-[var(--mp-ac-dark)] disabled:bg-[var(--border)] disabled:text-[var(--text-muted)]", PLAN_FOCUS)}
         >
           {saving ? "Сохраняем…" : label}
         </button>

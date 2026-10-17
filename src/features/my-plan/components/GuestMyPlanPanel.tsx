@@ -505,7 +505,7 @@ export function GuestMyPlanPanel({
         : "border-[var(--mp-line)] bg-[var(--mp-card)] text-[var(--mp-tx)] hover:border-[var(--mp-line-strong)]",
     );
   const primaryBtn =
-    "flex h-[54px] w-full items-center justify-center gap-2 rounded-2xl bg-[var(--mp-ac)] text-base font-bold text-white transition-colors hover:bg-[var(--mp-ac-dark)] disabled:bg-[#E6E0D9] disabled:text-[#6F6A65]";
+    "flex h-[54px] w-full items-center justify-center gap-2 rounded-2xl bg-[var(--mp-ac)] text-base font-bold text-white transition-colors hover:bg-[var(--mp-ac-dark)] disabled:bg-[var(--border)] disabled:text-[var(--text-muted)]";
   const quietBtn =
     "flex min-h-11 w-full items-center justify-center gap-[7px] rounded-xl text-[15px] font-bold text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)]";
 
@@ -791,14 +791,14 @@ export function GuestMyPlanPanel({
         </div>
       ) : null}
       {saveSheetOpen ? (
-        <div className="absolute inset-0 z-30 flex items-end bg-[rgba(29,27,25,.4)]" onClick={() => setSaveSheetOpen(false)}>
+        <div className="absolute inset-0 z-30 flex items-end bg-[var(--overlay-dark)]" onClick={() => setSaveSheetOpen(false)}>
           <div
             role="dialog"
             aria-label="Сохраним ваш план"
             className="w-full rounded-t-3xl bg-[var(--mp-bg)] px-5 pb-[max(1.75rem,env(safe-area-inset-bottom))] pt-2"
             onClick={(event) => event.stopPropagation()}
           >
-            <span className="mx-auto mb-4 block h-[5px] w-[38px] rounded-full bg-[#D3CBC2]" />
+            <span className="mx-auto mb-4 block h-[5px] w-[38px] rounded-full bg-[var(--border-strong)]" />
             <h3 className="mb-1.5 text-[23px] font-bold leading-[1.2] tracking-[-.02em] text-[var(--mp-tx)]">Сохраним ваш план</h3>
             <p className="mb-2.5 text-[15px] leading-[1.5] text-[var(--mp-tx2)]">Войдите — и&nbsp;план будет с&nbsp;вами везде.</p>
             {benefit(<Monitor className="h-5 w-5" aria-hidden />, <>Откроется на&nbsp;любом устройстве</>)}

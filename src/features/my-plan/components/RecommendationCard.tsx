@@ -177,9 +177,9 @@ export function RecommendationCard({
         </div>
       ) : (
         <div className="flex w-full items-center justify-between">
-          <div className="inline-flex shrink-0 items-center rounded-full bg-[#E6F0EA] px-3 py-1.5">
-            <Check className="mr-1.5 h-3.5 w-3.5 text-[#2B6448]" />
-            <p className="text-[11px] font-medium leading-none tracking-wide text-[#2B6448]">
+          <div className="inline-flex shrink-0 items-center rounded-full bg-[var(--success-soft)] px-3 py-1.5">
+            <Check className="mr-1.5 h-3.5 w-3.5 text-[var(--success-hover)]" />
+            <p className="text-[11px] font-medium leading-none tracking-wide text-[var(--success-hover)]">
               Добавлено
             </p>
           </div>
