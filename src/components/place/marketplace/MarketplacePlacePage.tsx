@@ -8,6 +8,8 @@ import { PlaceOffersSection } from "./PlaceOffersSection";
 import { PlaceAboutSection } from "./PlaceAboutSection";
 import { PlaceAddressSection } from "./PlaceAddressSection";
 import { PlaceReviewsSection } from "./PlaceReviewsSection";
+import { PlaceReputationOverviewSection } from "./PlaceReputationOverviewSection";
+import type { PlaceReputationOverview } from "@/lib/feedback/placeReputation";
 import { PlaceNetworkSection, type NetworkPlace } from "@/components/place/PlaceNetworkSection";
 import { PriceListBlock } from "@/components/shared/PriceListBlock";
 import { FaqSection } from "@/components/public/FaqSection";
@@ -113,6 +115,8 @@ interface MarketplacePlacePageProps {
   }>;
 
   /** Показать «Редактировать» с шагами визарда (те же права, что у редактора места). */
+  reputation?: PlaceReputationOverview;
+  showCrossSourceTotal?: boolean;
   ownerEditPlaceId?: string;
   relatedPlaces?: NetworkPlace[];
   sectionNotes?: {
@@ -135,13 +139,16 @@ export function MarketplacePlacePage({
   citySlug = "minsk",
   offers = [],
   reviews = [],
+  reputation,
+  showCrossSourceTotal = false,
   ownerEditPlaceId,
   relatedPlaces = [],
   sectionNotes,
   direct,
 }: MarketplacePlacePageProps) {
   const ctaRef = useRef<HTMLDivElement>(null);
-  const hasRenderableReviews = reviews.length > 0;
+  const legacyPlaceReviews = reputation ? reviews.filter((review) => review.source === "MAMAGO") : reviews;
+  const hasRenderableReviews = !reputation && reviews.length > 0;
   const displayReviewCount = hasRenderableReviews ? place.reviewCount : undefined;
   const displayRating = hasRenderableReviews ? place.rating : undefined;
 
@@ -284,15 +291,21 @@ export function MarketplacePlacePage({
         </>
       )}
 
-      {/* Reviews */}
-      {reviews.length > 0 && (
+      {/* New source-separated reputation, enabled only after DB/ToS gates. */}
+      {reputation ? (
+        <PlaceReputationOverviewSection overview={reputation} showCrossSourceTotal={showCrossSourceTotal} />
+      ) : null}
+
+      {/* Legacy mamaGo comments remain visible, Google never masquerades as mamaGo. */}
+      {legacyPlaceReviews.length > 0 && (
         <>
           <SectionNote text={sectionNotes?.reviews} />
           <PlaceReviewsSection
-            reviews={reviews}
+            reviews={legacyPlaceReviews}
             placeId={place.slug}
             rating={displayRating}
             reviewCount={displayReviewCount}
+            legacyMode={Boolean(reputation)}
           />
         </>
       )}
