@@ -11,10 +11,13 @@ import { ChipsRow } from "@/components/ui/chips-row";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ModalCloseButton } from "@/components/ui/modal-close-button";
+import { CloseIcon } from "@/components/ui/close-icon";
 
 export function DesignSystemFoundationSection() {
   const [selectedPrice, setSelectedPrice] = React.useState("free");
   const [selectedAge, setSelectedAge] = React.useState("3-6");
+  const [closeDemoOpen, setCloseDemoOpen] = React.useState(true);
 
   return (
     <DemoSection
@@ -57,6 +60,35 @@ export function DesignSystemFoundationSection() {
           <p className="mt-3 text-xs text-muted-foreground">
             Differences in height, padding and radius must be resolved at the primitive level.
           </p>
+        </RenderSafe>
+
+        <RenderSafe title="Close — одна иконка и единая кнопка закрытия" file="src/components/ui/modal-close-button.tsx">
+          <p className="mb-3 text-xs text-muted-foreground">
+            Каноническая X: src/components/ui/close-icon.tsx. Кнопка: ModalCloseButton.
+            Везде подпись для скринридеров «Закрыть»; круглая область нажатия 40 или 44 px.
+          </p>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="rounded-xl border border-border bg-surface-muted p-4">
+              <p className="mb-2 text-xs text-muted-foreground">Обычная · 40 px</p>
+              <ModalCloseButton onClick={() => setCloseDemoOpen(false)} />
+            </div>
+            <div className="rounded-xl border border-border bg-surface-muted p-4">
+              <p className="mb-2 text-xs text-muted-foreground">Touch · 44 px</p>
+              <ModalCloseButton size="touch" onClick={() => setCloseDemoOpen(false)} />
+            </div>
+            <div className="rounded-xl border border-border bg-surface-muted p-4">
+              <p className="mb-2 text-xs text-muted-foreground">Disabled</p>
+              <ModalCloseButton disabled />
+            </div>
+            <div className="rounded-xl border border-border bg-surface-muted p-4">
+              <p className="mb-2 text-xs text-muted-foreground">Иконка без кнопки</p>
+              <CloseIcon />
+            </div>
+          </div>
+          <div aria-live="polite" className="mt-3 text-xs text-muted-foreground">
+            {closeDemoOpen ? "Демонстрационный слой открыт." : "Слой закрыт."}
+          </div>
+          {!closeDemoOpen && <Button size="sm" variant="outline" onClick={() => setCloseDemoOpen(true)} className="mt-2">Открыть снова</Button>}
         </RenderSafe>
 
         <RenderSafe title="Chip — interactive single choice" file="src/components/ui/Chip.tsx">
