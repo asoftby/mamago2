@@ -40,7 +40,7 @@ test("signed-out users are redirected to login, other roles never receive protec
   const legacy = read("src/app/(ui)/ui-lab-admin/layout.tsx");
 
   assert.match(access, /if \(!isUiLabEnabled\(process\.env\)\) notFound\(\)/);
-  assert.match(access, /if \(!user\) await redirectToLogin\(\)/);
+  assert.match(access, /if \(!user\) return redirectToLogin\(\)/);
   assert.match(access, /return canViewUiLab\(user\.role\)/);
 
   for (const layout of [unified, legacy]) {
