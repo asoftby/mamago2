@@ -16,9 +16,9 @@ function resolveWelcomeCtaUrl(override?: string): string {
   }
 
   try {
-    return getPublicAppUrl();
+    return `${getPublicAppUrl()}/me/plan`;
   } catch {
-    return "https://mamago.by";
+    return "https://mamago.by/me/plan";
   }
 }
 

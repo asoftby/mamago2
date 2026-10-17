@@ -1,235 +1,209 @@
 import * as React from "react";
-import {
-  Body,
-  Button,
-  Container,
-  Head,
-  Html,
-  Img,
-  Preview,
-  Section,
-  Tailwind,
-  Text,
-} from "@react-email/components";
+import { Section, Text } from "@react-email/components";
+
+import { EmailButton } from "../src/features/email/components/email-button";
+import { EmailFooter } from "../src/features/email/components/email-footer";
+import { EmailLayout, emailTheme } from "../src/features/email/components/email-layout";
 
 export interface MamagoWelcomeEmailProps {
   ctaUrl?: string;
   unsubscribeUrl?: string;
+  userName?: string | null;
+  /** Plain text, already rendered from the scenario editor if overridden. */
+  introText?: string | null;
 }
 
 export const PreviewProps: MamagoWelcomeEmailProps = {
+  userName: "Катя",
   ctaUrl: "https://mamago.by/me/plan",
-  unsubscribeUrl: "https://mamago.by/u/demo-token",
 };
 
+const DEFAULT_CTA_URL = "https://mamago.by/me/plan";
+
+/**
+ * Code-first welcome design. Editorial text may be overridden from the
+ * communications scenario editor without changing the email's visual shell.
+ */
 function MamagoWelcome({
-  ctaUrl = "https://mamago.by/me/plan",
+  ctaUrl = DEFAULT_CTA_URL,
+  userName,
+  introText,
   unsubscribeUrl,
 }: MamagoWelcomeEmailProps) {
-  const logoBaseUrl = (() => {
-    try {
-      return new URL(ctaUrl).origin;
-    } catch {
-      return "https://mamago.by";
-    }
-  })();
-  const logoUrl = `${logoBaseUrl}/logomamago.webp`;
+  const firstName = userName?.trim().split(/\s+/)[0] || null;
 
   return (
-    <Html lang="ru">
-      <Head />
-      <Preview>Соберите первый план на выходные с mamaGo меньше чем за минуту.</Preview>
-      <Tailwind>
-        <Body
-          style={{
-            backgroundColor: "#f8f7f5",
-            margin: "0",
-            padding: "32px 16px",
-            fontFamily:
-              "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-            color: "#1f1f1f",
-          }}
-        >
-          <Container className="mx-auto max-w-[1140px]">
-            <Section
-              style={{
-                backgroundColor: "#f6f6f4",
-                borderRadius: "22px",
-                padding: "56px 46px 46px",
-              }}
-            >
-              <Section style={{ margin: "0 0 34px" }}>
-                <table
-                  role="presentation"
-                  width="100%"
-                  cellPadding="0"
-                  cellSpacing="0"
-                  style={{ borderCollapse: "collapse" }}
-                >
-                  <tbody>
-                    <tr>
-                      <td valign="top">
-                        <Text
-                          style={{
-                            margin: "0",
-                            fontSize: "42px",
-                            lineHeight: "1.08",
-                            fontWeight: 700,
-                            color: "#111111",
-                          }}
-                        >
-                          Привет 👋
-                        </Text>
-                      </td>
-                      <td align="right" valign="top">
-                        <Img
-                          src={logoUrl}
-                          alt="mamaGo"
-                          width="136"
-                          height="52"
-                          style={{ display: "block" }}
-                        />
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </Section>
+    <EmailLayout preview="Меньше поисков, больше времени вместе. Начните с первого семейного плана.">
+      <Section style={{ margin: "0 0 28px" }}>
+        <Text style={eyebrow}>ДОБРО ПОЖАЛОВАТЬ В MAMAGO</Text>
+        <Text style={greeting}>Привет{firstName ? `, ${firstName}` : ""}!</Text>
+        <Text style={headline}>Меньше поисков.<br />Больше времени вместе.</Text>
+        <Text style={intro}>
+          {introText?.trim()
+            ? introText
+            : "У нас есть идеи для семейного отдыха, занятий и маленьких приключений. А у вас — возможность собрать из них день, который понравится всей семье."}
+        </Text>
+      </Section>
 
-              <Text
-                style={{
-                  margin: "0 0 34px",
-                  fontSize: "16px",
-                  lineHeight: "1.5",
-                  color: "#171717",
-                }}
-              >
-                Не знаешь, куда пойти с ребёнком?
-                И каждые выходные снова одно и то же?
-              </Text>
+      <Section style={warmCard}>
+        <Text style={cardEyebrow}>ВАШ ПЛАН НА ВЫХОДНЫЕ</Text>
+        <Text style={cardTitle}>Всё начинается с одной идеи</Text>
+        <Text style={cardDescription}>
+          Не нужно держать десятки вкладок открытыми. Выберите интересное, добавьте в план — и всё важное останется под рукой.
+        </Text>
+        <Section style={stepsSection}>
+          <table role="presentation" width="100%" cellPadding="0" cellSpacing="0">
+            <tbody>
+              <tr>
+                <td style={stepNumber}>01</td>
+                <td style={stepText}>Находите события, места и занятия</td>
+              </tr>
+              <tr>
+                <td style={stepNumber}>02</td>
+                <td style={stepText}>Сохраняйте идеи в «Мой план»</td>
+              </tr>
+              <tr>
+                <td style={{ ...stepNumber, paddingBottom: 0 }}>03</td>
+                <td style={{ ...stepText, paddingBottom: 0 }}>Проводите больше времени вместе</td>
+              </tr>
+            </tbody>
+          </table>
+        </Section>
+      </Section>
 
-              <Section
-                style={{
-                  backgroundColor: "#fff1cb",
-                  borderRadius: "16px",
-                  padding: "34px 38px",
-                  margin: "0 0 38px",
-                }}
-              >
-                <Text
-                  style={{
-                    margin: "0 0 22px",
-                    fontSize: "16px",
-                    lineHeight: "1.4",
-                    fontWeight: 500,
-                    color: "#111111",
-                  }}
-                >
-                  mamaGo помогает:
-                </Text>
-                <Text
-                  style={{
-                    margin: "0",
-                    fontSize: "16px",
-                    lineHeight: "1.55",
-                    color: "#111111",
-                  }}
-                >
-                  - находить идеи
-                  <br />- планировать дни
-                  <br />- экономить время и нервы
-                </Text>
-              </Section>
+      <Section style={{ margin: "30px 0 28px" }}>
+        <EmailButton href={ctaUrl}>Собрать первый план</EmailButton>
+        <Text style={buttonHint}>Начните с любой идеи. Дальше mamaGo поможет.</Text>
+      </Section>
 
-              <Text
-                style={{
-                  margin: "0 0 34px",
-                  fontSize: "21px",
-                  lineHeight: "1.45",
-                  color: "#111111",
-                }}
-              >
-                Добавь 2–3 идеи → собери план на выходные → просто следуй ему
-              </Text>
+      <Section style={{ margin: "0 0 26px" }}>
+        <Text style={signOff}>
+          До встречи в ваших новых семейных историях!<br />
+          Команда mamaGo
+        </Text>
+      </Section>
 
-              <Text
-                style={{
-                  margin: "0 0 20px",
-                  fontSize: "18px",
-                  lineHeight: "1.4",
-                  color: "#111111",
-                }}
-              >
-                ✨ Первый раз за долгое время выходные проходят спокойно
-              </Text>
-
-              <Section style={{ margin: "0 0 40px" }}>
-                <Button
-                  href={ctaUrl}
-                  style={{
-                    backgroundColor: "#EF8759",
-                    color: "#ffffff",
-                    borderRadius: "14px",
-                    fontSize: "18px",
-                    fontWeight: 500,
-                    textDecoration: "none",
-                    textAlign: "center",
-                    display: "inline-block",
-                    padding: "18px 34px",
-                  }}
-                >
-                  На сайт mamaGo
-                </Button>
-              </Section>
-
-              <Text
-                style={{
-                  margin: "0 0 8px",
-                  fontSize: "18px",
-                  lineHeight: "1.2",
-                  color: "#111111",
-                  textDecoration: "underline",
-                }}
-              >
-                mamaGo.by
-              </Text>
-              <Text
-                style={{
-                  margin: "0",
-                  fontSize: "15px",
-                  lineHeight: "1.45",
-                  color: "#222222",
-                }}
-              >
-                Персональный помощник в организации семейного отдыха и развития
-              </Text>
-              
-              {unsubscribeUrl ? (
-                <Text
-                  style={{
-                    margin: "16px 0 0",
-                    fontSize: "13px",
-                    lineHeight: "1.4",
-                    color: "#9ca3af",
-                  }}
-                >
-                  <a
-                    href={unsubscribeUrl}
-                    style={{
-                      color: "#6b7280",
-                      textDecoration: "underline",
-                    }}
-                  >
-                    Отписаться от рассылки
-                  </a>
-                </Text>
-              ) : null}
-            </Section>
-          </Container>
-        </Body>
-      </Tailwind>
-    </Html>
+      <EmailFooter reason="Вы получили это письмо, потому что зарегистрировались в mamaGo." />
+      {unsubscribeUrl ? (
+        <Text style={unsubscribe}>
+          <a href={unsubscribeUrl} style={{ color: emailTheme.muted, textDecoration: "underline" }}>
+            Отписаться от рассылки
+          </a>
+        </Text>
+      ) : null}
+    </EmailLayout>
   );
 }
+
+const eyebrow: React.CSSProperties = {
+  margin: "0 0 12px",
+  fontSize: 11,
+  lineHeight: "17px",
+  fontWeight: 700,
+  letterSpacing: "0.11em",
+  color: emailTheme.accent,
+};
+
+const greeting: React.CSSProperties = {
+  margin: "0 0 10px",
+  color: emailTheme.ink,
+  fontWeight: 700,
+  fontSize: 38,
+  lineHeight: "44px",
+  letterSpacing: "-0.04em",
+};
+
+const headline: React.CSSProperties = {
+  margin: "0 0 20px",
+  color: emailTheme.ink,
+  fontWeight: 700,
+  fontSize: 26,
+  lineHeight: "33px",
+  letterSpacing: "-0.025em",
+};
+
+const intro: React.CSSProperties = {
+  color: emailTheme.text,
+  fontSize: 16,
+  lineHeight: "26px",
+  margin: 0,
+};
+
+const warmCard: React.CSSProperties = {
+  margin: 0,
+  padding: "26px 24px",
+  backgroundColor: emailTheme.warm,
+  borderRadius: 16,
+};
+
+const cardEyebrow: React.CSSProperties = {
+  color: "#96632D",
+  fontSize: 11,
+  lineHeight: "16px",
+  fontWeight: 700,
+  letterSpacing: "0.1em",
+  margin: "0 0 9px",
+};
+
+const cardTitle: React.CSSProperties = {
+  color: emailTheme.ink,
+  fontSize: 23,
+  fontWeight: 700,
+  lineHeight: "29px",
+  letterSpacing: "-0.03em",
+  margin: "0 0 12px",
+};
+
+const cardDescription: React.CSSProperties = {
+  color: emailTheme.text,
+  fontSize: 14,
+  lineHeight: "22px",
+  margin: "0 0 24px",
+};
+
+const stepsSection: React.CSSProperties = {
+  padding: "19px 0 0",
+  borderTop: "1px solid #E9D8BB",
+};
+
+const stepNumber: React.CSSProperties = {
+  verticalAlign: "top",
+  width: 38,
+  padding: "0 12px 13px 0",
+  color: "#AD6C39",
+  fontSize: 13,
+  lineHeight: "20px",
+  fontWeight: 700,
+};
+
+const stepText: React.CSSProperties = {
+  verticalAlign: "top",
+  color: emailTheme.ink,
+  fontSize: 14,
+  lineHeight: "21px",
+  padding: "0 0 13px",
+};
+
+const buttonHint: React.CSSProperties = {
+  color: emailTheme.muted,
+  fontSize: 12,
+  lineHeight: "18px",
+  margin: "12px 0 0",
+};
+
+const signOff: React.CSSProperties = {
+  color: emailTheme.text,
+  fontSize: 14,
+  lineHeight: "22px",
+  margin: 0,
+};
+
+const unsubscribe: React.CSSProperties = {
+  color: emailTheme.muted,
+  fontSize: 12,
+  lineHeight: "18px",
+  margin: "10px 0 0",
+};
 
 MamagoWelcome.PreviewProps = PreviewProps;
 

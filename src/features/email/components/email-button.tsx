@@ -14,13 +14,13 @@ export function EmailButton({ href, children }: EmailButtonProps) {
       href={href}
       style={{
         backgroundColor: emailTheme.accent,
-        borderRadius: 8,
+        borderRadius: 12,
         color: "#ffffff",
         display: "inline-block",
         fontSize: 15,
-        fontWeight: 600,
+        fontWeight: 700,
         lineHeight: "20px",
-        padding: "12px 24px",
+        padding: "15px 26px",
         textDecoration: "none",
       }}
     >
