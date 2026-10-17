@@ -32,6 +32,8 @@ export type GuestMyPlanDraftV1 = {
   kidRanges: string[];
   whenChoice: "today" | "tomorrow" | "weekend";
   formatChoice: "calm" | "active" | "any";
+  /** Необязательные интересы из квиза (канонические slug). Старые черновики без поля — []. */
+  interests?: string[];
   scenarioSlots: Array<{
     slot: GuestPlanSlot;
     activity: NonNullable<MyPlanIdea["activity"]>;
@@ -153,6 +155,8 @@ export function buildGuestMyPlanDraftPayload(params: {
   kidRanges: string[];
   whenChoice: "today" | "tomorrow" | "weekend";
   formatChoice: "calm" | "active" | "any";
+  /** Необязательные интересы из квиза (канонические slug). Старые черновики без поля — []. */
+  interests?: string[];
   scenarioSlots: Array<{
     slot: GuestPlanSlot;
     activity: NonNullable<MyPlanIdea["activity"]>;
@@ -174,6 +178,7 @@ export function buildGuestMyPlanDraftPayload(params: {
     kidRanges: [...params.kidRanges],
     whenChoice: params.whenChoice,
     formatChoice: params.formatChoice,
+    interests: [...(params.interests ?? [])],
     scenarioSlots: params.scenarioSlots.map((r) => ({
       slot: r.slot,
       activity: r.activity,

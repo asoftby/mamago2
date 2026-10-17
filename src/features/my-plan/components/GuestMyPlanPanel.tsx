@@ -14,6 +14,7 @@ import { usePathname } from "next/navigation";
 import { ArrowRight, Bell, Info, Infinity as InfinityIcon, Monitor, Repeat2, Search, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
+import { getSystemInterestLabel } from "@/lib/config/interests";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { toast } from "@/lib/toast";
 import {
@@ -37,6 +38,9 @@ import type { MyPlanGuestPanelPhase } from "./guestMyPlanTypes";
 type GuestSlot = GuestPlanSlot;
 
 const KID_AGE_GROUPS = AGE_GROUPS.filter((g) => g.value !== "18+");
+
+/** Интересы квиза — подмножество канонических SYSTEM_INTERESTS (подписи берутся оттуда же). */
+const QUIZ_INTEREST_SLUGS = ["creativity", "sport", "music", "science", "nature", "animals"] as const;
 
 function addDaysIso(iso: string, days: number): string {
   const [y, m, d] = iso.split("-").map(Number);
@@ -133,6 +137,7 @@ export function GuestMyPlanPanel({
   const [formatChoice, setFormatChoice] = useState<"calm" | "active" | "any">(
     "any",
   );
+  const [interests, setInterests] = useState<string[]>([]);
 
   const [scenarioSlots, setScenarioSlots] = useState<
     Array<{ slot: GuestSlot; activity: NonNullable<MyPlanIdea["activity"]> }>
@@ -181,6 +186,7 @@ export function GuestMyPlanPanel({
       setKidRanges([]);
       setWhenChoice("today");
       setFormatChoice("any");
+      setInterests([]);
       setScenarioSlots([]);
       setCommittedBySlot({});
       setGuestRemainingGenerations(null);
@@ -197,6 +203,7 @@ export function GuestMyPlanPanel({
     setKidRanges(draft.kidRanges);
     setWhenChoice(draft.whenChoice);
     setFormatChoice(draft.formatChoice);
+    setInterests(Array.isArray(draft.interests) ? draft.interests : []);
     setScenarioSlots(draft.scenarioSlots);
     setCommittedBySlot(reviveCommittedFromDraft(draft));
     setGuestRemainingGenerations(draft.guestRemainingGenerations);
@@ -229,6 +236,7 @@ export function GuestMyPlanPanel({
         kidRanges,
         whenChoice,
         formatChoice,
+        interests,
         scenarioSlots,
         committedBySlot,
         guestRemainingGenerations,
@@ -245,6 +253,7 @@ export function GuestMyPlanPanel({
     kidRanges,
     whenChoice,
     formatChoice,
+    interests,
     scenarioSlots,
     committedBySlot,
     guestRemainingGenerations,
@@ -300,6 +309,7 @@ export function GuestMyPlanPanel({
             date: resolvedTargetDate,
             exclude,
             ageRanges: kidRanges.slice().sort(),
+            ...(interests.length > 0 ? { interests } : {}),
           }),
         });
 
@@ -362,6 +372,7 @@ export function GuestMyPlanPanel({
       citySlug,
       formatChoice,
       guestCanGenerateMore,
+      interests,
       kidRanges,
       resolvedTargetDate,
       setSelectedPlanDate,
@@ -479,7 +490,8 @@ export function GuestMyPlanPanel({
           ? "Для себя"
           : "С кем угодно";
     const w = WHEN_OPTIONS.find((o) => o.key === whenChoice)!;
-    return `${who} · ${w.label}, ${w.sub} · ${MOOD_TEXT[formatChoice]}`;
+    const it = interests.map((k) => getSystemInterestLabel(k).toLowerCase()).join(", ");
+    return `${who} · ${w.label}, ${w.sub} · ${MOOD_TEXT[formatChoice]}${it ? ` · ${it}` : ""}`;
   })();
   const quizValid = !(whoKey === "kids" && kidRanges.length === 0);
 
@@ -541,7 +553,7 @@ export function GuestMyPlanPanel({
     body = (
       <>
         <p className="mb-[22px] text-[15px] leading-[1.5] text-[var(--mp-tx2)]">
-          Подберём, куда сходить. Три вопроса — и&nbsp;покажем варианты из&nbsp;афиши.
+          Подберём, куда сходить. Пара вопросов — и&nbsp;покажем варианты из&nbsp;афиши.
         </p>
         <div className="mb-[26px]">
           <div className="mb-[11px] text-[17px] font-bold tracking-[-.01em] text-[var(--mp-tx)]">С кем идёте?</div>
@@ -597,7 +609,7 @@ export function GuestMyPlanPanel({
             })}
           </div>
         </div>
-        <div>
+        <div className="mb-[26px]">
           <div className="mb-[11px] text-[17px] font-bold tracking-[-.01em] text-[var(--mp-tx)]">Какое настроение?</div>
           <div className="flex flex-wrap gap-2">
             {MOOD_OPTIONS.map((o) => (
@@ -605,6 +617,27 @@ export function GuestMyPlanPanel({
                 {o.label}
               </button>
             ))}
+          </div>
+        </div>
+        <div>
+          <div className="mb-[11px] text-[17px] font-bold tracking-[-.01em] text-[var(--mp-tx)]">
+            Интересы <span className="ml-1.5 text-[13px] font-medium tracking-normal text-[var(--mp-tx2)]">необязательно</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {QUIZ_INTEREST_SLUGS.map((slug) => {
+              const on = interests.includes(slug);
+              return (
+                <button
+                  key={slug}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setInterests((prev) => (on ? prev.filter((x) => x !== slug) : [...prev, slug]))}
+                  className={chipClass(on)}
+                >
+                  {getSystemInterestLabel(slug)}
+                </button>
+              );
+            })}
           </div>
         </div>
       </>
