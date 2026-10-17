@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { normalizeBrandFont } from "@/lib/typography";
 
 export interface BrandingConfig {
   logoAssetId: string | null;
@@ -24,8 +25,8 @@ const DEFAULTS: BrandingConfig = {
   colorBackground: "#FFFFFF",
   colorSurface: "#FAFAF9",
   colorText: "#1A1410",
-  fontHeading: "NTSomic",
-  fontBody: "NTSomic",
+  fontHeading: "PT Serif",
+  fontBody: "Google Sans",
   logoUrl: null,
   faviconUrl: null,
   faviconMimeType: null,
@@ -57,8 +58,8 @@ export async function getBrandingConfig(): Promise<BrandingConfig> {
     colorBackground: row.colorBackground ?? DEFAULTS.colorBackground,
     colorSurface: row.colorSurface ?? DEFAULTS.colorSurface,
     colorText: row.colorText ?? DEFAULTS.colorText,
-    fontHeading: row.fontHeading ?? DEFAULTS.fontHeading,
-    fontBody: row.fontBody ?? DEFAULTS.fontBody,
+    fontHeading: normalizeBrandFont(row.fontHeading, "PT Serif"),
+    fontBody: normalizeBrandFont(row.fontBody, "Google Sans"),
     logoUrl: row.logoAsset?.publicUrl ?? null,
     faviconUrl: row.faviconAsset?.publicUrl ?? null,
     faviconMimeType: row.faviconAsset?.mimeType ?? null,

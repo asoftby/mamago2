@@ -6,7 +6,7 @@
 .page {
   --font-display: var(--font-pt-serif), Georgia, serif;
   --font-body: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --font-mono: Menlo, ui-monospace, monospace;
   --page: #ffffff;
   --bg: #f6f2ea;
   --paper: #faf7f1;
