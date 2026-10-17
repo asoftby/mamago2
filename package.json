@@ -60,6 +60,8 @@
     "billing:reconcile": "tsx scripts/billing-reconcile.ts",
     "db:reset:dev": "prisma migrate reset",
     "ui:audit": "node scripts/ui-usage-audit.mjs",
+    "ui:design-audit": "node scripts/design-system-audit.mjs",
+    "test:design-system-audit": "node --test scripts/design-system-audit.test.mjs",
     "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
     "cleanup:otp": "tsx scripts/db/cleanup-phone-otps.ts",
     "backfill:verification": "tsx prisma/scripts/backfillVerificationStatus.ts",

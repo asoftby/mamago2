@@ -1,48 +1,6 @@
-import { AdminUIRulesSection } from "./_sections/AdminUIRulesSection";
-import { LayoutContractSection } from "./_sections/LayoutContractSection";
-import { TypographySection } from "./_sections/TypographySection";
-import { HeaderSection } from "./_sections/HeaderSection";
-import { PageStructureSection } from "./_sections/PageStructureSection";
-import { ToolbarsSection } from "./_sections/ToolbarsSection";
-import { KpiCardsSection } from "./_sections/KpiCardsSection";
-import { ContentShellsSection } from "./_sections/ContentShellsSection";
-import { ListsQueuesSection } from "./_sections/ListsQueuesSection";
-import { StatesSection } from "./_sections/StatesSection";
-import { FormsSection } from "./_sections/FormsSection";
-import { OverlaysSection } from "./_sections/OverlaysSection";
-import { EventScheduleSection } from "./_sections/EventScheduleSection";
-import { ActivityFormBuilderSection } from "./_sections/ActivityFormBuilderSection";
+import { redirect } from "next/navigation";
 
-export default function AdminUILabPage() {
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Lab Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Admin UI Laboratory</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Reusable admin interface patterns with desktop and mobile variants
-          </p>
-        </div>
-      </div>
-
-      {/* Lab Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-12">
-        <AdminUIRulesSection />
-        <LayoutContractSection />
-        <TypographySection />
-        <HeaderSection />
-        <PageStructureSection />
-        <ToolbarsSection />
-        <KpiCardsSection />
-        <ContentShellsSection />
-        <ListsQueuesSection />
-        <StatesSection />
-        <FormsSection />
-        <OverlaysSection />
-        <EventScheduleSection />
-        <ActivityFormBuilderSection />
-      </div>
-    </div>
-  );
+/** Historic URL; examples are preserved under the unified UI Lab admin archive. */
+export default function LegacyAdminUiLabRedirect() {
+  redirect("/ui-lab?tab=admin");
 }
