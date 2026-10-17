@@ -16,6 +16,7 @@ import {
 } from "@/server/services/guestPlanQuota";
 import { getTrustedClientIp } from "@/lib/security/clientIp";
 import { activePlanScopeFor } from "@/server/family/familyAccess";
+import { canonicalSystemInterestSlugs } from "@/lib/event/eventSystemInterests";
 
 /**
  * POST /api/plan/generate — подборка для «Мой план».
@@ -41,7 +42,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { anonymousId, city, date, exclude, ageRanges } = parsed.data;
+    const { anonymousId, city, date, exclude, ageRanges, interests } = parsed.data;
+    const interestSlugs = canonicalSystemInterestSlugs(interests);
     const excludeActivityIds = [...new Set((exclude ?? []).filter(Boolean))];
     const ageRangeValues = [...new Set(ageRanges ?? [])];
 
@@ -67,6 +69,7 @@ export async function POST(request: NextRequest) {
         excludeActivityIds: mergedExclude,
         take: 6,
         ...(ageRangeValues.length > 0 ? { ageRangeValues } : {}),
+        ...(interestSlugs.length > 0 ? { profileInterestSlugs: interestSlugs } : {}),
       });
       console.log("[API] real data used", {
         endpoint: "/api/plan/generate",
@@ -118,6 +121,7 @@ export async function POST(request: NextRequest) {
       excludeActivityIds,
       take: 6,
       ...(ageRangeValues.length > 0 ? { ageRangeValues } : {}),
+      ...(interestSlugs.length > 0 ? { profileInterestSlugs: interestSlugs } : {}),
     });
     console.log("[API] real data used", {
       endpoint: "/api/plan/generate",

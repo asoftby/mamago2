@@ -9,7 +9,7 @@ export const PLAN_FOCUS =
 
 export const PLAN_SEG = "grid auto-cols-fr grid-flow-col gap-1 rounded-[15px] bg-[var(--mp-soft)] p-1";
 export const PLAN_SEG_BTN = `mp-font-ui h-11 rounded-[11px] text-[14.5px] font-bold transition-colors ${PLAN_FOCUS}`;
-export const PLAN_SEG_ON = "bg-white text-[var(--mp-tx)] shadow-[0_1px_3px_rgba(29,27,25,.12)]";
+export const PLAN_SEG_ON = "bg-white text-[var(--mp-tx)] shadow-[0_1px_3px_rgba(26,20,16,.12)]";
 export const PLAN_SEG_OFF = "text-[var(--mp-tx2)]";
 
 export const PLAN_CHIP = `mp-font-ui inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border px-4 text-[15px] font-semibold transition-colors ${PLAN_FOCUS}`;
