@@ -64,8 +64,8 @@ export default async function RootLayout({
             --color-background: ${branding.colorBackground};
             --color-surface: ${branding.colorSurface};
             --color-text: ${branding.colorText};
-            --font-heading: ${getBrandFontStack(branding.fontHeading as import("@/lib/typography").BrandFont)};
-            --font-body: ${getBrandFontStack(branding.fontBody as import("@/lib/typography").BrandFont)};
+            --font-heading: ${getBrandFontStack(branding.fontHeading)};
+            --font-body: ${getBrandFontStack(branding.fontBody)};
           }
           html[data-cc-consent-known="1"] #mamago-cookie-shell {
             display: none !important;
