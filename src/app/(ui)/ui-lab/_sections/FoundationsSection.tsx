@@ -24,10 +24,33 @@ export function FoundationsSection() {
       </div>
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-4 rounded-xl border border-border p-5">
-          <h3 className="text-lg font-semibold">Типографика</h3>
-          <p style={{ fontFamily: "var(--font-pt-serif), Georgia, serif" }} className="text-3xl">Куда пойти всей семьёй</p>
-          <p className="text-base">NT Somic — интерфейс, поля, действия и основной текст</p>
-          <p className="text-sm text-muted-foreground">Размеры, веса и интервалы сравниваем с реальным UI до утверждения.</p>
+          <h3 className="text-lg font-semibold">Типографика · 3 шрифта</h3>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Google Sans · основной интерфейс</p>
+            <p className="text-xl" style={{ fontFamily: "var(--font-google-sans), ui-sans-serif, system-ui, sans-serif" }}>
+              Куда пойти с ребёнком в Минске
+            </p>
+            <p className="text-sm" style={{ fontFamily: "var(--font-google-sans), ui-sans-serif, system-ui, sans-serif" }}>
+              Карточки, кнопки, формы, описания и навигация
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">PT Serif · заголовки и редакционные акценты</p>
+            <p className="text-3xl" style={{ fontFamily: "var(--font-pt-serif), ui-serif, serif" }}>
+              Куда пойти всей семьёй
+            </p>
+            <p className="text-xl italic" style={{ fontFamily: "var(--font-pt-serif), ui-serif, serif" }}>
+              Лучшие идеи для выходных
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Menlo · цифры, технические подписи и код</p>
+            <p className="text-base font-mono">17.10.2026 · 14:30 · 80 BYN</p>
+            <p className="text-xs font-mono">mamaGo / UI Lab 2.0</p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Все три — единственные утверждённые семейства. Системные fallback нужны только при отсутствии шрифта на устройстве.
+          </p>
         </div>
         <div className="space-y-4 rounded-xl border border-border p-5">
           <h3 className="text-lg font-semibold">Формы и геометрия</h3>

@@ -26,9 +26,17 @@ for (const [face, weight] of [
 }
 
 assert.ok(fontsSource.includes('variable: "--font-google-sans"'));
-assert.ok(fontsSource.includes('variable: "--font-ntsomic"'));
+assert.ok(!fontsSource.includes('variable: "--font-ntsomic"'));
+assert.ok(!fontsSource.includes("SourceSerifPro-"));
+for (const face of ["Regular", "Bold", "Italic", "BoldItalic"]) {
+  const file = `public/fonts/PT_Serif-Web-${face}.ttf`;
+  assert.ok(existsSync(join(root, file)), `${file} must exist`);
+  assert.ok(fontsSource.includes(`PT_Serif-Web-${face}.ttf`), `${face} must be registered`);
+}
 assert.ok(layoutSource.includes('"--font-sans"'));
-assert.ok(layoutSource.includes("var(--font-google-sans), var(--font-ntsomic)"));
+assert.ok(layoutSource.includes('getBrandFontStack("Google Sans")'));
+assert.ok(!layoutSource.includes("--font-ntsomic"));
+assert.ok(layoutSource.includes("ptSerif.variable"));
 assert.ok(!layoutSource.includes("fonts.googleapis.com"));
 assert.ok(!layoutSource.includes("fonts.gstatic.com"));
 assert.ok(!existsSync(join(root, "src/lib/fontsRuntime.ts")));
@@ -38,4 +46,4 @@ assert.match(
   /SIL OPEN FONT LICENSE Version 1\.1/,
 );
 
-console.log("Google Sans local delivery contracts: OK");
+console.log("Google Sans and PT Serif local delivery contracts: OK");
