@@ -1,19 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { X } from "lucide-react";
+import { CloseIcon } from "@/components/ui/close-icon";
 import { cn } from "@/lib/utils";
 
 export const ModalCloseButton = React.forwardRef<
   HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement>
->(function ModalCloseButton({ className, ...props }, ref) {
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { size?: "default" | "touch" }
+>(function ModalCloseButton({ className, size = "default", ...props }, ref) {
   return (
     <button
       ref={ref}
       type="button"
       className={cn(
-        "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+        "inline-flex shrink-0 items-center justify-center rounded-full",
+        size === "touch" ? "h-11 w-11" : "h-10 w-10",
         "bg-white text-neutral-600 shadow-sm",
         "transition-colors hover:bg-neutral-50 hover:text-neutral-900",
         "z-[80] cursor-pointer touch-manipulation",
@@ -23,7 +24,7 @@ export const ModalCloseButton = React.forwardRef<
       aria-label="Закрыть"
       {...props}
     >
-      <X className="h-[18px] w-[18px] shrink-0" strokeWidth={2.5} aria-hidden />
+      <CloseIcon />
     </button>
   );
 });
