@@ -6742,6 +6742,7 @@ enum FeedbackTagScope {
   PROGRAM
   VENUE
   ORGANIZER
+  GENERAL
 }
 
 /// A private reaction becomes publicly eligible only after the separate
