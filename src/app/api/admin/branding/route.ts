@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireAdminApiUser } from "@/lib/auth/requireAdminApi";
 import { getBrandingConfig } from "@/lib/branding";
 import { prisma } from "@/lib/prisma";
+import { BRAND_FONTS } from "@/lib/typography";
 
 export const revalidate = 3600;
 
@@ -20,8 +21,8 @@ const PatchSchema = z.object({
   colorBackground: z.string().nullable().optional(),
   colorSurface: z.string().nullable().optional(),
   colorText: z.string().nullable().optional(),
-  fontHeading: z.string().nullable().optional(),
-  fontBody: z.string().nullable().optional(),
+  fontHeading: z.enum(BRAND_FONTS).nullable().optional(),
+  fontBody: z.enum(BRAND_FONTS).nullable().optional(),
 });
 
 export async function PATCH(req: NextRequest) {
