@@ -28,6 +28,7 @@ import {
   formWizardPhaseFromFlags,
 } from "@/components/form-shell";
 import { WizardProgress } from "@/components/ui/wizard-progress";
+import { MobileEventWizardProgress } from "./MobileEventWizardProgress";
 import { Button } from "@/components/ui/button";
 import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
@@ -1464,11 +1465,18 @@ function EventWizardInner({
         )}
         trailing={lastSaved ? businessFormCopy.savedAt(lastSaved) : undefined}
       >
-        <WizardProgress
+        <MobileEventWizardProgress
           steps={progressSteps}
           currentStep={currentStep}
           onStepChange={handleGoToStep}
         />
+        <div className="hidden sm:block">
+          <WizardProgress
+            steps={progressSteps}
+            currentStep={currentStep}
+            onStepChange={handleGoToStep}
+          />
+        </div>
       </FormWizardHeader>
 
       <FormPrimaryContentCard>{renderStep()}</FormPrimaryContentCard>
