@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { X } from "lucide-react";
+import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
@@ -65,14 +65,13 @@ export function BottomSheet({
                 <h3 className="text-base font-semibold text-gray-900">{title}</h3>
               )}
               {showCloseButton && (
-                <button
+                <ModalCloseButton
                   type="button"
                   onClick={() => onOpenChange(false)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full hover:bg-gray-200 transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-transparent shadow-none hover:bg-gray-200"
                   aria-label="Закрыть"
                 >
-                  <X className="h-5 w-5 text-gray-600" />
-                </button>
+                </ModalCloseButton>
               )}
             </>
           )}
