@@ -17,6 +17,8 @@ Use this skill for ALL new or modified UI components, forms, buttons, chips, bad
 - A chip is selectable; a badge is informational. Don't make status badges look clickable without interaction.
 - `rounded-full` is appropriate for pills; use radius tokens for regular controls and cards.
 - Preserve current public, business, admin and wizard functionality.
+- Typography: **Google Sans** for UI/body, **PT Serif** for editorial and italic, **Menlo** for monospaced details. Use `--font-sans`, `--font-serif` or `font-mono`; no NT Somic/Source Serif/other branded font families. Generic browser fallbacks are acceptable.
+- Closing controls: use `CloseIcon` (`src/components/ui/close-icon.tsx`) only through an accessible button, preferably `ModalCloseButton` with `aria-label="Закрыть"`, preserving dialog/sheet close semantics. `PageCloseButton` wraps the same primitive. Review existing close buttons before migrating, avoid blanket replacement.
 
 ## Workflow
 
