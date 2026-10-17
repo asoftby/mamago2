@@ -37,6 +37,7 @@ interface PlaceReviewsSectionProps {
   placeId: string;
   rating?: number;
   reviewCount?: number;
+  legacyMode?: boolean;
 }
 
 export function PlaceReviewsSection({
@@ -44,6 +45,7 @@ export function PlaceReviewsSection({
   placeId,
   rating,
   reviewCount,
+  legacyMode = false,
 }: PlaceReviewsSectionProps) {
   const [allOpen, setAllOpen] = useState(false);
 
@@ -87,8 +89,11 @@ export function PlaceReviewsSection({
                 fontWeight: 400,
               }}
             >
-              <em style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>{displayRating.toFixed(1)}</em>
-              {" · "}{displayCount} отзывов
+              {legacyMode ? (
+                <>Ранее опубликованные отзывы mamaGo · {reviews.length}</>
+              ) : (
+                <><em style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>{displayRating.toFixed(1)}</em>{" · "}{displayCount} отзывов</>
+              )}
             </h2>
           </div>
           <button
