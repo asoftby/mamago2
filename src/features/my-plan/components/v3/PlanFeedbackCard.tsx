@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { PhoneVerificationModal } from "@/components/place/PhoneVerificationModal";
 import { MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH } from "@/lib/experience/feedback";
@@ -56,13 +56,43 @@ export function PlanFeedbackCard({
   const [busy, setBusy] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const feedbackV1 = feed?.feedbackV1Enabled === true;
+
+  useEffect(() => () => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+  }, []);
+
+  function scheduleHide() {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => {
+      setHidden(true);
+      onChanged();
+    }, 3000);
+  }
+
+  async function persistV1(experienceId: string, sentiment: PlanSentiment) {
+    setBusy(true);
+    const result = await postExperienceFeedback(experienceId, sentiment, "");
+    setBusy(false);
+    if (result !== "ok") {
+      toast.error("Не получилось сохранить оценку");
+      return;
+    }
+    setSaved(true);
+    scheduleHide();
+  }
 
   if (!current || hidden) return null;
 
   async function pick(sentiment: PlanSentiment) {
     if (!current || busy) return;
     setPicked(sentiment);
-    if (current.kind === "rate") return;
+    if (current.kind === "rate") {
+      if (feedbackV1) await persistV1(current.experienceId, sentiment);
+      return;
+    }
     setBusy(true);
     const experience = await postExperienceAttendance(current.planItemId, "ATTENDED");
     setBusy(false);
@@ -72,6 +102,7 @@ export function PlanFeedbackCard({
       return;
     }
     setOverride({ kind: "rate", experienceId: experience.id, title: current.title, plannedDate: current.plannedDate });
+    if (feedbackV1) await persistV1(experience.id, sentiment);
   }
 
   async function skip() {
@@ -89,7 +120,8 @@ export function PlanFeedbackCard({
   }
 
   async function save() {
-    if (!current || current.kind !== "rate" || !picked || busy) return;
+    if (!current || current.kind !== "rate" || !picked || busy || (feedbackV1 && !comment.trim())) return;
+    if (hideTimer.current) clearTimeout(hideTimer.current);
     setBusy(true);
     const result = await postExperienceFeedback(current.experienceId, picked, comment);
     setBusy(false);
@@ -142,21 +174,28 @@ export function PlanFeedbackCard({
               <Check className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
               Визит засчитан
             </span>
+            {feedbackV1 && saved ? (
+              <p role="status" className="mt-3 text-[13px] font-semibold text-[var(--mp-tx)]">Оценка сохранена. Комментарий необязателен.</p>
+            ) : null}
             <div className="mt-3 flex gap-2">
               <input
                 value={comment}
-                onChange={(event) => setComment(event.target.value)}
+                onChange={(event) => {
+                  setComment(event.target.value);
+                  if (hideTimer.current) clearTimeout(hideTimer.current);
+                }}
+                onFocus={() => { if (hideTimer.current) clearTimeout(hideTimer.current); }}
                 maxLength={MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH}
                 placeholder="Пару слов? Можно пропустить"
                 className="h-12 min-w-0 flex-1 rounded-[14px] border border-[var(--mp-line)] bg-[var(--mp-bg)] px-3.5 text-[15px] text-[var(--mp-tx)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--mp-line-strong)] focus:bg-white"
               />
               <button
                 type="button"
-                disabled={busy || !picked}
+                disabled={busy || !picked || (feedbackV1 && !comment.trim())}
                 onClick={() => void save()}
                 className="h-12 rounded-[14px] bg-[var(--mp-tx)] px-[18px] text-[15px] font-bold text-white disabled:opacity-50"
               >
-                Готово
+                {feedbackV1 ? "Отправить" : "Готово"}
               </button>
             </div>
           </>

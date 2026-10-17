@@ -75,6 +75,7 @@ model User {
   partyQuotesResponded PartyQuote[] @relation("PartyQuoteResponder")
   partyQuotesDecided PartyQuote[] @relation("PartyQuoteDecider")
   bookingFeedbacks                  BookingFeedback[]
+  feedbackReactions                 FeedbackReaction[]
   reviewedBusinessVerifications     BusinessVerificationLog[]        @relation("ReviewedBy")
   children                          Child[]
   familyMemberships                 FamilyMembership[]
@@ -6698,4 +6699,133 @@ model CollectionItem {
   @@index([routeIdeaId])
   @@index([placeIdeaId])
   @@index([articleIdeaId])
+}
+
+
+// =====================================================
+// MAMAGO FEEDBACK 1.0 (additive, inactive until rollout)
+// =====================================================
+
+// IMPORTANT: NEWS is reserved for a future standalone news target. Breaking
+// news stored as Article continues to use ARTICLE during rollout.
+enum FeedbackTargetType {
+  EVENT
+  PLACE
+  OFFER
+  ARTICLE
+  NEWS
+  ROUTE
+}
+
+enum FeedbackSource {
+  PLAN
+  CARD
+  PUSH
+  ARTICLE
+  MIGRATION
+}
+
+enum FeedbackVisitStatus {
+  NONE
+  SELF_REPORTED
+  VERIFIED
+}
+
+enum FeedbackReviewStatus {
+  DRAFT
+  PENDING
+  PUBLISHED
+  REJECTED
+}
+
+enum FeedbackTagScope {
+  PROGRAM
+  VENUE
+  ORGANIZER
+  GENERAL
+}
+
+/// A private reaction becomes publicly eligible only after the separate
+/// identification / moderation / legal-policy checks. Defaults false.
+/// actorKey must be 'user:<id>' or an opaque, non-IP guest identity.
+/// occurrenceKey is NOT nullable: NULL in a SQL UNIQUE would allow duplicates.
+model FeedbackReaction {
+  id                String              @id @default(cuid())
+  userId            String?
+  actorKey          String
+  familyId          String?
+  targetType        FeedbackTargetType
+  targetId          String
+  occurrenceKey     String              @default("")
+  /// Immutable venue at the completed visit/service. Never infer from current Activity/Offer.placeId.
+  venuePlaceIdAtVisit String?
+  value             Int
+  tagIds            String[]            @default([])
+  visitStatus       FeedbackVisitStatus @default(NONE)
+  visitedAt         DateTime?
+  isPublicEligible  Boolean             @default(false)
+  source            FeedbackSource
+  originalRating    Int?
+  migrationKey      String?             @unique
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  user              User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  review            FeedbackReview?
+
+  @@unique([actorKey, targetType, targetId, occurrenceKey])
+  @@index([targetType, targetId, isPublicEligible])
+  @@index([targetType, occurrenceKey, isPublicEligible])
+  @@index([targetType, venuePlaceIdAtVisit, isPublicEligible])
+  @@index([userId, createdAt])
+  @@index([familyId, createdAt])
+  @@index([source])
+}
+
+model FeedbackReview {
+  id                String               @id @default(cuid())
+  reactionId        String               @unique
+  text              String               @db.Text
+  status            FeedbackReviewStatus @default(DRAFT)
+  phoneVerifiedAt   DateTime?
+  moderatedById     String?
+  moderatedAt       DateTime?
+  businessReply     String?              @db.Text
+  businessReplyStatus FeedbackReviewStatus?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  reaction          FeedbackReaction     @relation(fields: [reactionId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+}
+
+model FeedbackTag {
+  id          String               @id @default(cuid())
+  key         String               @unique
+  label       String
+  scope       FeedbackTagScope
+  showFor     Int[]                @default([])
+  targetTypes FeedbackTargetType[] @default([])
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([scope, isActive])
+}
+
+/// Direct scores only; linked venue/organizer signals are projected separately.
+/// No Google review content is included in this table.
+model FeedbackReputationAggregate {
+  targetType    FeedbackTargetType
+  targetId      String
+  count         Int                @default(0)
+  countPos      Int                @default(0)
+  countNeu      Int                @default(0)
+  countNeg      Int                @default(0)
+  sharePositive Float?
+  rankScore     Float?
+  topTags       Json?
+  linkedTags    Json?
+  updatedAt     DateTime           @updatedAt
+
+  @@id([targetType, targetId])
 }
