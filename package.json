@@ -79,7 +79,7 @@
     "test:seo-url-architecture": "tsx src/lib/seo/classifyArticleScope.test.ts && tsx scripts/seo-slug-backfill.test.ts && tsx src/lib/slug/publicSlug.test.ts",
     "test:mobile-bottom-slot": "tsx src/lib/mobile/bottomSlot.test.ts",
     "test:experience-feedback": "tsx src/lib/experience/feedback.test.ts",
-    "test:feedback-foundation": "tsx src/lib/feedback/model.test.ts && tsx src/lib/feedback/tagCatalog.test.ts",
+    "test:feedback-foundation": "tsx src/lib/feedback/model.test.ts && tsx src/lib/feedback/tagCatalog.test.ts && tsx src/lib/feedback/placeReputation.test.ts",
     "feedback:seed-tags": "tsx scripts/feedback/seed-tags.ts",
     "test:seo-admin-ui": "tsx src/lib/admin/seo/geo/geoSeoContext.test.ts && tsx src/lib/admin/seo/geo/selectorModel.test.ts && tsx src/lib/admin/seoNavConfig.test.ts",
     "test:user-avatar-migration": "tsx src/lib/migration/commit/user/voxelAvatarSource.test.ts && tsx src/lib/migration/commit/user/UserAvatarSyncer.test.ts && tsx scripts/migration-user-avatar-backfill.test.ts && tsx src/lib/migration/adapters/wordpress-db/WordPressRepository.test.ts",

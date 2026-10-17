@@ -36,6 +36,11 @@ interface PlaceHeroProps {
   logoUrl?: string | null;
   rating?: number;
   reviewCount?: number;
+  reputationSummary?: {
+    mamaGoSignals: number;
+    googleRating?: number;
+    googleCount?: number;
+  };
   workingHoursSummary?: string;
   isOpenNow?: boolean;
   todayHoursText?: string;
@@ -71,6 +76,7 @@ export function PlaceHero({
   logoUrl,
   rating,
   reviewCount,
+  reputationSummary,
   isOpenNow,
   hoursStatusDetail,
   hoursStatusShort,
@@ -336,8 +342,19 @@ export function PlaceHero({
               </SidebarCardTopSection>
             )}
 
-            {/* Rating */}
-            {rating != null && reviewCount != null && reviewCount > 0 ? (
+            {/* Source-separated reputation link, no blended star average. */}
+            {reputationSummary ? (
+              <SidebarCardTopSection mt={20} pt={20}>
+                <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+                  <a href="#place-reputation" className="font-semibold text-foreground underline decoration-dashed underline-offset-4">
+                    mamaGo · {reputationSummary.mamaGoSignals.toLocaleString("ru-RU")} оценок и впечатлений
+                  </a>
+                  {reputationSummary.googleRating != null && reputationSummary.googleCount != null ? (
+                    <span translate="no">Google Maps · ★ {reputationSummary.googleRating.toFixed(1)} · {reputationSummary.googleCount.toLocaleString("ru-RU")} оценок</span>
+                  ) : null}
+                </div>
+              </SidebarCardTopSection>
+            ) : rating != null && reviewCount != null && reviewCount > 0 ? (
               <SidebarCardTopSection mt={20} pt={20}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">

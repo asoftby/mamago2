@@ -6757,6 +6757,8 @@ model FeedbackReaction {
   targetType        FeedbackTargetType
   targetId          String
   occurrenceKey     String              @default("")
+  /// Immutable venue at the completed visit/service. Never infer from current Activity/Offer.placeId.
+  venuePlaceIdAtVisit String?
   value             Int
   tagIds            String[]            @default([])
   visitStatus       FeedbackVisitStatus @default(NONE)
@@ -6772,6 +6774,8 @@ model FeedbackReaction {
 
   @@unique([actorKey, targetType, targetId, occurrenceKey])
   @@index([targetType, targetId, isPublicEligible])
+  @@index([targetType, occurrenceKey, isPublicEligible])
+  @@index([targetType, venuePlaceIdAtVisit, isPublicEligible])
   @@index([userId, createdAt])
   @@index([familyId, createdAt])
   @@index([source])
