@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
+import { prisma } from "@/lib/prisma";
 import {
   confirmPlanExperience,
   ExperienceDomainError,
@@ -58,14 +59,27 @@ export async function GET() {
       listRecentExperienceSummaries({ userId: user.id, take: 3 }),
       listAttendedExperienceVisits({ userId: user.id }),
     ]);
+    const feedbackV1Enabled = process.env.FEEDBACK_V1_WRITE_ENABLED === "1";
+    // An Experience can be visible to the whole family, but Feedback v1 is
+    // personal. Do not ask another adult to edit its original author's vote.
+    let ownAwaiting = awaitingFeedback;
+    if (feedbackV1Enabled && awaitingFeedback.length > 0) {
+      const ownRows = await prisma.experience.findMany({
+        where: { userId: user.id, id: { in: awaitingFeedback.map((row) => row.id) } },
+        select: { id: true },
+      });
+      const ownIds = new Set(ownRows.map((row) => row.id));
+      ownAwaiting = awaitingFeedback.filter((row) => ownIds.has(row.id));
+    }
     return NextResponse.json({
       pending: pending.map((item) => ({
         ...item,
         plannedStartsAt: item.plannedStartsAt?.toISOString() ?? null,
       })),
-      awaitingFeedback,
+      awaitingFeedback: ownAwaiting,
       visits,
       phoneVerified: Boolean(user.phoneE164 && user.phoneVerifiedAt),
+      feedbackV1Enabled,
     });
   } catch (error) {
     console.error("[experience] feed failed", error);

@@ -3,6 +3,9 @@ import { z } from "zod";
 import { MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH } from "@/lib/experience/feedback";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
+import { prisma } from "@/lib/prisma";
+import { syncPlanExperienceReaction } from "@/server/services/feedback/syncPlanFeedback.service";
+import { requiresVerifiedPhoneForPlanFeedback } from "@/lib/feedback/planFeedbackPolicy";
 import {
   ExperienceDomainError,
   serializeExperience,
@@ -26,17 +29,38 @@ export async function POST(
     if (!parsed.success) {
       return NextResponse.json({ error: "invalid_sentiment" }, { status: 400 });
     }
-    if (!user.phoneE164 || !user.phoneVerifiedAt) {
-      return NextResponse.json({ error: "PHONE_NOT_VERIFIED", message: "Подтвердите номер телефона, чтобы оставить отзыв" }, { status: 403 });
+    const v1 = process.env.FEEDBACK_V1_WRITE_ENABLED === "1";
+    const textRequested = Boolean(parsed.data.comment?.trim());
+    if (requiresVerifiedPhoneForPlanFeedback({ feedbackV1Enabled: v1, comment: parsed.data.comment }) && (!user.phoneE164 || !user.phoneVerifiedAt)) {
+      return NextResponse.json({ error: "PHONE_NOT_VERIFIED", message: "Подтвердите номер телефона, чтобы оставить комментарий" }, { status: 403 });
     }
     const { id } = await context.params;
+    // In v1 each user owns their own reaction. A family member must never
+    // overwrite the Experience record created by another family member.
+    if (v1) {
+      const ownerExperience = await prisma.experience.findUnique({
+        where: { id }, select: { userId: true },
+      });
+      if (!ownerExperience || ownerExperience.userId !== user.id) {
+        return NextResponse.json({ error: "not_found" }, { status: 404 });
+      }
+    }
     const experience = await submitExperienceFeedback({
       userId: user.id,
       experienceId: id,
       sentiment: parsed.data.sentiment,
       comment: parsed.data.comment,
       sessionId: await getSessionRowIdFromCookies(),
+      allowEditing: v1,
     });
+    if (v1) {
+      await syncPlanExperienceReaction({
+        userId: user.id,
+        experience,
+        comment: textRequested ? parsed.data.comment : null,
+        phoneVerifiedAt: user.phoneVerifiedAt,
+      });
+    }
     return NextResponse.json({ experience: serializeExperience(experience) });
   } catch (error) {
     if (error instanceof ExperienceDomainError) {
