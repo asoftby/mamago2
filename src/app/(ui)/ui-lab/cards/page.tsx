@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { DemoSection } from "../_components/DemoSection";
 import { InventoryGrid } from "../_components/InventoryGrid";
 import { RenderSafe } from "../_components/RenderSafe";
@@ -201,10 +200,6 @@ function CardsShowcase() {
 }
 
 export default function UiLabCardsPage() {
-  if (process.env.NODE_ENV === "production") {
-    notFound();
-  }
-
   return (
     <div className="text-foreground">
       <div className="container mx-auto max-w-7xl px-4 py-12">
