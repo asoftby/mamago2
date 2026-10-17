@@ -25,9 +25,9 @@ const T = {
   accentDeep: "#C24E22",
   hot:        "#D6342B",   // promo-pill is RED, not orange
   titleAmber: "#FFC183",   // italic portion of title on hero
-  mono:       "var(--font-mono, 'JetBrains Mono', ui-monospace, monospace)",
-  serif:      "var(--font-serif, 'Instrument Serif', Georgia, serif)",
-  sans:       "var(--font-sans, 'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif)",
+  mono:       "var(--font-mono, Menlo, ui-monospace, monospace)",
+  serif:      "var(--font-serif, var(--font-pt-serif), ui-serif, serif)",
+  sans:       "var(--font-sans, var(--font-google-sans), ui-sans-serif, system-ui, sans-serif)",
 } as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
