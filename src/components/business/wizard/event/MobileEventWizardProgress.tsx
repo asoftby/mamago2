@@ -44,7 +44,7 @@ export function MobileEventWizardProgress({
 
     scroller.scrollTo({
       left: target.offsetLeft - first.offsetLeft,
-      behavior: didMountRef.current ? "smooth" : "instant",
+      behavior: didMountRef.current ? "smooth" : "auto",
     });
     didMountRef.current = true;
   }, [currentStep, steps.length]);
@@ -95,7 +95,7 @@ export function MobileEventWizardProgress({
               onClick={() => onStepChange(step.id)}
               className={cn(
                 "relative flex min-w-0 shrink-0 flex-col items-center gap-2 pb-3 pt-1",
-                "w-[calc((100%-32px)/5)] select-none",
+                "w-[calc(20%-6.4px)] select-none",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                 isDisabled ? "cursor-not-allowed" : "cursor-pointer",
               )}
