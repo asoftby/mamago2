@@ -20,7 +20,7 @@ type RawReaction = {
  *
  * A linked event is counted ONLY when:
  * - a published-eligible EVENT reaction references its original PlanItem ID,
- * - the PlanItem has the snapshot venuePlaceId of this place,
+ * - the reaction has an immutable venuePlaceIdAtVisit snapshot for this place,
  * - a non-private, uncancelled FAMILY PlanItem points at the same Activity,
  * - an ATTENDED Experience confirms the SAME user and PlanItem.
  *
@@ -45,7 +45,7 @@ export async function loadPlaceReputationOverview(input: {
         AND r."isPublicEligible" = TRUE
         AND r."userId" IS NOT NULL
         AND p."activityId" = r."targetId"
-        AND p."venuePlaceId" = ${input.placeId}
+        AND r."venuePlaceIdAtVisit" = ${input.placeId}
         AND p."visibility" = 'FAMILY'::"PlanVisibility"
         AND p."status" = 'CONFIRMED'::"PlanDecisionStatus"
         AND p."cancelledAt" IS NULL
@@ -62,6 +62,7 @@ export async function loadPlaceReputationOverview(input: {
         AND b."publicationType" = 'OFFER'::"PublicationType"
         AND b."offerId" = r."targetId"
         AND b."placeId" = ${input.placeId}
+        AND r."venuePlaceIdAtVisit" = ${input.placeId}
         AND b."status" = 'COMPLETED'::"BookingStatus"
         AND b."userId" = r."userId"
     `,
