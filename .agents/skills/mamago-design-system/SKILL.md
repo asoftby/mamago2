@@ -20,6 +20,26 @@ Use this skill for ALL new or modified UI components, forms, buttons, chips, bad
 - Typography: **Google Sans** for UI/body, **PT Serif** for editorial and italic, **Menlo** for monospaced details. Use `--font-sans`, `--font-serif` or `font-mono`; no NT Somic/Source Serif/other branded font families. Generic browser fallbacks are acceptable.
 - Closing controls: use `CloseIcon` (`src/components/ui/close-icon.tsx`) only through an accessible button, preferably `ModalCloseButton` with `aria-label="Закрыть"`, preserving dialog/sheet close semantics. `PageCloseButton` wraps the same primitive. Review existing close buttons before migrating, avoid blanket replacement.
 
+## Default quality bar: light, simple, efficient
+
+This skill enforces both the visual result and the engineering model:
+- **UI clarity**: one main action per interaction context, restrained accent,
+  legible hierarchy, whitespace, no unnecessary badges/cards/icons/overlays.
+- **Single actual owner**: tokens in globals.css, atomic controls in
+  src/components/ui, reusable compositions only when they have real consumers,
+  feature behavior stays in feature modules. UI Lab previews real code, not copies.
+- **Small JS footprint**: default Server Components; interactive client islands;
+  lazy-load heavy editors/maps/media; avoid duplicate libraries or global state
+  for simple local behavior.
+- **No uncontrolled variants**: inspect existing Button/Chip/CloseIcon/etc before
+  inventing a new wrapper. Remove a legacy path only after consumer migration.
+- **Measured quality**: before/after on mobile 320/375 and desktop 768/1200;
+  accessibility, keyboard, touch and image/font loading; note bundle and Web
+  Vitals changes where relevant. Prefer an audited improvement over aesthetic
+  replacement.
+- **No all-at-once migration**: refactor feature-by-feature with CI and DEV
+  smoke; do not modify PROD without approval.
+
 ## Workflow
 
 1. Run `pnpm ui:design-audit` (read-only) and `pnpm ui:audit` (component usage inventory) on a clean task worktree.
