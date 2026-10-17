@@ -6772,6 +6772,7 @@ model FeedbackReaction {
 
   @@unique([actorKey, targetType, targetId, occurrenceKey])
   @@index([targetType, targetId, isPublicEligible])
+  @@index([targetType, occurrenceKey, isPublicEligible])
   @@index([userId, createdAt])
   @@index([familyId, createdAt])
   @@index([source])
