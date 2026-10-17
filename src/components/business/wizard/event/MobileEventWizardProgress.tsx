@@ -37,27 +37,39 @@ export function MobileEventWizardProgress({
       Math.max(currentStep - FIRST_AUTO_SCROLL_STEP + 1, 0),
       Math.max(steps.length - VISIBLE_STEPS, 0),
     );
-    const items = scroller.querySelectorAll<HTMLElement>("[data-wizard-step]");
-    const first = items[0];
-    const target = items[firstVisibleIndex];
-    if (!first || !target) return;
 
-    scroller.scrollTo({
-      left: target.offsetLeft - first.offsetLeft,
-      behavior: didMountRef.current ? "smooth" : "auto",
-    });
+    const alignSteps = (behavior: ScrollBehavior) => {
+      // The mobile stepper is display:none at the sm breakpoint; wait until
+      // it has real dimensions before applying pixel-based positioning.
+      if (scroller.clientWidth === 0) return;
+      const items = scroller.querySelectorAll<HTMLElement>("[data-wizard-step]");
+      const first = items[0];
+      const target = items[firstVisibleIndex];
+      if (!first || !target) return;
+
+      scroller.scrollTo({
+        left: target.offsetLeft - first.offsetLeft,
+        behavior,
+      });
+      setCanScrollBack(scroller.scrollLeft > 3);
+    };
+
+    alignSteps(didMountRef.current ? "smooth" : "auto");
     didMountRef.current = true;
+
+    // Rotation, responsive resizing, and returning from the desktop breakpoint
+    // change item widths without changing the current step. Re-align only on
+    // dimension changes; free manual swipe scrolling is otherwise untouched.
+    const onResize = () => alignSteps("auto");
+    const observer =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(onResize) : null;
+    observer?.observe(scroller);
+    window.addEventListener("resize", onResize);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", onResize);
+    };
   }, [currentStep, steps.length]);
-
-  useEffect(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-
-    const update = () => setCanScrollBack(scroller.scrollLeft > 3);
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
 
   const scrollBack = () => {
     const scroller = scrollerRef.current;
