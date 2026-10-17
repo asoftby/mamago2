@@ -10,6 +10,77 @@
 - All semantic colors, surfaces and radii derive from `src/app/globals.css`. Avoid introducing hardcoded HEX values in new UI.
 - No page-specific global overrides to compensate for a shared component. Fix the primitive or create a documented variant.
 
+## Product quality goal: light visuals, simple behavior, sound architecture
+
+**The goal is not to make every page look identical.** Public discovery, family planning,
+business workflows and admin tables have different jobs. They must share a coherent
+visual language and implementation foundation while keeping fit-for-purpose density.
+
+### Visual lightness and interaction simplicity
+
+- Keep a visible hierarchy: clear page title, useful primary action, secondary actions
+  subordinate, quiet supporting data and enough whitespace. Avoid stacked badges,
+  simultaneous accent colors, unnecessary borders/shadows, repeated headings and
+  decorative iconography without informational or interactive purpose.
+- Use typography, whitespace and alignment before adding colored surfaces.
+  Google Sans / PT Serif / Menlo are the only brand typefaces; avoid using Menlo
+  for lengthy prose and avoid PT Serif on dense form controls.
+- Favor a single clear next action and progressive disclosure over crowded controls,
+  duplicate CTAs and multi-modal flows. Preserve domain correctness, especially
+  prices, dates, permissions and state transitions.
+- Make responsive behavior intentional, not desktop scaled down: check 320px,
+  375px, 768px and 1200px; no clipped text, accidental horizontal page scroll,
+  awkward touch targets or iOS focus zoom.
+
+### Implementation architecture
+
+1. **Design tokens**: `src/app/globals.css` owns semantic color, typography,
+   radius, spacing and surface decisions. Existing tokens must be preferred over
+   literal colors, one-off font stacks and copied style fragments.
+2. **Primitives**: `src/components/ui/` owns basic Button, Input, Chip, Badge,
+   ModalCloseButton, CloseIcon etc. Prefer shadcn/Radix APIs already in use.
+   Extend via variants/composition, never fork a nearly identical primitive per screen.
+3. **Reusable patterns**: add feature-independent combinations only where
+   duplication is real (e.g. modal header, picker, form field). Patterns compose
+   primitives; they do not restyle them through accumulating `!important` overrides.
+4. **Feature UI**: modules own their data, behavior and domain-specific composition.
+   Public, business and admin surfaces share primitives without forcing identical
+   layout density or interaction behavior.
+5. **UI Lab**: is a live preview of those real components, plus an explicit review
+   registry, **not** a parallel component library. A demo passing tests does not
+   automatically make its design approved.
+
+### Performance and maintainability contract
+
+- Default to Server Components for data/rendering; use client components only for
+  actual interaction, and isolate client boundaries instead of hydrating entire pages.
+- Avoid duplicate dependencies, large monolithic components, deep prop drilling,
+  hidden global overrides and per-render recomputation when a shared abstraction or
+  stable data flow is simpler. Avoid premature abstractions without two actual consumers.
+- Reuse lazy-loaded heavy widgets (maps, editors, lightboxes) and responsive images;
+  measure payload and rendering before claiming an optimization.
+- Optimize typography delivery: only required font families and weights, local
+  assets with `font-display: swap`, system Menlo without a web download. **Known
+  debt:** PT Serif currently consists of four ~340–375 KB TTF source files;
+  audit network cost and convert to WOFF2 where supported in a focused PR, after
+  visual comparison and licensing/file integrity checks.
+- Record before/after performance for affected routes (bundle/JS, font requests,
+  LCP, CLS, INP when measurable). No unconditional app-wide swap based only on
+  screenshots or CI. Preserve keyboard/a11y and feature tests.
+
+### Migration safety and definition of complete
+
+- **Inventory → choose canonical component → migrate one feature/surface →
+  test and visually verify → remove unused legacy path.**
+- Every migration must reduce duplication or complexity, or have an explicit
+  usability/performance reason. Avoid adding a wrapper merely to declare a
+  "single source of truth" if it makes the code harder to understand.
+- Review iPhone/Android and desktop, light/dark if supported, empty/loading/error,
+  disabled/focus/hover/pressed, and localization lengths.
+- Only promote a variant to `approved` in UI Lab after owner visual review.
+  Do not merge all legacy UI into a single large refactor or change PROD without
+  a reviewed DEV rollout.
+
 ## Existing source of truth
 
 | Role | Token / primitive | Usage |
@@ -46,7 +117,8 @@ Do not introduce additional named font families, including NT Somic, Georgia, Ro
 | `ChipsRow` | Group of choices; scroll, wrap or masonry | `src/components/ui/chips-row.tsx`; different sizes and legacy HEX colors | Shared choice primitive with layout-only variants; preserve horizontal scroll and age layouts |
 | `Badge` | Non-interactive metadata/status | `src/components/ui/badge.tsx` | Keep it informational; never substitute for selectable Chip |
 | `Input` / `Textarea` | Text entry | `src/components/ui/input.tsx` and `textarea.tsx` | Adopt common label, description, error, required, disabled states |
-| `CloseIcon` / `ModalCloseButton` | Close overlays/pages | `src/components/ui/close-icon.tsx` (single Lucide X) and `modal-close-button.tsx` (accessible button; 40/44px variants). Used by Dialog, Sheet, PageCloseButton, BottomSheet | Review context-specific surface/glass variants in UI Lab; never duplicate X glyph/stroke sizes in new close buttons |\n| `Toggle` | Boolean switch | `src/components/ui/Toggle.tsx`; selected state hardcodes brand HEX | Replace legacy literal with semantic token after reviewing variants |
+| `CloseIcon` / `ModalCloseButton` | Close overlays/pages | `src/components/ui/close-icon.tsx` (single Lucide X) and `modal-close-button.tsx` (accessible button; 40/44px variants). Used by Dialog, Sheet, PageCloseButton, BottomSheet | Review context-specific surface/glass variants in UI Lab; never duplicate X glyph/stroke sizes in new close buttons |
+| `Toggle` | Boolean switch | `src/components/ui/Toggle.tsx`; selected state hardcodes brand HEX | Replace legacy literal with semantic token after reviewing variants |
 
 This matrix describes current code, not an approved replacement for all button heights. Do not globally switch `rounded-md` to `rounded-[16px]` without screenshot review.
 
