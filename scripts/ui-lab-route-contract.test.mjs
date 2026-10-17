@@ -32,3 +32,19 @@ test("preview uses iframe (real responsive viewport) under gated layout", () => 
   for (const width of [320, 375, 768, 1200]) assert.match(workbench, new RegExp("px: " + width));
   assert.match(read("src/app/(ui)/ui-lab/preview/page.tsx"), /PreviewCanvas/);
 });
+
+
+test("signed-out users are redirected to login, other roles never receive protected content", () => {
+  const access = read("src/lib/ui-lab/access.ts");
+  const unified = read("src/app/(ui)/ui-lab/layout.tsx");
+  const legacy = read("src/app/(ui)/ui-lab-admin/layout.tsx");
+
+  assert.match(access, /if \(!isUiLabEnabled\(process\.env\)\) notFound\(\)/);
+  assert.match(access, /if \(!user\) return redirectToLogin\(\)/);
+  assert.match(access, /return canViewUiLab\(user\.role\)/);
+
+  for (const layout of [unified, legacy]) {
+    assert.match(layout, /if \(!hasAccess\) return <UiLabAccessDenied \/>/);
+    assert.match(layout, /const hasAccess = await requireUiLabAccess\(\)/);
+  }
+});
