@@ -42,3 +42,13 @@ Use this skill for ALL new or modified UI components, forms, buttons, chips, bad
 ## Output on each UI task
 
 Summarize affected components, original variations, token/variant choices, preserved exceptions, mobile/desktop checks, test results and whether UI Lab is updated.
+
+
+## UI Lab 2.0 navigation and approval
+
+- Unified internal review UI: `/ui-lab?tab=foundations|components|patterns|screens|admin|audit`, not the old public/admin catalogs as competing sources.
+- `/ui-lab/preview` uses an actual iframe viewport at 320/375/768/1200 px. `/ui-lab/cards` and `/ui-lab/wizard` are linked detail previews.
+- `src/lib/ui-lab/catalog.ts` records approval decisions (`draft`, `review`, `approved`, `legacy`). Do not mark a variant approved just because it renders or passes CI.
+- The old admin lab is an archive, including historical text that describes itself as a source of truth. Treat that as obsolete.
+- Every preview, legacy URL and embedded route must inherit `requireUiLabAccess`: only authenticated ADMIN/MODERATOR on non-production `APP_ENV`; never use `NODE_ENV` as the only DEV signal.
+- Missing usage statistics mean `unknown`, not 0. Do not treat a stale registry as proof a component is unused.
