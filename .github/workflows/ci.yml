@@ -59,6 +59,9 @@ jobs:
         # GitHub ubuntu runners abort TypeScript at Node's default heap ceiling.
         run: NODE_OPTIONS=--max-old-space-size=5120 pnpm tsc --noEmit
 
+      - name: Feedback model and multi-source reputation regressions
+        run: pnpm test:feedback-foundation
+
       - name: Business onboarding progress regressions
         run: pnpm exec tsx src/lib/business/onboardingProgress.test.ts
         env:
