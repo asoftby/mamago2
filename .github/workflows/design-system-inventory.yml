@@ -6,6 +6,8 @@ on:
       - "src/**"
       - "scripts/design-system-audit.mjs"
       - "scripts/design-system-audit.test.mjs"
+      - "scripts/ui-lab-route-contract.test.mjs"
+      - "src/lib/ui-lab/**"
       - "docs/design-system.md"
       - ".agents/skills/mamago-design-system/**"
       - ".github/workflows/design-system-inventory.yml"
@@ -27,6 +29,9 @@ jobs:
 
       - name: Test audit heuristics
         run: node --test scripts/design-system-audit.test.mjs
+
+      - name: Verify UI Lab routes and preview contract
+        run: node --test scripts/ui-lab-route-contract.test.mjs
 
       - name: Generate inventory (informational)
         run: node scripts/design-system-audit.mjs --out design-system-audit.md
