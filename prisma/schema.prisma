@@ -6701,7 +6701,7 @@ model CollectionItem {
   @@index([articleIdeaId])
 }
 
- 
+
 // =====================================================
 // MAMAGO FEEDBACK 1.0 (additive, inactive until rollout)
 // =====================================================
