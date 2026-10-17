@@ -13,7 +13,7 @@ export async function requireUiLabAccess(): Promise<boolean> {
   if (!isUiLabEnabled(process.env)) notFound();
 
   const user = await getCurrentUser();
-  if (!user) await redirectToLogin();
+  if (!user) return redirectToLogin();
 
   return canViewUiLab(user.role);
 }
