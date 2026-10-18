@@ -79,7 +79,7 @@ function Inner({ mode, collection, ideaTitle, collections, initialSelection, onA
       <div className="shrink-0 px-5 pb-3 pt-6 sm:px-6 sm:pt-7">
         <div className="mb-2 flex items-center gap-2" style={{ color: C.accentDeep }}>
           <FolderHeart className="size-[19px]" />
-          <span className="font-mono text-[11px] uppercase tracking-[0.12em]">Мои идеи</span>
+          <span className="font-mono text-[11px] uppercase tracking-[0.12em]">Мои идеи и коллекции</span>
         </div>
         <h2 className="pr-9 text-[24px] font-semibold leading-tight tracking-tight">
           {mode === "edit" ? "В коллекцию" : mode === "manage" ? "Управление коллекцией" : "Новая коллекция"}
