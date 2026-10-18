@@ -268,13 +268,6 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
     ? (collections.find((item) => item.id === collectionDialog.collectionId) ?? null)
     : null;
   const withoutCount = ideas.filter((item) => visibleInCollection(item, WITHOUT_COLLECTION, memberships)).length;
-  const emptyVariant =
-    ideas.length === 0
-      ? "INITIAL"
-      : filter === "UNPLANNED"
-        ? "UNPLANNED"
-        : "PLANNED";
-
   return (
     <div className="space-y-6 sm:space-y-8">
       {isCollectionPage ? (
