@@ -14,7 +14,6 @@ import { DepositTopUpTrigger } from "@/components/business/billing/DepositTopUpT
 import { DashboardHeader } from "@/components/business/dashboard/DashboardHeader";
 import { DashboardActionStack } from "@/components/business/dashboard/DashboardActionStack";
 import { DashboardPeriodSwitcher } from "@/components/business/dashboard/DashboardPeriodSwitcher";
-import { DashboardOnboarding } from "@/components/business/dashboard/DashboardOnboarding";
 import { NewBusinessDashboard } from "@/components/business/dashboard/NewBusinessDashboard";
 import { BusinessOnboardingTour } from "@/components/business/dashboard/BusinessOnboardingTour";
 import { BusinessReputationBlock } from "@/components/business/dashboard/BusinessReputationBlock";
@@ -491,7 +490,7 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
       {!isOnboarding && (
         <div className="flex justify-end">
           <button type="button" onClick={() => setTourOpen(true)} className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">
-            Обзор кабинета
+            Возможности mamaGo
           </button>
         </div>
       )}
