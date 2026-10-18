@@ -12,6 +12,7 @@ import { IdeaCardActions } from "./IdeaCardActions";
 
 type IdeaPosterCardProps = {
   idea: IdeaItem;
+  compact?: boolean;
   isScheduling: boolean;
   isRemoving: boolean;
   onSchedule: () => void;
@@ -34,6 +35,7 @@ function priceCaption(a: {
 
 export function IdeaPosterCard({
   idea,
+  compact = false,
   isScheduling,
   isRemoving,
   onSchedule,
@@ -99,7 +101,7 @@ export function IdeaPosterCard({
       )}
       {idea.isPlanned && <span className="text-xs font-medium text-stone-500">В плане</span>}
       {isPastEvent && <span className="text-xs text-stone-500">Уже прошло</span>}
-      <IdeaCardActions isPlanned={idea.isPlanned} isPast={isPastEvent} canSchedule={!isArticle}
+      <IdeaCardActions compact={compact} isPlanned={idea.isPlanned} isPast={isPastEvent} canSchedule={!isArticle}
         publicHref={activity.publicHref ?? null} onSchedule={onSchedule} onRemove={onRemove}
         onCollection={onCollection} isScheduling={isScheduling} isRemoving={isRemoving} />
     </div>
