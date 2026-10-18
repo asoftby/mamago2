@@ -80,8 +80,10 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
   // Keep the overlay mounted while it closes so the sheet exit animation can finish.
   const [collectionDialog, setCollectionDialog] = useState<CollectionDialogState>({ mode: "create" });
   const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
+  const [dialogInstance, setDialogInstance] = useState(0);
   function openCollectionDialog(dialog: CollectionDialogState) {
     setCollectionDialog(dialog);
+    setDialogInstance((current) => current + 1);
     setCollectionDialogOpen(true);
   }
   const [filter, setFilter] = useState<Filter>("ALL");
@@ -369,7 +371,7 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
       )}
 
       <IdeasCollectionDialog
-          key={collectionDialog.mode === "edit" ? `edit-${collectionDialog.ideaId}` : collectionDialog.mode === "manage" ? `manage-${collectionDialog.collectionId}` : "create"}
+          key={`${dialogInstance}-${collectionDialog.mode === "edit" ? `edit-${collectionDialog.ideaId}` : collectionDialog.mode === "manage" ? `manage-${collectionDialog.collectionId}` : "create"}`}
           open={collectionDialogOpen}
           onOpenChange={setCollectionDialogOpen}
           mode={collectionDialog.mode}
