@@ -161,21 +161,7 @@ export function NewBusinessDashboard({ data }: Props) {
         </div>
       </BusinessSurfaceCard>
 
-      <div className="grid gap-3 sm:grid-cols-3" data-business-tour="benefits">
-        {[
-          { Icon: BookOpen, title: "Публикации", body: "Ваши места, события и предложения находят семьи" },
-          { Icon: CheckCircle2, title: "Сохранения", body: "Пользователи возвращаются к понравившемуся" },
-          { Icon: MessageCircle, title: "Обращения", body: "Отслеживайте интерес и запросы клиентов" },
-        ].map(({ Icon, title: cardTitle, body }) => (
-          <BusinessSurfaceCard key={cardTitle} className="p-5">
-            <Icon className="h-5 w-5 text-stone-600" />
-            <p className="mt-3 text-sm font-semibold text-stone-950">{cardTitle}</p>
-            <p className="mt-1 text-xs leading-relaxed text-stone-500">{body}</p>
-          </BusinessSurfaceCard>
-        ))}
-      </div>
-
-      <BusinessSurfaceCard className="p-5 sm:p-6">
+      <BusinessSurfaceCard className="p-5 sm:p-6" data-business-tour="benefits">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold text-stone-950">Что умеет mamaGo для бизнеса</h3>
