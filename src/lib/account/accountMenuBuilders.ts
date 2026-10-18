@@ -96,7 +96,7 @@ export function buildPublicSiteAccountModel(input: {
       {
         key: "ideas",
         type: "button",
-        label: "Мои идеи",
+        label: "Мои идеи и коллекции",
         icon: Lightbulb,
         onClick: () => {
           onGoToPersonalIdeas();
