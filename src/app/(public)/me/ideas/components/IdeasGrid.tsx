@@ -8,9 +8,10 @@ type IdeasGridProps = {
   onSchedule: (ideaId: string) => void;
   onRemove: (idea: IdeaItem) => void;
   onCollection?: (ideaId: string) => void;
-  columns?: "default" | "two";
+  variant?: "unsorted" | "collection";
 };
 
+/** Consistent two-column publications grid on mobile and desktop. */
 export function IdeasGrid({
   ideas,
   planningIdeaId,
@@ -18,15 +19,16 @@ export function IdeasGrid({
   onSchedule,
   onRemove,
   onCollection,
-  columns = "default",
+  variant = "collection",
 }: IdeasGridProps) {
   return (
-    <div className={columns === "two" ? "grid grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-6 sm:gap-y-10" : "grid grid-cols-1 gap-x-6 gap-y-10 min-[720px]:grid-cols-2 lg:grid-cols-3"}>
+    <div className="grid w-full min-w-0 grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-6 sm:gap-y-10">
       {ideas.map((idea) => (
         <IdeaPosterCard
           key={idea.id}
           idea={idea}
-          compact={columns === "two"}
+          compact
+          unsorted={variant === "unsorted"}
           isScheduling={planningIdeaId === idea.id}
           isRemoving={removingIdeaId === idea.id}
           onSchedule={() => onSchedule(idea.id)}

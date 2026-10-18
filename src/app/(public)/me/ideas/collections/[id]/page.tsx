@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
-
-// Reuse the authenticated ideas data loader and layout.
-// IdeasClient selects the collection from the dynamic route parameter.
-export { default } from "../../page";
+import { redirect } from "next/navigation";
+import IdeasPage from "../../page";
 
 export const metadata: Metadata = { title: "Коллекция идей — mamaGo" };
+
+// Legacy virtual "Все идеи" links return to the overview.
+// Only user-created collections have detail pages.
+export default async function CollectionPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  if (id === "ALL") redirect("/me/ideas");
+  return <IdeasPage />;
+}

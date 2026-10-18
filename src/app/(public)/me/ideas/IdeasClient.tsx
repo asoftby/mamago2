@@ -16,7 +16,6 @@ import { IdeasEmptyState } from "./components/IdeasEmptyState";
 import { IdeasCollectionsBar } from "./components/IdeasCollectionsBar";
 import { IdeasCollectionDialog } from "./components/IdeasCollectionDialog";
 import {
-  ALL_IDEAS,
   WITHOUT_COLLECTION,
   collectionTarget,
   updateCollectionCounts,
@@ -76,8 +75,16 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
   const isCollectionPage = collectionId !== null;
   const collectionFilter = collectionId ?? WITHOUT_COLLECTION;
   const activeCollection = collections.find((item) => item.id === collectionId) ?? null;
-  const collectionExists = !isCollectionPage || collectionId === ALL_IDEAS || activeCollection !== null;
-  const [collectionDialog, setCollectionDialog] = useState<CollectionDialogState | null>(null);
+  const collectionExists = !isCollectionPage || activeCollection !== null;
+  // Keep the overlay mounted while it closes so the sheet exit animation can finish.
+  const [collectionDialog, setCollectionDialog] = useState<CollectionDialogState>({ mode: "create" });
+  const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
+  const [dialogInstance, setDialogInstance] = useState(0);
+  function openCollectionDialog(dialog: CollectionDialogState) {
+    setCollectionDialog(dialog);
+    setDialogInstance((current) => current + 1);
+    setCollectionDialogOpen(true);
+  }
   const [filter, setFilter] = useState<Filter>("ALL");
   const [planModalId, setPlanModalId] = useState<string | null>(null);
   const [removingIdeaId, setRemovingIdeaId] = useState<string | null>(null);
@@ -172,7 +179,7 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
   }
 
   async function saveMembership(ids: string[]): Promise<boolean> {
-    if (collectionDialog?.mode !== "edit") return false;
+    if (!collectionDialogOpen || collectionDialog.mode !== "edit") return false;
     const idea = ideas.find((item) => item.id === collectionDialog.ideaId);
     if (!idea) return false;
     try {
@@ -261,15 +268,15 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
   }
 
   const planningIdea = ideas.find((i) => i.id === planModalId) ?? null;
-  const editingIdea = collectionDialog?.mode === "edit"
+  const editingIdea = collectionDialog.mode === "edit"
     ? (ideas.find((idea) => idea.id === collectionDialog.ideaId) ?? null)
     : null;
-  const managingCollection = collectionDialog?.mode === "manage"
+  const managingCollection = collectionDialog.mode === "manage"
     ? (collections.find((item) => item.id === collectionDialog.collectionId) ?? null)
     : null;
   const withoutCount = ideas.filter((item) => visibleInCollection(item, WITHOUT_COLLECTION, memberships)).length;
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="w-full min-w-0 max-w-full space-y-6 overflow-x-clip sm:space-y-8">
       {isCollectionPage ? (
         <header className="space-y-4">
           <Link
@@ -282,7 +289,7 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 space-y-2">
               <h1 className="break-words text-[38px] leading-tight sm:text-[58px]" style={{ fontFamily: "var(--font-serif)" }}>
-                {collectionId === ALL_IDEAS ? "Все идеи" : (activeCollection?.title ?? "Коллекция не найдена")}
+                {activeCollection?.title ?? "Коллекция не найдена"}
               </h1>
               {collectionExists && (
                 <p className="text-sm text-muted-foreground">
@@ -296,7 +303,7 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
                 variant="outline"
                 size="icon"
                 aria-label={`Управлять коллекцией «${activeCollection.title}»`}
-                onClick={() => setCollectionDialog({ mode: "manage", collectionId: activeCollection.id })}
+                onClick={() => openCollectionDialog({ mode: "manage", collectionId: activeCollection.id })}
               >
                 <MoreHorizontal className="size-5" />
               </Button>
@@ -310,9 +317,8 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
             collections={collections}
             ideas={ideas}
             memberships={memberships}
-            total={ideas.length}
-            onCreate={() => setCollectionDialog({ mode: "create" })}
-            onManage={(id) => setCollectionDialog({ mode: "manage", collectionId: id })}
+            onCreate={() => openCollectionDialog({ mode: "create" })}
+            onManage={(id) => openCollectionDialog({ mode: "manage", collectionId: id })}
           />
           <section aria-label="Неотсортированные коллекции" className="space-y-4">
             <div className="flex flex-wrap items-baseline gap-2">
@@ -326,12 +332,12 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
             ) : (
               <IdeasGrid
                 ideas={filtered}
-                columns="two"
+                variant="unsorted"
                 planningIdeaId={planModalId}
                 removingIdeaId={removingIdeaId}
                 onSchedule={setPlanModalId}
                 onRemove={handleRemove}
-                onCollection={(ideaId) => setCollectionDialog({ mode: "edit", ideaId })}
+                onCollection={(ideaId) => openCollectionDialog({ mode: "edit", ideaId })}
               />
             )}
           </section>
@@ -350,7 +356,7 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
               removingIdeaId={removingIdeaId}
               onSchedule={setPlanModalId}
               onRemove={handleRemove}
-              onCollection={(ideaId) => setCollectionDialog({ mode: "edit", ideaId })}
+              onCollection={(ideaId) => openCollectionDialog({ mode: "edit", ideaId })}
             />
           ) : (
             <div className="rounded-2xl border border-border p-8 text-center">
@@ -363,11 +369,10 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
         </>
       )}
 
-      {collectionDialog && (
-        <IdeasCollectionDialog
-          key={collectionDialog.mode === "edit" ? `edit-${collectionDialog.ideaId}` : collectionDialog.mode === "manage" ? `manage-${collectionDialog.collectionId}` : "create"}
-          open={true}
-          onOpenChange={(open) => { if (!open) setCollectionDialog(null); }}
+      <IdeasCollectionDialog
+          key={`${dialogInstance}-${collectionDialog.mode === "edit" ? `edit-${collectionDialog.ideaId}` : collectionDialog.mode === "manage" ? `manage-${collectionDialog.collectionId}` : "create"}`}
+          open={collectionDialogOpen}
+          onOpenChange={setCollectionDialogOpen}
           mode={collectionDialog.mode}
           ideaTitle={editingIdea?.activity.title}
           collection={managingCollection}
@@ -378,7 +383,6 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
           onRename={renameCollection}
           onDelete={deleteCollection}
         />
-      )}
 
       <SaveToPlanModal
         open={planModalId !== null}
