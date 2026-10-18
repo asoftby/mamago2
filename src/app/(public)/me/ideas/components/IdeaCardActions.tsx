@@ -8,6 +8,7 @@ import { C } from "../theme";
 
 type IdeaCardActionsProps = {
   isPlanned: boolean;
+  compact?: boolean;
   isPast?: boolean;
   canSchedule?: boolean;
   publicHref?: string | null;
@@ -21,6 +22,7 @@ type IdeaCardActionsProps = {
 
 export function IdeaCardActions({
   isPlanned,
+  compact = false,
   isPast = false,
   canSchedule = true,
   publicHref,
@@ -36,17 +38,17 @@ export function IdeaCardActions({
   const showOpenAction = !canSchedule || isPast;
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={cn("flex min-w-0 items-center", compact ? "gap-1.5 sm:gap-2" : "gap-2")}>
       {showOpenAction && publicHref ? (
         <Button
           type="button"
           asChild
-          className="h-[46px] flex-1 rounded-full border px-4 text-sm font-semibold shadow-none transition-colors"
+          className={cn("min-w-0 flex-1 rounded-full border text-sm font-semibold shadow-none transition-colors", compact ? "h-10 px-1.5 sm:h-[46px] sm:px-4" : "h-[46px] px-4")}
           style={{ borderColor: C.line2, background: "transparent", color: C.ink }}
         >
-          <Link href={publicHref}>
+          <Link href={publicHref} aria-label="Посмотреть">
             <ExternalLink className="size-4" />
-            Посмотреть
+            <span className={compact ? "hidden sm:inline" : undefined}>Посмотреть</span>
           </Link>
         </Button>
       ) : (
@@ -54,7 +56,8 @@ export function IdeaCardActions({
           type="button"
           onClick={onSchedule}
           disabled={scheduleDisabled}
-          className={cn("h-[46px] flex-1 rounded-full border-0 px-4 text-sm font-semibold shadow-none transition-colors")}
+          aria-label={isPlanned ? "В плане" : "Запланировать"}
+          className={cn("min-w-0 flex-1 rounded-full border-0 text-sm font-semibold shadow-none transition-colors", compact ? "h-10 px-1.5 sm:h-[46px] sm:px-4" : "h-[46px] px-4")}
           style={
             isPlanned
               ? { background: "rgba(20,18,16,0.06)", color: C.ink }
@@ -68,7 +71,7 @@ export function IdeaCardActions({
           ) : (
             <CalendarPlus className="size-4" />
           )}
-          {isPlanned ? "В плане" : "Запланировать"}
+          <span className={compact ? "hidden sm:inline" : undefined}>{isPlanned ? "В плане" : "Запланировать"}</span>
         </Button>
       )}
 
@@ -81,7 +84,7 @@ export function IdeaCardActions({
           disabled={disabled}
           aria-label="В коллекцию"
           title="В коллекцию"
-          className="size-[46px] shrink-0 rounded-full border bg-transparent shadow-none transition-colors"
+          className={cn("shrink-0 rounded-full border bg-transparent shadow-none transition-colors", compact ? "size-10 sm:size-[46px]" : "size-[46px]")}
           style={{ borderColor: C.line2, color: C.accentDeep }}
         >
           <FolderPlus className="size-5" />
@@ -95,7 +98,7 @@ export function IdeaCardActions({
         disabled={removeDisabled}
         aria-label="Убрать из идей"
         title="Убрать из идей"
-        className="size-[46px] shrink-0 rounded-full border bg-transparent shadow-none transition-colors"
+        className={cn("shrink-0 rounded-full border bg-transparent shadow-none transition-colors", compact ? "size-10 sm:size-[46px]" : "size-[46px]")}
         style={{ borderColor: C.line2, color: C.ink3 }}
       >
         {isRemoving ? (
