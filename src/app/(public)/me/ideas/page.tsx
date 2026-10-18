@@ -19,7 +19,7 @@ import { normalizePricingMode } from "@/components/business/wizard/event/pricing
 import { getMinCampSessionPrice } from "@/lib/offers/campPricing";
 import { activePlanScopeFor } from "@/server/family/familyAccess";
 
-export const metadata = { title: "Мои идеи — mamaGo" };
+export const metadata = { title: "Мои идеи и коллекции — mamaGo" };
 
 function extractActivityDateRange(input: {
   nextOccurrenceAt: Date | null;
