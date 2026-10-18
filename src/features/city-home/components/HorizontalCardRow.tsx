@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,15 +26,13 @@ export function HorizontalCardRow({
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
 
-  const updateButtons = useMemo(() => {
-    return () => {
-      const el = scrollerRef.current;
-      if (!el) return;
-      // Small epsilon for fractional pixels
-      const eps = 2;
-      setCanLeft(el.scrollLeft > eps);
-      setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - eps);
-    };
+  const updateButtons = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    // Small epsilon for fractional pixels.
+    const eps = 2;
+    setCanLeft(el.scrollLeft > eps);
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - eps);
   }, []);
 
   useEffect(() => {
@@ -54,54 +52,75 @@ export function HorizontalCardRow({
   const scrollByPage = (dir: "left" | "right") => {
     const el = scrollerRef.current;
     if (!el) return;
-    const delta = Math.round(el.clientWidth * 0.9) * (dir === "left" ? -1 : 1);
-    el.scrollBy({ left: delta, behavior: "smooth" });
+    const cards = Array.from(el.children) as HTMLElement[];
+    if (cards.length === 0) return;
+
+    // Move by the number of full cards currently visible: two on phones,
+    // four on wide event rows. Using card positions keeps snap points exact.
+    const scrollerLeft = el.getBoundingClientRect().left;
+    const positions = cards.map(
+      (card) => card.getBoundingClientRect().left - scrollerLeft + el.scrollLeft,
+    );
+    const cardWidth = cards[0].getBoundingClientRect().width;
+    const gap = cards.length > 1 ? Math.max(0, positions[1] - positions[0] - cardWidth) : 0;
+    const visibleCount = Math.max(
+      1,
+      Math.floor((el.clientWidth + gap + 1) / (cardWidth + gap)),
+    );
+    const currentIndex = positions.reduce(
+      (current, position, index) => (position <= el.scrollLeft + 2 ? index : current),
+      0,
+    );
+    const direction = dir === "left" ? -1 : 1;
+    const targetIndex = Math.max(0, Math.min(cards.length - 1, currentIndex + direction * visibleCount));
+    el.scrollTo({ left: positions[targetIndex], behavior: "smooth" });
   };
 
+  const navigationControls = (
+    <div className="flex shrink-0 items-center gap-2">
+      <button
+        type="button"
+        onClick={() => scrollByPage("left")}
+        disabled={!canLeft}
+        aria-label="Предыдущие публикации"
+        className={cn(
+          "inline-flex size-9 shrink-0 items-center justify-center rounded-full",
+          "bg-muted text-foreground transition-colors hover:bg-muted/80",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          !canLeft && "cursor-default opacity-30",
+        )}
+      >
+        <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
+      </button>
+      <button
+        type="button"
+        onClick={() => scrollByPage("right")}
+        disabled={!canRight}
+        aria-label="Следующие публикации"
+        className={cn(
+          "inline-flex size-9 shrink-0 items-center justify-center rounded-full",
+          "bg-muted text-foreground transition-colors hover:bg-muted/80",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          !canRight && "cursor-default opacity-30",
+        )}
+      >
+        <ChevronRight className="size-4" strokeWidth={1.75} aria-hidden />
+      </button>
+    </div>
+  );
+
   return (
-    <div
-      className={cn("relative -mx-4 px-4 sm:mx-0 sm:px-0", padded && "pb-1")}
-    >
-      {/* Desktop nav: optional leading link + Airbnb-style arrows */}
-      <div className="absolute right-0 -top-12 flex items-center justify-end gap-3">
-        {navLeading ? (
-          <div className="flex h-8 items-center">{navLeading}</div>
-        ) : null}
-        <div className="hidden lg:flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => scrollByPage("left")}
-            disabled={!canLeft}
-            aria-label="Прокрутить назад"
-            className={cn(
-              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-              "bg-neutral-200 text-neutral-900 transition-colors hover:bg-neutral-300/90",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-              canLeft
-                ? "opacity-100"
-                : "opacity-30 cursor-default hover:bg-neutral-200",
-            )}
-          >
-            <ChevronLeft className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-          </button>
-          <button
-            type="button"
-            onClick={() => scrollByPage("right")}
-            disabled={!canRight}
-            aria-label="Прокрутить вперёд"
-            className={cn(
-              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-              "bg-neutral-200 text-neutral-900 transition-colors hover:bg-neutral-300/90",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-              canRight
-                ? "opacity-100"
-                : "opacity-30 cursor-default hover:bg-neutral-200",
-            )}
-          >
-            <ChevronRight className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-          </button>
+    <div className={cn("relative -mx-4 px-4 sm:mx-0 sm:px-0", padded && "pb-1")}>
+      {navLeading ? (
+        <div className="mb-4 flex min-h-9 items-center justify-between gap-3 px-1 sm:px-0">
+          <div className="min-w-0">{navLeading}</div>
+          {navigationControls}
         </div>
-      </div>
+      ) : (
+        <div className="absolute right-0 -top-12 hidden lg:flex">
+          {navigationControls}
+        </div>
+      )}
 
       <div
         ref={scrollerRef}
