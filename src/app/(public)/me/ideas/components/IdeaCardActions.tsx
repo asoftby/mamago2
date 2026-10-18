@@ -38,12 +38,12 @@ export function IdeaCardActions({
   const showOpenAction = !canSchedule || isPast;
 
   return (
-    <div className={cn("flex min-w-0 items-center", compact ? "gap-1.5 sm:gap-2" : "gap-2")}>
+    <div className={cn("flex min-w-0 items-center", compact ? "flex-wrap gap-2 sm:flex-nowrap" : "gap-2")}>
       {showOpenAction && publicHref ? (
         <Button
           type="button"
           asChild
-          className={cn("min-w-0 flex-1 rounded-full border text-sm font-semibold shadow-none transition-colors", compact ? "h-10 px-1.5 sm:h-[46px] sm:px-4" : "h-[46px] px-4")}
+          className={cn("min-w-0 flex-1 rounded-full border text-sm font-semibold shadow-none transition-colors", compact ? "h-11 w-full flex-none px-2 sm:h-[46px] sm:w-auto sm:flex-1 sm:px-4" : "h-[46px] px-4")}
           style={{ borderColor: C.line2, background: "transparent", color: C.ink }}
         >
           <Link href={publicHref} aria-label="Посмотреть">
@@ -57,7 +57,7 @@ export function IdeaCardActions({
           onClick={onSchedule}
           disabled={scheduleDisabled}
           aria-label={isPlanned ? "В плане" : "Запланировать"}
-          className={cn("min-w-0 flex-1 rounded-full border-0 text-sm font-semibold shadow-none transition-colors", compact ? "h-10 px-1.5 sm:h-[46px] sm:px-4" : "h-[46px] px-4")}
+          className={cn("min-w-0 flex-1 rounded-full border-0 text-sm font-semibold shadow-none transition-colors", compact ? "h-11 w-full flex-none px-2 sm:h-[46px] sm:w-auto sm:flex-1 sm:px-4" : "h-[46px] px-4")}
           style={
             isPlanned
               ? { background: "rgba(20,18,16,0.06)", color: C.ink }
@@ -84,7 +84,7 @@ export function IdeaCardActions({
           disabled={disabled}
           aria-label="В коллекцию"
           title="В коллекцию"
-          className={cn("shrink-0 rounded-full border bg-transparent shadow-none transition-colors", compact ? "size-10 sm:size-[46px]" : "size-[46px]")}
+          className={cn("shrink-0 rounded-full border bg-transparent shadow-none transition-colors", compact ? "h-11 min-w-11 flex-1 sm:size-[46px] sm:flex-none" : "size-[46px]")}
           style={{ borderColor: C.line2, color: C.accentDeep }}
         >
           <FolderPlus className="size-5" />
@@ -98,7 +98,7 @@ export function IdeaCardActions({
         disabled={removeDisabled}
         aria-label="Убрать из идей"
         title="Убрать из идей"
-        className={cn("shrink-0 rounded-full border bg-transparent shadow-none transition-colors", compact ? "size-10 sm:size-[46px]" : "size-[46px]")}
+        className={cn("shrink-0 rounded-full border bg-transparent shadow-none transition-colors", compact ? "h-11 min-w-11 flex-1 sm:size-[46px] sm:flex-none" : "size-[46px]")}
         style={{ borderColor: C.line2, color: C.ink3 }}
       >
         {isRemoving ? (
