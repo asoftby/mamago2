@@ -18,7 +18,7 @@ export function JournalCard({ href, title, imageUrl, categoryLabel, readTime, to
               <div
                 className={cn(
                   "relative w-full mb-3 overflow-hidden bg-gradient-to-br",
-                  homeCard ? "aspect-[4/5] rounded-[18px]" : "aspect-square rounded-xl",
+                  homeCard ? "rounded-[18px]" : "aspect-square rounded-xl",
                   [
                     "from-[#F2C8A7] to-[#E89460]",
                     "from-[#CDE3D6] to-[#9CC1AC]",
@@ -26,6 +26,7 @@ export function JournalCard({ href, title, imageUrl, categoryLabel, readTime, to
                     "from-[#E6DBC8] to-[#C9BCA0]",
                   ][tone % 4],
                 )}
+                style={homeCard ? { aspectRatio: "4 / 5" } : undefined}
               >
                 {imageUrl && canOptimizeWithNextImage(imageUrl) ? (
                   <Image
