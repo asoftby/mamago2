@@ -16,7 +16,6 @@ import { IdeasEmptyState } from "./components/IdeasEmptyState";
 import { IdeasCollectionsBar } from "./components/IdeasCollectionsBar";
 import { IdeasCollectionDialog } from "./components/IdeasCollectionDialog";
 import {
-  ALL_IDEAS,
   WITHOUT_COLLECTION,
   collectionTarget,
   updateCollectionCounts,
