@@ -94,7 +94,7 @@ export function getV2StepMembers(
       }
       return ["conditions", "openingHours", "bookingMethod"];
     case "terms":
-      return ["contacts"];
+      return ["contacts", "paymentTerms"];
     default:
       return [];
   }

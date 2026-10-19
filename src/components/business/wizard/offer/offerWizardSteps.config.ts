@@ -167,6 +167,7 @@ export function getStepsForOfferType(
     openingHours: v2StepDefWithoutKey("schedule"),
     classSchedule: v2StepDefWithoutKey("schedule"),
     bookingMethod: v2StepDefWithoutKey("schedule"),
+    paymentTerms: v2StepDefWithoutKey("terms"),
   };
 
   let stepKeys: OfferWizardStepKey[] = [];
@@ -296,6 +297,10 @@ export function getPreviousStepKey(
     return steps[currentIndex - 1].key;
   }
   return null;
+}
+
+function isPartyTermsProduct(data: OfferFormData): boolean {
+  return data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE";
 }
 
 /**
@@ -460,7 +465,13 @@ export function isStepComplete(
       }
 
     case "contacts":
+      // Новый мастер: телефон обязателен (если контакты не берутся из карточки места).
+      if (variant === "v2" && data.contactSource !== "place" && !data.phone.trim()) return false;
       return isOfferContactsComplete(data);
+
+    case "paymentTerms":
+      // Зона выезда обязательна, когда праздник только с выездом.
+      return !(isPartyTermsProduct(data) && data.birthdayDetails.locationType === "OFF_SITE" && !data.serviceAreaText.trim());
 
     case "openingHours":
       return !getScheduleMissingFields(data.schedule, data.productType).includes("Дни работы");
@@ -594,6 +605,13 @@ export function getMissingFieldsForStep(
 
     case "contacts":
       if (!data.placeId) missing.push("Место для предложения");
+      if (variant === "v2" && data.contactSource !== "place" && !data.phone.trim()) missing.push("Телефон");
+      break;
+
+    case "paymentTerms":
+      if (isPartyTermsProduct(data) && data.birthdayDetails.locationType === "OFF_SITE" && !data.serviceAreaText.trim()) {
+        missing.push("Зона выезда");
+      }
       break;
 
     case "openingHours":

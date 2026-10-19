@@ -134,6 +134,10 @@ const updateOfferSchema = z.object({
   faqItems: z.array(z.record(z.string(), z.unknown())).nullish(),
   categoryIds: z.array(z.string()).max(3).optional(),
   interestSlugs: z.array(z.string()).max(5).optional(),
+  /** Предоплата / отмена / зона выезда (новый мастер). Пустая строка и null стирают значение. */
+  prepaymentTerms: z.string().trim().max(500).nullable().optional(),
+  cancellationTerms: z.string().trim().max(500).nullable().optional(),
+  serviceAreaText: z.string().trim().max(200).nullable().optional(),
   /** Версия операционных данных, на которой клиент построил форму (`offerOperationalVersion`): защита от записи устаревшего снимка. */
   expectedOperationalVersion: z.string().optional(),
   /** Шаг «Расписание» нового мастера: способ записи, режим работы, закрытые дни. */
@@ -423,6 +427,9 @@ export async function PATCH(
       updateData.ageMaxMonths = normalizedAge.ageMaxMonths;
     }
     if (interestsCheck?.ok) updateData.interestSlugs = interestsCheck.slugs;
+    for (const column of ["prepaymentTerms", "cancellationTerms", "serviceAreaText"] as const) {
+      if (data[column] !== undefined) updateData[column] = data[column]?.trim() ? data[column].trim() : null;
+    }
     if (data.coverImage !== undefined) updateData.coverImage = data.coverImage;
     if (data.gallery !== undefined) updateData.galleryImages = data.gallery;
     if (data.videoUrl !== undefined) updateData.videoUrl = data.videoUrl;
