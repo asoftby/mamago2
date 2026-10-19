@@ -117,7 +117,7 @@ export function BusinessOnboardingTour({
   return (
     <>
     {index === 0 && viewport.width > 0 && (
-      <svg aria-hidden="true" className="pointer-events-auto fixed inset-0 z-[90] h-dvh w-screen" viewBox={`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio="none">
+      <svg aria-hidden="true" className="pointer-events-none fixed inset-0 z-[90] h-dvh w-screen" viewBox={`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio="none">
         <defs>
           <mask id={maskId}>
             <rect width={viewport.width} height={viewport.height} fill="white" />
