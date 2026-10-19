@@ -5,6 +5,20 @@ import { logSearchQuery } from "@/lib/search/logSearchQuery";
 import { resolveSearchLogCityId } from "@/lib/search/resolveSearchLogCityId";
 import { getCurrentUser } from "@/lib/auth/server";
 import { activityAddressLine, activityMetaLine, resolveActivityAgeLabel } from "@/lib/search/metaLines";
+import { resolvePlaceLogoUrlFromDb } from "@/lib/place/resolvePlaceLogoUrlFromDb";
+import { formatPriceFrom } from "@/lib/formatters/format-price";
+import { formatAgeKeysShort } from "@/lib/config/ages";
+
+function openingHoursSummary(rules: Array<{ isOpen: boolean; allDay: boolean; intervals: Array<{startTime: string; endTime: string}> }>): string | null {
+  const open = rules.filter((r) => r.isOpen);
+  if (!open.length) return null;
+  if (open.every((r) => r.allDay) && open.length === 7) return "Круглосуточно";
+  const starts = open.flatMap((r) => r.intervals.map((i) => i.startTime)).sort();
+  const ends = open.flatMap((r) => r.intervals.map((i) => i.endTime)).sort();
+  if (!starts.length || !ends.length) return null;
+  return `${starts[0]}–${ends[ends.length - 1]}`;
+}
+
 
 const MAX_QUERY_LENGTH = 200;
 const MAX_QUERY_TOKENS = 10;
@@ -180,15 +194,90 @@ export async function GET(request: Request) {
       }
     }
 
+    const placeIds = docs.filter((d) => d.entityType === "place").map((d) => d.entityId);
+    const offerIds = docs.filter((d) => d.entityType === "offer").map((d) => d.entityId);
+    const placeById = new Map<string, { summaryLine: string | null; metaLine: string; imageUrl: string | null }>();
+    const offerById = new Map<string, { summaryLine: string | null; metaLine: string }>();
+
+    if (placeIds.length) {
+      const places = await prisma.place.findMany({
+        where: { id: { in: placeIds }, status: "PUBLISHED", archivedAt: null },
+        select: {
+          id: true, shortAddress: true, formattedAddr: true, displayAddress: true, customAddress: true,
+          ageTags: true, logoImageId: true, images: { select: { id: true, url: true, kind: true } },
+          city: { select: { name: true } },
+          openingHours: { select: { rules: { select: {
+            isOpen: true, allDay: true, intervals: { select: { startTime: true, endTime: true } },
+          } } } },
+          offers: { where: { status: "PUBLISHED", archivedAt: null },
+            select: { priceFrom: true, priceMode: true, ageMinMonths: true, dateTo: true } },
+        },
+      });
+      for (const place of places) {
+        const address = activityAddressLine({
+          cityName: place.city?.name, placeDisplayAddress: place.displayAddress,
+          placeShortAddress: place.shortAddress, placeFormattedAddr: place.formattedAddr,
+          placeCustomAddress: place.customAddress,
+        });
+        const validOffers = place.offers.filter((o) => !o.dateTo || o.dateTo >= new Date());
+        const prices = validOffers.filter((o) => o.priceFrom != null && o.priceFrom >= 0 && o.priceMode !== "ON_REQUEST" && o.priceMode !== "NONE").map((o) => o.priceFrom!);
+        const minimum = prices.length ? Math.min(...prices) : null;
+        const age = formatAgeKeysShort(place.ageTags) ||
+          (validOffers.some((o) => o.ageMinMonths != null)
+            ? `${Math.floor(Math.min(...validOffers.filter((o) => o.ageMinMonths != null).map((o) => o.ageMinMonths!)) / 12)}+`
+            : null);
+        const hours = openingHoursSummary(place.openingHours?.rules ?? []);
+        const price = minimum == null ? null : minimum === 0 ? "Бесплатно" : formatPriceFrom(minimum);
+        placeById.set(place.id, {
+          summaryLine: address,
+          metaLine: [age, hours, price].filter(Boolean).join(" · "),
+          imageUrl: (await resolvePlaceLogoUrlFromDb(place.images, place.logoImageId)) ?? null,
+        });
+      }
+    }
+
+    if (offerIds.length) {
+      const offers = await prisma.offer.findMany({
+        where: { id: { in: offerIds }, status: "PUBLISHED", archivedAt: null },
+        select: {
+          id: true, ageMinMonths: true, dateFrom: true, dateTo: true, priceFrom: true,
+          priceText: true, priceMode: true, inheritPlaceOpeningHours: true,
+          openingHours: { select: { rules: { select: { isOpen: true, allDay: true, intervals: { select: { startTime: true, endTime: true } } } } } },
+          place: { select: {
+            shortAddress: true, formattedAddr: true, displayAddress: true, customAddress: true,
+            city: { select: { name: true } },
+            openingHours: { select: { rules: { select: { isOpen: true, allDay: true, intervals: { select: { startTime: true, endTime: true } } } } } },
+          } },
+        },
+      });
+      for (const offer of offers) {
+        const place = offer.place;
+        const address = place ? activityAddressLine({
+          cityName: place.city?.name, placeShortAddress: place.shortAddress,
+          placeDisplayAddress: place.displayAddress, placeFormattedAddr: place.formattedAddr,
+          placeCustomAddress: place.customAddress,
+        }) : null;
+        const date = offer.dateFrom?.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+        const age = offer.ageMinMonths == null ? null : `${Math.floor(offer.ageMinMonths / 12)}+`;
+        const hours = openingHoursSummary(offer.inheritPlaceOpeningHours ? (place?.openingHours?.rules ?? []) : (offer.openingHours?.rules ?? []));
+        const price = offer.priceMode === "FREE" ? "Бесплатно" :
+          offer.priceFrom != null ? formatPriceFrom(offer.priceFrom) : offer.priceText;
+        offerById.set(offer.id, {
+          summaryLine: address,
+          metaLine: [age, date, hours, price].filter(Boolean).join(" · "),
+        });
+      }
+    }
+
     const results: SearchResultItem[] = docs.map((d) => {
       const type = entityTypeToResultType(d.entityType);
-      const live = type === "activity" ? activityById.get(d.entityId) : undefined;
+      const live = type === "activity" ? activityById.get(d.entityId) : type === "place" ? placeById.get(d.entityId) : type === "offer" ? offerById.get(d.entityId) : undefined;
       return {
         id: d.entityId,
         type,
         title: d.title,
         url: d.urlPath,
-        imageUrl: d.imageUrl,
+        imageUrl: type === "place" ? (placeById.get(d.entityId)?.imageUrl ?? null) : d.imageUrl,
         // For activities prefer live fields even if address is null — never fall back
         // to the legacy shortDesc stored in SearchDocument.summaryLine.
         summaryLine: live ? live.summaryLine : d.summaryLine,
