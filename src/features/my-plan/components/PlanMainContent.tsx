@@ -18,6 +18,7 @@ import { toast } from "@/lib/toast";
 import { LiquidNotification } from "@/components/ui/liquid-notification";
 import { PlanCalendar } from "@/features/plan-calendar";
 import { PlanPersonFilter, planPersonFilterOptions } from "./PlanPersonFilter";
+import { PlanEmptyDayMessage } from "./PlanEmptyDayMessage";
 import { pluralRu, relativeLabel } from "@/lib/date/dateKey";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { QuickAddChildModal } from "@/components/children/QuickAddChildModal";
@@ -1166,7 +1167,7 @@ export function PlanMainContent({
           </>
         ) : (
           <>
-            <b className="font-bold text-[var(--mp-tx)]">Свободный день.</b> Можно просто отдохнуть.
+            <PlanEmptyDayMessage />
           </>
         )}
       </div>
