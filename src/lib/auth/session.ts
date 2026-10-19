@@ -1,14 +1,19 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateToken, hashToken } from "./crypto";
-import { SESSION_COOKIE_NAME, getAuthCookieOptions } from "./cookie";
+import { getSessionCookieName, getAuthCookieOptions } from "./cookie";
 import { SESSION_USER_SELECT, type SessionUserRecord } from "./safeUser";
 import { isSessionEligibleAccount, isSessionEligibleStatus } from "./accountEligibility";
 
 export type SessionUser = SessionUserRecord;
 
 const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+async function sessionRequestHost(): Promise<string | undefined> {
+  const requestHeaders = await headers();
+  return requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? undefined;
+}
 
 async function invalidateSessionById(sessionId: string): Promise<void> {
   // Idempotent under concurrent validations of the same now-ineligible session.
@@ -59,7 +64,7 @@ export async function createSession(userId: string): Promise<string> {
 export function setSessionCookie(res: NextResponse, token: string, requestHostname?: string): void {
   const cookieOptions = getAuthCookieOptions(requestHostname);
   
-  res.cookies.set(SESSION_COOKIE_NAME, token, {
+  res.cookies.set(getSessionCookieName(requestHostname), token, {
     ...cookieOptions,
     maxAge: SESSION_DURATION / 1000, // Convert to seconds
   });
@@ -75,7 +80,7 @@ export async function setSessionCookieAction(token: string, requestHostname?: st
   const cookieStore = await cookies();
   const cookieOptions = getAuthCookieOptions(requestHostname);
   
-  cookieStore.set(SESSION_COOKIE_NAME, token, {
+  cookieStore.set(getSessionCookieName(requestHostname ?? await sessionRequestHost()), token, {
     ...cookieOptions,
     maxAge: SESSION_DURATION / 1000, // Convert to seconds
   });
@@ -86,7 +91,7 @@ export async function setSessionCookieAction(token: string, requestHostname?: st
  */
 export async function getSessionToken(): Promise<string | null> {
   const cookieStore = await cookies();
-  const cookie = cookieStore.get(SESSION_COOKIE_NAME);
+  const cookie = cookieStore.get(getSessionCookieName(await sessionRequestHost()));
   return cookie?.value || null;
 }
 
@@ -100,7 +105,7 @@ export async function getSessionToken(): Promise<string | null> {
 export function deleteSessionCookie(res: NextResponse, requestHostname?: string): void {
   const cookieOptions = getAuthCookieOptions(requestHostname);
   
-  res.cookies.set(SESSION_COOKIE_NAME, "", {
+  res.cookies.set(getSessionCookieName(requestHostname), "", {
     ...cookieOptions,
     maxAge: 0,
   });
@@ -116,7 +121,7 @@ export async function deleteSessionCookieAction(requestHostname?: string): Promi
   const cookieOptions = getAuthCookieOptions(requestHostname);
   
   // Set cookie with maxAge: 0 to delete it
-  cookieStore.set(SESSION_COOKIE_NAME, "", {
+  cookieStore.set(getSessionCookieName(requestHostname ?? await sessionRequestHost()), "", {
     ...cookieOptions,
     maxAge: 0,
   });

@@ -10,6 +10,7 @@
 import assert from "node:assert/strict";
 import {
   getAuthCookieDomain,
+  getSessionCookieName,
   isSecureCookie,
   getAuthCookieOptions,
 } from "./cookie";
@@ -59,6 +60,11 @@ function withEnv(overrides: Partial<Record<(typeof ENV_KEYS)[number], string | u
 
 function main() {
   console.log("Starting cookie env-policy tests...");
+
+  assert.equal(getSessionCookieName("dev.mamago.by"), "mg_dev_session");
+  assert.equal(getSessionCookieName("business.dev.mamago.by:443"), "mg_dev_session");
+  assert.equal(getSessionCookieName("mamago.by"), "mg_session");
+  assert.equal(getSessionCookieName("admin.mamago.by"), "mg_session");
 
   // 1. NODE_ENV=production + APP_ENV=local: no Domain, Secure=false for HTTP.
   withEnv({ NODE_ENV: "production", APP_ENV: "local" }, () => {

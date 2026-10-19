@@ -6,6 +6,20 @@
 import { isDevLocalHost } from "@/lib/routing/surface";
 
 export const SESSION_COOKIE_NAME = "mg_session";
+export const DEV_SESSION_COOKIE_NAME = "mg_dev_session";
+
+/**
+ * DEV and PROD must never compete for the same cookie name: a production
+ * Domain=.mamago.by cookie is also sent to dev.mamago.by and can shadow
+ * its host-only session cookie during /api/auth/me verification.
+ */
+export function getSessionCookieName(requestHostname?: string): string {
+  const hostname = requestHostname?.split(":")[0]?.toLowerCase() ?? "";
+  return hostname === "dev.mamago.by" || hostname.endsWith(".dev.mamago.by")
+    ? DEV_SESSION_COOKIE_NAME
+    : SESSION_COOKIE_NAME;
+}
+
 
 function readTrimmedEnv(name: string): string | undefined {
   const value = process.env[name]?.trim();
