@@ -208,6 +208,34 @@ export function useAuthCredentialsFlow({
           );
           return;
         }
+        // A successful credentials response is not sufficient if the session
+        // cookie was rejected or shadowed by another cookie on a subdomain.
+        // Verify the same browser can read its session before navigating.
+        const sessionResponse = await fetch("/api/auth/me", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        const sessionData: unknown = sessionResponse.ok
+          ? await sessionResponse.json().catch(() => null)
+          : null;
+        const sessionUserId =
+          sessionData && typeof sessionData === "object" && "id" in sessionData
+          && typeof sessionData.id === "string"
+            ? sessionData.id
+            : null;
+        const loggedInUserId =
+          data.user && typeof data.user.id === "string" ? data.user.id : null;
+
+        if (!sessionResponse.ok || !sessionUserId || !loggedInUserId || sessionUserId !== loggedInUserId) {
+          const currentHost = typeof window !== "undefined" ? window.location.host : "";
+          const domainHint = currentHost === "dev.mamago.by"
+            ? "Попробуйте открыть dev.mamago.by в приватном окне."
+            : "Попробуйте открыть этот сайт в приватном окне.";
+          setError(
+            `Вход подтверждён, но сессия не совпала с вашим аккаунтом. ${domainHint} Если проблема повторится — сообщите нам.`,
+          );
+          return;
+        }
         saveAuthActionToPostAuthContext(parseAuthAction(data.authAction, "login"));
         const raw =
           typeof data.redirectTo === "string" && data.redirectTo.length > 0
