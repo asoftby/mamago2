@@ -8,7 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 
 /** Shared visual fallback for places without a saved logo.
- * Match normalized category labels, never place titles or user-entered descriptions.
+ * Prefer category, then recognize explicit place-type words in the title when metadata is missing.
  */
 const CATEGORIES = [
   { terms: ["парк", "лес", "сквер", "природ"], icon: Trees, bg: "#E9F4E9", fg: "#43865A" },
@@ -31,12 +31,21 @@ const CATEGORIES = [
 export function PlaceCategoryIcon({
   category,
   className,
+  title,
 }: {
   category?: string | null;
+  title?: string | null;
   className?: string;
 }) {
   const normalized = category?.toLocaleLowerCase("ru-RU").trim() ?? "";
-  const match = CATEGORIES.find(({ terms }) => terms.some((term) => normalized.includes(term)));
+  const categoryMatch = normalized && normalized !== "other"
+    ? CATEGORIES.find(({ terms }) => terms.some((term) => normalized.includes(term)))
+    : undefined;
+  // Only explicit type words at word boundaries; do not guess from arbitrary names.
+  const titleText = title?.toLocaleLowerCase("ru-RU") ?? "";
+  const inferred = !categoryMatch ? CATEGORIES.find(({ terms }) =>
+    terms.some((term) => new RegExp(`(^|[^а-яёa-z])${term}`, "iu").test(titleText))) : undefined;
+  const match = categoryMatch || inferred;
   const Icon = match?.icon ?? MapPin;
   return (
     <span
