@@ -21,6 +21,7 @@ import { PastPlanArchive } from "./PastPlanArchive";
 import type { PastPlanEntry } from "@/server/services/experience/pastPlanEntries.service";
 import { ManualPlanEntryDialog } from "./ManualPlanEntryDialog";
 import { PlanNewTaskDialog } from "./PlanNewTaskDialog";
+import { PlanStickyCounter } from "@/features/my-plan/components/PlanStickyCounter";
 import { addDays, monthName, startOfWeek, todayKey } from "@/lib/date/dateKey";
 import {
   shouldFetchCalendarWeek,
@@ -698,6 +699,10 @@ export function PlanPageClient({
           setOverviewOpen(false);
         }}
       />
+
+      {/* Та же стеклянная кнопка «Что нужно сделать?», что и в виджете «Мой план». Не показываем под открытым диалогом. */}
+      <div aria-hidden className="h-28" />
+      {!newTaskOpen && !manualDialogOpen ? <PlanStickyCounter floating onAdd={openCreate} /> : null}
 
       <PlanNewTaskDialog
         open={newTaskOpen}
