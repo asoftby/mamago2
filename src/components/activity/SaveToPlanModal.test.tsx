@@ -126,9 +126,23 @@ const activityScenario: SaveScenario = {
 {
   const html = render({ scenario: activityScenario, isIdea: true, inPlan: false });
   assert.ok(html.includes("В какой"), "saved events use the shared date picker");
-  assert.ok(html.includes("Уже в идеях"), "saved state appears in the shared picker");
+  assert.ok(html.includes("уже в идеях"), "saved state appears in the shared header");
   assert.ok(html.includes("Убрать из идей"), "saved state can still be removed");
   assert.ok(!html.includes("Готовы"), "old separate upsell screen is not rendered");
+}
+
+// Saved collection action follows the same full-width card pattern as the
+// unsaved "Сохранить в идеи" action; remove remains a quiet text button.
+{
+  const html = render({
+    scenario: activityScenario,
+    isIdea: true,
+    collectionTarget: { activityId: "test-activity" },
+  });
+  assert.ok(html.includes("В коллекцию"), "collection action is available");
+  assert.ok(html.includes("Выбрать или изменить коллекцию"), "collection card has subtitle");
+  assert.ok(html.includes("Убрать из идей"), "removal remains available");
+  assert.ok(!html.includes("rounded-full bg-surface-muted px-3 py-2"), "old chips are absent");
 }
 
 // Review regressions: lone start date must not generate arbitrary alternatives.
