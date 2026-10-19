@@ -111,6 +111,32 @@ void (async () => {
   }
 
   {
+    // Произвольные сроки: 5 минут, 1 час 30 минут и 24 часа.
+    const now = new Date("2026-08-27T12:00:00.000Z");
+    const sends: string[] = [];
+    const result = await runPlanEventRemindersCore(
+      { now },
+      {
+        listPlanItemsDueForReminderFn: async ({ windowEnd }) => {
+          assert.equal(windowEnd.toISOString(), "2026-08-28T12:10:00.000Z");
+          return [
+            { ...candidate("five", new Date("2026-08-27T12:05:00.000Z")), reminderLeadMinutes: 5 },
+            { ...candidate("ninety", new Date("2026-08-27T13:30:00.000Z")), reminderLeadMinutes: 90 },
+            { ...candidate("day", new Date("2026-08-28T12:00:00.000Z")), reminderLeadMinutes: 1440 },
+          ];
+        },
+        getReminderSettingsForUsersFn: async () => new Map(),
+        sendNotificationFn: async (input) => {
+          sends.push(input.userId);
+          return sentResult;
+        },
+      },
+    );
+    assert.deepEqual(sends, ["five", "ninety", "day"]);
+    assert.deepEqual(result.results.map((row) => row.offsetMinutes), [5, 90, 1440]);
+  }
+
+  {
     // Дело назначено одному взрослому: копии для остальных членов семьи не уведомляем.
     const now = new Date("2026-08-27T12:00:00.000Z");
     const sends: string[] = [];

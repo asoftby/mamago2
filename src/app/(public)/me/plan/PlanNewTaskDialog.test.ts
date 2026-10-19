@@ -17,6 +17,7 @@ assert.match(page, /<PlanNewTaskDialog[\s\S]*?onSaved=\{\(date\) => \{[\s\S]*?se
 assert.match(page, /const openEdit = \(item: SerializedPlanItem\) => \{[\s\S]*?setManualDialogOpen\(true\)/);
 assert.match(page, /<ManualPlanEntryDialog/);
 assert.equal((day.match(/\+ Добавить/g) ?? []).length, 0, "day header no longer duplicates the fixed add CTA");
-assert.match(page, /<PlanStickyCounter compact onAdd=\{openCreate\}/, "page reuses the modal add bar");
+assert.match(page, /<PlanStickyCounter floating onAdd=\{openCreate\}/, "page reuses the floating task action");
+assert.equal((page.match(/<PlanStickyCounter /g) ?? []).length, 1, "only one sticky add task bar");
 assert.match(day, /Куда пойти →/);
 console.log("Plan full-page create dialog and empty-state CTA: OK");
