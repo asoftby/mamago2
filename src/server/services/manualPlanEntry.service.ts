@@ -22,6 +22,7 @@ const TAG_MAX = 32;
 const TAG_COUNT_MAX = 12;
 /** Допустимые значения «за сколько напомнить» (укладываются в окно джоба напоминаний, 180 мин). */
 export const REMINDER_LEAD_MINUTES_OPTIONS = [15, 60, 120] as const;
+export const MAX_CUSTOM_REMINDER_LEAD_MINUTES = 24 * 60;
 export const FAMILY_CALENDAR_MAX_RANGE_DAYS = 42;
 
 export class ManualPlanEntryError extends Error {
@@ -275,7 +276,7 @@ function normalizeChildId(value: unknown): string | null {
 
 function normalizeReminderLeadMinutes(value: unknown): number | null {
   if (value == null) return null;
-  if (typeof value !== "number" || !(REMINDER_LEAD_MINUTES_OPTIONS as readonly number[]).includes(value)) {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > MAX_CUSTOM_REMINDER_LEAD_MINUTES) {
     throw new ManualPlanEntryError("INVALID_INPUT", "invalid_reminder_lead");
   }
   return value;
