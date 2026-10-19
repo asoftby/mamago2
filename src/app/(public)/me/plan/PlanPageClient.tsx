@@ -8,6 +8,7 @@ import type { PlanBookingState } from "@/server/family/planBookingPure";
 import { Container } from "@/components/ui/Container";
 import { PlanCalendar, invalidatePlanDayMarkers } from "@/features/plan-calendar";
 import { PlanPersonFilter, planPersonFilterOptions } from "@/features/my-plan/components/PlanPersonFilter";
+import { filterPlanEntriesByPerson } from "@/features/my-plan/lib/filterPlanEntriesByPerson";
 import { PlanDayList } from "./PlanDayList";
 import { PlanOverviewDialog } from "./PlanOverviewDialog";
 import { PlanProfileCompletionGate } from "./PlanProfileCompletionGate";
@@ -54,6 +55,7 @@ export type SerializedPlanItem = {
   activityId: string | null;
   title: string | null;
   childId: string | null;
+  assigneeUserId?: string | null;
   childName: string | null;
   locationText: string | null;
   notes: string | null;
@@ -102,6 +104,7 @@ type Props = {
   initialItems: SerializedPlanItem[];
   /** Non-null only for a family with 2+ active adults (flag FAMILY_CORE_READS on). */
   familyView?: FamilyView | null;
+  currentUserId: string;
   initialSelectedDate: string;
   initialRange: { from: string; to: string };
   familyChildren: Array<{ id: string; name: string }>;
@@ -293,6 +296,7 @@ function IdeasSidebar({ ideas }: { ideas: SerializedIdea[] }) {
 export function PlanPageClient({
   initialItems,
   familyView = null,
+  currentUserId,
   initialSelectedDate,
   initialRange,
   familyChildren,
@@ -413,11 +417,14 @@ export function PlanPageClient({
     }, {});
   }, [visibleItems]);
 
-  const dayItems = calendarFilter === "family" && familyView
-    ? filterFamilyCalendarItems(itemsByDate[selectedDate] ?? [], calendarFilter).filter(
-        (item) => item.authorId === familyView.currentUserId,
-      )
-    : filterFamilyCalendarItems(itemsByDate[selectedDate] ?? [], calendarFilter);
+  const dayItems = filterPlanEntriesByPerson(
+    itemsByDate[selectedDate] ?? [],
+    calendarFilter === "all"
+      ? { kind: "all" }
+      : calendarFilter === "family"
+        ? { kind: "adult", id: currentUserId }
+        : { kind: "child", id: calendarFilter.slice("child:".length) },
+  );
   const conflictIds = useMemo(() => findFamilyCalendarConflictIds(dayItems), [dayItems]);
   const todayISO = todayKey();
   const selectedWeekStart = startOfWeek(selectedDate);

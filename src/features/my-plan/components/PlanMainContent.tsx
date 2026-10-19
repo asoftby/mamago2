@@ -19,6 +19,7 @@ import { LiquidNotification } from "@/components/ui/liquid-notification";
 import { PlanCalendar } from "@/features/plan-calendar";
 import { PlanPersonFilter, planPersonFilterOptions } from "./PlanPersonFilter";
 import { PlanEmptyDayMessage } from "./PlanEmptyDayMessage";
+import { filterPlanEntriesByPerson } from "../lib/filterPlanEntriesByPerson";
 import { pluralRu, relativeLabel } from "@/lib/date/dateKey";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { QuickAddChildModal } from "@/components/children/QuickAddChildModal";
@@ -940,9 +941,7 @@ export function PlanMainContent({
     if (personFilter === "all") return dayItemsSorted;
     const person = personas.find((persona) => persona.id === personFilter);
     if (!person) return dayItemsSorted;
-    return dayItemsSorted.filter((item) =>
-      person.kind === "child" ? item.childId === person.id : item.assigneeUserId === person.id,
-    );
+    return filterPlanEntriesByPerson(dayItemsSorted, { kind: person.kind, id: person.id });
   }, [dayItemsSorted, personFilter, personas]);
 
   const totalPlannedCount = useMemo(() => {
