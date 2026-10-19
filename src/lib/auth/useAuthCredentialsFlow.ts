@@ -208,6 +208,19 @@ export function useAuthCredentialsFlow({
           );
           return;
         }
+        // A successful credentials response is not sufficient if the session
+        // cookie was rejected or shadowed by another cookie on a subdomain.
+        // Verify the same browser can read its session before navigating.
+        const sessionResponse = await fetch("/api/auth/me", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (!sessionResponse.ok) {
+          setError(
+            "Вход подтверждён, но сессия не сохранилась. Попробуйте открыть dev.mamago.by в приватном окне. Если проблема повторится — сообщите нам.",
+          );
+          return;
+        }
         saveAuthActionToPostAuthContext(parseAuthAction(data.authAction, "login"));
         const raw =
           typeof data.redirectTo === "string" && data.redirectTo.length > 0
