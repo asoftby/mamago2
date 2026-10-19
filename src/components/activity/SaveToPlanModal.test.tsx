@@ -36,18 +36,18 @@ const articleScenario: SaveScenario = {
   // Required copy present (rendered lowercase in source; uppercase is a pure
   // CSS text-transform, same convention as the pre-existing "сохранить
   // активность" eyebrow — see IdeaOnlyView).
-  assert.ok(html.includes("сохранить статью"), "eyebrow: СОХРАНИТЬ СТАТЬЮ");
+  assert.ok(html.includes("сохранить публикацию"), "shared publication save header");
   // "на потом" is a nested <span> (editorial serif italic accent) inside the
   // heading, so match the two parts rather than one exact phrase.
-  assert.ok(html.includes("Оставь"), "heading base present");
-  assert.ok(html.includes("на потом"), "heading italic accent present");
+  assert.ok(html.includes("Сохранить"), "shared heading base present");
+  assert.ok(html.includes("в идеи"), "shared heading accent present");
   assert.ok(
     html.includes("Детская зона MamaGo на фестивале огня Феникс"),
     "article title present",
   );
-  assert.ok(html.includes("Добавить в идеи"), "single action: add to ideas");
+  assert.ok(html.includes("Сохранить в идеи"), "single action: save to ideas");
   assert.ok(
-    html.includes("Вернуться к этой статье позже"),
+    html.includes("Вернуться к публикации позже"),
     "ideas action subtitle: article-specific, no 'без конкретного дня'",
   );
 
@@ -59,19 +59,19 @@ const articleScenario: SaveScenario = {
   assert.ok(!html.includes("напомнить"), "no date-slider heading");
   assert.ok(!html.includes("Куда сохранить"), "no editorial date-choice heading");
   // Activity's default IdeasRow copy must not leak into the Article view.
-  assert.ok(!html.includes("Сохранить в идеи"), "Activity's idea CTA copy not reused for Article");
+  assert.ok(!html.includes("или без даты"), "article still has no date selection");
 }
 
 // ── Article: already saved as idea ──────────────────────────────────────────
 {
   const html = render({ scenario: articleScenario, isIdea: true, inPlan: false });
 
-  assert.ok(html.includes("Сохранено в идеях"), "saved-as-idea confirmation shown");
+  assert.ok(html.includes("уже в идеях"), "saved-as-idea state shown in shared header");
   assert.ok(
     html.includes("Детская зона MamaGo на фестивале огня Феникс"),
     "article title present in saved state",
   );
-  assert.ok(html.includes("Все мои идеи"), "link to ideas list present");
+  assert.ok(html.includes("В коллекцию"), "collection selection remains available");
 
   // No upsell to plan a date, and no date UI at all, even if legacy
   // inPlan/planDate state existed.
@@ -90,7 +90,7 @@ const articleScenario: SaveScenario = {
   });
   assert.ok(!html.includes("Показать все"), "no date UI even with legacy inPlan state");
   assert.ok(!html.includes("В план"), "no plan-management view for articles");
-  assert.ok(html.includes("Добавить в идеи"), "still offers idea save");
+  assert.ok(html.includes("Сохранить в идеи"), "still offers idea save");
 }
 
 // ── Activity/Event regression: date UI must be unaffected ──────────────────

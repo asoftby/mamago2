@@ -6,7 +6,7 @@ function idea(id: string, past: boolean, createdAt: string): IdeaItem {
   return {
     id, ideaType: "ACTIVITY", createdAt, isPlanned: false, planStatus: "NONE",
     activity: { id, title: id, type: "EVENT", temporalState: past ? "PAST" : "UPCOMING" },
-  } as IdeaItem;
+  } as unknown as IdeaItem;
 }
 const original = [
   idea("oldPast", true, "2026-10-17"),
