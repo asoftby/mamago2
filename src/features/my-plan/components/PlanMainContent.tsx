@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { RecommendationCard } from "./RecommendationCard";
 import { PlanItemRow } from "./PlanItemRow";
 import type { PlanItemWithActivity } from "../types/event";
 import type { PlanSlotType } from "../hooks/useMyPlan";
@@ -19,16 +18,11 @@ import { toast } from "@/lib/toast";
 import { LiquidNotification } from "@/components/ui/liquid-notification";
 import { PlanCalendar } from "@/features/plan-calendar";
 import { pluralRu, relativeLabel } from "@/lib/date/dateKey";
-import { UpcomingPlanBlock } from "./UpcomingPlanBlock";
-import { selectUpcomingPlanItems } from "../lib/upcomingPlanItems";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { QuickAddChildModal } from "@/components/children/QuickAddChildModal";
 import { AddPersonaTypeModal } from "./AddPersonaTypeModal";
 import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
-import { RecommendationDecisionBlock } from "./RecommendationDecisionBlock";
-import { PlanSuggestionAudiencePicker } from "./PlanSuggestionAudiencePicker";
-import { PlanRecommendationCta } from "./PlanRecommendationCta";
 import { PlanStickyCounter } from "./PlanStickyCounter";
 import { PlanNewTaskScreen } from "./v3/PlanNewTaskScreen";
 import { PlanVisitsScreen } from "./v3/PlanVisitsScreen";
@@ -36,7 +30,9 @@ import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
 import { PlanDayBar } from "./v3/PlanDayBar";
 import { PlanMoveSheet, canMovePlanItem } from "./v3/PlanMoveSheet";
 import { fetchPlanExperienceFeed, type PlanExperienceFeed } from "./v3/planExperienceApi";
-import { History, ListChecks } from "lucide-react";
+import { History, Plus } from "lucide-react";
+import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { MediaCover } from "@/components/ui/media-cover";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
@@ -44,11 +40,9 @@ import { resolveScenarioCtaState, resolveScenarioCtaLabel } from "../lib/canOpen
 import { sortPlanItemsForDay } from "../lib/sortPlanItemsForDay";
 import { useResolveDefaultParticipants } from "../lib/useResolveDefaultParticipants";
 import { writeLastPlanAgeRanges } from "../lib/lastPlanAgeRangesStorage";
-import { writeLastPlanParticipants } from "../lib/lastPlanParticipantsStorage";
 import {
   fetchPlanSuggestions,
   createPlanSuggestionAudienceSnapshot,
-  mapSuggestionToPlanItem,
   type PlanSuggestionAudienceSnapshot,
   type PlanSuggestionItem,
 } from "../lib/fetchPlanSuggestions";
@@ -410,6 +404,8 @@ export function PlanMainContent({
   /** Вложенные экраны модалки: «Новое дело» и «Где мы уже были» заменяют план, а не открываются поверх. */
   const [screen, setScreen] = useState<"plan" | "new" | "visits">("plan");
   const [movingItem, setMovingItem] = useState<PlanItemWithActivity | null>(null);
+  /** Фильтр дня по человеку: «Все» либо id персоны (ребёнок — childId, взрослый — assigneeUserId). */
+  const [personFilter, setPersonFilter] = useState<string>("all");
   const [experienceFeed, setExperienceFeed] = useState<PlanExperienceFeed | null>(null);
   const reloadExperienceFeed = useCallback(async () => {
     setExperienceFeed(await fetchPlanExperienceFeed());
@@ -521,11 +517,6 @@ export function PlanMainContent({
     ),
     [defaultParticipants, planAudienceOverride],
   );
-  const changePlanAudience = useCallback((ids: string[]) => {
-    setPlanAudienceOverride(ids);
-    writeLastPlanParticipants(ids);
-    setAwaitingAgeAnswer(false);
-  }, []);
 
   /**
    * Полный список выбранных персон (взрослые + дети) из FamilyPersonaContext
@@ -663,14 +654,6 @@ export function PlanMainContent({
     }, 0);
   }, [buildFindAndAddHref, onRequestClose, router]);
 
-  /** M3.5: тап по sticky-счётчику «В плане: N» — на страницу плана целиком, не в саму модалку. */
-  const handleOpenPlanPage = useCallback(() => {
-    onRequestClose?.();
-    window.setTimeout(() => {
-      router.push(`/me/plan?date=${selectedDate}`);
-    }, 0);
-  }, [onRequestClose, router, selectedDate]);
-
   /** «Собрать сценарий дня» — переход на отдельную страницу, а не модалка поверх модалки. */
   const handleOpenScenarioPage = useCallback(() => {
     onRequestClose?.();
@@ -700,18 +683,6 @@ export function PlanMainContent({
       return changed ? next : current;
     });
   }, [planItemsByDate]);
-  const upcomingSelection = useMemo(
-    () => selectUpcomingPlanItems({
-      selectedDate,
-      todayIso: todayIso ?? new Date().toISOString().split("T")[0]!,
-      selectedDateItems: dayItems,
-      nearestDate: nearestPlanDate,
-      nearestCount: nearestPlanCount,
-      nearestItems: nearestPlanItems,
-    }),
-    [dayItems, nearestPlanCount, nearestPlanDate, nearestPlanItems, selectedDate, todayIso],
-  );
-
   const slotFromStartsAt = useCallback(
     (
       startsAt: Date | string | null | undefined,
@@ -963,6 +934,15 @@ export function PlanMainContent({
     [dayItems],
   );
 
+  const visibleDayItems = useMemo(() => {
+    if (personFilter === "all") return dayItemsSorted;
+    const person = personas.find((persona) => persona.id === personFilter);
+    if (!person) return dayItemsSorted;
+    return dayItemsSorted.filter((item) =>
+      person.kind === "child" ? item.childId === person.id : item.assigneeUserId === person.id,
+    );
+  }, [dayItemsSorted, personFilter, personas]);
+
   const totalPlannedCount = useMemo(() => {
     const existingActivityIds = new Set(
       dayItems.map((item) => item.activityId).filter((value): value is string => Boolean(value)),
@@ -1026,14 +1006,6 @@ export function PlanMainContent({
     );
   }, [recommendationDraftKeyValue, selectedDate, suggestions, suggestionsGeneration, addedSuggestionActivityIds]);
 
-  const recommendationAudienceLabel = useMemo(() => {
-    const labels = buildParticipantSummaryLabels(planAudienceIds, personas);
-    if (labels.length > 0) return labels.join(" · ");
-    if (defaultParticipants.source === "last-used-age-ranges" && planAudienceOverride === null) {
-      return "По возрасту детей";
-    }
-    return "Свободный поиск";
-  }, [planAudienceIds, personas, defaultParticipants, planAudienceOverride]);
 
   /** Только уже спланированные события — у них есть реальный startsAt, есть смысл группировать по слотам. */
   const dayPartSections = useMemo(() => {
@@ -1043,7 +1015,7 @@ export function PlanMainContent({
       evening: [],
     };
 
-    for (const item of dayItemsSorted) {
+    for (const item of visibleDayItems) {
       const slot = slotFromStartsAt(item.startsAt) ?? "afternoon";
       sections[slot].push(item);
     }
@@ -1055,19 +1027,9 @@ export function PlanMainContent({
         items: sections[slot],
       }))
       .filter((section) => section.items.length > 0);
-  }, [dayItemsSorted, slotFromStartsAt]);
+  }, [visibleDayItems, slotFromStartsAt]);
 
   const hasRequestedSuggestions = suggestionsGeneration > 0 || isFetchingSuggestions;
-  const showRecommendationResults = dayPartSections.length > 0 || hasRequestedSuggestions;
-  /** Пул закончился раньше лимита подборок (включая «пусто уже с первой попытки»). */
-  const suggestionsExhausted = suggestionsGeneration > 0 && !isFetchingSuggestions && suggestions.length === 0;
-  /**
-   * «Реши за меня / Сама решу» показывается только пока на выбранный день
-   * ничего не запланировано и подборка ещё не запрошена — а не «раз за
-   * сессию», как раньше. Так фор больше не всплывает поверх уже заполненного
-   * дня и не пропадает навсегда для дня, который снова опустел.
-   */
-  const showDecisionFork = dayPartSections.length === 0 && !hasRequestedSuggestions;
   // One calendar for both layouts: strip vs week row is chosen by container width.
   const planCalendar = onChangeDate ? (
     <div
@@ -1079,17 +1041,55 @@ export function PlanMainContent({
       <PlanCalendar value={selectedDate} onChange={onChangeDate} variant="widget" />
     </div>
   ) : null;
-  const dayContextLabel = relativeLabel(selectedDate, todayKey);
-
   const isPastDay = selectedDate < todayKey;
+  const isTodaySelected = selectedDate === todayKey;
+  const filterPerson = personFilter === "all" ? null : personas.find((persona) => persona.id === personFilter) ?? null;
+  const personShortName = (persona: { kind: string; displayName?: string | null }) =>
+    persona.displayName?.trim() || (persona.kind === "adult" ? "Я" : "");
+  const dayContextLabel = (() => {
+    const base = relativeLabel(selectedDate, todayKey);
+    const needsWeekday = ["Сегодня", "Завтра", "Вчера"].includes(base);
+    const weekday = new Date(`${selectedDate}T12:00:00`).toLocaleDateString("ru-RU", { weekday: "long" });
+    const label = needsWeekday ? `${base}, ${weekday}` : base;
+    return filterPerson ? `${label} · ${filterPerson.kind === "adult" ? "мои дела" : personShortName(filterPerson)}` : label;
+  })();
+
+  const filterChipClass = (on: boolean) =>
+    "inline-flex h-11 shrink-0 items-center gap-[7px] rounded-full border px-[15px] text-[14.5px] font-semibold transition-colors " +
+    (on
+      ? "border-[var(--mp-tx)] bg-[var(--mp-tx)] text-white"
+      : "border-[var(--mp-line)] bg-[var(--mp-card)] text-[var(--mp-tx)] hover:border-[var(--mp-line-strong)]");
+
+  /** Фильтр дня по человеку — только когда в семье больше одного участника. */
+  const renderPersonFilter = (compact: boolean) =>
+    personas.length < 2 ? null : (
+      <div role="group" aria-label="Чьи дела показать" className={(compact ? "-mx-5 px-5" : "-mx-8 px-8") + " flex gap-1.5 overflow-x-auto [scrollbar-width:none]"}>
+        <button type="button" aria-pressed={personFilter === "all"} className={filterChipClass(personFilter === "all")} onClick={() => setPersonFilter("all")}>
+          Все
+        </button>
+        {personas.map((persona) => {
+          const on = personFilter === persona.id;
+          return (
+            <button
+              key={persona.id}
+              type="button"
+              aria-pressed={on}
+              className={filterChipClass(on)}
+              onClick={() => setPersonFilter(on ? "all" : persona.id)}
+            >
+              {personShortName(persona)}
+            </button>
+          );
+        })}
+      </div>
+    );
 
   const renderDayPlanSection = (compact: boolean) => {
     const rows = dayPartSections.flatMap((section) => section.items);
     const timedRows = rows.filter((item) => item.startsAt);
     const untimedRows = rows.filter((item) => !item.startsAt);
-    const isToday = selectedDate === todayKey;
     const nowMs = Date.now();
-    const nowIndex = isToday
+    const nowIndex = isTodaySelected
       ? timedRows.findIndex((item) => new Date(item.startsAt!).getTime() > nowMs)
       : -2;
     const nowLabel = new Date(nowMs).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -1117,18 +1117,7 @@ export function PlanMainContent({
     );
     return (
       <section aria-label="В вашем плане">
-        <p
-          style={{
-            margin: compact ? "0 0 12px" : "0 0 10px",
-            fontSize: 13,
-            fontWeight: 600,
-            color: "var(--mp-tx2)",
-          }}
-        >
-          <span style={{ color: "var(--mp-tx)", fontWeight: 700 }}>{dayContextLabel}</span>
-          {" · "}
-          {totalPlannedCount} {pluralRu(totalPlannedCount, ["запись", "записи", "записей"])}
-        </p>
+        <p className={(compact ? "mb-3" : "mb-2.5") + " text-[13px] font-bold text-[var(--mp-tx2)]"}>{dayContextLabel}</p>
         <div className="space-y-2">
           {timedRows.map((item, index) => (
             <div key={item.id} className="space-y-2">
@@ -1148,17 +1137,6 @@ export function PlanMainContent({
     );
   };
 
-  const renderAllPlanLink = () => (
-    <button
-      type="button"
-      onClick={handleOpenPlanPage}
-      className="flex h-12 w-full items-center justify-center gap-[7px] rounded-2xl border border-[var(--mp-line-strong)] bg-transparent text-[15px] font-bold text-[var(--mp-tx)] transition-colors hover:bg-[var(--mp-soft)]"
-    >
-      <ListChecks className="h-[17px] w-[17px]" aria-hidden />
-      {totalPlannedCount > 0 ? `Весь план · ${totalPlannedCount}` : "Весь план"}
-    </button>
-  );
-
   /** Past days: records only — no recommendations, decision fork or scenario CTA. */
   const renderPastDay = (compact: boolean) =>
     isPendingDateHydration ? null : (
@@ -1173,86 +1151,134 @@ export function PlanMainContent({
             В этот день записей не было
           </p>
         )}
-        {totalPlannedCount > 0 ? renderAllPlanLink() : null}
       </div>
     );
 
-  const renderRecommendationArea = (compact: boolean) => {
+  /** Список дня: записи по времени либо спокойный пустой день. */
+  const renderDayList = (compact: boolean) => {
     if (isPendingDateHydration) {
       return (
         <div className="animate-pulse rounded-[18px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-4">
-          <div className="h-4 w-44 rounded bg-neutral-200" />
-          <div className="mt-3 h-3 w-52 rounded bg-neutral-100" />
-          <div className="mt-4 h-24 rounded-[22px] bg-neutral-100/80" />
+          <div className="h-4 w-44 rounded bg-[var(--surface-hover)]" />
+          <div className="mt-3 h-3 w-52 rounded bg-[var(--surface-hover)]" />
         </div>
       );
     }
-
-    if (!showRecommendationResults) {
-      return null;
-    }
-
+    if (dayPartSections.length > 0) return renderDayPlanSection(compact);
     return (
-      <div
+      <div role="status" className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-[15.5px] leading-[1.5] text-[var(--mp-tx2)]">
+        {filterPerson ? (
+          <>
+            <b className="font-bold text-[var(--mp-tx)]">
+              У {filterPerson.kind === "adult" ? "вас" : toGenitiveName(personShortName(filterPerson))} в этот день свободно.
+            </b>{" "}
+            <button type="button" onClick={() => setPersonFilter("all")} className="font-bold text-[var(--mp-ac-dark)] underline underline-offset-[3px]">
+              Показать всех
+            </button>
+          </>
+        ) : (
+          <>
+            <b className="font-bold text-[var(--mp-tx)]">Свободный день.</b> Можно просто отдохнуть.
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const ideaMeta = (activity: PlanSuggestionItem) => {
+    const text = activity.priceText?.trim();
+    const price = text
+      ? normalizeUiCurrencyText(text)
+      : activity.priceFrom === 0
+        ? "Бесплатно"
+        : activity.priceFrom != null && !Number.isNaN(activity.priceFrom)
+          ? formatPriceFrom(activity.priceFrom)
+          : null;
+    return [activity.ageLabel ?? null, price].filter(Boolean).join(" · ");
+  };
+
+  /** «Идеи на сегодня · от mamaGo»: пунктирный блок отдельно от плана; «+» добавляет в план. */
+  const renderIdeas = () => {
+    if (isPendingDateHydration) return null;
+    if (awaitingAgeAnswer) {
+      return <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} compact />;
+    }
+    const linkClass =
+      "flex min-h-11 w-full items-center justify-center gap-[7px] rounded-xl text-[15px] font-bold text-[var(--mp-ac-dark)] transition-colors hover:text-[var(--mp-ac)] disabled:opacity-60";
+    if (!hasRequestedSuggestions) {
+      return (
+        <button type="button" className={linkClass} onClick={handleDecideClick}>
+          Подобрать, куда сходить
+        </button>
+      );
+    }
+    const exhausted = suggestionsGeneration >= MAX_SUGGESTION_BATCHES;
+    return (
+      <section
         id="plan-recommendation-results"
-        className="space-y-4 outline-none"
+        className="rounded-[20px] border-[1.5px] border-dashed border-[var(--mp-line-strong)] px-3.5 pb-1 pt-3.5 outline-none"
         {...PLAN_RECOMMENDATION_RESULTS_A11Y}
       >
-        {dayPartSections.length > 0 ? renderDayPlanSection(compact) : null}
-
-        {hasRequestedSuggestions && !suggestionsError && !isFetchingSuggestions && suggestions.length > 0 && (
-          <section className="space-y-1 px-1" aria-label="Результаты подбора">
-            <h3 className="text-[20px] font-bold tracking-[-.02em] text-[var(--mp-tx)]">
-              Нашли {suggestions.length} {pluralRu(suggestions.length, ["вариант", "варианта", "вариантов"])}
-            </h3>
-            <p className="text-sm text-[var(--mp-tx2)]">
-              {new Date(selectedDate + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" })} · {recommendationAudienceLabel}
-            </p>
-          </section>
-        )}
-
-        {!hasRequestedSuggestions ? null : isFetchingSuggestions ? (
-          <div className="space-y-3">
+        <div className="mb-1.5 flex items-baseline justify-between">
+          <b className="text-base font-bold text-[var(--mp-tx)]">Идеи на {isTodaySelected ? "сегодня" : "этот день"}</b>
+          <span className="text-[12.5px] font-semibold text-[var(--mp-tx2)]">от mamaGo</span>
+        </div>
+        {isFetchingSuggestions ? (
+          <div className="space-y-2 pb-3 pt-1" aria-busy>
             {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="h-24 animate-pulse rounded-[18px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-4"
-              />
+              <div key={i} className="h-[52px] animate-pulse rounded-xl bg-[var(--surface-hover)]" />
             ))}
           </div>
         ) : suggestionsError ? (
-          <div className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-center">
-            <p className="text-[15px] leading-6 text-[var(--mp-tx2)]">Не получилось загрузить рекомендации</p>
+          <div className="pb-2 pt-1 text-[15px] leading-6 text-[var(--mp-tx2)]">
+            Не получилось загрузить идеи.{" "}
             <button
               type="button"
               onClick={() => void handleFetchSuggestions(lastRequestSnapshotRef.current)}
-              className="mt-2 inline-flex min-h-11 items-center text-[15px] font-bold text-[var(--mp-ac-dark)] underline-offset-2 hover:underline"
+              className="font-bold text-[var(--mp-ac-dark)] underline underline-offset-[3px]"
             >
               Попробовать снова
             </button>
           </div>
         ) : suggestions.length === 0 ? (
-          <div className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px]">
-            <p className="text-[17px] font-bold leading-6 text-[var(--mp-tx)]">
-              На эту дату подходящих событий пока нет
-            </p>
-            <p className="mt-1 text-[14px] leading-6 text-[var(--mp-tx2)]">
-              Искали на {new Date(selectedDate + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" })} · {recommendationAudienceLabel}.
-              Попробуйте изменить участников выше или посмотрите все события в каталоге.
-            </p>
-          </div>
+          <p className="pb-2 pt-1 text-[15px] leading-6 text-[var(--mp-tx2)]">
+            На эту дату подходящих событий пока нет.
+          </p>
         ) : (
-          <section className={compact ? "space-y-3" : "space-y-3"}>
-            {suggestions.map((activity) => (
-              <RecommendationCard
-                key={activity.id}
-                item={mapSuggestionToPlanItem(activity, selectedDate)}
-                onAddToPlan={() => void handleAddSuggestionToPlan(activity)}
-              />
-            ))}
-          </section>
+          suggestions.map((activity, index) => (
+            <div
+              key={activity.id}
+              className={"grid grid-cols-[52px_1fr_44px] items-center gap-3 py-[9px] " + (index === 0 ? "" : "border-t border-[var(--mp-line)]")}
+            >
+              <div className="w-[52px]">
+                <MediaCover imageUrl={activity.coverImageUrl || undefined} alt={activity.title} ratio="1/1" className="rounded-xl shadow-none" />
+              </div>
+              <div className="min-w-0">
+                <div className="line-clamp-2 text-[14.5px] font-bold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">{activity.title}</div>
+                {ideaMeta(activity) ? <div className="mt-0.5 text-[13px] leading-[1.4] text-[var(--mp-tx2)]">{ideaMeta(activity)}</div> : null}
+              </div>
+              <button
+                type="button"
+                aria-label="Добавить в план"
+                disabled={addingActivityId === activity.id}
+                onClick={() => void handleAddSuggestionToPlan(activity)}
+                className="flex h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-[var(--mp-line-strong)] text-[var(--mp-tx)] transition-colors hover:border-[var(--mp-ac)] hover:bg-[var(--mp-ac-soft)] hover:text-[var(--mp-ac-dark)] disabled:opacity-60"
+              >
+                <Plus className="h-[19px] w-[19px]" strokeWidth={2} aria-hidden />
+              </button>
+            </div>
+          ))
         )}
-      </div>
+        {!isFetchingSuggestions ? (
+          <button
+            type="button"
+            className={linkClass}
+            onClick={exhausted ? handleOpenCatalog : handleRegenerate}
+          >
+            {exhausted ? "Открыть каталог" : "Подобрать ещё"}
+          </button>
+        ) : null}
+      </section>
     );
   };
 
@@ -1269,27 +1295,15 @@ export function PlanMainContent({
           }
         />
       ) : null}
-      <div className="space-y-1">
-        <button
-          type="button"
-          onClick={() => setScreen("visits")}
-          className="flex min-h-11 w-full items-center justify-center gap-[7px] rounded-xl text-[15px] font-bold text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)]"
-        >
-          <History className="h-[17px] w-[17px]" aria-hidden />
-          Где мы уже были
-        </button>
-        {renderAllPlanLink()}
-      </div>
+      <button
+        type="button"
+        onClick={() => setScreen("visits")}
+        className="flex min-h-11 w-full items-center justify-center gap-[7px] rounded-xl text-[15px] font-bold text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)]"
+      >
+        <History className="h-[17px] w-[17px]" aria-hidden />
+        Где мы были
+      </button>
     </div>
-  );
-
-  const renderAudiencePicker = () => (
-    <PlanSuggestionAudiencePicker
-      personas={personas}
-      selectedIds={planAudienceIds}
-      onChange={changePlanAudience}
-      disabled={isFetchingSuggestions || family?.loading}
-    />
   );
 
   if (screen === "new") {
@@ -1351,46 +1365,20 @@ export function PlanMainContent({
         >
           {planCalendar}
 
+        {renderPersonFilter(true)}
+
+          {renderPersonFilter(false)}
+
           {selectedDate === todayKey ? <PlanDayBar items={dayItemsSorted} /> : null}
           <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
-
-          {isDesktop && upcomingSelection ? (
-            <UpcomingPlanBlock
-              items={upcomingSelection.items}
-              totalCount={upcomingSelection.count}
-              onNavigate={onRequestClose}
-            />
-          ) : null}
 
           {isPastDay ? (
             renderPastDay(false)
           ) : (
             <>
-              {renderAudiencePicker()}
-
-                  {awaitingAgeAnswer ? (
-                    <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} />
-                  ) : showDecisionFork ? (
-                    <RecommendationDecisionBlock
-                      onDecide={handleDecideClick}
-                      isGenerating={isFetchingSuggestions}
-                    />
-                  ) : null}
-
-                  {renderRecommendationArea(false)}
-
-                  {suggestionsGeneration > 0 ? (
-                    <PlanRecommendationCta
-                      onRegenerate={handleRegenerate}
-                      onCatalog={handleOpenCatalog}
-                      isRegenerating={isFetchingSuggestions}
-                      batchNumber={suggestionsGeneration}
-                      maxBatches={MAX_SUGGESTION_BATCHES}
-                      isExhausted={suggestionsExhausted}
-                    />
-                  ) : null}
-
-                  {renderBottomActions()}
+              {renderDayList(false)}
+              {renderIdeas()}
+              {renderBottomActions()}
             </>
           )}
         </div>
@@ -1449,45 +1437,13 @@ export function PlanMainContent({
         {selectedDate === todayKey ? <PlanDayBar items={dayItemsSorted} /> : null}
         <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
 
-        {isDesktop && upcomingSelection ? (
-          <UpcomingPlanBlock
-            items={upcomingSelection.items}
-            totalCount={upcomingSelection.count}
-            onNavigate={onRequestClose}
-          />
-        ) : null}
-
         {isPastDay ? (
           renderPastDay(true)
         ) : (
           <>
-            {renderAudiencePicker()}
-
-        {awaitingAgeAnswer ? (
-          <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} compact />
-        ) : showDecisionFork ? (
-          <RecommendationDecisionBlock
-            onDecide={handleDecideClick}
-            isGenerating={isFetchingSuggestions}
-            compact
-          />
-        ) : null}
-
-        {renderRecommendationArea(true)}
-
-        {suggestionsGeneration > 0 ? (
-          <PlanRecommendationCta
-            onRegenerate={handleRegenerate}
-            onCatalog={handleOpenCatalog}
-            isRegenerating={isFetchingSuggestions}
-            batchNumber={suggestionsGeneration}
-            maxBatches={MAX_SUGGESTION_BATCHES}
-            isExhausted={suggestionsExhausted}
-            compact
-          />
-        ) : null}
-
-        {renderBottomActions()}
+            {renderDayList(true)}
+            {renderIdeas()}
+            {renderBottomActions()}
           </>
         )}
       </div>
