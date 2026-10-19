@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import type { SerializedPlanItem } from "./PlanPageClient";
 import { PlanItemCard, type VisibilityChange } from "./PlanItemCard";
+import { PlanEmptyDayMessage } from "@/features/my-plan/components/PlanEmptyDayMessage";
 import type { FamilyView } from "@/features/my-plan/lib/planVisibilityView";
 import { dayOfMonth, monthGenitive, weekdayFull } from "@/lib/date/dateKey";
 import { resolveScenarioCtaState, resolveScenarioCtaLabel } from "@/features/my-plan/lib/canOpenDayScenario";
@@ -138,34 +139,8 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
             textAlign: "center",
           }}
         >
-          <h3
-            className="font-sans"
-            style={{
-              margin: 0,
-              fontSize: 32,
-              lineHeight: 1,
-              letterSpacing: "-.02em",
-              color: "#141210",
-            }}
-          >
-            На этот день{" "}
-            <span className="font-display-italic" style={{ color: "var(--primary)" }}>
-              пока пусто
-            </span>
-          </h3>
-          <p
-            style={{
-              marginTop: 10,
-              marginBottom: 24,
-              fontSize: 15,
-              color: "rgba(20,18,16,.55)",
-              lineHeight: 1.5,
-              maxWidth: 420,
-              marginLeft: "auto",
-              marginRight: "auto",
-            }}
-          >
-            Посмотрите, куда можно пойти в этот день.
+          <p className="mb-6 text-[16px] leading-6 text-[#3A332B]">
+            <PlanEmptyDayMessage />
           </p>
           <div style={{ display: "inline-flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
             <Link

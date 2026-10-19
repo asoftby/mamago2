@@ -13,6 +13,6 @@ test("both layouts route past days around recommendations, fork, CTA and scenari
   const guarded = source.match(/\{isPastDay \? \(\n\s+renderPastDay\((true|false)\)/g) ?? [];
   assert.equal(guarded.length, 2);
   // recommendation area / scenario button live only inside the non-past branch
-  const pastFn = source.slice(source.indexOf("const renderPastDay"), source.indexOf("const renderRecommendationArea"));
+  const pastFn = source.slice(source.indexOf("const renderPastDay"), source.indexOf("const renderDayList"));
   assert.doesNotMatch(pastFn, /renderRecommendationArea|renderBottomActions|BuildScenarioButton|RecommendationDecisionBlock/);
 });

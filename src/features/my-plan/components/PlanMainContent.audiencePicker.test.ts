@@ -9,7 +9,9 @@ const service = readFileSync(new URL("../../../server/services/planSuggestions.s
 // resolved default participants as the explicit audience.
 assert.doesNotMatch(content, /renderAudiencePicker|PlanSuggestionAudiencePicker/);
 assert.match(content, /personas\.length < 2 \? null/);
-assert.match(content, /aria-pressed=\{personFilter === "all"\}/);
+assert.match(content, /<PlanPersonFilter/);
+assert.match(content, /value=\{personFilter\}/);
+assert.match(content, /onChange=\{setPersonFilter\}/);
 
 // The request and local draft must use the explicit plan audience, not
 // an implicit global discovery selection.

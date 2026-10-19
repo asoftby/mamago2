@@ -7,6 +7,8 @@ import { CalendarDays, StickyNote } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { formatHHMM } from "@/lib/formatters/date";
+import { planEntryDisplay } from "@/features/my-plan/lib/planEntryDisplay";
+import { removePlanEntry } from "@/features/my-plan/lib/removePlanEntry";
 import { resolvePlanItemCategoryLabel } from "@/features/my-plan/lib/planItemMeta";
 import {
   authorCaption,
@@ -52,12 +54,13 @@ export function PlanItemCard({
   const isOwn = !item.authorId || item.authorId === currentUserId;
   const caption = familyUi ? authorCaption(item, currentUserId) : null;
   const presentation = buildFamilyCalendarItemPresentation(item);
-  const title = presentation.title;
-  const image = item.activity?.coverImageUrl ?? item.coverImageUrl;
+  const entryDisplay = planEntryDisplay(item);
+  const title = entryDisplay.title;
+  const image = entryDisplay.poster;
   const category = presentation.isCatalog
     ? resolvePlanItemCategoryLabel(item.activity)
     : null;
-  const time = formatTime(item.effectiveStartsAt);
+  const time = entryDisplay.time;
   const endTime = formatTime(item.endsAt);
   const age = item.activity?.ageLabel ?? null;
   const price = item.activity?.priceLabel ?? null;
@@ -82,12 +85,7 @@ export function PlanItemCard({
     if (removing) return;
     setRemoving(true);
     try {
-      const endpoint = item.source === "MANUAL"
-        ? `/api/plan/manual/${item.id}`
-        : `/api/save/plan?planItemId=${item.id}`;
-      const res = await fetch(endpoint, item.source === "MANUAL"
-        ? { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedUpdatedAt: item.updatedAt }) }
-        : { method: "DELETE" });
+      const res = await removePlanEntry(item);
       if (res.status === 409) {
         toast.error(visibilityErrorMessage("conflict"));
         router.refresh();

@@ -92,6 +92,7 @@ export default async function PlanPage({
   return (
     <PlanPageClient
       initialItems={calendar.items}
+      currentUserId={user.id}
       initialSelectedDate={selectedDate}
       initialRange={{ from: initialFrom, to: initialTo }}
       familyChildren={children.map((child) => ({ id: child.id, name: child.name?.trim() || "Ребёнок" }))}

@@ -17,6 +17,9 @@ import {
 import { toast } from "@/lib/toast";
 import { LiquidNotification } from "@/components/ui/liquid-notification";
 import { PlanCalendar } from "@/features/plan-calendar";
+import { PlanPersonFilter, planPersonFilterOptions } from "./PlanPersonFilter";
+import { PlanEmptyDayMessage } from "./PlanEmptyDayMessage";
+import { filterPlanEntriesByPerson } from "../lib/filterPlanEntriesByPerson";
 import { pluralRu, relativeLabel } from "@/lib/date/dateKey";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { QuickAddChildModal } from "@/components/children/QuickAddChildModal";
@@ -938,9 +941,7 @@ export function PlanMainContent({
     if (personFilter === "all") return dayItemsSorted;
     const person = personas.find((persona) => persona.id === personFilter);
     if (!person) return dayItemsSorted;
-    return dayItemsSorted.filter((item) =>
-      person.kind === "child" ? item.childId === person.id : item.assigneeUserId === person.id,
-    );
+    return filterPlanEntriesByPerson(dayItemsSorted, { kind: person.kind, id: person.id });
   }, [dayItemsSorted, personFilter, personas]);
 
   const totalPlannedCount = useMemo(() => {
@@ -1054,34 +1055,21 @@ export function PlanMainContent({
     return filterPerson ? `${label} · ${filterPerson.kind === "adult" ? "мои дела" : personShortName(filterPerson)}` : label;
   })();
 
-  const filterChipClass = (on: boolean) =>
-    "inline-flex h-11 shrink-0 items-center gap-[7px] rounded-full border px-[15px] text-[14.5px] font-semibold transition-colors " +
-    (on
-      ? "border-[var(--mp-tx)] bg-[var(--mp-tx)] text-white"
-      : "border-[var(--mp-line)] bg-[var(--mp-card)] text-[var(--mp-tx)] hover:border-[var(--mp-line-strong)]");
+  const personFilterOptions = planPersonFilterOptions(
+    personas.map((persona) => ({
+      value: persona.id,
+      label: persona.kind === "adult" ? "Я" : personShortName(persona),
+    })),
+  );
 
-  /** Фильтр дня по человеку — только когда в семье больше одного участника. */
-  const renderPersonFilter = (compact: boolean) =>
+  /** Same filter UI as /me/plan, only the outer spacing depends on the sheet. */
+  const renderPersonFilter = (_compact: boolean) =>
     personas.length < 2 ? null : (
-      <div role="group" aria-label="Чьи дела показать" className={(compact ? "-mx-5 px-5" : "-mx-8 px-8") + " flex gap-1.5 overflow-x-auto [scrollbar-width:none]"}>
-        <button type="button" aria-pressed={personFilter === "all"} className={filterChipClass(personFilter === "all")} onClick={() => setPersonFilter("all")}>
-          Все
-        </button>
-        {personas.map((persona) => {
-          const on = personFilter === persona.id;
-          return (
-            <button
-              key={persona.id}
-              type="button"
-              aria-pressed={on}
-              className={filterChipClass(on)}
-              onClick={() => setPersonFilter(on ? "all" : persona.id)}
-            >
-              {personShortName(persona)}
-            </button>
-          );
-        })}
-      </div>
+      <PlanPersonFilter
+        options={personFilterOptions}
+        value={personFilter}
+        onChange={setPersonFilter}
+      />
     );
 
   const renderDayPlanSection = (compact: boolean) => {
@@ -1178,7 +1166,7 @@ export function PlanMainContent({
           </>
         ) : (
           <>
-            <b className="font-bold text-[var(--mp-tx)]">Свободный день.</b> Можно просто отдохнуть.
+            <PlanEmptyDayMessage />
           </>
         )}
       </div>
