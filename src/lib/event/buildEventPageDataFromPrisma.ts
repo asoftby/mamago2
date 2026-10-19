@@ -104,6 +104,7 @@ export type ActivityForEventPageInput = {
       title: string;
       formattedAddr: string | null;
       customAddress: string | null;
+      shortAddress?: string | null;
       lat: number | null;
       lng: number | null;
       logoImageId: string | null;
