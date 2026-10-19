@@ -11,6 +11,7 @@ import { applyActivitySeoUpdate } from "@/lib/admin/seo/entities/applyEntitySeoU
 import {
   buildEventJsonLd,
   eventJsonLdOverrideHasMissingStartDate,
+  fillEventJsonLdOverrideAddress,
 } from "@/lib/seo/schema/buildEventJsonLd";
 import { loadPublicActivityForCityPage } from "@/lib/event/loadPublicActivityForCityPage";
 import {
@@ -264,13 +265,6 @@ export const eventProvider: SeoEntityProvider = {
       },
     });
     if (!a?.slug) return null;
-    if (
-      a.seoJsonLdOverride &&
-      typeof a.seoJsonLdOverride === "object" &&
-      !eventJsonLdOverrideHasMissingStartDate(a.seoJsonLdOverride)
-    ) {
-      return a.seoJsonLdOverride as Record<string, unknown>;
-    }
     const [activityCity, venueCity] = await Promise.all([
       a.cityId
         ? prisma.city.findUnique({ where: { id: a.cityId }, select: { slug: true } })
@@ -317,7 +311,7 @@ export const eventProvider: SeoEntityProvider = {
       loaded.venue?.city?.slug ||
       loaded.place?.city?.slug ||
       undefined;
-    return buildEventJsonLd({
+    const generatedJsonLd = buildEventJsonLd({
       canonicalUrl,
       title: loaded.title,
       description: loaded.shortDesc,
@@ -342,5 +336,10 @@ export const eventProvider: SeoEntityProvider = {
       },
       publicBaseUrl: publicBase,
     });
+    return a.seoJsonLdOverride &&
+      typeof a.seoJsonLdOverride === "object" &&
+      !eventJsonLdOverrideHasMissingStartDate(a.seoJsonLdOverride)
+      ? fillEventJsonLdOverrideAddress(a.seoJsonLdOverride as Record<string, unknown>, generatedJsonLd)
+      : generatedJsonLd;
   },
 };
