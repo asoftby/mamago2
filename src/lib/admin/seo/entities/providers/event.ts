@@ -304,9 +304,11 @@ export const eventProvider: SeoEntityProvider = {
     const locationAddress =
       loaded.venue?.place?.formattedAddr ||
       loaded.venue?.place?.customAddress ||
+      loaded.venue?.place?.shortAddress ||
       loaded.venue?.addressLine ||
       loaded.place?.formattedAddr ||
       loaded.place?.customAddress ||
+      loaded.place?.shortAddress ||
       undefined;
     // Canonical/listing city can differ from the physical venue city.
     // Do not claim addressLocality unless the linked physical place provides it.
