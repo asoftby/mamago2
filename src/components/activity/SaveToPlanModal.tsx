@@ -201,7 +201,10 @@ function formatEventRangeSubtitle(s?: string | null, e?: string | null): string 
 function buildDateRangeKeys(s?: string | null, e?: string | null): string[] {
   const start = normalizePlanDateISO(s);
   const end = normalizePlanDateISO(e);
-  if (!start || !end || end < start) return [];
+  if (!start) return [];
+  // An absent end date means a single-day event, not an unrestricted calendar.
+  if (!end) return [start];
+  if (end < start) return [];
   const keys: string[] = [];
   let cursor = start;
   while (cursor <= end) {
@@ -778,16 +781,22 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
 function DateSliderView({
   options, title, ticket,
   onConfirm, onIdea, sessionsByDate, confirmLabel,
+  isIdea = false, inPlan = false, onCollections, onRemoveIdea, onRemovePlan,
+  initialDateISO,
 }: {
   options: string[]; title: string; ticket?: ActivityTicketSource;
+  initialDateISO?: string | null;
   onConfirm: (iso: string, sessionId: string | null) => void; onIdea?: () => void;
+  isIdea?: boolean; inPlan?: boolean;
+  onCollections?: () => void; onRemoveIdea?: () => void; onRemovePlan?: () => void;
   /** Подпись кнопки подтверждения; по умолчанию «Сохранить». */
   confirmLabel?: string;
   sessionsByDate?: Record<string, Array<{ id: string; time: string; title?: string }>>;
 }) {
-  const [selISO, setSelISO] = React.useState<string>(options[0] ?? "");
+  const firstDate = initialDateISO && options.includes(initialDateISO) ? initialDateISO : (options[0] ?? "");
+  const [selISO, setSelISO] = React.useState<string>(firstDate);
   const [selectedSessionId, setSelectedSessionId] = React.useState<string | null>(() =>
-    defaultSessionId(options[0] ?? "", sessionsByDate?.[options[0] ?? ""])
+    defaultSessionId(firstDate, sessionsByDate?.[firstDate])
   );
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const FIRST = 5;
@@ -835,6 +844,31 @@ function DateSliderView({
           }}
         />
 
+        {(isIdea || inPlan) && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-full bg-surface-muted px-3 py-2 text-foreground">
+              {inPlan ? "В плане" : "Уже в идеях"}
+            </span>
+            {onCollections && <button type="button" onClick={onCollections}
+              className="min-h-10 rounded-full border border-border px-3 font-medium hover:bg-surface-hover">
+              В коллекцию
+            </button>}
+            {onRemoveIdea && <button type="button" onClick={onRemoveIdea}
+              className="min-h-10 rounded-full border border-border px-3 text-muted-foreground hover:bg-surface-hover">
+              Убрать из идей
+            </button>}
+            {onRemovePlan && <button type="button" onClick={onRemovePlan}
+              className="min-h-10 rounded-full border border-border px-3 text-muted-foreground hover:bg-surface-hover">
+              Убрать из плана
+            </button>}
+          </div>
+        )}
+
+        {options.length === 0 ? (
+          <p className="mb-5 rounded-xl bg-surface-muted px-4 py-4 text-sm text-muted-foreground">
+            Доступных будущих дат нет. Событие можно оставить в идеях или переместить в коллекцию.
+          </p>
+        ) : (<>
         {/* Month label + session count */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <span style={{ fontFamily: "var(--font-sans)", fontSize: 18, letterSpacing: "-.01em", fontWeight: 400 }}>
@@ -899,6 +933,7 @@ function DateSliderView({
           />
         )}
 
+        </>)}
         {onIdea ? (
           <>
             <OrDivider label="или без даты" />
@@ -1501,88 +1536,34 @@ function ConfirmView({ scenario, isIdea, inPlan, planDate, onCommit }: {
 }
 
 // ─── Idea-only view (no date semantics — e.g. Article) ───────────────────────
-function IdeaOnlyView({ title, isIdea, onIdea, onRemoveIdea }: {
-  title: string; isIdea: boolean; onIdea: () => void; onRemoveIdea: () => void;
+function IdeaOnlyView({ title, ticket, isIdea, onIdea, onRemoveIdea }: {
+  title: string; ticket?: ActivityTicketSource;
+  isIdea: boolean; onIdea: () => void; onRemoveIdea: () => void;
 }) {
-  if (isIdea) {
-    return (
-      <div style={{ padding: "24px 24px 20px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-          <span style={{
-            width: 22, height: 22, borderRadius: 99, background: C.green, color: "#fff",
-            display: "inline-flex", alignItems: "center", justifyContent: "center",
-            fontSize: 11, fontWeight: 700, boxShadow: `0 0 0 4px ${C.greenBg}`,
-          }}>✓</span>
-          <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: C.green }}>уже в идеях</span>
-        </div>
-
-        <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-sans)", fontSize: 30, lineHeight: 1.02, letterSpacing: "-.02em", fontWeight: 400 }}>
-          Сохранено в идеях
-        </h2>
-
-        <p style={{ marginTop: 8, marginBottom: 18, fontSize: 13, color: C.ink3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
-          {title}
-        </p>
-
-        <div style={{
-          display: "flex", alignItems: "center", gap: 12,
-          padding: "14px 14px 14px 16px",
-          background: C.paper, border: `1px solid ${C.line}`, borderRadius: 14, marginBottom: 18,
-        }}>
-          <IcoCircle bg={C.accentSoft} color={C.accentDeep}><BookmarkIcon size={16} /></IcoCircle>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.005em", color: C.ink }}>Без даты</div>
-            <div style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 11, color: C.ink3, marginTop: 3, letterSpacing: ".04em" }}>● в идеях</div>
-          </div>
-          <button onClick={onRemoveIdea} title="Убрать из идей" style={{
-            width: 32, height: 32, borderRadius: 99, border: `1px solid ${C.line2}`,
-            background: "transparent", color: C.ink3,
-            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-          }}><TrashIcon size={13} /></button>
-        </div>
-
-        <div style={{ display: "flex", gap: 10, paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
-          <button onClick={() => { window.location.href = "/me/ideas"; }} style={{
-            flex: 1, height: 46, borderRadius: 999, background: C.ink, color: "#FAF7F1",
-            border: 0, fontSize: 13, fontWeight: 600,
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-            cursor: "pointer", fontFamily: "var(--font-sans)",
-          }}>
-            Все мои идеи <ExternalLinkIcon size={13} color="#FAF7F1" />
-          </button>
-          <button type="button" onClick={onIdea} className="h-[46px] flex-1 rounded-full border border-[rgba(20,18,16,.18)] px-3 text-[13px] font-semibold">В коллекцию</button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ padding: "24px 24px 20px" }}>
-      <span style={{
-        fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const,
-        fontSize: 10, letterSpacing: ".14em", color: C.accentDeep,
-        display: "inline-block", marginBottom: 12,
-      }}>● сохранить статью</span>
-
-      <h2 style={{
-        margin: "0 0 8px",
-        fontFamily: "var(--font-sans)",
-        fontSize: 30, lineHeight: 1.02, letterSpacing: "-.02em", fontWeight: 600,
-      }}>
-        Оставь{" "}
-        <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 500, color: "var(--primary)" }}>
-          на потом
-        </span>
-      </h2>
-
-      <p style={{
-        marginTop: 8, marginBottom: 22, fontSize: 13, color: C.ink3,
-        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const,
-      }}>
-        {title}
-      </p>
-
-      <IdeasRow onClick={onIdea} title="Добавить в идеи" subtitle="Вернуться к этой статье позже" />
+    <div className="px-6 pb-6 pt-0 sm:pt-4">
+      <SaveActivityHeader
+        heading={<>Сохранить <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>в идеи</span>.</>}
+        ticket={ticket ?? { title }}
+        kicker={isIdea ? "уже в идеях" : "сохранить публикацию"}
+      />
+      {isIdea ? (
+        <div className="mb-4 rounded-xl bg-surface-muted p-4 text-sm text-muted-foreground">
+          Публикация уже сохранена. Можно выбрать коллекцию или убрать её из идей.
+        </div>
+      ) : (
+        <p className="mb-5 text-sm text-muted-foreground">
+          Сохраните публикацию без даты, чтобы вернуться к ней позже.
+        </p>
+      )}
+      <IdeasRow onClick={onIdea} title={isIdea ? "В коллекцию" : "Сохранить в идеи"}
+        subtitle={isIdea ? "Выбрать или изменить коллекцию" : "Вернуться к публикации позже"} />
+      {isIdea && (
+        <button type="button" onClick={onRemoveIdea}
+          className="mt-4 min-h-11 w-full rounded-full border border-border text-sm text-muted-foreground hover:bg-surface-hover">
+          Убрать из идей
+        </button>
+      )}
     </div>
   );
 }
@@ -1704,6 +1685,7 @@ function PickerBodyInner({
     return (
       <IdeaOnlyView
         title={scenario.title}
+        ticket={scenario.ticket}
         isIdea={isIdea}
         onIdea={() => setView("collections")}
         onRemoveIdea={() => onCommit({ action: "remove-idea" })}
@@ -1721,38 +1703,13 @@ function PickerBodyInner({
     );
   }
 
-  // Already in plan — manage state (unless user clicked "change date")
-  if (inPlan && planDate && !replanMode) {
-    return (
-      <InPlanView
-        planDate={planDate}
-        planStartsAt={planStartsAt}
-        planItemId={planItemId}
-        onSwitchCalendar={() => setReplanMode(true)}
-        onCollections={collectionTarget ? () => setView("collections") : undefined}
-        onRemovePlan={(id) => onCommit({ action: "remove-plan", planItemId: id })}
-        onClose={() => { onClose?.(); }}
-      />
-    );
-  }
-
-  // Already in ideas — nudge to plan
-  if (isIdea) {
-    return (
-      <InIdeasView
-        onRemoveIdea={() => onCommit({ action: "remove-idea" })}
-        onSchedule={(iso) => onCommit({ action: "plan", dateISO: iso, timeSlotId: null })}
-        onCollections={() => setView("collections")}
-        dateOptions={upcomingOptions}
-      />
-    );
-  }
-
   // For quickdate — always use the date slider UI.
   // If no event dates available, fall back to today + next 6 days.
+  const isPastEvent = isQuickdate && Boolean(scenario.eventPlanDateEndISO || scenario.eventPlanDateISO) &&
+    (scenario.eventPlanDateEndISO ?? scenario.eventPlanDateISO ?? "") < todayISO;
   const sliderOptions = upcomingOptions.length > 0
     ? upcomingOptions
-    : Array.from({ length: 7 }, (_, i) => addDaysLocal(todayISO, i));
+    : isPastEvent ? [] : Array.from({ length: 7 }, (_, i) => addDaysLocal(todayISO, i));
 
   return (
     <div style={{ position: "relative" }}>
@@ -1765,12 +1722,18 @@ function PickerBodyInner({
       )}
       <DateSliderView
         options={sliderOptions}
+        initialDateISO={normalizePlanDateISO(planDate)}
         title={scenario.title}
         ticket={scenario.ticket}
         sessionsByDate={sessionsByDate}
         onConfirm={(iso, sessionId) => onCommit({ action: "plan", dateISO: iso, timeSlotId: sessionId ?? null })}
-        onIdea={scenario.moveMode ? undefined : () => setView("collections")}
-        confirmLabel={scenario.moveMode ? "Перенести" : undefined}
+        onIdea={scenario.moveMode || isIdea ? undefined : () => setView("collections")}
+        confirmLabel={scenario.moveMode ? "Перенести" : inPlan ? "Изменить дату" : undefined}
+        isIdea={isIdea}
+        inPlan={inPlan}
+        onCollections={collectionTarget ? () => setView("collections") : undefined}
+        onRemoveIdea={isIdea ? () => onCommit({ action: "remove-idea" }) : undefined}
+        onRemovePlan={inPlan && planItemId ? () => onCommit({ action: "remove-plan", planItemId }) : undefined}
       />
     </div>
   );

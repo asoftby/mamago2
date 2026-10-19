@@ -9,6 +9,7 @@
  * Run: npx tsx src/components/activity/SaveToPlanModal.test.tsx
  */
 import { IdeaCollectionStep } from "./IdeaCollectionStep";
+import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
@@ -36,18 +37,18 @@ const articleScenario: SaveScenario = {
   // Required copy present (rendered lowercase in source; uppercase is a pure
   // CSS text-transform, same convention as the pre-existing "сохранить
   // активность" eyebrow — see IdeaOnlyView).
-  assert.ok(html.includes("сохранить статью"), "eyebrow: СОХРАНИТЬ СТАТЬЮ");
+  assert.ok(html.includes("сохранить публикацию"), "shared publication save header");
   // "на потом" is a nested <span> (editorial serif italic accent) inside the
   // heading, so match the two parts rather than one exact phrase.
-  assert.ok(html.includes("Оставь"), "heading base present");
-  assert.ok(html.includes("на потом"), "heading italic accent present");
+  assert.ok(html.includes("Сохранить"), "shared heading base present");
+  assert.ok(html.includes("в идеи"), "shared heading accent present");
   assert.ok(
     html.includes("Детская зона MamaGo на фестивале огня Феникс"),
     "article title present",
   );
-  assert.ok(html.includes("Добавить в идеи"), "single action: add to ideas");
+  assert.ok(html.includes("Сохранить в идеи"), "single action: save to ideas");
   assert.ok(
-    html.includes("Вернуться к этой статье позже"),
+    html.includes("Вернуться к публикации позже"),
     "ideas action subtitle: article-specific, no 'без конкретного дня'",
   );
 
@@ -59,19 +60,19 @@ const articleScenario: SaveScenario = {
   assert.ok(!html.includes("напомнить"), "no date-slider heading");
   assert.ok(!html.includes("Куда сохранить"), "no editorial date-choice heading");
   // Activity's default IdeasRow copy must not leak into the Article view.
-  assert.ok(!html.includes("Сохранить в идеи"), "Activity's idea CTA copy not reused for Article");
+  assert.ok(!html.includes("или без даты"), "article still has no date selection");
 }
 
 // ── Article: already saved as idea ──────────────────────────────────────────
 {
   const html = render({ scenario: articleScenario, isIdea: true, inPlan: false });
 
-  assert.ok(html.includes("Сохранено в идеях"), "saved-as-idea confirmation shown");
+  assert.ok(html.includes("уже в идеях"), "saved-as-idea state shown in shared header");
   assert.ok(
     html.includes("Детская зона MamaGo на фестивале огня Феникс"),
     "article title present in saved state",
   );
-  assert.ok(html.includes("Все мои идеи"), "link to ideas list present");
+  assert.ok(html.includes("В коллекцию"), "collection selection remains available");
 
   // No upsell to plan a date, and no date UI at all, even if legacy
   // inPlan/planDate state existed.
@@ -90,7 +91,7 @@ const articleScenario: SaveScenario = {
   });
   assert.ok(!html.includes("Показать все"), "no date UI even with legacy inPlan state");
   assert.ok(!html.includes("В план"), "no plan-management view for articles");
-  assert.ok(html.includes("Добавить в идеи"), "still offers idea save");
+  assert.ok(html.includes("Сохранить в идеи"), "still offers idea save");
 }
 
 // ── Activity/Event regression: date UI must be unaffected ──────────────────
@@ -121,14 +122,38 @@ const activityScenario: SaveScenario = {
   assert.ok(!html.includes("Оставь"), "Article headline not reused for Activity");
 }
 
-// Activity: already-in-ideas state still nudges toward planning a date
-// (untouched regression check for the pre-existing InIdeasView). "выбрать
-// день" is split across a nested <span> in source, so match the surrounding
-// word instead of the exact phrase.
+// Saved events use the same date slider as new events, with context actions.
 {
   const html = render({ scenario: activityScenario, isIdea: true, inPlan: false });
-  assert.ok(html.includes("Готовы"), "plan-upsell nudge unaffected for activities");
-  assert.ok(html.includes("Запланировать"), "schedule-from-idea action unaffected for activities");
+  assert.ok(html.includes("В какой"), "saved events use the shared date picker");
+  assert.ok(html.includes("Уже в идеях"), "saved state appears in the shared picker");
+  assert.ok(html.includes("Убрать из идей"), "saved state can still be removed");
+  assert.ok(!html.includes("Готовы"), "old separate upsell screen is not rendered");
+}
+
+// Review regressions: lone start date must not generate arbitrary alternatives.
+{
+  const start = addDaysLocal(getLocalDateKey(), 5);
+  const html = render({
+    scenario: { kind: "quickdate", title: "Разовое событие", eventPlanDateISO: start },
+    isIdea: true,
+  });
+  assert.ok(html.includes("1 дата"), "one-day event exposes exactly one date");
+  assert.ok(!html.includes("Показать все 7 дат"), "no invented week of dates");
+}
+
+// For existing plans the initial selection must be the plan date, not the first session.
+{
+  const earliest = addDaysLocal(getLocalDateKey(), 2);
+  const planned = addDaysLocal(getLocalDateKey(), 4);
+  const html = render({
+    scenario: { kind: "quickdate", title: "Повторяющееся событие", eventPlanDateOptions: [earliest, planned] },
+    isIdea: true,
+    inPlan: true,
+    planDate: planned,
+  });
+  assert.ok(html.includes("Изменить дату"), "existing plan has contextual update action");
+  assert.ok(html.includes(planned.slice(8)), "existing plan date appears in the selected confirmation");
 }
 
 // The article collection slide retains its entity label and scrolls as a whole
