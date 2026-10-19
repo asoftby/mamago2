@@ -128,9 +128,11 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
     const locationAddress =
       fromDb.venue?.place?.formattedAddr ||
       fromDb.venue?.place?.customAddress ||
+      fromDb.venue?.place?.shortAddress ||
       fromDb.venue?.addressLine ||
       fromDb.place?.formattedAddr ||
       fromDb.place?.customAddress ||
+      fromDb.place?.shortAddress ||
       undefined;
     // The route city is a listing/canonical concern, not proof of the physical address locality.
     // If the venue/place city is unknown, omit addressLocality instead of inventing it from the URL.
