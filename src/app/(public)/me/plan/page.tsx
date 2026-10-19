@@ -95,6 +95,7 @@ export default async function PlanPage({
       initialSelectedDate={selectedDate}
       initialRange={{ from: initialFrom, to: initialTo }}
       familyChildren={children.map((child) => ({ id: child.id, name: child.name?.trim() || "Ребёнок" }))}
+      accountDisplayName={user.displayName?.trim() || null}
       familyView={familyView}
       ideaActivityIds={ideaActivityIds}
       initialIdeas={serializedIdeas}

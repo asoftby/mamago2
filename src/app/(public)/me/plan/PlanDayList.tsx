@@ -79,12 +79,11 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
           }}
         >
           <h2
-            className="font-sans"
+            className="text-[32px] leading-[1.1] tracking-[-0.025em] lg:text-[40px]"
             style={{
               margin: 0,
-              fontSize: "clamp(32px, 4vw, 52px)",
-              lineHeight: 1,
-              letterSpacing: "-.025em",
+              fontFamily: "var(--font-pt-serif), Georgia, serif",
+              fontWeight: 400,
               color: "#141210",
             }}
           >
