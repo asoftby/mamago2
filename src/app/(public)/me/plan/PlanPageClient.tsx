@@ -103,6 +103,7 @@ type Props = {
   initialSelectedDate: string;
   initialRange: { from: string; to: string };
   familyChildren: Array<{ id: string; name: string }>;
+  accountDisplayName?: string | null;
   ideaActivityIds: string[];
   childrenAges: number[];
   initialIdeas?: SerializedIdea[];
@@ -571,7 +572,7 @@ export function PlanPageClient({
                     });
                   });
                 }}
-                className="flex min-h-11 w-full items-center justify-between border-t border-[rgba(20,18,16,.10)] px-[18px] py-2 text-left text-sm font-semibold text-primary transition-colors hover:bg-white/60"
+                className="flex min-h-11 w-full items-center justify-between border-t border-[rgba(20,18,16,.10)] px-[18px] py-2 text-left text-sm font-medium text-[#807C77] transition-colors hover:bg-white/60 hover:text-[#514D48]"
               >
                 Архив событий <span aria-hidden="true">→</span>
               </button>
@@ -628,25 +629,26 @@ export function PlanPageClient({
       )}
 
       {/* Week Calendar */}
-      <Container className="pb-12">
+      <Container className="pb-4">
         <PlanCalendar value={selectedDate} onChange={selectDate} variant="page" markerScope={familyUi ? scope : "all"} />
         {loadingWeek != null ? <span role="status" className="mt-2 block text-xs text-neutral-500">Загрузка…</span> : null}
-        <div className="mt-4 flex flex-wrap gap-2" aria-label="Фильтр по члену семьи">
+        <div className="mt-4 flex w-full flex-wrap items-center gap-2 rounded-2xl border border-[rgba(20,18,16,.10)] bg-[#FAF7F1] px-4 py-3 sm:gap-3" aria-label="Фильтр по члену семьи">
+          <span className="mr-1 text-[13px] font-semibold text-[#6B6258]">Для кого:</span>
           {([
-            ["all", "Все"],
-            ["family", "Я"],
+            ["family", accountDisplayName ? `${accountDisplayName} (Я)` : "Я"],
             ...familyChildren.map((child) => [`child:${child.id}`, child.name]),
+            ["all", "Для всех"],
           ] as Array<[FamilyCalendarFilter, string]>).map(([value, label]) => (
             <button
               key={value}
               type="button"
               aria-pressed={calendarFilter === value}
               onClick={() => setCalendarFilter(value)}
-              className="min-h-11 rounded-full border px-4 text-sm font-medium"
+              className="min-h-10 max-w-full truncate rounded-full border px-4 text-[13px] font-medium transition-colors"
               style={{
                 background: calendarFilter === value ? "#141210" : "#fff",
                 color: calendarFilter === value ? "#fff" : "#141210",
-                borderColor: "rgba(20,18,16,.18)",
+                borderColor: calendarFilter === value ? "#141210" : "rgba(20,18,16,.18)",
               }}
             >
               {label}
