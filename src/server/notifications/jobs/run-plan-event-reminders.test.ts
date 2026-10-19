@@ -111,6 +111,29 @@ void (async () => {
   }
 
   {
+    // Custom lead of 1h 35m is eligible, and the scanner looks far enough ahead.
+    const now = new Date("2026-08-27T12:00:00.000Z");
+    const startsAt = new Date("2026-08-27T13:35:00.000Z");
+    let windowEnd: Date | null = null;
+    const result = await runPlanEventRemindersCore(
+      { now },
+      {
+        listPlanItemsDueForReminderFn: async (window) => {
+          windowEnd = window.windowEnd;
+          return [{ ...candidate("custom95", startsAt), reminderLeadMinutes: 95 }];
+        },
+        getReminderSettingsForUsersFn: async () => new Map([
+          ["custom95", { enabled: true, offsetMinutes: 120, timeZone: "Europe/Minsk" }],
+        ]),
+        sendNotificationFn: async () => sentResult,
+      },
+    );
+    assert.equal(result.sent, 1);
+    assert.equal(result.results[0]?.offsetMinutes, 95);
+    assert.ok(windowEnd && windowEnd >= new Date("2026-08-28T12:00:00.000Z"));
+  }
+
+  {
     // Дело назначено одному взрослому: копии для остальных членов семьи не уведомляем.
     const now = new Date("2026-08-27T12:00:00.000Z");
     const sends: string[] = [];
