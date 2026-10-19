@@ -9,6 +9,8 @@ type CityHomeSectionProps = SectionHeaderProps & {
   className?: string;
   /** Доп. класс для обёртки заголовка + контента */
   innerClassName?: string;
+  /** Keep desktop heading text clear of the carousel link and arrow controls. */
+  reserveCarouselControls?: boolean;
 };
 
 export function CityHomeSection({
@@ -23,6 +25,7 @@ export function CityHomeSection({
   children,
   className,
   innerClassName,
+  reserveCarouselControls = false,
 }: CityHomeSectionProps) {
   return (
     <section className={cn("space-y-0", className)}>
@@ -35,6 +38,7 @@ export function CityHomeSection({
         actionIconButton={actionIconButton}
         actionInlineText={actionInlineText}
         headerActionClassName={headerActionClassName}
+        className={reserveCarouselControls ? "lg:pr-[250px]" : undefined}
       />
       <div className={cn(innerClassName)}>{children}</div>
     </section>

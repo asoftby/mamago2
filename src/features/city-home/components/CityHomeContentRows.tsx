@@ -118,6 +118,7 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
       className="pt-[5px]"
       title={title}
       titleCitySlug={citySlug}
+      reserveCarouselControls
     >
       <HorizontalCardRow
         navLeading={<CityHomeAllLink href={eventsHref} label={eventsLabel} />}
@@ -165,8 +166,10 @@ export function CityHomeClassesSection({
       subtitle={
         mode === "nearby" ? `В ${cityName} пока немного вариантов — посмотрите рядом` : undefined
       }
+      reserveCarouselControls
     >
       <HorizontalCardRow
+        headerHasSubtitle={mode === "nearby"}
         navLeading={
           <CityHomeAllLink
             href={appendCityQuery(`/${citySlug}/classes`)}
@@ -235,8 +238,10 @@ export function CityHomeRoutesSection({
     <CityHomeSection
       title={mode === "local" ? `Маршруты ${getCityLocativePhrase(citySlug)}` : "Маршруты рядом"}
       subtitle={mode === "nearby" ? "Подобрали маршруты недалеко от вас" : undefined}
+      reserveCarouselControls
     >
       <HorizontalCardRow
+        headerHasSubtitle={mode === "nearby"}
         navLeading={
           <CityHomeAllLink
             href={appendCityQuery(`/${citySlug}/routes`)}
@@ -274,6 +279,7 @@ export function CityHomeJournalSection({
   return (
     <CityHomeSection
       title="Статьи и обзоры"
+      reserveCarouselControls
     >
       <HorizontalCardRow
         navLeading={<CityHomeAllLink href={blogHref} label={blogLabel} />}
