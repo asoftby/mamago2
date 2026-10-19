@@ -16,7 +16,7 @@ export function SaveActivityHeader({ heading, ticket, kicker = "сохранит
         fontSize: 30, lineHeight: 1.02, letterSpacing: "-.02em", fontWeight: 400,
       }}>{heading}</h2>
       <div style={{ marginTop: 18, marginBottom: 18 }}>
-        <ActivityTicketCard source={ticket} />
+        <ActivityTicketCard source={ticket} plain />
       </div>
     </>
   );

@@ -92,6 +92,11 @@ const widePriceHtml = renderToStaticMarkup(
 );
 assert.ok(widePriceHtml.includes('text-[20px]'), "a four-digit price fits in the narrow price area");
 
+const plainTicketHtml = renderToStaticMarkup(
+  <ActivityTicketCard plain source={{ title: "Событие", priceMode: "FROM", priceValue: 30 }} />,
+);
+assert.ok(!plainTicketHtml.includes('mask-image'), "plain save ticket has no side cutouts");
+assert.ok(!plainTicketHtml.includes('border-dashed'), "plain save ticket has no perforation");
 const saveModal = readFileSync(join(process.cwd(), "src/components/activity/SaveToPlanModal.tsx"), "utf8");
 const saveHeader = readFileSync(join(process.cwd(), "src/components/activity/SaveActivityHeader.tsx"), "utf8");
 const confirmBar = saveModal.split("function ConfirmBar(")[1]?.split("// ─── All-dates drawer")[0];
@@ -101,7 +106,7 @@ assert.ok(saveHeader.includes("marginTop: 18, marginBottom: 18"), "ticket outsid
 assert.ok(saveHeader.includes('className="mb-1 flex h-10 -translate-y-1 items-center justify-start sm:translate-y-0"'), "header label is left-aligned");
 assert.ok(saveHeader.includes('kicker = "сохранить активность"'), "kicker has no bullet");
 assert.ok(!saveHeader.includes("● сохранить активность"), "kicker bullet is removed");
-assert.ok(saveModal.includes('className="px-6 pb-5 pt-0 sm:pt-4"'), "mobile and desktop header labels align with close button");
+assert.ok(saveModal.includes('min-w-0 w-full max-w-full overflow-x-clip px-4 pb-5 pt-0 sm:px-6 sm:pt-4'), "responsive save dialog content aligns without overflow");
 
 
 assert.equal(formatTicketAddress("ул. Московская 18а, Минск, Минская область 220007"), "г. Минск, ул. Московская, 18а");

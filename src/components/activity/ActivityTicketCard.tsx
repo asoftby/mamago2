@@ -106,15 +106,14 @@ export function adaptActivityTicket(source: ActivityTicketSource): ActivityTicke
   };
 }
 
-export function ActivityTicketCard({ source }: { source: ActivityTicketSource }) {
+export function ActivityTicketCard({ source, plain = false }: { source: ActivityTicketSource; plain?: boolean }) {
   const ticket = adaptActivityTicket(source);
   return (
     <article
       aria-label={`Информация: ${ticket.title}`}
       className="relative isolate flex min-h-[112px] w-full min-w-0 overflow-hidden rounded-[20px] bg-[#726d65] text-white shadow-[0_12px_30px_rgba(20,18,16,0.18)]"
-      // A real alpha mask cuts the paper notches out of the entire ticket (image and overlay),
-      // so the surrounding modal remains visible instead of covering the image with white circles.
-      style={{
+      // The save dialog uses a clean poster surface, not the perforated ticket variant.
+      style={plain ? undefined : {
         maskImage: "radial-gradient(circle 10px at left center, transparent 9.5px, black 10.5px), radial-gradient(circle 10px at right center, transparent 9.5px, black 10.5px)",
         maskComposite: "intersect",
       }}
@@ -157,7 +156,9 @@ export function ActivityTicketCard({ source }: { source: ActivityTicketSource })
         ) : null}
       </div>
 
-      <div className="relative flex w-[68px] shrink-0 items-center justify-center border-l border-dashed border-white/80 bg-black/10 sm:w-[78px]">
+      <div className={plain
+        ? "relative flex w-[68px] shrink-0 items-center justify-center bg-black/10 sm:w-[78px]"
+        : "relative flex w-[68px] shrink-0 items-center justify-center border-l border-dashed border-white/80 bg-black/10 sm:w-[78px]"}>
         {ticket.price?.kind === "free" ? (
           <span className="rotate-180 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.12em] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.5)] [writing-mode:vertical-rl]">
             Бесплатно
