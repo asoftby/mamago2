@@ -427,7 +427,7 @@ function DateSlider({ options, selISO, onSelect, sessionCountsByDate }: DateSlid
   }, [selISO]);
 
   return (
-    <div style={{ position: "relative", marginBottom: 2 }}>
+    <div className="w-full min-w-0 max-w-full" style={{ position: "relative", marginBottom: 2 }}>
       {/* Arrows */}
       {(["left", "right"] as const).map((side) => (
         <button
@@ -462,6 +462,7 @@ function DateSlider({ options, selISO, onSelect, sessionCountsByDate }: DateSlid
         ref={sliderRef}
         style={{
           display: "flex", gap: 8, overflowX: "auto", overflowY: "hidden",
+          width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box",
           padding: "4px 20px", scrollSnapType: "x proximity", scrollbarWidth: "none",
         }}
       >
@@ -833,8 +834,9 @@ function DateSliderView({
 
   return (
     <>
-      <div className="px-6 pb-5 pt-0 sm:pt-4">
+      <div className="min-w-0 w-full max-w-full overflow-x-clip px-4 pb-5 pt-0 sm:px-6 sm:pt-4">
         <SaveActivityHeader
+          kicker={inPlan ? "уже в плане" : isIdea ? "уже в идеях" : "сохранить активность"}
           heading={<>В какой{" "}<span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>день</span>{" "}напомнить.</>}
           ticket={{
             ...(ticket ?? { title }),
@@ -843,26 +845,6 @@ function DateSliderView({
               : (ticket?.title ?? title),
           }}
         />
-
-        {(isIdea || inPlan) && (
-          <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full bg-surface-muted px-3 py-2 text-foreground">
-              {inPlan ? "В плане" : "Уже в идеях"}
-            </span>
-            {onCollections && <button type="button" onClick={onCollections}
-              className="min-h-10 rounded-full border border-border px-3 font-medium hover:bg-surface-hover">
-              В коллекцию
-            </button>}
-            {onRemoveIdea && <button type="button" onClick={onRemoveIdea}
-              className="min-h-10 rounded-full border border-border px-3 text-muted-foreground hover:bg-surface-hover">
-              Убрать из идей
-            </button>}
-            {onRemovePlan && <button type="button" onClick={onRemovePlan}
-              className="min-h-10 rounded-full border border-border px-3 text-muted-foreground hover:bg-surface-hover">
-              Убрать из плана
-            </button>}
-          </div>
-        )}
 
         {options.length === 0 ? (
           <p className="mb-5 rounded-xl bg-surface-muted px-4 py-4 text-sm text-muted-foreground">
@@ -934,11 +916,32 @@ function DateSliderView({
         )}
 
         </>)}
-        {onIdea ? (
+        {onCollections ? (
+          <>
+            <OrDivider label="или без даты" />
+            <IdeasRow
+              onClick={onCollections}
+              title="В коллекцию"
+              subtitle="Выбрать или изменить коллекцию"
+            />
+          </>
+        ) : onIdea ? (
           <>
             <OrDivider label="или без даты" />
             <IdeasRow onClick={onIdea} />
           </>
+        ) : null}
+        {onRemoveIdea ? (
+          <button type="button" onClick={onRemoveIdea}
+            className="mt-4 min-h-11 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            Убрать из идей
+          </button>
+        ) : null}
+        {onRemovePlan ? (
+          <button type="button" onClick={onRemovePlan}
+            className="mt-2 min-h-11 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            Убрать из плана
+          </button>
         ) : null}
       </div>
 
@@ -1750,7 +1753,7 @@ function ModalContent(props: ModalContentProps) {
         .stp-opt:hover:not(:disabled) { background: #fff !important; border-color: #141210 !important; transform: translateX(2px); }
         .stp-opt:hover:not(:disabled) .stp-arr { transform: translateX(4px); color: #C24E22 !important; }
       `}</style>
-      <div style={{ position: "relative" }}>
+      <div className="relative min-w-0 w-full max-w-full overflow-x-clip">
         <SaveToPlanPickerBody
           scenario={scenario}
           isIdea={isIdea}
@@ -1784,7 +1787,7 @@ export function SaveToPlanModal(props: SaveToPlanModalProps) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="sm:max-w-md p-0 gap-0 overflow-hidden rounded-3xl border-neutral-200"
+          className="w-[calc(100vw-2rem)] min-w-0 max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[calc(100dvh-2rem)] overflow-x-hidden overflow-y-auto p-0 gap-0 rounded-3xl border-neutral-200"
           style={{ background: C.bg }}
         >
           <DialogTitle className="sr-only">Сохранить активность</DialogTitle>
