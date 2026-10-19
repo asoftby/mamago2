@@ -37,6 +37,7 @@ function addDaysIso(dateISO: string, days: number): string {
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import type { PlanItemWithActivity } from "../types/event";
 import { normalizePlanItemsFromApi } from "../lib/normalizePlanItemFromApi";
+import { removePlanEntry } from "../lib/removePlanEntry";
 import { sortPlanItemsForDay } from "../lib/sortPlanItemsForDay";
 import {
   MAX_PLAN_ITEMS_PER_SLOT,
@@ -646,10 +647,9 @@ function useMyPlanStore() {
   const removePlanItemFromDay = useCallback(
     async (planItemId: string): Promise<boolean> => {
       try {
-        const res = await fetch(
-          `/api/save/plan?planItemId=${encodeURIComponent(planItemId)}`,
-          { method: "DELETE", credentials: "include" },
-        );
+        const stored = Object.values(planItemsByDateMap).flat().find((item) => item.id === planItemId);
+        if (!stored) return false;
+        const res = await removePlanEntry(stored);
         if (!res.ok) return false;
         removePlanItemLocal(planItemId);
         void refetchPlanForDate(selectedPlanDate);
@@ -660,7 +660,7 @@ function useMyPlanStore() {
         return false;
       }
     },
-    [removePlanItemLocal, refetchPlanForDate, refetchPlanSummary, selectedPlanDate],
+    [planItemsByDateMap, removePlanItemLocal, refetchPlanForDate, refetchPlanSummary, selectedPlanDate],
   );
 
   const removeIdea = useCallback(async (activityId: string): Promise<boolean> => {
