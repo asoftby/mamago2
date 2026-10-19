@@ -91,15 +91,6 @@
   font-style: italic;
   color: var(--primary);
 }
-.heroTitleIcon {
-  display: inline-block;
-  width: 0.6em;
-  height: 0.6em;
-  margin-left: 0.2em;
-  vertical-align: 0.02em;
-  color: var(--primary);
-  stroke-width: 1.6;
-}
 .heroLead {
   max-width: 540px;
   margin-top: 22px;
@@ -331,7 +322,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--accent-deep);
+  color: var(--primary);
   margin-bottom: 28px;
 }
 .emptyTitle {
@@ -345,7 +336,7 @@
 .emptyTitleAccent {
   font-family: var(--font-display);
   font-style: italic;
-  color: var(--accent-deep);
+  color: var(--primary);
 }
 .emptyLead {
   margin: 14px 0 0;
