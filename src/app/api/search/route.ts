@@ -196,7 +196,7 @@ export async function GET(request: Request) {
 
     const placeIds = docs.filter((d) => d.entityType === "place").map((d) => d.entityId);
     const offerIds = docs.filter((d) => d.entityType === "offer").map((d) => d.entityId);
-    const placeById = new Map<string, { summaryLine: string | null; metaLine: string; imageUrl: string | null }>();
+    const placeById = new Map<string, { summaryLine: string | null; metaLine: string; imageUrl: string | null; placeCategory: string | null }>();
     const offerById = new Map<string, { summaryLine: string | null; metaLine: string }>();
 
     if (placeIds.length) {
@@ -204,6 +204,7 @@ export async function GET(request: Request) {
         where: { id: { in: placeIds }, status: "PUBLISHED", archivedAt: null },
         select: {
           id: true, shortAddress: true, formattedAddr: true, displayAddress: true, customAddress: true,
+          category: true, primaryCategory: { select: { nameRu: true } },
           ageTags: true, logoImageId: true, images: { select: { id: true, url: true, kind: true } },
           city: { select: { name: true } },
           openingHours: { select: { rules: { select: {
@@ -232,6 +233,7 @@ export async function GET(request: Request) {
           summaryLine: address,
           metaLine: [age, hours, price].filter(Boolean).join(" · "),
           imageUrl: (await resolvePlaceLogoUrlFromDb(place.images, place.logoImageId)) ?? null,
+          placeCategory: place.primaryCategory?.nameRu ?? place.category ?? null,
         });
       }
     }
@@ -278,6 +280,7 @@ export async function GET(request: Request) {
         title: d.title,
         url: d.urlPath,
         imageUrl: type === "place" ? (placeById.get(d.entityId)?.imageUrl ?? null) : d.imageUrl,
+        placeCategory: type === "place" ? (placeById.get(d.entityId)?.placeCategory ?? null) : null,
         // For activities prefer live fields even if address is null — never fall back
         // to the legacy shortDesc stored in SearchDocument.summaryLine.
         summaryLine: live ? live.summaryLine : d.summaryLine,

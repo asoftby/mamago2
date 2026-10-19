@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { PlaceCategoryIcon } from "@/components/place/PlaceCategoryIcon";
 import type { SearchResultItem as SearchResultItemType } from "@/lib/search/types";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
@@ -50,7 +51,6 @@ export function SearchResultItem({
   active?: boolean;
   onNavigate: () => void;
 }) {
-  const isActivity = item.type === "activity";
   const structured = ["activity", "offer", "place"].includes(item.type);
   const addressLine = structured ? item.summaryLine?.trim() || null : null;
   const detailLine = item.metaLine?.trim() || null;
@@ -69,6 +69,9 @@ export function SearchResultItem({
         active && "bg-neutral-50",
       )}
     >
+      {item.type === "place" && !item.imageUrl ? (
+        <PlaceCategoryIcon category={item.placeCategory} />
+      ) : (
       <div className={cn("relative h-12 w-12 shrink-0 overflow-hidden bg-neutral-100", item.type === "place" ? "rounded-full" : "rounded-lg")}>
         {item.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- динамические URL из каталога
@@ -83,6 +86,7 @@ export function SearchResultItem({
           </div>
         )}
       </div>
+      )}
       <div className="min-w-0 flex-1 space-y-0.5">
         <p className="truncate text-sm font-semibold text-neutral-900">
           {highlightText(item.title, query)}
