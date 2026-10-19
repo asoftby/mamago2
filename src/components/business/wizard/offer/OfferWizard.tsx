@@ -55,6 +55,8 @@ import {
 import { Step8Review } from "./steps/Step8Review";
 import { StepPaymentTerms } from "./steps/StepPaymentTerms";
 import { StepOpeningHours } from "./steps/StepOpeningHours";
+import { offerIsClass } from "@/lib/offers/offerClassSchedule";
+import { StepClassSchedule } from "./steps/StepClassSchedule";
 import { StepBookingMethod } from "./steps/StepBookingMethod";
 import { Step4CampSchedule } from "./steps/Step4CampSchedule";
 import { Step5Accommodation } from "./steps/Step5Accommodation";
@@ -407,7 +409,10 @@ export function OfferWizard({
   // The original schedule is tracked separately from the overall form dirty flag.
   const scheduleChanged = mode !== "edit" ||
     JSON.stringify(formData.schedule) !==
-    JSON.stringify((JSON.parse(baselineFormJson) as OfferFormData).schedule);
+    JSON.stringify((JSON.parse(baselineFormJson) as OfferFormData).schedule) ||
+    // Длительность занятия пересчитывает окончания занятий в расписании.
+    (offerIsClass(formData.productType) &&
+      formData.classDuration !== (JSON.parse(baselineFormJson) as OfferFormData).classDuration);
 
   /** Версия операционных данных, на которой построена форма; обновляется из ответа каждого PATCH. */
   const [operationalVersion, setOperationalVersion] = useState<string | undefined>(initialOperationalVersion);
@@ -595,6 +600,7 @@ export function OfferWizard({
           includeSchedule: variant === "v2" && scheduleChanged,
           includeTerms: variant === "v2",
           previousSchedule: (JSON.parse(baselineFormJson) as OfferFormData).schedule,
+          previousClassDuration: (JSON.parse(baselineFormJson) as OfferFormData).classDuration,
         });
         const response = await fetch(`/api/business/offers/${offerId}`, {
           method: "PATCH",
@@ -761,6 +767,7 @@ export function OfferWizard({
         includeSchedule: variant === "v2" && scheduleChanged,
           includeTerms: variant === "v2",
         previousSchedule: (JSON.parse(baselineFormJson) as OfferFormData).schedule,
+        previousClassDuration: (JSON.parse(baselineFormJson) as OfferFormData).classDuration,
       });
       const response = await fetch(`/api/business/offers/${offerId}`, {
         method: "PATCH",
@@ -851,13 +858,15 @@ export function OfferWizard({
         case "conditions":
           return <Step4Conditions {...commonProps} />;
         case "campSchedule":
-          return <Step4CampSchedule {...commonProps} />;
+          return <Step4CampSchedule {...commonProps} v2={variant === "v2"} />;
         case "accommodation":
           return <Step5Accommodation {...commonProps} />;
         case "price":
           return <Step5Pricing {...commonProps} hideCta={variant === "v2"} />;
         case "openingHours":
           return <StepOpeningHours {...commonProps} />;
+        case "classSchedule":
+          return <StepClassSchedule {...commonProps} />;
         case "bookingMethod":
           return (
             <StepBookingMethod

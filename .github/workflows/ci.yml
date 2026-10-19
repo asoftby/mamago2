@@ -37,6 +37,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: UI Lab access and route regressions
+        run: |
+          pnpm exec tsx src/lib/ui-lab/accessPolicy.test.ts
+          node --test scripts/ui-lab-route-contract.test.mjs
+          pnpm exec tsx src/lib/typography.test.ts
+          node --test scripts/typography-close-contract.test.mjs
+
       - name: Validate Prisma schema
         run: pnpm exec prisma validate
         env:
@@ -56,9 +63,19 @@ jobs:
           pnpm exec tsx src/server/services/booking/bookingBucket.contract.test.ts
 
       - name: Type check
-        run: pnpm tsc --noEmit
+        # GitHub ubuntu runners abort TypeScript at Node's default heap ceiling.
+        run: NODE_OPTIONS=--max-old-space-size=5120 pnpm tsc --noEmit
+
+      - name: Feedback model and multi-source reputation regressions
+        run: pnpm test:feedback-foundation
+
+      - name: Business onboarding progress regressions
+        run: pnpm exec tsx src/lib/business/onboardingProgress.test.ts
         env:
           NODE_OPTIONS: --max-old-space-size=6144
+
+      - name: Business publication date analytics regressions
+        run: pnpm exec tsx src/lib/business/publicationAnalyticsRange.test.ts
 
       - name: Upload pipeline regressions
         run: pnpm test:upload-pipeline
@@ -180,6 +197,9 @@ jobs:
       - name: Telegram plan notification regressions
         run: |
           NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/telegram/telegramNotificationBootstrap.service.test.ts
+          NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/telegram/botWelcome.test.ts
+          pnpm exec tsx src/lib/telegram/webAppButton.test.ts
+          pnpm exec tsx src/lib/telegram/verifyWebAppInitData.test.ts
           pnpm exec tsx src/lib/my-plan/planItemTimezoneRepair.test.ts
           bash -n scripts/deploy/run-prod-notification-jobs.sh
           bash -n scripts/deploy/install-prod-notification-cron.sh

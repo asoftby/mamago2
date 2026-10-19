@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, MoreHorizontal } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { SaveToPlanModal } from "@/components/activity/SaveToPlanModal";
+import { persistIdeaCollectionSelection } from "@/features/save/persistIdeaCollectionSelection";
 import { toast } from "@/lib/toast";
 import type { IdeaItem, Filter } from "./types";
 import { IdeasHeader } from "./components/IdeasHeader";
@@ -11,7 +16,6 @@ import { IdeasEmptyState } from "./components/IdeasEmptyState";
 import { IdeasCollectionsBar } from "./components/IdeasCollectionsBar";
 import { IdeasCollectionDialog } from "./components/IdeasCollectionDialog";
 import {
-  ALL_IDEAS,
   WITHOUT_COLLECTION,
   collectionTarget,
   updateCollectionCounts,
@@ -65,8 +69,22 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
   const [ideas, setIdeas] = useState<IdeaItem[]>(initialIdeas);
   const [collections, setCollections] = useState<CollectionSummary[]>(initialCollections);
   const [memberships, setMemberships] = useState<CollectionMemberships>(initialMemberships);
-  const [collectionFilter, setCollectionFilter] = useState(ALL_IDEAS);
-  const [collectionDialog, setCollectionDialog] = useState<CollectionDialogState | null>(null);
+  const params = useParams<{ id?: string }>();
+  const router = useRouter();
+  const collectionId = params?.id ?? null;
+  const isCollectionPage = collectionId !== null;
+  const collectionFilter = collectionId ?? WITHOUT_COLLECTION;
+  const activeCollection = collections.find((item) => item.id === collectionId) ?? null;
+  const collectionExists = !isCollectionPage || activeCollection !== null;
+  // Keep the overlay mounted while it closes so the sheet exit animation can finish.
+  const [collectionDialog, setCollectionDialog] = useState<CollectionDialogState>({ mode: "create" });
+  const [collectionDialogOpen, setCollectionDialogOpen] = useState(false);
+  const [dialogInstance, setDialogInstance] = useState(0);
+  function openCollectionDialog(dialog: CollectionDialogState) {
+    setCollectionDialog(dialog);
+    setDialogInstance((current) => current + 1);
+    setCollectionDialogOpen(true);
+  }
   const [filter, setFilter] = useState<Filter>("ALL");
   const [planModalId, setPlanModalId] = useState<string | null>(null);
   const [removingIdeaId, setRemovingIdeaId] = useState<string | null>(null);
@@ -151,7 +169,7 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
       if (!response.ok) throw new Error("delete_failed");
       setCollections((current) => current.filter((item) => item.id !== id));
       setMemberships((current) => Object.fromEntries(Object.entries(current).map(([ideaId, ids]) => [ideaId, ids.filter((item) => item !== id)])));
-      setCollectionFilter((current) => current === id ? ALL_IDEAS : current);
+      if (collectionId === id) router.replace("/me/ideas");
       toast.success("Коллекция удалена. Идеи сохранены.");
       return true;
     } catch {
@@ -161,7 +179,7 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
   }
 
   async function saveMembership(ids: string[]): Promise<boolean> {
-    if (collectionDialog?.mode !== "edit") return false;
+    if (!collectionDialogOpen || collectionDialog.mode !== "edit") return false;
     const idea = ideas.find((item) => item.id === collectionDialog.ideaId);
     if (!idea) return false;
     try {
@@ -183,28 +201,18 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
     }
   }
 
-  const counts = useMemo(
-    () => ({
-      ALL: ideas.length,
-      UNPLANNED: ideas.filter(
-        (idea) => !idea.isPlanned && idea.activity.temporalState !== "PAST",
-      ).length,
-      PLANNED: ideas.filter((idea) => idea.isPlanned).length,
-    }),
-    [ideas],
-  );
-
   const filtered = useMemo(
     () =>
       ideas.filter((idea) => {
         if (!visibleInCollection(idea, collectionFilter, memberships)) return false;
+        if (!isCollectionPage) return true;
         if (filter === "PLANNED") return idea.isPlanned;
         if (filter === "UNPLANNED") {
           return !idea.isPlanned && idea.activity.temporalState !== "PAST";
         }
         return true;
       }),
-    [filter, ideas, collectionFilter, memberships],
+    [filter, ideas, collectionFilter, memberships, isCollectionPage],
   );
 
   // Tab counts must be scoped to the selected collection, not all ideas.
@@ -260,65 +268,111 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
   }
 
   const planningIdea = ideas.find((i) => i.id === planModalId) ?? null;
-  const editingIdea = collectionDialog?.mode === "edit"
+  const editingIdea = collectionDialog.mode === "edit"
     ? (ideas.find((idea) => idea.id === collectionDialog.ideaId) ?? null)
     : null;
-  const managingCollection = collectionDialog?.mode === "manage"
+  const managingCollection = collectionDialog.mode === "manage"
     ? (collections.find((item) => item.id === collectionDialog.collectionId) ?? null)
     : null;
-  const withoutCount = ideas.filter((item) => !memberships[item.id]?.length).length;
-  const emptyVariant =
-    ideas.length === 0
-      ? "INITIAL"
-      : filter === "UNPLANNED"
-        ? "UNPLANNED"
-        : "PLANNED";
-
+  const withoutCount = ideas.filter((item) => visibleInCollection(item, WITHOUT_COLLECTION, memberships)).length;
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <IdeasHeader
-        totalCount={ideas.length}
-        plannedCount={counts.PLANNED}
-        unplannedCount={counts.UNPLANNED}
-      />
-
-      <IdeasCollectionsBar
-        collections={collections}
-        selected={collectionFilter}
-        total={ideas.length}
-        withoutCount={withoutCount}
-        onSelect={setCollectionFilter}
-        onCreate={() => setCollectionDialog({ mode: "create" })}
-        onManage={(collectionId) => setCollectionDialog({ mode: "manage", collectionId })}
-      />
-
-      {ideas.length > 0 ? (
-        <IdeasTabs value={filter} items={tabItems} onChange={setFilter} />
-      ) : null}
-
-      {filtered.length > 0 ? (
-        <IdeasGrid
-          ideas={filtered}
-          planningIdeaId={planModalId}
-          removingIdeaId={removingIdeaId}
-          onSchedule={setPlanModalId}
-          onRemove={handleRemove}
-          onCollection={(ideaId) => setCollectionDialog({ mode: "edit", ideaId })}
-        />
-      ) : collectionFilter !== ALL_IDEAS && ideas.length > 0 ? (
-        <div className="rounded-2xl border border-neutral-200 p-8 text-center">
-          <p className="text-base font-medium">В этой коллекции пока нет подходящих идей</p>
-          <button type="button" className="mt-3 text-sm font-semibold underline" onClick={() => { setCollectionFilter(ALL_IDEAS); setFilter("ALL"); }}>Все идеи</button>
-        </div>
+    <div className="w-full min-w-0 max-w-full space-y-6 overflow-x-clip sm:space-y-8">
+      {isCollectionPage ? (
+        <header className="space-y-4">
+          <Link
+            href="/me/ideas"
+            className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <ArrowLeft className="size-5" aria-hidden="true" />
+            Назад к идеям и коллекциям
+          </Link>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 space-y-2">
+              <h1 className="break-words text-[38px] leading-tight sm:text-[58px]" style={{ fontFamily: "var(--font-serif)" }}>
+                {activeCollection?.title ?? "Коллекция не найдена"}
+              </h1>
+              {collectionExists && (
+                <p className="text-sm text-muted-foreground">
+                  {ideas.filter((idea) => visibleInCollection(idea, collectionFilter, memberships)).length} сохранено
+                </p>
+              )}
+            </div>
+            {activeCollection && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label={`Управлять коллекцией «${activeCollection.title}»`}
+                onClick={() => openCollectionDialog({ mode: "manage", collectionId: activeCollection.id })}
+              >
+                <MoreHorizontal className="size-5" />
+              </Button>
+            )}
+          </div>
+        </header>
       ) : (
-        <IdeasEmptyState variant={emptyVariant} discoveryHref={discoveryHref} />
+        <>
+          <IdeasHeader />
+          <IdeasCollectionsBar
+            collections={collections}
+            ideas={ideas}
+            memberships={memberships}
+            onCreate={() => openCollectionDialog({ mode: "create" })}
+            onManage={(id) => openCollectionDialog({ mode: "manage", collectionId: id })}
+          />
+          <section aria-label="Неотсортированные коллекции" className="space-y-4">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <h2 className="text-lg font-semibold">Неотсортированные коллекции</h2>
+              <span className="text-sm text-muted-foreground">({withoutCount})</span>
+            </div>
+            {ideas.length === 0 ? (
+              <IdeasEmptyState variant="INITIAL" discoveryHref={discoveryHref} />
+            ) : withoutCount === 0 ? (
+              <p className="text-sm text-muted-foreground">Все сохранённые идеи уже распределены по коллекциям.</p>
+            ) : (
+              <IdeasGrid
+                ideas={filtered}
+                variant="unsorted"
+                planningIdeaId={planModalId}
+                removingIdeaId={removingIdeaId}
+                onSchedule={setPlanModalId}
+                onRemove={handleRemove}
+                onCollection={(ideaId) => openCollectionDialog({ mode: "edit", ideaId })}
+              />
+            )}
+          </section>
+        </>
       )}
 
-      {collectionDialog && (
-        <IdeasCollectionDialog
-          key={collectionDialog.mode === "edit" ? `edit-${collectionDialog.ideaId}` : collectionDialog.mode === "manage" ? `manage-${collectionDialog.collectionId}` : "create"}
-          open={true}
-          onOpenChange={(open) => { if (!open) setCollectionDialog(null); }}
+      {isCollectionPage && collectionExists && (
+        <>
+          {ideas.length > 0 && (
+            <IdeasTabs value={filter} items={tabItems} onChange={setFilter} />
+          )}
+          {filtered.length > 0 ? (
+            <IdeasGrid
+              ideas={filtered}
+              planningIdeaId={planModalId}
+              removingIdeaId={removingIdeaId}
+              onSchedule={setPlanModalId}
+              onRemove={handleRemove}
+              onCollection={(ideaId) => openCollectionDialog({ mode: "edit", ideaId })}
+            />
+          ) : (
+            <div className="rounded-2xl border border-border p-8 text-center">
+              <p className="text-base font-medium">В этой коллекции пока нет подходящих идей</p>
+              <Link href="/me/ideas" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline">
+                Вернуться к коллекциям
+              </Link>
+            </div>
+          )}
+        </>
+      )}
+
+      <IdeasCollectionDialog
+          key={`${dialogInstance}-${collectionDialog.mode === "edit" ? `edit-${collectionDialog.ideaId}` : collectionDialog.mode === "manage" ? `manage-${collectionDialog.collectionId}` : "create"}`}
+          open={collectionDialogOpen}
+          onOpenChange={setCollectionDialogOpen}
           mode={collectionDialog.mode}
           ideaTitle={editingIdea?.activity.title}
           collection={managingCollection}
@@ -329,7 +383,6 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
           onRename={renameCollection}
           onDelete={deleteCollection}
         />
-      )}
 
       <SaveToPlanModal
         open={planModalId !== null}
@@ -346,11 +399,27 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
         inPlan={planningIdea?.isPlanned ?? false}
         planDate={planningIdea?.plannedDate ?? null}
         source="ideas"
+        collectionTarget={planningIdea ? collectionTarget(planningIdea) : undefined}
         onConfirm={(result) => {
           if (result.action === "plan" && result.dateISO && planModalId) {
             handlePlanned(planModalId, result.dateISO);
           } else if (result.action === "remove-idea" && planningIdea) {
             void handleRemove(planningIdea, { silentSuccess: true });
+          } else if (result.action === "ideas" && planningIdea) {
+            const idea = planningIdea;
+            const target = collectionTarget(idea);
+            void persistIdeaCollectionSelection(result, target)
+              .then(async () => {
+                const response = await fetch("/api/save/idea/collections?" + new URLSearchParams(target), { cache: "no-store" });
+                if (response.ok) {
+                  const json = (await response.json()) as { collectionIds?: string[] };
+                  if (Array.isArray(json.collectionIds)) {
+                    setMemberships((current) => ({ ...current, [idea.id]: json.collectionIds ?? [] }));
+                  }
+                }
+                await refreshCollections();
+              })
+              .catch(() => toast.error("Не удалось обновить коллекцию"));
           }
           setPlanModalId(null);
         }}

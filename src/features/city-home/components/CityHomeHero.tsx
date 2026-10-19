@@ -1,5 +1,7 @@
 "use client";
 
+import { ptSerifHome } from "@/lib/fonts";
+
 import { useMemo } from "react";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
@@ -83,7 +85,7 @@ export function CityHomeHero() {
       {greeting && (
         <p className="text-sm text-neutral-400 font-medium">{greeting}</p>
       )}
-      <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-neutral-900">
+      <h1 className="text-2xl md:text-3xl font-normal tracking-tight text-neutral-900" style={{ fontFamily: ptSerifHome.style.fontFamily }}>
         {contextTitle}
       </h1>
       <p className="text-sm text-neutral-500 max-w-xl leading-relaxed pt-0.5">

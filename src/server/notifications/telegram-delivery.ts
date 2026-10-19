@@ -6,6 +6,7 @@ import type {
   PreparedNotificationPayload,
 } from "@/lib/notifications/domainContracts";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
+import { createTelegramLinkButton } from "@/lib/telegram/webAppButton";
 import {
   TelegramChannel,
   type TelegramParseMode,
@@ -53,7 +54,7 @@ async function buildTelegramPayload(prepared: PreparedNotificationPayload): Prom
     text,
     parseMode,
     replyMarkup: {
-      inline_keyboard: [[{ text: prepared.content.ctaLabel ?? "Открыть", url: ctaUrl }]],
+      inline_keyboard: [[createTelegramLinkButton(prepared.content.ctaLabel ?? "Открыть", ctaUrl, getCanonicalPublicAppUrl())]],
     },
   };
 }

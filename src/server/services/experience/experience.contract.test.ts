@@ -78,7 +78,9 @@ assert.match(feedbackRoute, /z\.enum\(\["LIKE", "NEUTRAL", "DISLIKE"\]\)/);
 assert.match(feedbackRoute, /MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH/);
 assert.match(feedbackRoute, /PHONE_NOT_VERIFIED/);
 assert.match(feedbackRoute, /user\.phoneVerifiedAt/);
-assert.match(service, /feedbackComment: comment/);
+assert.match(service, /feedbackComment:\s*nextComment/);
+assert.match(service, /const nextComment = input\.allowEditing && !comment \? existing\.feedbackComment : comment/);
+assert.match(service, /allowEditing\?: boolean/);
 assert.match(schema, /feedbackComment\s+String\?/);
 assert.doesNotMatch(engagementWeights, /ATTENDED|EXPERIENCE_FEEDBACK/);
 

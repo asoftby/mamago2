@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -36,12 +36,13 @@ export function PageCloseButton({
   }
 
   return (
-    <button
+    <ModalCloseButton
       type="button"
+      size="touch"
       onClick={handleClick}
       aria-label={ariaLabel}
       className={cn(
-        "absolute top-5 left-5 inline-flex h-11 w-11 items-center justify-center rounded-full",
+        "absolute top-5 left-5",
         "border border-white/70 bg-white/88 text-neutral-500 backdrop-blur-md",
         "shadow-[0_10px_30px_rgba(17,24,39,0.12)]",
         "transition-all duration-200 hover:-translate-y-0.5 hover:text-neutral-900",
@@ -49,8 +50,6 @@ export function PageCloseButton({
         "focus:outline-none focus:ring-2 focus:ring-[#EF8759]/30",
         className,
       )}
-    >
-      <X className="h-5 w-5" aria-hidden />
-    </button>
+    />
   );
 }

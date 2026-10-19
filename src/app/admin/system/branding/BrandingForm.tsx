@@ -15,6 +15,7 @@ import { toast } from "@/lib/toast";
 import { uploadMediaFile } from "@/lib/uploads/uploadClient";
 import { UPLOAD_IMAGE_ACCEPT } from "@/lib/uploads/uploadConfig";
 import type { BrandingConfig } from "@/lib/branding";
+import { BRAND_FONTS, getBrandFontStack, type BrandFont } from "@/lib/typography";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -54,25 +55,7 @@ const COLOR_TOKENS: {
   },
 ];
 
-const FONT_OPTIONS = [
-  { value: "Inter", label: "Inter" },
-  { value: "Roboto", label: "Roboto" },
-  { value: "Montserrat", label: "Montserrat" },
-  { value: "Nunito", label: "Nunito" },
-  { value: "Raleway", label: "Raleway" },
-  { value: "Playfair Display", label: "Playfair Display" },
-  { value: "Georgia", label: "Georgia (системный)" },
-  { value: "Arial", label: "Arial (системный)" },
-];
-
-const GOOGLE_FONTS = new Set([
-  "Inter",
-  "Roboto",
-  "Montserrat",
-  "Nunito",
-  "Raleway",
-  "Playfair Display",
-]);
+const FONT_OPTIONS = BRAND_FONTS.map((font) => ({ value: font, label: font }));
 
 const FAVICON_IMAGE_ACCEPT = "image/png,image/webp,.png,.webp";
 
@@ -266,30 +249,17 @@ function FontPreview({
   fontHeading: string;
   fontBody: string;
 }) {
-  const toImport = [...new Set([fontHeading, fontBody])].filter((f) =>
-    GOOGLE_FONTS.has(f),
-  );
-
-  const importUrl =
-    toImport.length > 0
-      ? `https://fonts.googleapis.com/css2?${toImport.map((f) => `family=${encodeURIComponent(f)}:wght@400;600;700`).join("&")}&display=swap`
-      : null;
-
   return (
     <div className="rounded-xl border border-gray-100 bg-white p-5 space-y-3">
-      {importUrl && (
-        // eslint-disable-next-line @next/next/no-css-tags
-        <style>{`@import url('${importUrl}');`}</style>
-      )}
       <p className="text-xs text-gray-400 font-mono mb-3">Preview</p>
       <p
-        style={{ fontFamily: `"${fontHeading}", sans-serif` }}
+        style={{ fontFamily: getBrandFontStack(fontHeading as BrandFont) }}
         className="text-xl font-bold text-gray-900"
       >
         Заголовок страницы
       </p>
       <p
-        style={{ fontFamily: `"${fontBody}", sans-serif` }}
+        style={{ fontFamily: getBrandFontStack(fontBody as BrandFont) }}
         className="text-sm text-gray-600"
       >
         Основной текст сайта. Здесь отображается шрифт для контента — описания
@@ -524,8 +494,7 @@ export function BrandingForm({ initial }: { initial: BrandingConfig }) {
               Шрифт заголовков
             </label>
             <p className="font-mono text-xs text-gray-400">
-              --font-heading → новая переменная — применится после внедрения в
-              компоненты
+              Google Sans / PT Serif / Menlo
             </p>
             <Select value={fontHeading} onValueChange={setFontHeading}>
               <SelectTrigger className="mt-1">
@@ -545,8 +514,7 @@ export function BrandingForm({ initial }: { initial: BrandingConfig }) {
               Шрифт текста
             </label>
             <p className="font-mono text-xs text-gray-400">
-              --font-body → новая переменная — применится после внедрения в
-              компоненты
+              Только утверждённые шрифты
             </p>
             <Select value={fontBody} onValueChange={setFontBody}>
               <SelectTrigger className="mt-1">

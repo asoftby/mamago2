@@ -26,6 +26,11 @@ import {
   normalizeClosedDates,
   type OfferScheduleForm,
 } from "@/lib/offers/offerSchedule";
+import {
+  defaultClassSchedule,
+  groupsFromRules,
+  offerIsClass,
+} from "@/lib/offers/offerClassSchedule";
 import type { OpeningHoursData } from "@/components/openingHours/openingHours.types";
 import {
   createExcerpt,
@@ -701,7 +706,7 @@ export function buildOfferCreatePayload(
     categoryIds: data.categoryIds,
     interestSlugs: data.interestSlugs,
     ...(opts?.includeTerms ? termsPayload(data) : {}),
-    ...(opts?.includeSchedule ? { schedule: buildScheduleInput(data.schedule, productType) } : {}),
+    ...(opts?.includeSchedule ? { schedule: buildScheduleInput(data.schedule, productType, data.classDuration) } : {}),
     wizardCompletedSteps: opts?.wizardCompletedSteps,
     faqItems: normalizeFaqItems(data.faqItems),
     status: opts?.status ?? "DRAFT",
@@ -866,6 +871,8 @@ export function buildOfferUpdatePayload(
     /** Новый мастер: отправлять предоплату, отмену и зону выезда (колонки Offer). */
     includeTerms?: boolean;
     previousSchedule?: OfferScheduleForm;
+    /** `classDuration` исходной формы: смена длительности пересчитывает концы занятий. */
+    previousClassDuration?: string;
   }
 ) {
   const pricingMode = data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
@@ -940,8 +947,8 @@ export function buildOfferUpdatePayload(
     interestSlugs: data.interestSlugs,
     ...(opts?.includeTerms ? termsPayload(data) : {}),
     ...(opts?.includeSchedule ? { schedule: opts.previousSchedule
-      ? buildChangedScheduleInput(data.schedule, opts.previousSchedule, productType)
-      : buildScheduleInput(data.schedule, productType) } : {}),
+      ? buildChangedScheduleInput(data.schedule, opts.previousSchedule, productType, data.classDuration, opts.previousClassDuration)
+      : buildScheduleInput(data.schedule, productType, data.classDuration) } : {}),
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
@@ -980,11 +987,13 @@ type OfferOpeningHoursRow = {
 
 /** Расписание формы из строки оффера. Прежние режимы записи остаются как есть (`legacyBookingMode`). */
 function scheduleFromOffer(offer: {
+  productType?: OfferProductType | null;
   bookingEnabled?: boolean | null;
   bookingMode?: string | null;
   inheritPlaceOpeningHours?: boolean | null;
   openingHours?: OfferOpeningHoursRow | null;
-  offerBooking?: { externalKind?: "WEBSITE" | "TICKETS" | null; externalUrl?: string | null } | null;
+  offerBooking?: OfferBookingRow | null;
+  sessions?: Array<{ startAt: Date | string; capacity?: number | null }> | null;
 }): OfferScheduleForm {
   const base = defaultOfferSchedule();
   const { method, legacy } = bookingMethodFromColumns(offer);
@@ -1018,9 +1027,66 @@ function scheduleFromOffer(offer: {
     // Свой график — только если оффер его не наследует от места и он реально есть.
     hoursSource: own && offer.inheritPlaceOpeningHours === false ? "own" : "place",
     hours,
-    closedDates: normalizeClosedDates(
-      (own?.exceptions ?? []).filter((item) => item.isClosed && item.allDay).map((item) => item.date),
-    ),
+    ...(offerIsClass(offer.productType) ? classScheduleFromOffer(offer) : {
+      closedDates: normalizeClosedDates(
+        (own?.exceptions ?? []).filter((item) => item.isClosed && item.allDay).map((item) => item.date),
+      ),
+    }),
+  };
+}
+
+type OfferBookingRow = {
+  externalKind?: "WEBSITE" | "TICKETS" | null;
+  externalUrl?: string | null;
+  scheduleKind?: string | null;
+  timezone?: string | null;
+  rules?: Array<{
+    weekday: number;
+    startMinutes: number;
+    capacity: number | null;
+    validFrom?: Date | string | null;
+    validTo?: Date | string | null;
+  }>;
+  exceptions?: Array<{ date: Date | string }>;
+};
+
+const dateKeyOf = (value: Date | string) => (typeof value === "string" ? value : value.toISOString()).slice(0, 10);
+
+/** Занятия: группы/даты и закрытые дни из OfferScheduleRule/Session/Exception. */
+function classScheduleFromOffer(offer: {
+  productType?: OfferProductType | null;
+  offerBooking?: OfferBookingRow | null;
+  sessions?: Array<{ startAt: Date | string; capacity?: number | null }> | null;
+}): Pick<OfferScheduleForm, "closedDates" | "classSchedule"> {
+  const booking = offer.offerBooking;
+  const classSchedule = defaultClassSchedule();
+  if (offer.productType === "REGULAR_ACTIVITY" && booking?.rules?.length) {
+    Object.assign(classSchedule, groupsFromRules(booking.rules));
+  }
+  if (offer.productType === "ONE_TIME_ACTIVITY" && offer.sessions?.length) {
+    const timezone = booking?.timezone || "Europe/Minsk";
+    classSchedule.dates = offer.sessions.map((session) => {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }).formatToParts(new Date(session.startAt));
+      const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "00";
+      return {
+        id: `session:${new Date(session.startAt).toISOString()}`,
+        date: `${part("year")}-${part("month")}-${part("day")}`,
+        time: `${part("hour")}:${part("minute")}`,
+        seats: session.capacity ? String(session.capacity) : "",
+      };
+    });
+  }
+  return {
+    classSchedule,
+    closedDates: normalizeClosedDates((booking?.exceptions ?? []).map((item) => dateKeyOf(item.date))),
   };
 }
 
@@ -1089,7 +1155,8 @@ export function mapOfferToFormData(offer: {
   bookingNote?: string | null;
   inheritPlaceOpeningHours?: boolean | null;
   openingHours?: OfferOpeningHoursRow | null;
-  offerBooking?: { externalKind?: "WEBSITE" | "TICKETS" | null; externalUrl?: string | null } | null;
+  offerBooking?: OfferBookingRow | null;
+  sessions?: Array<{ startAt: Date | string; capacity?: number | null }> | null;
   contactSocialLinks?: unknown;
   details?: unknown;
   // Phase 3b-1 party-filter columns (PARTY_SERVICE canon)

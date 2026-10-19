@@ -460,6 +460,8 @@ export async function submitExperienceFeedback(input: {
   sentiment: ExperienceSentiment;
   comment?: string | null;
   sessionId?: string | null;
+  /** Feedback v1 only: support revising personal reactions. */
+  allowEditing?: boolean;
 }): Promise<Experience> {
   const comment = normalizeExperienceFeedbackComment(input.comment);
   const found = await prisma.experience.findUnique({ where: { id: input.experienceId } });
@@ -475,7 +477,8 @@ export async function submitExperienceFeedback(input: {
   if (existing.attendance !== "ATTENDED") {
     throw new ExperienceDomainError("feedback_not_allowed", "Feedback requires attended experience");
   }
-  if (existing.feedbackSentiment && !isSameExperienceFeedback(existing, { sentiment: input.sentiment, comment })) {
+  const nextComment = input.allowEditing && !comment ? existing.feedbackComment : comment;
+  if (existing.feedbackSentiment && !isSameExperienceFeedback(existing, { sentiment: input.sentiment, comment: nextComment }) && !input.allowEditing) {
     throw new ExperienceDomainError("feedback_conflict", "Feedback has already been submitted");
   }
 
@@ -483,11 +486,20 @@ export async function submitExperienceFeedback(input: {
   if (!existing.feedbackSentiment) {
     const updated = await prisma.experience.updateMany({
       where: { id: existing.id, feedbackSentiment: null },
-      data: { feedbackSentiment: input.sentiment, feedbackComment: comment, feedbackAt: new Date() },
+      data: { feedbackSentiment: input.sentiment, feedbackComment: nextComment, feedbackAt: new Date() },
     });
     experience = await prisma.experience.findUniqueOrThrow({ where: { id: existing.id } });
-    if (updated.count === 0 && !isSameExperienceFeedback(experience, { sentiment: input.sentiment, comment })) {
+    if (updated.count === 0 && !isSameExperienceFeedback(experience, { sentiment: input.sentiment, comment: nextComment })) {
       throw new ExperienceDomainError("feedback_conflict", "Feedback has already been submitted");
+    }
+  } else if (input.allowEditing && !isSameExperienceFeedback(existing, { sentiment: input.sentiment, comment: nextComment })) {
+    const updated = await prisma.experience.updateMany({
+      where: { id: existing.id, feedbackSentiment: existing.feedbackSentiment, feedbackComment: existing.feedbackComment },
+      data: { feedbackSentiment: input.sentiment, feedbackComment: nextComment, feedbackAt: new Date() },
+    });
+    experience = await prisma.experience.findUniqueOrThrow({ where: { id: existing.id } });
+    if (updated.count === 0 && !isSameExperienceFeedback(experience, { sentiment: input.sentiment, comment: nextComment })) {
+      throw new ExperienceDomainError("feedback_conflict", "Feedback was edited concurrently");
     }
   }
   await ensureExperienceTelemetry(experience, "EXPERIENCE_FEEDBACK", input);

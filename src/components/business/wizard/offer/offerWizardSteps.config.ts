@@ -19,6 +19,8 @@ import { validatePublicationAccess } from "@/features/publication-access";
 import { showCampLodgingFormFields } from "./campOfferModel";
 import { isOfferContactsComplete } from "./contacts";
 import { getScheduleMissingFields } from "@/lib/offers/offerSchedule";
+import { getClassScheduleMissingFields } from "@/lib/offers/offerClassSchedule";
+import { getCampShiftMissingFields } from "./campOfferModel";
 import {
   type OfferWizardStepDef,
   V2_STEPS,
@@ -163,6 +165,7 @@ export function getStepsForOfferType(
     schedule: v2StepDefWithoutKey("schedule"),
     terms: v2StepDefWithoutKey("terms"),
     openingHours: v2StepDefWithoutKey("schedule"),
+    classSchedule: v2StepDefWithoutKey("schedule"),
     bookingMethod: v2StepDefWithoutKey("schedule"),
     paymentTerms: v2StepDefWithoutKey("terms"),
   };
@@ -384,9 +387,12 @@ export function isStepComplete(
       if (data.offerWizardType === "CAMP") {
         const dated = data.campSessions.filter((s) => s.dateFrom && s.dateTo);
         if (dated.length === 0) return false;
-        return !dated.some(
-          (s) => s.dateFrom && s.dateTo && s.dateFrom > s.dateTo,
-        );
+        if (dated.some((s) => s.dateFrom && s.dateTo && s.dateFrom > s.dateTo)) return false;
+        // Новый мастер: у каждой смены есть название, даты и цена.
+        if (variant === "v2") {
+          return data.campSessions.every((session) => getCampShiftMissingFields(session).length === 0);
+        }
+        return true;
       }
       return true;
 
@@ -469,6 +475,9 @@ export function isStepComplete(
 
     case "openingHours":
       return !getScheduleMissingFields(data.schedule, data.productType).includes("Дни работы");
+
+    case "classSchedule":
+      return getClassScheduleMissingFields(data.schedule.classSchedule, data.productType, data.classDuration).length === 0;
 
     case "bookingMethod":
       return !getScheduleMissingFields(data.schedule, data.productType).some(
@@ -579,6 +588,11 @@ export function getMissingFieldsForStep(
         ) {
           missing.push("Корректный интервал дат смены");
         }
+        if (variant === "v2") {
+          data.campSessions.forEach((session, index) => {
+            for (const field of getCampShiftMissingFields(session)) missing.push(`Смена ${index + 1}: ${field}`);
+          });
+        }
       }
       break;
 
@@ -602,6 +616,12 @@ export function getMissingFieldsForStep(
 
     case "openingHours":
       missing.push(...getScheduleMissingFields(data.schedule, data.productType).filter((field) => field === "Дни работы"));
+      break;
+
+    case "classSchedule":
+      missing.push(
+        ...getClassScheduleMissingFields(data.schedule.classSchedule, data.productType, data.classDuration),
+      );
       break;
 
     case "bookingMethod":

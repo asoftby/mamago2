@@ -30,7 +30,22 @@ export async function loadOfferForWizard(offerId: string, options?: { viewerEdit
         orderBy: { sortOrder: "asc" },
       },
       offerBooking: {
-        select: { externalKind: true, externalUrl: true },
+        select: {
+          externalKind: true,
+          externalUrl: true,
+          scheduleKind: true,
+          timezone: true,
+          rules: {
+            select: { weekday: true, startMinutes: true, capacity: true, validFrom: true, validTo: true },
+            orderBy: [{ startMinutes: "asc" }, { weekday: "asc" }],
+          },
+          exceptions: { select: { date: true }, orderBy: { date: "asc" } },
+        },
+      },
+      sessions: {
+        where: { isCancelled: false },
+        select: { startAt: true, capacity: true },
+        orderBy: { startAt: "asc" },
       },
       openingHours: {
         include: {

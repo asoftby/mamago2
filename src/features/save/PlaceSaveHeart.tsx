@@ -189,6 +189,7 @@ export function PlaceSaveHeart({
         open={flowOpen}
         onOpenChange={setFlowOpen}
         isAuthenticated={isAuthenticated}
+        collectionTarget={{ placeId }}
         scenario={{
           kind: "quickdate",
           title: placeTitle,

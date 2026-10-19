@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense, type CSSProperties } from "react";
 import "./globals.css";
-import { googleSans, ntSomic, ptSerif } from "@/lib/fonts";
+import { googleSans, ptSerif } from "@/lib/fonts";
+import { getBrandFontStack } from "@/lib/typography";
 import { Sonner } from "@/components/ui/sonner";
 import { AccountModeProvider } from "@/contexts/AccountModeContext";
 import { SaveIntentProvider } from "@/lib/save/SaveIntentContext";
@@ -45,10 +46,10 @@ export default async function RootLayout({
   return (
     <html
       lang="ru"
-      className={`${googleSans.variable} ${ntSomic.variable} ${ptSerif.variable}`}
+      className={`${googleSans.variable} ${ptSerif.variable}`}
       style={{
         "--font-sans":
-          "var(--font-google-sans), var(--font-ntsomic), ui-sans-serif, system-ui, sans-serif",
+          getBrandFontStack("Google Sans"),
       } as CSSProperties}
       suppressHydrationWarning
     >
@@ -63,8 +64,8 @@ export default async function RootLayout({
             --color-background: ${branding.colorBackground};
             --color-surface: ${branding.colorSurface};
             --color-text: ${branding.colorText};
-            --font-heading: ${branding.fontHeading};
-            --font-body: ${branding.fontBody};
+            --font-heading: ${getBrandFontStack(branding.fontHeading)};
+            --font-body: ${getBrandFontStack(branding.fontBody)};
           }
           html[data-cc-consent-known="1"] #mamago-cookie-shell {
             display: none !important;

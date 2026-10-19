@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { persistIdeaCollectionSelection, type IdeaCollectionTarget } from "@/features/save/persistIdeaCollectionSelection";
 import { CheckCircle2 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
@@ -46,6 +47,7 @@ export type SaveActivityFlowAdaptiveProps = {
   /** Entity id for guest pending-action resume; falls back to activityId when omitted */
   pendingEntityId?: string;
   source?: string;
+  collectionTarget?: IdeaCollectionTarget;
   onPersist: (result: SaveToPlanResult) => Promise<void>;
   nextHref?: string;
   /** Show "Видно семье"; enable only when onPersist forwards `result.visibility` to the server. */
@@ -108,6 +110,7 @@ export function SaveActivityFlowAdaptive({
   pendingEntityType = "activity",
   pendingEntityId,
   source,
+  collectionTarget,
   onPersist,
   nextHref,
   showVisibilityToggle = false,
@@ -135,8 +138,16 @@ export function SaveActivityFlowAdaptive({
     async (result: SaveToPlanResult) => {
       if (result.action === "cancel") return;
       await onPersist(result);
+      if (result.action === "ideas") {
+        try {
+          await persistIdeaCollectionSelection(result, collectionTarget);
+        } catch (error) {
+          toast.error("Идея сохранена, но коллекцию обновить не удалось. Попробуйте ещё раз.");
+          throw error;
+        }
+      }
     },
-    [onPersist],
+    [onPersist, collectionTarget],
   );
 
   const handleCommit = React.useCallback(
@@ -267,6 +278,7 @@ export function SaveActivityFlowAdaptive({
           planStartsAt={planStartsAt}
           planItemId={planItemId}
           source={source}
+          collectionTarget={collectionTarget}
           onCommit={handleCommit}
           onClose={() => onOpenChange(false)}
           showVisibilityToggle={showVisibilityToggle}

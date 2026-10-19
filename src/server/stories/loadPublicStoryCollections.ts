@@ -1,3 +1,4 @@
+import { publicOfferSessionWhere } from "@/lib/offers/publicOfferSessions";
 import { HomeStoryPlacementType, HomeStorySourceType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { applyRenderPolicy } from "@/lib/stories/renderPolicy";
@@ -164,7 +165,7 @@ export async function loadPublicStoryCollections(input: {
   const forcedOfferSessionIds = forced.filter((row) => row.sourceType === HomeStorySourceType.OFFER).map((row) => row.occurrenceKey);
   if (forcedOfferSessionIds.length > 0 && slotItems.has("today")) {
     const sessions = await prisma.offerSession.findMany({
-      where: { id: { in: forcedOfferSessionIds }, offer: { status: "PUBLISHED", OR: [{ cityId: input.cityId }, { place: { cityId: input.cityId } }] } },
+      where: { ...publicOfferSessionWhere, id: { in: forcedOfferSessionIds }, offer: { status: "PUBLISHED", OR: [{ cityId: input.cityId }, { place: { cityId: input.cityId } }] } },
       select: { id: true, offerId: true, startAt: true, offer: { select: { title: true, placeId: true, coverImage: true } } },
     });
     const additions: StoryRailItem[] = sessions.map((row) => ({

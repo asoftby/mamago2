@@ -450,9 +450,11 @@ export async function getPublicationAnalyticsDetail(params: {
   entityType: AnalyticsEntityType;
   entityId: string;
   filters: Pick<AnalyticsOverviewFilters, "dateRange" | "city">;
+  /** Optional ownership-checked business reporting window; admin path unchanged. */
+  rangeOverride?: { start: Date; end: Date };
 }): Promise<PublicationAnalyticsDetail> {
   const { entityType, entityId } = params;
-  const { start, end } = resolveAnalyticsDateRange(params.filters.dateRange);
+  const { start, end } = params.rangeOverride ?? resolveAnalyticsDateRange(params.filters.dateRange);
   const cityId = await resolveCityIdFromSlug(params.filters.city);
 
   const baseWhere: Prisma.UserEventWhereInput = {

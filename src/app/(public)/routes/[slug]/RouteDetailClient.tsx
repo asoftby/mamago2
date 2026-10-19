@@ -341,10 +341,10 @@ export function RouteDetailClient({ route, canEdit }: Props) {
       setInPlan(true);
       toast.success("Маршрут добавлен в план");
     } else if (result.action === "ideas") {
-      const res = await fetch("/api/save/idea", {
+      const res = await fetch("/api/ideas/routes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activityId: route.id }),
+        body: JSON.stringify({ routeId: route.id, routeSlug: route.slug }),
       });
       if (!res.ok) throw new Error("idea_save_failed");
       toast.success("Маршрут сохранён в идеи");
@@ -693,6 +693,7 @@ export function RouteDetailClient({ route, canEdit }: Props) {
         open={planOpen}
         onOpenChange={setPlanOpen}
         isAuthenticated={isAuthenticated}
+        collectionTarget={{ routeId: route.id }}
         scenario={{ kind: "quickdate", title: route.title }}
         onPersist={handlePersist}
       />

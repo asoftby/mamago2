@@ -13,7 +13,7 @@ import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import { BusinessSectionHeader } from "@/components/business/sections/BusinessSectionHeader";
 import { getPerformanceMetricsByEntity } from "@/server/services/business/businessWorkspace.service";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
-import { countPlanUsersByActivity } from "@/server/services/plan.service";
+import { businessPublicationDayRange } from "@/lib/business/publicationAnalyticsRange";
 import { getPromotionPerformanceByActivityIds } from "@/server/services/promotion/boostPerformance.service";
 
 interface SearchParams {
@@ -84,7 +84,7 @@ export default async function EventsPage({
     orderBy: { createdAt: "desc" },
   });
   const now = new Date();
-  const [metricsByEntity, planUsersByActivity, activePromotions, promotionPerformanceByActivity] = await Promise.all([
+  const [metricsByEntity, activePromotions, promotionPerformanceByActivity] = await Promise.all([
     getPerformanceMetricsByEntity({
       events: activities.map((activity) => ({
         id: activity.id,
@@ -93,8 +93,8 @@ export default async function EventsPage({
         status: activity.status,
       })),
       offers: [],
+      dateRange: businessPublicationDayRange("today", now),
     }),
-    countPlanUsersByActivity(activities.map((activity) => activity.id)),
     activities.length === 0
       ? Promise.resolve([])
       : prisma.promotion.findMany({
@@ -129,7 +129,6 @@ export default async function EventsPage({
         planAdds: 0,
         ctaClicks: 0,
       }),
-          planAdds: planUsersByActivity.get(activity.id) ?? 0,
         },
       };
     })

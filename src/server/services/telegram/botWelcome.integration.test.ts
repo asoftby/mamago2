@@ -130,7 +130,7 @@ test("first link: allowlisted user gets the full welcome once, with the plan but
   assert.match(sent[0]!.text, /Помогаю семье ничего не забывать/);
   assert.match(sent[0]!.text, /Попробуйте прямо сейчас/);
   assert.deepEqual(sent[0]!.replyMarkup, {
-    inline_keyboard: [[{ text: "Открыть Мой план", url: "https://example.test/me/plan" }]],
+    inline_keyboard: [[{ text: "Открыть Мой план", web_app: { url: "https://example.test/telegram/open?next=%2Fme%2Fplan" } }]],
   });
   const connection = await db.telegramConnection.findUniqueOrThrow({
     where: { userId_environment: { userId, environment: "DEV" } },

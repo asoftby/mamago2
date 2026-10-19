@@ -1,7 +1,5 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { WizardPlayground } from "./_components/WizardPlayground";
-
-export default function WizardPlaygroundPage() {
-  return <WizardPlayground />;
+export default function LegacyWizardUiLabRedirect() {
+  redirect("/ui-lab/wizard");
 }

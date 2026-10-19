@@ -9,7 +9,7 @@ import {
   getFamilyByIntermediateCertificates,
   resolveSourceSpecificTlsCa,
 } from "./familyByTls";
-import { describeFetchError, fetchHtml } from "./fetchHtml";
+import { describeFetchError, fetchHtml, redactFetchUrl } from "./fetchHtml";
 import { assertSafeFamilyByImportUrl } from "./familyByUrlPolicy";
 
 const FAMILY_BY_REGRESSION_URL =
@@ -133,11 +133,107 @@ async function testHtmlRejectsPrivateTargets() {
   );
 }
 
+function testRedactUrlsInDiagnostics() {
+  const token = "synthetic-ABWS-secret-not-real";
+  const url = `https://webgate.24guru.by/api/v3/sync/data/performances?key=${token}&distributor_company_id=550#secret-fragment`;
+  assert.equal(
+    redactFetchUrl(url),
+    "https://webgate.24guru.by/api/v3/sync/data/performances?[REDACTED]",
+  );
+  assert.equal(redactFetchUrl("https://example.com/afisha/"), "https://example.com/afisha/");
+  assert.equal(redactFetchUrl("not a url"), "[invalid URL]");
+
+  const detail = describeFetchError(
+    Object.assign(new Error(`failed requesting ${url} (unexpected error)`), {
+      cause: Object.assign(new Error("connect ETIMEDOUT"), { code: "ETIMEDOUT" }),
+    }),
+  );
+  assert.ok(detail.includes("ETIMEDOUT"));
+  assert.ok(detail.includes("/api/v3/sync/data/performances?[REDACTED]"));
+  assert.ok(!detail.includes(token));
+  assert.ok(!detail.includes("distributor_company_id=550"));
+}
+
+function stubHttpFailure(
+  statusCode: number,
+  statusMessage: string,
+  extraHeaders: Record<string, string> = {},
+) {
+  return (url: URL, options: RequestOptions, onResponse: (response: IncomingMessage) => void) => {
+    assert.equal(url.searchParams.get("key"), "synthetic-ABWS-secret-not-real", "the real request remains intact");
+    assert.equal(typeof options.lookup, "function");
+    const request = new EventEmitter() as ClientRequest;
+    request.setTimeout = ((_ms: number) => request) as ClientRequest["setTimeout"];
+    request.destroy = (() => request) as ClientRequest["destroy"];
+    request.end = (() => {
+      const stream = new PassThrough();
+      const response = stream as unknown as IncomingMessage;
+      response.statusCode = statusCode;
+      response.statusMessage = statusMessage;
+      response.headers = extraHeaders;
+      queueMicrotask(() => {
+        onResponse(response);
+        stream.end("error");
+      });
+      return request;
+    }) as ClientRequest["end"];
+    return request;
+  };
+}
+
+async function testMaskedFailureLogsAndImportError() {
+  const token = "synthetic-ABWS-secret-not-real";
+  const url = `https://webgate.24guru.by/api/v3/sync/data/performances?key=${token}&distributor_company_id=550`;
+  const logged: unknown[][] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => { logged.push(args); };
+  try {
+    const scenarios: Array<{
+      status: number;
+      message: string;
+      headers: Record<string, string>;
+      expectedStatus: number;
+    }> = [
+      { status: 401, message: "Unauthorized", headers: {}, expectedStatus: 502 },
+      { status: 200, message: "OK", headers: { "content-length": "500" }, expectedStatus: 400 },
+    ];
+    for (const scenario of scenarios) {
+      await assert.rejects(
+        fetchHtml(url, {
+          retries: 1,
+          maxBytes: 10,
+          resolveHostname: async () => [{ address: "93.184.216.34", family: 4 }],
+          request: stubHttpFailure(scenario.status, scenario.message, scenario.headers),
+        }),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.equal((error as Error & { httpStatus?: number }).httpStatus, scenario.expectedStatus);
+          assert.ok(!error.message.includes(token), "no token in ImportRun error");
+          assert.ok(!JSON.stringify(error).includes(token), "no token in error metadata");
+          const cause = (error as Error & { cause?: unknown }).cause;
+          assert.ok(cause instanceof Error, "sanitized cause is retained for diagnostics");
+          assert.ok(!cause.message.includes(token), "nested cause is sanitized");
+          return true;
+        },
+      );
+    }
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.equal(logged.length, 2);
+  const logText = JSON.stringify(logged);
+  assert.ok(!logText.includes(token), "logs never include the API credential");
+  assert.ok(!logText.includes("distributor_company_id=550"), "logs omit query data");
+  assert.ok(logText.includes("/api/v3/sync/data/performances?[REDACTED]"));
+}
+
 async function main() {
   testDescribeFetchError();
+  testRedactUrlsInDiagnostics();
   testFamilyByCaBundle();
   await testHtmlUsesPinnedTransport();
   await testHtmlRejectsPrivateTargets();
+  await testMaskedFailureLogsAndImportError();
   console.log("fetchHtml security tests: OK");
 }
 

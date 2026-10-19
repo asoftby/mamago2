@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ActivityTicketCard, adaptActivityTicket } from "./ActivityTicketCard";
+import { ActivityTicketCard, adaptActivityTicket, formatTicketAddress } from "./ActivityTicketCard";
 import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -51,7 +51,7 @@ const html = renderToStaticMarkup(
 );
 assert.ok(html.includes("line-clamp-2"), "title is clamped to two lines");
 assert.ok(html.includes("Детский центр"), "venue is rendered");
-assert.ok(html.includes("Минск, улица Примерная, 10"), "address is rendered");
+assert.ok(html.includes("г. Минск, улица Примерная, 10"), "address is rendered in short city-first form");
 assert.ok(html.includes("Бесплатно"), "free label is rendered");
 assert.ok(html.includes("Обложка отсутствует"), "missing image uses the project placeholder pattern");
 assert.ok(html.includes("border-dashed"), "price section keeps the ticket perforation");
@@ -75,7 +75,7 @@ assert.ok(!imageHtml.includes("Бесплатно"), "an unknown price is never 
 const paidHtml = renderToStaticMarkup(
   <ActivityTicketCard source={{ title: "Спектакль", venue: "Дворец культуры", address: "Минск, ул. Ленина, 10", priceMode: "FROM", priceValue: 40 }} />,
 );
-assert.ok(paidHtml.includes("Дворец культуры") && paidHtml.includes("Минск, ул. Ленина, 10"));
+assert.ok(paidHtml.includes("Дворец культуры") && paidHtml.includes("г. Минск, ул. Ленина, 10"));
 assert.ok(paidHtml.includes('>от</span>'), "the from prefix is rendered on its own line");
 assert.ok(paidHtml.includes('text-[26px]') && paidHtml.includes('>40</span>'), "the amount is prominently rendered on the second line");
 assert.ok(paidHtml.includes('text-[12px]') && paidHtml.includes('aria-label="бел. руб."'), "the official BYN sign is the same small size as 'от'");
@@ -93,12 +93,22 @@ const widePriceHtml = renderToStaticMarkup(
 assert.ok(widePriceHtml.includes('text-[20px]'), "a four-digit price fits in the narrow price area");
 
 const saveModal = readFileSync(join(process.cwd(), "src/components/activity/SaveToPlanModal.tsx"), "utf8");
+const saveHeader = readFileSync(join(process.cwd(), "src/components/activity/SaveActivityHeader.tsx"), "utf8");
 const confirmBar = saveModal.split("function ConfirmBar(")[1]?.split("// ─── All-dates drawer")[0];
 assert.ok(confirmBar?.includes("{label}"), "save action keeps its label");
 assert.ok(!confirmBar?.includes("<ArrowIcon"), "Save button has no arrow");
-assert.ok(saveModal.includes("marginTop: 23, marginBottom: 23"), "ticket outside spacing decreases another 5px on both sides");
-assert.ok(saveModal.includes('className="mb-1 flex h-10 -translate-y-1 items-center justify-center px-11 sm:translate-y-0"'), "header label is horizontally centered in a 40px close-button row");
+assert.ok(saveHeader.includes("marginTop: 18, marginBottom: 18"), "ticket outside spacing decreases another 5px on both sides");
+assert.ok(saveHeader.includes('className="mb-1 flex h-10 -translate-y-1 items-center justify-start sm:translate-y-0"'), "header label is left-aligned");
+assert.ok(saveHeader.includes('kicker = "сохранить активность"'), "kicker has no bullet");
+assert.ok(!saveHeader.includes("● сохранить активность"), "kicker bullet is removed");
 assert.ok(saveModal.includes('className="px-6 pb-5 pt-0 sm:pt-4"'), "mobile and desktop header labels align with close button");
 
+
+assert.equal(formatTicketAddress("ул. Московская 18а, Минск, Минская область 220007"), "г. Минск, ул. Московская, 18а");
+assert.equal(formatTicketAddress("г. Минск, ул. Московская, 18а"), "г. Минск, ул. Московская, 18а");
+assert.equal(formatTicketAddress("Минск, ул. Московская, 18а"), "г. Минск, ул. Московская, 18а");
+assert.equal(formatTicketAddress("ул. Советская 25, Гродно, Гродненская область 230000"), "г. Гродно, ул. Советская, 25");
+assert.equal(formatTicketAddress("Произвольное описание места"), "Произвольное описание места");
+assert.equal(formatTicketAddress(null), null);
 
 console.log("ActivityTicketCard tests: OK");

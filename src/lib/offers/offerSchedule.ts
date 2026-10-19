@@ -12,6 +12,13 @@
 import { z } from "zod";
 import type { DayOfWeek } from "@prisma/client";
 import type { OpeningHoursData } from "@/components/openingHours/openingHours.types";
+import {
+  buildClassScheduleInput,
+  classScheduleInputSchema,
+  defaultClassSchedule,
+  offerIsClass,
+  type ClassScheduleForm,
+} from "./offerClassSchedule";
 
 export const OFFER_BOOKING_METHODS = ["NONE", "REQUEST_ONLY", "EXTERNAL"] as const;
 export type OfferBookingMethod = (typeof OFFER_BOOKING_METHODS)[number];
@@ -35,8 +42,10 @@ export interface OfferScheduleForm {
   /** `place` — берём график места; `own` — свой график оффера (нужен для закрытых дней). */
   hoursSource: "place" | "own";
   hours: OpeningHoursData;
-  /** Закрытые целиком даты, `YYYY-MM-DD`. */
+  /** Закрытые целиком даты, `YYYY-MM-DD`. У занятий хранятся в `OfferScheduleException`, у остальных — в `OpeningHoursException`. */
   closedDates: string[];
+  /** Расписание занятий (дни + время + мест или список дат). */
+  classSchedule: ClassScheduleForm;
 }
 
 export function defaultOfferHours(timezone = "Europe/Minsk"): OpeningHoursData {
@@ -61,6 +70,7 @@ export function defaultOfferSchedule(): OfferScheduleForm {
     hoursSource: "place",
     hours: defaultOfferHours(),
     closedDates: [],
+    classSchedule: defaultClassSchedule(),
   };
 }
 
@@ -196,6 +206,8 @@ export const offerScheduleInputSchema = z
         }),
       ])
       .optional(),
+    /** Занятия: регулярные группы или список дат + закрытые дни (OfferScheduleRule/Session/Exception). */
+    classSchedule: classScheduleInputSchema.optional(),
   })
   .superRefine((value, ctx) => {
     if (value.bookingMethod === "EXTERNAL") {
@@ -225,6 +237,7 @@ export function validateExternalUrl(raw: string): string | null {
 export function buildScheduleInput(
   form: OfferScheduleForm,
   productType: string | null | undefined,
+  classDuration?: string | null,
 ): OfferScheduleInput {
   const input: OfferScheduleInput = {};
 
@@ -236,17 +249,21 @@ export function buildScheduleInput(
         : null;
   }
 
-  if (offerUsesClosedDays(productType) || offerUsesOpeningHours(productType)) {
-    // Закрытые дни живут в собственном `OpeningHours` оффера: график места не трогаем.
-    const wantsOwn =
-      form.hoursSource === "own" || (form.closedDates.length > 0 && !offerUsesOpeningHours(productType));
-    if (wantsOwn) {
+  if (offerIsClass(productType)) {
+    // Занятия: расписание и закрытые дни — в OfferScheduleRule/Session/Exception, не в OpeningHours.
+    const classSchedule = buildClassScheduleInput(form.classSchedule, form.closedDates, productType, classDuration);
+    if (classSchedule) input.classSchedule = classSchedule;
+    return input;
+  }
+
+  if (offerUsesOpeningHours(productType)) {
+    if (form.hoursSource === "own") {
       input.hours = {
         source: "own",
         data: form.hours,
         closedDates: normalizeClosedDates(form.closedDates),
       };
-    } else if (offerUsesOpeningHours(productType)) {
+    } else {
       input.hours = { source: "place" };
     }
   }
@@ -260,8 +277,10 @@ export function buildChangedScheduleInput(
   current: OfferScheduleForm,
   previous: OfferScheduleForm,
   productType: string | null | undefined,
+  classDuration?: string | null,
+  previousClassDuration?: string | null,
 ): OfferScheduleInput | undefined {
-  const full = buildScheduleInput(current, productType);
+  const full = buildScheduleInput(current, productType, classDuration);
   const bookingChanged = current.bookingMethod !== previous.bookingMethod ||
     (current.bookingMethod === "EXTERNAL" &&
       (current.externalKind !== previous.externalKind ||
@@ -275,12 +294,13 @@ export function buildChangedScheduleInput(
     patch.bookingMethod = full.bookingMethod;
     patch.external = full.external;
   }
-  if (hoursChanged) {
-    if (full.hours) patch.hours = full.hours;
-    else if (offerUsesClosedDays(productType) && previous.closedDates.length > 0) {
-      // Clearing the last closed date must remove previously saved exceptions.
-      patch.hours = { source: "own", data: current.hours, closedDates: [] };
+  if (offerIsClass(productType)) {
+    const before = buildClassScheduleInput(previous.classSchedule, previous.closedDates, productType, previousClassDuration);
+    if (full.classSchedule && JSON.stringify(full.classSchedule) !== JSON.stringify(before)) {
+      patch.classSchedule = full.classSchedule;
     }
+  } else if (hoursChanged) {
+    if (full.hours) patch.hours = full.hours;
   }
   return Object.keys(patch).length ? patch : undefined;
 }

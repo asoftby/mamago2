@@ -1,6 +1,6 @@
 "use client";
 
-import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -107,7 +107,7 @@ export function canShowEventArchiveAction(status: ContentStatus): boolean {
 function buildEventSubtitle(activity: Activity): string {
   const parts: string[] = [];
   if (activity.place?.title) {
-    parts.push(activity.place.title);
+    parts.push(`Где проходит: ${activity.place.title}`);
   }
   if (activity.nextOccurrenceAt) {
     parts.push(
@@ -117,7 +117,7 @@ function buildEventSubtitle(activity: Activity): string {
     );
   }
   if (activity.priceText) {
-    parts.push(normalizeUiCurrencyText(activity.priceText));
+    parts.push(formatPrice(activity.priceText));
   } else if (activity.priceFrom != null) {
     parts.push(formatPriceFrom(activity.priceFrom, { hideZero: true }));
   }
@@ -191,32 +191,14 @@ export function EventCardHorizontal({
   const updatedLine = formatUpdatedAgo(activity.updatedAt, activity.createdAt);
   const createdLine = `Создано: ${format(new Date(activity.createdAt), "d MMMM yyyy", { locale: ru })}`;
 
-  const latestPromotion = activity.promotionPerformance?.latestPeriod ?? null;
-  const viewPromotionProof = latestPromotion
-    ? latestPromotion.comparison.viewsMultiplier != null
-      ? `×${latestPromotion.comparison.viewsMultiplier.toLocaleString("ru-RU", {
-          minimumFractionDigits: 1,
-          maximumFractionDigits: 1,
-        })} во время промо`
-      : latestPromotion.metrics.views > 0
-        ? `${latestPromotion.metrics.views.toLocaleString("ru-RU")} за время промо`
-        : null
-    : null;
-  const planPromotionProof = latestPromotion
-    ? latestPromotion.comparison.planAddsPercentChange != null
-      ? `+${Math.round(latestPromotion.comparison.planAddsPercentChange)}% к предыдущему периоду`
-      : latestPromotion.metrics.planAdds > 0
-        ? `${latestPromotion.metrics.planAdds.toLocaleString("ru-RU")} за время промо`
-        : null
-    : null;
+  // Card metrics are strictly TODAY. Historical Boost comparisons must not be
+  // shown as deltas under today's figures; they remain in the Boost report.
   const cardMetrics = activity.metrics
     ? {
         views: activity.metrics.views,
         saves: activity.metrics.saves,
         planAdds: activity.metrics.planAdds,
         ctaClicks: activity.metrics.ctaClicks,
-        viewsDelta: viewPromotionProof,
-        planAddsDelta: planPromotionProof,
       }
     : null;
 
@@ -248,7 +230,7 @@ export function EventCardHorizontal({
         placeholderIcon={Calendar}
         title={activity.title}
         typeChip={
-          <BusinessChip tone="muted" size="compact">
+          <BusinessChip tone="muted" size="default" className="text-stone-700">
             {activityTypeLabelRu(activity.type)}
           </BusinessChip>
         }
@@ -257,6 +239,7 @@ export function EventCardHorizontal({
         updatedLine={updatedLine}
         createdLine={createdLine}
         metrics={cardMetrics}
+        metricsPeriodLabel="сегодня"
         actions={
           <>
             <button
@@ -351,6 +334,9 @@ export function EventCardHorizontal({
         onOpenChange={setStatisticsOpen}
         title={activity.title}
         entityLabel="события"
+        entityType="EVENT"
+        entityId={activity.id}
+        publicationCreatedAt={activity.createdAt}
         metrics={activity.metrics}
         promotionPeriods={activity.promotionPerformance?.periods}
         repeatPromotionHref="/dashboard"

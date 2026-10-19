@@ -18,6 +18,7 @@ import {
   type SaveToPlanResult,
 } from "@/components/activity/SaveToPlanModal";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
+import { persistIdeaCollectionSelection } from "@/features/save/persistIdeaCollectionSelection";
 import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { toast } from "@/lib/toast";
 import { CallModal } from "@/components/shared/CallModal";
@@ -343,9 +344,10 @@ export function OfferPageView({
           }
           if (!res.ok) throw new Error("offer_idea_save_failed");
           setIsIdeaSaved(true);
+          await persistIdeaCollectionSelection(result, { offerId: data.id });
         })
         .catch(() => {
-          toast.error("Не получилось сохранить предложение в идеи");
+          toast.error("Не получилось сохранить предложение в идеи или коллекцию");
         });
       return;
     }
@@ -474,6 +476,7 @@ export function OfferPageView({
           if (!open) setSaveTargetShift(null);
         }}
         scenario={saveScenario}
+        collectionTarget={{ offerId: data.id }}
         onConfirm={handleSavePersist}
         isIdea={isIdeaSaved}
         inPlan={isPlanSaved}

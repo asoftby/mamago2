@@ -563,6 +563,7 @@ export function ConversionEventPageView({ data }: { data: EventPageData }) {
         open={saveModalOpen}
         onOpenChange={setSaveModalOpen}
         isAuthenticated={isAuthenticated}
+        collectionTarget={{ activityId: data.id }}
         scenario={saveQuickdateScenario}
         onPersist={handleSaveToPlanConfirm}
         isIdea={saveStatus.isIdea}

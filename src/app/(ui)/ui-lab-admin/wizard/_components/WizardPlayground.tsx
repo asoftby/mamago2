@@ -184,7 +184,7 @@ export function WizardPlayground() {
       {/* Back to UI Lab link */}
       <div className="max-w-4xl mx-auto px-6 pt-4 pb-2">
         <Link
-          href="/admin/ui-lab"
+          href="/ui-lab?tab=patterns"
           className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-3 w-3" />
@@ -209,7 +209,7 @@ function SubmittedState({ onReset }: { onReset: () => void }) {
         <Button onClick={onReset} variant="outline" className="w-full">
           Начать заново
         </Button>
-        <Link href="/admin/ui-lab" className="block text-xs text-muted-foreground hover:text-foreground">
+        <Link href="/ui-lab?tab=patterns" className="block text-xs text-muted-foreground hover:text-foreground">
           ← Вернуться в UI Lab
         </Link>
       </div>

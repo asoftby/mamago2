@@ -14,9 +14,9 @@ function getUsageInfo(file: string) {
   
   if (!info) {
     return {
-      usageCount: 0,
+      usageCount: undefined,
       usageExamples: [],
-      usageBadge: "UNUSED" as UsageBadge
+      usageBadge: undefined
     };
   }
 
