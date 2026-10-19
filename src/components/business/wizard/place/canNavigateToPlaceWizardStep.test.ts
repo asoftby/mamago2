@@ -33,7 +33,7 @@ function testEditAllowsGoingBackward() {
 }
 
 function testAdminAndEditorCanJumpToIncompleteSteps() {
-  for (const role of ["ADMIN", "EDITOR"] as const) {
+  for (const role of ["ADMIN", "MODERATOR"] as const) {
     assert.equal(
       canNavigateToPlaceWizardStep({
         mode: "create",
@@ -48,7 +48,7 @@ function testAdminAndEditorCanJumpToIncompleteSteps() {
 }
 
 function testOtherRolesCannotJumpToIncompleteSteps() {
-  for (const role of ["BUSINESS", "MODERATOR", "USER"] as const) {
+  for (const role of ["BUSINESS_OWNER", "USER"] as const) {
     assert.equal(
       canNavigateToPlaceWizardStep({
         mode: "create",

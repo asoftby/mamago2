@@ -5,5 +5,5 @@ import type { Role } from "@prisma/client";
  * draft and publication validation must still run independently.
  */
 export function canFreelyNavigateWizard(role?: Role | null): boolean {
-  return role === "ADMIN" || role === "EDITOR";
+  return role === "ADMIN" || role === "MODERATOR";
 }

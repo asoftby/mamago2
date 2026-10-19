@@ -13,7 +13,7 @@ import type { PlaceWizardMode } from "./types";
  * already allowed free navigation, and there is no reason a PENDING or
  * DRAFT Place under staff review should behave differently — sequential
  * gating there only forces extra clicks through "Далее" for no safety
- * benefit. ADMIN and EDITOR may also navigate freely in `create` mode.
+ * benefit. ADMIN and MODERATOR may also navigate freely in `create` mode.
  * Other roles in `create` mode keep the original sequential rule: the entity
  * doesn't exist yet, so a later step may depend on data from an earlier
  * one not having been entered.
