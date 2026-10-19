@@ -347,12 +347,9 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
             ) : (
               <IdeasGrid
                 ideas={filtered}
-                variant="unsorted"
                 planningIdeaId={planModalId}
                 removingIdeaId={removingIdeaId}
                 onSchedule={setPlanModalId}
-                onRemove={handleRemove}
-                onCollection={(ideaId) => openCollectionDialog({ mode: "edit", ideaId })}
               />
             )}
           </section>
@@ -370,8 +367,6 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
               planningIdeaId={planModalId}
               removingIdeaId={removingIdeaId}
               onSchedule={setPlanModalId}
-              onRemove={handleRemove}
-              onCollection={(ideaId) => openCollectionDialog({ mode: "edit", ideaId })}
             />
           ) : (
             <div className="rounded-2xl border border-border p-8 text-center">
