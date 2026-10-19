@@ -12,6 +12,7 @@ import { editorEventEditHref } from "@/lib/content-editor/types";
 import {
   buildEventJsonLd,
   eventJsonLdOverrideHasMissingStartDate,
+  fillEventJsonLdOverrideAddress,
 } from "@/lib/seo/schema/buildEventJsonLd";
 import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
 import { buildFaqJsonLd } from "@/lib/seo/schema/buildFaqJsonLd";
@@ -172,7 +173,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
         : null;
     const jsonLd =
       overrideJsonLd && !eventJsonLdOverrideHasMissingStartDate(overrideJsonLd)
-        ? overrideJsonLd
+        ? fillEventJsonLdOverrideAddress(overrideJsonLd, generatedJsonLd)
         : generatedJsonLd;
     const breadcrumbJsonLd = buildBreadcrumbJsonLd(
       [
