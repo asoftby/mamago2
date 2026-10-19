@@ -965,10 +965,10 @@ function CalendarView({ onSelect, allowedDateKeys, onBack }: {
 }
 
 // ─── Already in plan state (Variant E) ───────────────────────────────────────
-function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onRemovePlan, onClose }: {
+function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onRemovePlan, onCollections, onClose }: {
   planDate: string | null; planStartsAt: string | null; planItemId: string | null;
   onSwitchCalendar: () => void;
-  onRemovePlan: (planItemId: string) => void; onClose: () => void;
+  onRemovePlan: (planItemId: string) => void; onCollections?: () => void; onClose: () => void;
 }) {
   const planDateFmt = planDate ? formatLocalPlanDate(planDate, "ru-RU") : null;
 
@@ -1052,6 +1052,17 @@ function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onRe
           }}><TrashIcon size={13} /></button>
         </div>
       </div>
+
+      {/* The plan state must still allow organizing the saved item into collections. */}
+      {onCollections && (
+        <button
+          type="button"
+          onClick={onCollections}
+          className="mb-4 flex min-h-11 w-full items-center justify-center rounded-full border border-border text-sm font-semibold text-primary hover:bg-surface-hover"
+        >
+          Добавить в коллекцию
+        </button>
+      )}
 
       {/* Footer */}
       <div style={{ paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
@@ -1718,6 +1729,7 @@ function PickerBodyInner({
         planStartsAt={planStartsAt}
         planItemId={planItemId}
         onSwitchCalendar={() => setReplanMode(true)}
+        onCollections={collectionTarget ? () => setView("collections") : undefined}
         onRemovePlan={(id) => onCommit({ action: "remove-plan", planItemId: id })}
         onClose={() => { onClose?.(); }}
       />

@@ -81,7 +81,7 @@ export function IdeaPosterCard({
     <article className="group min-w-0 break-inside-avoid">
       <div className="relative">
         <Link href={href} className="block rounded-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-          <div className="relative overflow-hidden rounded-[18px] bg-surface-muted">
+          <div className="relative flex min-h-[108px] items-center justify-center overflow-hidden rounded-[18px] bg-surface-muted">
             {activity.coverImageUrl ? (
               // The native image aspect ratio is intentional: unlike fixed-aspect discovery
               // cards, masonry must display the full artwork. Extremely tall banners shrink
