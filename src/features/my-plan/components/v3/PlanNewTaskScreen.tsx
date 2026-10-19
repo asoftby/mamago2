@@ -114,7 +114,7 @@ export function PlanNewTaskScreen({
   const timeValid = /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
   const pastToday = timed && timeValid && day === todayIso && time < new Date().toTimeString().slice(0, 5);
   const customLeadTotal = Number(customLeadHours || 0) * 60 + Number(customLeadMinutes || 0);
-  const customLeadValid = !customLeadOpen || (
+  const customLeadValid = !timed || !customLeadOpen || (
     /^\d{0,2}$/.test(customLeadHours) &&
     /^\d{0,2}$/.test(customLeadMinutes) &&
     Number(customLeadHours || 0) <= 24 &&
