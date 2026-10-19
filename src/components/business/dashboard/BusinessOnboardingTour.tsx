@@ -111,6 +111,19 @@ export function BusinessOnboardingTour({
     };
   }, [open, index]);
 
+  // Leave the tour when the user starts the real publication flow so the picker is never covered by the tour mask.
+  useEffect(() => {
+    if (!open || index !== 1) return;
+    const onCreateClick = (event: MouseEvent) => {
+      if (!(event.target instanceof Element)) return;
+      if (!event.target.closest('[data-business-tour-target="create-header"], [data-business-tour-target="create-button"]')) return;
+      void sendBusinessOnboardingAction("tour_skip");
+      onClose();
+    };
+    document.addEventListener("click", onCreateClick, true);
+    return () => document.removeEventListener("click", onCreateClick, true);
+  }, [open, index, onClose]);
+
   function finish(action: TourAction) {
     void sendBusinessOnboardingAction(action);
     onClose();
