@@ -3,18 +3,22 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 
-export function JournalCard({ href, title, imageUrl, categoryLabel, readTime, tone = 0 }: {
+export function JournalCard({ href, title, imageUrl, categoryLabel, readTime, tone = 0, homeCard = false }: {
   href: string; title: string; imageUrl?: string | null; categoryLabel?: string | null;
-  readTime?: number | null; tone?: number;
+  readTime?: number | null; tone?: number; homeCard?: boolean;
 }) {
   return (
             <Link
               href={href}
-              className="block rounded-2xl bg-white p-3 hover:bg-neutral-50/80 transition-colors group"
+              className={cn(
+                "block transition-colors group",
+                homeCard ? "bg-transparent" : "rounded-2xl bg-white p-3 hover:bg-neutral-50/80",
+              )}
             >
               <div
                 className={cn(
-                  "relative w-full aspect-square rounded-xl mb-3 overflow-hidden bg-gradient-to-br",
+                  "relative w-full mb-3 overflow-hidden bg-gradient-to-br",
+                  homeCard ? "rounded-[18px]" : "aspect-square rounded-xl",
                   [
                     "from-[#F2C8A7] to-[#E89460]",
                     "from-[#CDE3D6] to-[#9CC1AC]",
@@ -22,6 +26,7 @@ export function JournalCard({ href, title, imageUrl, categoryLabel, readTime, to
                     "from-[#E6DBC8] to-[#C9BCA0]",
                   ][tone % 4],
                 )}
+                style={homeCard ? { aspectRatio: "4 / 5" } : undefined}
               >
                 {imageUrl && canOptimizeWithNextImage(imageUrl) ? (
                   <Image
@@ -52,7 +57,12 @@ export function JournalCard({ href, title, imageUrl, categoryLabel, readTime, to
                   {readTime} мин.
                 </p>}
               </div>
-              <p className="line-clamp-3 text-sm font-semibold leading-snug text-neutral-900 transition-colors duration-150 group-hover:text-[#C24E22]">
+              <p className={cn(
+                  "font-semibold text-neutral-900 transition-colors duration-150 group-hover:text-primary",
+                  homeCard
+                    ? "line-clamp-2 text-[15px] leading-[1.3] tracking-[-0.01em]"
+                    : "line-clamp-3 text-sm leading-snug",
+                )}>
                 {title}
               </p>
             </Link>

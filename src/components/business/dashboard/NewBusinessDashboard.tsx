@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, BookOpen, CalendarDays, CheckCircle2, Circle, Eye, MapPin, MessageCircle, PlayCircle, Tag } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarDays, CheckCircle2, Circle, Eye, MapPin, MessageCircle, PlayCircle, Tag, BarChart3 } from "lucide-react";
 import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
 import { CreatePublicationQuickMenu } from "@/components/shared/CreatePublicationQuickMenu";
 import { BusinessInboxPreview } from "./BusinessInboxPreview";
@@ -21,7 +21,7 @@ type Props = {
 
 export function NewBusinessDashboard({ data }: Props) {
   const { onboarding } = data;
-  const [tourOpen, setTourOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(() => !data.onboarding.tourCompleted && !data.onboarding.tourSkipped && !data.onboarding.hasAny);
   const [selected, setSelected] = useState<(typeof TYPES)[number]["id"]>("place");
   const [viewed, setViewed] = useState(false);
   const chosen = TYPES.find((type) => type.id === selected) ?? TYPES[2];
@@ -42,17 +42,17 @@ export function NewBusinessDashboard({ data }: Props) {
       ? "Публикация отправлена на проверку"
       : hasDraft
         ? "Продолжите первую публикацию"
-        : "Добро пожаловать в mamaGo Business!";
+        : "Ваша компания подтверждена!";
   const subtitle = hasLive
     ? "Теперь семьи могут находить вашу публикацию. Проверьте, как она выглядит, и познакомьтесь с результатами."
     : hasPending
       ? "Вы сделали важный шаг. Пока материалы проверяются, изучите возможности кабинета."
       : hasDraft
         ? "Мы сохранили ваш черновик. Вернитесь к нему, когда будете готовы."
-        : "Расскажите о своём бизнесе, чтобы родители могли найти ваши места, события и предложения.";
+        : "Теперь вы можете размещать места, события и предложения для семей. Начните с подходящего формата — для создания первой публикации пополнять баланс не требуется.";
 
   const steps = [
-    { label: "Компания подтверждена", hint: "Вы можете пользоваться бизнес-инструментами", complete: true },
+    { label: "Компания подтверждена", hint: "Документы одобрены — бизнес-инструменты доступны", complete: true },
     { label: "Создана первая карточка", hint: "Место, событие или предложение", complete: onboarding.hasAny },
     { label: "Первая карточка опубликована", hint: "После проверки и публикации", complete: hasLive },
     { label: "Проверен публичный результат", hint: "Откройте свою карточку как посетитель", complete: hasLive && isViewed },
@@ -76,9 +76,10 @@ export function NewBusinessDashboard({ data }: Props) {
       <BusinessSurfaceCard className="p-5 sm:p-8" data-business-tour="intro">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-2xl">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-stone-500">Ваш старт на mamaGo</p>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-primary">Компания подтверждена · Ваш старт на mamaGo</p>
             <h2 className="text-2xl font-semibold tracking-tight text-stone-950 sm:text-3xl">{title}</h2>
             <p className="mt-3 text-sm leading-relaxed text-stone-600">{subtitle}</p>
+            {!hasLive && <p className="mt-2 text-xs text-stone-500">Перед появлением на сайте публикация проходит модерацию. Её статус можно посмотреть в разделе «Публикации».</p>}
           </div>
           <button type="button" onClick={() => setTourOpen(true)} className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-stone-200 px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">
             <PlayCircle className="h-4 w-4" /> Обзор кабинета
@@ -160,20 +161,34 @@ export function NewBusinessDashboard({ data }: Props) {
         </div>
       </BusinessSurfaceCard>
 
-      <div className="grid gap-3 sm:grid-cols-3" data-business-tour="benefits">
-        {[
-          { Icon: BookOpen, title: "Публикации", body: "Ваши места, события и предложения находят семьи" },
-          { Icon: CheckCircle2, title: "Сохранения", body: "Пользователи возвращаются к понравившемуся" },
-          { Icon: MessageCircle, title: "Обращения", body: "Отслеживайте интерес и запросы клиентов" },
-        ].map(({ Icon, title: cardTitle, body }) => (
-          <BusinessSurfaceCard key={cardTitle} className="p-5">
-            <Icon className="h-5 w-5 text-stone-600" />
-            <p className="mt-3 text-sm font-semibold text-stone-950">{cardTitle}</p>
-            <p className="mt-1 text-xs leading-relaxed text-stone-500">{body}</p>
-          </BusinessSurfaceCard>
-        ))}
-      </div>
-
+      <BusinessSurfaceCard className="p-5 sm:p-6" data-business-tour="benefits">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-stone-950">Что умеет mamaGo для бизнеса</h3>
+            <p className="mt-1 text-sm text-stone-600">Основные возможности кабинета — без обязательного пополнения баланса.</p>
+          </div>
+          <button type="button" onClick={() => setTourOpen(true)} className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">
+            Пройти обзор
+          </button>
+        </div>
+        <div className="mt-5 grid gap-4 sm:grid-cols-3">
+          <div className="space-y-2">
+            <BookOpen className="h-5 w-5 text-primary" />
+            <p className="text-sm font-semibold text-stone-900">Размещайте публикации</p>
+            <p className="text-xs leading-relaxed text-stone-600">Расскажите о площадке, мероприятии или услуге. Следите за статусом модерации.</p>
+          </div>
+          <div className="space-y-2">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            <p className="text-sm font-semibold text-stone-900">Изучайте результаты</p>
+            <p className="text-xs leading-relaxed text-stone-600">После публикации отслеживайте просмотры и сохранения.</p>
+          </div>
+          <div className="space-y-2">
+            <MessageCircle className="h-5 w-5 text-primary" />
+            <p className="text-sm font-semibold text-stone-900">Работайте с обращениями</p>
+            <p className="text-xs leading-relaxed text-stone-600">Когда появятся заявки и сообщения, управляйте ими в бизнес-кабинете.</p>
+          </div>
+        </div>
+      </BusinessSurfaceCard>
       <BusinessInboxPreview items={data.inboxPreview} notificationsHref={data.hrefs.bookings} />
       <BusinessOnboardingTour open={tourOpen} onClose={() => setTourOpen(false)} />
     </div>

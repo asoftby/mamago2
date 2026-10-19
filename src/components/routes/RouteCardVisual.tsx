@@ -3,12 +3,12 @@ import { MediaCover } from "@/components/ui/media-cover";
 import { Badge } from "@/components/ui/badge";
 import { H3, Caption } from "@/components/ui/typography";
 
-export function RouteCardVisual({ href, title, imageUrl, meta, badges = [] }: {
-  href: string; title: string; imageUrl?: string | null; meta?: string; badges?: string[];
+export function RouteCardVisual({ href, title, imageUrl, meta, badges = [], homeCard = false }: {
+  href: string; title: string; imageUrl?: string | null; meta?: string; badges?: string[]; homeCard?: boolean;
 }) {
   return (
         <Link href={href} className="block">
-          <MediaCover imageUrl={imageUrl} ratio="1/1">
+          <MediaCover imageUrl={imageUrl} ratio={homeCard ? "4/5" : "1/1"} className={homeCard ? "rounded-[18px] shadow-none" : undefined}>
             {badges.length > 0 && (
               <div className="absolute top-3 left-3 z-10 flex gap-2">
                 {badges.map((b, i) => (
@@ -23,10 +23,13 @@ export function RouteCardVisual({ href, title, imageUrl, meta, badges = [] }: {
             )}
           </MediaCover>
 
-          <div className="mt-2.5 px-1">
+          <div className={homeCard ? "mt-3 px-0.5" : "mt-2.5 px-1"}>
             <H3
               as="span"
-              className="text-sm md:text-base transition-colors duration-150 group-hover:text-primary line-clamp-2"
+              className={homeCard
+                ? "text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] transition-colors duration-150 group-hover:text-primary line-clamp-2"
+                : "text-sm md:text-base transition-colors duration-150 group-hover:text-primary line-clamp-2"
+              }
             >
               {title}
             </H3>

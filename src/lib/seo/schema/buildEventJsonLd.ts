@@ -237,3 +237,41 @@ export function buildEventJsonLd(input: BuildEventJsonLdInput): Record<string, u
     offers,
   };
 }
+
+/**
+ * Preserve an editor's custom Event markup, but backfill its missing physical
+ * address from the verified event/venue data. Never fabricate addresses or
+ * replace an explicitly different venue in a manual override.
+ */
+export function fillEventJsonLdOverrideAddress(
+  override: Record<string, unknown>,
+  generated: Record<string, unknown> | null,
+): Record<string, unknown> {
+  if (!generated) return override;
+  const generatedLocation = generated.location;
+  if (!isRecord(generatedLocation) || !isRecord(generatedLocation.address)) {
+    return override;
+  }
+
+  const patchNode = (node: unknown): unknown => {
+    if (Array.isArray(node)) return node.map(patchNode);
+    if (!isRecord(node)) return node;
+
+    const updated = { ...node };
+    if (Array.isArray(node["@graph"])) updated["@graph"] = node["@graph"].map(patchNode);
+    if (!hasEventType(node["@type"])) return updated;
+
+    const location = node.location;
+    if (!isRecord(location)) return updated;
+    const manualName = typeof location.name === "string" ? location.name.trim() : "";
+    const generatedName = typeof generatedLocation.name === "string"
+      ? generatedLocation.name.trim()
+      : "";
+    if (manualName && generatedName && manualName !== generatedName) return updated;
+    if (location.address != null && location.address !== "") return updated;
+    updated.location = { ...location, address: generatedLocation.address };
+    return updated;
+  };
+
+  return patchNode(override) as Record<string, unknown>;
+}

@@ -21,6 +21,13 @@ assert.equal(visibleInCollection(first, "collection1", memberships), true);
 assert.equal(visibleInCollection(first, "collection3", memberships), false);
 assert.equal(visibleInCollection(first, WITHOUT_COLLECTION, memberships), false);
 assert.equal(visibleInCollection(second, WITHOUT_COLLECTION, memberships), true);
+assert.deepEqual(
+  [first, second].filter((item) => visibleInCollection(item, WITHOUT_COLLECTION, memberships)).map((item) => item.id),
+  ["row2"],
+  "Only ideas without memberships are visible in the unsorted two-column section",
+);
+assert.equal(visibleInCollection(second, ALL_IDEAS, memberships), true, "All ideas remains a navigable collection");
+
 assert.deepEqual(updateCollectionCounts([
   { id: "a", title: "A", count: 1 }, { id: "b", title: "B", count: 0 },
 ], ["a"], ["b"]), [

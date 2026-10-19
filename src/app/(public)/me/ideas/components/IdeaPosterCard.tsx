@@ -12,6 +12,8 @@ import { IdeaCardActions } from "./IdeaCardActions";
 
 type IdeaPosterCardProps = {
   idea: IdeaItem;
+  compact?: boolean;
+  unsorted?: boolean;
   isScheduling: boolean;
   isRemoving: boolean;
   onSchedule: () => void;
@@ -34,6 +36,8 @@ function priceCaption(a: {
 
 export function IdeaPosterCard({
   idea,
+  compact = false,
+  unsorted = false,
   isScheduling,
   isRemoving,
   onSchedule,
@@ -83,7 +87,7 @@ export function IdeaPosterCard({
   const metaLine = [ageLabel, dateLabel].filter(Boolean).join(" · ");
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div className="flex w-full min-w-0 max-w-full flex-col gap-3">
       {idea.ideaType === "ACTIVITY" ? (
         <EventCard id={activity.id} title={activity.title} href={href}
           imageUrl={activity.coverImageUrl} categoryLabel={categoryLabel ?? undefined}
@@ -97,9 +101,9 @@ export function IdeaPosterCard({
           imageUrl={activity.coverImageUrl} categoryLabel={categoryLabel ?? undefined}
           dateLabel={dateLabel ?? undefined} priceLabel={priceLabel ?? undefined} hideSave />
       )}
-      {idea.isPlanned && <span className="text-xs font-medium text-stone-500">В плане</span>}
-      {isPastEvent && <span className="text-xs text-stone-500">Уже прошло</span>}
-      <IdeaCardActions isPlanned={idea.isPlanned} isPast={isPastEvent} canSchedule={!isArticle}
+      {!unsorted && idea.isPlanned && <span className="text-xs font-medium text-stone-500">В плане</span>}
+      {!unsorted && isPastEvent && <span className="text-xs text-stone-500">Уже прошло</span>}
+      <IdeaCardActions compact={compact} unsorted={unsorted} isPlanned={idea.isPlanned} isPast={isPastEvent} canSchedule={!isArticle}
         publicHref={activity.publicHref ?? null} onSchedule={onSchedule} onRemove={onRemove}
         onCollection={onCollection} isScheduling={isScheduling} isRemoving={isRemoving} />
     </div>
