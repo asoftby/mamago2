@@ -225,9 +225,10 @@
 }
 .heroTitle {
   margin: 0;
-  font-family: var(--font-body);
-  font-size: clamp(56px, 8vw, 100px);
-  line-height: 0.92;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(38px, 4.5vw, 58px);
+  line-height: 1.02;
   letter-spacing: -0.03em;
 }
 .heroTitleAccent {
@@ -535,7 +536,7 @@
 .emptyTitleAccent {
   font-family: var(--font-display);
   font-style: italic;
-  color: var(--accent-deep);
+  color: var(--primary);
 }
 .emptyLead {
   margin: 14px 0 32px;

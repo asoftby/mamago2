@@ -515,16 +515,10 @@ export function PlanPageClient({
               </span>
             </div>
             <h1
-              className="font-sans"
-              style={{
-                margin: 0,
-                fontSize: "clamp(56px, 8vw, 120px)",
-                lineHeight: 0.92,
-                letterSpacing: "-.03em",
-                color: "#141210",
-              }}
+              className="text-[38px] leading-[1.02] tracking-[-0.03em] sm:text-[58px]"
+              style={{ margin: 0, fontFamily: "var(--font-serif)", fontWeight: 400, color: "#141210" }}
             >
-              Мой план.
+              Мой <span className="italic text-primary">план</span>
             </h1>
             <p style={{
               maxWidth: 520,

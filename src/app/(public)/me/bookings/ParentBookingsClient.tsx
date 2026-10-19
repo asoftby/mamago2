@@ -81,7 +81,7 @@ export function ParentBookingsClient({ bookings }: Props) {
             </div>
             <h1 className={styles.heroTitle}>
               Мои{" "}
-              <span className={styles.heroTitleAccent}>записи.</span>
+              <span className={styles.heroTitleAccent}>записи</span>
             </h1>
             <p className={styles.heroLead}>
               Заявки на&nbsp;занятия, лагеря и&nbsp;мероприятия. Следите за&nbsp;статусом — мы&nbsp;напомним
