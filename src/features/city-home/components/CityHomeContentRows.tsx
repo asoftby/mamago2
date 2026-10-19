@@ -33,11 +33,6 @@ const cardShell = EVENT_CARD_SHELL;
 const kudaCardShell = EVENT_CARD_SHELL;
 const HOME_PERSONALIZED_PREVIEW_TAKE = 8;
 /** Оболочка ширины карточки статьи — тот же ритм, что у ленты «Куда», но 5 карточек в ряду на desktop. */
-const ARTICLE_CARD_SHELL =
-  "shrink-0 snap-start w-[44vw] min-w-[160px] max-w-[230px] sm:max-w-[250px] " +
-  "lg:w-[calc((100%-6rem)/5)] lg:max-w-none";
-
-
 function buildKudaSectionTitle(input: {
   citySlug: string;
   whenPreset: "TODAY" | "TOMORROW" | "WEEKEND" | null;
@@ -123,20 +118,9 @@ export function CityHomeKudaSection({ activities }: { activities: ActivityMock[]
       className="pt-[5px]"
       title={title}
       titleCitySlug={citySlug}
-      actionLabel={eventsLabel}
-      actionHref={eventsHref}
-      actionInlineText
-      // На lg ссылка уезжает к стрелкам карусели — скрываем дубль в заголовке
-      headerActionClassName="lg:hidden"
     >
       <HorizontalCardRow
-        navLeading={
-          <CityHomeAllLink
-            href={eventsHref}
-            label={eventsLabel}
-            className="hidden lg:inline-flex"
-          />
-        }
+        navLeading={<CityHomeAllLink href={eventsHref} label={eventsLabel} />}
       >
         {preview.map((activity, index) => (
           <div key={activity.id} className={kudaCardShell}>
@@ -181,11 +165,15 @@ export function CityHomeClassesSection({
       subtitle={
         mode === "nearby" ? `В ${cityName} пока немного вариантов — посмотрите рядом` : undefined
       }
-      actionLabel="Все занятия"
-      actionHref={appendCityQuery(`/${citySlug}/classes`)}
-      actionIconButton
     >
-      <HorizontalCardRow>
+      <HorizontalCardRow
+        navLeading={
+          <CityHomeAllLink
+            href={appendCityQuery(`/${citySlug}/classes`)}
+            label="[все занятия]"
+          />
+        }
+      >
         {preview.map((activity) => {
           const href =
             activity.href ??
@@ -247,14 +235,18 @@ export function CityHomeRoutesSection({
     <CityHomeSection
       title={mode === "local" ? `Маршруты ${getCityLocativePhrase(citySlug)}` : "Маршруты рядом"}
       subtitle={mode === "nearby" ? "Подобрали маршруты недалеко от вас" : undefined}
-      actionLabel="Все маршруты"
-      actionHref={appendCityQuery(`/${citySlug}/routes`)}
-      actionIconButton
     >
-      <HorizontalCardRow>
+      <HorizontalCardRow
+        navLeading={
+          <CityHomeAllLink
+            href={appendCityQuery(`/${citySlug}/routes`)}
+            label="[все маршруты]"
+          />
+        }
+      >
         {preview.map((route) => (
-          <div key={route.id} className={cn(cardShell, "max-w-[260px] sm:max-w-[280px]")}>
-            <RouteCard route={route} />
+          <div key={route.id} className={cardShell}>
+            <RouteCard route={route} homeCard />
           </div>
         ))}
       </HorizontalCardRow>
@@ -282,22 +274,12 @@ export function CityHomeJournalSection({
   return (
     <CityHomeSection
       title="Статьи и обзоры"
-      actionLabel={blogLabel}
-      actionHref={blogHref}
-      actionInlineText
-      headerActionClassName="lg:hidden"
     >
       <HorizontalCardRow
-        navLeading={
-          <CityHomeAllLink
-            href={blogHref}
-            label={blogLabel}
-            className="hidden lg:inline-flex"
-          />
-        }
+        navLeading={<CityHomeAllLink href={blogHref} label={blogLabel} />}
       >
         {visibleArticles.map((a, index) => (
-          <div key={a.slug} className={cn(ARTICLE_CARD_SHELL, "relative")}>
+          <div key={a.slug} className={cn(cardShell, "relative")}>
           <AnalyticsCardViewTracker
             entityType="ARTICLE"
             entityId={a.id}
@@ -306,12 +288,11 @@ export function CityHomeJournalSection({
             meta={{ section: "journal", position: index }}
           >
             <JournalCard href={a.href} title={a.title} imageUrl={a.coverImageUrl}
-              categoryLabel={a.category?.name} readTime={a.readTime} tone={index} />
+              categoryLabel={a.category?.name} readTime={a.readTime} tone={index} homeCard />
           </AnalyticsCardViewTracker>
-            {/* Heart overlay — mirrors the Link's own padding + cover box so it anchors to the cover, not the outer card */}
-            <div className="pointer-events-none absolute inset-0 p-3">
-              <div className="relative w-full aspect-square">
-                <div className="pointer-events-auto absolute right-3 top-3 z-10">
+            {/* Save action sits over the cover, outside the navigation link. */}
+            <div className="pointer-events-none absolute right-3 top-3 z-10">
+              <div className="pointer-events-auto">
                   <ArticleSaveHeart
                     articleId={a.id}
                     articleTitle={a.title}
@@ -322,7 +303,6 @@ export function CityHomeJournalSection({
                     className="h-11 w-11 bg-[rgba(250,247,241,0.82)] shadow-[0_1px_4px_rgba(20,18,16,0.10)] backdrop-blur-[6px] sm:h-8 sm:w-8"
                     iconClassName="h-5 w-5 sm:h-4 sm:w-4"
                   />
-                </div>
               </div>
             </div>
           </div>
