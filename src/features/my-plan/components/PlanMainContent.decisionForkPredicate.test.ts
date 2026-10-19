@@ -24,7 +24,9 @@ assert.match(source, /Подобрать ещё/);
 assert.match(source, /awaitingAgeAnswer\) \{\s*return <PlanNeedsAgeQuestion/);
 
 // Calm empty day, with a way back from a person filter.
-assert.match(source, /Свободный день\./);
+assert.match(source, /<PlanEmptyDayMessage \/>/);
+const emptyMessage = readFileSync(new URL("./PlanEmptyDayMessage.tsx", import.meta.url), "utf8");
+assert.match(emptyMessage, /Свободный день\./);
 assert.match(source, /Показать всех/);
 
 console.log("PlanMainContent day screen (ideas, filter, empty day) contract: OK");
