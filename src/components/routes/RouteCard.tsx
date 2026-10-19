@@ -18,9 +18,11 @@ type Props = {
   className?: string;
   /** Для аналитики CARD_VIEW (город листинга) */
   analyticsCitySlug?: string;
+  /** Match the event-card proportions in city-home horizontal rows. */
+  homeCard?: boolean;
 };
 
-export function RouteCard({ route, className, analyticsCitySlug = "minsk" }: Props) {
+export function RouteCard({ route, className, analyticsCitySlug = "minsk", homeCard = false }: Props) {
   const [planOpen, setPlanOpen] = useState(false);
   const { isAuthenticated } = useAuthMe();
   const router = useRouter();
@@ -80,7 +82,7 @@ export function RouteCard({ route, className, analyticsCitySlug = "minsk" }: Pro
         meta={{ section: "routes" }}
       >
       <div className={cn("group relative select-none", className)}>
-        <RouteCardVisual href={`/routes/${route.slug}`} title={route.title} imageUrl={route.coverImageUrl} meta={meta} badges={badges} />
+        <RouteCardVisual href={`/routes/${route.slug}`} title={route.title} imageUrl={route.coverImageUrl} meta={meta} badges={badges} homeCard={homeCard} />
 
         {/* Heart action — outside Link to prevent navigation */}
         <div className="absolute top-3 right-3 z-10">
