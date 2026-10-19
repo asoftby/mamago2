@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { PlaceCategoryIcon } from "@/components/place/PlaceCategoryIcon";
 import type { SearchResultItem as SearchResultItemType } from "@/lib/search/types";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
@@ -50,11 +51,11 @@ export function SearchResultItem({
   active?: boolean;
   onNavigate: () => void;
 }) {
-  const isActivity = item.type === "activity";
-  const addressLine = isActivity ? item.summaryLine?.trim() || null : null;
+  const structured = ["activity", "offer", "place"].includes(item.type);
+  const addressLine = structured ? item.summaryLine?.trim() || null : null;
   const detailLine = item.metaLine?.trim() || null;
   const fallbackSummary =
-    !isActivity && item.summaryLine?.trim()
+    !structured && item.summaryLine?.trim()
       ? item.summaryLine.trim()
       : TYPE_LABELS[item.type];
 
@@ -68,7 +69,10 @@ export function SearchResultItem({
         active && "bg-neutral-50",
       )}
     >
-      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-neutral-100">
+      {item.type === "place" && !item.imageUrl ? (
+        <PlaceCategoryIcon category={item.placeCategory} />
+      ) : (
+      <div className={cn("relative h-12 w-12 shrink-0 overflow-hidden bg-neutral-100", item.type === "place" ? "rounded-full" : "rounded-lg")}>
         {item.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- динамические URL из каталога
           <img
@@ -82,11 +86,12 @@ export function SearchResultItem({
           </div>
         )}
       </div>
+      )}
       <div className="min-w-0 flex-1 space-y-0.5">
         <p className="truncate text-sm font-semibold text-neutral-900">
           {highlightText(item.title, query)}
         </p>
-        {isActivity ? (
+        {structured ? (
           <>
             {addressLine ? (
               <p className="truncate text-xs text-muted-foreground">{addressLine}</p>

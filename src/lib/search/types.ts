@@ -11,6 +11,8 @@ export type SearchResultItem = {
   title: string;
   url: string;
   imageUrl: string | null;
+  /** Category name for the shared place icon fallback. */
+  placeCategory?: string | null;
   /** Короткое описание для второй строки карточки; иначе клиент показывает тип. */
   summaryLine: string | null;
   metaLine: string;
