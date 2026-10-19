@@ -639,14 +639,14 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 
 /* iOS Safari zooms the page when a focused form control renders text below 16px.
    Keep mobile entry fields readable without disabling pinch-to-zoom.  This
-   unlayered rule also covers forms that override the shared Input styles with
-   Tailwind text-sm / text-xs utilities. */
+   Tailwind text-sm / text-xs utilities and local CSS (some forms use 14px).
+   !important is needed because some forms also set fontSize inline. */
 @media (max-width: 767px) {
   :where(
     input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
     textarea,
     select
   ) {
-    font-size: 16px;
+    font-size: 16px !important;
   }
 }
