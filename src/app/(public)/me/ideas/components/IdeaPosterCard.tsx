@@ -91,21 +91,20 @@ export function IdeaPosterCard({
             isPastEvent && "pointer-events-none cursor-default grayscale opacity-55",
           )}
         >
-          <div className="relative flex min-h-[108px] items-center justify-center overflow-hidden rounded-[18px] bg-surface-muted">
+          <div className="relative aspect-[3/4] w-full overflow-hidden rounded-[18px] bg-surface-muted">
             {activity.coverImageUrl ? (
-              // The native image aspect ratio is intentional: unlike fixed-aspect discovery
-              // cards, masonry must display the full artwork. Extremely tall banners shrink
-              // to fit within the cap instead of stretching the Pinterest column indefinitely.
+              // Cover the entire card across responsive column widths; avoid side gutters
+              // caused by object-contain when posters hit a max-height constraint.
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={activity.coverImageUrl}
                 alt={activity.title}
                 loading="lazy"
                 decoding="async"
-                className="block h-auto max-h-[440px] w-full object-contain lg:max-h-[560px]"
+                className="absolute inset-0 h-full w-full object-cover"
               />
             ) : (
-              <div className="aspect-[4/5] bg-gradient-to-br from-surface-muted to-border" aria-hidden="true" />
+              <div className="h-full w-full bg-gradient-to-br from-surface-muted to-border" aria-hidden="true" />
             )}
             {priceLabel && (
               <span className="absolute bottom-3 right-3 inline-flex h-7 items-center rounded-full bg-foreground/75 px-3 font-mono text-[11px] text-background">

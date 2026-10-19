@@ -121,14 +121,13 @@ const activityScenario: SaveScenario = {
   assert.ok(!html.includes("Оставь"), "Article headline not reused for Activity");
 }
 
-// Activity: already-in-ideas state still nudges toward planning a date
-// (untouched regression check for the pre-existing InIdeasView). "выбрать
-// день" is split across a nested <span> in source, so match the surrounding
-// word instead of the exact phrase.
+// Saved events use the same date slider as new events, with context actions.
 {
   const html = render({ scenario: activityScenario, isIdea: true, inPlan: false });
-  assert.ok(html.includes("Готовы"), "plan-upsell nudge unaffected for activities");
-  assert.ok(html.includes("Запланировать"), "schedule-from-idea action unaffected for activities");
+  assert.ok(html.includes("В какой"), "saved events use the shared date picker");
+  assert.ok(html.includes("Уже в идеях"), "saved state appears in the shared picker");
+  assert.ok(html.includes("Убрать из идей"), "saved state can still be removed");
+  assert.ok(!html.includes("Готовы"), "old separate upsell screen is not rendered");
 }
 
 // The article collection slide retains its entity label and scrolls as a whole

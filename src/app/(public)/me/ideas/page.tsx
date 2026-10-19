@@ -443,9 +443,12 @@ async function getUserIdeas(userId: string): Promise<IdeaItem[]> {
     })
     .filter((item): item is IdeaItem => item !== null);
 
-  return [...activityIdeaItems, ...offerIdeaItems, ...routeIdeaItems].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
-  );
+  return [...activityIdeaItems, ...offerIdeaItems, ...routeIdeaItems].sort((a, b) => {
+    const aPast = a.ideaType === "ACTIVITY" && a.activity.temporalState === "PAST";
+    const bPast = b.ideaType === "ACTIVITY" && b.activity.temporalState === "PAST";
+    if (aPast !== bPast) return aPast ? 1 : -1;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
 }
 
 /**

@@ -9,6 +9,7 @@ import { SaveToPlanModal } from "@/components/activity/SaveToPlanModal";
 import { persistIdeaCollectionSelection } from "@/features/save/persistIdeaCollectionSelection";
 import { toast } from "@/lib/toast";
 import type { IdeaItem, Filter } from "./types";
+import { sortIdeasPastLast } from "./sortIdeas";
 import { IdeasHeader } from "./components/IdeasHeader";
 import { IdeasTabs } from "./components/IdeasTabs";
 import { IdeasGrid } from "./components/IdeasGrid";
@@ -50,7 +51,7 @@ function mergeIdeas(current: IdeaItem[], incoming: IdeaItem[]): IdeaItem[] {
   for (const idea of [...current, ...incoming]) {
     byEntity.set(ideaEntityKey(idea), idea);
   }
-  return [...byEntity.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return sortIdeasPastLast([...byEntity.values()]);
 }
 
 function buildRemoveQuery(idea: IdeaItem): string {
@@ -203,7 +204,7 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
 
   const filtered = useMemo(
     () =>
-      ideas.filter((idea) => {
+      sortIdeasPastLast(ideas.filter((idea) => {
         if (!visibleInCollection(idea, collectionFilter, memberships)) return false;
         if (!isCollectionPage) return true;
         if (filter === "PLANNED") return idea.isPlanned;
@@ -211,7 +212,7 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
           return !idea.isPlanned && idea.activity.temporalState !== "PAST";
         }
         return true;
-      }),
+      })),
     [filter, ideas, collectionFilter, memberships, isCollectionPage],
   );
 
@@ -404,7 +405,15 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
           title: planningIdea?.activity.title ?? "",
           eventPlanDateISO: planningIdea?.activity.dateStart ?? undefined,
           eventPlanDateEndISO: planningIdea?.activity.dateEnd ?? undefined,
-          ideaOnly: planningIdea?.ideaType === "ARTICLE" || planningIdea?.ideaType === "OFFER" || planningIdea?.activity.temporalState === "PAST",
+          ticket: planningIdea ? {
+            title: planningIdea.activity.title,
+            imageUrl: planningIdea.activity.coverImageUrl,
+            venue: planningIdea.activity.placeTitle,
+            address: planningIdea.activity.addressLabel,
+            priceMode: planningIdea.activity.priceFrom === 0 ? "FREE" : planningIdea.activity.priceFrom != null ? "FROM" : "UNKNOWN",
+            priceValue: planningIdea.activity.priceFrom,
+          } : undefined,
+          ideaOnly: planningIdea?.ideaType === "ARTICLE" || planningIdea?.ideaType === "OFFER",
         }}
         isIdea={true}
         inPlan={planningIdea?.isPlanned ?? false}

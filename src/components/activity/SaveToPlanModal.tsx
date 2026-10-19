@@ -778,9 +778,12 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
 function DateSliderView({
   options, title, ticket,
   onConfirm, onIdea, sessionsByDate, confirmLabel,
+  isIdea = false, inPlan = false, onCollections, onRemoveIdea, onRemovePlan,
 }: {
   options: string[]; title: string; ticket?: ActivityTicketSource;
   onConfirm: (iso: string, sessionId: string | null) => void; onIdea?: () => void;
+  isIdea?: boolean; inPlan?: boolean;
+  onCollections?: () => void; onRemoveIdea?: () => void; onRemovePlan?: () => void;
   /** Подпись кнопки подтверждения; по умолчанию «Сохранить». */
   confirmLabel?: string;
   sessionsByDate?: Record<string, Array<{ id: string; time: string; title?: string }>>;
@@ -835,6 +838,31 @@ function DateSliderView({
           }}
         />
 
+        {(isIdea || inPlan) && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-full bg-surface-muted px-3 py-2 text-foreground">
+              {inPlan ? "В плане" : "Уже в идеях"}
+            </span>
+            {onCollections && <button type="button" onClick={onCollections}
+              className="min-h-10 rounded-full border border-border px-3 font-medium hover:bg-surface-hover">
+              В коллекцию
+            </button>}
+            {onRemoveIdea && <button type="button" onClick={onRemoveIdea}
+              className="min-h-10 rounded-full border border-border px-3 text-muted-foreground hover:bg-surface-hover">
+              Убрать из идей
+            </button>}
+            {onRemovePlan && <button type="button" onClick={onRemovePlan}
+              className="min-h-10 rounded-full border border-border px-3 text-muted-foreground hover:bg-surface-hover">
+              Убрать из плана
+            </button>}
+          </div>
+        )}
+
+        {options.length === 0 ? (
+          <p className="mb-5 rounded-xl bg-surface-muted px-4 py-4 text-sm text-muted-foreground">
+            Доступных будущих дат нет. Событие можно оставить в идеях или переместить в коллекцию.
+          </p>
+        ) : (<>
         {/* Month label + session count */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <span style={{ fontFamily: "var(--font-sans)", fontSize: 18, letterSpacing: "-.01em", fontWeight: 400 }}>
@@ -899,6 +927,7 @@ function DateSliderView({
           />
         )}
 
+        </>)}
         {onIdea ? (
           <>
             <OrDivider label="или без даты" />
@@ -1721,38 +1750,13 @@ function PickerBodyInner({
     );
   }
 
-  // Already in plan — manage state (unless user clicked "change date")
-  if (inPlan && planDate && !replanMode) {
-    return (
-      <InPlanView
-        planDate={planDate}
-        planStartsAt={planStartsAt}
-        planItemId={planItemId}
-        onSwitchCalendar={() => setReplanMode(true)}
-        onCollections={collectionTarget ? () => setView("collections") : undefined}
-        onRemovePlan={(id) => onCommit({ action: "remove-plan", planItemId: id })}
-        onClose={() => { onClose?.(); }}
-      />
-    );
-  }
-
-  // Already in ideas — nudge to plan
-  if (isIdea) {
-    return (
-      <InIdeasView
-        onRemoveIdea={() => onCommit({ action: "remove-idea" })}
-        onSchedule={(iso) => onCommit({ action: "plan", dateISO: iso, timeSlotId: null })}
-        onCollections={() => setView("collections")}
-        dateOptions={upcomingOptions}
-      />
-    );
-  }
-
   // For quickdate — always use the date slider UI.
   // If no event dates available, fall back to today + next 6 days.
+  const isPastEvent = isQuickdate && Boolean(scenario.eventPlanDateEndISO || scenario.eventPlanDateISO) &&
+    (scenario.eventPlanDateEndISO ?? scenario.eventPlanDateISO ?? "") < todayISO;
   const sliderOptions = upcomingOptions.length > 0
     ? upcomingOptions
-    : Array.from({ length: 7 }, (_, i) => addDaysLocal(todayISO, i));
+    : isPastEvent ? [] : Array.from({ length: 7 }, (_, i) => addDaysLocal(todayISO, i));
 
   return (
     <div style={{ position: "relative" }}>
@@ -1769,8 +1773,13 @@ function PickerBodyInner({
         ticket={scenario.ticket}
         sessionsByDate={sessionsByDate}
         onConfirm={(iso, sessionId) => onCommit({ action: "plan", dateISO: iso, timeSlotId: sessionId ?? null })}
-        onIdea={scenario.moveMode ? undefined : () => setView("collections")}
-        confirmLabel={scenario.moveMode ? "Перенести" : undefined}
+        onIdea={scenario.moveMode || isIdea ? undefined : () => setView("collections")}
+        confirmLabel={scenario.moveMode ? "Перенести" : inPlan ? "Изменить дату" : undefined}
+        isIdea={isIdea}
+        inPlan={inPlan}
+        onCollections={collectionTarget ? () => setView("collections") : undefined}
+        onRemoveIdea={isIdea ? () => onCommit({ action: "remove-idea" }) : undefined}
+        onRemovePlan={inPlan && planItemId ? () => onCommit({ action: "remove-plan", planItemId }) : undefined}
       />
     </div>
   );
