@@ -111,6 +111,7 @@ export async function loadPublicActivityForCityPage(
               title: true,
               formattedAddr: true,
               customAddress: true,
+              shortAddress: true,
               lat: true,
               lng: true,
               logoImageId: true,
