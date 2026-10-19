@@ -84,6 +84,7 @@ export type DashboardData = {
     publications: string;
     promotion: string;
     bookings: string;
+    inquiries: string;
     newPublication: string;
     settings: string;
   };
