@@ -85,7 +85,10 @@ export function SiteHeaderShell() {
   const reduceMotion = useReducedMotion();
   const hb = useStableHeaderBehavior({
     scrollThreshold: 80,
-    scrollHysteresisPx: 16,
+    // На странице «Мой план» вторая строка хедера меняет высоту документа.
+    // Широкий гистерезис не даёт вызванному этим изменению scrollY тут же
+    // развернуть компактный хедер обратно (и запустить цикл мигания).
+    scrollHysteresisPx: pathname === "/me/plan" ? 120 : 16,
     headerRef,
   });
   const centerFadeDuration = reduceMotion ? 0.01 : 0.34;
