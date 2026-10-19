@@ -87,6 +87,12 @@ export function useWizardDraft<TData>({
 
   const autosaverRef = useRef<WizardDraftAutosaver<TData> | null>(null);
 
+  // Wizard form callers can construct a new data object on every render.
+  // React state updates from the autosaver must not restart its debounce timer.
+  // JSON is also the format persisted to localStorage, so value comparison
+  // here matches the actual draft payload (not the object's identity).
+  const dataSnapshot = JSON.stringify(data);
+
   // Начальное чтение LS — только после mount (hydration safety)
   /* eslint-disable react-hooks/set-state-in-effect -- one-shot чтение localStorage возможно только после mount; гейт hydratedKey исключает повторные прогоны */
   useEffect(() => {
@@ -128,20 +134,23 @@ export function useWizardDraft<TData>({
     };
   }, [storageKey, schemaVersion, debounceMs, entityUpdatedAt]);
 
-  // Планирование автосейва при изменении данных
+  // Планирование автосейва только при фактическом изменении данных.
   const isFirstDataRunRef = useRef(true);
   useEffect(() => {
     if (hydratedKey !== storageKey) return;
-    if (!enabled) return;
-    // hasDraft (решение не принято) — не затираем черновик прошлой сессии
-    if (hasDraft) return;
-    // первый прогон после гидрации — это начальные данные, не «изменение»
+    // Учитываем первый проход даже при disabled/hasDraft. Иначе первый ввод
+    // в пустую форму (enabled: false → true) потеряется без записи черновика.
     if (isFirstDataRunRef.current) {
       isFirstDataRunRef.current = false;
-      return;
+      if (enabled && !hasDraft) return; // начальные серверные данные, не правка
     }
-    autosaverRef.current?.schedule(data);
-  }, [data, enabled, hasDraft, hydratedKey, storageKey]);
+    // hasDraft (решение не принято) — не затираем черновик прошлой сессии
+    if (!enabled || hasDraft) return;
+    // Снимок с той же JSON-семантикой, что и запись в localStorage.
+    // Зависимость — примитивная строка, поэтому saved/saving не запускают
+    // повторный debounce при ререндере формы.
+    autosaverRef.current?.schedule(JSON.parse(dataSnapshot) as TData);
+  }, [dataSnapshot, enabled, hasDraft, hydratedKey, storageKey]);
 
   const restoreDraft = useCallback((): TData | null => {
     const found = readWizardDraft<TData>(window.localStorage, storageKey, schemaVersion);
