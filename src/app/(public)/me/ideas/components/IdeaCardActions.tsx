@@ -39,31 +39,33 @@ export function IdeaCardActions({
   const removeDisabled = disabled || isRemoving;
   const showOpenAction = !canSchedule || isPast;
 
-  if (unsorted) {
+  // Both saved-idea views use the same entry point as the homepage heart:
+  // open the existing save picker instead of removing an idea immediately.
+  if (compact) {
     return (
       <div className="flex min-w-0 items-center justify-center gap-3">
         <Button
           type="button"
           variant="ghost"
           size="icon-lg"
-          onClick={onRemove}
-          disabled={removeDisabled}
-          aria-label="Убрать из сохранённых идей"
-          title="Убрать из сохранённых идей"
-          className="size-11 rounded-full text-primary hover:text-primary"
+          onClick={onSchedule}
+          disabled={scheduleDisabled}
+          aria-label="Изменить сохранение в плане или идеях"
+          title="Изменить сохранение"
+          className="size-11 rounded-full bg-white text-primary shadow-sm transition-all hover:scale-105 hover:text-primary active:scale-95"
         >
-          {isRemoving ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Heart className="size-5 fill-current" />}
+          {isScheduling ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Heart className="size-5 fill-current" />}
         </Button>
         {onCollection && (
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="icon-lg"
             onClick={onCollection}
             disabled={disabled}
             aria-label="Добавить в коллекцию"
             title="Добавить в коллекцию"
-            className="size-11 rounded-full border-border text-primary"
+            className="size-11 rounded-full bg-white text-primary shadow-sm transition-all hover:scale-105 hover:text-primary active:scale-95"
           >
             <Plus className="size-5" />
           </Button>

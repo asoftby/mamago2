@@ -11,7 +11,7 @@ type IdeasGridProps = {
   variant?: "unsorted" | "collection";
 };
 
-/** Consistent two-column publications grid on mobile and desktop. */
+/** Two columns on mobile and four on desktop. */
 export function IdeasGrid({
   ideas,
   planningIdeaId,
@@ -22,7 +22,7 @@ export function IdeasGrid({
   variant = "collection",
 }: IdeasGridProps) {
   return (
-    <div className="grid w-full min-w-0 grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-6 sm:gap-y-10">
+    <div className="grid w-full min-w-0 grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-6 sm:gap-y-10 lg:grid-cols-4">
       {ideas.map((idea) => (
         <IdeaPosterCard
           key={idea.id}
