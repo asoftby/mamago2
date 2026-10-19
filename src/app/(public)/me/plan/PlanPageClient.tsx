@@ -7,6 +7,7 @@ import { PLAN_SCOPE_STORAGE_KEY, filterByScope, parsePlanScopeFilter, showFamily
 import type { PlanBookingState } from "@/server/family/planBookingPure";
 import { Container } from "@/components/ui/Container";
 import { PlanCalendar, invalidatePlanDayMarkers } from "@/features/plan-calendar";
+import { PlanPersonFilter, planPersonFilterOptions } from "@/features/my-plan/components/PlanPersonFilter";
 import { PlanDayList } from "./PlanDayList";
 import { PlanOverviewDialog } from "./PlanOverviewDialog";
 import { PlanProfileCompletionGate } from "./PlanProfileCompletionGate";
@@ -634,29 +635,15 @@ export function PlanPageClient({
       <Container className="pb-4">
         <PlanCalendar value={selectedDate} onChange={selectDate} variant="page" markerScope={familyUi ? scope : "all"} />
         {loadingWeek != null ? <span role="status" className="mt-2 block text-xs text-neutral-500">Загрузка…</span> : null}
-        <div className="mt-4 flex w-full flex-wrap items-center gap-2 rounded-2xl border border-[rgba(20,18,16,.10)] bg-[#FAF7F1] px-4 py-3 sm:gap-3" aria-label="Фильтр по члену семьи">
-          <span className="mr-1 text-[13px] font-semibold text-[#6B6258]">Для кого:</span>
-          {([
-            ["family", accountDisplayName ? `${accountDisplayName} (Я)` : "Я"],
-            ...familyChildren.map((child) => [`child:${child.id}`, child.name]),
-            ["all", "Для всех"],
-          ] as Array<[FamilyCalendarFilter, string]>).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={calendarFilter === value}
-              onClick={() => setCalendarFilter(value)}
-              className="min-h-10 max-w-full truncate rounded-full border px-4 text-[13px] font-medium transition-colors"
-              style={{
-                background: calendarFilter === value ? "#141210" : "#fff",
-                color: calendarFilter === value ? "#fff" : "#141210",
-                borderColor: calendarFilter === value ? "#141210" : "rgba(20,18,16,.18)",
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <PlanPersonFilter
+          className="mt-3"
+          options={planPersonFilterOptions([
+            { value: "family", label: "Я" },
+            ...familyChildren.map((child) => ({ value: `child:${child.id}`, label: child.name })),
+          ])}
+          value={calendarFilter}
+          onChange={(value) => setCalendarFilter(value as FamilyCalendarFilter)}
+        />
       </Container>
 
       {/* Main: day list + ideas sidebar */}
