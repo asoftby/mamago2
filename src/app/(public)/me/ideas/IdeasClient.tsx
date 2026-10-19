@@ -226,14 +226,29 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
     return FILTERS.map((tab) => ({ ...tab, count: scopedCounts[tab.value] }));
   }, [ideas, collectionFilter, memberships]);
 
-  function handlePlanned(ideaId: string, date: string): void {
-    setIdeas((prev) =>
-      prev.map((i) =>
-        i.id === ideaId
-          ? { ...i, isPlanned: true, plannedDate: date, planStatus: "PLANNED_UPCOMING" }
-          : i,
-      )
-    );
+  async function persistPlanChange(idea: IdeaItem, result: { action: "plan"; dateISO: string; visibility?: "PRIVATE" | "FAMILY" } | { action: "remove-plan"; planItemId: string }) {
+    try {
+      const response = result.action === "plan"
+        ? await fetch("/api/save/plan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...(idea.ideaType === "ROUTE" ? { routeId: idea.activity.id } : { activityId: idea.activity.id }),
+              date: result.dateISO,
+              title: idea.activity.title,
+              coverImageUrl: idea.activity.coverImageUrl,
+              ...(result.visibility ? { visibility: result.visibility } : {}),
+            }),
+          })
+        : await fetch(`/api/save/plan?planItemId=${encodeURIComponent(result.planItemId)}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("plan_change_failed");
+      setIdeas((current) => current.map((item) => item.id !== idea.id ? item : result.action === "plan"
+        ? { ...item, isPlanned: true, plannedDate: result.dateISO, planStatus: "PLANNED_UPCOMING" }
+        : { ...item, isPlanned: false, plannedDate: undefined, planItemId: undefined, planStatus: "UNPLANNED" }));
+      router.refresh();
+    } catch {
+      toast.error("Не удалось изменить план", { description: "Попробуйте ещё раз" });
+    }
   }
 
   async function handleRemove(idea: IdeaItem, options: RemoveIdeaOptions = {}) {
@@ -394,15 +409,17 @@ export function IdeasClient({ initialIdeas, initialCollections = [], initialMemb
           title: planningIdea?.activity.title ?? "",
           eventPlanDateISO: planningIdea?.activity.dateStart ?? undefined,
           eventPlanDateEndISO: planningIdea?.activity.dateEnd ?? undefined,
+          ideaOnly: planningIdea?.ideaType === "ARTICLE" || planningIdea?.ideaType === "OFFER" || planningIdea?.activity.temporalState === "PAST",
         }}
         isIdea={true}
         inPlan={planningIdea?.isPlanned ?? false}
         planDate={planningIdea?.plannedDate ?? null}
+        planItemId={planningIdea?.planItemId ?? null}
         source="ideas"
         collectionTarget={planningIdea ? collectionTarget(planningIdea) : undefined}
         onConfirm={(result) => {
-          if (result.action === "plan" && result.dateISO && planModalId) {
-            handlePlanned(planModalId, result.dateISO);
+          if ((result.action === "plan" || result.action === "remove-plan") && planningIdea) {
+            void persistPlanChange(planningIdea, result);
           } else if (result.action === "remove-idea" && planningIdea) {
             void handleRemove(planningIdea, { silentSuccess: true });
           } else if (result.action === "ideas" && planningIdea) {

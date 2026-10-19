@@ -22,7 +22,7 @@ export function IdeasCollectionsBar({ collections, ideas, memberships, onCreate,
   return (
     <section aria-label="Мои коллекции" className="min-w-0 space-y-4">
       <h2 className="text-lg font-semibold">Мои коллекции</h2>
-      <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-6">
+      <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-6 lg:grid-cols-4">
         {collections.map((item) => {
           const covers = ideas
             .filter((idea) => visibleInCollection(idea, item.id, memberships))

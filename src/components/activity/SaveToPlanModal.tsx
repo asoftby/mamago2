@@ -93,6 +93,7 @@ export interface SaveToPlanModalProps {
   inPlan?: boolean;
   planDate?: string | null;
   planStartsAt?: string | null;
+  planItemId?: string | null;
   source?: string;
   collectionTarget?: IdeaCollectionTarget;
 }
@@ -1767,7 +1768,7 @@ function PickerBodyInner({
 interface ModalContentProps extends SaveToPlanModalProps { onClose: () => void; }
 
 function ModalContent(props: ModalContentProps) {
-  const { onConfirm, onClose, scenario, isIdea, inPlan, planDate, planStartsAt, source, collectionTarget } = props;
+  const { onConfirm, onClose, scenario, isIdea, inPlan, planDate, planStartsAt, planItemId, source, collectionTarget } = props;
   return (
     <>
       <style>{`
@@ -1781,6 +1782,7 @@ function ModalContent(props: ModalContentProps) {
           inPlan={inPlan}
           planDate={planDate}
           planStartsAt={planStartsAt}
+          planItemId={planItemId}
           source={source}
           collectionTarget={collectionTarget}
           onCommit={(result) => {
