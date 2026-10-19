@@ -117,7 +117,7 @@ export function PlanNewTaskScreen({
         ? "Укажите время"
         : isMove
           ? "Перенести"
-          : "Добавить в план";
+          : `Добавить на ${whenWord}${timed ? ` в ${time}` : ""}`;
 
   function enableTime() {
     setTimed(true);

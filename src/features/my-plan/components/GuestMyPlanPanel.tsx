@@ -11,7 +11,7 @@ import {
   useState,
 } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowRight, Bell, Info, Infinity as InfinityIcon, Monitor, Repeat2, Search, Users, X } from "lucide-react";
+import { ArrowRight, Bell, Check, Info, Infinity as InfinityIcon, Monitor, Repeat2, Search, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { getSystemInterestLabel } from "@/lib/config/interests";
@@ -712,6 +712,10 @@ export function GuestMyPlanPanel({
           {kind}
           {ages.length > 0 ? ` для детей ${ages.join(", ")}` : ""} {whenText} в&nbsp;афише нет. В&nbsp;будни их&nbsp;обычно меньше, чем в&nbsp;выходные.
         </p>
+        <span className="mt-5 inline-flex h-[34px] items-center gap-1.5 rounded-full bg-[var(--success-soft)] px-3 text-[13.5px] font-bold text-[var(--success-hover)]">
+          <Check className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
+          Попытка не&nbsp;потратилась
+        </span>
       </div>
     );
     footer = (

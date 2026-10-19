@@ -1340,14 +1340,14 @@ export function PlanMainContent({
 
   if (isDesktop) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
+      <div className="relative flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
         <div className="sticky top-0 z-20 flex-shrink-0">
           <MyPlanHeader onClose={onRequestClose} />
         </div>
 
         <div
           id="my-plan-recommendations"
-          className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[var(--mp-bg)] px-8 pb-6 pt-1"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[var(--mp-bg)] px-8 pb-28 pt-1"
         >
           {planCalendar}
 
@@ -1435,14 +1435,14 @@ export function PlanMainContent({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
+    <div className="relative flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
       <div className="flex-shrink-0">
         <MyPlanHeader onClose={onRequestClose} compact />
       </div>
 
       <div
         id="my-plan-recommendations"
-        className="flex-1 space-y-5 overflow-y-auto bg-[var(--mp-bg)] px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4"
+        className="flex-1 space-y-5 overflow-y-auto bg-[var(--mp-bg)] px-5 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4"
       >
         {planCalendar}
 
