@@ -294,6 +294,7 @@ export function PlanPageClient({
   initialSelectedDate,
   initialRange,
   familyChildren,
+  accountDisplayName,
   initialIdeas = [],
   scenarioStatusByDate = {},
   experienceCandidates = [],
