@@ -32,6 +32,7 @@ import { MobileEventWizardProgress } from "./MobileEventWizardProgress";
 import { Button } from "@/components/ui/button";
 import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
+import { canFreelyNavigateWizard } from "../shared/canFreelyNavigateWizard";
 import { useWizardSession } from "@/hooks/useWizardSession";
 
 import type { EventFormData, EventWizardMode } from "./types";
@@ -294,6 +295,7 @@ function EventWizardInner({
   initialScheduleSourceState = EMPTY_SCHEDULE_SOURCE_STATE,
 }: EventWizardProps) {
   const router = useRouter();
+  const freeStepNavigation = canFreelyNavigateWizard(userRole);
   const pathname = usePathname();
   const surface: ContentEditorSurface = editorSurface ?? "business";
   const nav: ContentEditorNav = {
@@ -863,19 +865,20 @@ function EventWizardInner({
 
     if (currentStep >= TOTAL_STEPS) return;
 
-    // Block if genres are loading
-    if (isLoadingGenres) {
-      toast.error("Дождитесь загрузки жанров");
-      console.timeEnd("[EventWizard] navigate next step");
-      return;
-    }
+    if (!freeStepNavigation) {
+      // Non-staff roles still have to complete each step in order.
+      if (isLoadingGenres) {
+        toast.error("Дождитесь загрузки жанров");
+        console.timeEnd("[EventWizard] navigate next step");
+        return;
+      }
 
-    // Block forward navigation if current step isn't complete
-    const validation = validateStep(currentStep, formData, validationContext);
-    if (!validation.isComplete) {
-      toast.error("Заполните обязательные поля перед переходом дальше");
-      console.timeEnd("[EventWizard] navigate next step");
-      return;
+      const validation = validateStep(currentStep, formData, validationContext);
+      if (!validation.isComplete) {
+        toast.error("Заполните обязательные поля перед переходом дальше");
+        console.timeEnd("[EventWizard] navigate next step");
+        return;
+      }
     }
 
     setCurrentStep((prev) => prev + 1);
@@ -897,7 +900,7 @@ function EventWizardInner({
   const handleGoToStep = (step: number) => {
     if (step < 1 || step > TOTAL_STEPS) return;
 
-    if (mode === "edit" && event?.status === ContentStatus.PUBLISHED) {
+    if (freeStepNavigation || (mode === "edit" && event?.status === ContentStatus.PUBLISHED)) {
       setCurrentStep(step);
       return;
     }
@@ -1396,8 +1399,9 @@ function EventWizardInner({
 
   const canNext =
     currentStep < TOTAL_STEPS &&
-    validateStep(currentStep, formData, validationContext).isComplete &&
-    !isLoadingGenres;
+    (freeStepNavigation ||
+      (validateStep(currentStep, formData, validationContext).isComplete &&
+        !isLoadingGenres));
   const canPrev = true; // Always show back button (on step 1 it goes to returnTo)
   const isReviewStep = currentStep === TOTAL_STEPS;
   const isPublishedEdit =

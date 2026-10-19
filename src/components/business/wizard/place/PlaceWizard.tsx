@@ -44,6 +44,7 @@ import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
 import { canEditPlaceInWizard } from "./canEditPlaceInWizard";
 import { resolvePlaceWizardSubmitAction } from "./resolvePlaceWizardSubmitAction";
 import { canNavigateToPlaceWizardStep } from "./canNavigateToPlaceWizardStep";
+import { canFreelyNavigateWizard } from "../shared/canFreelyNavigateWizard";
 import { mapPlaceToFormData, buildPlacePayload, extractChanges } from "./mappers";
 import { validateStep, validateForSubmit, canGoToNextStep, canGoToPrevStep } from "./validation";
 
@@ -150,6 +151,7 @@ export function PlaceWizard({
   ctaStepEnabled = false,
 }: PlaceWizardProps) {
   const router = useRouter();
+  const freeStepNavigation = canFreelyNavigateWizard(userRole);
   const surface: ContentEditorSurface = editorSurface ?? "business";
   const wizardSteps = useMemo(
     () => getPlaceWizardSteps(ctaStepEnabled),
@@ -400,7 +402,7 @@ export function PlaceWizard({
   const handleNext = () => {
     if (
       currentStep < totalSteps &&
-      canGoToNextStep(currentStep, formData, ctaStepEnabled)
+      (freeStepNavigation || canGoToNextStep(currentStep, formData, ctaStepEnabled))
     ) {
       setCurrentStep(prev => prev + 1);
     }
@@ -422,6 +424,7 @@ export function PlaceWizard({
     if (
       canNavigateToPlaceWizardStep({
         mode,
+        role: userRole,
         currentStep,
         targetStep: step,
         firstStep: firstStepNumber,
@@ -1222,7 +1225,7 @@ export function PlaceWizard({
           !canNext ||
           isSaving ||
           isSubmitting ||
-          !canGoToNextStep(currentStep, formData, ctaStepEnabled)
+          (!freeStepNavigation && !canGoToNextStep(currentStep, formData, ctaStepEnabled))
         }
         onSubmit={isReviewStep ? handleSubmit : undefined}
         submitDisabled={
