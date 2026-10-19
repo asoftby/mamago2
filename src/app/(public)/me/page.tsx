@@ -168,7 +168,6 @@ export default async function MePage({ searchParams }: PageProps) {
     <AccountDesign
       userName={firstName}
       greeting={greeting}
-      settingsHref="/me/settings"
       homeHref="/"
       family={family}
       manageFamilyHref="/me/profile"

@@ -45,7 +45,6 @@ export type AccountParty = {
 export type AccountDesignProps = {
   userName: string;
   greeting: string;
-  settingsHref: string;
   homeHref: string;
   family: AccountFamilyMember[];
   manageFamilyHref: string;
@@ -99,12 +98,6 @@ function Reveal({
 
 /* ── Icons (verbatim from the design) ── */
 const Ic = {
-  Settings: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  ),
   Cal: () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
@@ -138,7 +131,6 @@ export function AccountDesign(props: AccountDesignProps) {
   const {
     userName,
     greeting,
-    settingsHref,
     homeHref,
     family,
     manageFamilyHref,
@@ -187,20 +179,14 @@ export function AccountDesign(props: AccountDesignProps) {
                 <span className="caps" style={{ color: "var(--accent-deep)" }}>● Мой аккаунт</span>
                 <span className="caps">{localGreeting}</span>
               </div>
-              <h1 className="serif" style={{ margin: 0, fontSize: "100px", lineHeight: 0.92, letterSpacing: "-.03em" }}>
+              <h1 className="serif account-hero-name" style={{ margin: 0 }}>
                 {userName}
-                <span style={{ fontStyle: "italic", color: "var(--accent-deep)" }}>.</span>
               </h1>
               <p style={{ maxWidth: 520, marginTop: 22, marginBottom: 0, fontSize: 18, lineHeight: 1.5, color: "var(--ink-2)" }}>
                 Семья, маршруты и&nbsp;праздники — всё в&nbsp;одном месте. Настройте профиль, чтобы рекомендации были точнее.
               </p>
             </Reveal>
 
-            <Reveal style={{ display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
-              <Link href={settingsHref} className="btn btn-ghost btn-sm">
-                <Ic.Settings /> Настройки
-              </Link>
-            </Reveal>
           </div>
         </section>
 
@@ -484,7 +470,9 @@ const CSS = `
 .mg-acc .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
 .mg-acc .reveal{opacity:0;transform:translateY(14px);transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform .9s cubic-bezier(.2,.7,.2,1)}
 .mg-acc .reveal.in{opacity:1;transform:none}
-.mg-acc .hero-grid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:32px;align-items:flex-end}
+.mg-acc .hero-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:32px;align-items:flex-end}
+.mg-acc .account-hero-name{font-size:38px;line-height:1.02;letter-spacing:-.03em;overflow-wrap:anywhere}
+@media(min-width:640px){.mg-acc .account-hero-name{font-size:58px}}
 
 /* Kicker divider */
 .mg-acc .kicker{display:flex;align-items:center;gap:14px;color:var(--ink-3);margin-bottom:18px}
@@ -521,7 +509,7 @@ const CSS = `
   background:var(--paper);border:1px solid var(--line);border-radius:16px;
   cursor:pointer;transition:all .18s;min-width:160px;
 }
-.mg-acc .member-card:hover{border-color:var(--ink);transform:translateY(-2px)}
+.mg-acc .member-card:hover{transform:translateY(-2px)}
 .mg-acc .member-add{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:8px;padding:14px;min-width:120px;
