@@ -50,8 +50,8 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar", buildInfo }: 
           if (item.type === "item") {
             const patterns = item.match ?? [item.href];
             return (
+              <div key={`${item.href}:${item.label}:${index}`} data-business-tour-target={item.href === BUSINESS_DASHBOARD_HREF ? "dashboard" : undefined}>
               <SidebarItem
-                key={`${item.href}:${item.label}:${index}`}
                 href={item.href}
                 icon={item.icon}
                 label={item.label}
@@ -63,6 +63,7 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar", buildInfo }: 
                 sidebarVariant="business"
                 onClick={onNavigate}
               />
+              </div>
             );
           }
 
