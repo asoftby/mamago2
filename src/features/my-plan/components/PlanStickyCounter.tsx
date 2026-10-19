@@ -8,8 +8,8 @@ interface PlanStickyCounterProps {
 }
 
 /**
- * Нижняя панель плана: только поле-кнопка «Что нужно сделать?» (открывает экран «Новое дело»).
- * Ссылка «Весь план» живёт в списке под «Где мы уже были». Живёт вне скролла.
+ * Нижняя «стеклянная» кнопка плана «Что нужно сделать?» (открывает экран «Новое дело»).
+ * Парит над списком, список добирает нижний отступ. Ссылка «Весь план» живёт под «Где мы уже были».
  */
 export function PlanStickyCounter({ compact = false, onAdd }: PlanStickyCounterProps) {
   if (!onAdd) return null;
@@ -17,17 +17,24 @@ export function PlanStickyCounter({ compact = false, onAdd }: PlanStickyCounterP
   return (
     <div
       className={
-        "flex-shrink-0 bg-[var(--mp-tx)] pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] " +
+        "pointer-events-none absolute inset-x-0 bottom-0 z-10 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] " +
         (compact ? "px-5" : "px-8")
       }
     >
       <button
         type="button"
         onClick={onAdd}
-        className="flex h-[54px] w-full items-center gap-2.5 rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] px-4 text-left text-base font-medium text-[#6F6A65] transition-colors hover:border-[var(--mp-line-strong)]"
+        className="pointer-events-auto relative isolate flex h-[60px] w-full items-center gap-3 overflow-hidden rounded-[20px] border border-white/90 bg-gradient-to-br from-white/80 to-white/40 pl-[18px] pr-2 text-left text-[16.5px] font-semibold text-[var(--mp-tx)] shadow-[0_10px_28px_-10px_color-mix(in_srgb,var(--brand)_40%,transparent),0_2px_6px_rgba(26,20,16,.08),inset_0_1px_0_#fff] backdrop-blur-[18px] backdrop-saturate-[1.6] transition-[transform,box-shadow] hover:-translate-y-px active:translate-y-px"
       >
-        <Plus className="h-5 w-5 text-[var(--mp-ac)]" strokeWidth={2} aria-hidden />
-        Что нужно сделать?
+        <span
+          aria-hidden
+          className="absolute inset-0 -z-10 bg-[radial-gradient(120%_140%_at_0%_0%,var(--brand-soft),transparent_55%),radial-gradient(90%_120%_at_100%_100%,var(--success-soft),transparent_60%)]"
+        />
+        <span aria-hidden className="pointer-events-none absolute inset-x-3 top-px h-[45%] rounded-[18px_18px_40px_40px] bg-gradient-to-b from-white/75 to-white/0" />
+        <span className="flex-1">Что нужно сделать?</span>
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[var(--mp-ac)] text-white shadow-[0_6px_14px_-4px_color-mix(in_srgb,var(--brand)_60%,transparent),inset_0_1px_0_rgba(255,255,255,.35)]">
+          <Plus className="h-[22px] w-[22px]" strokeWidth={2.4} aria-hidden />
+        </span>
       </button>
     </div>
   );

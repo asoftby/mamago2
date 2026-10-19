@@ -48,7 +48,7 @@ export function PlanDayBar({ items }: { items: PlanItemWithActivity[] }) {
         </span>
       </div>
       <div className="relative h-2 rounded-full bg-[var(--mp-soft)]">
-        <i className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#DCEFD3] to-[#9FD08A]" style={{ width: `${pos(nowMin)}%` }} />
+        <i className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[var(--success-soft)] to-[color-mix(in_srgb,var(--success)_45%,white)]" style={{ width: `${pos(nowMin)}%` }} />
         {timed.map(({ item, at }) => {
           const m = toMin(hhmm(at));
           const isNext = next?.item.id === item.id;
@@ -61,7 +61,7 @@ export function PlanDayBar({ items }: { items: PlanItemWithActivity[] }) {
           );
         })}
         <i
-          className="absolute top-1/2 h-[18px] w-[18px] rounded-full border-[3px] border-white bg-[#5FA84A] shadow-[0_1px_4px_rgba(29,27,25,.3)]"
+          className="absolute top-1/2 h-[18px] w-[18px] rounded-full border-[3px] border-white bg-[var(--success)] shadow-[0_1px_4px_rgba(26,20,16,.3)]"
           style={{ left: `${pos(nowMin)}%`, margin: "-9px 0 0 -9px" }}
         />
       </div>
@@ -74,7 +74,7 @@ export function PlanDayBar({ items }: { items: PlanItemWithActivity[] }) {
       </div>
       {next ? (
         <div className="mt-2 flex items-center gap-[7px] border-t border-[var(--mp-line)] pt-2.5 text-sm font-bold text-[var(--mp-tx)]">
-          <ArrowRight className="h-3.5 w-3.5 text-[#4E9A3A]" strokeWidth={2} aria-hidden />
+          <ArrowRight className="h-3.5 w-3.5 text-[var(--success)]" strokeWidth={2} aria-hidden />
           <span className="min-w-0 truncate">{next.item.title || next.item.activity?.title || "Событие"}</span>
         </div>
       ) : null}

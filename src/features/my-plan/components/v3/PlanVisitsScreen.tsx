@@ -68,7 +68,7 @@ function RateBox({
             maxLength={MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH}
             onChange={(event) => setText(event.target.value)}
             placeholder="Комментарий — по желанию"
-            className="mt-2 block w-full resize-none rounded-xl border border-[var(--mp-line)] bg-[var(--mp-bg)] px-3 py-2.5 text-[14.5px] leading-[1.4] text-[var(--mp-tx)] outline-none placeholder:text-[#6F6A65] focus:border-[var(--mp-line-strong)] focus:bg-white"
+            className="mt-2 block w-full resize-none rounded-xl border border-[var(--mp-line)] bg-[var(--mp-bg)] px-3 py-2.5 text-[14.5px] leading-[1.4] text-[var(--mp-tx)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--mp-line-strong)] focus:bg-white"
           />
           <div className="mt-2 flex items-center justify-end gap-1.5">
             <button type="button" onClick={onCancel} className="min-h-11 rounded-xl px-3 text-sm font-bold text-[var(--mp-tx2)] hover:text-[var(--mp-tx)]">
@@ -147,7 +147,7 @@ export function PlanVisitsScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
-      <PlanScreenTitleHead title={<>Где мы <em>уже были</em></>} onBack={onBack} />
+      <PlanScreenTitleHead title={<>Где мы <em>были</em></>} onBack={onBack} />
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-1 md:px-8">
 
         {visits === null && !failed ? (

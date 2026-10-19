@@ -1,49 +1,29 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-// Regression coverage for a P2 review finding on PR #163: the compact/mobile
-// rendering branch used the stale `suggestionsGeneration === 0` check for the
-// "Реши за меня / Сама решу" decision-fork CTA while the desktop branch
-// already used `showDecisionFork` (empty day AND suggestions not yet
-// requested). That let the CTA reappear on mobile over an already-filled
-// day. This file has no jsdom/RTL harness to mount PlanMainContent (it needs
-// many providers/hooks), so this is a static-source contract: both rendering
-// branches must gate the decision fork on the exact same predicate.
+// Static-source contract (PlanMainContent needs many providers, so there is no mount harness).
+// v3 day screen: the old «Реши за меня / Сама решу» fork is replaced by the «Идеи» block
+// (quiet «Подобрать, куда сходить» link → dashed «Идеи на сегодня · от mamaGo»). Both rendering
+// branches (desktop and compact) must render the same day body, so they cannot drift apart.
 const source = readFileSync(new URL("./PlanMainContent.tsx", import.meta.url), "utf8");
 
-// A. Desktop branch: empty day (no dayPartSections) + suggestions not yet
-// requested => decision fork shows. Filled day or suggestions already
-// requested => it doesn't. This branch already used the right predicate.
-assert.match(
-  source,
-  /awaitingAgeAnswer \? \(\s*<PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} \/>\s*\) : showDecisionFork \? \(/,
-  "desktop rendering branch must gate the decision fork on showDecisionFork",
-);
+assert.doesNotMatch(source, /RecommendationDecisionBlock|showDecisionFork/, "decision fork is gone from the day screen");
+assert.equal((source.match(/\{renderDayList\((true|false)\)\}/g) ?? []).length, 2, "both layouts render the day list");
+assert.equal((source.match(/\{renderIdeas\(\)\}/g) ?? []).length, 2, "both layouts render the ideas block");
+assert.equal((source.match(/\{renderPersonFilter\((true|false)\)\}/g) ?? []).length, 2, "both layouts render the person filter");
 
-// A. Compact/mobile branch: must use the identical predicate, not a
-// duplicated or divergent condition.
-assert.match(
-  source,
-  /awaitingAgeAnswer \? \(\s*<PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} compact \/>\s*\) : showDecisionFork \? \(/,
-  "compact rendering branch must gate the decision fork on showDecisionFork, matching desktop",
-);
+// Ideas: quiet link before the first request, dashed block with «+» after it.
+assert.match(source, /Подобрать, куда сходить/);
+assert.match(source, /Идеи на \{isTodaySelected \? "сегодня" : "этот день"\}/);
+assert.match(source, /от mamaGo/);
+assert.match(source, /aria-label="Добавить в план"/);
+assert.match(source, /Подобрать ещё/);
 
-// The old buggy predicate must be gone from the rendering ternary entirely
-// (suggestionsGeneration === 0 is still legitimately used elsewhere in the
-// file for unrelated batch-count checks, so this targets only the ternary
-// form that gated the decision fork).
-assert.doesNotMatch(
-  source,
-  /\) : suggestionsGeneration === 0 \? \(/,
-  "the stale suggestionsGeneration === 0 decision-fork condition must not remain",
-);
+// Age question still gates the first request when the audience age is unknown.
+assert.match(source, /awaitingAgeAnswer\) \{\s*return <PlanNeedsAgeQuestion/);
 
-// showDecisionFork itself is unchanged: empty day AND suggestions not
-// requested. Both rendering branches now read it, plus its own definition.
-assert.match(
-  source,
-  /const showDecisionFork = dayPartSections\.length === 0 && !hasRequestedSuggestions;/,
-);
-assert.equal((source.match(/showDecisionFork/g) ?? []).length, 3, "definition + both rendering branches");
+// Calm empty day, with a way back from a person filter.
+assert.match(source, /Свободный день\./);
+assert.match(source, /Показать всех/);
 
-console.log("PlanMainContent decision-fork predicate contract: OK");
+console.log("PlanMainContent day screen (ideas, filter, empty day) contract: OK");

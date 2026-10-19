@@ -14,4 +14,6 @@ export const guestGenerateBodySchema = z.object({
   date: z.string().optional(),
   exclude: z.array(z.string()).optional(),
   ageRanges: AgeRangesRequestSchema.optional(),
+  /** Интересы из квиза гостя; на сервере отфильтровываются по каноническому списку. */
+  interests: z.array(z.string().max(40)).max(13).optional(),
 });
