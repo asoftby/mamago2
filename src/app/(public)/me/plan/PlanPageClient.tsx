@@ -558,8 +558,8 @@ export function PlanPageClient({
                 <span className="font-mono text-[11px] uppercase tracking-[.12em] text-[#6B6258]">
                   На этой неделе
                 </span>
-                <span className="font-sans text-[27px] font-semibold leading-tight text-[#141210]">
-                  {weekItems.length} {pluralizeEvents(weekItems.length)}
+                <span className="font-sans text-[27px] font-normal leading-tight text-[#141210]">
+                  {weekItems.length === 0 ? "Нет событий" : `${weekItems.length} ${pluralizeEvents(weekItems.length)}`}
                 </span>
                 {weekItems.length > 0 && (
                   <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-primary">

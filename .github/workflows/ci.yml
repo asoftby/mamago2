@@ -175,6 +175,7 @@ jobs:
         run: |
           pnpm exec tsx src/features/my-plan/lib/planItemMeta.test.ts
           pnpm exec tsx src/features/my-plan/lib/planPagePresentation.test.ts
+          pnpm exec tsx "src/app/(public)/me/plan/PlanWeekSummary.contract.test.ts"
           pnpm test:experience-feedback
           pnpm test:plan-experience-contract
           pnpm exec tsx src/server/services/experience/pastPlanArchive.contract.test.ts
