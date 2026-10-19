@@ -1,24 +1,20 @@
 "use client";
 
-import { RouteCardVisual } from "@/components/routes/RouteCardVisual";
-import { JournalCard } from "@/components/content-cards/JournalCard";
-import { EventCard } from "@/components/events/EventCard";
-import { OfferCard } from "@/components/offers/OfferCard";
+import Link from "next/link";
+import { Heart } from "lucide-react";
+import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
+import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
 import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
 import { ageBoundsFromActivityFields } from "@/lib/event/activityAgeBounds";
 import type { IdeaItem } from "../types";
-import { IdeaCardActions } from "./IdeaCardActions";
+
 
 type IdeaPosterCardProps = {
   idea: IdeaItem;
-  compact?: boolean;
-  unsorted?: boolean;
   isScheduling: boolean;
   isRemoving: boolean;
   onSchedule: () => void;
-  onRemove: () => void;
-  onCollection?: () => void;
 };
 
 /** Same "от X" vs "X" heuristic already duplicated in ActivityCard.tsx and page.tsx for discovery cards. */
@@ -36,18 +32,13 @@ function priceCaption(a: {
 
 export function IdeaPosterCard({
   idea,
-  compact = false,
-  unsorted = false,
   isScheduling,
   isRemoving,
   onSchedule,
-  onRemove,
-  onCollection,
 }: IdeaPosterCardProps) {
   const activity = idea.activity;
   const href = activity.publicHref ?? "#";
   const isPastEvent = idea.ideaType === "ACTIVITY" && activity.temporalState === "PAST";
-  const isArticle = idea.ideaType === "ARTICLE";
 
   const ageBounds =
     idea.ideaType === "ACTIVITY"
@@ -87,25 +78,56 @@ export function IdeaPosterCard({
   const metaLine = [ageLabel, dateLabel].filter(Boolean).join(" · ");
 
   return (
-    <div className="flex w-full min-w-0 max-w-full flex-col gap-3">
-      {idea.ideaType === "ACTIVITY" ? (
-        <EventCard id={activity.id} title={activity.title} href={href}
-          imageUrl={activity.coverImageUrl} categoryLabel={categoryLabel ?? undefined}
-          metaLabel={metaLine} priceLabel={priceLabel ?? undefined} />
-      ) : idea.ideaType === "ROUTE" ? (
-        <div className="group relative"><RouteCardVisual href={href} title={activity.title} imageUrl={activity.coverImageUrl} meta={activity.ageLabel ?? undefined} /></div>
-      ) : isArticle ? (
-        <JournalCard href={href} title={activity.title} imageUrl={activity.coverImageUrl} categoryLabel={categoryLabel} />
-      ) : (
-        <OfferCard id={activity.id} title={activity.title} href={href}
-          imageUrl={activity.coverImageUrl} categoryLabel={categoryLabel ?? undefined}
-          dateLabel={dateLabel ?? undefined} priceLabel={priceLabel ?? undefined} hideSave />
-      )}
-      {!unsorted && idea.isPlanned && <span className="text-xs font-medium text-stone-500">В плане</span>}
-      {!unsorted && isPastEvent && <span className="text-xs text-stone-500">Уже прошло</span>}
-      <IdeaCardActions compact={compact} unsorted={unsorted} isPlanned={idea.isPlanned} isPast={isPastEvent} canSchedule={!isArticle}
-        publicHref={activity.publicHref ?? null} onSchedule={onSchedule} onRemove={onRemove}
-        onCollection={onCollection} isScheduling={isScheduling} isRemoving={isRemoving} />
-    </div>
+    <article className="group min-w-0 break-inside-avoid">
+      <div className="relative">
+        <Link href={href} className="block rounded-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          <div className="relative flex min-h-[108px] items-center justify-center overflow-hidden rounded-[18px] bg-surface-muted">
+            {activity.coverImageUrl ? (
+              // The native image aspect ratio is intentional: unlike fixed-aspect discovery
+              // cards, masonry must display the full artwork. Extremely tall banners shrink
+              // to fit within the cap instead of stretching the Pinterest column indefinitely.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={activity.coverImageUrl}
+                alt={activity.title}
+                loading="lazy"
+                decoding="async"
+                className="block h-auto max-h-[440px] w-full object-contain lg:max-h-[560px]"
+              />
+            ) : (
+              <div className="aspect-[4/5] bg-gradient-to-br from-surface-muted to-border" aria-hidden="true" />
+            )}
+            {priceLabel && (
+              <span className="absolute bottom-3 right-3 inline-flex h-7 items-center rounded-full bg-foreground/75 px-3 font-mono text-[11px] text-background">
+                {renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })}
+              </span>
+            )}
+          </div>
+          <div className="mt-3 flex flex-col gap-1 px-0.5">
+            {categoryLabel && (
+              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                {categoryLabel}
+              </span>
+            )}
+            <span className="line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] text-foreground group-hover:text-primary">
+              {activity.title}
+            </span>
+            {metaLine && <span className="font-mono text-xs text-muted-foreground">{metaLine}</span>}
+            {idea.isPlanned && <span className="text-xs font-medium text-muted-foreground">В плане</span>}
+            {isPastEvent && <span className="text-xs text-muted-foreground">Уже прошло</span>}
+          </div>
+        </Link>
+        <button
+          type="button"
+          onClick={onSchedule}
+          disabled={isScheduling || isRemoving}
+          aria-label="Изменить сохранение в плане или коллекции"
+          title="Изменить сохранение"
+          className="absolute right-3 top-3 z-10 flex size-11 items-center justify-center rounded-full bg-[rgba(250,247,241,0.82)] text-primary shadow-[0_1px_4px_rgba(20,18,16,0.10)] backdrop-blur-[6px] transition-transform hover:scale-105 active:scale-95 disabled:opacity-60 sm:size-8"
+        >
+          <Heart className="size-5 fill-current sm:size-4" aria-hidden="true" />
+        </button>
+      </div>
+    </article>
   );
 }
