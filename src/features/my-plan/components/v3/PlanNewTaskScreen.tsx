@@ -90,6 +90,23 @@ export function PlanNewTaskScreen({
     editItem?.startsAt && editItem.reminderEnabled ? (editItem.reminderLeadMinutes ?? null) : null,
   );
   const [leadTouched, setLeadTouched] = useState(false);
+  const [customLead, setCustomLead] = useState(
+    Boolean(editItem?.reminderLeadMinutes &&
+      !REMIND_OPTIONS.some((option) => option.minutes === editItem.reminderLeadMinutes)),
+  );
+  const [customHours, setCustomHours] = useState(
+    editItem?.reminderLeadMinutes ? String(Math.floor(editItem.reminderLeadMinutes / 60)) : "0",
+  );
+  const [customMinutes, setCustomMinutes] = useState(
+    editItem?.reminderLeadMinutes ? String(editItem.reminderLeadMinutes % 60) : "30",
+  );
+  const customValue = Number(customHours) * 60 + Number(customMinutes);
+  const customValid = /^\d{1,2}$/.test(customHours) &&
+    /^\d{1,2}$/.test(customMinutes) &&
+    Number(customHours) <= 24 && Number(customMinutes) <= 59 &&
+    customValue >= 1 && customValue <= 1440;
+  const selectedLead = customLead ? (customValid ? customValue : null) : lead;
+
   const [saving, setSaving] = useState(false);
   const timeRef = useRef<HTMLInputElement>(null);
 
@@ -107,7 +124,8 @@ export function PlanNewTaskScreen({
   const day = when === "today" ? todayIso : when === "tomorrow" ? tomorrowIso : pickedDate;
   const timeValid = /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
   const pastToday = timed && timeValid && day === todayIso && time < new Date().toTimeString().slice(0, 5);
-  const can = Boolean(text.trim() && day && (!timed || timeValid));
+  const can = Boolean(text.trim() && day && (!timed || timeValid) &&
+    (!timed || !customLead || customValid));
   const whenWord = when === "today" ? "сегодня" : when === "tomorrow" ? "завтра" : day ? longDay(day) : "";
   const label = !text.trim()
     ? "Напишите, что нужно сделать"
@@ -140,8 +158,8 @@ export function PlanNewTaskScreen({
         startsAt: timed ? time : null,
         childId: who?.kind === "child" ? who.id : null,
         assigneeUserId: who?.kind === "adult" ? who.id : null,
-        reminderEnabled: timed && lead !== null,
-        reminderLeadMinutes: timed ? lead : null,
+        reminderEnabled: timed && selectedLead !== null,
+        reminderLeadMinutes: timed ? selectedLead : null,
       };
       // Перенос: нетронутое напоминание (в т.ч. «по умолчанию», lead = null) не перезаписываем.
       const moveFields = editItem
@@ -346,7 +364,7 @@ export function PlanNewTaskScreen({
           <div className={SECTION_LABEL}>Когда напомнить?</div>
           <div className="flex flex-wrap gap-2">
             {REMIND_OPTIONS.map((o) => {
-              const on = timed ? lead === o.minutes : o.minutes === null;
+              const on = timed ? !customLead && lead === o.minutes : o.minutes === null;
               // Без времени доступно только «Не напоминать»; остальные явно выключены.
               const disabled = !timed && o.minutes !== null;
               return (
@@ -357,6 +375,7 @@ export function PlanNewTaskScreen({
                   disabled={disabled}
                   onClick={() => {
                     setLead(o.minutes);
+                    setCustomLead(false);
                     setLeadTouched(true);
                   }}
                   className={cn(PLAN_CHIP, on ? PLAN_CHIP_ON : PLAN_CHIP_OFF, PLAN_CHIP_DISABLED)}
@@ -367,7 +386,58 @@ export function PlanNewTaskScreen({
               );
             })}
           </div>
-          {!timed ? <p className="mx-0.5 mt-2 text-[13px] text-[var(--mp-tx2)]">Укажите время, чтобы включить напоминание</p> : null}
+          <div className="mt-2">
+            <button
+              type="button"
+              disabled={!timed}
+              aria-pressed={timed && customLead}
+              onClick={() => {
+                setCustomLead(true);
+                setLeadTouched(true);
+              }}
+              className={cn(PLAN_CHIP, timed && customLead ? PLAN_CHIP_ON : PLAN_CHIP_OFF, PLAN_CHIP_DISABLED)}
+            >
+              Свой интервал
+            </button>
+            {timed && customLead ? (
+              <div className="mt-3 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-3">
+                <label className="flex flex-col gap-1 text-[13px] text-[var(--mp-tx2)]">
+                  Часы
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={24}
+                    step={1}
+                    value={customHours}
+                    onChange={(event) => setCustomHours(event.target.value)}
+                    className="h-11 w-[86px] rounded-xl border border-[var(--mp-line-strong)] bg-white px-3 text-base text-[var(--mp-tx)]"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-[13px] text-[var(--mp-tx2)]">
+                  Минуты
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={59}
+                    step={1}
+                    value={customMinutes}
+                    onChange={(event) => setCustomMinutes(event.target.value)}
+                    className="h-11 w-[86px] rounded-xl border border-[var(--mp-line-strong)] bg-white px-3 text-base text-[var(--mp-tx)]"
+                  />
+                </label>
+                <span className="pb-3 text-[13px] text-[var(--mp-tx2)]">до начала дела</span>
+                {!customValid ? (
+                  <p role="alert" className="w-full text-[13px] text-danger">
+                    Укажите интервал от 1 минуты до 24 часов.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          {!timed ? <p className="mx-0.5 mt-2 text-[13px] text-[var(--mp-tx2)]">Укажите время дела, чтобы включить напоминание</p> : null}
+          {timed ? <p className="mx-0.5 mt-2 text-[12px] text-[var(--mp-tx2)]">Напоминание придёт в Telegram, если бот подключён и уведомления включены. Проверка выполняется примерно каждые 5 минут.</p> : null}
         </div>
       </div>
       <div className="shrink-0 border-t border-[var(--mp-line)] bg-[var(--mp-bg)] px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 md:px-8">

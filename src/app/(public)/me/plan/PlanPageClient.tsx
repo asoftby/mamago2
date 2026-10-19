@@ -24,7 +24,6 @@ import type { PastPlanEntry } from "@/server/services/experience/pastPlanEntries
 import { ManualPlanEntryDialog } from "./ManualPlanEntryDialog";
 import { PlanNewTaskDialog } from "./PlanNewTaskDialog";
 import { PlanStickyCounter } from "@/features/my-plan/components/PlanStickyCounter";
-import { PlanStickyCounter } from "@/features/my-plan/components/PlanStickyCounter";
 import { addDays, monthName, startOfWeek, todayKey } from "@/lib/date/dateKey";
 import {
   shouldFetchCalendarWeek,
