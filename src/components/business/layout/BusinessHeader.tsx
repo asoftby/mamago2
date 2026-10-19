@@ -86,7 +86,9 @@ export function BusinessHeader({ user, buildInfo }: BusinessHeaderProps) {
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            <CreatePublicationQuickMenu publicationMode="business" />
+            <div data-business-tour-target="create-header">
+              <CreatePublicationQuickMenu publicationMode="business" />
+            </div>
             <div data-business-tour-target="notifications">
               <NotificationsDropdown
                 context={notificationContext}

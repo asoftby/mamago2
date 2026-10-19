@@ -23,6 +23,7 @@ export function DashboardActionStack({
         trigger={(onClick) => (
           <button
             type="button"
+            data-business-tour-target="create-button"
             onClick={onClick}
             className="w-full rounded-2xl bg-stone-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-stone-800 active:scale-[0.98]"
           >

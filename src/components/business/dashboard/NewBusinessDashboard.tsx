@@ -122,8 +122,8 @@ export function NewBusinessDashboard({ data }: Props) {
                   ))}
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <Link href={chosen.href} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 sm:w-auto">
-                    Создать: {chosen.label.toLowerCase()} <ArrowRight className="h-4 w-4" />
+                  <Link href={chosen.href} data-business-tour-target="create-button" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 sm:w-auto">
+                    Создать публикацию <ArrowRight className="h-4 w-4" />
                   </Link>
                   <CreatePublicationQuickMenu publicationMode="business" trigger={(onClick) => (
                     <button type="button" onClick={onClick} className="rounded-xl border border-stone-200 px-4 py-3 text-sm font-medium text-stone-700 hover:bg-stone-50">
@@ -135,6 +135,15 @@ export function NewBusinessDashboard({ data }: Props) {
             )}
             {hasLive && !publicHref && (
               <p className="text-sm text-stone-500">Публичная ссылка появится, когда карточка получит адрес. Пока можно открыть список публикаций.</p>
+            )}
+            {(hasDraft || hasPending || hasLive) && (
+              <div data-business-tour-target="create-button" className="inline-flex">
+                <CreatePublicationQuickMenu publicationMode="business" trigger={(onClick) => (
+                  <button type="button" onClick={onClick} className="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90">
+                    Создать публикацию
+                  </button>
+                )} />
+              </div>
             )}
           </div>
 
@@ -160,6 +169,23 @@ export function NewBusinessDashboard({ data }: Props) {
           </div>
         </div>
       </BusinessSurfaceCard>
+
+      <section className="grid gap-3 sm:grid-cols-2" aria-label="Результаты ваших публикаций">
+        <div data-business-tour-target="publications" className="h-full">
+          <BusinessSurfaceCard className="h-full p-5">
+            <h3 className="text-sm font-semibold text-stone-950">Публикации</h3>
+            <p className="mt-2 text-sm text-stone-600">Здесь вы сможете отслеживать свои карточки и их статус после модерации.</p>
+            <Link href={data.hrefs.publications} className="mt-3 inline-flex text-sm font-medium text-primary">Посмотреть публикации →</Link>
+          </BusinessSurfaceCard>
+        </div>
+        <div data-business-tour-target="leads" className="h-full">
+          <BusinessSurfaceCard className="h-full p-5">
+            <h3 className="text-sm font-semibold text-stone-950">Лиды и обращения</h3>
+            <p className="mt-2 text-sm text-stone-600">Новые заявки и обращения клиентов появятся здесь после публикации.</p>
+            <Link href={data.hrefs.inquiries} className="mt-3 inline-flex text-sm font-medium text-primary">Перейти к обращениям →</Link>
+          </BusinessSurfaceCard>
+        </div>
+      </section>
 
       <BusinessSurfaceCard className="p-5 sm:p-6" data-business-tour="benefits">
         <div className="flex flex-wrap items-start justify-between gap-3">

@@ -210,6 +210,7 @@ export default async function BusinessDashboardPage({
       publications: href("/publications"),
       promotion: href("/promotion"),
       bookings: href("/notifications"),
+      inquiries: href("/bookings"),
       newPublication: href("/events"),
       settings: href("/settings"),
     },
