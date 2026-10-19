@@ -9,6 +9,7 @@ import {
 } from "@/features/my-plan/components/v3/PlanNewTaskScreen";
 import { MY_PLAN_V3_TOKENS } from "@/features/my-plan/components/v3/myPlanV3Tokens";
 import { todayKey } from "@/lib/date/dateKey";
+import { personaPlanLabel } from "@/features/my-plan/lib/personaPlanLabel";
 
 /**
  * Full-page "My Plan" uses the exact same new-task form as the widget.
@@ -30,7 +31,7 @@ export function PlanNewTaskDialog({
   const family = useFamilyPersona();
   const people: PlanNewTaskPerson[] = (family?.personas ?? []).map((person) => ({
     id: person.id,
-    name: person.displayName?.trim() || (person.kind === "adult" ? "Я" : ""),
+    name: personaPlanLabel(person),
     kind: person.kind,
   }));
   // During profile loading, known children remain selectable.

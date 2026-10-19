@@ -24,6 +24,7 @@ import { AddPersonaTypeModal } from "./AddPersonaTypeModal";
 import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
 import { PlanStickyCounter } from "./PlanStickyCounter";
+import { personaPlanLabel } from "../lib/personaPlanLabel";
 import { PlanNewTaskScreen } from "./v3/PlanNewTaskScreen";
 import { PlanVisitsScreen } from "./v3/PlanVisitsScreen";
 import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
@@ -1077,7 +1078,7 @@ export function PlanMainContent({
               className={filterChipClass(on)}
               onClick={() => setPersonFilter(on ? "all" : persona.id)}
             >
-              {personShortName(persona)}
+              {personaPlanLabel(persona)}
             </button>
           );
         })}
@@ -1313,7 +1314,7 @@ export function PlanMainContent({
         initialDate={selectedDate < todayKey ? todayKey : selectedDate}
         people={personas.map((persona) => ({
           id: persona.id,
-          name: persona.displayName?.trim() || (persona.kind === "adult" ? "Я" : ""),
+          name: personaPlanLabel(persona),
           kind: persona.kind,
         }))}
         onBack={() => setScreen("plan")}
@@ -1336,7 +1337,7 @@ export function PlanMainContent({
         editItem={movingNote}
         people={personas.map((persona) => ({
           id: persona.id,
-          name: persona.displayName?.trim() || (persona.kind === "adult" ? "Я" : ""),
+          name: personaPlanLabel(persona),
           kind: persona.kind,
         }))}
         onBack={() => setMovingItem(null)}

@@ -21,6 +21,7 @@ import { PastPlanArchive } from "./PastPlanArchive";
 import type { PastPlanEntry } from "@/server/services/experience/pastPlanEntries.service";
 import { ManualPlanEntryDialog } from "./ManualPlanEntryDialog";
 import { PlanNewTaskDialog } from "./PlanNewTaskDialog";
+import { PlanAddTaskButton } from "@/features/my-plan/components/PlanAddTaskButton";
 import { addDays, monthName, startOfWeek, todayKey } from "@/lib/date/dateKey";
 import {
   shouldFetchCalendarWeek,
@@ -662,7 +663,7 @@ export function PlanPageClient({
       </Container>
 
       {/* Main: day list + ideas sidebar */}
-      <Container className="pb-20">
+      <Container className="pb-28 lg:pb-20">
         <div
           className="plan-main-grid"
           style={{
@@ -686,6 +687,11 @@ export function PlanPageClient({
           {hasIdeas && <IdeasSidebar ideas={initialIdeas} />}
         </div>
       </Container>
+
+      {/* Mobile: floating «Что нужно сделать?» as in the widget (full-page plan has no bottom slot). */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 lg:hidden">
+        <PlanAddTaskButton onClick={openCreate} />
+      </div>
 
       <PlanOverviewDialog
         open={overviewOpen}
