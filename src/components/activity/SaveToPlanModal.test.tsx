@@ -9,6 +9,7 @@
  * Run: npx tsx src/components/activity/SaveToPlanModal.test.tsx
  */
 import { IdeaCollectionStep } from "./IdeaCollectionStep";
+import { addDaysLocal, getLocalDateKey } from "@/lib/date/localDateKey";
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
@@ -128,6 +129,31 @@ const activityScenario: SaveScenario = {
   assert.ok(html.includes("Уже в идеях"), "saved state appears in the shared picker");
   assert.ok(html.includes("Убрать из идей"), "saved state can still be removed");
   assert.ok(!html.includes("Готовы"), "old separate upsell screen is not rendered");
+}
+
+// Review regressions: lone start date must not generate arbitrary alternatives.
+{
+  const start = addDaysLocal(getLocalDateKey(), 5);
+  const html = render({
+    scenario: { kind: "quickdate", title: "Разовое событие", eventPlanDateISO: start },
+    isIdea: true,
+  });
+  assert.ok(html.includes("1 дата"), "one-day event exposes exactly one date");
+  assert.ok(!html.includes("Показать все 7 дат"), "no invented week of dates");
+}
+
+// For existing plans the initial selection must be the plan date, not the first session.
+{
+  const earliest = addDaysLocal(getLocalDateKey(), 2);
+  const planned = addDaysLocal(getLocalDateKey(), 4);
+  const html = render({
+    scenario: { kind: "quickdate", title: "Повторяющееся событие", eventPlanDateOptions: [earliest, planned] },
+    isIdea: true,
+    inPlan: true,
+    planDate: planned,
+  });
+  assert.ok(html.includes("Изменить дату"), "existing plan has contextual update action");
+  assert.ok(html.includes(planned.slice(8)), "existing plan date appears in the selected confirmation");
 }
 
 // The article collection slide retains its entity label and scrolls as a whole

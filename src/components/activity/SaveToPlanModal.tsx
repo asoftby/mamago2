@@ -201,7 +201,10 @@ function formatEventRangeSubtitle(s?: string | null, e?: string | null): string 
 function buildDateRangeKeys(s?: string | null, e?: string | null): string[] {
   const start = normalizePlanDateISO(s);
   const end = normalizePlanDateISO(e);
-  if (!start || !end || end < start) return [];
+  if (!start) return [];
+  // An absent end date means a single-day event, not an unrestricted calendar.
+  if (!end) return [start];
+  if (end < start) return [];
   const keys: string[] = [];
   let cursor = start;
   while (cursor <= end) {
@@ -779,8 +782,10 @@ function DateSliderView({
   options, title, ticket,
   onConfirm, onIdea, sessionsByDate, confirmLabel,
   isIdea = false, inPlan = false, onCollections, onRemoveIdea, onRemovePlan,
+  initialDateISO,
 }: {
   options: string[]; title: string; ticket?: ActivityTicketSource;
+  initialDateISO?: string | null;
   onConfirm: (iso: string, sessionId: string | null) => void; onIdea?: () => void;
   isIdea?: boolean; inPlan?: boolean;
   onCollections?: () => void; onRemoveIdea?: () => void; onRemovePlan?: () => void;
@@ -788,9 +793,10 @@ function DateSliderView({
   confirmLabel?: string;
   sessionsByDate?: Record<string, Array<{ id: string; time: string; title?: string }>>;
 }) {
-  const [selISO, setSelISO] = React.useState<string>(options[0] ?? "");
+  const firstDate = initialDateISO && options.includes(initialDateISO) ? initialDateISO : (options[0] ?? "");
+  const [selISO, setSelISO] = React.useState<string>(firstDate);
   const [selectedSessionId, setSelectedSessionId] = React.useState<string | null>(() =>
-    defaultSessionId(options[0] ?? "", sessionsByDate?.[options[0] ?? ""])
+    defaultSessionId(firstDate, sessionsByDate?.[firstDate])
   );
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const FIRST = 5;
@@ -1716,6 +1722,7 @@ function PickerBodyInner({
       )}
       <DateSliderView
         options={sliderOptions}
+        initialDateISO={normalizePlanDateISO(planDate)}
         title={scenario.title}
         ticket={scenario.ticket}
         sessionsByDate={sessionsByDate}
