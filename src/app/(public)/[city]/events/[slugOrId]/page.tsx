@@ -12,6 +12,7 @@ import { editorEventEditHref } from "@/lib/content-editor/types";
 import {
   buildEventJsonLd,
   eventJsonLdOverrideHasMissingStartDate,
+  fillEventJsonLdOverrideAddress,
 } from "@/lib/seo/schema/buildEventJsonLd";
 import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
 import { buildFaqJsonLd } from "@/lib/seo/schema/buildFaqJsonLd";
@@ -128,9 +129,11 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
     const locationAddress =
       fromDb.venue?.place?.formattedAddr ||
       fromDb.venue?.place?.customAddress ||
+      fromDb.venue?.place?.shortAddress ||
       fromDb.venue?.addressLine ||
       fromDb.place?.formattedAddr ||
       fromDb.place?.customAddress ||
+      fromDb.place?.shortAddress ||
       undefined;
     // The route city is a listing/canonical concern, not proof of the physical address locality.
     // If the venue/place city is unknown, omit addressLocality instead of inventing it from the URL.
@@ -170,7 +173,7 @@ export default async function CityEventPublicPage({ params, searchParams }: Even
         : null;
     const jsonLd =
       overrideJsonLd && !eventJsonLdOverrideHasMissingStartDate(overrideJsonLd)
-        ? overrideJsonLd
+        ? fillEventJsonLdOverrideAddress(overrideJsonLd, generatedJsonLd)
         : generatedJsonLd;
     const breadcrumbJsonLd = buildBreadcrumbJsonLd(
       [

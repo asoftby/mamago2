@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   buildEventJsonLd,
+  fillEventJsonLdOverrideAddress,
   eventJsonLdOverrideHasMissingStartDate,
   pickEventStartDate,
 } from "./buildEventJsonLd";
@@ -348,3 +349,45 @@ assert.equal(
 );
 
 console.log("buildEventJsonLd tests: OK");
+
+const noAddressEvent = buildEventJsonLd({
+  canonicalUrl,
+  title: "Venue without address",
+  startDate: "2026-11-01T12:00:00+03:00",
+  location: { name: "Музей" },
+});
+assert.ok(noAddressEvent);
+assert.equal((noAddressEvent.location as Record<string, unknown>).address, undefined,
+  "an unknown street must not be fabricated");
+
+const manualEvent = {
+  "@type": "Event",
+  performer: { "@type": "Person", name: "Артист" },
+  location: { "@type": "Place", name: "Парк истории Сула" },
+};
+const repairedManual = fillEventJsonLdOverrideAddress(manualEvent, structuredLocation);
+assert.deepEqual(repairedManual.performer, manualEvent.performer,
+  "custom Event fields must be retained");
+assert.equal(
+  ((repairedManual.location as Record<string, unknown>).address as Record<string, unknown>).streetAddress,
+  "Сула, 14, Сула, Минская область 222664",
+);
+assert.equal((manualEvent.location as Record<string, unknown>).address, undefined,
+  "repair must not mutate editor data");
+
+const distinctVenue = { "@type": "Event", location: { name: "Другой музей" } };
+assert.deepEqual(fillEventJsonLdOverrideAddress(distinctVenue, structuredLocation), distinctVenue,
+  "a distinct manually chosen location must never inherit another venue address");
+
+const graphOverride = {
+  "@graph": [
+    { "@type": "WebPage", name: "Details" },
+    { "@type": "Event", location: { name: "Парк истории Сула" } },
+  ],
+};
+const updatedGraph = fillEventJsonLdOverrideAddress(graphOverride, structuredLocation);
+assert.equal(
+  (((updatedGraph["@graph"] as Record<string, unknown>[])[1].location as Record<string, unknown>)
+    .address as Record<string, unknown>).streetAddress,
+  "Сула, 14, Сула, Минская область 222664",
+);
