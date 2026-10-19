@@ -147,7 +147,7 @@ export function PlanVisitsScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
-      <PlanScreenTitleHead title={<>Где мы <em>уже были</em></>} onBack={onBack} />
+      <PlanScreenTitleHead title={<>Где мы <em>были</em></>} onBack={onBack} />
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-1 md:px-8">
 
         {visits === null && !failed ? (
