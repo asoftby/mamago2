@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, X } from "lucide-react";
 
 const STEPS = [
   {
     anchor: "intro",
     title: "Это ваш бизнес-кабинет",
-    description: "Здесь вы начнёте работу с mamaGo. Подсказки можно пропустить и вернуться к ним позже.",
+    description: "Здесь вы взаимодействуете со своими публикациями, заявками и отзывами от клиентов.",
   },
   {
     anchor: "create",
@@ -22,6 +22,7 @@ const STEPS = [
 ] as const;
 
 type TourAction = "tour_complete" | "tour_skip";
+type SpotlightRect = { x: number; y: number; width: number; height: number };
 
 export async function sendBusinessOnboardingAction(action: "start" | "public_open" | TourAction) {
   try {
@@ -48,6 +49,9 @@ export function BusinessOnboardingTour({
 }) {
   const [index, setIndex] = useState(0);
   const nextButton = useRef<HTMLButtonElement>(null);
+  const maskId = useId().replace(/:/g, "");
+  const [spotlights, setSpotlights] = useState<SpotlightRect[]>([]);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     if (!open) return;
@@ -56,7 +60,7 @@ export function BusinessOnboardingTour({
 
   useEffect(() => {
     if (!open) return;
-    const target = Array.from(
+    const target = index === 0 ? undefined : Array.from(
       document.querySelectorAll<HTMLElement>(`[data-business-tour="${STEPS[index].anchor}"]`),
     ).find((element) => element.getClientRects().length > 0);
     target?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -78,6 +82,31 @@ export function BusinessOnboardingTour({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, index]);
 
+  useEffect(() => {
+    if (!open || index !== 0) return;
+    let frame = 0;
+    const update = () => {
+      const dashboard = Array.from(document.querySelectorAll<HTMLElement>('[data-business-tour-target="dashboard"], [data-business-tour-target="mobile-navigation"]'))
+        .find((element) => element.getClientRects().length > 0);
+      const notifications = document.querySelector<HTMLElement>('[data-business-tour-target="notifications"]');
+      const targets = [dashboard, notifications].filter((element): element is HTMLElement => Boolean(element && element.getClientRects().length));
+      setSpotlights(targets.map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { x: Math.max(0, rect.left - 5), y: Math.max(0, rect.top - 5), width: rect.width + 10, height: rect.height + 10 };
+      }));
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    };
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(update); };
+    schedule();
+    window.addEventListener("resize", schedule);
+    window.addEventListener("scroll", schedule, true);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", schedule);
+      window.removeEventListener("scroll", schedule, true);
+    };
+  }, [open, index]);
+
   function finish(action: TourAction) {
     void sendBusinessOnboardingAction(action);
     onClose();
@@ -86,11 +115,24 @@ export function BusinessOnboardingTour({
   if (!open) return null;
 
   return (
+    <>
+    {index === 0 && viewport.width > 0 && (
+      <svg aria-hidden="true" className="pointer-events-auto fixed inset-0 z-[90] h-dvh w-screen" viewBox={`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio="none">
+        <defs>
+          <mask id={maskId}>
+            <rect width={viewport.width} height={viewport.height} fill="white" />
+            {spotlights.map((rect, i) => <rect key={i} x={rect.x} y={rect.y} width={rect.width} height={rect.height} rx="12" fill="black" />)}
+          </mask>
+        </defs>
+        <rect width={viewport.width} height={viewport.height} fill="rgba(15, 23, 42, 0.70)" mask={`url(#${maskId})`} />
+        {spotlights.map((rect, i) => <rect key={i} x={rect.x} y={rect.y} width={rect.width} height={rect.height} rx="12" fill="none" stroke="var(--primary)" strokeWidth="2" />)}
+      </svg>
+    )}
     <div
       role="dialog"
       aria-label="Знакомство с бизнес-кабинетом mamaGo"
       aria-modal="false"
-      className="fixed bottom-4 left-4 right-4 z-[90] mx-auto max-w-[440px] rounded-2xl border border-stone-200 bg-white p-5 shadow-2xl sm:bottom-7 sm:left-auto sm:right-7"
+      className="fixed bottom-4 left-4 right-4 z-[110] mx-auto max-w-[440px] rounded-2xl border border-stone-200 bg-white p-5 shadow-2xl sm:bottom-7 sm:left-auto sm:right-7"
     >
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">
@@ -119,5 +161,6 @@ export function BusinessOnboardingTour({
         </div>
       </div>
     </div>
+    </>
   );
 }

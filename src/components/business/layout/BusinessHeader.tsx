@@ -69,6 +69,7 @@ export function BusinessHeader({ user, buildInfo }: BusinessHeaderProps) {
             onClick={() => setMobileNavOpen(!mobileNavOpen)}
             className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl hover:bg-stone-100 lg:hidden"
             aria-label={mobileNavOpen ? "Закрыть навигацию" : "Открыть навигацию"}
+            data-business-tour-target="mobile-navigation"
           >
             {mobileNavOpen ? (
               <X className="h-5 w-5 text-stone-600" />
@@ -86,10 +87,12 @@ export function BusinessHeader({ user, buildInfo }: BusinessHeaderProps) {
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <CreatePublicationQuickMenu publicationMode="business" />
-            <NotificationsDropdown
-              context={notificationContext}
-              triggerClassName={cn("inline-flex", HEADER_CHROME_ICON_BUTTON_CLASS)}
-            />
+            <div data-business-tour-target="notifications">
+              <NotificationsDropdown
+                context={notificationContext}
+                triggerClassName={cn("inline-flex", HEADER_CHROME_ICON_BUTTON_CLASS)}
+              />
+            </div>
             <ProfileDropdown
               mode="business"
               user={user}
