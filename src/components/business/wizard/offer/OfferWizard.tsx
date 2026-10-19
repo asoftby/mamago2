@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { WizardProgress } from "@/components/ui/wizard-progress";
+import { MobileWizardProgress } from "@/components/ui/mobile-wizard-progress";
 import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { useWizardSession } from "@/hooks/useWizardSession";
@@ -996,11 +997,20 @@ export function OfferWizard({
         }
       >
         {!isChoosingOfferType ? (
-          <WizardProgress
-            steps={progressSteps}
-            currentStep={currentStepNum}
-            onStepChange={handleGoToStep}
-          />
+          <>
+            <MobileWizardProgress
+              steps={progressSteps}
+              currentStep={currentStepNum}
+              onStepChange={handleGoToStep}
+            />
+            <div className="hidden sm:block">
+              <WizardProgress
+                steps={progressSteps}
+                currentStep={currentStepNum}
+                onStepChange={handleGoToStep}
+              />
+            </div>
+          </>
         ) : null}
       </FormWizardHeader>
 
