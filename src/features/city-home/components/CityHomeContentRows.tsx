@@ -167,6 +167,7 @@ export function CityHomeClassesSection({
       }
     >
       <HorizontalCardRow
+        headerHasSubtitle={mode === "nearby"}
         navLeading={
           <CityHomeAllLink
             href={appendCityQuery(`/${citySlug}/classes`)}
@@ -237,6 +238,7 @@ export function CityHomeRoutesSection({
       subtitle={mode === "nearby" ? "Подобрали маршруты недалеко от вас" : undefined}
     >
       <HorizontalCardRow
+        headerHasSubtitle={mode === "nearby"}
         navLeading={
           <CityHomeAllLink
             href={appendCityQuery(`/${citySlug}/routes`)}

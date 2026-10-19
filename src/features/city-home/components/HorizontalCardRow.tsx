@@ -11,6 +11,8 @@ type HorizontalCardRowProps = {
   padded?: boolean;
   /** Контент слева от стрелок карусели (например текстовая ссылка «все события») */
   navLeading?: React.ReactNode;
+  /** Align the desktop controls with the title even when the header has a subtitle. */
+  headerHasSubtitle?: boolean;
 };
 
 /**
@@ -21,6 +23,7 @@ export function HorizontalCardRow({
   className,
   padded = true,
   navLeading,
+  headerHasSubtitle = false,
 }: HorizontalCardRowProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [canLeft, setCanLeft] = useState(false);
@@ -112,7 +115,11 @@ export function HorizontalCardRow({
   return (
     <div className={cn("relative -mx-4 px-4 sm:mx-0 sm:px-0", padded && "pb-1")}>
       {navLeading ? (
-        <div className="mb-4 flex min-h-9 items-center justify-between gap-3 px-1 sm:px-0">
+        <div className={cn(
+          "mb-4 flex min-h-9 items-center justify-between gap-3 px-1 sm:px-0",
+          "lg:absolute lg:right-0 lg:mb-0 lg:px-0",
+          headerHasSubtitle ? "lg:-top-[70px]" : "lg:-top-[52px]",
+        )}>
           <div className="min-w-0">{navLeading}</div>
           {navigationControls}
         </div>
