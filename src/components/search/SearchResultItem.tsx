@@ -70,7 +70,7 @@ export function SearchResultItem({
       )}
     >
       {item.type === "place" && !item.imageUrl ? (
-        <PlaceCategoryIcon category={item.placeCategory} />
+        <PlaceCategoryIcon category={item.placeCategory} title={item.title} />
       ) : (
       <div className={cn("relative h-12 w-12 shrink-0 overflow-hidden bg-neutral-100", item.type === "place" ? "rounded-full" : "rounded-lg")}>
         {item.imageUrl ? (
