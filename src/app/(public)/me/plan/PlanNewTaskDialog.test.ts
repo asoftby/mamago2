@@ -19,3 +19,9 @@ assert.match(page, /<ManualPlanEntryDialog/);
 assert.equal((day.match(/\+ Добавить/g) ?? []).length, 1, "only header Add CTA remains");
 assert.match(day, /Куда пойти →/);
 console.log("Plan full-page create dialog and empty-state CTA: OK");
+
+// Mobile full-page plan: the same glass «Что нужно сделать?» button as in the widget, opening the new-task dialog.
+assert.match(page, /<PlanAddTaskButton onClick=\{openCreate\} \/>/);
+assert.match(page, /fixed inset-x-0 bottom-0 [^"]*lg:hidden/);
+assert.match(dialog, /name: personaPlanLabel\(person\)/);
+console.log("Plan full-page mobile add button and persona label: OK");
