@@ -54,17 +54,7 @@ export function PlaceNetworkSection({ places }: PlaceNetworkSectionProps) {
                 fontWeight: 400,
               }}
             >
-              Другие места{" "}
-              <em
-                style={{
-                  fontFamily: "var(--font-editorial)",
-                  fontStyle: "italic",
-                  fontWeight: 400,
-                  color: "#E86A3A",
-                }}
-              >
-                сети
-              </em>
+              Наши <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>филиалы</em>
             </h2>
           </div>
           <p
@@ -77,7 +67,7 @@ export function PlaceNetworkSection({ places }: PlaceNetworkSectionProps) {
               textAlign: "right",
             }}
           >
-            Места, которые связаны с этой локацией
+            Другие филиалы этой сети
           </p>
         </div>
 

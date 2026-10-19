@@ -1075,7 +1075,7 @@ export function PlaceWizard({
 
   const currentStepKey = getStepKey(currentStep, ctaStepEnabled);
   const showBusinessRelatedPlaces =
-    surface === "business" && currentStepKey === "profile";
+    surface === "business" && currentStepKey === "location";
   const showAdminRelatedPlaces =
     surface === "admin" &&
     mode === "edit" &&
