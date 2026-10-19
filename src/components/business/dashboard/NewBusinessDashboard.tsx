@@ -182,7 +182,7 @@ export function NewBusinessDashboard({ data }: Props) {
           <BusinessSurfaceCard className="h-full p-5">
             <h3 className="text-sm font-semibold text-stone-950">Лиды и обращения</h3>
             <p className="mt-2 text-sm text-stone-600">Новые заявки и обращения клиентов появятся здесь после публикации.</p>
-            <Link href={data.hrefs.bookings} className="mt-3 inline-flex text-sm font-medium text-primary">Перейти к обращениям →</Link>
+            <Link href={data.hrefs.inquiries} className="mt-3 inline-flex text-sm font-medium text-primary">Перейти к обращениям →</Link>
           </BusinessSurfaceCard>
         </div>
       </section>
