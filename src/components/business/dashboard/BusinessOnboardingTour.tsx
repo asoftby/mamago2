@@ -61,10 +61,10 @@ export function BusinessOnboardingTour({
   useEffect(() => {
     if (!open) return;
     const target = index === 0 ? undefined : Array.from(
-      document.querySelectorAll<HTMLElement>(`[data-business-tour="${STEPS[index].anchor}"]`),
+      document.querySelectorAll<HTMLElement>(`[data-business-tour-target="${index === 1 ? "create-button" : "publications"}"]`),
     ).find((element) => element.getClientRects().length > 0);
     target?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    target?.classList.add("outline", "outline-2", "outline-offset-4", "outline-primary");
+
     nextButton.current?.focus({ preventScroll: true });
 
     const onKey = (event: KeyboardEvent) => {
@@ -76,20 +76,24 @@ export function BusinessOnboardingTour({
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      target?.classList.remove("outline", "outline-2", "outline-offset-4", "outline-primary");
+
     };
     // We intentionally track the step rather than the finish callback identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, index]);
 
   useEffect(() => {
-    if (!open || index !== 0) return;
+    if (!open) return;
     let frame = 0;
     const update = () => {
-      const dashboard = Array.from(document.querySelectorAll<HTMLElement>('[data-business-tour-target="dashboard"], [data-business-tour-target="mobile-navigation"]'))
-        .find((element) => element.getClientRects().length > 0);
-      const notifications = document.querySelector<HTMLElement>('[data-business-tour-target="notifications"]');
-      const targets = [dashboard, notifications].filter((element): element is HTMLElement => Boolean(element && element.getClientRects().length));
+      const selectors = index === 0
+        ? ['[data-business-tour-target="dashboard"], [data-business-tour-target="mobile-navigation"]', '[data-business-tour-target="notifications"]']
+        : index === 1
+          ? ['[data-business-tour-target="create-header"]', '[data-business-tour-target="create-button"]']
+          : ['[data-business-tour-target="publications"]', '[data-business-tour-target="leads"]'];
+      const targets = selectors.map((selector) => Array.from(document.querySelectorAll<HTMLElement>(selector))
+        .find((element) => element.getClientRects().length > 0))
+        .filter((element): element is HTMLElement => Boolean(element));
       setSpotlights(targets.map((element) => {
         const rect = element.getBoundingClientRect();
         return { x: Math.max(0, rect.left - 5), y: Math.max(0, rect.top - 5), width: rect.width + 10, height: rect.height + 10 };
@@ -116,7 +120,7 @@ export function BusinessOnboardingTour({
 
   return (
     <>
-    {index === 0 && viewport.width > 0 && (
+    {viewport.width > 0 && (
       <svg aria-hidden="true" className="pointer-events-none fixed inset-0 z-[90] h-dvh w-screen" viewBox={`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio="none">
         <defs>
           <mask id={maskId}>
@@ -132,7 +136,7 @@ export function BusinessOnboardingTour({
       role="dialog"
       aria-label="Знакомство с бизнес-кабинетом mamaGo"
       aria-modal="false"
-      className="fixed bottom-4 left-4 right-4 z-[110] mx-auto max-w-[440px] rounded-2xl border border-stone-200 bg-white p-5 shadow-2xl sm:bottom-7 sm:left-auto sm:right-7"
+      className="fixed bottom-4 right-4 z-[110] w-[calc(100%-2rem)] max-w-[440px] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-stone-200 bg-white p-5 shadow-2xl sm:bottom-7 sm:right-7"
     >
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">

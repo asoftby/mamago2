@@ -168,7 +168,8 @@ function LeadsCard({
   const isEmpty = leadCount === 0 && ctaClicks === 0;
 
   return (
-    <BusinessSurfaceCard tone={isEmpty ? "default" : "success"} className="flex flex-col gap-4 p-6">
+    <div data-business-tour-target="leads" className="h-full">
+    <BusinessSurfaceCard tone={isEmpty ? "default" : "success"} className="flex h-full flex-col gap-4 p-6">
       <p className="text-xs font-semibold uppercase tracking-widest text-stone-400">Лиды и обращения</p>
 
       {isEmpty ? (
@@ -200,6 +201,7 @@ function LeadsCard({
         {isEmpty ? "Настроить публикации" : "Открыть заявки"}
       </Link>
     </BusinessSurfaceCard>
+    </div>
   );
 }
 
@@ -222,7 +224,8 @@ function PublicationsCard({
   const noPromotion = totalPublications > 0 && activePromotions === 0;
 
   return (
-    <BusinessSurfaceCard className="flex flex-col gap-4 p-6">
+    <div data-business-tour-target="publications" className="h-full">
+    <BusinessSurfaceCard className="flex h-full flex-col gap-4 p-6">
       <p className="text-xs font-semibold uppercase tracking-widest text-stone-400">
         {BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled
           ? "Публикации и продвижение"
@@ -281,6 +284,7 @@ function PublicationsCard({
             : "История Promotion"}
       </Link>}
     </BusinessSurfaceCard>
+    </div>
   );
 }
 
