@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Heart } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
@@ -80,7 +81,16 @@ export function IdeaPosterCard({
   return (
     <article className="group min-w-0 break-inside-avoid">
       <div className="relative">
-        <Link href={href} className="block rounded-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+        <Link
+          href={href}
+          aria-disabled={isPastEvent}
+          tabIndex={isPastEvent ? -1 : undefined}
+          onClick={isPastEvent ? (event) => event.preventDefault() : undefined}
+          className={cn(
+            "block rounded-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+            isPastEvent && "pointer-events-none cursor-default grayscale opacity-55",
+          )}
+        >
           <div className="relative flex min-h-[108px] items-center justify-center overflow-hidden rounded-[18px] bg-surface-muted">
             {activity.coverImageUrl ? (
               // The native image aspect ratio is intentional: unlike fixed-aspect discovery
@@ -109,12 +119,15 @@ export function IdeaPosterCard({
                 {categoryLabel}
               </span>
             )}
-            <span className="line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] text-foreground group-hover:text-primary">
+            <span className={cn(
+              "line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em]",
+              isPastEvent ? "text-muted-foreground" : "text-foreground group-hover:text-primary",
+            )}>
               {activity.title}
             </span>
             {metaLine && <span className="font-mono text-xs text-muted-foreground">{metaLine}</span>}
             {idea.isPlanned && <span className="text-xs font-medium text-muted-foreground">В плане</span>}
-            {isPastEvent && <span className="text-xs text-muted-foreground">Уже прошло</span>}
+            {isPastEvent && <span className="text-xs font-medium text-muted-foreground">Уже прошло</span>}
           </div>
         </Link>
         <button
