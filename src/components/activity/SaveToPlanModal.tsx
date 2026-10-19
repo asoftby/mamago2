@@ -214,14 +214,14 @@ function buildDateRangeKeys(s?: string | null, e?: string | null): string[] {
 function toastPlan(dateISO: string) {
   toast.success("Добавлено в план", {
     description: `Активность сохранена на ${formatLocalPlanDate(dateISO, "ru-RU")}`,
-    action: { label: "Открыть план", onClick: () => { window.location.href = "/me/plan"; } },
+    action: { label: "Смотреть план", onClick: () => { window.location.href = "/me/plan"; } },
     duration: 4000,
   });
 }
 function toastIdea() {
   toast.success("Сохранено в идеи", {
     description: "Вы сможете вернуться к этому позже",
-    action: { label: "Открыть идеи", onClick: () => { window.location.href = "/me/ideas"; } },
+    action: { label: "Смотреть идеи", onClick: () => { window.location.href = "/me/ideas"; } },
     duration: 4000,
   });
 }
