@@ -89,7 +89,8 @@ export function DirectListClient({ initialConversations, initialCounts }: Props)
               <span className={styles.caps}>Переписки с организациями</span>
             </div>
             <h1 className={styles.heroTitle}>
-              Мои <span className={styles.heroTitleAccent}>сообщения.</span>
+              Мои <span className={styles.heroTitleAccent}>сообщения</span>
+              <MessageSquare aria-hidden="true" className={styles.heroTitleIcon} />
             </h1>
             <p className={styles.heroLead}>
               Одна переписка на каждую организацию — все ваши заявки и вопросы к ней в одном месте.
