@@ -1365,8 +1365,6 @@ export function PlanMainContent({
         >
           {planCalendar}
 
-        {renderPersonFilter(true)}
-
           {renderPersonFilter(false)}
 
           {selectedDate === todayKey ? <PlanDayBar items={dayItemsSorted} /> : null}
@@ -1433,6 +1431,8 @@ export function PlanMainContent({
         className="flex-1 space-y-5 overflow-y-auto bg-[var(--mp-bg)] px-5 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4"
       >
         {planCalendar}
+
+        {renderPersonFilter(true)}
 
         {selectedDate === todayKey ? <PlanDayBar items={dayItemsSorted} /> : null}
         <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />

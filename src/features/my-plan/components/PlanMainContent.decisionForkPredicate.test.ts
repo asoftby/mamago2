@@ -10,7 +10,8 @@ const source = readFileSync(new URL("./PlanMainContent.tsx", import.meta.url), "
 assert.doesNotMatch(source, /RecommendationDecisionBlock|showDecisionFork/, "decision fork is gone from the day screen");
 assert.equal((source.match(/\{renderDayList\((true|false)\)\}/g) ?? []).length, 2, "both layouts render the day list");
 assert.equal((source.match(/\{renderIdeas\(\)\}/g) ?? []).length, 2, "both layouts render the ideas block");
-assert.equal((source.match(/\{renderPersonFilter\((true|false)\)\}/g) ?? []).length, 2, "both layouts render the person filter");
+assert.equal((source.match(/\{renderPersonFilter\(false\)\}/g) ?? []).length, 1, "desktop renders the person filter once");
+assert.equal((source.match(/\{renderPersonFilter\(true\)\}/g) ?? []).length, 1, "compact renders the person filter once");
 
 // Ideas: quiet link before the first request, dashed block with «+» after it.
 assert.match(source, /Подобрать, куда сходить/);
