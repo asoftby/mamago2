@@ -132,7 +132,7 @@ export function BusinessOnboardingTour({
       role="dialog"
       aria-label="Знакомство с бизнес-кабинетом mamaGo"
       aria-modal="false"
-      className="fixed bottom-4 left-4 right-4 z-[110] mx-auto max-w-[440px] rounded-2xl border border-stone-200 bg-white p-5 shadow-2xl sm:bottom-7 sm:left-auto sm:right-7"
+      className="fixed left-1/2 top-1/2 z-[110] w-[calc(100%-2rem)] max-w-[440px] max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-stone-200 bg-white p-5 shadow-2xl"
     >
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">
