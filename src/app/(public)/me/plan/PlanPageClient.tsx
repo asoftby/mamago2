@@ -24,6 +24,7 @@ import type { PastPlanEntry } from "@/server/services/experience/pastPlanEntries
 import { ManualPlanEntryDialog } from "./ManualPlanEntryDialog";
 import { PlanNewTaskDialog } from "./PlanNewTaskDialog";
 import { PlanStickyCounter } from "@/features/my-plan/components/PlanStickyCounter";
+import { PlanStickyCounter } from "@/features/my-plan/components/PlanStickyCounter";
 import { addDays, monthName, startOfWeek, todayKey } from "@/lib/date/dateKey";
 import {
   shouldFetchCalendarWeek,
@@ -670,7 +671,6 @@ export function PlanPageClient({
             onRemove={handleRemoveItem}
             familyView={familyUi ? familyView : null}
             onVisibilityChange={handleVisibilityChange}
-            onAddManual={openCreate}
             onEditManual={openEdit}
             conflictIds={conflictIds}
             scenarioStatus={scenarioStatuses[selectedDate]}
@@ -678,6 +678,13 @@ export function PlanPageClient({
           {hasIdeas && <IdeasSidebar ideas={initialIdeas} />}
         </div>
       </Container>
+
+      {/* One add action for the full page, matching the My Plan modal. */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 mx-auto h-[100px] w-full max-w-[1100px]" aria-label="Добавить запись в план">
+        <div className="relative h-full w-full">
+          <PlanStickyCounter compact onAdd={openCreate} />
+        </div>
+      </div>
 
       <PlanOverviewDialog
         open={overviewOpen}

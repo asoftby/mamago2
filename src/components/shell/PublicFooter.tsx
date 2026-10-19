@@ -26,9 +26,11 @@ const FOOTER_LINK_CLASS =
 type PublicFooterProps = {
   /** Детальная страница со sticky CTA снизу — ровно 45px между копирайтом и баром */
   withStickyCtaClearance?: boolean;
+  /** Full My Plan page has a fixed add-task bar on both desktop and mobile. */
+  withPlanStickyClearance?: boolean;
 };
 
-export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterProps) {
+export function PublicFooter({ withStickyCtaClearance = false, withPlanStickyClearance = false }: PublicFooterProps) {
   const currentYear = new Date().getFullYear();
 
   return (
@@ -36,9 +38,11 @@ export function PublicFooter({ withStickyCtaClearance = false }: PublicFooterPro
       <Container
         className={cn(
           "pt-12 md:pt-16",
-          withStickyCtaClearance
-            ? cn(STICKY_CTA_FOOTER_PAD, "lg:pb-16")
-            : "pb-4 md:pb-16",
+          withPlanStickyClearance
+            ? "pb-[calc(120px+env(safe-area-inset-bottom))] md:pb-[120px]"
+            : withStickyCtaClearance
+              ? cn(STICKY_CTA_FOOTER_PAD, "lg:pb-16")
+              : "pb-4 md:pb-16",
         )}
       >
         <nav aria-label="Футер" className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">

@@ -49,6 +49,7 @@ export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
   const hideBottomBar = shouldHideMobileBottomNav(pathname);
   // Отступ под «Мой план» нужен только в слоте `plan` (на деталях внизу свой бар покупки).
   const hasMobilePlanWidget = resolveMobileBottomSlot(pathname) === "plan";
+  const isFullPlanPage = pathname === "/me/plan";
   useNavigationReloadDebug(process.env.NODE_ENV !== "production");
 
   useEffect(() => {
@@ -122,7 +123,7 @@ export function PublicLayoutBody({ children }: { children: React.ReactNode }) {
 
       {/* Подложка под отступом — того же цвета, что футер, иначе под ним остаётся белая полоса. */}
       <div className={cn("bg-[#F6F2EA]", hasMobilePlanWidget ? MOBILE_MAIN_BOTTOM : "pb-0 lg:pb-0")}>
-        <PublicFooter withStickyCtaClearance={hideBottomBar} />
+        <PublicFooter withStickyCtaClearance={hideBottomBar} withPlanStickyClearance={isFullPlanPage} />
       </div>
 
       {!hideBottomBar ? <BetaTipMobile /> : null}

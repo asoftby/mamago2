@@ -20,7 +20,6 @@ type Props = {
   onRemove: (id: string) => void;
   familyView?: FamilyView | null;
   onVisibilityChange?: VisibilityChange;
-  onAddManual: () => void;
   onEditManual: (item: SerializedPlanItem) => void;
   conflictIds: ReadonlySet<string>;
   /** undefined = no Scenario yet for this date. */
@@ -63,7 +62,7 @@ function ScenarioCta({
   );
 }
 
-export function PlanDayList({ date, items, onRemove, familyView, onVisibilityChange, onAddManual, onEditManual, conflictIds, scenarioStatus }: Props) {
+export function PlanDayList({ date, items, onRemove, familyView, onVisibilityChange, onEditManual, conflictIds, scenarioStatus }: Props) {
   const { weekday, day, month } = formatDayLabel(date);
 
   return (
@@ -102,13 +101,6 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
                 {items.length} {items.length % 10 === 1 && items.length % 100 !== 11 ? "запись" : [2, 3, 4].includes(items.length % 10) && (items.length % 100 < 12 || items.length % 100 > 14) ? "записи" : "записей"}
               </span>
             )}
-            <button
-              type="button"
-              onClick={onAddManual}
-              className="min-h-11 rounded-full bg-primary px-4 text-sm font-semibold text-white"
-            >
-              + Добавить
-            </button>
           </div>
         </div>
         <ScenarioCta date={date} itemCount={items.length} scenarioStatus={scenarioStatus} />
