@@ -22,7 +22,7 @@ export function IdeasCollectionsBar({ collections, ideas, memberships, onCreate,
   return (
     <section aria-label="Мои коллекции" className="min-w-0 space-y-4">
       <h2 className="text-lg font-semibold">Мои коллекции</h2>
-      <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-6 lg:grid-cols-4">
+      <div className="min-w-0 columns-2 gap-x-3 sm:gap-x-6 lg:columns-4">
         {collections.map((item) => {
           const covers = ideas
             .filter((idea) => visibleInCollection(idea, item.id, memberships))
@@ -31,7 +31,7 @@ export function IdeasCollectionsBar({ collections, ideas, memberships, onCreate,
             .slice(0, 4);
 
           return (
-            <div key={item.id} className="min-w-0">
+            <div key={item.id} className="mb-6 min-w-0 break-inside-avoid">
               <Link
                 href={`/me/ideas/collections/${encodeURIComponent(item.id)}`}
                 className="group block w-full min-w-0 rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -55,7 +55,7 @@ export function IdeasCollectionsBar({ collections, ideas, memberships, onCreate,
         <button
           type="button"
           onClick={onCreate}
-          className="group min-w-0 self-start rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="group mb-6 inline-block w-full min-w-0 break-inside-avoid rounded-2xl text-left align-top focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <span className="flex aspect-[3/2] items-center justify-center rounded-2xl border-2 border-dashed border-border bg-surface-muted transition-colors group-hover:bg-surface-hover">
             <Plus className="size-9 text-muted-foreground" />
