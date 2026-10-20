@@ -204,6 +204,16 @@ function resolvePlaceStreetAndInterior(place: {
 
   if (streetRaw && cityName) {
     streetRaw = removeCityFromAddress(streetRaw, cityName);
+    // Some geocoders store the city at both ends:
+    // "г. Минск, ул. Ратомская 7, Минск". Remove the leading occurrence
+    // before the formatter prepends "г. Минск" once.
+    const escapedCity = cityName.replace(/[.*+?^\x24{}()|[\]\\]/g, "\\  if (streetRaw && cityName) {
+    streetRaw = removeCityFromAddress(streetRaw, cityName);
+  }");
+    streetRaw = streetRaw.replace(
+      new RegExp(`^\\s*(?:г\\.?\\s*)?${escapedCity}\\s*,\\s*`, "i"),
+      "",
+    ).trim();
   }
 
   let streetPart = streetRaw
