@@ -230,6 +230,14 @@ export function MobileSearchSheet({
     [router, handleSheetClose],
   );
 
+  const handleRecentResultNavigate = useCallback(
+    (url: string) => {
+      router.push(url);
+      handleSheetClose();
+    },
+    [router, handleSheetClose],
+  );
+
   const sheetActions = useMemo(
     () => ({
       ...actions,
@@ -954,6 +962,7 @@ export function MobileSearchSheet({
           selectedIntent={selectedIntent}
           onIntentSelect={handleIntentSelect}
           onResultNavigate={handleSearchResultNavigate}
+          onRecentNavigate={handleRecentResultNavigate}
           citySlug={pendingCitySlug}
           filtersSection={
             <>
