@@ -404,8 +404,21 @@ export function PlanMainContent({
   const [showAddPersonaTypeModal, setShowAddPersonaTypeModal] = useState(false);
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
-  /** Вложенные экраны модалки: «Новое дело» и «Где мы уже были» заменяют план, а не открываются поверх. */
+  /** Два экрана остаются в одной модалке: сдвигаем их по горизонтали, не теряя план. */
   const [screen, setScreen] = useState<"plan" | "new" | "visits">("plan");
+  /** Сохраняем исходящий экран в DOM до конца обратной анимации. */
+  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | null>(null);
+  const openNestedScreen = useCallback((next: "new" | "visits") => {
+    setMountedNestedScreen(next);
+    setScreen(next);
+  }, []);
+  const closeNestedScreen = useCallback(() => setScreen("plan"), []);
+
+  useEffect(() => {
+    if (screen !== "plan" || mountedNestedScreen === null) return;
+    const timeout = window.setTimeout(() => setMountedNestedScreen(null), 350);
+    return () => window.clearTimeout(timeout);
+  }, [screen, mountedNestedScreen]);
   const [movingItem, setMovingItem] = useState<PlanItemWithActivity | null>(null);
   /** Фильтр дня по человеку: «Все» либо id персоны (ребёнок — childId, взрослый — assigneeUserId). */
   const [personFilter, setPersonFilter] = useState<string>("all");
@@ -1285,7 +1298,7 @@ export function PlanMainContent({
       ) : null}
       <button
         type="button"
-        onClick={() => setScreen("visits")}
+        onClick={() => openNestedScreen("visits")}
         className="flex min-h-11 w-full items-center justify-center gap-[7px] rounded-xl text-[15px] font-bold text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)]"
       >
         <History className="h-[17px] w-[17px]" aria-hidden />
@@ -1293,25 +1306,6 @@ export function PlanMainContent({
       </button>
     </div>
   );
-
-  if (screen === "new") {
-    return (
-      <PlanNewTaskScreen
-        todayIso={todayKey}
-        initialDate={selectedDate < todayKey ? todayKey : selectedDate}
-        people={personas.map((persona) => ({
-          id: persona.id,
-          name: persona.displayName?.trim() || (persona.kind === "adult" ? "Я" : ""),
-          kind: persona.kind,
-        }))}
-        onBack={() => setScreen("plan")}
-        onSaved={(date) => {
-          onChangeDate?.(date);
-          setScreen("plan");
-        }}
-      />
-    );
-  }
 
   // Свои дела и записи Telegram используют одну форму даты/времени; каталог — расписание.
   const movingNote = movingItem?.source === "MANUAL" || movingItem?.source === "TELEGRAM_FORWARD"
@@ -1336,12 +1330,7 @@ export function PlanMainContent({
     );
   }
 
-  if (screen === "visits") {
-    return <PlanVisitsScreen onBack={() => setScreen("plan")} />;
-  }
-
-  if (isDesktop) {
-    return (
+  const planContent = isDesktop ? (
       <div className="relative flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
         <div className="sticky top-0 z-20 flex-shrink-0">
           <MyPlanHeader onClose={onRequestClose} />
@@ -1370,7 +1359,7 @@ export function PlanMainContent({
         </div>
 
         <PlanStickyCounter
-          onAdd={isPastDay ? undefined : () => setScreen("new")}
+          onAdd={isPastDay ? undefined : () => openNestedScreen("new")}
         />
 
         <PlanMoveSheet
@@ -1405,10 +1394,7 @@ export function PlanMainContent({
           }}
         />
       </div>
-    );
-  }
-
-  return (
+  ) : (
     <div className="relative flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
       <div className="flex-shrink-0">
         <MyPlanHeader onClose={onRequestClose} compact />
@@ -1437,7 +1423,7 @@ export function PlanMainContent({
       </div>
 
       <PlanStickyCounter
-        onAdd={isPastDay ? undefined : () => setScreen("new")}
+        onAdd={isPastDay ? undefined : () => openNestedScreen("new")}
         compact
       />
 
@@ -1472,6 +1458,49 @@ export function PlanMainContent({
           toast.success("Профиль обновлён");
         }}
       />
+    </div>
+  );
+
+  return (
+    <div className="relative h-full min-h-0 w-full overflow-hidden bg-[var(--mp-bg)]">
+      <div
+        className={cn(
+          "flex h-full min-h-0 w-[200%] transform-gpu transition-transform duration-300 ease-in-out motion-reduce:transition-none",
+          screen === "plan" ? "translate-x-0" : "-translate-x-1/2",
+        )}
+      >
+        <div
+          className="h-full min-h-0 w-1/2 shrink-0"
+          aria-hidden={screen !== "plan"}
+          inert={screen !== "plan"}
+        >
+          {planContent}
+        </div>
+        <div
+          className="h-full min-h-0 w-1/2 shrink-0"
+          aria-hidden={screen === "plan"}
+          inert={screen === "plan"}
+        >
+          {mountedNestedScreen === "new" ? (
+            <PlanNewTaskScreen
+              todayIso={todayKey}
+              initialDate={selectedDate < todayKey ? todayKey : selectedDate}
+              people={personas.map((persona) => ({
+                id: persona.id,
+                name: persona.displayName?.trim() || (persona.kind === "adult" ? "Я" : ""),
+                kind: persona.kind,
+              }))}
+              onBack={closeNestedScreen}
+              onSaved={(date) => {
+                onChangeDate?.(date);
+                closeNestedScreen();
+              }}
+            />
+          ) : mountedNestedScreen === "visits" ? (
+            <PlanVisitsScreen onBack={closeNestedScreen} />
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
