@@ -41,6 +41,12 @@ export async function GET(req: NextRequest) {
     return sum;
   }, 0);
 
+  // For the modal's «На этой неделе» section, use the remaining calendar
+  // week (through Sunday), not the widget's rolling seven-day counter.
+  const weekday = new Date(`${from}T12:00:00.000Z`).getUTCDay();
+  const currentWeekEnd = addDaysIso(from, (7 - weekday) % 7);
+  const currentWeekItems = items.filter((item) => item.date <= currentWeekEnd);
+
   const nextPlanItem =
     items.find((item) => item.date > from) == null
       ? null
@@ -62,6 +68,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     todayCount,
     weekItemsCount,
+    currentWeekItemsCount: currentWeekItems.length,
+    currentWeekItems,
     nextPlanItem,
     countsByDate,
     nearestDate,
