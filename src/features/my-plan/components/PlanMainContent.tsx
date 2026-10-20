@@ -425,6 +425,8 @@ export function PlanMainContent({
     return () => window.clearTimeout(timeout);
   }, [screen, mountedNestedScreen]);
   const [movingItem, setMovingItem] = useState<PlanItemWithActivity | null>(null);
+  /** Своя заметка, открытая тапом: та же форма «Новое дело», предзаполненная. */
+  const [editingNote, setEditingNote] = useState<PlanItemWithActivity | null>(null);
   const [openedEventId, setOpenedEventId] = useState<string | null>(null);
   /** Открытое событие ищем по всем датам: после переноса оно остаётся на экране до «Назад». */
   const openedEvent = useMemo(() => {
@@ -1123,6 +1125,11 @@ export function PlanMainContent({
         onRemove={() => handleRemoveFromPlan(item.id)}
         onMove={canMovePlanItem(item) && !isPastDay ? () => setMovingItem(item) : undefined}
         onOpen={() => {
+          if (item.source === "MANUAL") {
+            setEditingNote(item);
+            openNestedScreen("new");
+            return;
+          }
           setOpenedEventId(item.id);
           openNestedScreen("event");
         }}
@@ -1378,7 +1385,7 @@ export function PlanMainContent({
         </div>
 
         <PlanStickyCounter
-          onAdd={isPastDay ? undefined : () => openNestedScreen("new")}
+          onAdd={isPastDay ? undefined : () => { setEditingNote(null); openNestedScreen("new"); }}
         />
 
         <PlanMoveSheet
@@ -1442,7 +1449,7 @@ export function PlanMainContent({
       </div>
 
       <PlanStickyCounter
-        onAdd={isPastDay ? undefined : () => openNestedScreen("new")}
+        onAdd={isPastDay ? undefined : () => { setEditingNote(null); openNestedScreen("new"); }}
         compact
       />
 
@@ -1504,7 +1511,8 @@ export function PlanMainContent({
             <PlanNewTaskScreen
               key={nestedScreenVersion}
               todayIso={todayKey}
-              initialDate={selectedDate < todayKey ? todayKey : selectedDate}
+              initialDate={editingNote ? (editingNote.date < todayKey ? todayKey : editingNote.date) : selectedDate < todayKey ? todayKey : selectedDate}
+              editItem={editingNote}
               people={personas.map((persona) => ({
                 id: persona.id,
                 name: persona.displayName?.trim() || (persona.kind === "adult" ? "Я" : ""),

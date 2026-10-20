@@ -55,10 +55,14 @@ export function PlanEventScreen({
   const cta = activity ? resolveActivityParticipationCta(activity, city) : null;
   const ctaHref = cta?.href ?? detailHref;
   const price = activity ? resolvePriceLabel(activity) : null;
+  const isClass = activity?.type === "COURSE";
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
       <PlanScreenHead back="План" onBack={onBack} />
+      <span className={`mx-5 mb-3 inline-flex h-[30px] w-fit items-center rounded-full px-3 text-[13px] font-bold md:mx-8 ${isClass ? "bg-[#E4E6F4] text-[#454C86]" : "bg-[var(--mp-ac-soft)] text-[var(--mp-ac-dark)]"}`}>
+        {isClass ? "Занятие" : "Из афиши"}
+      </span>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 md:px-8">
         <div className="relative aspect-[16/10] w-full overflow-hidden rounded-3xl bg-[var(--mp-soft)]">
           {poster ? (
@@ -144,7 +148,7 @@ export function PlanEventScreen({
             {...(cta?.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
             className="flex h-[58px] min-w-0 flex-1 items-center justify-center overflow-hidden text-ellipsis whitespace-nowrap rounded-[18px] bg-[var(--mp-ac-dark)] px-3.5 text-[16.5px] font-bold text-white no-underline transition-colors hover:bg-[var(--mp-ac-dark)]/90 hover:text-white"
           >
-            {cta?.label ?? "Открыть событие"}
+            {cta?.label ?? (isClass ? "Записаться на пробное" : "Открыть событие")}
             {cta && price ? <span className="ml-2 text-[14.5px] font-semibold opacity-85">{price}</span> : null}
           </Link>
         ) : null}
