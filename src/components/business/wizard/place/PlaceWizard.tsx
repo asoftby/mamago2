@@ -13,6 +13,7 @@ import {
   formatRelativeTimeRu,
 } from "@/components/form-shell";
 import { WizardProgress } from "@/components/ui/wizard-progress";
+import { MobileWizardProgress } from "@/components/ui/mobile-wizard-progress";
 import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { useWizardSession } from "@/hooks/useWizardSession";
@@ -1126,11 +1127,18 @@ export function PlaceWizard({
         }
       >
         <div className="space-y-3">
-          <WizardProgress
+          <MobileWizardProgress
             steps={progressSteps}
             currentStep={currentStep}
             onStepChange={handleGoToStep}
           />
+          <div className="hidden sm:block">
+            <WizardProgress
+              steps={progressSteps}
+              currentStep={currentStep}
+              onStepChange={handleGoToStep}
+            />
+          </div>
           <div className="flex justify-end">
             <CompletionProgress data={formData} />
           </div>
