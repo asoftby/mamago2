@@ -60,6 +60,14 @@ export function MyPlanOverlay({ open, onOpenChange }: MyPlanOverlayProps) {
       a11yTitle="Мой план"
       variant="chromeless"
       dismissible={true}
+      onInteractOutside={(event) => {
+        // The Sonner undo action is portalled outside the Dialog/Sheet.
+        // Its tap must restore the activity, not dismiss the entire My Plan modal.
+        const target = event.detail.originalEvent.target;
+        if (target instanceof Element && target.closest("[data-plan-delete-toast]")) {
+          event.preventDefault();
+        }
+      }}
       showCloseButton={false}
       mobileTopSlot={dragHandle}
       heightMode="tall"
