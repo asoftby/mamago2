@@ -47,7 +47,6 @@ export function PlaceReviewsSection({
   reviews,
   placeId,
   rating,
-  reviewCount,
   legacyMode = false,
   googleRating,
   googleReviewCount,
@@ -141,7 +140,6 @@ export function PlaceReviewsSection({
               review={review}
               layout="grid"
               delay={i * 70}
-              onShowMore={() => setAllOpen(true)}
             />
           ))}
         </div>
@@ -195,12 +193,10 @@ function ReviewCard({
   review,
   layout,
   delay = 0,
-  onShowMore,
 }: {
   review: Review;
   layout: "grid" | "list";
   delay?: number;
-  onShowMore?: () => void;
 }) {
   const isGrid = layout === "grid";
   const textRef = useRef<HTMLParagraphElement>(null);
