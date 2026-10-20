@@ -206,26 +206,6 @@ export function PlaceHero({
                 <span className="text-[14px] font-semibold text-foreground sm:text-[16px]">{ageRange}</span>
               </>
             )}
-            {/* Desktop: «Сохранить» и «Поделиться» справа в строке категории; на мобильном — иконки в хедере. */}
-            <div className="ml-auto hidden items-center gap-5 lg:flex">
-              <PlaceSaveHeart
-                variant="text"
-                registerInHeader
-                placeId={placeId}
-                placeSlug={placeSlug}
-                placeTitle={title}
-                coverImageUrl={logoUrl}
-                source="place-detail"
-              />
-              <button
-                type="button"
-                onClick={() => setShareOpen(true)}
-                className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
-              >
-                <Share2 size={18} strokeWidth={1.75} aria-hidden />
-                Поделиться
-              </button>
-            </div>
           </div>
           <ShareModal
             open={shareOpen}
@@ -350,6 +330,30 @@ export function PlaceHero({
                 <OwnerPlaceEditDropdown placeId={ownerEditPlaceId} className="w-full h-14 rounded-full" />
               </SidebarCardTopSection>
             )}
+
+            {/* Save/share live alongside primary CTA actions. */}
+            <SidebarCardTopSection mt={20} pt={20}>
+            {/* Desktop actions in CTA card; mobile actions remain in publication header. */}
+            <div className="hidden items-center justify-between gap-5 lg:flex">
+              <PlaceSaveHeart
+                variant="text"
+                registerInHeader
+                placeId={placeId}
+                placeSlug={placeSlug}
+                placeTitle={title}
+                coverImageUrl={logoUrl}
+                source="place-detail"
+              />
+              <button
+                type="button"
+                onClick={() => setShareOpen(true)}
+                className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
+              >
+                <Share2 size={18} strokeWidth={1.75} aria-hidden />
+                Поделиться
+              </button>
+            </div>
+            </SidebarCardTopSection>
 
             {/* Source-separated reputation link, no blended star average. */}
             {reputationSummary ? (
