@@ -834,6 +834,7 @@ export function OfferWizard({
           onGoToStep={handleGoToStep}
           validation={submitValidation}
           variant={variant}
+          navigationType={navigationOfferType}
         />
       );
     }
