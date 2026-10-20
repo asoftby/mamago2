@@ -35,8 +35,6 @@ export type MobileSearchProps = {
   onResultNavigate: (item: SearchResultItemType) => void;
   /** Pending/active city slug for SearchQueryLog geo telemetry. */
   citySlug?: string | null;
-  /** Сфокусировать поле поиска при монтировании (поиск в шите открывается по тапу на плашку хедера). */
-  autoFocusInput?: boolean;
 };
 
 export function MobileSearch({
@@ -47,7 +45,6 @@ export function MobileSearch({
   filtersSection,
   onResultNavigate,
   citySlug,
-  autoFocusInput = false,
 }: MobileSearchProps) {
   const lastSearch = useLastPublicSearchQuery();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -65,7 +62,7 @@ export function MobileSearch({
   const debouncing = queryTrim.length >= 2 && queryTrim !== trimmed;
 
   const searchState: MobileSearchState = useMemo(() => {
-    if (queryTrim.length >= 2) return "typing";
+    if (searchOverlayOpen && queryTrim.length >= 2) return "typing";
     if (searchOverlayOpen) return "focused";
     return "idle";
   }, [queryTrim.length, searchOverlayOpen]);
@@ -112,7 +109,7 @@ export function MobileSearch({
   }, [selectedIntent]);
 
   useEffect(() => {
-    if (trimmed.length < 2) {
+    if (!searchOverlayOpen || trimmed.length < 2) {
       setResults([]);
       setLoading(false);
       setActiveIndex(-1);
@@ -141,13 +138,7 @@ export function MobileSearch({
     return () => {
       cancelled = true;
     };
-  }, [trimmed, citySlug]);
-
-  useEffect(() => {
-    if (!autoFocusInput) return;
-    const id = requestAnimationFrame(() => inputRef.current?.focus());
-    return () => cancelAnimationFrame(id);
-  }, [autoFocusInput]);
+  }, [trimmed, citySlug, searchOverlayOpen]);
 
   const handleDismissSearch = useCallback(() => {
     inputRef.current?.blur();
@@ -187,10 +178,7 @@ export function MobileSearch({
     [searchText, onResultNavigate],
   );
 
-  /**
-   * Табы разделов видны всегда, пока не набран запрос (idle и focused): поле поиска в фокусе при
-   * открытии шита, и если скрывать разделы, пользователь их не находит. Хаб города — до выбора раздела.
-   */
+  /** Табы разделов и фильтры остаются видимыми до нажатия на строку поиска. */
   const showIntentRow = searchState === "idle";
 
   const showPopularBlock =
@@ -247,7 +235,12 @@ export function MobileSearch({
           onClick={handleDismissSearch}
         />
       ) : null}
-      <div className={cn("shrink-0 px-4 pb-3 pt-2", searchOverlayOpen && "relative z-10")}>
+      <div
+        className={cn(
+          "shrink-0 px-4 pb-3 pt-2",
+          searchOverlayOpen && "relative z-10",
+        )}
+      >
         <MobileSearchHeroRow
           value={searchText}
           onChange={onSearchTextChange}
