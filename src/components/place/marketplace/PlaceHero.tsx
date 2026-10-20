@@ -193,10 +193,10 @@ export function PlaceHero({
                   {(reputationSummary?.googleRating ?? rating)?.toFixed(1)}
                 </span>
                 <a
-                  href="#place-reputation"
+                  href={reputationSummary ? "#place-reputation" : "#reviews"}
                   className="text-muted-foreground underline decoration-dashed underline-offset-4 transition-colors hover:text-foreground"
                 >
-                  {(reputationSummary?.googleCount ?? reviewCount)?.toLocaleString("ru-RU")} отзывов
+                  {(reputationSummary?.googleCount ?? reviewCount)?.toLocaleString("ru-RU")} {(() => { const count = reputationSummary?.googleCount ?? reviewCount ?? 0; return count % 100 >= 11 && count % 100 <= 14 ? "отзывов" : count % 10 === 1 ? "отзыв" : count % 10 >= 2 && count % 10 <= 4 ? "отзыва" : "отзывов"; })()}
                 </a>
               </div>
             ) : null}
