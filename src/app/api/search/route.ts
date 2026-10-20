@@ -110,7 +110,7 @@ export async function GET(request: Request) {
           priceItems: true,
           priceText: true,
           scheduleJson: true,
-          sessions: { where: { withdrawnAt: null, startsAt: { gte: new Date() } }, orderBy: { startsAt: "asc" }, take: 40, select: { startsAt: true } },
+          sessions: { where: { withdrawnAt: null, startsAt: { gte: new Date() } }, orderBy: { startsAt: "asc" }, take: 41, select: { startsAt: true } },
           nextOccurrenceAt: true,
           place: {
             select: {
@@ -180,6 +180,7 @@ export async function GET(request: Request) {
             formatActivitySearchDates({
               scheduleJson: activity.scheduleJson,
               sessions: activity.sessions,
+              sessionsTruncated: activity.sessions.length > 40,
               nextOccurrenceAt: activity.nextOccurrenceAt,
             }),
             formatSearchPublicationPrice({
@@ -208,7 +209,7 @@ export async function GET(request: Request) {
           ageTags: true, agePolicy: true, logoImageId: true, images: { select: { id: true, url: true, kind: true } },
           city: { select: { name: true } },
           openingHours: { select: { rules: { select: {
-            dayOfWeek: true, isOpen: true, allDay: true, intervals: { select: { startTime: true, endTime: true } },
+            dayOfWeek: true, isOpen: true, allDay: true, intervals: { orderBy: { sortOrder: "asc" }, select: { startTime: true, endTime: true, sortOrder: true } },
           } } } },
         },
       });
