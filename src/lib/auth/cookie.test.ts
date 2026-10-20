@@ -12,6 +12,7 @@ import {
   getAuthCookieDomain,
   isSecureCookie,
   getAuthCookieOptions,
+  SESSION_COOKIE_NAME,
 } from "./cookie";
 
 const ENV_KEYS = [
@@ -59,6 +60,11 @@ function withEnv(overrides: Partial<Record<(typeof ENV_KEYS)[number], string | u
 
 function main() {
   console.log("Starting cookie env-policy tests...");
+
+  // DEV/preview must not reuse a production cookie scoped to .mamago.by.
+  const initialAppEnv = process.env.APP_ENV?.trim().toLowerCase();
+  assert.strictEqual(SESSION_COOKIE_NAME,
+    initialAppEnv === "production" || initialAppEnv === "prod" ? "mg_session" : "mg_dev_session");
 
   // 1. NODE_ENV=production + APP_ENV=local: no Domain, Secure=false for HTTP.
   withEnv({ NODE_ENV: "production", APP_ENV: "local" }, () => {
