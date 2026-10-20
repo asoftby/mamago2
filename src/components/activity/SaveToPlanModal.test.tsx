@@ -125,7 +125,9 @@ const activityScenario: SaveScenario = {
 // Saved events use the same date slider as new events, with context actions.
 {
   const html = render({ scenario: activityScenario, isIdea: true, inPlan: false });
-  assert.ok(html.includes("В какой"), "saved events use the shared date picker");
+  assert.ok(html.includes("На когда"), "saved events use the planning headline");
+  assert.ok(html.includes("запланируем"), "saved events prompt to plan");
+  assert.ok(html.includes("Запланировать"), "saved events use the planning action");
   assert.ok(html.includes("уже в идеях"), "saved state appears in the shared header");
   assert.ok(html.includes("Убрать из идей"), "saved state can still be removed");
   assert.ok(!html.includes("Готовы"), "old separate upsell screen is not rendered");
