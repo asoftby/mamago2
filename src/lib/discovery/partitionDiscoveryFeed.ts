@@ -16,6 +16,9 @@ function ageRangeFromGroupId(id: string): (AgeRange & { id: string }) | null {
 }
 
 function sortByEngagementThenStable(list: ActivityMock[]): ActivityMock[] {
+  // Kuda cards arrive in temporal-first order from the server. Do not undo it
+  // after resolving the family audience. Keep the existing class-feed ordering.
+  if (list.length > 0 && list.every((activity) => activity.discoveryIntent === "kuda")) return [...list];
   return [...list].sort((a, b) => {
     const d = (b.engagementScore ?? 0) - (a.engagementScore ?? 0);
     if (d !== 0) return d;
