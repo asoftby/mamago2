@@ -409,7 +409,10 @@ export function PlanMainContent({
   const [screen, setScreen] = useState<"plan" | "new" | "visits">("plan");
   /** Сохраняем исходящий экран в DOM до конца обратной анимации. */
   const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | null>(null);
+  /** Каждое открытие формы — новый экземпляр; отменённая анимация не оставляет старый черновик. */
+  const [nestedScreenVersion, setNestedScreenVersion] = useState(0);
   const openNestedScreen = useCallback((next: "new" | "visits") => {
+    setNestedScreenVersion((version) => version + 1);
     setMountedNestedScreen(next);
     setScreen(next);
   }, []);
@@ -1484,6 +1487,7 @@ export function PlanMainContent({
         >
           {mountedNestedScreen === "new" ? (
             <PlanNewTaskScreen
+              key={nestedScreenVersion}
               todayIso={todayKey}
               initialDate={selectedDate < todayKey ? todayKey : selectedDate}
               people={personas.map((persona) => ({
@@ -1498,7 +1502,7 @@ export function PlanMainContent({
               }}
             />
           ) : mountedNestedScreen === "visits" ? (
-            <PlanVisitsScreen onBack={closeNestedScreen} />
+            <PlanVisitsScreen key={nestedScreenVersion} onBack={closeNestedScreen} />
           ) : null}
         </div>
       </div>
