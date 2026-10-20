@@ -14,7 +14,7 @@ import {
 } from "react";
 import { ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { ModalCloseButton } from "@/components/ui/modal-close-button";
+import { ModalHeader, ModalFooter, ModalPrimaryAction } from "@/components/ui/modal-chrome";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
@@ -906,16 +906,10 @@ export function MobileSearchSheet({
 
   return (
     <div className="fixed inset-0 z-[9999] flex min-h-0 flex-col bg-white">
-      <div className="sticky top-0 z-10 shrink-0 border-b border-gray-100 bg-white px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="w-10" />
-          <h2 className="text-lg font-semibold text-gray-900">Поиск</h2>
-          <ModalCloseButton
-            onClick={handleSheetClose}
-            className="-mr-2 shrink-0"
-          />
-        </div>
-      </div>
+      <ModalHeader
+        title={<h2 className="text-lg font-semibold text-gray-900">Поиск</h2>}
+        onClose={handleSheetClose}
+      />
 
       <div
         ref={scrollRegionRef}
@@ -1043,13 +1037,7 @@ export function MobileSearchSheet({
         />
       </div>
 
-      <div
-        className={cn(
-          "sticky bottom-0 z-10 shrink-0 border-t border-gray-100 bg-white/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-white/90",
-          isHubPickMode && "hidden",
-        )}
-      >
-        <div className="flex items-center gap-3">
+      <ModalFooter className={cn(isHubPickMode && "hidden")}>
           {searchFlowMode === "wizard" && activeSection === "date" ? (
             <button
               type="button"
@@ -1068,15 +1056,10 @@ export function MobileSearchSheet({
             <div className="w-[5.5rem] shrink-0" aria-hidden />
           )}
           <div className="min-w-0 flex-1" />
-          <button
-            type="button"
-            onClick={handleBottomPrimaryClick}
-            className="min-w-[10rem] shrink-0 rounded-xl bg-[#EF8759] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-primary-hover active:scale-[0.98]"
-          >
+          <ModalPrimaryAction onClick={handleBottomPrimaryClick}>
             {bottomPrimaryLabel}
-          </button>
-        </div>
-      </div>
+          </ModalPrimaryAction>
+      </ModalFooter>
     </div>
   );
 }
