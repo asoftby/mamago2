@@ -36,4 +36,23 @@ assert.equal(formatSearchOpeningHours(daily.slice(0, 5)), "Пн–Пт 10:00–2
 assert.equal(formatSearchOpeningHours([]), null);
 assert.equal(formatSearchOpeningHours(daily.map((r) => ({ ...r, allDay: true }))), "Круглосуточно");
 
+// A capped preview cannot be used to claim a shortened event end date.
+const manySessions = Array.from({ length: 41 }, (_, i) => ({
+  startsAt: new Date(Date.UTC(2026, 8, 4 + Math.floor(i / 4), 7)),
+}));
+assert.equal(formatActivitySearchDates({ sessions: manySessions, sessionsTruncated: true }), "4 сен");
+assert.equal(formatActivitySearchDates({ sessions: manySessions.slice(0, 40), sessionsTruncated: false }), "4–13 сен");
+
+// Interval order must be stable even if database relation order differs.
+const splitDay = [{
+  dayOfWeek: "MON",
+  isOpen: true,
+  allDay: false,
+  intervals: [
+    { startTime: "18:00", endTime: "22:00", sortOrder: 1 },
+    { startTime: "09:00", endTime: "12:00", sortOrder: 0 },
+  ],
+}];
+assert.equal(formatSearchOpeningHours(splitDay), "Пн 09:00–12:00, 18:00–22:00");
+
 console.log("Search result card date, price and opening-hours contracts: OK");
