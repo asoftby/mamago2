@@ -1551,9 +1551,10 @@ function ConfirmView({ scenario, isIdea, inPlan, planDate, onCommit }: {
 }
 
 // ─── Idea-only view (no date semantics — e.g. Article) ───────────────────────
-function IdeaOnlyView({ title, ticket, isIdea, onIdea, onRemoveIdea }: {
+function IdeaOnlyView({ title, ticket, isIdea, onIdea, onRemoveIdea, collectionLink }: {
   title: string; ticket?: ActivityTicketSource;
   isIdea: boolean; onIdea: () => void; onRemoveIdea: () => void;
+  collectionLink?: { title: string; href: string } | null;
 }) {
   return (
     <div className="px-6 pb-6 pt-0 sm:pt-4">
@@ -1571,11 +1572,23 @@ function IdeaOnlyView({ title, ticket, isIdea, onIdea, onRemoveIdea }: {
           Сохраните публикацию без даты, чтобы вернуться к ней позже.
         </p>
       )}
-      <IdeasRow onClick={onIdea} title={isIdea ? "В коллекцию" : "Сохранить в идеи"}
-        subtitle={isIdea ? "Выбрать или изменить коллекцию" : "Вернуться к публикации позже"} />
+      {isIdea && collectionLink ? (
+        <a href={collectionLink.href}
+          className="stp-opt flex min-h-[74px] w-full min-w-0 items-center gap-3 rounded-2xl border border-border bg-surface-muted px-4 text-left hover:border-primary">
+          <IcoCircle bg={C.bg} color={C.ink2} border={`1px solid ${C.line2}`}><BookmarkIcon size={17} /></IcoCircle>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[15px] font-semibold">{collectionLink.title}</span>
+            <span className="block text-[13px] text-muted-foreground">Открыть коллекцию</span>
+          </span>
+          <span aria-hidden="true">→</span>
+        </a>
+      ) : (
+        <IdeasRow onClick={onIdea} title={isIdea ? "В коллекцию" : "Сохранить в идеи"}
+          subtitle={isIdea ? "Выбрать или изменить коллекцию" : "Вернуться к публикации позже"} />
+      )}
       {isIdea && (
         <button type="button" onClick={onRemoveIdea}
-          className="mt-4 min-h-11 w-full rounded-full border border-border text-sm text-muted-foreground hover:bg-surface-hover">
+          className="mt-4 min-h-11 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
           Убрать из идей
         </button>
       )}
@@ -1731,6 +1744,7 @@ function PickerBodyInner({
         title={scenario.title}
         ticket={scenario.ticket}
         isIdea={isIdea}
+        collectionLink={collectionLink}
         onIdea={() => setView("collections")}
         onRemoveIdea={() => onCommit({ action: "remove-idea" })}
       />
