@@ -123,7 +123,7 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel }
         )}
 
         <div className="min-w-0 flex-1">
-          {onOpen && (item.activity || isManual) ? (
+          {onOpen && (item.activity || item.articleId || isManual) ? (
             <button
               type="button"
               onClick={onOpen}

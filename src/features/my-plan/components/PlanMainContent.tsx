@@ -28,7 +28,9 @@ import { AddPersonaTypeModal } from "./AddPersonaTypeModal";
 import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
 import { PlanStickyCounter } from "./PlanStickyCounter";
+import { PlanArticleScreen } from "./v3/PlanArticleScreen";
 import { PlanEventScreen } from "./v3/PlanEventScreen";
+import { PlanScenarioScreen } from "./v3/PlanScenarioScreen";
 import { PlanNewTaskScreen } from "./v3/PlanNewTaskScreen";
 import { PlanVisitsScreen } from "./v3/PlanVisitsScreen";
 import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
@@ -407,12 +409,12 @@ export function PlanMainContent({
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   /** Два экрана остаются в одной модалке: сдвигаем их по горизонтали, не теряя план. */
-  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "event">("plan");
+  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "event" | "scenario">("plan");
   /** Сохраняем исходящий экран в DOM до конца обратной анимации. */
-  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "event" | null>(null);
+  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "event" | "scenario" | null>(null);
   /** Каждое открытие формы — новый экземпляр; отменённая анимация не оставляет старый черновик. */
   const [nestedScreenVersion, setNestedScreenVersion] = useState(0);
-  const openNestedScreen = useCallback((next: "new" | "visits" | "event") => {
+  const openNestedScreen = useCallback((next: "new" | "visits" | "event" | "scenario") => {
     setNestedScreenVersion((version) => version + 1);
     setMountedNestedScreen(next);
     setScreen(next);
@@ -1313,7 +1315,7 @@ export function PlanMainContent({
     <div className="space-y-3">
       {scenarioCtaLabel ? (
         <BuildScenarioButton
-          onClick={handleOpenScenarioPage}
+          onClick={scenarioCtaState === "create" ? handleOpenScenarioPage : () => openNestedScreen("scenario")}
           label={scenarioCtaLabel}
           hint={
             scenarioCtaState === "create"
@@ -1525,7 +1527,18 @@ export function PlanMainContent({
               }}
             />
           ) : mountedNestedScreen === "event" ? (
-            openedEvent ? (
+            openedEvent?.articleId ? (
+              <PlanArticleScreen
+                key={openedEvent.id}
+                item={openedEvent}
+                onBack={closeNestedScreen}
+                onRemove={() => {
+                  handleRemoveFromPlan(openedEvent.id);
+                  closeNestedScreen();
+                }}
+                onMove={canMovePlanItem(openedEvent) && !isPastDay ? () => setMovingItem(openedEvent) : undefined}
+              />
+            ) : openedEvent ? (
               <PlanEventScreen
                 key={openedEvent.id}
                 item={openedEvent}
@@ -1537,6 +1550,14 @@ export function PlanMainContent({
                 onMove={canMovePlanItem(openedEvent) && !isPastDay ? () => setMovingItem(openedEvent) : undefined}
               />
             ) : null
+          ) : mountedNestedScreen === "scenario" ? (
+            <PlanScenarioScreen
+              date={selectedDate}
+              items={dayItems}
+              changed={scenarioCtaState === "changed"}
+              onBack={closeNestedScreen}
+              onOpen={handleOpenScenarioPage}
+            />
           ) : mountedNestedScreen === "visits" ? (
             <PlanVisitsScreen key={nestedScreenVersion} onBack={closeNestedScreen} />
           ) : null}
