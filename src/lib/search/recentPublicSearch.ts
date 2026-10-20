@@ -13,7 +13,7 @@ function normalizeQuery(raw: string): string {
 export function readLastPublicSearchQuery(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    const v = normalizeQuery(localStorage.getItem(STORAGE_KEY) ?? "");
+    const v = normalizeQuery(window.localStorage.getItem(STORAGE_KEY) ?? "");
     if (v.length < MIN_LEN || v.length > MAX_LEN) return null;
     return v;
   } catch {
@@ -32,7 +32,7 @@ export function rememberPublicSearchQuery(raw: string): void {
       window.dispatchEvent(new Event(LAST_PUBLIC_SEARCH_UPDATED_EVENT));
       return;
     }
-    localStorage.setItem(STORAGE_KEY, q);
+    window.localStorage.setItem(STORAGE_KEY, q);
     window.dispatchEvent(new Event(LAST_PUBLIC_SEARCH_UPDATED_EVENT));
   } catch {
     /* quota / private mode */
