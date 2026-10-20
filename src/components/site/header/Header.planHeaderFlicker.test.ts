@@ -4,10 +4,9 @@ import { readFileSync } from "node:fs";
 const source = readFileSync(new URL("./Header.tsx", import.meta.url), "utf8");
 const hook = readFileSync(new URL("../../../hooks/useStableHeaderBehavior.ts", import.meta.url), "utf8");
 
-// The collapsed search row shifts the document on /me/plan by considerably
-// more than the default 24px mode hysteresis. Keep an explicit margin only
-// on this route and leave the global header behavior unchanged.
-assert.match(source, /scrollHysteresisPx: pathname === "\/me\/plan" \? 120 : 16/);
+// The search row shifts the document on the account/profile and My Plan pages.
+// Preserve a wide hysteresis on both while leaving other public pages unchanged.
+assert.match(source, /scrollHysteresisPx: pathname === "\/me" \|\| pathname === "\/me\/plan" \? 120 : 16/);
 assert.match(hook, /scrollThreshold \+ Math\.max\(4, Math\.round\(scrollHysteresisPx \* 0\.45\)\)/);
 assert.match(hook, /scrollThreshold - scrollHysteresisPx/);
 const threshold = 80;
