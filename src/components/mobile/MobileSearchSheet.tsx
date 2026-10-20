@@ -955,7 +955,6 @@ export function MobileSearchSheet({
           onIntentSelect={handleIntentSelect}
           onResultNavigate={handleSearchResultNavigate}
           citySlug={pendingCitySlug}
-          autoFocusInput
           filtersSection={
             <>
               {renderAccordion(
