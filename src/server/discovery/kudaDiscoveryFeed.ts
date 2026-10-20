@@ -53,7 +53,7 @@ export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, 
 
 /**
  * Опубликованные события (EVENT) в городе для ленты «Куда пойти».
- * События текущего пользователя — выше остальных.
+ * Temporal relevance takes priority; ownership does not change organic position.
  * Только данные из БД (без моков и добора).
  */
 export async function getKudaDiscoveryFeed(
@@ -133,7 +133,6 @@ export async function getKudaDiscoveryFeed(
   perf.mark("cityLookup");
 
   const scoreMap = await getEventEngagementScores(rows.map((r) => r.id));
-  const ownerUserIdById = new Map(rows.map((row) => [row.id, row.ownerUserId]));
   perf.mark("engagement");
 
   // Occasion boost is a soft contextual ranking signal, not a visibility rule.
@@ -175,14 +174,10 @@ export async function getKudaDiscoveryFeed(
 
   const temporalById = new Map(rows.map((row) => [
     row.id,
-    eventTemporalScore({ now, nextOccurrenceAt: row.nextOccurrenceAt, sessions: row.sessions }),
+    eventTemporalScore({ now: runtimeFilters.dateRange?.start ?? now, nextOccurrenceAt: row.nextOccurrenceAt, sessions: row.sessions }),
   ]));
 
   cards.sort((a, b) => {
-    const aMine = currentUserId && ownerUserIdById.get(a.id) === currentUserId ? 0 : 1;
-    const bMine = currentUserId && ownerUserIdById.get(b.id) === currentUserId ? 0 : 1;
-    if (aMine !== bMine) return aMine - bMine;
-
     const aWeatherBoost = options?.weather ? getWeatherRankingBoost(a, options.weather) : 0;
     const bWeatherBoost = options?.weather ? getWeatherRankingBoost(b, options.weather) : 0;
     // Time is the dominant organic signal; engagement/weather are capped so
