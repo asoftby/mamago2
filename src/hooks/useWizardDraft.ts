@@ -87,6 +87,10 @@ export function useWizardDraft<TData>({
 
   const autosaverRef = useRef<WizardDraftAutosaver<TData> | null>(null);
 
+  // Compare the persisted JSON value, not newly allocated wizard objects.
+  // Status changes ("saving"/"saved") must not restart the debounce.
+  const dataSnapshot = JSON.stringify(data);
+
   // Начальное чтение LS — только после mount (hydration safety)
   /* eslint-disable react-hooks/set-state-in-effect -- one-shot чтение localStorage возможно только после mount; гейт hydratedKey исключает повторные прогоны */
   useEffect(() => {
@@ -128,20 +132,19 @@ export function useWizardDraft<TData>({
     };
   }, [storageKey, schemaVersion, debounceMs, entityUpdatedAt]);
 
-  // Планирование автосейва при изменении данных
+  // Планируем автосохранение при изменении содержимого, а не ссылки на объект.
   const isFirstDataRunRef = useRef(true);
   useEffect(() => {
     if (hydratedKey !== storageKey) return;
-    if (!enabled) return;
-    // hasDraft (решение не принято) — не затираем черновик прошлой сессии
-    if (hasDraft) return;
-    // первый прогон после гидрации — это начальные данные, не «изменение»
+    // First meaningful input must not get lost when enabled changes false → true.
     if (isFirstDataRunRef.current) {
       isFirstDataRunRef.current = false;
-      return;
+      if (enabled && !hasDraft) return; // initial server data, not a user edit
     }
-    autosaverRef.current?.schedule(data);
-  }, [data, enabled, hasDraft, hydratedKey, storageKey]);
+    // Never overwrite a previously saved draft until the user decides to restore/discard it.
+    if (!enabled || hasDraft) return;
+    autosaverRef.current?.schedule(JSON.parse(dataSnapshot) as TData);
+  }, [dataSnapshot, enabled, hasDraft, hydratedKey, storageKey]);
 
   const restoreDraft = useCallback((): TData | null => {
     const found = readWizardDraft<TData>(window.localStorage, storageKey, schemaVersion);
