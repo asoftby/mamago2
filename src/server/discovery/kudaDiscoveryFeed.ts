@@ -1,5 +1,5 @@
-import { ActivityFormat, ActivityType, ScheduleMode } from "@prisma/client";
-import { eventTemporalScore } from "@/server/discovery/eventTemporalRanking";
+import { ActivityFormat, ActivityType, OccasionType, ScheduleMode } from "@prisma/client";
+import { eventTemporalScore, KUDA_DEFAULT_HORIZON_DAYS, KUDA_SEASONAL_HORIZON_DAYS } from "@/server/discovery/eventTemporalRanking";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
@@ -36,13 +36,27 @@ export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, 
   const now = new Date();
   const { primaryCityId, expandedCityIds } = await resolveKudaDiscoveryCityIds(citySlug, cityId);
   const pub = getPublicListingActivityWhere(now);
-  // An explicit date filter is authoritative. Otherwise show upcoming opportunities
-  // during the next 14 calendar days plus always/on-demand experiences.
-  const horizon = new Date(now.getTime() + 14 * 86_400_000);
+  // Explicit date selection is authoritative. Without it, discover the next
+  // 45 days plus editorially tagged holiday/season events up to 90 days away.
+  const horizon = new Date(now.getTime() + KUDA_DEFAULT_HORIZON_DAYS * 86_400_000);
+  const seasonalHorizon = new Date(now.getTime() + KUDA_SEASONAL_HORIZON_DAYS * 86_400_000);
+  const seasonalOccasion: Prisma.OccasionWhereInput = {
+    isActive: true,
+    type: { in: [OccasionType.HOLIDAY, OccasionType.SEASON] },
+    OR: [{ endsAt: null }, { endsAt: { gte: now } }],
+    AND: [{ OR: [{ startsAt: null }, { startsAt: { lte: seasonalHorizon } }] }],
+  };
   const defaultWindow: Prisma.ActivityWhereInput[] = options.eventFilters.dateRange ? [] : [{
     OR: [
       { sessions: { some: { startsAt: { gte: now, lt: horizon }, withdrawnAt: null } } },
       { nextOccurrenceAt: { gte: now, lt: horizon } },
+      {
+        occasionLinks: { some: { occasion: seasonalOccasion } },
+        OR: [
+          { sessions: { some: { startsAt: { gte: now, lt: seasonalHorizon }, withdrawnAt: null } } },
+          { nextOccurrenceAt: { gte: now, lt: seasonalHorizon } },
+        ],
+      },
       { scheduleMode: { in: [ScheduleMode.ALWAYS, ScheduleMode.ON_DEMAND] }, nextOccurrenceAt: null },
     ],
   }];
@@ -107,6 +121,10 @@ export async function getKudaDiscoveryFeed(
       eventCategory: { select: { nameRu: true } },
       place: { select: { cityId: true, city: { select: { slug: true } } } },
       venue: { select: { cityId: true } },
+      occasionLinks: {
+        where: { occasion: { isActive: true, type: { in: [OccasionType.HOLIDAY, OccasionType.SEASON] } } },
+        select: { occasionId: true },
+      },
       boosts: {
         where: { startAt: { lte: now }, endAt: { gt: now } },
         select: { id: true },
@@ -174,7 +192,7 @@ export async function getKudaDiscoveryFeed(
 
   const temporalById = new Map(rows.map((row) => [
     row.id,
-    eventTemporalScore({ now: runtimeFilters.dateRange?.start ?? now, nextOccurrenceAt: row.nextOccurrenceAt, sessions: row.sessions }),
+    eventTemporalScore({ now: runtimeFilters.dateRange?.start ?? now, nextOccurrenceAt: row.nextOccurrenceAt, sessions: row.sessions, seasonal: row.occasionLinks.length > 0 }),
   ]));
 
   cards.sort((a, b) => {
