@@ -47,3 +47,13 @@ const noMove = renderToStaticMarkup(
 );
 assert.doesNotMatch(noMove, /aria-label="Перенести"/);
 console.log("PlanEventScreen tests: OK");
+
+// Цена идёт через канонический контракт priceMode, а не «от» по умолчанию.
+const exact = renderToStaticMarkup(
+  <PlanEventScreen
+    item={{ ...item, activity: { ...item.activity!, priceMode: "EXACT", priceFrom: 15 } } as PlanItemWithActivity}
+    onBack={() => undefined}
+    onRemove={() => undefined}
+  />,
+);
+assert.doesNotMatch(exact, /от\s*15/);

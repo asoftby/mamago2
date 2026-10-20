@@ -5,9 +5,9 @@ import { CalendarClock, CalendarDays, ExternalLink, MapPin, Trash2 } from "lucid
 import { useOptionalCity } from "@/contexts/CityContext";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
-import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { resolveActivityParticipationCta } from "@/lib/plan/resolveActivityParticipationCta";
 import { planEntryDisplay } from "../../lib/planEntryDisplay";
+import { formatPlanCardPrice } from "../../lib/planPagePresentation";
 import { resolveActivityAddress } from "../../lib/formatActivityAddress";
 import type { PlanItemWithActivity } from "../../types/event";
 import { PlanScreenHead } from "./PlanScreenHead";
@@ -21,13 +21,6 @@ function formatEventDate(dateISO: string): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-function resolvePriceLabel(activity: NonNullable<PlanItemWithActivity["activity"]>): string | null {
-  const text = activity.priceText?.trim();
-  if (text) return text;
-  if (activity.priceFrom == null) return null;
-  return formatPriceFrom(activity.priceFrom);
-}
-
 /**
  * Экран события внутри модалки «Мой план»: фото, где и когда, главная кнопка
  * (билет / запись), «Перенести» и «Удалить из плана». Выезжает справа, как «Новое дело».
@@ -37,12 +30,15 @@ export function PlanEventScreen({
   onBack,
   onRemove,
   onMove,
+  onNavigate,
 }: {
   item: PlanItemWithActivity;
   onBack: () => void;
   onRemove: () => void;
   /** Нет → кнопки «Перенести» нет (для события без возможности переноса). */
   onMove?: () => void;
+  /** Вызывается перед внутренним переходом по ссылке — закрыть модалку плана. */
+  onNavigate?: () => void;
 }) {
   const cityCtx = useOptionalCity();
   const city = cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
@@ -54,7 +50,7 @@ export function PlanEventScreen({
   const detailHref = activity ? publicActivityPath(activity.id, city, activity.slug) : null;
   const cta = activity ? resolveActivityParticipationCta(activity, city) : null;
   const ctaHref = cta?.href ?? detailHref;
-  const price = activity ? resolvePriceLabel(activity) : null;
+  const price = activity ? formatPlanCardPrice(activity) : null;
   const isClass = activity?.type === "COURSE";
 
   return (
@@ -113,6 +109,7 @@ export function PlanEventScreen({
         {detailHref ? (
           <Link
             href={detailHref}
+            onClick={onNavigate}
             className="mx-auto mt-3.5 flex min-h-11 w-fit items-center gap-2 rounded-xl px-2.5 text-[15.5px] font-bold text-[var(--mp-ac-dark)] no-underline transition-colors hover:text-[var(--mp-ac)]"
           >
             <ExternalLink className="h-[17px] w-[17px]" aria-hidden />
@@ -145,6 +142,7 @@ export function PlanEventScreen({
         {ctaHref ? (
           <Link
             href={ctaHref}
+            onClick={cta?.external ? undefined : onNavigate}
             {...(cta?.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
             className="flex h-[58px] min-w-0 flex-1 items-center justify-center overflow-hidden text-ellipsis whitespace-nowrap rounded-[18px] bg-[var(--mp-ac-dark)] px-3.5 text-[16.5px] font-bold text-white no-underline transition-colors hover:bg-[var(--mp-ac-dark)]/90 hover:text-white"
           >

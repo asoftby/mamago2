@@ -1568,6 +1568,7 @@ export function PlanMainContent({
             openedEvent?.articleId ? (
               <PlanArticleScreen
                 key={openedEvent.id}
+                onNavigate={onRequestClose}
                 item={openedEvent}
                 onBack={closeNestedScreen}
                 onRemove={() => {
@@ -1579,6 +1580,7 @@ export function PlanMainContent({
             ) : openedEvent ? (
               <PlanEventScreen
                 key={openedEvent.id}
+                onNavigate={onRequestClose}
                 item={openedEvent}
                 onBack={closeNestedScreen}
                 onRemove={() => {

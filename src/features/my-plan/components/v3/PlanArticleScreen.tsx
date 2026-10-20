@@ -24,11 +24,13 @@ export function PlanArticleScreen({
   onBack,
   onRemove,
   onMove,
+  onNavigate,
 }: {
   item: PlanItemWithActivity;
   onBack: () => void;
   onRemove: () => void;
   onMove?: () => void;
+  onNavigate?: () => void;
 }) {
   const cityCtx = useOptionalCity();
   const city = cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
@@ -102,6 +104,7 @@ export function PlanArticleScreen({
         {href ? (
           <Link
             href={href}
+            onClick={onNavigate}
             className="flex h-[58px] min-w-0 flex-1 items-center justify-center rounded-[18px] bg-[var(--mp-ac-dark)] px-3.5 text-[16.5px] font-bold text-white no-underline transition-colors hover:bg-[var(--mp-ac-dark)]/90 hover:text-white"
           >
             Читать статью
