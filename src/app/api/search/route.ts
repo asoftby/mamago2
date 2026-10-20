@@ -100,6 +100,7 @@ export async function GET(request: Request) {
           id: true,
           cityId: true,
           ageLabel: true,
+          agePolicy: true,
           ageTags: true,
           ageMinMonths: true,
           ageMaxMonths: true,
@@ -170,6 +171,7 @@ export async function GET(request: Request) {
           }) || null,
           metaLine: [
             resolveActivityAgeLabel({
+              agePolicy: activity.agePolicy,
               ageLabel: activity.ageLabel,
               ageTags: activity.ageTags,
               ageMinMonths: activity.ageMinMonths,
