@@ -12,14 +12,17 @@ import type { ValidationResult } from "../validation";
 interface Step8ReviewProps {
   /** Вариант мастера: определяет набор шагов в списке проверки. */
   variant?: OfferWizardVariant;
+  /** Display-only fallback when staff has not selected an offer format. */
+  navigationType?: OfferFormData["offerWizardType"];
   data: OfferFormData;
   isSubmitting: boolean;
   onGoToStep: (step: number) => void;
   validation: ValidationResult;
 }
 
-export function Step8Review({ data, isSubmitting, onGoToStep, validation, variant = "v1" }: Step8ReviewProps) {
-  const steps = getStepsForOfferType(data.offerWizardType, data.productType, variant);
+export function Step8Review({ data, isSubmitting, onGoToStep, validation, variant = "v1", navigationType }: Step8ReviewProps) {
+  const effectiveType = navigationType ?? data.offerWizardType;
+  const steps = getStepsForOfferType(effectiveType, data.productType, variant);
   
   // Calculate completion stats (exclude review step itself)
   const contentSteps = steps.filter(s => s.key !== "review");
@@ -39,7 +42,7 @@ export function Step8Review({ data, isSubmitting, onGoToStep, validation, varian
   const validationErrors = Array.from(new Set(validation.errors));
 
   const handleGoToStep = (stepKey: OfferWizardStepKey) => {
-    const stepNum = getStepNumber(data.offerWizardType, stepKey, data.productType, variant);
+    const stepNum = getStepNumber(effectiveType, stepKey, data.productType, variant);
     if (stepNum !== null) {
       onGoToStep(stepNum);
     }

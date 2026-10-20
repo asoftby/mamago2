@@ -26,6 +26,7 @@ import {
 import { WizardProgress } from "@/components/ui/wizard-progress";
 import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
+import { canFreelyNavigateWizard } from "../shared/canFreelyNavigateWizard";
 import { useWizardSession } from "@/hooks/useWizardSession";
 import { useWizardDraft } from "@/hooks/useWizardDraft";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
@@ -293,6 +294,7 @@ export function OfferWizard({
   };
   const afterSubmitDestination = returnTo ?? nav.afterSubmitListPath;
   const isPublishedEditMode = mode === "edit" && offer?.status === "PUBLISHED";
+  const freeStepNavigation = canFreelyNavigateWizard(userRole);
   const [successModalOpen, setSuccessModalOpen] = useState(false);
   const [successState, setSuccessState] = useState<ResolvedContentSuccessState | null>(null);
   
@@ -303,8 +305,10 @@ export function OfferWizard({
     return getDefaultFormData(defaultPlaceId ?? null);
   });
   
-  // Get steps based on current offer type
-  const steps = getStepsForOfferType(formData.offerWizardType, formData.productType, variant);
+  // Staff may browse the default step sequence before selecting a format.
+  // This fallback affects navigation only, never the submitted formData.
+  const navigationOfferType = formData.offerWizardType ?? (freeStepNavigation ? "SINGLE" : null);
+  const steps = getStepsForOfferType(navigationOfferType, formData.productType, variant);
   const totalSteps = steps.length;
   
   // Current step key (not number)
@@ -313,7 +317,7 @@ export function OfferWizard({
       return "type";
     }
     const fd = mapOfferToFormData(offer);
-    const initialSteps = getStepsForOfferType(fd.offerWizardType, fd.productType, variant);
+    const initialSteps = getStepsForOfferType(fd.offerWizardType ?? (freeStepNavigation ? "SINGLE" : null), fd.productType, variant);
     const idx = Math.min(initialStepNumber, initialSteps.length) - 1;
     return initialSteps[idx]?.key ?? "type";
   });
@@ -357,11 +361,11 @@ export function OfferWizard({
 
   // Normalize current step if offer type changes
   useEffect(() => {
-    const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey, formData.productType, variant);
+    const currentStepNum = getStepNumber(navigationOfferType, currentStepKey, formData.productType, variant);
     if (currentStepNum === null) {
       setCurrentStepKey("type");
     }
-  }, [formData.offerWizardType, formData.productType, currentStepKey, variant]);
+  }, [navigationOfferType, formData.productType, currentStepKey, variant]);
   
   // Дочистка черновика старого формата (до useWizardDraft): не восстанавливаем,
   // формат и ключ несовместимы
@@ -468,7 +472,7 @@ export function OfferWizard({
     }
     setFormData(nextFormData);
     setCompletedSteps(normalizeWizardCompletedSteps(restored.completedSteps));
-    const nextSteps = getStepsForOfferType(nextFormData.offerWizardType, nextFormData.productType, variant);
+    const nextSteps = getStepsForOfferType(nextFormData.offerWizardType ?? (freeStepNavigation ? "SINGLE" : null), nextFormData.productType, variant);
     setCurrentStepKey(
       nextSteps.some((s) => s.key === restored.currentStep)
         ? restored.currentStep
@@ -544,8 +548,8 @@ export function OfferWizard({
 
   // Navigation by step key
   const handleNext = () => {
-    // Шаг помечается completed только здесь — после успешной валидации по «Далее»
-    if (!isStepComplete(currentStepKey, formData, variant)) {
+    const complete = isStepComplete(currentStepKey, formData, variant);
+    if (!complete && !freeStepNavigation) {
       const missing = getMissingFieldsForStep(currentStepKey, formData, variant);
       toast.error(
         missing.length > 0
@@ -554,15 +558,16 @@ export function OfferWizard({
       );
       return;
     }
-    markStepCompleted(currentStepKey);
-    const nextKey = getNextStepKey(formData.offerWizardType, currentStepKey, formData.productType, variant);
+    // Skipped incomplete steps are never marked complete.
+    if (complete) markStepCompleted(currentStepKey);
+    const nextKey = getNextStepKey(navigationOfferType, currentStepKey, formData.productType, variant);
     if (nextKey) {
       setCurrentStepKey(nextKey);
     }
   };
 
   const handlePrev = () => {
-    const prevKey = getPreviousStepKey(formData.offerWizardType, currentStepKey, formData.productType, variant);
+    const prevKey = getPreviousStepKey(navigationOfferType, currentStepKey, formData.productType, variant);
     if (prevKey) {
       setCurrentStepKey(prevKey);
     } else {
@@ -829,6 +834,7 @@ export function OfferWizard({
           onGoToStep={handleGoToStep}
           validation={submitValidation}
           variant={variant}
+          navigationType={navigationOfferType}
         />
       );
     }
@@ -914,7 +920,7 @@ export function OfferWizard({
     return renderBlock(currentStepKey);
   };
 
-  const currentStepNum = getStepNumber(formData.offerWizardType, currentStepKey, formData.productType, variant) || 1;
+  const currentStepNum = getStepNumber(navigationOfferType, currentStepKey, formData.productType, variant) || 1;
   const canNext = currentStepKey !== "review" && currentStepNum < totalSteps;
   const canPrev = true;
   const isReviewStep = currentStepKey === "review";
@@ -948,10 +954,11 @@ export function OfferWizard({
       isComplete: effective[idx],
       // Кликабельны: completed-шаги, текущий и первый незавершённый
       isDisabled:
+        !freeStepNavigation &&
         !isPublishedEditMode &&
         !effective[idx] && idx + 1 !== currentStepNum && idx !== firstIncompleteIdx,
     }));
-  }, [completedSteps, currentStepNum, formData, isPublishedEditMode, steps, variant]);
+  }, [completedSteps, currentStepNum, formData, freeStepNavigation, isPublishedEditMode, steps, variant]);
 
   const phase = formWizardPhaseFromFlags({ isSaving, isSubmitting });
   const actionLabels = useMemo(() => {
@@ -995,7 +1002,7 @@ export function OfferWizard({
           />
         }
       >
-        {!isChoosingOfferType ? (
+        {(!isChoosingOfferType || freeStepNavigation) ? (
           <WizardProgress
             steps={progressSteps}
             currentStep={currentStepNum}
