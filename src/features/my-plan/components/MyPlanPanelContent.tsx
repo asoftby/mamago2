@@ -184,6 +184,8 @@ export function MyPlanPanelContent({
       nearestPlanDate={planSummary?.nearestDate ?? null}
       nearestPlanCount={planSummary?.nearestCount ?? 0}
       nearestPlanItems={planSummary?.nearestItems ?? []}
+      currentWeekItems={planSummary?.currentWeekItems ?? []}
+      currentWeekItemsCount={planSummary?.currentWeekItemsCount ?? 0}
       serverPlanSnapshotConfirmed={serverConfirmedPlanDates.includes(effectiveSelectedPlanDate)}
       todayIso={todayIso}
       onAddItemToPlan={markSlotSaved}
