@@ -31,6 +31,9 @@ interface MarketplacePlacePageProps {
     logoUrl?: string | null;
     rating?: number;
     reviewCount?: number;
+    googleRating?: number | null;
+    googleReviewCount?: number | null;
+    googleMapsReviewsUrl?: string | null;
 
     // Contact
     phones: NormalizedPlacePhone[];
@@ -311,6 +314,9 @@ export function MarketplacePlacePage({
             rating={displayRating}
             reviewCount={displayReviewCount}
             legacyMode={Boolean(reputation)}
+            googleRating={place.googleRating}
+            googleReviewCount={place.googleReviewCount}
+            googleMapsUrl={place.googleMapsReviewsUrl}
           />
         </>
       )}
