@@ -28,6 +28,7 @@ import { AddPersonaTypeModal } from "./AddPersonaTypeModal";
 import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
 import { PlanStickyCounter } from "./PlanStickyCounter";
+import { PlanEventScreen } from "./v3/PlanEventScreen";
 import { PlanNewTaskScreen } from "./v3/PlanNewTaskScreen";
 import { PlanVisitsScreen } from "./v3/PlanVisitsScreen";
 import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
@@ -406,12 +407,12 @@ export function PlanMainContent({
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   /** Два экрана остаются в одной модалке: сдвигаем их по горизонтали, не теряя план. */
-  const [screen, setScreen] = useState<"plan" | "new" | "visits">("plan");
+  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "event">("plan");
   /** Сохраняем исходящий экран в DOM до конца обратной анимации. */
-  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | null>(null);
+  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "event" | null>(null);
   /** Каждое открытие формы — новый экземпляр; отменённая анимация не оставляет старый черновик. */
   const [nestedScreenVersion, setNestedScreenVersion] = useState(0);
-  const openNestedScreen = useCallback((next: "new" | "visits") => {
+  const openNestedScreen = useCallback((next: "new" | "visits" | "event") => {
     setNestedScreenVersion((version) => version + 1);
     setMountedNestedScreen(next);
     setScreen(next);
@@ -424,6 +425,16 @@ export function PlanMainContent({
     return () => window.clearTimeout(timeout);
   }, [screen, mountedNestedScreen]);
   const [movingItem, setMovingItem] = useState<PlanItemWithActivity | null>(null);
+  const [openedEventId, setOpenedEventId] = useState<string | null>(null);
+  /** Открытое событие ищем по всем датам: после переноса оно остаётся на экране до «Назад». */
+  const openedEvent = useMemo(() => {
+    if (!openedEventId) return null;
+    for (const items of Object.values(planItemsByDate ?? {})) {
+      const found = items.find((candidate) => candidate.id === openedEventId);
+      if (found) return found;
+    }
+    return null;
+  }, [openedEventId, planItemsByDate]);
   /** Фильтр дня по человеку: «Все» либо id персоны (ребёнок — childId, взрослый — assigneeUserId). */
   const [personFilter, setPersonFilter] = useState<string>("all");
   const [experienceFeed, setExperienceFeed] = useState<PlanExperienceFeed | null>(null);
@@ -1111,6 +1122,10 @@ export function PlanMainContent({
         }
         onRemove={() => handleRemoveFromPlan(item.id)}
         onMove={canMovePlanItem(item) && !isPastDay ? () => setMovingItem(item) : undefined}
+        onOpen={() => {
+          setOpenedEventId(item.id);
+          openNestedScreen("event");
+        }}
       />
     );
     const nowLine = (
@@ -1501,6 +1516,19 @@ export function PlanMainContent({
                 closeNestedScreen();
               }}
             />
+          ) : mountedNestedScreen === "event" ? (
+            openedEvent ? (
+              <PlanEventScreen
+                key={openedEvent.id}
+                item={openedEvent}
+                onBack={closeNestedScreen}
+                onRemove={() => {
+                  handleRemoveFromPlan(openedEvent.id);
+                  closeNestedScreen();
+                }}
+                onMove={canMovePlanItem(openedEvent) && !isPastDay ? () => setMovingItem(openedEvent) : undefined}
+              />
+            ) : null
           ) : mountedNestedScreen === "visits" ? (
             <PlanVisitsScreen key={nestedScreenVersion} onBack={closeNestedScreen} />
           ) : null}
