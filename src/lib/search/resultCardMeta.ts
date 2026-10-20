@@ -42,6 +42,8 @@ export function formatSearchDateRange(
 export function formatActivitySearchDates(args: {
   scheduleJson?: unknown;
   sessions?: Array<{ startsAt: Date }>;
+  /** An additional session exists beyond the bounded preview; last preview date is not the series end. */
+  sessionsTruncated?: boolean;
   nextOccurrenceAt?: Date | null;
 }): string | null {
   const schedule = args.scheduleJson && typeof args.scheduleJson === "object" && !Array.isArray(args.scheduleJson)
@@ -62,7 +64,7 @@ export function formatActivitySearchDates(args: {
     const first = starts[0]!;
     const last = starts[starts.length - 1]!;
     // A bounded series can be described as an event period; long-running schedules show the next date only.
-    return formatSearchDateRange(first, last.getTime() - first.getTime() <= 14 * 86400000 ? last : null);
+    return formatSearchDateRange(first, !args.sessionsTruncated && last.getTime() - first.getTime() <= 14 * 86400000 ? last : null);
   }
   return formatSearchDateRange(args.nextOccurrenceAt);
 }
@@ -104,7 +106,7 @@ type SearchOpeningHoursRule = {
   dayOfWeek: string;
   isOpen: boolean;
   allDay: boolean;
-  intervals: Array<{ startTime: string; endTime: string }>;
+  intervals: Array<{ startTime: string; endTime: string; sortOrder?: number }>;
 };
 
 /** Short, accurate weekly opening-hours summary. Missing days are not invented. */
@@ -117,7 +119,9 @@ export function formatSearchOpeningHours(rules: SearchOpeningHoursRule[]): strin
     if (index < 0) continue;
     const hours = rule.allDay
       ? "круглосуточно"
-      : rule.intervals.map((t) => `${t.startTime}–${t.endTime}`).join(", ");
+      : [...rule.intervals]
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.startTime.localeCompare(b.startTime))
+          .map((t) => `${t.startTime}–${t.endTime}`).join(", ");
     if (!hours) continue;
     descriptions.set(hours, [...(descriptions.get(hours) ?? []), rule.dayOfWeek]);
   }
