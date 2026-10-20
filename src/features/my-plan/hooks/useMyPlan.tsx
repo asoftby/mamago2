@@ -93,6 +93,8 @@ export interface MyPlanIdea {
 interface PlanSummary {
   todayCount: number;
   weekItemsCount: number;
+  currentWeekItemsCount: number;
+  currentWeekItems: PlanItemWithActivity[];
   nextPlanItem: { date: string; item: { title: string | null } } | null;
   countsByDate: Record<string, number>;
   nearestDate: string | null;
@@ -384,6 +386,10 @@ function useMyPlanStore() {
       const normalized: PlanSummary = {
         todayCount: Number.isFinite(data?.todayCount) ? data.todayCount : 0,
         weekItemsCount: Number.isFinite(data?.weekItemsCount) ? data.weekItemsCount : 0,
+        currentWeekItemsCount: Number.isFinite(data?.currentWeekItemsCount) ? data.currentWeekItemsCount : 0,
+        currentWeekItems: Array.isArray(data?.currentWeekItems)
+          ? normalizePlanItemsFromApi(data.currentWeekItems)
+          : [],
         nextPlanItem:
           data?.nextPlanItem && typeof data.nextPlanItem.date === "string"
             ? {
