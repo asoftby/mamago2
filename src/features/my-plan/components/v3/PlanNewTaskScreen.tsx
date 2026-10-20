@@ -382,8 +382,7 @@ export function PlanNewTaskScreen({
                 </button>
               );
             })}
-          </div>
-          <button
+            <button
             type="button"
             disabled={!timed}
             aria-expanded={customLeadOpen}
@@ -397,10 +396,12 @@ export function PlanNewTaskScreen({
               setCustomLeadMinutes(initial ? String(initial % 60) : "");
               setCustomLeadOpen(true);
             }}
-            className={cn("mt-2 inline-flex min-h-11 items-center rounded-full px-4", PLAN_CHIP, customLeadOpen ? PLAN_CHIP_ON : PLAN_CHIP_OFF, PLAN_CHIP_DISABLED)}
+            className={cn(PLAN_CHIP, customLeadOpen ? PLAN_CHIP_ON : PLAN_CHIP_OFF, PLAN_CHIP_DISABLED)}
           >
+            <Bell className="h-4 w-4" aria-hidden />
             Своё время
           </button>
+          </div>
           {customLeadOpen && timed ? (
             <div className="mt-3 rounded-2xl border border-[var(--mp-line)] p-3">
               <p className="mb-2 text-[13px] text-[var(--mp-tx2)]">За сколько до начала напомнить (до 24 часов)</p>
