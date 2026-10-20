@@ -5,7 +5,12 @@
 
 import { isDevLocalHost } from "@/lib/routing/surface";
 
-export const SESSION_COOKIE_NAME = "mg_session";
+// Isolate preview/DEV cookies from legacy Domain=.mamago.by production cookies.
+// All session readers and writers must use the same environment-selected name.
+const appEnv = process.env.APP_ENV?.trim().toLowerCase();
+export const SESSION_COOKIE_NAME = appEnv === "production" || appEnv === "prod"
+  ? "mg_session"
+  : "mg_dev_session";
 
 function readTrimmedEnv(name: string): string | undefined {
   const value = process.env[name]?.trim();
