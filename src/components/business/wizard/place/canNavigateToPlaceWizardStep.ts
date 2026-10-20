@@ -1,3 +1,5 @@
+import type { Role } from "@prisma/client";
+import { canFreelyNavigateWizard } from "../shared/canFreelyNavigateWizard";
 import type { PlaceWizardMode } from "./types";
 
 /**
@@ -11,7 +13,8 @@ import type { PlaceWizardMode } from "./types";
  * already allowed free navigation, and there is no reason a PENDING or
  * DRAFT Place under staff review should behave differently — sequential
  * gating there only forces extra clicks through "Далее" for no safety
- * benefit. `create` mode keeps the original sequential rule: the entity
+ * benefit. ADMIN and MODERATOR may also navigate freely in `create` mode.
+ * Other roles in `create` mode keep the original sequential rule: the entity
  * doesn't exist yet, so a later step may depend on data from an earlier
  * one not having been entered.
  *
@@ -20,16 +23,17 @@ import type { PlaceWizardMode } from "./types";
  */
 export function canNavigateToPlaceWizardStep(params: {
   mode: PlaceWizardMode;
+  role?: Role | null;
   currentStep: number;
   targetStep: number;
   firstStep: number;
   totalSteps: number;
 }): boolean {
-  const { mode, currentStep, targetStep, firstStep, totalSteps } = params;
+  const { mode, role, currentStep, targetStep, firstStep, totalSteps } = params;
 
   if (targetStep < firstStep || targetStep > totalSteps) return false;
 
-  if (mode === "edit") return true;
+  if (canFreelyNavigateWizard(role) || mode === "edit") return true;
 
   // create: sequential — backward always allowed, forward only by one step.
   return targetStep <= currentStep + 1 || targetStep < currentStep;

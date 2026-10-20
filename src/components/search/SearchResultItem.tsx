@@ -64,7 +64,7 @@ export function SearchResultItem({
       type="button"
       onClick={onNavigate}
       className={cn(
-        "flex w-full cursor-pointer gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
+        "flex w-full min-h-[80px] cursor-pointer items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors",
         "hover:bg-neutral-50",
         active && "bg-neutral-50",
       )}
@@ -72,7 +72,7 @@ export function SearchResultItem({
       {item.type === "place" && !item.imageUrl ? (
         <PlaceCategoryIcon category={item.placeCategory} title={item.title} />
       ) : (
-      <div className={cn("relative h-12 w-12 shrink-0 overflow-hidden bg-neutral-100", item.type === "place" ? "rounded-full" : "rounded-lg")}>
+      <div className={cn("relative h-14 w-14 shrink-0 overflow-hidden bg-neutral-100", item.type === "place" ? "rounded-full" : "rounded-lg")}>
         {item.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- динамические URL из каталога
           <img
@@ -87,14 +87,14 @@ export function SearchResultItem({
         )}
       </div>
       )}
-      <div className="min-w-0 flex-1 space-y-0.5">
-        <p className="truncate text-sm font-semibold text-neutral-900">
+      <div className="min-w-0 flex-1 space-y-1">
+        <p className="line-clamp-2 text-sm font-semibold leading-snug text-neutral-900">
           {highlightText(item.title, query)}
         </p>
         {structured ? (
           <>
             {addressLine ? (
-              <p className="truncate text-xs text-muted-foreground">{addressLine}</p>
+              <p className="truncate text-xs leading-snug text-muted-foreground">{addressLine}</p>
             ) : null}
             {detailLine ? <MetaLine text={detailLine} /> : null}
           </>

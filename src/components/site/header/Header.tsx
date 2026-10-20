@@ -85,7 +85,9 @@ export function SiteHeaderShell() {
   const reduceMotion = useReducedMotion();
   const hb = useStableHeaderBehavior({
     scrollThreshold: 80,
-    scrollHysteresisPx: 16,
+    // В профиле и «Моём плане» переключение высоты поиска сдвигает документ.
+    // Увеличенный гистерезис предотвращает цикл разворачивания/сворачивания.
+    scrollHysteresisPx: pathname === "/me" || pathname === "/me/plan" ? 120 : 16,
     headerRef,
   });
   const centerFadeDuration = reduceMotion ? 0.01 : 0.34;

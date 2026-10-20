@@ -4,21 +4,11 @@ import type { SearchResultItem, SearchResultType } from "@/lib/search/types";
 import { logSearchQuery } from "@/lib/search/logSearchQuery";
 import { resolveSearchLogCityId } from "@/lib/search/resolveSearchLogCityId";
 import { getCurrentUser } from "@/lib/auth/server";
-import { activityAddressLine, activityMetaLine, resolveActivityAgeLabel } from "@/lib/search/metaLines";
+import { resolveActivityAgeLabel } from "@/lib/search/metaLines";
+import { formatMarketplaceHeroAddress } from "@/lib/placeLocationString";
+import { formatActivitySearchDates, formatSearchDateRange, formatSearchOpeningHours, formatSearchPublicationPrice } from "@/lib/search/resultCardMeta";
 import { resolvePlaceLogoUrlFromDb } from "@/lib/place/resolvePlaceLogoUrlFromDb";
-import { formatPriceFrom } from "@/lib/formatters/format-price";
 import { formatAgeKeysShort } from "@/lib/config/ages";
-
-function openingHoursSummary(rules: Array<{ isOpen: boolean; allDay: boolean; intervals: Array<{startTime: string; endTime: string}> }>): string | null {
-  const open = rules.filter((r) => r.isOpen);
-  if (!open.length) return null;
-  if (open.every((r) => r.allDay) && open.length === 7) return "Круглосуточно";
-  const starts = open.flatMap((r) => r.intervals.map((i) => i.startTime)).sort();
-  const ends = open.flatMap((r) => r.intervals.map((i) => i.endTime)).sort();
-  if (!starts.length || !ends.length) return null;
-  return `${starts[0]}–${ends[ends.length - 1]}`;
-}
-
 
 const MAX_QUERY_LENGTH = 200;
 const MAX_QUERY_TOKENS = 10;
@@ -110,12 +100,17 @@ export async function GET(request: Request) {
           id: true,
           cityId: true,
           ageLabel: true,
+          agePolicy: true,
           ageTags: true,
           ageMinMonths: true,
           ageMaxMonths: true,
           priceFrom: true,
+          priceTo: true,
+          priceMode: true,
+          priceItems: true,
           priceText: true,
-          currency: true,
+          scheduleJson: true,
+          sessions: { where: { withdrawnAt: null, startsAt: { gte: new Date() } }, orderBy: { startsAt: "asc" }, take: 41, select: { startsAt: true } },
           nextOccurrenceAt: true,
           place: {
             select: {
@@ -168,28 +163,34 @@ export async function GET(request: Request) {
           activity.place?.city?.name ??
           null;
         activityById.set(activity.id, {
-          summaryLine: activityAddressLine({
-            venueTitle: activity.venue?.title,
-            venueAddressLine: activity.venue?.addressLine,
-            placeTitle: venuePlace?.title ?? activity.place?.title,
-            placeShortAddress: venuePlace?.shortAddress ?? activity.place?.shortAddress,
-            placeFormattedAddr: venuePlace?.formattedAddr ?? activity.place?.formattedAddr,
-            placeDisplayAddress: venuePlace?.displayAddress ?? activity.place?.displayAddress,
-            placeCustomAddress: venuePlace?.customAddress ?? activity.place?.customAddress,
-            cityName,
-          }),
-          metaLine: activityMetaLine({
-            nextOccurrenceAt: activity.nextOccurrenceAt,
-            ageLabel: resolveActivityAgeLabel({
+          summaryLine: formatMarketplaceHeroAddress({
+            city: cityName ? { name: cityName } : null,
+            shortAddress: activity.venue?.addressLine || venuePlace?.shortAddress || activity.place?.shortAddress,
+            formattedAddr: venuePlace?.formattedAddr ?? activity.place?.formattedAddr,
+            customAddress: venuePlace?.customAddress ?? activity.place?.customAddress,
+          }) || null,
+          metaLine: [
+            resolveActivityAgeLabel({
+              agePolicy: activity.agePolicy,
               ageLabel: activity.ageLabel,
               ageTags: activity.ageTags,
               ageMinMonths: activity.ageMinMonths,
               ageMaxMonths: activity.ageMaxMonths,
             }),
-            priceFrom: activity.priceFrom,
-            currency: activity.currency,
-            priceText: activity.priceText,
-          }),
+            formatActivitySearchDates({
+              scheduleJson: activity.scheduleJson,
+              sessions: activity.sessions,
+              sessionsTruncated: activity.sessions.length > 40,
+              nextOccurrenceAt: activity.nextOccurrenceAt,
+            }),
+            formatSearchPublicationPrice({
+              priceMode: activity.priceMode,
+              priceFrom: activity.priceFrom,
+              priceTo: activity.priceTo,
+              priceItems: activity.priceItems,
+              priceText: activity.priceText,
+            }),
+          ].filter(Boolean).join(" · "),
         });
       }
     }
@@ -205,33 +206,27 @@ export async function GET(request: Request) {
         select: {
           id: true, shortAddress: true, formattedAddr: true, displayAddress: true, customAddress: true,
           category: true, primaryCategory: { select: { nameRu: true } },
-          ageTags: true, logoImageId: true, images: { select: { id: true, url: true, kind: true } },
+          ageTags: true, agePolicy: true, logoImageId: true, images: { select: { id: true, url: true, kind: true } },
           city: { select: { name: true } },
           openingHours: { select: { rules: { select: {
-            isOpen: true, allDay: true, intervals: { select: { startTime: true, endTime: true } },
+            dayOfWeek: true, isOpen: true, allDay: true, intervals: { orderBy: { sortOrder: "asc" }, select: { startTime: true, endTime: true, sortOrder: true } },
           } } } },
-          offers: { where: { status: "PUBLISHED", archivedAt: null },
-            select: { priceFrom: true, priceMode: true, ageMinMonths: true, dateTo: true } },
         },
       });
       for (const place of places) {
-        const address = activityAddressLine({
-          cityName: place.city?.name, placeDisplayAddress: place.displayAddress,
-          placeShortAddress: place.shortAddress, placeFormattedAddr: place.formattedAddr,
-          placeCustomAddress: place.customAddress,
-        });
-        const validOffers = place.offers.filter((o) => !o.dateTo || o.dateTo >= new Date());
-        const prices = validOffers.filter((o) => o.priceFrom != null && o.priceFrom >= 0 && o.priceMode !== "ON_REQUEST" && o.priceMode !== "NONE").map((o) => o.priceFrom!);
-        const minimum = prices.length ? Math.min(...prices) : null;
-        const age = formatAgeKeysShort(place.ageTags) ||
-          (validOffers.some((o) => o.ageMinMonths != null)
-            ? `${Math.floor(Math.min(...validOffers.filter((o) => o.ageMinMonths != null).map((o) => o.ageMinMonths!)) / 12)}+`
-            : null);
-        const hours = openingHoursSummary(place.openingHours?.rules ?? []);
-        const price = minimum == null ? null : minimum === 0 ? "Бесплатно" : formatPriceFrom(minimum);
+        const address = formatMarketplaceHeroAddress({
+          city: place.city,
+          shortAddress: place.shortAddress,
+          formattedAddr: place.formattedAddr,
+          customAddress: place.customAddress ?? place.displayAddress,
+        }) || null;
+        const age = place.agePolicy === "ADULT_ONLY"
+          ? "18+"
+          : formatAgeKeysShort(place.ageTags);
+        const hours = formatSearchOpeningHours(place.openingHours?.rules ?? []);
         placeById.set(place.id, {
           summaryLine: address,
-          metaLine: [age, hours, price].filter(Boolean).join(" · "),
+          metaLine: [age, hours].filter(Boolean).join(" · "),
           imageUrl: (await resolvePlaceLogoUrlFromDb(place.images, place.logoImageId)) ?? null,
           placeCategory: place.primaryCategory?.nameRu ?? place.category ?? null,
         });
@@ -242,31 +237,37 @@ export async function GET(request: Request) {
       const offers = await prisma.offer.findMany({
         where: { id: { in: offerIds }, status: "PUBLISHED", archivedAt: null },
         select: {
-          id: true, ageMinMonths: true, dateFrom: true, dateTo: true, priceFrom: true,
-          priceText: true, priceMode: true, inheritPlaceOpeningHours: true,
-          openingHours: { select: { rules: { select: { isOpen: true, allDay: true, intervals: { select: { startTime: true, endTime: true } } } } } },
+          id: true, ageMinMonths: true, agePolicy: true, dateFrom: true, dateTo: true,
+          priceFrom: true, priceTo: true, priceItems: true, priceText: true, priceMode: true,
           place: { select: {
             shortAddress: true, formattedAddr: true, displayAddress: true, customAddress: true,
             city: { select: { name: true } },
-            openingHours: { select: { rules: { select: { isOpen: true, allDay: true, intervals: { select: { startTime: true, endTime: true } } } } } },
           } },
         },
       });
       for (const offer of offers) {
         const place = offer.place;
-        const address = place ? activityAddressLine({
-          cityName: place.city?.name, placeShortAddress: place.shortAddress,
-          placeDisplayAddress: place.displayAddress, placeFormattedAddr: place.formattedAddr,
-          placeCustomAddress: place.customAddress,
-        }) : null;
-        const date = offer.dateFrom?.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
-        const age = offer.ageMinMonths == null ? null : `${Math.floor(offer.ageMinMonths / 12)}+`;
-        const hours = openingHoursSummary(offer.inheritPlaceOpeningHours ? (place?.openingHours?.rules ?? []) : (offer.openingHours?.rules ?? []));
-        const price = offer.priceMode === "FREE" ? "Бесплатно" :
-          offer.priceFrom != null ? formatPriceFrom(offer.priceFrom) : offer.priceText;
+        const address = place ? formatMarketplaceHeroAddress({
+          city: place.city,
+          shortAddress: place.shortAddress,
+          formattedAddr: place.formattedAddr,
+          customAddress: place.customAddress ?? place.displayAddress,
+        }) || null : null;
+        const age = offer.agePolicy === "ADULT_ONLY" ? "18+" :
+          offer.ageMinMonths != null ? `${Math.floor(offer.ageMinMonths / 12)}+` : null;
         offerById.set(offer.id, {
           summaryLine: address,
-          metaLine: [age, date, hours, price].filter(Boolean).join(" · "),
+          metaLine: [
+            age,
+            formatSearchDateRange(offer.dateFrom, offer.dateTo),
+            formatSearchPublicationPrice({
+              priceMode: offer.priceMode,
+              priceFrom: offer.priceFrom,
+              priceTo: offer.priceTo,
+              priceItems: offer.priceItems,
+              priceText: offer.priceText,
+            }),
+          ].filter(Boolean).join(" · "),
         });
       }
     }

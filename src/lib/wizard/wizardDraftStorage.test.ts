@@ -3,6 +3,7 @@
  * Запуск: npx tsx src/lib/wizard/wizardDraftStorage.test.ts
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   WizardDraftAutosaver,
@@ -205,6 +206,26 @@ asyncTests.push(async () => {
   assert.equal(storage.map.has(key), false, "cancel отменяет отложенную запись");
   saver.dispose();
 });
+
+// ─── React wrapper contract: draft status updates cannot reset debounce ───
+{
+  const hook = readFileSync("src/hooks/useWizardDraft.ts", "utf8");
+  assert.match(
+    hook,
+    /const dataSnapshot = JSON\.stringify\(data\)/,
+    "The hook must compare persisted draft values, not freshly allocated object identities",
+  );
+  assert.match(
+    hook,
+    /\[dataSnapshot, enabled, hasDraft, hydratedKey, storageKey\]/,
+    "Only actual data changes may reschedule autosave after status rerenders",
+  );
+  assert.match(
+    hook,
+    /schedule\(JSON\.parse\(dataSnapshot\) as TData\)/,
+    "The scheduled payload must match the serialized snapshot",
+  );
+}
 
 void (async () => {
   for (const t of asyncTests) await t();

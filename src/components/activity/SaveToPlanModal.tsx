@@ -217,14 +217,14 @@ function buildDateRangeKeys(s?: string | null, e?: string | null): string[] {
 function toastPlan(dateISO: string) {
   toast.success("Добавлено в план", {
     description: `Активность сохранена на ${formatLocalPlanDate(dateISO, "ru-RU")}`,
-    action: { label: "Открыть план", onClick: () => { window.location.href = "/me/plan"; } },
+    action: { label: "Смотреть план", onClick: () => { window.location.href = "/me/plan"; } },
     duration: 4000,
   });
 }
 function toastIdea() {
   toast.success("Сохранено в идеи", {
     description: "Вы сможете вернуться к этому позже",
-    action: { label: "Открыть идеи", onClick: () => { window.location.href = "/me/ideas"; } },
+    action: { label: "Смотреть идеи", onClick: () => { window.location.href = "/me/ideas"; } },
     duration: 4000,
   });
 }
@@ -783,9 +783,10 @@ function DateSliderView({
   options, title, ticket,
   onConfirm, onIdea, sessionsByDate, confirmLabel,
   isIdea = false, inPlan = false, onCollections, onRemoveIdea, onRemovePlan,
-  initialDateISO,
+  initialDateISO, collectionLink,
 }: {
   options: string[]; title: string; ticket?: ActivityTicketSource;
+  collectionLink?: { title: string; href: string } | null;
   initialDateISO?: string | null;
   onConfirm: (iso: string, sessionId: string | null) => void; onIdea?: () => void;
   isIdea?: boolean; inPlan?: boolean;
@@ -837,7 +838,9 @@ function DateSliderView({
       <div className="min-w-0 w-full max-w-full overflow-x-clip px-4 pb-5 pt-0 sm:px-6 sm:pt-4">
         <SaveActivityHeader
           kicker={inPlan ? "уже в плане" : isIdea ? "уже в идеях" : "сохранить активность"}
-          heading={<>В какой{" "}<span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>день</span>{" "}напомнить.</>}
+          heading={isIdea && !inPlan
+            ? <>На когда <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>запланируем</span>?</>
+            : <>В какой{" "}<span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>день</span>{" "}напомнить.</>}
           ticket={{
             ...(ticket ?? { title }),
             title: selectedSessionTitle
@@ -911,7 +914,7 @@ function DateSliderView({
             iso={selISO}
             time={selectedTime}
             onConfirm={() => onConfirm(selISO, selectedSessionId)}
-            label={confirmLabel}
+            label={confirmLabel ?? (isIdea && !inPlan ? "Запланировать" : undefined)}
           />
         )}
 
@@ -919,11 +922,20 @@ function DateSliderView({
         {onCollections ? (
           <>
             <OrDivider label="или без даты" />
-            <IdeasRow
-              onClick={onCollections}
-              title="В коллекцию"
-              subtitle="Выбрать или изменить коллекцию"
-            />
+            {collectionLink ? (
+              <a href={collectionLink.href}
+                className="stp-opt flex min-h-[74px] w-full min-w-0 items-center gap-3 rounded-2xl border border-border bg-surface-muted px-4 text-left hover:border-primary">
+                <IcoCircle bg={C.bg} color={C.ink2} border={`1px solid ${C.line2}`}><BookmarkIcon size={17} /></IcoCircle>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-semibold">{collectionLink.title}</span>
+                  <span className="block text-[13px] text-muted-foreground">Открыть коллекцию</span>
+                </span>
+                <span aria-hidden="true">→</span>
+              </a>
+            ) : (
+              <IdeasRow onClick={onCollections} title="В коллекцию"
+                subtitle="Выбрать или изменить коллекцию" />
+            )}
           </>
         ) : onIdea ? (
           <>
@@ -1539,9 +1551,10 @@ function ConfirmView({ scenario, isIdea, inPlan, planDate, onCommit }: {
 }
 
 // ─── Idea-only view (no date semantics — e.g. Article) ───────────────────────
-function IdeaOnlyView({ title, ticket, isIdea, onIdea, onRemoveIdea }: {
+function IdeaOnlyView({ title, ticket, isIdea, onIdea, onRemoveIdea, collectionLink }: {
   title: string; ticket?: ActivityTicketSource;
   isIdea: boolean; onIdea: () => void; onRemoveIdea: () => void;
+  collectionLink?: { title: string; href: string } | null;
 }) {
   return (
     <div className="px-6 pb-6 pt-0 sm:pt-4">
@@ -1559,11 +1572,23 @@ function IdeaOnlyView({ title, ticket, isIdea, onIdea, onRemoveIdea }: {
           Сохраните публикацию без даты, чтобы вернуться к ней позже.
         </p>
       )}
-      <IdeasRow onClick={onIdea} title={isIdea ? "В коллекцию" : "Сохранить в идеи"}
-        subtitle={isIdea ? "Выбрать или изменить коллекцию" : "Вернуться к публикации позже"} />
+      {isIdea && collectionLink ? (
+        <a href={collectionLink.href}
+          className="stp-opt flex min-h-[74px] w-full min-w-0 items-center gap-3 rounded-2xl border border-border bg-surface-muted px-4 text-left hover:border-primary">
+          <IcoCircle bg={C.bg} color={C.ink2} border={`1px solid ${C.line2}`}><BookmarkIcon size={17} /></IcoCircle>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[15px] font-semibold">{collectionLink.title}</span>
+            <span className="block text-[13px] text-muted-foreground">Открыть коллекцию</span>
+          </span>
+          <span aria-hidden="true">→</span>
+        </a>
+      ) : (
+        <IdeasRow onClick={onIdea} title={isIdea ? "В коллекцию" : "Сохранить в идеи"}
+          subtitle={isIdea ? "Выбрать или изменить коллекцию" : "Вернуться к публикации позже"} />
+      )}
       {isIdea && (
         <button type="button" onClick={onRemoveIdea}
-          className="mt-4 min-h-11 w-full rounded-full border border-border text-sm text-muted-foreground hover:bg-surface-hover">
+          className="mt-4 min-h-11 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
           Убрать из идей
         </button>
       )}
@@ -1628,6 +1653,35 @@ function PickerBodyInner({
   const [view, setView] = React.useState<"main" | "calendar" | "collections">("main");
   React.useEffect(() => { onCollectionStepChange?.(view === "collections"); }, [view, onCollectionStepChange]);
   const [replanMode, setReplanMode] = React.useState(false);
+  const [collectionLink, setCollectionLink] = React.useState<{ title: string; href: string } | null>(null);
+
+  // A saved publication may belong to several collections. Link directly only
+  // when membership is unambiguous; otherwise retain the collection picker.
+  React.useEffect(() => {
+    setCollectionLink(null);
+    if (!isIdea || !collectionTarget) return;
+    const targetEntries = Object.entries(collectionTarget).filter(([, value]) => typeof value === "string" && value.length > 0);
+    if (!targetEntries.length) return;
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const [membershipsResponse, collectionsResponse] = await Promise.all([
+          fetch("/api/save/idea/collections?" + new URLSearchParams(targetEntries as [string, string][]), { cache: "no-store", signal: controller.signal }),
+          fetch("/api/collections", { cache: "no-store", signal: controller.signal }),
+        ]);
+        if (!membershipsResponse.ok || !collectionsResponse.ok) return;
+        const membership = await membershipsResponse.json() as { collectionIds?: string[] };
+        const list = await collectionsResponse.json() as { collections?: Array<{ id: string; title: string }> };
+        if (controller.signal.aborted || membership.collectionIds?.length !== 1) return;
+        const match = list.collections?.find((c) => c.id === membership.collectionIds?.[0]);
+        if (match) setCollectionLink({ title: match.title, href: `/me/ideas/collections/${encodeURIComponent(match.id)}` });
+      } catch {
+        // Keep the picker functional if membership lookup fails.
+      }
+    })();
+    return () => controller.abort();
+  }, [isIdea, collectionTarget?.activityId, collectionTarget?.offerId,
+    collectionTarget?.routeId, collectionTarget?.placeId, collectionTarget?.articleId]);
 
   const todayISO = getLocalDateKey();
   const isQuickdate = scenario.kind === "quickdate";
@@ -1690,6 +1744,7 @@ function PickerBodyInner({
         title={scenario.title}
         ticket={scenario.ticket}
         isIdea={isIdea}
+        collectionLink={collectionLink}
         onIdea={() => setView("collections")}
         onRemoveIdea={() => onCommit({ action: "remove-idea" })}
       />
@@ -1726,6 +1781,7 @@ function PickerBodyInner({
       <DateSliderView
         options={sliderOptions}
         initialDateISO={normalizePlanDateISO(planDate)}
+        collectionLink={collectionLink}
         title={scenario.title}
         ticket={scenario.ticket}
         sessionsByDate={sessionsByDate}

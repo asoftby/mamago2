@@ -33,11 +33,12 @@ import { PlanEventScreen } from "./v3/PlanEventScreen";
 import { PlanScenarioScreen } from "./v3/PlanScenarioScreen";
 import { PlanNewTaskScreen } from "./v3/PlanNewTaskScreen";
 import { PlanVisitsScreen } from "./v3/PlanVisitsScreen";
+import { PlanWeekScreen } from "./v3/PlanWeekScreen";
 import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
 import { PlanDayBar } from "./v3/PlanDayBar";
 import { PlanMoveSheet, canMovePlanItem } from "./v3/PlanMoveSheet";
 import { fetchPlanExperienceFeed, type PlanExperienceFeed } from "./v3/planExperienceApi";
-import { History, Plus } from "lucide-react";
+import { ChevronRight, History, Plus } from "lucide-react";
 import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { MediaCover } from "@/components/ui/media-cover";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
@@ -78,6 +79,8 @@ interface PlanMainContentProps {
   nearestPlanDate?: string | null;
   nearestPlanCount?: number;
   nearestPlanItems?: PlanItemWithActivity[];
+  currentWeekItems?: PlanItemWithActivity[];
+  currentWeekItemsCount?: number;
   serverPlanSnapshotConfirmed?: boolean;
   todayIso?: string;
   layout?: "default" | "desktop";
@@ -356,15 +359,17 @@ function PlanDeleteCountdownToast({
   }, [onExpire, toastId]);
 
   return (
-    <LiquidNotification
-      variant="brand"
-      title={`Удаление через ${seconds} сек.`}
-      actionLabel="Отменить"
-      onAction={() => {
-        onUndo();
-        toast.dismiss(toastId);
-      }}
-    />
+    <div data-plan-delete-toast>
+      <LiquidNotification
+        variant="brand"
+        title={`Удаление через ${seconds} сек.`}
+        actionLabel="Отменить"
+        onAction={() => {
+          onUndo();
+          toast.dismiss(toastId);
+        }}
+      />
+    </div>
   );
 }
 
@@ -376,6 +381,8 @@ export function PlanMainContent({
   nearestPlanDate = null,
   nearestPlanCount = 0,
   nearestPlanItems = [],
+  currentWeekItems = [],
+  currentWeekItemsCount = 0,
   serverPlanSnapshotConfirmed = false,
   todayIso,
   layout = "default",
@@ -409,12 +416,12 @@ export function PlanMainContent({
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   /** Два экрана остаются в одной модалке: сдвигаем их по горизонтали, не теряя план. */
-  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "event" | "scenario">("plan");
+  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "week" | "event" | "scenario">("plan");
   /** Сохраняем исходящий экран в DOM до конца обратной анимации. */
-  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "event" | "scenario" | null>(null);
+  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "week" | "event" | "scenario" | null>(null);
   /** Каждое открытие формы — новый экземпляр; отменённая анимация не оставляет старый черновик. */
   const [nestedScreenVersion, setNestedScreenVersion] = useState(0);
-  const openNestedScreen = useCallback((next: "new" | "visits" | "event" | "scenario") => {
+  const openNestedScreen = useCallback((next: "new" | "visits" | "week" | "event" | "scenario") => {
     setNestedScreenVersion((version) => version + 1);
     setMountedNestedScreen(next);
     setScreen(next);
@@ -976,6 +983,17 @@ export function PlanMainContent({
     return filterPlanEntriesByPerson(dayItemsSorted, { kind: person.kind, id: person.id });
   }, [dayItemsSorted, personFilter, personas]);
 
+  const visibleCurrentWeekItems = useMemo(() => {
+    const entries = currentWeekItems.filter((item) => !hiddenPlanItemIds.has(item.id));
+    if (personFilter === "all") return entries;
+    const person = personas.find((persona) => persona.id === personFilter);
+    return person ? filterPlanEntriesByPerson(entries, { kind: person.kind, id: person.id }) : entries;
+  }, [currentWeekItems, personFilter, personas, hiddenPlanItemIds]);
+  const currentWeekCount =
+    personFilter === "all" && hiddenPlanItemIds.size === 0
+      ? currentWeekItemsCount
+      : visibleCurrentWeekItems.length;
+
   const totalPlannedCount = useMemo(() => {
     const existingActivityIds = new Set(
       dayItems.map((item) => item.activityId).filter((value): value is string => Boolean(value)),
@@ -1311,6 +1329,24 @@ export function PlanMainContent({
     );
   };
 
+  const renderWeekTeaser = () => (
+    <section aria-label="На этой неделе" className="rounded-[18px] border border-[var(--mp-line)] bg-[var(--mp-card)] px-4 py-3.5">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-[15px] font-bold text-[var(--mp-tx)]">На этой неделе</h2>
+        <button
+          type="button"
+          onClick={() => openNestedScreen("week")}
+          className="inline-flex min-h-10 items-center gap-1 text-[13px] font-semibold text-[var(--mp-ac-dark)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          Посмотреть все <ChevronRight className="h-4 w-4" aria-hidden />
+        </button>
+      </div>
+      <p className="mt-0.5 text-[13px] text-[var(--mp-tx2)]">
+        {currentWeekCount === 0 ? "Нет событий" : `${currentWeekCount} ${pluralRu(currentWeekCount, ["событие", "события", "событий"])}`}
+      </p>
+    </section>
+  );
+
   const renderBottomActions = () => (
     <div className="space-y-3">
       {scenarioCtaLabel ? (
@@ -1380,6 +1416,7 @@ export function PlanMainContent({
           ) : (
             <>
               {renderDayList(false)}
+              {renderWeekTeaser()}
               {renderIdeas()}
               {renderBottomActions()}
             </>
@@ -1444,6 +1481,7 @@ export function PlanMainContent({
         ) : (
           <>
             {renderDayList(true)}
+            {renderWeekTeaser()}
             {renderIdeas()}
             {renderBottomActions()}
           </>
@@ -1560,6 +1598,16 @@ export function PlanMainContent({
             />
           ) : mountedNestedScreen === "visits" ? (
             <PlanVisitsScreen key={nestedScreenVersion} onBack={closeNestedScreen} />
+          ) : mountedNestedScreen === "week" ? (
+            <PlanWeekScreen
+              key={nestedScreenVersion}
+              items={visibleCurrentWeekItems}
+              onBack={closeNestedScreen}
+              onSelectDate={(date) => {
+                onChangeDate?.(date);
+                closeNestedScreen();
+              }}
+            />
           ) : null}
         </div>
       </div>

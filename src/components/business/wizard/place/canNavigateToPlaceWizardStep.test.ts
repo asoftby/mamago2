@@ -32,6 +32,36 @@ function testEditAllowsGoingBackward() {
   );
 }
 
+function testAdminAndEditorCanJumpToIncompleteSteps() {
+  for (const role of ["ADMIN", "MODERATOR"] as const) {
+    assert.equal(
+      canNavigateToPlaceWizardStep({
+        mode: "create",
+        role,
+        currentStep: 1,
+        targetStep: 6,
+        ...RANGE,
+      }),
+      true,
+    );
+  }
+}
+
+function testOtherRolesCannotJumpToIncompleteSteps() {
+  for (const role of ["BUSINESS_OWNER", "USER"] as const) {
+    assert.equal(
+      canNavigateToPlaceWizardStep({
+        mode: "create",
+        role,
+        currentStep: 1,
+        targetStep: 6,
+        ...RANGE,
+      }),
+      false,
+    );
+  }
+}
+
 function testCreateForbidsJumpingAhead() {
   assert.equal(
     canNavigateToPlaceWizardStep({ mode: "create", currentStep: 1, targetStep: 4, ...RANGE }),
@@ -72,9 +102,15 @@ function main() {
   testEditDraftAllowsJumpingToLastStep();
   testEditPublishedKeepsFreeNavigation();
   testEditAllowsGoingBackward();
+  testAdminAndEditorCanJumpToIncompleteSteps();
+  testOtherRolesCannotJumpToIncompleteSteps();
   testCreateForbidsJumpingAhead();
   testCreateAllowsNextStep();
   testCreateAllowsGoingBackward();
+  assert.equal(
+    canNavigateToPlaceWizardStep({ mode: "create", role: "ADMIN", currentStep: 1, targetStep: 7, ...RANGE }),
+    false,
+  );
   testInvalidStepBelowRangeForbidden();
   testInvalidStepAboveRangeForbidden();
 }
