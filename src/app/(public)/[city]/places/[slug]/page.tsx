@@ -734,6 +734,11 @@ export default async function PlacePage({ params }: PlacePageProps) {
           instagramUrl: resolvedInstagramUrl,
           rating: reputation ? undefined : averageRating,
           reviewCount: reputation ? undefined : totalReviewCount,
+    googleRating: googleReviewsEnabled ? place.googleRating : null,
+    googleReviewCount: googleReviewsEnabled ? place.googleUserRatingsTotal : null,
+    googleMapsReviewsUrl: googleReviewsEnabled && place.googlePlaceId
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(displayTitle)}&query_place_id=${encodeURIComponent(place.googlePlaceId)}`
+      : null,
           publicBaseUrl: publicBase,
         });
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(
