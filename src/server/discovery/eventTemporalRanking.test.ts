@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eventTemporalScore } from "./eventTemporalRanking";
+import { eventTemporalScore, KUDA_DEFAULT_HORIZON_DAYS, KUDA_SEASONAL_HORIZON_DAYS } from "./eventTemporalRanking";
 
 const now = new Date("2026-10-21T09:00:00.000Z");
 const at = (day: number) => ({ startsAt: new Date(now.getTime() + day * 86_400_000) });
@@ -17,6 +17,17 @@ describe("eventTemporalScore", () => {
   });
   it("supports denormalized next occurrences without materialized sessions", () => {
     expect(eventTemporalScore({ now, nextOccurrenceAt: at(2).startsAt, sessions: [] })).toBeGreaterThan(5);
+  });
+  it("uses the 45-day default and 90-day seasonal planning horizons", () => {
+    expect(KUDA_DEFAULT_HORIZON_DAYS).toBe(45);
+    expect(KUDA_SEASONAL_HORIZON_DAYS).toBe(90);
+    expect(score([30])).toBeGreaterThan(score([44]));
+    expect(score([44])).toBeGreaterThan(score([70]));
+  });
+  it("keeps seasonal events discoverable without outranking nearby events", () => {
+    const christmas = eventTemporalScore({ now, nextOccurrenceAt: null, sessions: [at(65)], seasonal: true });
+    expect(christmas).toBeGreaterThan(score([65]));
+    expect(score([1])).toBeGreaterThan(christmas);
   });
   it("remains bounded", () => {
     expect(score([0])).toBeLessThanOrEqual(100);
