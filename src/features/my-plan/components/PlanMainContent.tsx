@@ -353,15 +353,17 @@ function PlanDeleteCountdownToast({
   }, [onExpire, toastId]);
 
   return (
-    <LiquidNotification
-      variant="brand"
-      title={`Удаление через ${seconds} сек.`}
-      actionLabel="Отменить"
-      onAction={() => {
-        onUndo();
-        toast.dismiss(toastId);
-      }}
-    />
+    <div data-plan-delete-toast>
+      <LiquidNotification
+        variant="brand"
+        title={`Удаление через ${seconds} сек.`}
+        actionLabel="Отменить"
+        onAction={() => {
+          onUndo();
+          toast.dismiss(toastId);
+        }}
+      />
+    </div>
   );
 }
 
