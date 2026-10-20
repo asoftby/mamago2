@@ -23,6 +23,10 @@ const content = read("src/components/form-shell/FormPrimaryContentCard.tsx");
 const actions = read("src/components/form-shell/FormStickyActionBar.tsx");
 const progress = read("src/components/ui/wizard-progress.tsx");
 const eventWizard = read("src/components/business/wizard/event/EventWizard.tsx");
+const eventMobileEntry = read("src/components/business/wizard/event/MobileEventWizardProgress.tsx");
+const placeWizard = read("src/components/business/wizard/place/PlaceWizard.tsx");
+const offerWizard = read("src/components/business/wizard/offer/OfferWizard.tsx");
+const sharedMobileProgress = read("src/components/ui/mobile-wizard-progress.tsx");
 
 assert.match(
   header,
@@ -112,5 +116,22 @@ assert.match(
   /<WizardProgress/,
   "Event wizard must stay on the shared mobile progress contract",
 );
+
+assert.match(
+  eventMobileEntry,
+  /MobileWizardProgress as MobileEventWizardProgress/,
+  "Events must use the canonical shared mobile stepper",
+);
+for (const [name, wizard] of [
+  ["Place", placeWizard],
+  ["Offer", offerWizard],
+] as const) {
+  assert.match(wizard, /<MobileWizardProgress/, name + " must use the same mobile stepper as Events");
+  assert.match(wizard, /className="hidden sm:block"/, name + " must keep desktop progress separate");
+}
+assert.match(sharedMobileProgress, /const VISIBLE_STEPS = 5/, "Show 5 steps on mobile");
+assert.match(sharedMobileProgress, /touch-pan-x gap-2 overflow-x-auto/, "Mobile steps must support horizontal swiping");
+assert.match(sharedMobileProgress, /Показать предыдущие шаги/, "Mobile progress must expose previous steps");
+assert.match(sharedMobileProgress, /scroller\.scrollTo\(/, "Active step must scroll into view");
 
 console.log("formWizardMobileContract.test.ts: OK");
