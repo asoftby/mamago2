@@ -906,7 +906,7 @@ export function MobileSearchSheet({
 
   return (
     <div className="fixed inset-0 z-[9999] flex min-h-0 flex-col bg-white">
-      <div className="sticky top-0 z-10 shrink-0 border-b border-gray-100 bg-white px-4 py-3">
+      <div className="sticky top-0 z-30 shrink-0 border-b border-gray-100 bg-white px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="w-10" />
           <h2 className="text-lg font-semibold text-gray-900">Поиск</h2>
@@ -955,7 +955,6 @@ export function MobileSearchSheet({
           onIntentSelect={handleIntentSelect}
           onResultNavigate={handleSearchResultNavigate}
           citySlug={pendingCitySlug}
-          autoFocusInput
           filtersSection={
             <>
               {renderAccordion(

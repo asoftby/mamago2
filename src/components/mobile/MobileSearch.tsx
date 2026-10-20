@@ -35,8 +35,6 @@ export type MobileSearchProps = {
   onResultNavigate: (item: SearchResultItemType) => void;
   /** Pending/active city slug for SearchQueryLog geo telemetry. */
   citySlug?: string | null;
-  /** Сфокусировать поле поиска при монтировании (поиск в шите открывается по тапу на плашку хедера). */
-  autoFocusInput?: boolean;
 };
 
 export function MobileSearch({
@@ -47,13 +45,12 @@ export function MobileSearch({
   filtersSection,
   onResultNavigate,
   citySlug,
-  autoFocusInput = false,
 }: MobileSearchProps) {
   const lastSearch = useLastPublicSearchQuery();
   const inputRef = useRef<HTMLInputElement>(null);
   const tabsRef = useRef<(HTMLElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [inputFocused, setInputFocused] = useState(false);
+  const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
   const [results, setResults] = useState<SearchResultItemType[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,14 +62,14 @@ export function MobileSearch({
   const debouncing = queryTrim.length >= 2 && queryTrim !== trimmed;
 
   const searchState: MobileSearchState = useMemo(() => {
-    if (queryTrim.length >= 2) return "typing";
-    if (inputFocused) return "focused";
+    if (searchOverlayOpen && queryTrim.length >= 2) return "typing";
+    if (searchOverlayOpen) return "focused";
     return "idle";
-  }, [queryTrim.length, inputFocused]);
+  }, [queryTrim.length, searchOverlayOpen]);
 
   /** Фильтры показываем только при выбранном разделе и без длинного запроса (чтобы не дублировать с автодополнением). */
   const showFiltersSection =
-    selectedIntent != null && queryTrim.length < 2;
+    !searchOverlayOpen && selectedIntent != null && queryTrim.length < 2;
   const selectedIntentEnabled = PRIMARY_NAVIGATION_ITEMS.some(
     (item) => item.id === selectedIntent && item.navigationEnabled,
   );
@@ -112,7 +109,7 @@ export function MobileSearch({
   }, [selectedIntent]);
 
   useEffect(() => {
-    if (trimmed.length < 2) {
+    if (!searchOverlayOpen || trimmed.length < 2) {
       setResults([]);
       setLoading(false);
       setActiveIndex(-1);
@@ -141,13 +138,26 @@ export function MobileSearch({
     return () => {
       cancelled = true;
     };
-  }, [trimmed, citySlug]);
+  }, [trimmed, citySlug, searchOverlayOpen]);
+
+  const handleDismissSearch = useCallback(() => {
+    inputRef.current?.blur();
+    setSearchOverlayOpen(false);
+    onSearchTextChange("");
+    setActiveIndex(-1);
+  }, [onSearchTextChange]);
 
   useEffect(() => {
-    if (!autoFocusInput) return;
-    const id = requestAnimationFrame(() => inputRef.current?.focus());
-    return () => cancelAnimationFrame(id);
-  }, [autoFocusInput]);
+    if (!searchOverlayOpen) return;
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        handleDismissSearch();
+      }
+    };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [searchOverlayOpen, handleDismissSearch]);
 
   const handlePopularPick = useCallback(
     (term: string) => {
@@ -168,11 +178,8 @@ export function MobileSearch({
     [searchText, onResultNavigate],
   );
 
-  /**
-   * Табы разделов видны всегда, пока не набран запрос (idle и focused): поле поиска в фокусе при
-   * открытии шита, и если скрывать разделы, пользователь их не находит. Хаб города — до выбора раздела.
-   */
-  const showIntentRow = searchState !== "typing";
+  /** Табы разделов и фильтры остаются видимыми до нажатия на строку поиска. */
+  const showIntentRow = searchState === "idle";
 
   const showPopularBlock =
     searchState === "focused" && queryTrim.length < 2;
@@ -214,24 +221,37 @@ export function MobileSearch({
   return (
     <div
       className={cn(
+        searchOverlayOpen && "relative z-20",
         showAutocomplete
           ? "flex min-h-0 flex-1 flex-col"
           : "space-y-0",
       )}
     >
-      <div className="shrink-0 px-4 pb-3 pt-2">
+      {searchOverlayOpen ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-0 cursor-default bg-white/40 backdrop-blur-md"
+          aria-label="Закрыть подсказки поиска"
+          onClick={handleDismissSearch}
+        />
+      ) : null}
+      <div
+        className={cn(
+          "shrink-0 px-4 pb-3 pt-2",
+          searchOverlayOpen && "relative z-10",
+        )}
+      >
         <MobileSearchHeroRow
           value={searchText}
           onChange={onSearchTextChange}
           inputRef={inputRef}
-          onFocus={() => setInputFocused(true)}
-          onBlur={() => setInputFocused(false)}
+          onFocus={() => setSearchOverlayOpen(true)}
           loading={(loading || debouncing) && queryTrim.length >= 2}
         />
       </div>
 
       {showAutocomplete ? (
-        <div className="flex min-h-0 flex-1 flex-col px-4 pb-2">
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col px-4 pb-2">
           <SearchResults
             variant="sheet"
             query={searchText}
@@ -339,7 +359,7 @@ export function MobileSearch({
           {showPopularHints ? (
             <div
               className={cn(
-                "animate-in fade-in slide-in-from-top-1 px-4 pb-4 duration-200",
+                "relative z-10 mx-4 animate-in fade-in slide-in-from-top-1 rounded-2xl border border-neutral-100 bg-white p-4 shadow-xl duration-200",
               )}
             >
               {lastSearch ? (
@@ -383,6 +403,14 @@ export function MobileSearch({
                   </ul>
                 </>
               ) : null}
+            </div>
+          ) : null}
+
+          {showPopularBlock && !showPopularHints ? (
+            <div className="relative z-10 mx-4 rounded-2xl border border-neutral-100 bg-white p-4 shadow-xl">
+              <p className="text-sm text-neutral-500">
+                Начните вводить запрос, чтобы найти события, места и маршруты.
+              </p>
             </div>
           ) : null}
 
