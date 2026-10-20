@@ -42,6 +42,8 @@ export type ResponsiveOverlayProps = {
   children: React.ReactNode;
   footer?: React.ReactNode;
   dismissible?: boolean;
+  /** Optional Radix outside-interaction guard for portalled controls (e.g. undo toast). */
+  onInteractOutside?: React.ComponentProps<typeof DialogContent>["onInteractOutside"];
   showCloseButton?: boolean;
   /** Полоска над контентом на mobile (см. MyPlanOverlay — свой handle) */
   mobileTopSlot?: React.ReactNode;
@@ -66,6 +68,7 @@ export function ResponsiveOverlay({
   children,
   footer,
   dismissible = true,
+  onInteractOutside,
   showCloseButton = true,
   mobileTopSlot,
   heightMode = "tall",
@@ -129,6 +132,7 @@ export function ResponsiveOverlay({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           dismissible={dismissible}
+          onInteractOutside={onInteractOutside}
           showCloseButton={false}
           className={cn(
             desktopDialogShellLarge,
@@ -153,6 +157,7 @@ export function ResponsiveOverlay({
       <SheetContent
         side="bottom"
         dismissible={dismissible}
+        onInteractOutside={onInteractOutside}
         showCloseButton={false}
         className={cn(
           mobileSheetShellBase,
