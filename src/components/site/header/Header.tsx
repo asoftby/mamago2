@@ -87,7 +87,7 @@ export function SiteHeaderShell() {
     scrollThreshold: 80,
     // В профиле и «Моём плане» переключение высоты поиска сдвигает документ.
     // Увеличенный гистерезис предотвращает цикл разворачивания/сворачивания.
-    scrollHysteresisPx: pathname === "/me" || pathname === "/me/plan" ? 120 : 16,
+    scrollHysteresisPx: pathname === "/me" || pathname === "/me/profile" || pathname === "/me/plan" ? 120 : 16,
     headerRef,
   });
   const centerFadeDuration = reduceMotion ? 0.01 : 0.34;
