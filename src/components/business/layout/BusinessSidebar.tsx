@@ -5,7 +5,9 @@ import { SidebarItem } from "@/components/shared/sidebar/SidebarItem";
 import { SidebarPublicSiteEntry } from "@/components/shared/sidebar/SidebarPublicSiteEntry";
 import { SidebarGroup } from "@/components/shared/sidebar/SidebarGroup";
 import { SidebarSubItem } from "@/components/shared/sidebar/SidebarSubItem";
+import { useBookingsMenuBadge } from "@/components/business/bookings/useBookingsMenuBadge";
 import {
+  BUSINESS_BOOKINGS_HREF,
   BUSINESS_DASHBOARD_HREF,
   businessNavigation,
 } from "@/lib/business/navigation";
@@ -20,6 +22,7 @@ interface BusinessSidebarProps {
 
 export function BusinessSidebar({ onNavigate, variant = "sidebar", buildInfo }: BusinessSidebarProps) {
   const pathname = usePathname();
+  const bookingsBadge = useBookingsMenuBadge();
   const businessPathname =
     pathname === "/business" || pathname.startsWith("/business/")
       ? pathname
@@ -62,6 +65,7 @@ export function BusinessSidebar({ onNavigate, variant = "sidebar", buildInfo }: 
                 }
                 sidebarVariant="business"
                 onClick={onNavigate}
+                badgeCount={item.href === BUSINESS_BOOKINGS_HREF ? bookingsBadge : 0}
               />
               </div>
             );

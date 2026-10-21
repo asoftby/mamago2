@@ -392,6 +392,18 @@ export async function getBusinessBookings(
   return { items, counts, weekCounts };
 }
 
+/** Direct tenant-scoped STANDARD detail lookup; independent of the capped calendar list. */
+export async function getBusinessBookingById(
+  bookingId: string,
+  businessId: string,
+): Promise<BusinessBookingItem | null> {
+  const row = await prisma.bookingRequest.findFirst({
+    where: { id: bookingId, businessId, kind: BookingKind.STANDARD },
+    select: BOOKING_SELECT,
+  });
+  return row ? mapBooking(row) : null;
+}
+
 // ─── Status update ────────────────────────────────────────────────────────────
 
 /** Допустимые переходы статусов */

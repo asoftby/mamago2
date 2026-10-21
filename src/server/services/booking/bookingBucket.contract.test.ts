@@ -51,6 +51,18 @@ assert.equal(classify({ ...party, partyStage: PartyRequestStage.QUOTED,
   quoteStatus: QuoteStatus.ACTIVE, quoteValidUntil: days(-1), serviceEndsAt: days(-1) }).bucket, "ARCHIVE");
 assert.equal(classify({ ...party, partyStage: PartyRequestStage.CONFIRMED,
   status: BookingStatus.CONFIRMED, hasServiceDate: true, serviceEndsAt: days(2) }).bucket, "UPCOMING");
+// An elapsed confirmed party has no supported STANDARD CLOSE_VISIT operation.
+const elapsedParty = classify({ ...party, partyStage: PartyRequestStage.CONFIRMED,
+  status: BookingStatus.CONFIRMED, hasServiceDate: true, serviceEndsAt: days(-1) });
+assert.equal(elapsedParty.bucket, "ARCHIVE");
+assert.equal(elapsedParty.action, "VIEW_ARCHIVE");
+assert.equal(elapsedParty.urgency, null);
+const undatedConfirmedParty = classify({ ...party, partyStage: PartyRequestStage.CONFIRMED,
+  status: BookingStatus.CONFIRMED, createdAt: days(-40), hasServiceDate: false, serviceEndsAt: null });
+assert.equal(undatedConfirmedParty.bucket, "UPCOMING");
+assert.equal(undatedConfirmedParty.action, "VIEW_UPCOMING");
+// Read-only archive does not alter the actual CONFIRMED party status.
+assert.doesNotThrow(() => assertPartyStatusPair(PartyRequestStage.CONFIRMED, BookingStatus.CONFIRMED));
 
 const terminal: [PartyRequestStageType, BookingStatusType][] = [
   [PartyRequestStage.DECLINED, BookingStatus.REJECTED],

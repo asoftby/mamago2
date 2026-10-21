@@ -1451,7 +1451,7 @@ function BookingListItem({
   );
 }
 
-function BookingDetailsDrawer({
+export function BookingDetailsDrawer({
   open,
   booking,
   selectedIndex,
