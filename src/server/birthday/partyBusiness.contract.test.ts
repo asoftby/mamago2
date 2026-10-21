@@ -38,6 +38,7 @@ for (const required of [
   "responseDueAt: { gt: now }", "firstResponseAt: now",
   "status: declined ? PartyItemStatus.DECLINED : PartyItemStatus.NEEDS_DECISION",
 ]) assert.ok(service.includes(required), "Missing transactional invariant: " + required);
+assert.ok(service.includes('status: { in: ["ACTIVE", "ACCEPTED"] }'), "A revised offer must supersede previously accepted terms");
 assert.ok(route.includes("getMyBusiness"), "Business membership must be verified");
 assert.ok(route.includes("Idempotency-Key"), "Idempotency header is required");
 assert.ok(!service.includes("customerPhone: true"), "Parent contacts must remain private");
