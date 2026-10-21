@@ -85,6 +85,16 @@ test("two concurrent group reservations cannot take the final seat", async () =>
   assert.equal(await db.bookingRequest.count({ where: { offerId, status: "NEW" } }), 1);
 });
 
+test("class reservation holds the seat for two hours, never past class start", async () => {
+  const { offerId, startAt, endAt } = await groupOffer();
+  const before = Date.now();
+  const result = await reserveSlot({ offerId, startsAt: startAt, endsAt: endAt, holdMinutes: 120, ...contact });
+  const expected = Math.min(before + 120 * 60_000, startAt.getTime());
+  assert.ok(result.holdUntil.getTime() >= expected - 2_000);
+  assert.ok(result.holdUntil.getTime() <= expected + 2_000);
+  assert.equal((await db.bookingRequest.findUniqueOrThrow({ where: { id: result.bookingId } })).holdUntil?.getTime(), result.holdUntil.getTime());
+});
+
 test("expired resource hold is released before a new reservation", async () => {
   await fixture();
   const unit = await db.bookingUnit.create({ data: {
