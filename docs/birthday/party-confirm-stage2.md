@@ -43,3 +43,38 @@ Do **not** ship any one PR on its own or enable BUSINESS_BOOKINGS_INBOX_UI befor
 Merge #666 → #672 → #655 after review and the checks above. Run DEV smoke and
 only then enable BUSINESS_BOOKINGS_INBOX_UI in both app and worker in the DEV environment.
 PROD release/flag activation is a separate decision after verifying DEV.
+
+## Isolated PostgreSQL verification (21 October 2026)
+
+Executed against an empty, localhost-only PostgreSQL 16 cluster named
+`mamago_birthday_it` on port **55443**, with all 291 migrations applied.
+The main repo and DEV/PROD databases were not connected.
+
+A safety gate in both scripts refuses to write unless `DATABASE_URL`
+has host `127.0.0.1`, port `55443`, and database `mamago_birthday_it`.
+For a fresh isolated cluster run:
+
+```bash
+DATABASE_URL='postgresql://party_it_runner@127.0.0.1:55443/mamago_birthday_it?schema=public' \
+  pnpm exec tsx scripts/it/seedPartyIT.ts
+DATABASE_URL='postgresql://party_it_runner@127.0.0.1:55443/mamago_birthday_it?schema=public' \
+  NODE_OPTIONS=--conditions=react-server \
+  pnpm exec tsx src/server/birthday/partyFullFlow.integration.test.ts
+```
+
+Coverage: versioned acceptance/replay, business isolation, quote expiry,
+active room selection, schedule exception, manual block, capacity,
+room deactivation and alternative, STANDARD/party overlap, concurrent party
+confirmations, add-on fan-out and add-on manual confirmation, event outbox
+dedupe, manual home/outdoor confirmation without allocation.
+Tests use generated per-run offers and no login passwords.
+
+### PostgreSQL timezone regression found by integration
+
+Both `BookingAllocation.expiresAt` and `updatedAt` are `timestamp without time zone`,
+written as UTC by Prisma. PostgreSQL on this test machine uses `Europe/Minsk`.
+Raw SQL with `expiresAt < now()` incorrectly expired a future STANDARD hold.
+The reservation and party confirmation paths now compare with
+`(now() AT TIME ZONE 'UTC')`, and write `updatedAt` in that same UTC convention.
+The integration test verifies that a future STANDARD hold remains HELD and
+blocks a competing PARTY allocation.

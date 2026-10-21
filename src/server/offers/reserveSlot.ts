@@ -109,8 +109,8 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
         if (!candidate.unitIds.includes(unitId)) throw new SlotReservationError("SLOT_UNAVAILABLE", "Ресурс уже занят");
         // The exclusion constraint cannot depend on now(). Release expired holds
         // inside this transaction before the availability recheck and insert.
-        await tx.$executeRaw`UPDATE "BookingAllocation" SET "status" = 'EXPIRED', "updatedAt" = now()
-          WHERE "bookingUnitId" = ${unitId} AND "status" = 'HELD' AND "expiresAt" < now()`;
+        await tx.$executeRaw`UPDATE "BookingAllocation" SET "status" = 'EXPIRED', "updatedAt" = (now() AT TIME ZONE 'UTC')
+          WHERE "bookingUnitId" = ${unitId} AND "status" = 'HELD' AND "expiresAt" < (now() AT TIME ZONE 'UTC')`;
         const unit = initial.units.find((item) => item.id === unitId)!;
         blockStart = new Date(input.startsAt.getTime() - unit.prepMinutes * MINUTE_MS);
         blockEnd = new Date(input.endsAt.getTime() + (unit.cleanupMinutes + initial.bufferMin) * MINUTE_MS);

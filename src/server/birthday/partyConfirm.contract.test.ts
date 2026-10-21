@@ -40,6 +40,13 @@ assert.match(service, /locked.status !== "ACTIVE"/);
 assert.match(service, /bookingUnitId_offerId/);
 assert.match(service, /PartyItemRole.STANDALONE/);
 assert.match(service, /responseDueAt: \{ gt: now \}/);
+const reserveSlotSql = readFileSync(new URL("../offers/reserveSlot.ts", import.meta.url), "utf8");
+for (const code of [service, reserveSlotSql]) {
+  assert.ok(code.includes(`"expiresAt" < (now() AT TIME ZONE 'UTC')`),
+    "Expiry SQL must compare UTC timestamp without session TZ coercion");
+  assert.ok(code.includes(`"updatedAt" = (now() AT TIME ZONE 'UTC')`),
+    "Raw SQL must also write updatedAt in UTC");
+}
 assert.match(route, /Idempotency-Key/);
 assert.match(route, /checkRateLimit/);
 assert.ok(!service.includes("customerPhone: order.contactPhone"), "Do not reveal parent phone in business request");

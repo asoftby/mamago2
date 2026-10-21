@@ -118,9 +118,8 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
       if (venueRequired && units.length === 0) {
         throw new PartyApiError(422, "Настройте ресурс площадки для подтверждения");
       }
-      if (associated.length !== units.length) {
-        throw new PartyApiError(409, "Один из ресурсов недоступен");
-      }
+      // An inactive room must not disable the entire offer when another
+      // active room remains available. The requested ID is checked below.
       const selectedId = input.bookingUnitId ?? quote.bookingUnitId ??
         (units.length === 1 ? units[0]?.id : undefined);
       const unit = selectedId ? units.find((candidate) => candidate.id === selectedId) : undefined;
@@ -177,9 +176,9 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
         // PostgreSQL exclusion constraint remains the final line of defense
         // against concurrent bookings through other reservation pathways.
         await tx.$executeRaw`UPDATE "BookingAllocation"
-          SET "status" = 'EXPIRED', "updatedAt" = now()
+          SET "status" = 'EXPIRED', "updatedAt" = (now() AT TIME ZONE 'UTC')
           WHERE "bookingUnitId" = ${unit.id} AND "status" = 'HELD'
-          AND "expiresAt" < now()`;
+          AND "expiresAt" < (now() AT TIME ZONE 'UTC')`;
         const exceptions = await tx.availabilityException.findMany({
           where: { bookingUnitId: unit.id, date: order.eventDate },
           select: { kind: true, startMinutes: true, endMinutes: true },
