@@ -88,7 +88,7 @@ export async function acceptPartyQuote(input: {
       where: { id: item.id }, data: { status: PartyItemStatus.NEEDS_DECISION },
     });
     await tx.bookingActivity.create({
-      data: { bookingId: requestId, type: "STATUS_CHANGED", actorType: "USER", actorId: userId,
+      data: { bookingId: requestId, type: "STATUS_CHANGED", actorType: "CUSTOMER", actorId: userId,
         payload: { quoteId, version: expectedVersion, fromStage: "QUOTED",
           toStage: "AWAITING_RECONFIRM", confirmed: false } },
     });
