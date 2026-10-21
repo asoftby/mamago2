@@ -44,8 +44,8 @@ for (const invariant of [
 assert.ok(!worker.includes("contactPhone: true"));
 assert.ok(!worker.includes("customerPhone: true"));
 // Business notifications deep-link into the unified inbox: held until the UI is released.
-assert.deepEqual(heldPartyOutboxEventTypes({}), ["PARTY_REQUEST_SENT"]);
-assert.deepEqual(heldPartyOutboxEventTypes({ BUSINESS_BOOKINGS_INBOX_UI: "false" }), ["PARTY_REQUEST_SENT"]);
+assert.deepEqual(heldPartyOutboxEventTypes({}), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED"]);
+assert.deepEqual(heldPartyOutboxEventTypes({ BUSINESS_BOOKINGS_INBOX_UI: "false" }), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED"]);
 assert.deepEqual(heldPartyOutboxEventTypes({ BUSINESS_BOOKINGS_INBOX_UI: "true" }), []);
 assert.ok(worker.includes("notIn: heldPartyOutboxEventTypes(process.env)"), "Inbox-linked events must be gated");
 for (const type of heldPartyOutboxEventTypes({})) {
