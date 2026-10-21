@@ -11,6 +11,7 @@ import { OfferAccordion } from "./OfferAccordion";
 import { OfferPlace } from "./OfferPlace";
 import { OfferPromoCta } from "./OfferPromoCta";
 import { CampShiftBookingOverlay } from "./CampShiftBookingOverlay";
+import { ClassBookingOverlay } from "./ClassBookingOverlay";
 import { EventStickyActionBar } from "@/components/event-page/EventStickyActionBar";
 import type { OfferPageData, OfferScheduleItem, ShiftCtaContext } from "@/lib/offer/offerPageTypes";
 import {
@@ -126,6 +127,7 @@ export function OfferPageView({
     }
   });
   const [bookingShift, setBookingShift] = useState<ShiftCtaContext | null>(null);
+  const [classBookingOpen, setClassBookingOpen] = useState(false);
   const [saveTargetShift, setSaveTargetShift] = useState<ShiftCtaContext | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [isIdeaSaved, setIsIdeaSaved] = useState(false);
@@ -253,6 +255,10 @@ export function OfferPageView({
       meta: { source: "detail", targetAction: "primary" },
     });
     if (data.hasPrimaryAction === false) return;
+    if (data.classSlotBookingEnabled) {
+      setClassBookingOpen(true);
+      return;
+    }
     if (data.resolvedCta?.actionKind === "EXTERNAL") {
       const url = data.resolvedCta.externalTarget?.href;
       if (url && typeof window !== "undefined") window.open(url, "_blank", "noopener,noreferrer");
@@ -276,7 +282,7 @@ export function OfferPageView({
     if (phone && typeof window !== "undefined") {
       window.location.href = `tel:${phone}`;
     }
-  }, [data.citySlug, data.cta.phone, data.cta.phones, data.hasPrimaryAction, data.id, data.resolvedCta, onPrimary, openBookingForShift, shiftOptions]);
+  }, [data.citySlug, data.cta.phone, data.cta.phones, data.hasPrimaryAction, data.classSlotBookingEnabled, data.id, data.resolvedCta, onPrimary, openBookingForShift, shiftOptions]);
 
   const handleStickyPrimary = useCallback(() => {
     // Sticky bar renders a real external anchor; the browser follows it.
@@ -382,7 +388,7 @@ export function OfferPageView({
           onSave={handleSave}
           ctaRef={ctaRef}
           directSlot={
-            direct && data.hasPrimaryAction !== false && data.resolvedCta?.actionKind !== "EXTERNAL" && (
+            direct && !data.classSlotBookingEnabled && data.hasPrimaryAction !== false && data.resolvedCta?.actionKind !== "EXTERNAL" && (
               <DirectRequestCta
                 publicationRef={{ publicationType: "OFFER", offerId: direct.offerId }}
                 publicationTitle={direct.publicationTitle}
@@ -483,6 +489,13 @@ export function OfferPageView({
         isPrimaryLoading={isPrimaryLoading}
         onPlan={handleSave}
         isPlanned={isSaved}
+      />
+
+      <ClassBookingOverlay
+        open={classBookingOpen}
+        onOpenChange={setClassBookingOpen}
+        offerId={data.id}
+        offerTitle={data.title}
       />
 
       <CampShiftBookingOverlay
