@@ -57,6 +57,10 @@ const elapsedParty = classify({ ...party, partyStage: PartyRequestStage.CONFIRME
 assert.equal(elapsedParty.bucket, "ARCHIVE");
 assert.equal(elapsedParty.action, "VIEW_ARCHIVE");
 assert.equal(elapsedParty.urgency, null);
+const undatedConfirmedParty = classify({ ...party, partyStage: PartyRequestStage.CONFIRMED,
+  status: BookingStatus.CONFIRMED, createdAt: days(-40), hasServiceDate: false, serviceEndsAt: null });
+assert.equal(undatedConfirmedParty.bucket, "UPCOMING");
+assert.equal(undatedConfirmedParty.action, "VIEW_UPCOMING");
 // Read-only archive does not alter the actual CONFIRMED party status.
 assert.doesNotThrow(() => assertPartyStatusPair(PartyRequestStage.CONFIRMED, BookingStatus.CONFIRMED));
 
