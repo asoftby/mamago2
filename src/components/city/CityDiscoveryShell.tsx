@@ -167,7 +167,7 @@ export function CityDiscoveryShell({
     );
   }
 
-  // ── Birthday: CTA block + activities ───────────────────────────────────────
+  // ── Birthday: CTA block + approved party offers ───────────────────────────────────────
   if (intent === "birthday") {
     return (
       <main className="min-h-screen bg-white pb-20">
@@ -178,7 +178,12 @@ export function CityDiscoveryShell({
           </div>
 
           <BirthdayQuickStartBanner city={city} />
-          <DiscoveryActivitiesGrid activities={discoveryActivities ?? []} coverRatio="1/1" />
+          <DiscoveryActivitiesGrid
+            activities={discoveryActivities ?? []}
+            coverRatio="1/1"
+            emptyTitle="Пока нет предложений для праздника"
+            emptyDescription="В этом городе пока нет опубликованных услуг и пакетов для праздников. Собрать свой праздник можно в конструкторе выше."
+          />
         </Container>
       </main>
     );
