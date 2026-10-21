@@ -248,7 +248,7 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
         priceFrom: candidate.priceFrom,
         priceTo: candidate.priceTo,
         currency: candidate.currency,
-      }) ?? candidate.priceText?.trim() ?? null,
+      }) ?? (candidate.priceMode === "UNKNOWN" ? candidate.priceText?.trim() ?? null : null),
     }));
 
 
