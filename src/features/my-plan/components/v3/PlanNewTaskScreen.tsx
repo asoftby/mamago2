@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bell, ChevronLeft, ChevronRight, Check, Clock3, Mic, Users } from "lucide-react";
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
 import { toast } from "@/lib/toast";
@@ -98,6 +98,13 @@ export function PlanNewTaskScreen({
   const [leadTouched, setLeadTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const timeRef = useRef<HTMLInputElement>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  // Экран монтируется за краем обрезанной дорожки слайда: нативный autoFocus прокручивает её к полю
+  // и форма съезжает влево, поэтому фокус ставим без прокрутки.
+  useEffect(() => {
+    if (isMove) return;
+    textRef.current?.focus({ preventScroll: true });
+  }, [isMove]);
 
   const [ty, tm] = todayIso.split("-").map(Number);
   const [monthOffset, setMonthOffset] = useState(0);
@@ -221,7 +228,7 @@ export function PlanNewTaskScreen({
         <label className="block">
           <span className="sr-only">Что нужно сделать</span>
           <textarea
-            autoFocus={!isMove}
+            ref={textRef}
             rows={2}
             maxLength={160}
             value={text}
