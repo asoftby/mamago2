@@ -365,3 +365,25 @@ export async function hasArticleIdeasBatch(
   });
   return new Set(rows.map((r) => r.articleId));
 }
+
+/**
+ * Все сохранённые идеи пользователя: события, офферы, маршруты, места и статьи —
+ * ровно те виды, что показывает раздел «Мои идеи и коллекции» (/me/ideas).
+ */
+export async function countUserSavedIdeas(userId: string): Promise<number> {
+  const safeCount = async (run: () => Promise<number>) => {
+    try {
+      return await run();
+    } catch {
+      return 0;
+    }
+  };
+  const counts = await Promise.all([
+    safeCount(() => prisma.idea.count({ where: { userId } })),
+    safeCount(() => prisma.offerIdea.count({ where: { userId } })),
+    safeCount(() => prisma.routeIdea.count({ where: { userId } })),
+    safeCount(() => prisma.placeIdea.count({ where: { userId } })),
+    safeCount(() => prisma.articleIdea.count({ where: { userId } })),
+  ]);
+  return counts.reduce((sum, n) => sum + n, 0);
+}

@@ -38,7 +38,7 @@ import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
 import { PlanDayBar } from "./v3/PlanDayBar";
 import { PlanMoveSheet, canMovePlanItem } from "./v3/PlanMoveSheet";
 import { fetchPlanExperienceFeed, type PlanExperienceFeed } from "./v3/planExperienceApi";
-import { ChevronRight, History, Plus } from "lucide-react";
+import { ChevronRight, History, Lightbulb, Plus } from "lucide-react";
 import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { MediaCover } from "@/components/ui/media-cover";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
@@ -97,6 +97,8 @@ interface PlanMainContentProps {
   onChangeSelectedAgeRanges: (ranges: AgeRangeSelection[]) => void;
   ideas?: MyPlanIdea[];
   ideasLoading?: boolean;
+  /** Всего сохранённых идей пользователя (для «Мои идеи · N»); null — ещё не загружено. */
+  ideasCount?: number | null;
   onAddIdeaToPlan?: (idea: MyPlanIdea) => Promise<{ ok: boolean; slot?: PlanSlotType }>;
   onRemoveIdea?: (activityId: string) => Promise<boolean> | boolean;
   /** Подборка из каталога (не сохранённые идеи) */
@@ -394,6 +396,7 @@ export function PlanMainContent({
   onChangeSelectedAgeRanges,
   ideas = [],
   ideasLoading = false,
+  ideasCount = null,
   onAddIdeaToPlan,
   onRemoveIdea,
   planSuggestions = [],
@@ -865,6 +868,12 @@ export function PlanMainContent({
       router.push(href);
     }, 0);
   };
+  const handleOpenMyIdeas = useCallback(() => {
+    onRequestClose?.();
+    window.setTimeout(() => {
+      router.push("/me/ideas");
+    }, 0);
+  }, [onRequestClose, router]);
   const handleIdeasPageClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
     onRequestClose?.();
@@ -1244,6 +1253,53 @@ export function PlanMainContent({
     return [activity.ageLabel ?? null, price].filter(Boolean).join(" · ");
   };
 
+  /** Пустой день: 1–2 сохранённые идеи с кнопкой «Запланировать на {дата}» (тот же механизм, что «+» у идей). */
+  const renderOwnIdeas = () => {
+    if (isPendingDateHydration || isPastDay || dayPartSections.length > 0 || filterPerson) return null;
+    const dayActivityIds = new Set((planItemsByDate?.[selectedDate] ?? []).map((item) => item.activityId));
+    const candidates = ideas
+      .filter((idea) => !idea.inPlanOnDate && !dayActivityIds.has(idea.activityId))
+      .slice(0, 2);
+    if (candidates.length === 0) return null;
+    const dayLabel = new Date(`${selectedDate}T12:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+    return (
+      <section aria-label="Из ваших идей" className="space-y-2">
+        <b className="block px-0.5 text-[15px] font-bold text-[var(--mp-tx)]">Из ваших идей</b>
+        {candidates.map((idea) => {
+          const poster = idea.activity.coverImageUrl;
+          return (
+            <div key={idea.id} className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-3">
+              <div className="flex min-w-0 items-center gap-3">
+                {poster ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={poster} alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover" />
+                ) : (
+                  <span aria-hidden className="h-12 w-12 shrink-0 rounded-xl bg-[var(--mp-soft)]" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="m-0 line-clamp-2 text-[15px] font-semibold leading-[1.3] text-[var(--mp-tx)] [overflow-wrap:anywhere]">
+                    {idea.activity.title}
+                  </p>
+                  {ideaMeta(idea.activity) ? (
+                    <p className="m-0 mt-0.5 truncate text-[13px] text-[var(--mp-tx2)]">{ideaMeta(idea.activity)}</p>
+                  ) : null}
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={addingActivityId === idea.activityId}
+                onClick={() => void handleAddIdeaToPlan(idea)}
+                className="mt-2.5 flex min-h-11 w-full items-center justify-center rounded-xl bg-[var(--mp-ac-dark)] px-3 text-[15px] font-bold text-white transition-colors hover:opacity-90 disabled:opacity-60"
+              >
+                <span className="truncate">Запланировать на {dayLabel}</span>
+              </button>
+            </div>
+          );
+        })}
+      </section>
+    );
+  };
+
   /** «Идеи на сегодня · от mamaGo»: пунктирный блок отдельно от плана; «+» добавляет в план. */
   const renderIdeas = () => {
     if (isPendingDateHydration) return null;
@@ -1360,14 +1416,24 @@ export function PlanMainContent({
           }
         />
       ) : null}
-      <button
-        type="button"
-        onClick={() => openNestedScreen("visits")}
-        className="flex min-h-11 w-full items-center justify-center gap-[7px] rounded-xl text-[15px] font-bold text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)]"
-      >
-        <History className="h-[17px] w-[17px]" aria-hidden />
-        Где мы были
-      </button>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={handleOpenMyIdeas}
+          className="flex min-h-11 min-w-0 items-center justify-center gap-[7px] rounded-xl border border-[var(--mp-line)] bg-[var(--mp-card)] px-3 text-[15px] font-bold text-[var(--mp-tx)] transition-colors hover:border-[var(--mp-line-strong)]"
+        >
+          <Lightbulb className="h-[17px] w-[17px] shrink-0 text-[var(--mp-ac-dark)]" aria-hidden />
+          <span className="truncate">{ideasCount ? `Мои идеи · ${ideasCount}` : "Мои идеи"}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => openNestedScreen("visits")}
+          className="flex min-h-11 min-w-0 items-center justify-center gap-[7px] rounded-xl border border-[var(--mp-line)] bg-[var(--mp-card)] px-3 text-[15px] font-bold text-[var(--mp-tx)] transition-colors hover:border-[var(--mp-line-strong)]"
+        >
+          <History className="h-[17px] w-[17px] shrink-0 text-[var(--mp-tx2)]" aria-hidden />
+          <span className="truncate">Где мы были</span>
+        </button>
+      </div>
     </div>
   );
 
@@ -1417,6 +1483,7 @@ export function PlanMainContent({
             <>
               {renderDayList(false)}
               {renderWeekTeaser()}
+              {renderOwnIdeas()}
               {renderIdeas()}
               {renderBottomActions()}
             </>
@@ -1482,6 +1549,7 @@ export function PlanMainContent({
           <>
             {renderDayList(true)}
             {renderWeekTeaser()}
+            {renderOwnIdeas()}
             {renderIdeas()}
             {renderBottomActions()}
           </>
