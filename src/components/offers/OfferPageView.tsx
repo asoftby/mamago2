@@ -3,6 +3,7 @@
 import "@/styles/event-page.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OfferHero } from "./OfferHero";
+import Link from "next/link";
 import { OfferEditorialInsights } from "./OfferEditorialInsights";
 import { OfferSchedule } from "./OfferSchedule";
 import { OfferReviews } from "./OfferReviews";
@@ -36,6 +37,7 @@ export interface OfferDirectCtaInfo {
 }
 
 interface OfferPageViewProps {
+  otherOffers?: Array<{ id: string; title: string; href: string; image: string | null; price: string | null }>;
   data: OfferPageData;
   isPrimaryLoading?: boolean;
   isSecondaryLoading?: boolean;
@@ -108,6 +110,7 @@ export function OfferPageView({
   onSave,
   onShiftCta,
   sectionNotes,
+  otherOffers = [],
   direct,
 }: OfferPageViewProps) {
   const { isAuthenticated } = useAuthMe();
@@ -440,6 +443,30 @@ export function OfferPageView({
             <OfferPlace place={data.place} citySlug={data.citySlug} />
           </>
         ) : null}
+
+        {otherOffers.length > 0 && (
+          <section aria-labelledby="other-business-offers-title" className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6">
+            <h2 id="other-business-offers-title" className="mb-5 font-editorial text-2xl md:text-3xl">
+              Другие наши предложения
+            </h2>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              {otherOffers.map((item) => (
+                <Link key={item.id} href={item.href} className="group min-w-0 overflow-hidden rounded-2xl border border-border bg-background transition-shadow hover:shadow-md">
+                  <div className="aspect-[4/3] overflow-hidden bg-muted">
+                    {item.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={item.image} alt="" loading="lazy" className="h-full w-full object-cover transition-transform group-hover:scale-[1.03]" />
+                    ) : null}
+                  </div>
+                  <div className="space-y-2 p-3">
+                    <h3 className="line-clamp-2 text-sm font-medium text-foreground">{item.title}</h3>
+                    {item.price && <p className="text-sm text-muted-foreground">{item.price}</p>}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
         {data.hasPrimaryAction !== false && data.promoCta && <OfferPromoCta {...data.promoCta} onPrimary={handlePrimary} />}
       </div>

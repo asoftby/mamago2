@@ -11,6 +11,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
+import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
 import { resolveOfferCanonicalUrl } from "@/lib/seo/resolveOfferCanonicalUrl";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { OfferPageView } from "@/components/offers";
@@ -196,6 +197,61 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
   const data = await getOfferPageData({ citySlug: actualCitySlug, slug: offer.slug ?? slug });
   if (!data) notFound();
 
+  // Only offers from the same verified owning business, never merely matching names.
+  const ownerBusinessId = offer.place?.ownerBusinessId;
+  const otherOffersRaw = ownerBusinessId
+    ? await prisma.offer.findMany({
+        where: {
+          id: { not: offer.id },
+          status: "PUBLISHED",
+          archivedAt: null,
+          place: {
+            ownerBusinessId,
+            archivedAt: null,
+            status: "PUBLISHED",
+            ownerBusiness: { operationalStatus: "ACTIVE" },
+          },
+        },
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          coverImage: true,
+          priceFrom: true,
+          priceTo: true,
+          priceMode: true,
+          currency: true,
+          priceText: true,
+          status: true,
+          archivedAt: true,
+          place: {
+            select: {
+              archivedAt: true,
+              ownerBusiness: { select: { operationalStatus: true } },
+              city: { select: { slug: true } },
+            },
+          },
+        },
+        orderBy: { publishedAt: "desc" },
+        take: 8,
+      })
+    : [];
+  const otherOffers = otherOffersRaw
+    .filter((candidate) => isOfferPubliclyVisible(candidate) && candidate.slug && candidate.place?.city?.slug)
+    .map((candidate) => ({
+      id: candidate.id,
+      title: candidate.title,
+      href: getOfferPublicPath({ slug: candidate.slug! }, candidate.place!.city!.slug),
+      image: candidate.coverImage,
+      price: formatPublicCardPrice({
+        priceMode: candidate.priceMode,
+        priceFrom: candidate.priceFrom,
+        priceTo: candidate.priceTo,
+        currency: candidate.currency,
+      }) ?? (candidate.priceMode === "UNKNOWN" ? candidate.priceText?.trim() ?? null : null),
+    }));
+
+
   const publicBase = getCanonicalPublicAppUrl();
   const canonicalPath = getOfferPublicPath({ slug: offer.slug }, actualCitySlug);
   const canonicalUrl = `${publicBase}${canonicalPath}`;
@@ -277,7 +333,7 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
           >[]
         }
       />
-      <OfferPageView data={data} canEditOffer={canEditOffer} direct={directCta} />
+      <OfferPageView data={data} canEditOffer={canEditOffer} direct={directCta} otherOffers={otherOffers} />
     </>
   );
 }

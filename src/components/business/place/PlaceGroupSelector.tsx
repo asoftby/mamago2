@@ -221,16 +221,12 @@ export function PlaceGroupSelector({
     await saveSelection(nextSelectedIds);
   }
 
-  if (!isLoading && places.length === 0) {
-    return null;
-  }
-
   return (
     <section className={cn("rounded-3xl border bg-background p-6", className)}>
       <div className="space-y-1">
-        <h3 className="text-base font-semibold text-foreground">Связанные места</h3>
+        <h3 className="text-base font-semibold text-foreground">Наши филиалы</h3>
         <p className="text-sm text-muted-foreground">
-          Выберите места, которые нужно показать рядом с этим местом.
+          Выберите другие филиалы вашего бизнеса. Они появятся на странице места в блоке «Наши филиалы».
         </p>
       </div>
 
