@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export type PartyOutboxEventType = "PARTY_REQUEST_SENT" | "PARTY_QUOTE_SENT" | "PARTY_REQUEST_DECLINED" | "PARTY_REQUEST_EXPIRED" | "PARTY_QUOTE_CLOSED" | "PARTY_QUOTE_ACCEPTED";
+export type PartyOutboxEventType = "PARTY_REQUEST_SENT" | "PARTY_QUOTE_SENT" | "PARTY_REQUEST_DECLINED" | "PARTY_REQUEST_EXPIRED" | "PARTY_QUOTE_CLOSED" | "PARTY_QUOTE_ACCEPTED" | "PARTY_BOOKING_CONFIRMED";
 
 export function partyNotificationId(outboxId: string, recipientId: string): string {
   return "party-" + createHash("sha256").update(outboxId + ":" + recipientId).digest("hex").slice(0, 32);
@@ -15,7 +15,7 @@ export function isPartyOutboxEventType(value: string): value is PartyOutboxEvent
     value === "PARTY_QUOTE_SENT" ||
     value === "PARTY_REQUEST_DECLINED" ||
     value === "PARTY_REQUEST_EXPIRED" || value === "PARTY_QUOTE_CLOSED" ||
-    value === "PARTY_QUOTE_ACCEPTED";
+    value === "PARTY_QUOTE_ACCEPTED" || value === "PARTY_BOOKING_CONFIRMED";
 }
 
 export function partyOutboxCopy(params: {
@@ -32,6 +32,15 @@ export function partyOutboxCopy(params: {
         body: "Новая заявка на «" + params.offerTitle + "» на " + params.dateLabel +
           ". Ответьте в разделе «Праздники».",
         actionUrl: "/business/bookings?tab=action&kind=party",
+      };
+    case "PARTY_BOOKING_CONFIRMED":
+      return {
+        type: "SYSTEM" as const,
+        audience: "USER" as const,
+        title: "Праздничная услуга подтверждена",
+        body: "Исполнитель подтвердил услугу «" + params.offerTitle +
+          "» на " + params.dateLabel + ". Посмотреть детали можно в празднике.",
+        actionUrl: "/me/birthdays",
       };
     case "PARTY_QUOTE_ACCEPTED":
       return {
