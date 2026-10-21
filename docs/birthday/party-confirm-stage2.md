@@ -27,6 +27,8 @@ Do **not** ship any one PR on its own or enable BUSINESS_BOOKINGS_INBOX_UI befor
 - Unit deactivated after parent acceptance or detached from offer; must fail.
 - More guests than unit capacity; must fail.
 - Two+ units: business must select one; selecting another company's unit must fail.
+- GET /api/business/party-requests/[id]/units is only a read-only availability preview;
+  POST /confirm rechecks inside the transaction. No selected room is a guarantee before confirmation.
 - Party VENUE/PACKAGE lacking a configured active unit must fail closed.
 - Anchor confirmation creates exactly one request per available selected service;
   unavailable add-on marked NEEDS_DECISION; package INCLUDED not externally requested.

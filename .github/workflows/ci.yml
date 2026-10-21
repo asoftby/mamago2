@@ -63,6 +63,7 @@ jobs:
           pnpm exec tsx src/server/birthday/partyQuoteAcceptance.contract.test.ts
           pnpm exec tsx src/server/birthday/partyConfirmationAvailability.test.ts
           pnpm exec tsx src/server/birthday/partyConfirm.contract.test.ts
+          pnpm exec tsx src/server/birthday/partyConfirmChoices.contract.test.ts
           pnpm exec tsx src/features/me/components/PartyOrderStatusScreen.contract.test.ts
           pnpm exec tsx src/server/services/booking/bookingBucket.contract.test.ts
 

@@ -5,43 +5,6 @@ import { getMyBusiness } from "@/server/business/getMyBusiness";
 import { partyRouteError, privatePartyResponse } from "@/server/birthday/partyRouteResponses";
 import { confirmPartyRequest } from "@/server/birthday/partyConfirm.service";
 import { checkRateLimit } from "@/lib/security/rateLimit";
-import prisma from "@/lib/prisma";
-
-/** Resource choices do not expose customer contact information. */
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
-  const business = await getMyBusiness(user.id);
-  if (!business || business.operationalStatus !== "ACTIVE") {
-    return NextResponse.json({ error: "Бизнес недоступен" }, { status: 403 });
-  }
-  const { id } = await params;
-  const request = await prisma.bookingRequest.findFirst({
-    where: { id, businessId: business.id, kind: "PARTY", partyStage: "AWAITING_RECONFIRM" },
-    select: { offerId: true, partyOrderItem: {
-      select: { role: true, partyOrder: { select: { venueMode: true } } },
-    } },
-  });
-  if (!request?.offerId || !request.partyOrderItem) {
-    return NextResponse.json({ error: "Заявка не найдена" }, { status: 404 });
-  }
-  const mappings = await prisma.bookingUnitOffer.findMany({
-    where: { offerId: request.offerId, bookingUnit: {
-      businessId: business.id, status: "ACTIVE",
-    } },
-    select: { bookingUnit: { select: {
-      id: true, name: true, capacity: true, timezone: true,
-    } } },
-  });
-  return NextResponse.json({
-    requireUnit: request.partyOrderItem.role === "ANCHOR" &&
-      ["VENUE", "PACKAGE"].includes(request.partyOrderItem.partyOrder.venueMode),
-    units: mappings.map((row) => row.bookingUnit),
-  }, { headers: { "Cache-Control": "private, no-store" } });
-}
 
 const confirmSchema = z.object({
   expectedQuoteVersion: z.number().int().min(1),

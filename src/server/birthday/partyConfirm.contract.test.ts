@@ -33,8 +33,8 @@ for (const invariant of [
   assert.ok(service.includes(invariant), "Missing invariant: " + invariant);
 }
 assert.match(route, /getMyBusiness\(user.id\)/);
-assert.match(route, /export async function GET/);
-assert.match(route, /businessId: business.id, kind: "PARTY", partyStage: "AWAITING_RECONFIRM"/);
+
+
 assert.match(service, /const venueRequired = isAnchor/);
 assert.match(service, /locked.status !== "ACTIVE"/);
 assert.match(service, /bookingUnitId_offerId/);
