@@ -27,6 +27,18 @@ assert.deepEqual(attempt("USER", 1, true), {
 });
 // Optional contact step is passable even with an empty draft.
 assert.deepEqual(attempt("USER", 7), { canContinue: true, issues: [] });
+// Source-owned imported dates count as a complete schedule without manual dates.
+assert.deepEqual(
+  evaluateEventStepNavigation({
+    role: "USER",
+    step: 5,
+    data: draft,
+    context: { hasAuthoritativeSchedule: true },
+    isLoadingGenres: false,
+  }),
+  { canContinue: true, issues: [] },
+);
+
 assert.equal(formatEventStepNavigationIssues([]), undefined);
 assert.equal(formatEventStepNavigationIssues(["Поле A", "Поле B"]), "Поле A · Поле B");
 console.log("Event wizard navigation: OK");

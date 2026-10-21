@@ -27,6 +27,10 @@ const wizardSource = readFileSync(
   "src/components/business/wizard/event/EventWizard.tsx",
   "utf8",
 );
+const navigationSource = readFileSync(
+  "src/components/business/wizard/event/navigation.ts",
+  "utf8",
+);
 const reviewSource = readFileSync(
   "src/components/business/wizard/event/steps/Step9Review.tsx",
   "utf8",
@@ -166,8 +170,13 @@ assert.match(
 );
 assert.match(
   wizardSource,
-  /validateStep\(currentStep, formData, validationContext\)/,
-  "continue-button validation must use imported schedule context",
+  /evaluateEventStepNavigation\(\{[\s\S]*?context:\s*validationContext/,
+  "continue-button must forward the imported schedule context to shared navigation",
+);
+assert.match(
+  navigationSource,
+  /validateStep\(step, data, context\)/,
+  "shared navigation must validate using the forwarded imported schedule context",
 );
 assert.match(
   wizardSource,
