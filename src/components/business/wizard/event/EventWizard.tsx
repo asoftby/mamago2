@@ -33,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { getBusinessFormActionLabels, businessFormCopy } from "../businessFormLabels";
 import { canPublishContentDirectly } from "@/lib/auth/businessContentAccess";
 import { canFreelyNavigateWizard } from "../shared/canFreelyNavigateWizard";
+import { evaluateEventStepNavigation, formatEventStepNavigationIssues } from "./navigation";
 import { useWizardSession } from "@/hooks/useWizardSession";
 
 import type { EventFormData, EventWizardMode } from "./types";
@@ -309,6 +310,7 @@ function EventWizardInner({
   const [submitStatus, setSubmitStatus] = useState<
     "idle" | "validating" | "submitting" | "success" | "error"
   >("idle");
+  const [nextAttemptedStep, setNextAttemptedStep] = useState<number | null>(null);
   const [currentStep, setCurrentStep] = useState(() => {
     if (
       mode === "edit" &&
@@ -856,30 +858,25 @@ function EventWizardInner({
     persistEventDraftCore,
   ]);
 
-  // Navigation
+  // Navigation: Continue stays clickable so incomplete steps can explain WHY
+  // they are blocked; staff navigation does not depend on completion.
   const handleNext = () => {
-    console.time("[EventWizard] navigate next step");
-
     if (currentStep >= TOTAL_STEPS) return;
 
-    if (!freeStepNavigation) {
-      // Non-staff roles still have to complete each step in order.
-      if (isLoadingGenres) {
-        toast.error("Дождитесь загрузки жанров");
-        console.timeEnd("[EventWizard] navigate next step");
-        return;
-      }
-
-      const validation = validateStep(currentStep, formData, validationContext);
-      if (!validation.isComplete) {
-        toast.error("Заполните обязательные поля перед переходом дальше");
-        console.timeEnd("[EventWizard] navigate next step");
-        return;
-      }
+    const result = evaluateEventStepNavigation({
+      role: userRole,
+      step: currentStep,
+      data: formData,
+      context: validationContext,
+      isLoadingGenres,
+    });
+    if (!result.canContinue) {
+      setNextAttemptedStep(currentStep);
+      return;
     }
 
-    setCurrentStep((prev) => prev + 1);
-    console.timeEnd("[EventWizard] navigate next step");
+    setNextAttemptedStep(null);
+    setCurrentStep((prev) => Math.min(prev + 1, TOTAL_STEPS));
   };
 
   const handlePrev = () => {
@@ -1394,11 +1391,17 @@ function EventWizardInner({
     return <StepComponent {...commonProps} />;
   };
 
-  const canNext =
-    currentStep < TOTAL_STEPS &&
-    (freeStepNavigation ||
-      (validateStep(currentStep, formData, validationContext).isComplete &&
-        !isLoadingGenres));
+  const nextStepIssues =
+    nextAttemptedStep === currentStep && !freeStepNavigation
+      ? evaluateEventStepNavigation({
+          role: userRole,
+          step: currentStep,
+          data: formData,
+          context: validationContext,
+          isLoadingGenres,
+        }).issues
+      : [];
+  const continueHint = formatEventStepNavigationIssues(nextStepIssues);
   const canPrev = true; // Always show back button (on step 1 it goes to returnTo)
   const isReviewStep = currentStep === TOTAL_STEPS;
   const isPublishedEdit =
@@ -1492,7 +1495,8 @@ function EventWizardInner({
         saveDraftDisabled={isSaving || isSubmitting}
         isReviewStep={isReviewStep}
         onContinue={!isReviewStep ? handleNext : undefined}
-        continueDisabled={!canNext || isSaving || isSubmitting}
+        continueDisabled={isSaving || isSubmitting}
+        continueHint={continueHint}
         onSubmit={
           isReviewStep
             ? isPublishedEditReview
