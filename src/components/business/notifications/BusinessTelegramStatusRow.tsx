@@ -39,7 +39,7 @@ export function BusinessTelegramStatusRow() {
     <div className="flex-1">
       <div className="font-medium">mamaGo Business Bot</div>
       <div className="text-xs text-muted-foreground">
-        {status?.linked ? "Подключён" : status?.configured ? "Не подключён" : "Ожидает настройки"}
+        {status?.linked ? "Подключён (уведомления включим отдельно)" : status?.configured ? "Не подключён" : "Ожидает настройки"}
       </div>
     </div>
     {status?.linked ? <Button variant="outline" size="sm" onClick={disconnect} disabled={busy}>Отключить</Button>

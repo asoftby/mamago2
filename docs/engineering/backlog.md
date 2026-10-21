@@ -5378,3 +5378,13 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Dependencies: owner-reviewed ruleset policy, current-base CI, per-PR review threads, external worktree/automation checks for branch retirement. P0/P1 release/security work stays in its existing Issues and is not downgraded by this P2 entry.
 - Acceptance criteria: agree/enforce required CI and review policy in a separate settings change; reconcile all retained PRs against fresh dev with exact-SHA evidence; archive reports only with per-file proof/link repair; retire only proven unused branches. Record outcomes in #653/#661.
 - Source: #653, #661, #657; audit 2026-10-22.
+
+## [BACKLOG-194] Business Telegram Bot — delivery, booking callbacks and rollout
+
+- Status: OPEN
+- Priority: P1
+- Area: Business / Telegram / Booking
+- Added: 2026-10-22
+- Reason deferred: business bot connection foundation must be reviewed and deployed before altering legacy notification delivery and payment-sensitive bookings. A separate bot token must not silently steal family subscriptions.
+- Next: route business-only notification scenarios to the business bot with explicit recipient and active membership check, delivery retry/idempotency, opt-in preferences and tests; add booking confirmation/change callbacks through existing booking state machine and PartyOutbox; configure DEV BotFather token/webhook and run smoke tests before enabling PROD.
+- Safety: legacy Info Bot and its connection remain unchanged; do not enable business callbacks or production delivery without confirmed migration and environment configuration.

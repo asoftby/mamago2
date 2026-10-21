@@ -24,3 +24,5 @@ Register bot webhooks separately at `/api/business/telegram/webhook` with `secre
 3. Replayed, expired or invalid link fails and does not alter state.
 4. Wrong webhook secret returns 403.
 5. Only an active business owner/manager can use the connection; prevent sending after revocation.
+
+The legacy Telegram connection remains displayed in the business notification settings; it controls existing notifications. New Business Bot connection is explicitly labelled as not yet delivering notifications.

@@ -44,11 +44,10 @@ export async function consumeBusinessTelegramLink(token: string, actor: {
     if (!link || link.environment !== config.environment || link.usedAt || link.expiresAt <= now) return false;
     // Re-check membership at consumption, not only at link issuance.
     const member = await tx.businessMember.findFirst({
-      where: { businessId: link.businessId, userId: link.userId, role: { in: ["OWNER", "MANAGER"] } },
+      where: { businessId: link.businessId, userId: link.userId, isActive: true, role: { in: ["OWNER", "MANAGER"] } },
       select: { id: true },
     });
-    const owner = await tx.business.findFirst({ where: { id: link.businessId, ownerUserId: link.userId }, select: { id: true } });
-    if (!member && !owner) return false;
+    if (!member) return false;
     const updated = await tx.businessTelegramLinkToken.updateMany({
       where: { id: link.id, usedAt: null, expiresAt: { gt: now } }, data: { usedAt: now },
     });
