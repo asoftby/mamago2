@@ -7,6 +7,10 @@
 - API / data / permissions impact:
 
 ## Verification
+- Session-start gate result and exact `BASE_HEAD`:
+- Latest observed `origin/dev` SHA and reconciliation/overlap review:
+- Isolated task branch/worktree:
+- Exact tested commit SHA and check links:
 - [ ] TypeScript / typecheck passed
 - [ ] ESLint passed
 - [ ] Relevant automated tests passed
@@ -31,6 +35,7 @@
 <!-- Include incomplete work, unresolved checks and follow-up issues. -->
 
 ## Merge readiness
+- [ ] Fresh `origin/dev` is contained in the task branch; diff remains task-only
 - [ ] CI checks passed
 - [ ] No unresolved review threads
 - [ ] Target branch is correct

@@ -5365,3 +5365,16 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Added: 2026-10-14
 - Reason deferred: падение pre-existing (воспроизводится на чистом `origin/dev` a6f9256f на macOS), не связано с worktree-deps; последний кейс теста (`install-shell-shortcuts.sh` + путь с `'`) не проходит локально.
 - Resolved: 2026-10-16. Тест нормализует временный корень через `pwd -P`: Git на macOS возвращает `/private/var`, тогда как TMPDIR может использовать `/var`. Установщик сохраняет путь корректно; регрессии с апострофом, изоляцией зависимостей и отпечатками содержимого проходят локально.
+
+## [BACKLOG-193] Repository governance and preserved PR reconciliation
+
+- Status: OPEN
+- Priority: P2
+- Area: Engineering / GitHub
+- Added: 2026-10-22
+- Reason deferred: access/governance decisions, conflicting historical PRs and production/DEV acceptance require separate reviewed work; no automatic risky merges or bulk archival.
+- Context: [Repository audit](repository-audit-2026-10-22.md) and [exact PR heads](repository-audit-2026-10-22.json), initial base `f174879ab39a345f8f4870177dddede849cb43cc`, reconciled base `1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2`.
+- Current state: existing Protect dev ruleset lacks required status checks; templates exist; README/error-dump cleanup is already owned by #685. Unique source branches are preserved. See #653/#661 and branch-retirement inventory #657; do not duplicate these trackers.
+- Dependencies: owner-reviewed ruleset policy, current-base CI, per-PR review threads, external worktree/automation checks for branch retirement. P0/P1 release/security work stays in its existing Issues and is not downgraded by this P2 entry.
+- Acceptance criteria: agree/enforce required CI and review policy in a separate settings change; reconcile all retained PRs against fresh dev with exact-SHA evidence; archive reports only with per-file proof/link repair; retire only proven unused branches. Record outcomes in #653/#661.
+- Source: #653, #661, #657; audit 2026-10-22.
