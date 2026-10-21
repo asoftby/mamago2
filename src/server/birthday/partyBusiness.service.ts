@@ -165,7 +165,7 @@ export async function replyToPartyRequest(params: {
     if (orderClaim.count !== 1) throw new PartyApiError(409, "Праздник уже изменён");
 
     await tx.partyQuote.updateMany({
-      where: { bookingRequestId: requestId, status: "ACTIVE" },
+      where: { bookingRequestId: requestId, status: { in: ["ACTIVE", "ACCEPTED"] } },
       data: { status: "SUPERSEDED", decidedAt: now },
     });
     const quote = await tx.partyQuote.create({
