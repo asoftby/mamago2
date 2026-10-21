@@ -10,6 +10,10 @@ export type AccountMenuRow =
       icon: LucideIcon;
       /** accent — как контекстные переходы (админка, бизнес и т.д.) */
       variant?: "default" | "accent";
+      /** Маршрут, на котором пункт считается активным; не задан — активным не бывает. */
+      activeHref?: string;
+      /** Только точное совпадение (для `/me`, иначе пункт активен на всех `/me/*`). */
+      activeExact?: boolean;
     }
   | {
       key: string;
@@ -19,6 +23,8 @@ export type AccountMenuRow =
       onClick: () => void;
       /** accent — контекстный переход (личный / админ и т.д.) */
       variant?: "default" | "accent";
+      activeHref?: string;
+      activeExact?: boolean;
     };
 
 export type AccountDropdownHeaderModel = {

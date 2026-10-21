@@ -87,8 +87,10 @@ export function buildPublicSiteAccountModel(input: {
       {
         key: "account",
         type: "button",
-        label: "Личный аккаунт",
+        label: "Мои данные",
         icon: UserCircle,
+        activeHref: "/me",
+        activeExact: true,
         onClick: () => {
           onGoToPersonalAccount();
         },
@@ -98,7 +100,7 @@ export function buildPublicSiteAccountModel(input: {
         type: "button",
         label: "Мои идеи и коллекции",
         icon: Lightbulb,
-        variant: "accent",
+        activeHref: "/me/ideas",
         onClick: () => {
           onGoToPersonalIdeas();
         },
@@ -108,6 +110,7 @@ export function buildPublicSiteAccountModel(input: {
         type: "button",
         label: "Мой план",
         icon: CalendarDays,
+        activeHref: "/me/plan",
         onClick: () => {
           onGoToPersonalPlan();
         },
@@ -117,6 +120,7 @@ export function buildPublicSiteAccountModel(input: {
         type: "button",
         label: "Мои записи",
         icon: CalendarCheck,
+        activeHref: "/me/bookings",
         onClick: () => {
           onGoToPersonalBookings();
         },
@@ -126,6 +130,7 @@ export function buildPublicSiteAccountModel(input: {
         type: "button",
         label: "Мои сообщения",
         icon: MessageCircle,
+        activeHref: "/me/direct",
         onClick: () => {
           onGoToPersonalDirect();
         },
@@ -136,6 +141,7 @@ export function buildPublicSiteAccountModel(input: {
         type: "button",
         label: "Настройки",
         icon: Settings,
+        activeHref: "/me/settings",
         onClick: () => {
           onGoToSettings();
         },
