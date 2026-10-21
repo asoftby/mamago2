@@ -2,6 +2,7 @@
 
 import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 import { useEffect, useMemo, useState } from "react";
+import { pluralRu } from "@/lib/text/pluralRu";
 import type { BirthdayBuilderWithGate } from "../../hooks/useBirthdayBuilderWithGate";
 import {
   calculateBookingInterval,
@@ -504,6 +505,9 @@ export function StepDone({
     up5: "до 5", "5-10": "5–10", "10-15": "10–15", "15plus": "15+",
   };
 
+  // One string => one text node (the button is display:flex, JSX fragments would split into separate flex items).
+  const submitLabel = `Отправить ${summaryItems.length} ${pluralRu(summaryItems.length, "заявку", "заявки", "заявок")} организаторам`;
+
   return (
     <div style={{ maxWidth: 760, margin: "0 auto" }}>
       <span style={{
@@ -700,7 +704,7 @@ export function StepDone({
           }}
         >
           {summaryItems.length > 0
-            ? <>Отправить {summaryItems.length} заявк{summaryItems.length === 1 ? "у" : summaryItems.length <= 4 ? "и" : ""} организаторам <ArrowIcon c="#fff" /></>
+            ? <>{submitLabel}<ArrowIcon c="#fff" /></>
             : "Выберите исполнителей на шаге 4"}
         </button>
 
