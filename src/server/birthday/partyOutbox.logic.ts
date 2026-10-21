@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export type PartyOutboxEventType = "PARTY_REQUEST_SENT" | "PARTY_QUOTE_SENT" | "PARTY_REQUEST_DECLINED" | "PARTY_REQUEST_EXPIRED" | "PARTY_QUOTE_CLOSED";
+export type PartyOutboxEventType = "PARTY_REQUEST_SENT" | "PARTY_QUOTE_SENT" | "PARTY_REQUEST_DECLINED" | "PARTY_REQUEST_EXPIRED" | "PARTY_QUOTE_CLOSED" | "PARTY_QUOTE_ACCEPTED" | "PARTY_BOOKING_CONFIRMED";
 
 export function partyNotificationId(outboxId: string, recipientId: string): string {
   return "party-" + createHash("sha256").update(outboxId + ":" + recipientId).digest("hex").slice(0, 32);
@@ -13,6 +13,7 @@ export function partyOutboxBackoff(attempt: number): number {
 export function isPartyOutboxEventType(value: string): value is PartyOutboxEventType {
   return value === "PARTY_REQUEST_SENT" ||
     value === "PARTY_QUOTE_SENT" ||
+    value === "PARTY_QUOTE_ACCEPTED" || value === "PARTY_BOOKING_CONFIRMED" ||
     value === "PARTY_REQUEST_DECLINED" ||
     value === "PARTY_REQUEST_EXPIRED" || value === "PARTY_QUOTE_CLOSED";
 }
@@ -39,6 +40,24 @@ export function partyOutboxCopy(params: {
         title: "Исполнитель ответил на заявку",
         body: "По услуге «" + params.offerTitle + "» поступило предложение. " +
           "Стоимость и условия нужно проверить и принять. Бронирование ещё не подтверждено.",
+        actionUrl: "/me/birthdays",
+      };
+    case "PARTY_QUOTE_ACCEPTED":
+      return {
+        type: "SYSTEM" as const,
+        audience: "BUSINESS" as const,
+        title: "Семья приняла условия праздника",
+        body: "Семья приняла предложение по «" + params.offerTitle +
+          "». Подтвердите доступный ресурс в разделе «Записи и заказы». Бронирование пока не подтверждено.",
+        actionUrl: "/business/bookings?tab=action&kind=party",
+      };
+    case "PARTY_BOOKING_CONFIRMED":
+      return {
+        type: "SYSTEM" as const,
+        audience: "USER" as const,
+        title: "Площадка подтверждена",
+        body: "Бронирование по «" + params.offerTitle +
+          "» подтверждено исполнителем. Проверьте детали праздника в своём кабинете.",
         actionUrl: "/me/birthdays",
       };
     case "PARTY_REQUEST_EXPIRED":
@@ -76,7 +95,7 @@ export function partyOutboxCopy(params: {
  * until the inbox UI is released and BUSINESS_BOOKINGS_INBOX_UI=true is set.
  */
 export function inboxLinkedEventTypes(): PartyOutboxEventType[] {
-  return ["PARTY_REQUEST_SENT"];
+  return ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED"];
 }
 
 export function heldPartyOutboxEventTypes(env: Readonly<Record<string, string | undefined>>): PartyOutboxEventType[] {

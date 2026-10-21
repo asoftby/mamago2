@@ -11,7 +11,7 @@ assert.notEqual(partyNotificationId("event-1", "user-1"), partyNotificationId("e
 assert.equal(partyOutboxBackoff(0), 60_000);
 assert.equal(partyOutboxBackoff(2), 240_000);
 assert.equal(partyOutboxBackoff(20), 3_600_000);
-for (const type of ["PARTY_REQUEST_SENT", "PARTY_QUOTE_SENT", "PARTY_REQUEST_DECLINED", "PARTY_REQUEST_EXPIRED"]) {
+for (const type of ["PARTY_REQUEST_SENT", "PARTY_QUOTE_SENT", "PARTY_QUOTE_ACCEPTED", "PARTY_BOOKING_CONFIRMED", "PARTY_REQUEST_DECLINED", "PARTY_REQUEST_EXPIRED"]) {
   assert.equal(isPartyOutboxEventType(type), true);
   const copy = partyOutboxCopy({ type: type as "PARTY_REQUEST_SENT", offerTitle: "Квест", dateLabel: "2026-10-20" });
   assert.match(copy.body, /Квест/);
@@ -24,6 +24,12 @@ assert.equal(partyOutboxCopy({
 assert.equal(partyOutboxCopy({
   type: "PARTY_REQUEST_SENT", offerTitle: "Квест", dateLabel: "2026-10-20",
 }).audience, "BUSINESS");
+assert.equal(partyOutboxCopy({
+  type: "PARTY_QUOTE_ACCEPTED", offerTitle: "Квест", dateLabel: "2026-10-20",
+}).audience, "BUSINESS");
+assert.equal(partyOutboxCopy({
+  type: "PARTY_BOOKING_CONFIRMED", offerTitle: "Квест", dateLabel: "2026-10-20",
+}).audience, "USER");
 assert.equal(authorizeCronRequest(null, { NODE_ENV: "production" })?.status, 503);
 assert.equal(authorizeCronRequest(null, { NODE_ENV: "production", CRON_SECRET: "secret" })?.status, 401);
 assert.equal(authorizeCronRequest("Bearer secret", { NODE_ENV: "production", CRON_SECRET: "secret" }), null);
@@ -44,8 +50,8 @@ for (const invariant of [
 assert.ok(!worker.includes("contactPhone: true"));
 assert.ok(!worker.includes("customerPhone: true"));
 // Business notifications deep-link into the unified inbox: held until the UI is released.
-assert.deepEqual(heldPartyOutboxEventTypes({}), ["PARTY_REQUEST_SENT"]);
-assert.deepEqual(heldPartyOutboxEventTypes({ BUSINESS_BOOKINGS_INBOX_UI: "false" }), ["PARTY_REQUEST_SENT"]);
+assert.deepEqual(heldPartyOutboxEventTypes({}), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED"]);
+assert.deepEqual(heldPartyOutboxEventTypes({ BUSINESS_BOOKINGS_INBOX_UI: "false" }), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED"]);
 assert.deepEqual(heldPartyOutboxEventTypes({ BUSINESS_BOOKINGS_INBOX_UI: "true" }), []);
 assert.ok(worker.includes("notIn: heldPartyOutboxEventTypes(process.env)"), "Inbox-linked events must be gated");
 for (const type of heldPartyOutboxEventTypes({})) {

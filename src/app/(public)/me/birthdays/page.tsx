@@ -12,6 +12,7 @@ import type { UserBirthdayParty } from "@/features/me/types/userBirthdayParty";
 import { sortPartiesForProfile } from "@/features/me/lib/userBirthdayPartyUi";
 import { BirthdayPartyCard } from "@/features/me/components/BirthdayPartyCard";
 import { getBirthdayBuilderHref } from "@/lib/birthday/getBirthdayBuilderHref";
+import prisma from "@/lib/prisma";
 
 function isArchived(p: UserBirthdayParty) {
   return p.status === "completed" || p.status === "archived";
@@ -25,6 +26,16 @@ export default async function MeBirthdaysPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
+  const orders = await prisma.partyOrder.findMany({
+    where: { ownerUserId: user.id },
+    orderBy: { updatedAt: "desc" },
+    take: 50,
+    select: {
+      id: true, eventDate: true, timeFrom: true, status: true,
+      items: { where: { role: "ANCHOR" }, take: 1,
+        select: { offer: { select: { title: true } } } },
+    },
+  });
   const parties = await listUserBirthdayParties(user.id);
   const sorted = sortPartiesForProfile(parties);
   const active = sorted.filter(isActive);
@@ -50,7 +61,33 @@ export default async function MeBirthdaysPage() {
           </BodyMuted>
         </div>
 
-        {parties.length === 0 ? (
+        {orders.length > 0 ? (
+          <section className="mb-8 space-y-3" aria-label="Заявки на праздники">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Заявки и предложения
+            </h3>
+            {orders.map((order) => (
+              <Link
+                key={order.id}
+                href={`/me/birthdays/${encodeURIComponent(order.id)}`}
+                className="block rounded-2xl border border-border bg-background p-4 transition-colors hover:bg-muted/50"
+              >
+                <span className="block font-semibold">
+                  {order.items[0]?.offer?.title ?? "Мой праздник"}
+                </span>
+                <span className="mt-1 block text-sm text-muted-foreground">
+                  {order.eventDate?.toLocaleDateString("ru-RU", { day: "numeric", month: "long" }) ?? "Дата не указана"}
+                  {order.timeFrom ? ` · ${order.timeFrom}` : ""}
+                  {" · "}{order.status === "ANCHOR_CONFIRMED" ? "Площадка подтверждена"
+                    : order.status === "ANCHOR_PENDING" ? "Ожидаем подтверждение площадки"
+                    : order.status === "NEEDS_ALTERNATIVE" ? "Нужен другой вариант"
+                    : order.status === "CANCELLED" ? "Отменён" : "Черновик"}
+                </span>
+              </Link>
+            ))}
+          </section>
+        ) : null}
+        {orders.length === 0 && parties.length === 0 ? (
           <Surface variant="elevated" className="p-8 text-center">
             <BodyMuted className="mb-4">
               Пока нет праздников — создайте сценарий в конструкторе.
