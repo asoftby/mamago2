@@ -11,17 +11,19 @@ UI поверх серверной части из `bookings-inbox-server-pr.md`
   `/business/bookings?tab=action&kind=party` открывает «Требуют действий» → «Праздники».
 - «Требуют действий»: сначала «Клиент ждёт», ниже «Закройте прошедшие». Пусто → «Всё обработано» + ближайшие.
 - Действия:
-  - PARTY SENT → ответ; AWAITING_RECONFIRM → только повторное предложение условий (`POST /api/business/party-requests/{id}/respond`,
-    `Idempotency-Key` на форму, `expectedStage`, `expectedQuoteVersion`);
+  - PARTY SENT: reply with the quote via /respond.
+  - PARTY AWAITING_RECONFIRM: choose available BookingUnit from GET /units and confirm it
+    via POST /confirm (depends on PR #660), or send revised terms via /respond.
+  - The confirmation operation rechecks availability inside a DB transaction.
+    No eligible unit means NO confirmed booking.
   - PARTY истёкшее предложение → продлить (≤24 ч, не позже чем за час до праздника) или закрыть
     (`POST .../resolve`);
   - STANDARD прошедший визит → «Состоялся / Не состоялся» (`POST /api/business/bookings/{id}/outcome`);
   - STANDARD NEW и остальные → отдельная карточка по `GET /api/business/bookings/[id]`
     с проверкой `businessId` и `kind=STANDARD`, без ограничения в 200 записей календаря.
 
-  **Важно:** текущий `/respond` возвращает заявку в QUOTED и не подтверждает бронирование.
-  Для AWAITING_RECONFIRM нужна отдельная транзакция с CAS, повторной проверкой ресурса,
-  версией предложения и идемпотентным outbox; кнопки «Подтвердить» в этом UI нет.
+  Important: /respond creates a new QUOTED proposal; it does not confirm a booking.
+  The real confirmation UI invokes the separate /confirm endpoint from PR #660.
 - PARTY: контакты родителя нигде не показываются (в API инбокса их нет).
 - Бейдж пункта меню «Записи и заказы» = `menuBadge` (только «Клиент ждёт»), обновляется при заходе,
   раз в минуту и после действий.
@@ -50,3 +52,12 @@ UI поверх серверной части из `bookings-inbox-server-pr.md`
 - Названия вкладок соответствуют серверным buckets, но перед активацией релиза
   требуют сверки с утверждённым UX.
 - Активация `BUSINESS_BOOKINGS_INBOX_UI` в worker/app только после DEV smoke.
+
+
+## Release prerequisites
+
+- PR #660 is required before this client can call /units and /confirm.
+- Business UI notifications remain gated by BUSINESS_BOOKINGS_INBOX_UI=true.
+- Parent acceptance and business confirmation additionally require PARTY_CONFIRMATION_ENABLED=true.
+- Both flags default to false and must be enabled separately only after DEV smoke.
+- Do not deploy the client with active confirmation buttons before its server endpoints.
