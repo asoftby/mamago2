@@ -156,11 +156,19 @@ export function FamilyJoinClient(props: { token: string; consentVersion: string;
             className="min-h-11 text-left text-sm font-medium text-neutral-800 underline underline-offset-4 hover:text-neutral-950">
             Прочитать соглашение о присоединении
           </button>
-          <label className="mt-2 flex cursor-pointer items-start gap-3 text-sm leading-relaxed text-neutral-800">
-            <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)}
-              className="mt-1 size-4 shrink-0 accent-neutral-900" />
-            <span>Я принимаю условия соглашения о присоединении к семье.</span>
-          </label>
+          <div className="mt-2 flex items-start gap-3 text-sm leading-relaxed text-neutral-800">
+            <input type="checkbox" id="family-join-consent" aria-label="Я принимаю условия соглашения о присоединении"
+              checked={agreed} onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-1 size-4 shrink-0 cursor-pointer accent-neutral-900" />
+            <div>
+              <label htmlFor="family-join-consent" className="cursor-pointer">Я принимаю условия </label>
+              <button type="button" onClick={() => setShowConsent(true)}
+                className="inline min-h-6 font-medium text-neutral-900 underline underline-offset-4 hover:text-neutral-700">
+                соглашения о присоединении
+              </button>
+              <span>.</span>
+            </div>
+          </div>
         </div>
         {error ? <p role="alert" className="mt-3 text-sm text-red-600">{error}</p> : null}
         <button type="button" className={`${btnPrimary} mt-5 w-full`} disabled={!agreed || busy} onClick={next}>
