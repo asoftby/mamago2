@@ -41,15 +41,22 @@
       "behindDev": 8,
       "cleanMergeIntoDev": true,
       "changedFileCount": 13,
-      "exactChangedPathsInDev": [],
-      "missingPathsInDev": [
+      "exactChangedPathsInDev": [
+        "docs/birthday/party-confirm-stage2.md",
+        "package.json",
         "prisma/migrations/20261021120000_party_anchor_confirmation/migration.sql",
+        "prisma/schema.prisma",
         "src/app/api/business/party-requests/[id]/prepaid/route.ts",
         "src/server/birthday/partyAnchorConfirmation.contract.test.ts",
+        "src/server/birthday/partyBusiness.contract.test.ts",
+        "src/server/birthday/partyBusiness.service.ts",
         "src/server/birthday/partyFixedPrice.ts",
         "src/server/birthday/partyItemLabel.ts",
-        "src/server/birthday/partyPrepaid.service.ts"
+        "src/server/birthday/partyPrepaid.service.ts",
+        "src/server/birthday/partySelection.ts",
+        "src/server/birthday/partySubmit.service.ts"
       ],
+      "missingPathsInDev": [],
       "unresolvedReviewThreads": null,
       "initialChecks": [
         {
@@ -207,7 +214,6 @@
         "src/server/birthday/partyOutbox.service.ts"
       ],
       "missingPathsInDev": [
-        "src/app/api/parent/parties/[id]/requests/[requestId]/accept/route.ts",
         "src/features/me/components/AcceptBirthdayQuoteButton.tsx",
         "src/server/birthday/partyConfirmation.contract.test.ts",
         "src/server/birthday/partyConfirmation.integration.test.ts",

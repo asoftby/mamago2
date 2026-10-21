@@ -105,6 +105,7 @@ Before any future move/delete record: purpose; rg/import and dynamic path lookup
 - Closed #662 as superseded with exact-file/commit evidence in its preserved PR body; its branch remains. Closed #670 with implementation SHAs and passing business-inbox regressions in its preserved Issue body. #658 and all other unfinished feature/release Issues remain open.
 - Session-start and task-sync PASS; separate own node_modules; Prisma client generated locally, no database commands.
 - Booking bucket contract PASS; business-inbox UI regression result recorded in the PR verification. Node 22 used for verification.
+- `pnpm lint` completed with 31 errors and 491 warnings in existing source/scripts. This PR changes only Markdown and the audit JSON; all linted source, ESLint config, package manifest and lockfile match reconciled dev. Do not silently fix unrelated source or require a currently failing global lint job. Initial default-heap typecheck exhausted 4 GB; rerun uses an explicit 8 GB heap on Node 22.
 - Full check:push, lint, CI and final commit are recorded in the PR; this report does not claim a check passed before it finishes.
 - Execution actions (closed items, labels, PR URL and commit SHA) are recorded in the final handoff. No production, DB, cron, secret, main or ruleset changes are authorized by this document.
 
