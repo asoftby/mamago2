@@ -4,6 +4,7 @@ import { PartyApiError, partyStartAt } from "./partyDraft.validation";
 import { isPartyAttentionStage, type PartyBusinessReply } from "./partyBusiness.validation";
 import { redactPartyContacts } from "./partyPrivacy";
 import { isAutoConfirmMode } from "./partySelection";
+import { verifyPartyOffers } from "./partyDraft.service";
 import { clockMinutes, isFixedPriceReply } from "./partyFixedPrice";
 
 
@@ -75,13 +76,13 @@ export async function replyToPartyRequest(params: {
     where: { id: requestId, businessId, kind: BookingKind.PARTY },
     select: {
       id: true, createdAt: true, partyStage: true, lastActivityAt: true,
-      firstResponseAt: true, responseDueAt: true, partyOrderItemId: true,
+      firstResponseAt: true, responseDueAt: true, partyOrderItemId: true, offerId: true,
       partyOrderItem: {
         select: {
           id: true, role: true, status: true, offerPriceSnapshot: true,
           pricingMode: true, confirmedBookingRequestId: true,
           partyOrder: { select: {
-            id: true, ownerUserId: true, eventDate: true,
+            id: true, ownerUserId: true, citySlug: true, eventDate: true,
             timeFrom: true, timeTo: true, venueMode: true, status: true,
           } },
         },
@@ -136,6 +137,15 @@ export async function replyToPartyRequest(params: {
     });
 
   return prisma.$transaction(async (tx) => {
+    // Automatic confirmation skips confirmPartyRequest, so repeat its live check:
+    // a withdrawn or reassigned publication must not become a confirmed booking.
+    if (autoConfirm) {
+      const offerId = existing.offerId;
+      const verified = offerId ? await verifyPartyOffers(order.citySlug, [offerId], tx) : null;
+      if (!offerId || verified?.get(offerId)?.place?.ownerBusinessId !== businessId) {
+        throw new PartyApiError(422, "Услуга больше не доступна у этого исполнителя");
+      }
+    }
     // Compare-and-swap prevents two concurrent replies from both producing quotes.
     const claimed = await tx.bookingRequest.updateMany({
       where: {

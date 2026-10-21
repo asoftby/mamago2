@@ -61,6 +61,17 @@ for (const needle of [
 assert.ok(!service.includes("addonRequests") && !service.includes('"PARTY_REQUEST_SENT"'), "No fan-out on auto-confirm (PR 3)");
 // Retry with the same Idempotency-Key short-circuits before any write.
 assert.ok(service.indexOf("bookingRequestId_idempotencyKey") < service.indexOf("prisma.$transaction"));
+// Auto-confirm repeats confirmPartyRequest's live check inside the transaction, before the claim:
+// a withdrawn publication or a place reassigned to another business must not confirm (422).
+const txStart = service.indexOf("prisma.$transaction");
+const liveCheck = service.indexOf("verifyPartyOffers(order.citySlug, [offerId], tx)");
+assert.ok(txStart !== -1 && liveCheck > txStart, "Offer check must run inside the transaction");
+assert.ok(liveCheck < service.indexOf("tx.bookingRequest.updateMany"), "Offer check must precede the claim");
+assert.match(service.slice(txStart, liveCheck), /if \(autoConfirm\) \{\s*const offerId = existing\.offerId;\s*const verified = offerId \? await $/,
+  "Offer check is the auto-confirm branch");
+const liveTail = service.slice(liveCheck, liveCheck + 400);
+assert.ok(liveTail.includes("!offerId ||") && liveTail.includes("ownerBusinessId !== businessId"), "Owner must be compared");
+assert.ok(liveTail.includes("new PartyApiError(422"), "Mismatch is a 422");
 assert.equal(partyOutboxCopy({ type: "PARTY_BOOKING_CONFIRMED", offerTitle: "Аниматор", dateLabel: "x" }).actionUrl, "/me/birthdays");
 
 // R3: prepaid.
