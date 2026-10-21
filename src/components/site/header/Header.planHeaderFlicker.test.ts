@@ -6,7 +6,7 @@ const hook = readFileSync(new URL("../../../hooks/useStableHeaderBehavior.ts", i
 
 // The search row shifts the document on the account/profile and My Plan pages.
 // Preserve a wide hysteresis on both while leaving other public pages unchanged.
-assert.match(source, /scrollHysteresisPx: pathname === "\/me" \|\| pathname === "\/me\/plan" \? 120 : 16/);
+assert.match(source, /scrollHysteresisPx: pathname === "\/me" \|\| pathname === "\/me\/profile" \|\| pathname === "\/me\/plan" \? 120 : 16/);
 assert.match(hook, /scrollThreshold \+ Math\.max\(4, Math\.round\(scrollHysteresisPx \* 0\.45\)\)/);
 assert.match(hook, /scrollThreshold - scrollHysteresisPx/);
 const threshold = 80;
