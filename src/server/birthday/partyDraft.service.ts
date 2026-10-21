@@ -65,8 +65,8 @@ export async function verifyPartyOffers(
       { placements: { some: { key: "BIRTHDAY", status: "APPROVED" } } },
     ] },
     select: {
-      id: true, productType: true, category: true, priceFrom: true, priceMode: true,
-      currency: true, details: true,
+      id: true, productType: true, category: true, partyLocationType: true,
+      priceFrom: true, priceMode: true, currency: true, details: true,
       components: { select: { category: true, isOptional: true } },
       place: { select: { ownerBusinessId: true } },
     },

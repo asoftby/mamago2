@@ -39,8 +39,9 @@ import {
   assertCompatibleSelection, offerPriceSnapshot, type CatalogOffer,
 } from "./partySelection";
 const base: CatalogOffer = {
-  id: "o", productType: "PARTY_SERVICE", category: "VENUE", priceFrom: 100, priceMode: "FROM",
-  currency: "BYN", details: null, components: [], place: { ownerBusinessId: "b" },
+  id: "o", productType: "PARTY_SERVICE", category: "VENUE", partyLocationType: null,
+  priceFrom: 100, priceMode: "FROM", currency: "BYN",
+  details: null, components: [], place: { ownerBusinessId: "b" },
 };
 const pkg: CatalogOffer = { ...base, id: "pk", productType: "PARTY_PACKAGE", category: null,
   details: { includedCategories: ["CAKE"] } };
@@ -53,6 +54,15 @@ assert.throws(() => assertCompatibleSelection("PACKAGE", pkg, [cake]), PartyApiE
 assert.throws(() => assertCompatibleSelection("VENUE", base, [{ ...base, id: "v2" }]), PartyApiError);
 assert.throws(() => assertCompatibleSelection("VENUE", base, [base]), PartyApiError);
 assert.throws(() => assertCompatibleSelection("HOME", base, []), PartyApiError); // venue anchor for a home party
+const mobilePackage: CatalogOffer = { ...pkg, partyLocationType: "OFF_SITE" };
+assert.doesNotThrow(() => assertCompatibleSelection("HOME", mobilePackage, [show]));
+assert.doesNotThrow(() => assertCompatibleSelection("OUTDOOR", mobilePackage, []));
+assert.throws(() => assertCompatibleSelection("VENUE", mobilePackage, []), PartyApiError);
+assert.throws(() => assertCompatibleSelection("HOME", pkg, []), PartyApiError); // unknown location must not imply mobile
+assert.throws(() => assertCompatibleSelection("HOME", mobilePackage,
+  [{ ...cake, partyLocationType: "ON_SITE" }]), PartyApiError);
+assert.throws(() => assertCompatibleSelection("VENUE", base,
+  [{ ...cake, partyLocationType: "OFF_SITE" }]), PartyApiError);
 // Price snapshot honours priceMode: a stale number behind ON_REQUEST is never frozen as a price.
 assert.equal(offerPriceSnapshot({ priceFrom: 500, priceMode: "ON_REQUEST", currency: "BYN" }), null);
 assert.equal(offerPriceSnapshot({ priceFrom: null, priceMode: "FREE", currency: "BYN" }), 0);

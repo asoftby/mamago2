@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { StepPick } from "../components/steps/StepPick";
-import { StepReview } from "../components/steps/StepReview";
+import { StepReview, calendarDateKeyToIso } from "../components/steps/StepReview";
 import type { BirthdayCatalogItem } from "../lib/realCatalog";
 import {
   catalogPriceSummary, eligibleAddons, hasValidCatalogAnchor, selectedCatalogOffers,
@@ -67,15 +67,25 @@ assert.equal(hasValidCatalogAnchor(offers, "v1", "VENUE"), false);
 assert.equal(eligibleAddons(offers, "real-package", "VENUE").some((o) => o.id === "real-cake"), false);
 assert.equal(eligibleAddons(offers, "real-package", "VENUE").some((o) => o.id === "real-animator"), true);
 assert.deepEqual(selectedCatalogOffers(offers, "v1", ["a1"]), []);
+// The catalog can rank an add-on before the chosen anchor: the anchor must still be first.
+assert.deepEqual(selectedCatalogOffers([cake, offer], offer.id, [cake.id]).map((o) => o.id),
+  [offer.id, cake.id]);
+assert.equal(calendarDateKeyToIso("2026-9-21"), "2026-10-21");
+assert.equal(calendarDateKeyToIso("2026-11-25"), "2026-12-25");
+assert.equal(calendarDateKeyToIso("2026-1-30"), null);
+assert.equal(calendarDateKeyToIso("invalid"), null);
 assert.deepEqual(catalogPriceSummary([offer, cake]), {
   minimumByn: 350, hasUnknownPrices: true,
 });
 const review = renderToStaticMarkup(createElement(StepReview, {
-  offers: [offer, cake], citySlug: "minsk", dateIso: "2026-12-20",
+  offers: [offer, cake], citySlug: "minsk", dateIso: null,
+  quizDateKey: "2026-11-20", timeStart: "12:30", timeEnd: "16:00",
   venueMode: "VENUE", childName: null, authenticated: true,
   authLoading: false, requestLogin: () => {},
 }));
 assert.match(review, /Некоторые услуги рассчитываются индивидуально/);
+assert.match(review, /type="date"[^>]*value="2026-12-20"/);
+assert.match(review, /type="time"[^>]*value="12:30"/);
 assert.match(review, /Отправить заявку основному исполнителю/);
 assert.doesNotMatch(review, /Забронировано/);
 

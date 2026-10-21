@@ -262,8 +262,11 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
           {currentStep === "done" && <StepReview
             offers={selectedOffers}
             citySlug={citySlug}
-            dateIso={state.quiz.dateRangeFrom}
-            venueMode={selectedOffers[0]?.productType === "PARTY_PACKAGE" ? "PACKAGE" : state.quiz.placeType === "HOME" ? "HOME" : state.quiz.placeType === "OUTDOOR" ? "OUTDOOR" : "VENUE"}
+            dateIso={state.partyPlanning.dateIso}
+            quizDateKey={state.quiz.dateRangeFrom}
+            timeStart={state.partyPlanning.timeStart}
+            timeEnd={state.partyPlanning.timeEnd}
+            venueMode={state.quiz.placeType === "HOME" ? "HOME" : state.quiz.placeType === "OUTDOOR" ? "OUTDOOR" : state.quiz.placeType === "PACKAGE" ? "PACKAGE" : "VENUE"}
             childName={state.quiz.partyForChild?.name ?? null}
             authenticated={builder.isAuthenticated}
             authLoading={builder.isAuthLoading}

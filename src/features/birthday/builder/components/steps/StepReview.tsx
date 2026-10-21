@@ -4,11 +4,15 @@ import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { BirthdayCatalogItem } from "../../lib/realCatalog";
 import { catalogPriceLabel, catalogPriceSummary } from "../../lib/catalogSelection";
+import { submitBirthdayParty, type PartyFlowState } from "../../lib/partySubmitFlow";
 
 type Props = {
   offers: BirthdayCatalogItem[];
   citySlug: string;
   dateIso: string | null;
+  quizDateKey: string | null;
+  timeStart: string | null;
+  timeEnd: string | null;
   venueMode: "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR";
   childName: string | null;
   authenticated: boolean;
@@ -16,24 +20,27 @@ type Props = {
   requestLogin: () => void;
 };
 
-type Draft = { id: string; version: number };
-
-async function partyRequest<T>(url: string, method: string, body: object, key?: string): Promise<T> {
-  const response = await fetch(url, {
-    method, credentials: "same-origin",
-    headers: { "Content-Type": "application/json", ...(key ? { "Idempotency-Key": key } : {}) },
-    body: JSON.stringify(body),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Не удалось отправить заявку");
-  return data as T;
+// The range calendar persists YYYY-(zero-based month)-D keys, not ISO dates.
+export function calendarDateKeyToIso(key: string | null): string | null {
+  if (!key) return null;
+  const match = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(key);
+  if (!match) return null;
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const monthIndex = Number(monthText);
+  const day = Number(dayText);
+  const valid = new Date(Date.UTC(year, monthIndex, day));
+  if (valid.getUTCFullYear() !== year || valid.getUTCMonth() !== monthIndex ||
+      valid.getUTCDate() !== day) return null;
+  return yearText + "-" + String(monthIndex + 1).padStart(2, "0") + "-" +
+    String(day).padStart(2, "0");
 }
 
-export function StepReview({ offers, citySlug, dateIso, venueMode, childName, authenticated, authLoading, requestLogin }: Props) {
+export function StepReview({ offers, citySlug, dateIso, quizDateKey, timeStart, timeEnd, venueMode, childName, authenticated, authLoading, requestLogin }: Props) {
   const total = catalogPriceSummary(offers);
-  const [date, setDate] = useState(dateIso ?? "");
-  const [timeFrom, setTimeFrom] = useState("15:00");
-  const [timeTo, setTimeTo] = useState("18:00");
+  const [date, setDate] = useState(dateIso ?? calendarDateKeyToIso(quizDateKey) ?? "");
+  const [timeFrom, setTimeFrom] = useState(timeStart ?? "15:00");
+  const [timeTo, setTimeTo] = useState(timeEnd ?? "18:00");
   const [children, setChildren] = useState("");
   const [adults, setAdults] = useState("");
   const [name, setName] = useState("");
@@ -41,9 +48,9 @@ export function StepReview({ offers, citySlug, dateIso, venueMode, childName, au
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
-  const draftRef = useRef<Draft | null>(null);
-  const keyRef = useRef<string | null>(null);
-  const pendingSubmitRef = useRef<Draft | null>(null);
+  const flowRef = useRef<PartyFlowState>({
+    draft: null, pending: null, key: null, submitted: false,
+  });
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,24 +60,12 @@ export function StepReview({ offers, citySlug, dateIso, venueMode, childName, au
     setBusy(true);
     setError(null);
     try {
-      if (!draftRef.current) {
-        draftRef.current = await partyRequest<Draft>("/api/parent/parties", "POST", { citySlug, venueMode });
-      }
-      const draft = draftRef.current;
-      if (!pendingSubmitRef.current) {
-        const updated = await partyRequest<Draft>("/api/parent/parties/" + draft.id, "PATCH", {
-          version: draft.version, eventDate: date, timeFrom, timeTo,
-          childrenCount: Number(children), adultsCount: Number(adults),
-          childName: childName || null, contactName: name, contactPhone: phone,
-          anchorOfferId: offers[0].id, addonOfferIds: offers.slice(1).map((offer) => offer.id),
-        });
-        draftRef.current = { id: draft.id, version: updated.version };
-        pendingSubmitRef.current = { id: draft.id, version: updated.version };
-        keyRef.current = crypto.randomUUID().replace(/-/g, "");
-      }
-      const pending = pendingSubmitRef.current;
-      await partyRequest("/api/parent/parties/" + pending.id + "/submit", "POST",
-        { version: pending.version }, keyRef.current!);
+      await submitBirthdayParty(flowRef.current, {
+        citySlug, venueMode, eventDate: date, timeFrom, timeTo,
+        childrenCount: Number(children), adultsCount: Number(adults),
+        childName: childName || null, contactName: name, contactPhone: phone,
+        anchorOfferId: offers[0].id, addonOfferIds: offers.slice(1).map((offer) => offer.id),
+      });
       setSent(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Ошибка отправки");
@@ -87,7 +82,7 @@ export function StepReview({ offers, citySlug, dateIso, venueMode, childName, au
   return (
     <section className="mx-auto max-w-3xl space-y-7">
       <header className="space-y-3">
-        <p className="text-xs uppercase tracking-widest text-orange-700">Шаг 5 · предварительный план</p>
+        <p className="text-xs uppercase tracking-widest text-primary">Шаг 5 · предварительный план</p>
         <h2 className="text-3xl font-semibold sm:text-5xl">Вы выбрали услуги</h2>
         <p className="text-stone-600">
           Сначала отправим заявку основному исполнителю. Остальные услуги сохранятся в празднике;
@@ -122,7 +117,7 @@ export function StepReview({ offers, citySlug, dateIso, venueMode, childName, au
       </div>
       <form className="space-y-4" onSubmit={handleSubmit}>
         <h3 className="font-semibold">Данные для заявки</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">
           <label className="text-sm">Дата праздника<input required type="date" value={date} onChange={e => setDate(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
           <label className="text-sm">Количество детей<input required type="number" min="1" max="500" value={children} onChange={e => setChildren(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
           <label className="text-sm">Начало<input required type="time" value={timeFrom} onChange={e => setTimeFrom(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
@@ -130,12 +125,12 @@ export function StepReview({ offers, citySlug, dateIso, venueMode, childName, au
           <label className="text-sm">Количество взрослых<input required type="number" min="0" max="500" value={adults} onChange={e => setAdults(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
           <label className="text-sm">Ваше имя<input required maxLength={120} value={name} onChange={e => setName(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
           <label className="text-sm sm:col-span-2">Телефон<input required type="tel" maxLength={40} value={phone} onChange={e => setPhone(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
-        </div>
+        </fieldset>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <button type="submit" disabled={busy || authLoading || !offers.length} className="w-full rounded-xl bg-primary p-4 font-semibold text-primary-foreground disabled:opacity-50">
           {busy ? "Отправляем…" : authenticated ? "Отправить заявку основному исполнителю" : "Войти и отправить заявку"}
         </button>
-        <p className="text-center text-xs text-muted-foreground">Остальные исполнители получат заявки после согласования основной площадки.</p>
+        <p className="text-center text-xs text-muted-foreground">Остальные исполнители получат заявки после согласования основного исполнителя.</p>
       </form>
     </section>
   );

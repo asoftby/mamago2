@@ -7,8 +7,10 @@ export function selectedCatalogOffers(
   baseId: string | null,
   addonIds: readonly string[],
 ): BirthdayCatalogItem[] {
-  const ids = new Set([baseId, ...addonIds].filter((id): id is string => Boolean(id)));
-  return offers.filter((offer) => ids.has(offer.id));
+  const base = offers.find((offer) => offer.id === baseId);
+  if (!base) return [];
+  const addons = new Set(addonIds.filter((id) => id !== baseId));
+  return [base, ...offers.filter((offer) => addons.has(offer.id))];
 }
 
 export function isVenueOffer(offer: BirthdayCatalogItem): boolean {
