@@ -93,7 +93,7 @@ export function IdeaCardActions({
           type="button"
           onClick={onSchedule}
           disabled={scheduleDisabled}
-          aria-label={isPlanned ? "В плане" : "Запланировать"}
+          aria-label={isPlanned ? "В плане" : "В план"}
           className={cn("min-w-0 flex-1 rounded-full border-0 text-sm font-semibold shadow-none transition-colors", compact ? "h-11 w-full flex-none px-2 sm:h-[46px] sm:w-auto sm:flex-1 sm:px-4" : "h-[46px] px-4")}
           style={
             isPlanned
@@ -108,7 +108,7 @@ export function IdeaCardActions({
           ) : (
             <CalendarPlus className="size-4" />
           )}
-          <span className={compact ? "hidden sm:inline" : undefined}>{isPlanned ? "В плане" : "Запланировать"}</span>
+          <span className={compact ? "hidden sm:inline" : undefined}>{isPlanned ? "В плане" : "В план"}</span>
         </Button>
       )}
 

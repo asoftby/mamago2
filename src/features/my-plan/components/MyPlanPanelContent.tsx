@@ -56,6 +56,7 @@ export function MyPlanPanelContent({
     clearSlotSaved,
     ideas,
     ideasLoading,
+    ideasCount,
     addIdeaToPlan,
     removeIdea,
     planSuggestions,
@@ -196,6 +197,7 @@ export function MyPlanPanelContent({
       onChangeSelectedAgeRanges={setSelectedAgeRanges}
       ideas={ideas}
       ideasLoading={ideasLoading}
+      ideasCount={ideasCount}
       onAddIdeaToPlan={addIdeaToPlan}
       onRemoveIdea={removeIdea}
       planSuggestions={planSuggestions}

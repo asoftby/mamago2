@@ -168,6 +168,8 @@ function useMyPlanStore() {
   planItemsByDateMapRef.current = planItemsByDateMap;
   const [ideas, setIdeas] = useState<MyPlanIdea[]>([]);
   const [ideasLoading, setIdeasLoading] = useState(false);
+  /** Все сохранённые идеи (включая статьи, места, маршруты) для чипа «Мои идеи · N»; null пока не загружено. */
+  const [ideasCount, setIdeasCount] = useState<number | null>(null);
   /** События из каталога для блока «Рекомендации» (не путать с сохранёнными идеями). */
   const [planSuggestions, setPlanSuggestions] = useState<
     NonNullable<MyPlanIdea["activity"]>[]
@@ -276,6 +278,23 @@ function useMyPlanStore() {
       setIdeasLoading(false);
     }
   }, [isAuthenticated, selectedPlanDate]);
+
+  useEffect(() => {
+    if (!isAuthenticated || authLoading) {
+      setIdeasCount(null);
+      return;
+    }
+    let cancelled = false;
+    void fetch("/api/save/ideas/count", { credentials: "include" })
+      .then((res) => (res.ok ? (res.json() as Promise<{ count?: number }>) : null))
+      .then((data) => {
+        if (!cancelled && typeof data?.count === "number") setIdeasCount(data.count);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, authLoading]);
 
   useEffect(() => {
     if (!isAuthenticated || authLoading) {
@@ -846,6 +865,7 @@ function useMyPlanStore() {
     openSlotSuggestion: () => {},
     ideas,
     ideasLoading,
+    ideasCount,
     refetchIdeas,
     removeIdea,
     addIdeaToPlan: async (idea: MyPlanIdea): Promise<{ ok: boolean }> => {
