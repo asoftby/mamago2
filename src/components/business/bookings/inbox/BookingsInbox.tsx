@@ -223,7 +223,7 @@ function InboxCard({
   } else if (isParty && action === "RECONFIRM") {
     primary = (
       <div className="flex flex-wrap gap-2">
-        <Button className="h-11" onClick={() => onConfirm(item)}>Подтвердить площадку</Button>
+        <Button className="h-11" onClick={() => onConfirm(item)}>Подтвердить заказ</Button>
         <Button variant="outline" className="h-11" onClick={() => onReply(item)}>
           Предложить другие условия
         </Button>

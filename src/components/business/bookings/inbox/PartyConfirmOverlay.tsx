@@ -11,6 +11,8 @@ import { formatInboxSchedule } from "./inboxFormat";
 type Availability = {
   requestId: string;
   quoteVersion: number;
+  manualAllowed?: boolean;
+  requireUnit?: boolean;
   units: Array<{ id: string; name: string }>;
 };
 
@@ -25,8 +27,8 @@ export function PartyConfirmOverlay({ item, onClose, onDone }: Props) {
     <ResponsiveOverlay
       open={Boolean(item)}
       onOpenChange={(open) => { if (!open) onClose(); }}
-      a11yTitle="Подтверждение площадки"
-      title="Подтвердить площадку"
+      a11yTitle="Подтверждение заказа"
+      title="Подтвердить заказ"
       subtitle={item ? `${item.title ?? "Праздник"} · ${formatInboxSchedule(item)}` : undefined}
     >
       {item ? <PartyConfirmForm key={item.id + ":" + (item.quote?.version ?? "")} item={item} onClose={onClose} onDone={onDone} /> : null}
@@ -68,7 +70,7 @@ function PartyConfirmForm({ item, onClose, onDone }: { item: InboxItem; onClose:
   }, [item.id]);
 
   const submit = async () => {
-    if (!available || !selectedUnit || saving || item.partyStage !== "AWAITING_RECONFIRM" ||
+    if (!available || (!selectedUnit && !available.manualAllowed) || saving || item.partyStage !== "AWAITING_RECONFIRM" ||
         available.quoteVersion !== item.quote?.version) {
       setError("Предложение изменилось. Обновите список заявок.");
       return;
@@ -78,10 +80,10 @@ function PartyConfirmForm({ item, onClose, onDone }: { item: InboxItem; onClose:
     try {
       await postInboxAction(
         `/api/business/party-requests/${encodeURIComponent(item.id)}/confirm`,
-        { expectedQuoteVersion: available.quoteVersion, bookingUnitId: selectedUnit },
+        { expectedQuoteVersion: available.quoteVersion, ...(selectedUnit ? { bookingUnitId: selectedUnit } : {}) },
         "party-confirm", keyRef.current,
       );
-      toast.success("Площадка подтверждена");
+      toast.success("Бронирование подтверждено");
       onDone();
       onClose();
     } catch (cause) {
@@ -96,14 +98,21 @@ function PartyConfirmForm({ item, onClose, onDone }: { item: InboxItem; onClose:
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
         <p className="text-sm text-muted-foreground">
-          Семья приняла условия. Подтверждение займёт конкретный ресурс на выбранное время.
-          Перед записью система повторно проверит его доступность.
+          Семья приняла условия. При наличии управляемого ресурса система забронирует его
+          только после повторной проверки доступности.
         </p>
         {loading ? <p role="status" className="text-sm">Проверяем свободные площадки…</p> : null}
-        {!loading && available?.units.length === 0 ? (
+        {!loading && available?.units.length === 0 && !available.manualAllowed ? (
           <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
             Нет свободного ресурса с настроенным расписанием для этого времени.
             Бронирование не подтверждено. Уточните расписание или предложите семье другие условия.
+          </p>
+        ) : null}
+        {!loading && available?.manualAllowed ? (
+          <p className="rounded-xl border border-border bg-muted/50 p-3 text-sm">
+            Для этой услуги не настроен отдельный ресурс. Подтверждая её,
+            вы самостоятельно отвечаете за доступность исполнителя на указанное время.
+            Автоматическая блокировка календаря не выполняется.
           </p>
         ) : null}
         {!loading && available && available.units.length > 0 ? (
@@ -129,7 +138,7 @@ function PartyConfirmForm({ item, onClose, onDone }: { item: InboxItem; onClose:
           Отмена
         </Button>
         <Button type="button" className="flex-1" onClick={() => void submit()}
-          disabled={saving || loading || !selectedUnit || !available || available.quoteVersion !== item.quote?.version}>
+          disabled={saving || loading || (!selectedUnit && !available?.manualAllowed) || !available || available.quoteVersion !== item.quote?.version}>
           {saving ? "Подтверждаем…" : "Подтвердить бронирование"}
         </Button>
       </div>

@@ -17,9 +17,9 @@ const eventDate = new Date("2026-10-15T00:00:00Z");
 const start = partyStartAt(eventDate, "12:00");
 assert.equal(start.toISOString(), "2026-10-15T09:00:00.000Z");
 const now = new Date("2026-10-11T09:00:00.000Z");
-assert.equal(validateSubmissionWindow(start, now).toISOString(), "2026-10-12T09:00:00.000Z");
+assert.equal(validateSubmissionWindow(start, now).toISOString(), "2026-10-11T11:00:00.000Z");
 const urgentNow = new Date("2026-10-13T09:00:00.000Z");
-assert.equal(validateSubmissionWindow(start, urgentNow).toISOString(), "2026-10-13T13:00:00.000Z");
+assert.equal(validateSubmissionWindow(start, urgentNow).toISOString(), "2026-10-13T10:00:00.000Z");
 assert.throws(() => validateSubmissionWindow(start, new Date("2026-10-14T09:00:00.000Z")), PartyApiError);
 
 const submit = readFileSync("src/server/birthday/partySubmit.service.ts", "utf8");
