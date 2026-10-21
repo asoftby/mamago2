@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import type { FormEvent } from "react";
+import { useState } from "react";
+import type { FormEvent, RefObject } from "react";
 import type { BirthdayCatalogItem } from "../../lib/realCatalog";
 import { catalogPriceLabel, catalogPriceSummary } from "../../lib/catalogSelection";
 import { submitBirthdayParty, type PartyFlowState } from "../../lib/partySubmitFlow";
@@ -18,6 +18,11 @@ type Props = {
   authenticated: boolean;
   authLoading: boolean;
   requestLogin: () => void;
+  flowStateRef: RefObject<PartyFlowState>;
+  busy: boolean;
+  onBusyChange: (value: boolean) => void;
+  sent: boolean;
+  onSent: () => void;
 };
 
 // The range calendar persists YYYY-(zero-based month)-D keys, not ISO dates.
@@ -36,7 +41,10 @@ export function calendarDateKeyToIso(key: string | null): string | null {
     String(day).padStart(2, "0");
 }
 
-export function StepReview({ offers, citySlug, dateIso, quizDateKey, timeStart, timeEnd, venueMode, childName, authenticated, authLoading, requestLogin }: Props) {
+export function StepReview({
+  offers, citySlug, dateIso, quizDateKey, timeStart, timeEnd, venueMode, childName,
+  authenticated, authLoading, requestLogin, flowStateRef, busy, onBusyChange, sent, onSent,
+}: Props) {
   const total = catalogPriceSummary(offers);
   const [date, setDate] = useState(dateIso ?? calendarDateKeyToIso(quizDateKey) ?? "");
   const [timeFrom, setTimeFrom] = useState(timeStart ?? "15:00");
@@ -45,32 +53,27 @@ export function StepReview({ offers, citySlug, dateIso, quizDateKey, timeStart, 
   const [adults, setAdults] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
-  const flowRef = useRef<PartyFlowState>({
-    draft: null, pending: null, key: null, submitted: false,
-  });
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || !offers.length) return;
     if (!authenticated) { requestLogin(); return; }
     if (timeTo <= timeFrom) { setError("Окончание должно быть позже начала"); return; }
-    setBusy(true);
+    onBusyChange(true);
     setError(null);
     try {
-      await submitBirthdayParty(flowRef.current, {
+      await submitBirthdayParty(flowStateRef.current, {
         citySlug, venueMode, eventDate: date, timeFrom, timeTo,
         childrenCount: Number(children), adultsCount: Number(adults),
         childName: childName || null, contactName: name, contactPhone: phone,
         anchorOfferId: offers[0].id, addonOfferIds: offers.slice(1).map((offer) => offer.id),
       });
-      setSent(true);
+      onSent();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Ошибка отправки");
     } finally {
-      setBusy(false);
+      onBusyChange(false);
     }
   }
 
