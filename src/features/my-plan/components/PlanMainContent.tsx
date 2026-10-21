@@ -28,6 +28,9 @@ import { AddPersonaTypeModal } from "./AddPersonaTypeModal";
 import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { MyPlanHeader } from "./MyPlanHeader";
 import { PlanStickyCounter } from "./PlanStickyCounter";
+import { PlanArticleScreen } from "./v3/PlanArticleScreen";
+import { PlanEventScreen } from "./v3/PlanEventScreen";
+import { PlanScenarioScreen } from "./v3/PlanScenarioScreen";
 import { PlanNewTaskScreen } from "./v3/PlanNewTaskScreen";
 import { PlanVisitsScreen } from "./v3/PlanVisitsScreen";
 import { PlanWeekScreen } from "./v3/PlanWeekScreen";
@@ -413,12 +416,12 @@ export function PlanMainContent({
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   /** Два экрана остаются в одной модалке: сдвигаем их по горизонтали, не теряя план. */
-  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "week">("plan");
+  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "week" | "event" | "scenario">("plan");
   /** Сохраняем исходящий экран в DOM до конца обратной анимации. */
-  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "week" | null>(null);
+  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "week" | "event" | "scenario" | null>(null);
   /** Каждое открытие формы — новый экземпляр; отменённая анимация не оставляет старый черновик. */
   const [nestedScreenVersion, setNestedScreenVersion] = useState(0);
-  const openNestedScreen = useCallback((next: "new" | "visits" | "week") => {
+  const openNestedScreen = useCallback((next: "new" | "visits" | "week" | "event" | "scenario") => {
     setNestedScreenVersion((version) => version + 1);
     setMountedNestedScreen(next);
     setScreen(next);
@@ -431,6 +434,18 @@ export function PlanMainContent({
     return () => window.clearTimeout(timeout);
   }, [screen, mountedNestedScreen]);
   const [movingItem, setMovingItem] = useState<PlanItemWithActivity | null>(null);
+  /** Своя заметка, открытая тапом: та же форма «Новое дело», предзаполненная. */
+  const [editingNote, setEditingNote] = useState<PlanItemWithActivity | null>(null);
+  const [openedEventId, setOpenedEventId] = useState<string | null>(null);
+  /** Открытое событие ищем по всем датам: после переноса оно остаётся на экране до «Назад». */
+  const openedEvent = useMemo(() => {
+    if (!openedEventId) return null;
+    for (const items of Object.values(planItemsByDate ?? {})) {
+      const found = items.find((candidate) => candidate.id === openedEventId);
+      if (found) return found;
+    }
+    return null;
+  }, [openedEventId, planItemsByDate]);
   /** Фильтр дня по человеку: «Все» либо id персоны (ребёнок — childId, взрослый — assigneeUserId). */
   const [personFilter, setPersonFilter] = useState<string>("all");
   const [experienceFeed, setExperienceFeed] = useState<PlanExperienceFeed | null>(null);
@@ -1129,6 +1144,15 @@ export function PlanMainContent({
         }
         onRemove={() => handleRemoveFromPlan(item.id)}
         onMove={canMovePlanItem(item) && !isPastDay ? () => setMovingItem(item) : undefined}
+        onOpen={() => {
+          if (item.source === "MANUAL") {
+            setEditingNote(item);
+            openNestedScreen("new");
+            return;
+          }
+          setOpenedEventId(item.id);
+          openNestedScreen("event");
+        }}
       />
     );
     const nowLine = (
@@ -1327,7 +1351,7 @@ export function PlanMainContent({
     <div className="space-y-3">
       {scenarioCtaLabel ? (
         <BuildScenarioButton
-          onClick={handleOpenScenarioPage}
+          onClick={scenarioCtaState === "create" ? handleOpenScenarioPage : () => openNestedScreen("scenario")}
           label={scenarioCtaLabel}
           hint={
             scenarioCtaState === "create"
@@ -1400,7 +1424,7 @@ export function PlanMainContent({
         </div>
 
         <PlanStickyCounter
-          onAdd={isPastDay ? undefined : () => openNestedScreen("new")}
+          onAdd={isPastDay ? undefined : () => { setEditingNote(null); openNestedScreen("new"); }}
         />
 
         <PlanMoveSheet
@@ -1465,7 +1489,7 @@ export function PlanMainContent({
       </div>
 
       <PlanStickyCounter
-        onAdd={isPastDay ? undefined : () => openNestedScreen("new")}
+        onAdd={isPastDay ? undefined : () => { setEditingNote(null); openNestedScreen("new"); }}
         compact
       />
 
@@ -1527,7 +1551,8 @@ export function PlanMainContent({
             <PlanNewTaskScreen
               key={nestedScreenVersion}
               todayIso={todayKey}
-              initialDate={selectedDate < todayKey ? todayKey : selectedDate}
+              initialDate={editingNote ? (editingNote.date < todayKey ? todayKey : editingNote.date) : selectedDate < todayKey ? todayKey : selectedDate}
+              editItem={editingNote}
               people={personas.map((persona) => ({
                 id: persona.id,
                 name: persona.displayName?.trim() || (persona.kind === "adult" ? "Я" : ""),
@@ -1538,6 +1563,40 @@ export function PlanMainContent({
                 onChangeDate?.(date);
                 closeNestedScreen();
               }}
+            />
+          ) : mountedNestedScreen === "event" ? (
+            openedEvent?.articleId ? (
+              <PlanArticleScreen
+                key={openedEvent.id}
+                onNavigate={onRequestClose}
+                item={openedEvent}
+                onBack={closeNestedScreen}
+                onRemove={() => {
+                  handleRemoveFromPlan(openedEvent.id);
+                  closeNestedScreen();
+                }}
+                onMove={canMovePlanItem(openedEvent) && !isPastDay ? () => setMovingItem(openedEvent) : undefined}
+              />
+            ) : openedEvent ? (
+              <PlanEventScreen
+                key={openedEvent.id}
+                onNavigate={onRequestClose}
+                item={openedEvent}
+                onBack={closeNestedScreen}
+                onRemove={() => {
+                  handleRemoveFromPlan(openedEvent.id);
+                  closeNestedScreen();
+                }}
+                onMove={canMovePlanItem(openedEvent) && !isPastDay ? () => setMovingItem(openedEvent) : undefined}
+              />
+            ) : null
+          ) : mountedNestedScreen === "scenario" ? (
+            <PlanScenarioScreen
+              date={selectedDate}
+              items={dayItems}
+              changed={scenarioCtaState === "changed"}
+              onBack={closeNestedScreen}
+              onOpen={handleOpenScenarioPage}
             />
           ) : mountedNestedScreen === "visits" ? (
             <PlanVisitsScreen key={nestedScreenVersion} onBack={closeNestedScreen} />

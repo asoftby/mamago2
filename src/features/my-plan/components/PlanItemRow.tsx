@@ -19,6 +19,8 @@ interface PlanItemRowProps {
   onRemove: () => void;
   /** Перенос на другую дату; не передан → кнопки «Перенести» нет (маршруты, места). */
   onMove?: () => void;
+  /** Открыть событие внутри модалки плана (слайд); не передан → ссылка на страницу события. */
+  onOpen?: () => void;
   /** Имя ребёнка, для кого пункт. Нет → «Вся семья». */
   participantLabel?: string | null;
 }
@@ -51,7 +53,7 @@ function Avatar({ name }: { name: string | null }) {
   );
 }
 
-export function PlanItemRow({ item, onRemove, onMove, participantLabel }: PlanItemRowProps) {
+export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel }: PlanItemRowProps) {
   const cityCtx = useOptionalCity();
   const city = cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
   const activityDetailHref = item.activity?.id
@@ -121,7 +123,16 @@ export function PlanItemRow({ item, onRemove, onMove, participantLabel }: PlanIt
         )}
 
         <div className="min-w-0 flex-1">
-          {openHref ? (
+          {onOpen && (item.activity || item.articleId || isManual) ? (
+            <button
+              type="button"
+              onClick={onOpen}
+              className={`${titleClassName} text-left after:absolute after:inset-0 after:content-['']`}
+              style={twoLineTitleStyle}
+            >
+              {title}
+            </button>
+          ) : openHref ? (
             <Link
               href={openHref}
               className={`${titleClassName} no-underline after:absolute after:inset-0 after:content-['']`}

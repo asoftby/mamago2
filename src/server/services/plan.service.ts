@@ -14,6 +14,14 @@ import {
 } from "@/server/family/familyAccess";
 import { fanOutItemsToDigestTargets, fanOutItemsToFamilyMembers } from "@/server/family/planRecipients";
 
+/** Статья в плане: slug и город — для ссылки, рубрика и анонс — для экрана пункта (без contentJson). */
+const planArticleSelect = {
+  slug: true,
+  excerpt: true,
+  category: { select: { nameRu: true } },
+  city: { select: { slug: true } },
+} as const;
+
 const planActivitySelect = {
   id: true,
   slug: true,
@@ -104,6 +112,13 @@ export type PlanItemWithActivity = {
   /** Family Core: audience + version for edit-conflict checks (persisted rows). */
   visibility?: PlanVisibility;
   updatedAt?: Date;
+  /** Только у пунктов-статей (articleId); см. planArticleSelect. */
+  article?: {
+    slug: string | null;
+    excerpt: string | null;
+    category: { nameRu: string } | null;
+    city: { slug: string } | null;
+  } | null;
   activity: {
     id: string;
     slug: string | null;
@@ -518,6 +533,7 @@ export async function listPlanItemsByWeek(
     where: { ...(await activePlanScopeFor(userId)), date: { gte: weekStartDate, lte: endDateStr } },
     include: {
       activity: { select: planActivitySelect },
+      article: { select: planArticleSelect },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -531,6 +547,7 @@ export async function listAllPlanItems(userId: string): Promise<PlanItemWithActi
     where: { ...(await activePlanScopeFor(userId)), ...DATED },
     include: {
       activity: { select: planActivitySelect },
+      article: { select: planArticleSelect },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -553,6 +570,7 @@ export async function listUpcomingPlanItems(
     where: { ...(await activePlanScopeFor(userId)), date: { gte: from, lte: toDateStr } },
     include: {
       activity: { select: planActivitySelect },
+      article: { select: planArticleSelect },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -571,6 +589,7 @@ export async function listPlanItemsInRange(
     where: { ...(await activePlanScopeFor(userId)), date: { gte: from, lte: to } },
     include: {
       activity: { select: planActivitySelect },
+      article: { select: planArticleSelect },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -587,6 +606,7 @@ export async function listPlanItemsByDate(
     where: { ...(await activePlanScopeFor(userId)), date },
     include: {
       activity: { select: planActivitySelect },
+      article: { select: planArticleSelect },
     },
     orderBy: { startsAt: "asc" },
   })) as PlanItemWithActivity[];
@@ -631,6 +651,7 @@ export async function listPlanItemsDueForReminder(args: {
     },
     include: {
       activity: { select: planActivitySelect },
+      article: { select: planArticleSelect },
     },
     orderBy: { startsAt: "asc" },
   })) as PlanReminderCandidate[];
@@ -687,6 +708,7 @@ export async function listPlanItemsForTomorrowDigest(args: {
     },
     include: {
       activity: { select: planActivitySelect },
+      article: { select: planArticleSelect },
     },
     orderBy: { startsAt: "asc" },
   })) as PlanTomorrowDigestCandidate[];
@@ -703,7 +725,7 @@ export async function listPlanItemsForUserDates(
         ...NOT_CANCELLED,
         OR: targets.map((target) => ({ userId: target.userId, date: target.date })),
       },
-      include: { activity: { select: planActivitySelect } },
+      include: { activity: { select: planActivitySelect }, article: { select: planArticleSelect } },
       orderBy: [{ userId: "asc" }, { startsAt: "asc" }, { createdAt: "asc" }],
     })) as PlanTomorrowDigestCandidate[];
   }
@@ -724,7 +746,7 @@ export async function listPlanItemsForUserDates(
           : { userId: t.userId, date: t.date },
       ),
     },
-    include: { activity: { select: planActivitySelect } },
+    include: { activity: { select: planActivitySelect }, article: { select: planArticleSelect } },
     orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
   })) as Array<PlanTomorrowDigestCandidate & { familyId?: string | null; visibility?: "PRIVATE" | "FAMILY" }>;
   return fanOutItemsToDigestTargets(rows, familyTargets);
