@@ -41,6 +41,8 @@ assert.match(schema, /@@unique\(\[bookingRequestId, version\]\)/);
 assert.match(schema, /partyQuoteId String\? @unique/);
 
 for (const route of [parent, business]) {
+  assert.match(route, /PARTY_CONFIRMATION_ENABLED/);
+  assert.match(route, /BUSINESS_BOOKINGS_INBOX_UI/);
   assert.match(route, /Idempotency-Key/);
   assert.match(route, /expectedQuoteVersion/);
   assert.match(route, /getCurrentUser/);
