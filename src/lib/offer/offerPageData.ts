@@ -476,6 +476,11 @@ async function buildOfferPageDataFromOffer(
     description: offer.description || "",
     offerType,
     productType: offer.productType ?? null,
+    classSlotBookingEnabled: Boolean(
+      (offer.productType === "REGULAR_ACTIVITY" || offer.productType === "ONE_TIME_ACTIVITY") &&
+      offer.bookingEnabled &&
+      (offer.bookingMode === "USE_PUBLICATION_DATES" || offer.bookingMode === "USE_PUBLICATION_SLOTS")
+    ),
     
     media: {
       posterUrl: offer.coverImage || "",
