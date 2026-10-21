@@ -12,6 +12,7 @@ import {
   getAuthCookieDomain,
   isSecureCookie,
   getAuthCookieOptions,
+  getSessionCookieName,
 } from "./cookie";
 
 const ENV_KEYS = [
@@ -59,6 +60,18 @@ function withEnv(overrides: Partial<Record<(typeof ENV_KEYS)[number], string | u
 
 function main() {
   console.log("Starting cookie env-policy tests...");
+
+  // Session names are separated by trusted deployment environment rather
+  // than request Host, including preview/localhost and Next's production mode.
+  assert.strictEqual(getSessionCookieName("production"), "mg_session");
+  assert.strictEqual(getSessionCookieName("prod"), "mg_session");
+  assert.strictEqual(getSessionCookieName(" PROD "), "mg_session");
+  assert.strictEqual(getSessionCookieName("dev"), "mg_dev_session");
+  assert.strictEqual(getSessionCookieName("preview"), "mg_dev_session");
+  assert.strictEqual(getSessionCookieName("staging"), "mg_dev_session");
+  assert.strictEqual(getSessionCookieName("local"), "mg_dev_session");
+  assert.strictEqual(getSessionCookieName(undefined), getSessionCookieName(process.env.APP_ENV));
+
 
   // 1. NODE_ENV=production + APP_ENV=local: no Domain, Secure=false for HTTP.
   withEnv({ NODE_ENV: "production", APP_ENV: "local" }, () => {

@@ -5,7 +5,19 @@
 
 import { isDevLocalHost } from "@/lib/routing/surface";
 
-export const SESSION_COOKIE_NAME = "mg_session";
+/**
+ * Use different names for DEV and PROD to prevent a production
+ * Domain=.mamago.by cookie from shadowing the DEV session cookie in Safari.
+ * APP_ENV is a trusted deployment setting; Host headers are not.
+ */
+export function getSessionCookieName(appEnv: string | undefined = process.env.APP_ENV): string {
+  const normalized = appEnv?.trim().toLowerCase();
+  return normalized === "production" || normalized === "prod"
+    ? "mg_session"
+    : "mg_dev_session";
+}
+
+export const SESSION_COOKIE_NAME = getSessionCookieName();
 
 function readTrimmedEnv(name: string): string | undefined {
   const value = process.env[name]?.trim();
