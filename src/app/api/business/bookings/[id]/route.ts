@@ -5,6 +5,7 @@ import { z } from "zod";
 import { BookingStatus } from "@prisma/client";
 import {
   updateBookingStatus,
+  getBusinessBookingById,
   BookingOwnershipError,
   BookingStatusTransitionError,
 } from "@/server/services/booking/bookingQuery.service";
@@ -16,6 +17,21 @@ const updateBookingSchema = z.object({
     BookingStatus.COMPLETED,
   ]),
 });
+
+/** Tenant-scoped single STANDARD detail: no 200-row calendar cap. */
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const business = await getMyBusiness(user.id);
+  if (!business) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { id } = await params;
+  const item = await getBusinessBookingById(id, business.id);
+  if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json(item, { headers: { "Cache-Control": "private, no-store" } });
+}
 
 export async function PATCH(
   request: NextRequest,
