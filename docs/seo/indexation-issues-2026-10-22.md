@@ -13,6 +13,8 @@
 | SEO-07 P2 | Listing lastmod из City/Category updatedAt, а не изменения фактической выдачи. Полнота sitemap при runtime DB exception не подтверждается HTTP одиночным снимком. | Проверить семантику lastmod и мониторинг полноты; не ставить today на каждый запрос. |
 | SEO-08 P2 | Два исторических SEO-теста падают и на BASE_HEAD: CITY/global path и 37/36 owner-review rows. | Отдельно сверить frozen data/owner decisions, затем восстановить regression suite. Не менять ожидания только ради CI. |
 
+| SEO-09 P2 | Top-18 legacy URL со слешем: два HTTP 308 перед final 200. Next automatic slash redirect исполнялся перед manifest. | `skipTrailingSlashRedirect: true`; существующий custom middleware и manifest остаются. Проверить собранный routes manifest и локальный HTTP, включая query и GET/HEAD. |
+
 ## Не считать установленными дефектами
 
 - 200 с `NEXT_HTTP_ERROR_FALLBACK;404` и meta noindex — streaming notFound, не доказательство индексируемой soft 404. URL Inspection нужен для фактической классификации Google.

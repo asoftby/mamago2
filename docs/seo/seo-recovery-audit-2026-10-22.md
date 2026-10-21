@@ -17,6 +17,8 @@
 
 Регрессии подключены к `test:seo-recovery`, обязательному `check:push` и существующему SEO-шагу CI. Синтетический интеграционный тест категорий запускается отдельно и требует локальной выделенной БД `mamago_seo_*` и явного opt-in. CI без PostgreSQL не выдаётся за проверку интеграции с БД.
 
+5. **P2: лишний slash-hop перед точным legacy redirect.** Подтверждён `/top-18-kafe-i-restoranov-s-detskoj-ploshhadkoj-ili-komnatoj/`: `308 → source без слеша → 308 → final 200`. Включён `skipTrailingSlashRedirect`, чтобы manifest обрабатывал исходный URL первым; существующий middleware сохраняет 301 для обычных GET/HEAD URL со слешем. Query и исключения API/assets остаются в существующей политике. Это изменение Next runtime config требует проверки собранного приложения; данные mappings не переписываются.
+
 ## Robots и sitemap
 
 - PROD `/robots.txt`: 200, Allow `/`, ссылка на `/sitemap.xml`.
