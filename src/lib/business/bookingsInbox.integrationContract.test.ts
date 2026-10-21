@@ -6,6 +6,7 @@ function source(path: string) {
 }
 const ui = source("../../components/business/bookings/inbox/BookingsInbox.tsx");
 const detail = source("../../components/business/bookings/inbox/StandardBookingDetails.tsx");
+const confirm = source("../../components/business/bookings/inbox/PartyConfirmOverlay.tsx");
 const service = source("../../server/services/booking/businessInbox.service.ts");
 const bookings = source("../../server/services/booking/bookingQuery.service.ts");
 const api = source("../../app/api/business/bookings/[id]/route.ts");
@@ -16,6 +17,11 @@ assert.match(ui, /setState\("loading"\)/);
 assert.match(ui, /onStandard=\{setStandardId\}/);
 assert.match(ui, /<StandardBookingDetails/);
 assert.match(ui, /action === "RECONFIRM"/);
+assert.match(ui, /onConfirm=\{setConfirm\}/);
+assert.match(ui, /<PartyConfirmOverlay/);
+assert.match(confirm, /\/api\/business\/party-requests\//);
+assert.match(confirm, /bookingUnitId: selectedUnit/);
+assert.match(confirm, /available.quoteVersion !== item.quote\?\.version/);
 assert.match(ui, /Предложить другие условия/);
 assert.doesNotMatch(ui, /Подтвердить условия/);
 assert.doesNotMatch(ui, /\?view=calendar&id/);

@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { requestBookingsBadgeRefresh } from "../bookingsBadgeEvents";
 import { StandardBookingDetails } from "./StandardBookingDetails";
+import { PartyConfirmOverlay } from "./PartyConfirmOverlay";
 import {
   PartyReplyOverlay, PartyResolveOverlay, VisitOutcomeOverlay,
 } from "./InboxActionOverlays";
@@ -32,6 +33,7 @@ export function BookingsInbox() {
   const [standardId, setStandardId] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>("loading");
   const [reply, setReply] = useState<InboxItem | null>(null);
+  const [confirm, setConfirm] = useState<InboxItem | null>(null);
   const [resolve, setResolve] = useState<InboxItem | null>(null);
   const [outcome, setOutcome] = useState<InboxItem | null>(null);
   const requestSeq = useRef(0);
@@ -139,14 +141,14 @@ export function BookingsInbox() {
             {waiting.length > 0 ? (
               <InboxSection title="Клиент ждёт" count={waiting.length}>
                 {waiting.map((item) => (
-                  <InboxCard key={item.id} item={item} onReply={setReply} onResolve={setResolve} onOutcome={setOutcome} onStandard={setStandardId} />
+                  <InboxCard key={item.id} item={item} onReply={setReply} onResolve={setResolve} onOutcome={setOutcome} onStandard={setStandardId} onConfirm={setConfirm} />
                 ))}
               </InboxSection>
             ) : null}
             {housekeeping.length > 0 ? (
               <InboxSection title="Закройте прошедшие" count={housekeeping.length} muted>
                 {housekeeping.map((item) => (
-                  <InboxCard key={item.id} item={item} onReply={setReply} onResolve={setResolve} onOutcome={setOutcome} onStandard={setStandardId} />
+                  <InboxCard key={item.id} item={item} onReply={setReply} onResolve={setResolve} onOutcome={setOutcome} onStandard={setStandardId} onConfirm={setConfirm} />
                 ))}
               </InboxSection>
             ) : null}
@@ -155,7 +157,7 @@ export function BookingsInbox() {
           <ul className="space-y-3">
             {items.map((item) => (
               <li key={item.id}>
-                <InboxCard item={item} onReply={setReply} onResolve={setResolve} onOutcome={setOutcome} onStandard={setStandardId} />
+                <InboxCard item={item} onReply={setReply} onResolve={setResolve} onOutcome={setOutcome} onStandard={setStandardId} onConfirm={setConfirm} />
               </li>
             ))}
           </ul>
@@ -167,6 +169,7 @@ export function BookingsInbox() {
       ) : null}
 
       <StandardBookingDetails id={standardId} onClose={() => setStandardId(null)} onDone={afterAction} />
+      <PartyConfirmOverlay item={confirm} onClose={() => setConfirm(null)} onDone={afterAction} />
       <PartyReplyOverlay item={reply} onClose={() => setReply(null)} onDone={afterAction} />
       <PartyResolveOverlay item={resolve} onClose={() => setResolve(null)} onDone={afterAction} />
       <VisitOutcomeOverlay item={outcome} onClose={() => setOutcome(null)} onDone={afterAction} />
@@ -191,13 +194,14 @@ function InboxSection({ title, count, muted, children }: { title: string; count:
 }
 
 function InboxCard({
-  item, onReply, onResolve, onOutcome, onStandard,
+  item, onReply, onResolve, onOutcome, onStandard, onConfirm,
 }: {
   item: InboxItem;
   onReply: (item: InboxItem) => void;
   onResolve: (item: InboxItem) => void;
   onOutcome: (item: InboxItem) => void;
   onStandard: (id: string) => void;
+  onConfirm: (item: InboxItem) => void;
 }) {
   const isParty = item.kind === "PARTY";
   const deadline = formatInboxDateTime(item.deadline);
@@ -217,8 +221,14 @@ function InboxCard({
   if (isParty && action === "RESPOND") {
     primary = <Button className="h-11 w-full sm:w-auto" onClick={() => onReply(item)}>Ответить</Button>;
   } else if (isParty && action === "RECONFIRM") {
-    // /respond only returns a new quote: do not falsely claim confirmation.
-    primary = <Button variant="outline" className="h-11 w-full sm:w-auto" onClick={() => onReply(item)}>Предложить другие условия</Button>;
+    primary = (
+      <div className="flex flex-wrap gap-2">
+        <Button className="h-11" onClick={() => onConfirm(item)}>Подтвердить площадку</Button>
+        <Button variant="outline" className="h-11" onClick={() => onReply(item)}>
+          Предложить другие условия
+        </Button>
+      </div>
+    );
   } else if (isParty && action === "EXTEND_OR_CLOSE") {
     primary = <Button className="h-11 w-full sm:w-auto" onClick={() => onResolve(item)}>Продлить или закрыть</Button>;
   } else if (!isParty && action === "CLOSE_VISIT") {
