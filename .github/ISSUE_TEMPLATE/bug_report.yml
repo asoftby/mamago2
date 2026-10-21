@@ -1,0 +1,46 @@
+name: Bug report
+description: Report a reproducible defect in mamaGo
+title: "fix: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is broken, and for whom?
+      placeholder: Describe observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include the URL, account role, device, and steps; do not paste secrets or personal data
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - Production
+        - Development
+        - Local
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and impact
+      description: Screenshots, relevant logs (redacted), frequency, workaround
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Conditions that will prove this bug is fixed

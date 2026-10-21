@@ -1,0 +1,35 @@
+name: Feature request
+description: Propose a scoped product or engineering improvement
+title: "feat: "
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: User problem and desired outcome
+      description: Who needs this, and why?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: In-scope behavior, out-of-scope behavior, key UX rules
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Observable, testable requirements
+    validations:
+      required: true
+  - type: textarea
+    id: technical
+    attributes:
+      label: Technical dependencies / data / permissions
+      description: Prisma, API, authentication, deployment, rollout dependencies if applicable
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and rollout
+      description: Compatibility, privacy, testing, metrics, rollback
