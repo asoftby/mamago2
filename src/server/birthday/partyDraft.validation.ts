@@ -1,3 +1,4 @@
+import { partyResponseDeadline } from "./partyResponseDeadline";
 import { z } from "zod";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Дата в формате ГГГГ-ММ-ДД")
@@ -50,10 +51,7 @@ export function validateSubmissionWindow(eventStart: Date, now: Date): Date {
   if (!Number.isFinite(eventStart.valueOf()) || eventStart.getTime() <= now.getTime() + 24 * 60 * 60_000) {
     throw new PartyApiError(422, "До праздника должно оставаться больше 24 часов");
   }
-  const hoursUntil = (eventStart.getTime() - now.getTime()) / 3_600_000;
-  const due = hoursUntil < 72
-    ? new Date(now.getTime() + 4 * 3_600_000)
-    : new Date(Math.min(now.getTime() + 24 * 3_600_000, eventStart.getTime() - 48 * 3_600_000));
+  const due = partyResponseDeadline(now, eventStart);
   if (due <= now) throw new PartyApiError(422, "Срок ответа уже прошёл");
   return due;
 }

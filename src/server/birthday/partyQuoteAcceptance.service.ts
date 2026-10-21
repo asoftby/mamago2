@@ -2,6 +2,7 @@ import "server-only";
 import { BookingKind, BookingStatus, PartyOrderStatus, PartyItemStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt } from "./partyDraft.validation";
+import { partyResponseDeadline } from "./partyResponseDeadline";
 
 /**
  * Parent accepts a particular quote/version, NOT a reservation.
@@ -66,10 +67,7 @@ export async function acceptPartyQuote(input: {
       where: { id: requestId, kind: BookingKind.PARTY, status: BookingStatus.NEW,
         partyStage: "QUOTED", lastActivityAt: request.lastActivityAt },
       data: { partyStage: "AWAITING_RECONFIRM", lastActivityAt: now,
-        responseDueAt: new Date(Math.min(
-          now.getTime() + 2 * 3_600_000,
-          partyStartAt(order.eventDate, order.timeFrom).getTime() - 3_600_000,
-        )) },
+        responseDueAt: partyResponseDeadline(now, partyStartAt(order.eventDate, order.timeFrom)) },
     });
     if (claimed.count !== 1) throw new PartyApiError(409, "Заявка уже изменена");
     const quote = await tx.partyQuote.updateMany({
