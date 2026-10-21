@@ -196,6 +196,10 @@ export function getClassScheduleMissingFields(
 ): string[] {
   if (!offerIsClass(productType)) return [];
   const missing: string[] = [];
+  const sessions = productType === "REGULAR_ACTIVITY" ? form.groups : form.dates;
+  if (sessions.some((session) => session.seats.trim() !== "" && parseSeats(session.seats) === null)) {
+    missing.push("Количество мест должно быть целым числом от 1 до 1000");
+  }
   const duration = parseClassDurationMinutes(classDuration);
   if (duration === null) missing.push("Продолжительность занятия числом");
   if (productType === "REGULAR_ACTIVITY") {
