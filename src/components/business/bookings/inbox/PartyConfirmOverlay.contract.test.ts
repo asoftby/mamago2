@@ -8,6 +8,8 @@ assert.match(overlay, /!selectedUnit && !available\.manualAllowed/);
 assert.match(overlay, /selectedUnit \? \{ bookingUnitId: selectedUnit \} : \{\}/);
 assert.match(overlay, /Автоматическая блокировка календаря не выполняется/);
 assert.match(overlay, /available\?\.manualAllowed/);
+assert.match(overlay, /available\?\.units.length === 0 && !available.manualAllowed/);
+assert.match(overlay, /available.quoteVersion !== item.quote\?\.version/);
 assert.match(inbox, /Подтвердить заказ/);
 assert.doesNotMatch(inbox, /Подтвердить площадку/);
 console.log("Manual/non-resource party confirmation UI: OK");
