@@ -27,6 +27,7 @@ export async function readPartyOrder(ownerUserId: string, partyId: string) {
         include: {
           offer: { select: { id: true, title: true } },
           requests: {
+            orderBy: { createdAt: "desc" },
             select: {
               id: true, partyStage: true, responseDueAt: true,
               partyQuotes: {
