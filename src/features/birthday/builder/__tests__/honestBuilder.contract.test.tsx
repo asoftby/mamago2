@@ -70,9 +70,13 @@ assert.deepEqual(selectedCatalogOffers(offers, "v1", ["a1"]), []);
 assert.deepEqual(catalogPriceSummary([offer, cake]), {
   minimumByn: 350, hasUnknownPrices: true,
 });
-const review = renderToStaticMarkup(createElement(StepReview, { offers: [offer, cake] }));
+const review = renderToStaticMarkup(createElement(StepReview, {
+  offers: [offer, cake], citySlug: "minsk", dateIso: "2026-12-20",
+  venueMode: "VENUE", childName: null, authenticated: true,
+  authLoading: false, requestLogin: () => {},
+}));
 assert.match(review, /Некоторые услуги рассчитываются индивидуально/);
-assert.match(review, /Ни один исполнитель ещё не получил заявку/);
+assert.match(review, /Отправить заявку основному исполнителю/);
 assert.doesNotMatch(review, /Забронировано/);
 
 const shell = readFileSync("src/features/birthday/builder/components/BirthdayBuilderShell.tsx", "utf8");

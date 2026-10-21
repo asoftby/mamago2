@@ -259,7 +259,16 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
               onToggleAddon={builder.toggleAddon}
             />
           )}
-          {currentStep === "done" && <StepReview offers={selectedOffers} />}
+          {currentStep === "done" && <StepReview
+            offers={selectedOffers}
+            citySlug={citySlug}
+            dateIso={state.quiz.dateRangeFrom}
+            venueMode={selectedOffers[0]?.productType === "PARTY_PACKAGE" ? "PACKAGE" : state.quiz.placeType === "HOME" ? "HOME" : state.quiz.placeType === "OUTDOOR" ? "OUTDOOR" : "VENUE"}
+            childName={state.quiz.partyForChild?.name ?? null}
+            authenticated={builder.isAuthenticated}
+            authLoading={builder.isAuthLoading}
+            requestLogin={builder.requestLoginToSubmit}
+          />}
         </main>
 
         {/* Summary sticky bar */}
