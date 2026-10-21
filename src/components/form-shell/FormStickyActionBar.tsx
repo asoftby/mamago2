@@ -21,6 +21,8 @@ export interface FormStickyActionBarProps {
   isReviewStep: boolean;
   onContinue?: () => void;
   continueDisabled?: boolean;
+  /** Explanation displayed after attempting to advance an incomplete step. */
+  continueHint?: string;
   /** Review step: primary = submit for moderation (or other final action) */
   onSubmit?: () => void;
   submitDisabled?: boolean;
@@ -58,6 +60,7 @@ export function FormStickyActionBar({
   isReviewStep,
   onContinue,
   continueDisabled,
+  continueHint,
   onSubmit,
   submitDisabled,
   busyHint,
@@ -156,6 +159,11 @@ export function FormStickyActionBar({
             ) : null}
           </div>
 
+          {continueHint && !busy ? (
+            <p role="alert" className="mt-2 text-center text-[12px] leading-snug text-destructive">
+              {continueHint}
+            </p>
+          ) : null}
           {busy && busyHint ? (
             <p className="mt-2 text-center text-[12px] leading-snug text-muted-foreground">
               {busyHint}
@@ -196,6 +204,11 @@ export function FormStickyActionBar({
           )}
 
           <div className="flex flex-col items-end gap-2">
+            {continueHint && !busy ? (
+              <p role="alert" className="max-w-xl text-right text-xs leading-snug text-destructive">
+                {continueHint}
+              </p>
+            ) : null}
             <div className="flex flex-wrap items-center justify-end gap-3">
               {showSaveDraft && onSaveDraft && (
                 <Button
