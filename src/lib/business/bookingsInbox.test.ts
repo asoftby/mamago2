@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {
   archiveLabel, createIdempotencyKey, isLegacyCalendarView, maxExtendUntil,
-  parseInboxKind, parseInboxTab,
+  parseInboxKind, parseInboxTab, NEXT_ACTION_LABEL,
 } from "./bookingsInbox";
 
 const params = (query: string) => new URLSearchParams(query);
@@ -16,6 +16,10 @@ assert.equal(parseInboxTab("AWAITING_CUSTOMER"), "customer");
 assert.equal(parseInboxTab("upcoming"), "upcoming");
 assert.equal(parseInboxKind("nope"), "all");
 assert.equal(parseInboxKind("standard"), "standard");
+
+// После принятия предложения семьёй бизнес должен подтвердить бронирование.
+assert.match(NEXT_ACTION_LABEL.RECONFIRM, /Семья приняла условия/);
+assert.match(NEXT_ACTION_LABEL.RECONFIRM, /подтвердите бронирование/);
 
 // старые ссылки (?status=, ?id=, ?date=) остаются в календарном виде
 assert.equal(isLegacyCalendarView(params("")), false);
