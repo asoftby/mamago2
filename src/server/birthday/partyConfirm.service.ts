@@ -7,6 +7,7 @@ import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt } from "./partyDraft.validation";
 import { verifyPartyOffers } from "./partyDraft.service";
 import { isWithinSchedule, minskBookingWindow } from "./partyConfirmationAvailability";
+import { partyResponseDeadline } from "./partyResponseDeadline";
 
 export interface ConfirmPartyRequestInput {
   requestId: string;
@@ -275,10 +276,7 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
               if (!(error instanceof PartyApiError) || error.status !== 422) throw error;
             }
           }
-          const due = new Date(Math.min(
-            now.getTime() + 4 * 3_600_000,
-            partyStartAt(order.eventDate, order.timeFrom).getTime() - 3_600_000,
-          ));
+          const due = partyResponseDeadline(now, partyStartAt(order.eventDate, order.timeFrom));
           for (const addon of addons) {
             const published = addon.offerId ? live.get(addon.offerId) : null;
             if (!addon.businessId || !addon.offerId || !published ||
