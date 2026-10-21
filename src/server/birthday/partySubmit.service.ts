@@ -2,7 +2,7 @@ import { PartyOrderStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt, validateSubmissionWindow } from "./partyDraft.validation";
 import { verifyPartyOffers } from "./partyDraft.service";
-import { isValidPartyAnchor } from "./partySelection";
+import { partyAnchorProblem } from "./partySelection";
 
 /**
  * Submit only the anchor. No other service receives a request before
@@ -57,9 +57,8 @@ export async function submitPartyAnchor(
   if (!published || published.place?.ownerBusinessId !== anchor.businessId) {
     throw new PartyApiError(422, "Выбранный исполнитель больше не доступен");
   }
-  if (!isValidPartyAnchor(party.venueMode, published)) {
-    throw new PartyApiError(422, "Основная услуга не соответствует формату праздника");
-  }
+  const anchorProblem = partyAnchorProblem(party.venueMode, published);
+  if (anchorProblem) throw new PartyApiError(422, anchorProblem);
 
   // Capture narrowed values before the async transaction callback: TypeScript
   // correctly regards nullable Prisma model fields as potentially mutable.
@@ -100,7 +99,7 @@ export async function submitPartyAnchor(
     const checked = await verifyPartyOffers(party.citySlug, [anchorOfferId], tx);
     const currentOffer = checked.get(anchorOfferId);
     if (!currentOffer || currentOffer.place?.ownerBusinessId !== anchorBusinessId ||
-        !isValidPartyAnchor(party.venueMode, currentOffer)) {
+        partyAnchorProblem(party.venueMode, currentOffer)) {
       throw new PartyApiError(422, "Выбранный исполнитель больше не доступен");
     }
 

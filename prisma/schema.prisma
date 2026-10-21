@@ -74,6 +74,7 @@ model User {
   partyOrders PartyOrder[] @relation("PartyOrderOwner")
   partyQuotesResponded PartyQuote[] @relation("PartyQuoteResponder")
   partyQuotesDecided PartyQuote[] @relation("PartyQuoteDecider")
+  partyItemsPrepaidMarked PartyOrderItem[] @relation("PartyItemPrepaidMarker")
   bookingFeedbacks                  BookingFeedback[]
   feedbackReactions                 FeedbackReaction[]
   reviewedBusinessVerifications     BusinessVerificationLog[]        @relation("ReviewedBy")
@@ -5432,6 +5433,14 @@ enum PartyOrderStatus {
   ANCHOR_CONFIRMED
   CANCELLED
 }
+enum PartyOrderEntry {
+  FULL
+  PART
+}
+enum PartyPricingMode {
+  BOOK
+  QUOTE
+}
 enum PartyItemRole {
   ANCHOR
   STANDALONE
@@ -5532,6 +5541,7 @@ model PartyOrder {
   contactName String?
   contactPhone String?
   status PartyOrderStatus @default(DRAFT)
+  entry PartyOrderEntry @default(FULL)
   version Int @default(0)
   submitKey String? @unique
   submittedAt DateTime?
@@ -5562,6 +5572,11 @@ model PartyOrderItem {
   note String?
   status PartyItemStatus @default(PLANNED)
   confirmedBookingRequestId String? @unique
+  pricingMode PartyPricingMode @default(BOOK)
+  serviceStart DateTime?
+  serviceEnd DateTime?
+  prepaidAt DateTime?
+  prepaidMarkedByUserId String?
   position Int @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -5574,6 +5589,7 @@ model PartyOrderItem {
   includedItems PartyOrderItem[] @relation("PartyItemComponents")
   requests BookingRequest[] @relation("PartyItemRequests")
   confirmedBooking BookingRequest? @relation("ConfirmedPartyBooking", fields: [confirmedBookingRequestId], references: [id], onDelete: SetNull)
+  prepaidMarkedBy User? @relation("PartyItemPrepaidMarker", fields: [prepaidMarkedByUserId], references: [id], onDelete: SetNull)
 
   @@index([partyOrderId, position])
   @@index([offerId])
@@ -5869,6 +5885,7 @@ enum BookingActivityType {
   QUOTE_REJECTED
   REQUEST_EXPIRED
   REQUEST_WITHDRAWN
+  PREPAYMENT_MARKED
 }
 
 /// Актор события: бизнес или система

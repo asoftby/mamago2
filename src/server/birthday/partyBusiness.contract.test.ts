@@ -43,5 +43,5 @@ assert.ok(route.includes("getMyBusiness"), "Business membership must be verified
 assert.ok(route.includes("Idempotency-Key"), "Idempotency header is required");
 assert.ok(!service.includes("customerPhone: true"), "Parent contacts must remain private");
 assert.ok(!service.includes("contactPhone: true"), "Party order contacts must remain private");
-assert.ok(!service.includes("status: BookingStatus.CONFIRMED"), "Reply must not confirm booking");
+assert.ok(service.includes('autoConfirm ? "ACCEPTED" : "ACTIVE"'), "Only the fixed-price rule may auto-confirm a reply");
 console.log("partyBusiness.contract.test.ts: OK");

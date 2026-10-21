@@ -27,14 +27,35 @@ export function isCompatiblePartyLocation(mode: PartyMode, offer: CatalogOffer):
   return location === (onsite ? "ON_SITE" : "OFF_SITE");
 }
 
+/** R1: at home/outdoors the anchor is the main entertainment service, not a venue. */
+export const PRIMARY_ENTERTAINMENT_CATEGORIES: readonly PartyCategory[] =
+  ["ANIMATOR", "SHOW", "PROGRAM", "MASTER_CLASS"];
+
 export function isValidPartyAnchor(mode: PartyMode, offer: CatalogOffer): boolean {
-  if (!isCompatiblePartyLocation(mode, offer)) return false;
-  if (mode === "VENUE" || mode === "PACKAGE") return isVenueOffer(offer);
+  return partyAnchorProblem(mode, offer) === null;
+}
+
+/** Human-readable (422) reason why the offer cannot anchor the format, or null. */
+export function partyAnchorProblem(mode: PartyMode, offer: CatalogOffer): string | null {
+  if (!isCompatiblePartyLocation(mode, offer)) {
+    return "Основная услуга не подходит по месту проведения";
+  }
+  if (mode === "VENUE" || mode === "PACKAGE") {
+    return isVenueOffer(offer) ? null : "Для праздника на площадке выберите площадку или пакет";
+  }
   if (offer.productType === "PARTY_PACKAGE") {
     // Only explicitly mobile packages can anchor home/outdoor celebrations.
-    return offer.partyLocationType === "OFF_SITE" || offer.partyLocationType === "BOTH";
+    return offer.partyLocationType === "OFF_SITE" || offer.partyLocationType === "BOTH"
+      ? null : "Этот пакет проводится только на площадке";
   }
-  return !isVenueOffer(offer);
+  if (isVenueOffer(offer)) return "Для праздника дома или на улице площадка не может быть основной услугой";
+  return offer.category && PRIMARY_ENTERTAINMENT_CATEGORIES.includes(offer.category)
+    ? null : "Основной услугой должны быть аниматор, шоу, программа или мастер-класс";
+}
+
+/** R2: only these formats have no exclusive inventory, so a fixed price may confirm instantly. */
+export function isAutoConfirmMode(mode: PartyMode): boolean {
+  return mode === "HOME" || mode === "OUTDOOR";
 }
 
 export function includedCategories(offer: CatalogOffer): PartyCategory[] {
@@ -62,9 +83,8 @@ export function offerPriceSnapshot(offer: Pick<CatalogOffer, "priceFrom" | "pric
 export function assertCompatibleSelection(
   mode: "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR", anchor: CatalogOffer, addons: CatalogOffer[],
 ): void {
-  if (!isValidPartyAnchor(mode, anchor)) {
-    throw new PartyApiError(422, "Основное предложение не соответствует формату");
-  }
+  const problem = partyAnchorProblem(mode, anchor);
+  if (problem) throw new PartyApiError(422, problem);
   const included = new Set(includedCategories(anchor));
   if (addons.some((offer) => offer.id === anchor.id || isVenueOffer(offer) ||
       !isCompatiblePartyLocation(mode, offer) ||

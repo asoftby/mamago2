@@ -3,6 +3,9 @@ import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt } from "./partyDraft.validation";
 import { isPartyAttentionStage, type PartyBusinessReply } from "./partyBusiness.validation";
 import { redactPartyContacts } from "./partyPrivacy";
+import { isAutoConfirmMode } from "./partySelection";
+import { clockMinutes, isFixedPriceReply } from "./partyFixedPrice";
+
 
 export async function listBusinessPartyRequests(businessId: string, onlyAttention = false) {
   const where: Prisma.BookingRequestWhereInput = {
@@ -75,10 +78,11 @@ export async function replyToPartyRequest(params: {
       firstResponseAt: true, responseDueAt: true, partyOrderItemId: true,
       partyOrderItem: {
         select: {
-          id: true, role: true, status: true,
+          id: true, role: true, status: true, offerPriceSnapshot: true,
+          pricingMode: true, confirmedBookingRequestId: true,
           partyOrder: { select: {
             id: true, ownerUserId: true, eventDate: true,
-            timeFrom: true, status: true,
+            timeFrom: true, timeTo: true, venueMode: true, status: true,
           } },
         },
       },
@@ -122,6 +126,14 @@ export async function replyToPartyRequest(params: {
   }
   const version = (existing.partyQuotes[0]?.version ?? 0) + 1;
   const declined = input.type === "DECLINED";
+  const from = clockMinutes(order.timeFrom);
+  const to = clockMinutes(order.timeTo);
+  const autoConfirm = !declined && isAutoConfirmMode(order.venueMode) &&
+    !item.confirmedBookingRequestId && isFixedPriceReply({
+      type: input.type, pricingMode: item.pricingMode, snapshot: item.offerPriceSnapshot,
+      priceByn: input.priceByn, replyDurationMinutes: input.durationMinutes,
+      orderDurationMinutes: from != null && to != null && to > from ? to - from : null,
+    });
 
   return prisma.$transaction(async (tx) => {
     // Compare-and-swap prevents two concurrent replies from both producing quotes.
@@ -133,9 +145,11 @@ export async function replyToPartyRequest(params: {
         responseDueAt: { gt: now },
       },
       data: {
-        partyStage: declined ? "DECLINED" : "QUOTED",
+        partyStage: declined ? "DECLINED" : autoConfirm ? "CONFIRMED" : "QUOTED",
         ...(declined ? { status: BookingStatus.REJECTED, rejectedAt: now,
-          partyCloseReason: "BUSINESS_DECLINED" } : {
+          partyCloseReason: "BUSINESS_DECLINED" } : autoConfirm ? {
+          status: BookingStatus.CONFIRMED, partyCloseReason: null, responseDueAt: null,
+        } : {
           status: BookingStatus.NEW,
           partyCloseReason: null,
         }),
@@ -158,7 +172,8 @@ export async function replyToPartyRequest(params: {
       data: {
         version: { increment: 1 },
         ...(item.role === "ANCHOR" ? {
-          status: declined ? PartyOrderStatus.NEEDS_ALTERNATIVE : PartyOrderStatus.ANCHOR_PENDING,
+          status: declined ? PartyOrderStatus.NEEDS_ALTERNATIVE
+            : autoConfirm ? PartyOrderStatus.ANCHOR_CONFIRMED : PartyOrderStatus.ANCHOR_PENDING,
         } : {}),
       },
     });
@@ -172,7 +187,8 @@ export async function replyToPartyRequest(params: {
       data: {
         bookingRequestId: requestId, version, idempotencyKey,
         respondedByUserId: actorUserId, type: input.type,
-        status: declined ? "REJECTED" : "ACTIVE",
+        status: declined ? "REJECTED" : autoConfirm ? "ACCEPTED" : "ACTIVE",
+        ...(autoConfirm ? { decidedAt: now, decidedByUserId: null } : {}),
         ...(declined ? {
           declineReason: input.declineReason,
           declineComment: input.declineComment ?? null,
@@ -188,24 +204,44 @@ export async function replyToPartyRequest(params: {
       },
       select: { id: true, version: true, type: true, status: true },
     });
-    await tx.partyOrderItem.update({
-      where: { id: item.id },
-      data: { status: declined ? PartyItemStatus.DECLINED : PartyItemStatus.NEEDS_DECISION },
-    });
+    if (autoConfirm) {
+      // confirmedBookingRequestId is unique: a second confirmed request for the item cannot win.
+      const confirmedItem = await tx.partyOrderItem.updateMany({
+        where: { id: item.id, confirmedBookingRequestId: null },
+        data: { status: PartyItemStatus.CONFIRMED, confirmedBookingRequestId: requestId },
+      });
+      if (confirmedItem.count !== 1) throw new PartyApiError(409, "Услуга уже подтверждена другой заявкой");
+    } else {
+      await tx.partyOrderItem.update({
+        where: { id: item.id },
+        data: { status: declined ? PartyItemStatus.DECLINED : PartyItemStatus.NEEDS_DECISION },
+      });
+    }
     await tx.bookingActivity.create({
       data: {
         bookingId: requestId,
         type: declined ? "STATUS_CHANGED" : "QUOTE_SENT",
         actorType: "BUSINESS", actorId: actorUserId,
         payload: { quoteId: quote.id, version, type: input.type,
-          fromStage: input.expectedStage, toStage: declined ? "DECLINED" : "QUOTED" },
+          fromStage: input.expectedStage,
+          toStage: declined ? "DECLINED" : autoConfirm ? "CONFIRMED" : "QUOTED" },
       },
     });
+    if (autoConfirm) {
+      await tx.bookingActivity.create({
+        data: {
+          bookingId: requestId, type: "QUOTE_ACCEPTED", actorType: "SYSTEM",
+          payload: { quoteId: quote.id, version, auto: true, rule: "FIXED_PRICE" },
+        },
+      });
+    }
     await tx.partyOutbox.create({
       data: {
-        eventType: declined ? "PARTY_REQUEST_DECLINED" : "PARTY_QUOTE_SENT",
+        eventType: declined ? "PARTY_REQUEST_DECLINED"
+          : autoConfirm ? "PARTY_BOOKING_CONFIRMED" : "PARTY_QUOTE_SENT",
         aggregateId: requestId,
-        dedupeKey: "party:" + requestId + ":quote:" + quote.id,
+        dedupeKey: autoConfirm ? "party:" + requestId + ":confirmed"
+          : "party:" + requestId + ":quote:" + quote.id,
         payload: { partyOrderId: order.id, requestId, quoteId: quote.id, userId: order.ownerUserId },
       },
     });
