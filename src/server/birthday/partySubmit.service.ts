@@ -2,6 +2,7 @@ import { PartyOrderStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt, validateSubmissionWindow } from "./partyDraft.validation";
 import { verifyPartyOffers } from "./partyDraft.service";
+import { isValidPartyAnchor } from "./partySelection";
 
 /**
  * Submit only the anchor. No other service receives a request before
@@ -56,8 +57,7 @@ export async function submitPartyAnchor(
   if (!published || published.place?.ownerBusinessId !== anchor.businessId) {
     throw new PartyApiError(422, "Выбранный исполнитель больше не доступен");
   }
-  const isVenue = published.category === "VENUE" || published.productType === "PARTY_PACKAGE";
-  if ((party.venueMode === "VENUE" || party.venueMode === "PACKAGE") !== isVenue) {
+  if (!isValidPartyAnchor(party.venueMode, published)) {
     throw new PartyApiError(422, "Основная услуга не соответствует формату праздника");
   }
 
@@ -98,7 +98,9 @@ export async function submitPartyAnchor(
     // Re-check publication under the submitting transaction: client snapshots
     // and the preflight query cannot authorize a currently withdrawn offer.
     const checked = await verifyPartyOffers(party.citySlug, [anchorOfferId], tx);
-    if (checked.get(anchorOfferId)?.place?.ownerBusinessId !== anchorBusinessId) {
+    const currentOffer = checked.get(anchorOfferId);
+    if (!currentOffer || currentOffer.place?.ownerBusinessId !== anchorBusinessId ||
+        !isValidPartyAnchor(party.venueMode, currentOffer)) {
       throw new PartyApiError(422, "Выбранный исполнитель больше не доступен");
     }
 

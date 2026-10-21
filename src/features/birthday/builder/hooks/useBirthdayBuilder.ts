@@ -229,6 +229,11 @@ export function useBirthdayBuilder(init?: { ageGroup?: BirthdayAgeGroup | null }
         return {
           ...s,
           quiz: newQuiz,
+          // A newly chosen date range invalidates a date saved for the previous range.
+          partyPlanning: params.dateRangeFrom !== undefined &&
+            params.dateRangeFrom !== s.quiz.dateRangeFrom
+            ? { ...s.partyPlanning, dateIso: null }
+            : s.partyPlanning,
         };
       });
     },

@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { StepPick } from "../components/steps/StepPick";
-import { StepReview } from "../components/steps/StepReview";
+import { StepReview, calendarDateKeyToIso } from "../components/steps/StepReview";
+import type { PartyFlowState } from "../lib/partySubmitFlow";
 import type { BirthdayCatalogItem } from "../lib/realCatalog";
 import {
   catalogPriceSummary, eligibleAddons, hasValidCatalogAnchor, selectedCatalogOffers,
@@ -67,18 +68,50 @@ assert.equal(hasValidCatalogAnchor(offers, "v1", "VENUE"), false);
 assert.equal(eligibleAddons(offers, "real-package", "VENUE").some((o) => o.id === "real-cake"), false);
 assert.equal(eligibleAddons(offers, "real-package", "VENUE").some((o) => o.id === "real-animator"), true);
 assert.deepEqual(selectedCatalogOffers(offers, "v1", ["a1"]), []);
+// The catalog can rank an add-on before the chosen anchor: the anchor must still be first.
+assert.deepEqual(selectedCatalogOffers([cake, offer], offer.id, [cake.id]).map((o) => o.id),
+  [offer.id, cake.id]);
+assert.equal(calendarDateKeyToIso("2026-9-21"), "2026-10-21");
+assert.equal(calendarDateKeyToIso("2026-11-25"), "2026-12-25");
+assert.equal(calendarDateKeyToIso("2026-1-30"), null);
+assert.equal(calendarDateKeyToIso("invalid"), null);
 assert.deepEqual(catalogPriceSummary([offer, cake]), {
   minimumByn: 350, hasUnknownPrices: true,
 });
-const review = renderToStaticMarkup(createElement(StepReview, { offers: [offer, cake] }));
+const submissionFlow: PartyFlowState = {
+  draft: null, pending: null, key: null, submitted: false,
+};
+const reviewProps = {
+  offers: [offer, cake], citySlug: "minsk", dateIso: null,
+  quizDateKey: "2026-11-20", timeStart: "12:30", timeEnd: "16:00",
+  venueMode: "VENUE" as const, childName: null, authenticated: true,
+  authLoading: false, requestLogin: () => {},
+  flowStateRef: { current: submissionFlow }, busy: false, onBusyChange: () => {},
+  sent: false, onSent: () => {},
+};
+const review = renderToStaticMarkup(createElement(StepReview, reviewProps));
 assert.match(review, /Некоторые услуги рассчитываются индивидуально/);
-assert.match(review, /Ни один исполнитель ещё не получил заявку/);
+assert.match(review, /type="date"[^>]*value="2026-12-20"/);
+assert.match(review, /type="time"[^>]*value="12:30"/);
+assert.match(review, /Отправить заявку основному исполнителю/);
 assert.doesNotMatch(review, /Забронировано/);
+// Simulate a review-step remount after submission: the parent-owned state persists.
+submissionFlow.submitted = true;
+const reviewAfterRemount = renderToStaticMarkup(createElement(StepReview, {
+  ...reviewProps, sent: submissionFlow.submitted,
+}));
+assert.match(reviewAfterRemount, /Заявка основному исполнителю отправлена/);
+assert.doesNotMatch(reviewAfterRemount, /Данные для заявки/);
 
 const shell = readFileSync("src/features/birthday/builder/components/BirthdayBuilderShell.tsx", "utf8");
 for (const forbidden of ["MOCK_PRICES", "buildMockScenarioTimeline", "buildSubmittedScenarioParty", "setSubmittedScenario"]) {
   assert.equal(shell.includes(forbidden), false, "fake booking flow remains: " + forbidden);
 }
+assert.match(shell, /const submissionFlowRef = useRef<PartyFlowState>/);
+assert.match(shell, /flowStateRef=\{submissionFlowRef\}/);
+assert.match(shell, /backDisabled=\{submissionBusy \|\| submissionSent\}/);
+assert.match(shell, /disabled=\{submissionBusy\}/);
+
 void (async () => {
   assert.deepEqual(await listUserBirthdayParties("user-a"), []);
   assert.equal(await getUserBirthdayPartyDetail("user-a", "demo-birthday-scenario"), null);

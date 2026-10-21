@@ -50,6 +50,7 @@ interface Props {
   overBudget: boolean;
   currentStep: BuilderStep;
   onBack: () => void;
+  backDisabled?: boolean;
   onNext: () => void;
   canNext: boolean;
   nextLabel: string;
@@ -62,6 +63,7 @@ export function BuilderSummaryBar({
   overBudget,
   currentStep,
   onBack,
+  backDisabled = false,
   onNext,
   canNext,
   nextLabel,
@@ -161,6 +163,7 @@ export function BuilderSummaryBar({
             <button
               type="button"
               onClick={onBack}
+              disabled={backDisabled}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
