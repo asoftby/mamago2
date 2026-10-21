@@ -6846,3 +6846,36 @@ model FeedbackReputationAggregate {
 
   @@id([targetType, targetId])
 }
+
+// Independent business Telegram bot connections. Existing TelegramConnection is family-only.
+model BusinessTelegramConnection {
+  id               String              @id @default(cuid())
+  businessId       String
+  userId           String
+  environment      TelegramEnvironment
+  botUsername      String
+  telegramUserId   String
+  telegramChatId   String
+  telegramUsername String?
+  isActive         Boolean             @default(true)
+  linkedAt         DateTime            @default(now())
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@unique([userId, environment])
+  @@unique([environment, telegramChatId])
+  @@index([businessId, environment, isActive])
+}
+
+model BusinessTelegramLinkToken {
+  id          String              @id @default(cuid())
+  tokenHash   String              @unique
+  businessId  String
+  userId      String
+  environment TelegramEnvironment
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime            @default(now())
+
+  @@index([userId, environment, expiresAt])
+}
