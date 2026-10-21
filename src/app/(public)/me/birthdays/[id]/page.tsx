@@ -26,7 +26,9 @@ export default async function MeBirthdayDetailPage({ params }: PageProps) {
     const anchor = order.items.find(item => item.role === "ANCHOR");
     const request = anchor?.requests[0];
     const quote = request?.partyQuotes[0];
-    const canAccept = order.status === "ANCHOR_PENDING" &&
+    const canAccept = process.env.PARTY_CONFIRMATION_ENABLED === "true" &&
+      process.env.BUSINESS_BOOKINGS_INBOX_UI === "true" &&
+      order.status === "ANCHOR_PENDING" &&
       request?.partyStage === "QUOTED" &&
       quote?.status === "ACTIVE" && quote.type !== "DECLINED" &&
       quote.validUntil && quote.validUntil > new Date();

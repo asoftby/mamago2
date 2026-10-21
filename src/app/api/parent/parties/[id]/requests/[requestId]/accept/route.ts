@@ -10,6 +10,10 @@ export async function POST(request: NextRequest, {
   params,
 }: { params: Promise<{ id: string; requestId: string }> }) {
   try {
+    if (process.env.PARTY_CONFIRMATION_ENABLED !== "true" ||
+        process.env.BUSINESS_BOOKINGS_INBOX_UI !== "true") {
+      return NextResponse.json({ error: "Подтверждение праздников пока не включено" }, { status: 503 });
+    }
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
     const key = request.headers.get("Idempotency-Key")?.trim();
