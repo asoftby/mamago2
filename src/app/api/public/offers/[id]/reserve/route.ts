@@ -19,6 +19,7 @@ const reservationSchema = z.object({
   customerEmail: z.string().email().optional(),
   customerComment: z.string().max(2000).optional(),
   planItemId: z.string().min(1).optional(),
+  childId: z.string().min(1).optional(),
 });
 
 export async function POST(
@@ -47,6 +48,7 @@ export async function POST(
       customerEmail: payload.data.customerEmail,
       customerComment: payload.data.customerComment,
       planItemId: payload.data.planItemId,
+      childId: payload.data.childId,
       userId: user?.id ?? null,
     });
     return NextResponse.json({

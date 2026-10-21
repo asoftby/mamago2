@@ -11,6 +11,7 @@
 
 import prisma from "@/lib/prisma";
 import { reserveSlot } from "@/server/offers/reserveSlot";
+import { childScopeFor } from "@/server/family/familyAccess";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 import {
   BookingMode,
@@ -281,6 +282,7 @@ export async function createPublicClassSlotBooking(input: {
   customerComment?: string | null;
   userId?: string | null;
   planItemId?: string | null;
+  childId?: string | null;
 }): Promise<{ bookingId: string; holdUntil: Date }> {
   const { customerName, customerPhone } = validateBookingCustomer(input);
   const offer = await prisma.offer.findFirst({
@@ -304,6 +306,25 @@ export async function createPublicClassSlotBooking(input: {
   if (!offer?.place?.ownerBusinessId) {
     throw new BookingNotFoundError("Занятие недоступно для записи");
   }
+  if (input.childId && (!input.userId || input.seats !== 1)) {
+    throw new BookingValidationError("childId", "Выберите одного ребёнка для одного места");
+  }
+  const child = input.childId
+    ? await prisma.child.findFirst({
+        where: { id: input.childId, ...(await childScopeFor(input.userId!)) },
+        select: { name: true, birthDate: true },
+      })
+    : null;
+  if (input.childId && !child) {
+    throw new BookingValidationError("childId", "Ребёнок недоступен");
+  }
+  const classDate = input.startsAt;
+  const childAge = child?.birthDate ? (() => {
+    let age = classDate.getUTCFullYear() - child.birthDate.getUTCFullYear();
+    const month = classDate.getUTCMonth() - child.birthDate.getUTCMonth();
+    if (month < 0 || (month === 0 && classDate.getUTCDate() < child.birthDate.getUTCDate())) age--;
+    return age >= 0 && age <= 18 ? age : null;
+  })() : null;
   const planLink = await resolveBookingPlanItem({
     userId: input.userId,
     planItemId: input.planItemId,
@@ -327,6 +348,8 @@ export async function createPublicClassSlotBooking(input: {
     userId: input.userId,
     planItemId: planLink.planItemId,
     holdMinutes: 120,
+    childName: child?.name?.trim() || null,
+    childAge,
   });
 
   triggerBookingCreatedSideEffects({
@@ -339,6 +362,8 @@ export async function createPublicClassSlotBooking(input: {
     cityId: offer.place.cityId ?? null,
     ownerUserId: offer.place.ownerBusiness?.ownerUserId ?? null,
     customerName,
+    childName: child?.name?.trim() || null,
+    childAge,
     offerId: offer.id,
     offerTitle: offer.title,
   });

@@ -12,6 +12,11 @@ type ClassSlot = {
 };
 type SlotsResponse = { slots?: ClassSlot[]; error?: string };
 type BookingResponse = { bookingId?: string; status?: string; error?: string };
+type PrefillResponse = {
+  authenticated: boolean;
+  user: { displayName: string | null; email: string | null; phone: string | null; phoneVerified: boolean } | null;
+  children: Array<{ id: string; name: string | null; age: number | null }>;
+};
 
 const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
   timeZone: "Europe/Minsk", weekday: "short", day: "numeric", month: "short",
@@ -36,6 +41,8 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle }:
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [bookingId, setBookingId] = useState<string | null>(null);
+  const [children, setChildren] = useState<PrefillResponse["children"]>([]);
+  const [selectedChildId, setSelectedChildId] = useState("");
   const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
@@ -66,6 +73,24 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle }:
     return () => controller.abort();
   }, [open, offerId, seats, refresh]);
 
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    void fetch("/api/public/bookings/camp-shift/prefill", {
+      signal: controller.signal, credentials: "include", cache: "no-store",
+    }).then(async (response) => {
+      if (!response.ok) return;
+      const data = await response.json() as PrefillResponse;
+      if (controller.signal.aborted) return;
+      setChildren(data.children ?? []);
+      setSelectedChildId(data.children?.length === 1 ? data.children[0].id : "");
+      if (data.user?.displayName) setName((previous) => previous || data.user!.displayName || "");
+      if (data.user?.email) setEmail((previous) => previous || data.user!.email || "");
+      if (data.user?.phoneVerified && data.user.phone) setPhone((previous) => previous || data.user!.phone || "");
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [open]);
+
   const chosen = useMemo(() => slots.find((slot) => slot.startsAt === selected) ?? null, [slots, selected]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -81,6 +106,7 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle }:
           startsAt: chosen.startsAt, endsAt: chosen.endsAt,
           seats, customerName: name.trim(), customerPhone: phone.trim(),
           ...(email.trim() ? { customerEmail: email.trim() } : {}),
+          ...(seats === 1 && selectedChildId ? { childId: selectedChildId } : {}),
         }),
       });
       const result = await response.json() as BookingResponse;
@@ -126,6 +152,18 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle }:
             <Input id="class-booking-seats" type="number" min={1} max={20} value={seats}
               onChange={(event) => { setSeats(Math.max(1, Math.min(20, Number(event.target.value) || 1))); setLoading(true); }} />
           </div>
+          {seats === 1 && children.length > 0 && (
+            <div className="space-y-2">
+              <label htmlFor="class-booking-child" className="text-sm font-medium">Для кого занятие</label>
+              <select id="class-booking-child" className="w-full rounded-xl border bg-background p-3 text-sm"
+                value={selectedChildId} onChange={(event) => setSelectedChildId(event.target.value)}>
+                <option value="">Не выбирать из профиля</option>
+                {children.map((child) => (
+                  <option key={child.id} value={child.id}>{child.name || "Ребёнок"}{child.age !== null ? ` · ${child.age} лет` : ""}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium">Дата и время (Минск)</legend>
             {loading && <p role="status" className="text-sm text-muted-foreground">Загружаем расписание…</p>}
