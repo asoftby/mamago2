@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 import Module from "node:module";
 
 let sessionToken: string | null = null;
+let sessionCookieName: string | null = null;
 
 type Loader = (request: string, parent: unknown, isMain: boolean) => unknown;
 const mod = Module as unknown as { _load: Loader };
@@ -17,7 +18,7 @@ const originalLoad = mod._load;
 mod._load = function patchedLoad(request, parent, isMain) {
   if (request === "next/headers") {
     return {
-      cookies: async () => ({ get: (name: string) => (name === "mg_session" && sessionToken ? { name, value: sessionToken } : undefined) }),
+      cookies: async () => ({ get: (name: string) => (name === sessionCookieName && sessionToken ? { name, value: sessionToken } : undefined) }),
       headers: async () => new Headers(),
     };
   }
@@ -43,6 +44,9 @@ function json(url: string, method: string, body?: unknown) {
 async function main() {
   const { prisma } = await import("@/lib/prisma");
   const { createSession } = await import("@/lib/auth/session");
+  // Import only after the next/headers stub is installed.
+  const { SESSION_COOKIE_NAME } = await import("@/lib/auth/cookie");
+  sessionCookieName = SESSION_COOKIE_NAME;
   const collectionsRoute = await import("./route");
   const collectionRoute = await import("./[id]/route");
   const ideaCollectionsRoute = await import("../save/idea/collections/route");
