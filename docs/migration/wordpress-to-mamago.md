@@ -504,7 +504,7 @@ Current mamaGo redirect system:
 - `scripts/build-migration-manifest.ts` generates `manifest.csv`.
 - `src/lib/seo/redirectManifest.ts` validates `manifest.csv` at build time.
 - `scripts/data/wp-redirect-map.json` is a curated static WP map.
-- `src/lib/routing/wpLegacyCatchAll.ts` redirects uncovered WP tail paths to the default city hub.
+- Unmapped paths reach normal route/not-found handling; the unrelated default-city fallback is removed in the [2026-10-22 recovery change](../seo/seo-recovery-audit-2026-10-22.md). Explicit manifest redirects remain.
 
 Gaps:
 

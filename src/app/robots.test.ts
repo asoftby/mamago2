@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import robots, { dynamic } from "./robots";
 
 const previous = {
+  APP_ENV: process.env.APP_ENV,
+  VERCEL_ENV: process.env.VERCEL_ENV,
   SITE_INDEXING_ENABLED: process.env.SITE_INDEXING_ENABLED,
   SITE_NOINDEX_FORCE: process.env.SITE_NOINDEX_FORCE,
   SITE_NOINDEX_DEFAULT: process.env.SITE_NOINDEX_DEFAULT,
@@ -11,6 +13,8 @@ const previous = {
 };
 
 function clearIndexingEnv() {
+  delete process.env.APP_ENV;
+  delete process.env.VERCEL_ENV;
   delete process.env.SITE_INDEXING_ENABLED;
   delete process.env.SITE_NOINDEX_FORCE;
   delete process.env.SITE_NOINDEX_DEFAULT;
@@ -32,6 +36,10 @@ try {
     rules: { userAgent: "*", allow: "/" },
     sitemap: "https://mamago.by/sitemap.xml",
   });
+
+  process.env.APP_ENV = "dev";
+  assert.deepEqual(robots(), { rules: { userAgent: "*", disallow: "/" } }, "DEV must ignore the production release indexing flag");
+  delete process.env.APP_ENV;
 
   process.env.SITE_NOINDEX_FORCE = "true";
   assert.deepEqual(robots(), {
