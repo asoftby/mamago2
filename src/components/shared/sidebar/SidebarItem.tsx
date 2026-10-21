@@ -14,6 +14,7 @@ interface SidebarItemProps {
   sidebarVariant?: "admin" | "business";
   onClick?: () => void;
   hasAttention?: boolean;
+  badgeCount?: number;
 }
 
 export function SidebarItem({
@@ -25,6 +26,7 @@ export function SidebarItem({
   sidebarVariant = "admin",
   onClick,
   hasAttention = false,
+  badgeCount = 0,
 }: SidebarItemProps) {
   const compatibleHref = buildCurrentBrowserCompatibleDestination(href);
 
@@ -107,6 +109,11 @@ export function SidebarItem({
         />
       </div>
       <span className={isActive ? "font-semibold" : undefined}>{label}</span>
+      {badgeCount > 0 && (
+        <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-semibold leading-5 text-white" aria-label={`Требуют ответа: ${badgeCount}`}>
+          {badgeCount > 99 ? "99+" : badgeCount}
+        </span>
+      )}
     </Link>
   );
 }

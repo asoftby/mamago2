@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useBirthdayBuilderWithGate } from "../hooks/useBirthdayBuilderWithGate";
 import { useBirthdayAgeSignals } from "../hooks/useBirthdayAgeSignals";
 import { BirthdayAgeSignalHydration } from "./BirthdayAgeSignalHydration";
@@ -22,6 +22,7 @@ import {
 import { BuilderProgressDots } from "./BuilderProgressDots";
 import { BuilderSummaryBar } from "./BuilderSummaryBar";
 import type { BuilderStep } from "../types/builder";
+import type { PartyFlowState } from "../lib/partySubmitFlow";
 
 const NEXT_LABELS: Partial<Record<BuilderStep, string>> = {
   when: "Далее — для кого",
@@ -69,9 +70,16 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
   const router = useRouter();
   const builder = useBirthdayBuilderWithGate();
   const ageSignals = useBirthdayAgeSignals();
+  // Keep the draft ID and idempotency key alive across review-step unmount/remount.
+  const submissionFlowRef = useRef<PartyFlowState>({
+    draft: null, pending: null, key: null, submitted: false,
+  });
+  const [submissionBusy, setSubmissionBusy] = useState(false);
+  const [submissionSent, setSubmissionSent] = useState(false);
   const closeFallbackHref = `/${citySlug}/birthday`;
 
   const handleClose = () => {
+    if (submissionBusy) return;
     if (typeof window !== "undefined" && window.history.length > 1) {
       router.back();
       return;
@@ -207,6 +215,7 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
             <button
               type="button"
               onClick={handleClose}
+              disabled={submissionBusy}
               aria-label="Закрыть"
               style={{
                 display: "inline-flex",
@@ -259,7 +268,24 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
               onToggleAddon={builder.toggleAddon}
             />
           )}
-          {currentStep === "done" && <StepReview offers={selectedOffers} />}
+          {currentStep === "done" && <StepReview
+            offers={selectedOffers}
+            citySlug={citySlug}
+            dateIso={state.partyPlanning.dateIso}
+            quizDateKey={state.quiz.dateRangeFrom}
+            timeStart={state.partyPlanning.timeStart}
+            timeEnd={state.partyPlanning.timeEnd}
+            venueMode={state.quiz.placeType === "HOME" ? "HOME" : state.quiz.placeType === "OUTDOOR" ? "OUTDOOR" : state.quiz.placeType === "PACKAGE" ? "PACKAGE" : "VENUE"}
+            childName={state.quiz.partyForChild?.name ?? null}
+            authenticated={builder.isAuthenticated}
+            authLoading={builder.isAuthLoading}
+            requestLogin={builder.requestLoginToSubmit}
+            flowStateRef={submissionFlowRef}
+            busy={submissionBusy}
+            onBusyChange={setSubmissionBusy}
+            sent={submissionSent}
+            onSent={() => setSubmissionSent(true)}
+          />}
         </main>
 
         {/* Summary sticky bar */}
@@ -268,9 +294,10 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
           totalPrice={totalPrice}
           overBudget={overBudget}
           currentStep={currentStep}
-          onBack={prevStep}
+          onBack={() => { if (!submissionBusy && !submissionSent) prevStep(); }}
+          backDisabled={submissionBusy || submissionSent}
           onNext={nextStep}
-          canNext={canNext}
+          canNext={canNext && !submissionBusy}
           nextLabel={nextLabel}
           showDone={currentStep === "done"}
         />

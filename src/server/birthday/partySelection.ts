@@ -1,10 +1,11 @@
-import { PartyCategory, type OfferProductType, type Prisma } from "@prisma/client";
+import { PartyCategory, type OfferProductType, type PartyLocationType, type Prisma } from "@prisma/client";
 import { PartyApiError } from "./partyDraft.validation";
 
 export type CatalogOffer = {
   id: string;
   productType: OfferProductType | null;
   category: PartyCategory | null;
+  partyLocationType: PartyLocationType | null;
   priceFrom: number | null;
   priceMode: string;
   currency: string;
@@ -15,6 +16,25 @@ export type CatalogOffer = {
 
 export function isVenueOffer(offer: CatalogOffer): boolean {
   return offer.productType === "PARTY_PACKAGE" || offer.category === "VENUE";
+}
+
+type PartyMode = "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR";
+
+export function isCompatiblePartyLocation(mode: PartyMode, offer: CatalogOffer): boolean {
+  const location = offer.partyLocationType;
+  if (!location || location === "BOTH") return true;
+  const onsite = mode === "VENUE" || mode === "PACKAGE";
+  return location === (onsite ? "ON_SITE" : "OFF_SITE");
+}
+
+export function isValidPartyAnchor(mode: PartyMode, offer: CatalogOffer): boolean {
+  if (!isCompatiblePartyLocation(mode, offer)) return false;
+  if (mode === "VENUE" || mode === "PACKAGE") return isVenueOffer(offer);
+  if (offer.productType === "PARTY_PACKAGE") {
+    // Only explicitly mobile packages can anchor home/outdoor celebrations.
+    return offer.partyLocationType === "OFF_SITE" || offer.partyLocationType === "BOTH";
+  }
+  return !isVenueOffer(offer);
 }
 
 export function includedCategories(offer: CatalogOffer): PartyCategory[] {
@@ -42,11 +62,12 @@ export function offerPriceSnapshot(offer: Pick<CatalogOffer, "priceFrom" | "pric
 export function assertCompatibleSelection(
   mode: "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR", anchor: CatalogOffer, addons: CatalogOffer[],
 ): void {
-  if ((mode === "VENUE" || mode === "PACKAGE") !== isVenueOffer(anchor)) {
+  if (!isValidPartyAnchor(mode, anchor)) {
     throw new PartyApiError(422, "Основное предложение не соответствует формату");
   }
   const included = new Set(includedCategories(anchor));
   if (addons.some((offer) => offer.id === anchor.id || isVenueOffer(offer) ||
+      !isCompatiblePartyLocation(mode, offer) ||
       (offer.category && included.has(offer.category)))) {
     throw new PartyApiError(422, "Дополнительная услуга уже входит в пакет или является площадкой");
   }

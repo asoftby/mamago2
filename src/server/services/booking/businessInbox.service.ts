@@ -134,7 +134,8 @@ export async function getBusinessInbox({
 
   const nearestUpcoming = bucket === "ACTION_REQUIRED"
     ? decisions
-        .filter((item) => item.decision.bucket === "UPCOMING")
+        .filter(({ row, decision }) => decision.bucket === "UPCOMING" &&
+          (kind === "all" || row.kind === (kind === "party" ? BookingKind.PARTY : BookingKind.STANDARD)))
         .sort(compareBookingDecisions)
         .slice(0, 3)
         .map(({ row, serviceEndsAt }) => ({

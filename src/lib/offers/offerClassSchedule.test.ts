@@ -160,3 +160,21 @@ const stableRules = [
   { weekday: 3, startMinutes: 1020, capacity: 8, validFrom: "2026-10-01", validTo: "2026-10-31" },
 ];
 assert.deepEqual(groupsFromRules(stableRules), groupsFromRules(stableRules));
+
+
+// Недопустимая вместимость не должна незаметно превращаться в null (без лимита).
+for (const productType of ["REGULAR_ACTIVITY", "ONE_TIME_ACTIVITY"] as const) {
+  for (const seats of ["0", "-1", "1.5", "1001", "abc"]) {
+    const form = defaultClassSchedule();
+    form.groups = [{ id: "g", days: [1], time: "17:00", seats }];
+    form.dates = [{ id: "d", date: "2026-11-01", time: "17:00", seats }];
+    assert.ok(
+      getClassScheduleMissingFields(form, productType, "60").includes("Количество мест должно быть целым числом от 1 до 1000"),
+      `${productType}: invalid seats ${seats}`,
+    );
+  }
+  const unlimited = defaultClassSchedule();
+  unlimited.groups = [{ id: "g", days: [1], time: "17:00", seats: "" }];
+  unlimited.dates = [{ id: "d", date: "2026-11-01", time: "17:00", seats: "" }];
+  assert.deepEqual(getClassScheduleMissingFields(unlimited, productType, "60"), []);
+}

@@ -4,7 +4,6 @@ import { loadSlotSnapshot } from "./getSlots";
 import { calculateSlots, type SlotSnapshot } from "./slotAvailability";
 import { dateKeyInZone, isoWeekday, localMinuteKey } from "./slotTime";
 
-const DAY_MS = 86_400_000;
 const MINUTE_MS = 60_000;
 const PHONE_RE = /^\+?[\d\s\-().]{7,20}$/;
 
@@ -19,6 +18,10 @@ export type ReserveSlotInput = {
   customerEmail?: string | null;
   customerComment?: string | null;
   userId?: string | null;
+  planItemId?: string | null;
+  holdMinutes?: number;
+  childName?: string | null;
+  childAge?: number | null;
 };
 
 export class SlotReservationError extends Error {
@@ -69,7 +72,9 @@ function isExclusionViolation(error: unknown): boolean {
  */
 export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId: string; holdUntil: Date }> {
   const seats = input.seats ?? 1;
+  const holdMinutes = input.holdMinutes ?? 24 * 60;
   if (!Number.isInteger(seats) || seats < 1 || seats > 100 ||
+      !Number.isInteger(holdMinutes) || holdMinutes < 1 || holdMinutes > 24 * 60 ||
       !(input.startsAt instanceof Date) || !(input.endsAt instanceof Date) ||
       !Number.isFinite(input.startsAt.getTime()) || !Number.isFinite(input.endsAt.getTime()) ||
       input.endsAt <= input.startsAt || !input.customerName?.trim() ||
@@ -94,7 +99,7 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       if (!candidate) throw new SlotReservationError("SLOT_UNAVAILABLE", "Слот уже недоступен");
 
       const holdUntil = new Date(Math.min(
-        now.getTime() + DAY_MS,
+        now.getTime() + holdMinutes * MINUTE_MS,
         input.startsAt.getTime() - offer.offerBooking.leadTimeHours * 60 * MINUTE_MS,
       ));
       if (holdUntil <= now) throw new SlotReservationError("SLOT_UNAVAILABLE", "Время записи на этот слот истекло");
@@ -138,6 +143,7 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
         data: {
           businessId,
           userId: input.userId ?? null,
+          planItemId: input.planItemId ?? null,
           publicationType: PublicationType.OFFER,
           offerId: input.offerId,
           offerSessionId: sessionId,
@@ -147,6 +153,8 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
           holdUntil,
           status: BookingStatus.NEW,
           customerName: input.customerName.trim(),
+          childName: input.childName?.trim() || null,
+          childAge: input.childAge ?? null,
           customerPhone: input.customerPhone.trim(),
           customerEmail: input.customerEmail?.trim() || null,
           customerComment: input.customerComment?.trim() || null,

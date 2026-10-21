@@ -10,6 +10,8 @@
  */
 
 import prisma from "@/lib/prisma";
+import { reserveSlot } from "@/server/offers/reserveSlot";
+import { childScopeFor } from "@/server/family/familyAccess";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 import {
   BookingMode,
@@ -263,6 +265,123 @@ async function logBookingCreatedAudit(params: {
     },
     metadata: params.metadata ?? null,
   });
+}
+
+/**
+ * Reserve an actual class session through the transactional slot engine.
+ * Keeps the same audit/notifications/family link as regular public bookings.
+ */
+export async function createPublicClassSlotBooking(input: {
+  offerId: string;
+  startsAt: Date;
+  endsAt: Date;
+  seats: number;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string | null;
+  customerComment?: string | null;
+  userId?: string | null;
+  planItemId?: string | null;
+  childId?: string | null;
+}): Promise<{ bookingId: string; holdUntil: Date }> {
+  const { customerName, customerPhone } = validateBookingCustomer(input);
+  const offer = await prisma.offer.findFirst({
+    where: {
+      id: input.offerId,
+      ...getPublicPublishedOfferWhere(),
+      productType: { in: ["REGULAR_ACTIVITY", "ONE_TIME_ACTIVITY"] },
+      bookingEnabled: true,
+      bookingMode: { in: ["USE_PUBLICATION_DATES", "USE_PUBLICATION_SLOTS"] },
+    },
+    select: {
+      id: true,
+      title: true,
+      place: { select: {
+        cityId: true,
+        ownerBusinessId: true,
+        ownerBusiness: { select: { ownerUserId: true } },
+      } },
+    },
+  });
+  if (!offer?.place?.ownerBusinessId) {
+    throw new BookingNotFoundError("Занятие недоступно для записи");
+  }
+  if (input.childId && (!input.userId || input.seats !== 1)) {
+    throw new BookingValidationError("childId", "Выберите одного ребёнка для одного места");
+  }
+  const child = input.childId
+    ? await prisma.child.findFirst({
+        where: { id: input.childId, ...(await childScopeFor(input.userId!)) },
+        select: { name: true, birthDate: true },
+      })
+    : null;
+  if (input.childId && !child) {
+    throw new BookingValidationError("childId", "Ребёнок недоступен");
+  }
+  const classDate = input.startsAt;
+  const childAge = child?.birthDate ? (() => {
+    let age = classDate.getUTCFullYear() - child.birthDate.getUTCFullYear();
+    const month = classDate.getUTCMonth() - child.birthDate.getUTCMonth();
+    if (month < 0 || (month === 0 && classDate.getUTCDate() < child.birthDate.getUTCDate())) age--;
+    return age >= 0 && age <= 18 ? age : null;
+  })() : null;
+  const planLink = await resolveBookingPlanItem({
+    userId: input.userId,
+    planItemId: input.planItemId,
+    publicationType: "OFFER",
+    publicationId: offer.id,
+    requestedDate: input.startsAt,
+  });
+  if (planLink.invalid) {
+    throw new BookingValidationError("planItemId", "Запись плана недоступна");
+  }
+
+  const result = await reserveSlot({
+    offerId: offer.id,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+    seats: input.seats,
+    customerName,
+    customerPhone,
+    customerEmail: input.customerEmail,
+    customerComment: input.customerComment,
+    userId: input.userId,
+    planItemId: planLink.planItemId,
+    holdMinutes: 120,
+    childName: child?.name?.trim() || null,
+    childAge,
+  });
+
+  triggerBookingCreatedSideEffects({
+    planItemId: planLink.planItemId,
+    bookingId: result.bookingId,
+    userId: input.userId ?? null,
+    entityType: "OFFER",
+    entityId: offer.id,
+    entityTitle: offer.title,
+    cityId: offer.place.cityId ?? null,
+    ownerUserId: offer.place.ownerBusiness?.ownerUserId ?? null,
+    customerName,
+    childName: child?.name?.trim() || null,
+    childAge,
+    offerId: offer.id,
+    offerTitle: offer.title,
+  });
+  await logBookingCreatedAudit({
+    bookingId: result.bookingId,
+    status: BookingStatus.NEW,
+    actorId: input.userId ?? null,
+    actorRole: input.userId ? "USER" : "ANONYMOUS",
+    publicationType: PublicationType.OFFER,
+    entityType: "OFFER",
+    entityId: offer.id,
+    businessId: offer.place.ownerBusinessId,
+    customerName,
+    customerPhone,
+    customerEmail: normalizeOptionalString(input.customerEmail),
+    metadata: { source: "public_class_slot", startsAt: input.startsAt.toISOString(), seats: input.seats },
+  });
+  return result;
 }
 
 // ─── Generic public booking ──────────────────────────────────────────────────

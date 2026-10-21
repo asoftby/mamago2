@@ -71,6 +71,12 @@ export function bookingBucket(input: BookingBucketInput, now = new Date()): Book
       return { bucket: "AWAITING_CUSTOMER", urgency: null, action: "WAIT_CUSTOMER", deadline: input.quoteValidUntil };
     }
     if (stage !== "CONFIRMED") return archive();
+    // PARTY completion has its own lifecycle. The STANDARD-only CLOSE_VISIT
+    // endpoint must not be offered for a confirmed party. Once elapsed,
+    // show it read-only in Archive without changing its CONFIRMED DB status.
+    if (input.serviceEndsAt && input.serviceEndsAt.getTime() <= time) return archive();
+    // An undated PARTY must not enter STANDARD housekeeping after 30 days.
+    return { bucket: "UPCOMING", urgency: null, action: "VIEW_UPCOMING", deadline: null };
   } else {
     if (input.status === "NEW") return action("RESPOND", input.serviceEndsAt ?? null);
     if (input.status !== "CONFIRMED") return archive();

@@ -62,6 +62,11 @@ jobs:
           pnpm exec tsx src/server/birthday/partyOutbox.contract.test.ts
           pnpm exec tsx src/server/services/booking/bookingBucket.contract.test.ts
 
+      - name: Classes schedule and capacity regressions
+        run: |
+          pnpm exec tsx src/lib/offers/offerClassSchedule.test.ts
+          pnpm exec tsx src/server/offers/slotAvailability.test.ts
+
       - name: Type check
         # GitHub ubuntu runners abort TypeScript at Node's default heap ceiling.
         run: NODE_OPTIONS=--max-old-space-size=5120 pnpm tsc --noEmit
