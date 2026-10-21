@@ -1,0 +1,91 @@
+{
+  "codeCommit": "67e0adcd88e3731da0833b4d70afdf779da8c87e",
+  "environment": "Task-only localhost production build; isolated synthetic PostgreSQL; no deployment",
+  "serverCleanup": "Both task-owned process groups stopped; both allocated loopback ports verified closed",
+  "checks": [
+    {
+      "path": "/top-18-kafe-i-restoranov-s-detskoj-ploshhadkoj-ili-komnatoj/?utm_source=seo-test",
+      "status": 308,
+      "location": "/minsk/blog/top-18-kafe-i-restoranov-s-detskoy-ploshchadkoy-ili-komnatoy?utm_source=seo-test",
+      "xRobots": null,
+      "canonical": [],
+      "notFound": false,
+      "noindex": false,
+      "mode": "production"
+    },
+    {
+      "path": "/minsk/events/?age=5",
+      "status": 301,
+      "location": "/minsk/events?age=5",
+      "xRobots": null,
+      "canonical": [],
+      "notFound": false,
+      "noindex": false,
+      "mode": "production"
+    },
+    {
+      "path": "/seo-audit-nonexistent-20261022",
+      "status": 200,
+      "location": null,
+      "xRobots": null,
+      "canonical": [],
+      "notFound": true,
+      "noindex": true,
+      "mode": "production"
+    },
+    {
+      "path": "/unknown-city-seo/events",
+      "status": 200,
+      "location": null,
+      "xRobots": null,
+      "canonical": [],
+      "notFound": true,
+      "noindex": true,
+      "mode": "production"
+    },
+    {
+      "path": "/minsk/blog/category/seo-runtime-category-20261022",
+      "status": 200,
+      "location": null,
+      "xRobots": null,
+      "canonical": [
+        "https://mamago.by/minsk/blog/category/seo-runtime-category-20261022"
+      ],
+      "notFound": false,
+      "noindex": false,
+      "mode": "production"
+    },
+    {
+      "path": "/robots.txt",
+      "status": 200,
+      "location": null,
+      "xRobots": null,
+      "canonical": [],
+      "notFound": false,
+      "noindex": false,
+      "mode": "dev"
+    },
+    {
+      "path": "/sitemap.xml",
+      "status": 200,
+      "location": null,
+      "xRobots": null,
+      "canonical": [],
+      "notFound": false,
+      "noindex": false,
+      "mode": "dev"
+    },
+    {
+      "path": "/minsk",
+      "status": 200,
+      "location": null,
+      "xRobots": "noindex, nofollow",
+      "canonical": [
+        "https://mamago.by/minsk"
+      ],
+      "notFound": false,
+      "noindex": true,
+      "mode": "dev"
+    }
+  ]
+}

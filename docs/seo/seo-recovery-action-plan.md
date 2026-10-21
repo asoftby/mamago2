@@ -9,6 +9,7 @@
 | P1 | SEO owner: восстановить разрешённое GSC чтение или выгрузить данные. | Pages indexing с причинами, sitemap статус и URL Inspection выборки; baseline performance. |
 | P1 | #253 / migration owner: сохранить DB-ready guard, проработать настоящий pre-stream HTTP redirect для ровно 13 утверждённых маршрутов, исключить Могилёв. | One-hop 301/308, final 200/indexable/self-canonical/in sitemap; сверка контента, проверка Google-selected canonical. Не активировать новые mappings без доказательств. |
 | P1 | #249 / SEO owner: проверить, что Google успешно прочитал текущий sitemap. | В GSC актуальный fetch без ошибки; причины excluded распределены по ожидаемым и ошибочным. |
+| P1 | Migration/SEO owner: four checked legacy event targets (Phase2A 25–28) remain missing/noindex. | Approved equivalent or restored historical content; otherwise explicit justified 404/410 policy. No inferred current-season target or generic hub. |
 | P2 | #270 / SEO owner: контроль /minsk/events по query/page на 7/14/28 день. | Сравнимые окна и сегменты, clicks/impressions/CTR/position, дата последней доступной статистики, отсутствие вывода по неполным дням. |
 | P2 | Engineering: восстановить исторические recovery tests после проверки утверждённых CITY/COUNTRY и owner-review решений. | Оба теста проходят без ослабления data guard и без подмены target нерелевантным хабом. |
 | P2 | Engineering: listing lastmod, category tag pagination и runtime sitemap полнота/alerts. | Доказанная потребность и отдельный fresh task; не расширять текущий PR неподтверждённой оптимизацией. |

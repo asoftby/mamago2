@@ -15,6 +15,8 @@
 
 | SEO-09 P2 | Top-18 legacy URL со слешем: два HTTP 308 перед final 200. Next automatic slash redirect исполнялся перед manifest. | `skipTrailingSlashRedirect: true`; существующий custom middleware и manifest остаются. Проверить собранный routes manifest и локальный HTTP, включая query и GET/HEAD. |
 
+| SEO-10 P1, existing migration gap | Four legacy event URLs (Phase2A positions 25–28) redirect to missing noindex cards; full paths in CSV. `/events` hub redirects correctly. | Current equivalent/content inventory required; preserve owner-review guards. No guessed seasonal redirect, blanket hub fallback or automatic 410. |
+
 ## Не считать установленными дефектами
 
 - 200 с `NEXT_HTTP_ERROR_FALLBACK;404` и meta noindex — streaming notFound, не доказательство индексируемой soft 404. URL Inspection нужен для фактической классификации Google.
