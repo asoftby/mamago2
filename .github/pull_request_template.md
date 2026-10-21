@@ -10,7 +10,8 @@
 - [ ] TypeScript / typecheck passed
 - [ ] ESLint passed
 - [ ] Relevant automated tests passed
-- [ ] Build / `pnpm check:push` passed (or explain exception)
+- [ ] `pnpm check:push` passed (mandatory task verification; provide run result)
+- [ ] If build-only validation was performed instead, document why and mark the mandatory check above incomplete
 - [ ] Manual validation (mobile and desktop where applicable)
 
 ## Database & compatibility
