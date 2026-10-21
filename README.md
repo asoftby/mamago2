@@ -58,6 +58,11 @@ pnpm check:push
 
 `check:push` runs the project verification gate (typecheck, regression tests and production build). It can be resource-intensive.
 
+Some regression checks read PostgreSQL. Use a dedicated local test database with
+synthetic data; never use DEV/PROD credentials or dumps for local verification.
+See the [repository audit](docs/engineering/repository-audit-2026-10-22.md) for
+verification prerequisites and the existing ESLint baseline.
+
 ## Branches and contributions
 
 - **`dev`** is the canonical integration branch. New work uses an isolated task branch and pull request; do not implement directly on `dev`.
