@@ -109,6 +109,7 @@ export interface OfferPageData {
   id: string;
   offerType: OfferType;
   productType?: OfferProductType | null;
+  classSlotBookingEnabled?: boolean;
   citySlug: string;
   slug: string;
   title: string;
