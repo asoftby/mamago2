@@ -20,6 +20,8 @@ export type ReserveSlotInput = {
   userId?: string | null;
   planItemId?: string | null;
   holdMinutes?: number;
+  childName?: string | null;
+  childAge?: number | null;
 };
 
 export class SlotReservationError extends Error {
@@ -151,6 +153,8 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
           holdUntil,
           status: BookingStatus.NEW,
           customerName: input.customerName.trim(),
+          childName: input.childName?.trim() || null,
+          childAge: input.childAge ?? null,
           customerPhone: input.customerPhone.trim(),
           customerEmail: input.customerEmail?.trim() || null,
           customerComment: input.customerComment?.trim() || null,
