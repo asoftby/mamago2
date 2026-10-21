@@ -88,7 +88,7 @@ export function isLegacyCalendarView(params: { get(name: string): string | null 
 
 export const NEXT_ACTION_LABEL: Record<InboxNextAction, string> = {
   RESPOND: "Ответьте клиенту",
-  RECONFIRM: "Нужно согласовать условия повторно",
+  RECONFIRM: "Семья приняла условия — подтвердите бронирование",
   EXTEND_OR_CLOSE: "Предложение истекло",
   CLOSE_VISIT: "Отметьте, состоялся ли визит",
   VIEW_UPCOMING: "Предстоит",
