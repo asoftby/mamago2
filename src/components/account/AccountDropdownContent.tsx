@@ -3,12 +3,15 @@
 import { formatPrice } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Building2, Check, Clock3, LogOut, Shield, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   accountDropdownIconClass,
   accountDropdownRowAccent,
+  accountDropdownRowActive,
   accountDropdownRowDefault,
+  isAccountRowActive,
 } from "@/components/account/accountDropdownTokens";
 import { AppMenu } from "@/components/account/AppMenu";
 import type { AccountDropdownHeaderModel, AccountMenuRow } from "@/components/account/types";
@@ -29,22 +32,27 @@ function MenuRow({
   onNavigate?: () => void;
   rowClassName?: string;
 }) {
+  const pathname = usePathname();
+  const active = isAccountRowActive(pathname, row);
+  const rowClass = active
+    ? accountDropdownRowActive
+    : row.variant === "accent"
+      ? accountDropdownRowAccent
+      : accountDropdownRowDefault;
+  const current = active ? ("page" as const) : undefined;
   if (row.type === "link") {
-    const rowClass =
-      row.variant === "accent" ? accountDropdownRowAccent : accountDropdownRowDefault;
     return (
-      <Link href={row.href} className={cn(rowClass, rowClassName)} onClick={onNavigate}>
+      <Link href={row.href} className={cn(rowClass, rowClassName)} onClick={onNavigate} aria-current={current}>
         <RowIcon Icon={row.icon} />
         {row.label}
       </Link>
     );
   }
-  const rowClass =
-    row.variant === "accent" ? accountDropdownRowAccent : accountDropdownRowDefault;
   return (
     <button
       type="button"
       className={cn(rowClass, rowClassName)}
+      aria-current={current}
       onClick={() => {
         row.onClick();
         onNavigate?.();
