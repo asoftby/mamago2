@@ -1,5 +1,6 @@
 import type { IdeaItem } from "../types";
 import { IdeaPosterCard } from "./IdeaPosterCard";
+import { OrderedMasonryGrid } from "@/components/ideas/OrderedMasonryGrid";
 
 type IdeasGridProps = {
   ideas: IdeaItem[];
@@ -8,7 +9,7 @@ type IdeasGridProps = {
   onSchedule: (ideaId: string) => void;
 };
 
-/** Pinterest-style masonry: native poster ratios, two columns mobile / four desktop. */
+/** Ordered Pinterest-style masonry: native poster ratios, two columns mobile / four desktop. */
 export function IdeasGrid({
   ideas,
   planningIdeaId,
@@ -16,9 +17,9 @@ export function IdeasGrid({
   onSchedule,
 }: IdeasGridProps) {
   return (
-    <div className="w-full min-w-0 columns-2 gap-x-3 sm:gap-x-6 lg:columns-4">
+    <OrderedMasonryGrid itemClassName="pb-5 sm:pb-8">
       {ideas.map((idea) => (
-        <div key={idea.id} className="mb-7 break-inside-avoid sm:mb-10">
+        <div key={idea.id} className="min-w-0">
           <IdeaPosterCard
             idea={idea}
             isScheduling={planningIdeaId === idea.id}
@@ -27,6 +28,6 @@ export function IdeasGrid({
           />
         </div>
       ))}
-    </div>
+    </OrderedMasonryGrid>
   );
 }

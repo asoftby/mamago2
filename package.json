@@ -133,7 +133,7 @@
     "test:discovery-intent-tabs": "tsx src/components/city/DiscoveryIntentTabs.test.tsx",
     "test:responsive-table": "tsx src/components/ui/table.test.tsx && tsx src/components/ui/data-card-list.test.tsx",
     "test:responsive-wizard": "tsx src/lib/responsive/formWizardMobileContract.test.ts",
-    "test:responsive-public-mobile": "tsx src/lib/responsive/publicMobileLayoutContract.test.ts && tsx src/components/site/header/Header.planHeaderFlicker.test.ts",
+    "test:responsive-public-mobile": "tsx src/lib/responsive/publicMobileLayoutContract.test.ts && tsx src/components/site/header/Header.planHeaderFlicker.test.ts && tsx src/components/ideas/orderedMasonryGeometry.test.ts",
     "test:notifications-mvp": "tsx src/lib/notifications/userNotificationPresentation.test.ts && tsx src/lib/notifications/userNotificationSchedule.test.ts && tsx src/lib/notifications/planNotificationScheduleUi.test.ts && tsx src/server/notifications/notification-renderer.test.ts && tsx src/server/notifications/notification-dedupe.test.ts && tsx src/server/notifications/notification.service.test.ts && tsx src/server/notifications/jobs/run-plan-event-reminders.test.ts && tsx src/server/notifications/jobs/run-plan-tomorrow-digests.test.ts && tsx src/server/notifications/template-render.test.ts",
     "test:plan-item-nullable-date": "tsx src/lib/plan/ideaPlanStatus.test.ts && tsx src/lib/plan/planItemNullableDateMigration.contract.test.ts",
     "test:plan-item-nullable-date-integration": "NODE_OPTIONS=--conditions=react-server tsx src/server/services/planItemNullableDate.integration.test.ts",

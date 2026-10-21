@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { MoreHorizontal, Plus } from "lucide-react";
 import { CollectionCover } from "@/components/ideas/CollectionCover";
+import { OrderedMasonryGrid } from "@/components/ideas/OrderedMasonryGrid";
 import { visibleInCollection, type CollectionSummary, type CollectionMemberships } from "../collectionState";
 import type { IdeaItem } from "../types";
 
@@ -22,7 +23,7 @@ export function IdeasCollectionsBar({ collections, ideas, memberships, onCreate,
   return (
     <section aria-label="Мои коллекции" className="min-w-0 space-y-4">
       <h2 className="text-lg font-semibold">Мои коллекции</h2>
-      <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-6 sm:gap-x-6 lg:grid-cols-4">
+      <OrderedMasonryGrid itemClassName="pb-4">
         {collections.map((item) => {
           const covers = ideas
             .filter((idea) => visibleInCollection(idea, item.id, memberships))
@@ -38,7 +39,7 @@ export function IdeasCollectionsBar({ collections, ideas, memberships, onCreate,
                 aria-label={`Открыть коллекцию «${item.title}»`}
               >
                 <CollectionCover covers={covers} className="transition-shadow group-hover:shadow-md" />
-                <span className="mt-3 block truncate text-base font-semibold">{item.title}</span>
+                <span className="mt-3 block break-words text-base font-semibold">{item.title}</span>
                 <span className="text-xs text-muted-foreground">{item.count} сохранено</span>
               </Link>
               <button
@@ -62,7 +63,7 @@ export function IdeasCollectionsBar({ collections, ideas, memberships, onCreate,
           </span>
           <span className="mt-3 block text-base font-semibold">Новая коллекция</span>
         </button>
-      </div>
+      </OrderedMasonryGrid>
     </section>
   );
 }
