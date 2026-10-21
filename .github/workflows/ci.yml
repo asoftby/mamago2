@@ -60,6 +60,7 @@ jobs:
           pnpm exec tsx src/server/birthday/partyDraft.contract.test.ts
           pnpm exec tsx src/server/birthday/partyBusiness.contract.test.ts
           pnpm exec tsx src/server/birthday/partyOutbox.contract.test.ts
+          pnpm exec tsx src/server/birthday/partyQuoteAcceptance.contract.test.ts
           pnpm exec tsx src/server/services/booking/bookingBucket.contract.test.ts
 
       - name: Classes schedule and capacity regressions
