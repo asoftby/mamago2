@@ -55,7 +55,7 @@ async function processOne(row: PartyOutboxRow): Promise<"sent" | "skipped" | "fa
     }
 
     const order = request.partyOrderItem.partyOrder;
-    const recipients = row.eventType === "PARTY_REQUEST_SENT"
+    const recipients = (row.eventType === "PARTY_REQUEST_SENT" || row.eventType === "PARTY_QUOTE_ACCEPTED")
       ? (await prisma.businessMember.findMany({
           where: { businessId: request.businessId, isActive: true,
             role: { in: ["OWNER", "MANAGER"] } },
