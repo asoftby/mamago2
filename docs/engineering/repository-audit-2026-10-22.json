@@ -1,0 +1,714 @@
+{
+  "initialBase": "f174879ab39a345f8f4870177dddede849cb43cc",
+  "reconciledBase": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+  "date": "2026-10-22 Europe/Minsk",
+  "pullRequests": [
+    {
+      "number": 685,
+      "url": "https://github.com/asoftby/mamago2/pull/685",
+      "title": "chore(repo): professional README and removal of obsolete TypeScript dumps",
+      "head": "eeda6659106692bdc936e8d7e28f351e1e737403",
+      "baseBranch": "dev",
+      "initialDraft": false,
+      "classification": "NEEDS_REBASE",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 5,
+      "behindDev": 8,
+      "cleanMergeIntoDev": true,
+      "changedFileCount": 5,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [],
+      "unresolvedReviewThreads": 0,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39674445282/job/119480482226"
+        }
+      ],
+      "evidenceAndNextAction": "README + four compiler dumps only; no references found by full local rg scan. Merge tree clean, but refresh against dev and run mandatory check:push before merge. Do not duplicate README/deletions."
+    },
+    {
+      "number": 684,
+      "url": "https://github.com/asoftby/mamago2/pull/684",
+      "title": "feat(birthday): якорь-роль, автоподтверждение по фикс. цене, маркер предоплаты",
+      "head": "cb38e679d527db503b8a8101e695c9d620c0cb6d",
+      "baseBranch": "dev",
+      "initialDraft": false,
+      "classification": "NEEDS_WORK",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 0,
+      "behindDev": 8,
+      "cleanMergeIntoDev": true,
+      "changedFileCount": 13,
+      "exactChangedPathsInDev": [
+        "docs/birthday/party-confirm-stage2.md",
+        "package.json",
+        "prisma/migrations/20261021120000_party_anchor_confirmation/migration.sql",
+        "prisma/schema.prisma",
+        "src/app/api/business/party-requests/[id]/prepaid/route.ts",
+        "src/server/birthday/partyAnchorConfirmation.contract.test.ts",
+        "src/server/birthday/partyBusiness.contract.test.ts",
+        "src/server/birthday/partyBusiness.service.ts",
+        "src/server/birthday/partyFixedPrice.ts",
+        "src/server/birthday/partyItemLabel.ts",
+        "src/server/birthday/partyPrepaid.service.ts",
+        "src/server/birthday/partySelection.ts",
+        "src/server/birthday/partySubmit.service.ts"
+      ],
+      "missingPathsInDev": [],
+      "unresolvedReviewThreads": null,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "IN_PROGRESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39676095916/job/119486212409"
+        },
+        {
+          "name": "audit",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39676095886/job/119486212258"
+        }
+      ],
+      "evidenceAndNextAction": "External actor merged during audit as 1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2. Initial review: migration and prepaid/auto-confirm changes; DEV and real DB gates were incomplete. This session did not merge it or certify rollout."
+    },
+    {
+      "number": 669,
+      "url": "https://github.com/asoftby/mamago2/pull/669",
+      "title": "feat(classes): choose child from Family Core when booking a class",
+      "head": "2b67236c0a0b2d92a80f819cd00a488a460d2293",
+      "baseBranch": "feat/classes-parent-booking-ui-20261021",
+      "initialDraft": true,
+      "classification": "SUPERSEDED",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 4,
+      "behindDev": 64,
+      "cleanMergeIntoDev": true,
+      "changedFileCount": 9,
+      "exactChangedPathsInDev": [
+        "src/app/api/public/offers/[id]/reserve/route.ts",
+        "src/app/api/public/offers/[id]/slots/route.ts",
+        "src/components/offers/ClassBookingOverlay.tsx",
+        "src/components/offers/OfferPageView.tsx",
+        "src/lib/offer/offerPageData.ts",
+        "src/lib/offer/offerPageTypes.ts",
+        "src/server/offers/reserveSlot.integration.test.ts",
+        "src/server/services/booking/booking.service.ts"
+      ],
+      "missingPathsInDev": [],
+      "unresolvedReviewThreads": 0,
+      "initialChecks": [
+        {
+          "name": "audit",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39596038160/job/119208467011"
+        }
+      ],
+      "evidenceAndNextAction": "8/9 cumulative changed paths identical to dev; remaining reserveSlot SQL uses now() instead of current explicit UTC conversion. Preserve newer UTC fix. Child ACL/snapshot exists in dev via 5e6ea7d8. Retain draft until #658 evidence is reconciled."
+    },
+    {
+      "number": 668,
+      "url": "https://github.com/asoftby/mamago2/pull/668",
+      "title": "feat(classes): parent slot chooser and booking on offer detail",
+      "head": "e5fe586f2cd242500aa0cb66c9db21c59c434aed",
+      "baseBranch": "feat/classes-reserve-endpoint-20261021",
+      "initialDraft": true,
+      "classification": "SUPERSEDED",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 3,
+      "behindDev": 64,
+      "cleanMergeIntoDev": false,
+      "changedFileCount": 9,
+      "exactChangedPathsInDev": [
+        "src/app/api/public/offers/[id]/slots/route.ts",
+        "src/components/offers/OfferPageView.tsx",
+        "src/lib/offer/offerPageData.ts",
+        "src/lib/offer/offerPageTypes.ts",
+        "src/server/offers/reserveSlot.integration.test.ts"
+      ],
+      "missingPathsInDev": [],
+      "unresolvedReviewThreads": 0,
+      "initialChecks": [
+        {
+          "name": "audit",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39595077173/job/119205264104"
+        }
+      ],
+      "evidenceAndNextAction": "Overlay and offer integration already present in dev; old cumulative stack lacks child selection and subsequent reservation hardening. Conflicts with dev despite clean status against its parent branch. Retain pending #658 acceptance."
+    },
+    {
+      "number": 665,
+      "url": "https://github.com/asoftby/mamago2/pull/665",
+      "title": "feat(classes): atomic reservation API with business notifications and family plan link",
+      "head": "431e033095d7f26e726905af8b57e01925708dc5",
+      "baseBranch": "feat/class-public-slots-read-20261021",
+      "initialDraft": true,
+      "classification": "SUPERSEDED",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 2,
+      "behindDev": 64,
+      "cleanMergeIntoDev": false,
+      "changedFileCount": 5,
+      "exactChangedPathsInDev": [
+        "src/app/api/public/offers/[id]/slots/route.ts",
+        "src/server/offers/reserveSlot.integration.test.ts"
+      ],
+      "missingPathsInDev": [],
+      "unresolvedReviewThreads": 0,
+      "initialChecks": [
+        {
+          "name": "audit",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39594388160/job/119202972513"
+        }
+      ],
+      "evidenceAndNextAction": "Current public command path already calls atomic reserveSlot (6bf46824). Old stack conflicts with newer child ACL, service and hold-expiry work. Preserve integration tests; retain draft pending #658 acceptance."
+    },
+    {
+      "number": 662,
+      "url": "https://github.com/asoftby/mamago2/pull/662",
+      "title": "feat(classes): public read-only availability endpoint for class sessions",
+      "head": "9d7bca548100e8ab1957900407d9f62b20442e8b",
+      "baseBranch": "dev",
+      "initialDraft": true,
+      "classification": "SUPERSEDED",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 1,
+      "behindDev": 64,
+      "cleanMergeIntoDev": true,
+      "changedFileCount": 1,
+      "exactChangedPathsInDev": [
+        "src/app/api/public/offers/[id]/slots/route.ts"
+      ],
+      "missingPathsInDev": [],
+      "unresolvedReviewThreads": 0,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39592916717/job/119198071386"
+        },
+        {
+          "name": "audit",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39592916723/job/119198074631"
+        }
+      ],
+      "evidenceAndNextAction": "Only changed file is byte-identical in dev: public slots route introduced by acc4bb1982fac7368cb37820d7a85880d333e706. Safe to close as superseded without deleting branch; does not close release issue #658."
+    },
+    {
+      "number": 660,
+      "url": "https://github.com/asoftby/mamago2/pull/660",
+      "title": "feat(birthday): принятие предложения и безопасное подтверждение площадки",
+      "head": "f9d01c92d94061b0ee00cd2a48a0176fc4f41384",
+      "baseBranch": "dev",
+      "initialDraft": true,
+      "classification": "NEEDS_WORK",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 4,
+      "behindDev": 64,
+      "cleanMergeIntoDev": false,
+      "changedFileCount": 14,
+      "exactChangedPathsInDev": [
+        "src/server/birthday/partyOutbox.service.ts"
+      ],
+      "missingPathsInDev": [
+        "src/features/me/components/AcceptBirthdayQuoteButton.tsx",
+        "src/server/birthday/partyConfirmation.contract.test.ts",
+        "src/server/birthday/partyConfirmation.integration.test.ts",
+        "src/server/birthday/partyConfirmation.service.ts"
+      ],
+      "unresolvedReviewThreads": 0,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39592353985/job/119196203979"
+        },
+        {
+          "name": "audit",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39592354290/job/119196204912"
+        }
+      ],
+      "evidenceAndNextAction": "Conflicts with newer quote acceptance/confirm/outbox implementation; unique older service, parent route and integration tests remain. Retain draft, map invariants and port only missing tests. Depends on business inbox and #656; no automatic integration."
+    },
+    {
+      "number": 647,
+      "url": "https://github.com/asoftby/mamago2/pull/647",
+      "title": "Family Access 2.0: invite UX simplification and delegated access architecture",
+      "head": "12e02162fd6ec8692925d779e7746f85d6611ed3",
+      "baseBranch": "dev",
+      "initialDraft": true,
+      "classification": "KEEP_DRAFT",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 4,
+      "behindDev": 91,
+      "cleanMergeIntoDev": true,
+      "changedFileCount": 3,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [
+        "docs/architecture/FAMILY_DELEGATED_ACCESS_2_0.md"
+      ],
+      "unresolvedReviewThreads": 0,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39521724360/job/118966894440"
+        },
+        {
+          "name": "audit",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39521724531/job/118966894764"
+        }
+      ],
+      "evidenceAndNextAction": "Unique invite consent UX and delegated-access architecture; grants/guest scopes unfinished. Keep draft. Security review of child/family ACL and consent required before enabling access."
+    },
+    {
+      "number": 645,
+      "url": "https://github.com/asoftby/mamago2/pull/645",
+      "title": "Place: категория, рейтинг, отзывы и возраст в одной строке",
+      "head": "993fb20f46edc84d98b22713013a6fbe82fc8e06",
+      "baseBranch": "dev",
+      "initialDraft": false,
+      "classification": "NEEDS_WORK",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 9,
+      "behindDev": 113,
+      "cleanMergeIntoDev": true,
+      "changedFileCount": 6,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [],
+      "unresolvedReviewThreads": 0,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39516823166/job/118950861648"
+        },
+        {
+          "name": "audit",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39516823258/job/118950861788"
+        }
+      ],
+      "evidenceAndNextAction": "Hero metadata changes remain distinct; overlaps brand PRs and current hero/location rendering. Merge tree clean; verify ratings source, review anchor and narrow mobile layout after refreshing base."
+    },
+    {
+      "number": 636,
+      "url": "https://github.com/asoftby/mamago2/pull/636",
+      "title": "Search: show last opened page in recent search hint",
+      "head": "def8158959413bd189ba06f5f94c1ed14148c9f9",
+      "baseBranch": "dev",
+      "initialDraft": false,
+      "classification": "NEEDS_WORK",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 9,
+      "behindDev": 165,
+      "cleanMergeIntoDev": true,
+      "changedFileCount": 8,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [
+        "src/components/search/LastSearchEntry.tsx",
+        "src/hooks/useLastPublicSearchResult.ts",
+        "src/lib/search/recentPublicSearch.test.ts"
+      ],
+      "unresolvedReviewThreads": 1,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39496777225/job/118883761275"
+        },
+        {
+          "name": "audit",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39496777276/job/118883760458"
+        }
+      ],
+      "evidenceAndNextAction": "New LastSearchEntry, storage hook and tests are absent in dev; unique functionality remains. One unresolved review thread. Overlaps #513/#571 mobile search; privacy/URL validation and browser QA pending."
+    },
+    {
+      "number": 626,
+      "url": "https://github.com/asoftby/mamago2/pull/626",
+      "title": "Custom hours and minutes for plan reminders via existing Telegram notifications",
+      "head": "76d8cb0a8d5b14a597539bb303bd246f366e374e",
+      "baseBranch": "dev",
+      "initialDraft": false,
+      "classification": "NEEDS_REBASE",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 2,
+      "behindDev": 180,
+      "cleanMergeIntoDev": false,
+      "changedFileCount": 5,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [],
+      "unresolvedReviewThreads": 1,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39314676622/job/118272943356"
+        },
+        {
+          "name": "audit",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39314676634/job/118272944601"
+        }
+      ],
+      "evidenceAndNextAction": "Custom 1..1440 minute inputs already exist, but service/job/test differences remain. Conflicts with current plan service and #483 reminder model. Preserve existing cron; reconcile contract and timezone tests without changing scheduler."
+    },
+    {
+      "number": 623,
+      "url": "https://github.com/asoftby/mamago2/pull/623",
+      "title": "Polish account profile heading and family member hover",
+      "head": "ca0dd165d1198cbb943dbbeacb5302df9b4566e7",
+      "baseBranch": "dev",
+      "initialDraft": false,
+      "classification": "NEEDS_WORK",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 1,
+      "behindDev": 189,
+      "cleanMergeIntoDev": true,
+      "changedFileCount": 2,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [],
+      "unresolvedReviewThreads": 0,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39308210688/job/118250676592"
+        },
+        {
+          "name": "audit",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39308210576/job/118250675091"
+        }
+      ],
+      "evidenceAndNextAction": "Two-file account typography/hover change remains different. Overlaps #482/#569; review current UX and verify mobile before any integration."
+    },
+    {
+      "number": 608,
+      "url": "https://github.com/asoftby/mamago2/pull/608",
+      "title": "feat(my-plan): floating add-task button on mobile plan page, 'Name (Я)' persona label",
+      "head": "7a9f283644f231b7c3cb98ace2ecffeaa3cd26fd",
+      "baseBranch": "dev",
+      "initialDraft": false,
+      "classification": "NEEDS_REBASE",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 1,
+      "behindDev": 219,
+      "cleanMergeIntoDev": false,
+      "changedFileCount": 8,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [
+        "src/features/my-plan/components/PlanAddTaskButton.tsx",
+        "src/features/my-plan/lib/personaPlanLabel.test.ts",
+        "src/features/my-plan/lib/personaPlanLabel.ts"
+      ],
+      "unresolvedReviewThreads": 1,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39271417126/job/118124463519"
+        },
+        {
+          "name": "audit",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39271417128/job/118124479497"
+        }
+      ],
+      "evidenceAndNextAction": "Conflicts with plan UI redesign. Persona-label helper and FAB component remain unique; #489 requires one CTA. Current plan has separate FAB tests, so do not merge historical page wholesale."
+    },
+    {
+      "number": 571,
+      "url": "https://github.com/asoftby/mamago2/pull/571",
+      "title": "style(brand): unify legacy orange and brick with primary",
+      "head": "aca78e0214404c1341a251a6c31aad4c5a737f7f",
+      "baseBranch": "dev",
+      "initialDraft": false,
+      "classification": "NEEDS_REBASE",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 5,
+      "behindDev": 495,
+      "cleanMergeIntoDev": false,
+      "changedFileCount": 203,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [
+        "src/lib/brand/primaryPalette.audit.test.ts"
+      ],
+      "unresolvedReviewThreads": 5,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/38585432939/job/115926045045"
+        }
+      ],
+      "evidenceAndNextAction": "203 changed paths (GitHub files first page alone returned 100). Broad brand replacement overlaps #569, search, plan, offers and auth. Five unresolved threads; split semantic changes from mechanical token substitutions, visual QA required."
+    },
+    {
+      "number": 569,
+      "url": "https://github.com/asoftby/mamago2/pull/569",
+      "title": "feat(brand): unify primary accents, PT Serif home headings and custom date titles",
+      "head": "52d2b3dfd13dcab91f1ce0190b2e2c61921a934b",
+      "baseBranch": "dev",
+      "initialDraft": false,
+      "classification": "NEEDS_REBASE",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 26,
+      "behindDev": 520,
+      "cleanMergeIntoDev": false,
+      "changedFileCount": 67,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [
+        "src/lib/formatters/customDateRangeTitle.test.ts"
+      ],
+      "unresolvedReviewThreads": 2,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/38578091274/job/115900417896"
+        }
+      ],
+      "evidenceAndNextAction": "67 files; overlaps #571 on brand tokens and adds unique date-range test/typography. Two unresolved threads and conflicts. Extract date formatter slice, preserve newer page implementations."
+    },
+    {
+      "number": 566,
+      "url": "https://github.com/asoftby/mamago2/pull/566",
+      "title": "feat(email): фирменная Email Design System и приветственное письмо (этап 1)",
+      "head": "faee3c1b915b49dcdd7bbb468b73c55f17888594",
+      "baseBranch": "dev",
+      "initialDraft": false,
+      "classification": "NEEDS_REBASE",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 5,
+      "behindDev": 524,
+      "cleanMergeIntoDev": false,
+      "changedFileCount": 10,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [
+        "docs/architecture/email-design-system-phase1.md",
+        "scripts/email-preview-server.tsx",
+        "src/features/email/components/email-theme.ts",
+        "src/features/email/components/welcome-email.test.tsx"
+      ],
+      "unresolvedReviewThreads": 1,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/38567534440/job/115863943922"
+        }
+      ],
+      "evidenceAndNextAction": "Welcome email components exist but design-system doc, preview and tests remain unique/different. Conflict in package/scripts and email code; unresolved thread. Explicit author restriction against auto-merge; email-client preview required."
+    },
+    {
+      "number": 565,
+      "url": "https://github.com/asoftby/mamago2/pull/565",
+      "title": "feat(offers): terms step with prepayment/cancellation chips and service area",
+      "head": "f22c69f042c1fc03cc45dc11ddc4d68d0b807ef0",
+      "baseBranch": "dev",
+      "initialDraft": false,
+      "classification": "NEEDS_REBASE",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 3,
+      "behindDev": 259,
+      "cleanMergeIntoDev": false,
+      "changedFileCount": 17,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [
+        "prisma/migrations/20261014150000_offer_terms_columns/migration.sql",
+        "src/components/business/wizard/offer/offerTermsStep.test.tsx",
+        "src/components/business/wizard/offer/steps/StepPaymentTerms.tsx",
+        "src/lib/offers/offerTerms.test.ts",
+        "src/lib/offers/offerTerms.ts"
+      ],
+      "unresolvedReviewThreads": 4,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39232831992/job/117994682969"
+        },
+        {
+          "name": "audit",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/39232831995/job/117994682867"
+        }
+      ],
+      "evidenceAndNextAction": "17 files, migration and terms-step feature; five paths absent in dev. Conflicts with latest wizard/schema. Four unresolved threads. Migration rehearsal, operational-vs-moderated text decision, mobile QA and public terms display pending."
+    },
+    {
+      "number": 545,
+      "url": "https://github.com/asoftby/mamago2/pull/545",
+      "title": "fix(telegram): abuse caps and capture latency instrumentation",
+      "head": "f57b778f15e2ad1183737f8623292deeafa2dfe7",
+      "baseBranch": "dev",
+      "initialDraft": true,
+      "classification": "KEEP_DRAFT",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 7,
+      "behindDev": 618,
+      "cleanMergeIntoDev": true,
+      "changedFileCount": 7,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [
+        "docs/security/telegram-capture-abuse-guard.md"
+      ],
+      "unresolvedReviewThreads": 0,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/38355745128/job/115158095772"
+        }
+      ],
+      "evidenceAndNextAction": "Unique abuse guard runbook and quota/latency changes. Draft explicitly forbids automatic merge/deploy. No conflict is not proof of safety: scratch-DB quota races, provider spending cap and real measurements remain required."
+    },
+    {
+      "number": 513,
+      "url": "https://github.com/asoftby/mamago2/pull/513",
+      "title": "UI: единые элементы модалок — этап 1 (поиск и фильтры)",
+      "head": "01108313ad1e5b096fc123e3f4df092b8d0438ca",
+      "baseBranch": "dev",
+      "initialDraft": true,
+      "classification": "KEEP_DRAFT",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 7,
+      "behindDev": 729,
+      "cleanMergeIntoDev": false,
+      "changedFileCount": 7,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [
+        "docs/UI_MODAL_SYSTEM.md",
+        "src/components/ui/modal-chrome.test.tsx",
+        "src/components/ui/modal-chrome.tsx"
+      ],
+      "unresolvedReviewThreads": 0,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/38082994310/job/114303584110"
+        }
+      ],
+      "evidenceAndNextAction": "Unique modal-chrome components/docs/test; conflicts with current search and package scripts. Draft; retain SaveToPlanModal exclusions, keyboard/nested-sheet/mobile checks before integration."
+    },
+    {
+      "number": 483,
+      "url": "https://github.com/asoftby/mamago2/pull/483",
+      "title": "Explicit reminders for My Plan entries",
+      "head": "a2f91ad9445e8f4eaf36d106ae4e4e6c91bbbf89",
+      "baseBranch": "dev",
+      "initialDraft": false,
+      "classification": "NEEDS_REBASE",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 32,
+      "behindDev": 1003,
+      "cleanMergeIntoDev": false,
+      "changedFileCount": 26,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [
+        "prisma/migrations/20261008130000_plan_item_explicit_reminder/migration.sql"
+      ],
+      "unresolvedReviewThreads": 2,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/37615224120/job/112771817068"
+        }
+      ],
+      "evidenceAndNextAction": "26 files, unique historical migration and reminder scenario; conflicts with current schema/plan. Current code has newer relative reminder support. Reconcile absolute-vs-relative model with #626; never apply or delete old migration automatically."
+    },
+    {
+      "number": 482,
+      "url": "https://github.com/asoftby/mamago2/pull/482",
+      "title": "Mobile account and My Plan calendar polish",
+      "head": "bb07f9d1e0a45301931ba0e437a015cbe6ba47b3",
+      "baseBranch": "dev",
+      "initialDraft": false,
+      "classification": "NEEDS_REBASE",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 9,
+      "behindDev": 1003,
+      "cleanMergeIntoDev": false,
+      "changedFileCount": 6,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [
+        "src/app/(public)/me/plan/WeekCalendar.tsx",
+        "src/features/my-plan/components/WeekCalendarStrip.tsx"
+      ],
+      "unresolvedReviewThreads": 1,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/37612748280/job/112763698631"
+        }
+      ],
+      "evidenceAndNextAction": "Six changed files with replaced calendar components now absent in dev. Conflicts and unresolved review thread. Preserve current v3 plan; map remaining hover/check-in UX against #502/#489 instead of reviving old calendar."
+    },
+    {
+      "number": 381,
+      "url": "https://github.com/asoftby/mamago2/pull/381",
+      "title": "feat(party): enum foundation for party constructor (PR 1)",
+      "head": "b9362ab691f71a10a68481ef97323b1a235a5f46",
+      "baseBranch": "dev",
+      "initialDraft": false,
+      "classification": "NEEDS_REBASE",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 3,
+      "behindDev": 1546,
+      "cleanMergeIntoDev": false,
+      "changedFileCount": 13,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [
+        "prisma/migrations/20260926120000_party_enum_value_additions/migration.sql",
+        "prisma/migrations/20260926120100_party_enum_types/migration.sql"
+      ],
+      "unresolvedReviewThreads": 0,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/36258215349/job/108448924868"
+        }
+      ],
+      "evidenceAndNextAction": "Historical enum migrations are absent by name, while modern birthday models exist. Conflicts with schema and billing; enum equivalence and fresh-DB migration order need review. Never merge/drop migration files just because feature now exists."
+    },
+    {
+      "number": 380,
+      "url": "https://github.com/asoftby/mamago2/pull/380",
+      "title": "docs(engineering): party constructor MVP spec v1.1",
+      "head": "30fa984adbaad2d93f4555f414fba0a13d903411",
+      "baseBranch": "dev",
+      "initialDraft": false,
+      "classification": "NEEDS_WORK",
+      "comparedDev": "1dbb4f654b8f5302cdcf3ccaa9e45b3a4882fda2",
+      "aheadDev": 2,
+      "behindDev": 1546,
+      "cleanMergeIntoDev": true,
+      "changedFileCount": 1,
+      "exactChangedPathsInDev": [],
+      "missingPathsInDev": [
+        "docs/engineering/party-mvp-spec.md"
+      ],
+      "unresolvedReviewThreads": 1,
+      "initialChecks": [
+        {
+          "name": "typecheck",
+          "state": "SUCCESS",
+          "url": "https://github.com/asoftby/mamago2/actions/runs/36258247814/job/108449017299"
+        }
+      ],
+      "evidenceAndNextAction": "Unique 411-line historical party spec absent at path; clean tree merge but unresolved review. Reconcile scope, expired target date, anchor and billing decisions with current birthday docs before adoption. Dependency predecessor to #381."
+    }
+  ]
+}
