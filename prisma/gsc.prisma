@@ -1,0 +1,12 @@
+/// Successful Search Analytics responses only; never credentials or OAuth tokens.
+/// Request hash includes exact property, range, dimensions, type and pagination.
+model GscQueryCache {
+  id        String   @id @db.VarChar(64)
+  property  String   @db.Text
+  startDate String   @db.VarChar(10)
+  endDate   String   @db.VarChar(10)
+  rows      Json
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}

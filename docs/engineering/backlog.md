@@ -3435,6 +3435,12 @@ P3 — cleanup / polish / optional
   Actions "CI" workflow (`.github/workflows/ci.yml`, `typecheck` job
   only) run ESLint at all — only `pnpm check`/`pnpm lint` do, and those
   are not part of any automated gate today.
+- Update 2026-10-22 (#705): `pnpm exec eslint src --quiet` reports 26 errors
+  in 17 files at base `79ef8b72ccb122c1b7755c5c95e1757e7d700403`. All error
+  files are byte-identical to that base; GSC task files pass targeted ESLint.
+  Additional findings include React hook purity/rules and prefer-const.
+  Deferred under this existing debt item; unrelated fixes are outside #705.
+
 - Dependencies: none.
 - Acceptance criteria: fix all 14 pre-existing findings (or their
   root causes) so `pnpm lint` is repo-wide green; then add an ESLint

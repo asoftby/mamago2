@@ -112,8 +112,9 @@ export function weeklyClicksFromPageRows(
 }
 
 export async function collectSeoEvergreenWeekly(ctx: MetricCollectorContext): Promise<MetricSampleDraft[]> {
-  const config = resolveGoogleSearchConsoleConfig();
-  if (!config) return [];
+  const resolved = resolveGoogleSearchConsoleConfig();
+  if (!resolved) return [];
+  const config = { ...resolved, cache: ctx.prisma.gscQueryCache, deadline: Date.now() + 110_000 };
 
   const weeks = completedIsoWeeksSince(ctx.now, SEO_BASELINE.measurementStartIsoWeek);
   if (weeks.length === 0) return [];
