@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { swapKeyboardLayout } from "@/lib/search/keyboardLayout";
 import prisma from "@/lib/prisma";
 import type { SearchResultItem, SearchResultType } from "@/lib/search/types";
 import { logSearchQuery } from "@/lib/search/logSearchQuery";
@@ -63,12 +64,11 @@ export async function GET(request: Request) {
       legacyCityId,
     });
 
-    const docs = await prisma.searchDocument.findMany({
-      where: {
-        isPublished: true,
-        ...buildSearchTextWhere(q),
-      },
-      take: limit,
+    // Prefer the literal query; only fill remaining slots from the alternate
+    // physical keyboard layout. Never let a guessed layout displace exact hits.
+    const findDocs = (query: string, take: number) => prisma.searchDocument.findMany({
+      where: { isPublished: true, ...buildSearchTextWhere(query) },
+      take,
       orderBy: [{ boost: "desc" }, { updatedAt: "desc" }],
       select: {
         entityId: true,
@@ -80,6 +80,19 @@ export async function GET(request: Request) {
         metaLine: true,
       },
     });
+
+    const literalDocs = await findDocs(q, limit);
+    const alternate = swapKeyboardLayout(q);
+    const additionalDocs = alternate && literalDocs.length < limit
+      ? await findDocs(alternate, limit - literalDocs.length)
+      : [];
+    const seen = new Set<string>();
+    const docs = [...literalDocs, ...additionalDocs].filter((doc) => {
+      const key = `${doc.entityType}:${doc.entityId}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, limit);
 
     const activityIds = docs
       .filter((d) => d.entityType === "activity")
