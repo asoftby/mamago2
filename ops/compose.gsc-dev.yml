@@ -1,0 +1,9 @@
+# DEV-only additive override; include only in the owner's normal DEV deployment.
+# Never pass this override to the PROD Compose project.
+services:
+  app:
+    env_file:
+      - /opt/mamago/dev/gsc-config/current/web.env
+  worker:
+    env_file:
+      - /opt/mamago/dev/gsc-config/current/worker.env

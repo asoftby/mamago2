@@ -1,0 +1,63 @@
+name: Stage GSC DEV configuration
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type STAGE_GSC_DEV; this stages files only, without deploy or restart'
+        required: true
+        type: string
+      enabled:
+        description: 'Enable only after the GSC code and cache migration are deployed to DEV'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gsc-dev-configuration
+  cancel-in-progress: false
+
+jobs:
+  stage:
+    if: github.repository == 'asoftby/mamago2' && github.ref == 'refs/heads/dev' && github.actor == 'asoftby'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate explicit confirmation
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: test "$CONFIRMATION" = STAGE_GSC_DEV
+
+      - name: Checkout reviewed DEV revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Stage configuration through restricted SSH receiver
+        env:
+          GSC_SERVICE_ACCOUNT_JSON_DEV: ${{ secrets.GSC_SERVICE_ACCOUNT_JSON_DEV }}
+          GSC_DEV_SSH_PRIVATE_KEY: ${{ secrets.GSC_DEV_SSH_PRIVATE_KEY }}
+          GSC_DEV_SSH_KNOWN_HOSTS: ${{ secrets.GSC_DEV_SSH_KNOWN_HOSTS }}
+          GSC_ENABLED: ${{ inputs.enabled }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$GSC_SERVICE_ACCOUNT_JSON_DEV" || -z "$GSC_DEV_SSH_PRIVATE_KEY" || -z "$GSC_DEV_SSH_KNOWN_HOSTS" ]]; then
+            echo '::error::Missing GSC JSON or restricted DEV SSH credentials.'
+            exit 1
+          fi
+          umask 077
+          key_dir=$(mktemp -d "$RUNNER_TEMP/gsc-ssh.XXXXXX")
+          trap 'rm -rf -- "$key_dir"' EXIT
+          printf '%s\n' "$GSC_DEV_SSH_PRIVATE_KEY" > "$key_dir/id"
+          printf '%s\n' "$GSC_DEV_SSH_KNOWN_HOSTS" > "$key_dir/known_hosts"
+          unset GSC_DEV_SSH_PRIVATE_KEY GSC_DEV_SSH_KNOWN_HOSTS
+          python3 scripts/deploy/stage-gsc-dev.py --client |
+            env -u GSC_SERVICE_ACCOUNT_JSON_DEV ssh -F /dev/null -T \
+              -i "$key_dir/id" -o IdentitiesOnly=yes -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$key_dir/known_hosts" \
+              -o ConnectTimeout=15 -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no \
+              ubuntu@134.17.17.134 stage-gsc-dev
