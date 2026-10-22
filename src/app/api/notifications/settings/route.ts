@@ -20,6 +20,7 @@ import {
   updateNotificationSettingsChannelValue,
 } from "@/server/services/notificationSettings.service";
 import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
+import { getActiveBusinessTelegramRecipient } from "@/server/services/telegram/businessTelegramDelivery.service";
 import { isLegacyUserNotificationType } from "@/lib/notifications/userNotificationEvents";
 
 const VALID_SURFACES = new Set<NotificationSettingsSurface>(["USER", "BUSINESS", "ADMIN"]);
@@ -118,7 +119,8 @@ export async function PATCH(req: NextRequest) {
 
   if (
     parsed.data.channel === NotificationChannel.TELEGRAM &&
-    !(await getTelegramLinkStatus({ userId: context.viewer.id })).linked
+    !(await getTelegramLinkStatus({ userId: context.viewer.id })).linked &&
+    !(surface === "BUSINESS" && await getActiveBusinessTelegramRecipient(context.viewer.id))
   ) {
     return NextResponse.json(
       { error: "Telegram is not connected" },

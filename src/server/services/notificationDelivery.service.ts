@@ -40,6 +40,7 @@ import { buildNotificationEmailTemplate } from "@/lib/email/notificationEmailTem
 import { resolveNotificationChannels } from "@/lib/notifications/resolveNotificationChannels";
 import type { UserForChannelResolution } from "@/lib/notifications/resolveNotificationChannels";
 import { getActiveTelegramConnectionForCurrentEnvironment } from "@/server/services/telegram/telegramConnection.service";
+import { getActiveBusinessTelegramRecipient, sendBusinessTelegramMessage } from "@/server/services/telegram/businessTelegramDelivery.service";
 import { TelegramChannel, type TelegramParseMode, type TelegramReplyMarkup } from "@/server/services/telegram/TelegramChannel";
 import { renderNotificationTelegramMessage } from "@/server/services/telegram/TelegramTemplateRenderer";
 import { isOneTimeNotificationType } from "./notificationDedup.service";
@@ -337,8 +338,16 @@ async function handleTelegram(notificationId: string, enabled: boolean): Promise
   }
 
   try {
-    const connection = await getActiveTelegramConnectionForCurrentEnvironment(notification.userId);
-    if (!connection?.isActive) {
+    // Route only BUSINESS audience through the separate bot, and only for
+    // explicitly connected, currently authorized recipients. Never route
+    // USER or ADMIN messages through the business bot.
+    const businessRecipient = notification.audience === "BUSINESS"
+      ? await getActiveBusinessTelegramRecipient(notification.userId)
+      : null;
+    const connection = businessRecipient
+      ? null
+      : await getActiveTelegramConnectionForCurrentEnvironment(notification.userId);
+    if (!businessRecipient && !connection?.isActive) {
       console.warn(
         "[delivery:telegram] skipped: TELEGRAM_NOT_CONNECTED",
         { userId: notification.userId, notificationId, type: notification.type }
@@ -351,13 +360,21 @@ async function handleTelegram(notificationId: string, enabled: boolean): Promise
     }
 
     const rendered = await buildTelegramMessageForNotification(notification);
-    const channel = new TelegramChannel();
-    await channel.sendMessage({
-      chatId: connection.telegramChatId,
-      text: rendered.text,
-      replyMarkup: rendered.replyMarkup,
-      parseMode: rendered.parseMode,
-    });
+    if (businessRecipient) {
+      await sendBusinessTelegramMessage({
+        chatId: businessRecipient.chatId,
+        text: rendered.text,
+        replyMarkup: rendered.replyMarkup,
+        parseMode: rendered.parseMode,
+      });
+    } else if (connection) {
+      await new TelegramChannel().sendMessage({
+        chatId: connection.telegramChatId,
+        text: rendered.text,
+        replyMarkup: rendered.replyMarkup,
+        parseMode: rendered.parseMode,
+      });
+    }
 
     await prisma.notificationDelivery.update({
       where: { id: deliveryId },
@@ -524,8 +541,13 @@ export async function retryFailedDelivery(
         return false;
       }
     } else if (delivery.channel === "TELEGRAM") {
-      const connection = await getActiveTelegramConnectionForCurrentEnvironment(delivery.userId);
-      if (!connection?.isActive) {
+      const businessRecipient = delivery.notification.audience === "BUSINESS"
+        ? await getActiveBusinessTelegramRecipient(delivery.userId)
+        : null;
+      const connection = businessRecipient
+        ? null
+        : await getActiveTelegramConnectionForCurrentEnvironment(delivery.userId);
+      if (!businessRecipient && !connection?.isActive) {
         await prisma.notificationDelivery.update({
           where: { id: deliveryId },
           data: { status: "SKIPPED", errorMessage: "TELEGRAM_NOT_CONNECTED" },
@@ -534,13 +556,21 @@ export async function retryFailedDelivery(
       }
 
       const rendered = await buildTelegramMessageForNotification(delivery.notification);
-      const channel = new TelegramChannel();
-      await channel.sendMessage({
-        chatId: connection.telegramChatId,
-        text: rendered.text,
-        replyMarkup: rendered.replyMarkup,
-        parseMode: rendered.parseMode,
-      });
+      if (businessRecipient) {
+        await sendBusinessTelegramMessage({
+          chatId: businessRecipient.chatId,
+          text: rendered.text,
+          replyMarkup: rendered.replyMarkup,
+          parseMode: rendered.parseMode,
+        });
+      } else if (connection) {
+        await new TelegramChannel().sendMessage({
+          chatId: connection.telegramChatId,
+          text: rendered.text,
+          replyMarkup: rendered.replyMarkup,
+          parseMode: rendered.parseMode,
+        });
+      }
 
       await prisma.notificationDelivery.update({
         where: { id: deliveryId },

@@ -26,3 +26,12 @@ Register bot webhooks separately at `/api/business/telegram/webhook` with `secre
 5. Only an active business owner/manager can use the connection; prevent sending after revocation.
 
 The legacy Telegram connection remains displayed in the business notification settings; it controls existing notifications. New Business Bot connection is explicitly labelled as not yet delivering notifications.
+
+
+## Phase 2 guarded delivery routing
+
+- Set `TELEGRAM_BUSINESS_DELIVERY_ENABLED=true` only after DEV credentials, webhook and migration are validated. Defaults to disabled.
+- BUSINESS-audience messages go to the Business Bot only when the recipient opted in by linking the Business Bot, and is still an active OWNER or MANAGER. USER/ADMIN messages never use business credentials.
+- With the flag off, existing Info Bot delivery remains unchanged. With the flag on, recipients without a Business Bot link continue the legacy path. If a business connection exists but delivery fails, do not resend the same message through Info Bot.
+- Retry uses the same recipient selection. Business actions/booking approvals remain explicitly unsupported in this phase; use the website CTA.
+- Settings screen retains legacy Info Bot management until the preferences model is migrated. No automatic Telegram subscription changes.
