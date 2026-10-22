@@ -6,6 +6,10 @@ const ruKeys = RU.slice(1);
 const enToRu = new Map([...enKeys].map((key, i) => [key, ruKeys[i]]));
 const ruToEn = new Map([...ruKeys].map((key, i) => [key, enKeys[i]]));
 enToRu.set("`", "ё");
+// Shifted US-keyboard punctuation corresponds to uppercase Russian letters.
+for (const [key, letter] of Object.entries({ "{": "Х", "}": "Ъ", ":": "Ж", "\"": "Э", "<": "Б", ">": "Ю", "~": "Ё" })) {
+  enToRu.set(key, letter);
+}
 ruToEn.set("ё", "`");
 
 export function swapKeyboardLayout(query: string): string | null {
