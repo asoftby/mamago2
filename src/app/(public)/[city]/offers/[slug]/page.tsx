@@ -194,7 +194,7 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
     permanentRedirect(getOfferPublicPath({ slug: offer.slug }, actualCitySlug));
   }
 
-  const data = await getOfferPageData({ citySlug: actualCitySlug, slug: offer.slug ?? slug });
+  const data = await getOfferPageData({ citySlug: actualCitySlug, slug: offer.slug ?? slug, offerId: offer.id });
   if (!data) notFound();
 
   // Only offers from the same verified owning business, never merely matching names.
