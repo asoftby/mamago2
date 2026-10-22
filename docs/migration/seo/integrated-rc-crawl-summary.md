@@ -1,5 +1,8 @@
 # Dev crawl — integrated RC (SEO closure branch)
 
+> Historical snapshot. For the 2026-10-22 removal of the generic hub fallback
+> and current HTTP evidence, see the [recovery audit](../../seo/seo-recovery-audit-2026-10-22.md).
+
 Branch `fix/seo-migration-closure`, Node 22.23.1, port 3075,
 `NEXT_PUBLIC_APP_URL=http://localhost:3075`, `.next` cleared before start.
 

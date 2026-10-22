@@ -1790,3 +1790,17 @@ images/covers, privileged collision keep-ADMIN, then implement only
 approved importer extensions before final rerun. Do not rerun Phoenix
 until that approval.
 ```
+
+
+## Handoff — 2026-10-22 SEO recovery audit
+
+Fresh base `8f564a489a9766f9ad5ac09b4c23415ef71a2898`; isolated task
+`fix/seo-recovery-audit-20261022`. [Recovery audit](../seo/seo-recovery-audit-2026-10-22.md)
+records public GET evidence, sitemap/robots/canonical and the 13 approved
+Route→Article mappings. Fixes remove the irrelevant unknown-path hub fallback,
+restore categories with NULL robots metadata, reject redirect-source stored
+canonical paths, and enforce explicit non-production noindex. No environment
+writes, migration runs on DEV/PROD, data repair, deployment or issue closure.
+Strict pre-stream HTTP redirect for #253, actual GSC evidence and two historical
+recovery-test inconsistencies remain open; see BACKLOG-194. Existing migration
+completion checkboxes above are not changed based on source-only fixes.

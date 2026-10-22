@@ -52,7 +52,12 @@ function indexableArticleWhere(city: CityRef): Prisma.ArticleWhereInput {
     noindex: false,
     slug: { not: null },
     publishedAt: { not: null },
-    NOT: { seoRobots: { contains: "noindex", mode: "insensitive" } },
+    // SQL NOT ILIKE excludes NULL too; an unset robots override is indexable.
+    // Keep this AND separate from the geography OR below.
+    AND: [{ OR: [
+      { seoRobots: null },
+      { NOT: { seoRobots: { contains: "noindex", mode: "insensitive" } } },
+    ] }],
     ...buildArticleCityDiscoveryWhere(city, true),
   };
 }

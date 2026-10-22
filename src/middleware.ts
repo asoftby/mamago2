@@ -19,10 +19,6 @@ import {
   shouldSkipTrailingSlashRedirect,
   removeTrailingSlash,
 } from "@/lib/routing/trailingSlashPolicy";
-import {
-  isWpLegacyCatchAllPath,
-  WP_LEGACY_CATCH_ALL_DESTINATION,
-} from "@/lib/routing/wpLegacyCatchAll";
 
 let didLogDevLocalHostDetection = false;
 
@@ -132,20 +128,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl, { status: 301 });
   }
 
-  // ── WP-migration catch-all (301 → hub) ──────────────────────────────────
-  // Config redirects (manifest.csv) уже отработали до middleware; сюда доходит
-  // только непокрытый хвост WordPress. Известные секции/города/reserved и
-  // asset-подобные пути проходят дальше и 404-ятся как обычно.
-  if (
-    (request.method === "GET" || request.method === "HEAD") &&
-    resolveSurfaceFromHostAndPathname(host, pathname) === "public" &&
-    isWpLegacyCatchAllPath(pathname)
-  ) {
-    return NextResponse.redirect(
-      new URL(WP_LEGACY_CATCH_ALL_DESTINATION, request.url),
-      { status: 301 },
-    );
-  }
+  // Unmapped URLs must reach route resolution (and its notFound), rather than
+  // redirecting unrelated content to /minsk. Verified legacy redirects run
+  // in next.config.ts before this middleware.
 
   if (shouldBypassSeoHeader(pathname)) {
     return nextWithRequestPath(request);
