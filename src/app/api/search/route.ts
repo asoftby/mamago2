@@ -83,8 +83,10 @@ export async function GET(request: Request) {
 
     const literalDocs = await findDocs(q, limit);
     const alternate = swapKeyboardLayout(q);
+    // An overlapping literal hit must not consume an alternate-result slot.
+    // Fetch up to the full page size and deduplicate after ranking.
     const additionalDocs = alternate && literalDocs.length < limit
-      ? await findDocs(alternate, limit - literalDocs.length)
+      ? await findDocs(alternate, limit)
       : [];
     const seen = new Set<string>();
     const docs = [...literalDocs, ...additionalDocs].filter((doc) => {
