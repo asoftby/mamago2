@@ -141,6 +141,7 @@
     "db:reset:safe": "pnpm db:backup && pnpm prisma migrate reset --force",
     "db:migrate:safe": "pnpm db:backup && pnpm prisma migrate dev",
     "build-migration-manifest": "tsx scripts/build-migration-manifest.ts",
+    "test:gsc:integration": "tsx --test src/server/ops/metrics/collectors/googleSearchConsole.integration.test.ts",
     "test:gsc": "tsx --test src/server/ops/metrics/collectors/googleSearchConsole.api.test.ts && tsx src/server/ops/metrics/collectors/googleSearchConsole.test.ts && tsx src/server/ops/metrics/collectors/seoEvergreenWeekly.test.ts",
     "test:unit": "tsx src/lib/slugifyLabelToValue.test.ts",
     "test:discovery-intent-config": "tsx src/lib/discovery/discoveryIntentConfig.test.ts",

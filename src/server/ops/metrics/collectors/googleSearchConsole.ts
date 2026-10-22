@@ -352,7 +352,13 @@ export async function dailyAggregate(config: GscConfig, token: string, range: Da
   if (!Number.isFinite(span) || span < 0 || span > 30) throw new Error("Invalid GSC aggregate range");
   let clicks = 0, impressions = 0, weightedPosition = 0;
   for (let day = range.startDate; day <= range.endDate; day = shiftYmd(day, 1)) {
-    const row = aggregateRow(await querySearchAnalytics(config, token, { startDate: day, endDate: day }), day);
+    const rows = await querySearchAnalytics(config, token, { startDate: day, endDate: day });
+    // GSC omits days with no data. Ask for the authoritative window instead
+    // of inventing a daily zero or blocking a low-traffic property forever.
+    if (!rows.length && range.startDate !== range.endDate) {
+      return aggregateRow(await querySearchAnalytics(config, token, range), "comparison");
+    }
+    const row = aggregateRow(rows, day);
     clicks += row.clicks;
     impressions += row.impressions;
     weightedPosition += row.position * row.impressions;

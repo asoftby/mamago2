@@ -88,6 +88,11 @@ test("direct GSC contracts (no database or Google credentials)", async (t) => {
     globalThis.fetch = async () => Response.json({ rows: [{ clicks: ++day, impressions: day * 10, ctr: 0.1, position: day }] });
     const result = await dailyAggregate(config, "token", { startDate: "2026-10-01", endDate: "2026-10-02" });
     assert.equal(result.clicks, 3); assert.equal(result.ctr, 0.1); assert.equal(result.position, 50 / 30);
+    globalThis.fetch = async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      return Response.json(body.startDate === body.endDate ? {} : { rows: [row] });
+    };
+    assert.deepEqual(await dailyAggregate(config, "token", { startDate: "2026-10-01", endDate: "2026-10-02" }), row);
     globalThis.fetch = async () => Response.json({});
     await assert.rejects(dailyAggregate(config, "token", range), /no aggregate/);
     for (const value of [{ rows: [null] }, { rows: [{ ...row, keys: [123] }] }]) {

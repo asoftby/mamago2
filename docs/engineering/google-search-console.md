@@ -61,8 +61,9 @@ property marker before showing metrics. No guessed domain from a city filter.
 - Daily property aggregates cover the current and previous complete seven-day
   windows. Clicks/impressions are summed, CTR is recomputed from sums, and
   position is impression-weighted. No-dimension totals are independent of
-  page/query sampling; omitted/empty aggregate rows remain unknown and fail the
-  cycle instead of inventing zero traffic.
+  page/query sampling. An omitted daily aggregate falls back to Google's whole
+  window aggregate. An empty whole window remains unknown and fails the cycle
+  instead of inventing zero traffic.
 - Successful responses use `GscQueryCache`, keyed by a SHA-256 hash of property,
   exact dates, dimensions, search type, data state, row limit and offset.
   Upsert replaces the same request, so retry/restart does not duplicate cache
@@ -120,8 +121,14 @@ Tests mock Google and Prisma: JWT signature/scope, property isolation,
 request identity/upsert, cache expiry, malformed rows, date validation,
 weighted metrics, bounded network/quota retries, Retry-After, error redaction,
 and admin batch freshness. Existing weekly/mover tests also run. `test:gsc`
-is included in the existing push gate. Real DB migration/lock integration and
-Google smoke are owner follow-ups requiring an isolated test DB / DEV access.
+is included in the existing push gate. The optional `pnpm test:gsc:integration`
+requires `GSC_TEST_DATABASE_URL` (not `DATABASE_URL`) pointing to a disposable
+loopback database named `gsc_migration_test` containing only the new migration.
+It checks actual Prisma upsert/restart/property isolation and failed refresh.
+The migration SQL was applied and this test passed in a new `/tmp` PostgreSQL
+cluster; the existing collector runner's DB tests passed in a separate empty
+test DB. Google smoke is an owner follow-up requiring DEV access. Checks use
+only a disposable local PostgreSQL cluster, never an environment database.
 
 Owner DEV smoke after approved deployment/configuration:
 
