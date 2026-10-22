@@ -60,7 +60,11 @@ export function resolveGoogleSearchConsoleConfig(
 }
 
 export function validProperty(value: string): boolean {
-  if (/^sc-domain:[a-z0-9]+(?:[.-][a-z0-9]+)*$/i.test(value)) return true;
+  if (value.startsWith("sc-domain:")) {
+    const domain = value.slice("sc-domain:".length);
+    return domain.length <= 253 && domain.split(".").every((label) =>
+      /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label));
+  }
   try {
     const url = new URL(value);
     return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash;

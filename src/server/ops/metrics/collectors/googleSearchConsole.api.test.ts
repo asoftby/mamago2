@@ -14,6 +14,10 @@ test("direct GSC contracts (no database or Google credentials)", async (t) => {
   t.after(() => { globalThis.fetch = originalFetch; });
   await t.test("property validation and readonly signed JWT", () => {
     assert.ok(validProperty("https://example.com/path/"));
+    assert.ok(validProperty("sc-domain:xn--e1afmkfd.xn--p1ai"));
+    assert.ok(validProperty("sc-domain:foo--bar.example"));
+    assert.equal(validProperty("sc-domain:-bad.example"), false);
+    assert.equal(validProperty(`sc-domain:${"a".repeat(64)}.example`), false);
     for (const property of ["sc-domain:", "sc-domain:../evil", "https://user:password@example.com/", "https://example.com/?secret=x"]) assert.equal(validProperty(property), false);
     const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
     const jwt = buildServiceAccountAssertion({ ...config, privateKey: privateKey.export({ type: "pkcs8", format: "pem" }).toString() }, new Date("2026-10-01T12:00:00Z"));
