@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
-import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
+import { getPublicBirthdayOfferWhere } from "./birthdayOfferVisibility";
 import { extractPartyDetails, publicPriceFrom, type BirthdayCatalogItem } from "@/features/birthday/builder/lib/realCatalog";
 
 // Bounded first page only: UI-specific age, guest, budget and location filters
@@ -12,16 +12,7 @@ export async function getPublicBirthdayCatalog(citySlug: string): Promise<Birthd
   const city = await findCityBySlug(citySlug, { select: { id: true }, isActive: true });
   if (!city) return null;
   const offers = await prisma.offer.findMany({
-    where: { AND: [
-      getPublicPublishedOfferWhere(),
-      // Exclude rows that cannot become a catalog card before applying the cap.
-      { place: { cityId: city.id, ownerBusiness: { isNot: null } } },
-      { OR: [
-        { productType: "PARTY_PACKAGE" },
-        { productType: "PARTY_SERVICE", category: { not: null } },
-      ] },
-      { placements: { some: { key: "BIRTHDAY", status: "APPROVED" } } },
-    ] },
+    where: getPublicBirthdayOfferWhere(city.id),
     select: {
       id: true, title: true, productType: true, category: true,
       placeId: true, coverImage: true, priceFrom: true, priceMode: true, currency: true,
