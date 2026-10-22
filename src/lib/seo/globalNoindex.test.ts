@@ -33,6 +33,8 @@ function probe(env: Record<string, string | undefined>): ProbeResult {
     }));
   `;
   const cleanEnv: NodeJS.ProcessEnv = { ...process.env };
+  delete cleanEnv.APP_ENV;
+  delete cleanEnv.VERCEL_ENV;
   delete cleanEnv.SITE_NOINDEX_FORCE;
   delete cleanEnv.SITE_NOINDEX_DEFAULT;
   delete cleanEnv.SITE_INDEXING_ENABLED;
@@ -90,6 +92,16 @@ function testMetaRobotsAndXRobotsTagNeverContradict() {
     );
   }
 }
+
+for (const APP_ENV of ["local", "dev", "development", "staging", "preview", "test", " DEV "]) {
+  const result = probe({ APP_ENV, SITE_INDEXING_ENABLED: "true", NODE_ENV: "production" });
+  assert.equal(result.isGlobalNoindexEnabled, true, `${APP_ENV} must remain isolated`);
+  assert.equal(result.metaRobotsIsNoindex, true);
+}
+for (const APP_ENV of ["production", "prod"]) {
+  assert.equal(probe({ APP_ENV, SITE_INDEXING_ENABLED: "true" }).isGlobalNoindexEnabled, false);
+}
+assert.equal(probe({ VERCEL_ENV: "preview", SITE_INDEXING_ENABLED: "true" }).isGlobalNoindexEnabled, true);
 
 testDefaultsToNoindexWithNoEnvSet();
 testSiteIndexingEnabledTurnsIndexingOn();

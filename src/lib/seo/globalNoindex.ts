@@ -22,8 +22,16 @@ function resolveEnvironmentSummary(): string {
   return parts.length > 0 ? parts.join(", ") : "environment unknown";
 }
 
+function isExplicitNonProductionEnvironment(): boolean {
+  const appEnv = process.env.APP_ENV?.trim().toLowerCase();
+  const nonProduction = ["local", "dev", "development", "staging", "preview", "test"];
+  if (appEnv) return nonProduction.includes(appEnv);
+  return ["development", "preview"].includes(process.env.VERCEL_ENV?.trim().toLowerCase() ?? "");
+}
+
 export function isGlobalNoindexEnabled(): boolean {
   if (readBooleanEnv("SITE_NOINDEX_FORCE")) return true;
+  if (isExplicitNonProductionEnvironment()) return true;
   if (readBooleanEnv(RELEASE_INDEXING_ENV)) return false;
   if (readBooleanEnv("SITE_NOINDEX_DEFAULT")) return true;
   return true;
@@ -34,6 +42,10 @@ export function getGlobalNoindexReason(): string {
 
   if (readBooleanEnv("SITE_NOINDEX_FORCE")) {
     return `Глобальный noindex принудительно включён через SITE_NOINDEX_FORCE=true (${envSummary}).`;
+  }
+
+  if (isExplicitNonProductionEnvironment()) {
+    return `Глобальный noindex включён для непродуктивного окружения (${envSummary}).`;
   }
 
   if (readBooleanEnv(RELEASE_INDEXING_ENV)) {

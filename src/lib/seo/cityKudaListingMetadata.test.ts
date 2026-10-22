@@ -2,7 +2,8 @@
  * Regression tests for city-scoped listing metadata builders and their
  * canonical/indexing contracts.
  *
- * Run: set -a; source .env; set +a; npx tsx src/lib/seo/cityKudaListingMetadata.test.ts
+ * Run with an explicitly supplied isolated test DATABASE_URL; do not source deployment env files.
+ * pnpm exec tsx src/lib/seo/cityKudaListingMetadata.test.ts
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -127,8 +128,16 @@ async function main() {
   for (const page of pages) {
     const modulePath = path.join(REPO_ROOT, page.file);
     const script = `
-      import { generateMetadata } from ${JSON.stringify(modulePath)};
+      // Standalone Node lacks Next's server-component loader. Mock only its
+      // boundary marker; keep the real metadata, Prisma and page imports.
+      const Module = require("node:module");
+      const originalLoad = Module._load;
+      Module._load = function(request, ...args) {
+        if (request === "server-only") return {};
+        return originalLoad.call(this, request, ...args);
+      };
       (async () => {
+        const { generateMetadata } = require(${JSON.stringify(modulePath)});
         const result = await generateMetadata({ params: Promise.resolve({ city: ${JSON.stringify(citySlug)} }), searchParams: Promise.resolve({}) });
         console.log(JSON.stringify({ robots: result.robots }));
       })();

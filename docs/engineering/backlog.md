@@ -5378,3 +5378,15 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Dependencies: owner-reviewed ruleset policy, current-base CI, per-PR review threads, external worktree/automation checks for branch retirement. P0/P1 release/security work stays in its existing Issues and is not downgraded by this P2 entry.
 - Acceptance criteria: agree/enforce required CI and review policy in a separate settings change; reconcile all retained PRs against fresh dev with exact-SHA evidence; archive reports only with per-file proof/link repair; retire only proven unused branches. Record outcomes in #653/#661.
 - Source: #653, #661, #657; audit 2026-10-22.
+
+## [BACKLOG-194] SEO recovery follow-up: guarded redirects and historical regression data
+
+- Status: OPEN
+- Priority: P1
+- Area: SEO / migration
+- Added: 2026-10-22
+- Reason deferred: true HTTP redirects for the 13 Route→Article cutovers must preserve the DB-ready guard; static replacements bypass publication/archive checks. Actual Google canonical and historical content parity need GSC/approved source evidence. No automatic data writes or production changes are authorized here.
+- Dependencies: #249 GSC access (Windsor currently returns plan-limit placeholders), #253 exact cutover acceptance; existing frozen geography and owner-review decisions.
+- Acceptance criteria: one-hop HTTP 301/308 for the approved 13 only, target content/indexability/canonical/sitemap parity; Mogilev excluded. Reconcile the two existing failing SEO recovery tests (CITY/global target and 37/36 blocked rows) with approved evidence, not weaker assertions. Assess listing lastmod and category filter duplicates separately (P2).
+- Additional HTTP proof: Phase2A event positions 25–28 still redirect to missing/noindex targets; current equivalent or historical restoration requires approved content/inventory, not guessed hub mappings.
+- Source: [SEO audit](../seo/seo-recovery-audit-2026-10-22.md), [action plan](../seo/seo-recovery-action-plan.md); base `8f564a489a9766f9ad5ac09b4c23415ef71a2898`.

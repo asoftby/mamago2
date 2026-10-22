@@ -73,6 +73,9 @@ const nextConfig: NextConfig = {
   // No-trailing-slash policy: canonical URLs never end with `/`.
   // Incoming requests with a trailing slash are redirected (301) by middleware.
   trailingSlash: false,
+  // Let exact manifest rules match legacy URLs before middleware normalises
+  // slashes; Next's default 308 otherwise adds an unnecessary redirect hop.
+  skipTrailingSlashRedirect: true,
   // Изолированная папка сборки (pre-push gate): сборка не трогает кэш работающего `next dev`.
   distDir: process.env.NEXT_DIST_DIR || ".next",
 

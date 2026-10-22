@@ -12,6 +12,8 @@ This folder holds project documentation. Runtime code lives under `src/`.
 - [Engineering backlog](engineering/backlog.md)
 - [Repository audit and PR/Issue triage, 22 October 2026](engineering/repository-audit-2026-10-22.md)
 
+- [SEO recovery audit and release checks, 22 October 2026](seo/seo-recovery-audit-2026-10-22.md)
+
 ## Layout
 
 | Path | Purpose |

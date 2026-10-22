@@ -23,7 +23,7 @@ export function validateStoredCanonical(input: ValidateStoredCanonicalInput): st
     const url = new URL(stored);
     const publicOrigin = new URL(input.publicBase).origin;
     const expectedPath = input.expectedPath.replace(/\/$/, "") || "/";
-    const actualPath = url.pathname.replace(/\/$/, "") || "/";
+    const actualPath = url.pathname;
 
     if (
       (url.protocol === "http:" || url.protocol === "https:") &&

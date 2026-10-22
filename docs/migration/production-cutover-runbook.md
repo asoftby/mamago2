@@ -192,13 +192,10 @@ documented decision at preflight time, not a default.
 3. **RankMath redirects are not included** in this manifest today (see
    Phase 1 "Redirects" gap in `wordpress-to-mamago.md` — RankMath's
    serialized `exact`/`start`/`contains` rules have no normalization/review
-   stage yet). `wordpress-to-mamago.md` also references a "WP legacy
-   catch-all classifier" that falls back uncovered WP paths to the default
-   city hub — that code (`src/lib/routing/wpLegacyCatchAll.ts`) is now on
-   `dev`, merged via PR #33. Confirm with the business owner whether that
-   fallback behavior is acceptable for launch, or whether RankMath redirect
-   normalization is still a launch blocker — this runbook does not resolve
-   that decision.
+   stage yet). The generic fallback of uncovered URLs to the default city
+   hub is removed by the [2026-10-22 recovery change](../seo/seo-recovery-audit-2026-10-22.md).
+   Unmapped paths must reach route/not-found handling. Preserve reviewed
+   exact manifest rules; do not restore the broad fallback to mask gaps.
 4. Deploy with `REQUIRE_REDIRECT_MANIFEST=1` set in the production build so
    a missing/underfilled/invalid manifest **fails the build** rather than
    silently shipping with broken redirects (mirrors
