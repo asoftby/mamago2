@@ -22,3 +22,11 @@ Dependencies: PR #692 (independent Business Bot and opt-in routing). This PR is 
 ## Release guard
 
 No webhook callback is enabled by this PR. The action service is inert until a separately reviewed integration wires a verified Business Bot webhook and actor lookup. Existing Info Bot behavior stays unchanged. Do not deploy as a complete working Business Bot.
+
+## Integration checkpoint — 2026-10-22
+
+- [x] PR #692 merged to `dev` as `b75151504a8f4e6a1d417c373eab0a7a5956b9f7`; default Business Bot delivery remains disabled
+- [x] PR #696 has no overlapping changed files with PR #692 or intervening `dev` commits
+- [x] PR #696 original GitHub CI passed
+- [ ] Verify GitHub CI again against the latest `dev` before merging PR #696
+- [ ] Wire webhook actions, run database integration tests and deploy DEV in later PRs
