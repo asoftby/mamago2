@@ -215,14 +215,14 @@ function PriceRangeControl({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border border-border bg-background px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="w-fit max-w-[calc(50%-0.375rem)] rounded-full border border-border bg-background px-4 py-3">
           <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">От</div>
           <div className="mt-1 text-base font-semibold text-foreground">
             {renderPriceWithIcon(formatPrice(minValue))}
           </div>
         </div>
-        <div className="rounded-2xl border border-border bg-background px-4 py-3">
+        <div className="w-fit max-w-[calc(50%-0.375rem)] rounded-full border border-border bg-background px-4 py-3">
           <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">До</div>
           <div className="mt-1 text-base font-semibold text-foreground">
             {renderPriceWithIcon(formatPrice(maxValue))}
