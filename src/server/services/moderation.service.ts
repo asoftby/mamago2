@@ -553,12 +553,29 @@ export async function approveOffer(
   const timer = createPublishTimer("publish:offer");
   const offer = await prisma.offer.findUnique({
     where: { id: offerId },
-    select: { status: true, title: true, slug: true, placeId: true, place: { select: { ownerBusinessId: true } } },
+    select: {
+      status: true,
+      title: true,
+      slug: true,
+      placeId: true,
+      place: { select: { ownerBusinessId: true, status: true, archivedAt: true } },
+    },
   });
 
   if (!offer) throw new Error("Offer not found");
   if (offer.status !== "PENDING") throw new Error(`Cannot approve from status: ${offer.status}`);
-  if (!offer.placeId) throw new Error("Cannot approve/publish an Offer without a Place");
+  if (!offer.placeId || !offer.place) throw new Error("Cannot approve/publish an Offer without a Place");
+  // The public Offer page only renders for a PUBLISHED, non-archived Place
+  // (getPublicPublishedOfferWhere). Approving against any other Place would mark
+  // the Offer PUBLISHED while its public URL stays dead (#706).
+  if (offer.place.archivedAt) {
+    throw new Error("Cannot publish an Offer whose Place is archived");
+  }
+  if (offer.place.status !== "PUBLISHED") {
+    throw new Error(
+      `Cannot publish an Offer whose Place is not published (Place status: ${offer.place.status}). Approve the Place first.`,
+    );
+  }
 
   // EVENT_SEARCH_INDEX_PUBLICATION_RACE fix: this status update and the
   // slug/canonical sync below are two sequential writes to the same row.

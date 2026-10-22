@@ -74,6 +74,7 @@ const offerMetaSelect = {
   place: {
     select: {
       title: true,
+      status: true,
       archivedAt: true,
       ownerBusiness: { select: { operationalStatus: true } },
       city: { select: { slug: true } },
@@ -164,6 +165,7 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
           id: true,
           title: true,
           slug: true,
+          status: true,
           archivedAt: true,
           ownerBusiness: { select: { operationalStatus: true } },
           createdByUserId: true,
@@ -226,6 +228,7 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
           archivedAt: true,
           place: {
             select: {
+              status: true,
               archivedAt: true,
               ownerBusiness: { select: { operationalStatus: true } },
               city: { select: { slug: true } },

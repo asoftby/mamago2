@@ -48,6 +48,7 @@ export async function generateMetadata({ params }: OfferPageProps): Promise<Meta
           place: {
             select: {
               title: true,
+              status: true,
               archivedAt: true,
               ownerBusiness: { select: { operationalStatus: true } },
             },
@@ -77,6 +78,7 @@ export async function generateMetadata({ params }: OfferPageProps): Promise<Meta
             place: {
               select: {
                 title: true,
+                status: true,
                 archivedAt: true,
                 ownerBusiness: { select: { operationalStatus: true } },
               },
@@ -126,6 +128,7 @@ export default async function OfferPage({ params }: OfferPageProps) {
       archivedAt: true,
       place: {
         select: {
+          status: true,
           archivedAt: true,
           ownerBusiness: { select: { operationalStatus: true } },
           city: { select: { slug: true } },
