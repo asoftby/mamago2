@@ -20,6 +20,8 @@ import { resolveCanonicalCta } from "@/lib/cta-platform";
 
 interface GetOfferPageDataParams {
   citySlug: string;
+  /** Resolve the already identified offer without an ambiguous global slug lookup. */
+  offerId?: string;
   /** @deprecated unused — section is not part of Offer identity, see BACKLOG-116. Kept optional for old callers. */
   section?: string;
   slug: string;
@@ -207,6 +209,7 @@ export async function getOfferPageData({
   citySlug,
   section,
   slug,
+  offerId,
 }: GetOfferPageDataParams): Promise<OfferPageData | null> {
   void section;
   // 1. Fetch offer with all related data
@@ -215,7 +218,7 @@ export async function getOfferPageData({
   const offer = await prisma.offer.findFirst({
     where: {
       AND: [
-        { slug },
+        offerId ? { id: offerId, slug } : { slug },
         getPublicPublishedOfferWhere(),
       ],
     },
