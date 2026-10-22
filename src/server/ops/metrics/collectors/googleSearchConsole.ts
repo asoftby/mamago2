@@ -1,5 +1,7 @@
 import { createHash, createSign } from "node:crypto";
 
+import type { PrismaClient, Prisma } from "@prisma/client";
+
 import type { MetricCollector, MetricCollectorContext, MetricSampleDraft } from "../types";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -15,6 +17,8 @@ export interface GscConfig {
   siteUrl: string;
   clientEmail: string;
   privateKey: string;
+  cache?: PrismaClient["gscQueryCache"];
+  deadline?: number;
 }
 
 export interface GscRow {
@@ -47,12 +51,60 @@ export function resolveGoogleSearchConsoleConfig(
   const clientEmail = env.GOOGLE_SEARCH_CONSOLE_CLIENT_EMAIL?.trim() ?? "";
   const privateKey = (env.GOOGLE_SEARCH_CONSOLE_PRIVATE_KEY ?? "").replace(/\\n/g, "\n").trim();
 
-  const validSite = siteUrl.startsWith("sc-domain:") || /^https?:\/\//i.test(siteUrl);
+  const validSite = validProperty(siteUrl);
   const validEmail = clientEmail.includes("@");
   const validKey = privateKey.includes("BEGIN PRIVATE KEY") && privateKey.includes("END PRIVATE KEY");
 
-  if (!validSite || !validEmail || !validKey) return null;
+  if (!validSite || !validEmail || !validKey) throw new Error("GSC enabled but configuration is invalid");
   return { siteUrl, clientEmail, privateKey };
+}
+
+export function validProperty(value: string): boolean {
+  if (/^sc-domain:[a-z0-9]+(?:[.-][a-z0-9]+)*$/i.test(value)) return true;
+  try {
+    const url = new URL(value);
+    return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash;
+  } catch { return false; }
+}
+
+/** Bounded retries; never include upstream response bodies, JWTs or keys in errors. */
+export async function gscRequest(
+  url: string, init: RequestInit, deadline = Date.now() + 25_000,
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+): Promise<unknown> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error("GSC request deadline exceeded");
+    let response: Response;
+    try {
+      response = await fetch(url, { ...init, signal: AbortSignal.timeout(Math.min(8_000, remaining)) });
+    } catch {
+      if (attempt === 2) throw new Error("GSC network request failed");
+      await sleep(250 * 2 ** attempt);
+      continue;
+    }
+    if (response.ok) {
+      try { return await response.json(); } catch { throw new Error("GSC returned invalid JSON"); }
+    }
+    let quota = false;
+    if (response.status === 403) {
+      try {
+        const error = await response.json() as { error?: { errors?: { reason?: string }[] } };
+        quota = error.error?.errors?.some(({ reason }) => ["rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"].includes(reason ?? "")) ?? false;
+      } catch { /* A non-JSON 403 is permanent. */ }
+    }
+    if (attempt === 2 || !(quota || response.status === 429 || response.status >= 500)) {
+      throw new Error(`GSC request failed with HTTP ${response.status}`);
+    }
+    const retryAfter = response.headers.get("retry-after");
+    const delay = retryAfter === null ? 250 * 2 ** attempt + Math.random() * 250
+      : /^\d+$/.test(retryAfter) ? Number(retryAfter) * 1000 : Math.max(0, Date.parse(retryAfter) - Date.now());
+    if (!Number.isFinite(delay) || delay > 10_000 || Date.now() + delay >= deadline) {
+      throw new Error(`GSC quota/backoff deferred (HTTP ${response.status})`);
+    }
+    await sleep(delay);
+  }
+  throw new Error("GSC retries exhausted");
 }
 
 function base64UrlJson(value: unknown): string {
@@ -81,16 +133,13 @@ export async function getAccessToken(config: GscConfig, now: Date): Promise<stri
     grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
     assertion: buildServiceAccountAssertion(config, now),
   });
-  const response = await fetch(TOKEN_URL, {
+  const json = await gscRequest(TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body,
-  });
-  if (!response.ok) {
-    throw new Error(`GSC OAuth failed with HTTP ${response.status}`);
-  }
-  const json = (await response.json()) as { access_token?: unknown };
-  if (typeof json.access_token !== "string" || !json.access_token) {
+  }, config.deadline) as { access_token?: unknown };
+  // Token is kept only for this collection; never persisted.
+  if (!json || typeof json.access_token !== "string" || !json.access_token) {
     throw new Error("GSC OAuth response did not contain an access token");
   }
   return json.access_token;
@@ -104,30 +153,43 @@ export async function querySearchAnalytics(
   rowLimit = 1,
   startRow = 0,
 ): Promise<GscRow[]> {
-  const endpoint = `${SEARCH_ANALYTICS_BASE}/${encodeURIComponent(config.siteUrl)}/searchAnalytics/query`;
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${accessToken}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      ...range,
-      ...(dimensions.length ? { dimensions } : {}),
-      type: "web",
-      rowLimit,
-      ...(startRow > 0 ? { startRow } : {}),
-    }),
-  });
-  if (!response.ok) {
-    throw new Error(`GSC Search Analytics failed with HTTP ${response.status}`);
+  const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && Number.isFinite(Date.parse(`${value}T00:00:00Z`))
+    && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+  if (!validProperty(config.siteUrl) || !validDate(range.startDate) || !validDate(range.endDate)
+    || range.startDate > range.endDate || !Number.isInteger(rowLimit) || rowLimit < 1 || rowLimit > 25_000
+    || !Number.isInteger(startRow) || startRow < 0 || dimensions.some((d) => !["page", "query", "date"].includes(d))) {
+    throw new Error("Invalid GSC query parameters");
   }
-  const json = (await response.json()) as GscResponse;
-  return Array.isArray(json.rows) ? json.rows.filter(validRow) : [];
+  const body = { ...range, dimensions, type: "web", dataState: "final", rowLimit, startRow };
+  const id = createHash("sha256").update(JSON.stringify([config.siteUrl, body])).digest("hex");
+  const cached = await config.cache?.findUnique({ where: { id } });
+  if (cached && cached.expiresAt.getTime() > Date.now()) return cached.rows as unknown as GscRow[];
+  const endpoint = `${SEARCH_ANALYTICS_BASE}/${encodeURIComponent(config.siteUrl)}/searchAnalytics/query`;
+  const json = await gscRequest(endpoint, {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  }, config.deadline) as GscResponse;
+  if (!json || typeof json !== "object" || (json.rows !== undefined && (!Array.isArray(json.rows)
+    || !json.rows.every((row) => validRow(row) && (dimensions.length === 0
+      || (Array.isArray(row.keys) && row.keys.length === dimensions.length && row.keys.every((key) => typeof key === "string"))))))) {
+    throw new Error("GSC returned malformed analytics rows");
+  }
+  const rows = json.rows ?? [];
+  // Empty aggregate is unknown, and must be retried next cycle rather than cached.
+  if (config.cache && (dimensions.length > 0 || rows.length > 0)) {
+    const old = range.endDate < shiftYmd(ptDateYmd(new Date()), -10);
+    const expiresAt = new Date(Date.now() + (old ? 7 * 24 : 6) * 3600_000);
+    const data = { property: config.siteUrl, startDate: range.startDate, endDate: range.endDate,
+      rows: rows as unknown as Prisma.InputJsonValue, expiresAt };
+    await config.cache.upsert({ where: { id }, create: { id, ...data }, update: data });
+  }
+  return rows;
 }
 
 function validRow(row: GscRow): boolean {
-  return [row.clicks, row.impressions, row.ctr, row.position].every(
+  return !!row && typeof row === "object" && [row.clicks, row.impressions, row.ctr, row.position].every(
     (value) => typeof value === "number" && Number.isFinite(value),
   );
 }
@@ -254,22 +316,23 @@ function moverSamples(currentRows: GscRow[], previousRows: GscRow[]): MetricSamp
 export async function collectGoogleSearchConsoleMetrics(
   ctx: MetricCollectorContext,
 ): Promise<MetricSampleDraft[]> {
-  const config = resolveGoogleSearchConsoleConfig();
-  if (!config) return [];
+  const resolved = resolveGoogleSearchConsoleConfig();
+  if (!resolved) return [];
+  const config = { ...resolved, cache: ctx.prisma.gscQueryCache, deadline: Date.now() + 110_000 };
+  await config.cache.deleteMany({ where: { expiresAt: { lt: new Date(Date.now() - 30 * 86400_000) } } });
 
   const accessToken = await getAccessToken(config, ctx.now);
   const ranges = searchConsoleComparisonRanges(ctx.now);
-  const [currentAggregateRows, previousAggregateRows, currentPages, previousPages, currentQueries] = await Promise.all([
-    querySearchAnalytics(config, accessToken, ranges.current),
-    querySearchAnalytics(config, accessToken, ranges.previous),
-    querySearchAnalytics(config, accessToken, ranges.current, ["page"], DETAIL_ROW_LIMIT),
-    querySearchAnalytics(config, accessToken, ranges.previous, ["page"], DETAIL_ROW_LIMIT),
-    querySearchAnalytics(config, accessToken, ranges.current, ["query"], DETAIL_ROW_LIMIT),
-  ]);
+  const current = await dailyAggregate(config, accessToken, ranges.current);
+  const previous = await dailyAggregate(config, accessToken, ranges.previous);
+  // Sequential requests bound quota usage; page/query totals retain Google's window semantics.
+  const currentPages = await querySearchAnalytics(config, accessToken, ranges.current, ["page"], DETAIL_ROW_LIMIT);
+  const previousPages = await querySearchAnalytics(config, accessToken, ranges.previous, ["page"], DETAIL_ROW_LIMIT);
+  const currentQueries = await querySearchAnalytics(config, accessToken, ranges.current, ["query"], DETAIL_ROW_LIMIT);
 
-  const current = aggregateRow(currentAggregateRows, "current");
-  const previous = aggregateRow(previousAggregateRows, "previous");
   return [
+    { metric: "gsc.property", dimKey: gscPropertyKey(config.siteUrl), value: 1 },
+    { metric: "gsc.data_through", dimKey: ranges.current.endDate, value: 1 },
     { metric: "gsc.clicks_7d", value: current.clicks },
     { metric: "gsc.clicks_prev_7d", value: previous.clicks },
     { metric: "gsc.impressions_7d", value: current.impressions },
@@ -284,9 +347,27 @@ export async function collectGoogleSearchConsoleMetrics(
   ];
 }
 
+export async function dailyAggregate(config: GscConfig, token: string, range: DateRange): Promise<GscRow> {
+  const span = (Date.parse(range.endDate) - Date.parse(range.startDate)) / 86400_000;
+  if (!Number.isFinite(span) || span < 0 || span > 30) throw new Error("Invalid GSC aggregate range");
+  let clicks = 0, impressions = 0, weightedPosition = 0;
+  for (let day = range.startDate; day <= range.endDate; day = shiftYmd(day, 1)) {
+    const row = aggregateRow(await querySearchAnalytics(config, token, { startDate: day, endDate: day }), day);
+    clicks += row.clicks;
+    impressions += row.impressions;
+    weightedPosition += row.position * row.impressions;
+  }
+  return { clicks, impressions, ctr: impressions ? clicks / impressions : 0,
+    position: impressions ? weightedPosition / impressions : 0 };
+}
+
 export const googleSearchConsoleCollector: MetricCollector = {
   name: "google_search_console",
   intervalSec: 6 * 60 * 60,
-  timeoutMs: 30_000,
+  timeoutMs: 120_000,
   collect: collectGoogleSearchConsoleMetrics,
 };
+
+export function gscPropertyKey(property: string): string {
+  return createHash("sha256").update(property).digest("hex");
+}

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import prisma from "@/lib/prisma";
+import { getGscAnalytics } from "@/lib/admin/seo/data/gscAnalytics";
 import { AlertTriangle, ChevronRight } from "lucide-react";
 import { SeoDashboardSection } from "@/components/admin/seo/SeoDashboardSection";
 import { SeoPageHeader } from "@/components/admin/seo/primitives/SeoPageHeader";
@@ -24,6 +26,7 @@ const severityStyles = {
 export default async function AdminSeoOverviewPage() {
   const session = await resolveSeoMarketSession();
   const summary = await getSeoDashboardSummary(session.filter);
+  const gsc = await getGscAnalytics(prisma);
 
   const weekFrom = startOfWeekMonday(new Date());
   const weekTo = addDays(weekFrom, 7);
@@ -191,13 +194,27 @@ export default async function AdminSeoOverviewPage() {
         )}
       </SeoDashboardSection>
 
-      <section className="rounded-xl border border-dashed border-gray-200 bg-gray-50/70 px-4 py-3">
-        <p className="text-sm font-medium text-gray-900">Поисковые данные</p>
-        <p className="mt-1 text-xs leading-relaxed text-gray-500">
-          Google Search Console, Яндекс.Вебмастер и Wordstat пока не подключены.
-          Внутренний спрос mamaGo доступен в «Темы и тренды».
-        </p>
-      </section>
+      <SeoDashboardSection title="Google Search Console" description="Поисковый трафик всей property · выбранный SEO-рынок не фильтрует эти данные">
+        <p className="text-sm text-gray-600">{gsc?.property ?? "Интеграция выключена или property не настроена"}</p>
+        {gsc?.metrics ? <>
+          <p className="text-xs text-gray-500">7 дней по {gsc.dataThrough} (Pacific Time). Обновлено: {gsc.collectedAt}</p>
+          {gsc.stale && <p className="text-sm text-amber-700">Данные устарели. Проверьте состояние сборщика.</p>}
+          <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              ["Клики", gsc.metrics.clicks, gsc.metrics.clicksChangePercent, "% к предыдущим 7 дням"],
+              ["Показы", gsc.metrics.impressions, gsc.metrics.impressionsChangePercent, "% к предыдущим 7 дням"],
+              ["CTR, %", gsc.metrics.ctr === null ? null : Math.round(gsc.metrics.ctr * 10000) / 100, gsc.metrics.ctrDeltaPp, "п.п."],
+              ["Позиция", gsc.metrics.position === null ? null : Math.round(gsc.metrics.position * 10) / 10, gsc.metrics.positionDelta, "к предыдущим 7 дням"],
+            ].map(([label, value, delta, unit]) => <div key={String(label)} className="rounded-xl border border-gray-200 bg-white p-4">
+              <dt className="text-sm text-gray-500">{label}</dt><dd className="text-2xl font-semibold tabular-nums">{value ?? "—"}</dd>
+              <dd className="text-xs text-gray-500">{delta === null ? "Нет сравнения" : `${delta} ${unit}`}</dd>
+            </div>)}
+          </dl>
+          <p className="text-xs text-gray-500">Изменения кликов среди страниц, присутствующих в обеих top-50 выборках:</p>
+          <ul className="text-sm text-gray-600">{[...gsc.metrics.rising, ...gsc.metrics.falling].map((row) =>
+            <li key={row.page} className="break-all">{row.page}: {row.deltaClicks > 0 ? "+" : ""}{row.deltaClicks}</li>)}</ul>
+        </> : <p className="text-sm text-gray-500">Данные ещё не получены. Нулевые значения не подставляются.</p>}
+      </SeoDashboardSection>
 
       <SeoDashboardSection title="Быстрый доступ" description="Рабочие разделы">
         <div className="grid gap-3 sm:grid-cols-3">

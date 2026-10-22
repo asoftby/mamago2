@@ -13,7 +13,7 @@ const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
 
 {
   assert.equal(resolveGoogleSearchConsoleConfig({}), null);
-  assert.equal(resolveGoogleSearchConsoleConfig({ GOOGLE_SEARCH_CONSOLE_ENABLED: "true" }), null);
+  assert.throws(() => resolveGoogleSearchConsoleConfig({ GOOGLE_SEARCH_CONSOLE_ENABLED: "true" }), /configuration/);
   const config = resolveGoogleSearchConsoleConfig({
     GOOGLE_SEARCH_CONSOLE_ENABLED: "true",
     GOOGLE_SEARCH_CONSOLE_SITE_URL: "sc-domain:mamago.by",
