@@ -17,6 +17,7 @@ import {
   resolveNotificationSettingsSurfaceForType,
 } from "./settingsDomain";
 import { getActiveTelegramConnectionForCurrentEnvironment } from "@/server/services/telegram/telegramConnection.service";
+import { getActiveBusinessTelegramRecipient } from "@/server/services/telegram/businessTelegramDelivery.service";
 
 export type ResolvedChannels = {
   inApp: boolean;
@@ -89,7 +90,9 @@ export async function resolveNotificationChannels(
   if (telegram) {
     const telegramLinked =
       user.telegramLinked ??
-      Boolean(await getActiveTelegramConnectionForCurrentEnvironment(user.id));
+      (Boolean(await getActiveTelegramConnectionForCurrentEnvironment(user.id)) ||
+        (resolveNotificationSettingsSurfaceForType(notificationType) === "BUSINESS" &&
+          Boolean(await getActiveBusinessTelegramRecipient(user.id))));
 
     if (!telegramLinked) telegram = false;
   }

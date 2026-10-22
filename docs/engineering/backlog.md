@@ -5390,3 +5390,13 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Acceptance criteria: one-hop HTTP 301/308 for the approved 13 only, target content/indexability/canonical/sitemap parity; Mogilev excluded. Reconcile the two existing failing SEO recovery tests (CITY/global target and 37/36 blocked rows) with approved evidence, not weaker assertions. Assess listing lastmod and category filter duplicates separately (P2).
 - Additional HTTP proof: Phase2A event positions 25–28 still redirect to missing/noindex targets; current equivalent or historical restoration requires approved content/inventory, not guessed hub mappings.
 - Source: [SEO audit](../seo/seo-recovery-audit-2026-10-22.md), [action plan](../seo/seo-recovery-action-plan.md); base `8f564a489a9766f9ad5ac09b4c23415ef71a2898`.
+
+## [BACKLOG-195] Business Telegram Bot — delivery, booking callbacks and rollout
+
+- Status: OPEN
+- Priority: P1
+- Area: Business / Telegram / Booking
+- Added: 2026-10-22
+- Reason deferred: business bot connection foundation must be reviewed and deployed before altering legacy notification delivery and payment-sensitive bookings. A separate bot token must not silently steal family subscriptions.
+- Next: route business-only notification scenarios to the business bot with explicit recipient and active membership check, delivery retry/idempotency, opt-in preferences and tests; add booking confirmation/change callbacks through existing booking state machine and PartyOutbox; configure DEV BotFather token/webhook and run smoke tests before enabling PROD.
+- Safety: legacy Info Bot and its connection remain unchanged; do not enable business callbacks or production delivery without confirmed migration and environment configuration.
