@@ -87,7 +87,9 @@ worker at the separate current files. Deliver this reviewed override through
 the existing release process and include it in the owner's normal DEV Compose
 invocation, alongside the existing compose files. The workflow does **not**
 install/modify Compose configuration or execute it. Without this adoption,
-staged files do not affect running containers or future deployments.
+staged files do not affect running containers or future deployments. Serialize
+staging with the owner's DEV deployment: Compose opens the two files separately
+and must not race a concurrent pointer rotation.
 
 Before enabling collection, verify the deployed code/build identity and
 `20261022120000_gsc_query_cache` migration using the existing deployment
