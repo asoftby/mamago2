@@ -190,7 +190,7 @@
     "test:redirect-manifest": "tsx src/lib/seo/redirectManifest.test.ts",
     "test:migrated-article-slug-recovery": "tsx src/lib/seo/migratedArticleSlugRecovery.test.ts",
     "test:city-article-public-route": "tsx src/lib/article/resolveCityArticlePublicRoute.test.ts",
-    "test:seo-recovery": "tsx src/lib/seo/redirectConfiguration.test.ts && tsx src/lib/routing/trailingSlashPolicy.test.ts && tsx src/lib/seo/validateStoredCanonical.test.ts && tsx src/lib/seo/globalNoindex.test.ts && tsx src/lib/routing/wpLegacyCatchAll.test.ts",
+    "test:seo-recovery": "tsx src/lib/seo/redirectConfiguration.test.ts && tsx src/lib/routing/trailingSlashPolicy.test.ts && tsx src/lib/seo/validateStoredCanonical.test.ts && tsx src/lib/seo/globalNoindex.test.ts && tsx src/lib/routing/wpLegacyCatchAll.test.ts && tsx src/lib/routing/prestreamEditorialRouteRedirect.test.ts",
     "test:wp-catch-all": "tsx src/lib/routing/wpLegacyCatchAll.test.ts",
     "test:rate-limit": "tsx src/lib/security/rateLimit.test.ts",
     "test:offer-published-edit-gate": "tsx src/lib/offers/offerPublishedEditGate.test.ts",
