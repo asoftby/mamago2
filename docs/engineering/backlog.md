@@ -5400,3 +5400,13 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Reason deferred: business bot connection foundation must be reviewed and deployed before altering legacy notification delivery and payment-sensitive bookings. A separate bot token must not silently steal family subscriptions.
 - Next: route business-only notification scenarios to the business bot with explicit recipient and active membership check, delivery retry/idempotency, opt-in preferences and tests; add booking confirmation/change callbacks through existing booking state machine and PartyOutbox; configure DEV BotFather token/webhook and run smoke tests before enabling PROD.
 - Safety: legacy Info Bot and its connection remain unchanged; do not enable business callbacks or production delivery without confirmed migration and environment configuration.
+
+## [BACKLOG-196] Public Offer 404 UX and already-published Offers on non-public Places
+
+- Status: OPEN
+- Priority: P2
+- Area: Offers / Public pages / Data integrity
+- Added: 2026-10-22
+- Reason deferred: #706 fixes the code path (visibility parity + approve guard). Offers approved before the guard may still sit PUBLISHED on a Place that is not PUBLISHED; they stay hidden (404) until the Place is approved. Finding them needs read-only DB access that is not authorized here.
+- Next: (1) run the read-only check from the #706 PR on DEV/PROD and decide per row whether to approve the Place or return the Offer to moderation (owner decision, no automatic writes); (2) there is no `not-found.tsx` under `src/app`, so `notFound()` after the `loading.tsx` skeleton shows the generic Next 404 — add a branded public 404.
+- Source: #706, #702, #699.
