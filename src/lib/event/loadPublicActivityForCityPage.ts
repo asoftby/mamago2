@@ -3,14 +3,14 @@ import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getPublicActivityDetailWhere } from "@/server/public/publicContentVisibility";
-import { activityInCityWhere } from "@/server/discovery/activityInCityWhere";
 import type { ActivityForEventPageInput } from "@/lib/event/buildEventPageDataFromPrisma";
 import { findActivityBySlug } from "@/lib/slug/activitySlugService";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import { enrichPlaceWithResolvedLogo } from "@/lib/place/resolvePlaceLogoUrlFromDb";
 
 /**
- * Публичная карточка события по `/{city}/events/{slug|id}` (опубликовано и в городе).
+ * Публичная карточка события по `/{city}/events/{slug|id}`.
+ * Город контекста не ограничивает доступ к опубликованной карточке.
  * Поддерживает:
  * - current slug
  * - old slug history (for redirect)
@@ -59,7 +59,6 @@ export async function loadPublicActivityForCityPage(
     AND: [
       { id: resolvedId },
       { type: ActivityType.EVENT },
-      activityInCityWhere(city.id),
       ...pubParts,
     ],
   };
