@@ -5416,3 +5416,28 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Reason deferred: #706 fixes the code path (visibility parity + approve guard). Offers approved before the guard may still sit PUBLISHED on a Place that is not PUBLISHED; they stay hidden (404) until the Place is approved. Finding them needs read-only DB access that is not authorized here.
 - Next: (1) run the read-only check from the #706 PR on DEV/PROD and decide per row whether to approve the Place or return the Offer to moderation (owner decision, no automatic writes); (2) there is no `not-found.tsx` under `src/app`, so `notFound()` after the `loading.tsx` skeleton shows the generic Next 404 — add a branded public 404.
 - Source: #706, #702, #699.
+
+
+## [BACKLOG-197] Activate owner-controlled GSC DEV secret staging
+
+- Status: BLOCKED
+- Priority: P2
+- Area: Infrastructure / DEV / GSC
+- Added: 2026-10-22
+- Context: owner saved `GSC_SERVICE_ACCOUNT_JSON_DEV` in GitHub. Manual staging
+  workflow, restricted receiver, DEV-only Compose override and synthetic-key tests
+  are prepared in commit `7bdd1a2f0d9cbf5782a3214ad310f5051876b929`, based on
+  fresh dev `625bcd83db04aaa52df7daf5778111bd60b19f7e`. No workflow dispatched,
+  real secret read, server setting changed, migration applied or deploy executed.
+- Reason deferred: owner authorization is limited to preparing the PR. Receiver
+  installation, restricted SSH-key provisioning, pinned host trust, default-main
+  workflow registration and Compose adoption are separate infrastructure actions.
+- Acceptance criteria: narrow reviewed workflow registration in default branch;
+  forced-command SSH access configured; owner stages disabled configuration,
+  verifies deployed GSC code/migration, adopts DEV override through normal release
+  process and completes the Google/DEV smoke. No broad dev-to-main merge.
+- Update 2026-10-23: live preflight confirms SSH user `user`, no `ubuntu`
+  account, and no passwordless sudo for installing the root-owned receiver.
+  Correct SSH destination in the same PR; privileged installation remains an
+  owner action. No permission workaround through Docker/systemctl is allowed.
+- Source: #705, #702; `docs/engineering/gsc-dev-github-secrets.md`.
