@@ -239,7 +239,7 @@ export function CityDiscoveryShell({
               {alternativeCities.slice(0, 5).map((option) => {
                 const query = new URLSearchParams();
                 for (const [key, value] of Object.entries(listingSearchParams)) {
-                  if (!value || key === "city") continue;
+                  if (!value || ["city", "district", "metro"].includes(key)) continue;
                   if (Array.isArray(value)) value.forEach((entry) => query.append(key, entry));
                   else query.set(key, value);
                 }
