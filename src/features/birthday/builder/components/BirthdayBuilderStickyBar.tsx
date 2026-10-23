@@ -402,7 +402,10 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
               ) : null}
             </span>
             <span className="flex flex-wrap items-center gap-x-1 min-w-0">
-              <span className="text-muted-foreground">{compactSummaryParts.budgetShort}</span>
+              <span className="inline-flex items-center gap-1 whitespace-nowrap text-muted-foreground">
+              {compactSummaryParts.budgetShort}
+              {budgetGroup && budgetGroup !== "unknown" ? <BelarusianRubleIcon size="sm" /> : null}
+            </span>
               <span className="text-muted-foreground/50">·</span>
               <span className="font-medium text-foreground">
                 {compactSummaryParts.totalRounded} <BelarusianRubleIcon />
@@ -457,7 +460,10 @@ export function BirthdayBuilderStickyBar({ builder }: BirthdayBuilderStickyBarPr
                 <span className="text-muted-foreground/50"> · </span>
               </>
             ) : null}
-            <span className="text-muted-foreground">{compactSummaryParts.budgetShort}</span>
+            <span className="inline-flex items-center gap-1 whitespace-nowrap text-muted-foreground">
+              {compactSummaryParts.budgetShort}
+              {budgetGroup && budgetGroup !== "unknown" ? <BelarusianRubleIcon size="sm" /> : null}
+            </span>
             <span className="text-muted-foreground/50"> · </span>
             <span className="font-medium text-foreground">
               {compactSummaryParts.totalRounded} <BelarusianRubleIcon />

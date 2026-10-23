@@ -74,6 +74,7 @@ const offerMetaSelect = {
   place: {
     select: {
       title: true,
+      status: true,
       archivedAt: true,
       ownerBusiness: { select: { operationalStatus: true } },
       city: { select: { slug: true } },
@@ -164,6 +165,7 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
           id: true,
           title: true,
           slug: true,
+          status: true,
           archivedAt: true,
           ownerBusiness: { select: { operationalStatus: true } },
           createdByUserId: true,
@@ -194,7 +196,7 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
     permanentRedirect(getOfferPublicPath({ slug: offer.slug }, actualCitySlug));
   }
 
-  const data = await getOfferPageData({ citySlug: actualCitySlug, slug: offer.slug ?? slug });
+  const data = await getOfferPageData({ citySlug: actualCitySlug, slug: offer.slug ?? slug, offerId: offer.id });
   if (!data) notFound();
 
   // Only offers from the same verified owning business, never merely matching names.
@@ -226,6 +228,7 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
           archivedAt: true,
           place: {
             select: {
+              status: true,
               archivedAt: true,
               ownerBusiness: { select: { operationalStatus: true } },
               city: { select: { slug: true } },

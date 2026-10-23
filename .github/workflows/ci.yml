@@ -73,6 +73,12 @@ jobs:
           pnpm exec tsx src/lib/offers/offerClassSchedule.test.ts
           pnpm exec tsx src/server/offers/slotAvailability.test.ts
 
+      - name: GSC DEV credential staging regressions
+        run: python3 scripts/deploy/stage-gsc-dev.test.py
+
+      - name: Direct Google Search Console regressions
+        run: pnpm test:gsc
+
       - name: Type check
         # GitHub ubuntu runners abort TypeScript at Node's default heap ceiling.
         run: NODE_OPTIONS=--max-old-space-size=5120 pnpm tsc --noEmit

@@ -42,6 +42,7 @@ export default async function LegacySectionOfferRedirectPage({ params }: LegacyO
       archivedAt: true,
       place: {
         select: {
+          status: true,
           archivedAt: true,
           ownerBusiness: { select: { operationalStatus: true } },
           city: { select: { slug: true } },

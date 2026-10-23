@@ -2,12 +2,14 @@ import { notFound } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
+import { listPublicCitySelectorOptions } from "@/server/city/publicCitySelector";
 import { CityDiscoveryShell } from "./CityDiscoveryShell";
 import { Intent } from "@/lib/intent";
 import { listPublicRoutesByCity } from "@/server/services/route.service";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
 import { getClassesDiscoveryFeed } from "@/server/discovery/classesDiscoveryFeed";
+import { getBirthdayDiscoveryFeed } from "@/server/discovery/birthdayDiscoveryFeed";
 import {
   listDiscoveryClassChips,
   resolveDiscoveryClassChipSlug,
@@ -63,29 +65,24 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
   let activeClassChipSlug = undefined;
   let budgetConfig: BudgetConfig = null;
 
-  if (intent === "kuda" || intent === "birthday") {
-    // DEFECT (not a TODO): intent === "birthday" reuses getKudaDiscoveryFeed and
-    // renders event/kuda discovery content (Activity/EVENT rows) — content outside
-    // the birthday domain, not the intended architecture for this section. This is
-    // a stand-in, not the target design: when the birthday section is activated,
-    // its feed must be built on party-specific entities (PartyCategory,
-    // PartyOccasion, PartyLocationType) and PARTY_SERVICE/PARTY_PACKAGE Offer rows
-    // — none of which currently have a read-side consumer anywhere in the codebase.
-    // Do not extend getKudaDiscoveryFeed itself with birthday-specific behavior;
-    // the fix is a separate feed function, not a branch added here.
+  if (intent === "birthday") {
+    // Only published party-specific offers approved for this section.
+    discoveryActivities = await getBirthdayDiscoveryFeed(city.id, city.slug);
+    if (budgetEnabled) {
+      const max = computeMaxBudget(discoveryActivities);
+      if (max) budgetConfig = { max, step: getBudgetStep(max) };
+    }
+  }
+  if (intent === "kuda") {
     const formatParam = Array.isArray(searchParams.format)
       ? searchParams.format[0]
       : searchParams.format;
-    const nearbyParam = Array.isArray(searchParams.nearby)
-      ? searchParams.nearby[0]
-      : searchParams.nearby;
     const scalar = (key: string) => {
       const value = searchParams[key];
       return Array.isArray(value) ? value[0] : value;
     };
-    const eventFilters = intent === "kuda"
-      ? {
-          categorySlugs: scalar("category")?.split(",").filter(Boolean) ?? [],
+    const eventFilters = {
+      categorySlugs: scalar("category")?.split(",").filter(Boolean) ?? [],
           genreSlugs: scalar("genre")?.split(",").filter(Boolean) ?? [],
           dateRange: resolveEventDateRange({
             preset:
@@ -103,11 +100,10 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
           districtId: scalar("district") ?? null,
           metroId: scalar("metro") ?? null,
           adultOnly: scalar("adultOnly") === "true",
-        }
-      : undefined;
+    };
     discoveryActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
       format: parseActivityFormatQuery(typeof formatParam === "string" ? formatParam : null),
-      nearby: intent === "kuda" ? false : nearbyParam === "true",
+      nearby: false,
       eventFilters,
     });
     if (budgetEnabled && discoveryActivities) {
@@ -115,7 +111,7 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
       // The slider domain must come from the same candidate pool without its own
       // ceiling, otherwise choosing 50 would collapse max to 50 and make it
       // impossible to increase the budget again.
-      if (intent === "kuda" && (eventFilters?.priceMin != null || eventFilters?.priceMax != null)) {
+      if (eventFilters.priceMin != null || eventFilters.priceMax != null) {
         budgetActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
           format: parseActivityFormatQuery(typeof formatParam === "string" ? formatParam : null),
           nearby: false,
@@ -212,10 +208,16 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
     routesData = realRoutes;
   }
 
+  const alternativeCities = intent === "kuda" || intent === "classes"
+    ? (await listPublicCitySelectorOptions()).filter((option) => option.slug !== city.slug)
+    : [];
+
   return (
     <CityDiscoveryShell
       city={citySlug}
       intent={intent}
+      alternativeCities={alternativeCities}
+      listingSearchParams={searchParams}
       routesData={routesData}
       discoveryActivities={discoveryActivities}
       classChips={classChips}

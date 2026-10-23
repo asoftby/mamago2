@@ -3435,6 +3435,12 @@ P3 — cleanup / polish / optional
   Actions "CI" workflow (`.github/workflows/ci.yml`, `typecheck` job
   only) run ESLint at all — only `pnpm check`/`pnpm lint` do, and those
   are not part of any automated gate today.
+- Update 2026-10-22 (#705): `pnpm exec eslint src --quiet` reports 26 errors
+  in 17 files at base `79ef8b72ccb122c1b7755c5c95e1757e7d700403`. All error
+  files are byte-identical to that base; GSC task files pass targeted ESLint.
+  Additional findings include React hook purity/rules and prefer-const.
+  Deferred under this existing debt item; unrelated fixes are outside #705.
+
 - Dependencies: none.
 - Acceptance criteria: fix all 14 pre-existing findings (or their
   root causes) so `pnpm lint` is repo-wide green; then add an ESLint
@@ -5390,3 +5396,48 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Acceptance criteria: one-hop HTTP 301/308 for the approved 13 only, target content/indexability/canonical/sitemap parity; Mogilev excluded. Reconcile the two existing failing SEO recovery tests (CITY/global target and 37/36 blocked rows) with approved evidence, not weaker assertions. Assess listing lastmod and category filter duplicates separately (P2).
 - Additional HTTP proof: Phase2A event positions 25–28 still redirect to missing/noindex targets; current equivalent or historical restoration requires approved content/inventory, not guessed hub mappings.
 - Source: [SEO audit](../seo/seo-recovery-audit-2026-10-22.md), [action plan](../seo/seo-recovery-action-plan.md); base `8f564a489a9766f9ad5ac09b4c23415ef71a2898`.
+
+## [BACKLOG-195] Business Telegram Bot — delivery, booking callbacks and rollout
+
+- Status: OPEN
+- Priority: P1
+- Area: Business / Telegram / Booking
+- Added: 2026-10-22
+- Reason deferred: business bot connection foundation must be reviewed and deployed before altering legacy notification delivery and payment-sensitive bookings. A separate bot token must not silently steal family subscriptions.
+- Next: route business-only notification scenarios to the business bot with explicit recipient and active membership check, delivery retry/idempotency, opt-in preferences and tests; add booking confirmation/change callbacks through existing booking state machine and PartyOutbox; configure DEV BotFather token/webhook and run smoke tests before enabling PROD.
+- Safety: legacy Info Bot and its connection remain unchanged; do not enable business callbacks or production delivery without confirmed migration and environment configuration.
+
+## [BACKLOG-196] Public Offer 404 UX and already-published Offers on non-public Places
+
+- Status: OPEN
+- Priority: P2
+- Area: Offers / Public pages / Data integrity
+- Added: 2026-10-22
+- Reason deferred: #706 fixes the code path (visibility parity + approve guard). Offers approved before the guard may still sit PUBLISHED on a Place that is not PUBLISHED; they stay hidden (404) until the Place is approved. Finding them needs read-only DB access that is not authorized here.
+- Next: (1) run the read-only check from the #706 PR on DEV/PROD and decide per row whether to approve the Place or return the Offer to moderation (owner decision, no automatic writes); (2) there is no `not-found.tsx` under `src/app`, so `notFound()` after the `loading.tsx` skeleton shows the generic Next 404 — add a branded public 404.
+- Source: #706, #702, #699.
+
+
+## [BACKLOG-197] Activate owner-controlled GSC DEV secret staging
+
+- Status: BLOCKED
+- Priority: P2
+- Area: Infrastructure / DEV / GSC
+- Added: 2026-10-22
+- Context: owner saved `GSC_SERVICE_ACCOUNT_JSON_DEV` in GitHub. Manual staging
+  workflow, restricted receiver, DEV-only Compose override and synthetic-key tests
+  are prepared in commit `7bdd1a2f0d9cbf5782a3214ad310f5051876b929`, based on
+  fresh dev `625bcd83db04aaa52df7daf5778111bd60b19f7e`. No workflow dispatched,
+  real secret read, server setting changed, migration applied or deploy executed.
+- Reason deferred: owner authorization is limited to preparing the PR. Receiver
+  installation, restricted SSH-key provisioning, pinned host trust, default-main
+  workflow registration and Compose adoption are separate infrastructure actions.
+- Acceptance criteria: narrow reviewed workflow registration in default branch;
+  forced-command SSH access configured; owner stages disabled configuration,
+  verifies deployed GSC code/migration, adopts DEV override through normal release
+  process and completes the Google/DEV smoke. No broad dev-to-main merge.
+- Update 2026-10-23: live preflight confirms SSH user `user`, no `ubuntu`
+  account, and no passwordless sudo for installing the root-owned receiver.
+  Correct SSH destination in the same PR; privileged installation remains an
+  owner action. No permission workaround through Docker/systemctl is allowed.
+- Source: #705, #702; `docs/engineering/gsc-dev-github-secrets.md`.
