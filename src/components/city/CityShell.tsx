@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
+import { listPublicCitySelectorOptions } from "@/server/city/publicCitySelector";
 import { CityDiscoveryShell } from "./CityDiscoveryShell";
 import { Intent } from "@/lib/intent";
 import { listPublicRoutesByCity } from "@/server/services/route.service";
@@ -207,10 +208,16 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
     routesData = realRoutes;
   }
 
+  const alternativeCities = intent === "kuda" || intent === "classes"
+    ? (await listPublicCitySelectorOptions()).filter((option) => option.slug !== city.slug)
+    : [];
+
   return (
     <CityDiscoveryShell
       city={citySlug}
       intent={intent}
+      alternativeCities={alternativeCities}
+      listingSearchParams={searchParams}
       routesData={routesData}
       discoveryActivities={discoveryActivities}
       classChips={classChips}

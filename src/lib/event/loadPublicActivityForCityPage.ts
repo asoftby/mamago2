@@ -3,14 +3,13 @@ import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getPublicActivityDetailWhere } from "@/server/public/publicContentVisibility";
-import { activityInCityWhere } from "@/server/discovery/activityInCityWhere";
 import type { ActivityForEventPageInput } from "@/lib/event/buildEventPageDataFromPrisma";
-import { findActivityBySlug } from "@/lib/slug/activitySlugService";
 import { resolveActivityCoverUrl } from "@/lib/event/resolveActivityCoverUrl";
 import { enrichPlaceWithResolvedLogo } from "@/lib/place/resolvePlaceLogoUrlFromDb";
 
 /**
- * Публичная карточка события по `/{city}/events/{slug|id}` (опубликовано и в городе).
+ * Публичная карточка события по `/{city}/events/{slug|id}`.
+ * Город контекста не ограничивает доступ к опубликованной карточке.
  * Поддерживает:
  * - current slug
  * - old slug history (for redirect)
@@ -48,9 +47,34 @@ export async function loadPublicActivityForCityPage(
 
   const now = new Date();
 
-  // Resolve slug → activityId (current or history)
-  const bySlug = await findActivityBySlug(slugOrId);
-  const resolvedId = bySlug?.activityId ?? slugOrId;
+  // Prefer the requested city's current slug (or historical slug). Slugs are
+  // only unique per city, so a global findFirst could show a different event.
+  const cityMatch = { OR: [
+    { cityId: city.id },
+    { place: { cityId: city.id } },
+    { venue: { cityId: city.id } },
+  ] } satisfies Prisma.ActivityWhereInput;
+  const scopedCurrent = await prisma.activity.findFirst({
+    where: { slug: slugOrId, ...cityMatch },
+    select: { id: true },
+  });
+  const scopedHistory = scopedCurrent ? null : await prisma.activitySlugHistory.findFirst({
+    where: { slug: slugOrId, cityId: city.id },
+    select: { activityId: true },
+  });
+
+  let resolvedId = scopedCurrent?.id ?? scopedHistory?.activityId ?? slugOrId;
+  if (!scopedCurrent && !scopedHistory) {
+    // Cross-city fallback is safe only if this slug identifies one event.
+    // An ambiguous slug must never expose an arbitrary city's publication.
+    const [current, history] = await Promise.all([
+      prisma.activity.findMany({ where: { slug: slugOrId }, select: { id: true }, take: 2 }),
+      prisma.activitySlugHistory.findMany({ where: { slug: slugOrId }, select: { activityId: true }, take: 2 }),
+    ]);
+    const ids = new Set([...current.map((item) => item.id), ...history.map((item) => item.activityId)]);
+    if (ids.size === 1) resolvedId = [...ids][0]!;
+    else if (ids.size > 1) return null;
+  }
 
   const pub = getPublicActivityDetailWhere();
   const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
@@ -59,7 +83,6 @@ export async function loadPublicActivityForCityPage(
     AND: [
       { id: resolvedId },
       { type: ActivityType.EVENT },
-      activityInCityWhere(city.id),
       ...pubParts,
     ],
   };
