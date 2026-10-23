@@ -108,6 +108,7 @@ class StagingTests(unittest.TestCase):
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("github.ref == 'refs/heads/dev'", workflow)
         self.assertIn("github.actor == 'asoftby'", workflow)
+        self.assertIn("user@134.17.17.134 stage-gsc-dev", workflow)
         self.assertIn("StrictHostKeyChecking=yes", workflow)
         self.assertIn("persist-credentials: false", workflow)
         for forbidden in ("pull_request:", "push:", "schedule:", "upload-artifact", "set -x", "docker compose", "migrate deploy", "StrictHostKeyChecking=no"):

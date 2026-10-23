@@ -33,12 +33,15 @@ It cannot stage arbitrary projects, paths, shell commands or PROD configuration.
    any selected execution ref other than `dev`.
 2. **Restricted SSH receiver.** On the shared DEV/PROD host, install the reviewed
    `scripts/deploy/stage-gsc-dev.py` from a known Git SHA as a root-owned,
-   non-writable-by-ubuntu file at `/usr/local/libexec/mamago-stage-gsc-dev.py`.
+   non-writable-by-user file at `/usr/local/libexec/mamago-stage-gsc-dev.py`.
+   Live preflight confirmed the SSH account is `user` (UID 1000); `ubuntu`
+   does not exist. Installing into `/usr/local/libexec` requires owner sudo:
+   the available passwordless sudo rules do not permit file installation.
    Python 3 and OpenSSL are prerequisites. Provision
-   `/opt/mamago/dev/gsc-config` owned by `ubuntu`, mode `0700`, with no symlinked
+   `/opt/mamago/dev/gsc-config` owned by `user`, mode `0700`, with no symlinked
    parent directories. Do not use the PROD directory.
 3. Create a **dedicated** SSH key for this one operation. Install only its public
-   key for `ubuntu`, with the following forced-command restrictions in the
+   key for `user`, with the following forced-command restrictions in the
    authorized key entry (replace the public-key placeholder):
 
    ```text

@@ -60,4 +60,4 @@ jobs:
               -i "$key_dir/id" -o IdentitiesOnly=yes -o BatchMode=yes \
               -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$key_dir/known_hosts" \
               -o ConnectTimeout=15 -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no \
-              ubuntu@134.17.17.134 stage-gsc-dev
+              user@134.17.17.134 stage-gsc-dev

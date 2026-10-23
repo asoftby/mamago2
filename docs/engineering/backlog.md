@@ -5436,4 +5436,8 @@ distributor_company_id=550) и хотели бы уточнить несколь
   forced-command SSH access configured; owner stages disabled configuration,
   verifies deployed GSC code/migration, adopts DEV override through normal release
   process and completes the Google/DEV smoke. No broad dev-to-main merge.
+- Update 2026-10-23: live preflight confirms SSH user `user`, no `ubuntu`
+  account, and no passwordless sudo for installing the root-owned receiver.
+  Correct SSH destination in the same PR; privileged installation remains an
+  owner action. No permission workaround through Docker/systemctl is allowed.
 - Source: #705, #702; `docs/engineering/gsc-dev-github-secrets.md`.
