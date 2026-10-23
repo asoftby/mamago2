@@ -28,6 +28,7 @@ async function run() {
       assert.equal(response.headers.get("x-middleware-next"), "1", `${path} must reach its route`);
       if (["/me", "/business", "/admin"].includes(path)) {
         assert.match(response.headers.get("x-robots-tag") ?? "", /noindex/, `${path} remains private`);
+        assert.equal(response.headers.get("x-middleware-request-x-mamago-pathname"), path);
       }
     }
     const slash = await proxy(new NextRequest("https://mamago.by/minsk/events/"));

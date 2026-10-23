@@ -136,7 +136,12 @@ async function main() {
   const migration = spawnSync("pnpm", ["exec", "prisma", "migrate", "deploy"], { stdio: "inherit", env: process.env });
   assert.equal(migration.status, 0, "Apply repository migrations to synthetic DB");
   migrated = true;
-  const country = await db.country.create({ data: { name: "Synthetic country", slug: "synthetic-country", isoCode: "BY", isActive: true } });
+  // Repository migrations seed the BY reference country even in an empty DB.
+  const country = await db.country.upsert({
+    where: { isoCode: "BY" },
+    update: { name: "Synthetic country", isActive: true },
+    create: { name: "Synthetic country", slug: "synthetic-country", isoCode: "BY", isActive: true },
+  });
   const city = await db.city.create({ data: { name: "Минск", slug: "minsk", countryId: country.id } });
   const otherCity = await db.city.create({ data: { name: "Synthetic other city", slug: "synthetic-other-city", countryId: country.id } });
   const category = await db.eventCategory.create({ data: { nameRu: "Маршруты", nameEn: "Synthetic routes", slug: "marshruty", publicationType: "ARTICLE" } });
@@ -158,7 +163,7 @@ async function main() {
   const article = await db.article.findFirstOrThrow({ where: { slug } });
   for (const data of [
     { status: "DRAFT" }, { contentJson: { version: 1, blocks: [] } }, { noindex: true }, { seoRobots: "NOINDEX, follow" },
-    { geoScope: "COUNTRY" }, { cityId: otherCity.id }, { categoryId: null },
+    { geoScope: "COUNTRY", cityId: null }, { cityId: otherCity.id }, { categoryId: null },
   ] satisfies Prisma.ArticleUncheckedUpdateInput[]) {
     // Scalar city/category foreign keys use the unchecked update variant.
     await db.article.update({ where: { id: article.id }, data });
@@ -205,7 +210,12 @@ async function main() {
     const result = await request(path);
     assert.equal(result.robots, "noindex, nofollow", `${path} stays private`);
     assert.ok([200, 307].includes(result.status), `${path} auth response: ${result.status}`);
-    assert.ok((result.location ?? result.body).includes("/login"), `${path} must require login`);
+    const refresh = result.body.match(/<meta[^>]*http-equiv="refresh"[^>]*>/)?.[0];
+    const destination = result.location ?? refresh?.match(/content="[01];url=([^"]+)"/)?.[1];
+    assert.ok(destination, `${path} must issue an actual auth redirect, including streamed redirects`);
+    const login = new URL(destination.replaceAll("&amp;", "&"), base);
+    assert.equal(login.pathname, "/login");
+    assert.equal(login.searchParams.get("redirectTo"), path, "Proxy preserves auth return path");
   }
   const api = await request("/api/health");
   assert.equal(api.status, 200);

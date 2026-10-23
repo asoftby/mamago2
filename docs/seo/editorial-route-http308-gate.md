@@ -69,4 +69,53 @@ local evidence is also written to `/tmp/mamago-editorial-http-evidence.json`.
 
 ## Verification
 
-Results are recorded after the local built-HTTP gate and final GitHub CI run.
+Local verification on 2026-10-23 used a dedicated PostgreSQL 16 cluster on
+127.0.0.1:55495, a non-superuser database owner and synthetic records only.
+Fresh dev base: `1f3ff2b1b53e1cccfbf50003cff10a430259d467`.
+
+- `sh scripts/git/task-check.sh`: PASS, including TypeScript, full `pnpm check:push`,
+  SEO regression tests and production build (app + worker).
+- ESLint of changed TypeScript files: PASS. Separate TypeScript check of the HTTP
+  runner (scripts are excluded from the app tsconfig): PASS.
+- `pnpm test:seo-http`: PASS, **312 actual HTTP requests**. There were **208 exact
+  cutover 308 responses**, **52 Article target 200 responses**, **42 negative
+  readiness/exclusion/outage responses**, and 10 remaining policy/auth/UGC probes.
+- DEV/staging/test: each of the 52 cutover responses per environment has
+  `X-Robots-Tag: noindex, nofollow`; all 13 Article targets per environment have
+  the same header, meta noindex and one correct environment canonical.
+  `robots.txt` disallows all. Production targets remain indexable with no global
+  X-Robots noindex override.
+- PostgreSQL outage: GET and HEAD both returned 500 with no Location and an
+  observable readiness error marker, never 308.
+- `/me` keeps its existing streamed login redirect; `/admin` and `/business`
+  return 307 to login. All preserve exact `redirectTo` and private noindex.
+- Same-origin redirects are serialized by Next as relative Location references.
+  The gate resolves each against the request origin and compares the complete
+  URL, including repeated and encoded query parameters. GET contains only Next's
+  plain redirect path text; HEAD has no body. Neither renders HTML/meta refresh.
+
+All rows below passed GET and HEAD, with and without trailing slash and with
+query preservation, in production, dev, staging and test runtime modes. Target
+prefix is `/minsk/blog/`; every target returned 200/content/self-canonical.
+
+| Approved slug | HTTP | Article target |
+| --- | --- | --- |
+
+| `marshrut-po-drozdam-zhivopisno-i-razvlekatelno` | 308 | 200 |
+| `marshrut-kurosovshchina-zoologicheski-ekstremalnaya` | 308 | 200 |
+| `marshrut-majak-minska-krasivo-i-aktivno` | 308 | 200 |
+| `marshrut-narochanskij-zhivopisno-i-peshehodno` | 308 | 200 |
+| `chto-posmotret-turistu-za-2-dnya-v-kobrine-i-breste` | 308 | 200 |
+| `marshrut-malinovka` | 308 | 200 |
+| `marshrut-traktornyj-zavod` | 308 | 200 |
+| `marshrut-braslav-nomad-houses-chto-posmotret-v-braslave` | 308 | 200 |
+| `marshrut-shchorsy` | 308 | 200 |
+| `novogodniy-marshrut` | 308 | 200 |
+| `5-mini-puteshestvij-na-1-den-nedaleko-ot-minska` | 308 | 200 |
+| `marshrut-na-avtodome-zoopark-vodopady-safari-gomel` | 308 | 200 |
+| `marshrut-po-piteru-kulturnaya-programma-na-2-sutok-bez-detej` | 308 | 200 |
+
+Final GitHub CI is linked in PR #695 on its final HEAD. No merge or deployment
+was performed. Issue #253 must remain open for separately authorized deployment,
+runtime identity/real-environment HTTP verification, Google canonical checks and
+GSC recovery monitoring.
