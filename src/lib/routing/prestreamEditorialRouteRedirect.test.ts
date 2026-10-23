@@ -5,14 +5,16 @@ import { resolvePrestreamEditorialRouteLocation as decide } from "./prestreamEdi
 async function run() {
   for (const slug of LEGACY_EDITORIAL_ROUTE_SLUGS) {
     let checks = 0;
-    for (const path of ["/routes/" + slug, "/routes/" + slug + "/"]) {
-      const result = await decide(
-        { pathname: path, search: "?utm_source=old&x=1", origin: "https://dev.mamago.by", method: "GET" },
-        async (actual) => { checks++; assert.equal(actual, slug); return "/minsk/blog/" + slug; },
-      );
-      assert.equal(result, "https://dev.mamago.by/minsk/blog/" + slug + "?utm_source=old&x=1");
+    for (const method of ["GET", "HEAD"]) {
+      for (const path of ["/routes/" + slug, "/routes/" + slug + "/"]) {
+        const result = await decide(
+          { pathname: path, search: "?utm_source=old&x=1", origin: "https://dev.mamago.by", method },
+          async (actual) => { checks++; assert.equal(actual, slug); return "/minsk/blog/" + slug; },
+        );
+        assert.equal(result, "https://dev.mamago.by/minsk/blog/" + slug + "?utm_source=old&x=1");
+      }
     }
-    assert.equal(checks, 2);
+    assert.equal(checks, 4);
   }
   for (const pathname of [
     "/routes/marshrut-mogilev",
@@ -39,6 +41,12 @@ async function run() {
     { pathname: "/routes/" + slug, search: "", origin: "https://mamago.by", method: "GET" },
     async () => { throw new Error("Database unavailable"); },
   ), null, "Database failure cannot produce a redirect");
+  for (const target of ["https://evil.test", "//evil.test", "/minsk/blog/other", "/minsk/blog/../other", `/minsk/blog/${slug}?x=1`, `/minsk/blog/${slug}#hash`]) {
+    assert.equal(await decide(
+      { pathname: `/routes/${slug}`, search: "", origin: "https://mamago.by", method: "GET" },
+      async () => target,
+    ), null, "Only the exact approved Article path is accepted");
+  }
   console.log("prestreamEditorialRouteRedirect.test.ts: PASS");
 }
 void run().catch((error) => { console.error(error); process.exitCode = 1; });

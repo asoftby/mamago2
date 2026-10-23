@@ -1,4 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
+import { parseArticleContentJson } from "@/lib/publications/articleMvp";
+import { DEFAULT_COUNTRY_ISO } from "@/server/geo/geoConstants";
 import {
   getLegacyEditorialRouteArticlePath,
   LEGACY_EDITORIAL_ROUTE_ARTICLE_CATEGORY_NAME,
@@ -32,10 +34,20 @@ export async function resolveReadyLegacyEditorialRouteArticlePath(
       status: "PUBLISHED",
       geoScope: "CITY",
       noindex: false,
-      city: { slug: LEGACY_EDITORIAL_ROUTE_ARTICLE_CITY_SLUG },
+      city: {
+        slug: LEGACY_EDITORIAL_ROUTE_ARTICLE_CITY_SLUG,
+        isActive: true,
+        isLegacyNonCity: false,
+        country: { isoCode: DEFAULT_COUNTRY_ISO },
+      },
+      OR: [
+        { seoRobots: null },
+        { NOT: { seoRobots: { contains: "noindex", mode: "insensitive" } } },
+      ],
     },
     select: {
       id: true,
+      contentJson: true,
       category: {
         select: {
           nameRu: true,
@@ -49,6 +61,7 @@ export async function resolveReadyLegacyEditorialRouteArticlePath(
 
   if (
     !article ||
+    parseArticleContentJson(article.contentJson).blocks.length === 0 ||
     article.category?.nameRu !== LEGACY_EDITORIAL_ROUTE_ARTICLE_CATEGORY_NAME ||
     article.category.publicationType !== "ARTICLE" ||
     !article.category.isActive ||

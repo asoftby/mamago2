@@ -13,6 +13,21 @@ on:
 jobs:
   typecheck:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      seo-postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: seo_redirect_test
+          POSTGRES_PASSWORD: synthetic_only
+          POSTGRES_DB: seo_redirect_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U seo_redirect_test -d seo_redirect_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     permissions:
       contents: read
 
@@ -275,3 +290,18 @@ jobs:
           pnpm test:abws-readonly-import-schedule
           pnpm test:abws-legacy-activities-route-readonly-wiring
           pnpm test:abws-shared-resync-guard
+
+      - name: SEO pre-stream regressions
+        run: pnpm test:seo-recovery
+
+      - name: Build production application for HTTP integration
+        run: pnpm build:ci
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+          APP_ENV: test
+          SITE_INDEXING_ENABLED: 'true'
+
+      - name: Real editorial redirect HTTP integration (isolated synthetic PostgreSQL)
+        run: pnpm test:seo-http
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test

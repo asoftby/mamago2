@@ -20,6 +20,8 @@ import {
   shouldSkipTrailingSlashRedirect,
   removeTrailingSlash,
 } from "@/lib/routing/trailingSlashPolicy";
+import { prismaBase } from "@/lib/prisma";
+import { resolveReadyLegacyEditorialRouteArticlePath } from "@/server/routes/legacyEditorialRouteCutover";
 
 let didLogDevLocalHostDetection = false;
 
@@ -79,7 +81,8 @@ function applyRobotsHeader(
   return response;
 }
 
-export async function middleware(request: NextRequest) {
+// Next.js 16 Proxy uses Node.js; a static Prisma import makes bundling errors fatal.
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // ── Absolute hard exit for API routes and Next.js internals ─────────────
@@ -120,17 +123,13 @@ export async function middleware(request: NextRequest) {
   // Existing resolver preserves the archived Route + published Article guards.
   const legacyLocation = await resolvePrestreamEditorialRouteLocation(
     { pathname, search: url.search, origin: url.origin, method: request.method },
-    async (slug) => {
-      const [{ default: prisma }, { resolveReadyLegacyEditorialRouteArticlePath }] =
-        await Promise.all([
-          import("@/lib/prisma"),
-          import("@/server/routes/legacyEditorialRouteCutover"),
-        ]);
-      return resolveReadyLegacyEditorialRouteArticlePath(prisma, slug);
-    },
+    (slug) => resolveReadyLegacyEditorialRouteArticlePath(prismaBase, slug),
   );
   if (legacyLocation) {
-    return NextResponse.redirect(legacyLocation, { status: 308 });
+    return applyRobotsHeader(NextResponse.redirect(legacyLocation, { status: 308 }), {
+      pathname,
+      surface: resolveSurfaceFromHostAndPathname(host, pathname),
+    });
   }
 
   // ── Trailing-slash canonical redirect (301) ──────────────────────────────
