@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback } from "react";
-import { getPublicBackAfterEdit } from "@/lib/navigation/publicEditReturn";
+import { useCallback, useEffect } from "react";
+import { capturePublicEditOrigin, getPublicBackAfterEdit } from "@/lib/navigation/publicEditReturn";
 import { useCityHomeHref } from "@/hooks/useCityHomeHref";
 import { hasInternalHistoryBackEntry } from "@/lib/navigation/internalHistory";
 
@@ -40,6 +40,7 @@ export function useSmartBack(fallbackHref?: string) {
   const router = useRouter();
   const cityHomeHref = useCityHomeHref();
   const resolvedFallbackHref = fallbackHref ?? cityHomeHref;
+  useEffect(() => capturePublicEditOrigin(), []);
 
   return useCallback(() => {
     const editReturn = getPublicBackAfterEdit();
