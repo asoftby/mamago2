@@ -84,6 +84,8 @@ function BirthdayQuickStartBanner({ city }: { city: string }) {
 interface CityDiscoveryShellProps {
   city: string;
   intent: Intent;
+  alternativeCities?: Array<{ id: string; slug: string; name: string }>;
+  listingSearchParams?: Record<string, string | string[] | undefined>;
   routesData?: PublicRouteCardModel[];
   /** Лента «Куда пойти»: только данные с сервера (БД) */
   discoveryActivities?: ActivityMock[];
@@ -99,6 +101,8 @@ interface CityDiscoveryShellProps {
 export function CityDiscoveryShell({
   city,
   intent,
+  alternativeCities = [],
+  listingSearchParams = {},
   routesData,
   discoveryActivities,
   classChips,
@@ -225,6 +229,34 @@ export function CityDiscoveryShell({
               : undefined
           }
         />
+        {(intent === "kuda" || intent === "classes") && alternativeCities.length > 0 && (
+          <section aria-label="Другие города" className="rounded-3xl border border-border bg-muted/30 p-5 sm:p-7">
+            <h2 className="font-serif text-2xl font-normal">Интересное есть и в других городах</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Вы посмотрели подборку своего города. Продолжите поиск в другом — ваши фильтры сохранятся.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {alternativeCities.slice(0, 5).map((option) => {
+                const query = new URLSearchParams();
+                for (const [key, value] of Object.entries(listingSearchParams)) {
+                  if (!value || key === "city") continue;
+                  if (Array.isArray(value)) value.forEach((entry) => query.append(key, entry));
+                  else query.set(key, value);
+                }
+                const suffix = query.size > 0 ? `?${query.toString()}` : "";
+                return (
+                  <Link
+                    key={option.id}
+                    href={`/${option.slug}/${intent === "classes" ? "classes" : "events"}${suffix}`}
+                    className="rounded-full border border-border bg-background px-4 py-2 text-sm font-medium transition-colors hover:border-primary hover:text-primary"
+                  >
+                    {option.name}
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </Container>
     </main>
   );
