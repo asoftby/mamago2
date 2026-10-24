@@ -21,11 +21,14 @@ declare global {
  * (белая полоса с текстом-ссылкой) скрыт — вместо него показываем лоадер.
  */
 export function InstagramReelEmbed({ url, title }: { url: string; title?: string }) {
+  return <InstagramReelEmbedInner key={url} url={url} title={title} />;
+}
+
+function InstagramReelEmbedInner({ url, title }: { url: string; title?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setReady(false);
     const container = containerRef.current;
     if (!container) return;
 
