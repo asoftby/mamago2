@@ -43,7 +43,8 @@ export async function POST(request: NextRequest) {
                 environment: config.environment,
                 telegramUserId: telegramId, telegramChatId,
                 isActive: true,
-                business: { operationalStatus: "ACTIVE" },
+                // Business status and OWNER/MANAGER membership are rechecked
+                // against BusinessMember by handlePartyTelegramConfirmation.
               },
               select: { userId: true, businessId: true },
             });
