@@ -21,8 +21,8 @@ export function PlacePhoneWebsiteFields({
   onChange,
   isEditable = true,
 }: PlaceContactFieldsSharedProps) {
-  const [manuallyShowPhone2, setShowPhone2] = useState(false);
-  const [manuallyShowPhone3, setShowPhone3] = useState(false);
+  const [manuallyShowPhone2, setShowPhone2] = useState(Boolean(data.phone2 || data.phone2Label || data.phone3 || data.phone3Label));
+  const [manuallyShowPhone3, setShowPhone3] = useState(Boolean(data.phone3 || data.phone3Label));
   const showPhone3 = manuallyShowPhone3 || Boolean(data.phone3 || data.phone3Label);
   const showPhone2 = manuallyShowPhone2 || showPhone3 || Boolean(data.phone2 || data.phone2Label);
 
@@ -31,6 +31,13 @@ export function PlacePhoneWebsiteFields({
     labelKey: "phoneLabel" | "phone2Label" | "phone3Label",
     value: string,
   ) => {
+    // Keep a row mounted while the user replaces an existing valid phone:
+    // the phone input may temporarily normalize an incomplete value to empty.
+    if (phoneKey === "phone2") setShowPhone2(true);
+    if (phoneKey === "phone3") {
+      setShowPhone2(true);
+      setShowPhone3(true);
+    }
     onChange({
       [phoneKey]: value || null,
       [labelKey]: value ? data[labelKey] : null,
