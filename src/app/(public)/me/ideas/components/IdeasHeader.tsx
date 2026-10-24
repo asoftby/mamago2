@@ -18,7 +18,7 @@ export function IdeasHeader() {
             className="text-[38px] leading-[1.02] tracking-[-0.03em] sm:text-[58px]"
             style={{ fontFamily: "var(--font-serif)", fontWeight: 400, color: C.ink }}
           >
-            Мои <span className="italic text-primary">идеи</span> и коллекции
+            Мои идеи и коллекции
           </h1>
           <p className="text-[15px] leading-6 sm:text-[17px]" style={{ color: C.ink2 }}>
             Сохраняйте понравившиеся активности, собирайте их в коллекции и переносите в план, когда удобно.
