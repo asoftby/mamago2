@@ -71,7 +71,7 @@ export function MyPlanOverlay({ open, onOpenChange }: MyPlanOverlayProps) {
       showCloseButton={false}
       mobileTopSlot={dragHandle}
       heightMode="tall"
-      dialogContentClassName="!max-w-[572px]"
+      dialogContentClassName="!max-w-[572px] !h-[min(90dvh,760px)]"
       bodyClassName="min-h-0 overflow-hidden"
     >
       <div
