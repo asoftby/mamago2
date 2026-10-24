@@ -274,7 +274,7 @@ export function DatePickerModal({
           color: C.text,
         }}>
           На какой{" "}
-          <em style={{ fontStyle: "italic", color: C.orange }}>день</em>{" "}
+          день{" "}
           напомнить?
         </h2>
 
