@@ -44,7 +44,15 @@ function initialPinFromProps(
   return { lat: initialLat, lng: initialLng };
 }
 
-export function EventLocationMapModal({
+export function EventLocationMapModal(props: EventLocationMapModalProps) {
+  if (!props.isOpen) return null;
+  // A fresh mounted editor receives the current persisted coordinates.
+  // Reopening (or replacing initial coordinates) discards the previous draft.
+  const pinKey = `${props.initialLat ?? "none"}:${props.initialLng ?? "none"}`;
+  return <EventLocationMapModalOpen key={pinKey} {...props} />;
+}
+
+function EventLocationMapModalOpen({
   isOpen,
   onClose,
   initialLat,
@@ -66,11 +74,6 @@ export function EventLocationMapModal({
       }),
     [initialLat, initialLng],
   );
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setTempPin(initialPinFromProps(initialLat, initialLng));
-  }, [isOpen, initialLat, initialLng]);
 
   useEffect(() => {
     if (!isOpen) return;
