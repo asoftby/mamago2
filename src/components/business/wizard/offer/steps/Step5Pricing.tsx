@@ -166,28 +166,28 @@ export function Step5Pricing({
   }
 
   if (data.offerWizardType === "CAMP") {
-    if (ctaRenderMode === "shared") {
-      return (
-        <CtaStep
-          value={ctaStepValue}
-          source={{
-            sourceEntityType: "OFFER",
-            sourceEntityId: data.placeId ?? "offer-wizard-draft",
-          }}
-          disabled={!isEditable}
-          onChange={handleCtaStepChange}
-        />
-      );
-    }
-
+    const requestSelected =
+      data.ctaType === "отправить_заявку" ||
+      publicationAccess.method === "prebooking";
     return (
-      <PublicationAccessEditor
-        entityType="offer"
-        value={publicationAccess}
-        onChange={(value) => onChange(buildOfferAccessPatch(value))}
-        allowedMethods={["details", "timeslots", "prebooking", "external", "contact"]}
-        disabled={!isEditable}
-      />
+      <div className="space-y-3">
+        <h2 className="text-xl font-semibold">Как родители записываются в лагерь?</h2>
+        <StableCardSelector
+          value={requestSelected ? "REQUEST" : null}
+          onValueChange={() =>
+            onChange({
+              ...buildOfferAccessPatch({ method: "prebooking", phone: data.ctaPhone }),
+              ctaType: "отправить_заявку",
+            })
+          }
+          isEditable={isEditable}
+          options={[{
+            value: "REQUEST" as const,
+            label: "Отправить заявку",
+            description: "Родитель выбирает смену и отправляет заявку через mamaGo.",
+          }]}
+        />
+      </div>
     );
   }
 
