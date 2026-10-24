@@ -7,6 +7,7 @@ import {
 import { isDevLocalHost, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { stripPublicDiscoverySearchParams } from "@/lib/routing/publicDiscoverySearchParams";
 import { isGlobalNoindexEnabled } from "@/lib/seo/globalNoindex";
+import { resolvePrestreamEditorialRouteLocation } from "@/lib/routing/prestreamEditorialRouteRedirect";
 import {
   isPermanentlyNoindexPath,
   isPermanentlyNoindexSurface,
@@ -19,6 +20,8 @@ import {
   shouldSkipTrailingSlashRedirect,
   removeTrailingSlash,
 } from "@/lib/routing/trailingSlashPolicy";
+import { prismaBase } from "@/lib/prisma";
+import { resolveReadyLegacyEditorialRouteArticlePath } from "@/server/routes/legacyEditorialRouteCutover";
 
 let didLogDevLocalHostDetection = false;
 
@@ -78,7 +81,8 @@ function applyRobotsHeader(
   return response;
 }
 
-export function middleware(request: NextRequest) {
+// Next.js 16 Proxy uses Node.js; a static Prisma import makes bundling errors fatal.
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // ── Absolute hard exit for API routes and Next.js internals ─────────────
@@ -113,6 +117,19 @@ export function middleware(request: NextRequest) {
       redirectUrl.pathname = removeTrailingSlash(redirectUrl.pathname);
     }
     return NextResponse.redirect(redirectUrl, { status: 301 });
+  }
+
+  // Resolve only approved legacy editorial routes before HTML starts streaming.
+  // Existing resolver preserves the archived Route + published Article guards.
+  const legacyLocation = await resolvePrestreamEditorialRouteLocation(
+    { pathname, search: url.search, origin: url.origin, method: request.method },
+    (slug) => resolveReadyLegacyEditorialRouteArticlePath(prismaBase, slug),
+  );
+  if (legacyLocation) {
+    return applyRobotsHeader(NextResponse.redirect(legacyLocation, { status: 308 }), {
+      pathname,
+      surface: resolveSurfaceFromHostAndPathname(host, pathname),
+    });
   }
 
   // ── Trailing-slash canonical redirect (301) ──────────────────────────────

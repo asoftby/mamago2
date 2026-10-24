@@ -1,7 +1,7 @@
 /**
  * Regression/contract tests for the global noindex switch — the one flag
  * that drives meta robots (applyGlobalRobotsOverride), robots.txt, and the
- * X-Robots-Tag response header (src/middleware.ts). All three must agree
+ * X-Robots-Tag response header (src/proxy.ts). All three must agree
  * with `isGlobalNoindexEnabled()`, since a mismatch between meta robots and
  * X-Robots-Tag is a hard-gate violation for SEO closure.
  *
@@ -74,7 +74,7 @@ function testExplicitDefaultFlagIsNoindex() {
 }
 
 function testMetaRobotsAndXRobotsTagNeverContradict() {
-  // Both robots.ts and middleware.ts derive their decision from the exact
+  // Both robots.ts and proxy.ts derive their decision from the exact
   // same isGlobalNoindexEnabled() call — this test locks that invariant so
   // a future edit can't make meta robots respect an env var that
   // X-Robots-Tag (or vice versa) ignores.
