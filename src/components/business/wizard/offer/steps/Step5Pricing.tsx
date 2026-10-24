@@ -167,7 +167,7 @@ export function Step5Pricing({
 
   if (data.offerWizardType === "CAMP") {
     const requestSelected =
-      data.ctaType === "отправить_заявку" ||
+      data.ctaType === "отправить_заявку" &&
       publicationAccess.method === "prebooking";
     return (
       <div className="space-y-3">
