@@ -32,7 +32,7 @@ export function StepBookingMethod({ data, onChange, isEditable, externalUrlLocke
   // Место, праздник и занятия: два блока расписания перед способом записи; у лагеря — смены на своём блоке выше.
   const number = data.productType === "CAMP" ? 1 : 3;
   const urlError = schedule.bookingMethod === "EXTERNAL" ? validateExternalUrl(schedule.externalUrl) : null;
-  const isCamp = data.offerWizardType === "CAMP";
+  const isCamp = data.productType === "CAMP" || data.offerWizardType === "CAMP";
 
   const kindChips: ChipItem[] = (
     [
