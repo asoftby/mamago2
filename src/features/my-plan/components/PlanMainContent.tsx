@@ -1597,7 +1597,7 @@ export function PlanMainContent({
 
   return (
     <div
-      className="relative h-full min-h-0 w-full overflow-hidden bg-[var(--mp-bg)]"
+      className="relative flex min-h-0 flex-1 flex-col w-full overflow-hidden bg-[var(--mp-bg)]"
       // Страховка: обрезанную дорожку слайда нельзя прокрутить вручную или фокусом — только transform.
       onScroll={(event) => {
         if (event.currentTarget.scrollLeft !== 0) event.currentTarget.scrollLeft = 0;
@@ -1605,7 +1605,7 @@ export function PlanMainContent({
     >
       <div
         className={cn(
-          "flex h-full min-h-0 w-[200%] transform-gpu transition-transform duration-300 ease-in-out motion-reduce:transition-none",
+          "flex min-h-0 flex-1 w-[200%] transform-gpu transition-transform duration-300 ease-in-out motion-reduce:transition-none",
           screen === "plan" ? "translate-x-0" : "-translate-x-1/2",
         )}
       >
