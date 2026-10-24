@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -21,21 +21,10 @@ export function PlacePhoneWebsiteFields({
   onChange,
   isEditable = true,
 }: PlaceContactFieldsSharedProps) {
-  const [showPhone2, setShowPhone2] = useState(Boolean(data.phone2 || data.phone2Label));
-  const [showPhone3, setShowPhone3] = useState(Boolean(data.phone3 || data.phone3Label));
-
-  useEffect(() => {
-    if (data.phone2 || data.phone2Label) {
-      setShowPhone2(true);
-    }
-  }, [data.phone2, data.phone2Label]);
-
-  useEffect(() => {
-    if (data.phone3 || data.phone3Label) {
-      setShowPhone2(true);
-      setShowPhone3(true);
-    }
-  }, [data.phone3, data.phone3Label]);
+  const [manuallyShowPhone2, setShowPhone2] = useState(false);
+  const [manuallyShowPhone3, setShowPhone3] = useState(false);
+  const showPhone3 = manuallyShowPhone3 || Boolean(data.phone3 || data.phone3Label);
+  const showPhone2 = manuallyShowPhone2 || showPhone3 || Boolean(data.phone2 || data.phone2Label);
 
   const handlePhonePairChange = (
     phoneKey: "phone" | "phone2" | "phone3",
