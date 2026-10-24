@@ -36,9 +36,19 @@ assert.notEqual(lifecycleEnd, -1, "expected to find the end of the map lifecycle
 const lifecycle = source.slice(lifecycleStart, lifecycleEnd);
 
 assert.match(
+  source,
+  /export function PlaceMapModal\(props: PlaceMapModalProps\)\s*\{\s*if \(!props\.isOpen\) return null;/,
+  "closed modal must unmount the map editor so reopening resets draft coordinates",
+);
+assert.match(
+  source,
+  /return <PlaceMapModalOpen key=\{pinKey\} \{\.\.\.props\} \/>;/,
+  "changes to initial coordinates must remount the editor via a stable coordinate key",
+);
+assert.match(
   lifecycle,
-  /setTempPin\(initialPin\);\s+void initMap\(initialPin\);/,
-  "opening/reopening the modal must reset tempPin from the current initial coordinates before map initialization",
+  /void initMap\(initialPin\);/,
+  "map initialization must use the current initial pin after mounting",
 );
 
 assert.match(

@@ -20,7 +20,15 @@ interface PlaceMapModalProps {
   }) => void;
 }
 
-export function PlaceMapModal({
+export function PlaceMapModal(props: PlaceMapModalProps) {
+  if (!props.isOpen) return null;
+  // A fresh mounted editor receives the current persisted coordinates.
+  // Reopening (or replacing initial coordinates) discards the previous draft.
+  const pinKey = `${props.initialLat ?? "none"}:${props.initialLng ?? "none"}`;
+  return <PlaceMapModalOpen key={pinKey} {...props} />;
+}
+
+function PlaceMapModalOpen({
   isOpen,
   onClose,
   initialLat,
@@ -160,7 +168,6 @@ export function PlaceMapModal({
     const initialPin =
       initialLat != null && initialLng != null ? { lat: initialLat, lng: initialLng } : null;
 
-    setTempPin(initialPin);
     void initMap(initialPin);
 
     const handleEsc = (e: KeyboardEvent) => {
