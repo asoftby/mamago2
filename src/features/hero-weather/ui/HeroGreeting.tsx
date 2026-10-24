@@ -23,7 +23,7 @@ function WeatherSummaryText({ text }: { text: string }) {
   const dashIdx = text.indexOf(WEATHER_SUMMARY_DASH);
   if (dashIdx === -1) {
     return (
-      <span className="min-w-0 font-sans" style={{ fontWeight: 400, color: "#141210" }}>
+      <span className="min-w-0 font-pt-serif" style={{ fontWeight: 400, color: "#141210" }}>
         {text}
       </span>
     );
@@ -33,10 +33,10 @@ function WeatherSummaryText({ text }: { text: string }) {
   const after = text.slice(dashIdx + WEATHER_SUMMARY_DASH.length);
 
   return (
-    <span className="min-w-0 font-sans" style={{ fontWeight: 400, color: "#141210" }}>
+    <span className="min-w-0 font-pt-serif" style={{ fontWeight: 400, color: "#141210" }}>
       {before}
       {WEATHER_SUMMARY_DASH}
-      {after}
+      <span className="italic text-primary">{after}</span>
     </span>
   );
 }
