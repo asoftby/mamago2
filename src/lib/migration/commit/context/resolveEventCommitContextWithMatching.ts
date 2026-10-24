@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 
 import type { MigrationWarning } from "../../types";
 import type { NormalizedEventCandidate } from "../event/types";
@@ -177,14 +177,17 @@ export async function resolveEventCommitContextWithMatching(
         const venueNorm = normText(rawVenue);
         const addrNorm = normText(rawAddr);
 
+        const placeConditions: Prisma.PlaceWhereInput[] = [];
+        if (rawVenue) placeConditions.push({ title: { contains: rawVenue, mode: "insensitive" } });
+        if (rawAddr) {
+          placeConditions.push({ formattedAddr: { contains: rawAddr, mode: "insensitive" } });
+          placeConditions.push({ customAddress: { contains: rawAddr, mode: "insensitive" } });
+        }
+
         const candidates = await prisma.place.findMany({
           where: {
             ...(cityId ? { cityId } : {}),
-            OR: [
-              rawVenue ? { title: { contains: rawVenue, mode: "insensitive" } } : undefined,
-              rawAddr ? { formattedAddr: { contains: rawAddr, mode: "insensitive" } } : undefined,
-              rawAddr ? { customAddress: { contains: rawAddr, mode: "insensitive" } } : undefined,
-            ].filter(Boolean) as any,
+            OR: placeConditions,
           },
           select: { id: true, title: true, formattedAddr: true, customAddress: true, cityId: true },
           take: 10,
