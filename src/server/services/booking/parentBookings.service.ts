@@ -324,6 +324,10 @@ function mapRow(raw: {
   const offerInstagramUrl =
     offerSocialLinks.find((item) => item.network === "instagram")?.url?.trim() ??
     null;
+  const offerPlaceInstagramUrl = resolveInstagramProfileHref(
+    raw.offer?.place?.instagramUrl,
+    raw.offer?.place?.instagramHandle,
+  );
   const activityInstagramUrl = resolveInstagramProfileHref(
     raw.activity?.place?.instagramUrl,
     raw.activity?.place?.instagramHandle,
@@ -396,7 +400,7 @@ function mapRow(raw: {
     null;
   const organizerTelegramUrl = offerTelegramUrl;
   const organizerInstagramResolved = pendingCamp
-    ? (offerInstagramUrl || (inheritedOfferContacts ? placeInstagramUrl : null))
+    ? (offerInstagramUrl || (inheritedOfferContacts ? offerPlaceInstagramUrl : null))
     : offerInstagramUrl ||
     organizerInstagramUrl ||
     placeInstagramUrl ||
