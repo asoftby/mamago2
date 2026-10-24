@@ -415,6 +415,10 @@ export function isStepComplete(
         // Новый мастер: способ записи выбирается на шаге «Расписание».
         if (variant === "v2") return true;
 
+        if (data.offerWizardType === "CAMP" && (
+          data.ctaType !== "отправить_заявку" || data.publicationAccess?.method !== "prebooking"
+        )) return false;
+
         if (data.publicationAccess) {
           return validatePublicationAccess(data.publicationAccess).valid;
         }
@@ -624,6 +628,10 @@ export function getMissingFieldsForStep(
       }
       if (variant === "v2") {
         // способ записи — на шаге «Расписание»
+      } else if (data.offerWizardType === "CAMP" && (
+        data.ctaType !== "отправить_заявку" || data.publicationAccess?.method !== "prebooking"
+      )) {
+        missing.push("Для лагеря выберите «Отправить заявку»");
       } else if (data.publicationAccess) {
         const validation = validatePublicationAccess(data.publicationAccess);
         missing.push(...Object.values(validation.errors));
