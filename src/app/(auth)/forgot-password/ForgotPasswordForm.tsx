@@ -33,8 +33,6 @@ function ResendButton({ sentAt }: { sentAt: number }) {
   const [remaining, setRemaining] = useState(() => getCooldownRemaining(sentAt));
 
   useEffect(() => {
-    setRemaining(getCooldownRemaining(sentAt));
-
     const interval = window.setInterval(() => {
       setRemaining(getCooldownRemaining(sentAt));
     }, 1000);
@@ -91,7 +89,7 @@ export function ForgotPasswordForm() {
         <form action={formAction} className="text-center text-sm text-neutral-500">
           <input type="hidden" name="email" value={state.email} />
           <span>Не пришло письмо? </span>
-          <ResendButton sentAt={state.sentAt} />
+          <ResendButton key={state.sentAt} sentAt={state.sentAt} />
         </form>
       </div>
     );
