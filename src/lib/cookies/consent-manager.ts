@@ -134,11 +134,10 @@ export async function openCookiePreferencesFromShell(): Promise<void> {
   // DOM classes/computed styles, which produced false failures in Chrome.
   await new Promise<void>((resolve, reject) => {
     let settled = false;
-    let timeoutId: number | undefined;
 
     const cleanup = () => {
       window.removeEventListener("cc:onModalShow", handleModalShow);
-      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      window.clearTimeout(timeoutId);
     };
 
     const finish = (error?: Error) => {
@@ -157,7 +156,7 @@ export async function openCookiePreferencesFromShell(): Promise<void> {
     };
 
     window.addEventListener("cc:onModalShow", handleModalShow);
-    timeoutId = window.setTimeout(() => {
+    const timeoutId = window.setTimeout(() => {
       finish(new Error("Cookie preferences modal did not become visible"));
     }, 1500);
 
