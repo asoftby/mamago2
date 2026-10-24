@@ -115,16 +115,9 @@ export function StepWho({ builder, ageSignals }: Props) {
         }}
       >
         Кто{" "}
-        <span
-          style={{
-            fontFamily: "var(--font-editorial)",
-            fontStyle: "italic",
-            fontWeight: 400,
-            color: "#E86A3A",
-          }}
-        >
+        
           именинник
-        </span>
+        
         ?
       </h2>
 
