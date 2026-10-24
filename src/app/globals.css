@@ -387,7 +387,7 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
     font-family: var(--font-pt-serif), ui-serif, serif !important;
   }
 
-  :is(h1, h2, h3, h4, h5, h6, .ui-h1, .ui-h2, .ui-h3) {
+  :is(h1, h2, h3, h4, h5, h6, .ui-h1, .ui-h2, .ui-h3, [role="heading"], [data-slot="dialog-title"], [data-slot="card-title"]) {
     font-family: var(--font-google-sans), ui-sans-serif, system-ui, sans-serif !important;
     font-style: normal !important;
   }
@@ -396,7 +396,7 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   :is(h1, h2, .ui-h1, .ui-h2) { letter-spacing: -0.02em !important; line-height: 1.1 !important; }
   :is(h3, .ui-h3) { letter-spacing: -0.01em !important; line-height: 1.25 !important; }
   :is(h4, h5, h6) { letter-spacing: 0 !important; line-height: 1.25 !important; }
-  :is(h1, h2, h3, h4, h5, h6) :is(em, i, .italic, .font-display-italic, [style*="font-style: italic"], [style*="font-style:italic"]) {
+  :is(h1, h2, h3, h4, h5, h6, [role="heading"], [data-slot="dialog-title"], [data-slot="card-title"]) :is(span, em, i, .italic, .font-display-italic, [style*="font-style: italic"], [style*="font-style:italic"]) {
     font-family: inherit !important;
     font-style: normal !important;
     color: inherit !important;
