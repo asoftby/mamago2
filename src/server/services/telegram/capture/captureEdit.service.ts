@@ -314,13 +314,16 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
     };
 
     const attempt = async (model: string): Promise<Attempt> => {
+      const startedAt = Date.now();
       const response = await deps.openrouter.chat({
         model,
         systemPrompt: replacingText ? CAPTURE_SYSTEM_PROMPT : CAPTURE_EDIT_SYSTEM_PROMPT,
         userParts,
         responseFormat,
       });
+      const modelMs = Date.now() - startedAt;
       if (!response.ok) {
+        console.log(`[capture-edit-model] inboxItemId=${snapshot.id} model=${model} durationMs=${modelMs} result=${response.code}`);
         return {
           kind: "infra",
           code: response.code,
@@ -330,6 +333,7 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
       }
       addUsage(usage, response);
       const parsed = parseCaptureDraft(response.content);
+      console.log(`[capture-edit-model] inboxItemId=${snapshot.id} model=${response.model} durationMs=${modelMs} result=${parsed.ok ? "PARSED" : parsed.code} tokensIn=${response.tokensIn ?? "-"} tokensOut=${response.tokensOut ?? "-"}`);
       return parsed.ok
         ? { kind: "parsed", draft: parsed.draft }
         : { kind: "invalid" };
