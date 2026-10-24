@@ -1,0 +1,42 @@
+name: Google Sans Cyrillic glyph coverage
+
+on:
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-fonts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install font reader
+        run: python3 -m pip install --disable-pip-version-check 'fonttools[woff]>=4.55,<5'
+      - name: Verify Russian and Belarusian glyphs at 500 and 600
+        shell: python
+        run: |
+          from pathlib import Path
+          from fontTools.ttLib import TTFont
+
+          sample = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюяІіЎў"
+          required = {ord(c) for c in sample}
+          root = Path("public/fonts/GoogleSans")
+
+          for weight, filename in [
+              (500, "GoogleSans-Medium.woff2"),
+              (600, "GoogleSans-SemiBold.woff2"),
+          ]:
+              font = TTFont(root / filename)
+              covered = set()
+              for table in font["cmap"].tables:
+                  if table.isUnicode():
+                      covered.update(table.cmap)
+              missing = sorted(required - covered)
+              print(f"{filename}: {len(covered)} Unicode codepoints; missing: {''.join(chr(n) for n in missing) or 'none'}")
+              if missing:
+                  raise SystemExit(f"FAIL: {weight} is missing Cyrillic glyphs")
+          print("PASS: Medium 500 and SemiBold 600 contain Russian and Belarusian Cyrillic glyphs")
