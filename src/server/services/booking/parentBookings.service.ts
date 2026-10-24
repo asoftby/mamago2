@@ -13,6 +13,7 @@ import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import { getPlacePublicUrl } from "@/lib/placePublicUrl";
 import { resolveInstagramProfileHref } from "@/lib/instagram/extractUsername";
+import { resolvePendingCampContacts } from "./pendingCampContacts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -370,15 +371,21 @@ function mapRow(raw: {
     raw.offer?.place?.title ??
     raw.place?.title ??
     null;
-  // До подтверждения заявки на лагерь показываем только опубликованные
-  // контакты самого предложения, без запасного телефона бизнес-аккаунта.
+  // Before a camp confirmation, only published Offer contacts and an
+  // explicitly inherited Place source are available to the applicant.
   const pendingCamp = raw.campShiftId !== null && raw.status === BookingStatus.NEW;
-  // The business may explicitly choose the Place as this Offer's contact
-  // source. These are public offer contacts, not private business-account data.
-  const inheritedOfferContacts = pendingCamp && raw.offer?.contactSource === "place";
+  const pendingCampContacts = pendingCamp ? resolvePendingCampContacts({
+    contactSource: raw.offer?.contactSource ?? null,
+    offerPhone: raw.offer?.contactPhone ?? null,
+    offerBookingPhone: raw.offer?.bookingPhone ?? null,
+    offerWebsite: raw.offer?.contactWebsite ?? null,
+    offerInstagram: offerInstagramUrl,
+    placePhone: raw.offer?.place?.phone ?? null,
+    placeWebsite: raw.offer?.place?.website ?? null,
+    placeInstagram: offerPlaceInstagramUrl,
+  }) : null;
   const organizerPhone = pendingCamp
-    ? (raw.offer?.contactPhone ?? raw.offer?.bookingPhone ??
-      (inheritedOfferContacts ? raw.offer?.place?.phone : null) ?? null)
+    ? pendingCampContacts?.phone ?? null
     : raw.offer?.contactPhone ??
     raw.offer?.bookingPhone ??
     raw.activity?.bookingPhone ??
@@ -390,8 +397,7 @@ function mapRow(raw: {
     raw.business?.phone ??
     null;
   const organizerWebsite = pendingCamp
-    ? (raw.offer?.contactWebsite ??
-      (inheritedOfferContacts ? raw.offer?.place?.website : null) ?? null)
+    ? pendingCampContacts?.website ?? null
     : raw.offer?.contactWebsite ??
     raw.activity?.organizer?.website ??
     raw.place?.website ??
@@ -400,7 +406,7 @@ function mapRow(raw: {
     null;
   const organizerTelegramUrl = offerTelegramUrl;
   const organizerInstagramResolved = pendingCamp
-    ? (offerInstagramUrl || (inheritedOfferContacts ? offerPlaceInstagramUrl : null))
+    ? pendingCampContacts?.instagram ?? null
     : offerInstagramUrl ||
     organizerInstagramUrl ||
     placeInstagramUrl ||
