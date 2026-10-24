@@ -1,0 +1,68 @@
+name: Birthday confirmation DB integration
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - ".github/workflows/birthday-confirmation-db-integration.yml"
+      - "src/server/birthday/**"
+      - "src/app/api/parent/parties/**"
+      - "src/app/api/business/party-requests/**"
+      - "src/server/public/publicContentVisibility.ts"
+      - "src/server/geo/findCityBySlug.ts"
+      - "prisma/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  push:
+    branches: [dev]
+    paths:
+      - ".github/workflows/birthday-confirmation-db-integration.yml"
+      - "src/server/birthday/**"
+      - "src/app/api/parent/parties/**"
+      - "src/app/api/business/party-requests/**"
+      - "prisma/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  party-confirmation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mamago_birthday_it
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mamago_birthday_it"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5434/mamago_birthday_it
+      NODE_ENV: test
+      CI: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.28.2
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Apply migrations to disposable PostgreSQL
+        run: pnpm exec prisma migrate deploy
+      - name: Verify real quote acceptance and exclusive confirmation
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyConfirmation.postgres.integration.test.ts
