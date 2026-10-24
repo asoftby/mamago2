@@ -12,7 +12,7 @@ const consumer = read("src/server/birthday/partyTelegramConfirmAction.service.ts
 for (const fragment of [
   'eventType: "PARTY_QUOTE_ACCEPTED"', 'aggregateId: notification.entityId',
   'businessId: recipient.businessId', 'partyStage: "AWAITING_RECONFIRM"',
-  'status: "NEW"', 'status: "ACCEPTED"',
+  'status: "NEW"', 'quote.status !== "ACCEPTED"',
   "listPartyConfirmChoices(", "canConfirmPartyWithOneTap(",
   "createPartyConfirmCallback(", "chatId: recipient.chatId",
 ]) assert.ok(producer.includes(fragment), "Producer missing " + fragment);
