@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { resolveEventCommitContextWithMatching } from "./resolveEventCommitContextWithMatching";
+import { resolveEventCommitContextWithMatching, type EventContextMatchingPrismaClient } from "./resolveEventCommitContextWithMatching";
 import type { EventCommitContext, NormalizedEventCandidate } from "../event/types";
 
 function baseCandidate(overrides: Partial<NormalizedEventCandidate> = {}): NormalizedEventCandidate {
@@ -40,7 +40,7 @@ function baseContext(overrides: Partial<EventCommitContext> = {}): EventCommitCo
 function createFakePrisma(overrides: Record<string, unknown> = {}) {
   return ({
     city: {
-      findFirst: async ({ where }: any) =>
+      findFirst: async ({ where }: { where?: { slug?: string } }) =>
         where?.slug === "minsk" ? { id: "city-minsk" } : null,
       findMany: async () => [{ id: "city-minsk", slug: "minsk", nameRu: "Минск" }],
     },
@@ -54,7 +54,7 @@ function createFakePrisma(overrides: Record<string, unknown> = {}) {
       findFirst: async () => null,
     },
     ...overrides,
-  }) as any;
+  }) as unknown as EventContextMatchingPrismaClient;
 }
 
 async function testContextOverrideWins() {
@@ -86,7 +86,7 @@ async function testCategoryExactMatchByNameRu() {
   const prisma = createFakePrisma({
     eventCategory: {
       findMany: async () => [{ id: "cat-1", nameRu: "Festival" }],
-    } as any,
+    },
   });
   const result = await resolveEventCommitContextWithMatching({
     sourceRecordKey: "wordpress-db:events:401",
@@ -102,9 +102,9 @@ async function testCategoryExactMatchByNameRu() {
 async function testPlaceLineageMatch() {
   const prisma = createFakePrisma({
     migrationLineage: {
-      findFirst: async ({ where }: any) =>
+      findFirst: async ({ where }: { where?: { sourceRecordKey?: string } }) =>
         where?.sourceRecordKey === "wordpress-db:places:301" ? { targetId: "place-1" } : null,
-    } as any,
+    },
   });
   const result = await resolveEventCommitContextWithMatching({
     sourceRecordKey: "wordpress-db:events:401",
@@ -117,7 +117,7 @@ async function testPlaceLineageMatch() {
 
 async function testPlaceUnmatchedPreservesRawWarning() {
   const prisma = createFakePrisma({
-    place: { findMany: async () => [] } as any,
+    place: { findMany: async () => [] },
   });
   const result = await resolveEventCommitContextWithMatching({
     sourceRecordKey: "wordpress-db:events:401",
