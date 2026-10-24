@@ -88,9 +88,9 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
             }}
           >
             {weekday},{" "}
-            <span className="font-display-italic" style={{ color: "var(--primary)" }}>
+            
               {day} {month}
-            </span>
+            
           </h2>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {items.length > 0 && (
