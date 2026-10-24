@@ -58,12 +58,12 @@ assert.equal(validateExternalUrl("https://tickets.example.by/show"), null);
 // форма → запрос
 const form = defaultOfferSchedule();
 assert.deepEqual(buildScheduleInput(form, "PLACE_VISIT"), { hours: { source: "place" } });
-assert.deepEqual(buildScheduleInput(form, "CAMP"), {});
+assert.deepEqual(buildScheduleInput(form, "CAMP"), { bookingMethod: "REQUEST_ONLY", external: null });
 form.bookingMethod = "EXTERNAL";
 form.externalUrl = " https://example.by/buy ";
 assert.deepEqual(buildScheduleInput(form, "CAMP"), {
-  bookingMethod: "EXTERNAL",
-  external: { kind: "WEBSITE", url: "https://example.by/buy" },
+  bookingMethod: "REQUEST_ONLY",
+  external: null,
 });
 form.bookingMethod = "NONE";
 assert.equal(buildScheduleInput(form, "CAMP").external, null);
@@ -102,14 +102,18 @@ assert.deepEqual(getScheduleMissingFields(own, "PARTY_PACKAGE"), ["Дни раб
 
 // Лагеря: только заявка через mamaGo; нельзя сохранить старую внешнюю ссылку.
 const camp = defaultOfferSchedule();
-assert.deepEqual(getScheduleMissingFields(camp, "CAMP"), ["Для лагеря выберите «Отправить заявку»"]);
+assert.deepEqual(getScheduleMissingFields(camp, "CAMP"), []);
 camp.bookingMethod = "EXTERNAL";
 camp.externalUrl = "https://example.by/camp";
-assert.deepEqual(getScheduleMissingFields(camp, "CAMP"), ["Для лагеря выберите «Отправить заявку»"]);
+assert.deepEqual(getScheduleMissingFields(camp, "CAMP"), []);
 camp.bookingMethod = "NONE";
-assert.deepEqual(getScheduleMissingFields(camp, "CAMP"), ["Для лагеря выберите «Отправить заявку»"]);
+assert.deepEqual(getScheduleMissingFields(camp, "CAMP"), []);
 camp.bookingMethod = "REQUEST_ONLY";
 assert.deepEqual(getScheduleMissingFields(camp, "CAMP"), []);
+assert.deepEqual(buildChangedScheduleInput(defaultOfferSchedule(), defaultOfferSchedule(), "CAMP"), {
+  bookingMethod: "REQUEST_ONLY", external: null,
+});
+assert.equal(buildChangedScheduleInput(camp, camp, "CAMP"), undefined);
 
 // схема запроса
 assert.equal(offerScheduleInputSchema.safeParse({ bookingMethod: "EXTERNAL", external: { kind: "TICKETS", url: "" } }).success, false);
