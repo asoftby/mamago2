@@ -42,6 +42,7 @@ import type { UserForChannelResolution } from "@/lib/notifications/resolveNotifi
 import { getActiveTelegramConnectionForCurrentEnvironment } from "@/server/services/telegram/telegramConnection.service";
 import { getActiveBusinessTelegramRecipient, sendBusinessTelegramMessage } from "@/server/services/telegram/businessTelegramDelivery.service";
 import { mayUseFamilyTelegramBot } from "@/lib/notifications/telegramAudienceRouting";
+import { buildPartyConfirmationTelegramKeyboard } from "@/server/birthday/partyTelegramKeyboard.service";
 import { TelegramChannel, type TelegramParseMode, type TelegramReplyMarkup } from "@/server/services/telegram/TelegramChannel";
 import { renderNotificationTelegramMessage } from "@/server/services/telegram/TelegramTemplateRenderer";
 import { isOneTimeNotificationType } from "./notificationDedup.service";
@@ -364,10 +365,16 @@ async function handleTelegram(notificationId: string, enabled: boolean): Promise
 
     const rendered = await buildTelegramMessageForNotification(notification);
     if (businessRecipient) {
+      // Party actions are generated only for an accepted live quote, after
+      // re-checking resource ambiguity and binding the token to this chat.
+      // Other business notifications preserve their normal keyboard.
+      const partyMarkup = await buildPartyConfirmationTelegramKeyboard(
+        notification, businessRecipient,
+      );
       await sendBusinessTelegramMessage({
         chatId: businessRecipient.chatId,
         text: rendered.text,
-        replyMarkup: rendered.replyMarkup,
+        replyMarkup: partyMarkup ?? rendered.replyMarkup,
         parseMode: rendered.parseMode,
       });
     } else if (connection) {
