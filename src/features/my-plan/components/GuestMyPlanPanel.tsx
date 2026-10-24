@@ -788,7 +788,7 @@ export function GuestMyPlanPanel({
         <div className="mb-2 mt-4 text-[13.5px] font-semibold text-[var(--mp-tx2)]">Вы попробовали 3 подборки — столько доступно без входа</div>
         <h3 className="mb-[22px] text-[30px] font-bold leading-[1.12] tracking-[-.03em] text-[var(--mp-tx)]">
           С&nbsp;аккаунтом подбирать{" "}
-          <em className="font-display font-medium text-[var(--mp-ac)]" style={{ fontStyle: "italic" }}>проще</em>
+          проще
         </h3>
         {benefit(<InfinityIcon className="h-5 w-5" aria-hidden />, "Подборки без ограничений")}
         {benefit(<Users className="h-5 w-5" aria-hidden />, "Точнее — запомним возраст детей")}
