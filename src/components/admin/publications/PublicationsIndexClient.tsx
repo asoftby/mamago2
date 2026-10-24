@@ -315,10 +315,7 @@ export function PublicationsIndexClient({
 
   useEffect(() => {
     const el = tableScrollRef.current;
-    if (!el) {
-      setTableScrollHint("none");
-      return;
-    }
+    if (!el) return;
 
     const update = () => {
       if (typeof window === "undefined") return;
