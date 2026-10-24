@@ -23,7 +23,8 @@ export async function getActiveBusinessTelegramRecipient(userId: string) {
   // Authorization is checked at delivery time, including revocations.
   const membership = await prismaBase.businessMember.findFirst({
     where: { businessId: connection.businessId, userId, isActive: true,
-      role: { in: ["OWNER", "MANAGER"] } },
+      role: { in: ["OWNER", "MANAGER"] },
+      business: { operationalStatus: "ACTIVE" } },
     select: { id: true },
   });
   if (!membership) return null;
