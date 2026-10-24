@@ -58,7 +58,7 @@ export function OfferSchedule({
           </div>
           <h2 className="tracking-[-0.02em] leading-[1] text-gray-900" style={{ fontFamily: "var(--font-sans)", fontWeight: 400, fontSize: 30 }}>
             Выбери{" "}
-            <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>своё лето</span>.
+            своё лето.
           </h2>
         </div>
       </div>

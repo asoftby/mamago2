@@ -524,9 +524,9 @@ function WorkingHoursSection({ summary }: { summary: string }) {
             style={{ fontSize: 30, lineHeight: 1, margin: "0", letterSpacing: "-.02em", color: "#141210", fontFamily: "var(--font-sans)", fontWeight: 400 }}
           >
             {isOpen ? (
-              <>Открыто <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#1F8A5B" }}>сейчас</em></>
+              <>Открыто сейчас</>
             ) : (
-              <>Режим <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>работы</em></>
+              <>Режим работы</>
             )}
           </h2>
           {leftStatusText ? (

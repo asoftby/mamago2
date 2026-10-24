@@ -35,16 +35,9 @@ export function FaqSection({ items, className }: FaqSectionProps) {
           }}
         >
           Частые{" "}
-          <em
-            style={{
-              fontFamily: "var(--font-editorial)",
-              fontStyle: "italic",
-              fontWeight: 400,
-              color: "#E86A3A",
-            }}
-          >
+          
             вопросы
-          </em>
+          
         </h2>
 
         <div className="mt-[30px] space-y-4">

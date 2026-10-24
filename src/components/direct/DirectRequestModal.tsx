@@ -182,7 +182,7 @@ export function DirectRequestModal({
 
           <div>
             <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontWeight: 400, fontSize: 32, lineHeight: 1, letterSpacing: "-.02em", color: "#141210" }}>
-              Заявка <em style={{ fontStyle: "italic", color: "#C24E22" }}>отправлена</em>!
+              Заявка отправлена!
             </h2>
             <p style={{ margin: "10px 0 0", fontSize: 14, color: "rgba(20,18,16,.55)", lineHeight: 1.55, maxWidth: 320 }}>
               Продолжить общение можно в личных сообщениях — {brandName} ответит там же.
@@ -218,7 +218,7 @@ export function DirectRequestModal({
       <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#F6F2EA", borderRadius: 24, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 22px 18px", borderBottom: "1px solid rgba(20,18,16,.10)", flexShrink: 0 }}>
           <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontWeight: 400, fontSize: 28, lineHeight: 1, letterSpacing: "-.02em", color: "#141210" }}>
-            Отправить <em style={{ fontStyle: "italic", color: "#C24E22" }}>заявку</em>
+            Отправить заявку
           </h2>
           <XBtn onClick={() => handleClose(false)} />
         </div>
