@@ -214,6 +214,7 @@ jobs:
 
       - name: Telegram plan notification regressions
         run: |
+          pnpm exec tsx src/lib/notifications/telegramAudienceRouting.test.ts
           NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/telegram/telegramNotificationBootstrap.service.test.ts
           NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/telegram/botWelcome.test.ts
           pnpm exec tsx src/lib/telegram/webAppButton.test.ts
