@@ -254,11 +254,11 @@ export function EventDecisionPanel({
                 <div>
                   <div className="flex items-baseline justify-end gap-1">
                     {fromPrefix && (
-                      <span className="font-pt-serif text-[20px] font-normal leading-tight tracking-[-0.5px] text-[#141210]">
+                      <span className="font-heading text-[20px] font-normal leading-tight tracking-[-0.5px] text-[#141210]">
                         {fromPrefix}
                       </span>
                     )}
-                    <span className="font-pt-serif text-[40px] font-normal leading-tight tracking-[-1px] text-[#141210]">
+                    <span className="font-heading text-[40px] font-normal leading-tight tracking-[-1px] text-[#141210]">
                       {amountPart}
                     </span>
                     {currencyPart && (
