@@ -451,6 +451,11 @@ export function ArticleGallery({
   const [mobileWarmIndexes, setMobileWarmIndexes] = useState<number[]>(() =>
     total > 0 ? [0] : [],
   );
+  const rememberMobileNeighbors = useCallback((index: number) => {
+    setMobileWarmIndexes((current) =>
+      mergeGalleryWarmIndexes(current, [index - 1, index, index + 1], total),
+    );
+  }, [total]);
   const [mobileTransition, setMobileTransition] = useState<{
     from: number;
     to: number;
@@ -471,6 +476,7 @@ export function ArticleGallery({
     lastTriggerRef.current = trigger;
     setLightboxIndex(index);
     setMobileIndex(index);
+    if (mobilePreloadReady) rememberMobileNeighbors(index);
   };
   const closeLightbox = () => {
     setLightboxIndex(null);
@@ -480,6 +486,7 @@ export function ArticleGallery({
     setLightboxIndex(index);
     setMobileTransition(null);
     setMobileIndex(index);
+    if (mobilePreloadReady) rememberMobileNeighbors(index);
   };
 
   const navigateMobile = useCallback(
@@ -487,6 +494,7 @@ export function ArticleGallery({
       if (mobileTransition) return;
       const to = Math.max(0, Math.min(mobileIndex + direction, total - 1));
       if (to === mobileIndex) return;
+      if (mobilePreloadReady) rememberMobileNeighbors(to);
 
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         setMobileIndex(to);
@@ -495,7 +503,7 @@ export function ArticleGallery({
 
       setMobileTransition({ from: mobileIndex, to, direction, moving: false });
     },
-    [mobileIndex, mobileTransition, total],
+    [mobileIndex, mobileTransition, mobilePreloadReady, rememberMobileNeighbors, total],
   );
   const goMobilePrev = useCallback(() => navigateMobile(-1), [navigateMobile]);
   const goMobileNext = useCallback(() => navigateMobile(1), [navigateMobile]);
@@ -526,6 +534,7 @@ export function ArticleGallery({
         (entries) => {
           if (!entries.some((entry) => entry.isIntersecting)) return;
           setMobilePreloadReady(true);
+          rememberMobileNeighbors(mobileIndex);
           stopObserver();
         },
         { rootMargin: "320px 0px", threshold: 0.01 },
@@ -539,18 +548,7 @@ export function ArticleGallery({
       query.removeEventListener("change", syncPreloadMode);
       stopObserver();
     };
-  }, []);
-
-  useEffect(() => {
-    if (!mobilePreloadReady) return;
-    setMobileWarmIndexes((current) =>
-      mergeGalleryWarmIndexes(
-        current,
-        [mobileIndex - 1, mobileIndex, mobileIndex + 1],
-        total,
-      ),
-    );
-  }, [mobileIndex, mobilePreloadReady, total]);
+  }, [mobileIndex, rememberMobileNeighbors]);
 
   useEffect(() => {
     if (!mobileTransition || mobileTransition.moving) return;
@@ -571,6 +569,7 @@ export function ArticleGallery({
 
   function handleMobileTouchStart(e: React.TouchEvent) {
     setMobilePreloadReady(true);
+    rememberMobileNeighbors(mobileIndex);
     touchStartXRef.current = e.touches[0].clientX;
     touchStartYRef.current = e.touches[0].clientY;
   }

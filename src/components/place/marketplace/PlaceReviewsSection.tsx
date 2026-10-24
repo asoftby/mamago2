@@ -204,10 +204,7 @@ function ReviewCard({
   const [expanded, setExpanded] = useState(false);
 
   useLayoutEffect(() => {
-    if (!isGrid || expanded || !review.text?.trim()) {
-      setIsTruncated(false);
-      return;
-    }
+    if (!isGrid || expanded || !review.text?.trim()) return;
 
     const el = textRef.current;
     if (!el) return;
@@ -216,8 +213,8 @@ function ReviewCard({
       setIsTruncated(el.scrollHeight > el.clientHeight + 1);
     };
 
-    checkTruncation();
-
+    // ResizeObserver delivers an initial observation asynchronously, then
+    // remeasures on layout changes without a synchronous effect update.
     const observer = new ResizeObserver(checkTruncation);
     observer.observe(el);
     return () => observer.disconnect();
