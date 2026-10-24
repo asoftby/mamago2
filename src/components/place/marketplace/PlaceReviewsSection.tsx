@@ -53,6 +53,7 @@ export function PlaceReviewsSection({
   googleMapsUrl,
 }: PlaceReviewsSectionProps) {
   const [allOpen, setAllOpen] = useState(false);
+  const [filter, setFilter] = useState<"ALL" | "MAMAGO" | "GOOGLE">("ALL");
 
   if (reviews.length === 0) return null;
 
@@ -60,7 +61,6 @@ export function PlaceReviewsSection({
   const displayCount = reviews.length;
   const googleAvailable = reviews.filter(r => r.source === "GOOGLE").length;
   const mamagoAvailable = reviews.filter(r => r.source === "MAMAGO").length;
-  const [filter, setFilter] = useState<"ALL" | "MAMAGO" | "GOOGLE">("ALL");
   const shown = filter === "ALL" ? reviews : reviews.filter(r => r.source === filter);
 
   return (
