@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { OpeningHoursEditor } from "@/components/openingHours";
 import type { OpeningHoursData } from "@/components/openingHours";
 import { createDefaultUIState, generateSummary } from "@/lib/openingHours";
@@ -18,17 +18,15 @@ export function Step5OpeningHours({
   onChange,
   isEditable = true,
 }: Step5OpeningHoursProps) {
-  // Local state for editor - initialize from prop
-  const [localData, setLocalData] = useState<OpeningHoursData | null>(() =>
-    data.openingHoursData || createDefaultUIState()
+  // The form prop is the source of truth; local draft only covers an empty form
+  // until the first editor change is propagated to the parent.
+  const [localDraft, setLocalDraft] = useState<OpeningHoursData>(() =>
+    createDefaultUIState()
   );
-
-  useEffect(() => {
-    setLocalData(data.openingHoursData || createDefaultUIState());
-  }, [data.openingHoursData]);
+  const localData = data.openingHoursData ?? localDraft;
 
   const handleChange = (openingHoursData: OpeningHoursData) => {
-    setLocalData(openingHoursData);
+    setLocalDraft(openingHoursData);
     onChange({ openingHoursData });
   };
 
