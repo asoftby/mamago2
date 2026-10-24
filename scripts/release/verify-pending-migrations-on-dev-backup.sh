@@ -34,6 +34,21 @@ shasum -a 256 -c "$backup.sha256"
 gzip -t "$backup"
 echo "BACKUP_INTEGRITY_OK"
 
+# Reject remote Docker engines and pin every command to a local Unix socket.
+# DOCKER_CONTEXT can redirect even when DOCKER_HOST looks local.
+unset DOCKER_HOST DOCKER_CONTEXT
+local_endpoint=$(command docker context inspect "$(command docker context show)" \
+  --format '{{(index .Endpoints "docker").Host}}') || {
+  echo "Cannot resolve Docker endpoint" >&2; exit 1;
+}
+case "$local_endpoint" in
+  unix:///*) ;;
+  *) echo "Refusing non-local Docker endpoint" >&2; exit 1 ;;
+esac
+[ -S "${local_endpoint#unix://}" ] || {
+  echo "Local Docker socket unavailable" >&2; exit 1;
+}
+docker() { command docker --host "$local_endpoint" "$@"; }
 docker info >/dev/null || { echo "Local Docker daemon unavailable" >&2; exit 1; }
 docker image inspect postgres:16-alpine >/dev/null || {
   echo "postgres:16-alpine not cached: refusing automatic pull" >&2
@@ -57,7 +72,7 @@ docker run -d --name "$container" --pull never \
 created=1
 ready=0
 for attempt in {1..45}; do
-  if docker exec "$container" pg_isready -U postgres -d restore_scratch >/dev/null 2>&1; then
+  if docker exec "$container" pg_isready -h 127.0.0.1 -p 5432 -U postgres -d restore_scratch >/dev/null 2>&1; then
     ready=1
     break
   fi
