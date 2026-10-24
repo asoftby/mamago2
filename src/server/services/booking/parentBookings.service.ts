@@ -382,7 +382,7 @@ function mapRow(raw: {
     offerInstagram: offerInstagramUrl,
     placePhone: raw.offer?.place?.phone ?? null,
     placeWebsite: raw.offer?.place?.website ?? null,
-    placeInstagram: offerPlaceInstagramUrl,
+    placeInstagram: offerPlaceInstagramUrl ?? null,
   }) : null;
   const organizerPhone = pendingCamp
     ? pendingCampContacts?.phone ?? null
