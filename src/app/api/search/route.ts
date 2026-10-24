@@ -9,7 +9,7 @@ import { resolveActivityAgeLabel } from "@/lib/search/metaLines";
 import { formatMarketplaceHeroAddress } from "@/lib/placeLocationString";
 import { formatActivitySearchDates, formatSearchDateRange, formatSearchOpeningHours, formatSearchPublicationPrice } from "@/lib/search/resultCardMeta";
 import { resolvePlaceLogoUrlFromDb } from "@/lib/place/resolvePlaceLogoUrlFromDb";
-import { formatAgeKeysShort } from "@/lib/config/ages";
+import { formatSearchAddress, formatSearchAgeFromTags } from "@/lib/search/compactSearchPresentation";
 
 const MAX_QUERY_LENGTH = 200;
 const MAX_QUERY_TOKENS = 10;
@@ -178,12 +178,12 @@ export async function GET(request: Request) {
           activity.place?.city?.name ??
           null;
         activityById.set(activity.id, {
-          summaryLine: formatMarketplaceHeroAddress({
+          summaryLine: formatSearchAddress(formatMarketplaceHeroAddress({
             city: cityName ? { name: cityName } : null,
             shortAddress: activity.venue?.addressLine || venuePlace?.shortAddress || activity.place?.shortAddress,
             formattedAddr: venuePlace?.formattedAddr ?? activity.place?.formattedAddr,
             customAddress: venuePlace?.customAddress ?? activity.place?.customAddress,
-          }) || null,
+          }), cityName),
           metaLine: [
             resolveActivityAgeLabel({
               agePolicy: activity.agePolicy,
@@ -229,15 +229,15 @@ export async function GET(request: Request) {
         },
       });
       for (const place of places) {
-        const address = formatMarketplaceHeroAddress({
+        const address = formatSearchAddress(formatMarketplaceHeroAddress({
           city: place.city,
           shortAddress: place.shortAddress,
           formattedAddr: place.formattedAddr,
           customAddress: place.customAddress ?? place.displayAddress,
-        }) || null;
+        }), place.city?.name);
         const age = place.agePolicy === "ADULT_ONLY"
           ? "18+"
-          : formatAgeKeysShort(place.ageTags);
+          : formatSearchAgeFromTags(place.ageTags);
         const hours = formatSearchOpeningHours(place.openingHours?.rules ?? []);
         placeById.set(place.id, {
           summaryLine: address,
@@ -262,12 +262,12 @@ export async function GET(request: Request) {
       });
       for (const offer of offers) {
         const place = offer.place;
-        const address = place ? formatMarketplaceHeroAddress({
+        const address = place ? formatSearchAddress(formatMarketplaceHeroAddress({
           city: place.city,
           shortAddress: place.shortAddress,
           formattedAddr: place.formattedAddr,
           customAddress: place.customAddress ?? place.displayAddress,
-        }) || null : null;
+        }), place.city?.name) : null;
         const age = offer.agePolicy === "ADULT_ONLY" ? "18+" :
           offer.ageMinMonths != null ? `${Math.floor(offer.ageMinMonths / 12)}+` : null;
         offerById.set(offer.id, {
