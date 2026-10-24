@@ -9,6 +9,7 @@ import { ContentPreviewBanner } from "@/components/shared/ContentPreviewBanner";
 import { editorPlaceEditHref } from "@/lib/content-editor/types";
 import { getPlaceDisplayTitle } from "@/lib/placeDisplayTitle";
 import { formatMarketplaceHeroAddress } from "@/lib/placeLocationString";
+import { formatAgeTagsCompact } from "@/lib/config/ages";
 import { resolveInstagramProfileHref } from "@/lib/instagram/extractUsername";
 import { buildPublicWorkingHoursText } from "@/server/services/openingHours/openingHours.publicSummary";
 import { getOpeningStatus } from "@/server/services/openingHours/openingHours.service";
@@ -564,6 +565,7 @@ export default async function MePlacePreviewPage({ params }: PageProps) {
     latitude: previewLat || undefined,
     longitude: previewLng || undefined,
     categoryLabel,
+    ageRange: formatAgeTagsCompact(activeRevision ? activeRevision.ageTags : place.ageTags),
     breadcrumbItems,
     mapsOpenUrl,
     mapsDirectionsUrl,

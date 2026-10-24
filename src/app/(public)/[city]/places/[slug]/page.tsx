@@ -7,6 +7,7 @@ import { getPlaceDisplayTitle } from "@/lib/placeDisplayTitle";
 import { findPlaceBySlug, findPlaceBySlugInCity } from "@/lib/slug/placeSlugService";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { formatMarketplaceHeroAddress } from "@/lib/placeLocationString";
+import { formatAgeTagsCompact } from "@/lib/config/ages";
 import { isPlacePubliclyVisible } from "@/lib/plan/publicVisibility";
 import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
 import { buildFaqJsonLd } from "@/lib/seo/schema/buildFaqJsonLd";
@@ -778,6 +779,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
     latitude: place.lat || undefined,
     longitude: place.lng || undefined,
     categoryLabel,
+    ageRange: formatAgeTagsCompact(place.ageTags),
 
     breadcrumbItems,
     mapsOpenUrl,

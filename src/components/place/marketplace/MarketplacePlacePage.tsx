@@ -207,6 +207,7 @@ export function MarketplacePlacePage({
         website={place.website}
         instagramUrl={place.instagramUrl}
         logoUrl={place.logoUrl}
+        ageRange={place.ageRange}
         rating={displayRating}
         reviewCount={displayReviewCount}
         reputationSummary={reputation ? {
