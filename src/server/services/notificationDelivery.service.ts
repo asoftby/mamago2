@@ -41,6 +41,7 @@ import { resolveNotificationChannels } from "@/lib/notifications/resolveNotifica
 import type { UserForChannelResolution } from "@/lib/notifications/resolveNotificationChannels";
 import { getActiveTelegramConnectionForCurrentEnvironment } from "@/server/services/telegram/telegramConnection.service";
 import { getActiveBusinessTelegramRecipient, sendBusinessTelegramMessage } from "@/server/services/telegram/businessTelegramDelivery.service";
+import { mayUseFamilyTelegramBot } from "@/lib/notifications/telegramAudienceRouting";
 import { TelegramChannel, type TelegramParseMode, type TelegramReplyMarkup } from "@/server/services/telegram/TelegramChannel";
 import { renderNotificationTelegramMessage } from "@/server/services/telegram/TelegramTemplateRenderer";
 import { isOneTimeNotificationType } from "./notificationDedup.service";
@@ -344,9 +345,11 @@ async function handleTelegram(notificationId: string, enabled: boolean): Promise
     const businessRecipient = notification.audience === "BUSINESS"
       ? await getActiveBusinessTelegramRecipient(notification.userId)
       : null;
-    const connection = businessRecipient
-      ? null
-      : await getActiveTelegramConnectionForCurrentEnvironment(notification.userId);
+    // BUSINESS is isolated even when its dedicated bot is unconfigured,
+    // disabled, or disconnected. Never leak a business notice to Info Bot.
+    const connection = mayUseFamilyTelegramBot(notification.audience)
+      ? await getActiveTelegramConnectionForCurrentEnvironment(notification.userId)
+      : null;
     if (!businessRecipient && !connection?.isActive) {
       console.warn(
         "[delivery:telegram] skipped: TELEGRAM_NOT_CONNECTED",
