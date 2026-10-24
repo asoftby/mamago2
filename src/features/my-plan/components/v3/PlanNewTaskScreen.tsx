@@ -223,7 +223,11 @@ export function PlanNewTaskScreen({
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
       <PlanScreenTitleHead title={isMove ? <>Перенести <em>дело</em></> : <>Новое <em>дело</em></>} onBack={onBack} />
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 md:px-8">
+      <div
+        data-plan-new-task-scroll
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y px-5 pb-6 md:px-8"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
         <div className="mb-[22px] mt-1">
         <label className="block">
           <span className="sr-only">Что нужно сделать</span>
