@@ -154,7 +154,7 @@ function EventAboutEditorial({
             <h2
               style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
             >
-              <span style={{ fontFamily: "var(--font-sans)" }}>Описание </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>события</span>
+              Описание события
             </h2>
           </div>
 
@@ -283,7 +283,7 @@ function EventFinalCta({
             Не пропустите
             <br />
             это{" "}
-            <span className="italic text-[#C24E22]">событие</span>.
+            событие.
           </h2>
           <p className="mx-auto mt-6 max-w-[520px] text-[19px] leading-[1.5] text-[#3A332B]">
             Купите билет за&nbsp;2&nbsp;минуты или отложите в&nbsp;план — мы&nbsp;напомним вечером накануне.
@@ -699,7 +699,7 @@ export function EventPageView({
                 <h2
                   style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
                 >
-                  <span style={{ fontFamily: "var(--font-sans)" }}>Сколько это </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>стоит</span>
+                  Сколько это стоит
                 </h2>
               </div>
             </div>
@@ -731,7 +731,7 @@ export function EventPageView({
               <h2
                 style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
               >
-                <span style={{ fontFamily: "var(--font-sans)" }}>Выбери </span><span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>удобное время</span>
+                Выбери удобное время
               </h2>
             </div>
             <EventSessionSelector
