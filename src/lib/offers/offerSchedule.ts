@@ -241,10 +241,13 @@ export function buildScheduleInput(
 ): OfferScheduleInput {
   const input: OfferScheduleInput = {};
 
-  if (form.bookingMethod) {
-    input.bookingMethod = form.bookingMethod;
+  // A camp always accepts applications on mamaGo, even for old drafts with
+  // NONE/EXTERNAL/null. Never persist a competing booking method or URL.
+  const method = productType === "CAMP" ? "REQUEST_ONLY" : form.bookingMethod;
+  if (method) {
+    input.bookingMethod = method;
     input.external =
-      form.bookingMethod === "EXTERNAL"
+      method === "EXTERNAL"
         ? { kind: form.externalKind, url: form.externalUrl.trim() }
         : null;
   }
@@ -281,7 +284,8 @@ export function buildChangedScheduleInput(
   previousClassDuration?: string | null,
 ): OfferScheduleInput | undefined {
   const full = buildScheduleInput(current, productType, classDuration);
-  const bookingChanged = current.bookingMethod !== previous.bookingMethod ||
+  const bookingChanged = (productType === "CAMP" && previous.bookingMethod !== "REQUEST_ONLY") ||
+    current.bookingMethod !== previous.bookingMethod ||
     (current.bookingMethod === "EXTERNAL" &&
       (current.externalKind !== previous.externalKind ||
         current.externalUrl.trim() !== previous.externalUrl.trim()));
@@ -312,8 +316,8 @@ export function getScheduleMissingFields(
   productType: string | null | undefined,
 ): string[] {
   const missing: string[] = [];
-  if (productType === "CAMP" && form.bookingMethod !== "REQUEST_ONLY") {
-    missing.push("Для лагеря выберите «Отправить заявку»");
+  if (productType === "CAMP") {
+    // Only one mode is available, and it is normalized on save.
   } else if (!form.bookingMethod && !form.legacyBookingMode) {
     missing.push("Способ записи");
   }
