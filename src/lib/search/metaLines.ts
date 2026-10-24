@@ -1,11 +1,8 @@
 import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
 import { getPlaceSearchAddressMetaLine } from "@/lib/placeLocationString";
-import { formatAgeKeysShort } from "@/lib/config/ages";
 import {
-  ageBoundsFromActivityFields,
   ageFromPlusBadgeFromAgeTags,
-  ageFromPlusLabelFromBounds,
 } from "@/lib/event/activityAgeBounds";
 
 /** Shared meta lines for SearchDocument (mirrors public search card hints). */
@@ -37,20 +34,23 @@ export function resolveActivityAgeLabel(args: {
 }): string | null {
   if (args.agePolicy === "ADULT_ONLY") return "18+";
   const labeled = args.ageLabel?.trim();
-  if (labeled) return labeled;
+  // Explicit single threshold takes precedence, but a list of ranges is not
+  // a badge and must never reach the compact search result.
+  if (labeled && /^\d+\+$/.test(labeled)) return labeled;
+
+  if (args.ageMinMonths != null && Number.isFinite(args.ageMinMonths)) {
+    return `${Math.max(0, Math.floor(args.ageMinMonths / 12))}+`;
+  }
 
   const fromTagsBadge = ageFromPlusBadgeFromAgeTags(args.ageTags ?? []);
   if (fromTagsBadge) return fromTagsBadge;
 
-  const fromTagsShort = formatAgeKeysShort(args.ageTags ?? []);
-  if (fromTagsShort) return fromTagsShort;
-
-  const { ageFrom } = ageBoundsFromActivityFields({
-    ageTags: args.ageTags ?? [],
-    ageMinMonths: args.ageMinMonths,
-    ageMaxMonths: args.ageMaxMonths,
-  });
-  return ageFromPlusLabelFromBounds(ageFrom);
+  // Legacy labels may contain a single range even when ageTags are empty.
+  if (labeled) {
+    const match = labeled.match(/^(\d+)\s*(?:[-–]\s*\d+|\+)/);
+    if (match) return `${Number(match[1])}+`;
+  }
+  return null;
 }
 
 /** Адрес для второй строки карточки события в поиске: «Город, улица …». */
