@@ -40,7 +40,7 @@ export function OfferReviews({ reviews, averageRating, totalCount }: OfferReview
           <h2 className="tracking-[-0.02em] leading-[1] text-gray-900 whitespace-nowrap" style={{ fontFamily: "var(--font-sans)", fontWeight: 400, fontSize: 30 }}>
             {averageRating && reviews.length > 0 ? (
               <>
-                <span style={{ fontFamily: "var(--font-display)", fontStyle: "italic", color: "var(--primary)" }}>{averageRating.toFixed(1)}</span>
+                {averageRating.toFixed(1)}
                 <span className="text-gray-300"> · </span>
                 <span><span style={{ fontFamily: "var(--font-sans)" }}>{totalCount}</span> {pluralReviews(totalCount)}</span>
               </>
