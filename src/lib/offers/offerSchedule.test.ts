@@ -100,6 +100,17 @@ own.bookingMethod = "NONE";
 own.hoursSource = "own";
 assert.deepEqual(getScheduleMissingFields(own, "PARTY_PACKAGE"), ["Дни работы"]);
 
+// Лагеря: только заявка через mamaGo; нельзя сохранить старую внешнюю ссылку.
+const camp = defaultOfferSchedule();
+assert.deepEqual(getScheduleMissingFields(camp, "CAMP"), ["Для лагеря выберите «Отправить заявку»"]);
+camp.bookingMethod = "EXTERNAL";
+camp.externalUrl = "https://example.by/camp";
+assert.deepEqual(getScheduleMissingFields(camp, "CAMP"), ["Для лагеря выберите «Отправить заявку»"]);
+camp.bookingMethod = "NONE";
+assert.deepEqual(getScheduleMissingFields(camp, "CAMP"), ["Для лагеря выберите «Отправить заявку»"]);
+camp.bookingMethod = "REQUEST_ONLY";
+assert.deepEqual(getScheduleMissingFields(camp, "CAMP"), []);
+
 // схема запроса
 assert.equal(offerScheduleInputSchema.safeParse({ bookingMethod: "EXTERNAL", external: { kind: "TICKETS", url: "" } }).success, false);
 assert.equal(offerScheduleInputSchema.safeParse({ bookingMethod: "NONE" }).success, true);
