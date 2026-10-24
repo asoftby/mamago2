@@ -142,7 +142,14 @@ export function PublicationsIndexClient({
   const [quickNoSlug, setQuickNoSlug] = useState(false);
   const [quickDrafts, setQuickDrafts] = useState(false);
   const [quickPublished, setQuickPublished] = useState(false);
-  const [page, setPage] = useState(1);
+  const filterKey = JSON.stringify([
+    tab, status, authorUserIdFilter, cityId, dateFrom, typeQuick, sort,
+    titleSearch, quickNoCover, quickNoSlug, quickDrafts, quickPublished,
+  ]);
+  const [pageSelection, setPageSelection] = useState({ filterKey, page: 1 });
+  const page = pageSelection.filterKey === filterKey ? pageSelection.page : 1;
+  const setPage = (nextPage: number) => setPageSelection({ filterKey, page: nextPage });
+  const resetPageForFilters = () => setPageSelection({ filterKey: "", page: 1 });
 
   // Drawer статистики
   const [statsDrawer, setStatsDrawer] = useState<PublicationStatsDrawerProps["publication"] | null>(null);
@@ -248,23 +255,6 @@ export function PublicationsIndexClient({
     return arr;
   }, [filtered, sort]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [
-    tab,
-    status,
-    authorUserIdFilter,
-    cityId,
-    dateFrom,
-    typeQuick,
-    sort,
-    titleSearch,
-    quickNoCover,
-    quickNoSlug,
-    quickDrafts,
-    quickPublished,
-  ]);
-
   const pagination = useMemo(
     () => getAdminPagination({ page, total: sorted.length }),
     [page, sorted.length],
@@ -326,10 +316,7 @@ export function PublicationsIndexClient({
 
   useEffect(() => {
     const el = tableScrollRef.current;
-    if (!el) {
-      setTableScrollHint("none");
-      return;
-    }
+    if (!el) return;
 
     const update = () => {
       if (typeof window === "undefined") return;
@@ -382,7 +369,7 @@ export function PublicationsIndexClient({
 
       <Tabs
         value={tab}
-        onValueChange={(v) => setTab(v as PublicationTabFilter)}
+        onValueChange={(v) => { resetPageForFilters(); setTab(v as PublicationTabFilter); }}
         className="min-w-0 space-y-3"
       >
         <div className="overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:thin]">
@@ -415,7 +402,7 @@ export function PublicationsIndexClient({
             id="publications-title-search"
             placeholder="Заголовок, slug, автор или город"
             value={titleSearch}
-            onChange={(e) => setTitleSearch(e.target.value)}
+            onChange={(e) => { resetPageForFilters(); setTitleSearch(e.target.value); }}
             className="w-full min-w-0"
           />
         </div>
@@ -425,7 +412,7 @@ export function PublicationsIndexClient({
             variant={quickNoCover ? "secondary" : "outline"}
             size="sm"
             className="h-8 shrink-0 text-xs"
-            onClick={() => setQuickNoCover((v) => !v)}
+            onClick={() => { resetPageForFilters(); setQuickNoCover((v) => !v); }}
           >
             Без обложки
           </Button>
@@ -434,7 +421,7 @@ export function PublicationsIndexClient({
             variant={quickNoSlug ? "secondary" : "outline"}
             size="sm"
             className="h-8 shrink-0 text-xs"
-            onClick={() => setQuickNoSlug((v) => !v)}
+            onClick={() => { resetPageForFilters(); setQuickNoSlug((v) => !v); }}
           >
             Без slug
           </Button>
@@ -443,7 +430,7 @@ export function PublicationsIndexClient({
             variant={quickDrafts ? "secondary" : "outline"}
             size="sm"
             className="h-8 shrink-0 text-xs"
-            onClick={() => setQuickDrafts((v) => !v)}
+            onClick={() => { resetPageForFilters(); setQuickDrafts((v) => !v); }}
           >
             Черновики
           </Button>
@@ -452,7 +439,7 @@ export function PublicationsIndexClient({
             variant={quickPublished ? "secondary" : "outline"}
             size="sm"
             className="h-8 shrink-0 text-xs"
-            onClick={() => setQuickPublished((v) => !v)}
+            onClick={() => { resetPageForFilters(); setQuickPublished((v) => !v); }}
           >
             Опубликованные
           </Button>
@@ -460,7 +447,7 @@ export function PublicationsIndexClient({
         <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 [&>*]:min-w-0">
           <div className="min-w-0">
             <span className="block text-sm font-medium text-gray-700 mb-1">Статус</span>
-            <Select value={status} onValueChange={setStatus}>
+            <Select value={status} onValueChange={(v) => { resetPageForFilters(); setStatus(v); }}>
               <SelectTrigger className="w-full min-w-0">
                 <SelectValue placeholder="Статус" />
               </SelectTrigger>
@@ -476,7 +463,7 @@ export function PublicationsIndexClient({
           </div>
           <div className="min-w-0">
             <span className="block text-sm font-medium text-gray-700 mb-1">Сортировка</span>
-            <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+            <Select value={sort} onValueChange={(v) => { resetPageForFilters(); setSort(v as SortKey); }}>
               <SelectTrigger className="w-full min-w-0">
                 <SelectValue placeholder="Сортировка" />
               </SelectTrigger>
@@ -495,7 +482,7 @@ export function PublicationsIndexClient({
             </span>
             <Select
               value={typeQuick}
-              onValueChange={(v) => setTypeQuick(v as "all" | "ARTICLE")}
+              onValueChange={(v) => { resetPageForFilters(); setTypeQuick(v as "all" | "ARTICLE"); }}
               disabled={tab !== PublicationTabFilter.ALL}
             >
               <SelectTrigger className="w-full min-w-0">
@@ -511,7 +498,7 @@ export function PublicationsIndexClient({
             <span className="block text-sm font-medium text-gray-700 mb-1">Автор</span>
             <Select
               value={authorUserIdFilter || "__all_authors__"}
-              onValueChange={(v) => setAuthorUserIdFilter(v === "__all_authors__" ? "" : v)}
+              onValueChange={(v) => { resetPageForFilters(); setAuthorUserIdFilter(v === "__all_authors__" ? "" : v); }}
             >
               <SelectTrigger className="w-full min-w-0">
                 <SelectValue placeholder="Автор" />
@@ -530,7 +517,7 @@ export function PublicationsIndexClient({
             <span className="block text-sm font-medium text-gray-700 mb-1">Город</span>
             <Select
               value={cityId || "__all_cities__"}
-              onValueChange={(v) => setCityId(v === "__all_cities__" ? "" : v)}
+              onValueChange={(v) => { resetPageForFilters(); setCityId(v === "__all_cities__" ? "" : v); }}
             >
               <SelectTrigger className="w-full min-w-0">
                 <SelectValue placeholder="Город" />
@@ -556,7 +543,7 @@ export function PublicationsIndexClient({
               id="publications-updated-from"
               type="date"
               value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
+              onChange={(e) => { resetPageForFilters(); setDateFrom(e.target.value); }}
               className="w-full min-w-0"
             />
           </div>

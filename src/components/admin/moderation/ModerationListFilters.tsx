@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, type FormEvent } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FilterSelect, type FilterSelectOption } from "@/components/ui/filter-select";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,7 @@ const TEMPORAL_OPTIONS: FilterSelectOption[] = [
  * Любое изменение фильтра сбрасывает `page`, чтобы пользователь не попадал
  * на пустую страницу старой пагинации после сужения выборки.
  */
-function ModerationListFiltersInner({
+function ModerationListFiltersFields({
   cities,
   basePath,
   statusFilter,
@@ -55,10 +55,6 @@ function ModerationListFiltersInner({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(searchParams.get("q") || "");
-
-  useEffect(() => {
-    setQuery(searchParams.get("q") || "");
-  }, [searchParams]);
 
   const pushParams = (params: URLSearchParams) => {
     params.delete("page");
@@ -150,6 +146,13 @@ function ModerationListFiltersInner({
       ) : null}
     </div>
   );
+}
+
+function ModerationListFiltersInner(props: ModerationListFiltersProps) {
+  const searchParams = useSearchParams();
+  // A changed URL search string should remount only the editable draft, not
+  // mutate component state synchronously in an effect.
+  return <ModerationListFiltersFields key={searchParams.get("q") ?? ""} {...props} />;
 }
 
 export function ModerationListFilters(props: ModerationListFiltersProps) {
