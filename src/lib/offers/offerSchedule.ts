@@ -316,12 +316,11 @@ export function getScheduleMissingFields(
   productType: string | null | undefined,
 ): string[] {
   const missing: string[] = [];
-  if (productType === "CAMP") {
-    // Only one mode is available, and it is normalized on save.
-  } else if (!form.bookingMethod && !form.legacyBookingMode) {
+  // Camps always use REQUEST_ONLY, normalized before persistence; no choice required.
+  if (productType !== "CAMP" && !form.bookingMethod && !form.legacyBookingMode) {
     missing.push("Способ записи");
   }
-  if (form.bookingMethod === "EXTERNAL" && validateExternalUrl(form.externalUrl)) {
+  if (productType !== "CAMP" && form.bookingMethod === "EXTERNAL" && validateExternalUrl(form.externalUrl)) {
     missing.push("Ссылка для записи");
   }
   if (offerUsesOpeningHours(productType) && form.hoursSource === "own") {
