@@ -204,7 +204,7 @@ async function main() {
 
       await reconcileDetectorSignals(prisma, DETECTOR, staleSignals); // PENDING
       await reconcileDetectorSignals(prisma, DETECTOR, staleSignals); // OPEN
-      let live = await prisma.operationalSignal.findFirst({
+      const live = await prisma.operationalSignal.findFirst({
         where: { detector: DETECTOR, fingerprint: moderationQueueStaleFingerprint("event"), resolvedAt: null },
       });
       assert.equal(live?.status, "OPEN");
