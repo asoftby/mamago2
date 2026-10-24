@@ -20,7 +20,9 @@ import type { SearchResultItem as SearchResultItemType } from "@/lib/search/type
 import { PUBLIC_SEARCH_DEBOUNCE_MS } from "@/lib/search/constants";
 import { buildPublicSearchApiUrl } from "@/lib/search/buildPublicSearchApiUrl";
 import { resolveVisiblePopularTags } from "@/lib/search/popularSearchTags";
-import { rememberPublicSearchQuery } from "@/lib/search/recentPublicSearch";
+import { rememberLastOpenedPublicSearchResult } from "@/lib/search/recentPublicSearch";
+import { useLastPublicSearchResult } from "@/hooks/useLastPublicSearchResult";
+import { LastSearchEntry } from "@/components/search/LastSearchEntry";
 import { useLastPublicSearchQuery } from "@/hooks/useLastPublicSearchQuery";
 
 export type MobileSearchState = "idle" | "focused" | "typing";
@@ -33,6 +35,7 @@ export type MobileSearchProps = {
   /** Аккордеон «Где / Когда / С кем» — только когда выбран раздел и запрос короче 2 символов */
   filtersSection: ReactNode;
   onResultNavigate: (item: SearchResultItemType) => void;
+  onRecentNavigate: (url: string) => void;
   /** Pending/active city slug for SearchQueryLog geo telemetry. */
   citySlug?: string | null;
 };
@@ -44,9 +47,11 @@ export function MobileSearch({
   onIntentSelect,
   filtersSection,
   onResultNavigate,
+  onRecentNavigate,
   citySlug,
 }: MobileSearchProps) {
   const lastSearch = useLastPublicSearchQuery();
+  const lastResult = useLastPublicSearchResult();
   const inputRef = useRef<HTMLInputElement>(null);
   const tabsRef = useRef<(HTMLElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -172,7 +177,7 @@ export function MobileSearch({
   const handleSelectResult = useCallback(
     (item: SearchResultItemType) => {
       const q = searchText.trim();
-      if (q.length >= 2) rememberPublicSearchQuery(q);
+      if (q.length >= 2) rememberLastOpenedPublicSearchResult(item, q);
       onResultNavigate(item);
     },
     [searchText, onResultNavigate],
@@ -186,7 +191,7 @@ export function MobileSearch({
   // Counts are not wired from SearchQueryLog yet → empty until threshold (≥20) can be met.
   const popularTags = resolveVisiblePopularTags();
   const showPopularHints =
-    showPopularBlock && (Boolean(lastSearch) || popularTags.length > 0);
+    showPopularBlock && (Boolean(lastResult || lastSearch) || popularTags.length > 0);
 
   const showAutocomplete =
     searchState === "typing" && queryTrim.length >= 2;
@@ -261,6 +266,7 @@ export function MobileSearch({
             activeIndex={activeIndex}
             onPopularPick={handlePopularPick}
             onSelectResult={handleSelectResult}
+            onLastResultNavigate={onRecentNavigate}
           />
         </div>
       ) : (
@@ -362,25 +368,15 @@ export function MobileSearch({
                 "relative z-10 mx-4 animate-in fade-in slide-in-from-top-1 rounded-2xl border border-neutral-100 bg-white p-4 shadow-xl duration-200",
               )}
             >
-              {lastSearch ? (
-                <>
-                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
-                    Последний поиск
-                  </p>
-                  <ul className={cn("flex flex-wrap gap-2", popularTags.length > 0 && "mb-5")}>
-                    <li className="max-w-full">
-                      <button
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => handlePopularPick(lastSearch)}
-                        className="max-w-full truncate rounded-full border border-neutral-200 bg-neutral-50 px-3.5 py-2 text-left text-sm font-medium text-neutral-800 transition-colors hover:border-border-brand-soft hover:bg-brand-soft active:scale-[0.98]"
-                        title={lastSearch}
-                      >
-                        {lastSearch}
-                      </button>
-                    </li>
-                  </ul>
-                </>
+              {(lastResult || lastSearch) ? (
+                <div className={popularTags.length > 0 ? "mb-5" : undefined}>
+                  <LastSearchEntry
+                    result={lastResult}
+                    fallbackQuery={lastSearch}
+                    onNavigate={onRecentNavigate}
+                    onQueryPick={handlePopularPick}
+                  />
+                </div>
               ) : null}
               {popularTags.length > 0 ? (
                 <>
