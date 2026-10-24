@@ -148,6 +148,7 @@ const PARENT_BOOKING_SELECT = {
       coverImage: true,
       bookingPhone: true,
       contactPhone: true,
+      contactSource: true,
       contactWebsite: true,
       contactSocialLinks: true,
       place: {
@@ -203,6 +204,7 @@ function mapRow(raw: {
         coverImage: string | null;
         bookingPhone: string | null;
         contactPhone: string | null;
+        contactSource: string | null;
         contactWebsite: string | null;
         contactSocialLinks: unknown;
         place: {
@@ -367,8 +369,12 @@ function mapRow(raw: {
   // До подтверждения заявки на лагерь показываем только опубликованные
   // контакты самого предложения, без запасного телефона бизнес-аккаунта.
   const pendingCamp = raw.campShiftId !== null && raw.status === BookingStatus.NEW;
+  // The business may explicitly choose the Place as this Offer's contact
+  // source. These are public offer contacts, not private business-account data.
+  const inheritedOfferContacts = pendingCamp && raw.offer?.contactSource === "place";
   const organizerPhone = pendingCamp
-    ? (raw.offer?.contactPhone ?? raw.offer?.bookingPhone ?? null)
+    ? (raw.offer?.contactPhone ?? raw.offer?.bookingPhone ??
+      (inheritedOfferContacts ? raw.offer?.place?.phone : null) ?? null)
     : raw.offer?.contactPhone ??
     raw.offer?.bookingPhone ??
     raw.activity?.bookingPhone ??
@@ -380,7 +386,8 @@ function mapRow(raw: {
     raw.business?.phone ??
     null;
   const organizerWebsite = pendingCamp
-    ? (raw.offer?.contactWebsite ?? null)
+    ? (raw.offer?.contactWebsite ??
+      (inheritedOfferContacts ? raw.offer?.place?.website : null) ?? null)
     : raw.offer?.contactWebsite ??
     raw.activity?.organizer?.website ??
     raw.place?.website ??
@@ -389,7 +396,7 @@ function mapRow(raw: {
     null;
   const organizerTelegramUrl = offerTelegramUrl;
   const organizerInstagramResolved = pendingCamp
-    ? offerInstagramUrl
+    ? (offerInstagramUrl || (inheritedOfferContacts ? placeInstagramUrl : null))
     : offerInstagramUrl ||
     organizerInstagramUrl ||
     placeInstagramUrl ||
