@@ -41,8 +41,8 @@ export default async function AdminSeoPlanPage({ searchParams }: PageProps) {
   let from: Date;
   let to: Date;
   let periodLabel: string;
-  let prevOffset = offset - 1;
-  let nextOffset = offset + 1;
+  const prevOffset = offset - 1;
+  const nextOffset = offset + 1;
 
   if (period === "week") {
     from = addDays(startOfWeekMonday(now), offset * 7);
