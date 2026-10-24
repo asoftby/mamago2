@@ -69,11 +69,18 @@ export function MyPlanPanelContent({
   const { isAuthenticated, isLoading: authMeLoading } = useAuthMe();
 
   const [isDateLoading, setIsDateLoading] = useState(false);
+  const [nowMs, setNowMs] = useState(Date.now);
+
+  useEffect(() => {
+    if (!open) return;
+    const tick = () => setNowMs(Date.now());
+    const timer = window.setInterval(tick, 30_000);
+    return () => window.clearInterval(timer);
+  }, [open]);
   const effectiveSelectedPlanDate = selectedPlanDate;
   const handleChangeDate = setSelectedPlanDate;
 
   const visiblePlanItemsByDate = useMemo(() => {
-    const nowMs = Date.now();
     const next: Record<string, PlanItemWithActivity[]> = {};
 
     for (const [date, items] of Object.entries(planItemsByDate)) {
@@ -86,7 +93,7 @@ export function MyPlanPanelContent({
     }
 
     return next;
-  }, [effectiveSelectedPlanDate, open, planItemsByDate, todayIso]);
+  }, [effectiveSelectedPlanDate, nowMs, planItemsByDate, todayIso]);
 
   /**
    * Recovery bridge for guest "Подбери за меня" -> auth.
