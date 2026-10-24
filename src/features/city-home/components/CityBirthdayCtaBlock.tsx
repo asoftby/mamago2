@@ -1,4 +1,3 @@
-import { ptSerifHome } from "@/lib/fonts";
 import Link from "next/link";
 import { ArrowRight, Cake } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -39,9 +38,9 @@ export function CityBirthdayCtaBlock({
             <Cake className="h-[33px] w-[33px]" aria-hidden />
           </div>
           <div className="min-w-0">
-            <h2 className="max-w-none text-[15px] tracking-[-0.04em] text-neutral-900 sm:leading-[1.1]" style={{ fontFamily: ptSerifHome.style.fontFamily, fontWeight: 400, fontSize: 32 }}>
+            <h2 className="max-w-none text-[15px] tracking-[-0.04em] text-neutral-900 sm:leading-[1.1]" style={{ fontSize: 32 }}>
               Организовать День Рождения{" "}
-              <em style={{ fontStyle: "italic", color: "var(--primary)", fontWeight: 400, fontFamily: ptSerifHome.style.fontFamily, fontSize: 32, letterSpacing: "-0.5px" }}>за <span style={{ fontFamily: ptSerifHome.style.fontFamily }}>10</span> минут</em>
+              за 10 минут
             </h2>
             <p className="mt-3 max-w-2xl text-[14px] leading-[150%] text-neutral-600 sm:text-[14px]">
               Площадка, анимация, торт, декор и другие штуковины — в одном конструкторе легко и просто
