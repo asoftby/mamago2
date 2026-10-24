@@ -142,7 +142,13 @@ export function PublicationsIndexClient({
   const [quickNoSlug, setQuickNoSlug] = useState(false);
   const [quickDrafts, setQuickDrafts] = useState(false);
   const [quickPublished, setQuickPublished] = useState(false);
-  const [page, setPage] = useState(1);
+  const filterKey = JSON.stringify([
+    tab, status, authorUserIdFilter, cityId, dateFrom, typeQuick, sort,
+    titleSearch, quickNoCover, quickNoSlug, quickDrafts, quickPublished,
+  ]);
+  const [pageSelection, setPageSelection] = useState({ filterKey, page: 1 });
+  const page = pageSelection.filterKey === filterKey ? pageSelection.page : 1;
+  const setPage = (nextPage: number) => setPageSelection({ filterKey, page: nextPage });
 
   // Drawer статистики
   const [statsDrawer, setStatsDrawer] = useState<PublicationStatsDrawerProps["publication"] | null>(null);
@@ -247,23 +253,6 @@ export function PublicationsIndexClient({
     });
     return arr;
   }, [filtered, sort]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [
-    tab,
-    status,
-    authorUserIdFilter,
-    cityId,
-    dateFrom,
-    typeQuick,
-    sort,
-    titleSearch,
-    quickNoCover,
-    quickNoSlug,
-    quickDrafts,
-    quickPublished,
-  ]);
 
   const pagination = useMemo(
     () => getAdminPagination({ page, total: sorted.length }),
