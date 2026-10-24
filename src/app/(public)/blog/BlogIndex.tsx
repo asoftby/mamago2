@@ -97,11 +97,11 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
             </div>
 
             <h1
-              className="font-serif m-0 leading-[.94] tracking-[-0.03em]"
+              className="font-heading m-0 leading-[.94] tracking-[-0.03em]"
               style={{ fontSize: "clamp(28px, 4.5vw, 62px)" }}
             >
               Обзоры{" "}
-              <span className="italic text-primary">и статьи</span>
+              и статьи
             </h1>
 
             <p className="mt-5 text-[17px] leading-relaxed text-muted-foreground w-full">
@@ -283,14 +283,14 @@ function FeaturedArticle({
         </div>
 
         <h2
-          className="font-serif m-0 leading-[1] tracking-[-0.025em] group-hover:text-primary transition-colors"
+          className="font-heading m-0 leading-[1] tracking-[-0.025em] group-hover:text-primary transition-colors"
           style={{ fontSize: "clamp(32px, 4.2vw, 58px)" }}
         >
           {article.title}
           {article.subtitle && (
             <>
               <br />
-              <span className="italic text-primary">{article.subtitle}</span>
+              {article.subtitle}
             </>
           )}
         </h2>
@@ -367,12 +367,12 @@ function ArticleRow({
       {/* Body */}
       <div className="flex flex-col gap-3">
         <h3
-          className="font-serif m-0 leading-[1.02] tracking-[-0.02em] text-foreground group-hover:text-primary transition-colors"
+          className="font-heading m-0 leading-[1.02] tracking-[-0.02em] text-foreground group-hover:text-primary transition-colors"
           style={{ fontSize: "clamp(22px, 2.6vw, 36px)" }}
         >
           {article.title}
           {article.subtitle && (
-            <> <span className="italic text-primary">{article.subtitle}</span></>
+            <> {article.subtitle}</>
           )}
         </h3>
       </div>
@@ -437,12 +437,12 @@ function NewsletterCTA() {
           ● подпишитесь на еженедельную рассылку
         </span>
         <h2
-          className="font-serif m-0 leading-[.95] tracking-[-0.025em] max-w-4xl mx-auto"
+          className="font-heading m-0 leading-[.95] tracking-[-0.025em] max-w-4xl mx-auto"
           style={{ fontSize: "clamp(44px, 7vw, 104px)" }}
         >
           Новые истории
           <br />
-          <span className="italic text-primary">каждую пятницу</span>.
+          каждую пятницу.
         </h2>
         <p className="text-[17px] text-muted-foreground max-w-[440px] mx-auto mt-5 mb-7 leading-relaxed">
           Один редакционный дайджест в неделю: 5 идей, что почитать и куда сходить с ребёнком.
