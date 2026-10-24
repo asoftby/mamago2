@@ -54,7 +54,7 @@ export function PlaceNetworkSection({ places }: PlaceNetworkSectionProps) {
                 fontWeight: 400,
               }}
             >
-              Наши <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>филиалы</em>
+              Наши филиалы
             </h2>
           </div>
           <p
