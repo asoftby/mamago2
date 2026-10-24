@@ -1,0 +1,77 @@
+.chip {
+  position: relative;
+  isolation: isolate;
+  flex: none;
+  height: 44px;
+  padding: 0 18px 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  border: 2px solid #e8834a;
+  background: #fff;
+  color: #1e1b18;
+  font: inherit;
+  font-weight: 500;
+  font-size: 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform .2s, background-color .2s, border-color .2s, color .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.chip::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(105deg, transparent 35%, rgba(232, 140, 90, .18) 50%, transparent 65%) -150% 0 / 250% 100% no-repeat;
+  animation: shine 4.5s ease-in-out infinite;
+}
+.chip:active { transform: scale(.96); }
+.chip:focus-visible { outline: 2px solid var(--primary, #e8834a); outline-offset: 3px; }
+.chip:disabled { opacity: .5; cursor: not-allowed; }
+.black { border-color: #1e1b18; }
+.active { background: #fff1e7; color: #1e1b18; }
+.black.active { background: #1e1b18; color: #ffe7d3; }
+.pumpkin {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  transform-origin: 50% 90%;
+  animation: sway 2.6s ease-in-out infinite;
+}
+.face { fill: #3b1f14; }
+.glow { fill: #ffc64b; opacity: 0; animation: flicker 3s steps(1) infinite; }
+.active .glow { opacity: 1; animation: burn 1.6s ease-in-out infinite; }
+.bat {
+  position: absolute;
+  top: -6px;
+  right: 6px;
+  width: 16px;
+  height: 10px;
+  pointer-events: none;
+  animation: fly 6s ease-in-out infinite;
+}
+.bat path {
+  fill: #3b2a44;
+  transform-origin: 50% 50%;
+  animation: flap .18s ease-in-out infinite alternate;
+}
+.black.active .bat path { fill: #ffb37a; }
+@keyframes sway { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+@keyframes flicker { 0%, 62%, 70%, 100% { opacity: 0; } 64%, 68%, 76%, 90% { opacity: 1; } }
+@keyframes burn { 0%, 100% { opacity: 1; } 45% { opacity: .6; } 55% { opacity: .95; } }
+@keyframes flap { from { transform: scaleY(1); } to { transform: scaleY(.35); } }
+@keyframes fly {
+  0%, 55% { opacity: 0; transform: translate(-40px, 14px) scale(.6); }
+  62% { opacity: 1; }
+  85% { opacity: 1; transform: translate(10px, -14px) scale(1); }
+  92%, 100% { opacity: 0; transform: translate(22px, -22px) scale(.8); }
+}
+@keyframes shine { 0%, 60% { background-position: -150% 0; } 100% { background-position: 250% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .chip::before, .pumpkin, .glow, .bat, .bat path { animation: none; }
+  .bat { opacity: 0; }
+  .active .glow { opacity: 1; }
+}
