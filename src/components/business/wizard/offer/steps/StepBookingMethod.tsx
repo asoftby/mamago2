@@ -55,7 +55,7 @@ export function StepBookingMethod({ data, onChange, isEditable, externalUrlLocke
         </h3>
         <p className="text-sm text-muted-foreground">
           {isCamp
-            ? "Для лагерей доступна только заявка через mamaGo."
+            ? "Для лагерей заявка через mamaGo включена автоматически. Родитель выбирает смену и отправляет заявку."
             : "Брони, заявки и закрытие отдельных часов — в Календаре кабинета."}
         </p>
       </div>
@@ -68,8 +68,10 @@ export function StepBookingMethod({ data, onChange, isEditable, externalUrlLocke
       )}
 
       <StableCardSelector
-        value={isCamp && schedule.bookingMethod !== "REQUEST_ONLY" ? null : schedule.bookingMethod}
-        onValueChange={(bookingMethod: OfferBookingMethod) => update({ bookingMethod })}
+        value={isCamp ? "REQUEST_ONLY" : schedule.bookingMethod}
+        onValueChange={(bookingMethod: OfferBookingMethod) => {
+          if (!isCamp) update({ bookingMethod });
+        }}
         options={isCamp ? [{
           value: "REQUEST_ONLY" as const,
           label: "Отправить заявку",
@@ -91,7 +93,7 @@ export function StepBookingMethod({ data, onChange, isEditable, externalUrlLocke
             description: "Запись на вашем сайте или покупка билетов",
           },
         ]}
-        isEditable={isEditable}
+        isEditable={isEditable && !isCamp}
         className="grid gap-3"
       />
 

@@ -41,6 +41,9 @@ export function BookingRecordCard({ booking }: Props) {
     ? `tel:${booking.organizerPhone.replace(/[^\d+]/g, "")}`
     : null;
   const messageHref = booking.organizerTelegramUrl ?? booking.organizerInstagramUrl;
+  const websiteHref = booking.organizerWebsite && /^https?:\/\//i.test(booking.organizerWebsite)
+    ? booking.organizerWebsite
+    : null;
   const routeHref = booking.mapUrl
     ? booking.mapUrl
     : booking.address
@@ -136,7 +139,11 @@ export function BookingRecordCard({ booking }: Props) {
             ) : null}
             {booking.address ? <p className={styles.contactRow}>{booking.address}</p> : null}
             {booking.organizerWebsite ? (
-              <p className={styles.contactRow}>{booking.organizerWebsite}</p>
+              <p className={styles.contactRow}>
+                {websiteHref ? (
+                  <a href={websiteHref} target="_blank" rel="noopener noreferrer">{booking.organizerWebsite}</a>
+                ) : booking.organizerWebsite}
+              </p>
             ) : null}
             <p className={styles.contactHint}>
               {isPending
