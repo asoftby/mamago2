@@ -52,7 +52,7 @@ export function NextArticlePreview({
           <p className="text-xs font-medium uppercase tracking-wide text-primary mb-1.5">
             {sectionName}
           </p>
-          <p className="font-serif text-lg sm:text-xl font-semibold text-foreground leading-snug group-hover:underline underline-offset-2 decoration-foreground/25">
+          <p className="font-heading text-lg sm:text-xl font-semibold text-foreground leading-snug group-hover:underline underline-offset-2 decoration-foreground/25">
             {title}
           </p>
           {excerpt?.trim() ? (

@@ -531,7 +531,7 @@ export function StepDone({
         color: "#141210",
       }}>
         Праздник{" "}
-        <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#E86A3A" }}>собран</span>{" "}
+        собран{" "}
         🎉
       </h2>
 

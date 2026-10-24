@@ -15,7 +15,7 @@ export function MyPlanHeader({ onClose, compact = false }: MyPlanHeaderProps) {
     >
       <h2 className="mp-font-display m-0 text-[28px] font-normal leading-[1.1] tracking-[-.02em] text-[var(--mp-tx)]">
         Мой{" "}
-        <em className="font-medium italic text-[var(--mp-ac)]">план</em>
+        план
       </h2>
 
       <button

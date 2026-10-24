@@ -101,7 +101,7 @@ export function PlaceReviewsSection({
               {legacyMode ? (
                 <>Ранее опубликованные отзывы mamaGo · {reviews.length}</>
               ) : (
-                <><em style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>{googleRating != null ? googleRating.toFixed(1) : displayRating.toFixed(1)}</em>{" · "}{googleReviewCount != null && googleReviewCount > 0 ? `${googleReviewCount} оценок Google` : `${displayCount} доступных отзывов`}</>
+                <>{googleRating != null ? googleRating.toFixed(1) : displayRating.toFixed(1)}{" · "}{googleReviewCount != null && googleReviewCount > 0 ? `${googleReviewCount} оценок Google` : `${displayCount} доступных отзывов`}</>
               )}
             </h2>
           </div>

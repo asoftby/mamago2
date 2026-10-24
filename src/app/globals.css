@@ -123,6 +123,7 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   /* next/font/local defines Google Sans on <html> via --font-sans. */
+  --font-heading: var(--font-google-sans);
   --font-mono: Menlo, ui-monospace, SFMono-Regular, Monaco, Consolas, monospace;
   
   /* Sidebar */
@@ -179,6 +180,7 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
 :root {
   /* Site-wide layout */
   --site-maxw: 1200px;
+  --font-heading: var(--font-google-sans);
   --font-editorial: var(--font-pt-serif);
   --font-serif: var(--font-pt-serif);
   --font-display: var(--font-pt-serif);
@@ -378,12 +380,26 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
     @apply bg-background text-foreground;
   }
 
-  /* Единое акцентное начертание: любой визуально наклонный текст должен
-     использовать настоящие локальные PT Serif Italic / Bold Italic. */
+  /* Keep legacy italic in article content only. Headings use Google Sans. */
   :where(em, i, .italic, .font-display-italic),
   [style*="font-style: italic"],
   [style*="font-style:italic"] {
     font-family: var(--font-pt-serif), ui-serif, serif !important;
+  }
+
+  :is(h1, h2, h3, h4, h5, h6, .ui-h1, .ui-h2, .ui-h3, [role="heading"], [data-slot="dialog-title"], [data-slot="card-title"]) {
+    font-family: var(--font-google-sans), ui-sans-serif, system-ui, sans-serif !important;
+    font-style: normal !important;
+  }
+  :is(h1, h2, h3, .ui-h1, .ui-h2, .ui-h3) { font-weight: 600 !important; }
+  :is(h4, h5, h6) { font-weight: 500 !important; }
+  :is(h1, h2, .ui-h1, .ui-h2) { letter-spacing: -0.02em !important; line-height: 1.1 !important; }
+  :is(h3, .ui-h3) { letter-spacing: -0.01em !important; line-height: 1.25 !important; }
+  :is(h4, h5, h6) { letter-spacing: 0 !important; line-height: 1.25 !important; }
+  :is(h1, h2, h3, h4, h5, h6, [role="heading"], [data-slot="dialog-title"], [data-slot="card-title"]) :is(span, em, i, .italic, .font-display-italic, [style*="font-style: italic"], [style*="font-style:italic"]) {
+    font-family: inherit !important;
+    font-style: normal !important;
+    color: inherit !important;
   }
 }
 

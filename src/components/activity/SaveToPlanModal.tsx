@@ -707,9 +707,9 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
           <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: "var(--primary)" }}>● Все даты</span>
           <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-sans)", fontSize: 24, letterSpacing: "-.015em", fontWeight: 600 }}>
             {options.length}{" "}
-            <span style={{ fontFamily: "var(--font-editorial)", color: "var(--primary)", fontStyle: "italic", fontWeight: 500 }}>
+            
               {pluralRu(options.length, ["сеанс", "сеанса", "сеансов"])}
-            </span>
+            
           </h3>
         </div>
       </div>
@@ -839,8 +839,8 @@ function DateSliderView({
         <SaveActivityHeader
           kicker={inPlan ? "уже в плане" : isIdea ? "уже в идеях" : "сохранить активность"}
           heading={isIdea && !inPlan
-            ? <>На когда <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>запланируем</span>?</>
-            : <>В какой{" "}<span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>день</span>{" "}напомнить.</>}
+            ? <>На когда запланируем?</>
+            : <>В какой{" "}день{" "}напомнить.</>}
           ticket={{
             ...(ticket ?? { title }),
             title: selectedSessionTitle
@@ -990,7 +990,7 @@ function CalendarView({ onSelect, allowedDateKeys, onBack }: {
         }}>‹ Назад</button>
       )}
       <h2 style={{ margin: "0 0 6px", fontFamily: "var(--font-sans)", fontSize: 34, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 600 }}>
-        Выберите <span style={{ fontStyle: "italic", color: C.accentDeep }}>дату</span>
+        Выберите дату
       </h2>
       <p style={{ marginTop: 8, marginBottom: 22, fontSize: 14, color: C.ink3, lineHeight: 1.5 }}>
         Добавим в план и {calendarReminderHint}.
@@ -1036,7 +1036,7 @@ function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onRe
 
       <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-sans)", fontSize: 30, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 600 }}>
         В вашем{" "}
-        <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "var(--primary)" }}>плане</span>.
+        плане.
       </h2>
 
       {/* Бейдж — derived от planDate */}
@@ -1175,7 +1175,7 @@ function InIdeasView({ onRemoveIdea, onSchedule, onCollections, dateOptions }: {
 
       <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-sans)", fontSize: 36, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 600 }}>
         В ваших{" "}
-        <span style={{ fontStyle: "italic", color: C.accentDeep }}>идеях</span>.
+        идеях.
       </h2>
 
       {/* Status chip */}
@@ -1304,9 +1304,9 @@ function InIdeasView({ onRemoveIdea, onSchedule, onCollections, dateOptions }: {
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".14em", color: C.accentDeep }}>● Выбор даты</span>
               <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-sans)", fontSize: 24, letterSpacing: "-.015em", fontWeight: 600 }}>
                 {dateOptions.length}{" "}
-                <span style={{ fontFamily: "var(--font-editorial)", color: "var(--primary)", fontStyle: "italic", fontWeight: 500 }}>
+                
                   {pluralRu(dateOptions.length, ["сеанс", "сеанса", "сеансов"])}
-                </span>
+                
               </h3>
             </div>
           </div>
@@ -1416,7 +1416,7 @@ function EditorialView({
 
       <h2 style={{ margin: "0 0 8px", fontFamily: "var(--font-sans)", fontSize: 38, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 600 }}>
         Куда сохранить{" "}
-        <span style={{ fontStyle: "italic", color: C.accentDeep }}>активность</span>?
+        активность?
       </h2>
       <p style={{ marginTop: 8, marginBottom: 22, fontSize: 14, color: C.ink3, lineHeight: 1.5 }}>
         Положите в план на дату — {reminderHint}.
@@ -1496,8 +1496,8 @@ function ConfirmView({ scenario, isIdea, inPlan, planDate, onCommit }: {
     <div style={{ padding: "24px 24px 20px" }}>
       <h2 style={{ margin: "0 0 20px", fontFamily: "var(--font-sans)", fontSize: 34, lineHeight: 1, letterSpacing: "-.02em", fontWeight: 600 }}>
         {scenario.kind === "timeslots"
-          ? <>Выберите <span style={{ fontStyle: "italic", color: C.accentDeep }}>время</span></>
-          : <>Добавить в <span style={{ fontStyle: "italic", color: C.accentDeep }}>план</span>?</>}
+          ? <>Выберите время</>
+          : <>Добавить в план?</>}
       </h2>
       <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderRadius: 16, padding: "14px 16px", marginBottom: 16 }}>
         <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.01em", color: C.ink }}>{scenario.title}</div>
@@ -1559,7 +1559,7 @@ function IdeaOnlyView({ title, ticket, isIdea, onIdea, onRemoveIdea, collectionL
   return (
     <div className="px-6 pb-6 pt-0 sm:pt-4">
       <SaveActivityHeader
-        heading={<>Сохранить <span style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", color: "var(--primary)" }}>в идеи</span>.</>}
+        heading={<>Сохранить в идеи.</>}
         ticket={ticket ?? { title }}
         kicker={isIdea ? "уже в идеях" : "сохранить публикацию"}
       />

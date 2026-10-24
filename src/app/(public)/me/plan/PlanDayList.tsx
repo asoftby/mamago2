@@ -82,15 +82,13 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
             className="text-[32px] leading-[1.1] tracking-[-0.025em] lg:text-[40px]"
             style={{
               margin: 0,
-              fontFamily: "var(--font-pt-serif), Georgia, serif",
+              fontFamily: "var(--font-heading)",
               fontWeight: 400,
               color: "#141210",
             }}
           >
             {weekday},{" "}
-            <span className="font-display-italic" style={{ color: "var(--primary)" }}>
-              {day} {month}
-            </span>
+            {day} {month}
           </h2>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {items.length > 0 && (

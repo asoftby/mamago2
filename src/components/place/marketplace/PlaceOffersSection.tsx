@@ -57,9 +57,9 @@ export function PlaceOffersSection({
           }}
         >
           Чему{" "}
-          <em style={{ fontFamily: "var(--font-editorial)", fontStyle: "italic", fontWeight: 400, color: "#C24E22" }}>
+          
             научим
-          </em>
+          
         </h2>
 
         {/* 4-col card grid */}

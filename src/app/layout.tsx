@@ -64,7 +64,7 @@ export default async function RootLayout({
             --color-background: ${branding.colorBackground};
             --color-surface: ${branding.colorSurface};
             --color-text: ${branding.colorText};
-            --font-heading: ${getBrandFontStack(branding.fontHeading)};
+            --font-heading: var(--font-google-sans), ui-sans-serif, system-ui, sans-serif;
             --font-body: ${getBrandFontStack(branding.fontBody)};
           }
           html[data-cc-consent-known="1"] #mamago-cookie-shell {
