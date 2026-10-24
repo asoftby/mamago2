@@ -16,7 +16,7 @@ export function IdeasHeader() {
         <div className="max-w-3xl space-y-3">
           <h1
             className="text-[38px] leading-[1.02] tracking-[-0.03em] sm:text-[58px]"
-            style={{ fontFamily: "var(--font-serif)", fontWeight: 400, color: C.ink }}
+            style={{ fontFamily: "var(--font-heading)", fontWeight: 400, color: C.ink }}
           >
             Мои идеи и коллекции
           </h1>
