@@ -13,6 +13,7 @@ import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import { getPlacePublicUrl } from "@/lib/placePublicUrl";
 import { resolveInstagramProfileHref } from "@/lib/instagram/extractUsername";
+import { resolvePendingCampContacts } from "./pendingCampContacts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -148,6 +149,7 @@ const PARENT_BOOKING_SELECT = {
       coverImage: true,
       bookingPhone: true,
       contactPhone: true,
+      contactSource: true,
       contactWebsite: true,
       contactSocialLinks: true,
       place: {
@@ -203,6 +205,7 @@ function mapRow(raw: {
         coverImage: string | null;
         bookingPhone: string | null;
         contactPhone: string | null;
+        contactSource: string | null;
         contactWebsite: string | null;
         contactSocialLinks: unknown;
         place: {
@@ -322,6 +325,10 @@ function mapRow(raw: {
   const offerInstagramUrl =
     offerSocialLinks.find((item) => item.network === "instagram")?.url?.trim() ??
     null;
+  const offerPlaceInstagramUrl = resolveInstagramProfileHref(
+    raw.offer?.place?.instagramUrl,
+    raw.offer?.place?.instagramHandle,
+  );
   const activityInstagramUrl = resolveInstagramProfileHref(
     raw.activity?.place?.instagramUrl,
     raw.activity?.place?.instagramHandle,
@@ -364,11 +371,21 @@ function mapRow(raw: {
     raw.offer?.place?.title ??
     raw.place?.title ??
     null;
-  // До подтверждения заявки на лагерь показываем только опубликованные
-  // контакты самого предложения, без запасного телефона бизнес-аккаунта.
+  // Before a camp confirmation, only published Offer contacts and an
+  // explicitly inherited Place source are available to the applicant.
   const pendingCamp = raw.campShiftId !== null && raw.status === BookingStatus.NEW;
+  const pendingCampContacts = pendingCamp ? resolvePendingCampContacts({
+    contactSource: raw.offer?.contactSource ?? null,
+    offerPhone: raw.offer?.contactPhone ?? null,
+    offerBookingPhone: raw.offer?.bookingPhone ?? null,
+    offerWebsite: raw.offer?.contactWebsite ?? null,
+    offerInstagram: offerInstagramUrl,
+    placePhone: raw.offer?.place?.phone ?? null,
+    placeWebsite: raw.offer?.place?.website ?? null,
+    placeInstagram: offerPlaceInstagramUrl ?? null,
+  }) : null;
   const organizerPhone = pendingCamp
-    ? (raw.offer?.contactPhone ?? raw.offer?.bookingPhone ?? null)
+    ? pendingCampContacts?.phone ?? null
     : raw.offer?.contactPhone ??
     raw.offer?.bookingPhone ??
     raw.activity?.bookingPhone ??
@@ -380,7 +397,7 @@ function mapRow(raw: {
     raw.business?.phone ??
     null;
   const organizerWebsite = pendingCamp
-    ? (raw.offer?.contactWebsite ?? null)
+    ? pendingCampContacts?.website ?? null
     : raw.offer?.contactWebsite ??
     raw.activity?.organizer?.website ??
     raw.place?.website ??
@@ -389,7 +406,7 @@ function mapRow(raw: {
     null;
   const organizerTelegramUrl = offerTelegramUrl;
   const organizerInstagramResolved = pendingCamp
-    ? offerInstagramUrl
+    ? pendingCampContacts?.instagram ?? null
     : offerInstagramUrl ||
     organizerInstagramUrl ||
     placeInstagramUrl ||

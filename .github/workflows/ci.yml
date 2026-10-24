@@ -74,6 +74,7 @@ jobs:
 
       - name: Classes schedule and capacity regressions
         run: |
+          pnpm exec tsx src/server/services/booking/pendingCampContacts.test.ts
           pnpm exec tsx src/lib/offers/offerClassSchedule.test.ts
           pnpm exec tsx src/server/offers/slotAvailability.test.ts
 
