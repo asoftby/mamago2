@@ -65,6 +65,10 @@ jobs:
           pnpm exec tsx src/server/birthday/partyResponseDeadline.test.ts
           pnpm exec tsx src/server/birthday/partyConfirm.contract.test.ts
           pnpm exec tsx src/server/birthday/partyConfirmChoices.contract.test.ts
+          pnpm exec tsx src/server/birthday/partyTelegramActionToken.test.ts
+          pnpm exec tsx src/server/birthday/partyTelegramConfirmAction.contract.test.ts
+          pnpm exec tsx src/server/birthday/partyTelegramButtonPolicy.test.ts
+          pnpm exec tsx src/server/birthday/partyTelegramEndToEnd.contract.test.ts
           pnpm exec tsx src/features/me/components/PartyOrderStatusScreen.contract.test.ts
           pnpm exec tsx src/server/services/booking/bookingBucket.contract.test.ts
 
