@@ -31,19 +31,19 @@ Total file categories in the 255-file compare: UI/components 82; backend service
 
 Search basis: the 56 PRs reported merged since 20 Oct 2026. This is a *recent merge cohort*, not an exhaustive enumeration of all 238 Git commits. The branch deployment status below is determined from merge commits and the pinned linear boundary.
 
-### Already present in running PROD (2)
+### Already present in running PROD (0)
 
-- [#632](https://github.com/asoftby/mamago2/pull/632) Mobile search suggestions; [#633](https://github.com/asoftby/mamago2/pull/633) horizontal My Plan transition. Their merge SHA is an ancestor of actual PROD SHA.
+- None among this 56-PR recent merge cohort. PR #632 and #633 belong in the DEV-only cohort, not PROD.
 
-### In running DEV, not in PROD (38)
+### In running DEV, not in PROD (40)
 
 | Area | Merged PRs |
 |---|---|
 | Birthday/booking/B2B | [#684](https://github.com/asoftby/mamago2/pull/684), #678, #674, #673, #672, #666, #663, #655 |
 | Classes | #671, #659 |
 | Authentication / dependency security | #681, #679, #664 |
-| My Plan / ideas / save UI | #652, #648, #642, #641, #640, #638, #637, #628, #618, #610, #650 |
-| Public place, ranking, search, relations | #646, #644, #634, #609 |
+| My Plan / ideas / save UI | #652, #648, #642, #641, #640, #638, #637, #628, #618, #610, #650, **#633** |
+| Public place, ranking, search, relations | #646, #644, #634, #609, **#632** |
 | Wizard / responsive / account | #683, #643, #630, #584, #651, #649 |
 | SEO / repository governance | #690, #686, #685, #654 |
 
