@@ -364,8 +364,12 @@ function mapRow(raw: {
     raw.offer?.place?.title ??
     raw.place?.title ??
     null;
-  const organizerPhone =
-    raw.offer?.contactPhone ??
+  // До подтверждения заявки на лагерь показываем только опубликованные
+  // контакты самого предложения, без запасного телефона бизнес-аккаунта.
+  const pendingCamp = raw.campShiftId !== null && raw.status === BookingStatus.NEW;
+  const organizerPhone = pendingCamp
+    ? (raw.offer?.contactPhone ?? raw.offer?.bookingPhone ?? null)
+    : raw.offer?.contactPhone ??
     raw.offer?.bookingPhone ??
     raw.activity?.bookingPhone ??
     raw.activity?.organizer?.phone ??
@@ -375,16 +379,18 @@ function mapRow(raw: {
     raw.activity?.place?.phone ??
     raw.business?.phone ??
     null;
-  const organizerWebsite =
-    raw.offer?.contactWebsite ??
+  const organizerWebsite = pendingCamp
+    ? (raw.offer?.contactWebsite ?? null)
+    : raw.offer?.contactWebsite ??
     raw.activity?.organizer?.website ??
     raw.place?.website ??
     raw.offer?.place?.website ??
     raw.activity?.place?.website ??
     null;
   const organizerTelegramUrl = offerTelegramUrl;
-  const organizerInstagramResolved =
-    offerInstagramUrl ||
+  const organizerInstagramResolved = pendingCamp
+    ? offerInstagramUrl
+    : offerInstagramUrl ||
     organizerInstagramUrl ||
     placeInstagramUrl ||
     activityInstagramUrl ||

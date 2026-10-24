@@ -312,7 +312,11 @@ export function getScheduleMissingFields(
   productType: string | null | undefined,
 ): string[] {
   const missing: string[] = [];
-  if (!form.bookingMethod && !form.legacyBookingMode) missing.push("Способ записи");
+  if (productType === "CAMP" && form.bookingMethod !== "REQUEST_ONLY") {
+    missing.push("Для лагеря выберите «Отправить заявку»");
+  } else if (!form.bookingMethod && !form.legacyBookingMode) {
+    missing.push("Способ записи");
+  }
   if (form.bookingMethod === "EXTERNAL" && validateExternalUrl(form.externalUrl)) {
     missing.push("Ссылка для записи");
   }

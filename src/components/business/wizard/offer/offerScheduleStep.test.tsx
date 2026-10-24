@@ -49,6 +49,11 @@ for (const text of ["Без записи", "По заявке", "Своя ссы
 }
 assert.ok(booking(form("REGULAR_ACTIVITY")).includes("3. Как к вам записываются"));
 assert.ok(booking(form("CAMP")).includes("1. Как к вам записываются"));
+const campBookingHtml = booking(form("CAMP", { bookingMethod: "EXTERNAL", externalUrl: "https://example.by" }));
+assert.ok(campBookingHtml.includes("Отправить заявку"));
+for (const forbidden of ["Без записи", "Своя ссылка", "schedule-external-url", "По заявке"]) {
+  assert.ok(!campBookingHtml.includes(forbidden), `CAMP cannot display ${forbidden}`);
+}
 assert.ok(!bookingPlace.includes("schedule-external-url"));
 
 // своя ссылка: поле и подсказка про модерацию у опубликованного оффера

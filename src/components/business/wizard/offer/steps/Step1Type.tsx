@@ -54,6 +54,10 @@ export function Step1Type({ data, onChange, isEditable, showCategories = false }
     const selection = getOfferTypeSelection(productType);
     onChange((prev) => ({
       ...selection,
+      // Лагерь всегда принимает заявку внутри mamaGo; внешние CTA не предлагаем.
+      schedule: productType === "CAMP"
+        ? { ...prev.schedule, bookingMethod: "REQUEST_ONLY", legacyBookingMode: null, externalUrl: "" }
+        : prev.schedule,
       // Категории зависят от формата: при смене формата выбор сбрасывается.
       categoryIds: [],
       serviceType: null,

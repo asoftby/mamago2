@@ -124,7 +124,7 @@ export function BookingRecordCard({ booking }: Props) {
         </div>
       ) : null}
 
-      {isConfirmed ? (
+      {(isConfirmed || (isPending && Boolean(booking.campShiftId))) ? (
         <div className={styles.recDetails}>
           <div className={styles.contactCard}>
             <p className={styles.contactLabel}>Контакты для связи</p>
@@ -139,7 +139,9 @@ export function BookingRecordCard({ booking }: Props) {
               <p className={styles.contactRow}>{booking.organizerWebsite}</p>
             ) : null}
             <p className={styles.contactHint}>
-              Визит подтверждён организатором. Если планы изменились — свяжитесь с ним заранее.
+              {isPending
+                ? "Заявка отправлена, ожидаем ответа организатора. Контакты предложения доступны для уточнения деталей; запись пока не подтверждена."
+                : "Визит подтверждён организатором. Если планы изменились — свяжитесь с ним заранее."}
             </p>
             {hasContacts ? (
               <div className={styles.contactActions}>

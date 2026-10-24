@@ -32,6 +32,7 @@ export function StepBookingMethod({ data, onChange, isEditable, externalUrlLocke
   // Место, праздник и занятия: два блока расписания перед способом записи; у лагеря — смены на своём блоке выше.
   const number = data.productType === "CAMP" ? 1 : 3;
   const urlError = schedule.bookingMethod === "EXTERNAL" ? validateExternalUrl(schedule.externalUrl) : null;
+  const isCamp = data.productType === "CAMP" || data.offerWizardType === "CAMP";
 
   const kindChips: ChipItem[] = (
     [
@@ -53,11 +54,13 @@ export function StepBookingMethod({ data, onChange, isEditable, externalUrlLocke
           {number}. Как к вам записываются
         </h3>
         <p className="text-sm text-muted-foreground">
-          Брони, заявки и закрытие отдельных часов — в Календаре кабинета.
+          {isCamp
+            ? "Для лагерей доступна только заявка через mamaGo."
+            : "Брони, заявки и закрытие отдельных часов — в Календаре кабинета."}
         </p>
       </div>
 
-      {schedule.legacyBookingMode && !schedule.bookingMethod && (
+      {!isCamp && schedule.legacyBookingMode && !schedule.bookingMethod && (
         <p className="rounded-xl border border-border/70 bg-muted/40 px-3 py-2.5 text-sm">
           Сейчас: {LEGACY_LABELS[schedule.legacyBookingMode]}. Эти настройки и слоты сохранены. Выберите способ ниже,
           только если хотите их заменить.
@@ -65,9 +68,13 @@ export function StepBookingMethod({ data, onChange, isEditable, externalUrlLocke
       )}
 
       <StableCardSelector
-        value={schedule.bookingMethod}
+        value={isCamp && schedule.bookingMethod !== "REQUEST_ONLY" ? null : schedule.bookingMethod}
         onValueChange={(bookingMethod: OfferBookingMethod) => update({ bookingMethod })}
-        options={[
+        options={isCamp ? [{
+          value: "REQUEST_ONLY" as const,
+          label: "Отправить заявку",
+          description: "Родитель отправляет заявку на смену, а вы получаете её в кабинете.",
+        }] : [
           {
             value: "NONE" as const,
             label: "Без записи",
@@ -88,7 +95,7 @@ export function StepBookingMethod({ data, onChange, isEditable, externalUrlLocke
         className="grid gap-3"
       />
 
-      {schedule.bookingMethod === "EXTERNAL" && (
+      {!isCamp && schedule.bookingMethod === "EXTERNAL" && (
         <div className="space-y-3">
           <ChipsRow items={kindChips} layout="wrap" aria-label="Тип ссылки" />
           <div className="space-y-2">

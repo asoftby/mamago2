@@ -281,6 +281,12 @@ function validateStep5(data: OfferFormData, requireLegacyAction = true): Validat
     }
   }
 
+  if (isCampOffer && requireLegacyAction && (
+    data.ctaType !== "отправить_заявку" || data.publicationAccess?.method !== "prebooking"
+  )) {
+    participationErrors.push("Для лагеря выберите «Отправить заявку»");
+  }
+
   if (!requireLegacyAction) {
     // В v2 запись валидируется отдельно на шаге «Расписание».
   } else if (data.publicationAccess) {
@@ -316,9 +322,12 @@ function validateStep5(data: OfferFormData, requireLegacyAction = true): Validat
         ((data.pricingMode === "single" && data.singlePrice.trim()) ||
          (data.pricingMode === "multiple" && data.pricingOptions.length > 0 &&
           data.pricingOptions.every(opt => opt.title.trim() && opt.price.trim()))))) &&
-    (!requireLegacyAction || (data.publicationAccess
-      ? validatePublicationAccess(data.publicationAccess).valid
-      : Boolean(data.ctaType)))
+    (!requireLegacyAction || (
+      (!isCampOffer || (
+        data.ctaType === "отправить_заявку" && data.publicationAccess?.method === "prebooking"
+      )) && (data.publicationAccess
+        ? validatePublicationAccess(data.publicationAccess).valid
+        : Boolean(data.ctaType))))
   );
 
   return {
