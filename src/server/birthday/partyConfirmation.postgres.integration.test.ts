@@ -52,11 +52,17 @@ const oneHourLater = () => new Date(Date.now() + 60 * 60_000);
 const oneDayLater = () => new Date(Date.now() + 24 * 60 * 60_000);
 
 async function fixture() {
-  const country = await db.country.create({
-    data: { name: "Belarus", slug: "belarus", isoCode: "BY", isActive: true },
+  // Fresh migrations may already seed Belarus and Minsk; reuse them in
+  // this disposable database instead of failing on unique country/city slugs.
+  const country = await db.country.upsert({
+    where: { slug: "belarus" },
+    update: { isActive: true, isoCode: "BY" },
+    create: { name: "Belarus", slug: "belarus", isoCode: "BY", isActive: true },
   });
-  const city = await db.city.create({
-    data: { name: "Минск", slug: "minsk", countryId: country.id, isActive: true },
+  const city = await db.city.upsert({
+    where: { countryId_slug: { countryId: country.id, slug: "minsk" } },
+    update: { isActive: true, isLegacyNonCity: false },
+    create: { name: "Минск", slug: "minsk", countryId: country.id, isActive: true },
   });
   const owner = await db.user.create({ data: { email: `party-owner-${suffix}@example.test` } });
   const parent = await db.user.create({ data: { email: `party-parent-${suffix}@example.test` } });
