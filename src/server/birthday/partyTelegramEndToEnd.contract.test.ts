@@ -8,6 +8,7 @@ const producer = read("src/server/birthday/partyTelegramKeyboard.service.ts");
 const delivery = read("src/server/services/notificationDelivery.service.ts");
 const webhook = read("src/app/api/business/telegram/webhook/route.ts");
 const consumer = read("src/server/birthday/partyTelegramConfirmAction.service.ts");
+const recipients = read("src/server/services/telegram/businessTelegramDelivery.service.ts");
 
 for (const fragment of [
   'eventType: "PARTY_QUOTE_ACCEPTED"', 'aggregateId: notification.entityId',
@@ -29,6 +30,8 @@ assert.match(consumer, /verifyPartyConfirmCallback/);
 assert.match(consumer, /confirmPartyRequest\(/);
 assert.match(consumer, /role: \{ in: \["OWNER", "MANAGER"\] \}/);
 assert.doesNotMatch(webhook, /getActiveTelegramConnectionForCurrentEnvironment/);
+assert.match(recipients, /business: \{ operationalStatus: "ACTIVE" \}/);
+assert.match(recipients, /role: \{ in: \["OWNER", "MANAGER"\] \}/);
 
 // Signed data is bound to recipient chat; the sender and receiver use the
 // same token contract, and a stale or forged recipient cannot use it.
