@@ -527,7 +527,7 @@ export function PlanPageClient({
             </div>
             <h1
               className="text-[38px] leading-[1.02] tracking-[-0.03em] sm:text-[58px]"
-              style={{ margin: 0, fontFamily: "var(--font-serif)", fontWeight: 400, color: "#141210" }}
+              style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 400, color: "#141210" }}
             >
               Мой план
             </h1>
