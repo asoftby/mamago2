@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { BusinessOnboardingSnapshot } from "@/lib/business/onboardingProgress";
 import Link from "next/link";
+import { ChevronRight, CirclePlay } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -456,7 +457,10 @@ interface DashboardClientProps {
 
 export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClientProps) {
   const [period, setPeriod] = useState<DashboardPeriod>(defaultPeriod);
-  const [tourOpen, setTourOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(() =>
+    data.onboarding.showLaunchpad && !data.onboarding.tourCompleted &&
+    !data.onboarding.tourSkipped && !data.onboarding.hasAny,
+  );
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -493,13 +497,33 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
           settingsHref={data.hrefs.settings}
         />
       </div>
-      {/* Business Bot connection is always visible, including the onboarding dashboard. */}
-      <BusinessTelegramStatusRow />
+      {/* One permanent way to restart the contextual tour, including during onboarding. */}
+      <button
+        type="button"
+        onClick={() => setTourOpen(true)}
+        aria-label="Возможности кабинета — короткий обзор основных функций"
+        className="group flex w-full items-center gap-3 rounded-2xl border border-stone-200/80 bg-white px-4 py-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-stone-50 text-stone-700">
+          <CirclePlay className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-stone-950">Возможности кабинета</span>
+          <span className="mt-0.5 block text-xs text-stone-500">Короткий обзор основных функций</span>
+        </span>
+        <ChevronRight className="h-5 w-5 shrink-0 text-stone-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+      </button>
+
+      {/* Business Bot connection stays visible in either dashboard state. */}
+      <BusinessTelegramStatusRow location="dashboard" />
+
+      {/* Primary action directly below the connection card for established businesses. */}
       {!isOnboarding && (
-        <div className="flex justify-end">
-          <button type="button" onClick={() => setTourOpen(true)} className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">
-            Возможности mamaGo
-          </button>
+        <div data-business-tour="create" className="w-full sm:max-w-md">
+          <DashboardActionStack
+            promotionHref={data.hrefs.promotion}
+            hasPublications={data.totalPublications > 0}
+          />
         </div>
       )}
 
@@ -520,12 +544,6 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
               depositHref={data.hrefs.deposit}
               promotionHref={data.hrefs.promotion}
             />}
-            <div data-business-tour="create">
-              <DashboardActionStack
-                promotionHref={data.hrefs.promotion}
-                hasPublications={data.totalPublications > 0}
-              />
-            </div>
             {BUSINESS_DASHBOARD_MVP.businessDailyFreeBoostUiEnabled && (
               <DailyFreeBoostCard data={data.dailyFreeBoost} />
             )}
@@ -578,12 +596,6 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
               depositHref={data.hrefs.deposit}
               promotionHref={data.hrefs.promotion}
             />}
-            <div data-business-tour="create">
-              <DashboardActionStack
-                promotionHref={data.hrefs.promotion}
-                hasPublications={data.totalPublications > 0}
-              />
-            </div>
             {BUSINESS_DASHBOARD_MVP.businessDailyFreeBoostUiEnabled && (
               <DailyFreeBoostCard data={data.dailyFreeBoost} />
             )}
@@ -593,7 +605,7 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
 
       </div>
       )}
-      {!isOnboarding && <BusinessOnboardingTour open={tourOpen} onClose={() => setTourOpen(false)} />}
+      <BusinessOnboardingTour open={tourOpen} onClose={() => setTourOpen(false)} />
     </div>
   );
 }
