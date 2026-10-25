@@ -8,7 +8,6 @@ import {
 } from "@/lib/business/onboardingProgress";
 import { redirect } from "next/navigation";
 import { getMyBusiness } from "@/server/business/getMyBusiness";
-import { VerificationBanner } from "@/components/business/VerificationBanner";
 import { buildSurfaceRedirectDestination } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import {
@@ -174,6 +173,8 @@ export default async function BusinessDashboardPage({
   // ── Dashboard data ─────────────────────────────────────────────────────────
   const dashboardData: DashboardData = {
     onboarding,
+    verificationStatus,
+    verificationReviewNote: business.reviewNote,
     onboardingPublicHref,
     businessName: business.name,
     legalName: business.legalName ?? null,
@@ -218,11 +219,6 @@ export default async function BusinessDashboardPage({
 
   return (
     <div className="space-y-6">
-      <VerificationBanner
-        status={verificationStatus}
-        reviewNote={business.reviewNote}
-        compact
-      />
       <DashboardClient data={dashboardData} defaultPeriod={selectedPeriod} />
     </div>
   );
