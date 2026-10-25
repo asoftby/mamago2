@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, BookOpen, CalendarDays, CheckCircle2, Circle, Eye, MapPin, MessageCircle, PlayCircle, Tag, BarChart3 } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarDays, CheckCircle2, Circle, Eye, MapPin, MessageCircle, Tag, BarChart3 } from "lucide-react";
 import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
 import { CreatePublicationQuickMenu } from "@/components/shared/CreatePublicationQuickMenu";
 import { BusinessInboxPreview } from "./BusinessInboxPreview";
-import { BusinessOnboardingTour, sendBusinessOnboardingAction } from "./BusinessOnboardingTour";
+import { sendBusinessOnboardingAction } from "./BusinessOnboardingTour";
 import type { DashboardData } from "./DashboardClient";
 
 const TYPES = [
@@ -21,7 +21,6 @@ type Props = {
 
 export function NewBusinessDashboard({ data }: Props) {
   const { onboarding } = data;
-  const [tourOpen, setTourOpen] = useState(() => !data.onboarding.tourCompleted && !data.onboarding.tourSkipped && !data.onboarding.hasAny);
   const [selected, setSelected] = useState<(typeof TYPES)[number]["id"]>("place");
   const [viewed, setViewed] = useState(false);
   const chosen = TYPES.find((type) => type.id === selected) ?? TYPES[2];
@@ -81,9 +80,6 @@ export function NewBusinessDashboard({ data }: Props) {
             <p className="mt-3 text-sm leading-relaxed text-stone-600">{subtitle}</p>
             {!hasLive && <p className="mt-2 text-xs text-stone-500">Перед появлением на сайте публикация проходит модерацию. Её статус можно посмотреть в разделе «Публикации».</p>}
           </div>
-          <button type="button" onClick={() => setTourOpen(true)} className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-stone-200 px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">
-            <PlayCircle className="h-4 w-4" /> Обзор кабинета
-          </button>
         </div>
 
         <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -193,9 +189,6 @@ export function NewBusinessDashboard({ data }: Props) {
             <h3 className="text-lg font-semibold text-stone-950">Что умеет mamaGo для бизнеса</h3>
             <p className="mt-1 text-sm text-stone-600">Основные возможности кабинета — без обязательного пополнения баланса.</p>
           </div>
-          <button type="button" onClick={() => setTourOpen(true)} className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">
-            Пройти обзор
-          </button>
         </div>
         <div className="mt-5 grid gap-4 sm:grid-cols-3">
           <div className="space-y-2">
@@ -216,7 +209,6 @@ export function NewBusinessDashboard({ data }: Props) {
         </div>
       </BusinessSurfaceCard>
       <BusinessInboxPreview items={data.inboxPreview} notificationsHref={data.hrefs.bookings} />
-      <BusinessOnboardingTour open={tourOpen} onClose={() => setTourOpen(false)} />
     </div>
   );
 }

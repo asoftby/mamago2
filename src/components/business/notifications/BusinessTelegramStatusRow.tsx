@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CheckCircle2, Send } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, Info, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
 
@@ -12,11 +13,15 @@ type Status = {
   username?: string;
 };
 
-export function BusinessTelegramStatusRow({
-  onStatusChange,
-}: {
+type Props = {
+  location?: "dashboard" | "settings";
   onStatusChange?: (status: Status) => void;
-}) {
+};
+
+export function BusinessTelegramStatusRow({
+  location = "settings",
+  onStatusChange,
+}: Props) {
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -44,7 +49,7 @@ export function BusinessTelegramStatusRow({
 
   useEffect(() => {
     void refresh();
-    // Linking takes place in Telegram. Refresh when the user returns to mamaGo.
+    // Refresh automatically after the user completes the Telegram /start flow.
     const onFocus = () => { void refresh(); };
     const onVisibility = () => {
       if (document.visibilityState === "visible") void refresh();
@@ -66,11 +71,11 @@ export function BusinessTelegramStatusRow({
       });
       const body = await response.json() as { url?: string };
       if (!response.ok || !body.url) throw new Error("Business Bot unavailable");
-      // Navigate directly: opening a new window after awaiting fetch can be
-      // blocked on mobile Safari, preventing the Telegram link from opening.
+      // Async window.open is blocked by some mobile browsers. Same-tab navigation
+      // opens the deep link reliably; browser Back returns to the dashboard.
       window.location.assign(body.url);
     } catch {
-      toast.error("Не удалось создать ссылку подключения Business Bot");
+      toast.error("Не удалось создать ссылку подключения Telegram");
     } finally {
       setBusy(false);
     }
@@ -85,49 +90,81 @@ export function BusinessTelegramStatusRow({
       });
       if (!response.ok) throw new Error("Cannot disconnect");
       await refresh();
-      toast.success("Business Bot отключён");
+      toast.success("Telegram для бизнеса отключён");
     } catch {
-      toast.error("Не удалось отключить Business Bot");
+      toast.error("Не удалось отключить Telegram для бизнеса");
     } finally {
       setBusy(false);
     }
   };
 
   const description = error
-    ? "Не удалось проверить подключение. Попробуйте ещё раз."
+    ? "Не удалось загрузить статус подключения. Обновите страницу."
     : loading
-      ? "Проверяем подключение…"
+      ? "Загружаем подключение…"
       : status?.linked
-        ? "Подключён. Доставка заявок включается отдельно после проверки."
+        ? "Telegram подключён. Управляйте уведомлениями в настройках бизнеса."
         : status?.configured
           ? "Подключите отдельного бота для заявок и уведомлений бизнеса."
-          : "Business Bot ещё не настроен на сервере.";
+          : "Подключение временно недоступно.";
 
   return (
-    <section aria-label="Telegram для бизнеса" className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-background p-4">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted" aria-hidden="true">
-        {status?.linked ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Send className="h-5 w-5 text-foreground" />}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-foreground">Telegram для бизнеса</p>
-        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{description}</p>
-        {status?.linked && status.username ? <p className="text-xs text-muted-foreground">Аккаунт: @{status.username}</p> : null}
+    <section
+      aria-label="Telegram для бизнеса"
+      className="rounded-[28px] border border-stone-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_14px_36px_rgba(15,23,42,0.04)] sm:p-6"
+    >
+      <div className="flex items-start gap-3 sm:gap-4">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sky-50 text-stone-900" aria-hidden="true">
+          <Send className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold text-stone-950">Telegram для бизнеса</h2>
+            {status?.linked && !error && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                Подключён
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-sm leading-6 text-stone-600" aria-live="polite">{description}</p>
+          {status?.linked && status.username && !error && (
+            <p className="mt-1 text-xs text-stone-500">Аккаунт: @{status.username}</p>
+          )}
+        </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {status?.linked ? (
-          <Button type="button" variant="outline" size="sm" onClick={() => void disconnect()} disabled={busy}>
-            Отключить
-          </Button>
-        ) : (
-          <Button type="button" variant="secondary" size="sm" onClick={() => void connect()}
-            disabled={busy || loading || error || !status?.configured}>
-            Подключить Telegram
-          </Button>
-        )}
-        <Button type="button" variant="outline" size="sm" onClick={() => void refresh()} disabled={busy || loading}>
-          Проверить статус
-        </Button>
-      </div>
+
+      {!error && (
+        <div className="mt-4">
+          {status?.linked ? (
+            location === "dashboard" ? (
+              <Button asChild className="w-full rounded-xl bg-stone-900 text-white hover:bg-stone-800 sm:w-auto">
+                <Link href="/business/settings/notifications">Настроить уведомления</Link>
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" className="w-full rounded-xl sm:w-auto" onClick={() => void disconnect()} disabled={busy}>
+                Отключить Telegram
+              </Button>
+            )
+          ) : (
+            <Button
+              type="button"
+              className="w-full rounded-xl bg-stone-900 text-white hover:bg-stone-800 sm:w-auto"
+              onClick={() => void connect()}
+              disabled={busy || loading || !status?.configured}
+            >
+              {busy ? "Открываем Telegram…" : "Подключить Telegram"}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {!status?.linked && !loading && !error && status?.configured && (
+        <div className="mt-4 flex items-start gap-2 border-t border-stone-100 pt-3 text-xs leading-5 text-stone-500">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>После подключения уведомления можно настроить в разделе «Настройки → Уведомления».</span>
+        </div>
+      )}
     </section>
   );
 }
