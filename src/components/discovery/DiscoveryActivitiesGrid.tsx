@@ -41,6 +41,7 @@ function filtersSignature(f: DiscoveryFilters): string {
     age: f.age,
     categories: f.categories,
     genres: f.genres,
+    occasion: f.occasionSlug ?? null,
     format: f.format,
     metro: f.metro,
     district: f.district,
