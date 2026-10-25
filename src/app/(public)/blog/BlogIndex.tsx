@@ -100,8 +100,7 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
               className="font-heading m-0 leading-[.94] tracking-[-0.03em]"
               style={{ fontSize: "clamp(28px, 4.5vw, 62px)" }}
             >
-              Обзоры{" "}
-              и статьи
+              Журнал
             </h1>
 
             <p className="mt-5 text-[17px] leading-relaxed text-muted-foreground w-full">
