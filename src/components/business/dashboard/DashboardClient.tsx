@@ -17,6 +17,7 @@ import { DashboardPeriodSwitcher } from "@/components/business/dashboard/Dashboa
 import { NewBusinessDashboard } from "@/components/business/dashboard/NewBusinessDashboard";
 import { BusinessOnboardingTour } from "@/components/business/dashboard/BusinessOnboardingTour";
 import { BusinessReputationBlock } from "@/components/business/dashboard/BusinessReputationBlock";
+import { BusinessTelegramStatusRow } from "@/components/business/notifications/BusinessTelegramStatusRow";
 import { DailyFreeBoostCard } from "@/components/business/dashboard/DailyFreeBoostCard";
 import { TableContainer } from "@/components/ui/table";
 import type { DashboardPeriod } from "@/server/services/business/businessWorkspace.service";
@@ -492,6 +493,8 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
           settingsHref={data.hrefs.settings}
         />
       </div>
+      {/* Business Bot connection is always visible, including the onboarding dashboard. */}
+      <BusinessTelegramStatusRow />
       {!isOnboarding && (
         <div className="flex justify-end">
           <button type="button" onClick={() => setTourOpen(true)} className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50">
