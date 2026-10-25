@@ -127,19 +127,14 @@ export function BusinessTelegramStatusRow({
               </span>
             )}
           </div>
-          {location === "dashboard" && status?.linked && !error && (
-            <Button asChild variant="outline" size="sm" className="mt-3 w-full gap-2 rounded-xl bg-stone-50 text-stone-800 hover:bg-stone-100 sm:hidden">
-              <Link href="/business/settings/notifications"><Settings className="h-4 w-4" aria-hidden="true" />Настроить уведомления</Link>
-            </Button>
-          )}
           <p className="mt-1 text-sm leading-6 text-stone-600" aria-live="polite">{description}</p>
           {status?.linked && status.username && !error && (
             <p className="mt-1 text-xs text-stone-500">Аккаунт: @{status.username}</p>
           )}
         </div>
         {location === "dashboard" && status?.linked && !error && (
-          <Button asChild variant="outline" size="sm" className="hidden shrink-0 gap-2 rounded-xl bg-stone-50 text-stone-800 hover:bg-stone-100 sm:inline-flex">
-            <Link href="/business/settings/notifications"><Settings className="h-4 w-4" aria-hidden="true" />Настроить уведомления</Link>
+          <Button asChild variant="outline" size="sm" className="shrink-0 gap-2 rounded-xl bg-stone-50 px-2 text-stone-800 hover:bg-stone-100 sm:px-3">
+            <Link href="/business/settings/notifications" aria-label="Настроить уведомления"><Settings className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Настроить уведомления</span></Link>
           </Button>
         )}
       </div>
