@@ -23,6 +23,7 @@ import {
   type NotificationSettingsSurfaceData,
 } from "@/lib/notifications/settingsDomain";
 import { useTelegramConnectionStatus } from "@/hooks/useTelegramConnectionStatus";
+import { BusinessTelegramStatusRow } from "./BusinessTelegramStatusRow";
 
 type Props = {
   surface?: NotificationSettingsSurface;
@@ -95,8 +96,8 @@ export function NotificationSettingsTable({
   // Use unified Telegram status hook with controlled polling
   const [isPolling, setIsPolling] = useState(false);
   const { status: telegramStatus, timedOut: pollingTimedOut, resetTimeout: resetPollingTimeout } = useTelegramConnectionStatus({
-    enabled: true,
-    polling: isPolling,
+    enabled: surface !== "BUSINESS",
+    polling: surface !== "BUSINESS" && isPolling,
     onConnected: (status) => {
       setIsPolling(false);
       setLinkCommand(null);
@@ -122,7 +123,7 @@ export function NotificationSettingsTable({
 
   // Sync telegram status from hook to data state
   useEffect(() => {
-    if (telegramStatus && data) {
+    if (surface !== "BUSINESS" && telegramStatus) {
       setData((prev) =>
         prev
           ? {
@@ -135,7 +136,7 @@ export function NotificationSettingsTable({
           : prev,
       );
     }
-  }, [telegramStatus, data]);
+  }, [telegramStatus, surface]);
 
   useEffect(() => {
     if (initialData) return;
@@ -473,7 +474,19 @@ export function NotificationSettingsTable({
         </Button>
       </div>
 
-      {data.telegramConnected ? (
+      {surface === "BUSINESS" ? (
+        <BusinessTelegramStatusRow
+          onStatusChange={(status) => {
+            setData((previous) => previous ? {
+              ...previous,
+              telegramConnected: status.linked,
+              telegramConfigured: status.configured,
+              telegramUsername: status.username,
+              telegramBotUsername: status.botUsername,
+            } : previous);
+          }}
+        />
+      ) : data.telegramConnected ? (
         <div className="flex items-center gap-3 rounded-[22px] border border-emerald-200/80 bg-emerald-50/80 px-4 py-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
             <Send className="h-4 w-4 text-emerald-600" />
