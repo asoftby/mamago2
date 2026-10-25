@@ -156,6 +156,7 @@ export function ArticleEditorClient({
   const [pinnedSlug, setPinnedSlug] = useState<string | null>(initial.slug?.trim() || null);
   const [coverImageId, setCoverImageId] = useState(initialArticleMedia.coverImageId ?? "");
   const [coverImagePreviewUrl, setCoverImagePreviewUrl] = useState(initial.coverImageUrl ?? "");
+  const [coverCaption, setCoverCaption] = useState(initial.content.coverCaption ?? "");
   const [authorUserId, setAuthorUserId] = useState<string | null>(initial.authorUserId ?? null);
   const [authorLabel, setAuthorLabel] = useState(initial.authorLabel ?? "");
   const [cityContext, setCityContext] = useState(initial.cityContext ?? "");
@@ -436,7 +437,7 @@ export function ArticleEditorClient({
       slug: slug.trim() || null,
       subtitle: null as string | null,
       excerpt: deriveArticleExcerptFromContent(content),
-      content: prepareArticleContentForSave(content),
+      content: { ...prepareArticleContentForSave(content), coverCaption: coverCaption.trim() || undefined },
       coverImageId: coverImageId.trim() || null,
       authorLabel: authorLabel.trim() || null,
       authorUserId: authorUserId || null,
@@ -464,6 +465,7 @@ export function ArticleEditorClient({
       slug,
       content,
       coverImageId,
+      coverCaption,
       authorLabel,
       authorUserId,
       cityContext,
@@ -981,7 +983,7 @@ export function ArticleEditorClient({
             value={coverImageId}
             initialPreviewUrl={initial.coverImageUrl}
             label="Обложка статьи"
-            description="Используется только как обложка статьи и не выводится в тексте."
+            description="Показывается в карточках журнала и после заголовка статьи."
             authorUserId={authorUserId}
             articleId={hasPersistedId ? initial.id : null}
             onChange={(id, previewUrl) => {
@@ -990,6 +992,12 @@ export function ArticleEditorClient({
             }}
             articleMediaSource={articleMediaSource}
           />
+
+          <div className="space-y-2">
+            <Label htmlFor="article-cover-caption">Подпись к обложке</Label>
+            <Input id="article-cover-caption" value={coverCaption} maxLength={500} onChange={(event) => setCoverCaption(event.target.value)} placeholder="Например: Фото: автор, источник" />
+            <p className="text-xs text-muted-foreground">Необязательно. Отображается под обложкой на странице статьи.</p>
+          </div>
 
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">

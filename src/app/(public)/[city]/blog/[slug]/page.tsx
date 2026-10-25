@@ -254,6 +254,7 @@ export default async function CityArticlePage({ params }: PageProps) {
       articleId={mvp.id}
       articleHref={canonicalPath}
       coverImageUrl={mvp.heroUrl}
+        coverCaption={mvp.coverCaption}
       author={mvp.author}
     />
   );

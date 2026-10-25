@@ -535,6 +535,7 @@ export async function loadArticleMvpBySlugPublic(
     publishedAt: article.publishedAt,
     heroUrl,
     heroAlt: cover?.alt ?? article.title,
+    coverCaption: content.coverCaption ?? null,
     blocks,
     author: article.authorUser
       ? { displayName: article.authorUser.displayName, avatarUrl: article.authorUser.avatarUrl }

@@ -233,6 +233,7 @@ export type ArticleBlockMvp = z.infer<typeof ArticleBlockMvpSchema>;
 
 export const ArticleContentPayloadSchema = z.object({
   version: z.literal(ARTICLE_CONTENT_VERSION),
+  coverCaption: z.string().trim().max(500).optional(),
   blocks: z.array(ArticleBlockMvpSchema),
 });
 
