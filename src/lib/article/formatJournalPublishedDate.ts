@@ -9,5 +9,5 @@ export function formatJournalPublishedDate(value: Date | string, now: Date = new
   }).format(date);
   const publishedYear = Number(new Intl.DateTimeFormat("en-US", { year: "numeric", timeZone: "Europe/Minsk" }).format(date));
   const currentYear = Number(new Intl.DateTimeFormat("en-US", { year: "numeric", timeZone: "Europe/Minsk" }).format(now));
-  return publishedYear < currentYear ? `${parts} ’${String(publishedYear).slice(-2)}` : parts;
+  return publishedYear < currentYear ? `${parts} ${publishedYear}` : parts;
 }
