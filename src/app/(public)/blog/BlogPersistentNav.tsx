@@ -43,6 +43,7 @@ export function BlogPersistentNav({ citySlug, categories }: {
     }
   }, [activeSlug]);
 
+  const collageCovers = categories.map((category) => category.thumbnailUrl).filter((url): url is string => Boolean(url)).slice(0, 4);
   const pills = [
     { id: "all", slug: null, name: "Все", thumbnailUrl: null, hasNewArticle: false },
     ...categories.map((category) => ({ id: category.id, slug: category.slug, name: category.name, thumbnailUrl: category.thumbnailUrl, hasNewArticle: category.hasNewArticle })),
@@ -60,20 +61,26 @@ export function BlogPersistentNav({ citySlug, categories }: {
               href={pill.slug ? buildPublicPath(`${base}/category/${pill.slug}`) : base}
               prefetch
               aria-current={active ? "page" : undefined}
-              className={`inline-flex shrink-0 items-center gap-2.5 rounded-full border py-1.5 pl-1.5 pr-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary ${active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-foreground hover:border-primary/50"}`}
+              className={`inline-flex h-14 shrink-0 items-center gap-3 rounded-full border pl-1.5 pr-5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary ${active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-foreground hover:border-primary/50"}`}
             >
-              {pill.slug && (
-                <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground" aria-hidden="true">
+              <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground" aria-hidden="true">
                   <span className="h-full w-full overflow-hidden rounded-full">
-                    {pill.thumbnailUrl ? (
+                    {!pill.slug && collageCovers.length > 0 ? (
+                      <span className="grid h-full w-full grid-cols-2 grid-rows-2 gap-px bg-background">
+                        {Array.from({ length: 4 }, (_, i) => (
+                          <span key={i} className="min-h-0 min-w-0 overflow-hidden">
+                            <img src={collageCovers[i % collageCovers.length]} alt="" className="h-full w-full object-cover" />
+                          </span>
+                        ))}
+                      </span>
+                    ) : pill.thumbnailUrl ? (
                       <img src={pill.thumbnailUrl} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <span className="flex h-full w-full items-center justify-center text-base">{pill.name.slice(0, 1)}</span>
+                      <span className="flex h-full w-full items-center justify-center text-base">{pill.slug ? pill.name.slice(0, 1) : "Все".slice(0, 1)}</span>
                     )}
                   </span>
-                  {pill.hasNewArticle && <span className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-primary" />}
+                  {pill.slug && pill.hasNewArticle && <span className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-primary" />}
                 </span>
-              )}
               {pill.name}
             </Link>
           );
