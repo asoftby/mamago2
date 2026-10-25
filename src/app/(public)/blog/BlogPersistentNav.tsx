@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { buildPublicPath } from "@/lib/routing/surface";
 import { buildCityPublicPath } from "@/lib/routing/cityPaths";
@@ -13,11 +13,24 @@ export function BlogPersistentNav({ citySlug, categories }: {
   categories: CityBlogCategory[];
 }) {
   const pathname = usePathname();
+  const [articleSection, setArticleSection] = useState<string | null>(null);
   const activeRef = useRef<HTMLAnchorElement>(null);
   const base = buildPublicPath(buildCityPublicPath({ citySlug, type: "journal" }));
-  const activeSlug = pathname.startsWith(`${base}/category/`)
-    ? pathname.slice(`${base}/category/`.length).split("/")[0]
-    : null;
+  const sectionPrefix = `${base}/category/`;
+  const articlePrefix = `${base}/`;
+  const isArticle = pathname.startsWith(articlePrefix) && !pathname.startsWith(sectionPrefix) && pathname !== base;
+  const activeSlug = pathname.startsWith(sectionPrefix)
+    ? pathname.slice(sectionPrefix.length).split("/")[0]
+    : isArticle ? articleSection : null;
+
+  useLayoutEffect(() => {
+    const onArticleSection = (event: Event) => {
+      const detail = (event as CustomEvent<{ slug: string | null }>).detail;
+      setArticleSection(detail?.slug ?? null);
+    };
+    window.addEventListener("mamago:journal-article-section", onArticleSection);
+    return () => window.removeEventListener("mamago:journal-article-section", onArticleSection);
+  }, []);
 
   useLayoutEffect(() => {
     const active = activeRef.current;
