@@ -86,19 +86,13 @@ export async function listPopulatedCityBlogCategories(city: CityRef): Promise<Ci
 }
 
 export async function resolveCityBlogCategory(city: CityRef, slug: string) {
-  const articleWhere = indexableArticleWhere(city);
+  void city;
   return prisma.eventCategory.findFirst({
     where: {
       slug,
       publicationType: EventCategoryPublicationType.ARTICLE,
       isActive: true,
       archivedAt: null,
-      OR: [
-        { articles: { some: articleWhere } },
-        { articleAdditionalLinks: { some: { article: articleWhere } } },
-        // Корневая категория без собственных материалов, но с материалами в подкатегориях.
-        { children: { some: { articles: { some: articleWhere } } } },
-      ],
     },
     select: {
       id: true,
