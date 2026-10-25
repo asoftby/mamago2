@@ -108,6 +108,7 @@ export function ArticleMvpView({
   articleId,
   articleHref,
   coverImageUrl,
+  coverCaption,
   author,
 }: {
   title: string;
@@ -128,6 +129,7 @@ export function ArticleMvpView({
   articleId?: string;
   articleHref?: string;
   coverImageUrl?: string | null;
+  coverCaption?: string | null;
   author?: ArticleAuthor;
 }) {
   const isBreakingNews = subtitle === BREAKING_NEWS_SUBTITLE;
@@ -180,6 +182,15 @@ export function ArticleMvpView({
           publishedAt={publishedAt ?? undefined}
           editHref={editHref}
         />
+
+        {coverImageUrl && (
+          <figure className="mb-6 md:mb-8">
+            <img src={coverImageUrl} alt={title} className="aspect-[4/3] w-full rounded-2xl object-cover sm:aspect-[16/10]" />
+            {coverCaption?.trim() && (
+              <figcaption className="mt-2 text-sm text-muted-foreground">{coverCaption.trim()}</figcaption>
+            )}
+          </figure>
+        )}
 
         <ArticleAuthorActionsBar
           author={author ?? null}
