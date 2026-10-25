@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { MapPin, Building2 } from "lucide-react";
 import { BYN_SYMBOL } from "@/lib/formatters/format-price";
 import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
 
@@ -145,13 +146,15 @@ export function ActivityTicketCard({ source, plain = false }: { source: Activity
           {ticket.title}
         </h3>
         {ticket.venue ? (
-          <p className="mt-1.5 truncate text-[11px] font-medium leading-[1.2] text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,.35)] sm:text-[12px]">
-            {ticket.venue}
+          <p className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium leading-[1.2] text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,.35)] sm:text-[12px]">
+            <Building2 size={13} className="shrink-0" aria-hidden="true" />
+            <span className="truncate">{ticket.venue}</span>
           </p>
         ) : null}
         {ticket.address ? (
-          <p className="mt-1 min-w-0 text-[10px] leading-[1.2] text-white/75 drop-shadow-[0_1px_2px_rgba(0,0,0,.4)] sm:text-[11px]">
-            <span className="block truncate">{ticket.address}</span>
+          <p className="mt-1 flex min-w-0 items-center gap-1.5 text-[10px] leading-[1.2] text-white/75 drop-shadow-[0_1px_2px_rgba(0,0,0,.4)] sm:text-[11px]">
+            <MapPin size={13} className="shrink-0" aria-hidden="true" />
+            <span className="truncate">{ticket.address}</span>
           </p>
         ) : null}
       </div>
