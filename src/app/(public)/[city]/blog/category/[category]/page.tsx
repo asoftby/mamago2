@@ -106,7 +106,7 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
 
       <header className="mb-8 border-b border-border pb-8">
         <p className="mb-3 text-[11px] font-mono uppercase tracking-[.14em] text-primary">Раздел журнала</p>
-        <h1 className="font-heading text-[40px] leading-tight tracking-[-.025em]">{category.nameRu}</h1>
+        <h1 className="font-heading text-[32px] leading-tight tracking-[-.025em]">{category.nameRu}</h1>
         <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground">
           {category.journalIntro?.trim() || `Статьи, обзоры и полезные материалы для семей с детьми в ${cityName}. Узнайте о новых идеях и событиях для всей семьи.`}
         </p>
