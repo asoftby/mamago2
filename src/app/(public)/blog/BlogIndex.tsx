@@ -231,11 +231,11 @@ function FeaturedArticle({
     <div className="relative">
     <Link
       href={article.href}
-      className="group grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-12 py-12 border-b border-border"
+      className="group grid grid-cols-1 gap-4 border-b border-border py-7 sm:grid-cols-2 sm:gap-12 sm:py-12"
     >
       {/* Image */}
       <div
-        className={`relative overflow-hidden rounded-[18px] bg-gradient-to-br ${TONES[0]} aspect-[5/4]`}
+        className={`relative overflow-hidden rounded-[18px] bg-gradient-to-br ${TONES[0]} aspect-[4/3] sm:aspect-[5/4]`}
       >
         {article.coverImageUrl ? (
           <img
@@ -254,7 +254,7 @@ function FeaturedArticle({
       </div>
 
       {/* Text */}
-      <div className="flex flex-col gap-4 justify-center">
+      <div className="flex flex-col gap-3 justify-center sm:gap-4">
         <div className="flex items-center gap-3 flex-wrap">
           {article.isBreakingNews ? (
             <BreakingPill />
@@ -274,8 +274,7 @@ function FeaturedArticle({
         </div>
 
         <h2
-          className="font-heading m-0 leading-[1] tracking-[-0.025em] group-hover:text-primary transition-colors"
-          style={{ fontSize: "36px" }}
+          className="font-heading m-0 line-clamp-2 text-[26px] leading-[1.1] tracking-[-0.025em] transition-colors group-hover:text-primary sm:line-clamp-none sm:text-[36px]"
         >
           {article.title}
           {article.subtitle && (
@@ -286,7 +285,7 @@ function FeaturedArticle({
           )}
         </h2>
 
-        <div className="mt-2">
+        <div className="mt-2 hidden sm:block">
           <span className="inline-flex items-center gap-2 h-12 px-5 rounded-full bg-foreground text-background text-sm font-semibold">
             Читать →
           </span>
@@ -297,7 +296,7 @@ function FeaturedArticle({
     {/* Heart overlay — mirrors the Link's own grid so it lands on the image corner without nesting inside <a> */}
     <div
       aria-hidden={false}
-      className="pointer-events-none absolute inset-0 grid grid-cols-1 py-12 sm:grid-cols-2 sm:gap-12"
+      className="pointer-events-none absolute inset-0 grid grid-cols-1 gap-4 py-7 sm:grid-cols-2 sm:gap-12 sm:py-12"
     >
       <div className="relative">
         <div className="pointer-events-auto absolute right-3 top-3 z-10">
@@ -332,10 +331,10 @@ function ArticleRow({
     <div className="relative">
     <Link
       href={article.href}
-      className="group grid grid-cols-[minmax(0,1fr)_104px] sm:grid-cols-[200px_1fr_180px] gap-4 sm:gap-9 py-8 border-t border-border last:border-b items-start sm:items-center transition-[padding] duration-200 hover:sm:pl-2"
+      className="group grid grid-cols-1 gap-3 border-t border-border py-7 last:border-b sm:grid-cols-[200px_1fr_180px] sm:items-center sm:gap-9 sm:py-8 sm:transition-[padding] sm:duration-200 hover:sm:pl-2"
     >
       {/* Meta */}
-      <div className="col-start-1 row-start-1 flex flex-wrap sm:flex-col gap-x-3 gap-y-1 sm:gap-2">
+      <div className="order-2 flex flex-wrap items-center gap-x-3 gap-y-1 sm:order-none sm:col-start-1 sm:row-start-1 sm:flex-col sm:items-start sm:gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           {article.isBreakingNews && <BreakingPill />}
           <span className="text-[11px] font-mono uppercase tracking-[.12em] text-primary">
@@ -353,10 +352,9 @@ function ArticleRow({
       </div>
 
       {/* Body */}
-      <div className="col-start-1 row-start-2 sm:col-auto sm:row-auto flex min-w-0 flex-col gap-3">
+      <div className="order-3 flex min-w-0 flex-col gap-3 sm:order-none sm:col-auto sm:row-auto">
         <h3
-          className="font-heading m-0 leading-[1.02] tracking-[-0.02em] text-foreground group-hover:text-primary transition-colors"
-          style={{ fontSize: "clamp(18px, 4.8vw, 32px)" }}
+          className="font-heading m-0 line-clamp-2 text-[24px] leading-[1.08] tracking-[-0.02em] text-foreground transition-colors group-hover:text-primary sm:line-clamp-none sm:text-[32px]"
         >
           {article.title}
           {article.subtitle && (
@@ -367,7 +365,7 @@ function ArticleRow({
 
       {/* Image */}
       <div
-        className={`col-start-2 row-span-2 row-start-1 relative overflow-hidden rounded-2xl bg-gradient-to-br ${tone} aspect-[4/3] sm:col-auto sm:row-auto`}
+        className={`order-1 relative aspect-[4/3] overflow-hidden rounded-2xl bg-gradient-to-br ${tone} sm:order-none sm:col-auto sm:row-auto`}
       >
         {article.coverImageUrl && (
           <img
