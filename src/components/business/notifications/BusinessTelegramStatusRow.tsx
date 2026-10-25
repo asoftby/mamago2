@@ -66,12 +66,9 @@ export function BusinessTelegramStatusRow({
       });
       const body = await response.json() as { url?: string };
       if (!response.ok || !body.url) throw new Error("Business Bot unavailable");
-      const opened = window.open(body.url, "_blank", "noopener,noreferrer");
-      if (!opened) {
-        // Browser may block an async pop-up; a same-tab navigation still works.
-        window.location.assign(body.url);
-      }
-      toast.success("Откройте Business Bot и нажмите Start");
+      // Navigate directly: opening a new window after awaiting fetch can be
+      // blocked on mobile Safari, preventing the Telegram link from opening.
+      window.location.assign(body.url);
     } catch {
       toast.error("Не удалось создать ссылку подключения Business Bot");
     } finally {
