@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Info, Send } from "lucide-react";
+import { CheckCircle2, Info, Send, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
 
@@ -127,25 +127,29 @@ export function BusinessTelegramStatusRow({
               </span>
             )}
           </div>
+          {location === "dashboard" && status?.linked && !error && (
+            <Button asChild variant="outline" size="sm" className="mt-3 w-full gap-2 rounded-xl bg-stone-50 text-stone-800 hover:bg-stone-100 sm:hidden">
+              <Link href="/business/settings/notifications"><Settings className="h-4 w-4" aria-hidden="true" />Настроить уведомления</Link>
+            </Button>
+          )}
           <p className="mt-1 text-sm leading-6 text-stone-600" aria-live="polite">{description}</p>
           {status?.linked && status.username && !error && (
             <p className="mt-1 text-xs text-stone-500">Аккаунт: @{status.username}</p>
           )}
         </div>
+        {location === "dashboard" && status?.linked && !error && (
+          <Button asChild variant="outline" size="sm" className="hidden shrink-0 gap-2 rounded-xl bg-stone-50 text-stone-800 hover:bg-stone-100 sm:inline-flex">
+            <Link href="/business/settings/notifications"><Settings className="h-4 w-4" aria-hidden="true" />Настроить уведомления</Link>
+          </Button>
+        )}
       </div>
 
-      {!error && (
+      {!error && (location !== "dashboard" || !status?.linked) && (
         <div className="mt-4">
           {status?.linked ? (
-            location === "dashboard" ? (
-              <Button asChild className="w-full rounded-xl bg-stone-900 text-white hover:bg-stone-800 sm:w-auto">
-                <Link href="/business/settings/notifications">Настроить уведомления</Link>
-              </Button>
-            ) : (
-              <Button type="button" variant="outline" className="w-full rounded-xl sm:w-auto" onClick={() => void disconnect()} disabled={busy}>
-                Отключить Telegram
-              </Button>
-            )
+            <Button type="button" variant="outline" className="w-full rounded-xl sm:w-auto" onClick={() => void disconnect()} disabled={busy}>
+              Отключить Telegram
+            </Button>
           ) : (
             <Button
               type="button"
