@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Info, Send } from "lucide-react";
+import { CheckCircle2, Info, Send, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
 
@@ -132,20 +132,19 @@ export function BusinessTelegramStatusRow({
             <p className="mt-1 text-xs text-stone-500">Аккаунт: @{status.username}</p>
           )}
         </div>
+        {location === "dashboard" && status?.linked && !error && (
+          <Button asChild variant="outline" size="sm" className="shrink-0 gap-2 rounded-xl bg-stone-50 px-2 text-stone-800 hover:bg-stone-100 sm:px-3">
+            <Link href="/business/settings/notifications" aria-label="Настроить уведомления"><Settings className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">Настроить уведомления</span></Link>
+          </Button>
+        )}
       </div>
 
-      {!error && (
+      {!error && (location !== "dashboard" || !status?.linked) && (
         <div className="mt-4">
           {status?.linked ? (
-            location === "dashboard" ? (
-              <Button asChild className="w-full rounded-xl bg-stone-900 text-white hover:bg-stone-800 sm:w-auto">
-                <Link href="/business/settings/notifications">Настроить уведомления</Link>
-              </Button>
-            ) : (
-              <Button type="button" variant="outline" className="w-full rounded-xl sm:w-auto" onClick={() => void disconnect()} disabled={busy}>
-                Отключить Telegram
-              </Button>
-            )
+            <Button type="button" variant="outline" className="w-full rounded-xl sm:w-auto" onClick={() => void disconnect()} disabled={busy}>
+              Отключить Telegram
+            </Button>
           ) : (
             <Button
               type="button"
