@@ -332,14 +332,14 @@ function ArticleRow({
     <div className="relative">
     <Link
       href={article.href}
-      className="group grid grid-cols-1 sm:grid-cols-[200px_1fr_180px] gap-4 sm:gap-9 py-8 border-t border-border last:border-b items-center transition-[padding] duration-200 hover:sm:pl-2"
+      className="group grid grid-cols-[minmax(0,1fr)_104px] sm:grid-cols-[200px_1fr_180px] gap-4 sm:gap-9 py-8 border-t border-border last:border-b items-start sm:items-center transition-[padding] duration-200 hover:sm:pl-2"
     >
       {/* Meta */}
-      <div className="flex sm:flex-col gap-3 sm:gap-2">
+      <div className="col-start-1 row-start-1 flex flex-wrap sm:flex-col gap-x-3 gap-y-1 sm:gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           {article.isBreakingNews && <BreakingPill />}
           <span className="text-[11px] font-mono uppercase tracking-[.12em] text-primary">
-            ● {article.category?.name ?? (article.contentType === "NEWS" ? "Новость" : "Статья")}
+            {article.category?.name ?? (article.contentType === "NEWS" ? "Новость" : "Статья")}
           </span>
         </div>
         {article.publishedAt && (
@@ -353,10 +353,10 @@ function ArticleRow({
       </div>
 
       {/* Body */}
-      <div className="flex flex-col gap-3">
+      <div className="col-start-1 row-start-2 sm:col-auto sm:row-auto flex min-w-0 flex-col gap-3">
         <h3
           className="font-heading m-0 leading-[1.02] tracking-[-0.02em] text-foreground group-hover:text-primary transition-colors"
-          style={{ fontSize: "32px" }}
+          style={{ fontSize: "clamp(18px, 4.8vw, 32px)" }}
         >
           {article.title}
           {article.subtitle && (
@@ -367,7 +367,7 @@ function ArticleRow({
 
       {/* Image */}
       <div
-        className={`hidden sm:block relative overflow-hidden rounded-2xl bg-gradient-to-br ${tone} aspect-[4/3]`}
+        className={`col-start-2 row-span-2 row-start-1 relative overflow-hidden rounded-2xl bg-gradient-to-br ${tone} aspect-[4/3] sm:col-auto sm:row-auto`}
       >
         {article.coverImageUrl && (
           <img
