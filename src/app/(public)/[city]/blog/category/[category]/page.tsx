@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatJournalPublishedDate } from "@/lib/article/formatJournalPublishedDate";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BlogPagination } from "../../../../blog/BlogPagination";
@@ -6,11 +7,11 @@ import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import {
   listCityBlogCategoryArticles,
   listCityBlogCategoryFacets,
-  listPopulatedCityBlogCategories,
   resolveCityBlogCategory,
 } from "@/server/article/cityBlogCategories";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
-import { buildAbsoluteCanonicalUrl } from "@/lib/routing/cityPaths";
+import { buildAbsoluteCanonicalUrl, buildCityPublicPath } from "@/lib/routing/cityPaths";
+import { buildPublicPath } from "@/lib/routing/surface";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,7 @@ async function resolveCity(citySlug: string) {
 }
 
 function categoryPath(citySlug: string, categorySlug: string) {
-  return `/${citySlug}/blog/category/${categorySlug}`;
+  return buildPublicPath(`${buildCityPublicPath({ citySlug, type: "journal" })}/category/${categorySlug}`);
 }
 
 export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
@@ -47,15 +48,17 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   if (!category) return applyGlobalRobotsOverride({ robots: { index: false, follow: true } });
 
   const page = parsePage(query.page);
+  const result = await listCityBlogCategoryArticles(city, category.id, page);
   const cityName = getCityDisplayName(city.slug);
   const basePath = categoryPath(city.slug, category.slug);
   const canonical = buildAbsoluteCanonicalUrl(page > 1 ? `${basePath}?page=${page}` : basePath);
-  const titleBase = `${category.nameRu} для семей в ${cityName}`;
+  const titleBase = category.journalSeoTitle?.trim() || `${category.nameRu} для семей в ${cityName}`;
 
   return applyGlobalRobotsOverride({
     title: page > 1 ? `${titleBase} — страница ${page} — mamaGo` : `${titleBase} — mamaGo`,
-    description: `Статьи, обзоры и полезные материалы mamaGo в разделе «${category.nameRu}» для семей с детьми в ${cityName}.`,
+    description: category.journalSeoDescription?.trim() || `Статьи, обзоры и полезные материалы mamaGo в разделе «${category.nameRu}» для семей с детьми в ${cityName}.`,
     alternates: { canonical },
+    ...(result.total === 0 ? { robots: { index: false, follow: true } } : {}),
   });
 }
 
@@ -72,10 +75,7 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
   const facets = await listCityBlogCategoryFacets(city, category);
   // Неизвестный slug темы игнорируем — показываем весь раздел.
   const activeTag = facets.tags.find((tag) => tag.slug === rawTag) ?? null;
-  const [journal, categories] = await Promise.all([
-    listCityBlogCategoryArticles(city, category.id, requestedPage, undefined, { tagSlug: activeTag?.slug ?? null }),
-    listPopulatedCityBlogCategories(city),
-  ]);
+  const journal = await listCityBlogCategoryArticles(city, category.id, requestedPage, undefined, { tagSlug: activeTag?.slug ?? null });
   if (requestedPage > journal.totalPages && journal.total > 0) notFound();
 
   const cityName = getCityDisplayName(city.slug);
@@ -87,6 +87,15 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
 
   return (
     <main className="site-wrap px-6 py-10 sm:px-7 md:py-14">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: city.name, item: buildAbsoluteCanonicalUrl(buildCityPublicPath({ citySlug: city.slug, type: "hub" })) },
+          { "@type": "ListItem", position: 2, name: "Журнал", item: buildAbsoluteCanonicalUrl(buildCityPublicPath({ citySlug: city.slug, type: "journal" })) },
+          { "@type": "ListItem", position: 3, name: category.nameRu, item: buildAbsoluteCanonicalUrl(categoryPath(city.slug, category.slug)) },
+        ],
+      }).replace(/</g, "\\u003c") }} />
       <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-muted-foreground" aria-label="Хлебные крошки">
         <Link href={`/${city.slug}`} className="hover:text-foreground hover:underline">{city.name}</Link>
         <span>/</span>
@@ -97,30 +106,11 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
 
       <header className="mb-8 border-b border-border pb-8">
         <p className="mb-3 text-[11px] font-mono uppercase tracking-[.14em] text-primary">Раздел журнала</p>
-        <h1 className="font-serif text-4xl leading-tight tracking-[-.025em] md:text-6xl">{category.nameRu}</h1>
+        <h1 className="font-heading text-[40px] leading-tight tracking-[-.025em]">{category.nameRu}</h1>
         <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground">
-          Статьи, обзоры и полезные материалы для семей с детьми в {cityName}.
+          {category.journalIntro?.trim() || `Статьи, обзоры и полезные материалы для семей с детьми в ${cityName}. Узнайте о новых идеях и событиях для всей семьи.`}
         </p>
       </header>
-
-      {categories.length > 1 ? (
-        <nav className="no-scrollbar mb-8 flex gap-2 overflow-x-auto pb-2" aria-label="Другие разделы журнала">
-          {categories.map((item) => (
-            <Link
-              key={item.id}
-              href={categoryPath(city.slug, item.slug)}
-              aria-current={item.id === category.id ? "page" : undefined}
-              className={
-                item.id === category.id
-                  ? "shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-semibold text-background"
-                  : "shrink-0 rounded-full border border-border px-4 py-2 text-sm hover:border-foreground/40"
-              }
-            >
-              {item.name}
-            </Link>
-          ))}
-        </nav>
-      ) : null}
 
       {facets.subcategories.length > 0 ? (
         <nav className="no-scrollbar mb-4 flex gap-2 overflow-x-auto pb-1" aria-label="Подкатегории">
@@ -166,6 +156,9 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
         </nav>
       ) : null}
 
+      {journal.total === 0 ? (
+        <div className="py-12 text-center"><p>Скоро здесь появятся материалы</p><Link href={buildCityPublicPath({ citySlug: city.slug, type: "journal" })} className="mt-4 inline-block text-primary underline">Все</Link></div>
+      ) : null}
       <section aria-label={`Материалы раздела ${category.nameRu}`}>
         <div className="grid gap-6 md:grid-cols-2">
           {journal.articles.map((article) => (
@@ -178,11 +171,11 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
                 )}
                 <div className="p-5">
                   <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    {article.publishedAt ? <time dateTime={new Date(article.publishedAt).toISOString()}>{new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(new Date(article.publishedAt))}</time> : null}
+                    {article.publishedAt ? <time dateTime={new Date(article.publishedAt).toISOString()}>{formatJournalPublishedDate(article.publishedAt)}</time> : null}
                     <span>·</span>
                     <span>{article.readTime} мин</span>
                   </div>
-                  <h2 className="font-serif text-2xl leading-tight tracking-[-.015em] transition-colors group-hover:text-primary">{article.title}</h2>
+                  <h2 className="font-heading text-[32px] leading-tight tracking-[-.015em] transition-colors group-hover:text-primary">{article.title}</h2>
                   {article.subtitle ? <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground">{article.subtitle}</p> : null}
                 </div>
               </Link>

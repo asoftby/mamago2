@@ -14,6 +14,7 @@ import {
 
 assert.deepEqual(getPublicPublishedArticleWhere(), {
   status: "PUBLISHED",
+  category: { publicationType: "ARTICLE", isActive: true, archivedAt: null },
 });
 
 assert.deepEqual(getPublicPageDetailWhere(), {

@@ -1007,6 +1007,9 @@ model EventCategory {
   id                   String                       @id @default(cuid())
   nameRu               String
   nameEn               String
+  journalSeoTitle      String?
+  journalSeoDescription String?
+  journalIntro         String? @db.Text
   slug                 String
   icon                 String?
   sortOrder            Int                          @default(0)

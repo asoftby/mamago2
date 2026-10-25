@@ -426,6 +426,7 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
     resolvedGeo.cityId ?? null,
     resolvedGeo.regionId ?? null,
   );
+  if (isPublishLikeStatus(input.status) && !input.categoryId) throw new Error("Для публикации статьи обязательно выберите раздел журнала");
   await assertArticleCategoryValid(input.categoryId);
 
   const created = await runArticleCriticalWrite(prisma, async (tx) => {
@@ -628,9 +629,10 @@ export async function submitArticleForModeration(id: string): Promise<ArticleEdi
   await runArticleCriticalWrite(prisma, async (tx) => {
     const row = await tx.article.findUnique({
       where: { id },
-      select: { title: true, slug: true, geoScope: true, cityId: true, regionId: true },
+      select: { title: true, slug: true, categoryId: true, geoScope: true, cityId: true, regionId: true },
     });
     if (!row) throw new Error("Article not found");
+    if (!row.categoryId) throw new Error("Для публикации статьи обязательно выберите раздел журнала");
     assertGeoScopeValidForPublish(row.geoScope, row.cityId, row.regionId);
     if (!row.slug?.trim()) {
       await resolveArticleSlugOnSaveInTransaction(tx, id, row.title, null);

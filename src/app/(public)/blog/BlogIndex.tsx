@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatJournalPublishedDate } from "@/lib/article/formatJournalPublishedDate";
 import { useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
@@ -24,10 +25,6 @@ const TONES = [
   "from-[#E6DBC8] to-[#C9BCA0]",
 ];
 
-function fmtDate(d: Date | null): string {
-  if (!d) return "";
-  return new Date(d).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
-}
 
 const TYPE_FILTERS: Array<{ key: BlogContentType; label: string }> = [
   { key: "ALL", label: "Все материалы" },
@@ -92,20 +89,17 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
             <div className="flex items-center gap-3 mb-5 text-[11px] font-mono uppercase tracking-[.14em] text-muted-foreground">
               <span className="text-primary">●</span>
               <span>Журнал</span>
-              <span className="opacity-40">·</span>
-              <span>{articles.length} материалов</span>
             </div>
 
             <h1
               className="font-heading m-0 leading-[.94] tracking-[-0.03em]"
-              style={{ fontSize: "clamp(28px, 4.5vw, 62px)" }}
+              style={{ fontSize: "40px" }}
             >
-              Обзоры{" "}
-              и статьи
+              Журнал
             </h1>
 
             <p className="mt-5 text-[17px] leading-relaxed text-muted-foreground w-full">
-              Вдохновение для семейных прогулок, событий и открытий — в одной редакторской подборке.
+              Вдохновение для семейных прогулок, событий и открытий.
             </p>
           </div>
 
@@ -202,9 +196,6 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
                     все материалы
                   </span>
                   <div className="flex-1 h-px bg-border" />
-                  <span className="text-[11px] font-mono text-muted-foreground shrink-0">
-                    {rest.length} из {articles.length}
-                  </span>
                 </div>
                 {rest.map((a, i) => (
                   <AnalyticsCardViewTracker
@@ -274,7 +265,7 @@ function FeaturedArticle({
           )}
           {article.publishedAt && (
             <span className="text-[11px] font-mono uppercase tracking-[.12em] text-muted-foreground">
-              {fmtDate(article.publishedAt)}
+              {formatJournalPublishedDate(article.publishedAt)}
             </span>
           )}
           <span className="text-[11px] font-mono text-muted-foreground">
@@ -284,7 +275,7 @@ function FeaturedArticle({
 
         <h2
           className="font-heading m-0 leading-[1] tracking-[-0.025em] group-hover:text-primary transition-colors"
-          style={{ fontSize: "clamp(32px, 4.2vw, 58px)" }}
+          style={{ fontSize: "36px" }}
         >
           {article.title}
           {article.subtitle && (
@@ -353,14 +344,11 @@ function ArticleRow({
         </div>
         {article.publishedAt && (
           <span className="text-[13px] text-foreground font-medium tracking-[-.005em]">
-            {fmtDate(article.publishedAt)}
+            {formatJournalPublishedDate(article.publishedAt)}
           </span>
         )}
         <span className="text-[11px] font-mono text-muted-foreground">
           {article.readTime} мин
-        </span>
-        <span className="hidden sm:block text-[10px] font-mono uppercase tracking-[.14em] text-muted-foreground/30 mt-1">
-          № {String(idx + 1).padStart(2, "0")}
         </span>
       </div>
 
@@ -368,7 +356,7 @@ function ArticleRow({
       <div className="flex flex-col gap-3">
         <h3
           className="font-heading m-0 leading-[1.02] tracking-[-0.02em] text-foreground group-hover:text-primary transition-colors"
-          style={{ fontSize: "clamp(22px, 2.6vw, 36px)" }}
+          style={{ fontSize: "32px" }}
         >
           {article.title}
           {article.subtitle && (
@@ -391,7 +379,6 @@ function ArticleRow({
         {!article.coverImageUrl && (
           <span className="absolute bottom-2 left-2.5 right-2.5 flex justify-between">
             <span className="text-[10px] font-mono uppercase tracking-[.12em] text-black/35">обложка</span>
-            <span className="text-[10px] font-mono text-black/25">{String(idx + 1).padStart(2, "0")}</span>
           </span>
         )}
       </div>

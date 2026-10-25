@@ -46,17 +46,20 @@ assert.deepEqual(articlePublicSlugWhere("weekend", null), {
   slug: "weekend",
   cityId: null,
   status: "PUBLISHED",
+  category: { publicationType: "ARTICLE", isActive: true, archivedAt: null },
 });
 assert.deepEqual(articlePublicSlugWhere("weekend", "minsk"), {
   slug: "weekend",
   cityId: "minsk",
   status: "PUBLISHED",
+  category: { publicationType: "ARTICLE", isActive: true, archivedAt: null },
 });
 assert.deepEqual(articlePublicSlugHistoryWhere("old-weekend", null), {
   slug: "old-weekend",
   cityId: null,
   article: {
     status: "PUBLISHED",
+    category: { publicationType: "ARTICLE", isActive: true, archivedAt: null },
   },
 });
 

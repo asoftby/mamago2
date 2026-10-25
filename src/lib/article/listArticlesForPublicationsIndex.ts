@@ -45,6 +45,7 @@ export async function listArticlesForPublicationsIndex(): Promise<PublicationLis
       slug: true,
       subtitle: true,
       status: true,
+      categoryId: true,
       geoScope: true,
       cityId: true,
       publishedAt: true,
@@ -160,6 +161,7 @@ export async function listArticlesForPublicationsIndex(): Promise<PublicationLis
       hasCover: !!(coverId && String(coverId).trim()),
       hasSlug: !!(r.slug && r.slug.trim()),
       hasBlocks: content.blocks.length > 0,
+      missingJournalCategory: !isBreakingNews && !r.categoryId,
       geoScope: r.geoScope ?? null,
       citySlug,
     };

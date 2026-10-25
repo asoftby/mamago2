@@ -50,6 +50,7 @@ export type PublicationListRow = {
   hasCover: boolean;
   hasSlug: boolean;
   hasBlocks: boolean;
+  missingJournalCategory?: boolean;
   geoScope?: GeoScope | null;
   citySlug?: string | null;
 };

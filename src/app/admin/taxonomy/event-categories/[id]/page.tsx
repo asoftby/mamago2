@@ -55,6 +55,9 @@ type EventCategory = {
   slug: string;
   nameRu: string;
   nameEn?: string;
+  journalSeoTitle?: string | null;
+  journalSeoDescription?: string | null;
+  journalIntro?: string | null;
   type: EventCategoryPublicationType;
   icon: string | null;
   sortOrder: number;
@@ -246,6 +249,9 @@ function EventCategoryEditor({
   const { hydrate: hydrateSlugFromServer } = nameSlug;
 
   const [icon, setIcon] = useState(category.icon ?? "");
+  const [journalSeoTitle, setJournalSeoTitle] = useState(category.journalSeoTitle ?? "");
+  const [journalSeoDescription, setJournalSeoDescription] = useState(category.journalSeoDescription ?? "");
+  const [journalIntro, setJournalIntro] = useState(category.journalIntro ?? "");
   const [order, setOrder] = useState(category.sortOrder);
   const [isActive, setIsActive] = useState(category.isActive);
   const [isFeatured, setIsFeatured] = useState(category.isFeatured);
@@ -258,6 +264,9 @@ function EventCategoryEditor({
   useEffect(() => {
     hydrateSlugFromServer(category.nameRu, category.slug);
     setIcon(category.icon ?? "");
+    setJournalSeoTitle(category.journalSeoTitle ?? "");
+    setJournalSeoDescription(category.journalSeoDescription ?? "");
+    setJournalIntro(category.journalIntro ?? "");
     setOrder(category.sortOrder);
     setIsActive(category.isActive);
     setIsFeatured(category.isFeatured);
@@ -269,6 +278,9 @@ function EventCategoryEditor({
     category.nameRu,
     category.slug,
     category.icon,
+    category.journalSeoTitle,
+    category.journalSeoDescription,
+    category.journalIntro,
     category.sortOrder,
     category.isActive,
     category.isFeatured,
@@ -292,6 +304,11 @@ function EventCategoryEditor({
       supportsProgram,
       selectableInProgram,
     };
+    if (category.type === "ARTICLE") {
+      body.journalSeoTitle = journalSeoTitle;
+      body.journalSeoDescription = journalSeoDescription;
+      body.journalIntro = journalIntro;
+    }
     if (parentId !== category.parentId) {
       body.parentId = parentId;
     }
@@ -425,6 +442,23 @@ function EventCategoryEditor({
             </Button>
           </div>
         </div>
+
+        {category.type === "ARTICLE" ? (
+          <div className="grid gap-4">
+            <div className="grid gap-1">
+              <Label>SEO title раздела</Label>
+              <Input value={journalSeoTitle} maxLength={140} onChange={(e) => setJournalSeoTitle(e.target.value)} />
+            </div>
+            <div className="grid gap-1">
+              <Label>Meta description раздела</Label>
+              <textarea className="min-h-20 w-full rounded-md border border-border p-3 text-sm" value={journalSeoDescription} maxLength={320} onChange={(e) => setJournalSeoDescription(e.target.value)} />
+            </div>
+            <div className="grid gap-1">
+              <Label>Вводный текст раздела (2–3 предложения)</Label>
+              <textarea className="min-h-28 w-full rounded-md border border-border p-3 text-sm" value={journalIntro} maxLength={2500} onChange={(e) => setJournalIntro(e.target.value)} />
+            </div>
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
           <div className="grid gap-1">
