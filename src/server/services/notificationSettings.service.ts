@@ -1,6 +1,7 @@
 import { NotificationChannel, type NotificationType } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getTelegramLinkStatus } from "@/server/services/telegramLink.service";
+import { businessTelegramStatus } from "@/server/services/telegram/businessTelegram.service";
 import {
   buildEmptyNotificationSettingsSurfaceData,
   getNotificationSettingsGroupDefinitions,
@@ -59,6 +60,21 @@ function assertSupportedNotificationType(
   }
 }
 
+async function getTelegramStatusForSurface(userId: string, surface: NotificationSettingsSurface) {
+  // Business notification preferences must reflect the separate Business Bot,
+  // never a connection to the family Info Bot.
+  if (surface === "BUSINESS") {
+    const status = await businessTelegramStatus(userId);
+    return {
+      linked: status?.linked ?? false,
+      configured: status?.configured ?? false,
+      username: status?.username,
+      botUsername: status?.botUsername,
+    };
+  }
+  return getTelegramLinkStatus({ userId });
+}
+
 export async function getNotificationSettingsSurfaceData(
   userId: string,
   surface: NotificationSettingsSurface,
@@ -68,7 +84,7 @@ export async function getNotificationSettingsSurfaceData(
 
   if (notificationTypes.length === 0) {
     const empty = buildEmptyNotificationSettingsSurfaceData(surface);
-    const telegramStatus = await getTelegramLinkStatus({ userId });
+    const telegramStatus = await getTelegramStatusForSurface(userId, surface);
 
     return {
       ...empty,
@@ -97,7 +113,7 @@ export async function getNotificationSettingsSurfaceData(
         telegramEnabled: true,
       },
     }),
-    getTelegramLinkStatus({ userId }),
+    getTelegramStatusForSurface(userId, surface),
   ]);
 
   const overridesByType = new Map(
