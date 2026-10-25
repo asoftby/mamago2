@@ -351,7 +351,7 @@ function inferRequestedPlacementsFromForm(
     case "REGULAR_ACTIVITY":
       return ["CLASSES"];
     case "ONE_TIME_ACTIVITY":
-      return ["WHERE_TO_GO"];
+      return ["CLASSES"];
     default:
       return undefined;
   }
@@ -385,6 +385,7 @@ function defaultRequestedPlacementsForProductType(
     case "REGULAR_ACTIVITY":
       return ["CLASSES"];
     case "ONE_TIME_ACTIVITY":
+      return ["CLASSES"];
     case "PLACE_VISIT":
       return ["WHERE_TO_GO"];
     case "PARTY_SERVICE":
