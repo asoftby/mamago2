@@ -96,6 +96,7 @@ interface CityDiscoveryShellProps {
   /** SEO-specific visible heading for dedicated discovery hubs. */
   pageTitleOverride?: string;
   weekendPlannerEnabled?: boolean;
+  halloweenEnabled?: boolean;
 }
 
 export function CityDiscoveryShell({
@@ -110,6 +111,7 @@ export function CityDiscoveryShell({
   budgetConfig,
   pageTitleOverride,
   weekendPlannerEnabled = false,
+  halloweenEnabled = false,
 }: CityDiscoveryShellProps) {
   const { applied } = useDiscoveryFilters();
   const budgetCtx = useOptionalDiscoveryBudgetConfig();
@@ -211,7 +213,7 @@ export function CityDiscoveryShell({
             <Link href={`/${city}/weekend`} className="inline-flex shrink-0 justify-center rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800">Подобрать мой выходной →</Link>
           </section>
         ) : null}
-        {intent === "kuda" ? <EventQuickFilters /> : null}
+        {intent === "kuda" ? <EventQuickFilters halloweenEnabled={halloweenEnabled} /> : null}
         {intent === "classes" && classChips && activeClassChipSlug ? (
           <ClassesChipBar chips={classChips} activeChipSlug={activeClassChipSlug} />
         ) : null}
