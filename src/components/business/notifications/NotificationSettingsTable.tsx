@@ -23,6 +23,7 @@ import {
   type NotificationSettingsSurfaceData,
 } from "@/lib/notifications/settingsDomain";
 import { useTelegramConnectionStatus } from "@/hooks/useTelegramConnectionStatus";
+import { BusinessTelegramStatusRow } from "./BusinessTelegramStatusRow";
 
 type Props = {
   surface?: NotificationSettingsSurface;
@@ -453,6 +454,8 @@ export function NotificationSettingsTable({
           ) : null}
         </div>
       ) : null}
+
+      {surface === "BUSINESS" ? <BusinessTelegramStatusRow /> : null}
 
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button
