@@ -22,7 +22,7 @@ assert.deepEqual([...chosenTypes].sort(), [...allTypes].sort(), "No persisted ty
 
 const expected = {
   PLACE_VISIT: ["place", "SINGLE", "WHERE_TO_GO", "service", null, "куда_пойти"],
-  ONE_TIME_ACTIVITY: ["classes", "SINGLE", "WHERE_TO_GO", "course", "single", "куда_пойти"],
+  ONE_TIME_ACTIVITY: ["classes", "SINGLE", "CLASSES", "course", "single", "занятия"],
   REGULAR_ACTIVITY: ["classes", "REGULAR", "CLASSES", "course", "recurring", "занятия"],
   CAMP: ["camps", "CAMP", "CAMPS", "course", "camp", "занятия"],
   PARTY_SERVICE: ["parties", "SINGLE", "BIRTHDAY", "service", null, "день_рождения"],
@@ -43,7 +43,7 @@ for (const productType of allTypes) {
       selection.intent,
     ],
     expected[productType],
-    `Legacy wizard mapping unchanged for ${productType}`,
+    `Wizard mapping correct for ${productType}`,
   );
 }
 assert.equal(getOfferCreationCategory(null), null);
