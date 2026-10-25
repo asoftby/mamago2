@@ -11,6 +11,8 @@ import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCar
 import { formatPrice } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { DepositTopUpTrigger } from "@/components/business/billing/DepositTopUpTrigger";
+import { BusinessTelegramDashboardStatus } from "@/components/business/dashboard/BusinessTelegramDashboardStatus";
+import { VerificationBanner } from "@/components/business/VerificationBanner";
 import { DashboardHeader } from "@/components/business/dashboard/DashboardHeader";
 import { DashboardActionStack } from "@/components/business/dashboard/DashboardActionStack";
 import { DashboardPeriodSwitcher } from "@/components/business/dashboard/DashboardPeriodSwitcher";
@@ -26,6 +28,8 @@ import { BUSINESS_DASHBOARD_MVP } from "@/config/businessDashboardMvp";
 
 export type DashboardData = {
   onboarding: BusinessOnboardingSnapshot;
+  verificationStatus: "DRAFT" | "PENDING" | "APPROVED" | "REJECTED";
+  verificationReviewNote?: string | null;
   onboardingPublicHref: string | null;
   // Business identity
   businessName: string;
@@ -491,6 +495,10 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
           city={data.city}
           settingsHref={data.hrefs.settings}
         />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <VerificationBanner status={data.verificationStatus} reviewNote={data.verificationReviewNote} compact />
+        <BusinessTelegramDashboardStatus settingsHref={data.hrefs.settings} />
       </div>
       {!isOnboarding && (
         <div className="flex justify-end">
