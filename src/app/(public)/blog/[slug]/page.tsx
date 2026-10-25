@@ -403,6 +403,7 @@ export default async function ArticlePage({
             editHref={editHref}
             articleHref={canonicalPath}
             coverImageUrl={mvp.heroUrl}
+        coverCaption={mvp.coverCaption}
           />
         </>
       );
@@ -425,6 +426,7 @@ export default async function ArticlePage({
         articleId={mvp.id}
         articleHref={canonicalPath}
         coverImageUrl={mvp.heroUrl}
+        coverCaption={mvp.coverCaption}
         author={mvp.author}
       />
     );
