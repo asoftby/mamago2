@@ -21,8 +21,9 @@ export function BusinessTelegramStatusRow() {
       const response = await fetch("/api/business/telegram", { method: "POST" });
       const body = await response.json() as { url?: string };
       if (!response.ok || !body.url) throw new Error("Business Bot не настроен");
-      const popup = window.open(body.url, "_blank", "noopener,noreferrer");
-      if (!popup) window.location.assign(body.url);
+      // A user-initiated same-tab navigation works on iOS Safari, where an
+      // async window.open after the link API request can be popup-blocked.
+      window.location.assign(body.url);
       toast.success("Откройте бота и нажмите Start, затем обновите статус подключения");
     } catch { toast.error("Не удалось создать ссылку подключения"); }
     finally { setBusy(false); }
