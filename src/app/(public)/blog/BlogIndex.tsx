@@ -98,7 +98,7 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
 
             <h1
               className="font-heading m-0 leading-[.94] tracking-[-0.03em]"
-              style={{ fontSize: "clamp(28px, 4.5vw, 62px)" }}
+              style={{ fontSize: "40px" }}
             >
               Журнал
             </h1>
@@ -283,7 +283,7 @@ function FeaturedArticle({
 
         <h2
           className="font-heading m-0 leading-[1] tracking-[-0.025em] group-hover:text-primary transition-colors"
-          style={{ fontSize: "clamp(32px, 4.2vw, 58px)" }}
+          style={{ fontSize: "36px" }}
         >
           {article.title}
           {article.subtitle && (
@@ -367,7 +367,7 @@ function ArticleRow({
       <div className="flex flex-col gap-3">
         <h3
           className="font-heading m-0 leading-[1.02] tracking-[-0.02em] text-foreground group-hover:text-primary transition-colors"
-          style={{ fontSize: "clamp(22px, 2.6vw, 36px)" }}
+          style={{ fontSize: "32px" }}
         >
           {article.title}
           {article.subtitle && (
