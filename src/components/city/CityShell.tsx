@@ -96,7 +96,7 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
     };
     const eventFilters = {
       categorySlugs: scalar("category")?.split(",").filter(Boolean) ?? [],
-      occasionSlug: scalar("occasion") === "halloween" ? "halloween" : null,
+      occasionSlug: halloweenEnabled && scalar("occasion") === "halloween" ? "halloween" : null,
           genreSlugs: scalar("genre")?.split(",").filter(Boolean) ?? [],
           dateRange: resolveEventDateRange({
             preset:
