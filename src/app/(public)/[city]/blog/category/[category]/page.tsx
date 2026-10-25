@@ -6,11 +6,11 @@ import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import {
   listCityBlogCategoryArticles,
   listCityBlogCategoryFacets,
-  listPopulatedCityBlogCategories,
   resolveCityBlogCategory,
 } from "@/server/article/cityBlogCategories";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
-import { buildAbsoluteCanonicalUrl } from "@/lib/routing/cityPaths";
+import { buildAbsoluteCanonicalUrl, buildCityPublicPath } from "@/lib/routing/cityPaths";
+import { buildPublicPath } from "@/lib/routing/surface";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ async function resolveCity(citySlug: string) {
 }
 
 function categoryPath(citySlug: string, categorySlug: string) {
-  return `/${citySlug}/blog/category/${categorySlug}`;
+  return buildPublicPath(`${buildCityPublicPath({ citySlug, type: "journal" })}/category/${categorySlug}`);
 }
 
 export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
@@ -72,10 +72,7 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
   const facets = await listCityBlogCategoryFacets(city, category);
   // Неизвестный slug темы игнорируем — показываем весь раздел.
   const activeTag = facets.tags.find((tag) => tag.slug === rawTag) ?? null;
-  const [journal, categories] = await Promise.all([
-    listCityBlogCategoryArticles(city, category.id, requestedPage, undefined, { tagSlug: activeTag?.slug ?? null }),
-    listPopulatedCityBlogCategories(city),
-  ]);
+  const journal = await listCityBlogCategoryArticles(city, category.id, requestedPage, undefined, { tagSlug: activeTag?.slug ?? null });
   if (requestedPage > journal.totalPages && journal.total > 0) notFound();
 
   const cityName = getCityDisplayName(city.slug);
@@ -87,6 +84,15 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
 
   return (
     <main className="site-wrap px-6 py-10 sm:px-7 md:py-14">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: city.name, item: buildAbsoluteCanonicalUrl(buildCityPublicPath({ citySlug: city.slug, type: "hub" })) },
+          { "@type": "ListItem", position: 2, name: "Журнал", item: buildAbsoluteCanonicalUrl(buildCityPublicPath({ citySlug: city.slug, type: "journal" })) },
+          { "@type": "ListItem", position: 3, name: category.nameRu, item: buildAbsoluteCanonicalUrl(categoryPath(city.slug, category.slug)) },
+        ],
+      }).replace(/</g, "\\u003c") }} />
       <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-muted-foreground" aria-label="Хлебные крошки">
         <Link href={`/${city.slug}`} className="hover:text-foreground hover:underline">{city.name}</Link>
         <span>/</span>
@@ -102,25 +108,6 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
           Статьи, обзоры и полезные материалы для семей с детьми в {cityName}.
         </p>
       </header>
-
-      {categories.length > 1 ? (
-        <nav className="no-scrollbar mb-8 flex gap-2 overflow-x-auto pb-2" aria-label="Другие разделы журнала">
-          {categories.map((item) => (
-            <Link
-              key={item.id}
-              href={categoryPath(city.slug, item.slug)}
-              aria-current={item.id === category.id ? "page" : undefined}
-              className={
-                item.id === category.id
-                  ? "shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-semibold text-background"
-                  : "shrink-0 rounded-full border border-border px-4 py-2 text-sm hover:border-foreground/40"
-              }
-            >
-              {item.name}
-            </Link>
-          ))}
-        </nav>
-      ) : null}
 
       {facets.subcategories.length > 0 ? (
         <nav className="no-scrollbar mb-4 flex gap-2 overflow-x-auto pb-1" aria-label="Подкатегории">
@@ -166,6 +153,9 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
         </nav>
       ) : null}
 
+      {journal.total === 0 ? (
+        <div className="py-12 text-center"><p>Скоро здесь появятся материалы</p><Link href={buildCityPublicPath({ citySlug: city.slug, type: "journal" })} className="mt-4 inline-block text-primary underline">Все</Link></div>
+      ) : null}
       <section aria-label={`Материалы раздела ${category.nameRu}`}>
         <div className="grid gap-6 md:grid-cols-2">
           {journal.articles.map((article) => (
