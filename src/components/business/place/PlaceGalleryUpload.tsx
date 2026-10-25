@@ -412,7 +412,7 @@ function GalleryImageCard({ image, isCover, onRemove }: GalleryImageCardProps) {
       <div
         {...attributes}
         {...listeners}
-        className="absolute top-2 right-2 p-1 bg-white/90 rounded cursor-move opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-2 right-2 p-1 bg-white/90 rounded cursor-grab touch-none opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
       >
         <GripVertical className="h-4 w-4 text-gray-600" />
       </div>
@@ -423,7 +423,7 @@ function GalleryImageCard({ image, isCover, onRemove }: GalleryImageCardProps) {
           e.stopPropagation();
           onRemove();
         }}
-        className="absolute bottom-2 right-2 p-1 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+        className="absolute bottom-2 right-2 p-1 bg-red-600 text-white rounded-full opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 hover:bg-red-700"
       >
         <X className="h-4 w-4" />
       </button>
