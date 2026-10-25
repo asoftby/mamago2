@@ -47,6 +47,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   if (!category) return applyGlobalRobotsOverride({ robots: { index: false, follow: true } });
 
   const page = parsePage(query.page);
+  const result = await listCityBlogCategoryArticles(city, category.id, page);
   const cityName = getCityDisplayName(city.slug);
   const basePath = categoryPath(city.slug, category.slug);
   const canonical = buildAbsoluteCanonicalUrl(page > 1 ? `${basePath}?page=${page}` : basePath);
@@ -56,6 +57,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
     title: page > 1 ? `${titleBase} — страница ${page} — mamaGo` : `${titleBase} — mamaGo`,
     description: `Статьи, обзоры и полезные материалы mamaGo в разделе «${category.nameRu}» для семей с детьми в ${cityName}.`,
     alternates: { canonical },
+    ...(result.total === 0 ? { robots: { index: false, follow: true } } : {}),
   });
 }
 
