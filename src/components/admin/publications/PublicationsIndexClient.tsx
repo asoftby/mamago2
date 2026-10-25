@@ -140,11 +140,12 @@ export function PublicationsIndexClient({
   const [titleSearch, setTitleSearch] = useState("");
   const [quickNoCover, setQuickNoCover] = useState(false);
   const [quickNoSlug, setQuickNoSlug] = useState(false);
+  const [quickProblemArticles, setQuickProblemArticles] = useState(false);
   const [quickDrafts, setQuickDrafts] = useState(false);
   const [quickPublished, setQuickPublished] = useState(false);
   const filterKey = JSON.stringify([
     tab, status, authorUserIdFilter, cityId, dateFrom, typeQuick, sort,
-    titleSearch, quickNoCover, quickNoSlug, quickDrafts, quickPublished,
+    titleSearch, quickNoCover, quickNoSlug, quickProblemArticles, quickDrafts, quickPublished,
   ]);
   const [pageSelection, setPageSelection] = useState({ filterKey, page: 1 });
   const page = pageSelection.filterKey === filterKey ? pageSelection.page : 1;
@@ -204,6 +205,7 @@ export function PublicationsIndexClient({
       }
       if (quickNoCover && row.hasCover) return false;
       if (quickNoSlug && row.hasSlug) return false;
+      if (quickProblemArticles && !row.missingJournalCategory) return false;
       if (quickDrafts && row.status !== PublicationStatus.DRAFT) return false;
       if (quickPublished && row.status !== PublicationStatus.PUBLISHED) return false;
       if (status !== "all" && row.status !== status) return false;
@@ -230,6 +232,7 @@ export function PublicationsIndexClient({
     titleSearch,
     quickNoCover,
     quickNoSlug,
+    quickProblemArticles,
     quickDrafts,
     quickPublished,
   ]);
@@ -424,6 +427,28 @@ export function PublicationsIndexClient({
             onClick={() => { resetPageForFilters(); setQuickNoSlug((v) => !v); }}
           >
             Без slug
+          </Button>
+          <Button
+            type="button"
+            variant={quickProblemArticles ? "secondary" : "outline"}
+            aria-pressed={quickProblemArticles}
+            size="sm"
+            className="h-8 shrink-0 text-xs"
+            onClick={() => {
+              resetPageForFilters();
+              setQuickProblemArticles((v) => !v);
+              if (!quickProblemArticles) {
+                setTab(PublicationTabFilter.ARTICLE);
+                setStatus("all");
+                setTypeQuick("all");
+                setQuickNoCover(false);
+                setQuickNoSlug(false);
+                setQuickDrafts(false);
+                setQuickPublished(false);
+              }
+            }}
+          >
+            Проблемные статьи ({initialRows.filter((row) => row.missingJournalCategory).length})
           </Button>
           <Button
             type="button"
