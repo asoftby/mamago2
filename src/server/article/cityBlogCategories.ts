@@ -93,11 +93,23 @@ export async function listPopulatedCityBlogCategories(city: CityRef): Promise<Ci
         coverImage: { select: { publicUrl: true } },
       },
     });
+    const recentCover = latest?.coverImage?.publicUrl ?? latest?.heroImage ?? null;
+    const illustrated = recentCover ? null : await prisma.article.findFirst({
+      where: {
+        AND: [articleWhere, categoryScopeWhere([category.id])],
+        OR: [
+          { coverImage: { isNot: null } },
+          { heroImage: { not: null } },
+        ],
+      },
+      orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
+      select: { heroImage: true, coverImage: { select: { publicUrl: true } } },
+    });
     return {
       id: category.id,
       slug: category.slug,
       name: category.nameRu,
-      thumbnailUrl: latest?.coverImage?.publicUrl ?? latest?.heroImage ?? null,
+      thumbnailUrl: recentCover ?? illustrated?.coverImage?.publicUrl ?? illustrated?.heroImage ?? null,
       hasNewArticle: Boolean(latest?.publishedAt && latest.publishedAt >= freshnessCutoff),
     };
   }));
