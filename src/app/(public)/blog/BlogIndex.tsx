@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatJournalPublishedDate } from "@/lib/article/formatJournalPublishedDate";
 import { useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
@@ -24,10 +25,6 @@ const TONES = [
   "from-[#E6DBC8] to-[#C9BCA0]",
 ];
 
-function fmtDate(d: Date | null): string {
-  if (!d) return "";
-  return new Date(d).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
-}
 
 const TYPE_FILTERS: Array<{ key: BlogContentType; label: string }> = [
   { key: "ALL", label: "Все материалы" },
@@ -273,7 +270,7 @@ function FeaturedArticle({
           )}
           {article.publishedAt && (
             <span className="text-[11px] font-mono uppercase tracking-[.12em] text-muted-foreground">
-              {fmtDate(article.publishedAt)}
+              {formatJournalPublishedDate(article.publishedAt)}
             </span>
           )}
           <span className="text-[11px] font-mono text-muted-foreground">
@@ -352,7 +349,7 @@ function ArticleRow({
         </div>
         {article.publishedAt && (
           <span className="text-[13px] text-foreground font-medium tracking-[-.005em]">
-            {fmtDate(article.publishedAt)}
+            {formatJournalPublishedDate(article.publishedAt)}
           </span>
         )}
         <span className="text-[11px] font-mono text-muted-foreground">
