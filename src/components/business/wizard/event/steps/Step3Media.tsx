@@ -261,7 +261,7 @@ function GalleryItemContent({
 
       <button
         onClick={() => onRemove(image.id)}
-        className="absolute right-2 top-2 z-10 rounded-full bg-red-600 p-1.5 text-white opacity-0 transition-opacity hover:bg-red-700 group-hover:opacity-100"
+        className="absolute right-2 top-2 z-10 rounded-full bg-red-600 p-1.5 text-white opacity-100 md:opacity-0 transition-opacity hover:bg-red-700 md:group-hover:opacity-100"
         type="button"
       >
         <Trash2 className="h-4 w-4" />
@@ -270,7 +270,7 @@ function GalleryItemContent({
       {showDragHandle ? (
         <div
           {...dragHandleProps}
-          className="absolute left-2 top-2 z-10 cursor-move rounded bg-black/50 p-1.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
+          className="absolute left-2 top-2 z-10 cursor-grab touch-none rounded bg-black/50 p-1.5 text-white opacity-100 md:opacity-0 transition-opacity md:group-hover:opacity-100"
         >
           <GripVertical className="h-4 w-4" />
         </div>
