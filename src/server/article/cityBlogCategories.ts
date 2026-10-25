@@ -175,7 +175,7 @@ export async function listCityBlogCategoryFacets(
 
   return {
     root,
-    subcategories: children.map((child) => ({ id: child.id, slug: child.slug, name: child.nameRu })),
+    subcategories: children.map((child) => ({ id: child.id, slug: child.slug, name: child.nameRu, thumbnailUrl: null })),
     tags: tags.map((tag) => ({ id: tag.id, slug: tag.slug, name: tag.title })),
   };
 }
