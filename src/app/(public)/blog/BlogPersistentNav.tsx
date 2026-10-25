@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { buildPublicPath } from "@/lib/routing/surface";
 import { buildCityPublicPath } from "@/lib/routing/cityPaths";
@@ -13,11 +13,24 @@ export function BlogPersistentNav({ citySlug, categories }: {
   categories: CityBlogCategory[];
 }) {
   const pathname = usePathname();
+  const [articleSection, setArticleSection] = useState<string | null>(null);
   const activeRef = useRef<HTMLAnchorElement>(null);
   const base = buildPublicPath(buildCityPublicPath({ citySlug, type: "journal" }));
-  const activeSlug = pathname.startsWith(`${base}/category/`)
-    ? pathname.slice(`${base}/category/`.length).split("/")[0]
-    : null;
+  const sectionPrefix = `${base}/category/`;
+  const articlePrefix = `${base}/`;
+  const isArticle = pathname.startsWith(articlePrefix) && !pathname.startsWith(sectionPrefix) && pathname !== base;
+  const activeSlug = pathname.startsWith(sectionPrefix)
+    ? pathname.slice(sectionPrefix.length).split("/")[0]
+    : isArticle ? articleSection : null;
+
+  useLayoutEffect(() => {
+    const onArticleSection = (event: Event) => {
+      const detail = (event as CustomEvent<{ slug: string | null }>).detail;
+      setArticleSection(detail?.slug ?? null);
+    };
+    window.addEventListener("mamago:journal-article-section", onArticleSection);
+    return () => window.removeEventListener("mamago:journal-article-section", onArticleSection);
+  }, []);
 
   useLayoutEffect(() => {
     const active = activeRef.current;
@@ -31,8 +44,8 @@ export function BlogPersistentNav({ citySlug, categories }: {
   }, [activeSlug]);
 
   const pills = [
-    { id: "all", slug: null, name: "Все" },
-    ...categories.map((category) => ({ id: category.id, slug: category.slug, name: category.name })),
+    { id: "all", slug: null, name: "Все", thumbnailUrl: null, hasNewArticle: false },
+    ...categories.map((category) => ({ id: category.id, slug: category.slug, name: category.name, thumbnailUrl: category.thumbnailUrl, hasNewArticle: category.hasNewArticle })),
   ];
 
   return (
@@ -47,8 +60,20 @@ export function BlogPersistentNav({ citySlug, categories }: {
               href={pill.slug ? buildPublicPath(`${base}/category/${pill.slug}`) : base}
               prefetch
               aria-current={active ? "page" : undefined}
-              className={`shrink-0 rounded-full border px-5 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary ${active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-foreground hover:border-primary/50"}`}
+              className={`inline-flex shrink-0 items-center gap-2.5 rounded-full border py-1.5 pl-1.5 pr-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary ${active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-foreground hover:border-primary/50"}`}
             >
+              {pill.slug && (
+                <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground" aria-hidden="true">
+                  <span className="h-full w-full overflow-hidden rounded-full">
+                    {pill.thumbnailUrl ? (
+                      <img src={pill.thumbnailUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-base">{pill.name.slice(0, 1)}</span>
+                    )}
+                  </span>
+                  {pill.hasNewArticle && <span className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-primary" />}
+                </span>
+              )}
               {pill.name}
             </Link>
           );
