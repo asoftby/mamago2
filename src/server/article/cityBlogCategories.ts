@@ -11,6 +11,8 @@ export type CityBlogCategory = {
   id: string;
   slug: string;
   name: string;
+  thumbnailUrl: string | null;
+  hasNewArticle: boolean;
 };
 
 type CityRef = {
@@ -78,10 +80,26 @@ export async function listPopulatedCityBlogCategories(city: CityRef): Promise<Ci
     orderBy: [{ sortOrder: "asc" }, { nameRu: "asc" }],
   });
 
-  return categories.map((category) => ({
-    id: category.id,
-    slug: category.slug,
-    name: category.nameRu,
+  // One latest visible publication per section: works for both primary and
+  // additional category assignments, independent of current journal pagination.
+  const freshnessCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  return Promise.all(categories.map(async (category) => {
+    const latest = await prisma.article.findFirst({
+      where: { AND: [articleWhere, categoryScopeWhere([category.id])] },
+      orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
+      select: {
+        publishedAt: true,
+        heroImage: true,
+        coverImage: { select: { publicUrl: true } },
+      },
+    });
+    return {
+      id: category.id,
+      slug: category.slug,
+      name: category.nameRu,
+      thumbnailUrl: latest?.coverImage?.publicUrl ?? latest?.heroImage ?? null,
+      hasNewArticle: Boolean(latest?.publishedAt && latest.publishedAt >= freshnessCutoff),
+    };
   }));
 }
 
@@ -153,7 +171,7 @@ export async function listCityBlogCategoryFacets(
 
   return {
     root,
-    subcategories: children.map((child) => ({ id: child.id, slug: child.slug, name: child.nameRu })),
+    subcategories: children.map((child) => ({ id: child.id, slug: child.slug, name: child.nameRu, thumbnailUrl: null, hasNewArticle: false })),
     tags: tags.map((tag) => ({ id: tag.id, slug: tag.slug, name: tag.title })),
   };
 }
