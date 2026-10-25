@@ -21,6 +21,12 @@ export function EventQuickFilters({ halloweenEnabled = false }: { halloweenEnabl
     if (applied.nearby) actions.setDraft({ nearby: false });
   }, [actions, applied.nearby]);
 
+  useEffect(() => {
+    if (!halloweenEnabled && applied.occasionSlug) {
+      actions.setDraft({ occasionSlug: null });
+    }
+  }, [halloweenEnabled, applied.occasionSlug, actions]);
+
   return (
     <div className="flex items-center gap-3 overflow-x-auto scroll-smooth pb-3 pt-2 [scrollbar-width:none]" aria-label="Быстрые фильтры событий">
       <ChipsRow className="contents [&>div]:contents" items={PRESETS.map((preset) => ({ id: preset.value, label: preset.label, active: applied.whenPreset === preset.value, onClick: () => actions.setDraft({ whenPreset: applied.whenPreset === preset.value ? null : preset.value }) }))} />
