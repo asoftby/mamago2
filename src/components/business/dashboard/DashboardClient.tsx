@@ -490,13 +490,13 @@ export function DashboardClient({ data, defaultPeriod = "week", verificationBann
   return (
     <div className="space-y-5">
       {/* Verification and tour share the top row on mobile and desktop. */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         {verificationBanner}
         <button
           type="button"
           onClick={() => setTourOpen(true)}
           aria-label="Возможности кабинета — короткий обзор основных функций"
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-800 transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="inline-flex max-w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-800 transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <CirclePlay className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span>Возможности кабинета</span>
