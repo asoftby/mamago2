@@ -666,6 +666,7 @@ export function PublicationsIndexClient({
                                     className="text-primary hover:text-primary/90 hover:underline"
                                   >
                                     {row.title}
+                                    {row.missingJournalCategory ? <span className="ml-2 rounded-md bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">Проблема: нет раздела</span> : null}
                                   </Link>
                                 ) : (
                                   row.title
