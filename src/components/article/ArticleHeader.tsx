@@ -114,7 +114,7 @@ export function ArticleHeader({
 
       {/* Title */}
       <h1
-        className="font-sans font-bold text-3xl md:text-4xl lg:text-5xl leading-tight tracking-tight text-foreground mb-4"
+        className="font-sans font-bold !text-[32px] leading-tight tracking-tight text-foreground mb-4"
       >
         {title}
       </h1>
