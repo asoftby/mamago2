@@ -403,7 +403,6 @@ export default async function ArticlePage({
             editHref={editHref}
             articleHref={canonicalPath}
             coverImageUrl={mvp.heroUrl}
-        coverCaption={mvp.coverCaption}
           />
         </>
       );
