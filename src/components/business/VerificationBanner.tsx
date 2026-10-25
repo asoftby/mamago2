@@ -61,7 +61,7 @@ export function VerificationBanner({
             />
           </svg>
           <span className="text-sm font-medium text-green-800">
-            Подтвержден
+            Верифицирован
           </span>
         </BusinessChip>
       );
