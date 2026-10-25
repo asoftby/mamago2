@@ -96,6 +96,9 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     parentId?: string | null;
     nameRu?: string;
     nameEn?: string;
+    journalSeoTitle?: string | null;
+    journalSeoDescription?: string | null;
+    journalIntro?: string | null;
     slug?: string;
     icon?: string | null;
     sortOrder?: number;
@@ -187,6 +190,18 @@ export async function PATCH(req: Request, { params }: RouteParams) {
     if (!v) return NextResponse.json({ error: "nameRu cannot be empty" }, { status: 400 });
     data.nameRu = v;
     data.nameEn = v;
+  }
+  if (current.publicationType === "ARTICLE") {
+    for (const field of ["journalSeoTitle", "journalSeoDescription", "journalIntro"] as const) {
+      if (body[field] === undefined) continue;
+      if (body[field] !== null && typeof body[field] !== "string") {
+        return NextResponse.json({ error: `Invalid ${field}` }, { status: 400 });
+      }
+      const value = typeof body[field] === "string" ? body[field].trim() : "";
+      const max = field === "journalSeoTitle" ? 140 : field === "journalSeoDescription" ? 320 : 2500;
+      if (value.length > max) return NextResponse.json({ error: `${field} too long` }, { status: 400 });
+      data[field] = value || null;
+    }
   }
   if (body.slug !== undefined) {
     const existingForSlug = await prisma.eventCategory.findUnique({
