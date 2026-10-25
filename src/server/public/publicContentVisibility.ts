@@ -14,7 +14,10 @@ export { activityOwnerBusinessActiveWhere, placeOwnerBusinessActiveWhere };
  * engine indexing, not whether a user may read the article by URL.
  */
 export function getPublicPublishedArticleWhere(): Prisma.ArticleWhereInput {
-  return { status: ContentStatus.PUBLISHED };
+  return {
+    status: ContentStatus.PUBLISHED,
+    category: { publicationType: "ARTICLE", isActive: true, archivedAt: null },
+  };
 }
 
 /**
