@@ -21,6 +21,7 @@ import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { ArticleMvpView } from "@/components/article/mvp/ArticleMvpView";
 import { BreakingNewsView } from "@/components/article/mvp/BreakingNewsView";
+import { BlogArticleSectionSync } from "../../../blog/BlogArticleSectionSync";
 import { ContinuousArticleReader } from "@/components/article/continuous/ContinuousArticleReader";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
@@ -202,6 +203,7 @@ export default async function CityArticlePage({ params }: PageProps) {
     const related = await loadRelatedBreakingNews(mvp.id);
     return (
       <>
+        <BlogArticleSectionSync slug={articleRow.category?.slug ?? null} />
         <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
         <JsonLd
           data={[schemaJsonLd, breadcrumbJsonLd].filter(
@@ -292,6 +294,7 @@ export default async function CityArticlePage({ params }: PageProps) {
 
     return (
       <>
+        <BlogArticleSectionSync slug={articleRow.category?.slug ?? null} />
         <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
         <JsonLd
           data={[schemaJsonLd, breadcrumbJsonLd].filter(
@@ -314,7 +317,8 @@ export default async function CityArticlePage({ params }: PageProps) {
 
   return (
     <>
-      <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+      <BlogArticleSectionSync slug={articleRow.category?.slug ?? null} />
+        <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
       <JsonLd
         data={[schemaJsonLd, breadcrumbJsonLd].filter(
           (item): item is Record<string, unknown> => Boolean(item),
