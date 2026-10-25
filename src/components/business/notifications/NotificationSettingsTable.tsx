@@ -123,7 +123,7 @@ export function NotificationSettingsTable({
 
   // Sync telegram status from hook to data state
   useEffect(() => {
-    if (telegramStatus && data) {
+    if (telegramStatus) {
       setData((prev) =>
         prev
           ? {
@@ -136,7 +136,7 @@ export function NotificationSettingsTable({
           : prev,
       );
     }
-  }, [telegramStatus, data]);
+  }, [telegramStatus]);
 
   useEffect(() => {
     if (initialData) return;
