@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatJournalPublishedDate } from "@/lib/article/formatJournalPublishedDate";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BlogPagination } from "../../../../blog/BlogPagination";
@@ -170,7 +171,7 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
                 )}
                 <div className="p-5">
                   <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    {article.publishedAt ? <time dateTime={new Date(article.publishedAt).toISOString()}>{new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(new Date(article.publishedAt))}</time> : null}
+                    {article.publishedAt ? <time dateTime={new Date(article.publishedAt).toISOString()}>{formatJournalPublishedDate(article.publishedAt)}</time> : null}
                     <span>·</span>
                     <span>{article.readTime} мин</span>
                   </div>
