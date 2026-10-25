@@ -51,11 +51,11 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   const cityName = getCityDisplayName(city.slug);
   const basePath = categoryPath(city.slug, category.slug);
   const canonical = buildAbsoluteCanonicalUrl(page > 1 ? `${basePath}?page=${page}` : basePath);
-  const titleBase = `${category.nameRu} для семей в ${cityName}`;
+  const titleBase = category.journalSeoTitle?.trim() || `${category.nameRu} для семей в ${cityName}`;
 
   return applyGlobalRobotsOverride({
     title: page > 1 ? `${titleBase} — страница ${page} — mamaGo` : `${titleBase} — mamaGo`,
-    description: `Статьи, обзоры и полезные материалы mamaGo в разделе «${category.nameRu}» для семей с детьми в ${cityName}.`,
+    description: category.journalSeoDescription?.trim() || `Статьи, обзоры и полезные материалы mamaGo в разделе «${category.nameRu}» для семей с детьми в ${cityName}.`,
     alternates: { canonical },
     ...(result.total === 0 ? { robots: { index: false, follow: true } } : {}),
   });
@@ -107,7 +107,7 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
         <p className="mb-3 text-[11px] font-mono uppercase tracking-[.14em] text-primary">Раздел журнала</p>
         <h1 className="font-heading text-[40px] leading-tight tracking-[-.025em]">{category.nameRu}</h1>
         <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground">
-          Статьи, обзоры и полезные материалы для семей с детьми в {cityName}.
+          {category.journalIntro?.trim() || `Статьи, обзоры и полезные материалы для семей с детьми в ${cityName}. Узнайте о новых идеях и событиях для всей семьи.`}
         </p>
       </header>
 
