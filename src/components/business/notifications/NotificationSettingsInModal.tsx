@@ -9,7 +9,6 @@ import {
   type NotificationSettingsSurfaceData,
 } from "@/lib/notifications/settingsDomain";
 import { TelegramStatusRow } from "./TelegramStatusRow";
-import { BusinessTelegramStatusRow } from "./BusinessTelegramStatusRow";
 
 type Mode = "user" | "business";
 
@@ -57,7 +56,9 @@ export function NotificationSettingsInModal({ mode }: Props) {
 
   return (
     <div className="space-y-4 pt-4">
-      {mode === "business" && <BusinessTelegramStatusRow />}
+      {mode === "business" ? (
+        <p className="text-xs text-muted-foreground">Личный Telegram для общих уведомлений</p>
+      ) : null}
       <TelegramStatusRow
         connected={data.telegramConnected}
         canSendTelegramTest={data.canSendTelegramTest}
