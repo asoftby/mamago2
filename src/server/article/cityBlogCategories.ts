@@ -11,6 +11,7 @@ export type CityBlogCategory = {
   id: string;
   slug: string;
   name: string;
+  thumbnailUrl: string | null;
 };
 
 type CityRef = {
@@ -78,10 +79,28 @@ export async function listPopulatedCityBlogCategories(city: CityRef): Promise<Ci
     orderBy: [{ sortOrder: "asc" }, { nameRu: "asc" }],
   });
 
-  return categories.map((category) => ({
-    id: category.id,
-    slug: category.slug,
-    name: category.nameRu,
+  // Resolve the latest visible publication per category (including additional
+  // category assignments). Do not rely on the current paginated journal page.
+  return Promise.all(categories.map(async (category) => {
+    const latest = await prisma.article.findFirst({
+      where: {
+        AND: [
+          articleWhere,
+          categoryScopeWhere([category.id]),
+        ],
+      },
+      orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
+      select: {
+        heroImage: true,
+        coverImage: { select: { publicUrl: true } },
+      },
+    });
+    return {
+      id: category.id,
+      slug: category.slug,
+      name: category.nameRu,
+      thumbnailUrl: latest?.coverImage?.publicUrl ?? latest?.heroImage ?? null,
+    };
   }));
 }
 
