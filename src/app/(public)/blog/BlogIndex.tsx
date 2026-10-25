@@ -89,8 +89,6 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
             <div className="flex items-center gap-3 mb-5 text-[11px] font-mono uppercase tracking-[.14em] text-muted-foreground">
               <span className="text-primary">●</span>
               <span>Журнал</span>
-              <span className="opacity-40">·</span>
-              <span>{articles.length} материалов</span>
             </div>
 
             <h1
@@ -101,7 +99,7 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
             </h1>
 
             <p className="mt-5 text-[17px] leading-relaxed text-muted-foreground w-full">
-              Вдохновение для семейных прогулок, событий и открытий — в одной редакторской подборке.
+              Вдохновение для семейных прогулок, событий и открытий.
             </p>
           </div>
 
@@ -198,9 +196,6 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
                     все материалы
                   </span>
                   <div className="flex-1 h-px bg-border" />
-                  <span className="text-[11px] font-mono text-muted-foreground shrink-0">
-                    {rest.length} из {articles.length}
-                  </span>
                 </div>
                 {rest.map((a, i) => (
                   <AnalyticsCardViewTracker
@@ -355,9 +350,6 @@ function ArticleRow({
         <span className="text-[11px] font-mono text-muted-foreground">
           {article.readTime} мин
         </span>
-        <span className="hidden sm:block text-[10px] font-mono uppercase tracking-[.14em] text-muted-foreground/30 mt-1">
-          № {String(idx + 1).padStart(2, "0")}
-        </span>
       </div>
 
       {/* Body */}
@@ -387,7 +379,6 @@ function ArticleRow({
         {!article.coverImageUrl && (
           <span className="absolute bottom-2 left-2.5 right-2.5 flex justify-between">
             <span className="text-[10px] font-mono uppercase tracking-[.12em] text-black/35">обложка</span>
-            <span className="text-[10px] font-mono text-black/25">{String(idx + 1).padStart(2, "0")}</span>
           </span>
         )}
       </div>
