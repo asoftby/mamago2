@@ -223,7 +223,6 @@ export default async function CityArticlePage({ params }: PageProps) {
           citySlug={city.slug}
           articleHref={canonicalPath}
           coverImageUrl={mvp.heroUrl}
-        coverCaption={mvp.coverCaption}
         />
       </>
     );
