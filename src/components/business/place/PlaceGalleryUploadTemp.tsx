@@ -165,7 +165,7 @@ function ImageItemContent({
       {/* Remove button */}
       <button
         onClick={() => onRemove(image.id)}
-        className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-10"
+        className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 hover:bg-red-700 z-10"
         type="button"
       >
         <X className="h-4 w-4" />
@@ -175,7 +175,7 @@ function ImageItemContent({
       {showDragHandle && (
         <div
           {...dragHandleProps}
-          className="absolute top-2 left-2 p-1.5 bg-black/50 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-move z-10"
+          className="absolute top-2 left-2 p-1.5 bg-black/50 text-white rounded opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 cursor-grab touch-none z-10"
         >
           <GripVertical className="h-4 w-4" />
         </div>
