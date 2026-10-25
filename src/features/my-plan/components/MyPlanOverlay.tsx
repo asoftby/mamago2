@@ -71,13 +71,13 @@ export function MyPlanOverlay({ open, onOpenChange }: MyPlanOverlayProps) {
       showCloseButton={false}
       mobileTopSlot={dragHandle}
       heightMode="tall"
-      dialogContentClassName="!max-w-[572px] !h-[min(90dvh,760px)]"
+      dialogContentClassName="!max-w-[572px] !h-[min(90dvh,760px)] !min-h-0"
       bodyClassName="min-h-0 overflow-hidden"
     >
       <div
         style={MY_PLAN_V3_TOKENS}
         className={cn(
-          "flex min-h-0 flex-1 flex-col bg-[var(--mp-bg)] text-[var(--mp-tx)]",
+          "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--mp-bg)] text-[var(--mp-tx)]",
           "animate-in fade-in-0 duration-150",
         )}
       >
