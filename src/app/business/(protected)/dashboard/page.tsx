@@ -217,13 +217,16 @@ export default async function BusinessDashboardPage({
   };
 
   return (
-    <div className="space-y-6">
-      <VerificationBanner
-        status={verificationStatus}
-        reviewNote={business.reviewNote}
-        compact
-      />
-      <DashboardClient data={dashboardData} defaultPeriod={selectedPeriod} />
-    </div>
+    <DashboardClient
+      data={dashboardData}
+      defaultPeriod={selectedPeriod}
+      verificationBanner={
+        <VerificationBanner
+          status={verificationStatus}
+          reviewNote={business.reviewNote}
+          compact
+        />
+      }
+    />
   );
 }

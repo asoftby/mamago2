@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { BusinessOnboardingSnapshot } from "@/lib/business/onboardingProgress";
 import Link from "next/link";
-import { ChevronRight, CirclePlay } from "lucide-react";
+import { CirclePlay } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -453,9 +453,10 @@ function PublicationsSection({
 interface DashboardClientProps {
   data: DashboardData;
   defaultPeriod?: DashboardPeriod;
+  verificationBanner: ReactNode;
 }
 
-export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClientProps) {
+export function DashboardClient({ data, defaultPeriod = "week", verificationBanner }: DashboardClientProps) {
   const [period, setPeriod] = useState<DashboardPeriod>(defaultPeriod);
   const [tourOpen, setTourOpen] = useState(() =>
     data.onboarding.showLaunchpad && !data.onboarding.tourCompleted &&
@@ -488,6 +489,20 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
 
   return (
     <div className="space-y-5">
+      {/* Verification and tour share the top row on mobile and desktop. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {verificationBanner}
+        <button
+          type="button"
+          onClick={() => setTourOpen(true)}
+          aria-label="Возможности кабинета — короткий обзор основных функций"
+          className="inline-flex max-w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-medium text-stone-800 transition hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <CirclePlay className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>Возможности кабинета</span>
+        </button>
+      </div>
+
       {/* Header: title + identity — always shown */}
       <div data-business-tour="intro">
         <DashboardHeader
@@ -497,29 +512,12 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
           settingsHref={data.hrefs.settings}
         />
       </div>
-      {/* One permanent way to restart the contextual tour, including during onboarding. */}
-      <button
-        type="button"
-        onClick={() => setTourOpen(true)}
-        aria-label="Возможности кабинета — короткий обзор основных функций"
-        className="group flex w-full items-center gap-3 rounded-2xl border border-stone-200/80 bg-white px-4 py-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-      >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-stone-50 text-stone-700">
-          <CirclePlay className="h-5 w-5" aria-hidden="true" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-stone-950">Возможности кабинета</span>
-          <span className="mt-0.5 block text-xs text-stone-500">Короткий обзор основных функций</span>
-        </span>
-        <ChevronRight className="h-5 w-5 shrink-0 text-stone-400 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-      </button>
-
       {/* Business Bot connection stays visible in either dashboard state. */}
       <BusinessTelegramStatusRow location="dashboard" />
 
-      {/* Primary action directly below the connection card for established businesses. */}
+      {/* Mobile: full-width action below Telegram; desktop: first right-column item. */}
       {!isOnboarding && (
-        <div data-business-tour="create" className="w-full sm:max-w-md">
+        <div data-business-tour="create" className="w-full lg:hidden">
           <DashboardActionStack
             promotionHref={data.hrefs.promotion}
             hasPublications={data.totalPublications > 0}
@@ -589,6 +587,12 @@ export function DashboardClient({ data, defaultPeriod = "week" }: DashboardClien
         {/* ── RIGHT: sticky Balance panel + actions (desktop only) ──────── */}
         <div className="hidden lg:block w-[300px] shrink-0 border-l border-stone-200/70 pl-6">
           <div className="sticky top-6 space-y-3">
+            <div data-business-tour="create">
+              <DashboardActionStack
+                promotionHref={data.hrefs.promotion}
+                hasPublications={data.totalPublications > 0}
+              />
+            </div>
             {BUSINESS_DASHBOARD_MVP.businessBalanceUiEnabled && <BalancePanel
               balance={data.depositBalance}
               periodSpend={data.periodSpend}
