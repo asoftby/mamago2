@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BlogIndex } from "../../blog/BlogIndex";
 import { BlogPagination } from "../../blog/BlogPagination";
-import { BlogCategoryNav } from "../../blog/BlogCategoryNav";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
 import {
   buildAbsoluteCanonicalUrl,
@@ -77,8 +76,7 @@ export default async function CityBlogPage({ params, searchParams }: PageProps) 
 
   return (
     <main>
-      <BlogCategoryNav citySlug={city.slug} categories={categories} />
-      <BlogIndex articles={journal.articles} />
+      <BlogIndex articles={journal.articles} citySlug={city.slug} cityCategories={categories} />
       <BlogPagination
         basePath={basePath}
         page={journal.page}
