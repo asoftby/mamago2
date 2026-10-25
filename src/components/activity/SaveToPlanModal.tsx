@@ -493,7 +493,7 @@ function DateSlider({ options, selISO, onSelect, sessionCountsByDate }: DateSlid
               onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.line; }}
             >
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: isSel ? "rgba(250,247,241,.6)" : C.ink3 }}>{chip.dow}</span>
-              <span style={{ fontFamily: "var(--font-display)", fontSize: 28, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
+              <span style={{ fontFamily: "var(--font-sans, ui-sans-serif)", fontSize: 28, fontWeight: 400, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 9, letterSpacing: ".08em", color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
               {dotsCount > 0 ? (
                 <span
@@ -619,7 +619,7 @@ function ConfirmBar({ iso, time, onConfirm, label = "Сохранить" }: { is
         <div style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".1em", color: "rgba(250,247,241,.55)", marginBottom: 3 }}>● выбрано</div>
         <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.01em" }}>
           {DOW_FULL[chip.dow] ?? chip.dow},{" "}
-          <span style={{ fontFamily: "var(--font-display)" }}>{chip.day}</span>{" "}
+          <span>{chip.day}</span>{" "}
           {RU_MONTHS_FULL[chip.monthIdx]}
           {time && (
             <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 13, fontWeight: 500, color: "rgba(250,247,241,.75)", marginLeft: 6 }}>
@@ -840,7 +840,7 @@ function DateSliderView({
           kicker={inPlan ? "уже в плане" : isIdea ? "уже в идеях" : "сохранить активность"}
           heading={isIdea && !inPlan
             ? <>На когда запланируем?</>
-            : <>В какой{" "}день{" "}напомнить.</>}
+            : <>В какой день напомнить?</>}
           ticket={{
             ...(ticket ?? { title }),
             title: selectedSessionTitle
