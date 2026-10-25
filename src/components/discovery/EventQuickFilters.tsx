@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { ChipsRow } from "@/components/ui/chips-row";
 import { EventDateRangePicker } from "./EventDateRangePicker";
+import { HalloweenChip } from "./HalloweenChip";
 import { useDiscoveryFilters, type WhenPreset } from "@/features/filters/discovery/filters.store";
 
 const PRESETS: Array<{ value: Exclude<WhenPreset, null>; label: string }> = [
@@ -11,7 +12,7 @@ const PRESETS: Array<{ value: Exclude<WhenPreset, null>; label: string }> = [
   { value: "WEEKEND", label: "Выходные" },
 ];
 
-export function EventQuickFilters() {
+export function EventQuickFilters({ halloweenEnabled = false }: { halloweenEnabled?: boolean }) {
   const { applied, actions } = useDiscoveryFilters();
 
   // Nearby has no executable proximity semantics yet. Clean old/shared URLs as
@@ -23,6 +24,12 @@ export function EventQuickFilters() {
   return (
     <div className="flex items-center gap-3 overflow-x-auto scroll-smooth pb-3 pt-2 [scrollbar-width:none]" aria-label="Быстрые фильтры событий">
       <ChipsRow className="contents [&>div]:contents" items={PRESETS.map((preset) => ({ id: preset.value, label: preset.label, active: applied.whenPreset === preset.value, onClick: () => actions.setDraft({ whenPreset: applied.whenPreset === preset.value ? null : preset.value }) }))} />
+      {halloweenEnabled && (
+        <HalloweenChip
+          active={applied.occasionSlug === "halloween"}
+          onClick={() => actions.setDraft({ occasionSlug: applied.occasionSlug === "halloween" ? null : "halloween" })}
+        />
+      )}
       <EventDateRangePicker applied={applied} onApply={actions.setDraft} />
     </div>
   );
