@@ -182,7 +182,7 @@ export function determineIntent(data: OfferFormData): "куда_пойти" | "�
   
   if (data.offerKind === "course") {
     if (data.durationType === "camp") return "занятия";
-    return data.durationType === "recurring" ? "занятия" : "куда_пойти";
+    return "занятия";
   }
   if (data.offerKind === "birthday") return "день_рождения";
   if (data.offerKind === "service") return "день_рождения";
