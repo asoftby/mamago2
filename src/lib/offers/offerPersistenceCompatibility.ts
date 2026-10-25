@@ -42,7 +42,7 @@ export function inferRequestedPlacements(params: {
     case "REGULAR_ACTIVITY":
       return ["CLASSES"];
     case "ONE_TIME_ACTIVITY":
-      return ["WHERE_TO_GO"];
+      return ["CLASSES"];
     default:
       return [];
   }
