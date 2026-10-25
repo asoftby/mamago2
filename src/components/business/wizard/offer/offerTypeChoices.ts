@@ -110,10 +110,10 @@ const OFFER_TYPE_SELECTIONS: Record<OfferProductType, OfferTypeSelection> = {
   ONE_TIME_ACTIVITY: {
     productType: "ONE_TIME_ACTIVITY",
     offerWizardType: "SINGLE",
-    requestedPlacements: ["WHERE_TO_GO"],
+    requestedPlacements: ["CLASSES"],
     offerKind: "course",
     durationType: "single",
-    intent: "куда_пойти",
+    intent: "занятия",
   },
   REGULAR_ACTIVITY: {
     productType: "REGULAR_ACTIVITY",
