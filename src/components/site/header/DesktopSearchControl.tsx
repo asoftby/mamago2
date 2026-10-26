@@ -541,11 +541,11 @@ function DiscoveryDesktopSearchControl({
       
       // If no personas left, clear age filters (enters free search mode)
       if (newIds.length === 0) {
-        actions.setDraft({ age: [] });
+        actions.setDraft({ age: [], profile: null });
       } else {
         // Sync age filters based on remaining personas
         const newAudience = mapPlanParticipantsToAudience(newIds, family.personas ?? []);
-        actions.setDraft({ age: newAudience });
+        actions.setDraft({ age: newAudience, profile: newIds.join(",") });
       }
     } else {
       // Select persona (exits free search mode automatically)
@@ -554,7 +554,7 @@ function DiscoveryDesktopSearchControl({
       
       // Sync age filters based on new personas
       const newAudience = mapPlanParticipantsToAudience(newIds, family.personas ?? []);
-      actions.setDraft({ age: newAudience });
+      actions.setDraft({ age: newAudience, profile: newIds.join(",") });
     }
   };
 
@@ -567,7 +567,7 @@ function DiscoveryDesktopSearchControl({
     // Switch to free mode: clear all selections via FamilyPersonaContext
     family.setSelectedPersonaIds([]);
     // Clear age filters
-    actions.setDraft({ age: [] });
+    actions.setDraft({ age: [], profile: null });
   };
 
   const toggleChild = (childId: string) => {
@@ -586,7 +586,7 @@ function DiscoveryDesktopSearchControl({
           if (ageMode === "derived") {
             return;
           }
-          actions.setDraft({ age: patch.age });
+          actions.setDraft({ age: patch.age, profile: null });
           return;
         }
         actions.setDraft(patch);
@@ -694,14 +694,14 @@ function DiscoveryDesktopSearchControl({
 
   const handleClearAge = () => {
     if (ageMode === "free" && showChildrenPreset) {
-      actions.setDraft({ age: [] });
+      actions.setDraft({ age: [], profile: null });
       return;
     }
     if (family?.primaryAdultPersonaId && showChildrenPreset) {
       family.setSelectedPersonaIds([]);
-      actions.setDraft({ age: [] });
+      actions.setDraft({ age: [], profile: null });
     } else {
-      actions.setDraft({ age: [] });
+      actions.setDraft({ age: [], profile: null });
       childrenScope.setSelectedChildrenIds([]);
     }
   };
