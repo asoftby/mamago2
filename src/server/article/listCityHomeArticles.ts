@@ -54,7 +54,6 @@ export type JournalPage = {
 type CityHomeArticleCity = {
   id: string;
   slug: string;
-  name: string;
   regionId?: string | null;
 };
 
