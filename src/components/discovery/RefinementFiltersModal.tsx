@@ -86,6 +86,7 @@ export function RefinementFiltersModal() {
       <ModalCloseButton
         type="button"
         onClick={() => setIsOpen(false)}
+        size="touch"
         className="shrink-0"
       />
     </div>
