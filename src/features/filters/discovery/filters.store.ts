@@ -25,6 +25,8 @@ export type WhenPreset = "TODAY" | "TOMORROW" | "WEEKEND" | null;
 export type DiscoveryFilters = {
   categories: string[];
   genres: string[];
+  /** Seasonal occasion quick-filter (presently Halloween). */
+  occasionSlug?: string | null;
   dateFrom: string | null;
   dateTo: string | null;
   whenPreset: WhenPreset;
@@ -42,6 +44,7 @@ export type DiscoveryFilters = {
 export const defaultFilters: DiscoveryFilters = {
   categories: [],
   genres: [],
+  occasionSlug: null,
   dateFrom: null,
   dateTo: null,
   whenPreset: null,
@@ -61,6 +64,7 @@ export function isDiscoveryFiltersEmpty(f: DiscoveryFilters): boolean {
     !f.dateFrom &&
     f.categories.length === 0 &&
     f.genres.length === 0 &&
+    !f.occasionSlug &&
     !f.dateTo &&
     !f.whenPreset &&
     f.age.length === 0 &&
@@ -90,7 +94,8 @@ export function discoveryFiltersEqual(a: DiscoveryFilters, b: DiscoveryFilters):
     a.adultOnly !== b.adultOnly ||
     a.age.length !== b.age.length ||
     a.categories.length !== b.categories.length ||
-    a.genres.length !== b.genres.length
+    a.genres.length !== b.genres.length ||
+    (a.occasionSlug ?? null) !== (b.occasionSlug ?? null)
   ) {
     return false;
   }
@@ -211,6 +216,7 @@ function hasDiscoveryFilterParamsInUrl(
     searchParams.get("age") ||
     searchParams.get("category") ||
     searchParams.get("genre") ||
+    searchParams.get("occasion") ||
     searchParams.get("format") ||
     searchParams.get("metro") ||
     searchParams.get("district") ||
@@ -304,6 +310,7 @@ export function parseAppliedFromUrl(
   const ageRaw = searchParams.get("age")?.split(",").filter(Boolean) || [];
   const categories = searchParams.get("category")?.split(",").filter(Boolean) || [];
   const genres = searchParams.get("genre")?.split(",").filter(Boolean) || [];
+  const occasionSlug = searchParams.get("occasion") === "halloween" ? "halloween" : null;
 
   const legacyAgeMap: Record<string, string> = {
     "0+": "0-1",
@@ -350,6 +357,7 @@ export function parseAppliedFromUrl(
   return {
     categories: [...new Set(categories)],
     genres: [...new Set(genres)],
+    occasionSlug,
     dateFrom: dFrom || null,
     dateTo: dTo || null,
     whenPreset,
@@ -405,6 +413,8 @@ export function serializeAppliedToSearchParams(
   else params.delete("category");
   if (next.genres.length > 0) params.set("genre", next.genres.join(","));
   else params.delete("genre");
+  if (next.occasionSlug === "halloween") params.set("occasion", next.occasionSlug);
+  else params.delete("occasion");
 
   const formatQuery = serializeActivityFormatQuery(next.format);
   if (formatQuery) params.set("format", formatQuery);
@@ -436,6 +446,7 @@ export function getDiscoveryFilterActiveCount(filters: DiscoveryFilters): number
     (filters.dateFrom || filters.dateTo || filters.whenPreset ? 1 : 0) +
     (filters.categories.length > 0 ? 1 : 0) +
     (filters.genres.length > 0 ? 1 : 0) +
+    (filters.occasionSlug ? 1 : 0) +
     (filters.age.length > 0 ? 1 : 0) +
     (filters.format ? 1 : 0) +
     (filters.metro ? 1 : 0) +
@@ -753,6 +764,7 @@ export function useDiscoveryFilters() {
       !!filters.dateFrom ||
       filters.categories.length > 0 ||
       filters.genres.length > 0 ||
+      !!filters.occasionSlug ||
       !!filters.dateTo ||
       !!filters.whenPreset ||
       filters.age.length > 0 ||

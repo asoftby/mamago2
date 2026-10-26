@@ -49,6 +49,7 @@ export function resolveEventDateRange(
 export type EventRuntimeFilters = {
   categorySlugs?: string[];
   genreSlugs?: string[];
+  occasionSlug?: string | null;
   dateRange: DateRange | null;
   free: boolean;
   priceMin?: number | null;
@@ -129,6 +130,10 @@ export function buildEventRuntimeWhere(filters: EventRuntimeFilters): Prisma.Act
   }
   if (genreSlugs.length > 0) {
     parts.push({ genreSlugs: { hasSome: genreSlugs } });
+  }
+  // Only explicitly linked events qualify: no title keyword guessing.
+  if (filters.occasionSlug === "halloween") {
+    parts.push({ occasionLinks: { some: { occasion: { slug: "halloween", isActive: true } } } });
   }
   if (filters.dateRange) {
     parts.push({

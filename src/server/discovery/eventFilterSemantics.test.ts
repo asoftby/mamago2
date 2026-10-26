@@ -139,3 +139,19 @@ test("numeric max matches canonical modes by priceFrom while no max keeps every 
 test("absent category and genre preserve the existing predicates", () => {
   assert.deepEqual(buildEventRuntimeWhere({ categorySlugs: [], genreSlugs: [], dateRange: null, free: false, priceMax: null, districtId: null, metroId: null, adultOnly: false }), []);
 });
+
+
+test("Halloween quick chip filters by linked active Occasion, not title keywords", () => {
+  const input = {
+    occasionSlug: "halloween",
+    dateRange: null,
+    free: false,
+    districtId: null,
+    metroId: null,
+    adultOnly: false,
+  };
+  assert.deepEqual(buildEventRuntimeWhere(input), [{
+    occasionLinks: { some: { occasion: { slug: "halloween", isActive: true } } },
+  }]);
+  assert.deepEqual(buildEventRuntimeWhere({ ...input, occasionSlug: null }), []);
+});

@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     eventFilters: {
       categorySlugs: p.get("category")?.split(",").filter(Boolean) ?? [],
       genreSlugs: p.get("genre")?.split(",").filter(Boolean) ?? [],
+      occasionSlug: p.get("occasion") === "halloween" ? "halloween" : null,
       dateRange: null,
       free: p.get("free") === "true",
       priceMax: null,

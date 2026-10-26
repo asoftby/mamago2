@@ -22,6 +22,7 @@ function hasActiveEventRuntimeFilters(filters: EventRuntimeFilters): boolean {
   return Boolean(
     filters.categorySlugs?.length ||
       filters.genreSlugs?.length ||
+      filters.occasionSlug ||
       filters.dateRange ||
       filters.free ||
       filters.priceMin !== null && filters.priceMin !== undefined ||

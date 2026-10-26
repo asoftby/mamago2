@@ -1,0 +1,82 @@
+.chip {
+  position: relative;
+  isolation: isolate;
+  flex: none;
+  height: 44px;
+  padding: 0 16px 0 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: #1e1b18;
+  font: inherit;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform .2s, background-color .2s, border-color .2s, color .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.chip::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(105deg, transparent 35%, rgba(232, 140, 90, .18) 50%, transparent 65%) -150% 0 / 250% 100% no-repeat;
+  animation: shine 4.5s ease-in-out infinite;
+}
+.chip:active { transform: scale(.96); }
+.chip:focus-visible { outline: 2px solid var(--primary, #e8834a); outline-offset: 3px; }
+.chip:disabled { opacity: .5; cursor: not-allowed; }
+.black { border-color: #1e1b18; }
+.active { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, white); color: #1e1b18; }
+.black.active { background: #1e1b18; color: #ffe7d3; }
+.pumpkin {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  transform-origin: 50% 90%;
+  animation: sway 2.6s ease-in-out infinite;
+}
+.face { fill: #3b1f14; }
+.glow { fill: #ffc64b; opacity: 0; animation: flicker 3s steps(1) infinite; }
+.active .glow { opacity: 1; animation: burn 1.6s ease-in-out infinite; }
+.laughing .pumpkin { animation: laugh .12s ease-in-out 6 alternate; }
+.laughing .glow { opacity: 1; animation: burn .25s ease-in-out infinite; }
+.laughing .face { transform-origin: 50% 70%; animation: mouth .22s ease-in-out 4 alternate; }
+.bat {
+  position: absolute;
+  top: -6px;
+  right: 6px;
+  width: 16px;
+  height: 10px;
+  pointer-events: none;
+  animation: fly 6s ease-in-out infinite;
+}
+.bat path {
+  fill: #3b2a44;
+  transform-origin: 50% 50%;
+  animation: flap .18s ease-in-out infinite alternate;
+}
+.black.active .bat path { fill: #ffb37a; }
+@keyframes laugh { from { transform: rotate(-12deg) scale(1); } to { transform: rotate(12deg) scale(1.06); } }
+@keyframes mouth { from { transform: scaleY(.78); } to { transform: scaleY(1.18); } }
+@keyframes sway { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+@keyframes flicker { 0%, 62%, 70%, 100% { opacity: 0; } 64%, 68%, 76%, 90% { opacity: 1; } }
+@keyframes burn { 0%, 100% { opacity: 1; } 45% { opacity: .6; } 55% { opacity: .95; } }
+@keyframes flap { from { transform: scaleY(1); } to { transform: scaleY(.35); } }
+@keyframes fly {
+  0%, 55% { opacity: 0; transform: translate(-40px, 14px) scale(.6); }
+  62% { opacity: 1; }
+  85% { opacity: 1; transform: translate(10px, -14px) scale(1); }
+  92%, 100% { opacity: 0; transform: translate(22px, -22px) scale(.8); }
+}
+@keyframes shine { 0%, 60% { background-position: -150% 0; } 100% { background-position: 250% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .chip::before, .pumpkin, .glow, .bat, .bat path, .laughing .pumpkin, .laughing .face, .laughing .glow { animation: none; }
+  .bat { opacity: 0; }
+  .active .glow { opacity: 1; }
+}
