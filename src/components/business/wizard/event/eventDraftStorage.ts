@@ -35,7 +35,7 @@ export function parseEventEditorDraft(
 
   // Previous builds persisted raw EventFormData with occasionIds: [] even
   // for events that had occasion links. Restore only that unreliable field.
-  const legacyDraft = record as EventFormData;
+  const legacyDraft = record as unknown as EventFormData;
   return {
     ...legacyDraft,
     occasionIds: mode === "edit"
