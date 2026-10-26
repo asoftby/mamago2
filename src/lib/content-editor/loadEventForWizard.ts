@@ -57,6 +57,11 @@ export async function loadEventForWizard(eventId: string) {
       programCategoryLinks: {
         select: { categoryId: true },
       },
+      // Without these links the wizard falsely displays all occasions as
+      // unselected and a subsequent edit can unintentionally remove them.
+      occasionLinks: {
+        select: { occasionId: true },
+      },
       eventCategory: {
         select: { id: true, parentId: true, slug: true, nameRu: true },
       },
