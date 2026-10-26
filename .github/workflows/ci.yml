@@ -84,6 +84,9 @@ jobs:
       - name: Direct Google Search Console regressions
         run: pnpm test:gsc
 
+      - name: Event wizard occasion hydration regressions
+        run: pnpm test:event-wizard-update-loop
+
       - name: Type check
         # GitHub ubuntu runners abort TypeScript at Node's default heap ceiling.
         run: NODE_OPTIONS=--max-old-space-size=5120 pnpm tsc --noEmit
