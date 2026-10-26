@@ -41,6 +41,7 @@ function placeFixture(overrides: Partial<Place> = {}): Place {
     id: "place-1",
     title: "Cool Place",
     cityId: "city-1",
+    territoryId: null,
     lat: 53.9,
     lng: 27.5667,
     phone: "+375291234567",

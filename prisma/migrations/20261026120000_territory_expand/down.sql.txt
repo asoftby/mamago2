@@ -1,0 +1,31 @@
+-- Rollback for 20261026120000_territory_expand (rename to .sql to run). Manual: NOT executed by `prisma migrate deploy`.
+-- After running, delete the row from _prisma_migrations. Safe: nothing reads the new columns yet.
+BEGIN;
+ALTER TABLE "RecommendationRun" DROP COLUMN "territoryId";
+ALTER TABLE "UserEvent" DROP COLUMN "territoryId";
+ALTER TABLE "District" DROP COLUMN "territoryId";
+ALTER TABLE "MetroStation" DROP COLUMN "territoryId";
+ALTER TABLE "Activity" DROP COLUMN "territoryId";
+ALTER TABLE "ActivitySlugHistory" DROP COLUMN "territoryId";
+ALTER TABLE "EventVenue" DROP COLUMN "territoryId";
+ALTER TABLE "Place" DROP COLUMN "territoryId";
+ALTER TABLE "PlaceRevision" DROP COLUMN "territoryId";
+ALTER TABLE "PlaceSlugHistory" DROP COLUMN "territoryId";
+ALTER TABLE "HomeStoryItem" DROP COLUMN "territoryId";
+ALTER TABLE "Offer" DROP COLUMN "territoryId";
+ALTER TABLE "OfferSlugHistory" DROP COLUMN "territoryId";
+ALTER TABLE "Route" DROP COLUMN "territoryId";
+ALTER TABLE "Article" DROP COLUMN "regionTerritoryId", DROP COLUMN "territoryId";
+ALTER TABLE "ArticleGeographyTarget" DROP COLUMN "regionTerritoryId", DROP COLUMN "territoryId";
+ALTER TABLE "ArticleSlugHistory" DROP COLUMN "territoryId";
+ALTER TABLE "EditorialRequest" DROP COLUMN "territoryId";
+ALTER TABLE "SearchDocument" DROP COLUMN "territoryId";
+ALTER TABLE "ImportSource" DROP COLUMN "territoryId";
+ALTER TABLE "SearchQuickTag" DROP COLUMN "territoryId";
+ALTER TABLE "SeoContentPlanItem" DROP COLUMN "regionTerritoryId", DROP COLUMN "territoryId";
+ALTER TABLE "SearchQueryLog" DROP COLUMN "territoryId";
+DROP TABLE "TerritoryLegacyMap";
+DROP TABLE "Territory";
+DROP TYPE "TerritoryLegacyKind";
+DROP TYPE "TerritoryType";
+COMMIT;
