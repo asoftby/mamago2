@@ -19,17 +19,57 @@ export type CityArticlePublicRouteResolution =
     };
 
 /**
- * Resolve a CITY-scoped public article route for /{city}/blog/{slug}.
- *
- * Uses the shared findArticleBySlug(slug, cityId) lookup so both the current
- * slug and ArticleSlugHistory entries resolve consistently.
+ * Resolve /{city}/blog/{slug}, including links opened from another city.
+ * Local slug ownership always wins; only an unambiguous published cross-city
+ * match redirects to its true canonical URL. Drafts and ambiguous slugs stay 404.
  */
 export async function resolveCityArticlePublicRoute(
   slug: string,
   city: { id: string; slug: string },
 ): Promise<CityArticlePublicRouteResolution> {
   const resolved = await findArticleBySlug(slug, city.id);
-  if (!resolved) return { kind: "not_found" };
+  if (!resolved) {
+    // Bad or stale city context in a shared link must not make a published
+    // article unreadable. Resolve an unambiguous slug across Belarus, while
+    // preserving the canonical city/region/country URL (no duplicate pages).
+    const matches = await prisma.article.findMany({
+      where: { ...getPublicPublishedArticleWhere(), slug },
+      select: { id: true, slug: true, geoScope: true, city: { select: { slug: true } } },
+      take: 2,
+    });
+
+    if (matches.length === 1) {
+      const match = matches[0];
+      const path = match.geoScope === "CITY" && match.city?.slug
+        ? buildCityPublicPath({ citySlug: match.city.slug, type: "article", slug: match.slug! })
+        : buildNationalArticlePath(match.slug!);
+      return { kind: match.geoScope === "CITY" ? "canonical_redirect" : "national_redirect", path };
+    }
+    if (matches.length > 1) return { kind: "not_found" };
+
+    // A historical slug can likewise come from a link with the wrong city.
+    const historicalMatches = await prisma.articleSlugHistory.findMany({
+      where: { slug, article: getPublicPublishedArticleWhere() },
+      distinct: ["articleId"],
+      take: 2,
+      select: { articleId: true },
+    });
+    if (historicalMatches.length !== 1) return { kind: "not_found" };
+
+    const match = await prisma.article.findFirst({
+      where: { id: historicalMatches[0].articleId, ...getPublicPublishedArticleWhere() },
+      select: { slug: true, geoScope: true, city: { select: { slug: true } } },
+    });
+    if (!match?.slug) return { kind: "not_found" };
+    if (match.geoScope === "CITY") {
+      if (!match.city?.slug) return { kind: "not_found" };
+      return {
+        kind: "canonical_redirect",
+        path: buildCityPublicPath({ citySlug: match.city.slug, type: "article", slug: match.slug }),
+      };
+    }
+    return { kind: "national_redirect", path: buildNationalArticlePath(match.slug) };
+  }
 
   const article = await prisma.article.findFirst({
     where: { id: resolved.articleId, ...getPublicPublishedArticleWhere() },
