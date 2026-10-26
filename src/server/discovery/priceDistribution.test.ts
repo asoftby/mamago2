@@ -2,20 +2,29 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildPriceDistribution } from "./priceDistribution";
 
-test("builds real buckets including free and handles edge cases", () => {
+test("bins paid prices within the same integer domain as the price slider", () => {
   assert.deepEqual(buildPriceDistribution([]), { max: null, maxPrice: null, minPaid: null, step: null, buckets: [] });
   const single = buildPriceDistribution([30]);
   assert.equal(single.minPaid, 30);
   assert.equal(single.maxPrice, 30);
+  assert.equal(single.step, 1);
   assert.equal(single.buckets.reduce((sum, bucket) => sum + bucket.count, 0), 1);
   const mixed = buildPriceDistribution([0, 30, 30, 120]);
   assert.equal(mixed.max, 125);
   assert.equal(mixed.maxPrice, 120);
   assert.equal(mixed.minPaid, 30);
+  assert.equal(mixed.step, 1);
+  assert.equal(mixed.buckets.reduce((sum, bucket) => sum + bucket.count, 0), 3);
+  assert.equal(mixed.buckets[0]?.from, 30);
+  assert.equal(mixed.buckets.at(-1)?.to, 120);
   assert.equal(buildPriceDistribution([0, 0]).minPaid, null);
+  assert.deepEqual(buildPriceDistribution([0, 0]).buckets, []);
   assert.equal(buildPriceDistribution([0, 5, 30]).minPaid, 5);
-  assert.equal(mixed.buckets.reduce((sum, bucket) => sum + bucket.count, 0), 4);
-  assert.equal(mixed.buckets[0]?.count, 3);
-  assert.ok((mixed.buckets[0]?.from ?? 1) <= 0);
-  assert.ok((mixed.buckets[0]?.to ?? 0) > 0);
+  const high = buildPriceDistribution([80, 90, 100]);
+  assert.equal(high.buckets[0]?.from, 80);
+  assert.equal(high.buckets.at(-1)?.to, 100);
+  assert.equal(high.buckets.reduce((sum, bucket) => sum + bucket.count, 0), 3);
+  const fractional = buildPriceDistribution([10.5, 20.25]);
+  assert.equal(fractional.buckets[0]?.from, 10);
+  assert.equal(fractional.buckets.at(-1)?.to, 21);
 });
