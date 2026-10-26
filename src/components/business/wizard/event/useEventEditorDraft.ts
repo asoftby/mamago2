@@ -5,6 +5,7 @@ import type { Activity } from "@prisma/client";
 import { getDefaultFormData } from "./defaults";
 import { mapEventToFormData, type ActivityWithRelations } from "./mappers";
 import type { EventFormData, EventWizardMode } from "./types";
+import { parseEventEditorDraft, serializeEventEditorDraft } from "./eventDraftStorage";
 
 const DEBUG_EDITOR = process.env.NODE_ENV !== "production";
 const EVENT_EDITOR_DRAFT_KEY_PREFIX = "mg.eventEditor.draft";
@@ -25,12 +26,12 @@ function buildInitialDraft(mode: EventWizardMode, event?: Activity): EventFormDa
   return getDefaultFormData();
 }
 
-function readPersistedDraft(storageKey: string): EventFormData | null {
+function readPersistedDraft(storageKey: string, serverDraft: EventFormData, mode: EventWizardMode): EventFormData | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.sessionStorage.getItem(storageKey);
     if (!raw) return null;
-    return JSON.parse(raw) as EventFormData;
+    return parseEventEditorDraft(raw, serverDraft, mode);
   } catch (error) {
     debugDraftLog("failed to read persisted draft", {
       storageKey,
@@ -94,7 +95,7 @@ export function useEventEditorDraft(params: {
     if (typeof window === "undefined") return;
     if (hydratedKeyRef.current === storageKey) return;
 
-    const persistedDraft = readPersistedDraft(storageKey);
+    const persistedDraft = readPersistedDraft(storageKey, initialDraft, params.mode);
     if (persistedDraft) {
       debugDraftLog("hydrated from sessionStorage", {
         storageKey,
@@ -119,7 +120,7 @@ export function useEventEditorDraft(params: {
     if (typeof window === "undefined") return;
     if (hydratedKeyRef.current !== storageKey) return;
     try {
-      window.sessionStorage.setItem(storageKey, JSON.stringify(draft));
+      window.sessionStorage.setItem(storageKey, serializeEventEditorDraft(draft));
     } catch (error) {
       debugDraftLog("failed to persist draft", {
         storageKey,
