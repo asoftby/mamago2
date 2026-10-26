@@ -12,6 +12,7 @@ import { MAX_ACTIVE_FAMILY_PERSONAS } from "@/lib/family/wholeFamilyPreset";
 import { mapPlanParticipantsToAudience } from "@/lib/family/audienceSyncMapper";
 import { resolveFamilyAgeMode } from "@/lib/family/familyAgeMode";
 import { useEventAvailableFacets } from "@/features/filters/discovery/useEventAvailableFacets";
+import { ClearableQuickFilterChip } from "./ClearableQuickFilterChip";
 
 /** Shared who/age controls for the Kuda row and dialog; never a second age state. */
 export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
@@ -27,12 +28,16 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
     selectedPersonaIds: selected,
     profileChildIds: childIds,
   });
-  const activeProfile = selected.length === 1 ? family?.personas.find(p => p.id === selected[0]) : null;
+  const appliedProfileIds = applied.profile?.split(",").filter(Boolean) ?? [];
+  const activeProfile = appliedProfileIds.length === 1
+    ? family?.personas.find(p => p.id === appliedProfileIds[0])
+    : null;
+  const hasWhoFilter = Boolean(applied.age.length || applied.profile || applied.adultOnly);
   const agesLabel = applied.age.length === 1
     ? AGE_GROUPS.find(group => group.value === applied.age[0])?.label
     : applied.age.length > 1 ? `${applied.age.length} возраста` : null;
   const label = activeProfile?.kind === "adult" ? "Я"
-    : activeProfile?.displayName ?? (selected.length > 1 ? `Семья · ${selected.length}` : agesLabel ?? "Для кого");
+    : activeProfile?.displayName ?? (appliedProfileIds.length > 1 ? `Семья · ${appliedProfileIds.length}` : agesLabel ?? "Для кого");
 
   const setSelection = (nextIds: string[]) => {
     if (!family) return;
@@ -42,6 +47,12 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
       age: mapPlanParticipantsToAudience(nextIds, family.personas),
       adultOnly: false,
     });
+  };
+
+  const clearWho = () => {
+    family?.setSelectedPersonaIds([]);
+    actions.setDraft({ age: [], profile: null, adultOnly: false });
+    setOpen(false);
   };
 
   const panel = (
@@ -85,11 +96,16 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Chip active={selected.length > 0 || applied.age.length > 0} className="h-11 shrink-0 gap-2 px-5">
-          {label} <ChevronDown className="h-4 w-4" />
-        </Chip>
-      </PopoverTrigger>
+      <ClearableQuickFilterChip active={hasWhoFilter} clearLabel="Сбросить возраст и профиль" onClear={clearWho}>
+        <PopoverTrigger asChild>
+          <Chip
+            active={hasWhoFilter}
+            className={`h-11 shrink-0 gap-2 px-5 ${hasWhoFilter ? "rounded-r-none pr-3" : ""}`}
+          >
+            {label} <ChevronDown className="h-4 w-4" />
+          </Chip>
+        </PopoverTrigger>
+      </ClearableQuickFilterChip>
       <PopoverContent align="start" className="w-[min(95vw,440px)] p-0">
         {panel}
       </PopoverContent>

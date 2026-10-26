@@ -15,6 +15,7 @@ import { addDateKeyDays } from "@/lib/stories/ranges";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
 import { pluralize } from "@/lib/formatters/pluralize";
+import { ClearableQuickFilterChip } from "./ClearableQuickFilterChip";
 
 const toKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const fromKey = (key: string | null) => key ? new Date(`${key}T12:00:00`) : null;
@@ -71,6 +72,7 @@ export function EventDateRangePicker({ applied, onApply }: { applied: DiscoveryF
   const displayDate = (key: string) => new Intl.DateTimeFormat("ru-RU", {
     day: "numeric", month: "short",
   }).format(new Date(`${key}T12:00:00`)).replace(".", "");
+  const hasDateRange = Boolean(applied.dateFrom || applied.dateTo);
   const label = applied.dateFrom
     ? applied.dateFrom === applied.dateTo || !applied.dateTo
       ? displayDate(applied.dateFrom)
@@ -79,18 +81,34 @@ export function EventDateRangePicker({ applied, onApply }: { applied: DiscoveryF
   const calendar = (months: 1 | 2, defaultMonth?: Date) => (
     <Calendar value={fromKey(draft.from)} rangeStart={fromKey(draft.from)} rangeEnd={fromKey(draft.to)} onChange={select} disablePast numberOfMonths={months} defaultMonth={defaultMonth} size="compact" density={density} />
   );
-  const trigger = <Chip active={Boolean(applied.dateFrom)} className="h-11 shrink-0 gap-2 px-5"><CalendarDays className="h-4 w-4" />{label}</Chip>;
+  const trigger = (
+    <Chip
+      active={hasDateRange}
+      className={`h-11 shrink-0 gap-2 px-5 ${hasDateRange ? "rounded-r-none pr-3" : ""}`}
+    >
+      <CalendarDays className="h-4 w-4" />
+      {label}
+    </Chip>
+  );
+  const clearDateRange = () => {
+    resetDateRange();
+    setOpen(false);
+  };
 
   if (!mobile) return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <ClearableQuickFilterChip active={hasDateRange} clearLabel="Сбросить выбранные даты" onClear={clearDateRange}>
+        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      </ClearableQuickFilterChip>
       <PopoverContent align="start" className="w-[650px] p-5">{calendar(2)}<div className="mt-3 flex items-center justify-between gap-4"><MobileOverlayResetAction disabled={!draft.from} onClick={resetDateRange} /><Button size="sm" disabled={!draft.from} onClick={() => { onApply({ whenPreset: null, dateFrom: draft.from, dateTo: draft.to }); setOpen(false); }}>Применить</Button></div></PopoverContent>
     </Popover>
   );
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>{trigger}</SheetTrigger>
+      <ClearableQuickFilterChip active={hasDateRange} clearLabel="Сбросить выбранные даты" onClear={clearDateRange}>
+        <SheetTrigger asChild>{trigger}</SheetTrigger>
+      </ClearableQuickFilterChip>
       <SheetContent side="bottom" className="flex h-[92dvh] flex-col gap-0 rounded-t-3xl bg-white p-0">
         <div className="sticky top-0 z-10 border-b bg-white px-5 py-4"><SheetTitle>Выберите даты</SheetTitle><div className="mt-1 text-sm text-muted-foreground">{draft.from ? `${draft.from}${draft.to && draft.to !== draft.from ? ` — ${draft.to}` : ""}` : "Диапазон не выбран"}</div></div>
         <div className="flex gap-2 overflow-x-auto px-4 py-3">{(["TODAY", "TOMORROW", "WEEKEND"] as const).map((p) => <Chip key={p} onClick={() => applyPreset(p)}>{p === "TODAY" ? "Сегодня" : p === "TOMORROW" ? "Завтра" : "Выходные"}</Chip>)}</div>
