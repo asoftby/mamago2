@@ -288,7 +288,7 @@ ALTER TABLE "SearchQueryLog" ADD CONSTRAINT "SearchQueryLog_territoryId_fkey" FO
 
 -- ============================================================================
 -- Data migration: Country / Region / City -> Territory (+ TerritoryLegacyMap)
--- Idempotent ids: ter_country_<id>, ter_region_<centre slug>, ter_city_<id>.
+-- Idempotent ids: ter_country_<id>, ter_region_<centre slug> (Belarus oblasts) / ter_region_<id> (others), ter_city_<id>.
 -- ============================================================================
 
 -- Reference: the six "city + oblast" regions. Region slug = slug of the centre city.
@@ -323,26 +323,30 @@ ON CONFLICT DO NOTHING;
 INSERT INTO "Territory" ("id","type","parentId","slug","name","nameIn","isActive","priority","createdAt","updatedAt")
 SELECT 'ter_region_' || ref."centreSlug", 'REGION',
        COALESCE(
-         (SELECT 'ter_country_' || r."countryId" FROM "Region" r WHERE r."slug" = ref."oblastSlug"),
+         (SELECT 'ter_country_' || r."countryId" FROM "Region" r WHERE r."slug" = ref."oblastSlug" AND r."countryId" = (SELECT c."id" FROM "Country" c WHERE c."slug" = 'belarus')),
          (SELECT 'ter_country_' || c."id" FROM "Country" c WHERE c."slug" = 'belarus')
        ),
        ref."centreSlug", ref."name", ref."nameIn",
-       COALESCE((SELECT r."isActive" FROM "Region" r WHERE r."slug" = ref."oblastSlug"), true),
+       COALESCE((SELECT r."isActive" FROM "Region" r WHERE r."slug" = ref."oblastSlug" AND r."countryId" = (SELECT c."id" FROM "Country" c WHERE c."slug" = 'belarus')), true),
        ref."priority", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM "_territory_region_ref" ref
 WHERE EXISTS (SELECT 1 FROM "Country" c WHERE c."slug" = 'belarus')
 ON CONFLICT ("id") DO NOTHING;
 
--- 2b. Any other legacy Region keeps its own slug.
+-- 2b. Any other legacy Region keeps its own slug; the id comes from the legacy id so the same slug
+--     in different countries never collides.
 INSERT INTO "Territory" ("id","type","parentId","slug","name","isActive","priority","createdAt","updatedAt")
-SELECT 'ter_region_' || r."slug", 'REGION', 'ter_country_' || r."countryId", r."slug", r."name", r."isActive", r."priority", r."createdAt", CURRENT_TIMESTAMP
+SELECT 'ter_region_' || r."id", 'REGION', 'ter_country_' || r."countryId", r."slug", r."name", r."isActive", r."priority", r."createdAt", CURRENT_TIMESTAMP
 FROM "Region" r
-WHERE r."slug" NOT IN (SELECT "oblastSlug" FROM "_territory_region_ref")
+WHERE NOT (r."slug" IN (SELECT "oblastSlug" FROM "_territory_region_ref") AND r."countryId" = (SELECT c."id" FROM "Country" c WHERE c."slug" = 'belarus'))
 ON CONFLICT ("id") DO NOTHING;
 
 INSERT INTO "TerritoryLegacyMap" ("legacyKind","legacyId","territoryId")
 SELECT 'REGION', r."id",
-       'ter_region_' || COALESCE((SELECT ref."centreSlug" FROM "_territory_region_ref" ref WHERE ref."oblastSlug" = r."slug"), r."slug")
+       COALESCE(
+         (SELECT 'ter_region_' || ref."centreSlug" FROM "_territory_region_ref" ref WHERE ref."oblastSlug" = r."slug" AND r."countryId" = (SELECT c."id" FROM "Country" c WHERE c."slug" = 'belarus')),
+         'ter_region_' || r."id"
+       )
 FROM "Region" r
 ON CONFLICT DO NOTHING;
 
