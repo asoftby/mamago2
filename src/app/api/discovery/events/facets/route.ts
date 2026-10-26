@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { ageBoundsFromActivityFields } from "@/lib/event/activityAgeBounds";
+import { matchesManualAgeRanges } from "@/lib/discovery/audienceEligibility";
 import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { buildKudaDiscoveryWhere } from "@/server/discovery/kudaDiscoveryFeed";
@@ -57,12 +58,18 @@ export async function GET(request: NextRequest) {
 
   const allowedForAge = (row: typeof rows[number], values: string[]) => {
     if (!values.length) return true;
-    if (row.agePolicy === "ADULT_ONLY") return values.includes("18+");
-    const bounds = ageBoundsFromActivityFields(row);
-    return values.some(value => {
+    const bounds = row.agePolicy === "ADULT_ONLY"
+      ? { ageFrom: 18, ageTo: 99 }
+      : ageBoundsFromActivityFields(row);
+    const ranges = values.flatMap(value => {
       const group = AGE_GROUPS.find(g => g.value === value);
-      return !!group && bounds.ageFrom <= (group.max ?? 99) && bounds.ageTo >= group.min;
+      return group ? [{ id: group.value, min: group.min, max: group.max ?? 99 }] : [];
     });
+    return matchesManualAgeRanges({
+      agePolicy: row.agePolicy,
+      ageFrom: bounds.ageFrom,
+      ageTo: bounds.ageTo,
+    }, ranges);
   };
   type Facet = "category" | "genre" | "format" | "age" | "price" | "occasion";
   const matches = (row: typeof rows[number], except: Facet) => {
