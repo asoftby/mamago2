@@ -24,6 +24,7 @@ export type CityHomeJournalArticle = {
   geographyLabel: string;
   geographyGroup: JournalGeographyGroup | null;
   title: string;
+  excerpt?: string | null;
   subtitle: string | null;
   contentType: "ARTICLE" | "NEWS";
   category: {
@@ -148,6 +149,7 @@ function toJournalArticle(
         : "Беларусь",
     geographyGroup: group,
     title: row.title,
+    excerpt: row.excerpt,
     subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,
     contentType: row.subtitle === BREAKING_NEWS_SUBTITLE ? "NEWS" : "ARTICLE",
     category: row.category
