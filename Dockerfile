@@ -50,6 +50,11 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/prisma ./prisma
+# System seed imports Territory dual-write helpers through the @/ path alias.
+# Keep the required sources and tsconfig in the runtime image for tsx resolution.
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/src/server/territory/syncLegacyGeo.ts ./src/server/territory/syncLegacyGeo.ts
+COPY --from=builder /app/src/server/territory/territoryIds.ts ./src/server/territory/territoryIds.ts
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
