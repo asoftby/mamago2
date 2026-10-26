@@ -29,13 +29,13 @@ export function EventQuickFilters({ halloweenEnabled = false }: { halloweenEnabl
 
   return (
     <div className="flex items-center gap-3 overflow-x-auto scroll-smooth pb-3 pt-2 [scrollbar-width:none]" aria-label="Быстрые фильтры событий">
-      <ChipsRow className="contents [&>div]:contents" items={PRESETS.map((preset) => ({ id: preset.value, label: preset.label, active: applied.whenPreset === preset.value, onClick: () => actions.setDraft({ whenPreset: applied.whenPreset === preset.value ? null : preset.value }) }))} />
       {halloweenEnabled && (
         <HalloweenChip
           active={applied.occasionSlug === "halloween"}
           onClick={() => actions.setDraft({ occasionSlug: applied.occasionSlug === "halloween" ? null : "halloween" })}
         />
       )}
+      <ChipsRow className="contents [&>div]:contents" items={PRESETS.map((preset) => ({ id: preset.value, label: preset.label, active: applied.whenPreset === preset.value, onClick: () => actions.setDraft({ whenPreset: applied.whenPreset === preset.value ? null : preset.value }) }))} />
       <EventDateRangePicker applied={applied} onApply={actions.setDraft} />
     </div>
   );

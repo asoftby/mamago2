@@ -15,6 +15,7 @@ import {
 } from "@/features/city-home/components/CityHomeContentRows";
 import { getCurrentUser } from "@/lib/auth/server";
 import { getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
+import { isHalloweenOccasionActive } from "@/server/discovery/activeHalloweenOccasion";
 import { listPublicRoutesByCity, listPublicRoutesByCityIds } from "@/server/services/route.service";
 import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { listCityHomeArticles } from "@/server/article/listCityHomeArticles";
@@ -93,6 +94,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
     ? listPublicRoutesByCity(city.id).catch(() => [])
     : Promise.resolve([]);
   const journalArticlesPromise = listCityHomeArticles(city);
+  const halloweenEnabledPromise = isHalloweenOccasionActive();
   const localClassesPromise = sectionAvailability.classes
     ? getClassesDiscoveryFeed(city.id, city.slug, { take: HOME_PERSONALIZATION_CANDIDATE_TAKE }).catch(() => [])
     : Promise.resolve([]);
@@ -135,6 +137,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
     user,
     ,
     kudaPreview,
+    halloweenEnabled,
     localRoutes,
     journalArticles,
     localClasses,
@@ -144,6 +147,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
     userPromise,
     nearbyCitiesPromise,
     kudaPreviewPromise,
+    halloweenEnabledPromise,
     localRoutesPromise,
     journalArticlesPromise,
     localClassesPromise,
@@ -235,7 +239,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
           </section>
         ) : null}
 
-        <CityHomeKudaSection activities={kudaPreview} />
+        <CityHomeKudaSection activities={kudaPreview} halloweenEnabled={halloweenEnabled} />
 
         {sectionAvailability.classes ? (
           <CityHomeClassesSection

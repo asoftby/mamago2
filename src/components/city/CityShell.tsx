@@ -19,6 +19,7 @@ import type { PublicRouteCardModel } from "@/components/routes/types";
 import { computeMaxBudget, getBudgetStep } from "@/lib/discovery/budgetUtils";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
 import { resolveEventDateRange } from "@/server/discovery/eventFilterSemantics";
+import { isHalloweenOccasionActive } from "@/server/discovery/activeHalloweenOccasion";
 
 export type BudgetConfig = { max: number; step: number } | null;
 
@@ -64,19 +65,9 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
   let classChips = undefined;
   let activeClassChipSlug = undefined;
   let budgetConfig: BudgetConfig = null;
-  // The admin's Occasion switch and active dates control this seasonal chip.
-  // A missing/inactive/out-of-period occasion is never shown.
-  const halloween = intent === "kuda"
-    ? await prisma.occasion.findUnique({
-        where: { slug: "halloween" },
-        select: { isActive: true, startsAt: true, endsAt: true },
-      })
-    : null;
-  const now = new Date();
-  const halloweenEnabled = Boolean(
-    halloween?.isActive && halloween.startsAt && halloween.endsAt &&
-    halloween.startsAt <= now && now <= halloween.endsAt,
-  );
+  const halloweenEnabled = intent === "kuda"
+    ? await isHalloweenOccasionActive()
+    : false;
 
   if (intent === "birthday") {
     // Only published party-specific offers approved for this section.
