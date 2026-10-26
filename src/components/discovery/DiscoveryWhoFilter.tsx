@@ -11,12 +11,14 @@ import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { MAX_ACTIVE_FAMILY_PERSONAS } from "@/lib/family/wholeFamilyPreset";
 import { mapPlanParticipantsToAudience } from "@/lib/family/audienceSyncMapper";
 import { resolveFamilyAgeMode } from "@/lib/family/familyAgeMode";
+import { useEventAvailableFacets } from "@/features/filters/discovery/useEventAvailableFacets";
 
 /** Shared who/age controls for the Kuda row and dialog; never a second age state. */
 export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
   const { applied, actions } = useDiscoveryFilters();
   const family = useFamilyPersona();
   const [open, setOpen] = useState(false);
+  const facets = useEventAvailableFacets(applied, inline || open);
   const selected = family?.selectedPersonaIds ?? [];
   const children = !family?.loading ? family?.childPersonasForFilter ?? [] : [];
   const childIds = children.map(child => child.id);
@@ -67,6 +69,7 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
       } : undefined}
       ageMode={ageMode}
       autoAgeValues={selected.length ? applied.age : []}
+      availableAgeValues={facets?.ages ?? null}
       personaPickAtLimit={selected.length >= MAX_ACTIVE_FAMILY_PERSONAS}
       whoFreeMode={selected.length === 0}
       onSelectEveryone={family ? () => setSelection([]) : undefined}
