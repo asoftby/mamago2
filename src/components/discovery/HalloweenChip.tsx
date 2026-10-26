@@ -38,7 +38,7 @@ export function HalloweenChip({ active = false, black = false, className, onClic
         <path className={styles.glow} d="m7 17 4-5 2 6zm12 1 2-6 4 5zm-9 4c4 3 8 3 12 0l-2 3-3-1-2 2-3-2z" />
       </svg>
       <span>Хэллоуин</span>
-      {active && <X className="ml-1 h-4 w-4 shrink-0" aria-hidden="true" />}
+      {active && <X className="ml-1 hidden h-4 w-4 shrink-0 md:block" aria-hidden="true" />}
       <svg className={styles.bat} viewBox="0 0 24 14" aria-hidden="true">
         <path d="M12 5 9 2 7 6C4 2 1 3 0 1c0 7 4 7 7 9l5 4 5-4c3-2 7-2 7-9-1 2-4 1-7 5l-2-4z" />
       </svg>
