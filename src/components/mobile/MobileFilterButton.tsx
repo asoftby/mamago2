@@ -18,8 +18,7 @@ export function MobileFilterButton({ intent, className }: MobileFilterButtonProp
   const safeIntent = intent as Intent | null;
   const { activeCount: secondaryActiveCount } = useSecondaryFiltersFromUrl(safeIntent);
   const { applied } = useDiscoveryFilters();
-  // «Куда пойти»: бейдж считает только уточнения из модалки (категория, жанр, формат, цена).
-  // Дата, возраст («Для всех» / дети из профиля), город и район — контекст шапки и бейдж не зажигают.
+  // Kuda badge includes all active URL filters visible in the unified modal.
   const activeCount = safeIntent === "kuda" ? getEventRefinementCount(applied) : secondaryActiveCount;
 
   const handleClick = () => {
