@@ -189,7 +189,7 @@
     "test:event-schedule-midnight": "tsx src/lib/event/scheduleItemTimeOrder.test.ts && tsx src/components/business/wizard/event/validation.midnight.test.ts",
     "test:event-schedule-midnight-server": "tsx src/lib/business/validateEventScheduleTimeOrder.test.ts && tsx src/lib/event/materializeScheduleSessions.test.ts",
     "test:event-media-upload-safety": "tsx src/components/business/wizard/event/steps/Step3Media.uploadSafety.test.ts",
-    "test:event-wizard-update-loop": "tsx src/components/business/wizard/event/EventWizard.updateLoop.test.ts",
+    "test:event-wizard-update-loop": "tsx src/components/business/wizard/event/EventWizard.updateLoop.test.ts && tsx src/components/business/wizard/event/eventDraftStorage.test.ts",
     "test:unp-verification": "tsx src/lib/verification/unpChecksum.test.ts && tsx src/lib/verification/companyNameMatch.test.ts && tsx src/server/egr/verifyUnp.test.ts",
     "test:redirect-manifest": "tsx src/lib/seo/redirectManifest.test.ts",
     "test:migrated-article-slug-recovery": "tsx src/lib/seo/migratedArticleSlugRecovery.test.ts",
