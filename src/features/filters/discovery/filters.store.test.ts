@@ -39,6 +39,15 @@ test("event filters survive URL serialization and parsing", () => {
   assert.equal(params.get("genre"), "puppet,musical");
 });
 
+test("family persona selection round-trips in the shareable URL", () => {
+  const filters = { ...defaultFilters, profile: "child-1", age: ["3-5"], occasionSlug: "halloween" };
+  const params = serializeAppliedToSearchParams(new URLSearchParams(), filters);
+  assert.equal(params.get("profile"), "child-1");
+  assert.equal(params.get("occasion"), "halloween");
+  assert.deepEqual(parseAppliedFromUrl(params as never), filters);
+  assert.equal(getDiscoveryFilterActiveCount(filters), 2);
+});
+
 test("reset serialization from an empty base clears primary, secondary, and budget", () => {
   const stale = new URLSearchParams("preset=TODAY&free=true&sec=free_only%3Atrue&budget=30");
   const params = serializeAppliedToSearchParams(new URLSearchParams(), defaultFilters);
@@ -120,16 +129,16 @@ test("hydration gate does NOT block on Instagram share ids (igshid/igsh) or ymcl
   assert.equal(hasAnyNonTrackingUrlParams(params as never), false);
 });
 
-// --- E: badge on the "Фильтры" icon must ignore date/whenPreset groups ---
+// --- Kuda modal badge now includes date and who: all URL filters are visible ---
 
-test("getModalFilterCount ignores whenPreset — quick-chip clicks must not light up the modal badge", () => {
+test("getModalFilterCount counts whenPreset as one dimension", () => {
   const filters = { ...defaultFilters, whenPreset: "TODAY" as const };
-  assert.equal(getModalFilterCount(filters), 0);
+  assert.equal(getModalFilterCount(filters), 1);
 });
 
-test("getModalFilterCount ignores dateFrom/dateTo", () => {
+test("getModalFilterCount counts dateFrom/dateTo as one dimension", () => {
   const filters = { ...defaultFilters, dateFrom: "2026-08-29", dateTo: "2026-08-31" };
-  assert.equal(getModalFilterCount(filters), 0);
+  assert.equal(getModalFilterCount(filters), 1);
 });
 
 test("getModalFilterCount counts age, format, metro-or-district as one group, and free", () => {

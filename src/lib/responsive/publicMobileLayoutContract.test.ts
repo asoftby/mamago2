@@ -48,12 +48,12 @@ assert.match(
 );
 assert.match(
   refinementModal,
-  /h-11 w-11 bg-gray-50/,
+  /size="touch"/,
   "Refinement filter close target must be at least 44px",
 );
 assert.match(
   refinementModal,
-  /px-4 pb-0 pt-3 sm:px-6/,
+  /min-h-0 flex-1 overflow-y-auto px-4 pt-4 sm:px-6/,
   "Refinement filter sheet must keep a wide 16px mobile content inset",
 );
 

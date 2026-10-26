@@ -29,12 +29,13 @@ test("adding a category is multi-select and preserves selected genres", () => {
   assert.deepEqual(toggleEventCategory(draft, "workshops", taxonomy).genres, ["puppet"]);
 });
 
-test("advanced modal keeps URL writes behind apply while using read-only live previews", () => {
+test("advanced modal immediately reflects the shared URL filters", () => {
   const source = readFileSync(new URL("../../../components/discovery/EventAdvancedFilters.tsx", import.meta.url), "utf8");
-  assert.equal(source.includes("actions.setDraft"), false);
-  assert.equal(source.includes("/api/discovery/events/count"), true);
-  assert.equal(source.includes("/api/discovery/events/price-distribution"), true);
-  assert.equal(source.match(/actions\.commitFilters\(/g)?.length, 1);
+  assert.match(source, /actions\.setDraft/);
+  assert.match(source, /applied: draft/);
+  assert.match(source, /useEventAvailableFacets/);
+  assert.match(source, /\/api\/discovery\/events\/count/);
+  assert.match(source, /\/api\/discovery\/events\/price-distribution/);
 });
 
 test("taxonomy cache key is normalized and city-scoped", () => {

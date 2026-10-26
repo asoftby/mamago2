@@ -11,7 +11,7 @@ import {
   resetEventRefinements,
 } from "./EventAdvancedFilters";
 
-test("price range uses two accessible custom thumbs and keeps URL writes behind Apply", () => {
+test("price range keeps two accessible thumbs and shared URL writes", () => {
   const source = readFileSync(new URL("./EventAdvancedFilters.tsx", import.meta.url), "utf8");
 
   assert.match(source, /role="slider"/);
@@ -21,75 +21,45 @@ test("price range uses two accessible custom thumbs and keeps URL writes behind 
   assert.match(source, /onKeyDown=\{/);
   assert.match(source, /bg-primary/);
   assert.match(source, /border-primary/);
-  assert.equal(source.match(/actions\.commitFilters\(/g)?.length, 1);
+  assert.match(source, /actions\.setDraft/);
   assert.match(source, /params\.delete\("priceMin"\)/);
   assert.match(source, /params\.delete\("priceMax"\)/);
 });
 
-test("advanced event filters do not duplicate global header context", () => {
+test("event modal shares the URL who filter, including Halloween occasion", () => {
   const source = readFileSync(new URL("./EventAdvancedFilters.tsx", import.meta.url), "utf8");
-
-  assert.doesNotMatch(source, /AGE_GROUPS/);
-  assert.doesNotMatch(source, /draft\.district/);
-  assert.doesNotMatch(source, /draft\.metro/);
-  assert.doesNotMatch(source, /Возраст · общий профиль/);
-  assert.doesNotMatch(source, /Где в городе/);
+  assert.match(source, /DiscoveryWhoFilter inline/);
+  assert.match(source, /Повод/);
+  assert.match(source, /draft\.occasionSlug === "halloween"/);
+  assert.match(source, /useEventAvailableFacets/);
 });
 
-test("resetting refinements preserves where, when and who", () => {
+test("resetting all Kuda filters clears who, when, Halloween and refinements", () => {
   const current = {
     ...defaultFilters,
     whenPreset: "WEEKEND" as const,
-    age: ["18+"],
-    district: "central",
-    metro: "nemiga",
+    profile: "child-1",
+    age: ["3-5"],
+    occasionSlug: "halloween",
     categories: ["concerts"],
     genres: ["jazz"],
     format: "ONLINE" as const,
     free: true,
-    priceMin: 20,
-    priceMax: 80,
-    adultOnly: true,
   };
-
-  const reset = resetEventRefinements(current);
-
-  assert.equal(reset.whenPreset, "WEEKEND");
-  assert.deepEqual(reset.age, ["18+"]);
-  assert.equal(reset.district, "central");
-  assert.equal(reset.metro, "nemiga");
-  assert.deepEqual(reset.categories, []);
-  assert.deepEqual(reset.genres, []);
-  assert.equal(reset.format, null);
-  assert.equal(reset.free, false);
-  assert.equal(reset.priceMin, null);
-  assert.equal(reset.priceMax, null);
-  assert.equal(reset.adultOnly, false);
+  assert.deepEqual(resetEventRefinements(current), defaultFilters);
 });
 
-test("filter badge counts the whole price range as one refinement", () => {
-  assert.equal(
-    getEventRefinementCount({
-      ...defaultFilters,
-      whenPreset: "TODAY",
-      age: ["3-5"],
-      district: "central",
-      metro: "nemiga",
-    }),
-    0,
-  );
-
-  assert.equal(
-    getEventRefinementCount({
-      ...defaultFilters,
-      categories: ["concerts"],
-      genres: ["jazz"],
-      format: "OFFLINE",
-      priceMin: 20,
-      priceMax: 50,
-    }),
-    4,
-  );
+test("badge includes who, date, occasion and secondary dimensions", () => {
+  assert.equal(getEventRefinementCount({
+    ...defaultFilters,
+    whenPreset: "TODAY", age: ["3-5"], profile: "child-1",
+    occasionSlug: "halloween",
+  }), 3);
+  assert.equal(getEventRefinementCount({
+    ...defaultFilters,
+    categories: ["concerts"], genres: ["jazz"],
+    format: "OFFLINE", priceMin: 20, priceMax: 50,
+  }), 4);
 });
 
 test("price range normalizes selected and unbounded values", () => {
@@ -102,7 +72,7 @@ test("price range normalizes selected and unbounded values", () => {
   assert.equal(priceSliderValueFromKey("End", 50, 60, 10), 60);
 });
 
-test("mobile filter button badge for kuda uses refinements only, not header context", () => {
+test("mobile filter button uses the same URL filter count as desktop", () => {
   const source = readFileSync(
     new URL("../mobile/MobileFilterButton.tsx", import.meta.url),
     "utf8",

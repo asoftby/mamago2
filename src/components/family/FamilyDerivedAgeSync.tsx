@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { usePathname } from "next/navigation";
+import { useEffect, useMemo, useRef } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
@@ -16,6 +16,7 @@ import { getCityFromPath } from "@/lib/intent";
  */
 export function FamilyDerivedAgeSync() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { isAuthenticated } = useAuthMe();
   const family = useFamilyPersona();
   const { applied, actions } = useDiscoveryFilters();
@@ -34,13 +35,50 @@ export function FamilyDerivedAgeSync() {
     [isAuthenticated, family, family?.loading],
   );
 
+  // Only URL navigation/hydration may restore a persona from the URL.
+  // A user selecting family members elsewhere in the app must not be undone
+  // merely because the FamilyPersonaContext updated before its URL write.
+  const lastUrlRef = useRef<string | null>(null);
+  const awaitingUrlHydrationRef = useRef(false);
+  // Date/category changes must not rehydrate a previously selected profile.
+  const urlSignature = `${pathname}|${searchParams.get("profile") ?? ""}|${searchParams.get("age") ?? ""}`;
+  useEffect(() => {
+    if (!inCityDiscoveryContext || !isAuthenticated || !family || family.loading) return;
+    if (lastUrlRef.current === urlSignature) return;
+    lastUrlRef.current = urlSignature;
+
+    const selectedFromUrl = (searchParams.get("profile") ?? "")
+      .split(",")
+      .filter(id => family.personas.some(persona => persona.id === id));
+    const selectedCurrent = family.selectedPersonaIds;
+    if (searchParams.has("profile") && selectedFromUrl.length > 0) {
+      if (selectedFromUrl.slice().sort().join(",") !== selectedCurrent.slice().sort().join(",")) {
+        awaitingUrlHydrationRef.current = true;
+        family.setSelectedPersonaIds(selectedFromUrl);
+      }
+    } else if (searchParams.has("age") && !searchParams.has("profile") && selectedCurrent.length > 0) {
+      awaitingUrlHydrationRef.current = true;
+      family.setSelectedPersonaIds([]);
+    }
+  }, [inCityDiscoveryContext, isAuthenticated, family, family?.loading, urlSignature, searchParams]);
+
   useEffect(() => {
     if (!inCityDiscoveryContext) return;
     if (!isAuthenticated || !family || family.loading) return;
 
-    /** Свободный поиск: глобальный выбор персон пуст. Legacy #nokids не должен залипать. */
+    if (awaitingUrlHydrationRef.current) {
+      const desired = (searchParams.get("profile") ?? "").split(",").filter(Boolean).sort().join(",");
+      const actual = family.selectedPersonaIds.slice().sort().join(",");
+      const hydrated = desired === actual || (!desired && actual === "");
+      if (!hydrated) return;
+      awaitingUrlHydrationRef.current = false;
+    }
+
+    /** Свободный поиск: a context change must clear a stale profile in URL. */
     if (family.selectedPersonaIds.length === 0) {
-      if (applied.adultOnly) actions.setDraft({ adultOnly: false });
+      if (applied.profile || applied.adultOnly) {
+        actions.setDraft({ profile: null, age: applied.profile ? [] : applied.age, adultOnly: false });
+      }
       return;
     }
 
@@ -64,12 +102,12 @@ export function FamilyDerivedAgeSync() {
 
       if (
         sortedCurrent.join(",") === sortedTarget.join(",") &&
-        !applied.adultOnly
+        !applied.adultOnly && applied.profile === family.selectedPersonaIds.join(",")
       ) {
         return;
       }
 
-      actions.setDraft({ age: sortedTarget, adultOnly: false });
+      actions.setDraft({ age: sortedTarget, profile: family.selectedPersonaIds.join(","), adultOnly: false });
       return;
     }
 
@@ -80,9 +118,10 @@ export function FamilyDerivedAgeSync() {
     if (adultSelected) {
       const current = applied.age ?? [];
       const alreadySelfContext =
-        current.length === 1 && current[0] === "18+" && !applied.adultOnly;
+        current.length === 1 && current[0] === "18+" && !applied.adultOnly &&
+        applied.profile === family.selectedPersonaIds.join(",");
       if (!alreadySelfContext) {
-        actions.setDraft({ age: ["18+"], adultOnly: false });
+        actions.setDraft({ age: ["18+"], profile: family.selectedPersonaIds.join(","), adultOnly: false });
       }
       return;
     }
@@ -96,7 +135,9 @@ export function FamilyDerivedAgeSync() {
     family?.loading,
     profileChildren,
     applied.age,
+    applied.profile,
     applied.adultOnly,
+    searchParams,
     actions,
   ]);
 
