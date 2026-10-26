@@ -232,6 +232,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
   const family = useFamilyPersona();
   const facets = useEventAvailableFacets(draft);
   const { categories, loading: taxonomyLoading } = useEventTaxonomy(citySlug);
+  const [count, setCount] = React.useState<number | null>(null);
   const [distribution, setDistribution] = React.useState<PriceDistribution>({ max: null, step: null, buckets: [] });
   const patch = (next: Partial<DiscoveryFilters>) => actions.setDraft(next);
 
@@ -240,6 +241,11 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
     const timer = setTimeout(() => {
       const params = serializeAppliedToSearchParams(new URLSearchParams(), draft);
       params.set("city", citySlug);
+      fetch(`/api/discovery/events/count?${params}`, { signal: controller.signal })
+        .then((response) => response.ok ? response.json() : null)
+        .then((data) => setCount(data?.count ?? null))
+        .catch(() => {});
+
       params.delete("priceMin");
       params.delete("priceMax");
       fetch(`/api/discovery/events/price-distribution?${params}`, { signal: controller.signal })
