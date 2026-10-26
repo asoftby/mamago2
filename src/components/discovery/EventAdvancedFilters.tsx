@@ -1,9 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { serializeAppliedToSearchParams, useDiscoveryFilters, type DiscoveryFilters } from "@/features/filters/discovery/filters.store";
-import { normalizeDraftToAvailableTaxonomy, toggleEventCategory, useEventTaxonomy } from "@/features/filters/discovery/eventTaxonomy";
+import { serializeAppliedToSearchParams, useDiscoveryFilters, getDiscoveryFilterActiveCount, defaultFilters, type DiscoveryFilters } from "@/features/filters/discovery/filters.store";
+import { toggleEventCategory, useEventTaxonomy } from "@/features/filters/discovery/eventTaxonomy";
 import { Chip } from "@/components/ui/Chip";
+import { DiscoveryWhoFilter } from "./DiscoveryWhoFilter";
+import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
+import { pluralize } from "@/lib/formatters/pluralize";
 import { Button } from "@/components/ui/button";
 import { ACTIVITY_FORMAT_OPTIONS } from "@/domain/activities/activity-format";
 import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
@@ -22,32 +25,14 @@ type PriceRangeValue = {
   max: number | null;
 };
 
-/**
- * Kuda header owns the global discovery context: where, when and who.
- * The advanced dialog only refines that context and must never reset it.
- */
-export function resetEventRefinements(filters: DiscoveryFilters): DiscoveryFilters {
-  return {
-    ...filters,
-    categories: [],
-    genres: [],
-    format: null,
-    free: false,
-    priceMin: null,
-    priceMax: null,
-    // Legacy strict #nokids lived in secondary filters. Header audience is now authoritative.
-    adultOnly: false,
-  };
+/** Full reset: the selected city lives in the route, not in these filters. */
+export function resetEventRefinements(_filters: DiscoveryFilters): DiscoveryFilters {
+  return { ...defaultFilters };
 }
 
-/** Badge next to “Фильтры” counts only refinements, never global header context. */
+/** The modal now owns the same facets as the quick row and header. */
 export function getEventRefinementCount(filters: DiscoveryFilters): number {
-  return (
-    (filters.categories.length > 0 ? 1 : 0) +
-    (filters.genres.length > 0 ? 1 : 0) +
-    (filters.format ? 1 : 0) +
-    (filters.free || filters.priceMin != null || filters.priceMax != null ? 1 : 0)
-  );
+  return getDiscoveryFilterActiveCount(filters);
 }
 
 export function normalizePriceSliderValue(value: string, domainMax: number): number | null {
@@ -77,10 +62,12 @@ function PriceRangeControl({
   distribution,
   value,
   onChange,
+  showHistogram = true,
 }: {
   distribution: PriceDistribution;
   value: PriceRangeValue;
   onChange: (next: PriceRangeValue) => void;
+  showHistogram?: boolean;
 }) {
   const trackRef = React.useRef<HTMLDivElement>(null);
   const domainMax = distribution.max ?? 0;
@@ -151,7 +138,7 @@ function PriceRangeControl({
   return (
     <div className="space-y-4">
       <div className="relative pt-2">
-        <div className="flex h-24 items-end gap-1 px-5" aria-hidden>
+        {showHistogram && <div className="flex h-24 items-end gap-1 px-5" aria-hidden>
           {distribution.buckets.map((bucket, index) => {
             const midpoint = (bucket.from + bucket.to) / 2;
             const selected = midpoint >= minValue && midpoint <= maxValue;
@@ -166,7 +153,7 @@ function PriceRangeControl({
               />
             );
           })}
-        </div>
+        </div>}
 
         <div
           ref={trackRef}
@@ -234,18 +221,12 @@ function PriceRangeControl({
 }
 
 export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; onApply?: () => void }) {
-  const { applied, actions } = useDiscoveryFilters();
+  const { applied: draft, actions } = useDiscoveryFilters();
+  const family = useFamilyPersona();
   const { categories, loading: taxonomyLoading } = useEventTaxonomy(citySlug);
-  const [draft, setDraft] = React.useState<DiscoveryFilters>(() => ({ ...applied, age: [...applied.age] }));
   const [count, setCount] = React.useState<number | null>(null);
   const [distribution, setDistribution] = React.useState<PriceDistribution>({ max: null, step: null, buckets: [] });
-  const patch = (next: Partial<DiscoveryFilters>) => setDraft((current) => ({ ...current, ...next }));
-
-  React.useEffect(() => {
-    if (!taxonomyLoading) {
-      setDraft((current) => normalizeDraftToAvailableTaxonomy(current, categories));
-    }
-  }, [categories, taxonomyLoading]);
+  const patch = (next: Partial<DiscoveryFilters>) => actions.setDraft(next);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -264,15 +245,6 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
         .then((data: PriceDistribution | null) => {
           if (!data) return;
           setDistribution(data);
-          if (data.max == null) return;
-          setDraft((current) => {
-            const nextMin = current.priceMin == null ? null : Math.min(current.priceMin, data.max!);
-            const nextMax = current.priceMax == null || current.priceMax >= data.max!
-              ? null
-              : Math.max(current.priceMax, nextMin ?? 0);
-            if (nextMin === current.priceMin && nextMax === current.priceMax) return current;
-            return { ...current, priceMin: nextMin, priceMax: nextMax };
-          });
         })
         .catch(() => {});
     }, 150);
@@ -281,21 +253,30 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
 
   return (
     <div className="space-y-6 pb-1">
-      <fieldset className="space-y-2">
+      <DiscoveryWhoFilter inline />
+
+      {draft.occasionSlug === "halloween" && (
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-semibold">Повод</legend>
+          <Chip active onClick={() => patch({ occasionSlug: null })}>Хэллоуин</Chip>
+        </fieldset>
+      )}
+
+      {categories.length > 0 && <fieldset className="space-y-2">
         <legend className="text-sm font-semibold">Категория</legend>
         <div className="flex flex-wrap gap-2">
           {categories.map((category) => (
             <Chip
               key={category.id}
               active={draft.categories.includes(category.slug)}
-              onClick={() => setDraft((current) => toggleEventCategory(current, category.slug, categories))}
+              onClick={() => actions.commitFilters(toggleEventCategory(draft, category.slug, categories))}
             >
               {category.nameRu}
             </Chip>
           ))}
           {taxonomyLoading && <span className="text-sm text-muted-foreground">Загрузка…</span>}
         </div>
-      </fieldset>
+      </fieldset>}
 
       {draft.categories.length > 0 && (
         <fieldset className="space-y-4">
@@ -357,6 +338,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
           <PriceRangeControl
             distribution={distribution}
             value={{ min: draft.priceMin, max: draft.priceMax }}
+            showHistogram={count != null && count >= 10 && distribution.buckets.filter(bucket => bucket.count > 0).length >= 3}
             onChange={(next) => patch({
               free: false,
               priceMin: next.min,
@@ -369,7 +351,11 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
       <div className="sticky bottom-0 z-10 -mx-4 flex items-center gap-2 border-t bg-white/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:mx-0 lg:justify-between lg:px-0 lg:pb-0 lg:pt-4 lg:backdrop-blur-none">
         <MobileOverlayResetAction
           className="min-h-11 px-2 lg:min-h-0 lg:rounded-none lg:px-0 lg:py-0 lg:font-semibold lg:text-foreground lg:underline lg:hover:bg-transparent lg:hover:text-foreground lg:active:bg-transparent"
-          onClick={() => setDraft((current) => resetEventRefinements(current))}
+          onClick={() => {
+            family?.setSelectedPersonaIds([]);
+            actions.commitFilters(resetEventRefinements(draft));
+            onApply?.();
+          }}
         >
           <span className="sm:hidden">Сбросить</span>
           <span className="hidden sm:inline">Сбросить уточнения</span>
@@ -377,12 +363,10 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
         <Button
           className="min-h-11 min-w-0 flex-1 rounded-full px-4 text-sm lg:flex-none lg:px-6"
           onClick={() => {
-            actions.commitFilters(draft);
             onApply?.();
           }}
         >
-          <span className="sm:hidden">Показать {count ?? "…"}</span>
-          <span className="hidden sm:inline">Показать {count ?? "…"} событий</span>
+          <span>Показать {count == null ? "…" : pluralize(count, ["событие", "события", "событий"])}</span>
         </Button>
       </div>
     </div>
