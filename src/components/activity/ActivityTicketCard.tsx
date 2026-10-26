@@ -147,13 +147,13 @@ export function ActivityTicketCard({ source, plain = false }: { source: Activity
         </h3>
         {ticket.venue ? (
           <p className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium leading-[1.2] text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,.35)] sm:text-[12px]">
-            <Building2 size={13} className="shrink-0" aria-hidden="true" />
+            {!plain && <Building2 size={13} className="shrink-0" aria-hidden="true" />}
             <span className="truncate">{ticket.venue}</span>
           </p>
         ) : null}
         {ticket.address ? (
           <p className="mt-1 flex min-w-0 items-center gap-1.5 text-[10px] leading-[1.2] text-white/75 drop-shadow-[0_1px_2px_rgba(0,0,0,.4)] sm:text-[11px]">
-            <MapPin size={13} className="shrink-0" aria-hidden="true" />
+            {!plain && <MapPin size={13} className="shrink-0" aria-hidden="true" />}
             <span className="truncate">{ticket.address}</span>
           </p>
         ) : null}
@@ -173,9 +173,9 @@ export function ActivityTicketCard({ source, plain = false }: { source: Activity
             ) : null}
             <span className="inline-flex items-end justify-center gap-[3px] whitespace-nowrap leading-none">
               <span className={
-                ticket.price.amount.length <= 2 ? "text-[26px] font-semibold tracking-tight" :
-                ticket.price.amount.length <= 4 ? "text-[20px] font-semibold tracking-tight" :
-                "text-[14px] font-semibold tracking-tight"
+                ticket.price.amount.length <= 2 ? "font-pt-serif text-[26px] font-normal tracking-tight" :
+                ticket.price.amount.length <= 4 ? "font-pt-serif text-[20px] font-normal tracking-tight" :
+                "font-pt-serif text-[14px] font-normal tracking-tight"
               }>{ticket.price.amount}</span>
               <span className="mb-[2px] text-[12px] leading-none">
                 <BelarusianRubleIcon size="default" />
