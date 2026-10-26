@@ -111,10 +111,10 @@ const JOURNAL_SELECT = {
   category: { select: { id: true, slug: true, nameRu: true } },
   tags: {
     where: { isActive: true },
-    orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
+    orderBy: [{ sortOrder: "asc" as const }, { title: "asc" as const }],
     select: { id: true, slug: true, title: true },
   },
-} as const satisfies Prisma.ArticleSelect;
+} satisfies Prisma.ArticleSelect;
 
 type JournalDbRow = Prisma.ArticleGetPayload<{ select: typeof JOURNAL_SELECT }>;
 
