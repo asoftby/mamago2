@@ -18,6 +18,8 @@ import { cn } from "@/lib/utils";
 
 type PriceDistribution = {
   max: number | null;
+  maxPrice: number | null;
+  minPaid: number | null;
   step: number | null;
   buckets: Array<{ from: number; to: number; count: number }>;
 };
@@ -77,7 +79,6 @@ function PriceRangeControl({
   const minValue = Math.min(Math.max(0, value.min ?? 0), domainMax);
   const maxValue = Math.max(minValue, Math.min(value.max ?? domainMax, domainMax));
   const peak = Math.max(1, ...distribution.buckets.map((item) => item.count));
-  const lowestPaidPrice = Math.min(...distribution.buckets.filter((bucket) => bucket.to > 0 && bucket.count > 0).map((bucket) => Math.max(0, bucket.from)), Number.POSITIVE_INFINITY);
   const pct = (n: number) => domainMax > 0 ? (n / domainMax) * 100 : 0;
 
   const emit = (thumb: "min" | "max", raw: number) => {
@@ -208,18 +209,18 @@ function PriceRangeControl({
       <div className="flex items-start justify-between gap-3">
         <div className="flex max-w-[calc(50%-0.375rem)] flex-col items-start gap-2">
           <span className="text-sm font-medium text-muted-foreground">Минимум</span>
-          <div className="rounded-full border border-border bg-background px-4 py-3 text-base font-semibold text-foreground">
+          <div className="inline-flex h-9 max-w-full items-center justify-center rounded-full border border-border bg-white px-4 text-sm font-normal text-foreground">
             {minValue > 0
-              ? renderPriceWithIcon(formatPrice(minValue))
-              : Number.isFinite(lowestPaidPrice) && lowestPaidPrice > 0
-                ? renderPriceWithIcon(formatPrice(lowestPaidPrice))
-                : "Без ограничения"}
+              ? renderPriceWithIcon(formatPrice(minValue), { iconSize: "text" })
+              : distribution.minPaid != null
+                ? renderPriceWithIcon(formatPrice(distribution.minPaid), { iconSize: "text" })
+                : "Нет платных"}
           </div>
         </div>
         <div className="flex max-w-[calc(50%-0.375rem)] flex-col items-end gap-2">
           <span className="text-sm font-medium text-muted-foreground">Максимум</span>
-          <div className="rounded-full border border-border bg-background px-4 py-3 text-base font-semibold text-foreground">
-            {renderPriceWithIcon(formatPrice(maxValue))}
+          <div className="inline-flex h-9 max-w-full items-center justify-center rounded-full border border-border bg-white px-4 text-sm font-normal text-foreground">
+            {renderPriceWithIcon(formatPrice(value.max == null ? (distribution.maxPrice ?? maxValue) : maxValue), { iconSize: "text" })}
           </div>
         </div>
       </div>
@@ -233,7 +234,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
   const facets = useEventAvailableFacets(draft);
   const { categories, loading: taxonomyLoading } = useEventTaxonomy(citySlug);
   const [count, setCount] = React.useState<number | null>(null);
-  const [distribution, setDistribution] = React.useState<PriceDistribution>({ max: null, step: null, buckets: [] });
+  const [distribution, setDistribution] = React.useState<PriceDistribution>({ max: null, maxPrice: null, minPaid: null, step: null, buckets: [] });
   const patch = (next: Partial<DiscoveryFilters>) => actions.setDraft(next);
 
   React.useEffect(() => {
