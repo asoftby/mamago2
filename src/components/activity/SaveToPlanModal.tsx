@@ -493,7 +493,7 @@ function DateSlider({ options, selISO, onSelect, sessionCountsByDate }: DateSlid
               onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.line; }}
             >
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: isSel ? "rgba(250,247,241,.6)" : C.ink3 }}>{chip.dow}</span>
-              <span style={{ fontFamily: "var(--font-sans, ui-sans-serif)", fontSize: 28, fontWeight: 400, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
+              <span style={{ fontFamily: "var(--font-pt-serif), Georgia, serif", fontSize: 28, fontWeight: 400, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
               <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 9, letterSpacing: ".08em", color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
               {dotsCount > 0 ? (
                 <span
@@ -749,7 +749,7 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
                     onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.line; }}
                   >
                     <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase" as const, color: dowColor }}>{chip.dow}</span>
-                    <span style={{ fontFamily: "var(--font-sans)", fontSize: 24, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
+                    <span style={{ fontFamily: "var(--font-pt-serif), Georgia, serif", fontSize: 24, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
                     <span style={{ fontSize: 11, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
                   </button>
                 );
@@ -1333,7 +1333,7 @@ function InIdeasView({ onRemoveIdea, onSchedule, onCollections, dateOptions }: {
                       }}
                     >
                       <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase" as const, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.dow}</span>
-                      <span style={{ fontFamily: "var(--font-sans)", fontSize: 24, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
+                      <span style={{ fontFamily: "var(--font-pt-serif), Georgia, serif", fontSize: 24, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
                       <span style={{ fontSize: 11, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
                     </button>
                   );
