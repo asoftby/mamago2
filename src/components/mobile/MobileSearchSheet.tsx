@@ -42,6 +42,7 @@ import {
 import { MAX_ACTIVE_FAMILY_PERSONAS } from "@/lib/family/wholeFamilyPreset";
 import { MobileSearch } from "@/components/mobile/MobileSearch";
 import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
+import { MobileOverlayPrimaryAction } from "@/components/mobile/MobileOverlayPrimaryAction";
 import type { SearchResultItem } from "@/lib/search/types";
 import { buildPublicPath } from "@/lib/routing/surface";
 
@@ -1067,13 +1068,9 @@ export function MobileSearchSheet({
             <div className="w-[5.5rem] shrink-0" aria-hidden />
           )}
           <div className="min-w-0 flex-1" />
-          <button
-            type="button"
-            onClick={handleBottomPrimaryClick}
-            className="min-w-[10rem] shrink-0 rounded-xl bg-[#EF8759] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors hover:bg-primary-hover active:scale-[0.98]"
-          >
+          <MobileOverlayPrimaryAction onClick={handleBottomPrimaryClick}>
             {bottomPrimaryLabel}
-          </button>
+          </MobileOverlayPrimaryAction>
         </div>
       </div>
     </div>

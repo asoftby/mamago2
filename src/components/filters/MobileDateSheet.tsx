@@ -1,5 +1,7 @@
 "use client";
 
+import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
+import { MobileOverlayPrimaryAction } from "@/components/mobile/MobileOverlayPrimaryAction";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import {
@@ -8,7 +10,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { WhenSelect } from "@/components/ui/when-select";
 import type { WhenValue } from "@/components/ui/when-select";
@@ -74,20 +75,10 @@ export function MobileDateSheet({
         </div>
 
         {/* Sticky Footer Action Bar */}
-        <div className="sticky bottom-0 border-t border-gray-200/80 bg-white px-4 py-3 pb-[calc(16px+env(safe-area-inset-bottom))] flex items-center justify-between shrink-0">
-          <button
-            onClick={handleReset}
-            className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Сбросить
-          </button>
-          <Button
-            onClick={handleDone}
-            variant="default"
-            className="rounded-full shadow-lg active:scale-95 transition-all px-8 font-semibold"
-          >
-            Готово
-          </Button>
+        <div className="sticky bottom-0 flex shrink-0 items-center gap-3 border-t border-gray-200/80 bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <MobileOverlayResetAction onClick={handleReset} />
+          <div className="min-w-0 flex-1" />
+          <MobileOverlayPrimaryAction onClick={handleDone}>Показать</MobileOverlayPrimaryAction>
         </div>
       </SheetContent>
     </Sheet>

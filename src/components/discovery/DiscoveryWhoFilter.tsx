@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
+import { MobileOverlayPrimaryAction } from "@/components/mobile/MobileOverlayPrimaryAction";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Chip } from "@/components/ui/Chip";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
@@ -119,9 +120,9 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
             <div className="flex items-center gap-3">
               <MobileOverlayResetAction disabled={!hasWhoFilter} onClick={() => clearWho(false)} />
               <div className="min-w-0 flex-1" />
-              <Button type="button" className="min-w-[10rem] shrink-0 rounded-full" onClick={() => setOpen(false)}>
+              <MobileOverlayPrimaryAction onClick={() => setOpen(false)}>
                 Показать
-              </Button>
+              </MobileOverlayPrimaryAction>
             </div>
           </div>
         </SheetContent>

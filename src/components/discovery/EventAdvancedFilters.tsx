@@ -11,6 +11,7 @@ import { useEventAvailableFacets } from "@/features/filters/discovery/useEventAv
 import { Button } from "@/components/ui/button";
 import { ACTIVITY_FORMAT_OPTIONS } from "@/domain/activities/activity-format";
 import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
+import { MobileOverlayPrimaryAction } from "@/components/mobile/MobileOverlayPrimaryAction";
 import { formatPrice } from "@/lib/formatters/format-price";
 import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
 import { cn } from "@/lib/utils";
@@ -362,13 +363,11 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
           <span className="sm:hidden">Сбросить</span>
           <span className="hidden sm:inline">Сбросить уточнения</span>
         </MobileOverlayResetAction>
-        <Button
-          className="min-h-11 min-w-0 flex-1 rounded-full px-4 text-sm lg:flex-none lg:px-6"
-          onClick={() => {
-            onApply?.();
-          }}
-        >
-          <span>Показать {count == null ? "…" : pluralize(count, ["событие", "события", "событий"])}</span>
+        <MobileOverlayPrimaryAction className="min-w-0 flex-1 lg:hidden" onClick={() => onApply?.()}>
+          Показать {count == null ? "…" : pluralize(count, ["событие", "события", "событий"])}
+        </MobileOverlayPrimaryAction>
+        <Button className="hidden min-h-11 rounded-full px-6 text-sm lg:inline-flex" onClick={() => onApply?.()}>
+          Показать {count == null ? "…" : pluralize(count, ["событие", "события", "событий"])}
         </Button>
       </div>
     </div>
