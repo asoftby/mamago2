@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { formatJournalPublishedDate } from "@/lib/article/formatJournalPublishedDate";
-import { Fragment, useEffect } from "react";
-import { JOURNAL_GROUP_LABELS, type JournalGeographyGroup } from "@/lib/article/articleJournalGeography";
+import { useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
+import type { CityHomeJournalArticle, JournalLocationOption } from "@/server/article/listCityHomeArticles";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { ArticleSaveHeart, type ArticleSaveStatus } from "@/features/save/ArticleSaveHeart";
 import { useArticleSaveStatusBatch } from "@/features/save/useArticleSaveStatusBatch";
@@ -34,17 +33,7 @@ const TYPE_FILTERS: Array<{ key: BlogContentType; label: string }> = [
 ];
 const SHOW_NEWSLETTER_CTA = false;
 
-function JournalGeographyHeading({ group, cityName }: { group: JournalGeographyGroup; cityName?: string }) {
-  const label = group === "CITY" && cityName ? cityName : JOURNAL_GROUP_LABELS[group];
-  return (
-    <div className="flex items-center gap-4 pt-7 pb-1">
-      <h2 className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</h2>
-      <div className="h-px flex-1 bg-border" />
-    </div>
-  );
-}
-
-export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) {
+export function BlogIndex({ articles, locationOptions = [], activeLocation = null }: { articles: CityHomeJournalArticle[]; locationOptions?: JournalLocationOption[]; activeLocation?: string | null }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -63,7 +52,17 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
     : null;
   const filtered = filterBlogArticles(articles, activeContentType, activeTagSlug);
   const showTypeFilter = availableTypes.size > 1;
+  const showLocationFilter = locationOptions.length > 0;
   const showTagFilter = availableTags.length >= 2;
+
+  const updateLocation = (next: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next) params.set("location", next);
+    else params.delete("location");
+    params.delete("page");
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
 
   const updateFilters = (type: BlogContentType, tagSlug: string | null) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -89,7 +88,6 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
   }, [activeContentType, activeTagSlug, pathname, requestedTagSlug, requestedTypeParam, router, searchParams]);
 
   const [featured, ...rest] = filtered;
-  const showGeographyGroups = filtered.some(article => article.geographyGroup !== null);
   const saveStatuses = useArticleSaveStatusBatch(filtered.map((a) => a.id));
 
   return (
@@ -98,11 +96,6 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
       <section className="border-b border-border">
         <div className="site-wrap px-6 sm:px-7 py-10 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-8 items-end">
           <div>
-            <div className="flex items-center gap-3 mb-5 text-[11px] font-mono uppercase tracking-[.14em] text-muted-foreground">
-              <span className="text-primary">●</span>
-              <span>Журнал</span>
-            </div>
-
             <h1
               className="font-heading m-0 leading-[.94] tracking-[-0.03em]"
               style={{ fontSize: "40px" }}
@@ -113,6 +106,22 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
             <p className="mt-5 text-[17px] leading-relaxed text-muted-foreground w-full">
               Вдохновение для семейных прогулок, событий и открытий.
             </p>
+            {showLocationFilter ? (
+              <label className="mt-5 inline-flex flex-col gap-1.5 text-sm font-medium text-foreground">
+                Локация
+                <select
+                  aria-label="Локация статей"
+                  value={activeLocation ?? ""}
+                  onChange={event => updateLocation(event.target.value)}
+                  className="min-w-[220px] max-w-full rounded-full border border-border bg-white px-4 py-2.5 pr-9 text-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <option value="">Все</option>
+                  {locationOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
           </div>
 
         </div>
@@ -189,9 +198,6 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
           </div>
         ) : (
           <>
-            {featured?.geographyGroup && (
-              <JournalGeographyHeading group={featured.geographyGroup} cityName={cityCtx?.cityName} />
-            )}
             {featured && (
               <AnalyticsCardViewTracker
                 entityType="ARTICLE"
@@ -206,27 +212,21 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
 
             {rest.length > 0 && (
               <div>
-                {!showGeographyGroups && (
-                  <div className="flex items-center gap-4 my-6">
-                    <span className="text-[10px] font-mono uppercase tracking-[.14em] text-muted-foreground shrink-0">все материалы</span>
-                    <div className="flex-1 h-px bg-border" />
-                  </div>
-                )}
+                <div className="flex items-center gap-4 my-6">
+                  <span className="text-[10px] font-mono uppercase tracking-[.14em] text-muted-foreground shrink-0">все материалы</span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
                 {rest.map((a, i) => (
-                  <Fragment key={a.id}>
-                    {a.geographyGroup && a.geographyGroup !== filtered[i].geographyGroup && (
-                      <JournalGeographyHeading group={a.geographyGroup} cityName={cityCtx?.cityName} />
-                    )}
-                    <AnalyticsCardViewTracker
-                      entityType="ARTICLE"
-                      entityId={a.id}
-                      vertical="CITY"
-                      citySlug={citySlug}
-                      meta={{ section: "journal", position: i + 1 }}
-                    >
-                      <ArticleRow article={a} idx={i + 1} saveStatus={saveStatuses[a.id]} />
-                    </AnalyticsCardViewTracker>
-                  </Fragment>
+                  <AnalyticsCardViewTracker
+                    key={a.id}
+                    entityType="ARTICLE"
+                    entityId={a.id}
+                    vertical="CITY"
+                    citySlug={citySlug}
+                    meta={{ section: "journal", position: i + 1 }}
+                  >
+                    <ArticleRow article={a} idx={i + 1} saveStatus={saveStatuses[a.id]} />
+                  </AnalyticsCardViewTracker>
                 ))}
               </div>
             )}
@@ -283,13 +283,13 @@ function FeaturedArticle({
             </span>
           )}
           <span className="text-[11px] font-medium text-muted-foreground">{article.geographyLabel}</span>
-          {article.publishedAt && (
+          {article.updatedAt && (
             <span className="text-[11px] font-mono uppercase tracking-[.12em] text-muted-foreground">
-              {formatJournalPublishedDate(article.publishedAt)}
+              {formatJournalPublishedDate(article.updatedAt)}
             </span>
           )}
           <span className="text-[11px] font-mono text-muted-foreground">
-            {article.readTime} мин
+            {article.readTime} мин чтения
           </span>
         </div>
 
@@ -362,13 +362,13 @@ function ArticleRow({
           </span>
         </div>
         <span className="text-xs text-muted-foreground">{article.geographyLabel}</span>
-        {article.publishedAt && (
+        {article.updatedAt && (
           <span className="text-[13px] text-foreground font-medium tracking-[-.005em]">
-            {formatJournalPublishedDate(article.publishedAt)}
+            {formatJournalPublishedDate(article.updatedAt)}
           </span>
         )}
         <span className="text-[11px] font-mono text-muted-foreground">
-          {article.readTime} мин
+          {article.readTime} мин чтения
         </span>
       </div>
 
