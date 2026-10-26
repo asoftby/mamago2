@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { ModalCloseButton } from "@/components/ui/modal-close-button";
 import { SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
+  DialogClose,
   DialogDescription,
   DialogHeader,
   DialogTitle,
@@ -88,17 +90,22 @@ export function RefinementFiltersButtonCompact({
       </DialogTrigger>
 
       <DialogContent
-        showCloseButton
+        showCloseButton={false}
         className="max-h-[min(90vh,800px)] max-w-[calc(100%-2rem)] gap-0 overflow-hidden p-0 sm:max-w-lg"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <DialogHeader className="border-b border-border/60 px-6 py-4 text-left">
-          <DialogTitle className="text-lg font-semibold">Фильтры</DialogTitle>
-          <DialogDescription className="sr-only">
-            Дополнительные фильтры для уточнения подборки событий.
-          </DialogDescription>
+        <DialogHeader className="flex !flex-row shrink-0 items-center justify-between gap-3 border-b border-neutral-200/90 px-4 py-3 text-left sm:px-5">
+          <div>
+            <DialogTitle className="text-lg font-semibold text-neutral-900">Фильтры</DialogTitle>
+            <DialogDescription className="sr-only">
+              Дополнительные фильтры для уточнения подборки событий.
+            </DialogDescription>
+          </div>
+          <DialogClose asChild>
+            <ModalCloseButton aria-label="Закрыть фильтры" />
+          </DialogClose>
         </DialogHeader>
-        <div className="max-h-[min(70vh,640px)] overflow-y-auto px-6 py-4">
+        <div className="max-h-[min(70vh,640px)] overflow-y-auto px-4 py-4 sm:px-5">
           {safeIntent === "kuda" ? (
             <EventAdvancedFilters citySlug={citySlug} onApply={() => setOpen(false)} />
           ) : (
