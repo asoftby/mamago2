@@ -129,16 +129,16 @@ test("hydration gate does NOT block on Instagram share ids (igshid/igsh) or ymcl
   assert.equal(hasAnyNonTrackingUrlParams(params as never), false);
 });
 
-// --- E: badge on the "Фильтры" icon must ignore date/whenPreset groups ---
+// --- Kuda modal badge now includes date and who: all URL filters are visible ---
 
-test("getModalFilterCount ignores whenPreset — quick-chip clicks must not light up the modal badge", () => {
+test("getModalFilterCount counts whenPreset as one dimension", () => {
   const filters = { ...defaultFilters, whenPreset: "TODAY" as const };
-  assert.equal(getModalFilterCount(filters), 0);
+  assert.equal(getModalFilterCount(filters), 1);
 });
 
-test("getModalFilterCount ignores dateFrom/dateTo", () => {
+test("getModalFilterCount counts dateFrom/dateTo as one dimension", () => {
   const filters = { ...defaultFilters, dateFrom: "2026-08-29", dateTo: "2026-08-31" };
-  assert.equal(getModalFilterCount(filters), 0);
+  assert.equal(getModalFilterCount(filters), 1);
 });
 
 test("getModalFilterCount counts age, format, metro-or-district as one group, and free", () => {
