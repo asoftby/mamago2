@@ -57,7 +57,7 @@ function MyPlanOverlayHost({ pathname }: { pathname: string }) {
   return (
     <>
       {!hidePlanEntryEffective ? <MyPlanWidget /> : null}
-      {showMobilePlanBar ? <MyPlanMobileWidget /> : null}
+      {showMobilePlanBar ? <MyPlanMobileWidget keepVisible={planOpen} /> : null}
       <MyPlanOverlay open={planOpen} onOpenChange={handlePlanOpenChange} />
       <PlanQuickAddHost />
     </>
