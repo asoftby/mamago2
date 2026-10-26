@@ -62,6 +62,12 @@ export function priceSliderValueFromKey(key: string, current: number, domainMax:
   return undefined;
 }
 
+/** In a single-price range, keep the immovable thumbs at the track ends. */
+export function priceThumbPercent(thumb: "min" | "max", value: number, lower: number, upper: number): number {
+  if (upper <= lower) return thumb === "min" ? 0 : 100;
+  return Math.min(100, Math.max(0, ((value - lower) / (upper - lower)) * 100));
+}
+
 function PriceRangeControl({
   distribution,
   value,
@@ -84,7 +90,8 @@ function PriceRangeControl({
   const minValue = Math.min(upper, Math.max(lower, value.min ?? lower));
   const maxValue = Math.max(minValue, Math.min(upper, value.max ?? upper));
   const peak = Math.max(1, ...distribution.buckets.map((item) => item.count));
-  const pct = (n: number) => upper > lower ? ((n - lower) / (upper - lower)) * 100 : 50;
+  const minPercent = priceThumbPercent("min", minValue, lower, upper);
+  const maxPercent = priceThumbPercent("max", maxValue, lower, upper);
   const emit = (thumb: "min" | "max", raw: number) => {
     if (disabled) return;
     if (thumb === "min") {
@@ -158,8 +165,8 @@ function PriceRangeControl({
           <div
             className="absolute top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-primary"
             style={{
-              left: `${pct(minValue)}%`,
-              right: `${100 - pct(maxValue)}%`,
+              left: `${minPercent}%`,
+              right: `${100 - maxPercent}%`,
             }}
           />
 
@@ -184,7 +191,7 @@ function PriceRangeControl({
                   "focus-visible:ring-4 focus-visible:ring-primary/20",
                   "active:scale-95",
                 )}
-                style={{ left: `${pct(current)}%`, ...(locked && thumb === "min" ? { transform: "translate(-65%, -50%)" } : locked ? { transform: "translate(-35%, -50%)" } : {}) }}
+                style={{ left: `${thumb === "min" ? minPercent : maxPercent}%` }}
                 onPointerDown={(event) => handleThumbPointer(thumb, event)}
                 onPointerMove={(event) => handleThumbMove(thumb, event)}
                 onKeyDown={(event) => handleThumbKey(thumb, event)}
@@ -199,14 +206,14 @@ function PriceRangeControl({
       </div>
 
       <div className="flex items-start justify-between gap-3">
-        <div className="flex max-w-[calc(50%-0.375rem)] flex-col items-start gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Минимум</span>
+        <div className="flex max-w-[calc(50%-0.375rem)] flex-col items-center gap-2">
+          <span className="text-center text-xs font-normal text-muted-foreground">Минимум</span>
           <div className="inline-flex h-9 max-w-full items-center justify-center rounded-full border border-border bg-white px-4 text-sm font-normal text-foreground">
             {renderPriceWithIcon(formatPrice(value.min == null ? (distribution.minPaid ?? minValue) : minValue), { iconSize: "text" })}
           </div>
         </div>
-        <div className="flex max-w-[calc(50%-0.375rem)] flex-col items-end gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Максимум</span>
+        <div className="flex max-w-[calc(50%-0.375rem)] flex-col items-center gap-2">
+          <span className="text-center text-xs font-normal text-muted-foreground">Максимум</span>
           <div className="inline-flex h-9 max-w-full items-center justify-center rounded-full border border-border bg-white px-4 text-sm font-normal text-foreground">
             {renderPriceWithIcon(formatPrice(value.max == null ? (distribution.maxPrice ?? maxValue) : maxValue), { iconSize: "text" })}
           </div>
