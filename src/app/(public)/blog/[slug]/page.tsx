@@ -371,8 +371,8 @@ export default async function ArticlePage({
       canEditPublishedArticle
         ? (
             mvp.subtitle === BREAKING_NEWS_SUBTITLE
-              ? `/admin/content/publications/new?type=news&id=${mvp.id}`
-              : `/admin/content/articles/${mvp.id}/edit`
+              ? `/admin/content/publications/new?type=news&id=${mvp.id}&returnTo=${encodeURIComponent(canonicalPath)}`
+              : `/admin/content/articles/${mvp.id}/edit?returnTo=${encodeURIComponent(canonicalPath)}`
           )
         : undefined;
 
@@ -541,7 +541,7 @@ export default async function ArticlePage({
     publicBase,
   );
   const legacyEditHref =
-    canEditPublishedArticle && seo?.id ? `/admin/content/articles/${seo.id}/edit` : undefined;
+    canEditPublishedArticle && seo?.id ? `/admin/content/articles/${seo.id}/edit?returnTo=${encodeURIComponent(buildNationalArticlePath(article.slug))}` : undefined;
 
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12 md:py-16">

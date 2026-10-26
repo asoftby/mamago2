@@ -48,7 +48,7 @@ export function installInternalHistoryTracking(): () => void {
     url?: string | URL | null,
   ) {
     const currentDepth = readDepthFromState(history.state) ?? 0;
-    return originalPushState(withDepth(state, currentDepth + 1), unused, url);
+    return originalPushState({ ...withDepth(state, currentDepth + 1), __mamagoPreviousPath: window.location.pathname + window.location.search }, unused, url);
   };
 
   const trackedReplaceState: History["replaceState"] = function (
@@ -57,7 +57,7 @@ export function installInternalHistoryTracking(): () => void {
     url?: string | URL | null,
   ) {
     const currentDepth = readDepthFromState(history.state) ?? 0;
-    return originalReplaceState(withDepth(state, currentDepth), unused, url);
+    return originalReplaceState({ ...withDepth(state, currentDepth), __mamagoPreviousPath: asRecord(history.state).__mamagoPreviousPath }, unused, url);
   };
 
   history.pushState = trackedPushState;

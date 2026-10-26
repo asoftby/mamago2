@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +36,7 @@ export function OwnerWizardEditDropdown({
   className?: string;
   label?: string;
 }) {
+  const pathname = usePathname();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -60,7 +62,7 @@ export function OwnerWizardEditDropdown({
               className="cursor-pointer p-0 focus:bg-transparent data-[highlighted]:bg-transparent"
             >
               <Link
-                href={step.href}
+                href={step.href.includes("returnTo=") ? step.href : `${step.href}${step.href.includes("?") ? "&" : "?"}returnTo=${encodeURIComponent(pathname)}`}
                 className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left text-[13px] text-[#141210] transition-colors hover:bg-[#FAF7F1]"
               >
                 <span className="min-w-0">{step.label}</span>

@@ -156,17 +156,17 @@ export default async function CityArticlePage({ params }: PageProps) {
     await incrementPublishedArticleViews(mvp.id);
   }
 
-  const editHref = canEdit
-    ? mvp.subtitle === BREAKING_NEWS_SUBTITLE
-      ? `/admin/content/publications/new?type=news&id=${mvp.id}`
-      : `/admin/content/articles/${mvp.id}/edit`
-    : undefined;
   const publicBase = getCanonicalPublicAppUrl();
   const canonicalPath = buildCityPublicPath({
     citySlug: city.slug,
     type: "article",
     slug: articleRow.slug,
   });
+  const editHref = canEdit
+    ? mvp.subtitle === BREAKING_NEWS_SUBTITLE
+      ? `/admin/content/publications/new?type=news&id=${mvp.id}&returnTo=${encodeURIComponent(canonicalPath)}`
+      : `/admin/content/articles/${mvp.id}/edit?returnTo=${encodeURIComponent(canonicalPath)}`
+    : undefined;
   const schemaJsonLd =
     articleRow.seoJsonLdOverride && typeof articleRow.seoJsonLdOverride === "object"
       ? (articleRow.seoJsonLdOverride as Record<string, unknown>)
