@@ -222,9 +222,21 @@ Restore is a manual, deliberate action — intentionally not scripted further
 (single wrong target argument on a one-click restore script is a bigger risk
 than one documented command run by a human who reads it first).
 
+### 4a. Migration gate: dump or abort
+
+Run `migrate deploy` through the wrapper, never bare. It calls
+`scripts/deploy/backup-remote-db.sh`, verifies the dump (non-empty, valid gzip,
+`pg_dump` completion marker, checksum) and runs the migration command only if
+every check passes; any failure aborts before the migration starts:
+
+```bash
+scripts/release/migrate-with-backup.sh mamago-dev dev-db-1 -- \
+  ssh mamago-dev 'docker compose -p dev run --rm migrate'
+```
+
 ## 5. Deploy order
 
-1. Backup (§4), verified non-empty + checksum recorded.
+1. Backup (§4); step 3 runs through the §4a wrapper, which re-verifies it.
 2. Migration diagnostics (§3 step 3) reviewed, no unexplained destructive
    diff.
 3. `pnpm prisma migrate deploy` via the existing `prod-migrate-1`-style
