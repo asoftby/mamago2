@@ -29,15 +29,20 @@ assert.ok(validateForSubmit(data, "v2").errors.includes("Ссылка для з�
 data.schedule.externalUrl = "https://tickets.example.by/a";
 assert.deepEqual(validateForSubmit(data, "v2").errors, []);
 
-// Camp submission refuses obsolete external/direct modes in both wizard variants.
+// Camps are always request-only: v2 ignores a stale EXTERNAL method (normalized before
+// persistence), while the legacy v1 wizard still refuses obsolete external/direct modes.
+const CAMP_ACTION_ERROR = "Для лагеря выберите «Отправить заявку»";
 const camp = getDefaultFormData("place-id");
 camp.productType = "CAMP";
 camp.offerWizardType = "CAMP";
 camp.schedule.bookingMethod = "EXTERNAL";
 camp.schedule.externalUrl = "https://tickets.example.by/camp";
-assert.ok(validateForSubmit(camp, "v2").errors.includes("Для лагеря выберите «Отправить заявку»"));
+assert.ok(!validateForSubmit(camp, "v2").errors.includes(CAMP_ACTION_ERROR));
+assert.ok(!validateForSubmit(camp, "v2").errors.includes("Ссылка для записи"));
+camp.schedule.externalUrl = "";
+assert.ok(!validateForSubmit(camp, "v2").errors.includes("Ссылка для записи"));
 camp.schedule.bookingMethod = "REQUEST_ONLY";
-assert.ok(!validateForSubmit(camp, "v2").errors.includes("Для лагеря выберите «Отправить заявку»"));
+assert.ok(!validateForSubmit(camp, "v2").errors.includes(CAMP_ACTION_ERROR));
 camp.publicationAccess = { method: "external", externalUrl: "https://tickets.example.by/camp" };
 camp.ctaType = "перейти_на_сайт";
 assert.ok(validateForSubmit(camp, "v1").errors.includes("Для лагеря выберите «Отправить заявку»"));
