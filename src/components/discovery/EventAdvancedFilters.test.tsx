@@ -5,6 +5,7 @@ import { defaultFilters } from "@/features/filters/discovery/filters.store";
 import {
   getEventRefinementCount,
   normalizePriceMinSliderValue,
+  priceThumbPercent,
   normalizePriceSliderValue,
   priceSliderValueFromKey,
   priceSliderValueFromPosition,
@@ -70,6 +71,19 @@ test("price range normalizes selected and unbounded values", () => {
   assert.equal(priceSliderValueFromPosition(50, 0, 60, 60, 10), 50);
   assert.equal(priceSliderValueFromKey("ArrowLeft", 60, 60, 10), 50);
   assert.equal(priceSliderValueFromKey("End", 50, 60, 10), 60);
+});
+
+test("locked single-price range keeps noninteractive thumbs at opposite ends", () => {
+  assert.equal(priceThumbPercent("min", 30, 30, 30), 0);
+  assert.equal(priceThumbPercent("max", 30, 30, 30), 100);
+  assert.equal(priceThumbPercent("min", 80, 80, 100), 0);
+  assert.equal(priceThumbPercent("max", 100, 80, 100), 100);
+  assert.equal(priceThumbPercent("max", 90, 80, 100), 50);
+
+  const source = readFileSync(new URL("./EventAdvancedFilters.tsx", import.meta.url), "utf8");
+  assert.match(source, /disabled=\{disabled\}/);
+  assert.match(source, /text-center text-xs font-normal text-muted-foreground">Минимум/);
+  assert.match(source, /text-center text-xs font-normal text-muted-foreground">Максимум/);
 });
 
 test("mobile filter button uses the same URL filter count as desktop", () => {

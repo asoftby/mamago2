@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Portal } from "@/components/ui/portal";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
@@ -22,22 +22,33 @@ export type FilterState = SecondaryValues;
 export function RefinementFiltersModal() {
   const { isOpen, setIsOpen, currentIntent } = useRefinementFilters();
   const [isVisible, setIsVisible] = useState(() => isOpen);
+  const [isEntered, setIsEntered] = useState(false);
   const citySlug = useOptionalCity()?.citySlug ?? DEFAULT_CITY_SLUG;
-  const prevIsOpenRef = useRef(isOpen);
 
-  // Sync visibility with animation delay
+  // Keep the sheet mounted while closing, but mount it below the viewport when opening.
   useEffect(() => {
-    if (prevIsOpenRef.current === isOpen) return;
-    prevIsOpenRef.current = isOpen;
-    
     if (isOpen) {
-      const timer = setTimeout(() => setIsVisible(true), 0);
-      return () => clearTimeout(timer);
-    } else {
-      const timer = setTimeout(() => setIsVisible(false), 300);
-      return () => clearTimeout(timer);
+      setIsVisible(true);
+      return;
     }
+    setIsEntered(false);
+    const timer = window.setTimeout(() => setIsVisible(false), 300);
+    return () => window.clearTimeout(timer);
   }, [isOpen]);
+
+  // Two paints ensure the browser sees translate-y-full before transitioning to 0.
+  // Without this the sheet mounts already open and appears abruptly on mobile Safari.
+  useEffect(() => {
+    if (!isVisible || !isOpen) return;
+    let secondFrame: number | null = null;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => setIsEntered(true));
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame != null) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [isVisible, isOpen]);
 
   // Keyed on isVisible (DOM-presence window), not isOpen, so the lock stays
   // held through the 300ms close animation instead of releasing early while
@@ -69,6 +80,7 @@ export function RefinementFiltersModal() {
     const closeForDesktop = () => {
       if (!mq.matches) return;
       setIsOpen(false);
+      setIsEntered(false);
       setIsVisible(false);
     };
     closeForDesktop();
@@ -97,8 +109,8 @@ export function RefinementFiltersModal() {
       <div className="fixed inset-0 z-[9999] lg:hidden">
         <div
           className={cn(
-            "fixed inset-0 bg-black/50 transition-opacity duration-300 ease-out",
-            isOpen ? "opacity-100" : "opacity-0",
+            "fixed inset-0 bg-black/50 transition-opacity duration-300 ease-out motion-reduce:transition-none",
+            isEntered ? "opacity-100" : "opacity-0",
           )}
           onClick={() => setIsOpen(false)}
           aria-hidden="true"
@@ -108,8 +120,8 @@ export function RefinementFiltersModal() {
 
         <div
           className={cn(
-            "fixed bottom-0 left-0 right-0 flex h-[88dvh] max-h-[calc(100dvh-0.75rem)] flex-col overflow-hidden rounded-t-3xl bg-white transition-transform duration-300 ease-out",
-            isOpen ? "translate-y-0" : "translate-y-full",
+            "fixed bottom-0 left-0 right-0 flex h-[88dvh] max-h-[calc(100dvh-0.75rem)] flex-col overflow-hidden rounded-t-3xl bg-white transition-transform duration-300 ease-out motion-reduce:transition-none",
+            isEntered ? "translate-y-0" : "translate-y-full",
           )}
         >
           <div className="flex-shrink-0">{stickyHeader}</div>
