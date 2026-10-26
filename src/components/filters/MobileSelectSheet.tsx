@@ -6,7 +6,6 @@ import * as React from "react";
 import { Check, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChipsRow, type ChipItem } from "@/components/ui/chips-row";
 
