@@ -264,10 +264,10 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
         </fieldset>
       )}
 
-      {categories.some(category => !facets || facets.categories.includes(category.slug)) && <fieldset className="space-y-2">
+      {categories.some(category => !facets || facets.categories.includes(category.slug) || draft.categories.includes(category.slug)) && <fieldset className="space-y-2">
         <legend className="text-sm font-semibold">Категория</legend>
         <div className="flex flex-wrap gap-2">
-          {categories.filter(category => !facets || facets.categories.includes(category.slug)).map((category) => (
+          {categories.filter(category => !facets || facets.categories.includes(category.slug) || draft.categories.includes(category.slug)).map((category) => (
             <Chip
               key={category.id}
               active={draft.categories.includes(category.slug)}
@@ -280,7 +280,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
         </div>
       </fieldset>}
 
-      {draft.categories.length > 0 && categories.some(category => draft.categories.includes(category.slug) && category.genres.some(genre => !facets || facets.genres.includes(genre.slug))) && (
+      {draft.categories.length > 0 && categories.some(category => draft.categories.includes(category.slug) && category.genres.some(genre => !facets || facets.genres.includes(genre.slug) || draft.genres.includes(genre.slug))) && (
         <fieldset className="space-y-4">
           <legend className="text-sm font-semibold">Жанр</legend>
           {categories
@@ -289,7 +289,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
               <div key={category.id} className="space-y-2">
                 <div className="text-xs font-medium text-muted-foreground">{category.nameRu}</div>
                 <div className="flex flex-wrap gap-2">
-                  {category.genres.filter(genre => !facets || facets.genres.includes(genre.slug)).map((genre) => (
+                  {category.genres.filter(genre => !facets || facets.genres.includes(genre.slug) || draft.genres.includes(genre.slug)).map((genre) => (
                     <Chip
                       key={`${category.id}:${genre.id}`}
                       active={draft.genres.includes(genre.slug)}
@@ -308,10 +308,10 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
         </fieldset>
       )}
 
-      {(!facets || facets.formats.length > 0) && <fieldset>
+      {(!facets || facets.formats.length > 0 || draft.format != null) && <fieldset>
         <legend className="mb-2 text-sm font-semibold">Формат</legend>
         <div className="flex flex-wrap gap-2">
-          {ACTIVITY_FORMAT_OPTIONS.filter(option => !facets || facets.formats.includes(option.value)).map(({ value, label }) => (
+          {ACTIVITY_FORMAT_OPTIONS.filter(option => !facets || facets.formats.includes(option.value) || draft.format === option.value).map(({ value, label }) => (
             <Chip
               key={value}
               active={draft.format === value}
@@ -323,9 +323,9 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
         </div>
       </fieldset>}
 
-      {(!facets || facets.freeAvailable || distribution.max != null) && <fieldset className="space-y-4">
+      {(!facets || facets.freeAvailable || distribution.max != null || draft.free || draft.priceMin != null || draft.priceMax != null) && <fieldset className="space-y-4">
         <legend className="text-sm font-semibold">Цена</legend>
-        {(!facets || facets.freeAvailable) && <Chip
+        {(!facets || facets.freeAvailable || draft.free) && <Chip
           active={draft.free}
           onClick={() => patch({
             free: !draft.free,
