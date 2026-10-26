@@ -36,3 +36,27 @@ for (const c of TERRITORY_EXPAND_COLUMNS) {
   assert.ok(migration.includes(backfill), `migration backfills ${c.table}.${c.territoryColumn}`);
 }
 console.log("territoryExpandColumns.test: ok");
+
+// DUAL WRITE triggers: every mirrored column has one, and the down script drops each of them.
+const triggers = readFileSync(
+  join(__dirname, "../../prisma/migrations/20261027090000_territory_dual_write_triggers/migration.sql"),
+  "utf8",
+);
+const triggersDown = readFileSync(
+  join(__dirname, "../../prisma/migrations/20261027090000_territory_dual_write_triggers/down.sql.txt"),
+  "utf8",
+);
+for (const c of TERRITORY_EXPAND_COLUMNS) {
+  const kind = c.legacyColumn === "cityId" ? "CITY" : "REGION";
+  const name = `territory_sync_${c.table}_${c.legacyColumn}`;
+  assert.ok(
+    triggers.includes(`CREATE TRIGGER "${name}" BEFORE INSERT OR UPDATE OF "${c.legacyColumn}" ON "${c.table}" FOR EACH ROW EXECUTE FUNCTION "territory_sync_from_legacy"('${c.legacyColumn}', '${c.territoryColumn}', '${kind}');`),
+    `dual-write trigger for ${c.table}.${c.legacyColumn}`,
+  );
+  assert.ok(
+    triggers.includes(`UPDATE "${c.table}" t SET "${c.territoryColumn}" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = '${kind}' AND m."legacyId" = t."${c.legacyColumn}" AND t."${c.territoryColumn}" IS DISTINCT FROM m."territoryId";`),
+    `catch-up backfill for ${c.table}.${c.territoryColumn}`,
+  );
+  assert.ok(triggersDown.includes(`DROP TRIGGER IF EXISTS "${name}" ON "${c.table}";`), `down drops ${name}`);
+}
+console.log("territoryExpandColumns.test (triggers): ok");
