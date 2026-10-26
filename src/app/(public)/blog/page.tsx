@@ -5,7 +5,7 @@ import {
   buildCityPublicPath,
 } from "@/lib/routing/cityPaths";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
-import { listNationalBlogArticlesPage } from "@/server/article/listCityHomeArticles";
+import { listNationalBlogArticlesPage, listJournalLocationOptions } from "@/server/article/listCityHomeArticles";
 import { BlogIndex } from "./BlogIndex";
 import { BlogPagination } from "./BlogPagination";
 
@@ -19,7 +19,7 @@ function parsePage(value: string | string[] | undefined): number {
 export async function generateMetadata({
   searchParams,
 }: {
-  searchParams: Promise<{ city?: string | string[]; page?: string | string[] }>;
+  searchParams: Promise<{ city?: string | string[]; page?: string | string[]; location?: string | string[] }>;
 }): Promise<Metadata> {
   const query = await searchParams;
   const page = parsePage(query.page);
@@ -37,7 +37,7 @@ export async function generateMetadata({
 export default async function BlogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ city?: string | string[]; page?: string | string[] }>;
+  searchParams: Promise<{ city?: string | string[]; page?: string | string[]; location?: string | string[] }>;
 }) {
   const query = await searchParams;
   const cityRaw = Array.isArray(query.city) ? query.city[0] : query.city;
@@ -54,13 +54,16 @@ export default async function BlogPage({
   }
 
   const requestedPage = parsePage(query.page);
-  const journal = await listNationalBlogArticlesPage(requestedPage);
+  const requestedLocation = Array.isArray(query.location) ? query.location[0] : query.location;
+  const locationOptions = await listJournalLocationOptions();
+  const location = locationOptions.some(option => option.value === requestedLocation) ? requestedLocation! : null;
+  const journal = await listNationalBlogArticlesPage(requestedPage, 24, location);
   if (requestedPage > journal.totalPages && journal.total > 0) notFound();
 
   return (
     <main>
-      <BlogIndex articles={journal.articles} />
-      <BlogPagination basePath="/blog" page={journal.page} totalPages={journal.totalPages} />
+      <BlogIndex articles={journal.articles} locationOptions={locationOptions} activeLocation={location} />
+      <BlogPagination basePath={location ? `/blog?location=${encodeURIComponent(location)}` : "/blog"} page={journal.page} totalPages={journal.totalPages} />
     </main>
   );
 }
