@@ -77,7 +77,7 @@ function PriceRangeControl({
   const minValue = Math.min(Math.max(0, value.min ?? 0), domainMax);
   const maxValue = Math.max(minValue, Math.min(value.max ?? domainMax, domainMax));
   const peak = Math.max(1, ...distribution.buckets.map((item) => item.count));
-  const lowestPaidPrice = distribution.buckets.find((bucket) => bucket.to > 0 && bucket.count > 0)?.from ?? null;
+  const lowestPaidPrice = Math.min(...distribution.buckets.filter((bucket) => bucket.to > 0 && bucket.count > 0).map((bucket) => Math.max(0, bucket.from)), Number.POSITIVE_INFINITY);
   const pct = (n: number) => domainMax > 0 ? (n / domainMax) * 100 : 0;
 
   const emit = (thumb: "min" | "max", raw: number) => {
@@ -211,7 +211,7 @@ function PriceRangeControl({
           <div className="rounded-full border border-border bg-background px-4 py-3 text-base font-semibold text-foreground">
             {minValue > 0
               ? renderPriceWithIcon(formatPrice(minValue))
-              : lowestPaidPrice != null && lowestPaidPrice > 0
+              : Number.isFinite(lowestPaidPrice) && lowestPaidPrice > 0
                 ? renderPriceWithIcon(formatPrice(lowestPaidPrice))
                 : "Без ограничения"}
           </div>
@@ -232,7 +232,6 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
   const family = useFamilyPersona();
   const facets = useEventAvailableFacets(draft);
   const { categories, loading: taxonomyLoading } = useEventTaxonomy(citySlug);
-  const [count, setCount] = React.useState<number | null>(null);
   const [distribution, setDistribution] = React.useState<PriceDistribution>({ max: null, step: null, buckets: [] });
   const patch = (next: Partial<DiscoveryFilters>) => actions.setDraft(next);
 
@@ -241,11 +240,6 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
     const timer = setTimeout(() => {
       const params = serializeAppliedToSearchParams(new URLSearchParams(), draft);
       params.set("city", citySlug);
-      fetch(`/api/discovery/events/count?${params}`, { signal: controller.signal })
-        .then((response) => response.ok ? response.json() : null)
-        .then((data) => setCount(data?.count ?? null))
-        .catch(() => {});
-
       params.delete("priceMin");
       params.delete("priceMax");
       fetch(`/api/discovery/events/price-distribution?${params}`, { signal: controller.signal })
