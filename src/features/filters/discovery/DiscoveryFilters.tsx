@@ -332,6 +332,8 @@ export function DiscoveryFilters({
           filters={{
              categories: applied.categories,
              genres: applied.genres,
+             occasionSlug: applied.occasionSlug,
+             profile: applied.profile,
              age: applied.age,
              metro: applied.metro,
              district: applied.district,
