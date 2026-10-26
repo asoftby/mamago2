@@ -20,6 +20,9 @@ export interface ActivityMock {
   title: string;
   description: string;
   image: string;
+  /** Stored pixel size of `image` (MediaAsset); null/undefined = unknown. */
+  imageWidth?: number | null;
+  imageHeight?: number | null;
   coverMediaId?: string | null;
   ageFrom: number;
   ageTo: number;

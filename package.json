@@ -231,6 +231,7 @@
     "test:billing-financial": "tsx --test src/lib/billing/billingPolicy.test.ts && tsx --test --test-concurrency=1 src/server/services/billing/billingFinancial.integration.test.ts",
     "search:reindex": "tsx scripts/search-reindex.ts",
     "media:backfill-migrated-metadata": "tsx scripts/backfill-migrated-media-metadata.ts",
+    "media:backfill-dimensions": "tsx scripts/backfill-media-dimensions.ts",
     "media:backfill-titles": "tsx scripts/data-migrations/backfill-media-titles.ts",
     "media:audit-alt": "tsx scripts/data-migrations/audit-media-alt.ts",
     "test:media-metadata-backfill": "tsx src/lib/media/isTechnicalMediaTitle.test.ts && tsx src/lib/media/decideMigratedMediaMetadataPatch.test.ts",
@@ -282,7 +283,7 @@
     "test:responsive-admin": "tsx src/lib/responsive/adminMobileLayoutContract.test.ts",
     "test:admin-user-360": "tsx \"src/app/admin/users/[id]/UserDetailsClient.contract.test.ts\"",
     "test:publication-media": "tsx src/lib/media/publicationMediaOrder.test.ts && tsx src/components/media/MobileMediaCarousel.test.tsx && tsx src/lib/media/parseVideoUrl.test.ts && tsx src/lib/event/buildEventGalleryItems.test.ts",
-    "test:upload-pipeline": "tsx src/lib/uploads/heicConversion.test.ts && tsx src/lib/uploads/uploadFilename.test.ts && tsx src/lib/uploads/uploadPipeline.contract.test.ts"
+    "test:upload-pipeline": "tsx src/lib/uploads/heicConversion.test.ts && tsx src/lib/uploads/uploadFilename.test.ts && tsx src/lib/uploads/uploadPipeline.contract.test.ts && tsx src/server/media/mediaDimensions.test.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

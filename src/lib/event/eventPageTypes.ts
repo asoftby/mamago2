@@ -96,6 +96,9 @@ export type EventPageSimilar = {
   id: string;
   title: string;
   imageUrl: string;
+  /** Stored pixel size of `imageUrl`; null/undefined = unknown. */
+  imageWidth?: number | null;
+  imageHeight?: number | null;
   dateLabel?: string;
   priceLabel?: string;
   categoryLabel?: string;
