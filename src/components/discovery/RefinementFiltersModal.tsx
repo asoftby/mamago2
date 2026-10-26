@@ -81,12 +81,12 @@ export function RefinementFiltersModal() {
   const intent = currentIntent as Intent;
 
   const stickyHeader = (
-    <div className="flex items-center justify-between border-b border-gray-200 bg-white pb-3">
-      <h2 className="text-lg font-semibold text-gray-900">Фильтры</h2>
+    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-200/90 bg-white px-4 py-3 sm:px-5">
+      <h2 className="text-lg font-semibold text-neutral-900">Фильтры</h2>
       <ModalCloseButton
         type="button"
         onClick={() => setIsOpen(false)}
-        className="h-11 w-11 bg-gray-50 text-gray-600 shadow-none hover:bg-gray-100"
+        className="shrink-0"
       />
     </div>
   );
@@ -111,12 +111,7 @@ export function RefinementFiltersModal() {
             isOpen ? "translate-y-0" : "translate-y-full",
           )}
         >
-          <div className="flex-shrink-0 px-4 pb-0 pt-3 sm:px-6 sm:pt-5">
-            <div className="mb-2 flex justify-center" aria-hidden>
-              <span className="h-1.5 w-12 rounded-full bg-neutral-300" />
-            </div>
-            {stickyHeader}
-          </div>
+          <div className="flex-shrink-0">{stickyHeader}</div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 sm:px-6">
             {intent === "kuda" ? (
