@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import prisma from "@/lib/prisma";
-import { buildCityPublicPath, buildNationalArticlePath } from "@/lib/routing/cityPaths";
+import { buildCityPublicPath } from "@/lib/routing/cityPaths";
 import { resolveCityArticlePublicRoute } from "./resolveCityArticlePublicRoute";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 
