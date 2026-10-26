@@ -1303,6 +1303,8 @@ model MetroStation {
 }
 
 model Activity {
+  /// Публикации журнала (подборки), в которых это событие — элемент (упорядоченно).
+  journalLinkedItems   ArticleLinkedItem[]       @relation("ArticleLinkedActivity")
   id                   String                    @id @default(cuid())
   description          String?
   cityId               String?
@@ -2501,6 +2503,8 @@ model OpeningHoursExceptionInterval {
 }
 
 model Offer {
+  /// Публикации журнала (подборки), в которых это предложение — элемент (упорядоченно).
+  journalLinkedItems       ArticleLinkedItem[]  @relation("ArticleLinkedOffer")
   id                       String               @id @default(cuid())
   /// Nullable: DRAFT Offers may temporarily exist without a Place (e.g.
   /// legacy Phoenix imports with no resolvable Place relation). PENDING/
@@ -3488,12 +3492,23 @@ model Article {
   seoJsonLdOverride  Json?
   publishedAt        DateTime?
   status             ContentStatus        @default(DRAFT)
+  /// Тип публикации журнала — ось, независимая от рубрики (categoryId).
+  /// BREAKING_NEWS: expiresAt обязателен (по умолчанию publishedAt + 7 дней).
+  publicationType    ArticlePublicationType @default(ARTICLE)
+  /// Кандидат в блок «Главное» (берётся самый свежий featured любого типа).
+  featured           Boolean              @default(false)
+  /// Закреплено в начале ленты «Свежие материалы».
+  pinned             Boolean              @default(false)
   noindex            Boolean              @default(false)
   views              Int                  @default(0)
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
   seoCanonicalSource SeoCanonicalSource   @default(FALLBACK)
   slugHistory        ArticleSlugHistory[]
+  /// Упорядоченные элементы публикации (для COLLECTION — минимум 3).
+  linkedItems        ArticleLinkedItem[]  @relation("ArticleLinkedItemOwner")
+  /// Публикации, в которые эта статья включена как элемент.
+  linkedFromItems    ArticleLinkedItem[]  @relation("ArticleLinkedArticle")
   /// The Place/venue this article is about (optional editorial context).
   /// Does NOT determine geoScope or cityId — geography is set independently by the editor.
   /// On DELETE SET NULL so deleting the place keeps the article.
@@ -3529,6 +3544,46 @@ model Article {
   @@index([categoryId])
   @@index([territoryId])
   @@index([regionTerritoryId])
+  @@index([publicationType, status, publishedAt])
+}
+
+/// Тип публикации журнала (ось «формат»; рубрика — Article.categoryId).
+enum ArticlePublicationType {
+  ARTICLE
+  COLLECTION
+  BREAKING_NEWS
+}
+
+/// Вид связанного объекта публикации.
+enum ArticleLinkedItemKind {
+  EVENT
+  OFFER
+  ARTICLE
+}
+
+/// Упорядоченная связь публикации с событием / предложением / другой публикацией.
+/// Ровно один из activityId / offerId / linkedArticleId не null и соответствует kind
+/// (CHECK в SQL-миграции); пары (articleId, объект) уникальны — partial unique индексы
+/// в SQL. position — редакторский порядок (основа под будущую продажу мест в подборках).
+model ArticleLinkedItem {
+  id              String                @id @default(cuid())
+  articleId       String
+  kind            ArticleLinkedItemKind
+  activityId      String?
+  offerId         String?
+  linkedArticleId String?
+  position        Int
+  createdAt       DateTime              @default(now())
+
+  article       Article   @relation("ArticleLinkedItemOwner", fields: [articleId], references: [id], onDelete: Cascade)
+  activity      Activity? @relation("ArticleLinkedActivity", fields: [activityId], references: [id], onDelete: Cascade)
+  offer         Offer?    @relation("ArticleLinkedOffer", fields: [offerId], references: [id], onDelete: Cascade)
+  linkedArticle Article?  @relation("ArticleLinkedArticle", fields: [linkedArticleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, position])
+  @@index([activityId])
+  @@index([offerId])
+  @@index([linkedArticleId])
 }
 
 /// Ordered secondary taxonomy assignments. Article.categoryId remains the primary category.
