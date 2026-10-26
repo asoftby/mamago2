@@ -69,8 +69,14 @@ assert.match(
 );
 assert.match(
   eventFilters,
-  /min-h-11 min-w-0 flex-1 rounded-full/,
-  "Event filter primary action must remain a full 44px mobile target",
+  /<MobileOverlayPrimaryAction className="min-w-0 flex-1 lg:hidden"/,
+  "Event filter mobile primary action must use the shared header-derived button",
+);
+const mobilePrimaryAction = readFileSync("src/components/mobile/MobileOverlayPrimaryAction.tsx", "utf8");
+assert.match(
+  mobilePrimaryAction,
+  /rounded-xl bg-\\[#EF8759\\] px-5 py-3\\.5/,
+  "Shared mobile primary action must preserve the mobile header button geometry",
 );
 
 assert.match(
