@@ -64,10 +64,28 @@ export function capturePublicEditOrigin(): () => void {
     if (!/^\/(admin|business|editor)(\/|$)/.test(url.pathname)) return;
     const pathname = window.location.pathname;
     if (/^\/(admin|business|editor)(\/|$)/.test(pathname)) return;
-    const marker: EditMarker = { origin: originForCurrentPage(), createdAt: Date.now() };
     try {
-      window.sessionStorage.setItem(PREFIX + pathname, JSON.stringify(marker));
-    } catch { /* Storage may be disabled. */ }
+      // A second edit from the just-saved public article must retain the
+      // original listing (including its filters), not overwrite it with the
+      // editor as the previous history entry.
+      const key = PREFIX + pathname;
+      const newOrigin = originForCurrentPage();
+      let savedOrigin: string | null = null;
+      const raw = window.sessionStorage.getItem(key);
+      if (raw) {
+        const previous = JSON.parse(raw) as Partial<EditMarker>;
+        if (typeof previous.createdAt === "number" &&
+            Date.now() - previous.createdAt <= MAX_AGE_MS &&
+            previous.createdAt <= Date.now()) {
+          savedOrigin = safePublicBackPath(previous.origin);
+        }
+      }
+      const marker: EditMarker = {
+        origin: newOrigin ?? savedOrigin,
+        createdAt: Date.now(),
+      };
+      window.sessionStorage.setItem(key, JSON.stringify(marker));
+    } catch { /* Storage may be unavailable or stale/corrupt. */ }
   };
 
   document.addEventListener("click", onClick, true);
