@@ -75,9 +75,14 @@ async function counting() {
     route: delegate("route", 5), article: delegate("article", 1),
   } as unknown as TerritoryCountsDb;
   const result = await countPublicContentForTerritory("t1", db);
-  assert.deepEqual(result, { events: 2, classes: 2, places: 3, offers: 4, routes: 5, articles: 1 });
-  assert.equal(totalSectionCounts(result), 17);
-  assert.equal((seen.activity as unknown[]).length, 2, "events and classes are separate queries");
+  assert.deepEqual(result, { events: 2, classes: 4, places: 3, offers: 4, routes: 5, articles: 1 });
+  assert.equal(totalSectionCounts(result), 19);
+  assert.equal((seen.activity as unknown[]).length, 1, "events: one EVENT-activity query, as in the kuda feed");
+  const offerQueries = (seen.offer as unknown[]).map((q) => JSON.stringify(q));
+  assert.equal(offerQueries.length, 2);
+  assert.ok(offerQueries[0].includes('"kind":"SERVICE"'), "classes = SERVICE offers, as in classesDiscoveryFeed");
+  assert.ok(offerQueries[1].includes('"kind":{"not":"SERVICE"}'));
+  assert.ok(!JSON.stringify(seen.activity).includes("COURSE"), "classes are not counted from activities");
   const articleWhere = JSON.stringify(seen.article);
   assert.ok(articleWhere.includes("additionalGeographyTargets") && articleWhere.includes("regionTerritoryId"));
 }

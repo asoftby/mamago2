@@ -12,9 +12,10 @@ import {
 /** Published content a territory holds, per product section. */
 export type TerritorySectionCounts = {
   events: number;
-  /** Non-event activities: courses and permanent offerings («Занятия»). */
+  /** «Занятия»: the classes feed pool — public SERVICE offers (see classesDiscoveryFeed). */
   classes: number;
   places: number;
+  /** Remaining public offers (kind EVENT) that are not part of the classes feed. */
   offers: number;
   routes: number;
   articles: number;
@@ -37,15 +38,9 @@ export function addSectionCounts(a: TerritorySectionCounts, b: TerritorySectionC
 
 export type TerritoryCountsDb = Pick<typeof prisma, "activity" | "place" | "offer" | "route" | "article">;
 
+/** Same shape as `activityInCityWhere` (kuda feed), keyed by territoryId. */
 function activityInTerritory(territoryId: string): Prisma.ActivityWhereInput {
-  return {
-    OR: [
-      { territoryId },
-      { place: { territoryId } },
-      { venue: { territoryId } },
-      { venue: { place: { territoryId } } },
-    ],
-  };
+  return { OR: [{ territoryId }, { place: { territoryId } }, { venue: { territoryId } }] };
 }
 
 /** Article belongs to a territory through its main city/region or any additional geography target. */
@@ -67,16 +62,15 @@ export async function countPublicContentForTerritory(
   territoryId: string,
   db: TerritoryCountsDb = prisma,
 ): Promise<TerritorySectionCounts> {
+  // Predicates mirror the section feeds: kuda = EVENT activities (kudaDiscoveryFeed),
+  // classes = SERVICE offers (classesDiscoveryFeed); both on top of the public visibility predicates.
   const listing = (getPublicListingActivityWhere().AND ?? []) as Prisma.ActivityWhereInput[];
-  const activities = (types: ActivityType[]) =>
-    db.activity.count({
-      where: { AND: [{ type: { in: types } }, ...listing, activityInTerritory(territoryId)] },
-    });
+  const publicOffers = getPublicPublishedOfferWhere();
   const [events, classes, places, offers, routes, articles] = await Promise.all([
-    activities([ActivityType.EVENT]),
-    activities([ActivityType.COURSE, ActivityType.PERMANENT]),
+    db.activity.count({ where: { AND: [{ type: ActivityType.EVENT }, ...listing, activityInTerritory(territoryId)] } }),
+    db.offer.count({ where: { AND: [publicOffers, { kind: "SERVICE" }, { place: { territoryId } }] } }),
     db.place.count({ where: { territoryId, AND: getPublicPublishedPlaceWhere().AND } }),
-    db.offer.count({ where: { AND: [getPublicPublishedOfferWhere(), { place: { territoryId } }] } }),
+    db.offer.count({ where: { AND: [publicOffers, { kind: { not: "SERVICE" } }, { place: { territoryId } }] } }),
     db.route.count({ where: { AND: [getPublicRouteIndexWhere(), { territoryId }] } }),
     db.article.count({ where: { AND: [getPublicPublishedArticleWhere(), articleInTerritory(territoryId)] } }),
   ]);
