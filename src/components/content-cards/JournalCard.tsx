@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { Glasses } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 
@@ -33,7 +34,8 @@ export function JournalCard({ href, title, imageUrl, categoryLabel, geographyLab
                     src={imageUrl}
                     alt={title}
                     fill
-                    sizes={"(min-width: 1024px) 250px, 50vw"}
+                    sizes="(min-width: 1600px) 320px, (min-width: 1024px) 26vw, (min-width: 640px) 44vw, 78vw"
+                    quality={85}
                     className="object-cover"
                   />
                 ) : imageUrl ? (
@@ -53,8 +55,9 @@ export function JournalCard({ href, title, imageUrl, categoryLabel, geographyLab
                   </p>
                 )}
                 {readTime != null && <p className="ml-auto flex shrink-0 items-center gap-1 font-mono text-[11px] text-[rgba(20,18,16,0.55)]">
+                  <Glasses className="h-3.5 w-3.5" aria-hidden="true" />
                   <span aria-hidden="true">~</span>
-                  {readTime} мин.
+                  {readTime} мин чтения
                 </p>}
               </div>
               {geographyLabel && (

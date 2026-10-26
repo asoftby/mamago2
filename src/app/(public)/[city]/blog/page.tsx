@@ -8,14 +8,14 @@ import {
   buildCityPublicPath,
 } from "@/lib/routing/cityPaths";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
-import { listCityBlogArticles } from "@/server/article/listCityHomeArticles";
+import { listCityBlogArticles, listJournalLocationOptions } from "@/server/article/listCityHomeArticles";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ city: string }>;
-  searchParams: Promise<{ page?: string | string[] }>;
+  searchParams: Promise<{ page?: string | string[]; location?: string | string[] }>;
 }
 
 async function resolveCity(citySlug: string) {
@@ -65,16 +65,19 @@ export default async function CityBlogPage({ params, searchParams }: PageProps) 
   if (!city) notFound();
 
   const requestedPage = parsePage(query.page);
-  const journal = await listCityBlogArticles(city, requestedPage);
+  const requestedLocation = Array.isArray(query.location) ? query.location[0] : query.location;
+  const locationOptions = await listJournalLocationOptions();
+  const location = locationOptions.some(option => option.value === requestedLocation) ? requestedLocation! : null;
+  const journal = await listCityBlogArticles(city, requestedPage, 24, location);
   if (requestedPage > journal.totalPages && journal.total > 0) notFound();
 
   const basePath = buildCityPublicPath({ citySlug: city.slug, type: "journal" });
 
   return (
     <main>
-      <BlogIndex articles={journal.articles} />
+      <BlogIndex articles={journal.articles} locationOptions={locationOptions} activeLocation={location} />
       <BlogPagination
-        basePath={basePath}
+        basePath={location ? `${basePath}?location=${encodeURIComponent(location)}` : basePath}
         page={journal.page}
         totalPages={journal.totalPages}
       />

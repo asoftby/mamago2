@@ -27,6 +27,7 @@ function article(
     readTime: 3,
     isBreakingNews: contentType === "NEWS",
     publishedAt: new Date("2026-01-01"),
+    updatedAt: new Date("2026-10-26T08:00:00.000Z"),
     coverImageUrl: null,
   };
 }
