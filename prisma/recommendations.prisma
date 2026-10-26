@@ -47,6 +47,8 @@ model RecommendationRun {
   anonymousId      String?
   surface          RecommendationSurface
   cityId           String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap (no FK, mirrors cityId)
+  territoryId String?
   citySlug         String?
   targetDateFrom   String?
   targetDateTo     String?
@@ -66,6 +68,7 @@ model RecommendationRun {
   @@index([surface, generatedAt])
   @@index([cityId, generatedAt])
   @@index([policyId])
+  @@index([territoryId])
 }
 
 /// A recommendation actually returned to a surface. We intentionally do not

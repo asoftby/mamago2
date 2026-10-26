@@ -200,6 +200,8 @@ model UserEvent {
   entityId         String?
   vertical         AnalyticsVertical?
   cityId           String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap (no FK, mirrors cityId)
+  territoryId String?
   /// RecommendationRun.id that caused this action, if any. Intentionally not a
   /// hard FK: raw event history must not depend on recommendation-retention
   /// tables and must survive their pruning.
@@ -226,6 +228,7 @@ model UserEvent {
   @@index([cityId, createdAt])
   @@index([decisionId])
   @@index([anonymousId, createdAt])
+  @@index([territoryId])
 }
 
 model Session {
@@ -1167,9 +1170,99 @@ model City {
   @@index([isLegacyNonCity])
 }
 
+enum TerritoryType {
+  COUNTRY
+  REGION
+  CITY
+}
+
+enum TerritoryLegacyKind {
+  COUNTRY
+  REGION
+  CITY
+}
+
+/// Unified geography: COUNTRY -> REGION ("city + oblast", slug of the centre, e.g. minsk, grodno) -> CITY.
+/// Expand phase: replaces Country/Region/City after expand -> dual write -> switch read -> contract.
+model Territory {
+  id          String        @id @default(cuid())
+  type        TerritoryType
+  parentId    String?
+  parent      Territory?    @relation("TerritoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children    Territory[]   @relation("TerritoryTree")
+  slug        String
+  name        String
+  /// Prepositional case for UI copy, e.g. "в Гродно".
+  nameIn      String?
+  isoCode     String?       @unique
+  lat         Float?
+  lng         Float?
+  isIndexable Boolean       @default(true)
+  isActive    Boolean       @default(false)
+  priority    Int           @default(0)
+  isVisibleInCityFilter Boolean @default(true)
+  isLegacyNonCity       Boolean @default(false)
+  centerLat   Float?
+  centerLng   Float?
+  radiusKm    Float?
+  hasMetro    Boolean       @default(false)
+  metroMaxDistanceM Int?
+  googlePlaceId String?
+  googleName  String?
+  googleNames Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  legacyMaps TerritoryLegacyMap[]
+  districtRefs District[] @relation("DistrictTerritory")
+  metroStationRefs MetroStation[] @relation("MetroStationTerritory")
+  activitySlugHistoryRefs ActivitySlugHistory[] @relation("ActivitySlugHistoryTerritory")
+  placeRefs Place[] @relation("PlaceTerritory")
+  placeRevisionRefs PlaceRevision[] @relation("PlaceRevisionTerritory")
+  placeSlugHistoryRefs PlaceSlugHistory[] @relation("PlaceSlugHistoryTerritory")
+  offerRefs Offer[] @relation("OfferTerritory")
+  offerSlugHistoryRefs OfferSlugHistory[] @relation("OfferSlugHistoryTerritory")
+  routeRefs Route[] @relation("RouteTerritory")
+  articleRefs Article[] @relation("ArticleTerritory")
+  articleRegionRefs Article[] @relation("ArticleRegionTerritory")
+  articleGeographyTargetRefs ArticleGeographyTarget[] @relation("ArticleGeographyTargetTerritory")
+  articleGeographyTargetRegionRefs ArticleGeographyTarget[] @relation("ArticleGeographyTargetRegionTerritory")
+  articleSlugHistoryRefs ArticleSlugHistory[] @relation("ArticleSlugHistoryTerritory")
+  editorialRequestRefs EditorialRequest[] @relation("EditorialRequestTerritory")
+  searchDocumentRefs SearchDocument[] @relation("SearchDocumentTerritory")
+  importSourceRefs ImportSource[] @relation("ImportSourceTerritory")
+  searchQuickTagRefs SearchQuickTag[] @relation("SearchQuickTagTerritory")
+  seoContentPlanItemRefs SeoContentPlanItem[] @relation("SeoContentPlanItemTerritory")
+  seoContentPlanItemRegionRefs SeoContentPlanItem[] @relation("SeoContentPlanItemRegionTerritory")
+  searchQueryLogRefs SearchQueryLog[] @relation("SearchQueryLogTerritory")
+
+  /// Not unique on bare slug: REGION and CITY share slugs (region minsk contains city minsk).
+  /// Country slugs: partial unique index in the migration (WHERE type = COUNTRY).
+  @@unique([parentId, slug])
+  @@index([type, slug])
+  @@index([parentId])
+  @@index([type, isActive, priority])
+}
+
+/// Temporary old id -> Territory mapping (dropped in the contract phase).
+model TerritoryLegacyMap {
+  legacyKind  TerritoryLegacyKind
+  legacyId    String
+  territoryId String
+  territory   Territory           @relation(fields: [territoryId], references: [id], onDelete: Cascade)
+  createdAt   DateTime            @default(now())
+
+  @@id([legacyKind, legacyId])
+  @@index([territoryId])
+}
+
+
 model District {
   id                 String   @id @default(cuid())
   cityId             String
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("DistrictTerritory", fields: [territoryId], references: [id], onDelete: Cascade)
   name               String
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -1181,11 +1274,15 @@ model District {
 
   @@unique([cityId, name])
   @@index([cityId])
+  @@index([territoryId])
 }
 
 model MetroStation {
   id                 String     @id @default(cuid())
   cityId             String
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("MetroStationTerritory", fields: [territoryId], references: [id], onDelete: Cascade)
   name               String
   lat                Float
   lng                Float
@@ -1202,12 +1299,15 @@ model MetroStation {
   @@unique([cityId, osmType, osmId])
   @@unique([cityId, name])
   @@index([cityId])
+  @@index([territoryId])
 }
 
 model Activity {
   id                   String                    @id @default(cuid())
   description          String?
   cityId               String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap (no FK, mirrors cityId)
+  territoryId String?
   metroStationId       String?
   createdAt            DateTime                  @default(now())
   updatedAt            DateTime                  @updatedAt
@@ -1309,6 +1409,7 @@ model Activity {
   @@index([slug])
   @@index([coverImageId])
   @@index([priceFrom])
+  @@index([territoryId])
 }
 
 /// Join table: категории «в программе» события (many-to-many Activity ↔ EventCategory).
@@ -1327,6 +1428,9 @@ model ActivitySlugHistory {
   id         String   @id @default(cuid())
   activityId String
   cityId     String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("ActivitySlugHistoryTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   slug       String
   createdAt  DateTime @default(now())
   activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
@@ -1335,6 +1439,7 @@ model ActivitySlugHistory {
   @@unique([cityId, slug])
   @@index([activityId])
   @@index([slug])
+  @@index([territoryId])
 }
 
 model ActivityImage {
@@ -1362,6 +1467,8 @@ model EventVenue {
   title       String?
   addressLine String?
   cityId      String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap (no FK, mirrors cityId)
+  territoryId String?
   lat         Float?
   lng         Float?
   note        String?
@@ -1374,6 +1481,7 @@ model EventVenue {
   @@index([activityId])
   @@index([placeId])
   @@index([kind])
+  @@index([territoryId])
 }
 
 model ActivitySession {
@@ -1605,6 +1713,9 @@ model Place {
   id                           String             @id @default(cuid())
   title                        String
   cityId                       String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("PlaceTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   lat                          Float?
   lng                          Float?
   phone                        String?
@@ -1757,6 +1868,7 @@ model Place {
   @@index([status, revisionRequestedAt])
   @@index([primaryCategoryId])
   @@index([priceFrom])
+  @@index([territoryId])
 }
 
 /// Подкатегории места (EventCategory с publicationType=PLACE, parentId=primaryCategoryId).
@@ -1842,6 +1954,9 @@ model PlaceRevision {
   directionsNote        String?
   countryCode           String?
   cityId                String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("PlaceRevisionTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   locationSource        LocationSource?
   customAddress         String?
   locationName          String?
@@ -1887,6 +2002,7 @@ model PlaceRevision {
   @@index([reviewedByUserId])
   @@index([status, revisionRequestedAt])
   @@index([placeId, createdAt])
+  @@index([territoryId])
 }
 
 model PlaceRevisionImage {
@@ -1929,6 +2045,9 @@ model PlaceSlugHistory {
   id        String   @id @default(cuid())
   placeId   String
   cityId    String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("PlaceSlugHistoryTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   slug      String
   createdAt DateTime @default(now())
   place     Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
@@ -1937,6 +2056,7 @@ model PlaceSlugHistory {
   @@unique([cityId, slug])
   @@index([placeId])
   @@index([slug])
+  @@index([territoryId])
 }
 
 model PlaceImage {
@@ -2227,6 +2347,8 @@ enum HomeStoryItemStatus {
 model HomeStoryItem {
   id               String                 @id @default(cuid())
   cityId           String
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap (no FK, mirrors cityId)
+  territoryId String?
   storyDate        DateTime
   sourceType       HomeStorySourceType
   sourceId         String
@@ -2254,6 +2376,7 @@ model HomeStoryItem {
   @@index([cityId, storyDate, status, pinned, manualOrder, startsAt])
   @@index([cityId, status, isFree, startsAt])
   @@index([sourceType, sourceId])
+  @@index([territoryId])
 }
 
 model EmailTemplate {
@@ -2452,6 +2575,9 @@ model Offer {
   seoCanonicalSource       SeoCanonicalSource   @default(FALLBACK)
   /// Snapshot cityId из place.cityId для роутинга; заполняется save-хуком, не редактируется напрямую
   cityId                   String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("OfferTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   /// Сигналы DISCOVERY домена (entityType=OFFER), ID SignalDefinition
   discoverySignalIds       String[]             @default([])
   /// Чипы публичной витрины /[city]/classes
@@ -2565,6 +2691,7 @@ model Offer {
   // Party-filter indexes (Phase 3b-1)
   @@index([category])
   @@index([minChildren, maxChildren])
+  @@index([territoryId])
 }
 
 /// Ревизия опубликованного оффера: контентные правки партнёра (текст, фото, категории и т.п.), которые
@@ -2784,6 +2911,9 @@ model OfferSlugHistory {
   id        String   @id @default(cuid())
   offerId   String
   cityId    String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("OfferSlugHistoryTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   slug      String
   createdAt DateTime @default(now())
   offer     Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
@@ -2792,6 +2922,7 @@ model OfferSlugHistory {
   @@unique([cityId, slug])
   @@index([offerId])
   @@index([slug])
+  @@index([territoryId])
 }
 
 model Boost {
@@ -3265,6 +3396,9 @@ model Route {
   agePolicy          AgePolicy          @default(UNKNOWN)
   budgetLevel        BudgetLevel        @default(LOW)
   cityId             String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("RouteTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   coverImageUrl      String?
   authorId           String?
   status             RouteStatus        @default(DRAFT)
@@ -3294,6 +3428,7 @@ model Route {
   @@index([authorId])
   @@index([cityId])
   @@index([slug])
+  @@index([territoryId])
 }
 
 model RouteSlugHistory {
@@ -3326,9 +3461,15 @@ model Article {
   cityContext        String?
   /// FK to the city this article belongs to (null = non-CITY-scope article)
   cityId             String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("ArticleTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   city               City?                @relation("ArticleCity", fields: [cityId], references: [id], onDelete: SetNull)
   /// FK to the region this article belongs to (null = non-REGION-scope article)
   regionId           String?
+  /// Expand phase: backfilled from regionId via TerritoryLegacyMap
+  regionTerritoryId   String?
+  regionTerritory Territory? @relation("ArticleRegionTerritory", fields: [regionTerritoryId], references: [id], onDelete: SetNull)
   region             Region?              @relation("ArticleRegion", fields: [regionId], references: [id], onDelete: SetNull)
   /// CITY = local article at /{city}/blog/{slug}; REGION = regional article at /blog/{slug} (relevant to cities in that region); COUNTRY = national article at /blog/{slug}; null = draft, scope not chosen
   geoScope           GeoScope?
@@ -3386,6 +3527,8 @@ model Article {
   @@index([geoScope])
   @@index([relatedPlaceId])
   @@index([categoryId])
+  @@index([territoryId])
+  @@index([regionTerritoryId])
 }
 
 /// Ordered secondary taxonomy assignments. Article.categoryId remains the primary category.
@@ -3408,7 +3551,13 @@ model ArticleGeographyTarget {
   articleId String
   type      ArticleGeographyTargetType
   cityId    String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("ArticleGeographyTargetTerritory", fields: [territoryId], references: [id], onDelete: Cascade)
   regionId  String?
+  /// Expand phase: backfilled from regionId via TerritoryLegacyMap
+  regionTerritoryId   String?
+  regionTerritory Territory? @relation("ArticleGeographyTargetRegionTerritory", fields: [regionTerritoryId], references: [id], onDelete: Cascade)
   position  Int
 
   article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
@@ -3418,6 +3567,8 @@ model ArticleGeographyTarget {
   @@unique([articleId, position])
   @@index([cityId, articleId])
   @@index([regionId, articleId])
+  @@index([territoryId])
+  @@index([regionTerritoryId])
 }
 
 model ArticleSlugHistory {
@@ -3425,6 +3576,9 @@ model ArticleSlugHistory {
   articleId String
   slug      String
   cityId    String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("ArticleSlugHistoryTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
   city      City?    @relation(fields: [cityId], references: [id], onDelete: SetNull)
@@ -3435,6 +3589,7 @@ model ArticleSlugHistory {
   @@index([articleId])
   @@index([slug])
   @@index([cityId])
+  @@index([territoryId])
 }
 
 model EditorialRequest {
@@ -3442,6 +3597,9 @@ model EditorialRequest {
   title       String
   description String?
   cityId      String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("EditorialRequestTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   status      EditorialRequestStatus @default(DRAFT)
   deadlineAt  DateTime?
   criteria    Json?
@@ -3454,6 +3612,7 @@ model EditorialRequest {
   @@index([status])
   @@index([createdAt])
   @@index([updatedAt])
+  @@index([territoryId])
 }
 
 /// Денормализованный индекс для быстрого поиска. Источник истины — сущности Activity/Offer/Place/Route/Article.
@@ -3471,6 +3630,9 @@ model SearchDocument {
   isPublished Boolean          @default(false)
   boost       Float            @default(1)
   cityId      String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("SearchDocumentTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   updatedAt   DateTime         @updatedAt
   createdAt   DateTime         @default(now())
 
@@ -3479,6 +3641,7 @@ model SearchDocument {
   @@unique([entityType, entityId])
   @@index([isPublished])
   @@index([isPublished, cityId])
+  @@index([territoryId])
 }
 
 enum SearchEntityType {
@@ -5183,6 +5346,9 @@ model ImportSource {
   lastErrorAt             DateTime?
   lastErrorMessage        String?
   cityId                  String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("ImportSourceTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   isActive                Boolean             @default(true)
   archivedAt              DateTime?
   crawlMaxPages           Int?
@@ -5204,6 +5370,7 @@ model ImportSource {
   @@index([cityId])
   @@index([archivedAt])
   @@index([isActive])
+  @@index([territoryId])
 }
 
 /// Один запуск импорта из источника
@@ -6229,6 +6396,9 @@ model SearchQuickTag {
   query     String
   filters   Json?
   cityId    String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("SearchQuickTagTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   isActive  Boolean  @default(true)
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
@@ -6239,6 +6409,7 @@ model SearchQuickTag {
   @@index([isActive])
   @@index([sortOrder])
   @@index([cityId])
+  @@index([territoryId])
 }
 
 /// Search synonyms для улучшения релевантности поиска
@@ -6282,7 +6453,13 @@ model SeoContentPlanItem {
   targetQueryKey   String?
   geoScope         GeoScope
   cityId           String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("SeoContentPlanItemTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   regionId         String?
+  /// Expand phase: backfilled from regionId via TerritoryLegacyMap
+  regionTerritoryId   String?
+  regionTerritory Territory? @relation("SeoContentPlanItemRegionTerritory", fields: [regionTerritoryId], references: [id], onDelete: SetNull)
   scheduledFor     DateTime?
   status           SeoContentPlanStatus   @default(IDEA)
   priority         SeoContentPlanPriority @default(MEDIUM)
@@ -6311,6 +6488,8 @@ model SeoContentPlanItem {
   @@index([regionId, status, scheduledFor])
   @@index([createdByUserId])
   @@index([articleId])
+  @@index([territoryId])
+  @@index([regionTerritoryId])
 }
 
 /// Search query log для аналитики и zero-result tracking
@@ -6321,6 +6500,9 @@ model SearchQueryLog {
   clickedEntityId   String?
   clickedEntityType String?
   cityId            String?
+  /// Expand phase: backfilled from cityId via TerritoryLegacyMap
+  territoryId   String?
+  territory Territory? @relation("SearchQueryLogTerritory", fields: [territoryId], references: [id], onDelete: SetNull)
   userId            String?
   sessionId         String?
   searchId          String?   @unique
@@ -6337,6 +6519,7 @@ model SearchQueryLog {
   @@index([userId])
   @@index([createdAt])
   @@index([query, resultsCount])
+  @@index([territoryId])
 }
 
 /// Search index record для контроля качества индексации
