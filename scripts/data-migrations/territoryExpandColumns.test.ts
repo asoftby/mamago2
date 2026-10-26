@@ -53,6 +53,10 @@ for (const c of TERRITORY_EXPAND_COLUMNS) {
     triggers.includes(`CREATE TRIGGER "${name}" BEFORE INSERT OR UPDATE OF "${c.legacyColumn}" ON "${c.table}" FOR EACH ROW EXECUTE FUNCTION "territory_sync_from_legacy"('${c.legacyColumn}', '${c.territoryColumn}', '${kind}');`),
     `dual-write trigger for ${c.table}.${c.legacyColumn}`,
   );
+  assert.ok(
+    triggers.includes(`UPDATE "${c.table}" t SET "${c.territoryColumn}" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = '${kind}' AND m."legacyId" = t."${c.legacyColumn}" AND t."${c.territoryColumn}" IS DISTINCT FROM m."territoryId";`),
+    `catch-up backfill for ${c.table}.${c.territoryColumn}`,
+  );
   assert.ok(triggersDown.includes(`DROP TRIGGER IF EXISTS "${name}" ON "${c.table}";`), `down drops ${name}`);
 }
 console.log("territoryExpandColumns.test (triggers): ok");

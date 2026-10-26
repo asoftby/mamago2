@@ -5,7 +5,7 @@
 -- Prisma connect) is covered by one mechanism. If the legacy value has no mapping the mirror is left
 -- untouched (never blocks a write); verify-territory-expand.ts reports such rows.
 -- Dropped in the contract phase together with the legacy columns.
--- Reversible: see ./down.sql.txt (rename to .sql to run).
+-- Reversible: see ./down.sql.txt (rename to .sql to run); the catch-up backfill needs no undo.
 
 CREATE OR REPLACE FUNCTION "territory_sync_from_legacy"() RETURNS trigger AS $$
 DECLARE
@@ -56,3 +56,33 @@ CREATE TRIGGER "territory_sync_SeoContentPlanItem_regionId" BEFORE INSERT OR UPD
 CREATE TRIGGER "territory_sync_SearchQueryLog_cityId" BEFORE INSERT OR UPDATE OF "cityId" ON "SearchQueryLog" FOR EACH ROW EXECUTE FUNCTION "territory_sync_from_legacy"('cityId', 'territoryId', 'CITY');
 CREATE TRIGGER "territory_sync_UserEvent_cityId" BEFORE INSERT OR UPDATE OF "cityId" ON "UserEvent" FOR EACH ROW EXECUTE FUNCTION "territory_sync_from_legacy"('cityId', 'territoryId', 'CITY');
 CREATE TRIGGER "territory_sync_RecommendationRun_cityId" BEFORE INSERT OR UPDATE OF "cityId" ON "RecommendationRun" FOR EACH ROW EXECUTE FUNCTION "territory_sync_from_legacy"('cityId', 'territoryId', 'CITY');
+
+-- Catch-up: rows written between the expand backfill and these triggers (separate deploys, live traffic).
+-- Runs after the triggers exist so no write can fall into a gap. Touches only mismatched mirrors and
+-- never the legacy column, so the triggers do not fire.
+UPDATE "District" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "MetroStation" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "Activity" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "ActivitySlugHistory" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "EventVenue" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "Place" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "PlaceRevision" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "PlaceSlugHistory" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "HomeStoryItem" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "Offer" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "OfferSlugHistory" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "Route" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "Article" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "Article" t SET "regionTerritoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'REGION' AND m."legacyId" = t."regionId" AND t."regionTerritoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "ArticleGeographyTarget" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "ArticleGeographyTarget" t SET "regionTerritoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'REGION' AND m."legacyId" = t."regionId" AND t."regionTerritoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "ArticleSlugHistory" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "EditorialRequest" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "SearchDocument" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "ImportSource" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "SearchQuickTag" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "SeoContentPlanItem" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "SeoContentPlanItem" t SET "regionTerritoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'REGION' AND m."legacyId" = t."regionId" AND t."regionTerritoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "SearchQueryLog" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "UserEvent" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
+UPDATE "RecommendationRun" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId" AND t."territoryId" IS DISTINCT FROM m."territoryId";
