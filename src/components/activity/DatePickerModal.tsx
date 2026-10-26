@@ -268,8 +268,8 @@ export function DatePickerModal({
         {/* Заголовок */}
         <h2 style={{
           margin: "0 0 8px",
-          fontFamily: "var(--font-editorial)",
-          fontSize: 30, fontWeight: 400,
+          fontFamily: "var(--font-sans)",
+          fontSize: 30, fontWeight: 400, fontStyle: "normal",
           lineHeight: 1.1, letterSpacing: "-0.5px",
           color: C.text,
         }}>
@@ -413,7 +413,8 @@ export function DatePickerModal({
 
                   {/* Число — крупный */}
                   <span style={{
-                    fontSize: 42, fontWeight: 800, lineHeight: 1,
+                    fontFamily: "var(--font-pt-serif), Georgia, serif",
+                    fontSize: 42, fontWeight: 400, lineHeight: 1,
                     letterSpacing: "-2px",
                     color: isSel ? "#fff" : C.text,
                   }}>
