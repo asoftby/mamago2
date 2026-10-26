@@ -314,7 +314,7 @@ export function CityHomeJournalSection({
             meta={{ section: "journal", position: index }}
           >
             <JournalCard href={a.href} title={a.title} imageUrl={a.coverImageUrl}
-              categoryLabel={a.category?.name} readTime={a.readTime} tone={index} homeCard />
+              categoryLabel={a.category?.name} geographyLabel={a.geographyLabel} readTime={a.readTime} tone={index} homeCard />
           </AnalyticsCardViewTracker>
             {/* Save action sits over the cover, outside the navigation link. */}
             <div className="pointer-events-none absolute right-3 top-3 z-10">
