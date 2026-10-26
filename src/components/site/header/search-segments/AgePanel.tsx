@@ -75,7 +75,7 @@ export function AgePanel({
   };
 
   const autoAgeSet = new Set(autoAgeValues);
-  const items: ChipItem[] = AGE_GROUPS.filter(group => availableAgeValues == null || availableAgeValues.includes(group.value)).map((ageGroup) => {
+  const items: ChipItem[] = AGE_GROUPS.filter(group => availableAgeValues == null || availableAgeValues.includes(group.value) || applied.age.includes(group.value)).map((ageGroup) => {
     const active = applied.age.includes(ageGroup.value);
     const isAuto = active && autoAgeSet.has(ageGroup.value);
     const readOnly = ageReadOnly;
