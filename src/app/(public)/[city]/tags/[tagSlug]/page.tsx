@@ -7,10 +7,10 @@ import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 import { getCanonicalPublicAppUrl } from "@/lib/config/publicAppUrl";
-import { buildArticlePublicPath, buildCityPublicPath } from "@/lib/routing/cityPaths";
+import { buildCityPublicPath } from "@/lib/routing/cityPaths";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
-import { buildArticleCityDiscoveryWhere } from "@/lib/article/articleGeographyTargets";
+import { queryCityHomeArticles } from "@/server/article/listCityHomeArticles";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 import { BlogPagination } from "../../../blog/BlogPagination";
 
@@ -53,7 +53,7 @@ function indexableTaggedArticleWhere(city: CityRef, tagId: string): Prisma.Artic
       { NOT: { seoRobots: { contains: "noindex", mode: "insensitive" } } },
     ],
     tags: { some: { id: tagId } },
-    ...buildArticleCityDiscoveryWhere(city, true),
+    // Geography is a ranking signal, not a filter. Tagged articles from other cities are welcome.
   };
 }
 
@@ -82,24 +82,10 @@ async function loadTagPageData(citySlug: string, tagSlug: string, page: number) 
   const safePage = Math.max(1, Math.trunc(page));
   const articles = safePage > totalPages
     ? []
-    : await prisma.article.findMany({
-        where,
-        orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }, { id: "desc" }],
+    : await queryCityHomeArticles(city, {
         skip: (safePage - 1) * PAGE_SIZE,
         take: PAGE_SIZE,
-        select: {
-          id: true,
-          title: true,
-          slug: true,
-          subtitle: true,
-          excerpt: true,
-          publishedAt: true,
-          heroImage: true,
-          seoOgImage: true,
-          geoScope: true,
-          city: { select: { slug: true } },
-          category: { select: { nameRu: true } },
-        },
+        additionalWhere: where,
       });
 
   return {
@@ -108,23 +94,19 @@ async function loadTagPageData(citySlug: string, tagSlug: string, page: number) 
     page: safePage,
     total,
     totalPages,
-    articles: articles.map((article) => ({
+    articles: articles.map(article => ({
       id: article.id,
       title: article.title,
-      slug: article.slug as string,
+      slug: article.slug,
       subtitle: article.subtitle,
-      excerpt: article.excerpt,
+      excerpt: null,
       publishedAt: article.publishedAt,
-      heroUrl: article.heroImage ?? article.seoOgImage ?? null,
-      categoryLabel:
-        article.subtitle === BREAKING_NEWS_SUBTITLE
-          ? "Breaking news"
-          : article.category?.nameRu ?? "Журнал",
-      href: buildArticlePublicPath({
-        slug: article.slug as string,
-        geoScope: article.geoScope,
-        citySlug: article.city?.slug ?? undefined,
-      }),
+      heroUrl: article.coverImageUrl,
+      categoryLabel: article.contentType === "NEWS"
+        ? "Breaking news"
+        : article.category?.name ?? "Журнал",
+      href: article.href,
+      geographyLabel: article.geographyLabel,
     })),
   };
 }
@@ -223,6 +205,7 @@ export default async function CityTagPage({ params, searchParams }: PageProps) {
             <div className="space-y-3 p-5">
               <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-primary">
                 <span>{article.categoryLabel}</span>
+                <span className="text-muted-foreground normal-case tracking-normal">{article.geographyLabel}</span>
                 {article.publishedAt ? (
                   <>
                     <span className="text-slate-300">•</span>
