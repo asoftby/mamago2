@@ -39,6 +39,15 @@ test("event filters survive URL serialization and parsing", () => {
   assert.equal(params.get("genre"), "puppet,musical");
 });
 
+test("family persona selection round-trips in the shareable URL", () => {
+  const filters = { ...defaultFilters, profile: "child-1", age: ["3-5"], occasionSlug: "halloween" };
+  const params = serializeAppliedToSearchParams(new URLSearchParams(), filters);
+  assert.equal(params.get("profile"), "child-1");
+  assert.equal(params.get("occasion"), "halloween");
+  assert.deepEqual(parseAppliedFromUrl(params as never), filters);
+  assert.equal(getDiscoveryFilterActiveCount(filters), 2);
+});
+
 test("reset serialization from an empty base clears primary, secondary, and budget", () => {
   const stale = new URLSearchParams("preset=TODAY&free=true&sec=free_only%3Atrue&budget=30");
   const params = serializeAppliedToSearchParams(new URLSearchParams(), defaultFilters);
