@@ -232,7 +232,7 @@ export async function listJournalLocationOptions(): Promise<JournalLocationOptio
     distinct: ["geoScope", "cityId", "regionId"],
     select: {
       geoScope: true,
-      city: { select: { slug: true, name: true } },
+      city: { select: { slug: true, name: true, region: { select: { slug: true, name: true } } } },
       region: { select: { slug: true, name: true } },
     },
   });
@@ -250,6 +250,16 @@ export async function listJournalLocationOptions(): Promise<JournalLocationOptio
       seen.add(option.value);
       options.push(option);
     }
+    // A region includes its cities, so it is available even when no article
+    // is directly assigned to the REGION geoScope.
+    const relatedRegion = row.geoScope === "CITY" ? row.city?.region : null;
+    if (relatedRegion) {
+      const regionalOption = { value: `region:${relatedRegion.slug}`, label: relatedRegion.name, kind: "region" as const };
+      if (!seen.has(regionalOption.value)) {
+        seen.add(regionalOption.value);
+        options.push(regionalOption);
+      }
+    }
   }
   return options.sort((a, b) => {
     const order = { city: 0, region: 1, country: 2 };
@@ -262,7 +272,14 @@ function journalLocationWhere(value: string | null): Prisma.ArticleWhereInput | 
   const [kind, slug, extra] = value.split(":");
   if (extra || !slug || !/^[a-z0-9-]{1,100}$/.test(slug)) return null;
   if (kind === "city") return { geoScope: "CITY", city: { is: { slug } } };
-  if (kind === "region") return { geoScope: "REGION", region: { is: { slug } } };
+  if (kind === "region") {
+    return {
+      OR: [
+        { geoScope: "REGION", region: { is: { slug } } },
+        { geoScope: "CITY", city: { is: { region: { is: { slug } } } } },
+      ],
+    };
+  }
   if (kind === "country" && slug === "belarus") return { geoScope: "COUNTRY" };
   return null;
 }
