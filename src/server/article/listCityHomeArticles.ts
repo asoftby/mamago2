@@ -167,9 +167,11 @@ function toJournalArticle(
  */
 export async function queryCityHomeArticles(
   city: CityHomeArticleCity,
-  options: { skip?: number; take?: number } = {},
+  options: { skip?: number; take?: number; additionalWhere?: Prisma.ArticleWhereInput } = {},
 ): Promise<CityHomeJournalArticle[]> {
-  const base = publicJournalWhere();
+  const base: Prisma.ArticleWhereInput = options.additionalWhere
+    ? { AND: [publicJournalWhere(), options.additionalWhere] }
+    : publicJournalWhere();
   const buckets = buildJournalGeographyBuckets(city);
   const counts = await Promise.all(buckets.map(bucket =>
     prisma.article.count({ where: { AND: [base, bucket.where] } }),
