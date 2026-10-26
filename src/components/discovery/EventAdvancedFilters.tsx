@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 
 type PriceDistribution = {
   max: number | null;
+  maxPrice: number | null;
   minPaid: number | null;
   step: number | null;
   buckets: Array<{ from: number; to: number; count: number }>;
@@ -219,7 +220,7 @@ function PriceRangeControl({
         <div className="flex max-w-[calc(50%-0.375rem)] flex-col items-end gap-2">
           <span className="text-sm font-medium text-muted-foreground">Максимум</span>
           <div className="inline-flex h-9 max-w-full items-center justify-center rounded-full border border-border bg-white px-4 text-sm font-normal text-foreground">
-            {renderPriceWithIcon(formatPrice(maxValue), { iconSize: "text" })}
+            {renderPriceWithIcon(formatPrice(value.max == null ? (distribution.maxPrice ?? maxValue) : maxValue), { iconSize: "text" })}
           </div>
         </div>
       </div>
@@ -233,7 +234,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
   const facets = useEventAvailableFacets(draft);
   const { categories, loading: taxonomyLoading } = useEventTaxonomy(citySlug);
   const [count, setCount] = React.useState<number | null>(null);
-  const [distribution, setDistribution] = React.useState<PriceDistribution>({ max: null, minPaid: null, step: null, buckets: [] });
+  const [distribution, setDistribution] = React.useState<PriceDistribution>({ max: null, maxPrice: null, minPaid: null, step: null, buckets: [] });
   const patch = (next: Partial<DiscoveryFilters>) => actions.setDraft(next);
 
   React.useEffect(() => {
