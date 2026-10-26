@@ -17,7 +17,7 @@ const ADMINISTRATIVE_SLUG_PATTERNS = [
   /-region/i,
 ];
 
-function isAdministrativeSlug(slug: string): boolean {
+export function isAdministrativeSlug(slug: string): boolean {
   return ADMINISTRATIVE_SLUG_PATTERNS.some((p) => p.test(slug));
 }
 

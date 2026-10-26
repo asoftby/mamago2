@@ -3,6 +3,13 @@
  */
 import assert from "node:assert/strict";
 import { buildAvailableTerritories } from "./listAvailableTerritories";
+import {
+  countPublicContentForTerritory,
+  EMPTY_SECTION_COUNTS,
+  totalSectionCounts,
+  type TerritoryCountsDb,
+  type TerritorySectionCounts,
+} from "./territoryContentCounts";
 import { defaultTerritorySlugForSection, isTerritoryTypeSupported } from "@/lib/territory/territorySections";
 import { parseTerritoryCookie, serializeTerritoryCookie } from "@/lib/territory/territoryCookie";
 
@@ -18,21 +25,34 @@ const rows = [
   r("ck", "CITY", "kopishche", "rm"),
   r("cg", "CITY", "grodno", "rg"),
   r("cmir", "CITY", "mir", "rg", 0, false), // hidden by admin
-  r("cb", "CITY", "brest", "rb"), // no events/places -> not in legacy visible set
+  r("cb", "CITY", "brest", "rb"), // no content at all
 ];
-const visible = new Set(["minsk", "kopishche", "grodno", "mir"]);
+const c = (patch: Partial<TerritorySectionCounts>): TerritorySectionCounts => ({ ...EMPTY_SECTION_COUNTS, ...patch });
+const counts = new Map<string, TerritorySectionCounts>([
+  ["cm", c({ events: 3, places: 5 })],
+  ["ck", c({ articles: 1 })], // a city that only has an article
+  ["cg", c({ offers: 2 })],
+  ["cmir", c({ places: 9 })],
+]);
 
-const list = buildAvailableTerritories(rows, visible, null);
+const list = buildAvailableTerritories(rows, counts, null, 4);
 assert.deepEqual(
   list.map((t) => `${t.type}:${t.slug}`),
   ["COUNTRY:belarus", "REGION:minsk", "CITY:kopishche", "REGION:grodno"],
-  "country first; centre city folded into its region; hidden/empty entries dropped; region without listed cities dropped",
+  "country first; centre city folded into its region; hidden and empty entries dropped",
 );
 assert.equal(list[0].path, "/belarus");
+assert.equal(list.find((t) => t.slug === "kopishche")!.counts.articles, 1, "city with only an article is listed");
+assert.equal(list.find((t) => t.slug === "minsk")!.counts.events, 3, "region includes its centre city content");
+assert.equal(list[0].counts.articles, 5, "country sums regions plus national articles");
 
-const birthday = buildAvailableTerritories(rows, visible, "birthday");
+// Only an article anywhere is enough; no content at all is not.
+assert.ok(buildAvailableTerritories(rows, new Map([["cb", c({ articles: 1 })]]), null).some((t) => t.slug === "brest" && t.type === "REGION"));
+assert.ok(!buildAvailableTerritories(rows, new Map(), null).some((t) => t.type !== "COUNTRY"));
+
+const birthday = buildAvailableTerritories(rows, counts, "birthday");
 assert.deepEqual(birthday.map((t) => t.supported), [false, true, true, true], "birthday does not support the whole country");
-assert.ok(buildAvailableTerritories(rows, visible, "kuda").every((t) => t.supported));
+assert.ok(buildAvailableTerritories(rows, counts, "kuda").every((t) => t.supported));
 assert.equal(isTerritoryTypeSupported("birthday", "COUNTRY"), false);
 assert.equal(isTerritoryTypeSupported("journal", "COUNTRY"), true);
 assert.equal(isTerritoryTypeSupported("classes", "COUNTRY"), true);
@@ -45,4 +65,20 @@ assert.equal(parseTerritoryCookie("mg_territory=%3Cscript%3E"), null);
 assert.equal(parseTerritoryCookie(null), null);
 assert.match(serializeTerritoryCookie("belarus"), /^mg_territory=belarus; Path=\/; Max-Age=\d+; SameSite=Lax$/);
 assert.throws(() => serializeTerritoryCookie("bad slug;"));
-console.log("listAvailableTerritories.test: ok");
+
+// Counting wiring: every section is queried, articles through the territory and its geography targets.
+async function counting() {
+  const seen: Record<string, unknown> = {};
+  const delegate = (name: string, n: number) => ({ count: async (args: unknown) => ((seen[name] = [...((seen[name] as unknown[]) ?? []), args]), n) });
+  const db = {
+    activity: delegate("activity", 2), place: delegate("place", 3), offer: delegate("offer", 4),
+    route: delegate("route", 5), article: delegate("article", 1),
+  } as unknown as TerritoryCountsDb;
+  const result = await countPublicContentForTerritory("t1", db);
+  assert.deepEqual(result, { events: 2, classes: 2, places: 3, offers: 4, routes: 5, articles: 1 });
+  assert.equal(totalSectionCounts(result), 17);
+  assert.equal((seen.activity as unknown[]).length, 2, "events and classes are separate queries");
+  const articleWhere = JSON.stringify(seen.article);
+  assert.ok(articleWhere.includes("additionalGeographyTargets") && articleWhere.includes("regionTerritoryId"));
+}
+counting().then(() => console.log("listAvailableTerritories.test: ok"));
