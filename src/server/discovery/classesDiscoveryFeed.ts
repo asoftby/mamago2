@@ -1,4 +1,5 @@
 import { ActivityFormat, type AgePolicy, type Prisma, type PublicationPriceMode } from "@prisma/client";
+import { placeInTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
 import prisma from "@/lib/prisma";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import type { ActivityMock } from "@/types/activity";
@@ -128,6 +129,11 @@ export async function getClassesDiscoveryFeed(
   const publicWhere = getPublicPublishedOfferWhere();
   const publicWhereParts = (publicWhere.AND ?? []) as Prisma.OfferWhereInput[];
   const now = new Date();
+  // `/minsk` = the whole territory (city + region); unknown territory falls back to the legacy city.
+  const scope = await resolveTerritoryScope(citySlug);
+  const placeWhere: Prisma.PlaceWhereInput = scope
+    ? placeInTerritoryScopeWhere(scope.territoryIds)
+    : { cityId };
 
   // classChipSlugs column may not exist yet (pending migration).
   // We try the full query first; if it fails with a missing-column error we
@@ -136,7 +142,7 @@ export async function getClassesDiscoveryFeed(
   let classChipSlugsAvailable = true;
 
   try {
-    rows = await runQuery({ publicWhereParts, cityId, chipSlug, now, free, priceMax });
+    rows = await runQuery({ publicWhereParts, placeWhere, chipSlug, now, free, priceMax });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const isMissingColumn =
@@ -150,7 +156,7 @@ export async function getClassesDiscoveryFeed(
       try {
         rows = await runQuery({
           publicWhereParts,
-          cityId,
+          placeWhere,
           chipSlug: null,
           now,
           free,
@@ -248,7 +254,7 @@ export async function getClassesDiscoveryFeed(
 
 type RunQueryParams = {
   publicWhereParts: Prisma.OfferWhereInput[];
-  cityId: string;
+  placeWhere: Prisma.PlaceWhereInput;
   chipSlug: string | null;
   now: Date;
   free: boolean;
@@ -258,7 +264,7 @@ type RunQueryParams = {
 
 async function runQuery({
   publicWhereParts,
-  cityId,
+  placeWhere,
   chipSlug,
   now,
   free,
@@ -272,7 +278,7 @@ async function runQuery({
       AND: [
         ...publicWhereParts,
         { kind: "SERVICE" },
-        { place: { cityId } },
+        { place: placeWhere },
         ...(priceWhere ? [priceWhere] : []),
         // Only add chip filter when column exists and chip is requested
         ...(chipSlug && !skipChipSlugsSelect

@@ -3,8 +3,8 @@ import { fromZonedTime } from "date-fns-tz";
 import { prisma } from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
-import { activityInAnyOfCitiesWhere } from "@/server/discovery/activityInCityWhere";
-import { resolveKudaDiscoveryCityIds } from "@/server/discovery/discoveryHubExpand";
+import { activityInCityWhere } from "@/server/discovery/activityInCityWhere";
+import { activityInTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
@@ -231,10 +231,7 @@ export async function rankPlanSuggestionsForCity(
     };
   }
 
-  const { expandedCityIds } = await resolveKudaDiscoveryCityIds(
-    input.citySlug,
-    city.id,
-  );
+  const scope = await resolveTerritoryScope(input.citySlug);
 
   const pub = getPublicListingActivityWhere();
   const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
@@ -265,7 +262,7 @@ export async function rankPlanSuggestionsForCity(
 
   const baseAnd: Prisma.ActivityWhereInput[] = [
     { type: ActivityType.EVENT },
-    activityInAnyOfCitiesWhere(expandedCityIds),
+    scope ? activityInTerritoryScopeWhere(scope.territoryIds) : activityInCityWhere(city.id),
     ...pubParts,
     ...scheduleFilterAnd,
     ...(exclude.length > 0 ? [{ id: { notIn: exclude } }] : []),

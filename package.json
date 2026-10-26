@@ -145,7 +145,7 @@
     "test:gsc:integration": "tsx --test src/server/ops/metrics/collectors/googleSearchConsole.integration.test.ts",
     "test:gsc": "tsx --test src/server/ops/metrics/collectors/googleSearchConsole.api.test.ts && tsx src/server/ops/metrics/collectors/googleSearchConsole.test.ts && tsx src/server/ops/metrics/collectors/seoEvergreenWeekly.test.ts",
     "test:migrate-with-backup": "bash scripts/release/migrate-with-backup.test.sh",
-    "test:territory": "tsx scripts/data-migrations/territoryExpandColumns.test.ts && tsx src/server/territory/syncLegacyGeo.test.ts && tsx src/server/territory/resolveTerritory.test.ts && tsx src/server/territory/listAvailableTerritories.test.ts",
+    "test:territory": "tsx scripts/data-migrations/territoryExpandColumns.test.ts && tsx src/server/territory/syncLegacyGeo.test.ts && tsx src/server/territory/resolveTerritory.test.ts && tsx src/server/territory/listAvailableTerritories.test.ts && tsx src/server/territory/territoryScope.test.ts && tsx scripts/data-migrations/territoryReverseTriggers.test.ts && tsx src/lib/article/articleJournalGeography.test.ts",
     "test:unit": "tsx src/lib/slugifyLabelToValue.test.ts",
     "test:offer-public-page": "tsx src/lib/offers/offerVisibility.test.ts && NODE_OPTIONS=--conditions=react-server tsx src/lib/offer/offerPublicPage.contract.test.ts",
     "test:discovery-intent-config": "tsx src/lib/discovery/discoveryIntentConfig.test.ts",

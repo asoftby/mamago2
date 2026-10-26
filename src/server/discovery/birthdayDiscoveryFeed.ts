@@ -1,4 +1,5 @@
 import { ActivityFormat, type AgePolicy, type PartyCategory, type PublicationPriceMode } from "@prisma/client";
+import { resolveTerritoryScope } from "@/server/territory/territoryScope";
 import prisma from "@/lib/prisma";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import type { ActivityMock } from "@/types/activity";
@@ -64,12 +65,14 @@ export function projectBirthdayOfferCard(offer: BirthdayCardOffer, citySlug: str
 
 /** Published offers approved for the birthday section — no events and no mock fill. */
 export async function getBirthdayDiscoveryFeed(cityId: string, citySlug: string): Promise<ActivityMock[]> {
+  const scope = await resolveTerritoryScope(citySlug);
   const rows = await prisma.offer.findMany({
-    where: getPublicBirthdayOfferWhere(cityId),
+    where: getPublicBirthdayOfferWhere(cityId, scope?.territoryIds),
     select: {
       id: true, slug: true, title: true, description: true, coverImage: true,
       productType: true, category: true, ageMinMonths: true, ageMaxMonths: true,
       agePolicy: true, priceMode: true, priceFrom: true, priceTo: true, currency: true,
+      place: { select: { city: { select: { slug: true } } } },
     },
     orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
     take: 80,
@@ -77,6 +80,7 @@ export async function getBirthdayDiscoveryFeed(cityId: string, citySlug: string)
 
   return rows.flatMap((offer): ActivityMock[] => {
     if (!offer.slug || (offer.productType !== "PARTY_SERVICE" && offer.productType !== "PARTY_PACKAGE")) return [];
-    return [projectBirthdayOfferCard({ ...offer, productType: offer.productType }, citySlug)];
+    // The offer lives in its own place city, which may differ from the territory page (`/minsk` covers its region).
+    return [projectBirthdayOfferCard({ ...offer, productType: offer.productType }, offer.place?.city?.slug ?? citySlug)];
   });
 }

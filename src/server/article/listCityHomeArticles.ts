@@ -1,6 +1,11 @@
 import { unstable_cache } from "next/cache";
 import type { Prisma } from "@prisma/client";
-import { buildJournalGeographyBuckets, type JournalGeographyGroup } from "@/lib/article/articleJournalGeography";
+import {
+  buildJournalGeographyBuckets,
+  buildJournalGeographyBucketsByTerritory,
+  type JournalGeographyGroup,
+} from "@/lib/article/articleJournalGeography";
+import { resolveTerritoryScope } from "@/server/territory/territoryScope";
 import prisma from "@/lib/prisma";
 import {
   buildCityPublicPath,
@@ -176,7 +181,10 @@ export async function queryCityHomeArticles(
   const base: Prisma.ArticleWhereInput = options.additionalWhere
     ? { AND: [publicJournalWhere(), options.additionalWhere] }
     : publicJournalWhere();
-  const buckets = buildJournalGeographyBuckets(city);
+  const scope = await resolveTerritoryScope(city.slug);
+  const buckets = scope
+    ? buildJournalGeographyBucketsByTerritory(scope)
+    : buildJournalGeographyBuckets(city);
   const counts = await Promise.all(buckets.map(bucket =>
     prisma.article.count({ where: { AND: [base, bucket.where] } }),
   ));
