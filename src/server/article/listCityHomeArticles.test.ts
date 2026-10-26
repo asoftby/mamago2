@@ -19,6 +19,12 @@ async function main() {
   const createdArticleIds: string[] = [];
 
   try {
+    const category = await prisma.eventCategory.findFirst({
+      where: { publicationType: "ARTICLE", isActive: true, archivedAt: null },
+      select: { id: true },
+    });
+    assert.ok(category, "active ARTICLE category required for public article visibility");
+
     const vitebskOblast = await prisma.region.findFirst({
       where: { slug: "vitebskaya-oblast" },
       select: { id: true, countryId: true },
@@ -55,6 +61,7 @@ async function main() {
     const regionArticle = await prisma.article.create({
       data: {
         title: `Braslav region article ${marker}`,
+        categoryId: category.id,
         slug: `braslav-region-article-${marker}`,
         geoScope: "REGION",
         regionId: vitebskOblast.id,
@@ -78,6 +85,7 @@ async function main() {
     const additionalArticle = await prisma.article.create({
       data: {
         title: `Additional geography article ${marker}`,
+        categoryId: category.id,
         slug: `additional-geography-${marker}`,
         geoScope: "CITY",
         cityId: primaryCity.id,
@@ -92,8 +100,23 @@ async function main() {
     });
     createdArticleIds.push(additionalArticle.id);
 
-    // Visible for a city in the SAME region.
-    const forVitebskCity = await queryCityHomeArticles(cityInVitebskRegion);
+    // An untagged CITY article from another city is discoverable nationwide.
+    const foreignCityArticle = await prisma.article.create({
+      data: {
+        title: `Other city published story ${marker}`,
+        slug: `other-city-story-${marker}`,
+        geoScope: "CITY",
+        cityId: cityInVitebskRegion.id,
+        categoryId: category.id,
+        status: "PUBLISHED",
+        publishedAt: new Date(),
+      },
+      select: { id: true },
+    });
+    createdArticleIds.push(foreignCityArticle.id);
+
+    // Every city gets the same nationwide chronological journal.
+    const forVitebskCity = await queryCityHomeArticles(cityInVitebskRegion, { take: 250 });
     assert.ok(
       forVitebskCity.some((a) => a.id === regionArticle.id),
       "REGION article must be visible for a city in the same region",
@@ -101,12 +124,15 @@ async function main() {
     const matched = forVitebskCity.find((a) => a.id === regionArticle.id);
     assert.equal(matched?.href, `/blog/braslav-region-article-${marker}`, "REGION article href = /blog/{slug}");
 
-    // NOT visible for a city in a DIFFERENT region.
-    const forGomelCity = await queryCityHomeArticles(cityInGomelRegion);
+    const forGomelCity = await queryCityHomeArticles(cityInGomelRegion, { take: 250 });
     assert.ok(
-      !forGomelCity.some((a) => a.id === regionArticle.id),
-      "REGION article must NOT be visible for a city in a different region",
+      forGomelCity.some((a) => a.id === regionArticle.id),
+      "REGION article must also be visible outside its primary region",
     );
+    const foreignMatch = forGomelCity.find((a) => a.id === foreignCityArticle.id);
+    assert.equal(foreignMatch?.href, `/${cityInVitebskRegion.slug}/blog/other-city-story-${marker}`,
+      "other-city story retains its actual canonical city URL");
+
     const additionalMatches = forGomelCity.filter((a) => a.id === additionalArticle.id);
     assert.equal(additionalMatches.length, 1, "multiple matching additional targets must return one article");
     assert.equal(
