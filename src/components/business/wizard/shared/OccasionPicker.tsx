@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { Check } from "lucide-react";
 
 type OccasionOption = {
   id: string;
@@ -102,6 +103,7 @@ export function OccasionPicker({
               key={o.id}
               type="button"
               disabled={chipDisabled}
+              aria-pressed={selected}
               onClick={() => toggle(o.id)}
               className={cn(
                 "inline-flex items-center rounded-full border px-3 py-1 text-sm transition-colors",
@@ -112,6 +114,7 @@ export function OccasionPicker({
                 chipDisabled && "cursor-not-allowed opacity-50",
               )}
             >
+              {selected ? <Check className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" /> : null}
               {o.name}
             </button>
           );
