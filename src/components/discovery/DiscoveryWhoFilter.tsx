@@ -54,10 +54,10 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
     });
   };
 
-  const clearWho = () => {
+  const clearWho = (close = true) => {
     family?.setSelectedPersonaIds([]);
     actions.setDraft({ age: [], profile: null, adultOnly: false });
-    setOpen(false);
+    if (close) setOpen(false);
   };
 
   const panel = (
@@ -117,7 +117,7 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
           </div>
           <div className="shrink-0 border-t bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             <div className="flex items-center gap-3">
-              <MobileOverlayResetAction disabled={!hasWhoFilter} onClick={clearWho} />
+              <MobileOverlayResetAction disabled={!hasWhoFilter} onClick={() => clearWho(false)} />
               <div className="min-w-0 flex-1" />
               <Button type="button" className="min-w-[10rem] shrink-0 rounded-full" onClick={() => setOpen(false)}>
                 Показать
