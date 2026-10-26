@@ -1236,6 +1236,8 @@ model Territory {
   seoContentPlanItemRegionRefs SeoContentPlanItem[] @relation("SeoContentPlanItemRegionTerritory")
   searchQueryLogRefs SearchQueryLog[] @relation("SearchQueryLogTerritory")
 
+  /// Not unique on bare slug: REGION and CITY share slugs (region minsk contains city minsk).
+  /// Country slugs: partial unique index in the migration (WHERE type = COUNTRY).
   @@unique([parentId, slug])
   @@index([type, slug])
   @@index([parentId])

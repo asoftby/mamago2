@@ -46,6 +46,24 @@ async function main() {
   );
   if (badParent) failures.push(`${badParent} territories have an invalid parent type`);
 
+  // Resolver ambiguity: `/minsk/` must resolve to exactly one REGION; a same-slug CITY is expected
+  // and must live inside that region.
+  const ambiguous = await prisma.$queryRawUnsafe<{ type: string; slug: string; n: bigint }[]>(
+    `SELECT "type"::text AS type, "slug", count(*) n FROM "Territory" GROUP BY 1, 2 HAVING count(*) > 1`,
+  );
+  for (const row of ambiguous) failures.push(`${row.n} ${row.type} territories share slug "${row.slug}"`);
+
+  const strayCentre = await count(
+    `SELECT count(*) n FROM "Territory" r JOIN "Territory" c ON c."type" = 'CITY' AND c."slug" = r."slug"
+     WHERE r."type" = 'REGION' AND c."parentId" IS DISTINCT FROM r."id"`,
+  );
+  if (strayCentre) failures.push(`${strayCentre} centre cities are not inside the region with their slug`);
+
+  const noCoords = await prisma.$queryRawUnsafe<{ slug: string }[]>(
+    `SELECT "slug" FROM "Territory" WHERE "type" = 'REGION' AND ("lat" IS NULL OR "lng" IS NULL) ORDER BY "slug"`,
+  );
+  for (const row of noCoords) failures.push(`region "${row.slug}" has no centre coordinates`);
+
   const cityUnderCountry = await prisma.$queryRawUnsafe<{ slug: string }[]>(
     `SELECT t."slug" FROM "Territory" t JOIN "Territory" p ON p."id" = t."parentId"
      WHERE t."type" = 'CITY' AND p."type" = 'COUNTRY' AND t."isLegacyNonCity" = false ORDER BY t."slug"`,

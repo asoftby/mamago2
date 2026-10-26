@@ -298,15 +298,17 @@ CREATE TEMP TABLE "_territory_region_ref" (
     "name"       TEXT NOT NULL,
     "nameIn"     TEXT NOT NULL,
     "cityNameIn" TEXT NOT NULL,
-    "priority"   INTEGER NOT NULL
+    "priority"   INTEGER NOT NULL,
+    "lat"        DOUBLE PRECISION NOT NULL,
+    "lng"        DOUBLE PRECISION NOT NULL
 );
 INSERT INTO "_territory_region_ref" VALUES
-    ('minsk',   'minskaya-oblast',     'Минск и область',   'в Минске и области',   'в Минске',   100),
-    ('brest',   'brestskaya-oblast',   'Брест и область',   'в Бресте и области',   'в Бресте',    90),
-    ('vitebsk', 'vitebskaya-oblast',   'Витебск и область', 'в Витебске и области', 'в Витебске',  90),
-    ('gomel',   'gomelskaya-oblast',   'Гомель и область',  'в Гомеле и области',   'в Гомеле',    90),
-    ('grodno',  'grodnenskaya-oblast', 'Гродно и область',  'в Гродно и области',   'в Гродно',    90),
-    ('mogilev', 'mogilevskaya-oblast', 'Могилёв и область', 'в Могилёве и области', 'в Могилёве',  90);
+    ('minsk',   'minskaya-oblast',     'Минск и область',   'в Минске и области',   'в Минске',   100, 53.9006, 27.5590),
+    ('brest',   'brestskaya-oblast',   'Брест и область',   'в Бресте и области',   'в Бресте',    90, 52.0976, 23.7341),
+    ('vitebsk', 'vitebskaya-oblast',   'Витебск и область', 'в Витебске и области', 'в Витебске',  90, 55.1904, 30.2049),
+    ('gomel',   'gomelskaya-oblast',   'Гомель и область',  'в Гомеле и области',   'в Гомеле',    90, 52.4345, 30.9754),
+    ('grodno',  'grodnenskaya-oblast', 'Гродно и область',  'в Гродно и области',   'в Гродно',    90, 53.6693, 23.8131),
+    ('mogilev', 'mogilevskaya-oblast', 'Могилёв и область', 'в Могилёве и области', 'в Могилёве',  90, 53.9007, 30.3313);
 
 -- 1. Countries
 INSERT INTO "Territory" ("id","type","parentId","slug","name","isoCode","isActive","priority","createdAt","updatedAt")
@@ -320,13 +322,13 @@ ON CONFLICT DO NOTHING;
 
 -- 2a. Known oblasts -> REGION named after the centre city (parent = the oblast's country,
 --     or the country of the only/first Country row when the oblast row is absent).
-INSERT INTO "Territory" ("id","type","parentId","slug","name","nameIn","isActive","priority","createdAt","updatedAt")
+INSERT INTO "Territory" ("id","type","parentId","slug","name","nameIn","lat","lng","centerLat","centerLng","isActive","priority","createdAt","updatedAt")
 SELECT 'ter_region_' || ref."centreSlug", 'REGION',
        COALESCE(
          (SELECT 'ter_country_' || r."countryId" FROM "Region" r WHERE r."slug" = ref."oblastSlug" AND r."countryId" = (SELECT c."id" FROM "Country" c WHERE c."slug" = 'belarus')),
          (SELECT 'ter_country_' || c."id" FROM "Country" c WHERE c."slug" = 'belarus')
        ),
-       ref."centreSlug", ref."name", ref."nameIn",
+       ref."centreSlug", ref."name", ref."nameIn", ref."lat", ref."lng", ref."lat", ref."lng",
        COALESCE((SELECT r."isActive" FROM "Region" r WHERE r."slug" = ref."oblastSlug" AND r."countryId" = (SELECT c."id" FROM "Country" c WHERE c."slug" = 'belarus')), true),
        ref."priority", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM "_territory_region_ref" ref
@@ -376,11 +378,18 @@ INSERT INTO "TerritoryLegacyMap" ("legacyKind","legacyId","territoryId")
 SELECT 'CITY', c."id", 'ter_city_' || c."id" FROM "City" c
 ON CONFLICT DO NOTHING;
 
--- 4. Region coordinates = centre city coordinates (when that city exists).
-UPDATE "Territory" r
-SET "lat" = c."lat", "lng" = c."lng", "centerLat" = c."centerLat", "centerLng" = c."centerLng"
-FROM "Territory" c
-WHERE r."type" = 'REGION' AND c."type" = 'CITY' AND c."parentId" = r."id" AND c."slug" = r."slug";
+-- 4. Cities that had no legacy region but belong to a known region (by slug).
+--    Only touches cities still parented directly by a COUNTRY.
+UPDATE "Territory" c
+SET "parentId" = r."id"
+FROM (VALUES ('kopishche', 'minsk'), ('ratomka', 'minsk'), ('mir', 'grodno')) AS fix("citySlug", "regionSlug")
+JOIN "Territory" r ON r."type" = 'REGION' AND r."slug" = fix."regionSlug"
+JOIN "Territory" country ON country."type" = 'COUNTRY' AND country."id" = r."parentId"
+WHERE c."type" = 'CITY' AND c."slug" = fix."citySlug" AND c."parentId" = country."id";
+
+-- Country slugs are roots (parentId NULL), which @@unique([parentId, slug]) cannot cover.
+-- Partial index, not expressible in schema.prisma (same convention as other raw indexes).
+CREATE UNIQUE INDEX "Territory_country_slug_key" ON "Territory"("slug") WHERE "type" = 'COUNTRY';
 
 -- 5. Backfill territoryId / regionTerritoryId from legacy ids.
 UPDATE "District" t SET "territoryId" = m."territoryId" FROM "TerritoryLegacyMap" m WHERE m."legacyKind" = 'CITY' AND m."legacyId" = t."cityId";
