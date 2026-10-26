@@ -4,6 +4,10 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { AgePanel } from "@/components/site/header/search-segments/AgePanel";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Chip } from "@/components/ui/Chip";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
@@ -19,6 +23,7 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
   const { applied, actions } = useDiscoveryFilters();
   const family = useFamilyPersona();
   const [open, setOpen] = useState(false);
+  const mobile = useIsMobile();
   const facets = useEventAvailableFacets(applied, inline || open);
   const selected = family?.selectedPersonaIds ?? [];
   const children = !family?.loading ? family?.childPersonasForFilter ?? [] : [];
@@ -49,10 +54,10 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
     });
   };
 
-  const clearWho = () => {
+  const clearWho = (close = true) => {
     family?.setSelectedPersonaIds([]);
     actions.setDraft({ age: [], profile: null, adultOnly: false });
-    setOpen(false);
+    if (close) setOpen(false);
   };
 
   const panel = (
@@ -80,7 +85,7 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
       } : undefined}
       ageMode={ageMode}
       autoAgeValues={selected.length ? applied.age : []}
-      availableAgeValues={facets?.ages ?? null}
+      availableAgeValues={selected.length ? facets?.ages ?? null : null}
       personaPickAtLimit={selected.length >= MAX_ACTIVE_FAMILY_PERSONAS}
       whoFreeMode={selected.length === 0}
       onSelectEveryone={family ? () => setSelection([]) : undefined}
@@ -92,6 +97,36 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
       <legend className="text-sm font-semibold">Для кого / Возраст детей</legend>
       {panel}
     </fieldset>;
+  }
+
+  if (mobile) {
+    return (
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>
+          <Chip active={hasWhoFilter} className="h-11 shrink-0 gap-2 px-5">
+            {label} <ChevronDown className="h-4 w-4" />
+          </Chip>
+        </SheetTrigger>
+        <SheetContent side="bottom" className="flex h-[92dvh] flex-col gap-0 rounded-t-3xl bg-white p-0">
+          <div className="shrink-0 border-b bg-white px-5 py-4">
+            <SheetTitle>Для кого</SheetTitle>
+            <p className="mt-1 text-sm text-muted-foreground">Выберите участников или возраст детей</p>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {panel}
+          </div>
+          <div className="shrink-0 border-t bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <div className="flex items-center gap-3">
+              <MobileOverlayResetAction disabled={!hasWhoFilter} onClick={() => clearWho(false)} />
+              <div className="min-w-0 flex-1" />
+              <Button type="button" className="min-w-[10rem] shrink-0 rounded-full" onClick={() => setOpen(false)}>
+                Показать
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+    );
   }
 
   return (

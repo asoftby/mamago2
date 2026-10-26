@@ -84,7 +84,7 @@ export function EventDateRangePicker({ applied, onApply }: { applied: DiscoveryF
   const trigger = (
     <Chip
       active={hasDateRange}
-      className={`h-11 shrink-0 gap-2 px-5 ${hasDateRange ? "rounded-r-none pr-3" : ""}`}
+      className={`h-11 shrink-0 gap-2 px-5 ${hasDateRange ? "md:rounded-r-none md:pr-3" : ""}`}
     >
       <CalendarDays className="h-4 w-4" />
       {label}

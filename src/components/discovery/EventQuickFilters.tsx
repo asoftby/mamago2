@@ -47,7 +47,7 @@ export function EventQuickFilters({ halloweenEnabled = false }: { halloweenEnabl
             label: (
               <span className="inline-flex items-center gap-2">
                 {preset.label}
-                {active && <X className="h-3.5 w-3.5" aria-hidden="true" />}
+                {active && <X className="hidden h-3.5 w-3.5 md:block" aria-hidden="true" />}
               </span>
             ),
             active,
