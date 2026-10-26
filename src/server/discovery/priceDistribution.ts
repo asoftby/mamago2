@@ -2,11 +2,12 @@ import { getBudgetStep, roundUpBudget } from "@/lib/discovery/budgetUtils";
 
 export type PriceDistributionBucket = { from: number; to: number; count: number };
 
-export function buildPriceDistribution(values: number[]): { max: number | null; minPaid: number | null; step: number | null; buckets: PriceDistributionBucket[] } {
+export function buildPriceDistribution(values: number[]): { max: number | null; maxPrice: number | null; minPaid: number | null; step: number | null; buckets: PriceDistributionBucket[] } {
   const prices = values.filter((value) => Number.isFinite(value) && value >= 0);
-  if (prices.length === 0) return { max: null, minPaid: null, step: null, buckets: [] };
+  if (prices.length === 0) return { max: null, maxPrice: null, minPaid: null, step: null, buckets: [] };
   const minPaid = prices.filter((price) => price > 0).reduce((min, price) => Math.min(min, price), Number.POSITIVE_INFINITY);
-  const max = roundUpBudget(Math.max(...prices));
+  const maxPrice = Math.max(...prices);
+  const max = roundUpBudget(maxPrice);
   const sliderStep = getBudgetStep(max);
   const bucketCount = Math.max(1, Math.min(12, Math.ceil(Math.sqrt(prices.length))));
   const width = max === 0 ? 1 : max / bucketCount;
@@ -15,5 +16,5 @@ export function buildPriceDistribution(values: number[]): { max: number | null; 
     const index = max === 0 ? 0 : Math.min(bucketCount - 1, Math.floor(price / width));
     buckets[index]!.count += 1;
   });
-  return { max, minPaid: Number.isFinite(minPaid) ? minPaid : null, step: sliderStep, buckets };
+  return { max, maxPrice, minPaid: Number.isFinite(minPaid) ? minPaid : null, step: sliderStep, buckets };
 }
