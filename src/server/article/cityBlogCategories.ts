@@ -1,11 +1,7 @@
 import { EventCategoryPublicationType, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { buildArticleCityDiscoveryWhere } from "@/lib/article/articleGeographyTargets";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
-import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
-import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
-import { parseArticleContentJson } from "@/lib/publications/articleMvp";
-import type { CityHomeJournalArticle, JournalPage } from "@/server/article/listCityHomeArticles";
+import { queryCityHomeArticles, type JournalPage } from "@/server/article/listCityHomeArticles";
 
 export type CityBlogCategory = {
   id: string;
@@ -23,44 +19,19 @@ type CityRef = {
 
 const PAGE_SIZE = 24;
 
-function estimateReadTimeMinutes(text: string): number {
-  const words = text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean).length;
-  return Math.max(3, Math.ceil(words / 180));
-}
-
-function extractArticlePlainText(raw: unknown, excerpt: string | null): string {
-  const content = parseArticleContentJson(raw);
-  const blockText = content.blocks
-    .map((block) => {
-      switch (block.type) {
-        case "intro":
-        case "quote":
-        case "heading":
-        case "text":
-        case "callout":
-          return block.text;
-        default:
-          return "";
-      }
-    })
-    .filter(Boolean)
-    .join(" ");
-  return [excerpt ?? "", blockText].filter(Boolean).join(" ");
-}
-
 function indexableArticleWhere(city: CityRef): Prisma.ArticleWhereInput {
+  void city; // Geography is a relevance rank, not a barrier to discovery.
   return {
     ...getPublicPublishedArticleWhere(),
     noindex: false,
     slug: { not: null },
     publishedAt: { not: null },
     // SQL NOT ILIKE excludes NULL too; an unset robots override is indexable.
-    // Keep this AND separate from the geography OR below.
+    // All published Belarusian articles remain discoverable in every city.
     AND: [{ OR: [
       { seoRobots: null },
       { NOT: { seoRobots: { contains: "noindex", mode: "insensitive" } } },
     ] }],
-    ...buildArticleCityDiscoveryWhere(city, true),
   };
 }
 
@@ -222,56 +193,13 @@ export async function listCityBlogCategoryArticles(
 
   const total = await prisma.article.count({ where });
   const totalPages = Math.max(1, Math.ceil(total / safePageSize));
-  const rows = safePage > totalPages
+  const articles = safePage > totalPages
     ? []
-    : await prisma.article.findMany({
-        where,
-        orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
+    : await queryCityHomeArticles(city, {
         skip: (safePage - 1) * safePageSize,
         take: safePageSize,
-        select: {
-          id: true,
-          slug: true,
-          geoScope: true,
-          city: { select: { slug: true } },
-          title: true,
-          subtitle: true,
-          excerpt: true,
-          contentJson: true,
-          publishedAt: true,
-          heroImage: true,
-          coverImage: { select: { publicUrl: true } },
-          category: { select: { id: true, slug: true, nameRu: true } },
-          tags: {
-            where: { isActive: true },
-            orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
-            select: { id: true, slug: true, title: true },
-          },
-        },
+        additionalWhere: where,
       });
-
-  const articles: CityHomeJournalArticle[] = rows
-    .filter((row): row is typeof row & { slug: string } => Boolean(row.slug))
-    .map((row) => ({
-      id: row.id,
-      slug: row.slug,
-      href: buildArticlePublicPath({
-        slug: row.slug,
-        geoScope: row.geoScope,
-        citySlug: row.city?.slug ?? city.slug,
-      }),
-      title: row.title,
-      subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,
-      contentType: row.subtitle === BREAKING_NEWS_SUBTITLE ? "NEWS" : "ARTICLE",
-      category: row.category
-        ? { id: row.category.id, slug: row.category.slug, name: row.category.nameRu }
-        : null,
-      tags: row.tags.map((tag) => ({ id: tag.id, slug: tag.slug, name: tag.title })),
-      readTime: estimateReadTimeMinutes(extractArticlePlainText(row.contentJson, row.excerpt)),
-      isBreakingNews: row.subtitle === BREAKING_NEWS_SUBTITLE,
-      publishedAt: row.publishedAt,
-      coverImageUrl: row.coverImage?.publicUrl ?? row.heroImage ?? null,
-    }));
 
   return { articles, page: safePage, pageSize: safePageSize, total, totalPages };
 }
