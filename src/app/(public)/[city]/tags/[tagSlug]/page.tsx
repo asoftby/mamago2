@@ -99,7 +99,7 @@ async function loadTagPageData(citySlug: string, tagSlug: string, page: number) 
       title: article.title,
       slug: article.slug,
       subtitle: article.subtitle,
-      excerpt: null,
+      excerpt: article.excerpt ?? null,
       publishedAt: article.publishedAt,
       heroUrl: article.coverImageUrl,
       categoryLabel: article.contentType === "NEWS"
