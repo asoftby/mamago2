@@ -5441,3 +5441,15 @@ distributor_company_id=550) и хотели бы уточнить несколь
   Correct SSH destination in the same PR; privileged installation remains an
   owner action. No permission workaround through Docker/systemctl is allowed.
 - Source: #705, #702; `docs/engineering/gsc-dev-github-secrets.md`.
+
+## [BACKLOG-198] Territory rollout: remove dead legacy geo service in the contract PR
+- Status: OPEN
+- Context: `src/server/geo/geoEntityService.ts` (Google Place → Country/Region/City
+  auto-create) has no callers. PR 2 of the Territory rollout deliberately does not
+  give it dual write; it must not be wired in again before the contract phase.
+- Reason deferred: it is deleted together with the legacy Country/Region/City tables
+  in PR 6 (contract), which needs explicit owner confirmation and a DB backup.
+- Acceptance criteria: delete `geoEntityService.ts` (and `city-resolver` auto-create
+  helpers only it used) in PR 6; any new city creation path writes Territory directly
+  (admin city creation is decided in PR 3).
+- Source: Territory rollout PR 2 (`feat/territory-core-dual-write-20261026`).

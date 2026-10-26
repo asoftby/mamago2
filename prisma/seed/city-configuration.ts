@@ -10,6 +10,7 @@
  */
 
 import prisma from "../../src/lib/prisma";
+import { syncCityToTerritory } from "../../src/server/territory/syncLegacyGeo";
 import { DEFAULT_COUNTRY_SLUG } from "../../src/server/geo/geoConstants";
 
 const CITY_CONFIGS = [
@@ -57,10 +58,11 @@ async function seedCityConfiguration() {
               metroMaxDistanceM: config.metroMaxDistanceM,
             },
           });
+          await syncCityToTerritory(prisma, existing.id);
           console.log(`✅ Updated: ${config.name} (${config.slug})`);
           updated++;
         } else {
-          await prisma.city.create({
+          const createdCity = await prisma.city.create({
             data: {
               countryId: belarus.id,
               slug: config.slug,
@@ -73,6 +75,7 @@ async function seedCityConfiguration() {
               metroMaxDistanceM: config.metroMaxDistanceM,
             },
           });
+          await syncCityToTerritory(prisma, createdCity.id);
           console.log(`✅ Created: ${config.name} (${config.slug})`);
           created++;
         }

@@ -16,8 +16,25 @@ import {
   resolveCityContext,
 } from "@/lib/city/resolveCityContext";
 import { usePublicCityOptions } from "@/lib/city/usePublicCityOptions";
+import { readTerritoryCookieClient, writeTerritoryCookieClient } from "@/lib/territory/territoryCookie";
 
-const STORAGE_KEY = "mamago.selectedCity";
+/** Legacy storage: read once to migrate the visitor's choice into the `mg_territory` cookie, then removed. */
+const LEGACY_STORAGE_KEY = "mamago.selectedCity";
+
+function readStoredSelection(): string | null {
+  const fromCookie = readTerritoryCookieClient();
+  if (fromCookie) return fromCookie;
+  try {
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy) {
+      writeTerritoryCookieClient(legacy);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    }
+    return readTerritoryCookieClient();
+  } catch {
+    return null;
+  }
+}
 
 type CityContextValue = ResolvedCityContext & {
   citySlug: string;
@@ -52,12 +69,7 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
 
   // 2. Hydrate storage city on mount
   useEffect(() => {
-    let nextStoredCity: string | null = null;
-    try {
-      nextStoredCity = localStorage.getItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
+    const nextStoredCity = readStoredSelection();
 
     queueMicrotask(() => {
       setStoredCity(nextStoredCity);
@@ -93,11 +105,7 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
     if (resolvedCity.citySlug === storedCity) return;
 
     // Only update storage if it's a route-based city or a default
-    try {
-      localStorage.setItem(STORAGE_KEY, resolvedCity.citySlug);
-    } catch {
-      /* ignore */
-    }
+    writeTerritoryCookieClient(resolvedCity.citySlug);
     queueMicrotask(() => {
       setStoredCity(resolvedCity.citySlug);
     });
@@ -122,11 +130,7 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
         console.debug("[CityContext] user city change", { from: citySlug, to: slug });
       }
 
-      try {
-        localStorage.setItem(STORAGE_KEY, slug);
-      } catch {
-        /* ignore */
-      }
+      writeTerritoryCookieClient(slug);
       setStoredCity(slug);
       router.push(`/${slug}`);
     },
@@ -175,11 +179,7 @@ export function useCity(): CityContextValue {
       citySlug,
       cityName,
       setCity: (slug: string) => {
-        try {
-          localStorage.setItem(STORAGE_KEY, slug);
-        } catch {
-          /* ignore */
-        }
+        writeTerritoryCookieClient(slug);
         router.push(`/${slug}`);
       },
       appendCityQuery: (href: string) => appendCityQueryToHref(href, citySlug),

@@ -11,6 +11,7 @@
  */
 
 import { PrismaClient, type OccasionType, type SignalDomain, type SignalEntityType } from "@prisma/client";
+import { syncCityToTerritory, syncCountryToTerritory, syncRegionToTerritory } from "../src/server/territory/syncLegacyGeo";
 import { seedPlaceCategories } from "./seed/place-categories";
 import { seedEventCategories } from "./seed/event-categories";
 import { seedDiscoverySectionFilters } from "./seed/discovery-section-filters";
@@ -505,6 +506,7 @@ async function main() {
       priority: 100,
     },
   });
+  await syncCountryToTerritory(prisma, belarus.id); // dual write (expand phase)
 
   const minskOblast = await prisma.region.upsert({
     where: { countryId_slug: { countryId: belarus.id, slug: "minskaya-oblast" } },
@@ -519,6 +521,7 @@ async function main() {
       priority: 100,
     },
   });
+  await syncRegionToTerritory(prisma, minskOblast.id);
 
   // Остальные административные области Беларуси — справочник для REGION-статей.
   const otherOblasts = [
@@ -530,7 +533,7 @@ async function main() {
   ] as const;
 
   for (const oblast of otherOblasts) {
-    await prisma.region.upsert({
+    const oblastRow = await prisma.region.upsert({
       where: { countryId_slug: { countryId: belarus.id, slug: oblast.slug } },
       update: { isActive: true, priority: oblast.priority },
       create: {
@@ -543,6 +546,7 @@ async function main() {
         priority: oblast.priority,
       },
     });
+    await syncRegionToTerritory(prisma, oblastRow.id);
   }
 
   console.log("  → Cities");
@@ -563,6 +567,7 @@ async function main() {
       metroMaxDistanceM: 2500,
     },
   });
+  await syncCityToTerritory(prisma, minsk.id);
 
   const minskDistricts = [
     { name: "Центральный", centerLat: 53.9006, centerLng: 27.5590 },
@@ -636,7 +641,7 @@ async function main() {
   }
 
   // Населённые пункты Минской области — лента /minsk/kuda может включать их (см. discoveryHubExpand)
-  await prisma.city.upsert({
+  const marinaGorka = await prisma.city.upsert({
     where: { countryId_slug: { countryId: belarus.id, slug: "marina-gorka" } },
     update: { regionId: minskOblast.id },
     create: {
@@ -652,6 +657,7 @@ async function main() {
       hasMetro: false,
     },
   });
+  await syncCityToTerritory(prisma, marinaGorka.id);
 
   // ── Place / Event Categories ──────────────────────────────────────────────
   // Категории сидируются ДО жанров и program-флагов: иначе на свежей базе

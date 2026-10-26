@@ -1,5 +1,6 @@
 // SAFE isolated local IT seed. Accounts have no passwords. Never run outside port 55443.
 import { PrismaClient } from "@prisma/client";
+import { syncCityToTerritory } from "../../src/server/territory/syncLegacyGeo";
 
 const url = process.env.DATABASE_URL ?? "";
 const parsed = new URL(url);
@@ -19,6 +20,8 @@ async function main() {
     ?? await prisma.country.create({ data: { name: "Беларусь", slug: "by", isoCode: "BY", isActive: true } });
   const city = await prisma.city.findFirst({ where: { slug: "minsk" } })
     ?? await prisma.city.create({ data: { countryId: country.id, name: "Минск", slug: "minsk", isActive: true } });
+
+  await syncCityToTerritory(prisma, city.id); // dual write (expand phase)
 
   await user("parent@it.test", "USER");
   const ownerA = await user("owner-a@it.test", "BUSINESS_OWNER");

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdminOrModeratorApiUser } from "@/lib/auth/requireAdminApi";
 import { invalidateAdminCityRowsCache } from "@/server/city/cityAdminData";
+import { syncCityToTerritory } from "@/server/territory/syncLegacyGeo";
 
 export const runtime = "nodejs";
 
@@ -19,27 +20,31 @@ export async function PATCH(
       priority?: number;
     };
 
-    const updated = await prisma.city.update({
-      where: { id },
-      data: {
-        ...(typeof body.isActive === "boolean"
-          ? { isActive: body.isActive }
-          : {}),
-        ...(typeof body.isVisibleInCityFilter === "boolean"
-          ? { isVisibleInCityFilter: body.isVisibleInCityFilter }
-          : {}),
-        ...(typeof body.priority === "number"
-          ? { priority: body.priority }
-          : {}),
-      },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        isActive: true,
-        isVisibleInCityFilter: true,
-        priority: true,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.city.update({
+        where: { id },
+        data: {
+          ...(typeof body.isActive === "boolean"
+            ? { isActive: body.isActive }
+            : {}),
+          ...(typeof body.isVisibleInCityFilter === "boolean"
+            ? { isVisibleInCityFilter: body.isVisibleInCityFilter }
+            : {}),
+          ...(typeof body.priority === "number"
+            ? { priority: body.priority }
+            : {}),
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          isActive: true,
+          isVisibleInCityFilter: true,
+          priority: true,
+        },
+      });
+      await syncCityToTerritory(tx, id);
+      return row;
     });
 
     invalidateAdminCityRowsCache();
