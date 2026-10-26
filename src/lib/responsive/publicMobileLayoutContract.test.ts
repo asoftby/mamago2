@@ -73,9 +73,8 @@ assert.match(
   "Event filter mobile primary action must use the shared header-derived button",
 );
 const mobilePrimaryAction = readFileSync("src/components/mobile/MobileOverlayPrimaryAction.tsx", "utf8");
-assert.match(
-  mobilePrimaryAction,
-  /rounded-xl bg-\\[#EF8759\\] px-5 py-3\\.5/,
+assert.ok(
+  mobilePrimaryAction.includes("rounded-xl bg-[#EF8759] px-5 py-3.5"),
   "Shared mobile primary action must preserve the mobile header button geometry",
 );
 
