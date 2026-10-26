@@ -40,7 +40,8 @@ export function FamilyDerivedAgeSync() {
   // merely because the FamilyPersonaContext updated before its URL write.
   const lastUrlRef = useRef<string | null>(null);
   const awaitingUrlHydrationRef = useRef(false);
-  const urlSignature = `${pathname}?${searchParams.toString()}`;
+  // Date/category changes must not rehydrate a previously selected profile.
+  const urlSignature = `${pathname}|${searchParams.get("profile") ?? ""}|${searchParams.get("age") ?? ""}`;
   useEffect(() => {
     if (!inCityDiscoveryContext || !isAuthenticated || !family || family.loading) return;
     if (lastUrlRef.current === urlSignature) return;
