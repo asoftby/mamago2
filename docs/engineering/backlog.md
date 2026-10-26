@@ -5453,3 +5453,16 @@ distributor_company_id=550) и хотели бы уточнить несколь
   helpers only it used) in PR 6; any new city creation path writes Territory directly
   (admin city creation is decided in PR 3).
 - Source: Territory rollout PR 2 (`feat/territory-core-dual-write-20261026`).
+
+## [BACKLOG-199] Карточка события: перенос цены и лайка с постера в текстовый блок
+
+- Status: OPEN
+- Priority: P2
+- Area: Events / Design system
+- Added: 2026-10-27
+- Reason deferred: владелец отложил раздел 5 ТЗ «Кладка постеров в афише» («пока»); в PR 2–3 оверлеи (сердце сверху справа, цена/«Бесплатно» снизу) остаются на постере во всех местах.
+- Context: целевая вёрстка — на постере ни одного оверлея; сверху вниз: постер; строка «категория слева, лайк справа» (та же `SaveHeart`, зона ≥ 44×44px); название до 2 строк; мета «возраст · дата · цена» (`Бесплатно` / `от 30 BYN`). Затрагивает `src/components/events/EventCard.tsx`, `src/app/(public)/me/ideas/components/IdeaPosterCard.tsx`; журнал (`ArticlePlaceEmbed`) визуально не меняется (вариант через prop), карусели — по решению. Аудит: `docs/engineering/poster-masonry-audit.md`.
+- Current state: PR 2 добавил только правило пропорций; на низких кадрах (< 3:4) цена переезжает в левый нижний угол, чтобы не наслаиваться на сердце (`posterPriceBadgeSide`).
+- Dependencies: решение владельца по возврату к задаче.
+- Acceptance criteria: на постере нет оверлеев во всех листингах событий и в избранном; кладка (`OrderedMasonryGrid`) корректно учитывает новую высоту текстового блока; журнал и карусель на главной не меняются визуально.
+- Source: ТЗ «Кладка постеров в афише», ответ владельца на вопросы PR #786.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { EventCard, activityMockToEventCard } from "@/components/events";
+import { EventCard, EVENT_LISTING_IMAGE_SIZES, activityMockToEventCard } from "@/components/events";
 import { OfferCard } from "@/components/offers/OfferCard";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import {
@@ -167,7 +167,8 @@ export function DiscoveryActivitiesGrid({
       ) : (
         <EventCard
           {...activityMockToEventCard(activity, citySlug)}
-          coverRatio={ratio}
+          framing="poster"
+          imageSizes={EVENT_LISTING_IMAGE_SIZES}
           className="h-full"
           imagePriority={feedBucket === "primary" && position <= 4}
         />

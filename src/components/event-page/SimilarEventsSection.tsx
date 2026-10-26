@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { EventCard } from "@/components/events/EventCard";
+import { EVENT_LISTING_IMAGE_SIZES } from "@/components/events/eventCardLayout";
 import type { EventPageSimilar } from "@/lib/event/eventPageTypes";
 
 /**
@@ -48,6 +49,10 @@ export function SimilarEventsSection({
             title={ev.title}
             href={ev.href}
             imageUrl={ev.imageUrl}
+            imageWidth={ev.imageWidth}
+            imageHeight={ev.imageHeight}
+            framing="poster"
+            imageSizes={EVENT_LISTING_IMAGE_SIZES}
             categoryLabel={ev.categoryLabel}
             metaLabel={[ev.ageLabel, ev.dateLabel].filter(Boolean).join(" · ") || undefined}
             priceLabel={ev.priceLabel}
