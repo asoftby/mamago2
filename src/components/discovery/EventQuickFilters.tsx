@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { X } from "lucide-react";
 import { ChipsRow } from "@/components/ui/chips-row";
 import { EventDateRangePicker } from "./EventDateRangePicker";
 import { HalloweenChip } from "./HalloweenChip";
@@ -30,15 +31,31 @@ export function EventQuickFilters({ halloweenEnabled = false }: { halloweenEnabl
 
   return (
     <div className="flex items-center gap-3 overflow-x-auto scroll-smooth pb-3 pt-2 [scrollbar-width:none]" aria-label="Быстрые фильтры событий">
-      <DiscoveryWhoFilter />
-      <ChipsRow className="contents [&>div]:contents" items={PRESETS.map((preset) => ({ id: preset.value, label: preset.label, active: applied.whenPreset === preset.value, onClick: () => actions.setDraft({ whenPreset: applied.whenPreset === preset.value ? null : preset.value }) }))} />
-      <EventDateRangePicker applied={applied} onApply={actions.setDraft} />
       {halloweenEnabled && (
         <HalloweenChip
           active={applied.occasionSlug === "halloween"}
           onClick={() => actions.setDraft({ occasionSlug: applied.occasionSlug === "halloween" ? null : "halloween" })}
         />
       )}
+      <DiscoveryWhoFilter />
+      <ChipsRow
+        className="contents [&>div]:contents"
+        items={PRESETS.map((preset) => {
+          const active = applied.whenPreset === preset.value;
+          return {
+            id: preset.value,
+            label: (
+              <span className="inline-flex items-center gap-2">
+                {preset.label}
+                {active && <X className="h-3.5 w-3.5" aria-hidden="true" />}
+              </span>
+            ),
+            active,
+            onClick: () => actions.setDraft({ whenPreset: active ? null : preset.value, dateFrom: null, dateTo: null }),
+          };
+        })}
+      />
+      <EventDateRangePicker applied={applied} onApply={actions.setDraft} />
     </div>
   );
 }
