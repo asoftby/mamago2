@@ -114,7 +114,7 @@ export function RefinementFiltersModal() {
         >
           <div className="flex-shrink-0">{stickyHeader}</div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-32 sm:px-6 lg:pb-0">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4 sm:px-6 pb-32 lg:pb-0">
             {intent === "kuda" ? (
               <EventAdvancedFilters citySlug={citySlug} onApply={() => setIsOpen(false)} />
             ) : (
