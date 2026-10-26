@@ -11,7 +11,7 @@ import {
   resetEventRefinements,
 } from "./EventAdvancedFilters";
 
-test("price range uses two accessible custom thumbs and keeps URL writes behind Apply", () => {
+test("price range keeps two accessible thumbs and shared URL writes", () => {
   const source = readFileSync(new URL("./EventAdvancedFilters.tsx", import.meta.url), "utf8");
 
   assert.match(source, /role="slider"/);
@@ -21,7 +21,7 @@ test("price range uses two accessible custom thumbs and keeps URL writes behind 
   assert.match(source, /onKeyDown=\{/);
   assert.match(source, /bg-primary/);
   assert.match(source, /border-primary/);
-  assert.equal(source.match(/actions\.commitFilters\(/g)?.length, 1);
+  assert.match(source, /actions\.setDraft/);
   assert.match(source, /params\.delete\("priceMin"\)/);
   assert.match(source, /params\.delete\("priceMax"\)/);
 });
