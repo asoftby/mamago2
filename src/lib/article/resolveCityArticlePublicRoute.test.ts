@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import prisma from "@/lib/prisma";
-import { buildCityPublicPath } from "@/lib/routing/cityPaths";
+import { buildCityPublicPath, buildNationalArticlePath } from "@/lib/routing/cityPaths";
 import { resolveCityArticlePublicRoute } from "./resolveCityArticlePublicRoute";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 
@@ -37,6 +37,15 @@ assert.match(
   /route\.canonicalSlug/,
   "city blog metadata must use canonical slug after route resolution",
 );
+
+async function getPublicArticleCategoryId() {
+  const category = await prisma.eventCategory.findFirst({
+    where: { publicationType: "ARTICLE", isActive: true, archivedAt: null },
+    select: { id: true },
+  });
+  assert.ok(category, "expected active ARTICLE publication category");
+  return category.id;
+}
 
 async function getMinskCity() {
   const city = await prisma.city.findFirst({
@@ -70,6 +79,7 @@ async function testCurrentSlugRenders() {
 
 async function testHistoricalSlugRedirectsToCurrent() {
   const city = await getMinskCity();
+  const categoryId = await getPublicArticleCategoryId();
   const suffix = Date.now().toString(36);
   const currentSlug = `city-route-current-${suffix}`;
   const historicalSlug = `city-route-old-${suffix}`;
@@ -77,6 +87,7 @@ async function testHistoricalSlugRedirectsToCurrent() {
   const article = await prisma.article.create({
     data: {
       title: "City route historical slug test",
+      categoryId,
       slug: currentSlug,
       cityId: city.id,
       geoScope: "CITY",
@@ -123,6 +134,7 @@ async function testUnknownSlugNotFound() {
 
 async function testDraftHistoricalSlugNotFound() {
   const city = await getMinskCity();
+  const categoryId = await getPublicArticleCategoryId();
   const suffix = Date.now().toString(36);
   const currentSlug = `city-route-draft-current-${suffix}`;
   const historicalSlug = `city-route-draft-old-${suffix}`;
@@ -130,6 +142,7 @@ async function testDraftHistoricalSlugNotFound() {
   const article = await prisma.article.create({
     data: {
       title: "City route draft historical slug test",
+      categoryId,
       slug: currentSlug,
       cityId: city.id,
       geoScope: "CITY",
@@ -159,8 +172,9 @@ async function testDraftHistoricalSlugNotFound() {
   }
 }
 
-async function testOtherCityHistoricalSlugNotFound() {
+async function testOtherCitySlugRedirectsToItsCanonicalPath() {
   const minsk = await getMinskCity();
+  const categoryId = await getPublicArticleCategoryId();
   const otherCity = await prisma.city.findFirst({
     where: { isActive: true, slug: { not: "minsk" } },
     select: { id: true, slug: true },
@@ -177,6 +191,7 @@ async function testOtherCityHistoricalSlugNotFound() {
   const article = await prisma.article.create({
     data: {
       title: "City route other-city historical slug test",
+      categoryId,
       slug: currentSlug,
       cityId: otherCity.id,
       geoScope: "CITY",
@@ -199,8 +214,14 @@ async function testOtherCityHistoricalSlugNotFound() {
       },
     });
 
+    const expected = buildCityPublicPath({ citySlug: otherCity.slug, type: "article", slug: currentSlug });
+    const direct = await resolveCityArticlePublicRoute(currentSlug, minsk);
+    assert.equal(direct.kind, "canonical_redirect");
+    if (direct.kind === "canonical_redirect") assert.equal(direct.path, expected);
+
     const resolution = await resolveCityArticlePublicRoute(historicalSlug, minsk);
-    assert.equal(resolution.kind, "not_found");
+    assert.equal(resolution.kind, "canonical_redirect");
+    if (resolution.kind === "canonical_redirect") assert.equal(resolution.path, expected);
   } finally {
     await prisma.articleSlugHistory.deleteMany({ where: { articleId: article.id } });
     await prisma.article.delete({ where: { id: article.id } });
@@ -212,7 +233,7 @@ async function main() {
   await testHistoricalSlugRedirectsToCurrent();
   await testUnknownSlugNotFound();
   await testDraftHistoricalSlugNotFound();
-  await testOtherCityHistoricalSlugNotFound();
+  await testOtherCitySlugRedirectsToItsCanonicalPath();
   console.log("resolveCityArticlePublicRoute.test.ts: PASS");
 }
 
