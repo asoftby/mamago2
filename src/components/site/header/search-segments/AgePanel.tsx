@@ -25,6 +25,8 @@ interface AgePanelProps {
    */
   ageMode?: FamilyAgeMode;
   autoAgeValues?: string[];
+  /** Optional availability filter; header without it retains all existing groups. */
+  availableAgeValues?: string[] | null;
   /** Без карточки, рамки и заголовка — внутри моб. аккордеона */
   embedded?: boolean;
   /** Лимит 3 персоны: нельзя добавить новую, пока не снять выбор с другой */
@@ -48,6 +50,7 @@ export function AgePanel({
   onToggleAdult,
   ageMode = "manual",
   autoAgeValues = [],
+  availableAgeValues = null,
   embedded = false,
   personaPickAtLimit = false,
   whoFreeMode = false,
@@ -72,7 +75,7 @@ export function AgePanel({
   };
 
   const autoAgeSet = new Set(autoAgeValues);
-  const items: ChipItem[] = AGE_GROUPS.map((ageGroup) => {
+  const items: ChipItem[] = AGE_GROUPS.filter(group => availableAgeValues == null || availableAgeValues.includes(group.value)).map((ageGroup) => {
     const active = applied.age.includes(ageGroup.value);
     const isAuto = active && autoAgeSet.has(ageGroup.value);
     const readOnly = ageReadOnly;
