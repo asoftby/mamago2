@@ -1,13 +1,10 @@
 import { unstable_cache } from "next/cache";
+import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import {
-  buildCityPublicPath,
-  buildNationalArticlePath,
-} from "@/lib/routing/cityPaths";
+import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
 import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
-import { buildArticleCityDiscoveryWhere } from "@/lib/article/articleGeographyTargets";
 import {
   PUBLIC_ARTICLE_CATEGORY_DEPENDENCY_TAG,
   PUBLIC_ARTICLE_LIST_CACHE_TAG,
@@ -52,6 +49,15 @@ type CityHomeArticleCity = {
   name: string;
   regionId?: string | null;
 };
+
+/** City selection is context, never a restriction on Belarus-wide journal visibility. */
+export function publicArticleJournalWhere(): Prisma.ArticleWhereInput {
+  return {
+    ...getPublicPublishedArticleWhere(),
+    slug: { not: null },
+    publishedAt: { not: null },
+  };
+}
 
 const PUBLIC_ARTICLE_LIST_CACHE_TAGS = [
   PUBLIC_ARTICLE_LIST_CACHE_TAG,
@@ -99,18 +105,10 @@ export async function queryCityHomeArticles(
   city: CityHomeArticleCity,
   options: { skip?: number; take?: number } = {},
 ): Promise<CityHomeJournalArticle[]> {
+  void city;
   const rows = await prisma.article.findMany({
-    where: {
-      ...getPublicPublishedArticleWhere(),
-      slug: { not: null },
-      publishedAt: { not: null },
-      OR: [
-        ...(buildArticleCityDiscoveryWhere(city).OR ?? []),
-        // Breaking news: country-scope articles shown on every city home
-        { subtitle: BREAKING_NEWS_SUBTITLE, geoScope: "COUNTRY" },
-      ],
-    },
-    orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
+    where: publicArticleJournalWhere(),
+    orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }, { id: "desc" }],
     skip: options.skip ?? 0,
     take: options.take ?? 6,
     select: {
@@ -135,14 +133,15 @@ export async function queryCityHomeArticles(
   });
 
   return rows
-    .filter((row): row is typeof row & { slug: string } => Boolean(row.slug))
+    .filter((row): row is typeof row & { slug: string } => Boolean(row.slug) && (row.geoScope !== "CITY" || Boolean(row.city?.slug)))
     .map((row) => ({
       id: row.id,
       slug: row.slug,
-      href:
-        row.geoScope === "CITY"
-          ? buildCityPublicPath({ citySlug: row.city?.slug ?? city.slug, type: "article", slug: row.slug })
-          : buildNationalArticlePath(row.slug),
+      href: buildArticlePublicPath({
+        slug: row.slug,
+        geoScope: row.geoScope,
+        citySlug: row.city?.slug,
+      }),
       title: row.title,
       subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,
       contentType: row.subtitle === BREAKING_NEWS_SUBTITLE ? "NEWS" : "ARTICLE",
@@ -185,15 +184,7 @@ export async function listCityBlogArticles(
 ): Promise<JournalPage> {
   const safePage = Math.max(1, Math.trunc(page));
   const safePageSize = Math.max(1, Math.min(60, Math.trunc(pageSize)));
-  const where = {
-    ...getPublicPublishedArticleWhere(),
-    slug: { not: null },
-    publishedAt: { not: null },
-    OR: [
-      ...(buildArticleCityDiscoveryWhere(city).OR ?? []),
-      { subtitle: BREAKING_NEWS_SUBTITLE, geoScope: "COUNTRY" as const },
-    ],
-  };
+  const where = publicArticleJournalWhere();
 
   const total = await prisma.article.count({ where });
   const totalPages = Math.max(1, Math.ceil(total / safePageSize));
@@ -212,18 +203,15 @@ async function queryNationalBlogArticles(
   options: { skip?: number; take?: number } = {},
 ): Promise<CityHomeJournalArticle[]> {
   const rows = await prisma.article.findMany({
-    where: {
-      ...getPublicPublishedArticleWhere(),
-      geoScope: "COUNTRY",
-      slug: { not: null },
-      publishedAt: { not: null },
-    },
-    orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
+    where: publicArticleJournalWhere(),
+    orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }, { id: "desc" }],
     skip: options.skip ?? 0,
     take: options.take ?? 100,
     select: {
       id: true,
       slug: true,
+      geoScope: true,
+      city: { select: { slug: true } },
       title: true,
       subtitle: true,
       excerpt: true,
@@ -241,11 +229,15 @@ async function queryNationalBlogArticles(
   });
 
   return rows
-    .filter((row): row is typeof row & { slug: string } => Boolean(row.slug))
+    .filter((row): row is typeof row & { slug: string } => Boolean(row.slug) && (row.geoScope !== "CITY" || Boolean(row.city?.slug)))
     .map((row) => ({
       id: row.id,
       slug: row.slug,
-      href: buildNationalArticlePath(row.slug),
+      href: buildArticlePublicPath({
+        slug: row.slug,
+        geoScope: row.geoScope,
+        citySlug: row.city?.slug,
+      }),
       title: row.title,
       subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,
       contentType: row.subtitle === BREAKING_NEWS_SUBTITLE ? "NEWS" : "ARTICLE",
@@ -268,10 +260,7 @@ async function queryNationalBlogArticles(
     }));
 }
 
-/**
- * National journal listing for /blog. Only COUNTRY-scoped published articles
- * belong here; city/region materials keep their own canonical discovery paths.
- */
+/** /blog lists all published Belarus articles using each article's canonical URL. */
 export async function listNationalBlogArticles(): Promise<CityHomeJournalArticle[]> {
   return unstable_cache(queryNationalBlogArticles, ["public-article-list:national"], {
     tags: PUBLIC_ARTICLE_LIST_CACHE_TAGS,
@@ -286,12 +275,7 @@ export async function listNationalBlogArticlesPage(
   const safePage = Math.max(1, Math.trunc(page));
   const safePageSize = Math.max(1, Math.min(60, Math.trunc(pageSize)));
   const total = await prisma.article.count({
-    where: {
-      ...getPublicPublishedArticleWhere(),
-      geoScope: "COUNTRY",
-      slug: { not: null },
-      publishedAt: { not: null },
-    },
+    where: publicArticleJournalWhere(),
   });
   const totalPages = Math.max(1, Math.ceil(total / safePageSize));
   const articles =
