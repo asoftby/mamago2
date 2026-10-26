@@ -61,6 +61,22 @@ assert.match(
   /min-h-0 flex-1 overflow-y-auto[^"]*pb-32/,
   "Refinement filter scroll region must clear the pinned action bar",
 );
+assert.match(
+  refinementModal,
+  /window\.requestAnimationFrame\(/,
+  "Mobile refinement sheet must stage its entry after mounting",
+);
+assert.match(
+  refinementModal,
+  /isEntered \? "translate-y-0" : "translate-y-full"/,
+  "Mobile refinement sheet must slide up from below the viewport",
+);
+assert.match(
+  refinementModal,
+  /isEntered \? "opacity-100" : "opacity-0"/,
+  "Refinement backdrop must fade in together with sheet",
+);
+
 
 assert.match(
   eventFilters,
