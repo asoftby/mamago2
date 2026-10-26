@@ -47,6 +47,15 @@ async function getMinskCity() {
   return city;
 }
 
+async function getArticleCategoryId() {
+  const category = await prisma.eventCategory.findFirst({
+    where: { publicationType: "ARTICLE", isActive: true, archivedAt: null },
+    select: { id: true },
+  });
+  assert.ok(category, "test needs a public ARTICLE category");
+  return category.id;
+}
+
 async function testCurrentSlugRenders() {
   const city = await getMinskCity();
   const article = await prisma.article.findFirst({
@@ -77,6 +86,7 @@ async function testHistoricalSlugRedirectsToCurrent() {
   const article = await prisma.article.create({
     data: {
       title: "City route historical slug test",
+      categoryId: await getArticleCategoryId(),
       slug: currentSlug,
       cityId: city.id,
       geoScope: "CITY",
@@ -159,7 +169,7 @@ async function testDraftHistoricalSlugNotFound() {
   }
 }
 
-async function testOtherCityHistoricalSlugNotFound() {
+async function testOtherCityHistoricalSlugRedirects() {
   const minsk = await getMinskCity();
   const otherCity = await prisma.city.findFirst({
     where: { isActive: true, slug: { not: "minsk" } },
@@ -177,6 +187,7 @@ async function testOtherCityHistoricalSlugNotFound() {
   const article = await prisma.article.create({
     data: {
       title: "City route other-city historical slug test",
+      categoryId: await getArticleCategoryId(),
       slug: currentSlug,
       cityId: otherCity.id,
       geoScope: "CITY",
@@ -200,7 +211,22 @@ async function testOtherCityHistoricalSlugNotFound() {
     });
 
     const resolution = await resolveCityArticlePublicRoute(historicalSlug, minsk);
-    assert.equal(resolution.kind, "not_found");
+    assert.equal(resolution.kind, "canonical_redirect");
+    if (resolution.kind === "canonical_redirect") {
+      assert.equal(
+        resolution.path,
+        buildCityPublicPath({ citySlug: otherCity.slug, type: "article", slug: currentSlug }),
+      );
+    }
+
+    const current = await resolveCityArticlePublicRoute(currentSlug, minsk);
+    assert.equal(current.kind, "canonical_redirect");
+    if (current.kind === "canonical_redirect") {
+      assert.equal(
+        current.path,
+        buildCityPublicPath({ citySlug: otherCity.slug, type: "article", slug: currentSlug }),
+      );
+    }
   } finally {
     await prisma.articleSlugHistory.deleteMany({ where: { articleId: article.id } });
     await prisma.article.delete({ where: { id: article.id } });
@@ -212,7 +238,7 @@ async function main() {
   await testHistoricalSlugRedirectsToCurrent();
   await testUnknownSlugNotFound();
   await testDraftHistoricalSlugNotFound();
-  await testOtherCityHistoricalSlugNotFound();
+  await testOtherCityHistoricalSlugRedirects();
   console.log("resolveCityArticlePublicRoute.test.ts: PASS");
 }
 

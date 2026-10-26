@@ -1,7 +1,7 @@
 /**
  * Integration tests for REGION-scope discovery in listCityHomeArticles:
- * a REGION-scoped article must surface on the city-home journal for cities
- * in the same region, and must NOT surface for cities in a different region.
+ * city journal prioritizes local/regional articles but still exposes articles
+ * from every Belarusian city and region with canonical links and labels.
  * Self-generated fixtures (2 cities + 1 article), cleaned up in a finally
  * block. Exercises the real DB projection without requiring Next incremental
  * cache context.
@@ -29,6 +29,11 @@ async function main() {
     });
     assert.ok(vitebskOblast, "vitebskaya-oblast region must exist (seed.ts) — run `pnpm db:seed:system`");
     assert.ok(gomelOblast, "gomelskaya-oblast region must exist (seed.ts) — run `pnpm db:seed:system`");
+    const category = await prisma.eventCategory.findFirst({
+      where: { publicationType: "ARTICLE", isActive: true, archivedAt: null },
+      select: { id: true },
+    });
+    assert.ok(category, "an active journal category must exist");
 
     const cityInVitebskRegion = await prisma.city.create({
       data: {
@@ -55,6 +60,7 @@ async function main() {
     const regionArticle = await prisma.article.create({
       data: {
         title: `Braslav region article ${marker}`,
+        categoryId: category.id,
         slug: `braslav-region-article-${marker}`,
         geoScope: "REGION",
         regionId: vitebskOblast.id,
@@ -78,6 +84,7 @@ async function main() {
     const additionalArticle = await prisma.article.create({
       data: {
         title: `Additional geography article ${marker}`,
+        categoryId: category.id,
         slug: `additional-geography-${marker}`,
         geoScope: "CITY",
         cityId: primaryCity.id,
@@ -93,7 +100,7 @@ async function main() {
     createdArticleIds.push(additionalArticle.id);
 
     // Visible for a city in the SAME region.
-    const forVitebskCity = await queryCityHomeArticles(cityInVitebskRegion);
+    const forVitebskCity = await queryCityHomeArticles(cityInVitebskRegion, { take: 1000 });
     assert.ok(
       forVitebskCity.some((a) => a.id === regionArticle.id),
       "REGION article must be visible for a city in the same region",
@@ -101,14 +108,16 @@ async function main() {
     const matched = forVitebskCity.find((a) => a.id === regionArticle.id);
     assert.equal(matched?.href, `/blog/braslav-region-article-${marker}`, "REGION article href = /blog/{slug}");
 
-    // NOT visible for a city in a DIFFERENT region.
-    const forGomelCity = await queryCityHomeArticles(cityInGomelRegion);
-    assert.ok(
-      !forGomelCity.some((a) => a.id === regionArticle.id),
-      "REGION article must NOT be visible for a city in a different region",
-    );
+    // Also visible to readers from other Belarusian cities, but ranked last.
+    const forGomelCity = await queryCityHomeArticles(cityInGomelRegion, { take: 1000 });
+    const crossRegion = forGomelCity.find((a) => a.id === regionArticle.id);
+    assert.ok(crossRegion, "a regional article must remain discoverable throughout Belarus");
+    assert.equal(crossRegion.geographyGroup, "BELARUS");
+    assert.equal(crossRegion.href, `/blog/braslav-region-article-${marker}`);
     const additionalMatches = forGomelCity.filter((a) => a.id === additionalArticle.id);
     assert.equal(additionalMatches.length, 1, "multiple matching additional targets must return one article");
+    assert.equal(additionalMatches[0]?.geographyGroup, "CITY", "targeted-city publication ranks locally");
+    assert.ok(forGomelCity.indexOf(additionalMatches[0]) < forGomelCity.indexOf(crossRegion!), "local entries precede other regions");
     assert.equal(
       additionalMatches[0]?.href,
       `/${primaryCity.slug}/blog/additional-geography-${marker}`,

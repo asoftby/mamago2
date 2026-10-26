@@ -1,4 +1,6 @@
 import { unstable_cache } from "next/cache";
+import type { Prisma } from "@prisma/client";
+import { buildJournalGeographyBuckets, type JournalGeographyGroup } from "@/lib/article/articleJournalGeography";
 import prisma from "@/lib/prisma";
 import {
   buildCityPublicPath,
@@ -7,7 +9,6 @@ import {
 import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
-import { buildArticleCityDiscoveryWhere } from "@/lib/article/articleGeographyTargets";
 import {
   PUBLIC_ARTICLE_CATEGORY_DEPENDENCY_TAG,
   PUBLIC_ARTICLE_LIST_CACHE_TAG,
@@ -19,7 +20,11 @@ export type CityHomeJournalArticle = {
   slug: string;
   /** Pre-computed canonical public href (/{city}/blog/{slug} or /blog/{slug}) */
   href: string;
+  /** Original publication geography, independent of the reader\u0027s selected city. */
+  geographyLabel: string;
+  geographyGroup: JournalGeographyGroup | null;
   title: string;
+  excerpt?: string | null;
   subtitle: string | null;
   contentType: "ARTICLE" | "NEWS";
   category: {
@@ -49,7 +54,6 @@ export type JournalPage = {
 type CityHomeArticleCity = {
   id: string;
   slug: string;
-  name: string;
   regionId?: string | null;
 };
 
@@ -90,79 +94,113 @@ function extractArticlePlainText(raw: unknown, excerpt: string | null): string {
   return [excerpt ?? "", blockText].filter(Boolean).join(" ");
 }
 
+/** All journal listings use real canonical URLs, never the reader's selected city. */
+const JOURNAL_SELECT = {
+  id: true,
+  slug: true,
+  geoScope: true,
+  city: { select: { slug: true, name: true } },
+  region: { select: { name: true } },
+  title: true,
+  subtitle: true,
+  excerpt: true,
+  contentJson: true,
+  publishedAt: true,
+  heroImage: true,
+  coverImage: { select: { publicUrl: true } },
+  category: { select: { id: true, slug: true, nameRu: true } },
+  tags: {
+    where: { isActive: true },
+    orderBy: [{ sortOrder: "asc" as const }, { title: "asc" as const }],
+    select: { id: true, slug: true, title: true },
+  },
+} satisfies Prisma.ArticleSelect;
+
+type JournalDbRow = Prisma.ArticleGetPayload<{ select: typeof JOURNAL_SELECT }>;
+
+const JOURNAL_ORDER: Prisma.ArticleOrderByWithRelationInput[] = [
+  { publishedAt: "desc" }, { updatedAt: "desc" }, { id: "desc" },
+];
+
+function publicJournalWhere(): Prisma.ArticleWhereInput {
+  return {
+    ...getPublicPublishedArticleWhere(),
+    slug: { not: null },
+    publishedAt: { not: null },
+  };
+}
+
+function toJournalArticle(
+  row: JournalDbRow,
+  group: JournalGeographyGroup | null,
+): CityHomeJournalArticle {
+  const slug = row.slug!;
+  return {
+    id: row.id,
+    slug,
+    href: row.geoScope === "CITY" && row.city?.slug
+      ? buildCityPublicPath({ citySlug: row.city.slug, type: "article", slug })
+      : buildNationalArticlePath(slug),
+    geographyLabel: row.geoScope === "CITY"
+      ? row.city?.name ?? "Город не указан"
+      : row.geoScope === "REGION"
+        ? row.region?.name ?? "Регион"
+        : "Беларусь",
+    geographyGroup: group,
+    title: row.title,
+    excerpt: row.excerpt,
+    subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,
+    contentType: row.subtitle === BREAKING_NEWS_SUBTITLE ? "NEWS" : "ARTICLE",
+    category: row.category
+      ? { id: row.category.id, slug: row.category.slug, name: row.category.nameRu }
+      : null,
+    tags: row.tags.map(tag => ({ id: tag.id, slug: tag.slug, name: tag.title })),
+    isBreakingNews: row.subtitle === BREAKING_NEWS_SUBTITLE,
+    readTime: estimateReadTimeMinutes(extractArticlePlainText(row.contentJson, row.excerpt)),
+    publishedAt: row.publishedAt,
+    coverImageUrl: row.coverImage?.publicUrl ?? row.heroImage ?? null,
+  };
+}
+
 /**
- * Uncached DB projection used by the runtime cache wrapper, paginated journal,
- * and existing DB integration tests. The default remains the six-item homepage
- * feed; callers that need a real archive must pass skip/take explicitly.
+ * Country-wide articles, grouped by primary relevance to the selected city.
+ * The bucket counts preserve the exact same order across all paginated pages.
  */
 export async function queryCityHomeArticles(
   city: CityHomeArticleCity,
-  options: { skip?: number; take?: number } = {},
+  options: { skip?: number; take?: number; additionalWhere?: Prisma.ArticleWhereInput } = {},
 ): Promise<CityHomeJournalArticle[]> {
-  const rows = await prisma.article.findMany({
-    where: {
-      ...getPublicPublishedArticleWhere(),
-      slug: { not: null },
-      publishedAt: { not: null },
-      OR: [
-        ...(buildArticleCityDiscoveryWhere(city).OR ?? []),
-        // Breaking news: country-scope articles shown on every city home
-        { subtitle: BREAKING_NEWS_SUBTITLE, geoScope: "COUNTRY" },
-      ],
-    },
-    orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
-    skip: options.skip ?? 0,
-    take: options.take ?? 6,
-    select: {
-      id: true,
-      slug: true,
-      geoScope: true,
-      city: { select: { slug: true } },
-      title: true,
-      subtitle: true,
-      excerpt: true,
-      contentJson: true,
-      publishedAt: true,
-      heroImage: true,
-      coverImage: { select: { publicUrl: true } },
-      category: { select: { id: true, slug: true, nameRu: true } },
-      tags: {
-        where: { isActive: true },
-        orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
-        select: { id: true, slug: true, title: true },
-      },
-    },
-  });
+  const base: Prisma.ArticleWhereInput = options.additionalWhere
+    ? { AND: [publicJournalWhere(), options.additionalWhere] }
+    : publicJournalWhere();
+  const buckets = buildJournalGeographyBuckets(city);
+  const counts = await Promise.all(buckets.map(bucket =>
+    prisma.article.count({ where: { AND: [base, bucket.where] } }),
+  ));
+  let skip = Math.max(0, options.skip ?? 0);
+  let remaining = Math.max(0, options.take ?? 6);
+  const articles: CityHomeJournalArticle[] = [];
 
-  return rows
-    .filter((row): row is typeof row & { slug: string } => Boolean(row.slug))
-    .map((row) => ({
-      id: row.id,
-      slug: row.slug,
-      href:
-        row.geoScope === "CITY"
-          ? buildCityPublicPath({ citySlug: row.city?.slug ?? city.slug, type: "article", slug: row.slug })
-          : buildNationalArticlePath(row.slug),
-      title: row.title,
-      subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,
-      contentType: row.subtitle === BREAKING_NEWS_SUBTITLE ? "NEWS" : "ARTICLE",
-      category: row.category
-        ? {
-            id: row.category.id,
-            slug: row.category.slug,
-            name: row.category.nameRu,
-          }
-        : null,
-      tags: row.tags.map((tag) => ({
-        id: tag.id,
-        slug: tag.slug,
-        name: tag.title,
-      })),
-      isBreakingNews: row.subtitle === BREAKING_NEWS_SUBTITLE,
-      readTime: estimateReadTimeMinutes(extractArticlePlainText(row.contentJson, row.excerpt)),
-      publishedAt: row.publishedAt,
-      coverImageUrl: row.coverImage?.publicUrl ?? row.heroImage ?? null,
-    }));
+  for (const [index, bucket] of buckets.entries()) {
+    if (remaining === 0) break;
+    const count = counts[index];
+    if (skip >= count) {
+      skip -= count;
+      continue;
+    }
+    const take = Math.min(remaining, count - skip);
+    const rows = await prisma.article.findMany({
+      where: { AND: [base, bucket.where] },
+      orderBy: JOURNAL_ORDER,
+      skip,
+      take,
+      select: JOURNAL_SELECT,
+    });
+    articles.push(...rows.map(row => toJournalArticle(row, bucket.group)));
+    remaining -= rows.length;
+    skip = 0;
+  }
+  return articles;
 }
 
 export async function listCityHomeArticles(
@@ -185,17 +223,7 @@ export async function listCityBlogArticles(
 ): Promise<JournalPage> {
   const safePage = Math.max(1, Math.trunc(page));
   const safePageSize = Math.max(1, Math.min(60, Math.trunc(pageSize)));
-  const where = {
-    ...getPublicPublishedArticleWhere(),
-    slug: { not: null },
-    publishedAt: { not: null },
-    OR: [
-      ...(buildArticleCityDiscoveryWhere(city).OR ?? []),
-      { subtitle: BREAKING_NEWS_SUBTITLE, geoScope: "COUNTRY" as const },
-    ],
-  };
-
-  const total = await prisma.article.count({ where });
+  const total = await prisma.article.count({ where: publicJournalWhere() });
   const totalPages = Math.max(1, Math.ceil(total / safePageSize));
   const articles =
     safePage > totalPages
@@ -212,65 +240,17 @@ async function queryNationalBlogArticles(
   options: { skip?: number; take?: number } = {},
 ): Promise<CityHomeJournalArticle[]> {
   const rows = await prisma.article.findMany({
-    where: {
-      ...getPublicPublishedArticleWhere(),
-      geoScope: "COUNTRY",
-      slug: { not: null },
-      publishedAt: { not: null },
-    },
-    orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
+    where: publicJournalWhere(),
+    orderBy: JOURNAL_ORDER,
     skip: options.skip ?? 0,
     take: options.take ?? 100,
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      subtitle: true,
-      excerpt: true,
-      contentJson: true,
-      publishedAt: true,
-      heroImage: true,
-      coverImage: { select: { publicUrl: true } },
-      category: { select: { id: true, slug: true, nameRu: true } },
-      tags: {
-        where: { isActive: true },
-        orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
-        select: { id: true, slug: true, title: true },
-      },
-    },
+    select: JOURNAL_SELECT,
   });
-
-  return rows
-    .filter((row): row is typeof row & { slug: string } => Boolean(row.slug))
-    .map((row) => ({
-      id: row.id,
-      slug: row.slug,
-      href: buildNationalArticlePath(row.slug),
-      title: row.title,
-      subtitle: row.subtitle === BREAKING_NEWS_SUBTITLE ? null : row.subtitle,
-      contentType: row.subtitle === BREAKING_NEWS_SUBTITLE ? "NEWS" : "ARTICLE",
-      category: row.category
-        ? {
-            id: row.category.id,
-            slug: row.category.slug,
-            name: row.category.nameRu,
-          }
-        : null,
-      tags: row.tags.map((tag) => ({
-        id: tag.id,
-        slug: tag.slug,
-        name: tag.title,
-      })),
-      isBreakingNews: row.subtitle === BREAKING_NEWS_SUBTITLE,
-      readTime: estimateReadTimeMinutes(extractArticlePlainText(row.contentJson, row.excerpt)),
-      publishedAt: row.publishedAt,
-      coverImageUrl: row.coverImage?.publicUrl ?? row.heroImage ?? null,
-    }));
+  return rows.map(row => toJournalArticle(row, null));
 }
 
 /**
- * National journal listing for /blog. Only COUNTRY-scoped published articles
- * belong here; city/region materials keep their own canonical discovery paths.
+ * National journal /blog: every published article across Belarus, newest first.
  */
 export async function listNationalBlogArticles(): Promise<CityHomeJournalArticle[]> {
   return unstable_cache(queryNationalBlogArticles, ["public-article-list:national"], {
@@ -285,14 +265,7 @@ export async function listNationalBlogArticlesPage(
 ): Promise<JournalPage> {
   const safePage = Math.max(1, Math.trunc(page));
   const safePageSize = Math.max(1, Math.min(60, Math.trunc(pageSize)));
-  const total = await prisma.article.count({
-    where: {
-      ...getPublicPublishedArticleWhere(),
-      geoScope: "COUNTRY",
-      slug: { not: null },
-      publishedAt: { not: null },
-    },
-  });
+  const total = await prisma.article.count({ where: publicJournalWhere() });
   const totalPages = Math.max(1, Math.ceil(total / safePageSize));
   const articles =
     safePage > totalPages

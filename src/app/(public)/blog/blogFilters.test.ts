@@ -17,6 +17,8 @@ function article(
     id: `id-${slug}`,
     slug,
     href: `/minsk/blog/${slug}`,
+    geographyLabel: "Минск",
+    geographyGroup: "CITY",
     title: slug,
     subtitle: null,
     contentType,

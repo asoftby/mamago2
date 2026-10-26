@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { formatJournalPublishedDate } from "@/lib/article/formatJournalPublishedDate";
-import { useEffect } from "react";
+import { Fragment, useEffect } from "react";
+import { JOURNAL_GROUP_LABELS, type JournalGeographyGroup } from "@/lib/article/articleJournalGeography";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
@@ -32,6 +33,16 @@ const TYPE_FILTERS: Array<{ key: BlogContentType; label: string }> = [
   { key: "NEWS", label: "Новости" },
 ];
 const SHOW_NEWSLETTER_CTA = false;
+
+function JournalGeographyHeading({ group, cityName }: { group: JournalGeographyGroup; cityName?: string }) {
+  const label = group === "CITY" && cityName ? cityName : JOURNAL_GROUP_LABELS[group];
+  return (
+    <div className="flex items-center gap-4 pt-7 pb-1">
+      <h2 className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</h2>
+      <div className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
 
 export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) {
   const pathname = usePathname();
@@ -78,6 +89,7 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
   }, [activeContentType, activeTagSlug, pathname, requestedTagSlug, requestedTypeParam, router, searchParams]);
 
   const [featured, ...rest] = filtered;
+  const showGeographyGroups = filtered.some(article => article.geographyGroup !== null);
   const saveStatuses = useArticleSaveStatusBatch(filtered.map((a) => a.id));
 
   return (
@@ -177,6 +189,9 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
           </div>
         ) : (
           <>
+            {featured?.geographyGroup && (
+              <JournalGeographyHeading group={featured.geographyGroup} cityName={cityCtx?.cityName} />
+            )}
             {featured && (
               <AnalyticsCardViewTracker
                 entityType="ARTICLE"
@@ -191,23 +206,27 @@ export function BlogIndex({ articles }: { articles: CityHomeJournalArticle[] }) 
 
             {rest.length > 0 && (
               <div>
-                <div className="flex items-center gap-4 my-6">
-                  <span className="text-[10px] font-mono uppercase tracking-[.14em] text-muted-foreground shrink-0">
-                    все материалы
-                  </span>
-                  <div className="flex-1 h-px bg-border" />
-                </div>
+                {!showGeographyGroups && (
+                  <div className="flex items-center gap-4 my-6">
+                    <span className="text-[10px] font-mono uppercase tracking-[.14em] text-muted-foreground shrink-0">все материалы</span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+                )}
                 {rest.map((a, i) => (
-                  <AnalyticsCardViewTracker
-                    key={a.slug}
-                    entityType="ARTICLE"
-                    entityId={a.id}
-                    vertical="CITY"
-                    citySlug={citySlug}
-                    meta={{ section: "journal", position: i + 1 }}
-                  >
-                    <ArticleRow article={a} idx={i + 1} saveStatus={saveStatuses[a.id]} />
-                  </AnalyticsCardViewTracker>
+                  <Fragment key={a.id}>
+                    {a.geographyGroup && a.geographyGroup !== filtered[i].geographyGroup && (
+                      <JournalGeographyHeading group={a.geographyGroup} cityName={cityCtx?.cityName} />
+                    )}
+                    <AnalyticsCardViewTracker
+                      entityType="ARTICLE"
+                      entityId={a.id}
+                      vertical="CITY"
+                      citySlug={citySlug}
+                      meta={{ section: "journal", position: i + 1 }}
+                    >
+                      <ArticleRow article={a} idx={i + 1} saveStatus={saveStatuses[a.id]} />
+                    </AnalyticsCardViewTracker>
+                  </Fragment>
                 ))}
               </div>
             )}
@@ -263,6 +282,7 @@ function FeaturedArticle({
               ● {article.category?.name ?? "Статья"}
             </span>
           )}
+          <span className="text-[11px] font-medium text-muted-foreground">{article.geographyLabel}</span>
           {article.publishedAt && (
             <span className="text-[11px] font-mono uppercase tracking-[.12em] text-muted-foreground">
               {formatJournalPublishedDate(article.publishedAt)}
@@ -341,6 +361,7 @@ function ArticleRow({
             {article.category?.name ?? (article.contentType === "NEWS" ? "Новость" : "Статья")}
           </span>
         </div>
+        <span className="text-xs text-muted-foreground">{article.geographyLabel}</span>
         {article.publishedAt && (
           <span className="text-[13px] text-foreground font-medium tracking-[-.005em]">
             {formatJournalPublishedDate(article.publishedAt)}

@@ -51,43 +51,45 @@ import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVis
  * Returns null if no redirect needed.
  */
 async function resolveCityRedirect(slug: string): Promise<string | null> {
-  // Only a publicly visible CITY article may redirect a public request.
-  const article = await prisma.article.findFirst({
-    where: { ...getPublicPublishedArticleWhere(), slug },
-    select: { geoScope: true, city: { select: { slug: true } } },
+  // A national or regional slug takes precedence in its own /blog namespace.
+  // City slugs are only unique within their city: never select one arbitrarily.
+  if (await findArticleBySlug(slug, null)) return null;
+
+  const matches = await prisma.article.findMany({
+    where: { ...getPublicPublishedArticleWhere(), geoScope: "CITY", slug },
+    take: 2,
+    select: { city: { select: { slug: true } } },
   });
-  if (!article) {
-    // Check public slug history (any scope). Draft/archived articles must not
-    // reveal their existence through a redirect.
-    const hist = await prisma.articleSlugHistory.findFirst({
-      where: { slug, article: getPublicPublishedArticleWhere() },
-      include: { article: { select: { geoScope: true, city: { select: { slug: true } } } } },
-    });
-    if (hist?.article.geoScope === "CITY" && hist.article.city?.slug) {
-      // Redirect old slug → current city-scoped slug via the article's current slug.
-      // Re-check visibility to make the second read race-safe as well.
-      const current = await prisma.article.findFirst({
-        where: { id: hist.articleId, ...getPublicPublishedArticleWhere() },
-        select: { slug: true, city: { select: { slug: true } } },
-      });
-      if (current?.slug && current.city?.slug) {
-        return buildCityPublicPath({
-          citySlug: current.city.slug,
-          type: "article",
-          slug: current.slug,
-        });
-      }
-    }
-    return null;
-  }
-  if (article.geoScope === "CITY" && article.city?.slug) {
+  if (matches.length > 1) return null;
+  if (matches.length === 1 && matches[0].city?.slug) {
     return buildCityPublicPath({
-      citySlug: article.city.slug,
+      citySlug: matches[0].city.slug,
       type: "article",
       slug,
     });
   }
-  return null;
+
+  const history = await prisma.articleSlugHistory.findMany({
+    where: {
+      slug,
+      article: { ...getPublicPublishedArticleWhere(), geoScope: "CITY" },
+    },
+    take: 2,
+    select: { articleId: true },
+  });
+  const ids = [...new Set(history.map(row => row.articleId))];
+  if (ids.length !== 1) return null;
+  const current = await prisma.article.findFirst({
+    where: { id: ids[0], ...getPublicPublishedArticleWhere(), geoScope: "CITY" },
+    select: { slug: true, city: { select: { slug: true } } },
+  });
+  return current?.slug && current.city?.slug
+    ? buildCityPublicPath({
+        citySlug: current.city.slug,
+        type: "article",
+        slug: current.slug,
+      })
+    : null;
 }
 
 async function getArticle(slug: string): Promise<ArticleVm | null> {
