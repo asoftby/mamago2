@@ -7,6 +7,7 @@ import { Chip } from "@/components/ui/Chip";
 import { DiscoveryWhoFilter } from "./DiscoveryWhoFilter";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { pluralize } from "@/lib/formatters/pluralize";
+import { useEventAvailableFacets } from "@/features/filters/discovery/useEventAvailableFacets";
 import { Button } from "@/components/ui/button";
 import { ACTIVITY_FORMAT_OPTIONS } from "@/domain/activities/activity-format";
 import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
@@ -223,6 +224,7 @@ function PriceRangeControl({
 export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; onApply?: () => void }) {
   const { applied: draft, actions } = useDiscoveryFilters();
   const family = useFamilyPersona();
+  const facets = useEventAvailableFacets(draft);
   const { categories, loading: taxonomyLoading } = useEventTaxonomy(citySlug);
   const [count, setCount] = React.useState<number | null>(null);
   const [distribution, setDistribution] = React.useState<PriceDistribution>({ max: null, step: null, buckets: [] });
@@ -255,17 +257,17 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
     <div className="space-y-6 pb-1">
       <DiscoveryWhoFilter inline />
 
-      {draft.occasionSlug === "halloween" && (
+      {(draft.occasionSlug === "halloween" || facets?.occasions.includes("halloween")) && (
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold">Повод</legend>
-          <Chip active onClick={() => patch({ occasionSlug: null })}>Хэллоуин</Chip>
+          <Chip active={draft.occasionSlug === "halloween"} onClick={() => patch({ occasionSlug: draft.occasionSlug === "halloween" ? null : "halloween" })}>Хэллоуин</Chip>
         </fieldset>
       )}
 
-      {categories.length > 0 && <fieldset className="space-y-2">
+      {categories.some(category => !facets || facets.categories.includes(category.slug)) && <fieldset className="space-y-2">
         <legend className="text-sm font-semibold">Категория</legend>
         <div className="flex flex-wrap gap-2">
-          {categories.map((category) => (
+          {categories.filter(category => !facets || facets.categories.includes(category.slug)).map((category) => (
             <Chip
               key={category.id}
               active={draft.categories.includes(category.slug)}
@@ -278,7 +280,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
         </div>
       </fieldset>}
 
-      {draft.categories.length > 0 && (
+      {draft.categories.length > 0 && categories.some(category => draft.categories.includes(category.slug) && category.genres.some(genre => !facets || facets.genres.includes(genre.slug))) && (
         <fieldset className="space-y-4">
           <legend className="text-sm font-semibold">Жанр</legend>
           {categories
@@ -287,7 +289,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
               <div key={category.id} className="space-y-2">
                 <div className="text-xs font-medium text-muted-foreground">{category.nameRu}</div>
                 <div className="flex flex-wrap gap-2">
-                  {category.genres.map((genre) => (
+                  {category.genres.filter(genre => !facets || facets.genres.includes(genre.slug)).map((genre) => (
                     <Chip
                       key={`${category.id}:${genre.id}`}
                       active={draft.genres.includes(genre.slug)}
@@ -306,10 +308,10 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
         </fieldset>
       )}
 
-      <fieldset>
+      {(!facets || facets.formats.length > 0) && <fieldset>
         <legend className="mb-2 text-sm font-semibold">Формат</legend>
         <div className="flex flex-wrap gap-2">
-          {ACTIVITY_FORMAT_OPTIONS.map(({ value, label }) => (
+          {ACTIVITY_FORMAT_OPTIONS.filter(option => !facets || facets.formats.includes(option.value)).map(({ value, label }) => (
             <Chip
               key={value}
               active={draft.format === value}
@@ -319,11 +321,11 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
             </Chip>
           ))}
         </div>
-      </fieldset>
+      </fieldset>}
 
-      <fieldset className="space-y-4">
+      {(!facets || facets.freeAvailable || distribution.max != null) && <fieldset className="space-y-4">
         <legend className="text-sm font-semibold">Цена</legend>
-        <Chip
+        {(!facets || facets.freeAvailable) && <Chip
           active={draft.free}
           onClick={() => patch({
             free: !draft.free,
@@ -332,7 +334,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
           })}
         >
           Бесплатно
-        </Chip>
+        </Chip>}
 
         {!draft.free && distribution.max != null && distribution.max > 0 && (
           <PriceRangeControl
@@ -346,7 +348,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
             })}
           />
         )}
-      </fieldset>
+      </fieldset>}
 
       <div className="sticky bottom-0 z-10 -mx-4 flex items-center gap-2 border-t bg-white/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:mx-0 lg:justify-between lg:px-0 lg:pb-0 lg:pt-4 lg:backdrop-blur-none">
         <MobileOverlayResetAction
