@@ -38,7 +38,7 @@ export function BoostPurchaseClient({
           <button
             key={option.id}
             type="button"
-            onClick={() => { setSelectedId(option.id); setMessage(null); }}
+            onClick={() => { setSelectedId(option.id); setMessage(null); setConfirmed(false); setRequestKey(crypto.randomUUID()); }}
             className={`rounded-2xl border p-4 text-left ${selectedId === option.id ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-white"}`}
           >
             <span className="block text-sm font-semibold">{option.durationDays} дн.</span>
