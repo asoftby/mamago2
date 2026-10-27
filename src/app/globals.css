@@ -78,6 +78,7 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   --color-brand-soft: var(--brand-soft);
   --color-brand-soft-hover: var(--brand-soft-hover);
   --color-brand-muted: var(--brand-muted);
+  --color-brand-ink: var(--brand-ink);
 
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
@@ -206,6 +207,8 @@ body:has([data-slot="alert-dialog-overlay"][data-state="open"]) {
   --brand-soft: #FFF2EB;
   --brand-soft-hover: #FFE8DC;
   --brand-muted: #FAF7F1;
+  /* Тёмно-оранжевый текст на brand-soft (бейдж «Подборка»): контраст 5.2:1 ≥ WCAG AA. */
+  --brand-ink: #A84A22;
 
   /* Primary action */
   --primary: var(--brand);

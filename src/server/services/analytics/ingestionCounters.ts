@@ -24,6 +24,17 @@ const FLUSH_INTERVAL_MS = 60_000;
 const pending: Record<IngestionOutcome, number> = { accepted: 0, bot: 0, no_identity: 0 };
 let lastFlushAt = Date.now();
 let flushing = false;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleFlush(): void {
+  if (flushTimer !== null) return;
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    void flushIngestionCounters();
+  }, FLUSH_INTERVAL_MS);
+  // Do not keep an otherwise idle Node.js worker alive for telemetry.
+  flushTimer.unref?.();
+}
 
 /** Only for tests: read and reset the in-memory buffer without writing. */
 export function __drainIngestionCountersForTests(): Record<IngestionOutcome, number> {
@@ -36,6 +47,7 @@ export function __drainIngestionCountersForTests(): Record<IngestionOutcome, num
 
 export function recordIngestionOutcome(outcome: IngestionOutcome, now: number = Date.now()): void {
   pending[outcome] += 1;
+  scheduleFlush();
   if (!flushing && now - lastFlushAt >= FLUSH_INTERVAL_MS) {
     void flushIngestionCounters(now);
   }
@@ -45,6 +57,10 @@ export function recordIngestionOutcome(outcome: IngestionOutcome, now: number = 
 export async function flushIngestionCounters(now: number = Date.now()): Promise<void> {
   if (flushing) return;
   flushing = true;
+  if (flushTimer !== null) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
   const snapshot = { ...pending };
   pending.accepted = 0;
   pending.bot = 0;
@@ -61,5 +77,6 @@ export async function flushIngestionCounters(now: number = Date.now()): Promise<
     console.error("[product-telemetry] ingestion counters flush failed:", error);
   } finally {
     flushing = false;
+    if (pending.accepted + pending.bot + pending.no_identity > 0) scheduleFlush();
   }
 }

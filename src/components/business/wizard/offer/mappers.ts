@@ -630,7 +630,15 @@ export function buildOfferCreatePayload(
   if (!data.placeId) {
     throw new Error("placeId is required to create offer payload");
   }
-  const pricingMode = data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
+  // Group tariffs are the source of truth for regular classes.
+  // The legacy offer price is only the lowest-price catalog projection.
+  const regularTariffPrices = data.productType === "REGULAR_ACTIVITY"
+    ? data.schedule.classSchedule.groups.flatMap((group) => (group.tariffs ?? [])
+        .map((tariff) => parsePrice(tariff.price))
+        .filter((price): price is number => price !== null && Number.isFinite(price)))
+    : [];
+  const regularLowestPrice = regularTariffPrices.length ? Math.min(...regularTariffPrices) : null;
+  const pricingMode = regularLowestPrice !== null ? "SINGLE" : data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
   const ages = ageGroupsToMonths(data.ageGroups);
   const accessFields = deriveOfferApiFieldsFromPublicationAccess(
     data.publicationAccess,
@@ -666,13 +674,13 @@ export function buildOfferCreatePayload(
         : createExcerpt(data.promotionDetails, 120) || undefined,
     pricingMode,
     singlePrice:
-      data.offerWizardType === "CAMP" ? undefined : parsePrice(data.singlePrice),
+      data.offerWizardType === "CAMP" ? undefined : (regularLowestPrice ?? parsePrice(data.singlePrice)),
     singlePriceLabel:
       data.offerWizardType === "CAMP"
         ? undefined
         : richTextToLegacyPriceText(data.priceCaption),
     pricingOptions:
-      data.offerWizardType === "CAMP"
+      data.offerWizardType === "CAMP" || regularLowestPrice !== null
         ? []
         : data.pricingOptions.map((o) => ({
             title: o.title.trim(),
@@ -845,7 +853,15 @@ export function buildOfferUpdatePayload(
     previousClassDuration?: string;
   }
 ) {
-  const pricingMode = data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
+  // Group tariffs are the source of truth for regular classes.
+  // The legacy offer price is only the lowest-price catalog projection.
+  const regularTariffPrices = data.productType === "REGULAR_ACTIVITY"
+    ? data.schedule.classSchedule.groups.flatMap((group) => (group.tariffs ?? [])
+        .map((tariff) => parsePrice(tariff.price))
+        .filter((price): price is number => price !== null && Number.isFinite(price)))
+    : [];
+  const regularLowestPrice = regularTariffPrices.length ? Math.min(...regularTariffPrices) : null;
+  const pricingMode = regularLowestPrice !== null ? "SINGLE" : data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
   const ages = ageGroupsToMonths(data.ageGroups);
   const accessFields = deriveOfferApiFieldsFromPublicationAccess(
     data.publicationAccess,
@@ -878,13 +894,13 @@ export function buildOfferUpdatePayload(
         : createExcerpt(data.promotionDetails, 120) || undefined,
     pricingMode,
     singlePrice:
-      data.offerWizardType === "CAMP" ? undefined : parsePrice(data.singlePrice),
+      data.offerWizardType === "CAMP" ? undefined : (regularLowestPrice ?? parsePrice(data.singlePrice)),
     singlePriceLabel:
       data.offerWizardType === "CAMP"
         ? undefined
         : richTextToLegacyPriceText(data.priceCaption),
     pricingOptions:
-      data.offerWizardType === "CAMP"
+      data.offerWizardType === "CAMP" || regularLowestPrice !== null
         ? []
         : data.pricingOptions.map((o) => ({
             title: o.title.trim(),
@@ -956,7 +972,7 @@ type OfferOpeningHoursRow = {
 
 /** Расписание формы из строки оффера. Прежние режимы записи остаются как есть (`legacyBookingMode`). */
 function scheduleFromOffer(offer: {
-  classGroups?: Array<{ id: string; title: string; tariffs: Array<{ id: string; title: string; price: string; unit: string; periodDays: number | null; active: boolean }> }>;
+  classGroups?: Array<{ id: string; title: string; tariffs: Array<{ id: string; title: string; price: string; unit: string; periodDays: number | null; visitsCount?: number | null; active: boolean }> }>;
   productType?: OfferProductType | null;
   bookingEnabled?: boolean | null;
   bookingMode?: string | null;
@@ -1025,7 +1041,7 @@ const dateKeyOf = (value: Date | string) => (typeof value === "string" ? value :
 
 /** Занятия: группы/даты и закрытые дни из OfferScheduleRule/Session/Exception. */
 function classScheduleFromOffer(offer: {
-  classGroups?: Array<{ id: string; title: string; tariffs: Array<{ id: string; title: string; price: string; unit: string; periodDays: number | null; active: boolean }> }>;
+  classGroups?: Array<{ id: string; title: string; tariffs: Array<{ id: string; title: string; price: string; unit: string; periodDays: number | null; visitsCount?: number | null; active: boolean }> }>;
   productType?: OfferProductType | null;
   offerBooking?: OfferBookingRow | null;
   sessions?: Array<{ startAt: Date | string; capacity?: number | null }> | null;
@@ -1039,7 +1055,7 @@ function classScheduleFromOffer(offer: {
       title: offer.classGroups?.find((item) => item.id === group.id)?.title,
       tariffs: offer.classGroups?.find((item) => item.id === group.id)?.tariffs
         .filter((item) => item.active)
-        .map(({ id, title, price, unit, periodDays }) => ({ id, title, price, unit, periodDays })) ?? [],
+        .map(({ id, title, price, unit, periodDays, visitsCount }) => ({ id, title, price, unit, periodDays, visitsCount: visitsCount ?? null })) ?? [],
     }));
   }
   if (offer.productType === "ONE_TIME_ACTIVITY" && offer.sessions?.length) {

@@ -5,6 +5,7 @@ import { parseArticleContentJson, type ArticleBlockMvp } from "@/lib/publication
 import { MAIN_ARTICLE_GALLERY_BLOCK_ID } from "@/lib/article/articleMainGallery";
 import { collectArticlePlaceIds, resolveArticlePlaceCard } from "@/lib/article/articlePlaceResolution";
 import { resolveUniqueConcurrently } from "@/lib/article/resolveUniqueConcurrently";
+import { linkedItemsToCardBlocks } from "@/lib/journal/linkedItemBlocks";
 import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { getOfferPublicPath, getOfferPublicSection } from "@/lib/offers/offerPublicUrl";
 import {
@@ -522,8 +523,19 @@ export async function loadArticleMvpBySlugPublic(
   if (!article) return null;
   const cover = await resolveCoverMedia(await fetchArticleCoverImageId(article.id));
   const content = parseArticleContentJson(article.contentJson);
-  if (content.blocks.length === 0) return null;
-  const blocks = await buildArticleMvpResolvedBlocks(content.blocks);
+  const linkedRows = await prisma.articleLinkedItem.findMany({
+    where: { articleId: article.id },
+    orderBy: { position: "asc" },
+    select: { id: true, kind: true, position: true, activityId: true, offerId: true, linkedArticleId: true },
+  });
+  const linkedBlocks = linkedItemsToCardBlocks(linkedRows);
+  if (content.blocks.length === 0 && linkedBlocks.length === 0) return null;
+  // Подборка: текст статьи, затем связанные объекты в сохранённом порядке.
+  const resolvedBlocks = await buildArticleMvpResolvedBlocks([...content.blocks, ...linkedBlocks]);
+  // Скрытые/снятые с публикации связанные объекты не показываем (без «не найдено»).
+  const blocks = resolvedBlocks.filter(
+    (block) => !(block.type === "activityCard" && block.id.startsWith("linked-") && !block.card),
+  );
   const heroUrl = cover?.publicUrl ?? article.heroImage ?? article.seoOgImage ?? null;
   return {
     id: article.id,

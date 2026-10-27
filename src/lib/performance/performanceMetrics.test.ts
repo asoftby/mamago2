@@ -34,12 +34,15 @@ const mondayNight = resolveCompletedWindow(7, monday0030);
 assert.equal(mondayMorning.start.toISOString(), mondayNight.start.toISOString());
 assert.equal(mondayMorning.end.toISOString(), mondayNight.end.toISOString());
 assert.equal(mondayMorning.start.toISOString(), "2026-08-02T21:00:00.000Z"); // Mon 3 Aug 00:00 Minsk
-assert.equal(mondayMorning.end.toISOString(), "2026-08-09T20:59:59.999Z"); // end of Sun 9 Aug
+assert.equal(mondayMorning.end.toISOString(), "2026-08-09T21:00:00.000Z"); // exclusive midnight after Sun 9 Aug
 assert.equal(mondayMorning.previousStart.toISOString(), "2026-07-26T21:00:00.000Z");
-assert.equal(mondayMorning.previousEnd.toISOString(), "2026-08-02T20:59:59.999Z");
+assert.equal(mondayMorning.previousEnd.toISOString(), "2026-08-02T21:00:00.000Z");
 assert.equal(mondayMorning.dayCount, 7);
+// Exclusive end ensures an event at 20:59:59.999Z belongs to this completed window.
+assert.ok(new Date("2026-08-09T20:59:59.999Z") < mondayMorning.end);
+assert.equal(mondayMorning.previousEnd.toISOString(), mondayMorning.start.toISOString());
 // Sunday 23:59 still sees the window ending on the previous Saturday.
-assert.equal(resolveCompletedWindow(7, sunday2359).end.toISOString(), "2026-08-08T20:59:59.999Z");
+assert.equal(resolveCompletedWindow(7, sunday2359).end.toISOString(), "2026-08-08T21:00:00.000Z");
 const completed30 = resolveCompletedWindow(30, monday0030);
 assert.equal(completed30.start.toISOString(), "2026-07-10T21:00:00.000Z");
 assert.equal(completed30.previousStart.toISOString(), "2026-06-10T21:00:00.000Z");
