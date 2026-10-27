@@ -1041,7 +1041,7 @@ const dateKeyOf = (value: Date | string) => (typeof value === "string" ? value :
 
 /** Занятия: группы/даты и закрытые дни из OfferScheduleRule/Session/Exception. */
 function classScheduleFromOffer(offer: {
-  classGroups?: Array<{ id: string; title: string; tariffs: Array<{ id: string; title: string; price: string; unit: string; periodDays: number | null; active: boolean }> }>;
+  classGroups?: Array<{ id: string; title: string; tariffs: Array<{ id: string; title: string; price: string; unit: string; periodDays: number | null; visitsCount?: number | null; active: boolean }> }>;
   productType?: OfferProductType | null;
   offerBooking?: OfferBookingRow | null;
   sessions?: Array<{ startAt: Date | string; capacity?: number | null }> | null;
