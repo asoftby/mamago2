@@ -530,10 +530,51 @@ export async function updateBookingStatus(
   }
 
   // 5. Обновляем
-  const updated = await prisma.bookingRequest.update({
-    where: { id: bookingId },
-    data: { status: newStatus, ...derivedData },
-    select: BOOKING_SELECT,
+  // Keep the request status and its resource allocation in one transaction.
+  // A confirmed booking must never lose its resource when the original hold expires.
+  const updated = await prisma.$transaction(async (tx) => {
+    const current = await tx.bookingRequest.findUnique({
+      where: { id: bookingId },
+      select: { status: true, businessId: true, kind: true },
+    });
+    if (!current || current.businessId !== businessId) throw new BookingOwnershipError();
+    if (current.kind !== BookingKind.STANDARD ||
+        !ALLOWED_TRANSITIONS[current.status]?.includes(newStatus)) {
+      throw new BookingStatusTransitionError(current.status, newStatus);
+    }
+
+    const allocations = await tx.bookingAllocation.findMany({
+      where: { bookingRequestId: bookingId },
+      select: { id: true, status: true, expiresAt: true },
+    });
+    if (newStatus === BookingStatus.CONFIRMED) {
+      if (allocations.some((allocation) =>
+        allocation.status !== "HELD" && allocation.status !== "CONFIRMED" ||
+        (allocation.status === "HELD" && allocation.expiresAt && allocation.expiresAt <= now))) {
+        throw new Error("Резерв истёк или освобождён. Выберите свободное время заново.");
+      }
+      await tx.bookingAllocation.updateMany({
+        where: { bookingRequestId: bookingId, status: "HELD" },
+        data: { status: "CONFIRMED", expiresAt: null },
+      });
+    } else if (newStatus === BookingStatus.REJECTED || newStatus === BookingStatus.CANCELLED) {
+      await tx.bookingAllocation.updateMany({
+        where: { bookingRequestId: bookingId, status: { in: ["HELD", "CONFIRMED"] } },
+        data: { status: "RELEASED", expiresAt: null },
+      });
+    }
+
+    const result = await tx.bookingRequest.updateMany({
+      where: { id: bookingId, status: current.status },
+      data: { status: newStatus, ...derivedData },
+    });
+    if (result.count !== 1) {
+      throw new BookingStatusTransitionError(current.status, newStatus);
+    }
+    return tx.bookingRequest.findUniqueOrThrow({
+      where: { id: bookingId },
+      select: BOOKING_SELECT,
+    });
   });
 
   await logAdminAudit({
