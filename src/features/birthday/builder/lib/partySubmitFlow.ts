@@ -33,6 +33,11 @@ export async function partyRequest<T>(url: string, method: string, body?: object
   return data as T;
 }
 
+/** The PartyOrder this flow created; one draft is reused across retries and edits. */
+export function submittedPartyId(state: PartyFlowState): string | null {
+  return state.pending?.id ?? state.draft?.id ?? null;
+}
+
 export async function submitBirthdayParty(
   state: PartyFlowState, input: PartySubmissionInput, request: PartyRequest = partyRequest,
 ): Promise<void> {

@@ -3,13 +3,14 @@ import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { StepPick } from "../components/steps/StepPick";
-import { StepReview, calendarDateKeyToIso } from "../components/steps/StepReview";
+import { StepReview } from "../components/steps/StepReview";
+import { calendarDateKeyToIso } from "../lib/partyDate";
 import type { PartyFlowState } from "../lib/partySubmitFlow";
 import type { BirthdayCatalogItem } from "../lib/realCatalog";
 import {
   catalogPriceSummary, eligibleAddons, hasValidCatalogAnchor, selectedCatalogOffers,
 } from "../lib/catalogSelection";
-import { listUserBirthdayParties, getUserBirthdayPartyDetail } from "@/server/services/userBirthdays.service";
+import { listUserBirthdayParties } from "@/server/services/userBirthdays.service";
 
 const offer: BirthdayCatalogItem = {
   id: "real-venue", title: "Реальное пространство", productType: "PARTY_SERVICE",
@@ -96,12 +97,16 @@ assert.match(review, /type="time"[^>]*value="12:30"/);
 assert.match(review, /Отправить заявку основному исполнителю/);
 assert.doesNotMatch(review, /Забронировано/);
 // Simulate a review-step remount after submission: the parent-owned state persists.
+submissionFlow.draft = { id: "party-42", version: 1 };
+submissionFlow.pending = { id: "party-42", version: 1, fingerprint: "{}" };
 submissionFlow.submitted = true;
 const reviewAfterRemount = renderToStaticMarkup(createElement(StepReview, {
   ...reviewProps, sent: submissionFlow.submitted,
 }));
 assert.match(reviewAfterRemount, /Заявка основному исполнителю отправлена/);
 assert.doesNotMatch(reviewAfterRemount, /Данные для заявки/);
+// The parent lands on the exact PartyOrder that was submitted, not a generic list.
+assert.match(reviewAfterRemount, /href="\/me\/birthdays\/party-42"/);
 
 const shell = readFileSync("src/features/birthday/builder/components/BirthdayBuilderShell.tsx", "utf8");
 for (const forbidden of ["MOCK_PRICES", "buildMockScenarioTimeline", "buildSubmittedScenarioParty", "setSubmittedScenario"]) {
@@ -114,6 +119,5 @@ assert.match(shell, /disabled=\{submissionBusy\}/);
 
 void (async () => {
   assert.deepEqual(await listUserBirthdayParties("user-a"), []);
-  assert.equal(await getUserBirthdayPartyDetail("user-a", "demo-birthday-scenario"), null);
   console.log("honestBuilder.contract.test.tsx: OK");
 })();

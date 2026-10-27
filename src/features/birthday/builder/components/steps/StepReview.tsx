@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import type { BirthdayCatalogItem } from "../../lib/realCatalog";
 import { catalogPriceLabel, catalogPriceSummary } from "../../lib/catalogSelection";
-import { submitBirthdayParty, type PartyFlowState } from "../../lib/partySubmitFlow";
+import { submitBirthdayParty, submittedPartyId, type PartyFlowState } from "../../lib/partySubmitFlow";
+import { calendarDateKeyToIso } from "../../lib/partyDate";
 
 type Props = {
   offers: BirthdayCatalogItem[];
@@ -24,22 +26,6 @@ type Props = {
   sent: boolean;
   onSent: () => void;
 };
-
-// The range calendar persists YYYY-(zero-based month)-D keys, not ISO dates.
-export function calendarDateKeyToIso(key: string | null): string | null {
-  if (!key) return null;
-  const match = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(key);
-  if (!match) return null;
-  const [, yearText, monthText, dayText] = match;
-  const year = Number(yearText);
-  const monthIndex = Number(monthText);
-  const day = Number(dayText);
-  const valid = new Date(Date.UTC(year, monthIndex, day));
-  if (valid.getUTCFullYear() !== year || valid.getUTCMonth() !== monthIndex ||
-      valid.getUTCDate() !== day) return null;
-  return yearText + "-" + String(monthIndex + 1).padStart(2, "0") + "-" +
-    String(day).padStart(2, "0");
-}
 
 export function StepReview({
   offers, citySlug, dateIso, quizDateKey, timeStart, timeEnd, venueMode, childName,
@@ -77,10 +63,18 @@ export function StepReview({
     }
   }
 
-  if (sent) return <section role="status" className="mx-auto max-w-3xl space-y-4 py-10">
-    <h2 className="text-2xl font-semibold">Заявка основному исполнителю отправлена</h2>
-    <p>Остальные выбранные услуги сохранены в празднике. Заявки по ним пока не отправлены.</p>
-  </section>;
+  if (sent) {
+    // Read from the parent-owned ref so a remounted review step still links the same order.
+    const partyId = submittedPartyId(flowStateRef.current);
+    return <section role="status" className="mx-auto max-w-3xl space-y-4 py-10">
+      <h2 className="text-2xl font-semibold">Заявка основному исполнителю отправлена</h2>
+      <p>Остальные выбранные услуги сохранены в празднике. Заявки по ним пока не отправлены.</p>
+      <Link href={partyId ? "/me/birthdays/" + encodeURIComponent(partyId) : "/me/birthdays"}
+        className="inline-flex rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground">
+        {partyId ? "Открыть праздник" : "Мои праздники"}
+      </Link>
+    </section>;
+  }
 
   return (
     <section className="mx-auto max-w-3xl space-y-7">

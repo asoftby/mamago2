@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  submitBirthdayParty, type PartyFlowState, type PartyRequest, type PartySubmissionInput,
+  submitBirthdayParty, submittedPartyId, type PartyFlowState, type PartyRequest, type PartySubmissionInput,
 } from "./partySubmitFlow";
 
 const input: PartySubmissionInput = {
@@ -29,6 +29,7 @@ test("lost submit response retries with the same key, never creates another orde
   assert.equal(state.submitted, false);
   await submitBirthdayParty(state, input, request);
   assert.equal(state.submitted, true);
+  assert.equal(submittedPartyId(state), "order1");
   assert.equal(calls.filter((c) => c.url === "/api/parent/parties").length, 1);
   assert.equal(calls.filter((c) => c.method === "PATCH").length, 1);
   const sent = calls.filter((c) => c.url.endsWith("/submit"));

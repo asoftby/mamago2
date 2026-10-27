@@ -19,6 +19,7 @@ import {
   catalogPriceSummary, compatibleCatalogSelection, eligibleAddons, hasValidCatalogAnchor,
   isLocationCompatible, selectedCatalogOffers,
 } from "../lib/catalogSelection";
+import { ageMonthsOnDate, calendarDateKeyToIso } from "../lib/partyDate";
 import { BuilderProgressDots } from "./BuilderProgressDots";
 import { BuilderSummaryBar } from "./BuilderSummaryBar";
 import type { BuilderStep } from "../types/builder";
@@ -99,17 +100,9 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
     : state.quiz.budgetGroup === "300-600" ? 600
     : state.quiz.budgetGroup === "600-1000" ? 1000 : null;
 
-  const ageMonths = useMemo(() => {
-    const dob = state.quiz.partyForChild?.birthDateIso;
-    const partyDate = state.quiz.dateRangeFrom;
-    if (!dob || !partyDate) return null;
-    const birth = new Date(dob + "T00:00:00Z");
-    const party = new Date(partyDate + "T00:00:00Z");
-    if (Number.isNaN(birth.valueOf()) || Number.isNaN(party.valueOf())) return null;
-    const fullMonths = (party.getUTCFullYear() - birth.getUTCFullYear()) * 12 +
-      (party.getUTCMonth() - birth.getUTCMonth());
-    return Math.max(0, fullMonths - Number(party.getUTCDate() < birth.getUTCDate()));
-  }, [state.quiz.partyForChild?.birthDateIso, state.quiz.dateRangeFrom]);
+  const ageMonths = useMemo(() => ageMonthsOnDate(
+    state.quiz.partyForChild?.birthDateIso, calendarDateKeyToIso(state.quiz.dateRangeFrom),
+  ), [state.quiz.partyForChild?.birthDateIso, state.quiz.dateRangeFrom]);
 
   const guests = GUESTS_RANGE[state.quiz.guestsGroup ?? ""] ?? null;
 
