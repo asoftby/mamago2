@@ -11,6 +11,7 @@ import { TimePicker } from "@/components/openingHours/TimePicker";
 import {
   emptyClassDate,
   emptyClassGroup,
+  newClassScheduleId,
   parseClassDurationMinutes,
   type ClassDateSession,
   type ClassScheduleForm,
@@ -136,6 +137,35 @@ export function StepClassSchedule({ data, onChange, isEditable }: StepClassSched
                         className="rounded-xl"
                       />
                     </div>
+                  </div>
+                  <div className="space-y-3 border-t border-border pt-3">
+                    <p className="text-sm font-medium">Тарифы группы</p>
+                    {(group.tariffs ?? []).map((tariff) => (
+                      <div key={tariff.id} className="flex flex-wrap items-end gap-2">
+                        <div className="min-w-36 flex-1 space-y-1"><Label>Название</Label>
+                          <Input value={tariff.title} disabled={!isEditable} onChange={(event) =>
+                            patchGroup(group.id, { tariffs: (group.tariffs ?? []).map((item) => item.id === tariff.id ? { ...item, title: event.target.value } : item) })} />
+                        </div>
+                        <div className="w-28 space-y-1"><Label>Цена, BYN</Label>
+                          <Input value={tariff.price} disabled={!isEditable} onChange={(event) =>
+                            patchGroup(group.id, { tariffs: (group.tariffs ?? []).map((item) => item.id === tariff.id ? { ...item, price: event.target.value } : item) })} />
+                        </div>
+                        <div className="w-24 space-y-1"><Label>Единица</Label>
+                          <Input value={tariff.unit} disabled={!isEditable} onChange={(event) =>
+                            patchGroup(group.id, { tariffs: (group.tariffs ?? []).map((item) => item.id === tariff.id ? { ...item, unit: event.target.value } : item) })} />
+                        </div>
+                        <div className="w-24 space-y-1"><Label>Дней</Label>
+                          <Input type="number" min={1} max={366} value={tariff.periodDays ?? ""} disabled={!isEditable}
+                            onChange={(event) => patchGroup(group.id, { tariffs: (group.tariffs ?? []).map((item) => item.id === tariff.id ? { ...item, periodDays: event.target.value ? Number(event.target.value) : null } : item) })} />
+                        </div>
+                        <Button type="button" variant="ghost" size="sm" disabled={!isEditable} onClick={() =>
+                          patchGroup(group.id, { tariffs: (group.tariffs ?? []).filter((item) => item.id !== tariff.id) })}>Удалить</Button>
+                      </div>
+                    ))}
+                    <Button type="button" variant="outline" size="sm" disabled={!isEditable || (group.tariffs?.length ?? 0) >= 12}
+                      onClick={() => patchGroup(group.id, { tariffs: [...(group.tariffs ?? []), { id: newClassScheduleId(), title: "", price: "", unit: "занятие", periodDays: null }] })}>
+                      <Plus className="mr-1 h-4 w-4" /> Добавить тариф
+                    </Button>
                   </div>
                   {separatePeriods && (
                     <div className="space-y-2">
