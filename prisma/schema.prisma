@@ -6021,6 +6021,10 @@ model BookingRequest {
 
   // Смена лагеря (snapshot из Offer.campSessions JSON)
   /// ID смены из JSON-массива campSessions (строковый ключ, не FK)
+  classTariffId String?
+  classTariffTitle String?
+  classTariffPrice String?
+  classTariffUnit String?
   campShiftId       String?
   /// Название смены (snapshot)
   campShiftTitle    String?
