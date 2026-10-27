@@ -4,15 +4,18 @@ import { useState, useTransition } from "react";
 import { formatPrice } from "@/lib/formatters/format-price";
 import type { BoostOptionId } from "@/lib/billing/boostOptions";
 import { purchaseOfferBoostAction } from "./actions";
+import { purchaseEventBoostAction } from "@/app/business/(protected)/events/[id]/boost/actions";
 
 type Option = { id: BoostOptionId; durationDays: number; price: number; currency: "BYN" };
 
 export function BoostPurchaseClient({
   offerId,
+  eventId,
   options,
   regions,
 }: {
-  offerId: string;
+  offerId?: string;
+  eventId?: string;
   options: Option[];
   regions: { id: string; name: string; slug: string }[];
 }) {
@@ -71,7 +74,9 @@ export function BoostPurchaseClient({
         disabled={!selectedId || isPending || confirmed}
         onClick={() => startTransition(async () => {
           if (!selectedId) return;
-          const result = await purchaseOfferBoostAction({ offerId, optionId: selectedId, requestKey, targetRegionIds });
+          const result = eventId
+            ? await purchaseEventBoostAction({ activityId: eventId, optionId: selectedId, requestKey, targetRegionIds })
+            : await purchaseOfferBoostAction({ offerId: offerId!, optionId: selectedId, requestKey, targetRegionIds });
           if (result.ok) {
             setMessage(result.idempotentReplay ? "Boost уже был куплен этим запросом." : "Boost активирован.");
             setConfirmed(true);
