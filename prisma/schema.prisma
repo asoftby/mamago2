@@ -2850,6 +2850,7 @@ model OfferClassTariff {
   price String
   unit String
   periodDays Int?
+  visitsCount Int?
   active Boolean @default(true)
   position Int @default(0)
   @@index([groupId, position])
