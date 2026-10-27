@@ -402,6 +402,8 @@ model Family {
   invites     FamilyInvite[]
   consents    ConsentRecord[]
   partyOrders PartyOrder[]
+
+  @@index([homeCityId])
 }
 
 /// Членство взрослого в семье. Инварианты — partial unique индексы в миграции:
