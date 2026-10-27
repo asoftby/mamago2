@@ -9,7 +9,6 @@ import {
 import { parseArticleContentJson } from "@/lib/publications/articleMvp";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
-import { notExpiredJournalPublicationWhere } from "@/lib/journal/publicationType";
 import { buildJournalFeedBuckets, type JournalBucket } from "@/server/journal/journalPageQueries";
 import {
   PUBLIC_ARTICLE_CATEGORY_DEPENDENCY_TAG,
@@ -140,16 +139,15 @@ const JOURNAL_ORDER: Prisma.ArticleOrderByWithRelationInput[] = [
 ];
 
 /**
- * Публичные списки журнала: опубликовано, есть slug и дата, и это не истёкшая
- * новость (BREAKING_NEWS с expiresAt <= now не попадает ни в одну ленту; страница
- * новости по URL остаётся доступной).
+ * Публичные списки журнала: опубликовано, есть slug и дата. Истёкшие новости
+ * остаются в лентах (с бейджем «Новость»); срок `expiresAt` отсекает их только
+ * из блока «Новости» (см. journalBlockWheres).
  */
-export function publicJournalWhere(now: Date = new Date()): Prisma.ArticleWhereInput {
+export function publicJournalWhere(): Prisma.ArticleWhereInput {
   return {
     ...getPublicPublishedArticleWhere(),
     slug: { not: null },
     publishedAt: { not: null },
-    AND: [notExpiredJournalPublicationWhere(now)],
   };
 }
 

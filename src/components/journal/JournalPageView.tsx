@@ -131,10 +131,29 @@ export function JournalPageView({
                 citySlug={citySlug}
                 meta={{ section: "journal", block: "feed", position: index + 1 }}
               >
-                <JournalFeedRow article={article} index={index + 1} saveStatus={saveStatuses[article.id]} />
+                <JournalFeedRow
+                  article={article}
+                  index={index + 1}
+                  saveStatus={saveStatuses[article.id]}
+                  typeHref={
+                    article.publicationType === "BREAKING_NEWS" && typeFilter !== "BREAKING_NEWS"
+                      ? typeHref("BREAKING_NEWS")
+                      : article.publicationType === "COLLECTION" && typeFilter !== "COLLECTION"
+                        ? typeHref("COLLECTION")
+                        : null
+                  }
+                />
               </AnalyticsCardViewTracker>
             ))}
           </div>
+          {typeFilter !== "BREAKING_NEWS" ? (
+            <Link
+              href={typeHref("BREAKING_NEWS")}
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-ink hover:underline"
+            >
+              Все новости →
+            </Link>
+          ) : null}
         </section>
       ) : null}
 

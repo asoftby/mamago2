@@ -13,6 +13,7 @@ test("type filter query param round-trips; unknown → null", () => {
     assert.equal(parseJournalTypeFilter(journalTypeFilterParam(type)), type);
   }
   assert.equal(parseJournalTypeFilter("news"), "BREAKING_NEWS");
+  assert.equal(parseJournalTypeFilter("collection"), "COLLECTION", "legacy alias");
   assert.equal(parseJournalTypeFilter(["collection", "news"]), "COLLECTION");
   assert.equal(parseJournalTypeFilter("NEWS"), null);
   assert.equal(parseJournalTypeFilter(undefined), null);
@@ -38,5 +39,5 @@ test("collection meta counts events or places", () => {
 
 test("type filter href keeps existing query", () => {
   assert.equal(journalTypeFilterHref("/minsk/blog", "BREAKING_NEWS"), "/minsk/blog?type=news");
-  assert.equal(journalTypeFilterHref("/minsk/blog/category/sovety?tag=leto", "COLLECTION"), "/minsk/blog/category/sovety?tag=leto&type=collection");
+  assert.equal(journalTypeFilterHref("/minsk/blog/category/sovety?tag=leto", "COLLECTION"), "/minsk/blog/category/sovety?tag=leto&type=collections");
 });

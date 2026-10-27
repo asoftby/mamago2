@@ -65,9 +65,11 @@ export async function loadJournalPage(input: {
     });
     const total = await countJournalArticles(feedWhere);
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
-    const feed = page > totalPages ? [] : await queryJournalArticles(input.city, {
+    // Страница типа (?type=news|collection) — все материалы типа, включая истёкшие
+    // новости, строго по дате публикации. Основная лента — закреплённые, затем город.
+    const feed = page > totalPages ? [] : await queryJournalArticles(input.typeFilter ? null : input.city, {
       additionalWhere: feedWhere,
-      pinnedFirst: true,
+      pinnedFirst: !input.typeFilter,
       skip: (page - 1) * pageSize,
       take: pageSize,
     });

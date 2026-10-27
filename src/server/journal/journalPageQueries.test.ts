@@ -11,12 +11,18 @@ test("all blocks are filtered by the selected rubric", () => {
   }
 });
 
-test("main = featured of any type; news/collections by type", () => {
-  const w = journalBlockWheres({ scopeWhere: null, typeFilter: null, mainId: null });
+test("main = featured of any type; news block only non-expired; collections by type", () => {
+  const now = new Date("2026-10-27T12:00:00Z");
+  const w = journalBlockWheres({ scopeWhere: null, typeFilter: null, mainId: null, now });
   assert.deepEqual(w.main, { featured: true });
-  assert.deepEqual(w.news, { publicationType: "BREAKING_NEWS" });
+  assert.deepEqual(w.news, {
+    AND: [
+      { publicationType: "BREAKING_NEWS" },
+      { OR: [{ publicationType: { not: "BREAKING_NEWS" } }, { publicationType: "BREAKING_NEWS", expiresAt: { gt: now } }] },
+    ],
+  });
   assert.deepEqual(w.collections, { publicationType: "COLLECTION" });
-  assert.deepEqual(w.feed, {}, "feed keeps every type (news and collections stay in the feed)");
+  assert.deepEqual(w.feed, {}, "feed keeps every type, expired news included (no expiry filter)");
 });
 
 test("main material is not duplicated in the feed", () => {

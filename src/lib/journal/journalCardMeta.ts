@@ -7,13 +7,13 @@ export type JournalTypeFilter = "ARTICLE" | "COLLECTION" | "BREAKING_NEWS";
 export function parseJournalTypeFilter(value: string | string[] | null | undefined): JournalTypeFilter | null {
   const raw = Array.isArray(value) ? value[0] : value;
   if (raw === "article") return "ARTICLE";
-  if (raw === "collection") return "COLLECTION";
+  if (raw === "collection" || raw === "collections") return "COLLECTION";
   if (raw === "news") return "BREAKING_NEWS";
   return null;
 }
 
 export function journalTypeFilterParam(type: JournalTypeFilter): string {
-  return type === "BREAKING_NEWS" ? "news" : type === "COLLECTION" ? "collection" : "article";
+  return type === "BREAKING_NEWS" ? "news" : type === "COLLECTION" ? "collections" : "article";
 }
 
 /** Лента с фильтром по типу: тот же путь + `type=` (сохраняет существующий query, напр. `tag`). */

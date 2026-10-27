@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type { JournalTypeFilter } from "@/lib/journal/journalCardMeta";
+import { notExpiredJournalPublicationWhere } from "@/lib/journal/publicationType";
 import {
   buildJournalGeographyBuckets,
   type JournalCity,
@@ -41,7 +42,9 @@ export function journalBlockWheres(input: {
   typeFilter: JournalTypeFilter | null;
   /** Материал из «Главное» не дублируется в ленте. */
   mainId: string | null;
+  now?: Date;
 }) {
+  const now = input.now ?? new Date();
   const scoped = (where: Prisma.ArticleWhereInput): Prisma.ArticleWhereInput =>
     input.scopeWhere ? { AND: [input.scopeWhere, where] } : where;
   const feedParts: Prisma.ArticleWhereInput[] = [];
@@ -50,11 +53,11 @@ export function journalBlockWheres(input: {
   return {
     /** «Главное»: самый свежий featured любого типа. */
     main: scoped({ featured: true }),
-    /** «Новости»: актуальные BREAKING_NEWS (срок отсекает базовый предикат). */
-    news: scoped({ publicationType: "BREAKING_NEWS" }),
+    /** «Новости»: только актуальные BREAKING_NEWS (expiresAt > now). */
+    news: scoped({ AND: [{ publicationType: "BREAKING_NEWS" }, notExpiredJournalPublicationWhere(now)] }),
     /** «Подборки mamaGo». */
     collections: scoped({ publicationType: "COLLECTION" }),
-    /** «Свежие материалы»: все типы (или фильтр ?type=), без «Главного». */
+    /** «Свежие материалы»: все типы, включая истёкшие новости (или фильтр ?type=), без «Главного». */
     feed: scoped(feedParts.length ? { AND: feedParts } : {}),
   };
 }
