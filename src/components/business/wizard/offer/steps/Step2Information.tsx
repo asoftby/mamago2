@@ -24,6 +24,7 @@ import {
   type SignalGroup,
 } from "../../shared/StructuredDiscoverySignalPicker";
 import { OfferClassChipPicker } from "../components/OfferClassChipPicker";
+import { OfferCategoryPicker } from "../components/OfferCategoryPicker";
 import { AgePolicy, SignalEntityType } from "@prisma/client";
 import { getProgramTypeLabel } from "@/lib/public/publicVerticalResolver";
 import { CAMP_OFFER_DISCOVERY_PICKER_CONFIGS } from "@/lib/offers/campOfferDiscoverySignals";
@@ -169,6 +170,17 @@ export function Step2Information({ data, onChange, isEditable, v2 = false }: Ste
           Эти данные увидят родители.
         </p>
       </div>
+
+      {v2 && isClassOffer && (
+        <section className="space-y-3" aria-label="Разделы занятий">
+          <OfferCategoryPicker
+            productType={data.productType!}
+            value={data.categoryIds}
+            onChange={(categoryIds) => onChange({ categoryIds })}
+            isEditable={isEditable}
+          />
+        </section>
+      )}
 
       {/* Title */}
       <div className="space-y-2">
@@ -318,7 +330,7 @@ export function Step2Information({ data, onChange, isEditable, v2 = false }: Ste
             { id: "unrestricted", label: "Любой", active: data.agePolicy === AgePolicy.UNRESTRICTED, disabled: !isEditable, onClick: () => onChange({ agePolicy: AgePolicy.UNRESTRICTED, ageGroups: [] }) },
             ...AGE_OPTIONS
               // В новом мастере «18+» — это один чип #nokids ниже, без дубля из справочника возрастов.
-              .filter((ageOption) => !(v2 && ageOption.key === "18+"))
+              .filter((ageOption) => !(v2 && (ageOption.key === "18+" || ageOption.shortLabel.toLowerCase() === "#nokids")))
               .map((ageOption): ChipItem => ({
             id: ageOption.key,
             label: ageOption.shortLabel,
