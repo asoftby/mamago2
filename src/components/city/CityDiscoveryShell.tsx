@@ -188,6 +188,7 @@ export function CityDiscoveryShell({
 
           <BirthdayQuickStartBanner city={city} />
           <DiscoveryActivitiesGrid
+            listingCitySlug={city}
             activities={discoveryActivities ?? []}
             coverRatio="1/1"
             emptyTitle="Пока нет предложений для праздника"
@@ -221,6 +222,7 @@ export function CityDiscoveryShell({
           <ClassesChipBar chips={classChips} activeChipSlug={activeClassChipSlug} />
         ) : null}
         <DiscoveryActivitiesGrid
+          listingCitySlug={city}
           activities={discoveryActivities ?? []}
           coverRatio={intent === "classes" ? "1/1" : undefined}
           emptyTitle={
