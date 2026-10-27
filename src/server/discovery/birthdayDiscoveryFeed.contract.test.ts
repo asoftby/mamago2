@@ -33,7 +33,7 @@ assert.equal(bundle.badge, "Праздник под ключ");
 
 // The birthday page must never call the event feed, even when no offers exist.
 const shell = readFileSync("src/components/city/CityShell.tsx", "utf8");
-assert.match(shell, /if \(intent === "birthday"\) \{[\s\S]*?getBirthdayDiscoveryFeed\(city\.id, city\.slug\)/);
+assert.match(shell, /if \(intent === "birthday"\) \{[\s\S]*?getBirthdayDiscoveryPage\(city\.id, city\.slug,/);
 assert.match(shell, /if \(intent === "kuda"\) \{/);
 assert.doesNotMatch(shell, /if \(intent === "kuda" \|\| intent === "birthday"\)/);
 const sticky = readFileSync("src/features/birthday/builder/components/BirthdayBuilderStickyBar.tsx", "utf8");
