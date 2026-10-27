@@ -12,6 +12,7 @@ import { SlotReservationError } from "@/server/offers/reserveSlot";
 
 const reservationSchema = z.object({
   startsAt: z.string().datetime({ offset: true }),
+  classTariffId: z.string().trim().min(1).max(128).optional(),
   endsAt: z.string().datetime({ offset: true }),
   seats: z.number().int().min(1).max(100).default(1),
   customerName: z.string().trim().min(1).max(150),
@@ -40,6 +41,7 @@ export async function POST(
   try {
     const result = await createPublicClassSlotBooking({
       offerId: id,
+      classTariffId: payload.data.classTariffId,
       startsAt: new Date(payload.data.startsAt),
       endsAt: new Date(payload.data.endsAt),
       seats: payload.data.seats,
