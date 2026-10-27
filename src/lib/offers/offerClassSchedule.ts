@@ -230,6 +230,7 @@ export function groupsFromRules(
     weekday: number;
     startMinutes: number;
     capacity: number | null;
+    classGroupId?: string | null;
     validFrom?: Date | string | null;
     validTo?: Date | string | null;
   }>,
@@ -241,13 +242,13 @@ export function groupsFromRules(
   const byKey = new Map<string, ClassSessionGroup>();
   for (const rule of [...rules].sort((a, b) => a.startMinutes - b.startMinutes || a.weekday - b.weekday)) {
     const period = { from: key(rule.validFrom), to: key(rule.validTo) };
-    const groupKey = JSON.stringify([rule.startMinutes, rule.capacity, period.from, period.to]);
+    const groupKey = rule.classGroupId ?? JSON.stringify([rule.startMinutes, rule.capacity, period.from, period.to]);
     const existing = byKey.get(groupKey);
     if (existing) {
       if (!existing.days.includes(rule.weekday)) existing.days.push(rule.weekday);
     } else {
       byKey.set(groupKey, {
-        id: `group:${groupKey}`,
+        id: rule.classGroupId ?? `group:${groupKey}`,
         days: [rule.weekday],
         time: minutesToTime(rule.startMinutes),
         seats: rule.capacity ? String(rule.capacity) : "",
