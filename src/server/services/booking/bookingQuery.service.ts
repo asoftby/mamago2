@@ -53,7 +53,9 @@ export interface BusinessBookingItem {
   } | null;
   place: { id: string; title: string; slug: string | null } | null;
 
-  // Camp shift snapshot
+  // Class group and tariff snapshot
+  classGroupId: string | null;
+  classGroupTitle: string | null;
   classTariffId: string | null;
   classTariffTitle: string | null;
   classTariffPrice: string | null;
@@ -137,6 +139,8 @@ const BOOKING_SELECT = {
   },
   place: { select: { id: true, title: true, slug: true } },
 
+  classGroupId: true,
+  classGroupTitle: true,
   classTariffId: true,
   classTariffTitle: true,
   classTariffPrice: true,
@@ -209,6 +213,8 @@ function mapBooking(raw: {
     currency: string | null;
   } | null;
   place: { id: string; title: string; slug: string | null } | null;
+  classGroupId: string | null;
+  classGroupTitle: string | null;
   classTariffId: string | null;
   classTariffTitle: string | null;
   classTariffPrice: string | null;
@@ -237,10 +243,18 @@ function mapBooking(raw: {
     : null;
 
   const display = buildBookingDisplay({
+    classGroupId: raw.classGroupId,
+    classGroupTitle: raw.classGroupTitle,
     classTariffId: raw.classTariffId,
     classTariffTitle: raw.classTariffTitle,
     classTariffPrice: raw.classTariffPrice,
     classTariffUnit: raw.classTariffUnit,
+    classTariffId: raw.classTariffId,
+    classTariffTitle: raw.classTariffTitle,
+    classTariffPrice: raw.classTariffPrice,
+    classTariffUnit: raw.classTariffUnit,
+    classGroupId: raw.classGroupId,
+    classGroupTitle: raw.classGroupTitle,
     classTariffId: raw.classTariffId,
     classTariffTitle: raw.classTariffTitle,
     classTariffPrice: raw.classTariffPrice,
