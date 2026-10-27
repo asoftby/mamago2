@@ -48,6 +48,12 @@ export function buildEditorComparable(input: {
   seoDescription: string | null;
   seoCanonicalUrl: string | null;
   noindex: boolean;
+  /** Поля журнала: тип, отметки, срок новости, элементы подборки. */
+  publicationType?: ArticleEditorSnapshot["publicationType"];
+  featured?: boolean;
+  pinned?: boolean;
+  expiresAtLocal?: string;
+  linkedItems?: Array<{ kind: string; id: string }>;
 }): string {
   return JSON.stringify({
     title: input.title,
@@ -71,6 +77,11 @@ export function buildEditorComparable(input: {
     seoDescription: input.seoDescription ?? "",
     seoCanonicalUrl: input.seoCanonicalUrl ?? "",
     noindex: input.noindex,
+    publicationType: input.publicationType ?? "ARTICLE",
+    featured: input.featured ?? false,
+    pinned: input.pinned ?? false,
+    expiresAtLocal: input.expiresAtLocal ?? "",
+    linkedItems: (input.linkedItems ?? []).map((item) => `${item.kind}:${item.id}`),
   });
 }
 
@@ -98,5 +109,10 @@ export function buildSavedComparable(snap: ArticleEditorSnapshot): string {
     seoDescription: snap.seoDescription,
     seoCanonicalUrl: snap.seoCanonicalUrl,
     noindex: snap.noindex,
+    publicationType: snap.publicationType,
+    featured: snap.featured,
+    pinned: snap.pinned,
+    expiresAtLocal: toLocalDatetimeValue(snap.expiresAt),
+    linkedItems: snap.linkedItems,
   });
 }

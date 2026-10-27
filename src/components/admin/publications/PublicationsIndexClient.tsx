@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { BarChart2, ChevronRight } from "lucide-react";
+import { BarChart2, ChevronRight, Pin, Star } from "lucide-react";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -61,24 +62,88 @@ function matchesTab(row: PublicationListRow, tab: PublicationTabFilter): boolean
   return row.type === tab;
 }
 
-/** Статья или Breaking news (обе в `Article`); подборки в этом списке не приходят. */
+/** Все типы журнала живут в `Article`; короткий редактор — только для новостей с маркером. */
 function publicationEditHref(row: PublicationListRow): string | null {
-  if (row.type === PublicationType.ARTICLE) {
-    return `/admin/content/articles/${row.id}/edit`;
-  }
-  if (row.type === PublicationType.NEWS) {
+  if (row.usesNewsEditor) {
     return `/admin/content/publications/new?type=news&id=${encodeURIComponent(row.id)}`;
   }
-  return null;
+  return `/admin/content/articles/${row.id}/edit`;
 }
 
 function hasArticleLikeActions(row: PublicationListRow): boolean {
-  return row.type === PublicationType.ARTICLE || row.type === PublicationType.NEWS;
+  return (
+    row.type === PublicationType.ARTICLE ||
+    row.type === PublicationType.NEWS ||
+    row.type === PublicationType.COLLECTION
+  );
+}
+
+type JournalFlags = { featured: boolean; pinned: boolean };
+
+/**
+ * Отметки «Главное» / «Закрепить» прямо из списка. Состояние — у родителя
+ * (`flagOverrides`), чтобы быстрые фильтры и повторный монтаж строки видели
+ * актуальные значения без перезагрузки страницы.
+ */
+function JournalFlagToggles({
+  row,
+  onChanged,
+}: {
+  row: PublicationListRow;
+  onChanged: (id: string, flags: JournalFlags) => void;
+}) {
+  const featured = Boolean(row.featured);
+  const pinned = Boolean(row.pinned);
+  const [busy, setBusy] = useState(false);
+  const update = async (patch: { featured?: boolean; pinned?: boolean }) => {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/articles/${encodeURIComponent(row.id)}/journal-flags`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error();
+      const data = (await res.json()) as JournalFlags;
+      onChanged(row.id, { featured: data.featured, pinned: data.pinned });
+    } catch {
+      toast.error("Не удалось обновить отметку");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const base = "inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-1.5 text-xs font-semibold transition-colors disabled:opacity-50";
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        disabled={busy}
+        aria-pressed={featured}
+        title={featured ? "Убрать из «Главное»" : "Отметить как «Главное»"}
+        aria-label="Главное"
+        onClick={() => void update({ featured: !featured })}
+        className={cn(base, featured ? "border-amber-300 bg-amber-50 text-amber-800" : "border-gray-200 text-gray-400 hover:text-gray-700")}
+      >
+        <Star className="h-3.5 w-3.5" aria-hidden fill={featured ? "currentColor" : "none"} />
+      </button>
+      <button
+        type="button"
+        disabled={busy}
+        aria-pressed={pinned}
+        title={pinned ? "Открепить" : "Закрепить в ленте"}
+        aria-label="Закрепить"
+        onClick={() => void update({ pinned: !pinned })}
+        className={cn(base, pinned ? "border-sky-300 bg-sky-50 text-sky-800" : "border-gray-200 text-gray-400 hover:text-gray-700")}
+      >
+        <Pin className="h-3.5 w-3.5" aria-hidden fill={pinned ? "currentColor" : "none"} />
+      </button>
+    </div>
+  );
 }
 
 function resolveArticleLikeLinks(row: PublicationListRow) {
   return resolveContentLinks({
-    kind: row.type === PublicationType.NEWS ? "breaking-news" : "article",
+    kind: row.usesNewsEditor ? "breaking-news" : "article",
     surface: "admin",
     outcome: "published",
     id: row.id,
@@ -125,6 +190,14 @@ export function PublicationsIndexClient({
   articleLifecycleMeta?: Record<string, ArticleLifecycleMeta>;
 }) {
   const router = useRouter();
+  const [flagOverrides, setFlagOverrides] = useState<Record<string, JournalFlags>>({});
+  const rows = useMemo(
+    () => initialRows.map((row) => (flagOverrides[row.id] ? { ...row, ...flagOverrides[row.id] } : row)),
+    [initialRows, flagOverrides],
+  );
+  const handleFlagsChanged = useCallback((id: string, flags: JournalFlags) => {
+    setFlagOverrides((prev) => ({ ...prev, [id]: flags }));
+  }, []);
   const [tab, setTab] = useState<PublicationTabFilter>(PublicationTabFilter.ALL);
   const [status, setStatus] = useState<string>("all");
   /** id пользователя-автора; пусто = все (как справочник в редакторе статьи) */
@@ -143,9 +216,12 @@ export function PublicationsIndexClient({
   const [quickProblemArticles, setQuickProblemArticles] = useState(false);
   const [quickDrafts, setQuickDrafts] = useState(false);
   const [quickPublished, setQuickPublished] = useState(false);
+  const [quickFeatured, setQuickFeatured] = useState(false);
+  const [quickPinned, setQuickPinned] = useState(false);
   const filterKey = JSON.stringify([
     tab, status, authorUserIdFilter, cityId, dateFrom, typeQuick, sort,
     titleSearch, quickNoCover, quickNoSlug, quickProblemArticles, quickDrafts, quickPublished,
+    quickFeatured, quickPinned,
   ]);
   const [pageSelection, setPageSelection] = useState({ filterKey, page: 1 });
   const page = pageSelection.filterKey === filterKey ? pageSelection.page : 1;
@@ -186,7 +262,7 @@ export function PublicationsIndexClient({
 
   const filtered = useMemo(() => {
     const q = titleSearch.trim().toLowerCase();
-    return initialRows.filter((row) => {
+    return rows.filter((row) => {
       if (!matchesTab(row, tab)) return false;
       if (
         tab === PublicationTabFilter.ALL &&
@@ -208,6 +284,8 @@ export function PublicationsIndexClient({
       if (quickProblemArticles && !row.missingJournalCategory) return false;
       if (quickDrafts && row.status !== PublicationStatus.DRAFT) return false;
       if (quickPublished && row.status !== PublicationStatus.PUBLISHED) return false;
+      if (quickFeatured && !row.featured) return false;
+      if (quickPinned && !row.pinned) return false;
       if (status !== "all" && row.status !== status) return false;
       if (authorUserIdFilter && row.authorUserId !== authorUserIdFilter) {
         return false;
@@ -222,7 +300,7 @@ export function PublicationsIndexClient({
       return true;
     });
   }, [
-    initialRows,
+    rows,
     tab,
     status,
     authorUserIdFilter,
@@ -235,6 +313,8 @@ export function PublicationsIndexClient({
     quickProblemArticles,
     quickDrafts,
     quickPublished,
+    quickFeatured,
+    quickPinned,
   ]);
 
   const sorted = useMemo(() => {
@@ -282,8 +362,8 @@ export function PublicationsIndexClient({
         };
       case PublicationTabFilter.COLLECTION:
         return {
-          hint: "Создайте подборку — откроется редактор (foundation, без сохранения на сервер).",
-          path: "/admin/content/publications/new?type=collection",
+          hint: "Создайте подборку — откроется редактор статьи с типом «Подборка».",
+          path: "/admin/content/articles/new?type=collection",
         };
       case PublicationTabFilter.ALL:
         return {
@@ -468,6 +548,24 @@ export function PublicationsIndexClient({
           >
             Опубликованные
           </Button>
+          <Button
+            type="button"
+            variant={quickFeatured ? "secondary" : "outline"}
+            size="sm"
+            className="h-8 shrink-0 text-xs"
+            onClick={() => { resetPageForFilters(); setQuickFeatured((v) => !v); }}
+          >
+            ★ Главное
+          </Button>
+          <Button
+            type="button"
+            variant={quickPinned ? "secondary" : "outline"}
+            size="sm"
+            className="h-8 shrink-0 text-xs"
+            onClick={() => { resetPageForFilters(); setQuickPinned((v) => !v); }}
+          >
+            Закреплённые
+          </Button>
         </div>
         <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 [&>*]:min-w-0">
           <div className="min-w-0">
@@ -624,6 +722,9 @@ export function PublicationsIndexClient({
                           <th className="px-2 py-2 sm:px-3 sm:py-2.5 text-left font-medium text-gray-700 w-[88px] xl:w-auto">
                             Тип
                           </th>
+                          <th className="px-2 py-2 sm:px-3 sm:py-2.5 text-left font-medium text-gray-700 whitespace-nowrap w-[84px] xl:w-auto">
+                            Отметки
+                          </th>
                           <th className="px-2 py-2 sm:px-3 sm:py-2.5 text-left font-medium text-gray-700 whitespace-nowrap w-[112px] xl:w-auto">
                             Статус
                           </th>
@@ -699,6 +800,9 @@ export function PublicationsIndexClient({
                               </td>
                               <td className="px-2 py-2 sm:px-3 sm:py-2.5 text-gray-700 align-top">
                                 {PUBLICATION_TYPE_LABEL[row.type]}
+                              </td>
+                              <td className="px-2 py-2 sm:px-3 sm:py-2.5 align-top">
+                                <JournalFlagToggles row={row} onChanged={handleFlagsChanged} />
                               </td>
                               <td className="px-2 py-2 sm:px-3 sm:py-2.5 align-top">
                                 <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
