@@ -36,7 +36,8 @@ function cand(over: Partial<FamilyPickCandidate> = {}): FamilyPickCandidate {
     territory: "CITY",
     isFree: false,
     engagementScore: 0,
-    historyAffinity: 0,
+    interestBoost: 0,
+    experienceAffinityBoost: 0,
     ...over,
   };
 }
@@ -124,7 +125,8 @@ test("MATCH is always above UNKNOWN even when UNKNOWN has a higher raw score", (
     ageMinMonths: null,
     ageMaxMonths: null,
     interestSlugs: ["sport"],
-    historyAffinity: 1,
+    interestBoost: 8,
+    experienceAffinityBoost: 6,
     territory: "CITY",
     engagementScore: 999,
   });
@@ -156,8 +158,9 @@ test("UNKNOWN-age items are capped and labelled honestly (never «Подходи
 test("score breakdown follows config weights; budget weight 0 adds nothing", () => {
   const c = cand({
     interestSlugs: ["sport", "music"],
+    interestBoost: 8,
     isFree: true,
-    historyAffinity: 0.5,
+    experienceAffinityBoost: 3,
     occurrences: [SAT],
     territory: "CITY",
   });
@@ -175,7 +178,7 @@ test("score breakdown follows config weights; budget weight 0 adds nothing", () 
 });
 
 test("changing weights in config changes ranking without code changes", () => {
-  const sporty = cand({ interestSlugs: ["sport"], occurrences: [WED] });
+  const sporty = cand({ interestSlugs: ["sport"], interestBoost: 4, occurrences: [WED] });
   const weekendy = cand({ occurrences: [SAT] });
   const filler = cand({ occurrences: [WED] });
   const c = ctx({ knownCategoryIds: new Set([sporty, weekendy, filler].map((x) => x.categoryId!)) });
@@ -208,7 +211,7 @@ test("diversity: at most 2 per category and 1 per business", () => {
 });
 
 test("novelty slot: one «Попробуйте новое» from an unknown category, placed last", () => {
-  const known = Array.from({ length: 6 }, (_, i) => cand({ categoryId: `known${i}`, interestSlugs: ["sport"] }));
+  const known = Array.from({ length: 6 }, (_, i) => cand({ categoryId: `known${i}`, interestSlugs: ["sport"], interestBoost: 4 }));
   const fresh = cand({ categoryId: "brand-new", occurrences: [WED] });
   const c = ctx({ knownCategoryIds: new Set(known.map((k) => k.categoryId!)) });
   const r = run([...known, fresh], c);
@@ -239,7 +242,7 @@ test("result is deterministic and positions are 1..N", () => {
 // ─── fallback ─────────────────────────────────────────────────────────────
 
 test("PERSONAL level: ages + interests, title «Для вашей семьи»", () => {
-  const items = Array.from({ length: 5 }, () => cand({ interestSlugs: ["sport"] }));
+  const items = Array.from({ length: 5 }, () => cand({ interestSlugs: ["sport"], interestBoost: 4 }));
   const r = run(items, ctx());
   assert.equal(r.level, "PERSONAL");
   assert.equal(r.title, "Для вашей семьи");
@@ -317,4 +320,33 @@ test("duplicates by entity key are collapsed", () => {
   const a = cand();
   const r = run([a, { ...a }, cand(), cand(), cand()], ctx());
   assert.equal(r.items.filter((i) => i.candidate.id === a.id).length, 1);
+});
+
+// ─── регрессии по ревью ───────────────────────────────────────────────────
+
+test("interest and history scores are taken from the shared ranker boosts, not recomputed", () => {
+  // Интересы ребёнка совпадают по слагам, но общий ранкер дал 0 → балл интересов 0.
+  const noBoost = cand({ interestSlugs: ["sport"], interestBoost: 0 });
+  const oneMatch = cand({ interestSlugs: ["sport"], interestBoost: 4 });
+  const r = run([noBoost, oneMatch, cand(), cand()], ctx());
+  const a = r.items.find((i) => i.candidate.id === noBoost.id)!;
+  const b = r.items.find((i) => i.candidate.id === oneMatch.id)!;
+  assert.equal(a.scoreBreakdown.interests, 0);
+  assert.equal(b.scoreBreakdown.interests, 12.5); // 4 / MAX_INTEREST_BOOST(8) × 25
+  const hist = cand({ experienceAffinityBoost: -6 });
+  const rn = run([hist, cand(), cand(), cand()], ctx());
+  assert.equal(rn.items.find((i) => i.candidate.id === hist.id)!.scoreBreakdown.history, -10);
+});
+
+test("novelty candidate keeps its business slot: regular picks cannot block it (review repro)", () => {
+  const A = cand({ categoryId: "new-cat", businessId: "biz1", occurrences: [SAT] }); // лучший novelty
+  const B = cand({ categoryId: "known", businessId: "biz1", occurrences: [SAT], interestBoost: 8, interestSlugs: ["sport"] });
+  const C = cand({ categoryId: "known", businessId: "biz2", occurrences: [SAT], interestBoost: 4, interestSlugs: ["sport"] });
+  const D = cand({ categoryId: "known", businessId: "biz3", occurrences: [SAT] });
+  const r = run([A, B, C, D], ctx({ knownCategoryIds: new Set(["known"]) }));
+  assert.notEqual(r.level, "NONE");
+  const ids = r.items.map((i) => i.candidate.id);
+  assert.ok(ids.includes(A.id));
+  assert.equal(r.items[r.items.length - 1]!.candidate.id, A.id);
+  assert.equal(r.items.length, 3);
 });

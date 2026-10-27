@@ -1,4 +1,5 @@
 import { getSystemInterestLabel } from "@/lib/config/interests";
+import { EXPERIENCE_AFFINITY_MAX, MAX_INTEREST_BOOST } from "@/server/services/recommendations/rankingSignals";
 import { minskIsoWeekday } from "./window";
 import type { ShowWindow } from "./window";
 import type { FamilyPicksConfig } from "./config";
@@ -34,8 +35,13 @@ export type FamilyPickCandidate = {
   isFree: boolean;
   /** Общая популярность из движка (eventEngagementScores). */
   engagementScore: number;
-  /** История семьи, нормализована в [-1, 1] (experienceAffinity). */
-  historyAffinity: number;
+  /**
+   * Сигналы общего ранкера (planSuggestionScore): `interestBoost` (0…MAX_INTEREST_BOOST) и
+   * `experienceAffinityBoost` (±EXPERIENCE_AFFINITY_MAX). Слой подбора их не пересчитывает,
+   * а только нормализует по границам общего контракта и применяет веса поверхности.
+   */
+  interestBoost: number;
+  experienceAffinityBoost: number;
 };
 
 export type FamilyContext = {
@@ -188,20 +194,22 @@ export function scoreCandidate(
   age = evaluateAge(ctx.children, c),
 ): Scored {
   const w = config.weights;
-  // Интересы учитываем у детей, которым событие подходит (или возраст неизвестен), не у MISMATCH.
+  // Только для объяснения («Подходит: Стёпа · спорт»): какие интересы детей совпали. На балл не влияет —
+  // балл берётся из общего ранкера (interestBoost).
   const eligibleChildren = ctx.children.filter((child) => ageMatchForChild(child, c) !== "MISMATCH");
   const interestSet = new Set<string>();
   for (const child of eligibleChildren) {
     for (const slug of child.interestSlugs) if (c.interestSlugs.includes(slug)) interestSet.add(slug);
   }
   const matchedInterestSlugs = [...interestSet];
-  const interestFraction = Math.min(matchedInterestSlugs.length, 2) / 2;
+  const interestFraction = Math.max(0, Math.min(1, c.interestBoost / MAX_INTEREST_BOOST));
+  const historyFraction = Math.max(-1, Math.min(1, c.experienceAffinityBoost / EXPERIENCE_AFFINITY_MAX));
   const breakdown = {
     age: age.match === "MATCH" ? w.age : 0,
     interests: interestFraction * w.interests,
     date: dateFit(c, window, now) * w.date,
     territory: territoryFit(c.territory) * w.territory,
-    history: Math.max(-1, Math.min(1, c.historyAffinity)) * w.history,
+    history: historyFraction * w.history,
     budget: c.isFree ? w.budget : 0,
   };
   const score = Object.values(breakdown).reduce((sum, v) => sum + v, 0);
@@ -339,7 +347,7 @@ export function selectFamilyPicks(
   const hasAgeData = childrenWithAge.length > 0;
   const hasInterestData = ctx.children.some((child) => child.interestSlugs.length > 0) || ctx.hasHistory;
   const personalSignal = (s: Scored) =>
-    s.ageMatch === "MATCH" && (s.matchedInterestSlugs.length > 0 || s.candidate.historyAffinity > 0);
+    s.ageMatch === "MATCH" && (s.candidate.interestBoost > 0 || s.candidate.experienceAffinityBoost > 0);
 
   let level: PickLevel;
   if (hasAgeData && hasInterestData && scored.filter(personalSignal).length >= config.minResultCount) {
@@ -404,34 +412,14 @@ export function selectFamilyPicks(
       ) ?? null;
   }
 
-  const regularTarget = config.resultCount - (noveltyPick ? Math.min(1, config.noveltySlots) : 0);
+  // Ёмкость разнообразия под слот «Попробуйте новое» резервируется ДО обычных карточек,
+  // иначе обычные могут занять его бизнес/категорию и заблокировать блок.
+  if (noveltyPick && fits(noveltyPick)) take(noveltyPick, true);
   for (const s of pool) {
-    if (chosen.length >= regularTarget) break;
-    if (noveltyPick && s === noveltyPick) continue;
+    if (chosen.length >= config.resultCount) break;
+    if (chosenKeys.has(`${s.candidate.entityType}:${s.candidate.id}`)) continue;
     if (!fits(s) || !unknownAllowed(s)) continue;
     take(s, false);
-  }
-  if (noveltyPick) {
-    if (fits(noveltyPick)) {
-      take(noveltyPick, true);
-    } else {
-      // Новинка не проходит лимиты — ищем следующую подходящую, иначе добираем обычными.
-      const alt = pool.find(
-        (s) =>
-          !chosenKeys.has(`${s.candidate.entityType}:${s.candidate.id}`) &&
-          s.candidate.categoryId != null &&
-          !ctx.knownCategoryIds.has(s.candidate.categoryId) &&
-          (!hasAgeData || s.ageMatch === "MATCH") &&
-          fits(s),
-      );
-      if (alt) take(alt, true);
-    }
-    for (const s of pool) {
-      if (chosen.length >= config.resultCount) break;
-      if (chosenKeys.has(`${s.candidate.entityType}:${s.candidate.id}`)) continue;
-      if (!fits(s) || !unknownAllowed(s)) continue;
-      take(s, false);
-    }
   }
 
   // «Попробуйте новое» всегда последним (стабильная сортировка).
@@ -447,8 +435,8 @@ export function selectFamilyPicks(
     const fit = s.breakdown.date / (config.weights.date || 1);
     const reasonCodes = buildReasonCodes({
       ageMatch: personalized ? s.ageMatch : "NONE",
-      hasInterestMatch: personalized && s.matchedInterestSlugs.length > 0,
-      historyAffinity: personalized ? s.candidate.historyAffinity : 0,
+      hasInterestMatch: personalized && s.candidate.interestBoost > 0,
+      historyAffinity: personalized ? s.candidate.experienceAffinityBoost : 0,
       dateFit: config.weights.date > 0 ? fit : dateFit(s.candidate, window, now),
       window,
       isFree: s.candidate.isFree,

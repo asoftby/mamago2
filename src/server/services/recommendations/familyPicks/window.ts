@@ -39,3 +39,23 @@ export function resolveShowWindow(now: Date, weekHorizonDays = 7): ShowWindow {
   }
   return { mode: "WEEK", dateFrom: today, dateTo: addDaysToKey(today, Math.max(1, weekHorizonDays) - 1) };
 }
+
+/**
+ * Сеансы, которые ещё можно посетить: внутри окна и не раньше `now` (окно начинается в 00:00,
+ * поэтому уже закончившиеся сегодня сеансы отсекаются). Фолбэк `nextOccurrenceAt` — только если
+ * сеансов нет и значение тоже в [max(start, now), end).
+ */
+export function collectUpcomingOccurrences(input: {
+  sessionStarts: readonly Date[];
+  nextOccurrenceAt: Date | null;
+  rangeStart: Date;
+  rangeEnd: Date;
+  now: Date;
+}): Date[] {
+  const lower = Math.max(input.rangeStart.getTime(), input.now.getTime());
+  const upper = input.rangeEnd.getTime();
+  const inRange = (d: Date) => d.getTime() >= lower && d.getTime() < upper;
+  const fromSessions = input.sessionStarts.filter(inRange);
+  if (fromSessions.length > 0) return fromSessions;
+  return input.nextOccurrenceAt && inRange(input.nextOccurrenceAt) ? [input.nextOccurrenceAt] : [];
+}

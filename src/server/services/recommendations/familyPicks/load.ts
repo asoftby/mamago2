@@ -9,10 +9,7 @@ import {
   eventSystemInterestSlugs,
   rankPlanSuggestionsForCity,
 } from "@/server/services/planSuggestions.service";
-import {
-  EXPERIENCE_AFFINITY_MAX,
-  resolveSelectedExperienceAffinity,
-} from "@/server/services/recommendations/experienceAffinity";
+import { resolveSelectedExperienceAffinity } from "@/server/services/recommendations/experienceAffinity";
 import { recordRecommendationRun } from "@/server/services/recommendations/RecommendationTraceService";
 import { FAMILY_PICKS_ALGORITHM_VERSION, normalizeFamilyPicksConfig, type FamilyPicksConfig } from "./config";
 import {
@@ -23,7 +20,10 @@ import {
   type FamilyPickCandidate,
   type FamilyPicksResult,
 } from "./select";
-import { resolveShowWindow, type ShowWindow } from "./window";
+import { collectUpcomingOccurrences, resolveShowWindow, type ShowWindow } from "./window";
+
+/** Постоянные расписания (как в общем движке): видимы независимо от дня. */
+const ALWAYS_AVAILABLE_MODES: ReadonlySet<string> = new Set(["ALWAYS", "ON_DEMAND", "RECURRING"]);
 
 export type FamilyPickCard = {
   entityType: "EVENT";
@@ -191,7 +191,8 @@ export async function loadFamilyPicks(input: LoadFamilyPicksInput): Promise<Fami
       nextOccurrenceAt: true,
       scheduleMode: true,
       sessions: {
-        where: { withdrawnAt: null, startsAt: { gte: range.start, lt: range.end } },
+        // Нижняя граница — не раньше now: сеансы, закончившиеся сегодня утром, не рекомендуем.
+        where: { withdrawnAt: null, startsAt: { gte: new Date(Math.max(range.start.getTime(), now.getTime())), lt: range.end } },
         select: { startsAt: true },
       },
     },
@@ -203,15 +204,13 @@ export async function loadFamilyPicks(input: LoadFamilyPicksInput): Promise<Fami
   for (const s of batch.suggestions) {
     const extra = extraById.get(s.activity.id);
     if (!extra) continue;
-    const occurrences = extra.sessions.map((row) => row.startsAt);
-    if (
-      occurrences.length === 0 &&
-      extra.nextOccurrenceAt &&
-      extra.nextOccurrenceAt >= range.start &&
-      extra.nextOccurrenceAt < range.end
-    ) {
-      occurrences.push(extra.nextOccurrenceAt);
-    }
+    const occurrences = collectUpcomingOccurrences({
+      sessionStarts: extra.sessions.map((row) => row.startsAt),
+      nextOccurrenceAt: extra.nextOccurrenceAt,
+      rangeStart: range.start,
+      rangeEnd: range.end,
+      now,
+    });
     candidates.push({
       entityType: "EVENT",
       id: s.activity.id,
@@ -222,11 +221,15 @@ export async function loadFamilyPicks(input: LoadFamilyPicksInput): Promise<Fami
       ageMaxMonths: extra.ageMaxMonths,
       interestSlugs: eventSystemInterestSlugs(s.activity.scheduleJson),
       occurrences,
-      alwaysAvailable: occurrences.length === 0 && extra.nextOccurrenceAt == null,
+      alwaysAvailable:
+        occurrences.length === 0 &&
+        extra.nextOccurrenceAt == null &&
+        ALWAYS_AVAILABLE_MODES.has(extra.scheduleMode),
       territory: extra.cityId === city.id ? "CITY" : "REGION",
       isFree: extra.priceMode === "FREE",
       engagementScore: s.scoreBreakdown.engagementScore,
-      historyAffinity: s.scoreBreakdown.experienceAffinityBoost / EXPERIENCE_AFFINITY_MAX,
+      interestBoost: s.scoreBreakdown.interestBoost,
+      experienceAffinityBoost: s.scoreBreakdown.experienceAffinityBoost,
     });
   }
 
