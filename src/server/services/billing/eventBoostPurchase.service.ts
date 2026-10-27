@@ -67,7 +67,7 @@ export async function purchaseEventBoost(params: {
       amount: option.price,
       type: BillingTransactionType.FEATURE_CHARGE,
       description: `Boost события «${event.title}» на ${option.durationDays} дн.`,
-      referenceType: BillingReferenceType.ACTIVITY,
+      referenceType: BillingReferenceType.EVENT,
       referenceId: boost.id,
       idempotencyKey: `boost:${params.requestKey}`,
       metadata: {
