@@ -14,7 +14,7 @@ export default async function EventBoostPage({ params }: { params: Promise<{ id:
 
   const { id } = await params;
   const event = await prisma.activity.findFirst({
-    where: { id, businessId: business.id, type: "EVENT" },
+    where: { id, OR: [{ businessId: business.id }, { ownerUserId: user.id }], type: "EVENT" },
     select: { id: true, title: true, status: true },
   });
   if (!event) notFound();
