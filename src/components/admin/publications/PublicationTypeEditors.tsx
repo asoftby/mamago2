@@ -32,6 +32,8 @@ import {
   parseBreakingNewsFromSnapshot,
 } from "@/lib/publications/breakingNewsArticle";
 import { PublicationPanel } from "@/components/admin/articles/PublicationPanel";
+import { Switch } from "@/components/ui/switch";
+import { BREAKING_NEWS_DEFAULT_TTL_DAYS } from "@/lib/journal/publicationType";
 import { ArticleBlocksEditor, ArticleTocToggle } from "@/components/admin/publications/ArticleBlocksEditor";
 import { useUnsavedChangesNavigationGuard } from "@/hooks/use-unsaved-changes-navigation-guard";
 import { PlaceLinkedContactsEditor } from "@/components/admin/publications/PlaceLinkedContactsEditor";
@@ -97,6 +99,9 @@ export function NewsPublicationEditor({
   const [status, setStatus] = useState<ContentStatus>("DRAFT");
   const [scheduledAtLocal, setScheduledAtLocal] = useState("");
   const [publishedAtLocal, setPublishedAtLocal] = useState("");
+  const [expiresAtLocal, setExpiresAtLocal] = useState("");
+  const [featured, setFeatured] = useState(false);
+  const [pinned, setPinned] = useState(false);
   const [views, setViews] = useState(0);
   const [canModerate, setCanModerate] = useState(false);
   const [actionsBusy, setActionsBusy] = useState(false);
@@ -147,6 +152,9 @@ export function NewsPublicationEditor({
       authorUserId,
       geoScope,
       cityId,
+      expiresAtLocal,
+      featured,
+      pinned,
     }),
     [
       title,
@@ -168,6 +176,9 @@ export function NewsPublicationEditor({
       authorUserId,
       geoScope,
       cityId,
+      expiresAtLocal,
+      featured,
+      pinned,
     ],
   );
 
@@ -204,6 +215,9 @@ export function NewsPublicationEditor({
       setAuthorError(null);
       setGeoScope(p.geoScope);
       setCityId(p.cityId);
+      setExpiresAtLocal(p.expiresAtLocal ?? "");
+      setFeatured(p.featured ?? false);
+      setPinned(p.pinned ?? false);
       setGeoScopeError(null);
       setViews(snap.views);
       seoTitleManualRef.current = Boolean(p.seoTitle.trim());
@@ -256,6 +270,9 @@ export function NewsPublicationEditor({
       setAuthorError(null);
       setGeoScope(draft.geoScope);
       setCityId(draft.cityId);
+      setExpiresAtLocal(draft.expiresAtLocal ?? "");
+      setFeatured(draft.featured ?? false);
+      setPinned(draft.pinned ?? false);
       setGeoScopeError(null);
     },
     [onTitleChange],
@@ -405,6 +422,10 @@ export function NewsPublicationEditor({
       seoOgDescription: input.seoOgDescription,
       seoRobots: input.seoRobots,
       noindex: input.noindex,
+      publicationType: input.publicationType,
+      expiresAt: input.expiresAt,
+      featured: input.featured,
+      pinned: input.pinned,
     };
   }, [formState, publishedAtLocal, scheduledAtLocal]);
 
@@ -879,6 +900,37 @@ export function NewsPublicationEditor({
         onNoindexChange={setNoindex}
       />
 
+      <section className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Журнал</h2>
+          <p className="text-sm text-muted-foreground">Срок актуальности и отметки новости в журнале.</p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="news-expires-at">Актуально до</Label>
+          <Input
+            id="news-expires-at"
+            type="datetime-local"
+            value={expiresAtLocal}
+            onChange={(e) => setExpiresAtLocal(e.target.value)}
+            className="sm:max-w-xs"
+          />
+          <p className="text-xs text-muted-foreground">
+            Если не заполнено — {BREAKING_NEWS_DEFAULT_TTL_DAYS} дней от даты публикации. После срока новость исчезает
+            из блоков и ленты журнала, страница остаётся по прежнему адресу.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex min-h-11 items-center gap-3 rounded-lg border border-gray-200 px-3 py-2.5">
+            <Switch checked={featured} onCheckedChange={setFeatured} aria-label="Главное" />
+            <span className="text-sm font-medium text-gray-900">Главное</span>
+          </label>
+          <label className="flex min-h-11 items-center gap-3 rounded-lg border border-gray-200 px-3 py-2.5">
+            <Switch checked={pinned} onCheckedChange={setPinned} aria-label="Закрепить" />
+            <span className="text-sm font-medium text-gray-900">Закрепить в ленте</span>
+          </label>
+        </div>
+      </section>
+
       {/* Публикация */}
       <PublicationPanel
         views={views}
@@ -1003,91 +1055,6 @@ export function ArticlePublicationEditor() {
         fallbackTitle="Заголовок статьи — mamaGo"
         fallbackDescription="Короткий лид статьи появится здесь."
         entityType="article"
-        onSeoTitleChange={setSeoTitle}
-        onSeoDescriptionChange={setSeoDescription}
-        onCanonicalUrlChange={setCanonicalUrl}
-        onNoindexChange={setNoindex}
-      />
-    </div>
-  );
-}
-
-export function CollectionPublicationEditor() {
-  const [seoTitle, setSeoTitle] = useState("");
-  const [seoDescription, setSeoDescription] = useState("");
-  const [canonicalUrl, setCanonicalUrl] = useState("");
-  const [noindex, setNoindex] = useState(false);
-
-  return (
-    <div className="space-y-8 max-w-3xl">
-      <section className="space-y-4">
-        <div className="space-y-2">
-          <Label>Заголовок</Label>
-          <Input />
-        </div>
-        <div className="space-y-2">
-          <Label>Slug</Label>
-          <Input className="font-mono text-sm" />
-        </div>
-        <div className="space-y-2">
-          <Label>Вводный SEO-текст</Label>
-          <Textarea rows={5} />
-        </div>
-        <div className="space-y-2">
-          <Label>Дополнительный текст</Label>
-          <Textarea rows={4} placeholder="Опционально" />
-        </div>
-        <div className="space-y-2 rounded-lg border border-dashed border-gray-200 p-4">
-          <Label>Конфиг выдачи (feed)</Label>
-          <p className="text-xs text-gray-500 mb-2">
-            Пресеты фильтров и источник ленты — подключение к API на следующем этапе.
-          </p>
-          <Textarea rows={4} className="font-mono text-xs" placeholder="{ }" disabled />
-        </div>
-        <div className="space-y-2">
-          <Label>Сортировка</Label>
-          <Select defaultValue="newest">
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="newest">Сначала новые</SelectItem>
-              <SelectItem value="popular">По популярности</SelectItem>
-              <SelectItem value="editorial">Редакторский порядок</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Статус</Label>
-            <Select defaultValue={PublicationStatus.DRAFT}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.values(PublicationStatus).map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Дата публикации</Label>
-            <Input type="datetime-local" />
-          </div>
-        </div>
-      </section>
-      <SeoPanel
-        entityKey="collection-publication-editor-demo"
-        seoTitle={seoTitle}
-        seoDescription={seoDescription}
-        canonicalUrl={canonicalUrl}
-        noindex={noindex}
-        fallbackTitle="Подборка mamaGo"
-        fallbackDescription="Краткое описание подборки появится здесь."
-        entityType="collection"
         onSeoTitleChange={setSeoTitle}
         onSeoDescriptionChange={setSeoDescription}
         onCanonicalUrlChange={setCanonicalUrl}

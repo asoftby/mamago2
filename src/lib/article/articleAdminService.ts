@@ -773,11 +773,15 @@ export async function submitArticleForModeration(id: string): Promise<ArticleEdi
   await runArticleCriticalWrite(prisma, async (tx) => {
     const row = await tx.article.findUnique({
       where: { id },
-      select: { title: true, slug: true, categoryId: true, geoScope: true, cityId: true, regionId: true },
+      select: {
+        title: true, slug: true, categoryId: true, geoScope: true, cityId: true, regionId: true,
+        publicationType: true, _count: { select: { linkedItems: true } },
+      },
     });
     if (!row) throw new Error("Article not found");
     if (!row.categoryId) throw new Error("Для публикации статьи обязательно выберите раздел журнала");
     assertGeoScopeValidForPublish(row.geoScope, row.cityId, row.regionId);
+    assertCollectionItemCount(row.publicationType, row._count.linkedItems);
     if (!row.slug?.trim()) {
       await resolveArticleSlugOnSaveInTransaction(tx, id, row.title, null);
     }
@@ -846,4 +850,19 @@ export async function moderateArticle(
   const published = await getArticleForEditor(id);
   if (!published) throw new Error("Article missing after publish");
   return published;
+}
+
+/** Быстрые отметки журнала из списка публикаций (без полной формы). */
+export async function setArticleJournalFlags(
+  id: string,
+  flags: { featured?: boolean; pinned?: boolean },
+): Promise<{ id: string; featured: boolean; pinned: boolean }> {
+  return prisma.article.update({
+    where: { id },
+    data: {
+      ...(flags.featured !== undefined ? { featured: flags.featured } : {}),
+      ...(flags.pinned !== undefined ? { pinned: flags.pinned } : {}),
+    },
+    select: { id: true, featured: true, pinned: true },
+  });
 }
