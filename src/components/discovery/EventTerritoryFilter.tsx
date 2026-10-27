@@ -3,6 +3,7 @@
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEventListingCitySlug } from "@/lib/city/useEventListingCitySlug";
+import { serializeAppliedToSearchParams, type DiscoveryFilters } from "@/features/filters/discovery/filters.store";
 
 type Territory = {
   id: string;
@@ -15,7 +16,7 @@ type Territory = {
 };
 type Available = { territories: Territory[] };
 
-export function EventTerritoryFilter({ onApply }: { onApply?: () => void }) {
+export function EventTerritoryFilter({ onApply, filters }: { onApply?: () => void; filters: DiscoveryFilters }) {
   const pathname = usePathname();
   const router = useRouter();
   const params = useSearchParams();
@@ -52,7 +53,7 @@ export function EventTerritoryFilter({ onApply }: { onApply?: () => void }) {
   function navigate(slug: string) {
     // Preserve existing age/date/category filters and the family's home-city cookie.
     // Geography-specific district/metro are invalid when switching territories.
-    const next = new URLSearchParams(params.toString());
+    const next = serializeAppliedToSearchParams(new URLSearchParams(params.toString()), filters);
     next.delete("city");
     next.delete("district");
     next.delete("metro");
