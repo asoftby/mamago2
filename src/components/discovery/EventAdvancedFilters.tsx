@@ -368,8 +368,8 @@ params.delete("priceMin");
         <MobileOverlayPrimaryAction className="min-w-0 flex-1 lg:hidden" onClick={() => { actions.commitFilters(draft); onApply?.(); }}>
           Показать события
         </MobileOverlayPrimaryAction>
-        <Button className="hidden min-h-11 rounded-full px-6 text-sm lg:inline-flex" onClick={() => onApply?.()}>
-          Показать {count == null ? "…" : pluralize(count, ["событие", "события", "событий"])}
+        <Button className="hidden min-h-11 rounded-full px-6 text-sm lg:inline-flex" onClick={() => { actions.commitFilters(draft); onApply?.(); }}>
+          Показать события
         </Button>
       </div>
     </div>
