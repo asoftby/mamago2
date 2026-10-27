@@ -11,7 +11,7 @@ type ClassSlot = {
   endsAt: string;
   remainingSeats: number | null;
 };
-type ClassGroup = { id: string; title: string; tariffs: Array<PriceItem & { periodDays?: number | null }>; slots: string[] };
+type ClassGroup = { id: string; title: string; tariffs: Array<PriceItem & { periodDays?: number | null }>; slots: ClassSlot[] };
 type SlotsResponse = { slots?: ClassSlot[]; groups?: ClassGroup[]; error?: string };
 type BookingResponse = { bookingId?: string; status?: string; error?: string };
 type PrefillResponse = {
@@ -100,7 +100,7 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
 
   const group = groups.find((item) => item.id === selectedGroupId) ?? null;
   const shownTariffs = group ? group.tariffs : groups.length > 0 ? [] : tariffs;
-  const visibleSlots = group ? slots.filter((slot) => group.slots.includes(slot.startsAt)) : groups.length > 0 ? [] : slots;
+  const visibleSlots = group ? group.slots : groups.length > 0 ? [] : slots;
   const chosen = useMemo(() => visibleSlots.find((slot) => slot.startsAt === selected) ?? null, [visibleSlots, selected]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
