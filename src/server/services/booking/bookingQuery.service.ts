@@ -54,6 +54,10 @@ export interface BusinessBookingItem {
   place: { id: string; title: string; slug: string | null } | null;
 
   // Camp shift snapshot
+  classTariffId: string | null;
+  classTariffTitle: string | null;
+  classTariffPrice: string | null;
+  classTariffUnit: string | null;
   campShiftId: string | null;
   campShiftTitle: string | null;
   campShiftDateFrom: string | null;
@@ -133,6 +137,10 @@ const BOOKING_SELECT = {
   },
   place: { select: { id: true, title: true, slug: true } },
 
+  classTariffId: true,
+  classTariffTitle: true,
+  classTariffPrice: true,
+  classTariffUnit: true,
   campShiftId: true,
   campShiftTitle: true,
   campShiftDateFrom: true,
@@ -225,6 +233,10 @@ function mapBooking(raw: {
     : null;
 
   const display = buildBookingDisplay({
+    classTariffId: raw.classTariffId,
+    classTariffTitle: raw.classTariffTitle,
+    classTariffPrice: raw.classTariffPrice,
+    classTariffUnit: raw.classTariffUnit,
     campShiftId: raw.campShiftId,
     campShiftTitle: raw.campShiftTitle,
     campShiftDateFrom,
