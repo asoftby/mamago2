@@ -117,7 +117,7 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
 
   const setCity = useCallback(
     (slug: string) => {
-      if (slug === citySlug) return;
+      if (slug === citySlug && !scopedEvents) return;
 
       if (process.env.NODE_ENV !== "production") {
         console.debug("[CityContext] user city change", { from: citySlug, to: slug });
@@ -127,7 +127,7 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
       setStoredCity(slug);
       router.push(`/${slug}`);
     },
-    [router, citySlug],
+    [router, citySlug, scopedEvents],
   );
 
   const appendCityQuery = useCallback(
