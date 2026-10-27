@@ -41,6 +41,8 @@ export type BreakingNewsFormState = {
    * Must be null when geoScope === "COUNTRY".
    */
   cityId: string | null;
+  /** Рубрика журнала (EventCategory publicationType=ARTICLE, корень). Обязательна для публикации. */
+  categoryId?: string | null;
   /** «Актуально до» (datetime-local). Пусто → сервер ставит publishedAt + 7 дней. */
   expiresAtLocal?: string;
   /** Отметки журнала. */
@@ -95,7 +97,7 @@ export function breakingNewsStateToArticleSaveInput(
     authorUserId: state.authorUserId,
     // cityContext is a denormalised slug — the service sets it from the city FK; pass null here.
     cityContext: null,
-    categoryId: null,
+    categoryId: state.categoryId ?? null,
     // Geography: pass through from form state so CITY breaking news get /{city}/blog/{slug}.
     geoScope: state.geoScope,
     cityId: state.geoScope === "COUNTRY" ? null : (state.cityId ?? null),
@@ -148,6 +150,7 @@ export function parseBreakingNewsFromSnapshot(snapshot: ArticleEditorSnapshot): 
     authorUserId: snapshot.authorUserId,
     geoScope: snapshot.geoScope ?? null,
     cityId: snapshot.cityId ?? null,
+    categoryId: snapshot.categoryId ?? null,
     expiresAtLocal: toLocalDatetimeValue(snapshot.expiresAt),
     featured: snapshot.featured,
     pinned: snapshot.pinned,

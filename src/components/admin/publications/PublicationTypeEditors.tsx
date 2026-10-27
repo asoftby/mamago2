@@ -100,6 +100,8 @@ export function NewsPublicationEditor({
   const [scheduledAtLocal, setScheduledAtLocal] = useState("");
   const [publishedAtLocal, setPublishedAtLocal] = useState("");
   const [expiresAtLocal, setExpiresAtLocal] = useState("");
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<{ id: string; label: string }[]>([]);
   const [featured, setFeatured] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [views, setViews] = useState(0);
@@ -155,6 +157,7 @@ export function NewsPublicationEditor({
       expiresAtLocal,
       featured,
       pinned,
+      categoryId,
     }),
     [
       title,
@@ -179,6 +182,7 @@ export function NewsPublicationEditor({
       expiresAtLocal,
       featured,
       pinned,
+      categoryId,
     ],
   );
 
@@ -216,6 +220,7 @@ export function NewsPublicationEditor({
       setGeoScope(p.geoScope);
       setCityId(p.cityId);
       setExpiresAtLocal(p.expiresAtLocal ?? "");
+      setCategoryId(p.categoryId ?? null);
       setFeatured(p.featured ?? false);
       setPinned(p.pinned ?? false);
       setGeoScopeError(null);
@@ -271,6 +276,7 @@ export function NewsPublicationEditor({
       setGeoScope(draft.geoScope);
       setCityId(draft.cityId);
       setExpiresAtLocal(draft.expiresAtLocal ?? "");
+      setCategoryId(draft.categoryId ?? null);
       setFeatured(draft.featured ?? false);
       setPinned(draft.pinned ?? false);
       setGeoScopeError(null);
@@ -348,9 +354,11 @@ export function NewsPublicationEditor({
       if (!res.ok || cancelled) return;
       const data = (await res.json().catch(() => null)) as {
         cities?: { id: string; name: string; slug: string }[];
+        categories?: { id: string; label: string }[];
       } | null;
       if (!data || cancelled) return;
       setCities(data.cities ?? []);
+      setCategories(data.categories ?? []);
       const selectedIds = tagIds.join(",");
       const tagsUrl = selectedIds
         ? `/api/admin/discovery-tags?selectedIds=${encodeURIComponent(selectedIds)}`
@@ -409,6 +417,7 @@ export function NewsPublicationEditor({
       authorLabel: input.authorLabel,
       authorUserId: input.authorUserId,
       tagIds: input.tagIds ?? [],
+      categoryId: input.categoryId,
       cityContext: input.cityContext,
       geoScope: input.geoScope,
       cityId: input.cityId,
@@ -792,6 +801,27 @@ export function NewsPublicationEditor({
           showPublishedSlugWarning={showPublishedSlugWarning}
           slugHistorySupported
         />
+        <div className="space-y-2">
+          <Label htmlFor="breaking-news-category">Рубрика</Label>
+          <p className="text-xs text-muted-foreground">
+            Обязательна для публикации: новость показывается в журнале в своей рубрике.
+          </p>
+          <Select
+            value={categoryId ?? "__none__"}
+            onValueChange={(v) => setCategoryId(v === "__none__" ? null : v)}
+            disabled={actionsBusy}
+          >
+            <SelectTrigger id="breaking-news-category" className="w-full">
+              <SelectValue placeholder="Выберите рубрику" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Не выбрано</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-2">
           <Label htmlFor="breaking-news-tags">Теги</Label>
           <p className="text-xs text-muted-foreground">
