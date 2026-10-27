@@ -125,10 +125,10 @@ export function AdminSegmentDetailClient({
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold text-gray-900">
-          Last activity by day (UTC)
+          Активные пользователи сегмента по дням
         </h2>
         <p className="mb-3 text-xs text-gray-500">
-          Users counted on the calendar day of their last seen timestamp.
+          Уникальные пользователи сегмента, совершившие хотя бы одно действие в этот день (сутки по Минску).
         </p>
         <div className="flex h-40 items-end gap-px overflow-x-auto pb-1">
           {data.trend.map((t) => (
@@ -153,20 +153,20 @@ export function AdminSegmentDetailClient({
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold text-gray-900">
-          Funnel (sum of profile totals)
+          Воронка (события за выбранный период)
         </h2>
         <div className="space-y-2">
           {(
             [
-              ["Views", data.funnel.views],
-              ["Opens", data.funnel.opens],
-              ["Saves", data.funnel.saves],
-              ["Plan adds", data.funnel.planAdds],
-              ["CTA clicks", data.funnel.ctaClicks],
+              ["Показы в ленте", data.funnel.views],
+              ["Открытия", data.funnel.opens],
+              ["Сохранения", data.funnel.saves],
+              ["В план", data.funnel.planAdds],
+              ["Переходы к партнёру", data.funnel.ctaClicks],
             ] as const
           ).map(([label, count]) => (
             <div key={label} className="flex items-center gap-3">
-              <span className="w-24 text-xs text-gray-500">{label}</span>
+              <span className="w-36 text-xs text-gray-500">{label}</span>
               <div className="h-8 min-w-0 flex-1 rounded-lg bg-muted/40">
                 <div
                   className="h-full rounded-lg bg-primary/30"

@@ -295,9 +295,9 @@ export async function getAnalyticsBehavior(
   const userIds = distinctUsers.map((r) => r.userId!);
   const [ageBreakdown, signalsBreakdown, categoryBreakdown, formatBreakdown] =
     await Promise.all([
-      ageBandStats(where),
+      ageBandStats(wsql),
       signalsFormatFromUsers(userIds, "signals"),
-      categoryFromProfiles(userIds),
+      categoryFromEvents(wsql),
       signalsFormatFromUsers(userIds, "formats"),
     ]);
 
@@ -408,20 +408,37 @@ async function dayOfWeekBuckets(
   });
 }
 
-async function planningProfileStats(where: Prisma.UserEventWhereInput): Promise<{
-  avgSame: number;
-  avgAdvance: number;
-  avgWeekend: number;
-}> {
+type PlanningProfileAverages = {
+  avgSame: number | null;
+  avgAdvance: number | null;
+  avgWeekend: number | null;
+};
+
+/**
+ * Average planning-timing shares over the profiles of users with events in the
+ * filter. null (not 0, not NaN) when there is nobody to average over — a user
+ * without a UserBehaviorProfile row (or an empty window) means "no data".
+ */
+export function averagePlanningProfiles(
+  profiles: ReadonlyArray<{ sameDayPlanningShare: number; advancePlanningShare: number; weekendShare: number }>,
+): PlanningProfileAverages {
+  const n = profiles.length;
+  if (n === 0) return { avgSame: null, avgAdvance: null, avgWeekend: null };
+  return {
+    avgSame: profiles.reduce((a, p) => a + p.sameDayPlanningShare, 0) / n,
+    avgAdvance: profiles.reduce((a, p) => a + p.advancePlanningShare, 0) / n,
+    avgWeekend: profiles.reduce((a, p) => a + p.weekendShare, 0) / n,
+  };
+}
+
+async function planningProfileStats(where: Prisma.UserEventWhereInput): Promise<PlanningProfileAverages> {
   const distinct = await prisma.userEvent.findMany({
     where: { ...where, userId: { not: null } },
     select: { userId: true },
     distinct: ["userId"],
   });
   const ids = distinct.map((d) => d.userId!);
-  if (ids.length === 0) {
-    return { avgSame: 0, avgAdvance: 0, avgWeekend: 0 };
-  }
+  if (ids.length === 0) return averagePlanningProfiles([]);
   const profiles = await prisma.userBehaviorProfile.findMany({
     where: { userId: { in: ids } },
     select: {
@@ -430,14 +447,7 @@ async function planningProfileStats(where: Prisma.UserEventWhereInput): Promise<
       weekendShare: true,
     },
   });
-  const n = profiles.length;
-  const avgSame =
-    profiles.reduce((a, p) => a + p.sameDayPlanningShare, 0) / n;
-  const avgAdvance =
-    profiles.reduce((a, p) => a + p.advancePlanningShare, 0) / n;
-  const avgWeekend =
-    profiles.reduce((a, p) => a + p.weekendShare, 0) / n;
-  return { avgSame, avgAdvance, avgWeekend };
+  return averagePlanningProfiles(profiles);
 }
 
 type GapRow = {
@@ -546,29 +556,34 @@ async function buildInteractionGaps(rows: GapRow[]): Promise<{
   };
 }
 
-async function ageBandStats(
-  where: Prisma.UserEventWhereInput,
-): Promise<AnalyticsBehaviorResult["ageBreakdown"]> {
+/**
+ * Views / saves / plan-adds by the youngest child's age band. The event table
+ * is aggregated IN SQL to one row per user (D5) — never loaded event-by-event
+ * into memory — and only the per-user counters are folded into bands.
+ */
+async function ageBandStats(wsql: Prisma.Sql): Promise<AnalyticsBehaviorResult["ageBreakdown"]> {
   const bandMap = await youngestChildBandByUser();
-  const events = await prisma.userEvent.findMany({
-    where: { ...where, userId: { not: null } },
-    select: { userId: true, eventType: true },
-  });
-  const acc: Record<string, { views: number; saves: number; planAdds: number }> =
-    {
-      "0-3": { views: 0, saves: 0, planAdds: 0 },
-      "3-6": { views: 0, saves: 0, planAdds: 0 },
-      "6-10": { views: 0, saves: 0, planAdds: 0 },
-      "10+": { views: 0, saves: 0, planAdds: 0 },
-      unknown: { views: 0, saves: 0, planAdds: 0 },
-    };
-  for (const e of events) {
-    const uid = e.userId!;
-    const band = bandMap.get(uid) ?? "unknown";
-    const b = acc[band] ?? acc.unknown;
-    if (e.eventType === PAGE_VIEW_EVENT) b.views += 1;
-    if (e.eventType === "SAVE") b.saves += 1;
-    if (e.eventType === "PLAN_ADD") b.planAdds += 1;
+  const perUser = await prisma.$queryRaw<Array<{ userId: string; views: bigint; saves: bigint; planAdds: bigint }>>`
+    SELECT e."userId" AS "userId",
+      COUNT(*) FILTER (WHERE e."eventType" = ${PAGE_VIEW_EVENT}::"UserEventType")::bigint AS views,
+      COUNT(*) FILTER (WHERE e."eventType" = 'SAVE')::bigint AS saves,
+      COUNT(*) FILTER (WHERE e."eventType" = 'PLAN_ADD')::bigint AS "planAdds"
+    FROM "UserEvent" e
+    WHERE ${wsql} AND e."userId" IS NOT NULL
+    GROUP BY e."userId"
+  `;
+  const acc: Record<string, { views: number; saves: number; planAdds: number }> = {
+    "0-3": { views: 0, saves: 0, planAdds: 0 },
+    "3-6": { views: 0, saves: 0, planAdds: 0 },
+    "6-10": { views: 0, saves: 0, planAdds: 0 },
+    "10+": { views: 0, saves: 0, planAdds: 0 },
+    unknown: { views: 0, saves: 0, planAdds: 0 },
+  };
+  for (const row of perUser) {
+    const b = acc[bandMap.get(row.userId) ?? "unknown"] ?? acc.unknown!;
+    b.views += Number(row.views);
+    b.saves += Number(row.saves);
+    b.planAdds += Number(row.planAdds);
   }
   return (["0-3", "3-6", "6-10", "10+", "unknown"] as const).map((band) => ({
     band,
@@ -578,45 +593,40 @@ async function ageBandStats(
   }));
 }
 
-async function categoryFromProfiles(
-  userIds: string[],
-): Promise<BehaviorNamedBreakdown[]> {
-  if (userIds.length === 0) return [];
-  const profiles = await prisma.userBehaviorProfile.findMany({
-    where: { userId: { in: userIds } },
-    select: {
-      preferredCategories: true,
-      totalViews: true,
-      totalSaves: true,
-      totalPlanAdds: true,
-    },
-  });
-  const catMap: Record<string, { v: number; s: number; p: number }> = {};
-  for (const p of profiles) {
-    const raw = p.preferredCategories;
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
-    for (const [k, val] of Object.entries(raw as Record<string, unknown>)) {
-      if (k === "_none") continue;
-      const weight = typeof val === "number" ? val : Number(val);
-      if (!Number.isFinite(weight) || weight <= 0) continue;
-      if (!catMap[k]) catMap[k] = { v: 0, s: 0, p: 0 };
-      catMap[k].v += weight;
-    }
-  }
-  const totalW = Object.values(catMap).reduce((a, x) => a + x.v, 0) || 1;
-  const totalProfileViews = profiles.reduce((a, p) => a + p.totalViews, 0) || 1;
-  const totalSaves = profiles.reduce((a, p) => a + p.totalSaves, 0) || 1;
-  const totalPlans = profiles.reduce((a, p) => a + p.totalPlanAdds, 0) || 1;
-  return Object.entries(catMap)
-    .map(([key, w]) => ({
-      key,
-      label: key.replace(/_/g, " "),
-      views: Math.round((w.v / totalW) * totalProfileViews),
-      saves: Math.round((w.v / totalW) * totalSaves),
-      planAdds: Math.round((w.v / totalW) * totalPlans),
-    }))
-    .sort((a, b) => b.views - a.views)
-    .slice(0, 10);
+/**
+ * Real events by the category of the event card (D4): feed impressions,
+ * saves, plan-adds and CTA clicks inside the selected period, grouped by
+ * `Activity.eventCategoryId`. Replaces the old "profile preference weight x
+ * lifetime totals" estimate, which did not depend on the period at all.
+ * Only EVENT entities carry a category; places/offers are not in this block.
+ */
+async function categoryFromEvents(wsql: Prisma.Sql): Promise<BehaviorNamedBreakdown[]> {
+  const rows = await prisma.$queryRaw<
+    Array<{ key: string; label: string; views: bigint; saves: bigint; planAdds: bigint; ctas: bigint }>
+  >`
+    SELECT c.id AS key, c."nameRu" AS label,
+      COUNT(*) FILTER (WHERE e."eventType" = ${FEED_IMPRESSION_EVENT}::"UserEventType")::bigint AS views,
+      COUNT(*) FILTER (WHERE e."eventType" = 'SAVE')::bigint AS saves,
+      COUNT(*) FILTER (WHERE e."eventType" = 'PLAN_ADD')::bigint AS "planAdds",
+      COUNT(*) FILTER (WHERE e."eventType" = 'CTA_CLICK')::bigint AS ctas
+    FROM "UserEvent" e
+    JOIN "Activity" a ON a.id = e."entityId"
+    JOIN "EventCategory" c ON c.id = a."eventCategoryId"
+    WHERE ${wsql}
+      AND e."entityType" = 'EVENT'
+      AND e."eventType" IN (${FEED_IMPRESSION_EVENT}::"UserEventType", 'SAVE', 'PLAN_ADD', 'CTA_CLICK')
+    GROUP BY c.id, c."nameRu"
+    ORDER BY views DESC, saves DESC, c."nameRu" ASC
+    LIMIT 10
+  `;
+  return rows.map((r) => ({
+    key: r.key,
+    label: r.label,
+    views: Number(r.views),
+    saves: Number(r.saves),
+    planAdds: Number(r.planAdds),
+    ctaClicks: Number(r.ctas),
+  }));
 }
 
 async function signalsFormatFromUsers(
@@ -762,10 +772,10 @@ function emptyBehaviorResult(
       activeUsers: 0,
     })),
     planning: {
-      sameDayShare: 0,
+      sameDayShare: null,
       nextDayShare: null,
-      advanceShare: 0,
-      weekendShare: 0,
+      advanceShare: null,
+      weekendShare: null,
     },
     interactionGaps: { openNoSave: [], saveNoPlan: [], planNoClick: [] },
     ageBreakdown: [],

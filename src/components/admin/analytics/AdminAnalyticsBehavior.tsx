@@ -19,8 +19,8 @@ function buildQuery(filters: AnalyticsOverviewFilters): string {
   return q.toString();
 }
 
-function pct(x: number): string {
-  return `${(x * 100).toFixed(1)}%`;
+function pct(x: number | null): string {
+  return x === null ? "—" : `${(x * 100).toFixed(1)}%`;
 }
 
 function HBar({
@@ -312,12 +312,12 @@ export function AdminAnalyticsBehavior({
           </div>
         </Section>
         <Section
-          title="Categories (profile)"
-          subtitle="Weighted mix from preferred categories."
+          title="Категории событий"
+          subtitle="Показы карточек событий в ленте по категории за выбранный период."
         >
           <div className="space-y-2">
             {data.categoryBreakdown.length === 0 ? (
-              <p className="text-xs text-gray-500">No data</p>
+              <p className="text-xs text-gray-500">Нет данных</p>
             ) : (
               data.categoryBreakdown.map((row) => (
                 <HBar

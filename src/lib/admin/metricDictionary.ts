@@ -484,6 +484,57 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     verifiable: true,
     changes: [ANALYTICS_B_CHANGE],
   },
+  "analytics.segment_trend": {
+    metricKey: "analytics.segment_trend",
+    displayName: "Тренд сегмента (7 / 30 дней)",
+    businessMeaning: "Как изменилось число активных пользователей сегмента по сравнению с предыдущим таким же периодом",
+    formula:
+      "(A − B) / B × 100%, где A — пользователи сегмента с ≥1 UserEvent в последних 7 (30) завершённых минских сутках, B — в предыдущих 7 (30); при B = 0 показывается «—»",
+    source: "UserBehaviorProfile.segmentKeys (состав сегмента) + UserEvent (активность)",
+    window: "Последние 7 / 30 завершённых минских суток против предыдущих; не зависит от выбранного периода отчёта",
+    exclusions: "Роли ADMIN и MODERATOR",
+    version: "2.0.0",
+    verifiable: false,
+    changes: [
+      {
+        date: "2026-10-27",
+        note: "Раньше — по lastSeenAt внутри выбранного периода, при нуле в предыдущем окне давало +N×100%; теперь по UserEvent за завершённые окна",
+      },
+    ],
+  },
+  "analytics.segment_avg_actions": {
+    metricKey: "analytics.segment_avg_actions",
+    displayName: "Среднее на пользователя сегмента: сохранения / в план / переходы к партнёру",
+    businessMeaning: "Сколько в среднем действий совершил пользователь сегмента за выбранный период",
+    formula:
+      "COUNT(UserEvent: SAVE | PLAN_ADD | CTA_CLICK пользователей сегмента за период) / число пользователей сегмента в периоде (последний визит в периоде)",
+    source: "UserEvent + UserBehaviorProfile.segmentKeys",
+    window: "Выбранный период в минских сутках",
+    exclusions: "Роли ADMIN и MODERATOR; при фильтре города — только события этого города",
+    version: "2.0.0",
+    verifiable: false,
+    changes: [
+      { date: "2026-10-27", note: "Раньше — накопленные за всё время счётчики профиля (totalSaves, totalPlanAdds, totalCtaClicks)" },
+    ],
+  },
+  "analytics.behavior_categories": {
+    metricKey: "analytics.behavior_categories",
+    displayName: "Категории событий (Поведение)",
+    businessMeaning: "Какие категории событий чаще показывают, сохраняют, добавляют в план и открывают для перехода",
+    formula:
+      "COUNT(UserEvent: CARD_VIEW | SAVE | PLAN_ADD | CTA_CLICK по карточкам событий) в разрезе Activity.eventCategoryId",
+    source: "UserEvent + Activity.eventCategoryId + EventCategory",
+    window: ANALYTICS_WINDOW,
+    exclusions: ANALYTICS_EXCLUSIONS,
+    version: "2.0.0",
+    verifiable: false,
+    changes: [
+      {
+        date: "2026-10-27",
+        note: "Раньше — вес предпочтений профиля × накопленные счётчики (не зависело от периода); теперь реальные события периода",
+      },
+    ],
+  },
 };
 
 export function getMetricDictionaryEntry(metricKey: string): MetricDictionaryEntry | null {
