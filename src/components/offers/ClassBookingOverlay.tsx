@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ResponsiveOverlay } from "@/components/ui/responsive-overlay";
+import type { PriceItem } from "@/lib/priceItems";
 
 type ClassSlot = {
   startsAt: string;
@@ -25,13 +26,15 @@ const timeFormatter = new Intl.DateTimeFormat("ru-RU", {
   timeZone: "Europe/Minsk", hour: "2-digit", minute: "2-digit", hour12: false,
 });
 
-export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle }: {
+export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, tariffs = [] }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   offerId: string;
   offerTitle: string;
+  tariffs?: PriceItem[];
 }) {
   const [slots, setSlots] = useState<ClassSlot[]>([]);
+  const [selectedTariffId, setSelectedTariffId] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +107,7 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle }:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           startsAt: chosen.startsAt, endsAt: chosen.endsAt,
+          ...(selectedTariffId ? { classTariffId: selectedTariffId } : {}),
           seats, customerName: name.trim(), customerPhone: phone.trim(),
           ...(email.trim() ? { customerEmail: email.trim() } : {}),
           ...(seats === 1 && selectedChildId ? { childId: selectedChildId } : {}),
@@ -164,6 +168,15 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle }:
               </select>
             </div>
           )}
+          {tariffs.length > 0 && (
+            <div className="space-y-2">
+              <label htmlFor="class-tariff" className="text-sm font-medium">Тариф</label>
+              <select id="class-tariff" required value={selectedTariffId} onChange={(event) => setSelectedTariffId(event.target.value)} className="w-full rounded-xl border bg-background p-3 text-sm">
+                <option value="">Выберите тариф</option>
+                {tariffs.map((tariff) => <option key={tariff.id} value={tariff.id}>{tariff.label} — {tariff.price} {tariff.unit}</option>)}
+              </select>
+            </div>
+          )}
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium">Дата и время (Минск)</legend>
             {loading && <p role="status" className="text-sm text-muted-foreground">Загружаем расписание…</p>}
@@ -188,7 +201,7 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle }:
             <Input id="class-booking-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} />
           </div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={!chosen || loading || submitting}>
+          <Button type="submit" className="w-full" disabled={!chosen || loading || submitting || (tariffs.length > 0 && !selectedTariffId)}>
             {submitting ? "Отправляем…" : "Отправить заявку"}
           </Button>
           <p className="text-xs text-muted-foreground">Заявка ещё не означает подтверждённую запись.</p>
