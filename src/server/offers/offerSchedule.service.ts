@@ -195,6 +195,16 @@ async function applyClassSchedule(db: Db, offerId: string, schedule: ClassSchedu
   }
 
   if (schedule.kind === "recurring") {
+    const groupIds = new Set<string>();
+    const tariffIds = new Set<string>();
+    for (const group of schedule.groups) {
+      if (groupIds.has(group.id)) throw new OfferScheduleValidationError("Повторяющийся ID группы");
+      groupIds.add(group.id);
+      for (const tariff of group.tariffs) {
+        if (tariffIds.has(tariff.id)) throw new OfferScheduleValidationError("Повторяющийся ID тарифа");
+        tariffIds.add(tariff.id);
+      }
+    }
     // Preserve stable wizard IDs; never remove groups referenced by historical bookings.
     const existingGroups = await db.offerClassGroup.findMany({
       where: { offerId }, select: { id: true },
@@ -208,8 +218,8 @@ async function applyClassSchedule(db: Db, offerId: string, schedule: ClassSchedu
       }
       await db.offerClassGroup.upsert({
         where: { id: group.id },
-        create: { id: group.id, offerId, title: `Группа ${position + 1}`, position },
-        update: { position, active: true },
+        create: { id: group.id, offerId, title: group.title?.trim() || `Группа ${position + 1}`, position },
+        update: { title: group.title?.trim() || `Группа ${position + 1}`, position, active: true },
       });
       const tariffs = group.tariffs ?? [];
       for (const [tariffPosition, tariff] of tariffs.entries()) {
