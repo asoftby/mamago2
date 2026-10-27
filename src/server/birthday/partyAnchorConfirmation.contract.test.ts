@@ -62,6 +62,10 @@ for (const needle of [
 // same transaction as the claim; the DB exclusion error maps to 409 (#818 double booking).
 assert.match(service, /const autoConfirm = fixedPrice && performerUnitId !== null;/);
 assert.match(service, /performerUnits\.length === 1 \? performerUnits\[0\]\.bookingUnitId : null/);
+// Lock order matches confirmPartyRequest: request row first, then the performer unit.
+assert.ok(service.indexOf('FROM "BookingRequest" WHERE "id" = ${requestId} FOR UPDATE') !== -1 &&
+  service.indexOf('FROM "BookingRequest" WHERE "id" = ${requestId} FOR UPDATE') < service.indexOf("lockAvailablePartyUnit(tx"),
+  "The request is locked before the performer");
 assert.ok(service.indexOf("lockAvailablePartyUnit(tx") < service.indexOf("tx.bookingRequest.updateMany"),
   "The performer is locked and checked before the request is claimed");
 assert.ok(service.indexOf("await allocatePartyUnit(tx") > service.indexOf("confirmedItem.count !== 1"));

@@ -157,6 +157,9 @@ export async function replyToPartyRequest(params: {
 
   try {
     return await prisma.$transaction(async (tx) => {
+      // Lock the request before any resource, in the same order as confirmPartyRequest,
+      // quote acceptance and expiry: concurrent paths must conflict (409), not deadlock.
+      await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${requestId} FOR UPDATE`;
       let performerWindow: PartyUnitWindow | null = null;
       // Automatic confirmation skips confirmPartyRequest, so repeat its live check:
       // a withdrawn or reassigned publication must not become a confirmed booking.
