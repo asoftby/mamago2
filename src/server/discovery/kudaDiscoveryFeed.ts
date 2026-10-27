@@ -21,6 +21,7 @@ import {
 import type { TimeOfDay } from "@/features/hero-weather/model/types";
 import { mapDiscoveryEventToActivityMock } from "@/server/discovery/mapDiscoveryEventToActivityMock";
 import { buildEventRuntimeWhere, type EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
+import { withImageDimensions } from "@/server/media/loadImageDimensionsByUrl";
 
 function hasActiveEventRuntimeFilters(filters: EventRuntimeFilters): boolean {
   return Boolean(
@@ -237,7 +238,7 @@ export async function getKudaDiscoveryFeed(
     return ta - tb || a.id.localeCompare(b.id);
   });
 
-  const result = cards.slice(0, take);
+  const result = await withImageDimensions(cards.slice(0, take), (card) => card.image);
   perf.mark("mapSort");
   perf.log({
     citySlug,

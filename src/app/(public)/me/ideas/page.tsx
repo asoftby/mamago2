@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
+import { attachIdeaImageDimensions } from "@/server/media/attachIdeaImageDimensions";
 import { Container } from "@/components/ui/Container";
 import { IdeasClient } from "./IdeasClient";
 import type { IdeaItem } from "./types";
@@ -443,12 +444,13 @@ async function getUserIdeas(userId: string): Promise<IdeaItem[]> {
     })
     .filter((item): item is IdeaItem => item !== null);
 
-  return [...activityIdeaItems, ...offerIdeaItems, ...routeIdeaItems].sort((a, b) => {
+  const sorted = [...activityIdeaItems, ...offerIdeaItems, ...routeIdeaItems].sort((a, b) => {
     const aPast = a.ideaType === "ACTIVITY" && a.activity.temporalState === "PAST";
     const bPast = b.ideaType === "ACTIVITY" && b.activity.temporalState === "PAST";
     if (aPast !== bPast) return aPast ? 1 : -1;
     return b.createdAt.localeCompare(a.createdAt);
   });
+  return attachIdeaImageDimensions(sorted);
 }
 
 /**
