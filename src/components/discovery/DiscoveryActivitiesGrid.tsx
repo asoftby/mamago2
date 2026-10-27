@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { isScopedEventBrowsing } from "@/lib/city/scopedEventBrowsing";
 import { EventCard, activityMockToEventCard } from "@/components/events";
 import { OfferCard } from "@/components/offers/OfferCard";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
@@ -71,6 +73,9 @@ export function DiscoveryActivitiesGrid({
   emptyDescription = "В этом городе пока нет подходящих опубликованных событий — или стоит ослабить фильтры.",
 }: DiscoveryActivitiesGridProps) {
   const cityCtx = useOptionalCity();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const scopedEvents = isScopedEventBrowsing(pathname, searchParams.get("explore"));
   const citySlug = cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
   const ratio = coverRatio ?? "4/5";
   const { applied, actions, derived } = useDiscoveryFilters();
@@ -167,6 +172,10 @@ export function DiscoveryActivitiesGrid({
       ) : (
         <EventCard
           {...activityMockToEventCard(activity, citySlug)}
+          href={(() => {
+            const href = activityMockToEventCard(activity, citySlug).href;
+            return scopedEvents ? `${href}${href.includes("?") ? "&" : "?"}explore=1` : href;
+          })()}
           coverRatio={ratio}
           className="h-full"
           imagePriority={feedBucket === "primary" && position <= 4}
