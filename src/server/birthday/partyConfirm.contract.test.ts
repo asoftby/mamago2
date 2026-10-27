@@ -4,8 +4,12 @@ import { partyOutboxCopy, isPartyOutboxEventType } from "./partyOutbox.logic";
 
 const confirmService = readFileSync(new URL("./partyConfirm.service.ts", import.meta.url), "utf8");
 const fanout = readFileSync(new URL("./partyAddonFanout.ts", import.meta.url), "utf8");
-// The add-on fan-out is shared with the fixed-price auto-confirmation; check both together.
-const service = confirmService + fanout;
+const unitAllocation = readFileSync(new URL("./partyUnitAllocation.ts", import.meta.url), "utf8");
+// The add-on fan-out and the locked unit check are shared with the fixed-price
+// auto-confirmation; check them together with the confirmation service.
+const service = confirmService + fanout + unitAllocation;
+assert.match(confirmService, /window = await lockAvailablePartyUnit\(tx, \{/);
+assert.match(confirmService, /await allocatePartyUnit\(tx, \{ unitId: unit\.id, requestId, quoteId: quote\.id, window \}\)/);
 assert.match(confirmService, /isAnchor \? await requestPartyAddonsAfterAnchor\(tx,/);
 // Claim PLANNED → REQUESTED before creating the request: a repeat cannot double-request an item.
 assert.ok(fanout.indexOf("status: PartyItemStatus.REQUESTED") < fanout.indexOf("tx.bookingRequest.create"));
@@ -48,7 +52,7 @@ assert.match(service, /bookingUnitId_offerId/);
 assert.match(service, /PartyItemRole.STANDALONE/);
 assert.match(service, /responseDueAt: \{ gt: now \}/);
 const reserveSlotSql = readFileSync(new URL("../offers/reserveSlot.ts", import.meta.url), "utf8");
-for (const code of [service, reserveSlotSql]) {
+for (const code of [unitAllocation, reserveSlotSql]) {
   assert.ok(code.includes(`"expiresAt" < (now() AT TIME ZONE 'UTC')`),
     "Expiry SQL must compare UTC timestamp without session TZ coercion");
   assert.ok(code.includes(`"updatedAt" = (now() AT TIME ZONE 'UTC')`),
