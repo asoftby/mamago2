@@ -114,6 +114,7 @@ export const classScheduleInputSchema = z
     groups: z
       .array(
         z.object({
+          id: z.string().min(1).max(128),
           days: z.array(z.number().int().min(1).max(7)).min(1).max(7),
           time: z.string().regex(TIME_RE),
           seats: seatsSchema,
@@ -173,7 +174,7 @@ export function buildClassScheduleInput(
         ? form.groups
             .filter((group) => group.days.length > 0 && TIME_RE.test(group.time))
             .map((group) => ({
-              days: [...new Set(group.days)].sort(), time: group.time, seats: parseSeats(group.seats),
+              id: group.id, days: [...new Set(group.days)].sort(), time: group.time, seats: parseSeats(group.seats),
               ...(group.period !== undefined ? { period: group.period } : {}),
             }))
         : [],
