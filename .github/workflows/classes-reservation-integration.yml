@@ -56,4 +56,6 @@ jobs:
       - name: Run concurrent reservation integration tests
         run: pnpm exec tsx src/server/offers/reserveSlot.integration.test.ts
       - name: Class group schedule, tariffs and independent capacity integration
+        env:
+          NODE_OPTIONS: "--conditions=react-server"
         run: pnpm exec tsx src/server/offers/offerSchedule.integration.test.ts
