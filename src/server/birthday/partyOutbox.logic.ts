@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export type PartyOutboxEventType = "PARTY_REQUEST_SENT" | "PARTY_QUOTE_SENT" | "PARTY_REQUEST_DECLINED" | "PARTY_REQUEST_EXPIRED" | "PARTY_QUOTE_CLOSED" | "PARTY_QUOTE_ACCEPTED" | "PARTY_BOOKING_CONFIRMED";
+export type PartyOutboxEventType = "PARTY_REQUEST_SENT" | "PARTY_QUOTE_SENT" | "PARTY_REQUEST_DECLINED" | "PARTY_REQUEST_EXPIRED" | "PARTY_QUOTE_CLOSED" | "PARTY_QUOTE_ACCEPTED" | "PARTY_BOOKING_CONFIRMED" | "PARTY_QUOTE_EXPIRED" | "PARTY_QUOTE_EXPIRED_BUSINESS";
 
 export function partyNotificationId(outboxId: string, recipientId: string): string {
   return "party-" + createHash("sha256").update(outboxId + ":" + recipientId).digest("hex").slice(0, 32);
@@ -15,7 +15,14 @@ export function isPartyOutboxEventType(value: string): value is PartyOutboxEvent
     value === "PARTY_QUOTE_SENT" ||
     value === "PARTY_REQUEST_DECLINED" ||
     value === "PARTY_REQUEST_EXPIRED" || value === "PARTY_QUOTE_CLOSED" ||
-    value === "PARTY_QUOTE_ACCEPTED" || value === "PARTY_BOOKING_CONFIRMED";
+    value === "PARTY_QUOTE_ACCEPTED" || value === "PARTY_BOOKING_CONFIRMED" ||
+    value === "PARTY_QUOTE_EXPIRED" || value === "PARTY_QUOTE_EXPIRED_BUSINESS";
+}
+
+/** Events addressed to the business members (OWNER/MANAGER); all others go to the parent. */
+export function isBusinessPartyEvent(type: PartyOutboxEventType): boolean {
+  return type === "PARTY_REQUEST_SENT" || type === "PARTY_QUOTE_ACCEPTED" ||
+    type === "PARTY_QUOTE_EXPIRED_BUSINESS";
 }
 
 export function partyOutboxCopy(params: {
@@ -78,6 +85,24 @@ export function partyOutboxCopy(params: {
           "». Можно выбрать другое предложение. Бронирование не подтверждено.",
         actionUrl: "/me/birthdays",
       };
+    case "PARTY_QUOTE_EXPIRED":
+      return {
+        type: "SYSTEM" as const,
+        audience: "USER" as const,
+        title: "Срок предложения истёк",
+        body: "Предложение по услуге «" + params.offerTitle + "» не было принято вовремя и закрыто. " +
+          "Можно выбрать другого исполнителя. Бронирование не создано.",
+        actionUrl: "/me/birthdays",
+      };
+    case "PARTY_QUOTE_EXPIRED_BUSINESS":
+      return {
+        type: "SYSTEM" as const,
+        audience: "BUSINESS" as const,
+        title: "Предложение закрыто по сроку",
+        body: "Клиент не принял предложение по услуге «" + params.offerTitle + "» на " +
+          params.dateLabel + " до окончания срока. Заявка закрыта, время не занято.",
+        actionUrl: "/business/bookings?tab=action&kind=party",
+      };
     case "PARTY_REQUEST_DECLINED":
       return {
         type: "SYSTEM" as const,
@@ -95,7 +120,7 @@ export function partyOutboxCopy(params: {
  * until the inbox UI is released and BUSINESS_BOOKINGS_INBOX_UI=true is set.
  */
 export function inboxLinkedEventTypes(): PartyOutboxEventType[] {
-  return ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED"];
+  return ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED", "PARTY_QUOTE_EXPIRED_BUSINESS"];
 }
 
 export function heldPartyOutboxEventTypes(env: Readonly<Record<string, string | undefined>>): PartyOutboxEventType[] {

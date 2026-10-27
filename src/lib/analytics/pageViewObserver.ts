@@ -1,5 +1,6 @@
 /**
  * Pure decision rule for the PAGE_VIEW route observer (`PageViewTracker`).
+ * CI verification after re-targeting PR #838 to dev.
  * Kept separate from the client component so it can be unit-tested without
  * mounting React — this repo's tests run as plain tsx scripts, not RTL.
  */

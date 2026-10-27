@@ -5534,6 +5534,19 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Acceptance criteria: при импорте событию автоматически назначаются категория и интересы (правила по жанру/ключевым словам источника, с флагом «авто» для ручной правки); покрытие измеряется SQL из аудита (#794) до/после; ручные значения не перетираются.
 - Source: ТЗ «Для вашей семьи», решение владельца.
 
+## [BACKLOG-205] «Для вашей семьи»: предложения (Offer) как кандидаты подбора
+
+- Status: OPEN
+- Priority: P2
+- Area: Recommendations / Offers
+- Added: 2026-10-27
+- Reason deferred: общий движок `rankPlanSuggestionsForCity` работает только с событиями (EVENT); PR 2 ТЗ «Для вашей семьи» не расширял его на `Offer`, чтобы не форкать ранжирование.
+- Context: чистый слой `familyPicks/select.ts` уже поддерживает `entityType: "OFFER"` (возраст, интересы, окно, разнообразие); не хватает загрузчика офферов (публичный `getPublicPublishedOfferWhere`, возраст `ageMinMonths/ageMaxMonths/agePolicy`, `interestSlugs`, бизнес `Place.ownerBusinessId`, ссылка `getOfferPublicPath`) и расчёта популярности/истории для офферов.
+- Current state: в подбор попадают только события.
+- Dependencies: решение по общему engagement-скорингу офферов.
+- Acceptance criteria: офферы участвуют в `loadFamilyPicks` теми же фильтрами и весами; unit-тесты слоя расширены; экспозиции пишутся с `entityType = OFFER`.
+- Source: ТЗ «Для вашей семьи», PR 2.
+
 ## [BACKLOG-210] Кабинет бизнеса и отчёты по бусту: перевести на новые определения аналитики
 
 - Status: OPEN

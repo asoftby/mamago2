@@ -72,6 +72,7 @@ export const DECISION_INTENTS = [
   "my_plan_suggestions",
   "guest_plan_generate",
   "related_event_suggestions",
+  "family_picks",
 ] as const;
 export type DecisionIntent = (typeof DECISION_INTENTS)[number];
 

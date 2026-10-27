@@ -1,4 +1,5 @@
 /**
+ * CI verification for PR #843 against current dev.
  * supplyHealth collector test — "active" = published + currently relevant
  * (not an all-time total), freshness = updatedAt >= now - 7d.
  *

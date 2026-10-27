@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { isPartyOutboxEventType, heldPartyOutboxEventTypes, partyOutboxCopy } from "./partyOutbox.logic";
+import {
+  isBusinessPartyEvent, isPartyOutboxEventType, heldPartyOutboxEventTypes, partyOutboxCopy,
+} from "./partyOutbox.logic";
 
 const service = readFileSync(new URL("./partyQuoteAcceptance.service.ts", import.meta.url), "utf8");
 const route = readFileSync(new URL("../../app/api/parent/parties/[id]/quotes/[quoteId]/accept/route.ts", import.meta.url), "utf8");
@@ -16,7 +18,9 @@ assert.match(service, /dedupeKey: "party:" \+ requestId \+ ":accepted:" \+ quote
 assert.match(route, /getCurrentUser\(\)/);
 assert.match(route, /checkRateLimit/);
 assert.match(route, /requestId: body.requestId/);
-assert.match(dispatcher, /"PARTY_QUOTE_ACCEPTED"/);
+// The dispatcher routes business events through one predicate; acceptance goes to the business.
+assert.match(dispatcher, /isBusinessPartyEvent\(row\.eventType\)/);
+assert.equal(isBusinessPartyEvent("PARTY_QUOTE_ACCEPTED"), true);
 assert.equal(isPartyOutboxEventType("PARTY_QUOTE_ACCEPTED"), true);
 assert.ok(heldPartyOutboxEventTypes({}).includes("PARTY_QUOTE_ACCEPTED"));
 const copy = partyOutboxCopy({ type: "PARTY_QUOTE_ACCEPTED", offerTitle: "Площадка", dateLabel: "10.11" });
