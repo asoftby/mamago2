@@ -102,34 +102,10 @@ export function Step4Conditions({ data, onChange, isEditable }: Step4ConditionsP
         />
       </div>
 
-      <div className="space-y-2">
-        <Label>
-          Формат занятия <span className="text-red-500">*</span>
-        </Label>
-        <StableCardSelector
-          value={data.classFormat}
-          onValueChange={(format: "trial" | "course" | "subscription") => onChange({ classFormat: format })}
-          options={[
-            { 
-              value: "trial" as const, 
-              label: "Пробное", 
-              description: "Разовое пробное занятие" 
-            },
-            { 
-              value: "course" as const, 
-              label: "Курс", 
-              description: "Серия занятий с программой" 
-            },
-            { 
-              value: "subscription" as const, 
-              label: "Абонемент", 
-              description: "Гибкое посещение по абонементу" 
-            },
-          ]}
-          isEditable={isEditable}
-          className="grid grid-cols-3 gap-3"
-        />
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Пробное посещение, разовое занятие, курс и абонемент — это варианты тарифа,
+        а не взаимоисключающие форматы предложения. Настройте тарифы в каждой группе расписания.
+      </p>
     </div>
   );
 

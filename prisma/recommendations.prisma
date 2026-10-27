@@ -5,6 +5,7 @@ enum RecommendationSurface {
   DISCOVERY
   MY_PLAN
   TELEGRAM
+  JOURNAL
 }
 
 enum RecommendationPolicyStatus {

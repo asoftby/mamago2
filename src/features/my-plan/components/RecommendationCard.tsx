@@ -13,6 +13,7 @@ import type { PlanItemWithActivity } from "../types/event";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
+import { IMPRESSION_DWELL_MS, IMPRESSION_VISIBLE_RATIO } from "@/lib/analytics/impressionGate";
 import { postProductTelemetryEvent } from "@/lib/analytics/client";
 
 interface RecommendationCardProps {
@@ -317,6 +318,8 @@ export function RecommendationCard({
         vertical="CITY"
         citySlug={city}
         meta={recommendationMeta}
+        threshold={IMPRESSION_VISIBLE_RATIO}
+        dwellMs={IMPRESSION_DWELL_MS}
       >
         {card}
       </AnalyticsCardViewTracker>
