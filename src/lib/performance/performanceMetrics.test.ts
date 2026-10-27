@@ -3,6 +3,7 @@ import {
   comparisonPercent,
   parsePerformancePeriod,
   ratioPercent,
+  resolveCompletedWindow,
   resolvePerformanceWindow,
 } from "./performanceMetrics";
 
@@ -24,6 +25,24 @@ assert.equal(seven.previousStart.toISOString(), "2026-07-29T21:00:00.000Z");
 
 const thirty = resolvePerformanceWindow("30d", boundary);
 assert.equal(thirty.start.toISOString(), "2026-07-13T21:00:00.000Z");
+
+// C1: completed windows depend only on the Minsk calendar day, never on the hour.
+const monday0030 = new Date("2026-08-09T21:30:00.000Z"); // Mon 10 Aug 00:30 Minsk
+const sunday2359 = new Date("2026-08-09T20:59:00.000Z"); // Sun 9 Aug 23:59 Minsk
+const mondayMorning = resolveCompletedWindow(7, new Date("2026-08-10T05:00:00.000Z"));
+const mondayNight = resolveCompletedWindow(7, monday0030);
+assert.equal(mondayMorning.start.toISOString(), mondayNight.start.toISOString());
+assert.equal(mondayMorning.end.toISOString(), mondayNight.end.toISOString());
+assert.equal(mondayMorning.start.toISOString(), "2026-08-02T21:00:00.000Z"); // Mon 3 Aug 00:00 Minsk
+assert.equal(mondayMorning.end.toISOString(), "2026-08-09T20:59:59.999Z"); // end of Sun 9 Aug
+assert.equal(mondayMorning.previousStart.toISOString(), "2026-07-26T21:00:00.000Z");
+assert.equal(mondayMorning.previousEnd.toISOString(), "2026-08-02T20:59:59.999Z");
+assert.equal(mondayMorning.dayCount, 7);
+// Sunday 23:59 still sees the window ending on the previous Saturday.
+assert.equal(resolveCompletedWindow(7, sunday2359).end.toISOString(), "2026-08-08T20:59:59.999Z");
+const completed30 = resolveCompletedWindow(30, monday0030);
+assert.equal(completed30.start.toISOString(), "2026-07-10T21:00:00.000Z");
+assert.equal(completed30.previousStart.toISOString(), "2026-06-10T21:00:00.000Z");
 
 assert.equal(ratioPercent(7, 10), 70);
 assert.equal(ratioPercent(0, 0), null);

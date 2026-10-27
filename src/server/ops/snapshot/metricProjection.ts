@@ -7,29 +7,45 @@
  * A missing sample projects to `null`, never 0 — a collector that hasn't
  * run yet (or whose last run failed) must not be indistinguishable from a
  * genuinely observed zero.
+ *
+ * A STALE sample also projects to `null` (ТЗ «Аналитика админки», C2): a
+ * sample older than 3 × its collector's `intervalSec` (see
+ * metricFreshness.ts) is not shown, so a disabled or persistently failing
+ * collector reads as "Нет данных" instead of its last value forever. Metrics
+ * with no known owner never expire.
  */
 import type { PrismaClient } from "@prisma/client";
 import { format } from "date-fns";
 
-async function latestMetricValue(prisma: PrismaClient, metric: string, dimKey = ""): Promise<number | null> {
+import { isSampleStale } from "../metrics/metricFreshness";
+
+export async function latestMetricValue(
+  prisma: PrismaClient,
+  metric: string,
+  dimKey = "",
+  now: Date = new Date(),
+): Promise<number | null> {
   const row = await prisma.metricSample.findFirst({
     where: { metric, dimKey },
     orderBy: { collectedAt: "desc" },
-    select: { value: true },
+    select: { value: true, collectedAt: true },
   });
-  return row ? row.value : null;
+  if (!row || isSampleStale(metric, row.collectedAt, now)) return null;
+  return row.value;
 }
 
 async function latestMetricSample(
   prisma: PrismaClient,
   metric: string,
+  now: Date,
 ): Promise<{ dimKey: string; value: number } | null> {
   const row = await prisma.metricSample.findFirst({
     where: { metric },
     orderBy: { collectedAt: "desc" },
-    select: { dimKey: true, value: true },
+    select: { dimKey: true, value: true, collectedAt: true },
   });
-  return row ?? null;
+  if (!row || isSampleStale(metric, row.collectedAt, now)) return null;
+  return { dimKey: row.dimKey, value: row.value };
 }
 
 export interface ModerationQueueProjection {
@@ -55,12 +71,12 @@ export interface OperationsQueuesProjection {
 
 const MODERATION_QUEUE_KEYS = ["place", "place_revision", "event", "offer"] as const;
 
-async function projectModerationQueues(prisma: PrismaClient): Promise<OperationsQueuesProjection["moderation"]> {
+async function projectModerationQueues(prisma: PrismaClient, now: Date): Promise<OperationsQueuesProjection["moderation"]> {
   const entries = await Promise.all(
     MODERATION_QUEUE_KEYS.map(async (key) => {
       const [size, oldestAgeSec] = await Promise.all([
-        latestMetricValue(prisma, "queue.moderation.size", key),
-        latestMetricValue(prisma, "queue.moderation.oldest_age_sec", key),
+        latestMetricValue(prisma, "queue.moderation.size", key, now),
+        latestMetricValue(prisma, "queue.moderation.oldest_age_sec", key, now),
       ]);
       return [key, { size, oldestAgeSec }] as const;
     }),
@@ -68,12 +84,15 @@ async function projectModerationQueues(prisma: PrismaClient): Promise<Operations
   return Object.fromEntries(entries) as OperationsQueuesProjection["moderation"];
 }
 
-export async function projectOperationsQueues(prisma: PrismaClient): Promise<OperationsQueuesProjection> {
+export async function projectOperationsQueues(
+  prisma: PrismaClient,
+  now: Date = new Date(),
+): Promise<OperationsQueuesProjection> {
   const [moderation, reviewSize, failedSources, pendingSize] = await Promise.all([
-    projectModerationQueues(prisma),
-    latestMetricValue(prisma, "queue.import.review_size"),
-    latestMetricValue(prisma, "import.failed_sources"),
-    latestMetricValue(prisma, "queue.b2b.pending_size"),
+    projectModerationQueues(prisma, now),
+    latestMetricValue(prisma, "queue.import.review_size", "", now),
+    latestMetricValue(prisma, "import.failed_sources", "", now),
+    latestMetricValue(prisma, "queue.b2b.pending_size", "", now),
   ]);
 
   return {
@@ -84,15 +103,17 @@ export async function projectOperationsQueues(prisma: PrismaClient): Promise<Ope
 }
 
 /** Global-dimKey (dimKey="") KPI metric names projected onto the snapshot's `kpis` field. */
-const KPI_METRIC_NAMES = [
+export const KPI_METRIC_NAMES = [
   "db.latency_ms",
   "db.connection_capacity_pct",
   "comms.failed_deliveries_1h",
   "audience.dau",
   "audience.wau",
-  "audience.wau_prev",
+  "audience.wau_completed",
+  "audience.wau_completed_prev",
   "audience.mau",
-  "audience.mau_prev",
+  "audience.mau_completed",
+  "audience.mau_completed_prev",
   "search.queries_total",
   "search.zero_result_rate",
   "search.action_rate",
@@ -106,7 +127,8 @@ const KPI_METRIC_NAMES = [
   "telemetry.no_identity_rejected_share_24h",
   "telemetry.stored_without_identity_share_24h",
   "planning.wpf",
-  "planning.wpf_prev",
+  "planning.wpf_completed",
+  "planning.wpf_completed_prev",
   "retention.w1",
   "retention.w1_prev",
   "retention.w4",
@@ -140,17 +162,17 @@ export interface GscPageMoverProjection {
   deltaClicks: number;
 }
 
-async function projectGscPageMovers(prisma: PrismaClient): Promise<{
+async function projectGscPageMovers(prisma: PrismaClient, now: Date): Promise<{
   rising: GscPageMoverProjection[];
   falling: GscPageMoverProjection[];
 }> {
   const [rise1, rise2, rise3, fall1, fall2, fall3] = await Promise.all([
-    latestMetricSample(prisma, "gsc.page.rise.1"),
-    latestMetricSample(prisma, "gsc.page.rise.2"),
-    latestMetricSample(prisma, "gsc.page.rise.3"),
-    latestMetricSample(prisma, "gsc.page.fall.1"),
-    latestMetricSample(prisma, "gsc.page.fall.2"),
-    latestMetricSample(prisma, "gsc.page.fall.3"),
+    latestMetricSample(prisma, "gsc.page.rise.1", now),
+    latestMetricSample(prisma, "gsc.page.rise.2", now),
+    latestMetricSample(prisma, "gsc.page.rise.3", now),
+    latestMetricSample(prisma, "gsc.page.fall.1", now),
+    latestMetricSample(prisma, "gsc.page.fall.2", now),
+    latestMetricSample(prisma, "gsc.page.fall.3", now),
   ]);
   const toMover = (row: { dimKey: string; value: number } | null): GscPageMoverProjection | null =>
     row && row.dimKey ? { page: row.dimKey, deltaClicks: row.value } : null;
@@ -160,7 +182,8 @@ async function projectGscPageMovers(prisma: PrismaClient): Promise<{
   };
 }
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
 const DASHBOARD_TIME_ZONE = "Europe/Minsk";
 
 /**
@@ -218,6 +241,35 @@ export function bucketLastValuePerWeek(
     .map(([isoWeek, value]) => ({ isoWeek, value }));
 }
 
+/**
+ * Sparkline points for a rolling global metric (WAU / WPF) — COMPLETED ISO
+ * weeks only (ТЗ «Аналитика админки», C7). The current, unfinished week is not
+ * returned at all (it would draw a falling tail every Monday). A week counts
+ * only when its last reading was taken on that week's Sunday (Minsk), i.e. it
+ * really is a week-end reading of the trailing 7 days; a week whose collector
+ * stopped earlier is absent (a gap), never an old value passed off as the
+ * week's. Weeks without a sample are absent, never 0.
+ */
+export function bucketCompletedWeeks(
+  rows: readonly { collectedAt: Date; value: number }[],
+  now: Date,
+  timeZone = DASHBOARD_TIME_ZONE,
+): WeeklyHistoryPoint[] {
+  const currentWeek = isoWeekInTimeZone(now, timeZone);
+  const lastPerWeek = new Map<string, { collectedAt: Date; value: number }>();
+  for (const row of [...rows].sort((a, b) => a.collectedAt.getTime() - b.collectedAt.getTime())) {
+    lastPerWeek.set(isoWeekInTimeZone(row.collectedAt, timeZone), row);
+  }
+  const points: WeeklyHistoryPoint[] = [];
+  for (const [isoWeek, row] of lastPerWeek) {
+    if (isoWeek >= currentWeek) continue;
+    // 24 h after a Sunday reading it is already next week's Monday.
+    const takenOnWeekEnd = isoWeekInTimeZone(new Date(row.collectedAt.getTime() + DAY_MS), timeZone) !== isoWeek;
+    if (takenOnWeekEnd) points.push({ isoWeek, value: row.value });
+  }
+  return points.sort((a, b) => (a.isoWeek < b.isoWeek ? -1 : a.isoWeek > b.isoWeek ? 1 : 0));
+}
+
 async function weeklyHistory(
   prisma: PrismaClient,
   metric: string,
@@ -225,10 +277,10 @@ async function weeklyHistory(
   weeks: number,
 ): Promise<WeeklyHistoryPoint[]> {
   const rows = await prisma.metricSample.findMany({
-    where: { metric, dimKey: "", collectedAt: { gte: new Date(now.getTime() - weeks * WEEK_MS) } },
+    where: { metric, dimKey: "", collectedAt: { gte: new Date(now.getTime() - (weeks + 1) * WEEK_MS) } },
     select: { collectedAt: true, value: true },
   });
-  return bucketLastValuePerWeek(rows).slice(-weeks);
+  return bucketCompletedWeeks(rows, now).slice(-weeks);
 }
 
 export async function projectOperationsKpis(
@@ -237,8 +289,8 @@ export async function projectOperationsKpis(
 ): Promise<Record<string, unknown>> {
   const since = new Date(now.getTime() - 16 * WEEK_MS);
   const [entries, pageMovers, evergreenWeekly, totalWeekly, wauWeekly, wpfWeekly] = await Promise.all([
-    Promise.all(KPI_METRIC_NAMES.map(async (metric) => [metric, await latestMetricValue(prisma, metric)] as const)),
-    projectGscPageMovers(prisma),
+    Promise.all(KPI_METRIC_NAMES.map(async (metric) => [metric, await latestMetricValue(prisma, metric, "", now)] as const)),
+    projectGscPageMovers(prisma, now),
     latestValuesByDimKey(prisma, "seo.evergreen_clicks_weekly", since),
     latestValuesByDimKey(prisma, "seo.total_clicks_weekly", since),
     weeklyHistory(prisma, "audience.wau", now, 8),
