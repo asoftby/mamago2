@@ -5507,3 +5507,29 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Dependencies: нет.
 - Acceptance criteria: файлы и неиспользуемые типы удалены; `tsc`, lint и `test:birthday-catalog` зелёные.
 - Source: аудит #818.
+
+## [BACKLOG-203] Новость с publicationType из полной формы рендерится шаблоном статьи
+
+- Status: OPEN
+- Priority: P2
+- Area: Journal / Public article pages
+- Added: 2026-10-27
+- Reason deferred: вне scope PR журнала (#834); найдено при исправлении Stories.
+- Context: страницы `src/app/(public)/[city]/blog/[slug]/page.tsx` и `src/app/(public)/blog/[slug]/page.tsx` выбирают шаблон новости (`BreakingNewsView`), `isNews` для JSON-LD и `editHref` только по `subtitle === BREAKING_NEWS_SUBTITLE`. Новость, у которой `publicationType = BREAKING_NEWS` выставлен в полной форме, но legacy-маркера в `subtitle` нет, открывается шаблоном статьи.
+- Current state: Stories, ленты журнала и публичные фильтры уже учитывают `publicationType`; страницы деталей — нет. Также `loadRelatedBreakingNews` ищет по маркеру.
+- Dependencies: нет.
+- Acceptance criteria: шаблон новости, `isNews` и ссылка редактирования определяются по `publicationType = BREAKING_NEWS` (с поддержкой legacy-маркера); `loadRelatedBreakingNews` тоже; тест на выбор шаблона.
+- Source: ревью PR #792/#834 (Codex P2), координатор.
+
+## [BACKLOG-204] Автоназначение категории и интересов событиям из импортов 24afisha и family.by
+
+- Status: OPEN
+- Priority: P1
+- Area: Events import / Recommendations
+- Added: 2026-10-27
+- Reason deferred: решение владельца при снятии стоп-правила ТЗ «Для вашей семьи» — алгоритм строится при низком покрытии, улучшение данных — отдельной задачей.
+- Context: фильтры и баллы подбора «Для вашей семьи» (интересы 25, возраст 25) опираются на категорию и интересы события; у импортированных событий (24afisha, family.by) они часто пустые, из-за чего события выпадают из подбора или получают UNKNOWN.
+- Current state: импорт сохраняет события без автоматического назначения категории и интересов.
+- Dependencies: схема импортов 24afisha (BACKLOG-147), SYSTEM_INTERESTS.
+- Acceptance criteria: при импорте событию автоматически назначаются категория и интересы (правила по жанру/ключевым словам источника, с флагом «авто» для ручной правки); покрытие измеряется SQL из аудита (#794) до/после; ручные значения не перетираются.
+- Source: ТЗ «Для вашей семьи», решение владельца.

@@ -279,6 +279,15 @@ export async function linkRecommendationOutcome(
     const verified = await verifyRecommendationAttribution(input);
     if (!verified) return false;
 
+    // CARD_VIEW с верифицированной экспозицией = показ пользователю (≥50% ≥1 с на клиенте):
+    // фиксируем первый момент доставки, повторные показы его не перетирают.
+    if (input.eventType === "CARD_VIEW") {
+      await prisma.recommendationExposure.updateMany({
+        where: { id: verified.exposureId, deliveredAt: null },
+        data: { deliveredAt: new Date() },
+      });
+    }
+
     await prisma.recommendationOutcome.upsert({
       where: { userEventId: input.userEventId },
       create: {

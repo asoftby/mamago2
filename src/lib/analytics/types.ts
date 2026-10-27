@@ -24,7 +24,9 @@ export type AnalyticsMetaPayload = {
   /** Recommendation attribution. These IDs point to the shared trace layer. */
   recommendationRunId?: string;
   recommendationExposureId?: string;
-  recommendationSurface?: "home" | "discovery" | "my_plan" | "telegram";
+  recommendationSurface?: "home" | "discovery" | "my_plan" | "telegram" | "journal";
+  /** CARD_VIEW, посчитанный как показ: ≥50% площади ≥1 с (impressionGate). */
+  impression?: boolean;
 
   /** Small, normalized user/context dimensions useful for later ranking. */
   selectedPersonaIds?: string[];
