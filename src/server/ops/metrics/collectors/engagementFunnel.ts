@@ -15,11 +15,17 @@
  * refinement, tracked in the backlog, not required for this to be
  * directionally correct).
  *
- * No role exclusion — matches funnel.ts's own stated convention (no
- * ADMIN/MODERATOR exclusion exists in the canonical UserEvent writers).
+ * Internal traffic is excluded (ТЗ «Аналитика админки», B1, 2026-10): users
+ * with a role in AUDIENCE_EXCLUDED_ROLES never enter the engaged set. Every
+ * row here is userId-keyed, so canonicalAudience.ts's session tainting has
+ * nothing to add (an admin's own userId is what gets excluded). funnel.ts's
+ * raw 15-minute Operations counters intentionally stay unfiltered.
  */
 import { Prisma } from "@prisma/client";
 import { resolvePerformanceWindow } from "@/lib/performance/performanceMetrics";
+import { AUDIENCE_EXCLUDED_ROLES } from "@/server/services/analytics/canonicalAudience";
+
+const EXCLUDED_ROLES_SQL_LIST = Prisma.raw(AUDIENCE_EXCLUDED_ROLES.map((role) => `'${role}'`).join(", "));
 import type { MetricCollector, MetricCollectorContext, MetricSampleDraft } from "../types";
 
 interface FunnelRow {
@@ -34,11 +40,13 @@ export async function collectEngagementFunnel(ctx: MetricCollectorContext): Prom
 
   const rows = await ctx.prisma.$queryRaw<FunnelRow[]>(Prisma.sql`
     WITH opens AS (
-      SELECT "userId", MIN("createdAt") AS first_open
-      FROM "UserEvent"
-      WHERE "eventType" = 'DETAIL_OPEN' AND "userId" IS NOT NULL
-        AND "createdAt" >= ${window.start} AND "createdAt" < ${window.end}
-      GROUP BY "userId"
+      SELECT e."userId", MIN(e."createdAt") AS first_open
+      FROM "UserEvent" e
+      LEFT JOIN "User" u ON u.id = e."userId"
+      WHERE e."eventType" = 'DETAIL_OPEN' AND e."userId" IS NOT NULL
+        AND e."createdAt" >= ${window.start} AND e."createdAt" < ${window.end}
+        AND (u.role IS NULL OR u.role NOT IN (${EXCLUDED_ROLES_SQL_LIST}))
+      GROUP BY e."userId"
     ),
     saved AS (
       SELECT DISTINCT o."userId" FROM opens o

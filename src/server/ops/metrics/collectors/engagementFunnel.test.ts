@@ -21,8 +21,8 @@ const eventIds: string[] = [];
 async function main() {
   const prisma = new PrismaClient({ datasourceUrl: DATABASE_URL });
 
-  async function makeUser(): Promise<string> {
-    const user = await prisma.user.create({ data: { email: `funnel-test-${marker}-${randomUUID()}@example.invalid` } });
+  async function makeUser(role: "USER" | "ADMIN" | "MODERATOR" = "USER"): Promise<string> {
+    const user = await prisma.user.create({ data: { email: `funnel-test-${marker}-${randomUUID()}@example.invalid`, role } });
     userIds.push(user.id);
     return user.id;
   }
@@ -54,13 +54,20 @@ async function main() {
     const userPlanNoOpen = await makeUser();
     await makeEvent(userPlanNoOpen, "PLAN_ADD", new Date(now.getTime() - 5 * HOUR));
 
+    // B1: staff opens/saves never enter the engaged set.
+    const admin = await makeUser("ADMIN");
+    await makeEvent(admin, "DETAIL_OPEN", new Date(now.getTime() - 5 * HOUR));
+    await makeEvent(admin, "SAVE", new Date(now.getTime() - 4 * HOUR));
+    const moderator = await makeUser("MODERATOR");
+    await makeEvent(moderator, "DETAIL_OPEN", new Date(now.getTime() - 5 * HOUR));
+
     const samples = await collectEngagementFunnel({ prisma, now });
     const engaged = samples.find((s) => s.metric === "funnel.engaged_users");
     const saveRate = samples.find((s) => s.metric === "funnel.save_rate");
     const planRate = samples.find((s) => s.metric === "funnel.plan_rate");
     const ctaRate = samples.find((s) => s.metric === "funnel.cta_rate");
 
-    assert.equal(engaged?.value, 3, "engaged = users with a DETAIL_OPEN in-window; userPlanNoOpen excluded");
+    assert.equal(engaged?.value, 3, "engaged = users with a DETAIL_OPEN in-window; userPlanNoOpen and staff excluded");
     assert.equal(saveRate?.value, 1 / 3, "only userEngagedSaved's SAVE is at/after their first open");
     assert.equal(planRate?.value, 0, "no engaged user has a PLAN_ADD at/after their first open");
     assert.equal(ctaRate?.value, 0, "no engaged user has a CTA_CLICK at/after their first open");

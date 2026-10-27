@@ -32,17 +32,23 @@ export type AnalyticsOverviewTopItem = {
 
 export type AnalyticsOverviewDayPoint = {
   day: string;
-  /** ISO date YYYY-MM-DD */
+  /** Минский календарный день YYYY-MM-DD */
   date: string;
-  views: number;
+  /** PAGE_VIEW без внутреннего трафика */
+  pageViews: number;
   opens: number;
 };
 
 export type AnalyticsOverviewResult = {
   range: { start: string; end: string };
-  activeUsers: number;
-  sessions: number;
-  views: number;
+  /** computeCanonicalAudience().visitors (как на /admin) */
+  visitors: number;
+  /** DISTINCT sessionId (вечный id браузера) — «Устройства», не сессии */
+  devices: number;
+  /** Только PAGE_VIEW — computeCanonicalAudience().pageViews */
+  pageViews: number;
+  /** CARD_VIEW — «Показы в ленте», отдельно от просмотров */
+  feedImpressions: number;
   opens: number;
   saves: number;
   planAdds: number;

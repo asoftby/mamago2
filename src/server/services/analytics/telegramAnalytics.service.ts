@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { getTelegramRuntimeEnvironment } from "@/server/config/telegram.config";
+import { AUDIENCE_EXCLUDED_ROLES } from "@/server/services/analytics/canonicalAudience";
 import type {
   TelegramAnalyticsPeriod,
   TelegramFamilyAnalytics,
@@ -55,10 +56,20 @@ export async function getTelegramFamilyAnalytics(
   const environment = getTelegramRuntimeEnvironment();
   const { start, end } = rangeFor(period);
 
+  // B1: staff (ADMIN/MODERATOR) are excluded from every user metric below;
+  // bot error counters (failedMessages, errorCodes) still include them.
+  const staffRows = await prisma.user.findMany({
+    where: { role: { in: [...AUDIENCE_EXCLUDED_ROLES] } },
+    select: { id: true },
+  });
+  const staffIds = staffRows.map((u) => u.id);
+  const isStaff = new Set(staffIds);
+  const notStaff = staffIds.length > 0 ? { userId: { notIn: staffIds } } : {};
+
   const [connections, connectedInPeriod, received, planAdds] = await Promise.all([
-    prisma.telegramConnection.count({ where: { environment, isActive: true } }),
+    prisma.telegramConnection.count({ where: { environment, isActive: true, ...notStaff } }),
     prisma.telegramConnection.count({
-      where: { environment, isActive: true, linkedAt: { gte: start, lte: end } },
+      where: { environment, isActive: true, linkedAt: { gte: start, lte: end }, ...notStaff },
     }),
     prisma.inboxItem.findMany({
       where: { environment, createdAt: { gte: start, lte: end } },
@@ -82,6 +93,7 @@ export async function getTelegramFamilyAnalytics(
         source: "TELEGRAM_FORWARD",
         createdAt: { gte: start, lte: end },
         inboxItemId: { not: null },
+        ...notStaff,
       },
       select: { userId: true, createdAt: true, inboxItemId: true },
     }),
@@ -125,7 +137,17 @@ export async function getTelegramFamilyAnalytics(
   let processingSecondsTotal = 0;
   let processingCount = 0;
 
+  let staffReceived = 0;
   for (const item of received) {
+    if (isStaff.has(item.userId)) {
+      // Bot error counters keep staff traffic; nothing else does.
+      staffReceived += 1;
+      if (item.status === "FAILED") failedMessages += 1;
+      if (item.status === "FAILED" && item.error) {
+        errors.set(item.error, (errors.get(item.error) ?? 0) + 1);
+      }
+      continue;
+    }
     const date = minskDateKey(item.createdAt);
     const activityDays = daysByUser.get(item.userId) ?? new Set<string>();
     activityDays.add(date);
@@ -172,7 +194,7 @@ export async function getTelegramFamilyAnalytics(
     connectedInPeriod,
     activeUsers: daysByUser.size,
     returningUsers: [...daysByUser.values()].filter((days) => days.size >= 2).length,
-    inboxMessages: received.length,
+    inboxMessages: received.length - staffReceived,
     forwardedMessages,
     usersWithDrafts: usersWithDrafts.size,
     confirmedUsers: usersConfirmed.size,
