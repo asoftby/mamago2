@@ -29,6 +29,11 @@ type SaveHeartProps = {
   className?: string;
   iconClassName?: string;
   onSaveChange?: (isSaved: boolean) => void;
+  /**
+   * Текстовая кнопка вместо сердечка (например «В мой план»): тот же поток сохранения,
+   * но подписанная кнопка с зоной нажатия ≥ 44px.
+   */
+  triggerLabel?: string;
 };
 
 function normalizePlanDateISO(value?: string | null): string | undefined {
@@ -51,6 +56,7 @@ export function SaveHeart({
   className,
   iconClassName,
   onSaveChange,
+  triggerLabel,
 }: SaveHeartProps) {
   const { isAuthenticated } = useAuthMe();
   const [flowOpen, setFlowOpen] = useState(false);
@@ -191,6 +197,22 @@ export function SaveHeart({
 
   return (
     <>
+      {triggerLabel ? (
+        <button
+          type="button"
+          onClick={handleHeartClick}
+          disabled={isLoading}
+          aria-haspopup="dialog"
+          className={cn(
+            "inline-flex min-h-11 items-center justify-center rounded-full border border-border bg-white px-4 text-[13px] font-semibold text-foreground transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            isSaved && "border-primary text-primary",
+            isLoading && "cursor-not-allowed opacity-50",
+            className,
+          )}
+        >
+          {saveStatus.inPlan ? "В плане" : triggerLabel}
+        </button>
+      ) : (
       <button
         type="button"
         onClick={handleHeartClick}
@@ -213,6 +235,7 @@ export function SaveHeart({
           )}
         />
       </button>
+      )}
 
       <SaveActivityFlowAdaptive
         open={flowOpen}

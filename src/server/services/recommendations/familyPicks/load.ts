@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import type { Subject } from "@/lib/decision/decisionContext";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
-import { activePlanScopeFor, childScopeFor } from "@/server/family/familyAccess";
+import { activeFamilyUserIds, activePlanScopeFor, childScopeFor } from "@/server/family/familyAccess";
 import {
   eventSystemInterestSlugs,
   rankPlanSuggestionsForCity,
@@ -14,6 +14,7 @@ import { recordRecommendationRun } from "@/server/services/recommendations/Recom
 import { FAMILY_PICKS_ALGORITHM_VERSION, normalizeFamilyPicksConfig, type FamilyPicksConfig } from "./config";
 import {
   ageMonthsAt,
+  ageFilterKeysForChildren,
   selectFamilyPicks,
   type FamilyChild,
   type FamilyContext,
@@ -42,12 +43,18 @@ export type FamilyPickCard = {
   isNovelty: boolean;
   reasonCodes: string[];
   reasonText: string | null;
+  /** До двух чипов причин для карточки. */
+  reasonChips: string[];
 };
 
 export type FamilyPicksResponse = {
   level: FamilyPicksResult["level"];
   title: string | null;
   window: ShowWindow;
+  /** guest — без аккаунта; user — авторизован (даже если детей в профиле ещё нет). */
+  audience: "guest" | "user";
+  /** Ключи возрастных групп детей для ссылки «Другие идеи» (`age=`). Пусто, если возраст неизвестен. */
+  ageFilter: string[];
   runId: string | null;
   algorithmVersion: string;
   items: FamilyPickCard[];
@@ -62,7 +69,29 @@ export type LoadFamilyPicksInput = {
   config?: Partial<FamilyPicksConfig> | unknown;
 };
 
-async function loadFamily(userId: string, now: Date, config: FamilyPicksConfig) {
+async function loadDismissedKeys(input: {
+  userId: string | null;
+  anonymousId: string | null;
+  since: Date;
+}): Promise<string[]> {
+  const actors: Array<{ userId: { in: string[] } } | { anonymousId: string }> = [];
+  if (input.userId) actors.push({ userId: { in: await activeFamilyUserIds(input.userId) } });
+  if (input.anonymousId) actors.push({ anonymousId: input.anonymousId });
+  if (actors.length === 0) return [];
+  const rows = await prisma.userEvent.findMany({
+    where: {
+      OR: actors,
+      eventType: "DISMISS",
+      entityType: AnalyticsEntityType.EVENT,
+      entityId: { not: null },
+      createdAt: { gte: input.since },
+    },
+    select: { entityId: true },
+  });
+  return rows.flatMap((row) => (row.entityId ? [`EVENT:${row.entityId}`] : []));
+}
+
+async function loadFamily(userId: string, anonymousId: string | null, now: Date, config: FamilyPicksConfig) {
   const childRows = await prisma.child.findMany({
     where: await childScopeFor(userId),
     select: {
@@ -85,27 +114,18 @@ async function loadFamily(userId: string, now: Date, config: FamilyPicksConfig) 
   }));
 
   const dismissSince = new Date(now.getTime() - config.dismissCooldownDays * 86_400_000);
-  const [planned, dismissed, experienceAffinity] = await Promise.all([
+  const [planned, dismissedKeys, experienceAffinity] = await Promise.all([
     prisma.planItem.findMany({
       where: { ...(await activePlanScopeFor(userId)), activityId: { not: null } },
       select: { activityId: true },
     }),
-    prisma.userEvent.findMany({
-      where: {
-        userId,
-        eventType: "DISMISS",
-        entityType: AnalyticsEntityType.EVENT,
-        entityId: { not: null },
-        createdAt: { gte: dismissSince },
-      },
-      select: { entityId: true },
-    }),
+    loadDismissedKeys({ userId, anonymousId, since: dismissSince }),
     resolveSelectedExperienceAffinity({ userId, subjects, now }),
   ]);
 
   const excludedKeys = new Set<string>();
   for (const p of planned) if (p.activityId) excludedKeys.add(`EVENT:${p.activityId}`);
-  for (const d of dismissed) if (d.entityId) excludedKeys.add(`EVENT:${d.entityId}`);
+  for (const key of dismissedKeys) excludedKeys.add(key);
 
   const knownCategoryIds = new Set<string>();
   for (const subject of experienceAffinity.subjects) {
@@ -139,6 +159,8 @@ export async function loadFamilyPicks(input: LoadFamilyPicksInput): Promise<Fami
     level: "NONE",
     title: null,
     window,
+    audience: input.userId ? "user" : "guest",
+    ageFilter: [],
     runId: null,
     algorithmVersion: FAMILY_PICKS_ALGORITHM_VERSION,
     items: [],
@@ -148,7 +170,7 @@ export async function loadFamilyPicks(input: LoadFamilyPicksInput): Promise<Fami
   if (!city) return empty;
 
   const family = input.userId
-    ? await loadFamily(input.userId, now, config)
+    ? await loadFamily(input.userId, input.anonymousId ?? null, now, config)
     : {
         children: [] as FamilyChild[],
         subjects: [] as Subject[],
@@ -156,7 +178,13 @@ export async function loadFamilyPicks(input: LoadFamilyPicksInput): Promise<Fami
         ctx: {
           children: [],
           knownCategoryIds: new Set<string>(),
-          excludedKeys: new Set<string>(),
+          excludedKeys: new Set<string>(
+            await loadDismissedKeys({
+              userId: null,
+              anonymousId: input.anonymousId ?? null,
+              since: new Date(now.getTime() - config.dismissCooldownDays * 86_400_000),
+            }),
+          ),
           hasHistory: false,
         } satisfies FamilyContext,
       };
@@ -296,6 +324,7 @@ export async function loadFamilyPicks(input: LoadFamilyPicksInput): Promise<Fami
       isNovelty: item.isNovelty,
       reasonCodes: item.reasonCodes,
       reasonText: item.reasonText,
+      reasonChips: item.reasonChips,
     };
   });
 
@@ -303,6 +332,8 @@ export async function loadFamilyPicks(input: LoadFamilyPicksInput): Promise<Fami
     level: result.level,
     title: result.title,
     window,
+    audience: input.userId ? "user" : "guest",
+    ageFilter: ageFilterKeysForChildren(family.children),
     runId: trace?.runId ?? null,
     algorithmVersion: FAMILY_PICKS_ALGORITHM_VERSION,
     items,

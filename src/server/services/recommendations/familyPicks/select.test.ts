@@ -3,7 +3,9 @@ import test from "node:test";
 import { DEFAULT_FAMILY_PICKS_CONFIG, normalizeFamilyPicksConfig } from "./config";
 import {
   ageMatchForChild,
+  ageFilterKeysForChildren,
   ageMonthsAt,
+  buildReasonChips,
   evaluateAge,
   formatChildNames,
   selectFamilyPicks,
@@ -349,4 +351,39 @@ test("novelty candidate keeps its business slot: regular picks cannot block it (
   assert.ok(ids.includes(A.id));
   assert.equal(r.items[r.items.length - 1]!.candidate.id, A.id);
   assert.equal(r.items.length, 3);
+});
+
+// ─── чипы причин и фильтр «Другие идеи» ──────────────────────────────────
+
+test("reason chips: at most two, never «Подходит» for UNKNOWN age", () => {
+  const sporty = cand({ interestSlugs: ["sport"], interestBoost: 8, isFree: true });
+  const others = [cand(), cand(), cand()];
+  const r = run(
+    [sporty, ...others],
+    ctx({ knownCategoryIds: new Set([sporty, ...others].map((x) => x.categoryId!)) }),
+  );
+  const item = r.items.find((i) => i.candidate.id === sporty.id)!;
+  assert.ok(item.reasonChips.length <= 2);
+  assert.equal(item.reasonChips[0], "Подходит: Стёпа");
+
+  const unknownChips = buildReasonChips({
+    codes: ["AGE_UNKNOWN", "DATE_WEEKEND", "FREE"],
+    matchedChildren: [],
+    matchedInterestSlugs: [],
+  });
+  assert.deepEqual(unknownChips, ["Возраст не указан", "В эти выходные"]);
+  assert.ok(unknownChips.every((c) => !c.startsWith("Подходит")));
+
+  assert.deepEqual(buildReasonChips({ codes: ["NEW_CATEGORY", "AGE_MATCH"], matchedChildren: [stepa], matchedInterestSlugs: [] }), [
+    "Попробуйте новое",
+    "Подходит: Стёпа",
+  ]);
+  assert.deepEqual(buildReasonChips({ codes: ["POPULAR"], matchedChildren: [], matchedInterestSlugs: [] }), ["Популярно"]);
+});
+
+test("age filter keys cover each child with a known age", () => {
+  assert.deepEqual(ageFilterKeysForChildren([{ ageMonths: null }]), []);
+  const keys = ageFilterKeysForChildren([{ ageMonths: 60 }, { ageMonths: 20 }]);
+  assert.ok(keys.length >= 2);
+  assert.deepEqual(keys, [...new Set(keys)]);
 });
