@@ -81,6 +81,7 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
     }
   }
   if (intent === "kuda") {
+    const explicitTerritorySlug = (Array.isArray(searchParams.explore) ? searchParams.explore[0] : searchParams.explore) === "1" ? citySlug : null;
     const formatParam = Array.isArray(searchParams.format)
       ? searchParams.format[0]
       : searchParams.format;
@@ -113,6 +114,7 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
     discoveryActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
       format: parseActivityFormatQuery(typeof formatParam === "string" ? formatParam : null),
       nearby: false,
+      explicitTerritorySlug,
       eventFilters,
     });
     if (budgetEnabled && discoveryActivities) {
@@ -124,6 +126,7 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
         budgetActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
           format: parseActivityFormatQuery(typeof formatParam === "string" ? formatParam : null),
           nearby: false,
+          explicitTerritorySlug,
           eventFilters: { ...eventFilters, priceMin: null, priceMax: null },
         });
       }
