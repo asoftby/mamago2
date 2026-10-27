@@ -1012,6 +1012,7 @@ type OfferBookingRow = {
   rules?: Array<{
     weekday: number;
     startMinutes: number;
+    classGroupId?: string | null;
     capacity: number | null;
     validFrom?: Date | string | null;
     validTo?: Date | string | null;
