@@ -59,6 +59,9 @@ export default async function FamilyProfilePage() {
         }}
         familyChildren={children}
       />
+      <Link href="/me/settings/family-city" className="mb-5 inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline">
+        Домашний город семьи →
+      </Link>
       {familyView ? (
         <FamilyMembersCard
           myRole={familyView.myRole}

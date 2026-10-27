@@ -4,6 +4,7 @@ import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import type { ActivityMock } from "@/types/activity";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
 import { getBusinessQualityBoostMap, applyActivePublicationBoost } from "@/server/services/ranking/businessQualityBoost";
+import { ALL_BELARUS_REGIONS, getDiscoveryRegionContext } from "@/server/geo/boostRegionTargeting";
 
 function ageBoundsFromOffer(offer: {
   ageMinMonths: number | null;
@@ -128,6 +129,7 @@ export async function getClassesDiscoveryFeed(
   const publicWhere = getPublicPublishedOfferWhere();
   const publicWhereParts = (publicWhere.AND ?? []) as Prisma.OfferWhereInput[];
   const now = new Date();
+  const targetRegionId = await getDiscoveryRegionContext(cityId, citySlug);
 
   // classChipSlugs column may not exist yet (pending migration).
   // We try the full query first; if it fails with a missing-column error we
@@ -136,7 +138,7 @@ export async function getClassesDiscoveryFeed(
   let classChipSlugsAvailable = true;
 
   try {
-    rows = await runQuery({ publicWhereParts, cityId, chipSlug, now, free, priceMax });
+    rows = await runQuery({ publicWhereParts, cityId, targetRegionId, chipSlug, now, free, priceMax });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const isMissingColumn =
@@ -151,6 +153,7 @@ export async function getClassesDiscoveryFeed(
         rows = await runQuery({
           publicWhereParts,
           cityId,
+          targetRegionId,
           chipSlug: null,
           now,
           free,
@@ -249,6 +252,7 @@ export async function getClassesDiscoveryFeed(
 type RunQueryParams = {
   publicWhereParts: Prisma.OfferWhereInput[];
   cityId: string;
+  targetRegionId: string | null;
   chipSlug: string | null;
   now: Date;
   free: boolean;
@@ -259,6 +263,7 @@ type RunQueryParams = {
 async function runQuery({
   publicWhereParts,
   cityId,
+  targetRegionId,
   chipSlug,
   now,
   free,
@@ -272,7 +277,22 @@ async function runQuery({
       AND: [
         ...publicWhereParts,
         { kind: "SERVICE" },
-        { place: { cityId } },
+        {
+          OR: [
+            { place: { cityId } },
+            ...(targetRegionId ? [{
+              boosts: { some: {
+                isFreeDaily: false,
+                purchaseRequestKey: { not: null },
+                startAt: { lte: now }, endAt: { gt: now },
+                OR: [
+                  { targetRegionIds: { has: targetRegionId } },
+                  { targetRegionIds: { has: ALL_BELARUS_REGIONS } },
+                ],
+              } },
+            } satisfies Prisma.OfferWhereInput] : []),
+          ],
+        },
         ...(priceWhere ? [priceWhere] : []),
         // Only add chip filter when column exists and chip is requested
         ...(chipSlug && !skipChipSlugsSelect
@@ -315,7 +335,7 @@ async function runQuery({
           startAt: { lte: now },
           endAt: { gt: now },
         },
-        select: { id: true },
+        select: { id: true, targetRegionIds: true },
       },
     },
   });

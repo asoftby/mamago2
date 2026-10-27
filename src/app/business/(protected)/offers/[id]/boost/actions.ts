@@ -11,6 +11,7 @@ const purchaseSchema = z.object({
   offerId: z.string().min(1),
   optionId: z.string().refine(isBoostOptionId),
   requestKey: z.string().trim().min(8).max(128),
+  targetRegionIds: z.array(z.string().min(1)).max(6).default([]),
 });
 
 export async function purchaseOfferBoostAction(input: z.input<typeof purchaseSchema>) {
@@ -29,6 +30,7 @@ export async function purchaseOfferBoostAction(input: z.input<typeof purchaseSch
       offerId: parsed.data.offerId,
       optionId: parsed.data.optionId,
       requestKey: parsed.data.requestKey,
+      targetRegionIds: parsed.data.targetRegionIds,
     });
     revalidatePath("/business/offers");
     revalidatePath("/business/billing");
