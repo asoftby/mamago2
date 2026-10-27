@@ -198,7 +198,7 @@ export function buildClassScheduleInput(
         ? form.groups
             .filter((group) => group.days.length > 0 && TIME_RE.test(group.time))
             .map((group) => ({
-              id: group.id, title: group.title, tariffs: group.tariffs ?? [], days: [...new Set(group.days)].sort(), time: group.time, seats: parseSeats(group.seats),
+              id: group.id, ...(group.title !== undefined ? { title: group.title } : {}), tariffs: group.tariffs ?? [], days: [...new Set(group.days)].sort(), time: group.time, seats: parseSeats(group.seats),
               ...(group.period !== undefined ? { period: group.period } : {}),
             }))
         : [],
