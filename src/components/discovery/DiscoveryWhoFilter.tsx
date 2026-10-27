@@ -69,7 +69,7 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
       actions={{ setDraft: patch => {
         if (!Array.isArray(patch.age)) { actions.setDraft(patch); return; }
         if (selected.length) family?.setSelectedPersonaIds([]);
-        actions.setDraft({ age: patch.age, profile: null, adultOnly: false });
+        actions.setDraft({ age: patch.age, profile: null, adultOnly: patch.age.includes("18+") });
       } }}
       selectedPersonaIds={selected.filter(id => mapPlanParticipantsToAudience([id], family?.personas ?? []).some(age => applied.age.includes(age)))}
       selectedChildIds={selected.filter(id => childIds.includes(id))}
