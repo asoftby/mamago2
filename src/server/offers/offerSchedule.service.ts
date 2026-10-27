@@ -259,6 +259,8 @@ async function applyClassSchedule(db: Db, offerId: string, schedule: ClassSchedu
     return;
   }
 
+  // Regular groups no longer available when switching to dated sessions; preserve IDs for history.
+  await db.offerClassGroup.updateMany({ where: { offerId, active: true }, data: { active: false } });
   // Удаляем прежнее регулярное представление при переходе к разовым датам.
   await db.offerScheduleRule.deleteMany({ where: { offerBookingId: booking.id } });
   // Разовые занятия — OfferSession по датам.
