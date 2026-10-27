@@ -12,9 +12,16 @@ import {
   getPublicRouteIndexWhere,
 } from "./publicContentVisibility";
 
+// Breaking News is a publication type and is valid without a thematic category.
+// Regular articles and collections still require an active ARTICLE category.
 assert.deepEqual(getPublicPublishedArticleWhere(), {
   status: "PUBLISHED",
-  category: { publicationType: "ARTICLE", isActive: true, archivedAt: null },
+  AND: [{
+    OR: [
+      { publicationType: "BREAKING_NEWS" },
+      { category: { publicationType: "ARTICLE", isActive: true, archivedAt: null } },
+    ],
+  }],
 });
 
 assert.deepEqual(getPublicPageDetailWhere(), {

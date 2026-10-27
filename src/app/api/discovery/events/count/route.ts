@@ -8,9 +8,11 @@ export async function GET(request: NextRequest) {
   const p = request.nextUrl.searchParams;
   const city = await findCityBySlug(p.get("city") ?? "minsk");
   if (!city) return NextResponse.json({ error: "CITY_NOT_FOUND" }, { status: 404 });
+  const explicitTerritorySlug = p.get("explore") === "1" ? city.slug : null;
   const preset = p.get("preset");
   const count = await countKudaDiscoveryEvents(city.id, city.slug, {
     format: parseActivityFormatQuery(p.get("format")),
+    explicitTerritorySlug,
     eventFilters: {
       categorySlugs: p.get("category")?.split(",").filter(Boolean) ?? [],
       genreSlugs: p.get("genre")?.split(",").filter(Boolean) ?? [],
