@@ -50,7 +50,7 @@ function availableSlot(snapshot: SlotSnapshot, input: ReserveSlotInput, now: Dat
 
 function sessionCapacity(snapshot: SlotSnapshot, start: Date): number | null {
   const existing = snapshot.sessions.find((session) => session.startAt.getTime() === start.getTime());
-  if (existing) return existing.capacity ?? snapshot.capacity;
+  if (existing?.capacity != null) return existing.capacity;
   const local = localMinuteKey(start, snapshot.timezone);
   const date = dateKeyInZone(start, snapshot.timezone);
   const minute = Number(local.slice(11, 13)) * 60 + Number(local.slice(14, 16));
@@ -118,7 +118,11 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
           (!rule.validTo || date <= rule.validTo.toISOString().slice(0, 10)));
         if (!belongsToGroup) throw new SlotReservationError("INVALID_SLOT", "Время не соответствует расписанию группы");
       }
-      const query = { offerId: input.offerId, from: input.startsAt, to: new Date(input.endsAt.getTime() + 1), requestedSeats: seats };
+      // Serialize reservations within the same class group; different groups keep separate quotas.
+      if (group) {
+        await tx.$queryRaw`SELECT "id" FROM "OfferClassGroup" WHERE "id" = ${group.id} AND "offerId" = ${input.offerId} FOR UPDATE`;
+      }
+      const query = { offerId: input.offerId, ...(group ? { classGroupId: group.id } : {}), from: input.startsAt, to: new Date(input.endsAt.getTime() + 1), requestedSeats: seats };
       const initial = await loadSlotSnapshot(query, tx);
       if (!initial) throw new SlotReservationError("OFFER_UNAVAILABLE", "Запись по расписанию не включена");
       const candidate = availableSlot(initial, input, now);
