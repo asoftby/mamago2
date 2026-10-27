@@ -40,6 +40,7 @@ import {
   resolveFamilyAgeMode,
 } from "@/lib/family/familyAgeMode";
 import { MAX_ACTIVE_FAMILY_PERSONAS } from "@/lib/family/wholeFamilyPreset";
+import { mapPlanParticipantsToAudience } from "@/lib/family/audienceSyncMapper";
 import { MobileSearch } from "@/components/mobile/MobileSearch";
 import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
 import { MobileOverlayPrimaryAction } from "@/components/mobile/MobileOverlayPrimaryAction";
