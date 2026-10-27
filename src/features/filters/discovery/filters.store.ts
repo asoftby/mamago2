@@ -759,6 +759,15 @@ export function useDiscoveryFilters() {
         stripAgeFromStoredDiscoverySession(cityForSession, path, next);
         scheduleOverlayFailsafe();
       },
+      /** Cancel a debounced URL write before navigation to another territory. */
+      cancelPendingWrite: () => {
+        if (writeTimerRef.current) {
+          clearTimeout(writeTimerRef.current);
+          writeTimerRef.current = null;
+        }
+        pendingWriteRef.current = null;
+        clearOverlayFailsafe();
+      },
       /** Закрыть панель без отката URL */
       close: () => {},
     }),

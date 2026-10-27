@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { serializeAppliedToSearchParams, mergeDiscoveryPatch, useDiscoveryFilters, getDiscoveryFilterActiveCount, defaultFilters, type DiscoveryFilters } from "@/features/filters/discovery/filters.store";
+import { serializeAppliedToSearchParams, useDiscoveryFilters, getDiscoveryFilterActiveCount, defaultFilters, type DiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { toggleEventCategory, useEventTaxonomy } from "@/features/filters/discovery/eventTaxonomy";
 import { Chip } from "@/components/ui/Chip";
 import { DiscoveryWhoFilter } from "./DiscoveryWhoFilter";
+import { EventTerritoryFilter } from "./EventTerritoryFilter";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
+import { pluralize } from "@/lib/formatters/pluralize";
 import { useEventAvailableFacets } from "@/features/filters/discovery/useEventAvailableFacets";
 import { Button } from "@/components/ui/button";
 import { ACTIVITY_FORMAT_OPTIONS } from "@/domain/activities/activity-format";
@@ -224,22 +226,27 @@ function PriceRangeControl({
 }
 
 export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; onApply?: () => void }) {
-  const { applied, actions } = useDiscoveryFilters();
-  const [draft, setDraft] = React.useState<DiscoveryFilters>(() => applied);
+  const { applied: draft, actions } = useDiscoveryFilters();
   const family = useFamilyPersona();
-  const facets = useEventAvailableFacets(applied);
+  const facets = useEventAvailableFacets(draft);
   const explore = useEventListingExplore();
   const { categories, loading: taxonomyLoading } = useEventTaxonomy(citySlug);
+  const [count, setCount] = React.useState<number | null>(null);
   const [distribution, setDistribution] = React.useState<PriceDistribution>({ max: null, maxPrice: null, minPaid: null, step: null, buckets: [] });
-  const patch = (next: Partial<DiscoveryFilters>) => setDraft(prev => mergeDiscoveryPatch(prev, next));
+  const patch = (next: Partial<DiscoveryFilters>) => actions.setDraft(next);
 
   React.useEffect(() => {
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      const params = serializeAppliedToSearchParams(new URLSearchParams(), applied);
+      const params = serializeAppliedToSearchParams(new URLSearchParams(), draft);
       params.set("city", citySlug);
       if (explore) params.set("explore", "1");
-params.delete("priceMin");
+      fetch(`/api/discovery/events/count?${params}`, { signal: controller.signal })
+        .then((response) => response.ok ? response.json() : null)
+        .then((data) => setCount(data?.count ?? null))
+        .catch(() => {});
+
+      params.delete("priceMin");
       params.delete("priceMax");
       params.delete("free");
       fetch(`/api/discovery/events/price-distribution?${params}`, { signal: controller.signal })
@@ -251,11 +258,12 @@ params.delete("priceMin");
         .catch(() => {});
     }, 150);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [citySlug, applied, explore]);
+  }, [citySlug, draft, explore]);
 
   return (
     <div className="space-y-6 pb-1">
-      <DiscoveryWhoFilter inline draftFilters={draft} onDraftPatch={patch} />
+      <EventTerritoryFilter onApply={onApply} filters={draft} onBeforeNavigate={actions.cancelPendingWrite} />
+      <DiscoveryWhoFilter inline />
 
       {(draft.occasionSlug === "halloween" || facets?.occasions.includes("halloween")) && (
         <fieldset className="space-y-2">
@@ -271,7 +279,7 @@ params.delete("priceMin");
             <Chip
               key={category.id}
               active={draft.categories.includes(category.slug)}
-              onClick={() => setDraft(toggleEventCategory(draft, category.slug, categories))}
+              onClick={() => actions.commitFilters(toggleEventCategory(draft, category.slug, categories))}
             >
               {category.nameRu}
             </Chip>
@@ -356,20 +364,18 @@ params.delete("priceMin");
           className="min-h-11 px-2 lg:min-h-0 lg:rounded-none lg:px-0 lg:py-0 lg:font-semibold lg:text-foreground lg:underline lg:hover:bg-transparent lg:hover:text-foreground lg:active:bg-transparent"
           onClick={() => {
             family?.setSelectedPersonaIds([]);
-            const reset = resetEventRefinements(draft);
-            setDraft(reset);
-            actions.commitFilters(reset);
+            actions.commitFilters(resetEventRefinements(draft));
             onApply?.();
           }}
         >
           <span className="sm:hidden">Сбросить</span>
           <span className="hidden sm:inline">Сбросить уточнения</span>
         </MobileOverlayResetAction>
-        <MobileOverlayPrimaryAction className="min-w-0 flex-1 lg:hidden" onClick={() => { actions.commitFilters(draft); onApply?.(); }}>
-          Показать события
+        <MobileOverlayPrimaryAction className="min-w-0 flex-1 lg:hidden" onClick={() => onApply?.()}>
+          Показать {count == null ? "…" : pluralize(count, ["событие", "события", "событий"])}
         </MobileOverlayPrimaryAction>
-        <Button className="hidden min-h-11 rounded-full px-6 text-sm lg:inline-flex" onClick={() => { actions.commitFilters(draft); onApply?.(); }}>
-          Показать события
+        <Button className="hidden min-h-11 rounded-full px-6 text-sm lg:inline-flex" onClick={() => onApply?.()}>
+          Показать {count == null ? "…" : pluralize(count, ["событие", "события", "событий"])}
         </Button>
       </div>
     </div>
