@@ -19,7 +19,7 @@ export async function loadSlotSnapshot(
       inheritPlaceOpeningHours: true,
       place: { select: { openingHoursId: true } },
       offerBooking: {
-        include: { rules: true, exceptions: true },
+        include: { rules: { where: input.classGroupId ? { classGroupId: input.classGroupId } : {} }, exceptions: true },
       },
     },
   });
@@ -36,7 +36,7 @@ export async function loadSlotSnapshot(
       select: { id: true, startAt: true, endAt: true, capacity: true, isCancelled: true },
     }),
     db.bookingRequest.findMany({
-      where: { offerId: input.offerId, status: { in: ["NEW", "CONFIRMED"] } },
+      where: { offerId: input.offerId, ...(input.classGroupId ? { classGroupId: input.classGroupId } : {}), status: { in: ["NEW", "CONFIRMED"] } },
       select: {
         offerSessionId: true, startsAt: true, seats: true, status: true, holdUntil: true,
         campShiftDateFrom: true, campShiftDateTo: true, childrenCount: true,
@@ -81,7 +81,7 @@ export async function loadSlotSnapshot(
       capacity: rule.capacity,
     })),
     closedDates: booking.exceptions.map((exception) => dateKey(exception.date)),
-    sessions,
+    sessions: input.classGroupId ? sessions.map((session) => ({ ...session, capacity: null })) : sessions,
     requests: requests.map((request) => ({ ...request, status: request.status as "NEW" | "CONFIRMED" })),
     openingHours: hours ? {
       mode: hours.mode,
