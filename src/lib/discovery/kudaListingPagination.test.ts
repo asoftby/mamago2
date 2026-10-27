@@ -78,6 +78,15 @@ assert.equal(buildBudgetSearchParams(onPage3, null).get("priceMax"), null);
 assert.equal(buildBudgetSearchParams(new URLSearchParams("budget=50&page=2"), 30).get("budget"), null);
 assert.equal(serializeAppliedToSearchParams(onPage3, { ...defaultFilters, age: ["3-5"] }).get("page"), null);
 assert.equal(resetListingPage(new URLSearchParams("page=9&x=1")).toString(), "x=1");
+// Territory switch: same serializer as EventTerritoryFilter.navigate() → no stale page.
+{
+  const territory = serializeAppliedToSearchParams(new URLSearchParams("age=3-5&page=4&explore=1"), { ...defaultFilters, age: ["3-5"] });
+  territory.set("explore", "1");
+  assert.equal(territory.get("page"), null);
+  assert.equal(territory.get("age"), "3-5");
+}
+// Persona IDs never round-trip through the listing URL (#799).
+assert.equal(parseAppliedFromUrl(new URLSearchParams("profile=user1,child2")).profile, null);
 
 // Other URL writers of discovery filters also go through resetListingPage.
 import("node:fs").then(({ readFileSync }) => {
@@ -89,6 +98,9 @@ import("node:fs").then(({ readFileSync }) => {
   ]) {
     assert.match(readFileSync(file, "utf8"), /resetListingPage\(new URLSearchParams/, `${file} must reset page`);
   }
+  // Territory switch (#810) reuses the serializer → page dropped; overview links skip it.
+  assert.match(readFileSync("src/components/discovery/EventTerritoryFilter.tsx", "utf8"), /serializeAppliedToSearchParams\(new URLSearchParams\(params\.toString\(\)\), filters\)/);
+  assert.match(readFileSync("src/components/discovery/BelarusTripIdeas.tsx", "utf8"), /"metro","page"\]/);
   const hubPage = readFileSync("src/app/(public)/[city]/events/category/[category]/page.tsx", "utf8");
   assert.match(hubPage, /implicitFilters=\{\{ category: hub\.category\.slug \}\}/);
 });

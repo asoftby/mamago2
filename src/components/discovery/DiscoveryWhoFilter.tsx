@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { DiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { ChevronDown } from "lucide-react";
 import { AgePanel } from "@/components/site/header/search-segments/AgePanel";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -20,13 +21,17 @@ import { useEventAvailableFacets } from "@/features/filters/discovery/useEventAv
 import { ClearableQuickFilterChip } from "./ClearableQuickFilterChip";
 
 /** Shared who/age controls for the Kuda row and dialog; never a second age state. */
-export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
-  const { applied, actions } = useDiscoveryFilters();
+export function DiscoveryWhoFilter({ inline = false, draftFilters, onDraftPatch }: { inline?: boolean; draftFilters?: DiscoveryFilters; onDraftPatch?: (patch: Partial<DiscoveryFilters>) => void }) {
+  const shared = useDiscoveryFilters();
+  const applied = draftFilters ?? shared.applied;
+  const actions = { setDraft: onDraftPatch ?? shared.actions.setDraft };
+  const [draftPersonaIds, setDraftPersonaIds] = useState<string[]>([]);
+  const controlled = !!draftFilters && !!onDraftPatch;
   const family = useFamilyPersona();
   const [open, setOpen] = useState(false);
   const mobile = useIsMobile();
-  const facets = useEventAvailableFacets(applied, inline || open);
-  const selected = family?.selectedPersonaIds ?? [];
+  const facets = useEventAvailableFacets(controlled ? shared.applied : applied, inline || open);
+  const selected = controlled ? draftPersonaIds : family?.selectedPersonaIds ?? [];
   const children = !family?.loading ? family?.childPersonasForFilter ?? [] : [];
   const childIds = children.map(child => child.id);
   const ageMode = resolveFamilyAgeMode({
@@ -47,16 +52,18 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
 
   const setSelection = (nextIds: string[]) => {
     if (!family) return;
-    family.setSelectedPersonaIds(nextIds);
+    if (controlled) setDraftPersonaIds(nextIds);
+    else family.setSelectedPersonaIds(nextIds);
     actions.setDraft({
-      profile: nextIds.length ? nextIds.join(",") : null,
+      profile: null,
       age: mapPlanParticipantsToAudience(nextIds, family.personas),
       adultOnly: false,
     });
   };
 
   const clearWho = (close = true) => {
-    family?.setSelectedPersonaIds([]);
+    if (controlled) setDraftPersonaIds([]);
+    else family?.setSelectedPersonaIds([]);
     actions.setDraft({ age: [], profile: null, adultOnly: false });
     if (close) setOpen(false);
   };
@@ -68,10 +75,13 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
       applied={applied}
       actions={{ setDraft: patch => {
         if (!Array.isArray(patch.age)) { actions.setDraft(patch); return; }
-        if (selected.length) family?.setSelectedPersonaIds([]);
+        if (selected.length) {
+          if (controlled) setDraftPersonaIds([]);
+          else family?.setSelectedPersonaIds([]);
+        }
         actions.setDraft({ age: patch.age, profile: null, adultOnly: false });
       } }}
-      selectedPersonaIds={selected}
+      selectedPersonaIds={selected.filter(id => mapPlanParticipantsToAudience([id], family?.personas ?? []).some(age => applied.age.includes(age)))}
       selectedChildIds={selected.filter(id => childIds.includes(id))}
       availableChildren={children}
       onToggleChild={family ? id => setSelection(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id]) : undefined}
@@ -84,7 +94,7 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
         const id = family.primaryAdultPersonaId!;
         setSelection(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id]);
       } : undefined}
-      ageMode={ageMode}
+      ageMode="manual"
       autoAgeValues={selected.length ? applied.age : []}
       availableAgeValues={selected.length ? facets?.ages ?? null : null}
       personaPickAtLimit={selected.length >= MAX_ACTIVE_FAMILY_PERSONAS}

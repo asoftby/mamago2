@@ -18,8 +18,10 @@ export async function GET(request: NextRequest) {
   const city = await findCityBySlug(p.get("city") ?? "minsk");
   if (!city) return NextResponse.json({ error: "CITY_NOT_FOUND" }, { status: 404 });
 
+  const explicitTerritorySlug = p.get("explore") === "1" ? city.slug : null;
   const preset = p.get("preset");
   const { where } = await buildKudaDiscoveryWhere(city.id, city.slug, {
+    explicitTerritorySlug,
     eventFilters: {
       categorySlugs: [], genreSlugs: [], occasionSlug: null,
       dateRange: resolveEventDateRange({

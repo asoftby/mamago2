@@ -22,6 +22,8 @@ export async function GET(request: NextRequest) {
     searchParams: params,
     page: parseListingPage(params.get("page")),
     halloweenEnabled,
+    // Same scope as the SSR render and the count/facets APIs (#795).
+    explicitTerritorySlug: params.get("explore") === "1" ? city.slug : null,
   });
 
   return NextResponse.json(

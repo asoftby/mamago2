@@ -1,12 +1,8 @@
-import prisma from "@/lib/prisma";
 import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 import { parseAppliedFromUrl } from "@/features/filters/discovery/discoveryFilterParams";
 import { partitionDiscoveryFeed } from "@/lib/discovery/partitionDiscoveryFeed";
-import type { AudienceSelection } from "@/lib/discovery/audienceEligibility";
-import type { FamilyPersona } from "@/lib/family/familyPersonaTypes";
 import { getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
 import { resolveEventDateRange, type EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
-import { childScopeFor } from "@/server/family/familyAccess";
 import type { ActivityMock } from "@/types/activity";
 import {
   KUDA_LISTING_PAGE_SIZE,
@@ -72,39 +68,6 @@ export function buildKudaEventFilters(
   };
 }
 
-/**
- * Server-side «Для кого» audience. The client already mirrors the selected
- * family personas into the URL (`profile=<ids>`, FamilyDerivedAgeSync), so the
- * server resolves the same personas for the signed-in user and applies the
- * very same `partitionDiscoveryFeed` the client used to run — once, over the
- * whole ranked pool, before slicing pages. Guests (no personas) fall back to
- * the manual `age` chips exactly like before.
- */
-export async function loadListingAudience(
-  userId: string | null,
-  profileParam: string | null,
-): Promise<AudienceSelection | undefined> {
-  if (!userId || !profileParam) return undefined;
-  const requested = profileParam.split(",").filter(Boolean);
-  if (requested.length === 0) return undefined;
-  const children = await prisma.child.findMany({
-    where: await childScopeFor(userId),
-    select: { id: true, birthDate: true },
-  });
-  const personas: FamilyPersona[] = [
-    { id: userId, kind: "adult", displayName: "Я" },
-    ...children.map((child) => ({
-      id: child.id,
-      kind: "child" as const,
-      displayName: "",
-      birthDate: child.birthDate?.toISOString() ?? null,
-    })),
-  ];
-  const known = new Set(personas.map((persona) => persona.id));
-  const selectedPersonaIds = requested.filter((id) => known.has(id));
-  return selectedPersonaIds.length > 0 ? { personas, selectedPersonaIds } : undefined;
-}
-
 export type KudaListingResult = KudaListingPage<ActivityMock> & {
   /** Whole partitioned pool (budget slider domain). */
   pool: ActivityMock[];
@@ -117,21 +80,24 @@ export async function loadKudaListingPage(input: {
   searchParams: Pick<URLSearchParams, "get">;
   page: number;
   halloweenEnabled: boolean;
+  /** Events-only territory scope (`explore=1`, #795); null = default city hub expansion. */
+  explicitTerritorySlug?: string | null;
   pageSize?: number;
 }): Promise<KudaListingResult> {
   const filters = parseAppliedFromUrl(input.searchParams);
   const eventFilters = buildKudaEventFilters(input.searchParams, input.halloweenEnabled);
-  const [feed, audience] = await Promise.all([
-    getKudaDiscoveryFeed(input.cityId, input.citySlug, input.userId, {
+  // Family personas never reach the server listing (no persona IDs in URLs,
+  // #799): the partition uses only explicit filters (manual age chips), so
+  // `?page=N`, infinite scroll and guests all see the same membership/order.
+  const feed = await getKudaDiscoveryFeed(input.cityId, input.citySlug, input.userId, {
       take: KUDA_LISTING_POOL,
       candidatePoolCap: KUDA_LISTING_POOL,
       format: parseActivityFormatQuery(input.searchParams.get("format")),
       nearby: false,
+      explicitTerritorySlug: input.explicitTerritorySlug ?? null,
       eventFilters,
-    }),
-    loadListingAudience(input.userId, filters.profile),
-  ]);
-  const partition = partitionDiscoveryFeed(filters, feed, audience);
+  });
+  const partition = partitionDiscoveryFeed(filters, feed);
   const page = paginateKudaFeed(partition, input.page, input.pageSize ?? KUDA_LISTING_PAGE_SIZE);
   return { ...page, pool: [...partition.primary, ...partition.secondary] };
 }

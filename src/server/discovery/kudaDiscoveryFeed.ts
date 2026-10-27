@@ -3,8 +3,12 @@ import { eventTemporalScore, KUDA_DEFAULT_HORIZON_DAYS, KUDA_SEASONAL_HORIZON_DA
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
-import { activityInAnyOfCitiesWhere } from "@/server/discovery/activityInCityWhere";
+import { activityInAnyOfCitiesWhere, activityInExactCitiesWhere } from "@/server/discovery/activityInCityWhere";
 import { resolveKudaDiscoveryCityIds } from "@/server/discovery/discoveryHubExpand";
+import { resolveTerritoryBySlug } from "@/server/territory/resolveTerritory";
+import { resolveTerritoryCityIds } from "@/server/territory/resolveTerritoryCityIds";
+import { getCrossRegionPopularActivityIds } from "@/server/discovery/crossRegionFamilySignal";
+import { ALL_BELARUS_REGIONS, getDiscoveryRegionContext } from "@/server/geo/boostRegionTargeting";
 import { createDiscoveryPerf } from "@/server/discovery/discoveryPerf";
 import type { ActivityMock } from "@/types/activity";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
@@ -34,9 +38,18 @@ function hasActiveEventRuntimeFilters(filters: EventRuntimeFilters): boolean {
   );
 }
 
-export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, options: { format?: ActivityFormat | null; nearby?: boolean; eventFilters: EventRuntimeFilters }) {
+export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, options: { format?: ActivityFormat | null; nearby?: boolean; eventFilters: EventRuntimeFilters; explicitTerritorySlug?: string | null }) {
   const now = new Date();
-  const { primaryCityId, expandedCityIds } = await resolveKudaDiscoveryCityIds(citySlug, cityId);
+  const explicitTerritory = options.explicitTerritorySlug ? await resolveTerritoryBySlug(options.explicitTerritorySlug) : null;
+  if (options.explicitTerritorySlug && !explicitTerritory) throw new Error("Unknown explicit territory");
+  const { primaryCityId, expandedCityIds } = explicitTerritory
+    ? { primaryCityId: cityId, expandedCityIds: await resolveTerritoryCityIds(explicitTerritory) }
+    : await resolveKudaDiscoveryCityIds(citySlug, cityId);
+  const strictGeo = Boolean(explicitTerritory);
+  const [crossRegionPopularIds, targetRegionId] = await Promise.all([
+    options.nearby || strictGeo ? Promise.resolve([] as string[]) : getCrossRegionPopularActivityIds(primaryCityId, expandedCityIds),
+    options.nearby || strictGeo ? Promise.resolve(null) : getDiscoveryRegionContext(cityId, citySlug),
+  ]);
   const pub = getPublicListingActivityWhere(now);
   // Explicit date selection is authoritative. Without it, discover the next
   // 45 days plus editorially tagged holiday/season events up to 90 days away.
@@ -63,7 +76,18 @@ export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, 
     ],
   }];
   const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
-  const where: Prisma.ActivityWhereInput = { AND: [{ type: ActivityType.EVENT }, ...(options.format ? [{ format: options.format }] : options.nearby ? [{ format: { in: [ActivityFormat.OFFLINE, ActivityFormat.HYBRID] } }] : []), activityInAnyOfCitiesWhere(expandedCityIds), ...buildEventRuntimeWhere(options.eventFilters), ...defaultWindow, ...pubParts] };
+  const where: Prisma.ActivityWhereInput = { AND: [{ type: ActivityType.EVENT }, ...(options.format ? [{ format: options.format }] : options.nearby ? [{ format: { in: [ActivityFormat.OFFLINE, ActivityFormat.HYBRID] } }] : []), { OR: [
+    strictGeo ? activityInExactCitiesWhere(expandedCityIds) : activityInAnyOfCitiesWhere(expandedCityIds),
+    ...(crossRegionPopularIds.length > 0 ? [{ id: { in: crossRegionPopularIds } }] : []),
+    ...(targetRegionId ? [{ boosts: { some: {
+      isFreeDaily: false, purchaseRequestKey: { not: null },
+      startAt: { lte: now }, endAt: { gt: now },
+      OR: [
+        { targetRegionIds: { has: targetRegionId } },
+        { targetRegionIds: { has: ALL_BELARUS_REGIONS } },
+      ],
+    } } } satisfies Prisma.ActivityWhereInput] : []),
+  ] }, ...buildEventRuntimeWhere(options.eventFilters), ...defaultWindow, ...pubParts] };
   return { where, primaryCityId };
 }
 
@@ -83,6 +107,7 @@ export async function getKudaDiscoveryFeed(
     format?: ActivityFormat | null;
     nearby?: boolean;
     eventFilters?: EventRuntimeFilters;
+    explicitTerritorySlug?: string | null;
     weather?: {
       scenario: HomeWeatherScenario;
       timeOfDay: TimeOfDay;
@@ -104,7 +129,9 @@ export async function getKudaDiscoveryFeed(
         metroId: null,
         adultOnly: false,
       };
-  const { where, primaryCityId } = await buildKudaDiscoveryWhere(cityId, citySlug, { format: options?.format ?? null, nearby: options?.nearby, eventFilters: runtimeFilters });
+  // Candidate selection is a function of explicit discovery choices only.
+  // The authenticated user ID is intentionally absent from this query.
+  const { where, primaryCityId } = await buildKudaDiscoveryWhere(cityId, citySlug, { format: options?.format ?? null, nearby: options?.nearby, eventFilters: runtimeFilters, explicitTerritorySlug: options?.explicitTerritorySlug });
   perf.mark("where");
 
   /** Достаточно изображений, чтобы сопоставить coverImageId с ActivityImage (как на detail). */
@@ -236,7 +263,7 @@ export async function getKudaDiscoveryFeed(
 export async function countKudaDiscoveryEvents(
   cityId: string,
   citySlug: string,
-  options: { format?: ActivityFormat | null; eventFilters: EventRuntimeFilters },
+  options: { format?: ActivityFormat | null; eventFilters: EventRuntimeFilters; explicitTerritorySlug?: string | null },
 ): Promise<number> {
   const perf = createDiscoveryPerf("kuda-count");
   const { where } = await buildKudaDiscoveryWhere(cityId, citySlug, options);

@@ -101,6 +101,9 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
   }
   let kudaListing: KudaListingProps | undefined = undefined;
   if (intent === "kuda") {
+    // Events-only browsing of another territory (#795): `explore=1` scopes the
+    // candidate query to this city's territory; pagination keeps that scope.
+    const explicitTerritorySlug = (Array.isArray(searchParams.explore) ? searchParams.explore[0] : searchParams.explore) === "1" ? citySlug : null;
     const urlParams = toUrlSearchParams(searchParams);
     const eventFilters = buildKudaEventFilters(urlParams, halloweenEnabled);
     alternativeEventFilters = { ...eventFilters, districtId: null, metroId: null };
@@ -111,6 +114,7 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
       searchParams: urlParams,
       page: parseListingPage(searchParams.page),
       halloweenEnabled,
+      explicitTerritorySlug,
     });
     // A page past the end of a non-empty result set does not exist.
     if (listing.total > 0 && listing.page > listing.totalPages) notFound();
@@ -133,6 +137,7 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
         budgetActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
           format: parseActivityFormatQuery(urlParams.get("format")),
           nearby: false,
+          explicitTerritorySlug,
           eventFilters: { ...eventFilters, priceMin: null, priceMax: null },
         });
       }

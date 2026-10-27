@@ -147,7 +147,7 @@ export function normalizeStoredDiscoveryFilters(parsed: Partial<DiscoveryFilters
     age: Array.isArray(parsed.age) ? parsed.age : [],
     categories: Array.isArray(parsed.categories) ? parsed.categories : [],
     genres: Array.isArray(parsed.genres) ? parsed.genres : [],
-    profile: typeof parsed.profile === "string" ? parsed.profile : null,
+    profile: null,
   };
 }
 
@@ -307,8 +307,8 @@ export function serializeAppliedToSearchParams(
   else params.delete("genre");
   if (next.occasionSlug === "halloween") params.set("occasion", next.occasionSlug);
   else params.delete("occasion");
-  if (next.profile) params.set("profile", next.profile);
-  else params.delete("profile");
+  // Legacy persona identifiers must never be exposed in shareable URLs.
+  params.delete("profile");
 
   const formatQuery = serializeActivityFormatQuery(next.format);
   if (formatQuery) params.set("format", formatQuery);
@@ -640,6 +640,15 @@ export function useDiscoveryFilters() {
         if (shouldClearStoredDiscoveryState(next)) clearSessionForCurrentRoute();
         stripAgeFromStoredDiscoverySession(cityForSession, path, next);
         scheduleOverlayFailsafe();
+      },
+      /** Cancel a debounced URL write before navigation to another territory. */
+      cancelPendingWrite: () => {
+        if (writeTimerRef.current) {
+          clearTimeout(writeTimerRef.current);
+          writeTimerRef.current = null;
+        }
+        pendingWriteRef.current = null;
+        clearOverlayFailsafe();
       },
       /** Закрыть панель без отката URL */
       close: () => {},

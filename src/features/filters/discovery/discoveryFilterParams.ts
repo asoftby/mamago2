@@ -72,7 +72,8 @@ export function parseAppliedFromUrl(
   const categories = searchParams.get("category")?.split(",").filter(Boolean) || [];
   const genres = searchParams.get("genre")?.split(",").filter(Boolean) || [];
   const occasionSlug = searchParams.get("occasion") === "halloween" ? "halloween" : null;
-  const profile = searchParams.get("profile") || null;
+  // Family persona IDs are never read from (or written to) public URLs (#799).
+  const profile = null;
 
   const legacyAgeMap: Record<string, string> = {
     "0+": "0-1",

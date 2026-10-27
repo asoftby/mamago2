@@ -6,6 +6,7 @@ import {
   type BoostOptionId,
 } from "@/lib/billing/boostOptions";
 import { debitBusinessDepositInTx } from "./billingAccount.service";
+import { validateBoostTargetRegions } from "@/server/geo/boostRegionTargeting";
 
 export class BoostPurchaseNotAllowedError extends Error {
   code = "BOOST_PURCHASE_NOT_ALLOWED" as const;
@@ -45,11 +46,14 @@ export async function purchaseOfferBoost(params: {
   offerId: string;
   optionId: BoostOptionId;
   requestKey: string;
+  targetRegionIds?: string[];
 }) {
   const option = getConfiguredBoostOptions().find((item) => item.id === params.optionId);
   if (!option) {
     throw new BoostPricingUnavailableError("Selected Boost option is not enabled");
   }
+
+  const targetRegionIds = await validateBoostTargetRegions(params.targetRegionIds ?? []);
 
   return prisma.$transaction(async (tx) => {
     const replay = await tx.boost.findUnique({
@@ -60,7 +64,8 @@ export async function purchaseOfferBoost(params: {
       if (
         replay.offerId !== params.offerId ||
         replay.durationDays !== option.durationDays ||
-        !replay.price?.equals(option.price)
+        !replay.price?.equals(option.price) ||
+        JSON.stringify([...replay.targetRegionIds].sort()) !== JSON.stringify([...targetRegionIds].sort())
       ) {
         throw new BoostPurchaseNotAllowedError("Request key was used for another Boost purchase");
       }
@@ -113,6 +118,7 @@ export async function purchaseOfferBoost(params: {
         price: new Prisma.Decimal(option.price),
         currency: BILLING_CURRENCY,
         purchaseRequestKey: params.requestKey,
+        targetRegionIds,
       },
     });
 
@@ -132,6 +138,7 @@ export async function purchaseOfferBoost(params: {
         price: option.price,
         currency: BILLING_CURRENCY,
         requestKey: params.requestKey,
+        targetRegionIds,
       },
     });
 
