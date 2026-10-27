@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { Container } from "@/components/ui/Container";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { DiscoveryActivitiesGrid } from "@/components/discovery/DiscoveryActivitiesGrid";
+import type { KudaListingProps } from "@/components/discovery/KudaMasonryListing";
+import type { ImplicitListingFilters } from "@/features/filters/discovery/discoveryFilterParams";
 import { Intent } from "@/lib/intent";
 import { H1 } from "@/components/ui/typography";
 import { CityTitle } from "@/components/ui/CityTitle";
@@ -100,6 +102,10 @@ interface CityDiscoveryShellProps {
   pageTitleOverride?: string;
   weekendPlannerEnabled?: boolean;
   halloweenEnabled?: boolean;
+  /** Afisha («kuda»): server-paginated masonry listing. */
+  kudaListing?: KudaListingProps;
+  /** Route-implied filters (category hub) — part of the effective client filters. */
+  implicitFilters?: ImplicitListingFilters;
 }
 
 export function CityDiscoveryShell({
@@ -116,6 +122,8 @@ export function CityDiscoveryShell({
   pageTitleOverride,
   weekendPlannerEnabled = false,
   halloweenEnabled = false,
+  kudaListing,
+  implicitFilters,
 }: CityDiscoveryShellProps) {
   const { applied } = useDiscoveryFilters();
   const { citySlug: globalCitySlug } = useCity();
@@ -241,6 +249,8 @@ export function CityDiscoveryShell({
         <DiscoveryActivitiesGrid
           listingCitySlug={city}
           activities={discoveryActivities ?? []}
+          kudaListing={intent === "kuda" ? kudaListing : undefined}
+          implicitFilters={implicitFilters}
           coverRatio={intent === "classes" ? "1/1" : undefined}
           emptyTitle={
             intent === "classes"

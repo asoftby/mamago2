@@ -18,7 +18,20 @@ import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 import type { PublicRouteCardModel } from "@/components/routes/types";
 import { computeMaxBudget, getBudgetStep } from "@/lib/discovery/budgetUtils";
 import { summarizeRouteBudget } from "@/lib/routes/routeBudget";
-import { resolveEventDateRange, type EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
+import {
+  buildKudaEventFilters,
+  loadKudaListingPage,
+  parseListingPage,
+  toUrlSearchParams,
+} from "@/server/discovery/kudaListingPage";
+import {
+  discoveryFiltersSignature,
+  parseAppliedFromUrl,
+  type ImplicitListingFilters,
+} from "@/features/filters/discovery/discoveryFilterParams";
+import type { ActivityMock } from "@/types/activity";
+import type { KudaListingProps } from "@/components/discovery/KudaMasonryListing";
+import type { EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
 import { isHalloweenOccasionActive } from "@/server/discovery/activeHalloweenOccasion";
 
 export type BudgetConfig = { max: number; step: number } | null;
@@ -30,6 +43,8 @@ interface CityShellProps {
   intent: Intent;
   searchParams: Record<string, string | string[] | undefined>;
   pageTitleOverride?: string;
+  /** Filters implied by the route (category hub), applied over `searchParams`. */
+  implicitFilters?: ImplicitListingFilters;
 }
 
 function isSectionSystemFilterTableMissing(error: unknown): boolean {
@@ -40,7 +55,11 @@ function isSectionSystemFilterTableMissing(error: unknown): boolean {
   );
 }
 
-export async function CityShell({ citySlug, intent, searchParams, pageTitleOverride }: CityShellProps) {
+export async function CityShell({ citySlug, intent, searchParams: rawSearchParams, pageTitleOverride, implicitFilters }: CityShellProps) {
+  // Route-implied filters (category hub) override the query, like before.
+  const searchParams = implicitFilters?.category
+    ? { ...rawSearchParams, category: implicitFilters.category }
+    : rawSearchParams;
   const [city, user, systemFilters] = await Promise.all([
     findCityBySlug(citySlug),
     getCurrentUser(),
@@ -86,51 +105,43 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
       if (max) budgetConfig = { max, step: getBudgetStep(max) };
     }
   }
+  let kudaListing: KudaListingProps | undefined = undefined;
   if (intent === "kuda") {
+    // Events-only browsing of another territory (#795): `explore=1` scopes the
+    // candidate query to this city's territory; pagination keeps that scope.
     const explicitTerritorySlug = (Array.isArray(searchParams.explore) ? searchParams.explore[0] : searchParams.explore) === "1" ? citySlug : null;
-    const formatParam = Array.isArray(searchParams.format)
-      ? searchParams.format[0]
-      : searchParams.format;
-    const scalar = (key: string) => {
-      const value = searchParams[key];
-      return Array.isArray(value) ? value[0] : value;
-    };
-    const eventFilters = {
-      categorySlugs: scalar("category")?.split(",").filter(Boolean) ?? [],
-      occasionSlug: halloweenEnabled && scalar("occasion") === "halloween" ? "halloween" : null,
-          genreSlugs: scalar("genre")?.split(",").filter(Boolean) ?? [],
-          dateRange: resolveEventDateRange({
-            preset:
-              scalar("preset") === "TODAY" ||
-              scalar("preset") === "TOMORROW" ||
-              scalar("preset") === "WEEKEND"
-                ? (scalar("preset") as "TODAY" | "TOMORROW" | "WEEKEND")
-                : null,
-            from: scalar("from") ?? scalar("dateFrom") ?? null,
-            to: scalar("to") ?? scalar("dateTo") ?? null,
-          }),
-          free: scalar("free") === "true",
-          priceMin: scalar("free") === "true" || scalar("priceMin") == null ? null : (() => { const value = Number(scalar("priceMin")); return Number.isFinite(value) && value > 0 ? value : null; })(),
-          priceMax: scalar("free") === "true" || scalar("priceMax") == null ? null : (() => { const value = Number(scalar("priceMax")); return Number.isFinite(value) && value >= 0 ? value : null; })(),
-          districtId: scalar("district") ?? null,
-          metroId: scalar("metro") ?? null,
-          adultOnly: scalar("adultOnly") === "true",
-    };
+    const urlParams = toUrlSearchParams(searchParams);
+    const eventFilters = buildKudaEventFilters(urlParams, halloweenEnabled);
     alternativeEventFilters = { ...eventFilters, districtId: null, metroId: null };
-    discoveryActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
-      format: parseActivityFormatQuery(typeof formatParam === "string" ? formatParam : null),
-      nearby: false,
+    const listing = await loadKudaListingPage({
+      cityId: city.id,
+      citySlug: city.slug,
+      userId: user?.id ?? null,
+      searchParams: urlParams,
+      page: parseListingPage(searchParams.page),
+      halloweenEnabled,
       explicitTerritorySlug,
-      eventFilters,
     });
-    if (budgetEnabled && discoveryActivities) {
-      let budgetActivities = discoveryActivities;
+    // A page past the end of a non-empty result set does not exist.
+    if (listing.total > 0 && listing.page > listing.totalPages) notFound();
+    discoveryActivities = listing.items;
+    kudaListing = {
+      page: listing.page,
+      totalPages: listing.totalPages,
+      total: listing.total,
+      offset: listing.offset,
+      items: listing.items,
+      secondaryHeading: listing.secondaryHeading,
+      filtersSignature: discoveryFiltersSignature(parseAppliedFromUrl(urlParams)),
+    };
+    if (budgetEnabled) {
+      let budgetActivities: ActivityMock[] = listing.pool;
       // The slider domain must come from the same candidate pool without its own
       // ceiling, otherwise choosing 50 would collapse max to 50 and make it
       // impossible to increase the budget again.
       if (eventFilters.priceMin != null || eventFilters.priceMax != null) {
         budgetActivities = await getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
-          format: parseActivityFormatQuery(typeof formatParam === "string" ? formatParam : null),
+          format: parseActivityFormatQuery(urlParams.get("format")),
           nearby: false,
           explicitTerritorySlug,
           eventFilters: { ...eventFilters, priceMin: null, priceMax: null },
@@ -258,6 +269,8 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
       pageTitleOverride={pageTitleOverride}
       weekendPlannerEnabled={intent === "kuda" && user?.role === "ADMIN"}
       halloweenEnabled={halloweenEnabled}
+      kudaListing={kudaListing}
+      implicitFilters={implicitFilters}
     />
   );
 }

@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { CityShell } from "@/components/city/CityShell";
 import { BelarusTripIdeas } from "@/components/discovery/BelarusTripIdeas";
-import { buildCityEventsListingMetadata } from "@/lib/seo/cityKudaListingMetadata";
+import {
+  buildCityEventsListingMetadata,
+  cityEventsListingPath,
+  withListingPage,
+} from "@/lib/seo/cityKudaListingMetadata";
+import { parseListingPage } from "@/server/discovery/kudaListingPage";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
 interface PageProps {
@@ -23,7 +28,11 @@ export async function generateMetadata({
   if (citySlug === "belarus") {
     return applyGlobalRobotsOverride({ title: "Куда поехать с детьми по Беларуси — mamaGo", robots: { index: false, follow: true } });
   }
-  const metadata = await buildCityEventsListingMetadata(citySlug);
+  const metadata = withListingPage(
+    await buildCityEventsListingMetadata(citySlug),
+    cityEventsListingPath(citySlug),
+    parseListingPage(query.page),
+  );
   if (isFiltered) metadata.robots = { index: false, follow: true };
   return applyGlobalRobotsOverride(metadata);
 }
