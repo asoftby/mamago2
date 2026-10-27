@@ -50,8 +50,6 @@ export async function listBreakingNewsArticles(
             { cityContext: null },
           ],
         },
-        // «Актуально до» из журнала: истёкшая новость не показывается и в Stories.
-        { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
       ],
       subtitle: BREAKING_NEWS_SUBTITLE,
       publishedAt: { not: null, ...getBreakingNewsStoriesPublishedWindow(now) },

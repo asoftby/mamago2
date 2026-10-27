@@ -1,7 +1,6 @@
 import { EventCategoryPublicationType, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
-import { notExpiredJournalPublicationWhere } from "@/lib/journal/publicationType";
 import { queryCityHomeArticles, type JournalPage } from "@/server/article/listCityHomeArticles";
 
 export type CityBlogCategory = {
@@ -32,7 +31,7 @@ function indexableArticleWhere(city: CityRef): Prisma.ArticleWhereInput {
     AND: [{ OR: [
       { seoRobots: null },
       { NOT: { seoRobots: { contains: "noindex", mode: "insensitive" } } },
-    ] }, notExpiredJournalPublicationWhere(new Date())],
+    ] }],
   };
 }
 
