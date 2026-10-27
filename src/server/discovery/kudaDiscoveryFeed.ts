@@ -3,7 +3,7 @@ import { eventTemporalScore, KUDA_DEFAULT_HORIZON_DAYS, KUDA_SEASONAL_HORIZON_DA
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
-import { activityInAnyOfCitiesWhere } from "@/server/discovery/activityInCityWhere";
+import { activityInAnyOfCitiesWhere, activityInExactCitiesWhere } from "@/server/discovery/activityInCityWhere";
 import { resolveKudaDiscoveryCityIds } from "@/server/discovery/discoveryHubExpand";
 import { resolveTerritoryBySlug } from "@/server/territory/resolveTerritory";
 import { resolveTerritoryCityIds } from "@/server/territory/resolveTerritoryCityIds";
@@ -76,7 +76,7 @@ export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, 
   }];
   const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
   const where: Prisma.ActivityWhereInput = { AND: [{ type: ActivityType.EVENT }, ...(options.format ? [{ format: options.format }] : options.nearby ? [{ format: { in: [ActivityFormat.OFFLINE, ActivityFormat.HYBRID] } }] : []), { OR: [
-    activityInAnyOfCitiesWhere(expandedCityIds),
+    strictGeo ? activityInExactCitiesWhere(expandedCityIds) : activityInAnyOfCitiesWhere(expandedCityIds),
     ...(crossRegionPopularIds.length > 0 ? [{ id: { in: crossRegionPopularIds } }] : []),
     ...(targetRegionId ? [{ boosts: { some: {
       isFreeDaily: false, purchaseRequestKey: { not: null },
