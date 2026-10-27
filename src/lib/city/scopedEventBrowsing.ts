@@ -2,7 +2,7 @@
 export const SCOPED_EVENT_BROWSE_PARAM = "explore";
 
 export function isScopedEventBrowsing(pathname: string | null, explore: string | null): boolean {
-  return explore === "1" && /^\/[a-z0-9-]+\/events\/?$/.test(pathname ?? "");
+  return explore === "1" && /^\/[a-z0-9-]+\/events(?:\/[^/?#]+)?\/?$/.test(pathname ?? "");
 }
 
 export function buildScopedEventHref(
