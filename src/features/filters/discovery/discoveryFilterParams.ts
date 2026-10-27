@@ -161,3 +161,39 @@ export function discoveryFiltersSignature(f: DiscoveryFilters): string {
     adultOnly: f.adultOnly,
   });
 }
+
+/** Listing pagination query param (afisha `?page=N`). */
+export const LISTING_PAGE_PARAM = "page";
+
+/**
+ * Every write that changes the result set must start from the first page;
+ * otherwise a narrower filter can land past the end (404) or skip matches.
+ */
+export function resetListingPage<T extends Pick<URLSearchParams, "delete">>(params: T): T {
+  params.delete(LISTING_PAGE_PARAM);
+  return params;
+}
+
+/**
+ * Filters implied by the route rather than the query string — e.g. the
+ * category hub `/[city]/events/category/[category]` injects `category`
+ * server-side. The route value wins, exactly like the server render.
+ */
+export type ImplicitListingFilters = { category?: string | null };
+
+export function withImplicitListingFilters(
+  filters: DiscoveryFilters,
+  implicit: ImplicitListingFilters | null | undefined,
+): DiscoveryFilters {
+  if (!implicit?.category) return filters;
+  return { ...filters, categories: [implicit.category] };
+}
+
+/** Same override applied to raw query params (pagination requests). */
+export function applyImplicitListingParams<T extends Pick<URLSearchParams, "set">>(
+  params: T,
+  implicit: ImplicitListingFilters | null | undefined,
+): T {
+  if (implicit?.category) params.set("category", implicit.category);
+  return params;
+}

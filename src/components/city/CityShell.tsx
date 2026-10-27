@@ -27,6 +27,7 @@ import {
 import {
   discoveryFiltersSignature,
   parseAppliedFromUrl,
+  type ImplicitListingFilters,
 } from "@/features/filters/discovery/discoveryFilterParams";
 import type { ActivityMock } from "@/types/activity";
 import type { KudaListingProps } from "@/components/discovery/KudaMasonryListing";
@@ -42,6 +43,8 @@ interface CityShellProps {
   intent: Intent;
   searchParams: Record<string, string | string[] | undefined>;
   pageTitleOverride?: string;
+  /** Filters implied by the route (category hub), applied over `searchParams`. */
+  implicitFilters?: ImplicitListingFilters;
 }
 
 function isSectionSystemFilterTableMissing(error: unknown): boolean {
@@ -52,7 +55,11 @@ function isSectionSystemFilterTableMissing(error: unknown): boolean {
   );
 }
 
-export async function CityShell({ citySlug, intent, searchParams, pageTitleOverride }: CityShellProps) {
+export async function CityShell({ citySlug, intent, searchParams: rawSearchParams, pageTitleOverride, implicitFilters }: CityShellProps) {
+  // Route-implied filters (category hub) override the query, like before.
+  const searchParams = implicitFilters?.category
+    ? { ...rawSearchParams, category: implicitFilters.category }
+    : rawSearchParams;
   const [city, user, systemFilters] = await Promise.all([
     findCityBySlug(citySlug),
     getCurrentUser(),
@@ -251,6 +258,7 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
       weekendPlannerEnabled={intent === "kuda" && user?.role === "ADMIN"}
       halloweenEnabled={halloweenEnabled}
       kudaListing={kudaListing}
+      implicitFilters={implicitFilters}
     />
   );
 }

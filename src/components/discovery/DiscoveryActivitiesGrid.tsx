@@ -6,7 +6,11 @@ import { isScopedEventBrowsing } from "@/lib/city/scopedEventBrowsing";
 import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { EventCard, EVENT_LISTING_IMAGE_SIZES, activityMockToEventCard } from "@/components/events";
 import { KudaMasonryListing, type KudaListingProps } from "@/components/discovery/KudaMasonryListing";
-import { discoveryFiltersSignature } from "@/features/filters/discovery/discoveryFilterParams";
+import {
+  discoveryFiltersSignature,
+  withImplicitListingFilters,
+  type ImplicitListingFilters,
+} from "@/features/filters/discovery/discoveryFilterParams";
 import { OfferCard } from "@/components/offers/OfferCard";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import {
@@ -42,6 +46,8 @@ type DiscoveryActivitiesGridProps = {
    * as ordered masonry with infinite scroll. When set, `activities` is ignored.
    */
   kudaListing?: KudaListingProps;
+  /** Route-implied filters (category hub); merged into the effective filters. */
+  implicitFilters?: ImplicitListingFilters;
 };
 
 function filtersSignature(f: DiscoveryFilters): string {
@@ -82,6 +88,7 @@ export function DiscoveryActivitiesGrid({
   emptyTitle = "Пока нет событий по вашему запросу",
   emptyDescription = "В этом городе пока нет подходящих опубликованных событий — или стоит ослабить фильтры.",
   kudaListing,
+  implicitFilters,
 }: DiscoveryActivitiesGridProps) {
   const cityCtx = useOptionalCity();
   const pathname = usePathname();
@@ -96,7 +103,7 @@ export function DiscoveryActivitiesGrid({
   const filterSummary = filtersSignature(debounced);
   // Afisha: pending until the server render for the applied URL arrives.
   const isPending = kudaListing
-    ? discoveryFiltersSignature(applied) !== kudaListing.filtersSignature
+    ? discoveryFiltersSignature(withImplicitListingFilters(applied, implicitFilters)) !== kudaListing.filtersSignature
     : appliedFilterSummary !== filterSummary;
   const previousFilterSummaryRef = useRef<string | null>(null);
 
@@ -239,7 +246,12 @@ export function DiscoveryActivitiesGrid({
             ))}
           </div>
         ) : (
-          <KudaMasonryListing listing={kudaListing} citySlug={citySlug} filterSummary={filterSummary} />
+          <KudaMasonryListing
+            listing={kudaListing}
+            citySlug={citySlug}
+            filterSummary={filterSummary}
+            implicitFilters={implicitFilters}
+          />
         )
       )}
 

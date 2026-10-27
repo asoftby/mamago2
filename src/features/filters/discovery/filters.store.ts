@@ -22,6 +22,7 @@ import { parseActivityFormatQuery, serializeActivityFormatQuery } from "@/domain
 import {
   defaultFilters,
   parseAppliedFromUrl,
+  resetListingPage,
   type DiscoveryFilters,
   type WhenPreset,
 } from "./discoveryFilterParams";
@@ -283,9 +284,8 @@ export function serializeAppliedToSearchParams(
   searchParams: Pick<URLSearchParams, "toString">,
   next: DiscoveryFilters,
 ): URLSearchParams {
-  const params = new URLSearchParams(searchParams.toString());
   // A new filter combination always starts from the first listing page.
-  params.delete("page");
+  const params = resetListingPage(new URLSearchParams(searchParams.toString()));
 
   if (next.dateFrom) params.set("from", next.dateFrom);
   else params.delete("from");

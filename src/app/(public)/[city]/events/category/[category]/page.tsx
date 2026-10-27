@@ -98,7 +98,8 @@ export default async function EventCategoryHubPage({ params, searchParams }: Pag
     <CityShell
       citySlug={citySlug}
       intent="kuda"
-      searchParams={{ ...query, category: hub.category.slug }}
+      searchParams={query}
+      implicitFilters={{ category: hub.category.slug }}
       pageTitleOverride={hubTitle}
     />
   );

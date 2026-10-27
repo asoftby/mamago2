@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { resetListingPage } from "./discoveryFilterParams";
 
 /**
  * Historical component/API names still say "budget", but discovery has one
@@ -20,6 +21,24 @@ export type BudgetFilterState = {
 function parsePositiveBudget(raw: string | null): number | null {
   const n = raw ? parseInt(raw, 10) : null;
   return n && n > 0 ? n : null;
+}
+
+/**
+ * Query for a new budget value. Changing the budget changes the result set, so
+ * the listing restarts from page 1 (drops `page`) like every other filter write.
+ */
+export function buildBudgetSearchParams(
+  current: Pick<URLSearchParams, "toString">,
+  value: number | null,
+): URLSearchParams {
+  const params = resetListingPage(new URLSearchParams(current.toString()));
+  params.delete(LEGACY_BUDGET_URL_KEY);
+  if (value && value > 0) {
+    params.set(BUDGET_URL_KEY, String(value));
+  } else {
+    params.delete(BUDGET_URL_KEY);
+  }
+  return params;
 }
 
 export function useBudgetFilter(): BudgetFilterState {
@@ -50,14 +69,7 @@ export function useBudgetFilter(): BudgetFilterState {
 
   const setBudget = useCallback(
     (value: number | null) => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete(LEGACY_BUDGET_URL_KEY);
-      if (value && value > 0) {
-        params.set(BUDGET_URL_KEY, String(value));
-      } else {
-        params.delete(BUDGET_URL_KEY);
-      }
-      const qs = params.toString();
+      const qs = buildBudgetSearchParams(searchParams, value).toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     },
     [router, pathname, searchParams],

@@ -8,11 +8,13 @@ import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardVi
 import { OrderedMasonryGrid } from "@/components/ideas/OrderedMasonryGrid";
 import { resolvePosterFrame } from "@/lib/media/posterFrame";
 import {
+  buildNextPageParams,
   listingPageHref,
   type FeedBucket,
   type KudaListingPage,
 } from "@/lib/discovery/kudaListingPagination";
 import type { ActivityMock } from "@/types/activity";
+import type { ImplicitListingFilters } from "@/features/filters/discovery/discoveryFilterParams";
 
 export type KudaListingItem = ActivityMock & { feedBucket: FeedBucket };
 
@@ -81,10 +83,13 @@ export function KudaMasonryListing({
   listing,
   citySlug,
   filterSummary,
+  implicitFilters,
 }: {
   listing: KudaListingProps;
   citySlug: string;
   filterSummary: string;
+  /** Route-implied filters (category hub) — must reach every next-page request. */
+  implicitFilters?: ImplicitListingFilters;
 }) {
   const pathname = usePathname();
   const query = useSearchParams().toString();
@@ -172,9 +177,11 @@ export function KudaMasonryListing({
     setLoading(true);
     setFailed(false);
     try {
-      const params = new URLSearchParams(window.location.search);
-      params.set("page", String(lastPage + 1));
-      params.set("listingCity", citySlug);
+      const params = buildNextPageParams(window.location.search, {
+        page: lastPage + 1,
+        citySlug,
+        implicitFilters,
+      });
       const response = await fetch(`/api/discovery/events/page?${params.toString()}`, {
         credentials: "include",
         cache: "no-store",
@@ -192,7 +199,7 @@ export function KudaMasonryListing({
     } finally {
       setLoading(false);
     }
-  }, [loading, hasMore, lastPage, citySlug]);
+  }, [loading, hasMore, lastPage, citySlug, implicitFilters]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;

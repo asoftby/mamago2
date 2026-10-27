@@ -1,5 +1,10 @@
 /** Client-safe pagination contract for the afisha («Куда пойти») masonry listing. */
 
+import {
+  applyImplicitListingParams,
+  type ImplicitListingFilters,
+} from "@/features/filters/discovery/discoveryFilterParams";
+
 export const KUDA_LISTING_PAGE_SIZE = 24;
 
 export type FeedBucket = "primary" | "secondary";
@@ -50,4 +55,19 @@ export function listingPageHref(pathname: string, query: string, page: number): 
   else params.set("page", String(page));
   const qs = params.toString();
   return qs ? `${pathname}?${qs}` : pathname;
+}
+
+/**
+ * Query for `/api/discovery/events/page`: the current listing URL + next page +
+ * listing city + route-implied filters (category hub), so every appended page
+ * is cut from the same result set as the SSR render.
+ */
+export function buildNextPageParams(
+  search: string,
+  input: { page: number; citySlug: string; implicitFilters?: ImplicitListingFilters | null },
+): URLSearchParams {
+  const params = applyImplicitListingParams(new URLSearchParams(search), input.implicitFilters);
+  params.set("page", String(input.page));
+  params.set("listingCity", input.citySlug);
+  return params;
 }
