@@ -972,7 +972,7 @@ type OfferOpeningHoursRow = {
 
 /** Расписание формы из строки оффера. Прежние режимы записи остаются как есть (`legacyBookingMode`). */
 function scheduleFromOffer(offer: {
-  classGroups?: Array<{ id: string; title: string; tariffs: Array<{ id: string; title: string; price: string; unit: string; periodDays: number | null; active: boolean }> }>;
+  classGroups?: Array<{ id: string; title: string; tariffs: Array<{ id: string; title: string; price: string; unit: string; periodDays: number | null; visitsCount?: number | null; active: boolean }> }>;
   productType?: OfferProductType | null;
   bookingEnabled?: boolean | null;
   bookingMode?: string | null;
@@ -1055,7 +1055,7 @@ function classScheduleFromOffer(offer: {
       title: offer.classGroups?.find((item) => item.id === group.id)?.title,
       tariffs: offer.classGroups?.find((item) => item.id === group.id)?.tariffs
         .filter((item) => item.active)
-        .map(({ id, title, price, unit, periodDays }) => ({ id, title, price, unit, periodDays })) ?? [],
+        .map(({ id, title, price, unit, periodDays, visitsCount }) => ({ id, title, price, unit, periodDays, visitsCount: visitsCount ?? null })) ?? [],
     }));
   }
   if (offer.productType === "ONE_TIME_ACTIVITY" && offer.sessions?.length) {
