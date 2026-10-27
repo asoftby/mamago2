@@ -77,6 +77,11 @@ export function EventTerritoryFilter({ onApply }: { onApply?: () => void }) {
       {error && <p role="alert" className="text-sm text-muted-foreground">Не удалось загрузить регионы. Откройте фильтры повторно.</p>}
       {!loading && !error && (
         <>
+          <button type="button" onClick={() => setSelection("belarus")}
+            aria-pressed={selectedSlug === "belarus"}
+            className={`min-h-11 w-full rounded-xl border px-3 text-left text-sm font-semibold ${selectedSlug === "belarus" ? "border-primary bg-primary/10 text-primary" : "border-gray-200 hover:bg-gray-50"}`}>
+            Не знаю, куда поехать · Вся Беларусь
+          </button>
           {matchesQuery ? (
             <div className="max-h-52 space-y-1 overflow-y-auto">
               {matching.length === 0 && <p className="text-sm text-muted-foreground">Ничего не найдено</p>}
@@ -117,7 +122,7 @@ export function EventTerritoryFilter({ onApply }: { onApply?: () => void }) {
               )}
             </>
           )}
-          <button type="button" disabled={!selection || selection === currentSlug}
+          <button type="button" disabled={!selection || (selection === currentSlug && params.get("explore") === "1")}
             onClick={() => selection && navigate(selection)}
             className="min-h-11 w-full rounded-full bg-primary px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">
             Применить территорию
