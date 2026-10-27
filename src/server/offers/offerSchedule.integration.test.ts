@@ -196,8 +196,8 @@ const classInput = (overrides: Record<string, unknown> = {}) => ({
     kind: "recurring" as const,
     durationMin: 60,
     groups: [
-      { days: [2, 4], time: "17:30", seats: 8 },
-      { days: [6], time: "11:00", seats: null },
+      { id: "g-weekdays", tariffs: [], days: [2, 4], time: "17:30", seats: 8 },
+      { id: "g-weekend", tariffs: [], days: [6], time: "11:00", seats: null },
     ],
     dates: [],
     period: { from: "2026-10-19", to: "2026-12-14" },
@@ -236,7 +236,7 @@ test("регулярные занятия: правила по дням, пер�
     applyOfferSchedule({
       db: tx,
       offerId,
-      input: classInput({ groups: [{ days: [1], time: "09:00", seats: 5 }], period: null, closedDates: [] }),
+      input: classInput({ groups: [{ id: "g-monday", tariffs: [], days: [1], time: "09:00", seats: 5 }], period: null, closedDates: [] }),
       externalUrlNeedsModeration: false,
     }),
   );
@@ -334,10 +334,10 @@ test("разные периоды одного слота переживают �
   }
 });
 
-test("конфликтующие правила отклоняются без частичной потери существующего расписания", async () => {
+test("повторный ID группы отклоняется без потери существующего расписания", async () => {
   const offerId = await newOffer({ productType: "REGULAR_ACTIVITY" });
   const first = { kind: "recurring" as const, durationMin: 60, dates: [], closedDates: ["2026-12-01"], period: null,
-    groups: [{ days: [1], time: "17:00", seats: 10, period: { from: "2026-10-01", to: "2026-10-31" } }] };
+    groups: [{ id: "g-dup", tariffs: [], days: [1], time: "17:00", seats: 10, period: { from: "2026-10-01", to: "2026-10-31" } }] };
   await db.$transaction(tx => applyOfferSchedule({ db: tx, offerId, input: { classSchedule: first }, externalUrlNeedsModeration: false }));
   const booking = await db.offerBooking.findUniqueOrThrow({ where: { offerId } });
   const before = await db.offerScheduleRule.findMany({ where: { offerBookingId: booking.id } });
