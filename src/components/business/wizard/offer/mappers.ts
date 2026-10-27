@@ -956,6 +956,7 @@ type OfferOpeningHoursRow = {
 
 /** Расписание формы из строки оффера. Прежние режимы записи остаются как есть (`legacyBookingMode`). */
 function scheduleFromOffer(offer: {
+  classGroups?: Array<{ id: string; title: string; tariffs: Array<{ id: string; title: string; price: string; unit: string; periodDays: number | null; active: boolean }> }>;
   productType?: OfferProductType | null;
   bookingEnabled?: boolean | null;
   bookingMode?: string | null;
@@ -1012,6 +1013,7 @@ type OfferBookingRow = {
   rules?: Array<{
     weekday: number;
     startMinutes: number;
+    classGroupId?: string | null;
     capacity: number | null;
     validFrom?: Date | string | null;
     validTo?: Date | string | null;
@@ -1023,6 +1025,7 @@ const dateKeyOf = (value: Date | string) => (typeof value === "string" ? value :
 
 /** Занятия: группы/даты и закрытые дни из OfferScheduleRule/Session/Exception. */
 function classScheduleFromOffer(offer: {
+  classGroups?: Array<{ id: string; title: string; tariffs: Array<{ id: string; title: string; price: string; unit: string; periodDays: number | null; active: boolean }> }>;
   productType?: OfferProductType | null;
   offerBooking?: OfferBookingRow | null;
   sessions?: Array<{ startAt: Date | string; capacity?: number | null }> | null;
@@ -1031,6 +1034,13 @@ function classScheduleFromOffer(offer: {
   const classSchedule = defaultClassSchedule();
   if (offer.productType === "REGULAR_ACTIVITY" && booking?.rules?.length) {
     Object.assign(classSchedule, groupsFromRules(booking.rules));
+    classSchedule.groups = classSchedule.groups.map((group) => ({
+      ...group,
+      title: offer.classGroups?.find((item) => item.id === group.id)?.title,
+      tariffs: offer.classGroups?.find((item) => item.id === group.id)?.tariffs
+        .filter((item) => item.active)
+        .map(({ id, title, price, unit, periodDays }) => ({ id, title, price, unit, periodDays })) ?? [],
+    }));
   }
   if (offer.productType === "ONE_TIME_ACTIVITY" && offer.sessions?.length) {
     const timezone = booking?.timezone || "Europe/Minsk";
@@ -1061,6 +1071,7 @@ function classScheduleFromOffer(offer: {
 
 /** Map Prisma offer row to wizard form (fields stored in DB only). */
 export function mapOfferToFormData(offer: {
+  classGroups?: Array<{ id: string; title: string; tariffs: Array<{ id: string; title: string; price: string; unit: string; periodDays: number | null; active: boolean }> }>;
   placeId?: string | null;
   place?: { title?: string | null } | null;
   kind: OfferKind;

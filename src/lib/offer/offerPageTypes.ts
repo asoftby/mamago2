@@ -156,6 +156,7 @@ export interface OfferPageData {
 
   pricing: {
     /** Canonical publication price semantics from Offer.priceMode. */
+    rawPriceItems?: unknown;
     priceMode?: "FREE" | "EXACT" | "FROM" | "RANGE" | "NONE" | "UNKNOWN" | "ON_REQUEST";
     priceFrom?: string;
     singlePrice?: string;

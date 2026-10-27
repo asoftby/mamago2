@@ -53,7 +53,13 @@ export interface BusinessBookingItem {
   } | null;
   place: { id: string; title: string; slug: string | null } | null;
 
-  // Camp shift snapshot
+  // Class group and tariff snapshot
+  classGroupId: string | null;
+  classGroupTitle: string | null;
+  classTariffId: string | null;
+  classTariffTitle: string | null;
+  classTariffPrice: string | null;
+  classTariffUnit: string | null;
   campShiftId: string | null;
   campShiftTitle: string | null;
   campShiftDateFrom: string | null;
@@ -133,6 +139,12 @@ const BOOKING_SELECT = {
   },
   place: { select: { id: true, title: true, slug: true } },
 
+  classGroupId: true,
+  classGroupTitle: true,
+  classTariffId: true,
+  classTariffTitle: true,
+  classTariffPrice: true,
+  classTariffUnit: true,
   campShiftId: true,
   campShiftTitle: true,
   campShiftDateFrom: true,
@@ -201,6 +213,12 @@ function mapBooking(raw: {
     currency: string | null;
   } | null;
   place: { id: string; title: string; slug: string | null } | null;
+  classGroupId: string | null;
+  classGroupTitle: string | null;
+  classTariffId: string | null;
+  classTariffTitle: string | null;
+  classTariffPrice: string | null;
+  classTariffUnit: string | null;
   campShiftId: string | null;
   campShiftTitle: string | null;
   campShiftDateFrom: Date | null;
@@ -225,6 +243,12 @@ function mapBooking(raw: {
     : null;
 
   const display = buildBookingDisplay({
+    classGroupId: raw.classGroupId,
+    classGroupTitle: raw.classGroupTitle,
+    classTariffId: raw.classTariffId,
+    classTariffTitle: raw.classTariffTitle,
+    classTariffPrice: raw.classTariffPrice,
+    classTariffUnit: raw.classTariffUnit,
     campShiftId: raw.campShiftId,
     campShiftTitle: raw.campShiftTitle,
     campShiftDateFrom,
@@ -259,6 +283,12 @@ function mapBooking(raw: {
     activity: raw.activity,
     place: raw.place,
 
+    classGroupId: raw.classGroupId,
+    classGroupTitle: raw.classGroupTitle,
+    classTariffId: raw.classTariffId,
+    classTariffTitle: raw.classTariffTitle,
+    classTariffPrice: raw.classTariffPrice,
+    classTariffUnit: raw.classTariffUnit,
     campShiftId: raw.campShiftId,
     campShiftTitle: raw.campShiftTitle,
     campShiftDateFrom,

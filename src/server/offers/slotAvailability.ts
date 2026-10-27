@@ -23,6 +23,7 @@ export type Slot = {
 
 export type GetSlotsInput = {
   offerId: string;
+  classGroupId?: string;
   from: Date;
   to: Date;
   requestedSeats?: number;
