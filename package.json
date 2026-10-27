@@ -146,6 +146,7 @@
     "test:gsc": "tsx --test src/server/ops/metrics/collectors/googleSearchConsole.api.test.ts && tsx src/server/ops/metrics/collectors/googleSearchConsole.test.ts && tsx src/server/ops/metrics/collectors/seoEvergreenWeekly.test.ts",
     "test:migrate-with-backup": "bash scripts/release/migrate-with-backup.test.sh",
     "test:territory": "tsx scripts/data-migrations/territoryExpandColumns.test.ts && tsx src/server/territory/syncLegacyGeo.test.ts && tsx src/server/territory/resolveTerritory.test.ts && tsx src/server/territory/listAvailableTerritories.test.ts",
+    "test:family-picks": "tsx src/server/services/recommendations/familyPicks/window.test.ts && tsx src/server/services/recommendations/familyPicks/config.test.ts && tsx src/server/services/recommendations/familyPicks/select.test.ts",
     "test:journal": "tsx src/lib/journal/publicationType.test.ts && tsx src/lib/journal/journalCardMeta.test.ts && tsx src/lib/journal/linkedItemBlocks.test.ts && tsx src/lib/analytics/impressionGate.test.ts && tsx src/server/journal/journalPageQueries.test.ts && tsx src/components/journal/JournalBadge.test.tsx && tsx src/lib/article/articleEditorComparable.test.ts && tsx src/server/article/publicArticleListCacheWiring.test.ts",
     "test:unit": "tsx src/lib/slugifyLabelToValue.test.ts",
     "test:offer-public-page": "tsx src/lib/offers/offerVisibility.test.ts && NODE_OPTIONS=--conditions=react-server tsx src/lib/offer/offerPublicPage.contract.test.ts",
