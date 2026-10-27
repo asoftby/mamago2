@@ -1,6 +1,7 @@
 import { EventCategoryPublicationType, Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
+import { notExpiredJournalPublicationWhere } from "@/lib/journal/publicationType";
 import { queryCityHomeArticles, type JournalPage } from "@/server/article/listCityHomeArticles";
 
 export type CityBlogCategory = {
@@ -31,7 +32,7 @@ function indexableArticleWhere(city: CityRef): Prisma.ArticleWhereInput {
     AND: [{ OR: [
       { seoRobots: null },
       { NOT: { seoRobots: { contains: "noindex", mode: "insensitive" } } },
-    ] }],
+    ] }, notExpiredJournalPublicationWhere(new Date())],
   };
 }
 
@@ -164,6 +165,29 @@ function categoryScopeWhere(categoryIds: string[]): Prisma.ArticleWhereInput {
     OR: [
       { categoryId: { in: categoryIds } },
       { additionalCategoryLinks: { some: { categoryId: { in: categoryIds } } } },
+    ],
+  };
+}
+
+/**
+ * Фильтр рубрики для блоков журнала: индексируемые материалы рубрики (включая
+ * подрубрики корня) и, опционально, тема. Используется всеми блоками страницы рубрики.
+ */
+export async function cityBlogCategoryScopeWhere(
+  city: CityRef,
+  categoryId: string,
+  options: { tagSlug?: string | null } = {},
+): Promise<Prisma.ArticleWhereInput> {
+  const childRows = await prisma.eventCategory.findMany({
+    where: { parentId: categoryId, isActive: true, archivedAt: null },
+    select: { id: true },
+  });
+  const scopeIds = [categoryId, ...childRows.map((child) => child.id)];
+  return {
+    AND: [
+      indexableArticleWhere(city),
+      categoryScopeWhere(scopeIds),
+      ...(options.tagSlug ? [{ tags: { some: { slug: options.tagSlug, isActive: true } } }] : []),
     ],
   };
 }

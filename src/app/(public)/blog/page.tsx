@@ -5,8 +5,9 @@ import {
   buildCityPublicPath,
 } from "@/lib/routing/cityPaths";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
-import { listNationalBlogArticlesPage, listJournalLocationOptions } from "@/server/article/listCityHomeArticles";
-import { BlogIndex } from "./BlogIndex";
+import { JournalPageView } from "@/components/journal/JournalPageView";
+import { journalTypeFilterHref, parseJournalTypeFilter } from "@/lib/journal/journalCardMeta";
+import { loadJournalPage } from "@/server/journal/journalPage";
 import { BlogPagination } from "./BlogPagination";
 
 function parsePage(value: string | string[] | undefined): number {
@@ -16,10 +17,12 @@ function parsePage(value: string | string[] | undefined): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
+type BlogSearchParams = { city?: string | string[]; page?: string | string[]; type?: string | string[] };
+
 export async function generateMetadata({
   searchParams,
 }: {
-  searchParams: Promise<{ city?: string | string[]; page?: string | string[]; location?: string | string[] }>;
+  searchParams: Promise<BlogSearchParams>;
 }): Promise<Metadata> {
   const query = await searchParams;
   const page = parsePage(query.page);
@@ -37,7 +40,7 @@ export async function generateMetadata({
 export default async function BlogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ city?: string | string[]; page?: string | string[]; location?: string | string[] }>;
+  searchParams: Promise<BlogSearchParams>;
 }) {
   const query = await searchParams;
   const cityRaw = Array.isArray(query.city) ? query.city[0] : query.city;
@@ -54,16 +57,30 @@ export default async function BlogPage({
   }
 
   const requestedPage = parsePage(query.page);
-  const requestedLocation = Array.isArray(query.location) ? query.location[0] : query.location;
-  const locationOptions = await listJournalLocationOptions();
-  const location = locationOptions.some(option => option.value === requestedLocation) ? requestedLocation! : null;
-  const journal = await listNationalBlogArticlesPage(requestedPage, 24, location);
+  const typeFilter = parseJournalTypeFilter(query.type);
+  const journal = await loadJournalPage({
+    city: null,
+    scopeWhere: null,
+    scopeKey: "all",
+    typeFilter,
+    page: requestedPage,
+  });
   if (requestedPage > journal.totalPages && journal.total > 0) notFound();
+
 
   return (
     <main>
-      <BlogIndex articles={journal.articles} locationOptions={locationOptions} activeLocation={location} />
-      <BlogPagination basePath={location ? `/blog?location=${encodeURIComponent(location)}` : "/blog"} page={journal.page} totalPages={journal.totalPages} />
+      <JournalPageView
+        title="Журнал"
+        subtitle="Вдохновение для семейных прогулок, событий и открытий."
+        main={journal.main}
+        news={journal.news}
+        collections={journal.collections}
+        feed={journal.feed}
+        typeFilter={typeFilter}
+        basePath="/blog"
+      />
+      <BlogPagination basePath={typeFilter ? journalTypeFilterHref("/blog", typeFilter) : "/blog"} page={journal.page} totalPages={journal.totalPages} />
     </main>
   );
 }
