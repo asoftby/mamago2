@@ -169,7 +169,7 @@ export async function listArticlesForPublicationsIndex(): Promise<PublicationLis
       hasCover: !!(coverId && String(coverId).trim()),
       hasSlug: !!(r.slug && r.slug.trim()),
       hasBlocks: content.blocks.length > 0,
-      missingJournalCategory: !usesNewsEditor && !r.categoryId,
+      missingJournalCategory: !isBreakingNews && !r.categoryId,
       geoScope: r.geoScope ?? null,
       citySlug,
       featured: r.featured,
