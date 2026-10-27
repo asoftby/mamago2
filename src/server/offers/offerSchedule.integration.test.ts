@@ -11,6 +11,8 @@ import {
 import { buildClassScheduleInput, defaultClassSchedule, groupsFromRules } from "@/lib/offers/offerClassSchedule";
 import { hoursFromSimple } from "@/lib/offers/offerSchedule";
 import { BookingValidationError, createPublicBooking } from "@/server/services/booking/booking.service";
+import { getSlots } from "@/server/offers/getSlots";
+import { reserveSlot, SlotReservationError } from "@/server/offers/reserveSlot";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl || !["127.0.0.1", "localhost"].includes(new URL(databaseUrl).hostname)) {
@@ -396,4 +398,57 @@ test("одинаковое время с разными end-only периода�
   } } }));
   const booking = await db.offerBooking.findUniqueOrThrow({ where: { offerId } });
   assert.equal(await db.offerScheduleRule.count({ where: { offerBookingId: booking.id } }), 2);
+});
+
+
+test("две группы одновременно: собственные тарифы, квоты и транзакционное бронирование", async () => {
+  const offerId = await newOffer({
+    productType: "REGULAR_ACTIVITY", status: "PUBLISHED", bookingEnabled: true,
+    bookingMode: "USE_PUBLICATION_SLOTS", publishedAt: new Date(),
+  });
+  const groupA = `group-a-${run}`, groupB = `group-b-${run}`;
+  await db.$transaction((tx) => applyOfferSchedule({
+    db: tx, offerId, externalUrlNeedsModeration: false,
+    input: { classSchedule: {
+      kind: "recurring", durationMin: 60, dates: [], period: null, closedDates: [],
+      groups: [
+        { id: groupA, days: [1], time: "17:00", seats: 2,
+          tariffs: [{ id: `tariff-a-${run}`, title: "Разовое", price: "25", unit: "BYN" }] },
+        { id: groupB, days: [1], time: "17:00", seats: 4,
+          tariffs: [{ id: `tariff-b-${run}`, title: "Абонемент", price: "120", unit: "BYN", periodDays: 30 }] },
+      ],
+    } },
+  }));
+  const now = new Date();
+  const future = new Date(now.getTime() + 14 * 86_400_000);
+  future.setUTCDate(future.getUTCDate() + ((8 - future.getUTCDay()) % 7));
+  const date = future.toISOString().slice(0, 10);
+  const start = new Date(`${date}T14:00:00.000Z`);
+  const end = new Date(start.getTime() + 60 * 60_000);
+  const range = { offerId, from: new Date(start.getTime() - 1000), to: new Date(end.getTime() + 1000) };
+  const beforeA = await getSlots({ ...range, classGroupId: groupA });
+  const beforeB = await getSlots({ ...range, classGroupId: groupB });
+  assert.equal(beforeA.find((item) => item.startsAt.getTime() === start.getTime())?.remainingSeats, 2);
+  assert.equal(beforeB.find((item) => item.startsAt.getTime() === start.getTime())?.remainingSeats, 4);
+
+  const hold = await reserveSlot({
+    offerId, classGroupId: groupA, classTariffId: `tariff-a-${run}`,
+    startsAt: start, endsAt: end, seats: 2, customerName: "Test Parent", customerPhone: "+375291112233",
+    holdMinutes: 120,
+  });
+  const persisted = await db.bookingRequest.findUniqueOrThrow({ where: { id: hold.bookingId } });
+  assert.equal(persisted.classGroupId, groupA);
+  assert.equal(persisted.classTariffTitle, "Разовое");
+  assert.equal((await getSlots({ ...range, classGroupId: groupA })).some((item) => item.startsAt.getTime() === start.getTime()), false);
+  assert.equal((await getSlots({ ...range, classGroupId: groupB })).find((item) => item.startsAt.getTime() === start.getTime())?.remainingSeats, 4);
+  await assert.rejects(reserveSlot({
+    offerId, classGroupId: groupA, classTariffId: `tariff-a-${run}`,
+    startsAt: start, endsAt: end, seats: 1, customerName: "Test Parent", customerPhone: "+375291112233",
+    holdMinutes: 120,
+  }), (error: unknown) => error instanceof SlotReservationError && error.code === "SLOT_UNAVAILABLE");
+  await assert.rejects(reserveSlot({
+    offerId, classGroupId: groupA, classTariffId: `tariff-b-${run}`,
+    startsAt: start, endsAt: end, seats: 1, customerName: "Test Parent", customerPhone: "+375291112233",
+    holdMinutes: 120,
+  }), (error: unknown) => error instanceof SlotReservationError && error.code === "INVALID_SLOT");
 });
