@@ -126,6 +126,8 @@ export async function getKudaDiscoveryFeed(
         metroId: null,
         adultOnly: false,
       };
+  // Candidate selection is a function of explicit discovery choices only.
+  // The authenticated user ID is intentionally absent from this query.
   const { where, primaryCityId } = await buildKudaDiscoveryWhere(cityId, citySlug, { format: options?.format ?? null, nearby: options?.nearby, eventFilters: runtimeFilters, explicitTerritorySlug: options?.explicitTerritorySlug });
   perf.mark("where");
 

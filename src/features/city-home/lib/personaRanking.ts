@@ -1,5 +1,6 @@
 import type { FamilyPersona } from "@/lib/family/familyPersonaTypes";
 import type { ActivityMock } from "@/types/activity";
+import { rankForFamily } from "@/lib/discovery/rankForFamily";
 
 type PersonaRankingInput = {
   personas: FamilyPersona[];
@@ -196,26 +197,11 @@ export function applyPersonaRanking(
     return activities;
   }
 
-  // Family context affects ranking only; explicit discovery filters own eligibility.
-  // Never shrink the candidate set using a selected family persona.
-  return activities
-    .map((activity, index) => {
-      const baseScore = (activities.length - index) * 100 + (activity.engagementScore ?? 0);
-      const ageScore = getAgeScore(activity, personaSummary.children);
-      const personaBoost = getPersonaBoost(activity, personaSummary.selected);
-      const finalScore = baseScore + ageScore + personaBoost;
-
-      return {
-        activity,
-        index,
-        finalScore,
-      };
-    })
-    .sort((left, right) => {
-      if (right.finalScore !== left.finalScore) {
-        return right.finalScore - left.finalScore;
-      }
-      return left.index - right.index;
-    })
-    .map((entry) => entry.activity);
+  // Only the explicit listing query controls which activities can appear.
+  return rankForFamily(activities, (activity, index) => {
+    const baseScore = (activities.length - index) * 100 + (activity.engagementScore ?? 0);
+    return baseScore +
+      getAgeScore(activity, personaSummary.children) +
+      getPersonaBoost(activity, personaSummary.selected);
+  });
 }
