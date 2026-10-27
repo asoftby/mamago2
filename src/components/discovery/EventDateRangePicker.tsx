@@ -55,13 +55,10 @@ export function EventDateRangePicker({ applied, onApply }: { applied: DiscoveryF
 
   const select = (date: Date | null) => {
     if (!date) return;
-    const previousSelecting = draft.selectingEnd;
     const key = toKey(date);
+    // Selecting the end of a range only updates the draft. Both a single date
+    // and a range are committed exclusively by the Apply button.
     dispatch({ type: "select", date: key, today });
-    if (!mobile && previousSelecting && draft.from && key >= draft.from) {
-      onApply({ whenPreset: null, dateFrom: draft.from, dateTo: key });
-      setOpen(false);
-    }
   };
   const applyPreset = (preset: Exclude<WhenPreset, null>) => {
     const range = computePresetRange(preset, today);
