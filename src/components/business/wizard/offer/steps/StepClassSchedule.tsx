@@ -113,6 +113,12 @@ export function StepClassSchedule({ data, onChange, isEditable }: StepClassSched
                       Удалить
                     </Button>
                   </div>
+                  <div className="space-y-1">
+                    <Label htmlFor={`group-title-${group.id}`}>Название группы</Label>
+                    <Input id={`group-title-${group.id}`} placeholder={`Группа ${index + 1}`}
+                      value={group.title ?? ""} disabled={!isEditable}
+                      onChange={(event) => patchGroup(group.id, { title: event.target.value })} />
+                  </div>
                   <ChipsRow items={dayChips} layout="wrap" aria-label={`Дни занятий, группа ${index + 1}`} />
                   <div className="flex flex-wrap items-end gap-4">
                     <div className="space-y-2">
