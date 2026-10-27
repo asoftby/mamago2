@@ -18,3 +18,10 @@ export function useEventListingCitySlug(): string {
   }
   return city;
 }
+
+/** Append explicit event territory scope to a filter API request. */
+export function useEventListingExplore(): boolean {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  return isScopedEventBrowsing(pathname, searchParams.get("explore"));
+}
