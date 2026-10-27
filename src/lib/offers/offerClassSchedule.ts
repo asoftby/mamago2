@@ -121,7 +121,7 @@ export const classScheduleInputSchema = z
           tariffs: z.array(z.object({
             id: z.string().min(1).max(128),
             title: z.string().trim().min(1).max(120),
-            price: z.string().trim().min(1).max(80),
+            price: z.string().trim().regex(/^\d+(?:[.,]\d{1,2})?$/, "Цена должна быть числом в BYN с точностью до двух знаков"),
             unit: z.string().trim().min(1).max(80),
             periodDays: z.number().int().min(1).max(366).nullable().optional(),
           })).max(12).default([]),
