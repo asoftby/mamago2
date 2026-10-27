@@ -70,6 +70,8 @@ jobs:
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyConfirmation.postgres.integration.test.ts
       - name: Verify server closes offers not accepted in time
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyQuoteExpiry.postgres.integration.test.ts
+      - name: Verify parent cancellation before confirmation
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyCancel.postgres.integration.test.ts
 
   # End-to-end party flow (add-on fan-out, races, manual home/outdoor, cross-tenant,
   # expiry). The test and its seed only accept 127.0.0.1:55443/mamago_birthday_it.

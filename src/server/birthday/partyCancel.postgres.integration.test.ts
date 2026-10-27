@@ -123,6 +123,8 @@ test("a party without confirmations is cancelled at once and its requests are cl
   assert.equal(bookingBucket({ kind: "PARTY", partyStage: closed.partyStage, status: closed.status,
     createdAt: closed.createdAt }).bucket, "ARCHIVE");
   assert.equal((await db.partyQuote.findUniqueOrThrow({ where: { id: quote!.id } })).status, "WITHDRAWN");
+  assert.deepEqual((await db.partyOutbox.findMany({ where: { aggregateId: request.id },
+    select: { eventType: true } })).map((e) => e.eventType), ["PARTY_REQUEST_CANCELLED"]);
   for (const id of [anchor.id, addon.id]) {
     assert.equal((await db.partyOrderItem.findUniqueOrThrow({ where: { id } })).status, "CANCELLED");
   }

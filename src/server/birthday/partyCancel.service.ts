@@ -66,6 +66,13 @@ export async function cancelPartyBeforeConfirmation(
           payload: { reason: "CUSTOMER_CANCELLED", fromStage: request.partyStage, partyOrderId: partyId },
         },
       });
+      // Tell the business the request is closed (held behind the inbox flag like other
+      // inbox-linked events); the dedupe key makes a repeated cancellation a no-op.
+      await tx.partyOutbox.create({
+        data: { eventType: "PARTY_REQUEST_CANCELLED", aggregateId: request.id,
+          dedupeKey: "party:" + request.id + ":customer-cancelled",
+          payload: { requestId: request.id, partyOrderId: partyId } },
+      });
     }
     await tx.partyOrderItem.updateMany({
       where: { partyOrderId: partyId,

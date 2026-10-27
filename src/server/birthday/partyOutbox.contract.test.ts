@@ -25,6 +25,9 @@ assert.equal(partyOutboxCopy({ type: "PARTY_QUOTE_EXPIRED_BUSINESS", offerTitle:
 assert.equal(isBusinessPartyEvent("PARTY_QUOTE_EXPIRED_BUSINESS"), true);
 assert.equal(isBusinessPartyEvent("PARTY_QUOTE_EXPIRED"), false);
 assert.ok(heldPartyOutboxEventTypes({}).includes("PARTY_QUOTE_EXPIRED_BUSINESS"));
+// #818 D1: a parent cancellation notifies the business about each closed request.
+assert.equal(isBusinessPartyEvent("PARTY_REQUEST_CANCELLED"), true);
+assert.equal(partyOutboxCopy({ type: "PARTY_REQUEST_CANCELLED", offerTitle: "Квест", dateLabel: "x" }).audience, "BUSINESS");
 assert.equal(partyOutboxCopy({
   type: "PARTY_QUOTE_SENT", offerTitle: "Квест", dateLabel: "2026-10-20",
 }).body.includes("Бронирование ещё не подтверждено"), true);
@@ -51,8 +54,8 @@ for (const invariant of [
 assert.ok(!worker.includes("contactPhone: true"));
 assert.ok(!worker.includes("customerPhone: true"));
 // Business notifications deep-link into the unified inbox: held until the UI is released.
-assert.deepEqual(heldPartyOutboxEventTypes({}), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED", "PARTY_QUOTE_EXPIRED_BUSINESS"]);
-assert.deepEqual(heldPartyOutboxEventTypes({ BUSINESS_BOOKINGS_INBOX_UI: "false" }), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED", "PARTY_QUOTE_EXPIRED_BUSINESS"]);
+assert.deepEqual(heldPartyOutboxEventTypes({}), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED", "PARTY_QUOTE_EXPIRED_BUSINESS", "PARTY_REQUEST_CANCELLED"]);
+assert.deepEqual(heldPartyOutboxEventTypes({ BUSINESS_BOOKINGS_INBOX_UI: "false" }), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED", "PARTY_QUOTE_EXPIRED_BUSINESS", "PARTY_REQUEST_CANCELLED"]);
 assert.deepEqual(heldPartyOutboxEventTypes({ BUSINESS_BOOKINGS_INBOX_UI: "true" }), []);
 assert.ok(worker.includes("notIn: heldPartyOutboxEventTypes(process.env)"), "Inbox-linked events must be gated");
 for (const type of heldPartyOutboxEventTypes({})) {
