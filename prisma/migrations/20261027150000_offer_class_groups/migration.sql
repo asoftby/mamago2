@@ -30,3 +30,8 @@ ALTER TABLE "OfferScheduleRule" ADD CONSTRAINT "OfferScheduleRule_classGroupId_f
 
 ALTER TABLE "BookingRequest" ADD COLUMN "classGroupId" TEXT;
 ALTER TABLE "BookingRequest" ADD COLUMN "classGroupTitle" TEXT;
+
+-- Group-scoped schedule rules can share the same weekday and clock time.
+DROP INDEX IF EXISTS "OfferScheduleRule_offerBookingId_weekday_startMinutes_endMinutes_validFrom_key";
+CREATE INDEX "OfferScheduleRule_offerBookingId_weekday_startMinutes_endMinutes_validFrom_idx"
+  ON "OfferScheduleRule"("offerBookingId", "weekday", "startMinutes", "endMinutes", "validFrom");
