@@ -2,16 +2,10 @@ import { unstable_cache } from "next/cache";
 import prisma from "@/lib/prisma";
 
 /**
- * Для ленты «Куда пойти» хаб может включать не только сам город, но и связанные населённые пункты
- * (например Минск + Марьина Горка), без смены URL — пользователь по-прежнему на /minsk/kuda.
- *
- * Ключ — slug города-хаба из URL; значение — дополнительные slug городов из справочника `City`.
- * Сам хаб в список не дублируем: он берётся из текущей страницы.
+ * An event listing covers the selected city AND every real city in its oblast.
+ * Minsk is a separate administrative city; its listing additionally covers
+ * Minsk oblast. This is a geographic candidate pool, not a paid targeting rule.
  */
-export const DISCOVERY_HUB_EXTRA_CITY_SLUGS: Readonly<Record<string, readonly string[]>> = {
-  minsk: ["marina-gorka"],
-};
-
 export const DISCOVERY_HUB_CITY_IDS_REVALIDATE_SECONDS = 60 * 60;
 
 type DiscoveryHubCityIds = {
@@ -26,42 +20,47 @@ function fallbackHubCityIds(hubCityId: string): DiscoveryHubCityIds {
 async function readKudaDiscoveryCityIds(
   hubCitySlug: string,
   hubCityId: string,
-  extras: readonly string[],
 ): Promise<DiscoveryHubCityIds> {
-  const slugs = [hubCitySlug, ...extras];
-  const rows = await prisma.city.findMany({
-    where: { slug: { in: slugs }, isLegacyNonCity: false },
-    select: { id: true, slug: true },
+  const city = await prisma.city.findFirst({
+    where: { id: hubCityId, isLegacyNonCity: false },
+    select: { id: true, countryId: true, regionId: true },
   });
+  if (!city) return fallbackHubCityIds(hubCityId);
 
-  const bySlug = new Map(rows.map((r) => [r.slug, r.id]));
-  const expandedCityIds: string[] = [];
-  const primary = bySlug.get(hubCitySlug);
-  if (primary) expandedCityIds.push(primary);
-  for (const s of extras) {
-    const id = bySlug.get(s);
-    if (id && !expandedCityIds.includes(id)) expandedCityIds.push(id);
+  // Minsk has no regionId in some installations; link it to Minsk oblast
+  // without changing the City's administrative region in the database.
+  let regionId = city.regionId;
+  if (hubCitySlug === "minsk") {
+    const minskOblast = await prisma.region.findFirst({
+      where: { countryId: city.countryId, slug: "minskaya-oblast", isActive: true },
+      select: { id: true },
+    });
+    regionId = minskOblast?.id ?? regionId;
   }
-  if (!primary || expandedCityIds.length === 0) {
-    return fallbackHubCityIds(hubCityId);
-  }
-  return { primaryCityId: primary, expandedCityIds };
+  if (!regionId) return fallbackHubCityIds(hubCityId);
+
+  const cities = await prisma.city.findMany({
+    where: {
+      countryId: city.countryId,
+      regionId,
+      isLegacyNonCity: false,
+      isActive: true,
+    },
+    select: { id: true },
+  });
+  return {
+    primaryCityId: hubCityId,
+    expandedCityIds: Array.from(new Set([hubCityId, ...cities.map((row) => row.id)])),
+  };
 }
 
 export async function resolveKudaDiscoveryCityIds(
   hubCitySlug: string,
   hubCityId: string,
 ): Promise<DiscoveryHubCityIds> {
-  const extras = DISCOVERY_HUB_EXTRA_CITY_SLUGS[hubCitySlug];
-  if (!extras?.length) {
-    // Most cities are not hubs: preserve the zero-DB fast path and avoid even
-    // invoking the incremental cache for a value already present in the call.
-    return fallbackHubCityIds(hubCityId);
-  }
-
   return unstable_cache(
-    () => readKudaDiscoveryCityIds(hubCitySlug, hubCityId, extras),
-    ["discovery-hub-city-ids", hubCitySlug, hubCityId, ...extras],
+    () => readKudaDiscoveryCityIds(hubCitySlug, hubCityId),
+    ["discovery-oblast-city-ids-v2", hubCitySlug, hubCityId],
     { revalidate: DISCOVERY_HUB_CITY_IDS_REVALIDATE_SECONDS },
   )();
 }
