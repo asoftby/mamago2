@@ -59,6 +59,10 @@ Negative actions (`UNSAVE`, `PLAN_REMOVE`, cancellation, negative feedback) affe
 
 `RecommendationOutcome` attributes an existing `UserEvent` to the exposure that caused it. Outcome rows do not replace or duplicate `UserEvent`.
 
+### Impressions and dismissals
+
+An **impression** is a `CARD_VIEW` sent when a card is ≥50% visible continuously for ≥1 s (`src/lib/analytics/impressionGate.ts`, `AnalyticsCardViewTracker` with `dwellMs`; meta `impression: true`). For a verified exposure the first qualified impression (`meta.impression === true`) sets `RecommendationExposure.deliveredAt`; later ones do not overwrite it. Actions are existing `UserEvent`s (`DETAIL_OPEN`, `SAVE`, `PLAN_ADD`, `CTA_CLICK`, ...) linked through `RecommendationOutcome`. `UserEventType.DISMISS` ("не интересно") is a client-sendable negative signal (`BEHAVIOR_AFFINITY_WEIGHTS.DISMISS = -2`) and is attributed the same way. The journal collections carousel and My Plan recommendation cards use the impression rule.
+
 ## Versioning
 
 Every production recommendation run must have an `algorithmVersion`.
@@ -75,6 +79,7 @@ Current enum:
 - `DISCOVERY`
 - `MY_PLAN`
 - `TELEGRAM`
+- `JOURNAL`
 
 When a new surface is added, prefer reusing the shared candidate/ranking path and adding a surface policy. Creating a new `*RecommendationEngine` is an architecture violation unless the domain has genuinely different entities/objectives and the decision is explicitly documented.
 

@@ -168,6 +168,29 @@ function categoryScopeWhere(categoryIds: string[]): Prisma.ArticleWhereInput {
   };
 }
 
+/**
+ * Фильтр рубрики для блоков журнала: индексируемые материалы рубрики (включая
+ * подрубрики корня) и, опционально, тема. Используется всеми блоками страницы рубрики.
+ */
+export async function cityBlogCategoryScopeWhere(
+  city: CityRef,
+  categoryId: string,
+  options: { tagSlug?: string | null } = {},
+): Promise<Prisma.ArticleWhereInput> {
+  const childRows = await prisma.eventCategory.findMany({
+    where: { parentId: categoryId, isActive: true, archivedAt: null },
+    select: { id: true },
+  });
+  const scopeIds = [categoryId, ...childRows.map((child) => child.id)];
+  return {
+    AND: [
+      indexableArticleWhere(city),
+      categoryScopeWhere(scopeIds),
+      ...(options.tagSlug ? [{ tags: { some: { slug: options.tagSlug, isActive: true } } }] : []),
+    ],
+  };
+}
+
 export async function listCityBlogCategoryArticles(
   city: CityRef,
   categoryId: string,

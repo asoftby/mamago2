@@ -21,6 +21,8 @@ export const BEHAVIOR_AFFINITY_WEIGHTS: Readonly<Partial<Record<UserEventType, n
   BOOKING_CONFIRMED: 6,
   BOOKING_COMPLETED: 8,
   BOOKING_CANCELLED: -5,
+  // «Не интересно» по рекомендации — мягкий негативный сигнал (ТЗ «Для вашей семьи»).
+  DISMISS: -2,
   FEEDBACK_LEFT: 1,
 };
 
