@@ -2868,7 +2868,7 @@ model OfferScheduleRule {
   capacity Int?
   offerBooking OfferBooking @relation(fields: [offerBookingId], references: [id], onDelete: Cascade)
 
-  @@unique([offerBookingId, weekday, startMinutes, endMinutes, validFrom])
+  @@index([offerBookingId, weekday, startMinutes, endMinutes, validFrom])
   @@index([classGroupId])
 }
 
