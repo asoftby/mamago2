@@ -16,7 +16,7 @@ type Territory = {
 };
 type Available = { territories: Territory[] };
 
-export function EventTerritoryFilter({ onApply, filters }: { onApply?: () => void; filters: DiscoveryFilters }) {
+export function EventTerritoryFilter({ onApply, onBeforeNavigate, filters }: { onApply?: () => void; onBeforeNavigate: () => void; filters: DiscoveryFilters }) {
   const pathname = usePathname();
   const router = useRouter();
   const params = useSearchParams();
@@ -58,6 +58,7 @@ export function EventTerritoryFilter({ onApply, filters }: { onApply?: () => voi
     next.delete("district");
     next.delete("metro");
     next.set("explore", "1");
+    onBeforeNavigate();
     router.push(`/${slug}/events?${next.toString()}`);
     onApply?.();
   }
