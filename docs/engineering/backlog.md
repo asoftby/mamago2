@@ -5507,3 +5507,29 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Dependencies: нет.
 - Acceptance criteria: файлы и неиспользуемые типы удалены; `tsc`, lint и `test:birthday-catalog` зелёные.
 - Source: аудит #818.
+
+## [BACKLOG-203] Push gate: убрать дубли gate-сьютов из CI-job `typecheck`
+
+- Status: BLOCKED
+- Priority: P3
+- Area: Infra / CI
+- Added: 2026-10-27
+- Reason deferred: вне scope разделения push gate (chore/gate-timing); сначала `gate-tests` должен стать required check.
+- Context: CI-job `typecheck` (`.github/workflows/ci.yml`) отдельно запускает 26 сьютов из `scripts/git/gate-steps.json` (`test:gsc`, `test:upload-pipeline`, `test:abws-*`, `test:responsive-*` и др.), которые теперь целиком гоняет job `gate-tests`. Дубль стоит ~1 мин CI на PR, проверки не ослабляет.
+- Current state: дубли оставлены сознательно, чтобы не уменьшать покрытие required-job до включения `gate-tests` в ruleset.
+- Dependencies: `gate-tests` и `production-build` — required status checks в ruleset `dev`.
+- Acceptance criteria: из job `typecheck` удалены только шаги, полностью покрытые `gate-tests`; непокрытые CI-only тесты остаются.
+- Source: PR chore/gate-timing (замеры push gate 2026-10-27).
+
+## [BACKLOG-204] Push gate: параллельный прогон сьютов и cross-directory зависимости changed-tests
+
+- Status: OPEN
+- Priority: P3
+- Area: Infra / CI
+- Added: 2026-10-27
+- Reason deferred: ускорение второго порядка; сначала нужно убедиться, что сьюты не делят общее состояние (БД, файлы).
+- Context: `scripts/git/run-gate-steps.mjs` запускает сьюты последовательно (~155 с на 4 ядрах). Выбор `--changed-tests` идёт по каталогам тест-файлов сьюта, поэтому contract-тесты, читающие исходники из других каталогов (например `src/lib/responsive/*Contract.test.ts`), локально могут не запуститься — их ловит required job `gate-tests`.
+- Current state: последовательный прогон; каталоговая эвристика + полный прогон при изменении package.json / lockfile / prisma / tsconfig / scripts/git / .husky.
+- Dependencies: нет.
+- Acceptance criteria: решение по `--jobs N` (с проверкой изоляции сьютов) и/или явной карте зависимостей сьют → пути; замер до/после.
+- Source: PR chore/gate-timing (замеры push gate 2026-10-27).

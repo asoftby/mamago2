@@ -76,4 +76,4 @@ sh scripts/git/worktree-deps.sh ensure
 echo "[task-check] Running pnpm check:push"
 pnpm check:push
 
-echo "[task-check] PASS: branch is current with origin/dev and full push checks passed."
+echo "[task-check] PASS: branch is current with origin/dev and push checks passed (full set: pnpm check:push:full / CI)."
