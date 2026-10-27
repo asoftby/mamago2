@@ -89,7 +89,7 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
     return await prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: input.offerId },
-        select: { status: true, priceItems: true, classGroups: { include: { tariffs: true, rules: true } }, place: { select: { ownerBusinessId: true } }, offerBooking: { select: { leadTimeHours: true } } },
+        select: { status: true, priceItems: true, classGroups: { include: { tariffs: true, rules: true } }, place: { select: { ownerBusinessId: true } }, offerBooking: { select: { leadTimeHours: true, timezone: true } } },
       });
       const businessId = offer?.place?.ownerBusinessId;
       if (!offer || offer.status !== "PUBLISHED" || !businessId || !offer.offerBooking) {
@@ -97,7 +97,7 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       }
       const groups = offer.classGroups.filter((group) => group.active);
       const group = input.classGroupId ? groups.find((item) => item.id === input.classGroupId) : null;
-      if (groups.length > 0 && !group) throw new SlotReservationError("INVALID_SLOT", "Выберите доступную группу");
+      if ((groups.length > 0 && !group) || (input.classGroupId && !group)) throw new SlotReservationError("INVALID_SLOT", "Выберите доступную группу");
       const structuredTariffs = group?.tariffs.filter((item) => item.active) ?? [];
       const legacyTariffs = parsePriceData(offer.priceItems).items;
       const tariff = structuredTariffs.length > 0
@@ -109,8 +109,8 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       if (input.classTariffId && !tariff) throw new SlotReservationError("INVALID_SLOT", "Тариф недоступен для выбранной группы");
       if (group && group.rules.length === 0) throw new SlotReservationError("INVALID_SLOT", "Расписание группы не задано");
       if (group) {
-        const date = dateKeyInZone(input.startsAt, "Europe/Minsk");
-        const local = localMinuteKey(input.startsAt, "Europe/Minsk");
+        const date = dateKeyInZone(input.startsAt, offer.offerBooking.timezone);
+        const local = localMinuteKey(input.startsAt, offer.offerBooking.timezone);
         const minutes = Number(local.slice(11, 13)) * 60 + Number(local.slice(14, 16));
         const belongsToGroup = group.rules.some((rule) =>
           rule.weekday === isoWeekday(date) && rule.startMinutes === minutes &&
