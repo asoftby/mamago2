@@ -638,7 +638,7 @@ export function buildOfferCreatePayload(
         .filter((price): price is number => price !== null && Number.isFinite(price)))
     : [];
   const regularLowestPrice = regularTariffPrices.length ? Math.min(...regularTariffPrices) : null;
-  const pricingMode = data.productType === "REGULAR_ACTIVITY" ? "SINGLE" : data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
+  const pricingMode = regularLowestPrice !== null ? "SINGLE" : data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
   const ages = ageGroupsToMonths(data.ageGroups);
   const accessFields = deriveOfferApiFieldsFromPublicationAccess(
     data.publicationAccess,
@@ -680,7 +680,7 @@ export function buildOfferCreatePayload(
         ? undefined
         : richTextToLegacyPriceText(data.priceCaption),
     pricingOptions:
-      data.offerWizardType === "CAMP" || data.productType === "REGULAR_ACTIVITY"
+      data.offerWizardType === "CAMP" || regularLowestPrice !== null
         ? []
         : data.pricingOptions.map((o) => ({
             title: o.title.trim(),
@@ -861,7 +861,7 @@ export function buildOfferUpdatePayload(
         .filter((price): price is number => price !== null && Number.isFinite(price)))
     : [];
   const regularLowestPrice = regularTariffPrices.length ? Math.min(...regularTariffPrices) : null;
-  const pricingMode = data.productType === "REGULAR_ACTIVITY" ? "SINGLE" : data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
+  const pricingMode = regularLowestPrice !== null ? "SINGLE" : data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
   const ages = ageGroupsToMonths(data.ageGroups);
   const accessFields = deriveOfferApiFieldsFromPublicationAccess(
     data.publicationAccess,
@@ -900,7 +900,7 @@ export function buildOfferUpdatePayload(
         ? undefined
         : richTextToLegacyPriceText(data.priceCaption),
     pricingOptions:
-      data.offerWizardType === "CAMP" || data.productType === "REGULAR_ACTIVITY"
+      data.offerWizardType === "CAMP" || regularLowestPrice !== null
         ? []
         : data.pricingOptions.map((o) => ({
             title: o.title.trim(),
