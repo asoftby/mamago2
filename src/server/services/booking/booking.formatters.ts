@@ -56,6 +56,10 @@ export function getBookingTypeLabel(sourceType: BookingSourceType): string {
 // ─── Display builder ──────────────────────────────────────────────────────────
 
 export interface BookingDisplayInput {
+  classTariffId?: string | null;
+  classTariffTitle?: string | null;
+  classTariffPrice?: string | null;
+  classTariffUnit?: string | null;
   campShiftId: string | null;
   campShiftTitle: string | null;
   campShiftDateFrom: string | null;
@@ -128,7 +132,11 @@ function buildCampShiftDisplay(input: BookingDisplayInput): BookingDisplay {
 
 function buildOfferDisplay(input: BookingDisplayInput): BookingDisplay {
   const title = input.offer?.title ?? "Предложение";
-  const subtitle = buildDateTimeMeta(input.requestedDate, input.requestedTime);
+  const dateTime = input.session
+    ? fmtEventDateTime(input.session.startsAt)
+    : buildDateTimeMeta(input.requestedDate, input.requestedTime);
+  const tariff = input.classTariffTitle?.trim();
+  const subtitle = [tariff, dateTime].filter(Boolean).join(" · ") || null;
   const meta = buildChildMeta(input.childName, input.childAge);
 
   return {
