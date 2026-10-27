@@ -69,9 +69,11 @@ export function ArticleLinkedItemsEditor({
   useEffect(() => {
     const query = q.trim();
     if (query.length < 2) return;
+    // Каждый запуск эффекта (смена запроса или типа) отменяет свой запрос, и
+    // ответ применяется только если он относится к текущим query + kind.
+    const controller = new AbortController();
     const timer = setTimeout(() => {
       abortRef.current?.abort();
-      const controller = new AbortController();
       abortRef.current = controller;
       setLoading(true);
       fetch(`/api/admin/content/entity-search?q=${encodeURIComponent(query)}&type=${kind}`, {
@@ -79,13 +81,20 @@ export function ArticleLinkedItemsEditor({
         signal: controller.signal,
       })
         .then((r) => r.json() as Promise<{ results?: SearchResult[] }>)
-        .then((data) => setResults(data.results ?? []))
+        .then((data) => {
+          if (!controller.signal.aborted) setResults(data.results ?? []);
+        })
         .catch((e: unknown) => {
           if ((e as Error).name !== "AbortError") setResults([]);
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false);
+        });
     }, 300);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [q, kind]);
 
   const sensors = useSensors(
@@ -130,7 +139,7 @@ export function ArticleLinkedItemsEditor({
 
       <div className="grid gap-2 sm:grid-cols-[180px_1fr]">
         {hydrated ? (
-          <Select value={kind} onValueChange={(v) => { setKind(v as ArticleLinkedItemKind); setResults([]); }}>
+          <Select value={kind} onValueChange={(v) => { setKind(v as ArticleLinkedItemKind); setResults([]); setLoading(false); }}>
             <SelectTrigger aria-label="Тип элемента">
               <SelectValue />
             </SelectTrigger>

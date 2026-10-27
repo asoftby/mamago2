@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
@@ -78,10 +78,22 @@ function hasArticleLikeActions(row: PublicationListRow): boolean {
   );
 }
 
-/** Отметки «Главное» / «Закрепить» прямо из списка. */
-function JournalFlagToggles({ row }: { row: PublicationListRow }) {
-  const [featured, setFeatured] = useState(Boolean(row.featured));
-  const [pinned, setPinned] = useState(Boolean(row.pinned));
+type JournalFlags = { featured: boolean; pinned: boolean };
+
+/**
+ * Отметки «Главное» / «Закрепить» прямо из списка. Состояние — у родителя
+ * (`flagOverrides`), чтобы быстрые фильтры и повторный монтаж строки видели
+ * актуальные значения без перезагрузки страницы.
+ */
+function JournalFlagToggles({
+  row,
+  onChanged,
+}: {
+  row: PublicationListRow;
+  onChanged: (id: string, flags: JournalFlags) => void;
+}) {
+  const featured = Boolean(row.featured);
+  const pinned = Boolean(row.pinned);
   const [busy, setBusy] = useState(false);
   const update = async (patch: { featured?: boolean; pinned?: boolean }) => {
     setBusy(true);
@@ -92,9 +104,8 @@ function JournalFlagToggles({ row }: { row: PublicationListRow }) {
         body: JSON.stringify(patch),
       });
       if (!res.ok) throw new Error();
-      const data = (await res.json()) as { featured: boolean; pinned: boolean };
-      setFeatured(data.featured);
-      setPinned(data.pinned);
+      const data = (await res.json()) as JournalFlags;
+      onChanged(row.id, { featured: data.featured, pinned: data.pinned });
     } catch {
       toast.error("Не удалось обновить отметку");
     } finally {
@@ -179,6 +190,14 @@ export function PublicationsIndexClient({
   articleLifecycleMeta?: Record<string, ArticleLifecycleMeta>;
 }) {
   const router = useRouter();
+  const [flagOverrides, setFlagOverrides] = useState<Record<string, JournalFlags>>({});
+  const rows = useMemo(
+    () => initialRows.map((row) => (flagOverrides[row.id] ? { ...row, ...flagOverrides[row.id] } : row)),
+    [initialRows, flagOverrides],
+  );
+  const handleFlagsChanged = useCallback((id: string, flags: JournalFlags) => {
+    setFlagOverrides((prev) => ({ ...prev, [id]: flags }));
+  }, []);
   const [tab, setTab] = useState<PublicationTabFilter>(PublicationTabFilter.ALL);
   const [status, setStatus] = useState<string>("all");
   /** id пользователя-автора; пусто = все (как справочник в редакторе статьи) */
@@ -243,7 +262,7 @@ export function PublicationsIndexClient({
 
   const filtered = useMemo(() => {
     const q = titleSearch.trim().toLowerCase();
-    return initialRows.filter((row) => {
+    return rows.filter((row) => {
       if (!matchesTab(row, tab)) return false;
       if (
         tab === PublicationTabFilter.ALL &&
@@ -281,7 +300,7 @@ export function PublicationsIndexClient({
       return true;
     });
   }, [
-    initialRows,
+    rows,
     tab,
     status,
     authorUserIdFilter,
@@ -783,7 +802,7 @@ export function PublicationsIndexClient({
                                 {PUBLICATION_TYPE_LABEL[row.type]}
                               </td>
                               <td className="px-2 py-2 sm:px-3 sm:py-2.5 align-top">
-                                <JournalFlagToggles row={row} />
+                                <JournalFlagToggles row={row} onChanged={handleFlagsChanged} />
                               </td>
                               <td className="px-2 py-2 sm:px-3 sm:py-2.5 align-top">
                                 <ContentLifecycleStatusBadge viewModel={lifecycleViewModel} />
