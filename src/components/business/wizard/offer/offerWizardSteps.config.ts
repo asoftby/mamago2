@@ -621,7 +621,9 @@ export function getMissingFieldsForStep(
       break;
 
     case "price":
-      if (data.offerWizardType !== "CAMP") {
+      if (data.productType === "REGULAR_ACTIVITY") {
+        if (!data.schedule.classSchedule.groups.some((g) => (g.tariffs ?? []).some((t) => t.title.trim() && t.price.trim()))) missing.push("Тариф группы");
+      } else if (data.offerWizardType !== "CAMP") {
         if (!data.pricingMode) {
           missing.push("Режим ценообразования");
         } else if (data.pricingMode === "single" && !data.singlePrice.trim()) {
