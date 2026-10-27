@@ -1,0 +1,112 @@
+name: Publish isolated Telegram PROD origin hotfix (prod-hotfix-955)
+
+# One-off, branch-scoped publishing workflow. Does not run docker.yml or
+# write the mutable dev tag. Its Docker context is pinned to the tested SHA.
+on:
+  push:
+    branches:
+      - release/telegram-origin-prod-hotfix-955-build
+    paths:
+      - ".github/workflows/telegram-origin-prod-image-955.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: telegram-origin-prod-hotfix-955-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/release/telegram-origin-prod-hotfix-955-build'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+      actions: read
+    env:
+      SOURCE_SHA: 4a8fafd7ea4709b6a0c8336a0be8289bffa3f806
+      TARGET_REF: ghcr.io/asoftby/mamago2:prod-hotfix-955
+    steps:
+      - name: Verify green hotfix CI (no Docker publishing from DEV)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          actual_sha="$(gh api repos/${{ github.repository }}/actions/runs/40588527199 --jq .head_sha)"
+          conclusion="$(gh api repos/${{ github.repository }}/actions/runs/40588527199 --jq .conclusion)"
+          test "$actual_sha" = "$SOURCE_SHA"
+          test "$conclusion" = "success"
+          echo "Verified hotfix CI run 40588527199: success for $SOURCE_SHA"
+      - name: Checkout the exact tested hotfix SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 4a8fafd7ea4709b6a0c8336a0be8289bffa3f806
+          persist-credentials: false
+      - name: Confirm immutable source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          echo "Building exactly $SOURCE_SHA"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Refuse to overwrite an existing PROD hotfix image
+        run: |
+          set -euo pipefail
+          if docker buildx imagetools inspect "$TARGET_REF" > /tmp/hotfix-tag-inspect.log 2>&1; then
+            echo "::error::Refusing to overwrite existing immutable image $TARGET_REF"
+            exit 1
+          fi
+          # A failed inspection is not sufficient: explicitly require not-found,
+          # never treat token, network, or registry failures as a free tag.
+          if ! grep -Eiq 'not found|manifest unknown|name unknown|404' /tmp/hotfix-tag-inspect.log; then
+            echo "::error::Cannot confirm that destination tag is free; aborting."
+            exit 1
+          fi
+          echo "Destination tag does not exist: $TARGET_REF"
+      - name: Build and publish ONLY new immutable prod-hotfix-955
+        id: build
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ghcr.io/asoftby/mamago2:prod-hotfix-955
+          labels: |
+            org.opencontainers.image.source=https://github.com/asoftby/mamago2
+            org.opencontainers.image.revision=4a8fafd7ea4709b6a0c8336a0be8289bffa3f806
+            org.opencontainers.image.version=prod-hotfix-955
+          build-args: |
+            REDIRECT_MANIFEST_MIN_ROWS=850
+            NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
+            NEXT_PUBLIC_GOOGLE_MAP_ID=${{ secrets.NEXT_PUBLIC_GOOGLE_MAP_ID }}
+            BUILD_ID=prod-hotfix-955
+            GIT_COMMIT_SHA=4a8fafd7ea4709b6a0c8336a0be8289bffa3f806
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Verify published digest and exact source revision
+        env:
+          BUILT_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          published_digest="$(docker buildx imagetools inspect "$TARGET_REF" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          test -n "$published_digest"
+          test "$published_digest" = "$BUILT_DIGEST"
+          published_revision="$(docker buildx imagetools inspect "$TARGET_REF" --format '{{index .Image.Config.Labels "org.opencontainers.image.revision"}}')"
+          test "$published_revision" = "$SOURCE_SHA"
+          {
+            echo "### PROD Telegram Mini App origin hotfix image published"
+            echo ""
+            echo "Source SHA: \$SOURCE_SHA"
+            echo "Image: \$TARGET_REF"
+            echo "Digest: \$published_digest"
+            echo ""
+            echo "No deployment was performed; PROD and DEV containers were not changed."
+          } >> "$GITHUB_STEP_SUMMARY"
