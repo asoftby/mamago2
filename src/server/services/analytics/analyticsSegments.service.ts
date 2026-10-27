@@ -16,6 +16,12 @@ import {
   resolveAnalyticsDateRange,
   resolveCityIdFromSlug,
 } from "@/server/services/analytics/analyticsDateRange";
+import { AUDIENCE_EXCLUDED_ROLES } from "@/server/services/analytics/canonicalAudience";
+
+/** B1: staff (ADMIN/MODERATOR) profiles never count in segment analytics. */
+const NOT_STAFF_PROFILE: Prisma.UserBehaviorProfileWhereInput = {
+  user: { role: { notIn: [...AUDIENCE_EXCLUDED_ROLES] } },
+};
 
 function mergeCountMaps(
   rows: Array<{ preferredCategories: Prisma.JsonValue | null }>,
@@ -84,6 +90,7 @@ async function userIdsActiveInCity(
       cityId,
       createdAt: { gte: start, lte: end },
       userId: { not: null },
+      user: { role: { notIn: [...AUDIENCE_EXCLUDED_ROLES] } },
     },
     select: { userId: true },
     distinct: ["userId"],
@@ -131,6 +138,7 @@ export async function getAnalyticsSegments(
   }
 
   const baseWhere: Prisma.UserBehaviorProfileWhereInput = {
+    ...NOT_STAFF_PROFILE,
     lastSeenAt: { gte: start, lte: end },
     ...(cityUserIds ? { userId: { in: cityUserIds } } : {}),
   };
@@ -274,6 +282,7 @@ export async function getAnalyticsSegmentDetail(
   }
 
   const baseWhere: Prisma.UserBehaviorProfileWhereInput = {
+    ...NOT_STAFF_PROFILE,
     lastSeenAt: { gte: start, lte: end },
     segmentKeys: { has: key },
     ...(cityUserIds ? { userId: { in: cityUserIds } } : {}),

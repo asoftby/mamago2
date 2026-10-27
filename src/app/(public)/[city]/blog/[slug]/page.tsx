@@ -296,7 +296,7 @@ export default async function CityArticlePage({ params }: PageProps) {
     return (
       <>
         <BlogArticleSectionSync slug={articleRow.category?.slug ?? null} />
-        <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+        {/* DETAIL_OPEN comes from ContinuousArticleReader (article_view); no second beacon. */}
         <JsonLd
           data={[schemaJsonLd, breadcrumbJsonLd].filter(
             (item): item is Record<string, unknown> => Boolean(item),

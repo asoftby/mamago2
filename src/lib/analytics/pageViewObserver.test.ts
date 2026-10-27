@@ -3,7 +3,7 @@
  * Запуск: npx tsx src/lib/analytics/pageViewObserver.test.ts
  */
 import assert from "node:assert/strict";
-import { isPublicPageViewPath, shouldEmitPageView } from "./pageViewObserver";
+import { isPublicPageViewPath, pageViewCitySlug, shouldEmitPageView } from "./pageViewObserver";
 
 /**
  * Mirrors PageViewTracker's own composition of the two guards (same order,
@@ -110,7 +110,15 @@ function main() {
   state = decide(state.last, "/minsk/places/some-place");
   assert.equal(state.emit, false, "same pathname duplicate remains suppressed");
 
-  console.log("pageViewObserver.test.ts: OK");
+  {
+  assert.equal(pageViewCitySlug({ citySlug: "minsk", source: "route" }), "minsk");
+  assert.equal(pageViewCitySlug({ citySlug: "grodno", source: "preference" }), "grodno");
+  assert.equal(pageViewCitySlug({ citySlug: "minsk", source: "default" }), null, "silent default city is not attributed");
+  assert.equal(pageViewCitySlug({ citySlug: "", source: "none" }), null);
+  assert.equal(pageViewCitySlug(null), null);
+}
+
+console.log("pageViewObserver.test.ts: OK");
 }
 
 main();

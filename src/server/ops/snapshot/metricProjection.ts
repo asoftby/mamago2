@@ -11,9 +11,16 @@
 import type { PrismaClient } from "@prisma/client";
 import { format } from "date-fns";
 
-async function latestMetricValue(prisma: PrismaClient, metric: string, dimKey = ""): Promise<number | null> {
+const QUALITY_METRIC_MAX_AGE_MS: Record<string, number> = {
+  "telemetry.bot_rejected_share_24h": 20 * 60 * 1000,
+  "telemetry.bot_rejected_share_7d": 20 * 60 * 1000,
+  "telemetry.no_identity_rejected_share_24h": 20 * 60 * 1000,
+  "telemetry.stored_without_identity_share_24h": 20 * 60 * 1000,
+};
+
+async function latestMetricValue(prisma: PrismaClient, metric: string, dimKey = "", now: Date = new Date()): Promise<number | null> {
   const row = await prisma.metricSample.findFirst({
-    where: { metric, dimKey },
+    where: { metric, dimKey, ...(QUALITY_METRIC_MAX_AGE_MS[metric] ? { collectedAt: { gte: new Date(now.getTime() - QUALITY_METRIC_MAX_AGE_MS[metric]) } } : {}) },
     orderBy: { collectedAt: "desc" },
     select: { value: true },
   });
@@ -101,6 +108,10 @@ const KPI_METRIC_NAMES = [
   "funnel.plan_adds",
   "funnel.cta_clicks",
   "telemetry.events_written_5m",
+  "telemetry.bot_rejected_share_24h",
+  "telemetry.bot_rejected_share_7d",
+  "telemetry.no_identity_rejected_share_24h",
+  "telemetry.stored_without_identity_share_24h",
   "planning.wpf",
   "planning.wpf_prev",
   "retention.w1",
@@ -233,7 +244,7 @@ export async function projectOperationsKpis(
 ): Promise<Record<string, unknown>> {
   const since = new Date(now.getTime() - 16 * WEEK_MS);
   const [entries, pageMovers, evergreenWeekly, totalWeekly, wauWeekly, wpfWeekly] = await Promise.all([
-    Promise.all(KPI_METRIC_NAMES.map(async (metric) => [metric, await latestMetricValue(prisma, metric)] as const)),
+    Promise.all(KPI_METRIC_NAMES.map(async (metric) => [metric, await latestMetricValue(prisma, metric, "", now)] as const)),
     projectGscPageMovers(prisma),
     latestValuesByDimKey(prisma, "seo.evergreen_clicks_weekly", since),
     latestValuesByDimKey(prisma, "seo.total_clicks_weekly", since),

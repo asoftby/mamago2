@@ -8,11 +8,12 @@ import type { NodeKey, NodeState } from "@/server/ops/types";
 import { formatFreshness } from "../_lib/operationsSignalPresentation";
 import { OperationsBlock, type DashboardSignal } from "./OperationsBlock";
 import { OperationalLoadBlock } from "./blocks/OperationalLoadBlock";
+import { DataQualityBlock } from "./blocks/DataQualityBlock";
 import { OrganicRecoveryBlock } from "./growth/OrganicRecoveryBlock";
 import { GrowthKpiTiles } from "./growth/GrowthKpiTiles";
 import { ValuePathBlock } from "./growth/ValuePathBlock";
 import { SupplyPartnersBlock } from "./growth/SupplyPartnersBlock";
-import type { WorkloadViewModel } from "@/lib/admin/dashboardViewModels";
+import type { DataQualityViewModel, WorkloadViewModel } from "@/lib/admin/dashboardViewModels";
 import type { GrowthOverviewViewModel, OrganicRecoveryViewModel } from "@/lib/admin/growthDashboardViewModel";
 
 const AUTO_REFRESH_MS = 60_000;
@@ -30,6 +31,7 @@ export interface AdminDashboardShellProps {
   organic: OrganicRecoveryViewModel;
   growth: GrowthOverviewViewModel;
   workload: WorkloadViewModel;
+  dataQuality: DataQualityViewModel;
 }
 
 export function AdminDashboardShell({
@@ -45,6 +47,7 @@ export function AdminDashboardShell({
   organic,
   growth,
   workload,
+  dataQuality,
 }: AdminDashboardShellProps) {
   const router = useRouter();
   const [now, setNow] = useState(serverNow);
@@ -117,6 +120,7 @@ export function AdminDashboardShell({
         <h2 className="text-base font-semibold text-gray-700 mb-3">Операционная работа</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <OperationalLoadBlock model={workload} />
+          <DataQualityBlock model={dataQuality} />
         </div>
       </div>
     </div>

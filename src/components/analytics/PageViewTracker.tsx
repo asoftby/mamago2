@@ -3,7 +3,8 @@
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { postProductTelemetryEvent } from "@/lib/analytics/client";
-import { isPublicPageViewPath, shouldEmitPageView } from "@/lib/analytics/pageViewObserver";
+import { isPublicPageViewPath, pageViewCitySlug, shouldEmitPageView } from "@/lib/analytics/pageViewObserver";
+import { useOptionalCity } from "@/contexts/CityContext";
 
 /**
  * Emits one PAGE_VIEW per initial public page load or client-side
@@ -19,18 +20,23 @@ import { isPublicPageViewPath, shouldEmitPageView } from "@/lib/analytics/pageVi
  */
 export function PageViewTracker() {
   const pathname = usePathname();
+  const city = useOptionalCity();
+  const citySlug = pageViewCitySlug(city);
   const lastPathnameRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!pathname) return;
+    if (!pathname || (city && !city.isHydrated)) return;
     if (!isPublicPageViewPath(pathname)) return;
     if (!shouldEmitPageView(lastPathnameRef.current, pathname)) return;
     lastPathnameRef.current = pathname;
     void postProductTelemetryEvent({
       eventType: "PAGE_VIEW",
+      citySlug,
       meta: { path: pathname },
     });
-  }, [pathname]);
+    // Re-run once stored territory is hydrated; pathname ref prevents duplicates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, city?.isHydrated]);
 
   return null;
 }

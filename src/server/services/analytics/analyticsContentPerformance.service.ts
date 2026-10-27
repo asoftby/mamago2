@@ -21,6 +21,7 @@ import {
   resolveAnalyticsDateRange,
   resolveCityIdFromSlug,
 } from "@/server/services/analytics/analyticsDateRange";
+import { resolveInternalTrafficExclusion } from "@/server/services/analytics/canonicalAudience";
 import { labelForCtaTargetAction } from "@/lib/analytics/ctaTargetActionLabels";
 
 const VIEW_TYPES: UserEventType[] = ["PAGE_VIEW", "CARD_VIEW"];
@@ -160,10 +161,11 @@ export async function getAnalyticsContentPerformance(
   if (allowed && allowed.size === 0) {
     return emptyResult(start, end, page, pageSize, sortKey, sortDir);
   }
+  const exclusion = await resolveInternalTrafficExclusion(prisma, start, end);
 
-  const baseWhere = buildAnalyticsBaseEventWhere(start, end, filters, cityId);
+  const baseWhere = buildAnalyticsBaseEventWhere(start, end, filters, cityId, exclusion);
   const where = applyAnalyticsUserFilter(baseWhere, allowed);
-  const wsql = analyticsEventWhereSql(start, end, filters, cityId, allowed);
+  const wsql = analyticsEventWhereSql(start, end, filters, cityId, allowed, exclusion);
 
   const [aggRows, metaRows] = await Promise.all([
     prisma.$queryRaw<AggRow[]>`

@@ -15,6 +15,9 @@
  *   weekly_planning_families (60min), retention (24h), habit (24h),
  *   engagement_funnel (60min), supply_health (30min), b2b_health (60min)
  *
+ * Telemetry ingestion quality (bot / no-identity shares for Data Quality):
+ *   ingestion_quality (15min)
+ *
  * External SEO health (read-only, fail-closed):
  *   google_search_console (6h)
  *   seo_evergreen_weekly (12h) — recovery-gate metric per ISO week
@@ -36,6 +39,7 @@ import { funnelMetricsCollector } from "./funnel";
 import { googleSearchConsoleCollector } from "./googleSearchConsole";
 import { habitCollector } from "./habit";
 import { importMetricsCollector } from "./importMetrics";
+import { ingestionQualityCollector } from "./ingestionQuality";
 import { moderationQueueMetricsCollector } from "./moderationQueues";
 import { retentionCollector } from "./retention";
 import { searchMetricsCollector } from "./search";
@@ -62,4 +66,5 @@ export function registerCoreMetricCollectors(): void {
   registerMetricCollector(b2bHealthCollector);
   registerMetricCollector(googleSearchConsoleCollector);
   registerMetricCollector(seoEvergreenWeeklyCollector);
+  registerMetricCollector(ingestionQualityCollector);
 }

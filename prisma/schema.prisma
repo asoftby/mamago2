@@ -215,6 +215,11 @@ model UserEvent {
   familyId         String?
   /// Plan audience (PRIVATE | FAMILY) for plan-related events. Server-only.
   planVisibility   PlanVisibility?
+  /// Класс клиента, приславшего событие через `/api/analytics/events`
+  /// (определяется по User-Agent; сам UA не хранится). null — событие записано
+  /// сервером или до введения фильтра ботов (2026-10). `bot` не пишется:
+  /// такие запросы отбрасываются и учитываются только счётчиком.
+  clientClass      UserEventClientClass?
   meta             Json?
   createdAt        DateTime             @default(now())
   promotionActions PromotionAction[]
@@ -2850,6 +2855,7 @@ model OfferClassTariff {
   price String
   unit String
   periodDays Int?
+  visitsCount Int?
   active Boolean @default(true)
   position Int @default(0)
   @@index([groupId, position])
@@ -4070,6 +4076,13 @@ enum UserModerationActionType {
   BAN
   UNBAN
   ROLE_CHANGE
+}
+
+/// Класс клиента продуктовой телеметрии (см. UserEvent.clientClass).
+enum UserEventClientClass {
+  browser
+  bot
+  unknown
 }
 
 enum UserEventType {
