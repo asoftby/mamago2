@@ -535,6 +535,43 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
       },
     ],
   },
+  "analytics.user_funnel": {
+    metricKey: "analytics.user_funnel",
+    displayName: "Воронка: видели → открыли → сохранили / в план / к партнёру",
+    businessMeaning:
+      "Сколько людей прошли каждый шаг. «Сохранили», «Добавили в план» и «Перешли к партнёру» — отдельные ветки от «Открыли»: доля считается от открывших и не превышает 100%",
+    formula:
+      "Уникальные люди (userId, иначе анонимный sessionId). Видели = любое событие воронки; Открыли = ≥1 DETAIL_OPEN; остальные шаги = действие не раньше первого открытия. Доля = шаг / открывшие; при нуле открывших — «—»",
+    source: "UserEvent (PAGE_VIEW, CARD_VIEW, DETAIL_OPEN, SAVE, PLAN_ADD, CTA_CLICK)",
+    window: ANALYTICS_WINDOW,
+    exclusions: ANALYTICS_EXCLUSIONS,
+    version: "2.0.0",
+    verifiable: false,
+    changes: [
+      {
+        date: "2026-10-27",
+        note: "Раньше считались события (одна сессия могла дать 300% от предыдущего шага), без учёта порядка, а «Обзор» игнорировал фильтры сегмента и возраста ребёнка. Теперь — уникальные люди с учётом времени, фильтры применяются на всех вкладках",
+      },
+    ],
+  },
+  "analytics.content_performance": {
+    metricKey: "analytics.content_performance",
+    displayName: "Эффективность контента: показы в ленте, открытия, сохранения, в план, CTA",
+    businessMeaning: "Как карточка ведёт себя в выбранном периоде. CTR = открытия / показы в ленте",
+    formula:
+      "COUNT(UserEvent) по карточке: показы в ленте = CARD_VIEW, открытия = DETAIL_OPEN, сохранения = SAVE, в план = PLAN_ADD, CTA = CTA_CLICK. CTR = открытия / показы; без показов — «—». Может быть выше 100%: карточку открывают и мимо ленты (поиск, прямая ссылка)",
+    source: "UserEvent",
+    window: ANALYTICS_WINDOW,
+    exclusions: ANALYTICS_EXCLUSIONS,
+    version: "2.0.0",
+    verifiable: false,
+    changes: [
+      {
+        date: "2026-10-27",
+        note: "Раньше в «просмотры» входили и PAGE_VIEW, и CARD_VIEW; теперь колонка «Показы в ленте» — только CARD_VIEW",
+      },
+    ],
+  },
 };
 
 export function getMetricDictionaryEntry(metricKey: string): MetricDictionaryEntry | null {

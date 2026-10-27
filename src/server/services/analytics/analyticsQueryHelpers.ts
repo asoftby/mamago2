@@ -78,7 +78,7 @@ function bandFromAgeYears(age: number): string {
   return "10+";
 }
 
-async function youngestChildBandByUser(): Promise<Map<string, string>> {
+export async function youngestChildBandByUser(): Promise<Map<string, string>> {
   const births = await youngestChildBirthByUser();
   const map = new Map<string, string>();
   for (const [userId, youngest] of births) {

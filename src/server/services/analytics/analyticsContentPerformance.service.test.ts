@@ -86,6 +86,13 @@ async function testAggregationCountsMatchWrittenEvents() {
       entityId: FIXTURE_ENTITY_ID,
       citySlug: CITY_SLUG,
     });
+    // D9: a page view of the entity is not a feed impression ("Показы в ленте" = CARD_VIEW only).
+    await trackUserEvent({
+      eventType: "PAGE_VIEW",
+      entityType: "PLACE",
+      entityId: FIXTURE_ENTITY_ID,
+      citySlug: CITY_SLUG,
+    });
 
     const result = await getAnalyticsContentPerformance(baseFilters(), { pageSize: 100 });
     const row = result.performanceTable.find(
@@ -95,7 +102,7 @@ async function testAggregationCountsMatchWrittenEvents() {
     assert.equal(row!.opens, 3, "DETAIL_OPEN count must match exactly");
     assert.equal(row!.ctaClicks, 1);
     assert.equal(row!.saves, 1);
-    assert.equal(row!.views, 0, "no CARD_VIEW was emitted, so raw views must be 0, not fabricated");
+    assert.equal(row!.views, 0, "no CARD_VIEW was emitted (PAGE_VIEW is not a feed impression), so impressions must be 0");
     assert.equal(
       row!.openRate,
       null,

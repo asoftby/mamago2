@@ -145,23 +145,23 @@ export function AdminAnalyticsContentPerformance({
   return (
     <div className="space-y-6">
       <p className="text-xs text-gray-500">
-        Aggregated events (not raw rows).{" "}
+        Агрегаты событий (не сырые строки). Показы в ленте — только показы карточки в ленте, без просмотров страниц.{" "}
         {new Date(data.range.start).toLocaleDateString()} —{" "}
         {new Date(data.range.end).toLocaleDateString()}
         {loading ? " · updating…" : ""}
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <TopBlock title="Top views" items={data.topViews} metric="views" />
-        <TopBlock title="Top opens" items={data.topOpens} metric="opens" />
-        <TopBlock title="Top saves" items={data.topSaves} metric="saves" />
+        <TopBlock title="Топ по показам в ленте" items={data.topViews} metric="views" />
+        <TopBlock title="Топ по открытиям" items={data.topOpens} metric="opens" />
+        <TopBlock title="Топ по сохранениям" items={data.topSaves} metric="saves" />
         <TopBlock
-          title="Top plan adds"
+          title="Топ по добавлениям в план"
           items={data.topPlanAdds}
           metric="planAdds"
         />
         <TopBlock
-          title="Top CTA"
+          title="Топ по CTA"
           items={data.topClicks}
           metric="ctaClicks"
         />
@@ -272,25 +272,24 @@ export function AdminAnalyticsContentPerformance({
 
       <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-gray-900">
-          Best converters
+          Лучшие по конверсии
         </h2>
         <p className="mt-1 text-xs text-gray-500">
-          Thresholds: save rate (views≥10, opens≥3); plan rate (saves≥3); CTA/opens
-          (opens≥5).
+          Пороги: сохранения/открытия (показы ≥ 10, открытия ≥ 3); план/сохранения (сохранения ≥ 3); CTA/открытия (открытия ≥ 5).
         </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <ConverterList
-            title="Save rate"
+            title="Сохр./откр."
             rows={data.bestConverters.bySaveRate}
             rate={(r) => pct(r.saveRate)}
           />
           <ConverterList
-            title="Plan rate"
+            title="План/сохр."
             rows={data.bestConverters.byPlanRate}
             rate={(r) => pct(r.planRate)}
           />
           <ConverterList
-            title="CTA / opens"
+            title="CTA/откр."
             rows={data.bestConverters.byClickRate}
             rate={(r) => pct(r.clickRateVsOpens)}
           />
@@ -299,14 +298,14 @@ export function AdminAnalyticsContentPerformance({
 
       <section className="rounded-2xl border border-amber-200/80 bg-amber-50/40 p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-gray-900">
-          Worst converters (high traffic, low save rate)
+          Худшие по конверсии (много показов, мало сохранений)
         </h2>
         <p className="mt-1 text-xs text-gray-600">
-          views ≥ 35, opens ≥ 5, save rate &lt; 12%
+          показы ≥ 35, открытия ≥ 5, сохр./откр. &lt; 12%
         </p>
         <ul className="mt-2 space-y-2">
           {data.worstConverters.length === 0 ? (
-            <li className="text-xs text-gray-500">No matches</li>
+            <li className="text-xs text-gray-500">Нет подходящих</li>
           ) : (
             data.worstConverters.map((r) => (
               <li
@@ -315,7 +314,7 @@ export function AdminAnalyticsContentPerformance({
               >
                 <span className="font-medium text-gray-900">{r.title}</span>
                 <span className="text-gray-600">
-                  views {r.views} · save {pct(r.saveRate)}
+                  показы {r.views} · сохр. {pct(r.saveRate)}
                 </span>
               </li>
             ))
@@ -325,11 +324,11 @@ export function AdminAnalyticsContentPerformance({
 
       <div className="grid gap-4 lg:grid-cols-2">
         <ComparisonBlock
-          title="Entity type"
+          title="Тип сущности"
           rows={data.entityTypeComparison}
         />
         <ComparisonBlock
-          title="Vertical"
+          title="Раздел"
           rows={data.verticalComparison}
         />
       </div>
@@ -347,20 +346,20 @@ export function AdminAnalyticsContentPerformance({
 
 function labelForKey(k: string): string {
   const m: Record<string, string> = {
-    title: "Title",
-    entityType: "Type",
-    vertical: "Vertical",
-    cityName: "City",
-    views: "Views",
-    opens: "Opens",
-    saves: "Saves",
-    planAdds: "Plan",
+    title: "Название",
+    entityType: "Тип",
+    vertical: "Раздел",
+    cityName: "Город",
+    views: "Показы в ленте",
+    opens: "Открытия",
+    saves: "Сохранения",
+    planAdds: "В план",
     ctaClicks: "CTA",
-    openRate: "Open %",
-    saveRate: "Save %",
-    planRate: "Plan %",
-    clickRateVsOpens: "CTA/opens",
-    clickRateVsPlans: "CTA/plan",
+    openRate: "CTR (откр./показы)",
+    saveRate: "Сохр./откр.",
+    planRate: "План/сохр.",
+    clickRateVsOpens: "CTA/откр.",
+    clickRateVsPlans: "CTA/план",
   };
   return m[k] ?? k;
 }
@@ -457,7 +456,7 @@ function ComparisonBlock({
               <div className="mb-1 flex justify-between text-xs">
                 <span className="font-medium text-gray-800">{r.label}</span>
                 <span className="tabular-nums text-gray-600">
-                  v{r.views} · save {pct(r.saveRate)}
+                  показы {r.views} · сохр. {pct(r.saveRate)}
                 </span>
               </div>
               <div className="flex h-2 overflow-hidden rounded-full bg-muted/50">
@@ -468,7 +467,7 @@ function ComparisonBlock({
               </div>
               <p className="mt-0.5 text-[10px] text-gray-500">
                 opens {r.opens} · saves {r.saves} · plans {r.planAdds} · CTA{" "}
-                {r.ctaClicks} · plan {pct(r.planRate)}
+                {r.ctaClicks} · в план {pct(r.planRate)}
               </p>
             </div>
           ))

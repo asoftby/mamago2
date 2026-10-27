@@ -7,9 +7,14 @@ import type {
 import { analyticsDayKeys } from "@/server/services/analytics/analyticsDateRange";
 import {
   analyticsEventWhereSql,
+  applyAnalyticsUserFilter,
   buildAnalyticsBaseEventWhere,
   loadAnalyticsScope,
 } from "@/server/services/analytics/analyticsQueryHelpers";
+import {
+  countOrderedFunnel,
+  share,
+} from "@/server/services/analytics/orderedUserFunnel";
 import {
   AUDIENCE_EXCLUDED_ROLES,
   computeCanonicalAudience,
@@ -20,7 +25,6 @@ import {
   CTA_CLICK_EVENT,
   DETAIL_OPEN_EVENT,
   FEED_IMPRESSION_EVENT,
-  METRIC_LABELS,
   PLAN_ADD_EVENT,
   SAVE_EVENT,
 } from "@/server/services/analytics/metricDefinitions";
@@ -47,15 +51,28 @@ function shortDayLabel(dateKey: string): string {
  * трафик (ADMIN/MODERATOR + tainted-сессии) исключён из всех цифр; сутки —
  * по Минску. Фильтры сущности/вертикали относятся к контентным событиям и к
  * аудитории (PAGE_VIEW без сущности) не применяются.
+ *
+ * D6: фильтры «сегмент» и «возраст ребёнка» применяются ко всем цифрам вкладки
+ * (аудитория, события, ряд по дням) — раньше они молча игнорировались.
+ * D7: воронка и конверсии — по уникальным людям, доли считаются от открывших
+ * и не превышают 100%; при нуле открывших доля — null («—»), а не 0%.
  */
 export async function getAnalyticsOverview(
   filters: AnalyticsOverviewFilters,
 ): Promise<AnalyticsOverviewResult> {
-  const { start, end, cityId, exclusion } = await loadAnalyticsScope(filters);
-  const base = buildAnalyticsBaseEventWhere(start, end, filters, cityId, exclusion);
+  const { start, end, cityId, allowed, exclusion } = await loadAnalyticsScope(filters);
+  const base = applyAnalyticsUserFilter(
+    buildAnalyticsBaseEventWhere(start, end, filters, cityId, exclusion),
+    allowed,
+  );
   const exclusionSql = internalTrafficExclusionSql(exclusion, "e");
   const cityPageViewSql = cityId ? Prisma.sql`AND e."cityId" = ${cityId}` : Prisma.empty;
-  const contentEventSql = analyticsEventWhereSql(start, end, filters, cityId, null, exclusion);
+  const allowedPageViewSql = allowed
+    ? allowed.size === 0
+      ? Prisma.sql`AND FALSE`
+      : Prisma.sql`AND e."userId" IN (${Prisma.join([...allowed])})`
+    : Prisma.empty;
+  const contentEventSql = analyticsEventWhereSql(start, end, filters, cityId, allowed, exclusion);
 
   const [
     audience,
@@ -64,18 +81,20 @@ export async function getAnalyticsOverview(
     saves,
     planAdds,
     ctaClicks,
+    people,
     profilesActiveInRange,
     topVerticalRows,
     topEntityRows,
     dailyPageViewRows,
     dailyOpenRows,
   ] = await Promise.all([
-    computeCanonicalAudience(prisma, start, end, { cityId }),
+    computeCanonicalAudience(prisma, start, end, { cityId, allowedUserIds: allowed }),
     countByType(base, FEED_IMPRESSION_EVENT),
     countByType(base, DETAIL_OPEN_EVENT),
     countByType(base, SAVE_EVENT),
     countByType(base, PLAN_ADD_EVENT),
     countByType(base, CTA_CLICK_EVENT),
+    countOrderedFunnel(contentEventSql),
     prisma.userBehaviorProfile.count({
       where: {
         lastSeenAt: { gte: start, lte: end },
@@ -108,6 +127,7 @@ export async function getAnalyticsOverview(
         AND e."createdAt" >= ${start} AND e."createdAt" <= ${end}
         AND (e."sessionId" IS NOT NULL OR e."userId" IS NOT NULL)
         ${cityPageViewSql}
+        ${allowedPageViewSql}
         AND ${exclusionSql}
       GROUP BY 1
     `),
@@ -120,20 +140,19 @@ export async function getAnalyticsOverview(
   ]);
 
   const pageViews = audience.pageViews;
-  const denomViews = Math.max(pageViews, 1);
-  const denomSaves = Math.max(saves, 1);
-  const saveRate = saves / denomViews;
-  const planRate = planAdds / denomSaves;
-  const clickRate = ctaClicks / denomViews;
+  // D7: доли — от уникальных открывших; ветки save/plan/click не короче 100%.
+  const saveRate = share(people.save, people.open);
+  const planRate = share(people.plan, people.open);
+  const clickRate = share(people.click, people.open);
 
-  const top = Math.max(pageViews, 1);
-  const pctOfTop = (n: number) => Math.round((n / top) * 1000) / 10;
+  const pctOfTop = (n: number, top: number) =>
+    top > 0 ? Math.round((n / top) * 1000) / 10 : 0;
   const funnel = [
-    { key: "view" as const, label: METRIC_LABELS.pageViews, count: pageViews, percentOfTop: 100 },
-    { key: "open" as const, label: METRIC_LABELS.opens, count: opens, percentOfTop: pctOfTop(opens) },
-    { key: "save" as const, label: METRIC_LABELS.saves, count: saves, percentOfTop: pctOfTop(saves) },
-    { key: "plan" as const, label: METRIC_LABELS.planAdds, count: planAdds, percentOfTop: pctOfTop(planAdds) },
-    { key: "click" as const, label: METRIC_LABELS.ctaClicks, count: ctaClicks, percentOfTop: pctOfTop(ctaClicks) },
+    { key: "view" as const, label: "Видели контент", count: people.view, percentOfTop: people.view > 0 ? 100 : 0 },
+    { key: "open" as const, label: "Открыли карточку", count: people.open, percentOfTop: pctOfTop(people.open, people.view) },
+    { key: "save" as const, label: "Сохранили", count: people.save, percentOfTop: pctOfTop(people.save, people.open) },
+    { key: "plan" as const, label: "Добавили в план", count: people.plan, percentOfTop: pctOfTop(people.plan, people.open) },
+    { key: "click" as const, label: "Перешли к партнёру", count: people.click, percentOfTop: pctOfTop(people.click, people.open) },
   ];
 
   const topVerticals = topVerticalRows.map((r) => ({

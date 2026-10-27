@@ -5,12 +5,13 @@ export type ContentPerformanceEntityRow = {
   vertical: string | null;
   cityId: string | null;
   cityName: string | null;
+  /** «Показы в ленте» — только CARD_VIEW (PAGE_VIEW не считается) */
   views: number;
   opens: number;
   saves: number;
   planAdds: number;
   ctaClicks: number;
-  /** null when views (the denominator) is 0 — do not render as a fake 0%. */
+  /** CTR = открытия / показы в ленте; null, если показов нет. Может быть >100%: открытия идут и мимо ленты (поиск, прямая ссылка). */
   openRate: number | null;
   /** null when opens is 0 */
   saveRate: number | null;

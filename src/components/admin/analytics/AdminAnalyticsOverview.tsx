@@ -18,8 +18,8 @@ function buildQuery(filters: AnalyticsOverviewFilters): string {
   return q.toString();
 }
 
-function formatPct(x: number): string {
-  return `${(x * 100).toFixed(1)}%`;
+function formatPct(x: number | null): string {
+  return x == null ? "—" : `${(x * 100).toFixed(1)}%`;
 }
 
 function formatRangeLabel(isoStart: string, isoEnd: string): string {
@@ -148,33 +148,36 @@ export function AdminAnalyticsOverview({
           />
           <KpiCard label="Просмотры страниц" value={data.pageViews.toLocaleString("ru-RU")} />
           <KpiCard label="Показы в ленте" value={data.feedImpressions.toLocaleString("ru-RU")} />
-          <KpiCard label="Opens" value={data.opens.toLocaleString()} />
-          <KpiCard label="Saves" value={data.saves.toLocaleString()} />
+          <KpiCard label="Открытия" value={data.opens.toLocaleString("ru-RU")} />
+          <KpiCard label="Сохранения" value={data.saves.toLocaleString("ru-RU")} />
           <KpiCard
-            label="Plan adds"
-            value={data.planAdds.toLocaleString()}
+            label="Добавления в план"
+            value={data.planAdds.toLocaleString("ru-RU")}
           />
           <KpiCard
-            label="CTA clicks"
-            value={data.ctaClicks.toLocaleString()}
+            label="Переходы к партнёру"
+            value={data.ctaClicks.toLocaleString("ru-RU")}
           />
           <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-            <p className="text-xs text-gray-600">Conversion rates</p>
+            <p className="text-xs text-gray-600">Конверсии</p>
+            <p className="mt-0.5 text-[11px] text-gray-400">
+              Доля людей, открывших карточку и затем сохранивших / добавивших в план / перешедших к партнёру.
+            </p>
             <dl className="mt-2 space-y-1.5 text-sm">
               <div className="flex justify-between gap-2 tabular-nums">
-                <dt className="text-gray-500">Save rate</dt>
+                <dt className="text-gray-500">Сохранили</dt>
                 <dd className="font-medium text-gray-900">
                   {formatPct(data.saveRate)}
                 </dd>
               </div>
               <div className="flex justify-between gap-2 tabular-nums">
-                <dt className="text-gray-500">Plan rate</dt>
+                <dt className="text-gray-500">В план</dt>
                 <dd className="font-medium text-gray-900">
                   {formatPct(data.planRate)}
                 </dd>
               </div>
               <div className="flex justify-between gap-2 tabular-nums">
-                <dt className="text-gray-500">Click rate</dt>
+                <dt className="text-gray-500">К партнёру</dt>
                 <dd className="font-medium text-gray-900">
                   {formatPct(data.clickRate)}
                 </dd>
@@ -186,7 +189,10 @@ export function AdminAnalyticsOverview({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <h3 className="mb-4 text-sm font-semibold text-gray-900">Funnel</h3>
+          <h3 className="mb-1 text-sm font-semibold text-gray-900">Воронка</h3>
+          <p className="mb-4 text-[11px] text-gray-500">
+            Уникальные люди. «Открыли» — от видевших; остальное — от открывших.
+          </p>
           <div className="space-y-3">
             {data.funnel.map((step) => (
               <div key={step.key} className="flex items-center gap-3">
@@ -199,10 +205,10 @@ export function AdminAnalyticsOverview({
                     style={{ width: `${Math.min(100, step.percentOfTop)}%` }}
                   />
                 </div>
-                <span className="w-24 shrink-0 text-right text-xs text-gray-600">
+                <span className="w-32 shrink-0 text-right text-xs text-gray-600">
                   {step.label}{" "}
                   <span className="font-medium text-gray-900">
-                    {step.count.toLocaleString()}
+                    {step.count.toLocaleString("ru-RU")}
                   </span>
                 </span>
               </div>
