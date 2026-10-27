@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
   const window = resolveEventDateRange({ from: p.get("windowFrom"), to: p.get("windowTo") });
   if (!window) return NextResponse.json({ error: "INVALID_WINDOW" }, { status: 400 });
   const { where } = await buildKudaDiscoveryWhere(city.id, city.slug, {
+    explicitTerritorySlug,
     format: parseActivityFormatQuery(p.get("format")),
     eventFilters: {
       categorySlugs: p.get("category")?.split(",").filter(Boolean) ?? [],
