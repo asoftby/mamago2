@@ -1,12 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { serializeAppliedToSearchParams, useDiscoveryFilters, getDiscoveryFilterActiveCount, defaultFilters, type DiscoveryFilters } from "@/features/filters/discovery/filters.store";
+import { serializeAppliedToSearchParams, mergeDiscoveryPatch, useDiscoveryFilters, getDiscoveryFilterActiveCount, defaultFilters, type DiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { toggleEventCategory, useEventTaxonomy } from "@/features/filters/discovery/eventTaxonomy";
 import { Chip } from "@/components/ui/Chip";
 import { DiscoveryWhoFilter } from "./DiscoveryWhoFilter";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
-import { pluralize } from "@/lib/formatters/pluralize";
 import { useEventAvailableFacets } from "@/features/filters/discovery/useEventAvailableFacets";
 import { Button } from "@/components/ui/button";
 import { ACTIVITY_FORMAT_OPTIONS } from "@/domain/activities/activity-format";
@@ -231,7 +230,6 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
   const facets = useEventAvailableFacets(applied);
   const explore = useEventListingExplore();
   const { categories, loading: taxonomyLoading } = useEventTaxonomy(citySlug);
-  const [count, setCount] = React.useState<number | null>(null);
   const [distribution, setDistribution] = React.useState<PriceDistribution>({ max: null, maxPrice: null, minPaid: null, step: null, buckets: [] });
   const patch = (next: Partial<DiscoveryFilters>) => setDraft(prev => mergeDiscoveryPatch(prev, next));
 
@@ -241,12 +239,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
       const params = serializeAppliedToSearchParams(new URLSearchParams(), applied);
       params.set("city", citySlug);
       if (explore) params.set("explore", "1");
-      fetch(`/api/discovery/events/count?${params}`, { signal: controller.signal })
-        .then((response) => response.ok ? response.json() : null)
-        .then((data) => setCount(data?.count ?? null))
-        .catch(() => {});
-
-      params.delete("priceMin");
+params.delete("priceMin");
       params.delete("priceMax");
       params.delete("free");
       fetch(`/api/discovery/events/price-distribution?${params}`, { signal: controller.signal })
