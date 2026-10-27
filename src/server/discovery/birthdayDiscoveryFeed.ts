@@ -62,21 +62,39 @@ export function projectBirthdayOfferCard(offer: BirthdayCardOffer, citySlug: str
   };
 }
 
-/** Published offers approved for the birthday section — no events and no mock fill. */
-export async function getBirthdayDiscoveryFeed(cityId: string, citySlug: string): Promise<ActivityMock[]> {
-  const rows = await prisma.offer.findMany({
-    where: getPublicBirthdayOfferWhere(cityId),
-    select: {
-      id: true, slug: true, title: true, description: true, coverImage: true,
-      productType: true, category: true, ageMinMonths: true, ageMaxMonths: true,
-      agePolicy: true, priceMode: true, priceFrom: true, priceTo: true, currency: true,
-    },
-    orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
-    take: 80,
-  });
+/** Stable, database-paginated public birthday catalog. */
+export async function getBirthdayDiscoveryPage(
+  cityId: string,
+  citySlug: string,
+  requestedPage: number,
+  requestedPageSize = 24,
+) {
+  const pageSize = Math.max(1, Math.min(60, Math.trunc(requestedPageSize) || 24));
+  const page = Math.max(1, Math.trunc(requestedPage) || 1);
+  const where = getPublicBirthdayOfferWhere(cityId);
+  const [total, rows] = await prisma.$transaction([
+    prisma.offer.count({ where }),
+    prisma.offer.findMany({
+      where,
+      select: {
+        id: true, slug: true, title: true, description: true, coverImage: true,
+        productType: true, category: true, ageMinMonths: true, ageMaxMonths: true,
+        agePolicy: true, priceMode: true, priceFrom: true, priceTo: true, currency: true,
+      },
+      orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+  const activities = rows.flatMap((offer): ActivityMock[] =>
+    offer.slug && (offer.productType === "PARTY_SERVICE" || offer.productType === "PARTY_PACKAGE")
+      ? [projectBirthdayOfferCard({ ...offer, productType: offer.productType }, citySlug)]
+      : [],
+  );
+  return { activities, page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
+}
 
-  return rows.flatMap((offer): ActivityMock[] => {
-    if (!offer.slug || (offer.productType !== "PARTY_SERVICE" && offer.productType !== "PARTY_PACKAGE")) return [];
-    return [projectBirthdayOfferCard({ ...offer, productType: offer.productType }, citySlug)];
-  });
+/** @deprecated Use getBirthdayDiscoveryPage for visible catalog pages. */
+export async function getBirthdayDiscoveryFeed(cityId: string, citySlug: string): Promise<ActivityMock[]> {
+  return (await getBirthdayDiscoveryPage(cityId, citySlug, 1, 80)).activities;
 }
