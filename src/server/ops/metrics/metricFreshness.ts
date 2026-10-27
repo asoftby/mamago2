@@ -76,10 +76,26 @@ export function metricIntervalSec(metric: string): number | null {
   return best ? best.interval : null;
 }
 
+/**
+ * Stricter per-metric limits (ms) than 3 x interval. The ingestion-quality
+ * shares are shown on the Data Quality block, where a 45-minute-old ratio
+ * would hide a broken ingestion: they expire after 20 minutes (owner decision
+ * on PR 1).
+ */
+const TTL_OVERRIDE_MS: Readonly<Record<string, number>> = {
+  "telemetry.bot_rejected_share_24h": 20 * 60 * 1000,
+  "telemetry.bot_rejected_share_7d": 20 * 60 * 1000,
+  "telemetry.no_identity_rejected_share_24h": 20 * 60 * 1000,
+  "telemetry.stored_without_identity_share_24h": 20 * 60 * 1000,
+};
+
 /** Max age (ms) a sample may have to still be shown; null = no known owner, never expire. */
 export function metricTtlMs(metric: string): number | null {
   const interval = metricIntervalSec(metric);
-  return interval === null ? null : SAMPLE_TTL_INTERVALS * interval * 1000;
+  if (interval === null) return TTL_OVERRIDE_MS[metric] ?? null;
+  const generic = SAMPLE_TTL_INTERVALS * interval * 1000;
+  const override = TTL_OVERRIDE_MS[metric];
+  return override === undefined ? generic : Math.min(generic, override);
 }
 
 /** True when a sample collected at `collectedAt` is older than the metric's TTL at `now`. */

@@ -40,6 +40,7 @@ function readStoredSelection(): string | null {
 type CityContextValue = ResolvedCityContext & {
   citySlug: string;
   cityName: string;
+  isHydrated: boolean;
   setCity: (slug: string) => void;
   appendCityQuery: (href: string) => string;
 };
@@ -136,8 +137,8 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ ...resolvedCity, citySlug, cityName, setCity, appendCityQuery }),
-    [resolvedCity, citySlug, cityName, setCity, appendCityQuery],
+    () => ({ ...resolvedCity, citySlug, cityName, isHydrated: isInitialized, setCity, appendCityQuery }),
+    [resolvedCity, citySlug, cityName, isInitialized, setCity, appendCityQuery],
   );
 
   return <CityContext.Provider value={value}>{children}</CityContext.Provider>;
@@ -171,6 +172,7 @@ export function useCity(): CityContextValue {
       ...resolvedCity,
       citySlug,
       cityName,
+      isHydrated: true,
       setCity: (slug: string) => {
         writeTerritoryCookieClient(slug);
         router.push(`/${slug}`);

@@ -1,21 +1,22 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { BlogIndex } from "../../blog/BlogIndex";
 import { BlogPagination } from "../../blog/BlogPagination";
+import { JournalPageView } from "@/components/journal/JournalPageView";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
+import { journalTypeFilterHref, parseJournalTypeFilter } from "@/lib/journal/journalCardMeta";
 import {
   buildAbsoluteCanonicalUrl,
   buildCityPublicPath,
 } from "@/lib/routing/cityPaths";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
-import { listCityBlogArticles, listJournalLocationOptions } from "@/server/article/listCityHomeArticles";
+import { loadJournalPage } from "@/server/journal/journalPage";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ city: string }>;
-  searchParams: Promise<{ page?: string | string[]; location?: string | string[] }>;
+  searchParams: Promise<{ page?: string | string[]; type?: string | string[] }>;
 }
 
 async function resolveCity(citySlug: string) {
@@ -65,19 +66,34 @@ export default async function CityBlogPage({ params, searchParams }: PageProps) 
   if (!city) notFound();
 
   const requestedPage = parsePage(query.page);
-  const requestedLocation = Array.isArray(query.location) ? query.location[0] : query.location;
-  const locationOptions = await listJournalLocationOptions();
-  const location = locationOptions.some(option => option.value === requestedLocation) ? requestedLocation! : null;
-  const journal = await listCityBlogArticles(city, requestedPage, 24, location);
+  const typeFilter = parseJournalTypeFilter(query.type);
+  // Территория — только из глобальной шапки (город страницы): материалы города выше.
+  const journal = await loadJournalPage({
+    city,
+    scopeWhere: null,
+    scopeKey: "all",
+    typeFilter,
+    page: requestedPage,
+  });
   if (requestedPage > journal.totalPages && journal.total > 0) notFound();
 
   const basePath = buildCityPublicPath({ citySlug: city.slug, type: "journal" });
 
   return (
     <main>
-      <BlogIndex articles={journal.articles} locationOptions={locationOptions} activeLocation={location} />
+      <JournalPageView
+        title="Журнал"
+        subtitle="Вдохновение для семейных прогулок, событий и открытий."
+        main={journal.main}
+        news={journal.news}
+        collections={journal.collections}
+        feed={journal.feed}
+        typeFilter={typeFilter}
+        basePath={basePath}
+        citySlug={city.slug}
+      />
       <BlogPagination
-        basePath={location ? `${basePath}?location=${encodeURIComponent(location)}` : basePath}
+        basePath={typeFilter ? journalTypeFilterHref(basePath, typeFilter) : basePath}
         page={journal.page}
         totalPages={journal.totalPages}
       />

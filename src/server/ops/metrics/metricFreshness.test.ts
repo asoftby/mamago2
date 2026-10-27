@@ -40,6 +40,10 @@ const now = new Date("2026-10-27T12:00:00.000Z");
 assert.equal(isSampleStale("audience.dau", new Date(now.getTime() - 3 * 900 * 1000), now), false, "exactly 3 intervals is still fresh");
 assert.equal(isSampleStale("audience.dau", new Date(now.getTime() - 3 * 900 * 1000 - 1), now), true);
 assert.equal(isSampleStale("retention.w1", new Date(now.getTime() - 2 * 86_400_000), now), false, "daily collector tolerates 2 days");
+// Data Quality shares expire after 20 minutes (stricter than 3 x 15 min).
+assert.equal(metricTtlMs("telemetry.bot_rejected_share_24h"), 20 * 60 * 1000);
+assert.equal(isSampleStale("telemetry.no_identity_rejected_share_24h", new Date(now.getTime() - 21 * 60 * 1000), now), true);
+assert.equal(isSampleStale("telemetry.no_identity_rejected_share_24h", new Date(now.getTime() - 19 * 60 * 1000), now), false);
 assert.equal(isSampleStale("unknown.metric", new Date(0), now), false, "no owner -> never expires");
 
 console.log("metricFreshness.test.ts: OK");
