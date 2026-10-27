@@ -22,6 +22,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 /** Группа регулярных занятий: дни недели ISO (1 = Пн … 7 = Вс), время начала, число мест. */
 export interface ClassSessionGroup {
   id: string;
+  tariffs?: Array<{ id: string; title: string; price: string; unit: string; periodDays?: number | null }>;
   days: number[];
   time: string;
   seats: string;
@@ -115,6 +116,13 @@ export const classScheduleInputSchema = z
       .array(
         z.object({
           id: z.string().min(1).max(128),
+          tariffs: z.array(z.object({
+            id: z.string().min(1).max(128),
+            title: z.string().trim().min(1).max(120),
+            price: z.string().trim().min(1).max(80),
+            unit: z.string().trim().min(1).max(80),
+            periodDays: z.number().int().min(1).max(366).nullable().optional(),
+          })).max(12).default([]),
           days: z.array(z.number().int().min(1).max(7)).min(1).max(7),
           time: z.string().regex(TIME_RE),
           seats: seatsSchema,
@@ -174,7 +182,7 @@ export function buildClassScheduleInput(
         ? form.groups
             .filter((group) => group.days.length > 0 && TIME_RE.test(group.time))
             .map((group) => ({
-              id: group.id, days: [...new Set(group.days)].sort(), time: group.time, seats: parseSeats(group.seats),
+              id: group.id, tariffs: group.tariffs ?? [], days: [...new Set(group.days)].sort(), time: group.time, seats: parseSeats(group.seats),
               ...(group.period !== undefined ? { period: group.period } : {}),
             }))
         : [],
