@@ -49,7 +49,7 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
     if (!family) return;
     family.setSelectedPersonaIds(nextIds);
     actions.setDraft({
-      profile: nextIds.length ? nextIds.join(",") : null,
+      profile: null,
       age: mapPlanParticipantsToAudience(nextIds, family.personas),
       adultOnly: false,
     });
@@ -71,7 +71,7 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
         if (selected.length) family?.setSelectedPersonaIds([]);
         actions.setDraft({ age: patch.age, profile: null, adultOnly: false });
       } }}
-      selectedPersonaIds={selected}
+      selectedPersonaIds={selected.filter(id => mapPlanParticipantsToAudience([id], family?.personas ?? []).some(age => applied.age.includes(age)))}
       selectedChildIds={selected.filter(id => childIds.includes(id))}
       availableChildren={children}
       onToggleChild={family ? id => setSelection(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id]) : undefined}
@@ -84,7 +84,7 @@ export function DiscoveryWhoFilter({ inline = false }: { inline?: boolean }) {
         const id = family.primaryAdultPersonaId!;
         setSelection(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id]);
       } : undefined}
-      ageMode={ageMode}
+      ageMode="manual"
       autoAgeValues={selected.length ? applied.age : []}
       availableAgeValues={selected.length ? facets?.ages ?? null : null}
       personaPickAtLimit={selected.length >= MAX_ACTIVE_FAMILY_PERSONAS}

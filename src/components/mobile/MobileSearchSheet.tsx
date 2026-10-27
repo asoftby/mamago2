@@ -40,6 +40,7 @@ import {
   resolveFamilyAgeMode,
 } from "@/lib/family/familyAgeMode";
 import { MAX_ACTIVE_FAMILY_PERSONAS } from "@/lib/family/wholeFamilyPreset";
+import { mapPlanParticipantsToAudience } from "@/lib/family/audienceSyncMapper";
 import { MobileSearch } from "@/components/mobile/MobileSearch";
 import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
 import { MobileOverlayPrimaryAction } from "@/components/mobile/MobileOverlayPrimaryAction";
@@ -344,6 +345,8 @@ export function MobileSearchSheet({
         // Deselect persona
         const newIds = family.selectedPersonaIds.filter((id) => id !== personaId);
         family.setSelectedPersonaIds(newIds);
+        const ages = mapPlanParticipantsToAudience(newIds, family.personas ?? []);
+        setSheetDraft(prev => ({ ...prev, age: ages, profile: null }));
         
         // If no personas left, clear age filters (enters free search mode)
         if (newIds.length === 0) {
@@ -353,6 +356,8 @@ export function MobileSearchSheet({
         // Select persona (exits free search mode automatically)
         const newIds = [...family.selectedPersonaIds, personaId];
         family.setSelectedPersonaIds(newIds);
+        const ages = mapPlanParticipantsToAudience(newIds, family.personas ?? []);
+        setSheetDraft(prev => ({ ...prev, age: ages, profile: null }));
       }
     },
     [family],
@@ -410,14 +415,14 @@ export function MobileSearchSheet({
     () => ({
       setDraft: (patch: Partial<DiscoveryFilters>) => {
         if (Array.isArray(patch.age)) {
-          if (ageMode === "derived") return;
+          // Explicit manual age chips always remain editable.
           patchSheetDraft({ age: patch.age });
           return;
         }
         patchSheetDraft(patch);
       },
     }),
-    [ageMode, patchSheetDraft],
+    [patchSheetDraft],
   );
 
   const isHubPickMode =
@@ -1024,7 +1029,7 @@ export function MobileSearchSheet({
                         }
                         adultSelected={adultSelected}
                         onToggleAdult={family ? toggleAdult : undefined}
-                        ageMode={ageMode}
+                        ageMode="manual"
                         autoAgeValues={childrenScope.autoAgeValues}
                         personaPickAtLimit={
                           !!family &&

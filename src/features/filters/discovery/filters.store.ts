@@ -180,7 +180,7 @@ export function normalizeStoredDiscoveryFilters(parsed: Partial<DiscoveryFilters
     age: Array.isArray(parsed.age) ? parsed.age : [],
     categories: Array.isArray(parsed.categories) ? parsed.categories : [],
     genres: Array.isArray(parsed.genres) ? parsed.genres : [],
-    profile: typeof parsed.profile === "string" ? parsed.profile : null,
+    profile: null,
   };
 }
 
@@ -319,7 +319,7 @@ export function parseAppliedFromUrl(
   const categories = searchParams.get("category")?.split(",").filter(Boolean) || [];
   const genres = searchParams.get("genre")?.split(",").filter(Boolean) || [];
   const occasionSlug = searchParams.get("occasion") === "halloween" ? "halloween" : null;
-  const profile = searchParams.get("profile") || null;
+  const profile = null;
 
   const legacyAgeMap: Record<string, string> = {
     "0+": "0-1",
@@ -425,8 +425,8 @@ export function serializeAppliedToSearchParams(
   else params.delete("genre");
   if (next.occasionSlug === "halloween") params.set("occasion", next.occasionSlug);
   else params.delete("occasion");
-  if (next.profile) params.set("profile", next.profile);
-  else params.delete("profile");
+  // Legacy persona identifiers must never be exposed in shareable URLs.
+  params.delete("profile");
 
   const formatQuery = serializeActivityFormatQuery(next.format);
   if (formatQuery) params.set("format", formatQuery);
