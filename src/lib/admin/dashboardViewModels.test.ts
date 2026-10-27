@@ -127,7 +127,12 @@ function main() {
 
   // ---- North Star (WPF) ----
   {
-    const model = deriveNorthStar({ "planning.wpf": 220, "planning.wpf_prev": 200, "audience.wau": 1000 });
+    const model = deriveNorthStar({
+      "planning.wpf": 220,
+      "planning.wpf_completed": 220,
+      "planning.wpf_completed_prev": 200,
+      "audience.wau": 1000,
+    });
     assert.equal(model.wpf, 220);
     assert.equal(model.wpfWoWPercent, 10, "220 vs 200 is +10%");
     assert.equal(model.planningPenetration, 0.22, "220 / 1000");
@@ -187,11 +192,14 @@ function main() {
   {
     const model = deriveGrowth({
       "audience.mau": 1100,
-      "audience.mau_prev": 1000,
+      "audience.mau_completed": 1100,
+      "audience.mau_completed_prev": 1000,
       "audience.wau": 540,
-      "audience.wau_prev": 500,
+      "audience.wau_completed": 540,
+      "audience.wau_completed_prev": 500,
       "planning.wpf": 220,
-      "planning.wpf_prev": 200,
+      "planning.wpf_completed": 220,
+      "planning.wpf_completed_prev": 200,
     });
     assert.equal(model.mauGrowthPercent, 10);
     assert.equal(model.wauGrowthPercent, 8);
@@ -202,6 +210,22 @@ function main() {
     assert.equal(model.mauGrowthPercent, null);
     assert.equal(model.wauGrowthPercent, null);
     assert.equal(model.wpfGrowthPercent, null);
+  }
+
+  // C1: a partial-day live value must not move the growth percentage — only completed windows count.
+  {
+    const base = {
+      "audience.wau_completed": 700,
+      "audience.wau_completed_prev": 700,
+      "planning.wpf_completed": 100,
+      "planning.wpf_completed_prev": 100,
+    };
+    const monday = deriveGrowth({ ...base, "audience.wau": 120 });
+    const sunday = deriveGrowth({ ...base, "audience.wau": 690 });
+    assert.equal(monday.wauGrowthPercent, 0);
+    assert.equal(sunday.wauGrowthPercent, 0, "same traffic -> same WoW regardless of the live reading");
+    assert.equal(deriveGrowth({ "audience.wau": 540, "audience.wau_completed": 540 }).wauGrowthPercent, null);
+    assert.equal(deriveGrowth({ ...base, "audience.wau_completed_prev": 0 }).wauGrowthPercent, null, "prev = 0 -> no percentage");
   }
 
   // ---- Supply Health ----
@@ -247,6 +271,22 @@ function main() {
     const stale = deriveDataQuality(true);
     assert.equal(stale.internalEventsOk, false);
     assert.equal(stale.overallHealthPercent, null, "a stale snapshot must never be graded as healthy");
+
+    // Telemetry ingestion shares: absent -> null, never a fabricated 0.
+    assert.equal(fresh.botRejectedShare24h, null);
+    assert.equal(fresh.botRejectedShare7d, null);
+    assert.equal(fresh.noIdentityRejectedShare24h, null);
+    assert.equal(fresh.storedWithoutIdentityShare24h, null);
+    const withShares = deriveDataQuality(false, {
+      "telemetry.bot_rejected_share_24h": 0.4,
+      "telemetry.bot_rejected_share_7d": 0.35,
+      "telemetry.no_identity_rejected_share_24h": 0,
+      "telemetry.stored_without_identity_share_24h": 0.02,
+    });
+    assert.equal(withShares.botRejectedShare24h, 0.4);
+    assert.equal(withShares.botRejectedShare7d, 0.35);
+    assert.equal(withShares.noIdentityRejectedShare24h, 0, "a real 0 stays 0");
+    assert.equal(withShares.storedWithoutIdentityShare24h, 0.02);
   }
 
   console.log("dashboardViewModels.test.ts: OK");

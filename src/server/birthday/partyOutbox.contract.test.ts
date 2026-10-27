@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  heldPartyOutboxEventTypes, isPartyOutboxEventType, partyNotificationId, partyOutboxBackoff, partyOutboxCopy,
+  heldPartyOutboxEventTypes, isBusinessPartyEvent, isPartyOutboxEventType, partyNotificationId,
+  partyOutboxBackoff, partyOutboxCopy,
 } from "./partyOutbox.logic";
 import { authorizeCronRequest } from "@/server/cron/authorizeCron";
 
@@ -18,6 +19,12 @@ for (const type of ["PARTY_REQUEST_SENT", "PARTY_QUOTE_SENT", "PARTY_REQUEST_DEC
   assert.doesNotMatch(copy.body, /телефон|\+375/i);
 }
 assert.equal(isPartyOutboxEventType("UNKNOWN"), false);
+// An expired quote notifies both sides; the business copy links to the gated inbox.
+assert.equal(partyOutboxCopy({ type: "PARTY_QUOTE_EXPIRED", offerTitle: "Квест", dateLabel: "x" }).audience, "USER");
+assert.equal(partyOutboxCopy({ type: "PARTY_QUOTE_EXPIRED_BUSINESS", offerTitle: "Квест", dateLabel: "x" }).audience, "BUSINESS");
+assert.equal(isBusinessPartyEvent("PARTY_QUOTE_EXPIRED_BUSINESS"), true);
+assert.equal(isBusinessPartyEvent("PARTY_QUOTE_EXPIRED"), false);
+assert.ok(heldPartyOutboxEventTypes({}).includes("PARTY_QUOTE_EXPIRED_BUSINESS"));
 assert.equal(partyOutboxCopy({
   type: "PARTY_QUOTE_SENT", offerTitle: "Квест", dateLabel: "2026-10-20",
 }).body.includes("Бронирование ещё не подтверждено"), true);
@@ -44,8 +51,8 @@ for (const invariant of [
 assert.ok(!worker.includes("contactPhone: true"));
 assert.ok(!worker.includes("customerPhone: true"));
 // Business notifications deep-link into the unified inbox: held until the UI is released.
-assert.deepEqual(heldPartyOutboxEventTypes({}), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED"]);
-assert.deepEqual(heldPartyOutboxEventTypes({ BUSINESS_BOOKINGS_INBOX_UI: "false" }), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED"]);
+assert.deepEqual(heldPartyOutboxEventTypes({}), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED", "PARTY_QUOTE_EXPIRED_BUSINESS"]);
+assert.deepEqual(heldPartyOutboxEventTypes({ BUSINESS_BOOKINGS_INBOX_UI: "false" }), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED", "PARTY_QUOTE_EXPIRED_BUSINESS"]);
 assert.deepEqual(heldPartyOutboxEventTypes({ BUSINESS_BOOKINGS_INBOX_UI: "true" }), []);
 assert.ok(worker.includes("notIn: heldPartyOutboxEventTypes(process.env)"), "Inbox-linked events must be gated");
 for (const type of heldPartyOutboxEventTypes({})) {

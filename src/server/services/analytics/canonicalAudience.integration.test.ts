@@ -11,7 +11,13 @@ import { randomUUID } from "node:crypto";
 
 async function main(): Promise<void> {
   const { prisma } = await import("@/lib/prisma");
-  const { computeCanonicalAudience } = await import("./canonicalAudience");
+  const {
+    computeCanonicalAudience,
+    internalTrafficExclusionSql,
+    internalTrafficExclusionWhere,
+    resolveInternalTrafficExclusion,
+  } = await import("./canonicalAudience");
+  const { Prisma } = await import("@prisma/client");
   const { getTrafficViewModel } = await import("@/server/admin/getTrafficViewModel");
   const { collectAudienceDau } = await import("@/server/ops/metrics/collectors/audienceDaily");
 
@@ -27,13 +33,19 @@ async function main(): Promise<void> {
     return user.id;
   }
 
-  async function pageView(opts: { at: Date; sessionId?: string | null; userId?: string | null }): Promise<void> {
+  async function pageView(opts: {
+    at: Date;
+    sessionId?: string | null;
+    userId?: string | null;
+    cityId?: string | null;
+  }): Promise<void> {
     await prisma.userEvent.create({
       data: {
         eventType: "PAGE_VIEW",
         createdAt: opts.at,
         sessionId: opts.sessionId ?? undefined,
         userId: opts.userId ?? undefined,
+        cityId: opts.cityId ?? undefined,
       },
     });
   }
@@ -368,6 +380,71 @@ async function main(): Promise<void> {
       assert.equal(traffic.pageViewsPerVisitor, null, "pv13: 0-visitor guard => null, never Infinity/NaN");
     }
 
+    // --- ТЗ «Аналитика админки» B: devices, city/user narrowing, exclusion for any event type ---
+
+    // b1. devices = DISTINCT sessionId of eligible PAGE_VIEW; admin session never a device.
+    {
+      const w = win(40);
+      const t = (s: number) => new Date(w.start.getTime() + s * 1000);
+      await pageView({ at: t(1), sessionId: sid("b1-A") });
+      await pageView({ at: t(2), sessionId: sid("b1-A") });
+      await pageView({ at: t(3), sessionId: sid("b1-B"), userId: userU });
+      await pageView({ at: t(4), sessionId: sid("b1-C"), userId: userU });
+      await pageView({ at: t(5), sessionId: sid("b1-admin"), userId: userAdmin });
+      const r = await computeCanonicalAudience(prisma, w.start, w.end);
+      assert.equal(r.visitors, 2, "b1: anonymous A + user U");
+      assert.equal(r.devices, 3, "b1: sessions A, B, C — admin session excluded");
+      assert.equal(r.pageViews, 4);
+    }
+
+    // b2. cityId narrowing and allowedUserIds narrowing (empty set => zeros).
+    {
+      const w = win(41);
+      const t = (s: number) => new Date(w.start.getTime() + s * 1000);
+      const cityA = `city-${marker}-a`;
+      await pageView({ at: t(1), sessionId: sid("b2-A"), cityId: cityA });
+      await pageView({ at: t(2), sessionId: sid("b2-B"), userId: userU });
+      const inCity = await computeCanonicalAudience(prisma, w.start, w.end, { cityId: cityA });
+      assert.equal(inCity.visitors, 1, "b2: only the PAGE_VIEW written with this cityId");
+      assert.equal(inCity.pageViews, 1);
+      const onlyU = await computeCanonicalAudience(prisma, w.start, w.end, { allowedUserIds: new Set([userU]) });
+      assert.equal(onlyU.visitors, 1, "b2: user filter keeps only that user's rows");
+      assert.equal(onlyU.anonymousOnlyVisitors, 0, "b2: anonymous rows can never match a user filter");
+      const none = await computeCanonicalAudience(prisma, w.start, w.end, { allowedUserIds: new Set() });
+      assert.deepEqual(none, { authenticatedVisitors: 0, anonymousOnlyVisitors: 0, visitors: 0, pageViews: 0, devices: 0 });
+    }
+
+    // b3. Internal-traffic exclusion for any event type: an admin's session is
+    // tainted IN THE WINDOW — including the SAVE recorded before login.
+    {
+      const w = win(42);
+      const t = (s: number) => new Date(w.start.getTime() + s * 1000);
+      await prisma.userEvent.create({ data: { eventType: "SAVE", createdAt: t(1), sessionId: sid("b3-admin") } });
+      await prisma.userEvent.create({ data: { eventType: "SAVE", createdAt: t(2), sessionId: sid("b3-admin"), userId: userAdmin } });
+      await prisma.userEvent.create({ data: { eventType: "SAVE", createdAt: t(3), userId: userModerator } });
+      await prisma.userEvent.create({ data: { eventType: "SAVE", createdAt: t(4), sessionId: sid("b3-user"), userId: userU } });
+      await prisma.userEvent.create({ data: { eventType: "SAVE", createdAt: t(5), sessionId: sid("b3-anon") } });
+      await prisma.userEvent.create({ data: { eventType: "SAVE", createdAt: t(6), entityId: `ent-${marker}` } });
+      const exclusion = await resolveInternalTrafficExclusion(prisma, w.start, w.end);
+      assert.ok(exclusion.taintedSessionIds.includes(sid("b3-admin")));
+      assert.ok(!exclusion.taintedSessionIds.includes(sid("b3-user")));
+
+      const viaPrisma = await prisma.userEvent.count({
+        where: { createdAt: { gte: w.start, lt: w.end }, ...internalTrafficExclusionWhere(exclusion) },
+      });
+      const viaSql = await prisma.$queryRaw<{ c: bigint }[]>(Prisma.sql`
+        SELECT count(*)::bigint AS c FROM "UserEvent" e
+        WHERE e."createdAt" >= ${w.start} AND e."createdAt" < ${w.end}
+          AND ${internalTrafficExclusionSql(exclusion, "e")}
+      `);
+      assert.equal(viaPrisma, 3, "b3: user, anonymous and identity-less rows remain; admin (pre-login too) and moderator excluded");
+      assert.equal(Number(viaSql[0]!.c), viaPrisma, "b3: Prisma and SQL forms of the exclusion agree");
+
+      // Outside the window the same session is not tainted.
+      const later = await resolveInternalTrafficExclusion(prisma, win(43).start, win(43).end);
+      assert.ok(!later.taintedSessionIds.includes(sid("b3-admin")), "b3: tainting is per window");
+    }
+
     console.log("canonicalAudience.integration.test.ts: OK");
   } finally {
     await prisma.userEvent.deleteMany({
@@ -375,6 +452,8 @@ async function main(): Promise<void> {
         OR: [
           { sessionId: { startsWith: `fx-${marker}-` } },
           { userId: { in: userIds } },
+          { cityId: { startsWith: `city-${marker}-` } },
+          { entityId: `ent-${marker}` },
         ],
       },
     });

@@ -42,6 +42,8 @@ function metaRecord(meta: Prisma.InputJsonValue | undefined): Record<string, unk
 export async function trackUserEvent(
   input: TrackUserEventInput,
 ): Promise<TrackUserEventResult> {
+  // A2: a bot-classified event is never written, whichever caller passes it.
+  if (input.clientClass === "bot") return { ok: true };
   try {
     const cityId = await resolveCityId(input.cityId ?? null, input.citySlug ?? null);
 
@@ -143,6 +145,7 @@ export async function trackUserEvent(
           entityId: input.entityId ?? undefined,
           vertical: input.vertical ?? undefined,
           cityId: cityId ?? undefined,
+          clientClass: input.clientClass ?? undefined,
           meta: meta === undefined ? undefined : meta,
         },
       });

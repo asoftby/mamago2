@@ -4,7 +4,8 @@ import { PartyOutboxStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { dispatchDelivery } from "@/server/services/notificationDelivery.service";
 import {
-  heldPartyOutboxEventTypes, isPartyOutboxEventType, partyNotificationId, partyOutboxBackoff, partyOutboxCopy,
+  heldPartyOutboxEventTypes, isBusinessPartyEvent, isPartyOutboxEventType, partyNotificationId,
+  partyOutboxBackoff, partyOutboxCopy,
 } from "./partyOutbox.logic";
 
 const MAX_ATTEMPTS = 5;
@@ -55,7 +56,7 @@ async function processOne(row: PartyOutboxRow): Promise<"sent" | "skipped" | "fa
     }
 
     const order = request.partyOrderItem.partyOrder;
-    const recipients = (row.eventType === "PARTY_REQUEST_SENT" || row.eventType === "PARTY_QUOTE_ACCEPTED")
+    const recipients = isBusinessPartyEvent(row.eventType)
       ? (await prisma.businessMember.findMany({
           where: { businessId: request.businessId, isActive: true,
             role: { in: ["OWNER", "MANAGER"] } },

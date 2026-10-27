@@ -15,12 +15,20 @@ import type {
   BehaviorNamedBreakdown,
   BehaviorTimeBucket,
 } from "@/lib/analytics/analyticsBehaviorTypes";
+import { loadAnalyticsScope } from "@/server/services/analytics/analyticsQueryHelpers";
 import {
-  resolveAnalyticsDateRange,
-  resolveCityIdFromSlug,
-} from "@/server/services/analytics/analyticsDateRange";
+  internalTrafficExclusionSql,
+  internalTrafficExclusionWhere,
+  type InternalTrafficExclusion,
+} from "@/server/services/analytics/canonicalAudience";
+import {
+  ANALYTICS_TIME_ZONE,
+  FEED_IMPRESSION_EVENT,
+  PAGE_VIEW_EVENT,
+} from "@/server/services/analytics/metricDefinitions";
 
-const VIEW_TYPES: UserEventType[] = ["PAGE_VIEW", "CARD_VIEW"];
+// "createdAt" is timestamp WITHOUT time zone holding UTC: read it as UTC first, then convert to Minsk wall time.
+const MINSK_TZ = Prisma.raw(`'${ANALYTICS_TIME_ZONE}'`);
 
 function entityMap(): Record<string, AnalyticsEntityType> {
   return {
@@ -114,9 +122,11 @@ function buildBaseEventWhere(
   end: Date,
   filters: AnalyticsOverviewFilters,
   cityId: string | null,
+  exclusion: InternalTrafficExclusion,
 ): Prisma.UserEventWhereInput {
   const w: Prisma.UserEventWhereInput = {
     createdAt: { gte: start, lte: end },
+    ...internalTrafficExclusionWhere(exclusion),
   };
   if (cityId) w.cityId = cityId;
   if (filters.entity && filters.entity !== "all") {
@@ -151,10 +161,12 @@ function eventWhereSql(
   filters: AnalyticsOverviewFilters,
   cityId: string | null,
   allowed: Set<string> | null,
+  exclusion: InternalTrafficExclusion,
 ): Prisma.Sql {
   const parts: Prisma.Sql[] = [
     Prisma.sql`e."createdAt" >= ${start}`,
     Prisma.sql`e."createdAt" <= ${end}`,
+    internalTrafficExclusionSql(exclusion, "e"),
   ];
   if (cityId) parts.push(Prisma.sql`e."cityId" = ${cityId}`);
   if (filters.entity && filters.entity !== "all") {
@@ -226,11 +238,14 @@ function formatGroupKey(slug: string): string {
 }
 
 const TIME_LABELS: Record<BehaviorTimeBucket, string> = {
-  morning: "Morning (6–12 UTC)",
-  day: "Day (12–18 UTC)",
-  evening: "Evening (18–22 UTC)",
-  night: "Night (22–6 UTC)",
+  morning: "Утро (6–12)",
+  day: "День (12–18)",
+  evening: "Вечер (18–22)",
+  night: "Ночь (22–6)",
 };
+
+/** Бакеты времени суток и дни недели — по Минску (B2). */
+const TIMEZONE_NOTE = "Время суток и дни недели — по Минску.";
 
 const DOW_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -244,17 +259,16 @@ const ORDERED_BUCKETS: BehaviorTimeBucket[] = [
 export async function getAnalyticsBehavior(
   filters: AnalyticsOverviewFilters,
 ): Promise<AnalyticsBehaviorResult> {
-  const { start, end } = resolveAnalyticsDateRange(filters.dateRange);
-  const cityId = await resolveCityIdFromSlug(filters.city);
+  const { start, end, cityId, exclusion } = await loadAnalyticsScope(filters);
   const allowed = await resolveAllowedUserIds(filters);
 
   if (allowed && allowed.size === 0) {
     return emptyBehaviorResult(start, end);
   }
 
-  const baseWhere = buildBaseEventWhere(start, end, filters, cityId);
+  const baseWhere = buildBaseEventWhere(start, end, filters, cityId, exclusion);
   const where = applyUserFilter(baseWhere, allowed);
-  const wsql = eventWhereSql(start, end, filters, cityId, allowed);
+  const wsql = eventWhereSql(start, end, filters, cityId, allowed, exclusion);
 
   const [
     timeRows,
@@ -270,7 +284,7 @@ export async function getAnalyticsBehavior(
     planningProfileStats(where),
     prisma.userEvent.count({ where: { ...where, eventType: "PLAN_ADD" } }),
     countPlanAddsNextDay(wsql),
-    entityFunnelAggregates(where),
+    entityFunnelAggregates(wsql),
     prisma.userEvent.findMany({
       where: { ...where, userId: { not: null } },
       select: { userId: true },
@@ -295,7 +309,7 @@ export async function getAnalyticsBehavior(
 
   return {
     range: { start: start.toISOString(), end: end.toISOString() },
-    timezoneNote: "Time-of-day buckets use UTC.",
+    timezoneNote: TIMEZONE_NOTE,
     activityByTime: timeRows,
     activityByDay: dowRows,
     planning: {
@@ -337,9 +351,9 @@ async function timeOfDayBuckets(
       SELECT
         e."sessionId",
         CASE
-          WHEN EXTRACT(HOUR FROM e."createdAt" AT TIME ZONE 'UTC') BETWEEN 6 AND 11 THEN 'morning'
-          WHEN EXTRACT(HOUR FROM e."createdAt" AT TIME ZONE 'UTC') BETWEEN 12 AND 17 THEN 'day'
-          WHEN EXTRACT(HOUR FROM e."createdAt" AT TIME ZONE 'UTC') BETWEEN 18 AND 21 THEN 'evening'
+          WHEN EXTRACT(HOUR FROM (e."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${MINSK_TZ}) BETWEEN 6 AND 11 THEN 'morning'
+          WHEN EXTRACT(HOUR FROM (e."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${MINSK_TZ}) BETWEEN 12 AND 17 THEN 'day'
+          WHEN EXTRACT(HOUR FROM (e."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${MINSK_TZ}) BETWEEN 18 AND 21 THEN 'evening'
           ELSE 'night'
         END AS bucket
       FROM "UserEvent" e
@@ -371,7 +385,7 @@ async function dayOfWeekBuckets(
     }>
   >`
     SELECT
-      EXTRACT(ISODOW FROM e."createdAt" AT TIME ZONE 'UTC')::int AS dow,
+      EXTRACT(ISODOW FROM (e."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${MINSK_TZ})::int AS dow,
       COUNT(*)::bigint AS events,
       COUNT(DISTINCT e."sessionId")::bigint AS sessions,
       COUNT(DISTINCT e."userId")::bigint AS users
@@ -435,9 +449,7 @@ type GapRow = {
   ctas: bigint;
 };
 
-async function entityFunnelAggregates(
-  where: Prisma.UserEventWhereInput,
-): Promise<GapRow[]> {
+async function entityFunnelAggregates(wsql: Prisma.Sql): Promise<GapRow[]> {
   const raw = await prisma.$queryRaw<GapRow[]>`
     SELECT
       e."entityType"::text AS "entityType",
@@ -447,35 +459,12 @@ async function entityFunnelAggregates(
       SUM(CASE WHEN e."eventType" = 'PLAN_ADD' THEN 1 ELSE 0 END)::bigint AS plans,
       SUM(CASE WHEN e."eventType" = 'CTA_CLICK' THEN 1 ELSE 0 END)::bigint AS ctas
     FROM "UserEvent" e
-    WHERE ${eventWhereSqlFromPrismaWhere(where)}
+    WHERE ${wsql}
       AND e."entityId" IS NOT NULL
       AND e."entityType" IS NOT NULL
     GROUP BY e."entityType", e."entityId"
   `;
   return raw;
-}
-
-/** Только для raw: восстанавливает условия из объекта where (ограниченный набор полей). */
-function eventWhereSqlFromPrismaWhere(where: Prisma.UserEventWhereInput): Prisma.Sql {
-  const w = where as Record<string, unknown>;
-  const parts: Prisma.Sql[] = [];
-  const ca = w.createdAt as { gte?: Date; lte?: Date } | undefined;
-  if (ca?.gte) parts.push(Prisma.sql`e."createdAt" >= ${ca.gte}`);
-  if (ca?.lte) parts.push(Prisma.sql`e."createdAt" <= ${ca.lte}`);
-  if (w.cityId) parts.push(Prisma.sql`e."cityId" = ${w.cityId as string}`);
-  if (w.entityType) parts.push(Prisma.sql`e."entityType" = ${w.entityType}::"AnalyticsEntityType"`);
-  if (w.vertical) parts.push(Prisma.sql`e."vertical" = ${w.vertical}::"AnalyticsVertical"`);
-  if (w.userId && typeof w.userId === "object" && "in" in (w.userId as object)) {
-    const inp = w.userId as { in: string[] };
-    if (inp.in.length === 0) return Prisma.sql`FALSE`;
-    parts.push(Prisma.sql`e."userId" IN (${Prisma.join(inp.in)})`);
-  }
-  if (parts.length === 0) return Prisma.sql`TRUE`;
-  let acc = parts[0]!;
-  for (let i = 1; i < parts.length; i++) {
-    acc = Prisma.sql`${acc} AND ${parts[i]!}`;
-  }
-  return acc;
 }
 
 async function buildInteractionGaps(rows: GapRow[]): Promise<{
@@ -577,7 +566,7 @@ async function ageBandStats(
     const uid = e.userId!;
     const band = bandMap.get(uid) ?? "unknown";
     const b = acc[band] ?? acc.unknown;
-    if (e.eventType === "PAGE_VIEW" || e.eventType === "CARD_VIEW") b.views += 1;
+    if (e.eventType === PAGE_VIEW_EVENT) b.views += 1;
     if (e.eventType === "SAVE") b.saves += 1;
     if (e.eventType === "PLAN_ADD") b.planAdds += 1;
   }
@@ -709,8 +698,9 @@ async function signalsFormatFromUsers(
 async function verticalMetrics(
   where: Prisma.UserEventWhereInput,
 ): Promise<BehaviorNamedBreakdown[]> {
+  // Per-vertical "views" are feed impressions (CARD_VIEW): PAGE_VIEW carries no vertical.
   const types: UserEventType[] = [
-    ...VIEW_TYPES,
+    FEED_IMPRESSION_EVENT,
     "SAVE",
     "PLAN_ADD",
     "CTA_CLICK",
@@ -733,8 +723,7 @@ async function verticalMetrics(
     if (!byVert[v])
       byVert[v] = { views: 0, saves: 0, planAdds: 0, cta: 0 };
     const c = r._count._all;
-    if (r.eventType === "PAGE_VIEW" || r.eventType === "CARD_VIEW")
-      byVert[v].views += c;
+    if (r.eventType === FEED_IMPRESSION_EVENT) byVert[v].views += c;
     if (r.eventType === "SAVE") byVert[v].saves += c;
     if (r.eventType === "PLAN_ADD") byVert[v].planAdds += c;
     if (r.eventType === "CTA_CLICK") byVert[v].cta += c;
@@ -763,7 +752,7 @@ function emptyBehaviorResult(
   });
   return {
     range: { start: start.toISOString(), end: end.toISOString() },
-    timezoneNote: "UTC",
+    timezoneNote: TIMEZONE_NOTE,
     activityByTime: ORDERED_BUCKETS.map(z),
     activityByDay: DOW_LABELS.map((label, i) => ({
       isoDow: i + 1,

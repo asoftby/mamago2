@@ -139,11 +139,13 @@ export interface NorthStarViewModel {
 
 export function deriveNorthStar(kpis: Record<string, unknown>): NorthStarViewModel {
   const wpf = readNumber(kpis["planning.wpf"]);
-  const wpfPrev = readNumber(kpis["planning.wpf_prev"]);
+  // WoW from COMPLETED windows only (C1) — the live value above is a partial-day reading.
+  const wpfDone = readNumber(kpis["planning.wpf_completed"]);
+  const wpfDonePrev = readNumber(kpis["planning.wpf_completed_prev"]);
   const wau = readNumber(kpis["audience.wau"]);
   return {
     wpf,
-    wpfWoWPercent: wpf !== null && wpfPrev !== null ? comparisonPercent(wpf, wpfPrev) : null,
+    wpfWoWPercent: wpfDone !== null && wpfDonePrev !== null ? comparisonPercent(wpfDone, wpfDonePrev) : null,
     planningPenetration: wpf !== null && wau !== null && wau > 0 ? wpf / wau : null,
   };
 }
@@ -202,16 +204,16 @@ export interface GrowthViewModel {
 }
 
 export function deriveGrowth(kpis: Record<string, unknown>): GrowthViewModel {
-  const mau = readNumber(kpis["audience.mau"]);
-  const mauPrev = readNumber(kpis["audience.mau_prev"]);
-  const wau = readNumber(kpis["audience.wau"]);
-  const wauPrev = readNumber(kpis["audience.wau_prev"]);
-  const wpf = readNumber(kpis["planning.wpf"]);
-  const wpfPrev = readNumber(kpis["planning.wpf_prev"]);
+  // Growth compares the last N COMPLETED Minsk days with the N days before (C1).
+  const growth = (key: string) => {
+    const done = readNumber(kpis[`${key}_completed`]);
+    const prev = readNumber(kpis[`${key}_completed_prev`]);
+    return done !== null && prev !== null ? comparisonPercent(done, prev) : null;
+  };
   return {
-    mauGrowthPercent: mau !== null && mauPrev !== null ? comparisonPercent(mau, mauPrev) : null,
-    wauGrowthPercent: wau !== null && wauPrev !== null ? comparisonPercent(wau, wauPrev) : null,
-    wpfGrowthPercent: wpf !== null && wpfPrev !== null ? comparisonPercent(wpf, wpfPrev) : null,
+    mauGrowthPercent: growth("audience.mau"),
+    wauGrowthPercent: growth("audience.wau"),
+    wpfGrowthPercent: growth("planning.wpf"),
   };
 }
 
@@ -268,6 +270,12 @@ export function deriveDiscoveryQuality(kpis: Record<string, unknown>): Discovery
  * exists yet — see backlog); overallHealthPercent is scoped strictly to
  * what's actually checkable today (internal snapshot freshness), never a
  * fabricated aggregate that implies external reconciliation is done.
+ *
+ * Telemetry ingestion shares (ТЗ «Аналитика админки», A3) come from the
+ * `ingestion_quality` collector: share of client telemetry requests dropped
+ * as bots (24h / 7d), dropped for having no identity (anonymous, no
+ * sessionId), and share of stored UserEvent rows without any identity.
+ * Each is null when its denominator was empty or the snapshot is stale.
  */
 export interface DataQualityViewModel {
   internalEventsOk: boolean;
@@ -276,14 +284,22 @@ export interface DataQualityViewModel {
   identityReconciliation: "NOT_APPLICABLE";
   /** null when the snapshot itself is stale — an honest health % requires a fresh snapshot to grade. */
   overallHealthPercent: number | null;
+  botRejectedShare24h: number | null;
+  botRejectedShare7d: number | null;
+  noIdentityRejectedShare24h: number | null;
+  storedWithoutIdentityShare24h: number | null;
 }
 
-export function deriveDataQuality(stale: boolean): DataQualityViewModel {
+export function deriveDataQuality(stale: boolean, kpis: Record<string, unknown> = {}): DataQualityViewModel {
   return {
     internalEventsOk: !stale,
     ga4Status: "NOT_CONFIGURED",
     yandexStatus: "NOT_CONFIGURED",
     identityReconciliation: "NOT_APPLICABLE",
     overallHealthPercent: stale ? null : 100,
+    botRejectedShare24h: readNumber(kpis["telemetry.bot_rejected_share_24h"]),
+    botRejectedShare7d: readNumber(kpis["telemetry.bot_rejected_share_7d"]),
+    noIdentityRejectedShare24h: readNumber(kpis["telemetry.no_identity_rejected_share_24h"]),
+    storedWithoutIdentityShare24h: readNumber(kpis["telemetry.stored_without_identity_share_24h"]),
   };
 }

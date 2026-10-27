@@ -122,7 +122,7 @@ export function AdminAnalyticsOverview({
 
   const maxDaily = Math.max(
     1,
-    ...data.dailySeries.map((d) => Math.max(d.views, d.opens)),
+    ...data.dailySeries.map((d) => Math.max(d.pageViews, d.opens)),
   );
 
   return (
@@ -137,15 +137,17 @@ export function AdminAnalyticsOverview({
         </h2>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <KpiCard
-            label="Active users"
-            value={data.activeUsers.toLocaleString()}
+            label="Визиторы"
+            value={data.visitors.toLocaleString("ru-RU")}
             subtitle={`Profiles seen: ${data.profilesActiveInRange.toLocaleString()}`}
           />
           <KpiCard
-            label="Sessions"
-            value={data.sessions.toLocaleString()}
+            label="Устройства"
+            value={data.devices.toLocaleString("ru-RU")}
+            subtitle="Браузеры (не сессии)"
           />
-          <KpiCard label="Views" value={data.views.toLocaleString()} />
+          <KpiCard label="Просмотры страниц" value={data.pageViews.toLocaleString("ru-RU")} />
+          <KpiCard label="Показы в ленте" value={data.feedImpressions.toLocaleString("ru-RU")} />
           <KpiCard label="Opens" value={data.opens.toLocaleString()} />
           <KpiCard label="Saves" value={data.saves.toLocaleString()} />
           <KpiCard
@@ -217,13 +219,13 @@ export function AdminAnalyticsOverview({
               <div
                 key={d.date}
                 className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-end gap-1"
-                title={`${d.date}: views ${d.views}, opens ${d.opens}`}
+                title={`${d.date}: просмотры страниц ${d.pageViews}, открытия ${d.opens}`}
               >
                 <div className="flex h-[140px] w-full items-end justify-center gap-0.5">
                   <div
                     className="w-1/2 max-w-[8px] rounded-t-sm bg-primary/60"
                     style={{
-                      height: `${Math.max(2, (d.views / maxDaily) * 100)}%`,
+                      height: `${Math.max(2, (d.pageViews / maxDaily) * 100)}%`,
                     }}
                   />
                   <div
@@ -242,7 +244,7 @@ export function AdminAnalyticsOverview({
           <div className="mt-2 flex flex-wrap gap-4 text-xs text-gray-600">
             <span className="inline-flex items-center gap-1.5">
               <span className="inline-block size-2 rounded-sm bg-primary/60" />
-              Views
+              Просмотры страниц
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="inline-block size-2 rounded-sm bg-amber-500/70" />

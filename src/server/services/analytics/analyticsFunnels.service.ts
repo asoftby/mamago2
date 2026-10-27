@@ -23,6 +23,10 @@ import {
   resolveAnalyticsDateRange,
   resolveCityIdFromSlug,
 } from "@/server/services/analytics/analyticsDateRange";
+import {
+  resolveInternalTrafficExclusion,
+  type InternalTrafficExclusion,
+} from "@/server/services/analytics/canonicalAudience";
 
 const VIEW_TYPES: UserEventType[] = ["PAGE_VIEW", "CARD_VIEW"];
 
@@ -167,6 +171,7 @@ function sortBiggestDrops(
 
 async function funnelForScopedFilters(
   filters: AnalyticsOverviewFilters,
+  exclusion: InternalTrafficExclusion,
 ): Promise<FunnelCounts> {
   const { start, end } = resolveAnalyticsDateRange(filters.dateRange);
   const cityId = await resolveCityIdFromSlug(filters.city);
@@ -174,7 +179,7 @@ async function funnelForScopedFilters(
   if (allowed && allowed.size === 0) {
     return { view: 0, open: 0, save: 0, plan: 0, click: 0 };
   }
-  const base = buildAnalyticsBaseEventWhere(start, end, filters, cityId);
+  const base = buildAnalyticsBaseEventWhere(start, end, filters, cityId, exclusion);
   const where = applyAnalyticsUserFilter(base, allowed);
   return countFunnel(where);
 }
@@ -298,8 +303,9 @@ export async function getAnalyticsFunnels(
   if (allowed && allowed.size === 0) {
     return emptyFunnelsResult(start, end);
   }
+  const exclusion = await resolveInternalTrafficExclusion(prisma, start, end);
 
-  const baseWhere = buildAnalyticsBaseEventWhere(start, end, filters, cityId);
+  const baseWhere = buildAnalyticsBaseEventWhere(start, end, filters, cityId, exclusion);
   const where = applyAnalyticsUserFilter(baseWhere, allowed);
   const globalRaw = await countFunnel(where);
   const globalFunnel = toFunnelSeries(globalRaw);
@@ -335,7 +341,7 @@ export async function getAnalyticsFunnels(
           ...filtersNoEntity,
           entity: slug,
         };
-        const raw = await funnelForScopedFilters(f);
+        const raw = await funnelForScopedFilters(f, exclusion);
         return [slug.toUpperCase(), toFunnelSeries(raw)] as const;
       }),
     ),
@@ -345,7 +351,7 @@ export async function getAnalyticsFunnels(
           ...filtersNoVertical,
           vertical: slug,
         };
-        const raw = await funnelForScopedFilters(f);
+        const raw = await funnelForScopedFilters(f, exclusion);
         return [analyticsVerticalMap()[slug]!, toFunnelSeries(raw)] as const;
       }),
     ),
@@ -362,15 +368,16 @@ export async function getAnalyticsFunnels(
           end,
           filtersNoSegment,
           cityIdNs,
+          exclusion,
         );
         const whereNs = applyAnalyticsUserFilter(baseNs, merged);
         const raw = await countFunnel(whereNs);
         return [segKey, toFunnelSeries(raw)] as const;
       }),
     ),
-    loadCityFunnels(start, end, filtersNoCity, allowed),
-    loadComparisons(filters),
-    loadAggRowsForWorst(start, end, filters, cityId, allowed),
+    loadCityFunnels(start, end, filtersNoCity, allowed, exclusion),
+    loadComparisons(filters, exclusion),
+    loadAggRowsForWorst(start, end, filters, cityId, allowed, exclusion),
   ]);
 
   const byEntityType = Object.fromEntries(byEntityTypeEntries);
@@ -430,6 +437,7 @@ async function loadCityFunnels(
   end: Date,
   filtersNoCity: AnalyticsOverviewFilters,
   allowed: Set<string> | null,
+  exclusion: InternalTrafficExclusion,
 ): Promise<
   Array<{ citySlug: string; cityName: string; funnel: AnalyticsFunnelSeries }>
 > {
@@ -439,6 +447,7 @@ async function loadCityFunnels(
     end,
     filtersNoCity,
     cityIdBase,
+    exclusion,
   );
   const whereBase = applyAnalyticsUserFilter(base, allowed);
 
@@ -475,7 +484,7 @@ async function loadCityFunnels(
     const c = byId.get(id);
     if (!c) continue;
     const w = applyAnalyticsUserFilter(
-      buildAnalyticsBaseEventWhere(start, end, filtersNoCity, id),
+      buildAnalyticsBaseEventWhere(start, end, filtersNoCity, id, exclusion),
       allowed,
     );
     const raw = await countFunnel(w);
@@ -490,6 +499,7 @@ async function loadCityFunnels(
 
 async function loadComparisons(
   filters: AnalyticsOverviewFilters,
+  exclusion: InternalTrafficExclusion,
 ): Promise<AnalyticsFunnelComparisonPair[]> {
   const em = analyticsEntityMap();
   const vm = analyticsVerticalMap();
@@ -500,12 +510,12 @@ async function loadComparisons(
         ...filters,
         entity: "event",
         vertical: filters.vertical,
-      });
+      }, exclusion);
       const b = await funnelForScopedFilters({
         ...filters,
         entity: "offer",
         vertical: filters.vertical,
-      });
+      }, exclusion);
       return {
         id: "event_vs_offer",
         label: "EVENT vs OFFER",
@@ -526,12 +536,12 @@ async function loadComparisons(
         ...filters,
         vertical: "city",
         entity: filters.entity,
-      });
+      }, exclusion);
       const b = await funnelForScopedFilters({
         ...filters,
         vertical: "travel",
         entity: filters.entity,
-      });
+      }, exclusion);
       return {
         id: "city_vs_travel",
         label: "Vertical: CITY vs TRAVEL",
@@ -551,11 +561,11 @@ async function loadComparisons(
       const a = await funnelForScopedFilters({
         ...filters,
         segment: "WEEKEND_ORIENTED",
-      });
+      }, exclusion);
       const b = await funnelForScopedFilters({
         ...filters,
         segment: "WEEKDAY_ORIENTED",
-      });
+      }, exclusion);
       return {
         id: "weekend_vs_weekday_segment",
         label: "Segment: WEEKEND_ORIENTED vs WEEKDAY_ORIENTED",
@@ -584,8 +594,9 @@ async function loadAggRowsForWorst(
   filters: AnalyticsOverviewFilters,
   cityId: string | null,
   allowed: Set<string> | null,
+  exclusion: InternalTrafficExclusion,
 ): Promise<AggRow[]> {
-  const base = buildAnalyticsBaseEventWhere(start, end, filters, cityId);
+  const base = buildAnalyticsBaseEventWhere(start, end, filters, cityId, exclusion);
   const where = applyAnalyticsUserFilter(base, allowed);
 
   const types: UserEventType[] = [

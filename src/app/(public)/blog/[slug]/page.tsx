@@ -469,7 +469,7 @@ export default async function ArticlePage({
       return (
         <>
           <ArticleGeoLabelSync label={articleGeoLabel} />
-          <AnalyticsDetailBeacon entityType="ARTICLE" entityId={mvp.id} vertical="CITY" />
+          {/* DETAIL_OPEN comes from ContinuousArticleReader (article_view); no second beacon. */}
           <JsonLd
             data={[articleJsonLd, breadcrumbJsonLd].filter(
               (item): item is Record<string, unknown> => Boolean(item),

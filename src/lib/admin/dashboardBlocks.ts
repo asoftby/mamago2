@@ -16,6 +16,7 @@ export type AdminDashboardBlockId =
   | "valuePath"
   | "supply"
   | "workload"
+  | "dataQuality"
   | "traffic"
   | "engagement"
   | "finance";
@@ -35,7 +36,7 @@ export interface AdminDashboardBlockDefinition {
 /**
  * `order` reflects the growth-first dashboard (Operations -> Organic
  * recovery -> Growth KPIs -> Path to value / Supply & partners ->
- * Operational load). `AdminDashboardShell` composes rows explicitly in JSX
+ * Operational load / Data quality). `AdminDashboardShell` composes rows explicitly in JSX
  * (not by iterating this list), so `order` here is documentation/lookup
  * metadata, not the actual render driver; keep it in sync with the shell's
  * JSX order when either changes.
@@ -52,6 +53,7 @@ export const ADMIN_DASHBOARD_BLOCKS: readonly AdminDashboardBlockDefinition[] = 
   { id: "valuePath", enabled: true, order: 30, size: "medium", title: "Путь к ценности · 30 дней", href: adminPath("/analytics") },
   { id: "supply", enabled: true, order: 40, size: "medium", title: "Предложение и партнёры" },
   { id: "workload", enabled: true, order: 80, size: "medium", title: "Операционная нагрузка" },
+  { id: "dataQuality", enabled: true, order: 90, size: "medium", title: "Качество данных" },
   { id: "traffic", enabled: false, order: 900, size: "medium", title: "Посещаемость" },
   { id: "engagement", enabled: false, order: 901, size: "medium", title: "Использование" },
   { id: "finance", enabled: false, order: 902, size: "medium", title: "Finance" },
