@@ -4,6 +4,7 @@
  */
 
 import prisma from "@/lib/prisma";
+import { allocationTransition } from "./allocationTransition";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 import { BookingKind, BookingStatus, Prisma } from "@prisma/client";
 import { buildBookingDisplay } from "./booking.formatters";
@@ -549,17 +550,13 @@ export async function updateBookingStatus(
       where: { bookingRequestId: bookingId },
       select: { id: true, status: true, expiresAt: true },
     });
-    if (newStatus === BookingStatus.CONFIRMED) {
-      if (allocations.some((allocation) =>
-        allocation.status !== "HELD" && allocation.status !== "CONFIRMED" ||
-        (allocation.status === "HELD" && allocation.expiresAt && allocation.expiresAt <= now))) {
-        throw new Error("Резерв истёк или освобождён. Выберите свободное время заново.");
-      }
+    const allocationTarget = allocationTransition(newStatus, allocations, now);
+    if (allocationTarget === "CONFIRMED") {
       await tx.bookingAllocation.updateMany({
         where: { bookingRequestId: bookingId, status: "HELD" },
         data: { status: "CONFIRMED", expiresAt: null },
       });
-    } else if (newStatus === BookingStatus.REJECTED || newStatus === BookingStatus.CANCELLED) {
+    } else if (allocationTarget === "RELEASED") {
       await tx.bookingAllocation.updateMany({
         where: { bookingRequestId: bookingId, status: { in: ["HELD", "CONFIRMED"] } },
         data: { status: "RELEASED", expiresAt: null },
