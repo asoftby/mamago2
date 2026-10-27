@@ -16,10 +16,12 @@ import {
 // Regular articles and collections still require an active ARTICLE category.
 assert.deepEqual(getPublicPublishedArticleWhere(), {
   status: "PUBLISHED",
-  OR: [
-    { publicationType: "BREAKING_NEWS" },
-    { category: { publicationType: "ARTICLE", isActive: true, archivedAt: null } },
-  ],
+  AND: [{
+    OR: [
+      { publicationType: "BREAKING_NEWS" },
+      { category: { publicationType: "ARTICLE", isActive: true, archivedAt: null } },
+    ],
+  }],
 });
 
 assert.deepEqual(getPublicPageDetailWhere(), {
