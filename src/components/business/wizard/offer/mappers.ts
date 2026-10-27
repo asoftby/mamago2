@@ -630,7 +630,15 @@ export function buildOfferCreatePayload(
   if (!data.placeId) {
     throw new Error("placeId is required to create offer payload");
   }
-  const pricingMode = data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
+  // Group tariffs are the source of truth for regular classes.
+  // The legacy offer price is only the lowest-price catalog projection.
+  const regularTariffPrices = data.productType === "REGULAR_ACTIVITY"
+    ? data.schedule.classSchedule.groups.flatMap((group) => (group.tariffs ?? [])
+        .map((tariff) => parsePrice(tariff.price))
+        .filter((price): price is number => price !== null && Number.isFinite(price)))
+    : [];
+  const regularLowestPrice = regularTariffPrices.length ? Math.min(...regularTariffPrices) : null;
+  const pricingMode = data.productType === "REGULAR_ACTIVITY" ? "SINGLE" : data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
   const ages = ageGroupsToMonths(data.ageGroups);
   const accessFields = deriveOfferApiFieldsFromPublicationAccess(
     data.publicationAccess,
@@ -666,13 +674,13 @@ export function buildOfferCreatePayload(
         : createExcerpt(data.promotionDetails, 120) || undefined,
     pricingMode,
     singlePrice:
-      data.offerWizardType === "CAMP" ? undefined : parsePrice(data.singlePrice),
+      data.offerWizardType === "CAMP" ? undefined : (regularLowestPrice ?? parsePrice(data.singlePrice)),
     singlePriceLabel:
       data.offerWizardType === "CAMP"
         ? undefined
         : richTextToLegacyPriceText(data.priceCaption),
     pricingOptions:
-      data.offerWizardType === "CAMP"
+      data.offerWizardType === "CAMP" || data.productType === "REGULAR_ACTIVITY"
         ? []
         : data.pricingOptions.map((o) => ({
             title: o.title.trim(),
@@ -845,7 +853,15 @@ export function buildOfferUpdatePayload(
     previousClassDuration?: string;
   }
 ) {
-  const pricingMode = data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
+  // Group tariffs are the source of truth for regular classes.
+  // The legacy offer price is only the lowest-price catalog projection.
+  const regularTariffPrices = data.productType === "REGULAR_ACTIVITY"
+    ? data.schedule.classSchedule.groups.flatMap((group) => (group.tariffs ?? [])
+        .map((tariff) => parsePrice(tariff.price))
+        .filter((price): price is number => price !== null && Number.isFinite(price)))
+    : [];
+  const regularLowestPrice = regularTariffPrices.length ? Math.min(...regularTariffPrices) : null;
+  const pricingMode = data.productType === "REGULAR_ACTIVITY" ? "SINGLE" : data.pricingMode === "multiple" ? "MULTIPLE" : "SINGLE";
   const ages = ageGroupsToMonths(data.ageGroups);
   const accessFields = deriveOfferApiFieldsFromPublicationAccess(
     data.publicationAccess,
@@ -878,13 +894,13 @@ export function buildOfferUpdatePayload(
         : createExcerpt(data.promotionDetails, 120) || undefined,
     pricingMode,
     singlePrice:
-      data.offerWizardType === "CAMP" ? undefined : parsePrice(data.singlePrice),
+      data.offerWizardType === "CAMP" ? undefined : (regularLowestPrice ?? parsePrice(data.singlePrice)),
     singlePriceLabel:
       data.offerWizardType === "CAMP"
         ? undefined
         : richTextToLegacyPriceText(data.priceCaption),
     pricingOptions:
-      data.offerWizardType === "CAMP"
+      data.offerWizardType === "CAMP" || data.productType === "REGULAR_ACTIVITY"
         ? []
         : data.pricingOptions.map((o) => ({
             title: o.title.trim(),
