@@ -7,6 +7,7 @@ import { isAutoConfirmMode } from "./partySelection";
 import { verifyPartyOffers } from "./partyDraft.service";
 import { clockMinutes, isFixedPriceReply } from "./partyFixedPrice";
 import { requestPartyAddonsAfterAnchor } from "./partyAddonFanout";
+import { isPartyConfirmationEnabled } from "./partyConfirmationFlag";
 import {
   allocatePartyUnit, isAllocationOverlapError, lockAvailablePartyUnit, type PartyUnitWindow,
 } from "./partyUnitAllocation";
@@ -136,7 +137,8 @@ export async function replyToPartyRequest(params: {
   const declined = input.type === "DECLINED";
   const from = clockMinutes(order.timeFrom);
   const to = clockMinutes(order.timeTo);
-  const fixedPrice = !declined && isAutoConfirmMode(order.venueMode) &&
+  // With confirmations switched off the reply is still recorded, but only as a QUOTED offer.
+  const fixedPrice = !declined && isPartyConfirmationEnabled() && isAutoConfirmMode(order.venueMode) &&
     !item.confirmedBookingRequestId && isFixedPriceReply({
       type: input.type, pricingMode: item.pricingMode, snapshot: item.offerPriceSnapshot,
       priceByn: input.priceByn, replyDurationMinutes: input.durationMinutes,

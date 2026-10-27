@@ -404,3 +404,32 @@ function addMinutes(time: string, minutes: number): string {
   const total = h * 60 + m + minutes;
   return String(Math.floor(total / 60)).padStart(2, "0") + ":" + String(total % 60).padStart(2, "0");
 }
+
+test("with PARTY_CONFIRMATION_ENABLED off nothing is accepted or confirmed", async () => {
+  const ctx = await fixture();
+  const previous = process.env.PARTY_CONFIRMATION_ENABLED;
+  process.env.PARTY_CONFIRMATION_ENABLED = "false";
+  try {
+    const venue = await ctx.requestWithQuote();
+    await assert.rejects(acceptPartyQuote({
+      userId: ctx.parent.id, orderId: venue.order.id, requestId: venue.request.id,
+      quoteId: venue.quote.id, expectedVersion: 1,
+    }), isPartyError(503));
+    await assert.rejects(confirmPartyRequest({
+      requestId: venue.request.id, businessId: ctx.business.id, actorUserId: ctx.owner.id,
+      expectedQuoteVersion: 1, idempotencyKey: randomUUID(), bookingUnitId: ctx.unit.id,
+    }), isPartyError(503));
+    assert.equal((await db.partyQuote.findUniqueOrThrow({ where: { id: venue.quote.id } })).status, "ACTIVE");
+
+    // A fixed-price reply is still recorded, but as an offer, not an automatic confirmation.
+    const setup = await homeSetup(ctx);
+    const home = await homeOrder(ctx, setup, "16:00", "17:00");
+    const reply = await fixedPriceReply(ctx, home.request.id, 60);
+    assert.equal(reply.quote.status, "ACTIVE");
+    assert.equal((await db.partyOrder.findUniqueOrThrow({ where: { id: home.order.id } })).status, "ANCHOR_PENDING");
+    assert.equal(await db.bookingAllocation.count({ where: { bookingUnitId: setup.performer!.id } }), 0);
+  } finally {
+    if (previous === undefined) delete process.env.PARTY_CONFIRMATION_ENABLED;
+    else process.env.PARTY_CONFIRMATION_ENABLED = previous;
+  }
+});

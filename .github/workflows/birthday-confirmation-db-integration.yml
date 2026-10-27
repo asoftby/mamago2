@@ -50,6 +50,8 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5434/mamago_birthday_it
       NODE_ENV: test
       CI: "true"
+      # Confirmations are gated server-side; the integration flows exercise them enabled.
+      PARTY_CONFIRMATION_ENABLED: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -92,6 +94,8 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55443/mamago_birthday_it
       NODE_ENV: test
       CI: "true"
+      # Confirmations are gated server-side; the integration flows exercise them enabled.
+      PARTY_CONFIRMATION_ENABLED: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

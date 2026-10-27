@@ -63,6 +63,8 @@ export async function handlePartyTelegramConfirmation(input: {
     if (status === 409 || status === 410 || status === 422) {
       return { ok: false as const, reason: "STALE_REQUEST" as const };
     }
+    // PARTY_CONFIRMATION_ENABLED is off: say so instead of a generic failure.
+    if (status === 503) return { ok: false as const, reason: "CONFIRMATION_DISABLED" as const };
     throw error;
   }
 }
