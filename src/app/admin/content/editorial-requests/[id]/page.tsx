@@ -9,10 +9,11 @@ import {
   listEditorialRequestFormCatalog,
 } from "@/server/editorial/editorialRequestService";
 import { previewEditorialRequestMatchesByRequestId } from "@/server/editorial/editorialRequestMatchingService";
+import { formatAdminDateTime } from "@/lib/admin/formatRu";
 
 function formatDate(value: string | null) {
   if (!value) return "—";
-  return new Date(value).toLocaleString("ru-RU");
+  return formatAdminDateTime(value);
 }
 
 export default async function AdminEditorialRequestDetailPage({

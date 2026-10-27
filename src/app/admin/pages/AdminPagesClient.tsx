@@ -8,6 +8,7 @@ import { getPagePublicUrl } from "@/lib/pagePublicUrl";
 import { toast } from "sonner";
 import { AdminContentRowActions } from "@/components/admin/content/AdminContentRowActions";
 import { TableContainer } from "@/components/ui/table";
+import { formatAdminDate } from "@/lib/admin/formatRu";
 
 type Page = {
   id: string;
@@ -264,7 +265,7 @@ export function AdminPagesClient() {
                     )}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
-                    {new Date(page.updatedAt).toLocaleDateString("ru-RU")}
+                    {formatAdminDate(page.updatedAt)}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <AdminContentRowActions

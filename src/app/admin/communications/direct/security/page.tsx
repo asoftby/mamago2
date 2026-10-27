@@ -10,6 +10,7 @@ import {
   getDirectSafetyDashboard,
   type SafetySignalRow,
 } from "@/server/services/direct/directAdmin.service";
+import { formatAdminDateTime } from "@/lib/admin/formatRu";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -82,7 +83,7 @@ function SignalTable({ rows, emptyLabel }: { rows: SafetySignalRow[]; emptyLabel
                 <SeverityBadge severity={s.severity} />
               </td>
               <td className="px-4 py-3 text-stone-700">{s.score}</td>
-              <td className="px-4 py-3 text-stone-500">{new Date(s.createdAt).toLocaleString("ru-RU")}</td>
+              <td className="px-4 py-3 text-stone-500">{formatAdminDateTime(s.createdAt)}</td>
               <td className="px-4 py-3 text-right">
                 {s.dialogHref && (
                   <Link href={s.dialogHref} className="text-sm font-medium text-stone-900 underline underline-offset-2">
@@ -208,7 +209,7 @@ export default async function AdminDirectSecurityPage({
                   <tr key={r.id} className="hover:bg-stone-50/60">
                     <td className="px-4 py-3 text-stone-700">{r.businessName ?? r.customerName ?? "—"}</td>
                     <td className="px-4 py-3 text-stone-700">{r.distinctThreadCount ?? "—"}</td>
-                    <td className="px-4 py-3 text-stone-500">{new Date(r.createdAt).toLocaleString("ru-RU")}</td>
+                    <td className="px-4 py-3 text-stone-500">{formatAdminDateTime(r.createdAt)}</td>
                   </tr>
                 ))}
                 {dashboard.repeatedOffenders.length === 0 && (
@@ -340,7 +341,7 @@ export default async function AdminDirectSecurityPage({
                       <span className="line-clamp-2 max-w-md">{m.body}</span>
                     </td>
                     <td className="px-4 py-3 text-stone-500">{m.hiddenReason ?? "—"}</td>
-                    <td className="px-4 py-3 text-stone-500">{new Date(m.hiddenAt).toLocaleString("ru-RU")}</td>
+                    <td className="px-4 py-3 text-stone-500">{formatAdminDateTime(m.hiddenAt)}</td>
                     <td className="px-4 py-3 text-right">
                       <Link href={m.dialogHref} className="text-sm font-medium text-stone-900 underline underline-offset-2">
                         Открыть
@@ -390,7 +391,7 @@ export default async function AdminDirectSecurityPage({
                     <td className="px-4 py-3 text-stone-700">
                       {c.businessName} / {c.customerName}
                     </td>
-                    <td className="px-4 py-3 text-stone-500">{new Date(c.createdAt).toLocaleString("ru-RU")}</td>
+                    <td className="px-4 py-3 text-stone-500">{formatAdminDateTime(c.createdAt)}</td>
                     <td className="px-4 py-3 text-right">
                       <Link
                         href={`${DIALOGS_PATH}/${c.threadId}`}

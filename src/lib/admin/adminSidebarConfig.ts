@@ -73,7 +73,7 @@ export const NAV_COMMUNICATIONS: AdminSidebarNavItem = {
     },
     {
       id: "communications-notification-deliveries",
-      label: "Deliveries",
+      label: "Доставки",
       href: adminPath("/communications/notifications/deliveries"),
       matchers: [{ type: "prefix", value: adminPath("/communications/notifications/deliveries") }],
     },
@@ -85,7 +85,7 @@ export const NAV_COMMUNICATIONS: AdminSidebarNavItem = {
     },
     {
       id: "communications-direct",
-      label: "Direct",
+      label: "Прямые сообщения",
       href: adminPath("/communications/direct"),
       matchers: [{ type: "prefix", value: adminPath("/communications/direct") }],
     },
@@ -94,13 +94,13 @@ export const NAV_COMMUNICATIONS: AdminSidebarNavItem = {
 
 export const NAV_ANALYTICS: AdminSidebarNavItem = {
   id: "analytics",
-  label: "Analytics",
+  label: "Аналитика",
   href: adminPath("/analytics"),
   icon: ChartColumn,
   children: [
     {
       id: "performance",
-      label: "Performance",
+      label: "Производительность",
       href: adminPath("/performance"),
       matchers: [{ type: "exact", value: adminPath("/performance") }],
     },
@@ -157,7 +157,7 @@ export const NAV_IMPORT: AdminSidebarNavItem = {
     },
     {
       id: "import-debug",
-      label: "Debug",
+      label: "Отладка",
       href: adminPath("/import/debug/parser"),
       matchers: [{ type: "prefix", value: adminPath("/import/debug") }],
     },
@@ -356,37 +356,37 @@ export const GROUP_SEARCH: AdminSidebarGroup = {
   children: [
     {
       id: "search-overview",
-      label: "Overview",
+      label: "Обзор",
       href: adminPath("/search"),
       matchers: [{ type: "exact", value: adminPath("/search") }],
     },
     {
       id: "search-quick-tags",
-      label: "Quick Tags",
+      label: "Быстрые теги",
       href: adminPath("/search/quick-tags"),
       matchers: [{ type: "prefix", value: adminPath("/search/quick-tags") }],
     },
     {
       id: "search-synonyms",
-      label: "Synonyms",
+      label: "Синонимы",
       href: adminPath("/search/synonyms"),
       matchers: [{ type: "prefix", value: adminPath("/search/synonyms") }],
     },
     {
       id: "search-zero-results",
-      label: "Zero Results",
+      label: "Пустая выдача",
       href: adminPath("/search/zero-results"),
       matchers: [{ type: "prefix", value: adminPath("/search/zero-results") }],
     },
     {
       id: "search-index",
-      label: "Index",
+      label: "Индекс",
       href: adminPath("/search/index"),
       matchers: [{ type: "prefix", value: adminPath("/search/index") }],
     },
     {
       id: "search-ranking",
-      label: "Ranking",
+      label: "Ранжирование",
       href: adminPath("/search/ranking"),
       matchers: [{ type: "prefix", value: adminPath("/search/ranking") }],
     },
@@ -395,7 +395,7 @@ export const GROUP_SEARCH: AdminSidebarGroup = {
 
 export const GROUP_DISCOVERY: AdminSidebarGroup = {
   id: "discovery",
-  label: "Discovery",
+  label: "Поиск и подборки",
   icon: Filter,
   children: [
     {
@@ -442,24 +442,24 @@ export const GROUP_DISCOVERY: AdminSidebarGroup = {
 
 export const GROUP_RANKING: AdminSidebarGroup = {
   id: "ranking",
-  label: "Ranking",
+  label: "Ранжирование",
   icon: BarChart2,
   children: [
     {
       id: "ranking-stories-intents",
-      label: "Stories на главной",
+      label: "Истории на главной",
       href: adminPath("/ranking/stories-intents"),
       matchers: [{ type: "prefix", value: adminPath("/ranking/stories-intents") }],
     },
     {
       id: "ranking-weights",
-      label: "Ranking Weights",
+      label: "Веса ранжирования",
       href: adminPath("/ranking/weights"),
       matchers: [{ type: "prefix", value: adminPath("/ranking/weights") }],
     },
     {
       id: "ranking-boost",
-      label: "Boost Rules",
+      label: "Правила продвижения",
       href: adminPath("/ranking/boost"),
       matchers: [{ type: "prefix", value: adminPath("/ranking/boost") }],
     },

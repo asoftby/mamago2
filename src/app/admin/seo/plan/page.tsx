@@ -15,12 +15,12 @@ export const dynamic = "force-dynamic";
 
 function formatWeekLabel(from: Date, toExclusive: Date): string {
   const to = addDays(toExclusive, -1);
-  const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "long" };
+  const opts: Intl.DateTimeFormatOptions = { timeZone: "Europe/Minsk", day: "numeric", month: "long" };
   return `${from.toLocaleDateString("ru-RU", opts)} – ${to.toLocaleDateString("ru-RU", opts)}`;
 }
 
 function formatMonthLabel(from: Date): string {
-  return from.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  return from.toLocaleDateString("ru-RU", { timeZone: "Europe/Minsk", month: "long", year: "numeric" });
 }
 
 interface PageProps {

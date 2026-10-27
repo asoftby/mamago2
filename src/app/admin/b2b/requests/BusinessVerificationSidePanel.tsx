@@ -7,6 +7,7 @@ import { normalizeBusinessVisibilityStatus } from "@/lib/business/businessStatus
 import { BusinessDangerZonePlaceholder } from "@/components/admin/business/BusinessDangerZonePlaceholder";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { formatAdminDateTime } from "@/lib/admin/formatRu";
 
 type BusinessDetail = {
   id: string;
@@ -273,7 +274,7 @@ export function BusinessVerificationSidePanel({
                       Дата создания
                     </dt>
                     <dd className="mt-1 text-sm text-gray-900">
-                      {new Date(business.createdAt).toLocaleString("ru-RU")}
+                      {formatAdminDateTime(business.createdAt)}
                     </dd>
                   </div>
                   {business.submittedAt && (
@@ -282,7 +283,7 @@ export function BusinessVerificationSidePanel({
                         Дата подачи
                       </dt>
                       <dd className="mt-1 text-sm text-gray-900">
-                        {new Date(business.submittedAt).toLocaleString("ru-RU")}
+                        {formatAdminDateTime(business.submittedAt)}
                       </dd>
                     </div>
                   )}
@@ -310,7 +311,7 @@ export function BusinessVerificationSidePanel({
                       Дата регистрации
                     </dt>
                     <dd className="mt-1 text-sm text-gray-900">
-                      {new Date(business.owner.createdAt).toLocaleString("ru-RU")}
+                      {formatAdminDateTime(business.owner.createdAt)}
                     </dd>
                   </div>
                 </dl>
@@ -337,7 +338,7 @@ export function BusinessVerificationSidePanel({
                             {STATUS_LABELS[log.statusTo]}
                           </span>
                           <span className="text-gray-500 text-xs">
-                            {new Date(log.createdAt).toLocaleString("ru-RU")}
+                            {formatAdminDateTime(log.createdAt)}
                           </span>
                         </div>
                         {log.note && (

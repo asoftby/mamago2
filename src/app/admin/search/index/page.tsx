@@ -400,7 +400,7 @@ export default function SearchIndexPage() {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {record.indexedAt
-                          ? new Date(record.indexedAt).toLocaleDateString("ru-RU", {
+                          ? new Date(record.indexedAt).toLocaleDateString("ru-RU", { timeZone: "Europe/Minsk",
                               day: "numeric",
                               month: "short",
                               year: "numeric",

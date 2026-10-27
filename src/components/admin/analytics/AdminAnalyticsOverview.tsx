@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { formatAdminDateRange } from "@/lib/admin/formatRu";
 import type {
   AnalyticsOverviewFilters,
   AnalyticsOverviewResult,
@@ -23,14 +24,7 @@ function formatPct(x: number | null): string {
 }
 
 function formatRangeLabel(isoStart: string, isoEnd: string): string {
-  const a = new Date(isoStart);
-  const b = new Date(isoEnd);
-  const opts: Intl.DateTimeFormatOptions = {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  };
-  return `${a.toLocaleDateString("en-CA", opts)} — ${b.toLocaleDateString("en-CA", opts)}`;
+  return formatAdminDateRange(isoStart, isoEnd);
 }
 
 function KpiCard({
@@ -139,7 +133,7 @@ export function AdminAnalyticsOverview({
           <KpiCard
             label="Визиторы"
             value={data.visitors.toLocaleString("ru-RU")}
-            subtitle={`Profiles seen: ${data.profilesActiveInRange.toLocaleString()}`}
+            subtitle={`Profiles seen: ${data.profilesActiveInRange.toLocaleString("ru-RU")}`}
           />
           <KpiCard
             label="Устройства"
@@ -278,7 +272,7 @@ export function AdminAnalyticsOverview({
                     {row.label}
                   </span>
                   <span className="shrink-0 tabular-nums text-gray-600">
-                    {row.count.toLocaleString()}
+                    {row.count.toLocaleString("ru-RU")}
                   </span>
                 </li>
               ))
@@ -308,7 +302,7 @@ export function AdminAnalyticsOverview({
                     ) : null}
                   </div>
                   <span className="shrink-0 tabular-nums text-gray-600">
-                    {row.count.toLocaleString()}
+                    {row.count.toLocaleString("ru-RU")}
                   </span>
                 </li>
               ))

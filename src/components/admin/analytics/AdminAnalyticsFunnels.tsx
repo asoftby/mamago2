@@ -66,7 +66,7 @@ function FunnelStrip({
               {step.label}
             </div>
             <div className="mt-1 text-lg font-semibold tabular-nums text-gray-900">
-              {step.count.toLocaleString()}
+              {step.count.toLocaleString("ru-RU")}
             </div>
             <div className="mt-0.5 text-xs tabular-nums text-gray-600">
               {i === 0 ? (
@@ -349,7 +349,7 @@ export function AdminAnalyticsFunnels({
                           <tr key={s.key} className="border-t border-gray-100">
                             <td className="py-1 text-gray-600">{s.label}</td>
                             <td className="py-1 text-right tabular-nums text-gray-900">
-                              {s.count.toLocaleString()}
+                              {s.count.toLocaleString("ru-RU")}
                             </td>
                             <td className="py-1 text-right tabular-nums text-gray-500">
                               {i === 0

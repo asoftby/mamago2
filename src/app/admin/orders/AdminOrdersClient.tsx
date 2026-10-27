@@ -109,7 +109,7 @@ const DEFAULT_COUNTS: Record<BookingStatus, number> = {
 };
 
 function formatDateTime(value: string) {
-  return new Date(value).toLocaleString("ru-RU", {
+  return new Date(value).toLocaleString("ru-RU", { timeZone: "Europe/Minsk",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -120,7 +120,7 @@ function formatDateTime(value: string) {
 
 function formatCompactDate(value: string | null) {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString("ru-RU", {
+  return new Date(value).toLocaleDateString("ru-RU", { timeZone: "Europe/Minsk",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",

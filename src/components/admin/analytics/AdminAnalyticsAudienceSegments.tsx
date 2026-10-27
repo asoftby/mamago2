@@ -167,7 +167,7 @@ export function AdminAnalyticsAudienceSegments({
       <p className="text-xs text-gray-500">
         Profiles in range:{" "}
         <span className="font-medium text-gray-800">
-          {totalProfiles.toLocaleString()}
+          {totalProfiles.toLocaleString("ru-RU")}
         </span>
       </p>
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -242,7 +242,7 @@ export function AdminAnalyticsAudienceSegments({
                   </div>
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums text-gray-800">
-                  {row.usersCount.toLocaleString()}
+                  {row.usersCount.toLocaleString("ru-RU")}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums text-gray-700">
                   {formatShare(row.share)}

@@ -49,7 +49,7 @@ function fmtPct(n: number | null): string {
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" });
+    return new Date(iso).toLocaleDateString("ru-RU", { timeZone: "Europe/Minsk", day: "2-digit", month: "2-digit", year: "2-digit" });
   } catch {
     return "—";
   }
