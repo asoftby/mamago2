@@ -228,9 +228,9 @@ async function applyClassSchedule(db: Db, offerId: string, schedule: ClassSchedu
         await db.offerClassTariff.upsert({
           where: { id: tariff.id },
           create: { id: tariff.id, groupId: group.id, title: tariff.title, price: tariff.price,
-            unit: tariff.unit, periodDays: tariff.periodDays ?? null, position: tariffPosition },
+            unit: tariff.unit, periodDays: tariff.periodDays ?? null, visitsCount: tariff.visitsCount ?? null, position: tariffPosition },
           update: { title: tariff.title, price: tariff.price, unit: tariff.unit,
-            periodDays: tariff.periodDays ?? null, position: tariffPosition, active: true },
+            periodDays: tariff.periodDays ?? null, visitsCount: tariff.visitsCount ?? null, position: tariffPosition, active: true },
         });
       }
       await db.offerClassTariff.updateMany({
