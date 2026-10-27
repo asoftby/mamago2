@@ -4107,6 +4107,8 @@ enum UserEventType {
   PLAN_ITEM_SHARED
   PLAN_ITEM_MADE_PRIVATE
   PLAN_ITEM_RESCHEDULED
+  /// Пользователь скрыл/отклонил рекомендацию («не интересно»). Приходит с клиента.
+  DISMISS
 }
 
 enum ExperienceAttendance {

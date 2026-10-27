@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
 import { HorizontalCardRow } from "@/features/city-home/components/HorizontalCardRow";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
+import { IMPRESSION_DWELL_MS, IMPRESSION_VISIBLE_RATIO } from "@/lib/analytics/impressionGate";
 import { JournalCollectionCard } from "./JournalCards";
 
 const COLLECTION_CARD_SHELL =
@@ -50,6 +51,8 @@ export function JournalCollectionsCarousel({
               entityId={article.id}
               vertical="CITY"
               citySlug={citySlug}
+              threshold={IMPRESSION_VISIBLE_RATIO}
+              dwellMs={IMPRESSION_DWELL_MS}
               meta={{ section: placement, block: "collections", position: index }}
             >
               <JournalCollectionCard article={article} tone={index} />
