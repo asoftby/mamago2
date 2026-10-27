@@ -22,7 +22,7 @@ export async function purchaseEventBoostAction(input: z.input<typeof schema>) {
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Некорректный запрос Boost." };
   try {
-    const result = await purchaseEventBoost({ ...parsed.data, businessId: business.id });
+    const result = await purchaseEventBoost({ ...parsed.data, businessId: business.id, ownerUserId: user.id });
     revalidatePath("/business/events");
     revalidatePath("/business/billing");
     return { ok: true as const, boostId: result.boostId, idempotentReplay: result.idempotentReplay };
