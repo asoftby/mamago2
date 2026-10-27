@@ -7,7 +7,7 @@ import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt } from "./partyDraft.validation";
 import { verifyPartyOffers } from "./partyDraft.service";
 import { isWithinSchedule, minskBookingWindow } from "./partyConfirmationAvailability";
-import { partyResponseDeadline } from "./partyResponseDeadline";
+import { requestPartyAddonsAfterAnchor } from "./partyAddonFanout";
 
 export interface ConfirmPartyRequestInput {
   requestId: string;
@@ -249,72 +249,10 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
 
       // The first business confirmation activates parallel add-on requests.
       // A failure during fan-out rolls the whole confirmation back.
-      let addonRequests = 0;
-      if (isAnchor) {
-        await tx.partyOrderItem.updateMany({
-          where: { partyOrderId: order.id, role: PartyItemRole.INCLUDED,
-            status: PartyItemStatus.PLANNED },
-          data: { status: PartyItemStatus.CONFIRMED },
-        });
-        const addons = await tx.partyOrderItem.findMany({
-          where: { partyOrderId: order.id, role: { in: [PartyItemRole.ADDON, PartyItemRole.STANDALONE] },
-            status: PartyItemStatus.PLANNED },
-          select: { id: true, offerId: true, businessId: true, note: true },
-        });
-        if (addons.length) {
-          const live = new Map<string, Awaited<ReturnType<typeof verifyPartyOffers>> extends Map<string, infer T> ? T : never>();
-          // One discontinued add-on must not roll back a confirmed venue. It
-          // remains NEEDS_DECISION so the parent can select a replacement.
-          for (const addon of addons) {
-            if (!addon.offerId) continue;
-            try {
-              const checked = await verifyPartyOffers(order.citySlug, [addon.offerId], tx);
-              const candidate = checked.get(addon.offerId);
-              if (candidate) live.set(addon.offerId, candidate);
-            } catch (error) {
-              if (!(error instanceof PartyApiError) || error.status !== 422) throw error;
-            }
-          }
-          const due = partyResponseDeadline(now, partyStartAt(order.eventDate, order.timeFrom));
-          for (const addon of addons) {
-            const published = addon.offerId ? live.get(addon.offerId) : null;
-            if (!addon.businessId || !addon.offerId || !published ||
-                published.place?.ownerBusinessId !== addon.businessId || due <= now) {
-              await tx.partyOrderItem.update({
-                where: { id: addon.id }, data: { status: PartyItemStatus.NEEDS_DECISION },
-              });
-              continue;
-            }
-            const child = await tx.bookingRequest.create({
-              data: {
-                kind: BookingKind.PARTY, publicationType: "OFFER",
-                userId: order.ownerUserId, businessId: addon.businessId,
-                offerId: addon.offerId, partyOrderItemId: addon.id,
-                partyStage: "SENT", status: BookingStatus.NEW,
-                requestedDate: order.eventDate, requestedTime: order.timeFrom,
-                adultsCount: order.adultsCount ?? 0, childrenCount: order.childrenCount ?? 0,
-                childAge: order.childAge,
-                customerName: null, customerPhone: null, customerComment: null,
-                responseDueAt: due,
-              },
-              select: { id: true },
-            });
-            await tx.partyOrderItem.update({
-              where: { id: addon.id }, data: { status: PartyItemStatus.REQUESTED },
-            });
-            await tx.bookingActivity.create({
-              data: { bookingId: child.id, type: "CREATED", actorType: "SYSTEM",
-                payload: { partyOrderId: order.id, afterAnchorConfirmation: requestId } },
-            });
-            await tx.partyOutbox.create({
-              data: { eventType: "PARTY_REQUEST_SENT", aggregateId: child.id,
-                dedupeKey: "party:" + child.id + ":sent",
-                payload: { partyOrderId: order.id, requestId: child.id, businessId: addon.businessId } },
-            });
-            addonRequests++;
-          }
-        }
-      }
+      const addonRequests = isAnchor ? await requestPartyAddonsAfterAnchor(tx, {
+        order: { ...order, eventDate: order.eventDate, timeFrom: order.timeFrom },
+        anchorRequestId: requestId, now,
+      }) : 0;
       return { requestId, confirmed: true, alreadyConfirmed: false, addonRequests };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 30_000 });
   } catch (error) {

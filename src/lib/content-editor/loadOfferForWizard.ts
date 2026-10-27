@@ -23,6 +23,7 @@ export async function loadOfferForWizard(offerId: string, options?: { viewerEdit
           },
         },
       },
+      classGroups: { orderBy: { position: "asc" }, include: { tariffs: { orderBy: { position: "asc" } } } },
       placements: {
         orderBy: { createdAt: "asc" },
       },
@@ -36,7 +37,7 @@ export async function loadOfferForWizard(offerId: string, options?: { viewerEdit
           scheduleKind: true,
           timezone: true,
           rules: {
-            select: { weekday: true, startMinutes: true, capacity: true, validFrom: true, validTo: true },
+            select: { classGroupId: true, weekday: true, startMinutes: true, capacity: true, validFrom: true, validTo: true },
             orderBy: [{ startMinutes: "asc" }, { weekday: "asc" }],
           },
           exceptions: { select: { date: true }, orderBy: { date: "asc" } },

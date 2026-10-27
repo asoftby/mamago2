@@ -195,7 +195,7 @@ export function Step1Type({ data, onChange, isEditable, showCategories = false }
         </section>
       )}
 
-      {showCategories && data.productType && (
+      {showCategories && data.productType && data.productType !== "ONE_TIME_ACTIVITY" && data.productType !== "REGULAR_ACTIVITY" && (
         <OfferCategoryPicker
           productType={data.productType}
           value={data.categoryIds}

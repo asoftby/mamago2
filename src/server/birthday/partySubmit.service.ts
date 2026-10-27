@@ -2,7 +2,7 @@ import { PartyOrderStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt, validateSubmissionWindow } from "./partyDraft.validation";
 import { verifyPartyOffers } from "./partyDraft.service";
-import { partyAnchorProblem } from "./partySelection";
+import { partyAnchorProblem, partyRequirementsProblem } from "./partySelection";
 
 /**
  * Submit only the anchor. No other service receives a request before
@@ -59,6 +59,20 @@ export async function submitPartyAnchor(
   }
   const anchorProblem = partyAnchorProblem(party.venueMode, published);
   if (anchorProblem) throw new PartyApiError(422, anchorProblem);
+  // The builder filters by age and guests on the client; the server must not rely on it.
+  const requirements = { childrenCount: party.childrenCount, childAge: party.childAge };
+  const anchorRequirement = partyRequirementsProblem(published, requirements);
+  if (anchorRequirement) throw new PartyApiError(422, anchorRequirement);
+  const addonOffers = await prisma.offer.findMany({
+    where: { partyOrderItems: { some: { partyOrderId: partyId, role: "STANDALONE" } } },
+    select: {
+      title: true, ageMinMonths: true, ageMaxMonths: true, minChildren: true, maxChildren: true,
+    },
+  });
+  for (const addon of addonOffers) {
+    const problem = partyRequirementsProblem(addon, requirements);
+    if (problem) throw new PartyApiError(422, problem + ". Измените состав праздника");
+  }
 
   // Capture narrowed values before the async transaction callback: TypeScript
   // correctly regards nullable Prisma model fields as potentially mutable.

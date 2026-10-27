@@ -2,6 +2,8 @@
 
 import { cn } from "@/lib/utils";
 import { useLastPublicSearchQuery } from "@/hooks/useLastPublicSearchQuery";
+import { useLastPublicSearchResult } from "@/hooks/useLastPublicSearchResult";
+import { LastSearchEntry } from "./LastSearchEntry";
 import type { SearchResultItem as SearchResultItemType } from "@/lib/search/types";
 import { resolveVisiblePopularTags } from "@/lib/search/popularSearchTags";
 import { SearchResultItem } from "./SearchResultItem";
@@ -67,6 +69,7 @@ export function SearchResults({
   activeIndex,
   onPopularPick,
   onSelectResult,
+  onLastResultNavigate,
   variant = "overlay",
 }: {
   query: string;
@@ -76,15 +79,17 @@ export function SearchResults({
   activeIndex: number;
   onPopularPick: (term: string) => void;
   onSelectResult: (item: SearchResultItemType) => void;
+  onLastResultNavigate: (url: string) => void;
   /** overlay — десктопный дропдаун (ограниченная высота); sheet — fullscreen mobile */
   variant?: "overlay" | "sheet";
 }) {
   const lastSearch = useLastPublicSearchQuery();
+  const lastResult = useLastPublicSearchResult();
   // Counts are not wired from SearchQueryLog yet → empty until threshold can be met.
   const popularTags = resolveVisiblePopularTags();
   const showEmptyHints = trimmedQuery.length < 2;
   const showNoResults = trimmedQuery.length >= 2 && !loading && results.length === 0;
-  const showEmptyPanel = showEmptyHints && (Boolean(lastSearch) || popularTags.length > 0);
+  const showEmptyPanel = showEmptyHints && (Boolean(lastResult || lastSearch) || popularTags.length > 0);
 
   return (
     <div
@@ -97,24 +102,15 @@ export function SearchResults({
     >
       {showEmptyPanel ? (
         <div className="p-4">
-          {lastSearch ? (
-            <>
-              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-400">
-                Последний поиск
-              </p>
-              <ul className={cn("flex flex-wrap gap-2", popularTags.length > 0 && "mb-5")}>
-                <li className="max-w-full">
-                  <button
-                    type="button"
-                    onClick={() => onPopularPick(lastSearch)}
-                    className="max-w-full truncate rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-100"
-                    title={lastSearch}
-                  >
-                    {lastSearch}
-                  </button>
-                </li>
-              </ul>
-            </>
+          {(lastResult || lastSearch) ? (
+            <div className={popularTags.length > 0 ? "mb-5" : undefined}>
+              <LastSearchEntry
+                result={lastResult}
+                fallbackQuery={lastSearch}
+                onNavigate={onLastResultNavigate}
+                onQueryPick={onPopularPick}
+              />
+            </div>
           ) : null}
           <PopularTagsBlock tags={popularTags} onPopularPick={onPopularPick} />
         </div>
@@ -141,23 +137,14 @@ export function SearchResults({
         <div className="p-6 text-center">
           <p className="text-sm font-medium text-neutral-900">Ничего не найдено</p>
           <p className="mt-1 text-sm text-neutral-500">Попробуйте изменить запрос</p>
-          {lastSearch ? (
+          {(lastResult || lastSearch) ? (
             <div className="mt-6 text-left">
-              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-400">
-                Последний поиск
-              </p>
-              <ul className="flex flex-wrap gap-2">
-                <li className="max-w-full">
-                  <button
-                    type="button"
-                    onClick={() => onPopularPick(lastSearch)}
-                    className="max-w-full truncate rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-left text-sm text-neutral-700 transition-colors hover:bg-neutral-100"
-                    title={lastSearch}
-                  >
-                    {lastSearch}
-                  </button>
-                </li>
-              </ul>
+              <LastSearchEntry
+                result={lastResult}
+                fallbackQuery={lastSearch}
+                onNavigate={onLastResultNavigate}
+                onQueryPick={onPopularPick}
+              />
             </div>
           ) : null}
           <PopularTagsBlock

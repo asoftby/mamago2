@@ -12,7 +12,41 @@ export type CatalogOffer = {
   details: Prisma.JsonValue | null;
   components: { category: PartyCategory; isOptional: boolean }[];
   place: { ownerBusinessId: string | null } | null;
+  ageMinMonths?: number | null;
+  ageMaxMonths?: number | null;
+  minChildren?: number | null;
+  maxChildren?: number | null;
 };
+
+export type PartyRequirementOffer = Pick<
+  CatalogOffer, "ageMinMonths" | "ageMaxMonths" | "minChildren" | "maxChildren"
+> & { title?: string | null };
+
+/**
+ * Server-side twin of the builder filters: guest count against the offer's capacity and,
+ * when the parent gave it, the child's age. Age is stored in whole years, so a year
+ * covers months 12Y..12Y+11 and only a range entirely outside the offer is rejected.
+ */
+export function partyRequirementsProblem(
+  offer: PartyRequirementOffer, party: { childrenCount: number; childAge: number | null },
+): string | null {
+  const name = offer.title ? "«" + offer.title + "»" : "Выбранная услуга";
+  if (offer.minChildren != null && party.childrenCount < offer.minChildren) {
+    return name + " рассчитана минимум на " + offer.minChildren + " детей";
+  }
+  if (offer.maxChildren != null && party.childrenCount > offer.maxChildren) {
+    return name + " рассчитана максимум на " + offer.maxChildren + " детей";
+  }
+  if (party.childAge != null) {
+    const fromMonths = party.childAge * 12;
+    const toMonths = fromMonths + 11;
+    if ((offer.ageMinMonths != null && toMonths < offer.ageMinMonths) ||
+        (offer.ageMaxMonths != null && fromMonths > offer.ageMaxMonths)) {
+      return name + " не подходит по возрасту ребёнка";
+    }
+  }
+  return null;
+}
 
 export function isVenueOffer(offer: CatalogOffer): boolean {
   return offer.productType === "PARTY_PACKAGE" || offer.category === "VENUE";

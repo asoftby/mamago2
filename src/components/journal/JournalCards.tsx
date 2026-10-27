@@ -196,3 +196,62 @@ export function JournalFeedRow({
     </div>
   );
 }
+
+/**
+ * Десктопная лента «Свежие материалы» (≥ lg): четыре колонки, обложка сверху.
+ * Те же правила, что у JournalFeedRow: бейдж типа — соседняя ссылка, не вложенная в <a>.
+ */
+export function JournalFeedGridCard({
+  article,
+  index,
+  saveStatus,
+  typeHref,
+}: {
+  article: CityHomeJournalArticle;
+  index: number;
+  saveStatus?: ArticleSaveStatus;
+  typeHref?: string | null;
+}) {
+  const typeBadge = journalTypeBadgeVariant(article.publicationType);
+  const date = article.publishedAt ? formatJournalPublishedDate(article.publishedAt) : null;
+  return (
+    <article className="group min-w-0">
+      <div className="relative">
+        <Link href={article.href} tabIndex={-1} aria-hidden className="block">
+          <Cover article={article} tone={index} className="aspect-[4/3] rounded-2xl" />
+        </Link>
+        <SaveOverlay article={article} saveStatus={saveStatus} source="journal-feed-grid" />
+      </div>
+      <div className="mt-4 flex min-w-0 flex-col gap-2">
+        {article.category || typeBadge ? (
+          <div className="flex flex-wrap items-center gap-x-2">
+            {article.category ? (
+              <span className="font-mono text-[11px] font-semibold uppercase tracking-[.12em] text-brand-ink">
+                {article.category.name}
+              </span>
+            ) : null}
+            {typeBadge && typeHref ? (
+              <Link
+                href={typeHref}
+                className="inline-flex min-h-11 items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={typeBadge === "news" ? "Все новости" : "Все подборки mamaGo"}
+              >
+                <JournalBadge variant={typeBadge} />
+              </Link>
+            ) : typeBadge ? (
+              <JournalBadge variant={typeBadge} />
+            ) : null}
+          </div>
+        ) : null}
+        <Link href={article.href} className="min-h-11">
+          <h3 className="m-0 line-clamp-4 font-heading text-[24px] font-semibold leading-[1.18] tracking-[-0.025em] text-foreground transition-colors group-hover:text-primary">
+            {article.title}
+          </h3>
+        </Link>
+        <p className="text-[13px] text-muted-foreground">
+          {[article.geographyLabel, date, journalCardMeta(article)].filter(Boolean).join(" · ")}
+        </p>
+      </div>
+    </article>
+  );
+}

@@ -87,7 +87,8 @@ blocks a competing PARTY allocation.
 - **R2** For HOME/OUTDOOR only, an `AS_REQUESTED` reply equal to `offerPriceSnapshot` (Decimal) with
   duration not shorter than the order confirms at once (system decision, `auto: true, rule: FIXED_PRICE`,
   event `PARTY_BOOKING_CONFIRMED`). VENUE/PACKAGE always go through the manual confirm with a BookingUnit.
-  Add-on fan-out after an automatic anchor confirmation is NOT done here (PR 3).
+  Add-on fan-out after an automatic anchor confirmation: added in #818 PR-C1 via the shared
+  `requestPartyAddonsAfterAnchor` (`partyAddonFanout.ts`), same transaction as the auto-confirm.
 - **R3** `POST /api/business/party-requests/[id]/prepaid` sets `PartyOrderItem.prepaidAt`.
   Parents see "Забронировано" only after it (`partyItemCustomerLabel`).
 - Parent contacts are never exposed to the business by the party code; no reveal at CONFIRMED yet.

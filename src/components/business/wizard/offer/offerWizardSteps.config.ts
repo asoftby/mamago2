@@ -318,7 +318,7 @@ export function isStepComplete(
       return (
         !!data.offerWizardType &&
         !!data.productType &&
-        (variant !== "v2" || data.categoryIds.length > 0)
+        (variant !== "v2" || (data.productType === "ONE_TIME_ACTIVITY" || data.productType === "REGULAR_ACTIVITY") || data.categoryIds.length > 0)
       );
 
     case "placements":
@@ -355,7 +355,8 @@ export function isStepComplete(
         data.title.trim().length >= 3 &&
         data.shortDescription.trim().length >= 10 &&
         data.shortDescription.length <= 120 &&
-        detailedDescriptionLength >= 20
+        detailedDescriptionLength >= 20 &&
+        (variant !== "v2" || !(data.productType === "ONE_TIME_ACTIVITY" || data.productType === "REGULAR_ACTIVITY") || data.categoryIds.length > 0)
       );
 
     case "photo":
@@ -507,7 +508,7 @@ export function getMissingFieldsForStep(
   switch (stepKey) {
     case "type":
       if (!data.productType) missing.push("Формат предложения");
-      else if (variant === "v2" && data.categoryIds.length === 0) missing.push("Категория");
+      else if (variant === "v2" && !(data.productType === "ONE_TIME_ACTIVITY" || data.productType === "REGULAR_ACTIVITY") && data.categoryIds.length === 0) missing.push("Категория");
       break;
 
     case "placements":
@@ -536,6 +537,7 @@ export function getMissingFieldsForStep(
       break;
 
     case "details":
+      if (variant === "v2" && (data.productType === "ONE_TIME_ACTIVITY" || data.productType === "REGULAR_ACTIVITY") && data.categoryIds.length === 0) missing.push("Раздел занятий");
       if (!data.title || data.title.trim().length < 3) missing.push("Название");
       if (
         !data.shortDescription ||

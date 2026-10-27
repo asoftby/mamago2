@@ -68,6 +68,7 @@ export async function verifyPartyOffers(
     select: {
       id: true, productType: true, category: true, partyLocationType: true,
       priceFrom: true, priceMode: true, currency: true, details: true,
+      ageMinMonths: true, ageMaxMonths: true, minChildren: true, maxChildren: true,
       components: { select: { category: true, isOptional: true } },
       place: { select: { ownerBusinessId: true } },
     },

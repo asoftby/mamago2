@@ -1,7 +1,6 @@
 import prisma from "@/lib/prisma";
 import type {
-  UserBirthdayParty, UserBirthdayPartyDetail,
-  UserBirthdayPartyStatus,
+  UserBirthdayParty, UserBirthdayPartyStatus,
 } from "@/features/me/types/userBirthdayParty";
 import { PartyOrderStatus, PartyItemStatus } from "@prisma/client";
 
@@ -51,14 +50,4 @@ export async function listUserBirthdayParties(userId: string): Promise<UserBirth
       updatedAt: row.updatedAt.toISOString(),
     };
   });
-}
-
-/** Legacy demo format is intentionally not used for persisted PartyOrder details. */
-export async function getUserBirthdayPartyDetail(
-  userId: string,
-  partyId: string,
-): Promise<UserBirthdayPartyDetail | null> {
-  void userId;
-  void partyId;
-  return null;
 }

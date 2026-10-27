@@ -36,7 +36,7 @@ assert.match(read, /key: "BIRTHDAY", status: "APPROVED"/);
 console.log("partyDraft.contract.test.ts: OK");
 
 import {
-  assertCompatibleSelection, offerPriceSnapshot, type CatalogOffer,
+  assertCompatibleSelection, offerPriceSnapshot, partyRequirementsProblem, type CatalogOffer,
 } from "./partySelection";
 const base: CatalogOffer = {
   id: "o", productType: "PARTY_SERVICE", category: "VENUE", partyLocationType: null,
@@ -68,4 +68,17 @@ assert.equal(offerPriceSnapshot({ priceFrom: 500, priceMode: "ON_REQUEST", curre
 assert.equal(offerPriceSnapshot({ priceFrom: null, priceMode: "FREE", currency: "BYN" }), 0);
 assert.equal(offerPriceSnapshot({ priceFrom: 80, priceMode: "EXACT", currency: "BYN" }), 80);
 assert.equal(offerPriceSnapshot({ priceFrom: 80, priceMode: "EXACT", currency: "USD" }), null);
+// Server twin of the builder filters: capacity and age are checked on submit, not only in the UI.
+const hall = { title: "Зал", minChildren: 5, maxChildren: 12, ageMinMonths: 48, ageMaxMonths: 96 };
+assert.equal(partyRequirementsProblem(hall, { childrenCount: 8, childAge: 6 }), null);
+assert.match(partyRequirementsProblem(hall, { childrenCount: 4, childAge: null }) ?? "", /минимум на 5/);
+assert.match(partyRequirementsProblem(hall, { childrenCount: 13, childAge: null }) ?? "", /«Зал».*максимум на 12/);
+// Age is whole years (Y → 12Y..12Y+11 months); reject only when the whole range is outside.
+// 3 years = 36–47 months, all below 48 → rejected; 8 years = 96–107 overlaps 96 → allowed.
+assert.match(partyRequirementsProblem(hall, { childrenCount: 8, childAge: 3 }) ?? "", /по возрасту/);
+assert.equal(partyRequirementsProblem(hall, { childrenCount: 8, childAge: 8 }), null);
+assert.match(partyRequirementsProblem(hall, { childrenCount: 8, childAge: 9 }) ?? "", /по возрасту/);
+assert.equal(partyRequirementsProblem({}, { childrenCount: 200, childAge: 0 }), null);
+assert.match(submit, /partyRequirementsProblem\(published, requirements\)/);
+assert.match(submit, /role: "STANDALONE"/);
 console.log("partySelection checks: OK");
