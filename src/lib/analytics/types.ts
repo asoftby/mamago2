@@ -2,6 +2,7 @@ import type {
   AnalyticsEntityType,
   AnalyticsVertical,
   PlanVisibility,
+  UserEventClientClass,
   UserEventType,
 } from "@prisma/client";
 import type { Subject } from "@/lib/decision/decisionContext";
@@ -75,6 +76,11 @@ export type TrackUserEventInput = {
   /** Резолвится в cityId на сервере, если cityId не передан */
   citySlug?: string | null;
   meta?: AnalyticsMetaPayload | null;
+  /**
+   * Класс клиента (по User-Agent), только для событий из `/api/analytics/events`.
+   * `bot` никогда не пишется. Серверные события оставляют null.
+   */
+  clientClass?: UserEventClientClass | null;
 };
 
 export type TrackUserEventResult = { ok: true } | { ok: false; error: string };

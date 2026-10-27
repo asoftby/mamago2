@@ -24,9 +24,17 @@ export interface MetricDictionaryEntry {
   /** Set only when the metric's identity unit is a stand-in for something else not yet modeled. */
   identityModel?: string;
   verifiable: boolean;
+  /** Dated definition changes (ТЗ «Аналитика админки»: каждое изменённое определение — с датой). */
+  changes?: { date: string; note: string }[];
 }
 
+const DETAIL_OPEN_CLIENT_CHANGE = {
+  date: "2026-10-27",
+  note: "DETAIL_OPEN пишется с клиента (одно на загрузку страницы сущности), боты по User-Agent и анонимы без sessionId отсекаются; до релиза открытия завышены ботами",
+};
+
 const EXCLUDES_STAFF = "Исключены роли ADMIN и MODERATOR";
+const TELEMETRY_WINDOW_NOTE = "Знаменатель — все клиентские запросы к /api/analytics/events за окно (принятые + отсеянные)";
 
 export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
   "external_analytics.ga4_coverage": {
@@ -132,8 +140,9 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     source: "UserEvent (DETAIL_OPEN)",
     window: "Скользящие 30 дней",
     exclusions: "Нет (совпадает с существующей UserEvent-инструментацией)",
-    version: "1.0.0",
+    version: "1.1.0",
     verifiable: true,
+    changes: [DETAIL_OPEN_CLIENT_CHANGE],
   },
   "funnel.save_rate": {
     metricKey: "funnel.save_rate",
@@ -143,8 +152,9 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     source: "UserEvent (DETAIL_OPEN, SAVE)",
     window: "Скользящие 30 дней",
     exclusions: "Упорядочено по времени относительно первого открытия — не независимая ставка по всем пользователям",
-    version: "1.0.0",
+    version: "1.1.0",
     verifiable: true,
+    changes: [DETAIL_OPEN_CLIENT_CHANGE],
   },
   "funnel.plan_rate": {
     metricKey: "funnel.plan_rate",
@@ -154,8 +164,9 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     source: "UserEvent (DETAIL_OPEN, PLAN_ADD)",
     window: "Скользящие 30 дней",
     exclusions: "Не требует предварительного SAVE — считается независимо от save rate",
-    version: "1.0.0",
+    version: "1.1.0",
     verifiable: true,
+    changes: [DETAIL_OPEN_CLIENT_CHANGE],
   },
   "funnel.cta_rate": {
     metricKey: "funnel.cta_rate",
@@ -165,8 +176,9 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     source: "UserEvent (DETAIL_OPEN, CTA_CLICK)",
     window: "Скользящие 30 дней",
     exclusions: "—",
-    version: "1.0.0",
+    version: "1.1.0",
     verifiable: true,
+    changes: [DETAIL_OPEN_CLIENT_CHANGE],
   },
   "supply.active_events": {
     metricKey: "supply.active_events",
@@ -279,6 +291,54 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     exclusions: "—",
     version: "1.0.0",
     verifiable: true,
+  },
+  "telemetry.bot_rejected_share_24h": {
+    metricKey: "telemetry.bot_rejected_share_24h",
+    displayName: "Отсеяно ботов · 24 ч",
+    businessMeaning: "Какая доля входящей клиентской телеметрии пришла от ботов и превью мессенджеров",
+    formula: "отсеянные ботами запросы / (принятые + боты + без идентичности)",
+    source: "MetricSample telemetry.ingest_*_delta (счётчики /api/analytics/events, isbot по User-Agent)",
+    window: "Скользящие 24 часа",
+    exclusions: TELEMETRY_WINDOW_NOTE,
+    version: "1.0.0",
+    verifiable: true,
+    changes: [{ date: "2026-10-27", note: "Новая метрика (ТЗ A3)" }],
+  },
+  "telemetry.bot_rejected_share_7d": {
+    metricKey: "telemetry.bot_rejected_share_7d",
+    displayName: "Отсеяно ботов · 7 дней",
+    businessMeaning: "То же за неделю",
+    formula: "отсеянные ботами запросы / (принятые + боты + без идентичности)",
+    source: "MetricSample telemetry.ingest_*_delta",
+    window: "Скользящие 7 дней",
+    exclusions: TELEMETRY_WINDOW_NOTE,
+    version: "1.0.0",
+    verifiable: true,
+    changes: [{ date: "2026-10-27", note: "Новая метрика (ТЗ A3)" }],
+  },
+  "telemetry.no_identity_rejected_share_24h": {
+    metricKey: "telemetry.no_identity_rejected_share_24h",
+    displayName: "Запросы без идентичности · 24 ч",
+    businessMeaning: "Доля клиентских запросов от анонимов без sessionId (не записываются)",
+    formula: "отсеянные без идентичности / (принятые + боты + без идентичности)",
+    source: "MetricSample telemetry.ingest_*_delta",
+    window: "Скользящие 24 часа",
+    exclusions: TELEMETRY_WINDOW_NOTE,
+    version: "1.0.0",
+    verifiable: true,
+    changes: [{ date: "2026-10-27", note: "Новая метрика (ТЗ A3)" }],
+  },
+  "telemetry.stored_without_identity_share_24h": {
+    metricKey: "telemetry.stored_without_identity_share_24h",
+    displayName: "События без идентичности · 24 ч",
+    businessMeaning: "Доля записанных событий, которые нельзя отнести ни к пользователю, ни к устройству",
+    formula: "COUNT(UserEvent без userId, sessionId и anonymousId) / COUNT(UserEvent)",
+    source: "UserEvent",
+    window: "Скользящие 24 часа",
+    exclusions: "—",
+    version: "1.0.0",
+    verifiable: true,
+    changes: [{ date: "2026-10-27", note: "Новая метрика (ТЗ A3)" }],
   },
 };
 

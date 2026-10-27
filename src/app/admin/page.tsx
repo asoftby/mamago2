@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getOperationsView } from "@/server/ops/read/getOperationsView";
 import type { OperationsSyntheticSignal, OperationsView } from "@/server/ops/read/getOperationsView";
 import type { OperationalSignal } from "@prisma/client";
-import { deriveWorkload } from "@/lib/admin/dashboardViewModels";
+import { deriveDataQuality, deriveWorkload } from "@/lib/admin/dashboardViewModels";
 import { deriveGrowthOverview, deriveOrganicRecovery } from "@/lib/admin/growthDashboardViewModel";
 import { AdminDashboardShell } from "./_components/AdminDashboardShell";
 import type { DashboardSignal } from "./_components/OperationsBlock";
@@ -51,6 +51,7 @@ export default async function AdminDashboardPage() {
   const organic = deriveOrganicRecovery(view.kpis);
   const growth = deriveGrowthOverview(view.kpis);
   const workload = deriveWorkload(view.queues, view.kpis);
+  const dataQuality = deriveDataQuality(view.stale, view.kpis);
 
   return (
     <AdminDashboardShell
@@ -66,6 +67,7 @@ export default async function AdminDashboardPage() {
       organic={organic}
       growth={growth}
       workload={workload}
+      dataQuality={dataQuality}
     />
   );
 }

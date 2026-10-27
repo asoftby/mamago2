@@ -14,6 +14,8 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { getSessionRowIdFromCookies } from "@/lib/analytics/getSessionRowId";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { SafeOpaqueIdSchema } from "@/lib/decision/identifiers";
+import { decideClientIngestion } from "@/lib/analytics/clientClass";
+import { recordIngestionOutcome } from "@/server/services/analytics/ingestionCounters";
 
 const analyticsMetaSchema = z
   .record(z.string(), z.unknown())
@@ -63,6 +65,19 @@ export async function POST(request: NextRequest) {
       sessionRowId ||
       null;
 
+    // A2: bots (by User-Agent) and anonymous requests without any sessionId
+    // are not written. 204 — the client has nothing to retry. Raw UA is never stored.
+    const decision = decideClientIngestion({
+      userAgent: request.headers.get("user-agent"),
+      userId: user?.id ?? null,
+      sessionId,
+    });
+    if (!decision.accept) {
+      recordIngestionOutcome(decision.reason);
+      return new NextResponse(null, { status: 204 });
+    }
+    recordIngestionOutcome("accepted");
+
     await trackUserEvent({
       userId: user?.id ?? null,
       sessionId,
@@ -74,6 +89,7 @@ export async function POST(request: NextRequest) {
       cityId: body.cityId ?? null,
       citySlug: body.citySlug ?? null,
       meta: body.meta ?? null,
+      clientClass: decision.clientClass,
     });
 
     return NextResponse.json({ ok: true });
