@@ -323,6 +323,7 @@ function validateStep5(data: OfferFormData, requireLegacyAction = true): Validat
 
   const isComplete = Boolean(
     (isCampOffer ||
+      (isRegularClass && pricingErrors.length === 0) ||
       (data.pricingMode &&
         ((data.pricingMode === "single" && data.singlePrice.trim()) ||
          (data.pricingMode === "multiple" && data.pricingOptions.length > 0 &&
