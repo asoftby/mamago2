@@ -61,7 +61,7 @@ Negative actions (`UNSAVE`, `PLAN_REMOVE`, cancellation, negative feedback) affe
 
 ### Impressions and dismissals
 
-An **impression** is a `CARD_VIEW` sent when a card is ≥50% visible continuously for ≥1 s (`src/lib/analytics/impressionGate.ts`, `AnalyticsCardViewTracker` with `dwellMs`; meta `impression: true`). For a verified exposure the first impression sets `RecommendationExposure.deliveredAt`; later ones do not overwrite it. Actions are existing `UserEvent`s (`DETAIL_OPEN`, `SAVE`, `PLAN_ADD`, `CTA_CLICK`, ...) linked through `RecommendationOutcome`. `UserEventType.DISMISS` ("не интересно") is a client-sendable negative signal (`BEHAVIOR_AFFINITY_WEIGHTS.DISMISS = -2`) and is attributed the same way. The journal collections carousel uses the impression rule.
+An **impression** is a `CARD_VIEW` sent when a card is ≥50% visible continuously for ≥1 s (`src/lib/analytics/impressionGate.ts`, `AnalyticsCardViewTracker` with `dwellMs`; meta `impression: true`). For a verified exposure the first qualified impression (`meta.impression === true`) sets `RecommendationExposure.deliveredAt`; later ones do not overwrite it. Actions are existing `UserEvent`s (`DETAIL_OPEN`, `SAVE`, `PLAN_ADD`, `CTA_CLICK`, ...) linked through `RecommendationOutcome`. `UserEventType.DISMISS` ("не интересно") is a client-sendable negative signal (`BEHAVIOR_AFFINITY_WEIGHTS.DISMISS = -2`) and is attributed the same way. The journal collections carousel and My Plan recommendation cards use the impression rule.
 
 ## Versioning
 
