@@ -122,10 +122,12 @@ export async function computeCanonicalAudience(
       -- appear more than once here only if it was somehow linked to more
       -- than one distinct userId in-window, which the taint check below
       -- treats conservatively (any excluded-role link taints the session).
-      SELECT DISTINCT pv."sessionId", u.role
-      FROM pv
-      LEFT JOIN "User" u ON u.id = pv."userId"
-      WHERE pv."sessionId" IS NOT NULL AND pv."userId" IS NOT NULL
+      SELECT DISTINCT e."sessionId", u.role
+      FROM "UserEvent" e
+      JOIN "User" u ON u.id = e."userId"
+      WHERE e."sessionId" IS NOT NULL AND e."userId" IS NOT NULL
+        AND e."createdAt" >= ${start} AND e."createdAt" < ${end}
+        AND e."sessionId" IN (SELECT "sessionId" FROM pv WHERE "sessionId" IS NOT NULL)
     ),
     linked_sessions AS (
       SELECT DISTINCT "sessionId" FROM session_user_roles
@@ -212,7 +214,7 @@ export async function resolveInternalTrafficExclusion(
       JOIN "User" u ON u.id = e."userId"
       WHERE e."sessionId" IS NOT NULL
         AND u.role IN (${EXCLUDED_ROLES_SQL_LIST})
-        AND e."createdAt" >= ${start} AND e."createdAt" <= ${end}
+        AND e."createdAt" >= ${start} AND e."createdAt" < ${end}
     `),
   ]);
   return {
