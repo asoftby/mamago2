@@ -390,6 +390,8 @@ enum PlanDecisionStatus {
 model Family {
   id          String             @id @default(cuid())
   name        String?
+  /// Explicit family home city. Never changed by catalog browsing.
+  homeCityId  String?
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
   /// Закрытая семья (когда взрослых не осталось, B3/A2).
@@ -666,6 +668,7 @@ model PlanItem {
   @@index([venuePlaceId])
   @@index([familyId, date])
   @@index([familyId, visibility, status])
+  @@index([activityId, cancelledAt, status, familyId])
   @@unique([id, familyId])
 }
 
@@ -2934,6 +2937,8 @@ model Boost {
   endAt                DateTime
   isFreeDaily          Boolean             @default(false)
   freeDailyDateKey     String?
+  /// Empty = home geography only; ["*"] = Belarus; otherwise Region IDs.
+  targetRegionIds      String[]            @default([])
   durationDays         Int?
   price                Decimal?            @db.Decimal(10, 2)
   currency             String?
