@@ -10,6 +10,9 @@ export type PartyOrderScreenData = {
   id: string;
   childName: string;
   status: string;
+  version: number;
+  /** Why the parent cannot cancel at once (confirmed services); null when cancellation is allowed. */
+  cancelBlocker: string | null;
   date: string | null;
   time: string | null;
   items: Array<{
@@ -46,10 +49,38 @@ const stageLabels: Record<string, string> = {
   CANCELLED: "Отменено",
 };
 
+const orderNotices: Record<string, string> = {
+  NEEDS_ALTERNATIVE: "Основной исполнитель не подтвердил праздник. Можно выбрать другой вариант или отменить праздник.",
+  CANCELLED: "Праздник отменён. Заявки исполнителям закрыты.",
+};
+
 export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData }) {
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const cancelled = party.status === "CANCELLED";
+
+  const cancelParty = async () => {
+    if (pending || !window.confirm("Отменить праздник? Все неподтверждённые заявки исполнителям будут закрыты.")) return;
+    setPending("cancel");
+    setError(null);
+    try {
+      const res = await fetch(`/api/parent/parties/${encodeURIComponent(party.id)}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version: party.version }),
+      });
+      if (!res.ok) {
+        const result = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(result.error || "Не удалось отменить праздник");
+      }
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Не удалось отменить праздник");
+    } finally {
+      setPending(null);
+    }
+  };
 
   const accept = async (requestId: string, quoteId: string, expectedVersion: number) => {
     if (pending) return;
@@ -99,12 +130,20 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
           </p>
         </header>
 
+        {orderNotices[party.status] ? (
+          <p role="status" className="rounded-xl border border-border bg-muted/50 p-3 text-sm text-foreground">
+            {orderNotices[party.status]}
+          </p>
+        ) : null}
         {error ? <p role="alert" className="rounded-xl border border-destructive/20 p-3 text-sm text-destructive">{error}</p> : null}
         <div className="space-y-4">
           {party.items.filter((item) => item.role !== "INCLUDED").map((item) => {
             const stage = item.request?.partyStage;
             const quote = item.request?.quote;
-            const isAvailable = stage === "QUOTED" && quote?.canAccept === true;
+            const isAvailable = !cancelled && stage === "QUOTED" && quote?.canAccept === true;
+            // An offer past its validity is closed by the server shortly; say so instead of
+            // showing an offer the parent cannot accept.
+            const offerExpired = stage === "QUOTED" && quote?.canAccept !== true;
             const confirmed = stage === "CONFIRMED";
             return (
               <section key={item.id} className="space-y-3 rounded-2xl border border-border bg-card p-4 sm:p-6">
@@ -114,7 +153,7 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
                     <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       {confirmed ? <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden /> :
                         <Clock3 className="h-4 w-4" aria-hidden />}
-                      {stage ? stageLabels[stage] ?? "Ожидаем действий" :
+                      {offerExpired ? "Срок предложения истёк" : stage ? stageLabels[stage] ?? "Ожидаем действий" :
                         item.status === "PLANNED" ? "Будет отправлено после подтверждения основной услуги" :
                           item.status === "NEEDS_DECISION" ? "Нужен новый выбор" : "В подготовке"}
                     </p>
@@ -152,6 +191,22 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
             );
           })}
         </div>
+        {!cancelled ? (
+          <section className="space-y-2 border-t border-border pt-5">
+            {party.cancelBlocker ? (
+              <p className="text-sm text-muted-foreground">{party.cancelBlocker}</p>
+            ) : (
+              <button
+                type="button"
+                disabled={Boolean(pending)}
+                onClick={() => void cancelParty()}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-destructive/40 px-5 text-sm font-semibold text-destructive hover:bg-destructive/5 disabled:opacity-50"
+              >
+                {pending === "cancel" ? "Отменяем…" : "Отменить праздник"}
+              </button>
+            )}
+          </section>
+        ) : null}
       </div>
     </div>
   );

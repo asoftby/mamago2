@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { readPartyOrder } from "@/server/birthday/partyDraft.service";
 import { PartyApiError } from "@/server/birthday/partyDraft.validation";
+import { partyCancelBlocker } from "@/server/birthday/partyCancelRules";
 import {
   PartyOrderStatusScreen, type PartyOrderScreenData,
 } from "@/features/me/components/PartyOrderStatusScreen";
@@ -23,6 +24,8 @@ export default async function MeBirthdayDetailPage({ params }: PageProps) {
     id: party.id,
     childName: party.childName || "ребёнка",
     status: party.status,
+    version: party.version,
+    cancelBlocker: partyCancelBlocker(party),
     date: party.eventDate?.toISOString().slice(0, 10) ?? null,
     time: party.timeFrom && party.timeTo ? `${party.timeFrom}–${party.timeTo}` : party.timeFrom,
     items: party.items.map((item) => {
