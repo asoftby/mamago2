@@ -16,7 +16,13 @@ export { activityOwnerBusinessActiveWhere, placeOwnerBusinessActiveWhere };
 export function getPublicPublishedArticleWhere(): Prisma.ArticleWhereInput {
   return {
     status: ContentStatus.PUBLISHED,
-    category: { publicationType: "ARTICLE", isActive: true, archivedAt: null },
+    // Breaking News is a publication type, not a journal section: its editor
+    // intentionally saves categoryId=null. Regular articles and collections
+    // still require an active ARTICLE category.
+    OR: [
+      { publicationType: "BREAKING_NEWS" },
+      { category: { publicationType: "ARTICLE", isActive: true, archivedAt: null } },
+    ],
   };
 }
 
