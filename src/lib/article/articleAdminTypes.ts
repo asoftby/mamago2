@@ -1,6 +1,17 @@
-import type { ContentStatus, GeoScope } from "@prisma/client";
+import type { ArticleLinkedItemKind, ArticlePublicationType, ContentStatus, GeoScope } from "@prisma/client";
 import type { ArticleContentPayload } from "@/lib/publications/articleMvp";
 import type { ArticleGeographyTargetInput } from "@/lib/article/articleGeographyTargets";
+
+/** Элемент публикации (подборки) в порядке редактора. */
+export type ArticleLinkedItemInput = {
+  kind: ArticleLinkedItemKind;
+  id: string;
+};
+
+export type ArticleLinkedItemSnapshot = ArticleLinkedItemInput & {
+  /** Заголовок объекта для редактора; null — объект недоступен. */
+  title: string | null;
+};
 
 /** Снимок для редактора статьи (админ API и клиент без Prisma runtime). */
 export type ArticleEditorSnapshot = {
@@ -39,6 +50,13 @@ export type ArticleEditorSnapshot = {
   noindex: boolean;
   /** Discovery tags attached to this publication (global tags across all cities). */
   tagIds: string[];
+  /** Тип публикации журнала (независим от рубрики). */
+  publicationType: ArticlePublicationType;
+  featured: boolean;
+  pinned: boolean;
+  /** «Актуально до»; обязателен для BREAKING_NEWS. */
+  expiresAt: string | null;
+  linkedItems: ArticleLinkedItemSnapshot[];
   views: number;
   updatedAt: string;
 };
@@ -72,4 +90,12 @@ export type ArticleSaveInput = {
   noindex: boolean;
   /** Discovery tag IDs to attach to this publication. */
   tagIds?: string[];
+  /** undefined = не менять (для новой статьи — ARTICLE, либо BREAKING_NEWS по маркеру subtitle). */
+  publicationType?: ArticlePublicationType;
+  featured?: boolean;
+  pinned?: boolean;
+  /** undefined = не менять; для новости null → publishedAt + 7 дней. */
+  expiresAt?: string | null;
+  /** undefined = не менять; порядок массива = порядок элементов. */
+  linkedItems?: ArticleLinkedItemInput[];
 };
