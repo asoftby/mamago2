@@ -46,29 +46,35 @@ assert.deepEqual(articlePublicSlugWhere("weekend", null), {
   slug: "weekend",
   cityId: null,
   status: "PUBLISHED",
-  OR: [
-    { publicationType: "BREAKING_NEWS" },
-    { category: { publicationType: "ARTICLE", isActive: true, archivedAt: null } },
-  ],
+  AND: [{
+    OR: [
+      { publicationType: "BREAKING_NEWS" },
+      { category: { publicationType: "ARTICLE", isActive: true, archivedAt: null } },
+    ],
+  }],
 });
 assert.deepEqual(articlePublicSlugWhere("weekend", "minsk"), {
   slug: "weekend",
   cityId: "minsk",
   status: "PUBLISHED",
-  OR: [
-    { publicationType: "BREAKING_NEWS" },
-    { category: { publicationType: "ARTICLE", isActive: true, archivedAt: null } },
-  ],
+  AND: [{
+    OR: [
+      { publicationType: "BREAKING_NEWS" },
+      { category: { publicationType: "ARTICLE", isActive: true, archivedAt: null } },
+    ],
+  }],
 });
 assert.deepEqual(articlePublicSlugHistoryWhere("old-weekend", null), {
   slug: "old-weekend",
   cityId: null,
   article: {
     status: "PUBLISHED",
+    AND: [{
     OR: [
-    { publicationType: "BREAKING_NEWS" },
-    { category: { publicationType: "ARTICLE", isActive: true, archivedAt: null } },
-  ],
+      { publicationType: "BREAKING_NEWS" },
+      { category: { publicationType: "ARTICLE", isActive: true, archivedAt: null } },
+    ],
+  }],
   },
 });
 
