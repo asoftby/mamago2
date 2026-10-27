@@ -53,4 +53,5 @@ assert.equal(comparisonPercent(12, 10), 20);
 assert.equal(comparisonPercent(7, 10), -30);
 assert.equal(comparisonPercent(0, 0), null);
 
+// PR #840 CI verification against the updated dev base.
 console.log("performance metric calculations tests: OK");

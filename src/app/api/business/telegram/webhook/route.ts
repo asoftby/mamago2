@@ -57,7 +57,9 @@ export async function POST(request: NextRequest) {
           ? "Заявка подтверждена."
           : result.reason === "STALE_REQUEST"
             ? "Заявка уже изменилась. Откройте бизнес-кабинет."
-            : responseText;
+            : result.reason === "CONFIRMATION_DISABLED"
+              ? "Подтверждение заявок временно недоступно."
+              : responseText;
       } catch {
         // Never expose Telegram identity, signed token or customer details.
         console.error("[business-telegram] Party confirmation callback failed");

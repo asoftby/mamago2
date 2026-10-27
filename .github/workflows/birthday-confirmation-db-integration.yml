@@ -50,6 +50,8 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5434/mamago_birthday_it
       NODE_ENV: test
       CI: "true"
+      # Confirmations are gated server-side; the integration flows exercise them enabled.
+      PARTY_CONFIRMATION_ENABLED: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -68,6 +70,8 @@ jobs:
         run: pnpm exec prisma migrate deploy
       - name: Verify real quote acceptance and exclusive confirmation
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyConfirmation.postgres.integration.test.ts
+      - name: Verify server closes offers not accepted in time
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyQuoteExpiry.postgres.integration.test.ts
 
   # End-to-end party flow (add-on fan-out, races, manual home/outdoor, cross-tenant,
   # expiry). The test and its seed only accept 127.0.0.1:55443/mamago_birthday_it.
@@ -92,6 +96,8 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55443/mamago_birthday_it
       NODE_ENV: test
       CI: "true"
+      # Confirmations are gated server-side; the integration flows exercise them enabled.
+      PARTY_CONFIRMATION_ENABLED: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

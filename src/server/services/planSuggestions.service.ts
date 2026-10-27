@@ -8,6 +8,7 @@ import { resolveKudaDiscoveryCityIds } from "@/server/discovery/discoveryHubExpa
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
 import { SYSTEM_INTERESTS } from "@/lib/config/interests";
+import { INTEREST_MATCH_WEIGHT, MAX_INTEREST_MATCHES } from "@/server/services/recommendations/rankingSignals";
 import {
   CANONICAL_EVENT_INTEREST_SLUGS,
   eventSystemInterestSlugs,
@@ -25,8 +26,7 @@ export { eventSystemInterestSlugs } from "@/lib/event/eventSystemInterests";
  * explainable after the algorithm evolves.
  */
 export const PLAN_SUGGESTION_ALGORITHM_VERSION = "engagement-profile-interest-experience-v3";
-export const INTEREST_MATCH_WEIGHT = 4;
-export const MAX_INTEREST_MATCHES = 2;
+export { INTEREST_MATCH_WEIGHT, MAX_INTEREST_MATCHES, MAX_INTEREST_BOOST } from "@/server/services/recommendations/rankingSignals";
 
 export function profileInterestScore(
   profileInterestSlugs: readonly string[],
