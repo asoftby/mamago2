@@ -8,6 +8,7 @@ import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { formatRuShortDayMonthRange } from "@/lib/formatters/date";
 import { formatPrice, formatPriceFrom } from "@/lib/formatters/format-price";
 import { ageBoundsFromActivityFields } from "@/lib/event/activityAgeBounds";
+import { posterPriceBadgeSide, resolvePosterFrame } from "@/lib/media/posterFrame";
 import type { IdeaItem } from "../types";
 
 
@@ -77,6 +78,9 @@ export function IdeaPosterCard({
         : (activity.categoryLabel ?? null);
 
   const metaLine = [ageLabel, dateLabel].filter(Boolean).join(" · ");
+  // Same poster rule as afisha listings, for every saved type.
+  const poster = resolvePosterFrame(activity.imageWidth, activity.imageHeight);
+  const badgeSide = posterPriceBadgeSide(poster);
 
   return (
     <article className="group min-w-0 break-inside-avoid">
@@ -91,7 +95,11 @@ export function IdeaPosterCard({
             isPastEvent && "pointer-events-none cursor-default grayscale opacity-55",
           )}
         >
-          <div className="relative aspect-[3/4] w-full overflow-hidden rounded-[18px] bg-surface-muted">
+          <div
+            className="relative w-full overflow-hidden rounded-[18px] bg-surface-muted"
+            style={{ aspectRatio: poster.aspectRatio }}
+            data-poster-crop={poster.cropped ? poster.objectPosition : "none"}
+          >
             {activity.coverImageUrl ? (
               // Cover the entire card across responsive column widths; avoid side gutters
               // caused by object-contain when posters hit a max-height constraint.
@@ -101,13 +109,18 @@ export function IdeaPosterCard({
                 alt={activity.title}
                 loading="lazy"
                 decoding="async"
-                className="absolute inset-0 h-full w-full object-cover"
+                className={cn("absolute inset-0 h-full w-full object-cover", poster.objectPosition === "top" && "object-top")}
               />
             ) : (
               <div className="h-full w-full bg-gradient-to-br from-surface-muted to-border" aria-hidden="true" />
             )}
             {priceLabel && (
-              <span className="absolute bottom-3 right-3 inline-flex h-7 items-center rounded-full bg-foreground/75 px-3 font-mono text-[11px] text-background">
+              <span
+                className={cn(
+                  "absolute bottom-3 inline-flex h-7 items-center rounded-full bg-foreground/75 px-3 font-mono text-[11px] text-background",
+                  badgeSide === "left" ? "left-3" : "right-3",
+                )}
+              >
                 {renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })}
               </span>
             )}

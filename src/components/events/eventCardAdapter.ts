@@ -14,6 +14,8 @@ type EventListingSource = {
   citySlug: string;
   href?: string;
   imageUrl?: string | null;
+  imageWidth?: number | null;
+  imageHeight?: number | null;
   format?: ActivityFormat | null;
   badge?: string | null;
   ageFrom?: number | null;
@@ -62,6 +64,8 @@ function eventListingToEventCard(source: EventListingSource): EventCardProps {
     title: source.title,
     href,
     imageUrl: source.imageUrl ?? null,
+    imageWidth: source.imageWidth ?? null,
+    imageHeight: source.imageHeight ?? null,
     categoryLabel: buildCategoryLabel(source),
     metaLabel: buildMetaLabel(source),
     priceLabel: buildPriceLabel(source),
@@ -83,6 +87,8 @@ export function activityMockToEventCard(
     citySlug: activity.citySlug ?? fallbackCitySlug,
     href: activity.href,
     imageUrl: activity.image ?? null,
+    imageWidth: activity.imageWidth ?? null,
+    imageHeight: activity.imageHeight ?? null,
     format: activity.format,
     badge: activity.badge ?? null,
     ageFrom: activity.ageFrom,
