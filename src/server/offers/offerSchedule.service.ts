@@ -201,10 +201,31 @@ async function applyClassSchedule(db: Db, offerId: string, schedule: ClassSchedu
     });
     const wantedIds = new Set(schedule.groups.map((group) => group.id));
     for (const [position, group] of schedule.groups.entries()) {
+      const existingById = existingGroups.some((item) => item.id === group.id);
+      if (!existingById) {
+        const ownedElsewhere = await db.offerClassGroup.findUnique({ where: { id: group.id }, select: { offerId: true } });
+        if (ownedElsewhere) throw new OfferScheduleValidationError("Идентификатор группы принадлежит другому предложению");
+      }
       await db.offerClassGroup.upsert({
         where: { id: group.id },
         create: { id: group.id, offerId, title: `Группа ${position + 1}`, position },
         update: { position, active: true },
+      });
+      const tariffs = group.tariffs ?? [];
+      for (const [tariffPosition, tariff] of tariffs.entries()) {
+        const old = await db.offerClassTariff.findUnique({ where: { id: tariff.id }, select: { groupId: true } });
+        if (old && old.groupId !== group.id) throw new OfferScheduleValidationError("Тариф относится к другой группе");
+        await db.offerClassTariff.upsert({
+          where: { id: tariff.id },
+          create: { id: tariff.id, groupId: group.id, title: tariff.title, price: tariff.price,
+            unit: tariff.unit, periodDays: tariff.periodDays ?? null, position: tariffPosition },
+          update: { title: tariff.title, price: tariff.price, unit: tariff.unit,
+            periodDays: tariff.periodDays ?? null, position: tariffPosition, active: true },
+        });
+      }
+      await db.offerClassTariff.updateMany({
+        where: { groupId: group.id, id: { notIn: tariffs.map((tariff) => tariff.id) } },
+        data: { active: false },
       });
     }
     await db.offerClassGroup.updateMany({
