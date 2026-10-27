@@ -91,6 +91,7 @@ interface CityDiscoveryShellProps {
   routesData?: PublicRouteCardModel[];
   /** Лента «Куда пойти»: только данные с сервера (БД) */
   discoveryActivities?: ActivityMock[];
+  birthdayPagination?: { page: number; totalPages: number; total: number };
   classChips?: Array<{ id: string; title: string; slug: string }>;
   activeClassChipSlug?: string;
   /** Конфигурация бюджетного фильтра; null = фильтр выключен в админке. */
@@ -108,6 +109,7 @@ export function CityDiscoveryShell({
   listingSearchParams = {},
   routesData,
   discoveryActivities,
+  birthdayPagination,
   classChips,
   activeClassChipSlug,
   budgetConfig,
@@ -194,6 +196,21 @@ export function CityDiscoveryShell({
             emptyTitle="Пока нет предложений для праздника"
             emptyDescription="В этом городе пока нет опубликованных услуг и пакетов для праздников. Собрать свой праздник можно в конструкторе выше."
           />
+          {birthdayPagination && birthdayPagination.totalPages > 1 ? (
+            <nav aria-label="Страницы предложений для праздника" className="flex flex-wrap items-center justify-center gap-3 pt-4">
+              {birthdayPagination.page > 1 ? (
+                <Link className="rounded-full border px-5 py-2 text-sm" href={birthdayPagination.page === 2 ? `/${city}/birthday` : `/${city}/birthday?page=${birthdayPagination.page - 1}`}>
+                  Назад
+                </Link>
+              ) : null}
+              <span className="text-sm text-muted-foreground">Страница {birthdayPagination.page} из {birthdayPagination.totalPages}</span>
+              {birthdayPagination.page < birthdayPagination.totalPages ? (
+                <Link className="rounded-full border px-5 py-2 text-sm" href={`/${city}/birthday?page=${birthdayPagination.page + 1}`}>
+                  Далее
+                </Link>
+              ) : null}
+            </nav>
+          ) : null}
         </Container>
       </main>
     );

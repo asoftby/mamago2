@@ -9,7 +9,7 @@ import { listPublicRoutesByCity } from "@/server/services/route.service";
 import { getCurrentUser } from "@/lib/auth/server";
 import { countKudaDiscoveryEvents, getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
 import { getClassesDiscoveryFeed } from "@/server/discovery/classesDiscoveryFeed";
-import { getBirthdayDiscoveryFeed } from "@/server/discovery/birthdayDiscoveryFeed";
+import { getBirthdayDiscoveryPage } from "@/server/discovery/birthdayDiscoveryFeed";
 import {
   listDiscoveryClassChips,
   resolveDiscoveryClassChipSlug,
@@ -64,6 +64,7 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
   const budgetEnabled = systemFilters.some((f) => f.type === "BUDGET");
 
   let discoveryActivities = undefined;
+  let birthdayPagination: { page: number; totalPages: number; total: number } | undefined;
   let classChips = undefined;
   let activeClassChipSlug = undefined;
   let budgetConfig: BudgetConfig = null;
@@ -74,7 +75,12 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
 
   if (intent === "birthday") {
     // Only published party-specific offers approved for this section.
-    discoveryActivities = await getBirthdayDiscoveryFeed(city.id, city.slug);
+    const rawPage = Array.isArray(searchParams.page) ? searchParams.page[0] : searchParams.page;
+    const requestedPage = Number(rawPage);
+    const result = await getBirthdayDiscoveryPage(city.id, city.slug, Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
+    if (result.page > result.totalPages && result.total > 0) notFound();
+    discoveryActivities = result.activities;
+    birthdayPagination = { page: result.page, totalPages: result.totalPages, total: result.total };
     if (budgetEnabled) {
       const max = computeMaxBudget(discoveryActivities);
       if (max) budgetConfig = { max, step: getBudgetStep(max) };
@@ -245,6 +251,7 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
       listingSearchParams={searchParams}
       routesData={routesData}
       discoveryActivities={discoveryActivities}
+      birthdayPagination={birthdayPagination}
       classChips={classChips}
       activeClassChipSlug={activeClassChipSlug}
       budgetConfig={budgetConfig}
