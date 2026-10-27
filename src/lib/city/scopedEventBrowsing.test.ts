@@ -3,6 +3,7 @@ import { buildScopedEventHref, isScopedEventBrowsing } from "./scopedEventBrowsi
 
 assert.equal(isScopedEventBrowsing("/grodno/events", "1"), true);
 assert.equal(isScopedEventBrowsing("/grodno/events/", "1"), true);
+assert.equal(isScopedEventBrowsing("/grodno/events/some-event", "1"), true);
 assert.equal(isScopedEventBrowsing("/grodno/places", "1"), false);
 assert.equal(isScopedEventBrowsing("/grodno/events", null), false);
 assert.equal(isScopedEventBrowsing("/me/plan", "1"), false);
