@@ -3,7 +3,8 @@
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { postProductTelemetryEvent } from "@/lib/analytics/client";
-import { isPublicPageViewPath, shouldEmitPageView } from "@/lib/analytics/pageViewObserver";
+import { isPublicPageViewPath, pageViewCitySlug, shouldEmitPageView } from "@/lib/analytics/pageViewObserver";
+import { useOptionalCity } from "@/contexts/CityContext";
 
 /**
  * Emits one PAGE_VIEW per initial public page load or client-side
@@ -19,6 +20,8 @@ import { isPublicPageViewPath, shouldEmitPageView } from "@/lib/analytics/pageVi
  */
 export function PageViewTracker() {
   const pathname = usePathname();
+  const city = useOptionalCity();
+  const citySlug = pageViewCitySlug(city);
   const lastPathnameRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -28,8 +31,11 @@ export function PageViewTracker() {
     lastPathnameRef.current = pathname;
     void postProductTelemetryEvent({
       eventType: "PAGE_VIEW",
+      citySlug,
       meta: { path: pathname },
     });
+    // citySlug is read at emit time; a city change without navigation is not a new page view.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   return null;

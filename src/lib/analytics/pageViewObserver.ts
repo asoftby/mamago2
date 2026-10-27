@@ -69,3 +69,17 @@ export function isPublicPageViewPath(pathname: string): boolean {
   const firstSegment = pathname.split("/", 2)[1] ?? "";
   return !(NON_PUBLIC_TOP_SEGMENTS as readonly string[]).includes(firstSegment);
 }
+
+/**
+ * City written onto PAGE_VIEW (ТЗ «Аналитика админки», B3): the city of a
+ * `/{city}/…` route, otherwise the visitor's own explicit city choice. The
+ * silent default city (no route city, no choice) is NOT attributed — a
+ * homepage view isn't "a Minsk view" just because Minsk is the default.
+ * `trackUserEvent` resolves the slug to `cityId`.
+ */
+export function pageViewCitySlug(
+  city: { citySlug: string; source: "route" | "preference" | "default" | "none" } | null,
+): string | null {
+  if (!city?.citySlug) return null;
+  return city.source === "route" || city.source === "preference" ? city.citySlug : null;
+}

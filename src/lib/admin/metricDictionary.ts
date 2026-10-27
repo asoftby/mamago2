@@ -34,6 +34,19 @@ const DETAIL_OPEN_CLIENT_CHANGE = {
 };
 
 const EXCLUDES_STAFF = "Исключены роли ADMIN и MODERATOR";
+const INTERNAL_TRAFFIC_EXCLUDED_CHANGE = {
+  date: "2026-10-27",
+  note: "Исключён внутренний трафик: роли ADMIN/MODERATOR (раньше коллектор не исключал роли)",
+};
+
+const ANALYTICS_EXCLUSIONS =
+  "Исключены роли ADMIN и MODERATOR и tainted-сессии (сессия, связанная в окне с такой ролью, исключается целиком, включая события до логина) — canonicalAudience.ts";
+const ANALYTICS_WINDOW = "Выбранный период в минских сутках: с 00:00 по Минску первого дня до текущего момента";
+const ANALYTICS_B_CHANGE = {
+  date: "2026-10-27",
+  note: "Единые определения (metricDefinitions.ts): сутки по Минску вместо UTC, исключён внутренний трафик",
+};
+
 const TELEMETRY_WINDOW_NOTE = "Знаменатель — все клиентские запросы к /api/analytics/events за окно (принятые + отсеянные)";
 
 export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
@@ -139,10 +152,10 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     formula: "DISTINCT userId с DETAIL_OPEN за окно",
     source: "UserEvent (DETAIL_OPEN)",
     window: "Скользящие 30 дней",
-    exclusions: "Нет (совпадает с существующей UserEvent-инструментацией)",
-    version: "1.1.0",
+    exclusions: EXCLUDES_STAFF,
+    version: "1.2.0",
     verifiable: true,
-    changes: [DETAIL_OPEN_CLIENT_CHANGE],
+    changes: [DETAIL_OPEN_CLIENT_CHANGE, INTERNAL_TRAFFIC_EXCLUDED_CHANGE],
   },
   "funnel.save_rate": {
     metricKey: "funnel.save_rate",
@@ -152,9 +165,9 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     source: "UserEvent (DETAIL_OPEN, SAVE)",
     window: "Скользящие 30 дней",
     exclusions: "Упорядочено по времени относительно первого открытия — не независимая ставка по всем пользователям",
-    version: "1.1.0",
+    version: "1.2.0",
     verifiable: true,
-    changes: [DETAIL_OPEN_CLIENT_CHANGE],
+    changes: [DETAIL_OPEN_CLIENT_CHANGE, INTERNAL_TRAFFIC_EXCLUDED_CHANGE],
   },
   "funnel.plan_rate": {
     metricKey: "funnel.plan_rate",
@@ -164,9 +177,9 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     source: "UserEvent (DETAIL_OPEN, PLAN_ADD)",
     window: "Скользящие 30 дней",
     exclusions: "Не требует предварительного SAVE — считается независимо от save rate",
-    version: "1.1.0",
+    version: "1.2.0",
     verifiable: true,
-    changes: [DETAIL_OPEN_CLIENT_CHANGE],
+    changes: [DETAIL_OPEN_CLIENT_CHANGE, INTERNAL_TRAFFIC_EXCLUDED_CHANGE],
   },
   "funnel.cta_rate": {
     metricKey: "funnel.cta_rate",
@@ -176,9 +189,9 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     source: "UserEvent (DETAIL_OPEN, CTA_CLICK)",
     window: "Скользящие 30 дней",
     exclusions: "—",
-    version: "1.1.0",
+    version: "1.2.0",
     verifiable: true,
-    changes: [DETAIL_OPEN_CLIENT_CHANGE],
+    changes: [DETAIL_OPEN_CLIENT_CHANGE, INTERNAL_TRAFFIC_EXCLUDED_CHANGE],
   },
   "supply.active_events": {
     metricKey: "supply.active_events",
@@ -339,6 +352,54 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     version: "1.0.0",
     verifiable: true,
     changes: [{ date: "2026-10-27", note: "Новая метрика (ТЗ A3)" }],
+  },
+  "analytics.visitors": {
+    metricKey: "analytics.visitors",
+    displayName: "Визиторы",
+    businessMeaning: "Уникальные посетители за период — то же определение, что DAU/WAU/MAU на /admin",
+    formula: "computeCanonicalAudience().visitors: DISTINCT eligible userId + DISTINCT sessionId, ни разу не связанный в окне с userId",
+    source: "UserEvent (PAGE_VIEW) — canonicalAudience.ts",
+    window: ANALYTICS_WINDOW,
+    exclusions: ANALYTICS_EXCLUSIONS,
+    version: "2.0.0",
+    verifiable: false,
+    changes: [{ date: "2026-10-27", note: "Раньше: distinct userId и distinct sessionId по всем событиям раздельно («Active users»)" }],
+  },
+  "analytics.devices": {
+    metricKey: "analytics.devices",
+    displayName: "Устройства",
+    businessMeaning: "Сколько браузеров/устройств открывали сайт. Это не сессии (BACKLOG-211)",
+    formula: "computeCanonicalAudience().devices: DISTINCT sessionId среди учтённых PAGE_VIEW",
+    source: "UserEvent (PAGE_VIEW); sessionId = mg_analytics_sid (вечный id браузера)",
+    window: ANALYTICS_WINDOW,
+    exclusions: ANALYTICS_EXCLUSIONS,
+    version: "2.0.0",
+    verifiable: false,
+    changes: [{ date: "2026-10-27", note: "Переименовано из «Sessions»; раньше — distinct sessionId по всем типам событий" }],
+  },
+  "analytics.page_views": {
+    metricKey: "analytics.page_views",
+    displayName: "Просмотры страниц",
+    businessMeaning: "Сколько страниц открыли посетители",
+    formula: "computeCanonicalAudience().pageViews: PAGE_VIEW строки учтённых визиторов",
+    source: "UserEvent (PAGE_VIEW)",
+    window: ANALYTICS_WINDOW,
+    exclusions: ANALYTICS_EXCLUSIONS,
+    version: "2.0.0",
+    verifiable: false,
+    changes: [{ date: "2026-10-27", note: "Раньше PAGE_VIEW + CARD_VIEW («Views»); показы карточек вынесены отдельно" }],
+  },
+  "analytics.feed_impressions": {
+    metricKey: "analytics.feed_impressions",
+    displayName: "Показы в ленте",
+    businessMeaning: "Сколько раз карточки показывались в лентах и подборках",
+    formula: "COUNT(UserEvent WHERE eventType = CARD_VIEW)",
+    source: "UserEvent (CARD_VIEW)",
+    window: ANALYTICS_WINDOW,
+    exclusions: ANALYTICS_EXCLUSIONS,
+    version: "1.0.0",
+    verifiable: true,
+    changes: [ANALYTICS_B_CHANGE],
   },
 };
 
