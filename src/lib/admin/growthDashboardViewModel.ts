@@ -26,9 +26,9 @@ import {
   deriveProductPulse,
   deriveSupplyHealth,
 } from "./dashboardViewModels";
+import { MIN_RATE_SAMPLE } from "./rateSample";
 
-/** Rates computed on fewer users than this are shown as counts only. */
-export const MIN_RATE_SAMPLE = 30;
+export { MIN_RATE_SAMPLE };
 
 const ISO_WEEK_FORMAT = "RRRR-'W'II";
 const ISO_WEEK_REFERENCE = new Date(2000, 0, 3, 12, 0, 0);
@@ -185,8 +185,11 @@ export interface GrowthOverviewViewModel {
   dau: number | null;
   w1: number | null;
   w1DeltaPp: number | null;
+  /** Size of the W1 registration cohort (shown even when the percentage is hidden). */
+  w1CohortSize: number | null;
   w4: number | null;
   w4DeltaPp: number | null;
+  w4CohortSize: number | null;
   engagedUsers: number | null;
   saveRate: number | null;
   planRate: number | null;
@@ -223,8 +226,10 @@ export function deriveGrowthOverview(kpis: Record<string, unknown>): GrowthOverv
     dau: pulse.dau,
     w1: habit.w1,
     w1DeltaPp: habit.w1DeltaPp,
+    w1CohortSize: habit.w1CohortSize,
     w4: habit.w4,
     w4DeltaPp: habit.w4DeltaPp,
+    w4CohortSize: habit.w4CohortSize,
     engagedUsers: funnel.engagedUsers,
     saveRate: ratesReliable ? funnel.saveRate : null,
     planRate: ratesReliable ? funnel.planRate : null,
