@@ -1,4 +1,5 @@
 /**
+ * CI verification for PR #843 against current dev.
  * supplyHealth collector test — "active" = published + currently relevant
  * (not an all-time total), freshness = updatedAt >= now - 7d.
  *
@@ -22,6 +23,8 @@ const marker = randomUUID().slice(0, 8);
 const activityIds: string[] = [];
 const placeIds: string[] = [];
 const offerIds: string[] = [];
+const businessIds: string[] = [];
+const extraUserIds: string[] = [];
 let ownerUserId: string | null = null;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -39,11 +42,17 @@ async function main() {
     const owner = await prisma.user.create({ data: { email: `supply-test-${marker}@example.invalid` } });
     ownerUserId = owner.id;
 
-    async function makeActivity(opts: { nextOccurrenceAt: Date | null; status: "PUBLISHED" | "DRAFT"; updatedAt: Date }) {
+    async function makeActivity(opts: {
+      nextOccurrenceAt: Date | null;
+      status: "PUBLISHED" | "DRAFT";
+      updatedAt: Date;
+      scheduleMode?: "ONE_TIME" | "ALWAYS";
+      ownerUserId?: string;
+    }) {
       const activity = await prisma.activity.create({
         data: {
-          ownerUserId: owner.id,
-          scheduleMode: "ONE_TIME",
+          ownerUserId: opts.ownerUserId ?? owner.id,
+          scheduleMode: opts.scheduleMode ?? "ONE_TIME",
           shortDesc: "test",
           title: `Supply test event ${marker}-${randomUUID()}`,
           type: "EVENT",
@@ -55,7 +64,7 @@ async function main() {
       activityIds.push(activity.id);
     }
 
-    async function makePlace(opts: { status: "PUBLISHED" | "DRAFT"; updatedAt: Date }) {
+    async function makePlace(opts: { status: "PUBLISHED" | "DRAFT"; updatedAt: Date; archivedAt?: Date; ownerBusinessId?: string }) {
       const place = await prisma.place.create({
         data: {
           title: `Supply test place ${marker}-${randomUUID()}`,
@@ -63,37 +72,68 @@ async function main() {
           createdByUserId: owner.id,
           status: opts.status,
           updatedAt: opts.updatedAt,
+          archivedAt: opts.archivedAt ?? null,
+          ownerBusinessId: opts.ownerBusinessId ?? null,
         },
       });
       placeIds.push(place.id);
+      return place.id;
     }
 
-    async function makeOffer(opts: { status: "PUBLISHED" | "DRAFT"; updatedAt: Date }) {
+    async function makeOffer(opts: { status: "PUBLISHED" | "DRAFT"; updatedAt: Date; placeId?: string; archivedAt?: Date }) {
       const offer = await prisma.offer.create({
         data: {
           kind: "SERVICE",
           title: `Supply test offer ${marker}-${randomUUID()}`,
           status: opts.status,
           updatedAt: opts.updatedAt,
+          placeId: opts.placeId ?? null,
+          archivedAt: opts.archivedAt ?? null,
         },
       });
       offerIds.push(offer.id);
     }
 
-    // Events: fresh+active, stale+active, past (not active), null-occurrence (active, treated as always-relevant), draft (not active).
+    // Events: fresh+active, stale+active, past (not active), null-occurrence ALWAYS schedule (active,
+    // always-relevant), null-occurrence ONE_TIME (no date -> not public), draft (not active).
     await makeActivity({ nextOccurrenceAt: new Date(now.getTime() + 5 * DAY_MS), status: "PUBLISHED", updatedAt: new Date(now.getTime() - 1 * DAY_MS) });
     await makeActivity({ nextOccurrenceAt: new Date(now.getTime() + 5 * DAY_MS), status: "PUBLISHED", updatedAt: new Date(now.getTime() - 10 * DAY_MS) });
     await makeActivity({ nextOccurrenceAt: new Date(now.getTime() - 5 * DAY_MS), status: "PUBLISHED", updatedAt: new Date(now.getTime() - 1 * DAY_MS) });
-    await makeActivity({ nextOccurrenceAt: null, status: "PUBLISHED", updatedAt: new Date(now.getTime() - 1 * DAY_MS) });
+    await makeActivity({ nextOccurrenceAt: null, status: "PUBLISHED", scheduleMode: "ALWAYS", updatedAt: new Date(now.getTime() - 1 * DAY_MS) });
+    await makeActivity({ nextOccurrenceAt: null, status: "PUBLISHED", scheduleMode: "ONE_TIME", updatedAt: new Date(now.getTime() - 1 * DAY_MS) });
+
+    // C6: owner business switched off -> the public site hides the event, so it is not "active".
+    const disabledOwner = await prisma.user.create({ data: { email: `supply-test-disabled-${marker}@example.invalid` } });
+    extraUserIds.push(disabledOwner.id);
+    const disabledBusiness = await prisma.business.create({
+      data: { name: `Disabled ${marker}`, ownerUserId: disabledOwner.id, operationalStatus: "DISABLED" },
+    });
+    businessIds.push(disabledBusiness.id);
+    await makeActivity({
+      nextOccurrenceAt: new Date(now.getTime() + 5 * DAY_MS),
+      status: "PUBLISHED",
+      updatedAt: new Date(now.getTime() - 1 * DAY_MS),
+      ownerUserId: disabledOwner.id,
+    });
     await makeActivity({ nextOccurrenceAt: new Date(now.getTime() + 5 * DAY_MS), status: "DRAFT", updatedAt: new Date(now.getTime() - 1 * DAY_MS) });
 
-    // Places: fresh+active, stale+active, draft (not active).
+    // Places: fresh+active, stale+active, draft (not active), archived (hidden), owned by a disabled business (hidden).
     await makePlace({ status: "PUBLISHED", updatedAt: new Date(now.getTime() - 1 * DAY_MS) });
     await makePlace({ status: "PUBLISHED", updatedAt: new Date(now.getTime() - 10 * DAY_MS) });
     await makePlace({ status: "DRAFT", updatedAt: new Date(now.getTime() - 1 * DAY_MS) });
+    await makePlace({ status: "PUBLISHED", archivedAt: new Date(now.getTime() - 2 * DAY_MS), updatedAt: new Date(now.getTime() - 1 * DAY_MS) });
+    const hiddenPlaceId = await makePlace({
+      status: "PUBLISHED",
+      ownerBusinessId: disabledBusiness.id,
+      updatedAt: new Date(now.getTime() - 1 * DAY_MS),
+    });
 
-    // Offers: fresh+active only.
-    await makeOffer({ status: "PUBLISHED", updatedAt: new Date(now.getTime() - 1 * DAY_MS) });
+    // Offers: fresh+active; the offer of a hidden (disabled-business) place and an archived offer are not public.
+    // (an offer without a place is excluded by the public rule too, so the active offer needs a public place)
+    const publicPlaceId = await makePlace({ status: "PUBLISHED", updatedAt: new Date(now.getTime() - 1 * DAY_MS) });
+    await makeOffer({ status: "PUBLISHED", placeId: publicPlaceId, updatedAt: new Date(now.getTime() - 1 * DAY_MS) });
+    await makeOffer({ status: "PUBLISHED", placeId: hiddenPlaceId, updatedAt: new Date(now.getTime() - 1 * DAY_MS) });
+    await makeOffer({ status: "PUBLISHED", placeId: publicPlaceId, archivedAt: new Date(now.getTime() - 2 * DAY_MS), updatedAt: new Date(now.getTime() - 1 * DAY_MS) });
 
     const after = await collectSupplyHealth({ prisma, now });
 
@@ -101,9 +141,9 @@ async function main() {
     const deltaPlaces = valueOf(after, "supply.active_places") - valueOf(before, "supply.active_places");
     const deltaOffers = valueOf(after, "supply.active_offers") - valueOf(before, "supply.active_offers");
 
-    assert.equal(deltaEvents, 3, "fresh + stale + null-occurrence events are active; past + draft are not");
-    assert.equal(deltaPlaces, 2, "fresh + stale places are active; draft is not");
-    assert.equal(deltaOffers, 1, "only the published offer is active");
+    assert.equal(deltaEvents, 3, "fresh + stale + ALWAYS-schedule events are active; past, undated one-time, draft and disabled-business events are not");
+    assert.equal(deltaPlaces, 3, "fresh + stale + the offers' public place are active; draft, archived and disabled-business places are not");
+    assert.equal(deltaOffers, 1, "only the offer of a public place is active; hidden-place and archived offers are not");
 
     // Freshness is a ratio over the WHOLE active inventory (including
     // pre-existing real rows), so we can't delta it directly — instead
@@ -120,7 +160,9 @@ async function main() {
     await prisma.offer.deleteMany({ where: { id: { in: offerIds } } });
     await prisma.activity.deleteMany({ where: { id: { in: activityIds } } });
     await prisma.place.deleteMany({ where: { id: { in: placeIds } } });
+    await prisma.business.deleteMany({ where: { id: { in: businessIds } } });
     if (ownerUserId) await prisma.user.deleteMany({ where: { id: ownerUserId } });
+    await prisma.user.deleteMany({ where: { id: { in: extraUserIds } } });
     await prisma.$disconnect();
   }
 }

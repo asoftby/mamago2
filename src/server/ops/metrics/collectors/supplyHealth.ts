@@ -2,13 +2,21 @@
  * supply.active_events / supply.active_places / supply.active_offers /
  * supply.content_freshness_pct — every 30 min.
  *
- * "Active" = currently relevant, published inventory — never an all-time
- * total (see dashboard plan §14: no vanity totals on the first screen).
+ * "Active" = what the public site actually shows right now — never an
+ * all-time total (see dashboard plan §14: no vanity totals on the first
+ * screen) and never a status-only count (ТЗ «Аналитика админки», C6). The
+ * predicates are the SAME ones the public listings use
+ * (`@/server/public/publicContentVisibility`), so an event of a switched-off
+ * business, an archived place, or an offer of a hidden place no longer
+ * inflates the numbers:
  *
- *   active_events  -> Activity WHERE type='EVENT' AND status='PUBLISHED'
- *                     AND (nextOccurrenceAt IS NULL OR nextOccurrenceAt >= now)
- *   active_places  -> Place WHERE status='PUBLISHED'
- *   active_offers  -> Offer WHERE status='PUBLISHED'
+ *   active_events  -> Activity WHERE type='EVENT' AND getPublicListingActivityWhere(now)
+ *                     (public status + active owner business + not expired:
+ *                     getActivityNotExpiredForPublicWhere)
+ *   active_places  -> getPublicPublishedPlaceWhere(now)
+ *                     (PUBLISHED + not archived + active owner business)
+ *   active_offers  -> getPublicPublishedOfferWhere(now)
+ *                     (PUBLISHED + not archived + publicly visible place)
  *
  * content_freshness_pct = (active inventory with updatedAt >= now - 7d) /
  * (all active inventory), across all three types combined. PROVISIONAL by
@@ -17,19 +25,20 @@
  * is still accurate — a real "freshness" signal needs a content-specific
  * review/staleness field, tracked as a follow-up.
  */
+import {
+  getPublicListingActivityWhere,
+  getPublicPublishedOfferWhere,
+  getPublicPublishedPlaceWhere,
+} from "@/server/public/publicContentVisibility";
 import type { MetricCollector, MetricCollectorContext, MetricSampleDraft } from "../types";
 
 export async function collectSupplyHealth(ctx: MetricCollectorContext): Promise<MetricSampleDraft[]> {
   const { prisma, now } = ctx;
   const freshCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  const activeEventWhere = {
-    type: "EVENT" as const,
-    status: "PUBLISHED" as const,
-    OR: [{ nextOccurrenceAt: null }, { nextOccurrenceAt: { gte: now } }],
-  };
-  const activePlaceWhere = { status: "PUBLISHED" as const };
-  const activeOfferWhere = { status: "PUBLISHED" as const };
+  const activeEventWhere = { type: "EVENT" as const, AND: [getPublicListingActivityWhere(now)] };
+  const activePlaceWhere = getPublicPublishedPlaceWhere(now);
+  const activeOfferWhere = getPublicPublishedOfferWhere(now);
 
   const [activeEvents, activePlaces, activeOffers, freshEvents, freshPlaces, freshOffers] = await Promise.all([
     prisma.activity.count({ where: activeEventWhere }),
