@@ -956,7 +956,7 @@ type OfferOpeningHoursRow = {
 
 /** Расписание формы из строки оффера. Прежние режимы записи остаются как есть (`legacyBookingMode`). */
 function scheduleFromOffer(offer: {
-  classGroups?: Array<{ id: string; tariffs: Array<{ id: string; title: string; price: string; unit: string; periodDays: number | null; active: boolean }> }>;
+  classGroups?: Array<{ id: string; title: string; tariffs: Array<{ id: string; title: string; price: string; unit: string; periodDays: number | null; active: boolean }> }>;
   productType?: OfferProductType | null;
   bookingEnabled?: boolean | null;
   bookingMode?: string | null;
@@ -1036,6 +1036,7 @@ function classScheduleFromOffer(offer: {
     Object.assign(classSchedule, groupsFromRules(booking.rules));
     classSchedule.groups = classSchedule.groups.map((group) => ({
       ...group,
+      title: offer.classGroups?.find((item) => item.id === group.id)?.title,
       tariffs: offer.classGroups?.find((item) => item.id === group.id)?.tariffs
         .filter((item) => item.active)
         .map(({ id, title, price, unit, periodDays }) => ({ id, title, price, unit, periodDays })) ?? [],
