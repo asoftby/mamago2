@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
 import { getSlots } from "@/server/offers/getSlots";
+import { dateKeyInZone, isoWeekday, localMinuteKey } from "@/server/offers/slotTime";
 
 const DAY_MS = 86_400_000;
 const MAX_RANGE_DAYS = 31;
@@ -36,12 +37,26 @@ export async function GET(
       bookingEnabled: true,
       bookingMode: { in: ["USE_PUBLICATION_DATES", "USE_PUBLICATION_SLOTS"] },
     },
-    select: { id: true },
+    select: { id: true, offerBooking: { select: { timezone: true } }, classGroups: { where: { active: true }, orderBy: { position: "asc" }, include: { tariffs: { where: { active: true }, orderBy: { position: "asc" } }, rules: true } } },
   });
   if (!offer) return NextResponse.json({ error: "Занятие недоступно для записи" }, { status: 404 });
 
   const slots = await getSlots({ offerId: offer.id, from, to, requestedSeats: seats });
+  const timezone = offer.offerBooking?.timezone ?? "Europe/Minsk";
+  const groups = offer.classGroups.map((group) => ({
+    id: group.id, title: group.title,
+    tariffs: group.tariffs.map((tariff) => ({ id: tariff.id, label: tariff.title, price: tariff.price, unit: tariff.unit, periodDays: tariff.periodDays })),
+    slots: slots.filter((slot) => {
+      const date = dateKeyInZone(slot.startsAt, timezone);
+      const local = localMinuteKey(slot.startsAt, timezone);
+      const minute = Number(local.slice(11, 13)) * 60 + Number(local.slice(14, 16));
+      return group.rules.some((rule) => rule.weekday === isoWeekday(date) && rule.startMinutes === minute &&
+        (!rule.validFrom || date >= rule.validFrom.toISOString().slice(0, 10)) &&
+        (!rule.validTo || date <= rule.validTo.toISOString().slice(0, 10)));
+    }).map((slot) => slot.startsAt.toISOString()),
+  }));
   return NextResponse.json({
+    groups,
     slots: slots.map((slot) => ({
       startsAt: slot.startsAt.toISOString(),
       endsAt: slot.endsAt.toISOString(),
