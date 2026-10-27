@@ -37,13 +37,13 @@ export function activityInExactCitiesWhere(cityIds: string[]): Prisma.ActivityWh
       { venue: { cityId: { in: cityIds } } },
       {
         AND: [
-          { OR: [{ venueId: null }, { venue: { cityId: null } }] },
+          { OR: [{ venue: null }, { venue: { cityId: null } }] },
           { place: { cityId: { in: cityIds } } },
         ],
       },
       {
         AND: [
-          { OR: [{ venueId: null }, { venue: { cityId: null } }] },
+          { OR: [{ venue: null }, { venue: { cityId: null } }] },
           { OR: [{ placeId: null }, { place: { cityId: null } }] },
           { cityId: { in: cityIds } },
         ],
