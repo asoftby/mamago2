@@ -139,6 +139,20 @@ export const classScheduleInputSchema = z
     closedDates: z.array(z.string().regex(DATE_RE)).max(366).default([]),
   })
   .superRefine((value, ctx) => {
+    const ids = new Set<string>();
+    for (const [i, group] of value.groups.entries()) {
+      if (ids.has(group.id)) {
+        ctx.addIssue({ code: "custom", path: ["groups", i, "id"], message: "ID группы должен быть уникальным" });
+      }
+      ids.add(group.id);
+      const tariffIds = new Set<string>();
+      for (const [j, tariff] of group.tariffs.entries()) {
+        if (tariffIds.has(tariff.id)) {
+          ctx.addIssue({ code: "custom", path: ["groups", i, "tariffs", j, "id"], message: "ID тарифа должен быть уникальным" });
+        }
+        tariffIds.add(tariff.id);
+      }
+    }
     for (const [i, group] of value.groups.entries()) {
       const period = group.period === undefined ? value.period : group.period;
       if (period?.from && period.to && period.to < period.from) {
