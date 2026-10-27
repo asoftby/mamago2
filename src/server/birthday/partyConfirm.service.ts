@@ -10,6 +10,7 @@ import {
   allocatePartyUnit, isAllocationOverlapError, lockAvailablePartyUnit, type PartyUnitWindow,
 } from "./partyUnitAllocation";
 import { requestPartyAddonsAfterAnchor } from "./partyAddonFanout";
+import { assertPartyConfirmationEnabled } from "./partyConfirmationFlag";
 
 export interface ConfirmPartyRequestInput {
   requestId: string;
@@ -28,6 +29,8 @@ export interface ConfirmPartyRequestInput {
  */
 export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
   const { requestId, businessId, actorUserId, expectedQuoteVersion, idempotencyKey } = input;
+  // Covers the site and the Telegram confirmation, which both call this service.
+  assertPartyConfirmationEnabled();
   const dedupeKey = `party:${requestId}:confirmed:${idempotencyKey}`;
   try {
     return await prisma.$transaction(async (tx) => {

@@ -58,6 +58,8 @@ UI поверх серверной части из `bookings-inbox-server-pr.md`
 
 - PR #660 is required before this client can call /units and /confirm.
 - Business UI notifications remain gated by BUSINESS_BOOKINGS_INBOX_UI=true.
-- Parent acceptance and business confirmation additionally require PARTY_CONFIRMATION_ENABLED=true.
+- Parent acceptance, business confirmation (site and Telegram) and the fixed-price auto-confirmation
+  additionally require PARTY_CONFIRMATION_ENABLED=true, enforced server-side in
+  `src/server/birthday/partyConfirmationFlag.ts` (503 when off; a fixed-price reply then stays QUOTED).
 - Both flags default to false and must be enabled separately only after DEV smoke.
 - Do not deploy the client with active confirmation buttons before its server endpoints.
