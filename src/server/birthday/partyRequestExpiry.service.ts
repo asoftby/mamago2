@@ -108,9 +108,11 @@ async function expirePartyQuotes(now: Date, limit: number) {
             id: request.id, kind: "PARTY", partyStage: "QUOTED", status: "NEW",
             lastActivityAt: request.lastActivityAt,
           },
+          // NOT_ACCEPTED pairs with CANCELLED (assertPartyStatusPair, business inbox);
+          // partyCloseReason tells the expiry apart from a business closing the offer.
           data: {
             partyStage: "NOT_ACCEPTED", partyCloseReason: "EXPIRED",
-            status: "EXPIRED", lastActivityAt: now,
+            status: "CANCELLED", lastActivityAt: now,
           },
         });
         if (changed.count !== 1) throw new QuoteRaceLost();

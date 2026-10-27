@@ -14,6 +14,7 @@ import { PrismaClient } from "@prisma/client";
 import { PartyApiError } from "./partyDraft.validation";
 import { expirePartyRequests } from "./partyRequestExpiry.service";
 import { resolveExpiredPartyQuote } from "./partyQuoteResolution.service";
+import { bookingBucket } from "@/server/services/booking/bookingBucket";
 
 const url = new URL(process.env.DATABASE_URL ?? "http://invalid");
 if (!["localhost", "127.0.0.1"].includes(url.hostname) || url.port !== "5434" ||
@@ -101,8 +102,12 @@ test("an offer not accepted in time is closed by the server and both sides are n
   const request = await db.bookingRequest.findUniqueOrThrow({ where: { id: stale.request.id } });
   assert.deepEqual(
     { stage: request.partyStage, status: request.status, reason: request.partyCloseReason },
-    { stage: "NOT_ACCEPTED", status: "EXPIRED", reason: "EXPIRED" },
+    { stage: "NOT_ACCEPTED", status: "CANCELLED", reason: "EXPIRED" },
   );
+  // The business inbox classifies every request; the closed one must land in the archive
+  // (an unsupported stage/status pair would make the whole inbox fail).
+  assert.equal(bookingBucket({ kind: "PARTY", partyStage: request.partyStage, status: request.status,
+    responseDueAt: request.responseDueAt, createdAt: request.createdAt }).bucket, "ARCHIVE");
   assert.equal((await db.partyQuote.findUniqueOrThrow({ where: { id: stale.quote.id } })).status, "EXPIRED");
   assert.equal((await db.partyOrderItem.findUniqueOrThrow({ where: { id: stale.item.id } })).status, "EXPIRED");
   assert.equal((await db.partyOrder.findUniqueOrThrow({ where: { id: stale.order.id } })).status,
