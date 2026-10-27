@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/prisma";
 import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
+import { attachIdeaImageDimensions } from "@/server/media/attachIdeaImageDimensions";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -66,5 +67,5 @@ export async function GET() {
     ];
   });
 
-  return NextResponse.json({ items });
+  return NextResponse.json({ items: await attachIdeaImageDimensions(items) });
 }

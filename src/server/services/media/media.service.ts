@@ -14,6 +14,7 @@ import {
   resolveLegacyPublicUploadPath,
   resolveStoredMediaPath,
 } from "@/server/media/media-storage";
+import { readImageDimensions } from "@/server/media/readImageDimensions";
 
 export interface CreateMediaAssetInput {
   kind: MediaAssetKind;
@@ -50,9 +51,34 @@ export interface UpdateMediaMetadataInput {
 }
 
 /**
+ * Single place where every pipeline (uploads, wizard, business cabinet,
+ * from-url, stored-file registration) persists a MediaAsset. When a caller
+ * did not pass dimensions for an image, read them from the stored file header
+ * so poster layout never depends on which pipeline produced the file.
+ */
+async function resolveMissingImageDimensions(
+  input: CreateMediaAssetInput,
+): Promise<{ width?: number; height?: number }> {
+  if (input.width && input.height) return { width: input.width, height: input.height };
+  if (input.kind !== MediaAssetKind.IMAGE) return { width: input.width, height: input.height };
+
+  const absolutePath =
+    resolveStoredMediaPath(input.storageKey) ??
+    resolveStoredMediaPath(input.publicUrl) ??
+    resolveLegacyPublicUploadPath(input.storageKey);
+  if (!absolutePath || !existsSync(absolutePath)) {
+    return { width: input.width, height: input.height };
+  }
+
+  const dimensions = await readImageDimensions(absolutePath);
+  return dimensions ?? { width: input.width, height: input.height };
+}
+
+/**
  * Create new media asset
  */
 export async function createMediaAsset(input: CreateMediaAssetInput) {
+  const { width, height } = await resolveMissingImageDimensions(input);
   return prisma.mediaAsset.create({
     data: {
       kind: input.kind,
@@ -62,8 +88,8 @@ export async function createMediaAsset(input: CreateMediaAssetInput) {
       mimeType: input.mimeType,
       extension: input.extension,
       sizeBytes: input.sizeBytes,
-      width: input.width,
-      height: input.height,
+      width,
+      height,
       durationSec: input.durationSec,
       storageKey: input.storageKey,
       publicUrl: input.publicUrl,

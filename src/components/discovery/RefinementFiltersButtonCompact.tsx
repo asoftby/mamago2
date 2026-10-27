@@ -19,8 +19,7 @@ import { useSecondaryFiltersFromUrl } from "@/features/filters/discovery/useSeco
 import { useBudgetFilter } from "@/features/filters/discovery/useBudgetFilter";
 import { useOptionalDiscoveryBudgetConfig } from "@/features/filters/discovery/discoveryBudgetContext";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
-import { useOptionalCity } from "@/contexts/CityContext";
-import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
+import { useEventListingCitySlug } from "@/lib/city/useEventListingCitySlug";
 import { EventAdvancedFilters, getEventRefinementCount } from "@/components/discovery/EventAdvancedFilters";
 
 interface RefinementFiltersButtonCompactProps {
@@ -40,7 +39,7 @@ export function RefinementFiltersButtonCompact({
   const budgetConfig = budgetCtx?.budgetConfig ?? null;
   const { budget } = useBudgetFilter();
   const { applied } = useDiscoveryFilters();
-  const citySlug = useOptionalCity()?.citySlug ?? DEFAULT_CITY_SLUG;
+  const citySlug = useEventListingCitySlug();
   const budgetActive =
     Boolean(budgetConfig) &&
     budget !== null &&

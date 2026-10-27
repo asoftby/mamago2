@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { isScopedEventBrowsing } from "@/lib/city/scopedEventBrowsing";
 import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
-import { EventCard, activityMockToEventCard } from "@/components/events";
+import { EventCard, EVENT_LISTING_IMAGE_SIZES, activityMockToEventCard } from "@/components/events";
 import { OfferCard } from "@/components/offers/OfferCard";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import {
@@ -175,6 +175,8 @@ export function DiscoveryActivitiesGrid({
       ) : (
         <EventCard
           {...activityMockToEventCard(activity, citySlug)}
+          framing="poster"
+          imageSizes={EVENT_LISTING_IMAGE_SIZES}
           metaLabel={(() => {
             const meta = activityMockToEventCard(activity, citySlug).metaLabel;
             const location = activity.citySlug && activity.citySlug !== citySlug
@@ -186,7 +188,6 @@ export function DiscoveryActivitiesGrid({
             const href = activityMockToEventCard(activity, citySlug).href;
             return scopedEvents ? `${href}${href.includes("?") ? "&" : "?"}explore=1` : href;
           })()}
-          coverRatio={ratio}
           className="h-full"
           imagePriority={feedBucket === "primary" && position <= 4}
         />

@@ -12,7 +12,7 @@ import { dateRangeReducer, emptyDateRangeDraft } from "@/features/filters/discov
 import { computePresetRange, todayKeyIn } from "@/features/filters/discovery/quickFilterPresets";
 import { serializeAppliedToSearchParams, type DiscoveryFilters, type WhenPreset } from "@/features/filters/discovery/filters.store";
 import { addDateKeyDays } from "@/lib/stories/ranges";
-import { useOptionalCity } from "@/contexts/CityContext";
+import { useEventListingCitySlug, useEventListingExplore } from "@/lib/city/useEventListingCitySlug";
 import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
 import { MobileOverlayPrimaryAction } from "@/components/mobile/MobileOverlayPrimaryAction";
 import { pluralize } from "@/lib/formatters/pluralize";
@@ -28,7 +28,8 @@ export function EventDateRangePicker({ applied, onApply }: { applied: DiscoveryF
   const [density, setDensity] = React.useState<Record<string, number>>({});
   const [resultCount, setResultCount] = React.useState<number | null>(null);
   const today = todayKeyIn(new Date());
-  const city = useOptionalCity()?.citySlug ?? "minsk";
+  const city = useEventListingCitySlug();
+  const explore = useEventListingExplore();
 
   React.useEffect(() => {
     if (open) dispatch({ type: "hydrate", from: applied.dateFrom, to: applied.dateTo });
@@ -38,10 +39,10 @@ export function EventDateRangePicker({ applied, onApply }: { applied: DiscoveryF
     const controller = new AbortController();
     const nonDate = { ...applied, dateFrom: null, dateTo: null, whenPreset: null };
     const params = serializeAppliedToSearchParams(new URLSearchParams(), nonDate);
-    params.set("city", city); params.set("windowFrom", today); params.set("windowTo", addDateKeyDays(today, 123));
+    params.set("city", city); if (explore) params.set("explore", "1"); params.set("windowFrom", today); params.set("windowTo", addDateKeyDays(today, 123));
     fetch(`/api/calendar/density?${params}`, { signal: controller.signal }).then((r) => r.ok ? r.json() : {}).then(setDensity).catch(() => {});
     return () => controller.abort();
-  }, [open, applied, city, today]);
+  }, [open, applied, city, explore, today]);
   React.useEffect(() => {
     if (!open || !draft.from) { setResultCount(null); return; }
     const controller = new AbortController();
@@ -50,17 +51,14 @@ export function EventDateRangePicker({ applied, onApply }: { applied: DiscoveryF
     params.set("city", city);
     const timer = setTimeout(() => fetch(`/api/discovery/events/count?${params}`, { signal: controller.signal }).then((r) => r.ok ? r.json() : null).then((data) => setResultCount(data?.count ?? null)).catch(() => {}), 150);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [open, draft.from, draft.to, applied, city]);
+  }, [open, draft.from, draft.to, applied, city, explore]);
 
   const select = (date: Date | null) => {
     if (!date) return;
-    const previousSelecting = draft.selectingEnd;
     const key = toKey(date);
+    // Selecting the end of a range only updates the draft. Both a single date
+    // and a range are committed exclusively by the Apply button.
     dispatch({ type: "select", date: key, today });
-    if (!mobile && previousSelecting && draft.from && key >= draft.from) {
-      onApply({ whenPreset: null, dateFrom: draft.from, dateTo: key });
-      setOpen(false);
-    }
   };
   const applyPreset = (preset: Exclude<WhenPreset, null>) => {
     const range = computePresetRange(preset, today);

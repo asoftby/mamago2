@@ -67,9 +67,9 @@ test("clearing age or custom date preserves other selected facets in shareable U
   const dateParams = serializeAppliedToSearchParams(new URLSearchParams(), withoutDate);
   assert.equal(dateParams.get("from"), null);
   assert.equal(dateParams.get("to"), null);
-  assert.equal(dateParams.get("profile"), "child-123");
+  assert.equal(dateParams.get("profile"), null);
   assert.equal(dateParams.get("occasion"), "halloween");
-  assert.deepEqual(parseAppliedFromUrl(dateParams as never), withoutDate);
+  assert.deepEqual(parseAppliedFromUrl(dateParams as never), { ...withoutDate, profile: null });
 });
 
 test("mobile who/age uses the same bottom-sheet model as date interval", () => {

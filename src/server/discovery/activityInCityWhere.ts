@@ -24,3 +24,30 @@ export function activityInAnyOfCitiesWhere(cityIds: string[]): Prisma.ActivityWh
     ],
   };
 }
+
+/**
+ * Strict geographic scope follows the card's displayed city precedence:
+ * venue > place > activity. A mismatched fallback city must never leak
+ * an event into a different explicitly selected territory.
+ */
+export function activityInExactCitiesWhere(cityIds: string[]): Prisma.ActivityWhereInput {
+  if (cityIds.length === 0) return { id: { in: [] } };
+  return {
+    OR: [
+      { venue: { cityId: { in: cityIds } } },
+      {
+        AND: [
+          { OR: [{ venue: null }, { venue: { cityId: null } }] },
+          { place: { cityId: { in: cityIds } } },
+        ],
+      },
+      {
+        AND: [
+          { OR: [{ venue: null }, { venue: { cityId: null } }] },
+          { OR: [{ placeId: null }, { place: { cityId: null } }] },
+          { cityId: { in: cityIds } },
+        ],
+      },
+    ],
+  };
+}

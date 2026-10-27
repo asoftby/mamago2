@@ -41,7 +41,7 @@ export type BreakingNewsFormState = {
    * Must be null when geoScope === "COUNTRY".
    */
   cityId: string | null;
-  /** Рубрика журнала (EventCategory publicationType=ARTICLE, корень). Обязательна для публикации. */
+  /** Рубрика журнала (EventCategory publicationType=ARTICLE, корень). Для новости необязательна. */
   categoryId?: string | null;
   /** «Актуально до» (datetime-local). Пусто → сервер ставит publishedAt + 7 дней. */
   expiresAtLocal?: string;

@@ -274,6 +274,16 @@ export function EventCardHorizontal({
               <Pencil className="h-4 w-4" />
             </Link>
 
+            {activity.status === ContentStatus.PUBLISHED && !activity.isPromoted ? (
+              <Link
+                href={`/business/events/${activity.id}/boost`}
+                className={cn(BUSINESS_PUBLICATION_ACTION_BUTTON, BUSINESS_PUBLICATION_ACTION_PROMOTE)}
+              >
+                <Zap className="h-4 w-4 shrink-0" />
+                Продвинуть
+              </Link>
+            ) : null}
+
             {BUSINESS_DASHBOARD_MVP.businessPaidPromotionUiEnabled && <Link
               href={buildPromotionLaunchHref({
                 publicationType: "EVENT",

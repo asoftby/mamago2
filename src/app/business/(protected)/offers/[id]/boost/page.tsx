@@ -4,6 +4,7 @@ import { getMyBusiness } from "@/server/business/getMyBusiness";
 import prisma from "@/lib/prisma";
 import { getConfiguredBoostOptions } from "@/server/services/billing/boostPurchase.service";
 import { BoostPurchaseClient } from "./BoostPurchaseClient";
+import { listBoostTargetRegions } from "@/server/geo/boostRegionTargeting";
 
 export default async function OfferBoostPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -18,6 +19,8 @@ export default async function OfferBoostPage({ params }: { params: Promise<{ id:
   });
   if (!offer) notFound();
 
+  const regions = await listBoostTargetRegions();
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="rounded-3xl border border-stone-200 bg-white p-6">
@@ -30,7 +33,7 @@ export default async function OfferBoostPage({ params }: { params: Promise<{ id:
           Boost доступен только для опубликованного активного предложения.
         </div>
       ) : (
-        <BoostPurchaseClient offerId={offer.id} options={getConfiguredBoostOptions()} />
+        <BoostPurchaseClient offerId={offer.id} options={getConfiguredBoostOptions()} regions={regions} />
       )}
     </div>
   );

@@ -54,11 +54,13 @@ export function ModerationQueueRowActions({ item, onResolved }: Props) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  const [revisionReason, setRevisionReason] = useState("");
   const [rejectReason, setRejectReason] = useState("");
 
   const endpoint = useMemo(() => getModerationEndpoint(item), [item]);
 
-  const handleModeration = async (action: "APPROVE" | "REJECT", reason?: string) => {
+  const handleModeration = async (action: "APPROVE" | "REJECT" | "NEEDS_REVISION", reason?: string) => {
     setIsSubmitting(true);
     try {
       const response = await fetch(endpoint, {
@@ -72,7 +74,7 @@ export function ModerationQueueRowActions({ item, onResolved }: Props) {
           comment:
             action === "REJECT"
               ? reason?.trim() || "Отклонено модератором."
-              : undefined,
+              : action === "NEEDS_REVISION" ? reason?.trim() : undefined,
         }),
       });
 
@@ -83,7 +85,11 @@ export function ModerationQueueRowActions({ item, onResolved }: Props) {
 
       onResolved(`${item.kind}:${item.id}`);
       router.refresh();
-      toast.success(action === "APPROVE" ? "Публикация одобрена" : "Публикация отклонена");
+      toast.success(action === "APPROVE" ? "Публикация одобрена" : action === "NEEDS_REVISION" ? "Публикация возвращена на доработку" : "Публикация отклонена");
+      if (action === "NEEDS_REVISION") {
+        setRevisionOpen(false);
+        setRevisionReason("");
+      }
       if (action === "REJECT") {
         setRejectOpen(false);
         setRejectReason("");
@@ -114,6 +120,11 @@ export function ModerationQueueRowActions({ item, onResolved }: Props) {
           {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Опубликовать
         </Button>
+        {item.kind === "OFFER" ? (
+          <Button type="button" size="sm" variant="outline" disabled={isSubmitting} onClick={() => setRevisionOpen(true)}>
+            Запросить правки
+          </Button>
+        ) : null}
         <Button
           type="button"
           size="sm"
@@ -125,6 +136,35 @@ export function ModerationQueueRowActions({ item, onResolved }: Props) {
           Отклонить
         </Button>
       </div>
+
+      <AlertDialog open={revisionOpen} onOpenChange={setRevisionOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Вернуть предложение на доработку?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Бизнес получит замечание и сможет исправить предложение перед повторной модерацией.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <label htmlFor={`revision-reason-${item.id}`} className="text-sm font-medium text-stone-800">
+              Что необходимо исправить
+            </label>
+            <Textarea
+              id={`revision-reason-${item.id}`}
+              value={revisionReason}
+              onChange={(event) => setRevisionReason(event.target.value)}
+              placeholder="Например: укажите цену или выберите «Цена по запросу»."
+              className="min-h-[88px] resize-none"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>Отмена</AlertDialogCancel>
+            <Button type="button" size="sm" disabled={isSubmitting || !revisionReason.trim()} onClick={() => void handleModeration("NEEDS_REVISION", revisionReason)}>
+              Запросить правки
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={rejectOpen} onOpenChange={setRejectOpen}>
         <AlertDialogContent>

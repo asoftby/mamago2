@@ -239,6 +239,15 @@ function resolveCreatePublicationType(input: ArticleSaveInput): ArticleEditorSna
   return input.subtitle === BREAKING_NEWS_SUBTITLE ? "BREAKING_NEWS" : "ARTICLE";
 }
 
+function assertRequiredJournalCategory(
+  categoryId: string | null,
+  publicationType: ArticleEditorSnapshot["publicationType"],
+): void {
+  if (publicationType !== "BREAKING_NEWS" && !categoryId) {
+    throw new Error("Для публикации статьи обязательно выберите раздел журнала");
+  }
+}
+
 async function assertArticleCategoryValid(categoryId: string | null): Promise<void> {
   if (!categoryId) return;
   const category = await prisma.eventCategory.findFirst({
@@ -519,10 +528,9 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
     resolvedGeo.cityId ?? null,
     resolvedGeo.regionId ?? null,
   );
-  if (isPublishLikeStatus(input.status) && !input.categoryId) throw new Error("Для публикации статьи обязательно выберите раздел журнала");
-  await assertArticleCategoryValid(input.categoryId);
-
   const publicationType = resolveCreatePublicationType(input);
+  if (isPublishLikeStatus(input.status)) assertRequiredJournalCategory(input.categoryId, publicationType);
+  await assertArticleCategoryValid(input.categoryId);
   const linkedItems = input.linkedItems ?? [];
   const expiresAt = resolveJournalExpiresAt({
     publicationType,
@@ -648,6 +656,7 @@ export async function saveArticleDraft(
       : input.cityContext;
 
   const publicationType = input.publicationType ?? previous.publicationType;
+  if (isPublishLikeStatus(input.status)) assertRequiredJournalCategory(input.categoryId, publicationType);
   const expiresAt = resolveJournalExpiresAt({
     publicationType,
     expiresAt: input.expiresAt !== undefined
@@ -774,12 +783,12 @@ export async function submitArticleForModeration(id: string): Promise<ArticleEdi
     const row = await tx.article.findUnique({
       where: { id },
       select: {
-        title: true, slug: true, categoryId: true, geoScope: true, cityId: true, regionId: true,
-        publicationType: true, _count: { select: { linkedItems: true } },
+        title: true, slug: true, categoryId: true, publicationType: true, geoScope: true, cityId: true, regionId: true,
+        _count: { select: { linkedItems: true } },
       },
     });
     if (!row) throw new Error("Article not found");
-    if (!row.categoryId) throw new Error("Для публикации статьи обязательно выберите раздел журнала");
+    assertRequiredJournalCategory(row.categoryId, row.publicationType);
     assertGeoScopeValidForPublish(row.geoScope, row.cityId, row.regionId);
     assertCollectionItemCount(row.publicationType, row._count.linkedItems);
     if (!row.slug?.trim()) {
@@ -819,10 +828,11 @@ export async function moderateArticle(
       where: { id },
       select: {
         title: true, slug: true, geoScope: true, cityId: true, regionId: true,
-        publicationType: true, expiresAt: true, _count: { select: { linkedItems: true } },
+        categoryId: true, publicationType: true, expiresAt: true, _count: { select: { linkedItems: true } },
       },
     });
     if (!row) throw new Error("Article not found");
+    assertRequiredJournalCategory(row.categoryId, row.publicationType);
     assertGeoScopeValidForPublish(row.geoScope, row.cityId, row.regionId);
     if (row.publicationType === "COLLECTION") {
       assertCollectionItemCount("COLLECTION", row._count.linkedItems);

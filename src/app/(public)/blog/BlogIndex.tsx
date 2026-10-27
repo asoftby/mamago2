@@ -283,9 +283,9 @@ function FeaturedArticle({
             </span>
           )}
           <span className="text-[11px] font-medium text-muted-foreground">{article.geographyLabel}</span>
-          {article.updatedAt && (
+          {article.publishedAt && (
             <span className="text-[11px] font-mono uppercase tracking-[.12em] text-muted-foreground">
-              {formatJournalPublishedDate(article.updatedAt)}
+              {formatJournalPublishedDate(article.publishedAt)}
             </span>
           )}
           <span className="text-[11px] font-mono text-muted-foreground">
@@ -362,9 +362,9 @@ function ArticleRow({
           </span>
         </div>
         <span className="text-xs text-muted-foreground">{article.geographyLabel}</span>
-        {article.updatedAt && (
+        {article.publishedAt && (
           <span className="text-[13px] text-foreground font-medium tracking-[-.005em]">
-            {formatJournalPublishedDate(article.updatedAt)}
+            {formatJournalPublishedDate(article.publishedAt)}
           </span>
         )}
         <span className="text-[11px] font-mono text-muted-foreground">

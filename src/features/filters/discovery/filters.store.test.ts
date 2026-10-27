@@ -39,13 +39,17 @@ test("event filters survive URL serialization and parsing", () => {
   assert.equal(params.get("genre"), "puppet,musical");
 });
 
-test("family persona selection round-trips in the shareable URL", () => {
+test("persona identifiers never survive public discovery URL serialization or parsing", () => {
   const filters = { ...defaultFilters, profile: "child-1", age: ["3-5"], occasionSlug: "halloween" };
-  const params = serializeAppliedToSearchParams(new URLSearchParams(), filters);
-  assert.equal(params.get("profile"), "child-1");
+  const legacy = new URLSearchParams("profile=legacy-child-id&utm_source=instagram");
+  const params = serializeAppliedToSearchParams(legacy, filters);
+  assert.equal(params.has("profile"), false);
+  assert.equal(params.get("age"), "3-5");
   assert.equal(params.get("occasion"), "halloween");
-  assert.deepEqual(parseAppliedFromUrl(params as never), filters);
-  assert.equal(getDiscoveryFilterActiveCount(filters), 2);
+  assert.equal(params.get("utm_source"), "instagram");
+  assert.deepEqual(parseAppliedFromUrl(params as never), { ...filters, profile: null });
+  assert.equal(parseAppliedFromUrl(legacy as never).profile, null);
+  assert.equal(normalizeStoredDiscoveryFilters({ profile: "stored-child-id" }).profile, null);
 });
 
 test("reset serialization from an empty base clears primary, secondary, and budget", () => {

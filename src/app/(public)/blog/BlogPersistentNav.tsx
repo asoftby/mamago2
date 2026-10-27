@@ -15,6 +15,8 @@ export function BlogPersistentNav({ citySlug, categories }: {
   const pathname = usePathname();
   const [articleSection, setArticleSection] = useState<string | null>(null);
   const activeRef = useRef<HTMLAnchorElement>(null);
+  const scrollRef = useRef<HTMLElement>(null);
+  const [scrollEdges, setScrollEdges] = useState({ left: false, right: false });
   const base = buildPublicPath(buildCityPublicPath({ citySlug, type: "journal" }));
   const sectionPrefix = `${base}/category/`;
   const articlePrefix = `${base}/`;
@@ -43,6 +45,33 @@ export function BlogPersistentNav({ citySlug, categories }: {
     }
   }, [activeSlug]);
 
+  // The scrollbar is visually hidden; desktop needs visible navigation controls.
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    const updateEdges = () => {
+      const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+      setScrollEdges({
+        left: scroller.scrollLeft > 2,
+        right: maxScroll > 2 && scroller.scrollLeft < maxScroll - 2,
+      });
+    };
+    updateEdges();
+    scroller.addEventListener("scroll", updateEdges, { passive: true });
+    const resizeObserver = new ResizeObserver(updateEdges);
+    resizeObserver.observe(scroller);
+    return () => {
+      scroller.removeEventListener("scroll", updateEdges);
+      resizeObserver.disconnect();
+    };
+  }, [categories, activeSlug]);
+
+  const scrollCategories = (direction: -1 | 1) => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    scroller.scrollBy({ left: direction * Math.max(240, scroller.clientWidth * 0.65), behavior: "smooth" });
+  };
+
   const collageCovers = categories.map((category) => category.thumbnailUrl).filter((url): url is string => Boolean(url)).slice(0, 4);
   const pills = [
     { id: "all", slug: null, name: "Все", thumbnailUrl: null, hasNewArticle: false },
@@ -51,7 +80,8 @@ export function BlogPersistentNav({ citySlug, categories }: {
 
   return (
     <section className="border-b border-border" aria-label="Разделы журнала">
-      <nav className="site-wrap no-scrollbar flex h-[72px] items-center gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap px-6 sm:px-7" aria-label="Разделы журнала">
+      <div className="site-wrap relative">
+      <nav ref={scrollRef} className="no-scrollbar flex h-[72px] items-center gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap px-6 sm:px-7" aria-label="Разделы журнала">
         {pills.map((pill) => {
           const active = pill.slug === activeSlug;
           return (
@@ -86,6 +116,27 @@ export function BlogPersistentNav({ citySlug, categories }: {
           );
         })}
       </nav>
+      {scrollEdges.left && (
+        <button
+          type="button"
+          onClick={() => scrollCategories(-1)}
+          aria-label="Прокрутить разделы журнала влево"
+          className="absolute left-2 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background shadow-sm transition-colors hover:bg-muted sm:flex"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+        </button>
+      )}
+      {scrollEdges.right && (
+        <button
+          type="button"
+          onClick={() => scrollCategories(1)}
+          aria-label="Прокрутить разделы журнала вправо"
+          className="absolute right-2 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-background shadow-sm transition-colors hover:bg-muted sm:flex"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+        </button>
+      )}
+      </div>
     </section>
   );
 }

@@ -9,8 +9,7 @@ import { SecondaryFiltersForm } from "@/components/discovery/SecondaryFiltersFor
 import type { Intent } from "@/lib/intent";
 import type { SecondaryValues } from "@/lib/discovery/secondaryFiltersUrl";
 import { EventAdvancedFilters } from "@/components/discovery/EventAdvancedFilters";
-import { useOptionalCity } from "@/contexts/CityContext";
-import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
+import { useEventListingCitySlug } from "@/lib/city/useEventListingCitySlug";
 
 /** @deprecated Используйте SecondaryValues из secondaryFiltersUrl */
 export type FilterState = SecondaryValues;
@@ -23,7 +22,7 @@ export function RefinementFiltersModal() {
   const { isOpen, setIsOpen, currentIntent } = useRefinementFilters();
   const [isVisible, setIsVisible] = useState(() => isOpen);
   const [isEntered, setIsEntered] = useState(false);
-  const citySlug = useOptionalCity()?.citySlug ?? DEFAULT_CITY_SLUG;
+  const citySlug = useEventListingCitySlug();
 
   // Keep the sheet mounted while closing, but mount it below the viewport when opening.
   useEffect(() => {

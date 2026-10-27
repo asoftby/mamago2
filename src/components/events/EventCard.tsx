@@ -8,6 +8,7 @@ import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { EVENT_CARD_IMAGE_SIZES } from "@/components/events/eventCardLayout";
 import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
+import { posterPriceBadgeSide, resolvePosterFrame } from "@/lib/media/posterFrame";
 
 // ─── Public props ────────────────────────────────────────────────────────────
 
@@ -24,8 +25,18 @@ export type EventCardProps = {
   metaLabel?: string;
   /** Бейдж цены на обложке: "от 48 б", "бесплатно" */
   priceLabel?: string;
-  /** Отношение сторон обложки, по умолчанию 4/5 */
+  /** Отношение сторон обложки, по умолчанию 4/5 (только для framing="fixed") */
   coverRatio?: string;
+  /** Stored pixel size of the cover (MediaAsset); null = unknown. */
+  imageWidth?: number | null;
+  imageHeight?: number | null;
+  /**
+   * "fixed" — legacy single frame `coverRatio` (carousels, journal embeds).
+   * "poster" — native poster ratio with the 16:9…2:3 crop rule (listings).
+   */
+  framing?: "fixed" | "poster";
+  /** Override `sizes` when the card is not in the carousel shell. */
+  imageSizes?: string;
   saveMeta?: {
     dateISO?: string | null;
     dateEndISO?: string | null;
@@ -94,26 +105,36 @@ export function EventCard({
   metaLabel,
   priceLabel,
   coverRatio = "4/5",
+  imageWidth,
+  imageHeight,
+  framing = "fixed",
+  imageSizes,
   saveMeta,
   className,
 }: EventCardProps) {
+  const poster = framing === "poster" ? resolvePosterFrame(imageWidth, imageHeight) : null;
+  const aspectRatio = poster ? poster.aspectRatio : coverRatio;
+  // Fixed framing keeps the legacy default (center) without extra classes.
+  const objectPositionClass = poster?.objectPosition === "top" ? "object-top" : undefined;
+  const badgeSide = poster ? posterPriceBadgeSide(poster) : "right";
   return (
     <div className={cn("group relative select-none", className)}>
       <Link href={href} className="block focus:outline-none">
         {/* Cover */}
         <div
           className="relative overflow-hidden rounded-[18px] bg-[#EDE8DF]"
-          style={{ aspectRatio: coverRatio }}
+          style={{ aspectRatio }}
+          data-poster-crop={poster ? (poster.cropped ? poster.objectPosition : "none") : undefined}
         >
           {imageUrl && canOptimizeWithNextImage(imageUrl) ? (
             <Image
               src={imageUrl}
               alt={title}
               fill
-              sizes={EVENT_CARD_IMAGE_SIZES}
+              sizes={imageSizes ?? EVENT_CARD_IMAGE_SIZES}
               loading={imagePriority ? "eager" : "lazy"}
               fetchPriority={imagePriority ? "high" : undefined}
-              className="object-cover"
+              className={cn("object-cover", objectPositionClass)}
             />
           ) : imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- unknown external hosts are intentionally outside the Next/Image allowlist.
@@ -122,7 +143,7 @@ export function EventCard({
               alt={title}
               loading={imagePriority ? "eager" : "lazy"}
               fetchPriority={imagePriority ? "high" : undefined}
-              className="h-full w-full object-cover"
+              className={cn("h-full w-full object-cover", objectPositionClass)}
             />
           ) : (
             <div
@@ -143,7 +164,12 @@ export function EventCard({
 
           {/* Price badge — bottom right */}
           {priceLabel && (
-            <span className="absolute bottom-3 right-3 inline-flex h-7 items-center rounded-full bg-[rgba(20,18,16,0.72)] px-3 font-mono text-[11px] font-medium text-white backdrop-blur-[4px]">
+            <span
+              className={cn(
+                "absolute bottom-3 inline-flex h-7 items-center rounded-full bg-[rgba(20,18,16,0.72)] px-3 font-mono text-[11px] font-medium text-white backdrop-blur-[4px]",
+                badgeSide === "left" ? "left-3" : "right-3",
+              )}
+            >
               {renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })}
             </span>
           )}

@@ -5,6 +5,7 @@ import { serializeAppliedToSearchParams, useDiscoveryFilters, getDiscoveryFilter
 import { toggleEventCategory, useEventTaxonomy } from "@/features/filters/discovery/eventTaxonomy";
 import { Chip } from "@/components/ui/Chip";
 import { DiscoveryWhoFilter } from "./DiscoveryWhoFilter";
+import { EventTerritoryFilter } from "./EventTerritoryFilter";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { pluralize } from "@/lib/formatters/pluralize";
 import { useEventAvailableFacets } from "@/features/filters/discovery/useEventAvailableFacets";
@@ -15,6 +16,7 @@ import { MobileOverlayPrimaryAction } from "@/components/mobile/MobileOverlayPri
 import { formatPrice } from "@/lib/formatters/format-price";
 import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
 import { cn } from "@/lib/utils";
+import { useEventListingExplore } from "@/lib/city/useEventListingCitySlug";
 
 type PriceDistribution = {
   max: number | null;
@@ -227,6 +229,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
   const { applied: draft, actions } = useDiscoveryFilters();
   const family = useFamilyPersona();
   const facets = useEventAvailableFacets(draft);
+  const explore = useEventListingExplore();
   const { categories, loading: taxonomyLoading } = useEventTaxonomy(citySlug);
   const [count, setCount] = React.useState<number | null>(null);
   const [distribution, setDistribution] = React.useState<PriceDistribution>({ max: null, maxPrice: null, minPaid: null, step: null, buckets: [] });
@@ -237,6 +240,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
     const timer = setTimeout(() => {
       const params = serializeAppliedToSearchParams(new URLSearchParams(), draft);
       params.set("city", citySlug);
+      if (explore) params.set("explore", "1");
       fetch(`/api/discovery/events/count?${params}`, { signal: controller.signal })
         .then((response) => response.ok ? response.json() : null)
         .then((data) => setCount(data?.count ?? null))
@@ -254,10 +258,11 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
         .catch(() => {});
     }, 150);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [citySlug, draft]);
+  }, [citySlug, draft, explore]);
 
   return (
     <div className="space-y-6 pb-1">
+      <EventTerritoryFilter onApply={onApply} filters={draft} onBeforeNavigate={actions.cancelPendingWrite} />
       <DiscoveryWhoFilter inline />
 
       {(draft.occasionSlug === "halloween" || facets?.occasions.includes("halloween")) && (

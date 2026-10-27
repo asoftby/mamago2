@@ -804,7 +804,7 @@ export function NewsPublicationEditor({
         <div className="space-y-2">
           <Label htmlFor="breaking-news-category">Рубрика</Label>
           <p className="text-xs text-muted-foreground">
-            Обязательна для публикации: новость показывается в журнале в своей рубрике.
+            Необязательно. Если выбрана — новость попадает и в фильтр журнала по этой рубрике.
           </p>
           <Select
             value={categoryId ?? "__none__"}
