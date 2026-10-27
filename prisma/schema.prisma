@@ -6117,6 +6117,8 @@ model BookingRequest {
   place        Place?            @relation(fields: [placeId], references: [id], onDelete: SetNull)
   session      ActivitySession?  @relation(fields: [selectedSessionId], references: [id], onDelete: SetNull)
   offerSession OfferSession? @relation(fields: [offerSessionId], references: [id], onDelete: SetNull)
+  classPassIssued ClassPass? @relation("ClassPassIssuedByBooking")
+  classPassUsage ClassPassUsage? @relation("ClassPassUsageBooking")
   activities   BookingActivity[]
   feedback     BookingFeedback?
   directThread DirectThread?
@@ -6141,6 +6143,40 @@ model BookingRequest {
   @@index([createdAt])
   @@index([businessId, createdAt])
   @@index([businessId, firstResponseAt])
+}
+
+/// Group-class subscription issued from a confirmed class booking.
+/// Issuance and consumption are separate actions; no automatic fulfilment is implied.
+model ClassPass {
+  id String @id @default(cuid())
+  issuedBookingId String @unique
+  issuedBooking BookingRequest @relation("ClassPassIssuedByBooking", fields: [issuedBookingId], references: [id], onDelete: Restrict)
+  offerId String
+  classGroupId String
+  classTariffId String
+  visitsTotal Int
+  visitsRemaining Int
+  validFrom DateTime
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  usages ClassPassUsage[]
+
+  @@index([offerId, classGroupId, expiresAt])
+}
+
+/// Each class booking consumes at most one visit from a subscription.
+/// Cancellation restores it only through an explicit transactional state transition.
+model ClassPassUsage {
+  id String @id @default(cuid())
+  classPassId String
+  classPass ClassPass @relation(fields: [classPassId], references: [id], onDelete: Restrict)
+  bookingId String @unique
+  booking BookingRequest @relation("ClassPassUsageBooking", fields: [bookingId], references: [id], onDelete: Restrict)
+  restoredAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([classPassId, restoredAt])
 }
 
 /// Тип события в истории заявки
