@@ -10,12 +10,16 @@ type Option = { id: BoostOptionId; durationDays: number; price: number; currency
 export function BoostPurchaseClient({
   offerId,
   options,
+  regions,
 }: {
   offerId: string;
   options: Option[];
+  regions: { id: string; name: string; slug: string }[];
 }) {
   const [selectedId, setSelectedId] = useState<BoostOptionId | null>(options[0]?.id ?? null);
   const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
+  const [targetRegionIds, setTargetRegionIds] = useState<string[]>([]);
+  const [confirmed, setConfirmed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -42,18 +46,35 @@ export function BoostPurchaseClient({
           </button>
         ))}
       </div>
+      <fieldset className="rounded-2xl border border-stone-200 bg-white p-4">
+        <legend className="px-2 text-sm font-semibold">География продвижения</legend>
+        <p className="mb-3 text-sm text-stone-600">По умолчанию — только свой регион. Дополнительные регионы доступны по выбору. Цена указана выше и не изменяется.</p>
+        <label className="mb-3 flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={targetRegionIds.includes("*")} onChange={(event) => { setTargetRegionIds(event.target.checked ? ["*"] : []); setConfirmed(false); setRequestKey(crypto.randomUUID()); }} />
+          Вся Беларусь
+        </label>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {regions.map((region) => (
+            <label key={region.id} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" disabled={targetRegionIds.includes("*")} checked={targetRegionIds.includes(region.id)} onChange={(event) => { setTargetRegionIds((prev) => event.target.checked ? [...prev, region.id] : prev.filter((id) => id !== region.id)); setConfirmed(false); setRequestKey(crypto.randomUUID()); }} />
+              {region.name}
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <p className="text-sm text-stone-600">
         Цена определяется сервером. После подтверждения Boost и списание появятся атомарно одной операцией.
       </p>
       {message ? <p className="rounded-xl bg-stone-100 p-3 text-sm text-stone-800">{message}</p> : null}
       <button
         type="button"
-        disabled={!selectedId || isPending}
+        disabled={!selectedId || isPending || confirmed}
         onClick={() => startTransition(async () => {
           if (!selectedId) return;
-          const result = await purchaseOfferBoostAction({ offerId, optionId: selectedId, requestKey });
+          const result = await purchaseOfferBoostAction({ offerId, optionId: selectedId, requestKey, targetRegionIds });
           if (result.ok) {
             setMessage(result.idempotentReplay ? "Boost уже был куплен этим запросом." : "Boost активирован.");
+            setConfirmed(true);
           } else {
             setMessage(result.error);
             setRequestKey(crypto.randomUUID());
