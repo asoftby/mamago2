@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 import { activityInAnyOfCitiesWhere } from "@/server/discovery/activityInCityWhere";
 import { resolveKudaDiscoveryCityIds } from "@/server/discovery/discoveryHubExpand";
+import { getCrossRegionPopularActivityIds } from "@/server/discovery/crossRegionFamilySignal";
 import { createDiscoveryPerf } from "@/server/discovery/discoveryPerf";
 import type { ActivityMock } from "@/types/activity";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
@@ -36,6 +37,7 @@ function hasActiveEventRuntimeFilters(filters: EventRuntimeFilters): boolean {
 export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, options: { format?: ActivityFormat | null; nearby?: boolean; eventFilters: EventRuntimeFilters }) {
   const now = new Date();
   const { primaryCityId, expandedCityIds } = await resolveKudaDiscoveryCityIds(citySlug, cityId);
+  const crossRegionPopularIds = options.nearby ? [] : await getCrossRegionPopularActivityIds(primaryCityId, expandedCityIds);
   const pub = getPublicListingActivityWhere(now);
   // Explicit date selection is authoritative. Without it, discover the next
   // 45 days plus editorially tagged holiday/season events up to 90 days away.
@@ -62,7 +64,7 @@ export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, 
     ],
   }];
   const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
-  const where: Prisma.ActivityWhereInput = { AND: [{ type: ActivityType.EVENT }, ...(options.format ? [{ format: options.format }] : options.nearby ? [{ format: { in: [ActivityFormat.OFFLINE, ActivityFormat.HYBRID] } }] : []), activityInAnyOfCitiesWhere(expandedCityIds), ...buildEventRuntimeWhere(options.eventFilters), ...defaultWindow, ...pubParts] };
+  const where: Prisma.ActivityWhereInput = { AND: [{ type: ActivityType.EVENT }, ...(options.format ? [{ format: options.format }] : options.nearby ? [{ format: { in: [ActivityFormat.OFFLINE, ActivityFormat.HYBRID] } }] : []), { OR: [activityInAnyOfCitiesWhere(expandedCityIds), ...(crossRegionPopularIds.length > 0 ? [{ id: { in: crossRegionPopularIds } }] : [])] }, ...buildEventRuntimeWhere(options.eventFilters), ...defaultWindow, ...pubParts] };
   return { where, primaryCityId };
 }
 
