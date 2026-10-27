@@ -23,7 +23,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export interface ClassSessionGroup {
   id: string;
   title?: string;
-  tariffs?: Array<{ id: string; title: string; price: string; unit: string; periodDays?: number | null }>;
+  tariffs?: Array<{ id: string; title: string; price: string; unit: string; periodDays?: number | null; visitsCount?: number | null }>;
   days: number[];
   time: string;
   seats: string;
@@ -124,6 +124,7 @@ export const classScheduleInputSchema = z
             price: z.string().trim().regex(/^\d+(?:[.,]\d{1,2})?$/, "Цена должна быть числом в BYN с точностью до двух знаков"),
             unit: z.string().trim().min(1).max(80),
             periodDays: z.number().int().min(1).max(366).nullable().optional(),
+            visitsCount: z.number().int().min(1).max(365).nullable().optional(),
           })).max(12).default([]),
           days: z.array(z.number().int().min(1).max(7)).min(1).max(7),
           time: z.string().regex(TIME_RE),
@@ -240,6 +241,7 @@ export function getClassScheduleMissingFields(
         if (!/^\\d+(?:[.,]\\d{1,2})?$/.test(tariff.price.trim())) missing.push("Стоимость тарифа в BYN");
         if (!tariff.unit.trim()) missing.push("Единица тарифа");
         if (tariff.periodDays != null && (!Number.isInteger(tariff.periodDays) || tariff.periodDays < 1 || tariff.periodDays > 366)) missing.push("Срок тарифа от 1 до 366 дней");
+        if (tariff.visitsCount != null && (!Number.isInteger(tariff.visitsCount) || tariff.visitsCount < 1 || tariff.visitsCount > 365)) missing.push("Количество посещений от 1 до 365");
         const identity = group.id + ":" + tariff.id;
         if (tariffIds.has(identity)) missing.push("Повторяющийся тариф группы");
         tariffIds.add(identity);
