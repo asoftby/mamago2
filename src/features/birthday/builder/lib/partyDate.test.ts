@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ageMonthsOnDate, calendarDateKeyToIso } from "./partyDate";
+import { ageMonthsOnDate, calendarDateKeyToIso, childAgeYearsOnDate } from "./partyDate";
 
 test("calendar keys use a zero-based month", () => {
   assert.equal(calendarDateKeyToIso("2027-0-5"), "2027-01-05");
@@ -35,4 +35,11 @@ test("invalid or impossible dates disable the age filter", () => {
   assert.equal(ageMonthsOnDate("2027-01-01", "2026-10-21"), null);
   assert.equal(ageMonthsOnDate(null, "2026-10-21"), null);
   assert.equal(ageMonthsOnDate("2020-01-01", null), null);
+});
+
+test("child age in full years is sent with the order", () => {
+  assert.equal(childAgeYearsOnDate("2020-03-15", "2026-03-14"), 5);
+  assert.equal(childAgeYearsOnDate("2020-03-15", "2026-03-15"), 6);
+  assert.equal(childAgeYearsOnDate("2000-01-01", "2026-03-15"), null);
+  assert.equal(childAgeYearsOnDate(null, "2026-03-15"), null);
 });

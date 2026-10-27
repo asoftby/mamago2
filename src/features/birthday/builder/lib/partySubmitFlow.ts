@@ -15,6 +15,8 @@ export type PartySubmissionInput = {
   childrenCount: number;
   adultsCount: number;
   childName: string | null;
+  /** Full years on the party date, so the server can check offer age limits. */
+  childAge: number | null;
   contactName: string;
   contactPhone: string;
   anchorOfferId: string;

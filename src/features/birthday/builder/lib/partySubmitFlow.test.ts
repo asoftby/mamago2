@@ -7,7 +7,7 @@ import {
 const input: PartySubmissionInput = {
   citySlug: "minsk", venueMode: "HOME", eventDate: "2026-12-20",
   timeFrom: "14:00", timeTo: "17:00", childrenCount: 8, adultsCount: 3,
-  childName: "Тая", contactName: "Родитель", contactPhone: "+375291234567",
+  childName: "Тая", childAge: 6, contactName: "Родитель", contactPhone: "+375291234567",
   anchorOfferId: "animator", addonOfferIds: ["cake"],
 };
 function fresh(): PartyFlowState {

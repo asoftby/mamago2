@@ -8,7 +8,7 @@ import { calendarDateKeyToIso } from "../lib/partyDate";
 import type { PartyFlowState } from "../lib/partySubmitFlow";
 import type { BirthdayCatalogItem } from "../lib/realCatalog";
 import {
-  catalogPriceSummary, eligibleAddons, hasValidCatalogAnchor, selectedCatalogOffers,
+  catalogPriceSummary, eligibleAddons, hasValidCatalogAnchor, partyBudgetWarning, selectedCatalogOffers,
 } from "../lib/catalogSelection";
 import { listUserBirthdayParties } from "@/server/services/userBirthdays.service";
 
@@ -79,13 +79,19 @@ assert.equal(calendarDateKeyToIso("invalid"), null);
 assert.deepEqual(catalogPriceSummary([offer, cake]), {
   minimumByn: 350, hasUnknownPrices: true,
 });
+// Soft budget: the whole party is compared with the budget, the parent is only warned.
+assert.equal(partyBudgetWarning({ minimumByn: 750, hasUnknownPrices: false }, 600),
+  "Предварительная стоимость праздника — от 750 BYN. Это выше выбранного бюджета на 150 BYN. " +
+  "Вы можете изменить состав праздника или продолжить оформление.");
+assert.equal(partyBudgetWarning({ minimumByn: 600, hasUnknownPrices: false }, 600), null);
+assert.equal(partyBudgetWarning({ minimumByn: 5000, hasUnknownPrices: false }, null), null);
 const submissionFlow: PartyFlowState = {
   draft: null, pending: null, key: null, submitted: false,
 };
 const reviewProps = {
   offers: [offer, cake], citySlug: "minsk", dateIso: null,
-  quizDateKey: "2026-11-20", timeStart: "12:30", timeEnd: "16:00",
-  venueMode: "VENUE" as const, childName: null, authenticated: true,
+  quizDateKey: "2026-11-20", maxBudget: null as number | null, timeStart: "12:30", timeEnd: "16:00",
+  venueMode: "VENUE" as const, childName: null, childBirthDateIso: null, authenticated: true,
   authLoading: false, requestLogin: () => {},
   flowStateRef: { current: submissionFlow }, busy: false, onBusyChange: () => {},
   sent: false, onSent: () => {},
@@ -96,6 +102,14 @@ assert.match(review, /type="date"[^>]*value="2026-12-20"/);
 assert.match(review, /type="time"[^>]*value="12:30"/);
 assert.match(review, /Отправить заявку основному исполнителю/);
 assert.doesNotMatch(review, /Забронировано/);
+assert.match(review, /окончательная сумма пока неизвестна/);
+assert.doesNotMatch(review, /выше выбранного бюджета/);
+// 350 + 400 = 750 BYN against a 600 BYN budget: warn, but keep the submit button enabled.
+const overBudgetReview = renderToStaticMarkup(createElement(StepReview, {
+  ...reviewProps, offers: [offer, { ...animator, priceFrom: 400 }], maxBudget: 600,
+}));
+assert.match(overBudgetReview, /от 750 BYN\. Это выше выбранного бюджета на 150 BYN/);
+assert.match(overBudgetReview, /<button type="submit"(?![^>]*disabled="")[^>]*>Отправить заявку основному исполнителю/);
 // Simulate a review-step remount after submission: the parent-owned state persists.
 submissionFlow.draft = { id: "party-42", version: 1 };
 submissionFlow.pending = { id: "party-42", version: 1, fingerprint: "{}" };
@@ -112,6 +126,8 @@ const shell = readFileSync("src/features/birthday/builder/components/BirthdayBui
 for (const forbidden of ["MOCK_PRICES", "buildMockScenarioTimeline", "buildSubmittedScenarioParty", "setSubmittedScenario"]) {
   assert.equal(shell.includes(forbidden), false, "fake booking flow remains: " + forbidden);
 }
+// Budget must not hide single offers: each card can be above budget while the whole party is not.
+assert.doesNotMatch(shell, /maxBudget: offer\.currency/);
 assert.match(shell, /const submissionFlowRef = useRef<PartyFlowState>/);
 assert.match(shell, /flowStateRef=\{submissionFlowRef\}/);
 assert.match(shell, /backDisabled=\{submissionBusy \|\| submissionSent\}/);

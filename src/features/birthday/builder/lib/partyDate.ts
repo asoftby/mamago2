@@ -38,3 +38,13 @@ export function ageMonthsOnDate(
     Number(party.day < birth.day);
   return fullMonths < 0 ? null : fullMonths;
 }
+
+/** Full years on the party date within the API range (0–20), otherwise null. */
+export function childAgeYearsOnDate(
+  birthDateIso: string | null | undefined, partyDateIso: string | null | undefined,
+): number | null {
+  const months = ageMonthsOnDate(birthDateIso, partyDateIso);
+  if (months == null) return null;
+  const years = Math.floor(months / 12);
+  return years <= 20 ? years : null;
+}

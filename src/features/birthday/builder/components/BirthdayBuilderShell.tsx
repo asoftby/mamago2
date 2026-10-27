@@ -20,6 +20,7 @@ import {
   isLocationCompatible, selectedCatalogOffers,
 } from "../lib/catalogSelection";
 import { ageMonthsOnDate, calendarDateKeyToIso } from "../lib/partyDate";
+import { budgetMaxByn } from "../lib/budgetRanges";
 import { BuilderProgressDots } from "./BuilderProgressDots";
 import { BuilderSummaryBar } from "./BuilderSummaryBar";
 import type { BuilderStep } from "../types/builder";
@@ -96,9 +97,8 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
   });
 
   const catalog = useRealBirthdayCatalog(citySlug);
-  const maxBudget = state.quiz.budgetGroup === "up300" ? 300
-    : state.quiz.budgetGroup === "300-600" ? 600
-    : state.quiz.budgetGroup === "600-1000" ? 1000 : null;
+  // Soft budget: compared with the whole party in review, never used to hide single offers.
+  const maxBudget = budgetMaxByn(state.quiz.budgetGroup);
 
   const ageMonths = useMemo(() => ageMonthsOnDate(
     state.quiz.partyForChild?.birthDateIso, calendarDateKeyToIso(state.quiz.dateRangeFrom),
@@ -109,10 +109,9 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
   const visibleOffers = useMemo(() => catalog.offers.filter((offer) =>
     isLocationCompatible(offer, state.quiz.placeType) &&
     matchesBirthdayRequirements(offer, {
-      ageMonths, maxBudget: offer.currency === "BYN" ? maxBudget : null,
-      childrenMin: guests?.min, childrenMax: guests?.max,
+      ageMonths, childrenMin: guests?.min, childrenMax: guests?.max,
     })),
-    [catalog.offers, state.quiz.placeType, ageMonths, maxBudget, guests?.min, guests?.max]);
+    [catalog.offers, state.quiz.placeType, ageMonths, guests?.min, guests?.max]);
 
   const validBase = hasValidCatalogAnchor(
     visibleOffers, state.selection.selectedBaseId, state.quiz.placeType,
@@ -266,6 +265,8 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
             citySlug={citySlug}
             dateIso={state.partyPlanning.dateIso}
             quizDateKey={state.quiz.dateRangeFrom}
+            maxBudget={maxBudget}
+            childBirthDateIso={state.quiz.partyForChild?.birthDateIso ?? null}
             timeStart={state.partyPlanning.timeStart}
             timeEnd={state.partyPlanning.timeEnd}
             venueMode={state.quiz.placeType === "HOME" ? "HOME" : state.quiz.placeType === "OUTDOOR" ? "OUTDOOR" : state.quiz.placeType === "PACKAGE" ? "PACKAGE" : "VENUE"}

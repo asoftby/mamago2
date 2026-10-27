@@ -101,6 +101,20 @@ export function catalogPriceSummary(offers: readonly BirthdayCatalogItem[]) {
   };
 }
 
+/**
+ * Soft budget: compares the whole party's known minimum with the chosen budget.
+ * It only informs the parent; submission is never blocked.
+ */
+export function partyBudgetWarning(
+  prices: { minimumByn: number; hasUnknownPrices: boolean }, maxBudget: number | null,
+): string | null {
+  if (maxBudget == null || prices.minimumByn <= maxBudget) return null;
+  const byn = (value: number) => value.toLocaleString("ru-RU") + " BYN";
+  return "Предварительная стоимость праздника — от " + byn(prices.minimumByn) +
+    ". Это выше выбранного бюджета на " + byn(prices.minimumByn - maxBudget) +
+    ". Вы можете изменить состав праздника или продолжить оформление.";
+}
+
 /** Price text that respects how the business declared the price. Unknown never reads as zero. */
 export function catalogPriceLabel(offer: Pick<BirthdayCatalogItem, "priceFrom" | "priceMode" | "currency">): string {
   if (offer.priceMode === "FREE") return "Бесплатно";

@@ -4,19 +4,22 @@ import Link from "next/link";
 import { useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import type { BirthdayCatalogItem } from "../../lib/realCatalog";
-import { catalogPriceLabel, catalogPriceSummary } from "../../lib/catalogSelection";
+import { catalogPriceLabel, catalogPriceSummary, partyBudgetWarning } from "../../lib/catalogSelection";
 import { submitBirthdayParty, submittedPartyId, type PartyFlowState } from "../../lib/partySubmitFlow";
-import { calendarDateKeyToIso } from "../../lib/partyDate";
+import { calendarDateKeyToIso, childAgeYearsOnDate } from "../../lib/partyDate";
 
 type Props = {
   offers: BirthdayCatalogItem[];
   citySlug: string;
   dateIso: string | null;
   quizDateKey: string | null;
+  /** Upper bound of the chosen budget group in BYN; informational only. */
+  maxBudget: number | null;
   timeStart: string | null;
   timeEnd: string | null;
   venueMode: "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR";
   childName: string | null;
+  childBirthDateIso: string | null;
   authenticated: boolean;
   authLoading: boolean;
   requestLogin: () => void;
@@ -28,10 +31,11 @@ type Props = {
 };
 
 export function StepReview({
-  offers, citySlug, dateIso, quizDateKey, timeStart, timeEnd, venueMode, childName,
+  offers, citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName, childBirthDateIso,
   authenticated, authLoading, requestLogin, flowStateRef, busy, onBusyChange, sent, onSent,
 }: Props) {
   const total = catalogPriceSummary(offers);
+  const budgetWarning = partyBudgetWarning(total, maxBudget);
   const [date, setDate] = useState(dateIso ?? calendarDateKeyToIso(quizDateKey) ?? "");
   const [timeFrom, setTimeFrom] = useState(timeStart ?? "15:00");
   const [timeTo, setTimeTo] = useState(timeEnd ?? "18:00");
@@ -52,7 +56,8 @@ export function StepReview({
       await submitBirthdayParty(flowStateRef.current, {
         citySlug, venueMode, eventDate: date, timeFrom, timeTo,
         childrenCount: Number(children), adultsCount: Number(adults),
-        childName: childName || null, contactName: name, contactPhone: phone,
+        childName: childName || null, childAge: childAgeYearsOnDate(childBirthDateIso, date),
+        contactName: name, contactPhone: phone,
         anchorOfferId: offers[0].id, addonOfferIds: offers.slice(1).map((offer) => offer.id),
       });
       onSent();
@@ -109,7 +114,10 @@ export function StepReview({
           {total.minimumByn > 0 ? "От " + total.minimumByn.toLocaleString("ru-RU") + " BYN" : "Стоимость уточняется"}
         </p>
         {total.hasUnknownPrices && (
-          <p className="mt-2 text-sm text-stone-600">Некоторые услуги рассчитываются индивидуально и в эту сумму не включены.</p>
+          <p className="mt-2 text-sm text-stone-600">Некоторые услуги рассчитываются индивидуально и в эту сумму не включены, поэтому окончательная сумма пока неизвестна.</p>
+        )}
+        {budgetWarning && (
+          <p role="note" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">{budgetWarning}</p>
         )}
       </div>
       <form className="space-y-4" onSubmit={handleSubmit}>
