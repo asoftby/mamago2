@@ -54,7 +54,7 @@ test("only one concurrent status transition can consume NEW", {
       where: { id: booking.id },
       select: { status: true },
     });
-    assert.ok([BookingStatus.CONFIRMED, BookingStatus.REJECTED].includes(persisted.status));
+    assert.ok(persisted.status === BookingStatus.CONFIRMED || persisted.status === BookingStatus.REJECTED);
   } finally {
     await prisma.bookingRequest.delete({ where: { id: booking.id } });
     await prisma.business.delete({ where: { id: business.id } });
