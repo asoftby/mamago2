@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { isScopedEventBrowsing } from "@/lib/city/scopedEventBrowsing";
+import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { EventCard, activityMockToEventCard } from "@/components/events";
 import { OfferCard } from "@/components/offers/OfferCard";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
@@ -28,6 +29,7 @@ import { publicActivityPath } from "@/lib/business/eventPublicLink";
 
 type DiscoveryActivitiesGridProps = {
   activities: ActivityMock[];
+  listingCitySlug?: string;
   className?: string;
   /** Соотношение обложки `ActivityCard` (по умолчанию 4/5, для «Занятия» — 1/1) */
   coverRatio?: string;
@@ -67,6 +69,7 @@ function masonrySkeletonAspect(index: number): string {
 
 export function DiscoveryActivitiesGrid({
   activities,
+  listingCitySlug,
   className,
   coverRatio,
   emptyTitle = "Пока нет событий по вашему запросу",
@@ -76,7 +79,7 @@ export function DiscoveryActivitiesGrid({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const scopedEvents = isScopedEventBrowsing(pathname, searchParams.get("explore"));
-  const citySlug = cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
+  const citySlug = listingCitySlug ?? cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
   const ratio = coverRatio ?? "4/5";
   const { applied, actions, derived } = useDiscoveryFilters();
   const family = useFamilyPersona();
@@ -172,6 +175,13 @@ export function DiscoveryActivitiesGrid({
       ) : (
         <EventCard
           {...activityMockToEventCard(activity, citySlug)}
+          metaLabel={(() => {
+            const meta = activityMockToEventCard(activity, citySlug).metaLabel;
+            const location = activity.citySlug && activity.citySlug !== citySlug
+              ? getCityNominativeName(activity.citySlug)
+              : null;
+            return [meta, location].filter(Boolean).join(" · ") || undefined;
+          })()}
           href={(() => {
             const href = activityMockToEventCard(activity, citySlug).href;
             return scopedEvents ? `${href}${href.includes("?") ? "&" : "?"}explore=1` : href;
