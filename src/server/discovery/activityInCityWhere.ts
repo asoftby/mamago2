@@ -15,5 +15,12 @@ export function activityInAnyOfCitiesWhere(cityIds: string[]): Prisma.ActivityWh
   if (cityIds.length === 1) {
     return activityInCityWhere(cityIds[0]!);
   }
-  return { OR: cityIds.map((id) => activityInCityWhere(id)) };
+  // Three IN predicates instead of 3 × N OR predicates for an entire oblast.
+  return {
+    OR: [
+      { cityId: { in: cityIds } },
+      { place: { cityId: { in: cityIds } } },
+      { venue: { cityId: { in: cityIds } } },
+    ],
+  };
 }
