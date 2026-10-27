@@ -51,6 +51,9 @@ export async function listArticlesForPublicationsIndex(): Promise<PublicationLis
       publishedAt: true,
       updatedAt: true,
       contentJson: true,
+      publicationType: true,
+      featured: true,
+      pinned: true,
     },
   });
 
@@ -138,7 +141,8 @@ export async function listArticlesForPublicationsIndex(): Promise<PublicationLis
         ? manual
         : authorLineFromUser(authorUserById.get(r.id));
     const coverId = coverImageIdById.get(r.id);
-    const isBreakingNews = r.subtitle === BREAKING_NEWS_SUBTITLE;
+    const usesNewsEditor = r.subtitle === BREAKING_NEWS_SUBTITLE;
+    const isBreakingNews = r.publicationType === "BREAKING_NEWS" || usesNewsEditor;
     const rawCityContext = cityContextById.get(r.id)?.trim() || "";
     const normalizedCityLabel = rawCityContext
       ? cityNameFromSlug(rawCityContext, cityCatalog) || rawCityContext
@@ -150,7 +154,11 @@ export async function listArticlesForPublicationsIndex(): Promise<PublicationLis
       id: r.id,
       title: r.title,
       slug: r.slug,
-      type: isBreakingNews ? PublicationType.NEWS : PublicationType.ARTICLE,
+      type: isBreakingNews
+        ? PublicationType.NEWS
+        : r.publicationType === "COLLECTION"
+          ? PublicationType.COLLECTION
+          : PublicationType.ARTICLE,
       status: mapStatus(r.status),
       authorLabel,
       authorUserId: authorUserIdById.get(r.id) ?? null,
@@ -161,9 +169,12 @@ export async function listArticlesForPublicationsIndex(): Promise<PublicationLis
       hasCover: !!(coverId && String(coverId).trim()),
       hasSlug: !!(r.slug && r.slug.trim()),
       hasBlocks: content.blocks.length > 0,
-      missingJournalCategory: !isBreakingNews && !r.categoryId,
+      missingJournalCategory: !usesNewsEditor && !r.categoryId,
       geoScope: r.geoScope ?? null,
       citySlug,
+      featured: r.featured,
+      pinned: r.pinned,
+      usesNewsEditor,
     };
   });
 }

@@ -41,6 +41,11 @@ export type BreakingNewsFormState = {
    * Must be null when geoScope === "COUNTRY".
    */
   cityId: string | null;
+  /** «Актуально до» (datetime-local). Пусто → сервер ставит publishedAt + 7 дней. */
+  expiresAtLocal?: string;
+  /** Отметки журнала. */
+  featured?: boolean;
+  pinned?: boolean;
 };
 
 export function emptyBreakingNewsContent(): ArticleContentPayload {
@@ -104,11 +109,15 @@ export function breakingNewsStateToArticleSaveInput(
     seoOgDescription: null,
     seoRobots: null,
     noindex: state.noindex,
+    publicationType: "BREAKING_NEWS",
+    expiresAt: fromLocalDatetimeValue(state.expiresAtLocal ?? ""),
+    featured: state.featured ?? false,
+    pinned: state.pinned ?? false,
   };
 }
 
 export function isBreakingNewsSnapshot(snapshot: ArticleEditorSnapshot): boolean {
-  return snapshot.subtitle === BREAKING_NEWS_SUBTITLE;
+  return snapshot.publicationType === "BREAKING_NEWS" || snapshot.subtitle === BREAKING_NEWS_SUBTITLE;
 }
 
 export function parseBreakingNewsFromSnapshot(snapshot: ArticleEditorSnapshot): BreakingNewsFormState {
@@ -139,6 +148,9 @@ export function parseBreakingNewsFromSnapshot(snapshot: ArticleEditorSnapshot): 
     authorUserId: snapshot.authorUserId,
     geoScope: snapshot.geoScope ?? null,
     cityId: snapshot.cityId ?? null,
+    expiresAtLocal: toLocalDatetimeValue(snapshot.expiresAt),
+    featured: snapshot.featured,
+    pinned: snapshot.pinned,
   };
 }
 
