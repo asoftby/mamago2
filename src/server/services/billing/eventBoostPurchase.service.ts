@@ -8,6 +8,7 @@ import { validateBoostTargetRegions } from "@/server/geo/boostRegionTargeting";
 
 export async function purchaseEventBoost(params: {
   businessId: string;
+  ownerUserId: string;
   activityId: string;
   optionId: BoostOptionId;
   requestKey: string;
@@ -30,7 +31,7 @@ export async function purchaseEventBoost(params: {
 
     await tx.$queryRaw`SELECT id FROM "Activity" WHERE id = ${params.activityId} FOR UPDATE`;
     const event = await tx.activity.findFirst({
-      where: { id: params.activityId, businessId: params.businessId, type: "EVENT", status: "PUBLISHED" },
+      where: { id: params.activityId, OR: [{ businessId: params.businessId }, { ownerUserId: params.ownerUserId }], type: "EVENT", status: "PUBLISHED" },
       select: { id: true, title: true },
     });
     if (!event) throw new Error("Событие не опубликовано или не принадлежит вашему бизнесу.");
