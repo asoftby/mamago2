@@ -368,7 +368,7 @@ export function isStepComplete(
         data.productType === "ONE_TIME_ACTIVITY" ||
         data.productType === "REGULAR_ACTIVITY"
       ) {
-        return !!(data.classDuration.trim() && data.classFormat);
+        return !!data.classDuration.trim();
       }
       // PARTY_SERVICE: included/program moved here from "placements" (Phase 3c relayout).
       if (data.productType === "PARTY_SERVICE") {
@@ -403,7 +403,9 @@ export function isStepComplete(
     case "price":
       {
         const hasValidPricing =
-          data.offerWizardType === "CAMP"
+          data.productType === "REGULAR_ACTIVITY"
+            ? data.schedule.classSchedule.groups.some((g) => (g.tariffs ?? []).some((t) => t.title.trim() && t.price.trim()))
+            : data.offerWizardType === "CAMP"
             ? true
             : !!data.pricingMode &&
               (data.pricingMode === "single"
@@ -561,7 +563,7 @@ export function getMissingFieldsForStep(
         data.productType === "REGULAR_ACTIVITY"
       ) {
         if (!data.classDuration.trim()) missing.push("Продолжительность занятия");
-        if (!data.classFormat) missing.push("Формат занятия");
+        // Trial, course and subscription are group tariffs, not exclusive class types.
       }
       // PARTY_SERVICE: included/program moved here from "placements" (Phase 3c relayout).
       if (
@@ -619,7 +621,9 @@ export function getMissingFieldsForStep(
       break;
 
     case "price":
-      if (data.offerWizardType !== "CAMP") {
+      if (data.productType === "REGULAR_ACTIVITY") {
+        if (!data.schedule.classSchedule.groups.some((g) => (g.tariffs ?? []).some((t) => t.title.trim() && t.price.trim()))) missing.push("Тариф группы");
+      } else if (data.offerWizardType !== "CAMP") {
         if (!data.pricingMode) {
           missing.push("Режим ценообразования");
         } else if (data.pricingMode === "single" && !data.singlePrice.trim()) {

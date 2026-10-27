@@ -193,6 +193,7 @@ export async function trackUserEvent(
         entityId: input.entityId,
         userEventId: userEvent.id,
         eventType: input.eventType,
+        impression: metaObject?.impression === true,
         userId: input.userId ?? null,
         sessionId: input.sessionId ?? null,
         anonymousId: input.anonymousId ?? null,

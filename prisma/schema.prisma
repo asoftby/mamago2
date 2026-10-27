@@ -2855,6 +2855,7 @@ model OfferClassTariff {
   price String
   unit String
   periodDays Int?
+  visitsCount Int?
   active Boolean @default(true)
   position Int @default(0)
   @@index([groupId, position])
@@ -4119,6 +4120,8 @@ enum UserEventType {
   PLAN_ITEM_SHARED
   PLAN_ITEM_MADE_PRIVATE
   PLAN_ITEM_RESCHEDULED
+  /// Пользователь скрыл/отклонил рекомендацию («не интересно»). Приходит с клиента.
+  DISMISS
 }
 
 enum ExperienceAttendance {

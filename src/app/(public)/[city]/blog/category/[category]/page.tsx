@@ -1,14 +1,17 @@
 import Link from "next/link";
-import { formatJournalPublishedDate } from "@/lib/article/formatJournalPublishedDate";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BlogPagination } from "../../../../blog/BlogPagination";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import {
+  cityBlogCategoryScopeWhere,
   listCityBlogCategoryArticles,
   listCityBlogCategoryFacets,
   resolveCityBlogCategory,
 } from "@/server/article/cityBlogCategories";
+import { JournalPageView } from "@/components/journal/JournalPageView";
+import { journalTypeFilterHref, parseJournalTypeFilter } from "@/lib/journal/journalCardMeta";
+import { loadJournalPage } from "@/server/journal/journalPage";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
 import { buildAbsoluteCanonicalUrl, buildCityPublicPath } from "@/lib/routing/cityPaths";
 import { buildPublicPath } from "@/lib/routing/surface";
@@ -18,7 +21,7 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ city: string; category: string }>;
-  searchParams: Promise<{ page?: string | string[]; tag?: string | string[] }>;
+  searchParams: Promise<{ page?: string | string[]; tag?: string | string[]; type?: string | string[] }>;
 };
 
 function parsePage(value: string | string[] | undefined): number {
@@ -75,45 +78,39 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
   const facets = await listCityBlogCategoryFacets(city, category);
   // Неизвестный slug темы игнорируем — показываем весь раздел.
   const activeTag = facets.tags.find((tag) => tag.slug === rawTag) ?? null;
-  const journal = await listCityBlogCategoryArticles(city, category.id, requestedPage, undefined, { tagSlug: activeTag?.slug ?? null });
+  const typeFilter = parseJournalTypeFilter(query.type);
+  // Рубрика фильтрует все блоки страницы (Главное, Новости, Подборки, лента).
+  const scopeWhere = await cityBlogCategoryScopeWhere(city, category.id, { tagSlug: activeTag?.slug ?? null });
+  const journal = await loadJournalPage({
+    city,
+    scopeWhere,
+    scopeKey: `category:${category.id}:${activeTag?.slug ?? ""}`,
+    typeFilter,
+    page: requestedPage,
+  });
   if (requestedPage > journal.totalPages && journal.total > 0) notFound();
 
   const cityName = getCityDisplayName(city.slug);
   const categoryBasePath = categoryPath(city.slug, category.slug);
   const basePath = activeTag ? `${categoryBasePath}?tag=${encodeURIComponent(activeTag.slug)}` : categoryBasePath;
-  const chipBase = "shrink-0 rounded-full border px-4 py-2 text-sm transition-colors";
+  const chipBase = "inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-sm transition-colors";
   const chipIdle = "border-border hover:border-foreground/40";
   const chipActive = "border-foreground bg-foreground font-semibold text-background";
 
-  return (
-    <main className="site-wrap px-6 py-10 sm:px-7 md:py-14">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          { "@type": "ListItem", position: 1, name: city.name, item: buildAbsoluteCanonicalUrl(buildCityPublicPath({ citySlug: city.slug, type: "hub" })) },
-          { "@type": "ListItem", position: 2, name: "Журнал", item: buildAbsoluteCanonicalUrl(buildCityPublicPath({ citySlug: city.slug, type: "journal" })) },
-          { "@type": "ListItem", position: 3, name: category.nameRu, item: buildAbsoluteCanonicalUrl(categoryPath(city.slug, category.slug)) },
-        ],
-      }).replace(/</g, "\\u003c") }} />
-      <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-muted-foreground" aria-label="Хлебные крошки">
-        <Link href={`/${city.slug}`} className="hover:text-foreground hover:underline">{city.name}</Link>
-        <span>/</span>
-        <Link href={`/${city.slug}/blog`} className="hover:text-foreground hover:underline">Журнал</Link>
-        <span>/</span>
-        <span className="text-foreground">{category.nameRu}</span>
-      </nav>
+  const breadcrumbsJsonLd = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: city.name, item: buildAbsoluteCanonicalUrl(buildCityPublicPath({ citySlug: city.slug, type: "hub" })) },
+      { "@type": "ListItem", position: 2, name: "Журнал", item: buildAbsoluteCanonicalUrl(buildCityPublicPath({ citySlug: city.slug, type: "journal" })) },
+      { "@type": "ListItem", position: 3, name: category.nameRu, item: buildAbsoluteCanonicalUrl(categoryPath(city.slug, category.slug)) },
+    ],
+  }).replace(/</g, "\\u003c");
 
-      <header className="mb-8 border-b border-border pb-8">
-        <p className="mb-3 text-[11px] font-mono uppercase tracking-[.14em] text-primary">Раздел журнала</p>
-        <h1 className="font-heading text-[32px] leading-tight tracking-[-.025em]">{category.nameRu}</h1>
-        <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground">
-          {category.journalIntro?.trim() || `Статьи, обзоры и полезные материалы для семей с детьми в ${cityName}. Узнайте о новых идеях и событиях для всей семьи.`}
-        </p>
-      </header>
-
+  const facetsNav = facets.subcategories.length > 0 || facets.tags.length > 0 ? (
+    <div className="space-y-3 pt-2">
       {facets.subcategories.length > 0 ? (
-        <nav className="no-scrollbar mb-4 flex gap-2 overflow-x-auto pb-1" aria-label="Подкатегории">
+        <nav className="no-scrollbar flex gap-2 overflow-x-auto pb-1" aria-label="Подкатегории">
           <Link
             href={categoryPath(city.slug, facets.root.slug)}
             aria-current={!category.parentId ? "page" : undefined}
@@ -133,13 +130,12 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
           ))}
         </nav>
       ) : null}
-
       {facets.tags.length > 0 ? (
-        <nav className="no-scrollbar mb-8 flex gap-2 overflow-x-auto pb-1" aria-label="Темы раздела">
+        <nav className="no-scrollbar flex gap-2 overflow-x-auto pb-1" aria-label="Темы раздела">
           <Link
             href={categoryBasePath}
             aria-current={!activeTag ? "page" : undefined}
-            className={`${chipBase} ${!activeTag ? "border-primary bg-primary/10 font-semibold text-primary" : chipIdle}`}
+            className={`${chipBase} ${!activeTag ? "border-primary bg-primary/10 font-semibold text-brand-ink" : chipIdle}`}
           >
             Все темы
           </Link>
@@ -148,43 +144,36 @@ export default async function CityBlogCategoryPage({ params, searchParams }: Pag
               key={tag.id}
               href={`${categoryBasePath}?tag=${encodeURIComponent(tag.slug)}`}
               aria-current={activeTag?.slug === tag.slug ? "page" : undefined}
-              className={`${chipBase} ${activeTag?.slug === tag.slug ? "border-primary bg-primary/10 font-semibold text-primary" : chipIdle}`}
+              className={`${chipBase} ${activeTag?.slug === tag.slug ? "border-primary bg-primary/10 font-semibold text-brand-ink" : chipIdle}`}
             >
               {tag.name}
             </Link>
           ))}
         </nav>
       ) : null}
+    </div>
+  ) : null;
 
-      {journal.total === 0 ? (
-        <div className="py-12 text-center"><p>Скоро здесь появятся материалы</p><Link href={buildCityPublicPath({ citySlug: city.slug, type: "journal" })} className="mt-4 inline-block text-primary underline">Все</Link></div>
-      ) : null}
-      <section aria-label={`Материалы раздела ${category.nameRu}`}>
-        <div className="grid gap-6 md:grid-cols-2">
-          {journal.articles.map((article) => (
-            <article key={article.id} className="overflow-hidden rounded-2xl border border-border bg-background">
-              <Link href={article.href} className="group block h-full">
-                {article.coverImageUrl ? (
-                  <img src={article.coverImageUrl} alt="" className="aspect-[16/10] w-full object-cover" loading="lazy" />
-                ) : (
-                  <div className="aspect-[16/10] w-full bg-muted" />
-                )}
-                <div className="p-5">
-                  <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    {article.publishedAt ? <time dateTime={new Date(article.publishedAt).toISOString()}>{formatJournalPublishedDate(article.publishedAt)}</time> : null}
-                    <span>·</span>
-                    <span>{article.readTime} мин</span>
-                  </div>
-                  <h2 className="font-heading text-[32px] leading-tight tracking-[-.015em] transition-colors group-hover:text-primary">{article.title}</h2>
-                  {article.subtitle ? <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground">{article.subtitle}</p> : null}
-                </div>
-              </Link>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <BlogPagination basePath={basePath} page={journal.page} totalPages={journal.totalPages} />
+  return (
+    <main>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: breadcrumbsJsonLd }} />
+      <JournalPageView
+        title={category.nameRu}
+        subtitle={category.journalIntro?.trim() || `Статьи, обзоры и полезные материалы для семей с детьми в ${cityName}.`}
+        main={journal.main}
+        news={journal.news}
+        collections={journal.collections}
+        feed={journal.feed}
+        typeFilter={typeFilter}
+        basePath={basePath}
+        citySlug={city.slug}
+        intro={facetsNav}
+      />
+      <BlogPagination
+        basePath={typeFilter ? journalTypeFilterHref(basePath, typeFilter) : basePath}
+        page={journal.page}
+        totalPages={journal.totalPages}
+      />
     </main>
   );
 }

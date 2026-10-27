@@ -164,12 +164,16 @@ export function StepClassSchedule({ data, onChange, isEditable }: StepClassSched
                           <Input type="number" min={1} max={366} value={tariff.periodDays ?? ""} disabled={!isEditable}
                             onChange={(event) => patchGroup(group.id, { tariffs: (group.tariffs ?? []).map((item) => item.id === tariff.id ? { ...item, periodDays: event.target.value ? Number(event.target.value) : null } : item) })} />
                         </div>
+                        <div className="w-24 space-y-1"><Label>Посещений</Label>
+                          <Input type="number" min={1} max={365} placeholder="1" value={tariff.visitsCount ?? ""} disabled={!isEditable}
+                            onChange={(event) => patchGroup(group.id, { tariffs: (group.tariffs ?? []).map((item) => item.id === tariff.id ? { ...item, visitsCount: event.target.value ? Number(event.target.value) : null } : item) })} />
+                        </div>
                         <Button type="button" variant="ghost" size="sm" disabled={!isEditable} onClick={() =>
                           patchGroup(group.id, { tariffs: (group.tariffs ?? []).filter((item) => item.id !== tariff.id) })}>Удалить</Button>
                       </div>
                     ))}
                     <Button type="button" variant="outline" size="sm" disabled={!isEditable || (group.tariffs?.length ?? 0) >= 12}
-                      onClick={() => patchGroup(group.id, { tariffs: [...(group.tariffs ?? []), { id: newClassScheduleId(), title: "", price: "", unit: "занятие", periodDays: null }] })}>
+                      onClick={() => patchGroup(group.id, { tariffs: [...(group.tariffs ?? []), { id: newClassScheduleId(), title: "", price: "", unit: "занятие", periodDays: null, visitsCount: 1 }] })}>
                       <Plus className="mr-1 h-4 w-4" /> Добавить тариф
                     </Button>
                   </div>
