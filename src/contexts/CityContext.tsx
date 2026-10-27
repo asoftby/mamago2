@@ -101,17 +101,8 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
   const citySlug = resolvedCity.citySlug ?? DEFAULT_CITY_SLUG;
   const cityName = resolvedCity.cityName ?? citySlug;
 
-  // 3. Sync storage with stable city (but NO router.push/refresh here)
-  useEffect(() => {
-    if (!isInitialized || !resolvedCity.citySlug || scopedEvents) return;
-    if (resolvedCity.citySlug === storedCity) return;
-
-    // Only update storage if it's a route-based city or a default
-    writeTerritoryCookieClient(resolvedCity.citySlug);
-    queueMicrotask(() => {
-      setStoredCity(resolvedCity.citySlug);
-    });
-  }, [resolvedCity.citySlug, storedCity, isInitialized, scopedEvents]);
+  // A route is not consent to change the persisted catalog territory.
+  // Only the explicit global header setCity() action writes mg_territory.
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production" && isInitialized) {
