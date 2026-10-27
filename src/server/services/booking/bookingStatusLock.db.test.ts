@@ -4,6 +4,7 @@
  *   RUN_BOOKING_LOCK_DB_TEST=1 pnpm exec tsx src/server/services/booking/bookingStatusLock.db.test.ts
  */
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { BookingStatus, PublicationType } from "@prisma/client";
 import prisma from "@/lib/prisma";
@@ -11,8 +12,13 @@ import prisma from "@/lib/prisma";
 test("only one concurrent status transition can consume NEW", {
   skip: process.env.RUN_BOOKING_LOCK_DB_TEST !== "1" ? "requires isolated PostgreSQL fixture" : false,
 }, async () => {
-  const business = await prisma.business.findFirst({ select: { id: true } });
-  if (!business) throw new Error("Integration database must contain a business fixture");
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl || !["localhost", "127.0.0.1"].includes(new URL(databaseUrl).hostname)) {
+    throw new Error("This test requires a disposable localhost PostgreSQL database");
+  }
+  const ownerId = `booking-lock-${randomUUID()}`;
+  await prisma.user.create({ data: { id: ownerId, email: `${ownerId}@example.test` } });
+  const business = await prisma.business.create({ data: { name: ownerId, ownerUserId: ownerId } });
   const booking = await prisma.bookingRequest.create({
     data: {
       businessId: business.id,
@@ -51,5 +57,7 @@ test("only one concurrent status transition can consume NEW", {
     assert.ok([BookingStatus.CONFIRMED, BookingStatus.REJECTED].includes(persisted.status));
   } finally {
     await prisma.bookingRequest.delete({ where: { id: booking.id } });
+    await prisma.business.delete({ where: { id: business.id } });
+    await prisma.user.delete({ where: { id: ownerId } });
   }
 });
