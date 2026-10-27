@@ -35,7 +35,9 @@ const browser = {
 };
 const previousWindow = (globalThis as { window?: unknown }).window;
 const previousEvent = (globalThis as { Event?: unknown }).Event;
+const previousLocalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
 (globalThis as { window?: unknown }).window = browser;
+Object.defineProperty(globalThis, "localStorage", { configurable: true, value: browser.localStorage });
 (globalThis as { Event?: unknown }).Event = class { constructor(public type: string) {} };
 try {
   assert.equal(readLastPublicSearchResult(), null);
@@ -62,6 +64,11 @@ try {
   assert.equal(readLastPublicSearchResult()?.title, "Детский центр");
   assert.ok(events.includes("mmg-last-search-result-updated"));
 } finally {
+  if (previousLocalStorage) {
+    Object.defineProperty(globalThis, "localStorage", previousLocalStorage);
+  } else {
+    Reflect.deleteProperty(globalThis, "localStorage");
+  }
   (globalThis as { window?: unknown }).window = previousWindow;
   (globalThis as { Event?: unknown }).Event = previousEvent;
 }
