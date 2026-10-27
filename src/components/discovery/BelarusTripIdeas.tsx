@@ -44,7 +44,8 @@ export async function BelarusTripIdeas({ searchParams }: { searchParams: Params 
   const suggestions = counted.filter((item) => item.count > 0).sort((a,b) => b.count - a.count || a.region.name.localeCompare(b.region.name, "ru"));
   const preserved = new URLSearchParams();
   for (const [key,value] of Object.entries(searchParams)) {
-    if (["city","explore","district","metro"].includes(key) || value == null) continue;
+    // Another territory is a new result set: start from its first listing page.
+    if (["city","explore","district","metro","page"].includes(key) || value == null) continue;
     if (Array.isArray(value)) value.forEach(v => preserved.append(key,v));
     else preserved.set(key,value);
   }

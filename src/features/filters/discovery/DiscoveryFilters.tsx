@@ -1,5 +1,6 @@
 "use client";
 
+import { resetListingPage } from "./discoveryFilterParams";
 import { useState, useEffect, useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useDiscoveryFilters, type DiscoveryFilters as DiscoveryFiltersType } from "./filters.store";
@@ -239,7 +240,7 @@ export function DiscoveryFilters({
   // Helper function to update URL immediately (for desktop)
   const updateUrlImmediately = (patch: Partial<DiscoveryFiltersType>) => {
     const nextApplied = { ...applied, ...patch };
-    const params = new URLSearchParams(searchParams.toString());
+    const params = resetListingPage(new URLSearchParams(searchParams.toString()));
     
     // Date
     if (nextApplied.dateFrom) params.set("from", nextApplied.dateFrom); else params.delete("from");

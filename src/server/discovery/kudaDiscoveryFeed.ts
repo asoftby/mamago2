@@ -21,6 +21,7 @@ import {
 import type { TimeOfDay } from "@/features/hero-weather/model/types";
 import { mapDiscoveryEventToActivityMock } from "@/server/discovery/mapDiscoveryEventToActivityMock";
 import { buildEventRuntimeWhere, type EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
+import { withImageDimensions } from "@/server/media/loadImageDimensionsByUrl";
 
 function hasActiveEventRuntimeFilters(filters: EventRuntimeFilters): boolean {
   return Boolean(
@@ -101,6 +102,8 @@ export async function getKudaDiscoveryFeed(
   currentUserId: string | null,
   options?: {
     take?: number;
+    /** Max DB candidates ranked in memory (default 200). Paginated listings raise it. */
+    candidatePoolCap?: number;
     format?: ActivityFormat | null;
     nearby?: boolean;
     eventFilters?: EventRuntimeFilters;
@@ -137,7 +140,7 @@ export async function getKudaDiscoveryFeed(
   /** Пул кандидатов для сортировки; без избыточного findMany (было ×5 до 400 — долго на TTFB). */
   const rows = await prisma.activity.findMany({
     where,
-    take: Math.min(take * 3, 200),
+    take: Math.min(take * 3, options?.candidatePoolCap ?? 200),
     orderBy: [{ nextOccurrenceAt: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
     include: {
       images: {
@@ -237,7 +240,7 @@ export async function getKudaDiscoveryFeed(
     return ta - tb || a.id.localeCompare(b.id);
   });
 
-  const result = cards.slice(0, take);
+  const result = await withImageDimensions(cards.slice(0, take), (card) => card.image);
   perf.mark("mapSort");
   perf.log({
     citySlug,

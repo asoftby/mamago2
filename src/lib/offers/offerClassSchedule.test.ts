@@ -43,7 +43,7 @@ regular.periodTo = "2026-12-14";
 assert.deepEqual(buildClassScheduleInput(regular, ["2026-11-07", "2026-11-07", "bad"], "REGULAR_ACTIVITY", "1 час"), {
   kind: "recurring",
   durationMin: 60,
-  groups: [{ days: [2, 4], time: "17:30", seats: 8 }],
+  groups: [{ id: "a", tariffs: [], days: [2, 4], time: "17:30", seats: 8 }],
   dates: [],
   period: { from: "2026-10-19", to: "2026-12-14" },
   closedDates: ["2026-11-07"],
@@ -79,20 +79,20 @@ assert.deepEqual(getClassScheduleMissingFields(defaultClassSchedule(), "PLACE_VI
 
 // схема запроса: занятие не должно выходить за полночь, конец курса не раньше начала
 assert.equal(
-  classScheduleInputSchema.safeParse({ kind: "recurring", durationMin: 60, groups: [{ days: [1], time: "23:30", seats: null }] }).success,
+  classScheduleInputSchema.safeParse({ kind: "recurring", durationMin: 60, groups: [{ id: "late", days: [1], time: "23:30", seats: null }] }).success,
   false,
 );
 assert.equal(
   classScheduleInputSchema.safeParse({
     kind: "recurring",
     durationMin: 60,
-    groups: [{ days: [1], time: "10:00", seats: null }],
+    groups: [{ id: "invalid-period", days: [1], time: "10:00", seats: null }],
     period: { from: "2026-12-01", to: "2026-11-01" },
   }).success,
   false,
 );
 assert.equal(
-  classScheduleInputSchema.safeParse({ kind: "recurring", durationMin: 60, groups: [{ days: [8], time: "10:00", seats: null }] }).success,
+  classScheduleInputSchema.safeParse({ kind: "recurring", durationMin: 60, groups: [{ id: "invalid-day", days: [8], time: "10:00", seats: null }] }).success,
   false,
 );
 assert.equal(classScheduleInputSchema.safeParse({ kind: "dated", durationMin: 60 }).success, true);
@@ -140,12 +140,12 @@ for (const secondStart of [1020, 1080]) {
 // Явный null группы означает отсутствие границ, а не общий период.
 const explicitUnbounded = classScheduleInputSchema.parse({
   kind: "recurring", durationMin: 60, period: { from: "2026-10-01", to: "2026-10-31" },
-  groups: [{ days: [1], time: "17:00", seats: null, period: null }],
+  groups: [{ id: "unbounded", days: [1], time: "17:00", seats: null, period: null }],
 });
 assert.equal(explicitUnbounded.groups[0].period, null);
 assert.equal(classScheduleInputSchema.safeParse({
   kind: "recurring", durationMin: 60,
-  groups: [{ days: [1], time: "17:00", seats: 10, period: { from: "2026-11-30", to: "2026-11-01" } }],
+  groups: [{ id: "reversed", days: [1], time: "17:00", seats: 10, period: { from: "2026-11-30", to: "2026-11-01" } }],
 }).success, false);
 const invalidGroupPeriod = { ...defaultClassSchedule(), groups: [{
   id: "bad-period", days: [1], time: "17:00", seats: "10",
@@ -178,3 +178,16 @@ for (const productType of ["REGULAR_ACTIVITY", "ONE_TIME_ACTIVITY"] as const) {
   unlimited.dates = [{ id: "d", date: "2026-11-01", time: "17:00", seats: "" }];
   assert.deepEqual(getClassScheduleMissingFields(unlimited, productType, "60"), []);
 }
+
+// Stable IDs and group-scoped tariff options must survive build/parse cycles.
+const withTariff = defaultClassSchedule();
+withTariff.groups = [{ id: "grp-001", days: [1], time: "17:00", seats: "8",
+  tariffs: [{ id: "tariff-001", title: "Месяц", price: "120", unit: "BYN", periodDays: 30 }] }];
+const structured = classScheduleInputSchema.parse(buildClassScheduleInput(withTariff, [], "REGULAR_ACTIVITY", "60"));
+assert.equal(structured.groups[0].id, "grp-001");
+assert.deepEqual(structured.groups[0].tariffs, [{ id: "tariff-001", title: "Месяц", price: "120", unit: "BYN", periodDays: 30 }]);
+const sameTimeGroups = groupsFromRules([
+  { classGroupId: "grp-001", weekday: 1, startMinutes: 1020, capacity: 8 },
+  { classGroupId: "grp-002", weekday: 1, startMinutes: 1020, capacity: 12 },
+]);
+assert.deepEqual(sameTimeGroups.groups.map((g) => g.id), ["grp-001", "grp-002"]);

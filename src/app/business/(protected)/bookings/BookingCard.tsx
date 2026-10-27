@@ -130,6 +130,13 @@ export function BookingCard({ booking, onStatusChange }: BookingCardProps) {
             )}
           </div>
 
+          {(booking.classGroupTitle || booking.classTariffTitle) && (
+            <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-800">
+              {booking.classGroupTitle && <span className="font-medium">Группа: {booking.classGroupTitle}</span>}
+              {booking.classTariffTitle && <span className="ml-2 font-medium">Тариф: {booking.classTariffTitle}</span>}
+              {booking.classTariffPrice ? <span className="ml-2 text-stone-600">· {booking.classTariffPrice} {booking.classTariffUnit ?? ""}</span> : null}
+            </div>
+          )}
           {/* Title from display */}
           <h3 className="text-[15px] font-semibold text-stone-900 leading-snug">
             {display.title}

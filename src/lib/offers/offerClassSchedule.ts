@@ -22,6 +22,8 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 /** Группа регулярных занятий: дни недели ISO (1 = Пн … 7 = Вс), время начала, число мест. */
 export interface ClassSessionGroup {
   id: string;
+  title?: string;
+  tariffs?: Array<{ id: string; title: string; price: string; unit: string; periodDays?: number | null }>;
   days: number[];
   time: string;
   seats: string;
@@ -114,6 +116,15 @@ export const classScheduleInputSchema = z
     groups: z
       .array(
         z.object({
+          id: z.string().min(1).max(128),
+          title: z.string().trim().max(120).optional(),
+          tariffs: z.array(z.object({
+            id: z.string().min(1).max(128),
+            title: z.string().trim().min(1).max(120),
+            price: z.string().trim().min(1).max(80),
+            unit: z.string().trim().min(1).max(80),
+            periodDays: z.number().int().min(1).max(366).nullable().optional(),
+          })).max(12).default([]),
           days: z.array(z.number().int().min(1).max(7)).min(1).max(7),
           time: z.string().regex(TIME_RE),
           seats: seatsSchema,
@@ -130,6 +141,20 @@ export const classScheduleInputSchema = z
     closedDates: z.array(z.string().regex(DATE_RE)).max(366).default([]),
   })
   .superRefine((value, ctx) => {
+    const ids = new Set<string>();
+    for (const [i, group] of value.groups.entries()) {
+      if (ids.has(group.id)) {
+        ctx.addIssue({ code: "custom", path: ["groups", i, "id"], message: "ID группы должен быть уникальным" });
+      }
+      ids.add(group.id);
+      const tariffIds = new Set<string>();
+      for (const [j, tariff] of group.tariffs.entries()) {
+        if (tariffIds.has(tariff.id)) {
+          ctx.addIssue({ code: "custom", path: ["groups", i, "tariffs", j, "id"], message: "ID тарифа должен быть уникальным" });
+        }
+        tariffIds.add(tariff.id);
+      }
+    }
     for (const [i, group] of value.groups.entries()) {
       const period = group.period === undefined ? value.period : group.period;
       if (period?.from && period.to && period.to < period.from) {
@@ -173,7 +198,7 @@ export function buildClassScheduleInput(
         ? form.groups
             .filter((group) => group.days.length > 0 && TIME_RE.test(group.time))
             .map((group) => ({
-              days: [...new Set(group.days)].sort(), time: group.time, seats: parseSeats(group.seats),
+              id: group.id, ...(group.title !== undefined ? { title: group.title } : {}), tariffs: group.tariffs ?? [], days: [...new Set(group.days)].sort(), time: group.time, seats: parseSeats(group.seats),
               ...(group.period !== undefined ? { period: group.period } : {}),
             }))
         : [],
@@ -229,6 +254,7 @@ export function groupsFromRules(
     weekday: number;
     startMinutes: number;
     capacity: number | null;
+    classGroupId?: string | null;
     validFrom?: Date | string | null;
     validTo?: Date | string | null;
   }>,
@@ -240,13 +266,13 @@ export function groupsFromRules(
   const byKey = new Map<string, ClassSessionGroup>();
   for (const rule of [...rules].sort((a, b) => a.startMinutes - b.startMinutes || a.weekday - b.weekday)) {
     const period = { from: key(rule.validFrom), to: key(rule.validTo) };
-    const groupKey = JSON.stringify([rule.startMinutes, rule.capacity, period.from, period.to]);
+    const groupKey = rule.classGroupId ?? JSON.stringify([rule.startMinutes, rule.capacity, period.from, period.to]);
     const existing = byKey.get(groupKey);
     if (existing) {
       if (!existing.days.includes(rule.weekday)) existing.days.push(rule.weekday);
     } else {
       byKey.set(groupKey, {
-        id: `group:${groupKey}`,
+        id: rule.classGroupId ?? `group:${groupKey}`,
         days: [rule.weekday],
         time: minutesToTime(rule.startMinutes),
         seats: rule.capacity ? String(rule.capacity) : "",

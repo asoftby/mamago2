@@ -22,7 +22,9 @@ export default async function AdminPublicationsPage() {
     rows
       .filter(
         (row) =>
-          row.type === PublicationType.ARTICLE || row.type === PublicationType.NEWS,
+          row.type === PublicationType.ARTICLE ||
+          row.type === PublicationType.NEWS ||
+          row.type === PublicationType.COLLECTION,
       )
       .map((row) => {
         const status = row.status as ContentStatus;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
 import { getSlots } from "@/server/offers/getSlots";
+import { dateKeyInZone, isoWeekday, localMinuteKey } from "@/server/offers/slotTime";
 
 const DAY_MS = 86_400_000;
 const MAX_RANGE_DAYS = 31;
@@ -36,12 +37,30 @@ export async function GET(
       bookingEnabled: true,
       bookingMode: { in: ["USE_PUBLICATION_DATES", "USE_PUBLICATION_SLOTS"] },
     },
-    select: { id: true },
+    select: { id: true, offerBooking: { select: { timezone: true } }, classGroups: { where: { active: true }, orderBy: { position: "asc" }, include: { tariffs: { where: { active: true }, orderBy: { position: "asc" } }, rules: true } } },
   });
   if (!offer) return NextResponse.json({ error: "Занятие недоступно для записи" }, { status: 404 });
 
-  const slots = await getSlots({ offerId: offer.id, from, to, requestedSeats: seats });
+  const legacySlots = offer.classGroups.length === 0
+    ? await getSlots({ offerId: offer.id, from, to, requestedSeats: seats })
+    : [];
+  const groups = await Promise.all(offer.classGroups.map(async (group) => {
+    const scoped = await getSlots({ offerId: offer.id, classGroupId: group.id, from, to, requestedSeats: seats });
+    return {
+      id: group.id,
+      title: group.title,
+      tariffs: group.tariffs.map((tariff) => ({
+        id: tariff.id, label: tariff.title, price: tariff.price, unit: tariff.unit, periodDays: tariff.periodDays,
+      })),
+      slots: scoped.map((slot) => ({
+        startsAt: slot.startsAt.toISOString(), endsAt: slot.endsAt.toISOString(),
+        remainingSeats: slot.remainingSeats, unitIds: slot.unitIds, sessionId: slot.sessionId ?? null,
+      })),
+    };
+  }));
+  const slots = legacySlots;
   return NextResponse.json({
+    groups,
     slots: slots.map((slot) => ({
       startsAt: slot.startsAt.toISOString(),
       endsAt: slot.endsAt.toISOString(),

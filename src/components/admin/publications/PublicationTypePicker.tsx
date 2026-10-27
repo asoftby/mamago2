@@ -21,7 +21,7 @@ const OPTIONS = [
   {
     type: "collection" as const,
     title: "Подборка",
-    description: "SEO-страница с вводным текстом и динамической выдачей",
+    description: "Публикация журнала со списком событий, предложений и статей (от 3)",
     Icon: Layers,
   },
 ];
@@ -43,6 +43,10 @@ export function PublicationTypePicker({
     }
     if (type === "article") {
       router.push("/admin/content/articles/new");
+      return;
+    }
+    if (type === "collection") {
+      router.push("/admin/content/articles/new?type=collection");
       return;
     }
     router.push(`/admin/content/publications/new?type=${type}`);

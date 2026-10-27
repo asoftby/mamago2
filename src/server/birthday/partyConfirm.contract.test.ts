@@ -2,7 +2,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { partyOutboxCopy, isPartyOutboxEventType } from "./partyOutbox.logic";
 
-const service = readFileSync(new URL("./partyConfirm.service.ts", import.meta.url), "utf8");
+const confirmService = readFileSync(new URL("./partyConfirm.service.ts", import.meta.url), "utf8");
+const fanout = readFileSync(new URL("./partyAddonFanout.ts", import.meta.url), "utf8");
+// The add-on fan-out is shared with the fixed-price auto-confirmation; check both together.
+const service = confirmService + fanout;
+assert.match(confirmService, /isAnchor \? await requestPartyAddonsAfterAnchor\(tx,/);
+// Claim PLANNED → REQUESTED before creating the request: a repeat cannot double-request an item.
+assert.ok(fanout.indexOf("status: PartyItemStatus.REQUESTED") < fanout.indexOf("tx.bookingRequest.create"));
+assert.match(fanout, /if \(claimed\.count !== 1\) continue;/);
 const route = readFileSync(new URL("../../app/api/business/party-requests/[id]/confirm/route.ts", import.meta.url), "utf8");
 
 for (const invariant of [

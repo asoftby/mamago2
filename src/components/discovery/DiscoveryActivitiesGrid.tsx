@@ -4,7 +4,13 @@ import { useEffect, useMemo, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { isScopedEventBrowsing } from "@/lib/city/scopedEventBrowsing";
 import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
-import { EventCard, activityMockToEventCard } from "@/components/events";
+import { EventCard, EVENT_LISTING_IMAGE_SIZES, activityMockToEventCard } from "@/components/events";
+import { KudaMasonryListing, type KudaListingProps } from "@/components/discovery/KudaMasonryListing";
+import {
+  discoveryFiltersSignature,
+  withImplicitListingFilters,
+  type ImplicitListingFilters,
+} from "@/features/filters/discovery/discoveryFilterParams";
 import { OfferCard } from "@/components/offers/OfferCard";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import {
@@ -35,6 +41,13 @@ type DiscoveryActivitiesGridProps = {
   coverRatio?: string;
   emptyTitle?: string;
   emptyDescription?: string;
+  /**
+   * Afisha («Куда пойти»): server-paginated, server-partitioned listing rendered
+   * as ordered masonry with infinite scroll. When set, `activities` is ignored.
+   */
+  kudaListing?: KudaListingProps;
+  /** Route-implied filters (category hub); merged into the effective filters. */
+  implicitFilters?: ImplicitListingFilters;
 };
 
 function filtersSignature(f: DiscoveryFilters): string {
@@ -74,6 +87,8 @@ export function DiscoveryActivitiesGrid({
   coverRatio,
   emptyTitle = "Пока нет событий по вашему запросу",
   emptyDescription = "В этом городе пока нет подходящих опубликованных событий — или стоит ослабить фильтры.",
+  kudaListing,
+  implicitFilters,
 }: DiscoveryActivitiesGridProps) {
   const cityCtx = useOptionalCity();
   const pathname = usePathname();
@@ -86,7 +101,10 @@ export function DiscoveryActivitiesGrid({
   const debounced = useDebouncedValue(applied, 400);
   const appliedFilterSummary = filtersSignature(applied);
   const filterSummary = filtersSignature(debounced);
-  const isPending = appliedFilterSummary !== filterSummary;
+  // Afisha: pending until the server render for the applied URL arrives.
+  const isPending = kudaListing
+    ? discoveryFiltersSignature(withImplicitListingFilters(applied, implicitFilters)) !== kudaListing.filtersSignature
+    : appliedFilterSummary !== filterSummary;
   const previousFilterSummaryRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -110,11 +128,11 @@ export function DiscoveryActivitiesGrid({
 
   const { primary, secondary, secondaryHeading } = useMemo(
     () =>
-      partitionDiscoveryFeed(debounced, activities, {
+      partitionDiscoveryFeed(debounced, kudaListing ? [] : activities, {
         personas: family?.personas ?? [],
         selectedPersonaIds: family?.selectedPersonaIds ?? [],
       }),
-    [debounced, activities, family?.personas, family?.selectedPersonaIds],
+    [debounced, activities, kudaListing, family?.personas, family?.selectedPersonaIds],
   );
 
   const renderCard = (
@@ -175,6 +193,8 @@ export function DiscoveryActivitiesGrid({
       ) : (
         <EventCard
           {...activityMockToEventCard(activity, citySlug)}
+          framing="poster"
+          imageSizes={EVENT_LISTING_IMAGE_SIZES}
           metaLabel={(() => {
             const meta = activityMockToEventCard(activity, citySlug).metaLabel;
             const location = activity.citySlug && activity.citySlug !== citySlug
@@ -186,7 +206,6 @@ export function DiscoveryActivitiesGrid({
             const href = activityMockToEventCard(activity, citySlug).href;
             return scopedEvents ? `${href}${href.includes("?") ? "&" : "?"}explore=1` : href;
           })()}
-          coverRatio={ratio}
           className="h-full"
           imagePriority={feedBucket === "primary" && position <= 4}
         />
@@ -194,7 +213,9 @@ export function DiscoveryActivitiesGrid({
     </AnalyticsCardViewTracker>
   );
 
-  const showEmpty = !isPending && primary.length === 0 && secondary.length === 0;
+  const showEmpty = kudaListing
+    ? !isPending && kudaListing.total === 0
+    : !isPending && primary.length === 0 && secondary.length === 0;
 
   return (
     <div className={cn("space-y-8", className)}>
@@ -217,7 +238,24 @@ export function DiscoveryActivitiesGrid({
         </div>
       )}
 
-      {!showEmpty && (
+      {kudaListing && !showEmpty && (
+        isPending ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 lg:gap-5" aria-hidden>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className={cn("overflow-hidden rounded-[18px] bg-neutral-100 animate-pulse", masonrySkeletonAspect(i))} />
+            ))}
+          </div>
+        ) : (
+          <KudaMasonryListing
+            listing={kudaListing}
+            citySlug={citySlug}
+            filterSummary={filterSummary}
+            implicitFilters={implicitFilters}
+          />
+        )
+      )}
+
+      {!kudaListing && !showEmpty && (
       <div
         className={cn(
           "grid grid-cols-1 gap-5 min-[360px]:grid-cols-2 lg:grid-cols-4",
@@ -241,7 +279,7 @@ export function DiscoveryActivitiesGrid({
       </div>
       )}
 
-      {!isPending && !showEmpty && secondary.length > 0 && secondaryHeading && (
+      {!kudaListing && !isPending && !showEmpty && secondary.length > 0 && secondaryHeading && (
         <div className="space-y-4">
           <h2 className="px-1 text-[15px] font-semibold text-muted-foreground">
             {secondaryHeading}

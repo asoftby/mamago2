@@ -5469,7 +5469,46 @@ distributor_company_id=550) и хотели бы уточнить несколь
   порядок не меняется без оплаты.
 - Source: аудит #787.
 
-## [BACKLOG-202] Кабинет бизнеса и отчёты по бусту: перевести на новые определения аналитики
+## [BACKLOG-199] Карточка события: перенос цены и лайка с постера в текстовый блок
+
+- Status: OPEN
+- Priority: P2
+- Area: Events / Design system
+- Added: 2026-10-27
+- Reason deferred: владелец отложил раздел 5 ТЗ «Кладка постеров в афише» («пока»); в PR 2–3 оверлеи (сердце сверху справа, цена/«Бесплатно» снизу) остаются на постере во всех местах.
+- Context: целевая вёрстка — на постере ни одного оверлея; сверху вниз: постер; строка «категория слева, лайк справа» (та же `SaveHeart`, зона ≥ 44×44px); название до 2 строк; мета «возраст · дата · цена» (`Бесплатно` / `от 30 BYN`). Затрагивает `src/components/events/EventCard.tsx`, `src/app/(public)/me/ideas/components/IdeaPosterCard.tsx`; журнал (`ArticlePlaceEmbed`) визуально не меняется (вариант через prop), карусели — по решению. Аудит: `docs/engineering/poster-masonry-audit.md`.
+- Current state: PR 2 добавил только правило пропорций; на низких кадрах (< 3:4) цена переезжает в левый нижний угол, чтобы не наслаиваться на сердце (`posterPriceBadgeSide`).
+- Dependencies: решение владельца по возврату к задаче.
+- Acceptance criteria: на постере нет оверлеев во всех листингах событий и в избранном; кладка (`OrderedMasonryGrid`) корректно учитывает новую высоту текстового блока; журнал и карусель на главной не меняются визуально.
+- Source: ТЗ «Кладка постеров в афише», ответ владельца на вопросы PR #786.
+
+## [BACKLOG-201] Кладка афиши: замер CLS/LCP на DEV и нативный CSS masonry
+
+- Status: OPEN
+- Priority: P2
+- Area: Events / Performance
+- Added: 2026-10-27
+- Reason deferred: в окружении агента нет браузера и БД — целевые метрики ТЗ (мобильный CLS < 0.05, LCP не хуже текущего) не измерены; нативный CSS masonry (`display: grid-lanes`/`masonry`) не включён — ТЗ допускает его только как прогрессивное улучшение.
+- Context: PR 3 «кладка постеров» (`feat/poster-masonry-feed-20261027`): `OrderedMasonryGrid` («самая короткая колонка», 2/3/4), пагинация афиши по 24 (`?page=N` + догрузка), восстановление позиции из sessionStorage. На ≥640px до гидрации рендерится сетка в порядке выдачи, после гидрации — кладка (возможен сдвиг на планшете/десктопе; на мобильном SSR = клиент).
+- Current state: unit-тесты раскладки/пагинации есть; Lighthouse/Web Vitals не сняты.
+- Dependencies: деплой PR 1–3 на DEV, бэкфилл размеров (`pnpm media:backfill-dimensions`).
+- Acceptance criteria: Lighthouse mobile (Slow 4G, 4x CPU, 5 прогонов) на `/minsk/events` и `/minsk/events?page=2`: CLS < 0.05, LCP ≤ текущего `dev`; ручная проверка возврата с карточки события (позиция и колонки), поворота экрана, подгрузки; при необходимости — SSR-кладка по `Sec-CH-Viewport-Width`/UA для планшетов.
+- Source: ТЗ «Кладка постеров в афише», PR 3.
+
+## [BACKLOG-202] Удалить legacy-демо компоненты карточки праздника в ЛК
+
+- Status: OPEN
+- Priority: P3
+- Area: Birthday / Parent cabinet
+- Added: 2026-10-27
+- Reason deferred: вне scope исправлений P0 из аудита #818; удаление не влияет на поведение.
+- Context: `/me/birthdays/[id]` рендерит `PartyOrderStatusScreen` из `readPartyOrder` (с проверкой `ownerUserId`). Заглушка `getUserBirthdayPartyDetail` удалена в рамках #818; компоненты `BirthdayPartyDetailView`, `ScenarioFinalPage`, `BookingStatusPage` (`src/features/me/components/`) и демо-поля типа `UserBirthdayPartyDetail` больше нигде не импортируются.
+- Current state: мёртвый код, сборку не ломает.
+- Dependencies: нет.
+- Acceptance criteria: файлы и неиспользуемые типы удалены; `tsc`, lint и `test:birthday-catalog` зелёные.
+- Source: аудит #818.
+
+## [BACKLOG-210] Кабинет бизнеса и отчёты по бусту: перевести на новые определения аналитики
 
 - Status: OPEN
 - Priority: P2

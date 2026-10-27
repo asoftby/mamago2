@@ -499,6 +499,7 @@ async function buildOfferPageDataFromOffer(
       (offer.bookingMode !== "EXTERNAL" || Boolean(offer.offerBooking?.externalUrl)),
     
     pricing: {
+      rawPriceItems: offer.priceItems,
       priceMode: offer.priceMode,
       mode: pricingMode,
       singlePrice: effectivePriceFrom != null ? formatPrice(effectivePriceFrom) : undefined,

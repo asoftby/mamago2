@@ -58,7 +58,11 @@ for (const needle of [
   'rule: "FIXED_PRICE"', "auto: true", '"PARTY_BOOKING_CONFIRMED"', '"party:" + requestId + ":confirmed"',
   "lastActivityAt: existing.lastActivityAt",
 ]) assert.ok(service.includes(needle), "Missing auto-confirm invariant: " + needle);
-assert.ok(!service.includes("addonRequests") && !service.includes('"PARTY_REQUEST_SENT"'), "No fan-out on auto-confirm (PR 3)");
+// An auto-confirmed anchor requests the add-ons in the same transaction (deferred "PR 3", #818 F1).
+assert.match(service, /if \(item\.role === "ANCHOR"\) \{\s*await requestPartyAddonsAfterAnchor\(tx, \{/,
+  "Auto-confirmed anchor must fan out add-ons");
+assert.ok(service.indexOf("requestPartyAddonsAfterAnchor(tx") > service.indexOf("confirmedItem.count !== 1"),
+  "Fan-out runs only after the anchor item is confirmed");
 // Retry with the same Idempotency-Key short-circuits before any write.
 assert.ok(service.indexOf("bookingRequestId_idempotencyKey") < service.indexOf("prisma.$transaction"));
 // Auto-confirm repeats confirmPartyRequest's live check inside the transaction, before the claim:

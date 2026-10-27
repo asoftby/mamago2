@@ -30,6 +30,7 @@ import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { useRegisterHeaderSaveAction } from "@/contexts/PublicationIntentContext";
 import { shouldFetchOwnSaveStatus } from "@/features/save/saveStatusFetchGuard";
+import { parsePriceData } from "@/lib/priceItems";
 
 export interface OfferDirectCtaInfo {
   offerId: string;
@@ -388,7 +389,7 @@ export function OfferPageView({
           onSave={handleSave}
           ctaRef={ctaRef}
           directSlot={
-            direct && !data.classSlotBookingEnabled && data.hasPrimaryAction !== false && data.resolvedCta?.actionKind !== "EXTERNAL" && (
+            direct && data.offerType !== "REGULAR" && !data.classSlotBookingEnabled && data.hasPrimaryAction !== false && data.resolvedCta?.actionKind !== "EXTERNAL" && (
               <DirectRequestCta
                 publicationRef={{ publicationType: "OFFER", offerId: direct.offerId }}
                 publicationTitle={direct.publicationTitle}
@@ -496,6 +497,7 @@ export function OfferPageView({
         onOpenChange={setClassBookingOpen}
         offerId={data.id}
         offerTitle={data.title}
+        tariffs={parsePriceData(data.pricing.rawPriceItems).items}
       />
 
       <CampShiftBookingOverlay

@@ -273,6 +273,8 @@ async function logBookingCreatedAudit(params: {
  */
 export async function createPublicClassSlotBooking(input: {
   offerId: string;
+  classGroupId?: string | null;
+  classTariffId?: string | null;
   startsAt: Date;
   endsAt: Date;
   seats: number;
@@ -338,6 +340,8 @@ export async function createPublicClassSlotBooking(input: {
 
   const result = await reserveSlot({
     offerId: offer.id,
+    classGroupId: input.classGroupId,
+    classTariffId: input.classTariffId,
     startsAt: input.startsAt,
     endsAt: input.endsAt,
     seats: input.seats,

@@ -2513,6 +2513,7 @@ model OpeningHoursExceptionInterval {
 }
 
 model Offer {
+  classGroups OfferClassGroup[]
   /// Публикации журнала (подборки), в которых это предложение — элемент (упорядоченно).
   journalLinkedItems       ArticleLinkedItem[]  @relation("ArticleLinkedOffer")
   id                       String               @id @default(cuid())
@@ -2833,7 +2834,35 @@ model OfferBooking {
 }
 
 /// Group sessions have no BookingUnit; resource windows remain in AvailabilityRule.
+model OfferClassGroup {
+  id String @id @default(cuid())
+  offerId String
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  title String
+  active Boolean @default(true)
+  position Int @default(0)
+  tariffs OfferClassTariff[]
+  rules OfferScheduleRule[]
+  @@unique([id, offerId])
+  @@index([offerId, position])
+}
+
+model OfferClassTariff {
+  id String @id @default(cuid())
+  groupId String
+  group OfferClassGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title String
+  price String
+  unit String
+  periodDays Int?
+  active Boolean @default(true)
+  position Int @default(0)
+  @@index([groupId, position])
+}
+
 model OfferScheduleRule {
+  classGroupId String?
+  classGroup OfferClassGroup? @relation(fields: [classGroupId], references: [id], onDelete: SetNull)
   id String @id @default(cuid())
   offerBookingId String
   weekday Int
@@ -2844,7 +2873,8 @@ model OfferScheduleRule {
   capacity Int?
   offerBooking OfferBooking @relation(fields: [offerBookingId], references: [id], onDelete: Cascade)
 
-  @@unique([offerBookingId, weekday, startMinutes, endMinutes, validFrom])
+  @@index([offerBookingId, weekday, startMinutes, endMinutes, validFrom])
+  @@index([classGroupId])
 }
 
 model OfferScheduleException {
@@ -6033,6 +6063,12 @@ model BookingRequest {
 
   // Смена лагеря (snapshot из Offer.campSessions JSON)
   /// ID смены из JSON-массива campSessions (строковый ключ, не FK)
+  classGroupId String?
+  classGroupTitle String?
+  classTariffId String?
+  classTariffTitle String?
+  classTariffPrice String?
+  classTariffUnit String?
   campShiftId       String?
   /// Название смены (snapshot)
   campShiftTitle    String?

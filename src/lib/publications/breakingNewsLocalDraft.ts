@@ -81,6 +81,10 @@ export function breakingNewsEditorComparable(
     authorUserId: draft.authorUserId,
     geoScope: draft.geoScope,
     cityId: draft.cityId,
+    categoryId: draft.categoryId ?? null,
+    expiresAtLocal: draft.expiresAtLocal ?? "",
+    featured: draft.featured ?? false,
+    pinned: draft.pinned ?? false,
   });
 }
 
