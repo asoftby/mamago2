@@ -15,15 +15,18 @@ export type AnalyticsSegmentRow = {
   avgSaves: number;
   avgPlanAdds: number;
   avgCtaClicks: number;
-  /** % изменения «активных в сегменте» last 7d vs prev 7d */
-  trend7d: number;
-  trend30d: number;
+  /**
+   * % изменения числа активных пользователей сегмента (≥1 UserEvent): последние 7 / 30
+   * завершённых минских суток против предыдущих. null — в предыдущем окне активности не было.
+   */
+  trend7d: number | null;
+  trend30d: number | null;
 };
 
 export type AnalyticsSegmentTrendPoint = {
   /** YYYY-MM-DD */
   date: string;
-  /** Профилей в сегменте с lastSeen в этот календарный день (UTC) */
+  /** Уникальных активных пользователей сегмента (≥1 UserEvent) в этот минский календарный день */
   usersCount: number;
 };
 
