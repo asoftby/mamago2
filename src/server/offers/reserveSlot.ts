@@ -10,6 +10,7 @@ const PHONE_RE = /^\+?[\d\s\-().]{7,20}$/;
 
 export type ReserveSlotInput = {
   offerId: string;
+  classGroupId?: string | null;
   classTariffId?: string | null;
   startsAt: Date;
   endsAt: Date;
@@ -88,18 +89,34 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
     return await prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: input.offerId },
-        select: { status: true, priceItems: true, place: { select: { ownerBusinessId: true } }, offerBooking: { select: { leadTimeHours: true } } },
+        select: { status: true, priceItems: true, classGroups: { include: { tariffs: true, rules: true } }, place: { select: { ownerBusinessId: true } }, offerBooking: { select: { leadTimeHours: true } } },
       });
       const businessId = offer?.place?.ownerBusinessId;
       if (!offer || offer.status !== "PUBLISHED" || !businessId || !offer.offerBooking) {
         throw new SlotReservationError("OFFER_UNAVAILABLE", "Предложение сейчас недоступно для записи");
       }
-      const tariffs = parsePriceData(offer.priceItems).items;
-      const tariff = input.classTariffId
-        ? tariffs.find((item) => item.id === input.classTariffId)
-        : null;
-      if ((tariffs.length > 0 && !tariff) || (input.classTariffId && !tariff)) {
+      const groups = offer.classGroups.filter((group) => group.active);
+      const group = input.classGroupId ? groups.find((item) => item.id === input.classGroupId) : null;
+      if (groups.length > 0 && !group) throw new SlotReservationError("INVALID_SLOT", "Выберите доступную группу");
+      const structuredTariffs = group?.tariffs.filter((item) => item.active) ?? [];
+      const legacyTariffs = parsePriceData(offer.priceItems).items;
+      const tariff = structuredTariffs.length > 0
+        ? structuredTariffs.find((item) => item.id === input.classTariffId)
+        : !group ? legacyTariffs.find((item) => item.id === input.classTariffId) : null;
+      if ((structuredTariffs.length > 0 || (!group && legacyTariffs.length > 0)) && !tariff) {
         throw new SlotReservationError("INVALID_SLOT", "Выберите доступный тариф");
+      }
+      if (input.classTariffId && !tariff) throw new SlotReservationError("INVALID_SLOT", "Тариф недоступен для выбранной группы");
+      if (group && group.rules.length === 0) throw new SlotReservationError("INVALID_SLOT", "Расписание группы не задано");
+      if (group) {
+        const date = dateKeyInZone(input.startsAt, "Europe/Minsk");
+        const local = localMinuteKey(input.startsAt, "Europe/Minsk");
+        const minutes = Number(local.slice(11, 13)) * 60 + Number(local.slice(14, 16));
+        const belongsToGroup = group.rules.some((rule) =>
+          rule.weekday === isoWeekday(date) && rule.startMinutes === minutes &&
+          (!rule.validFrom || date >= rule.validFrom.toISOString().slice(0, 10)) &&
+          (!rule.validTo || date <= rule.validTo.toISOString().slice(0, 10)));
+        if (!belongsToGroup) throw new SlotReservationError("INVALID_SLOT", "Время не соответствует расписанию группы");
       }
       const query = { offerId: input.offerId, from: input.startsAt, to: new Date(input.endsAt.getTime() + 1), requestedSeats: seats };
       const initial = await loadSlotSnapshot(query, tx);
@@ -155,8 +172,10 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
           planItemId: input.planItemId ?? null,
           publicationType: PublicationType.OFFER,
           offerId: input.offerId,
+          classGroupId: group?.id ?? null,
+          classGroupTitle: group?.title ?? null,
           classTariffId: tariff?.id ?? null,
-          classTariffTitle: tariff?.label ?? null,
+          classTariffTitle: tariff ? ('title' in tariff ? tariff.title : tariff.label) : null,
           classTariffPrice: tariff?.price ?? null,
           classTariffUnit: tariff?.unit ?? null,
           offerSessionId: sessionId,
