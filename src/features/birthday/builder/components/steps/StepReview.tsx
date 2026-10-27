@@ -1,20 +1,25 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import type { BirthdayCatalogItem } from "../../lib/realCatalog";
-import { catalogPriceLabel, catalogPriceSummary } from "../../lib/catalogSelection";
-import { submitBirthdayParty, type PartyFlowState } from "../../lib/partySubmitFlow";
+import { catalogPriceLabel, catalogPriceSummary, partyBudgetWarning } from "../../lib/catalogSelection";
+import { submitBirthdayParty, submittedPartyId, type PartyFlowState } from "../../lib/partySubmitFlow";
+import { calendarDateKeyToIso, childAgeYearsOnDate } from "../../lib/partyDate";
 
 type Props = {
   offers: BirthdayCatalogItem[];
   citySlug: string;
   dateIso: string | null;
   quizDateKey: string | null;
+  /** Upper bound of the chosen budget group in BYN; informational only. */
+  maxBudget: number | null;
   timeStart: string | null;
   timeEnd: string | null;
   venueMode: "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR";
   childName: string | null;
+  childBirthDateIso: string | null;
   authenticated: boolean;
   authLoading: boolean;
   requestLogin: () => void;
@@ -25,27 +30,12 @@ type Props = {
   onSent: () => void;
 };
 
-// The range calendar persists YYYY-(zero-based month)-D keys, not ISO dates.
-export function calendarDateKeyToIso(key: string | null): string | null {
-  if (!key) return null;
-  const match = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(key);
-  if (!match) return null;
-  const [, yearText, monthText, dayText] = match;
-  const year = Number(yearText);
-  const monthIndex = Number(monthText);
-  const day = Number(dayText);
-  const valid = new Date(Date.UTC(year, monthIndex, day));
-  if (valid.getUTCFullYear() !== year || valid.getUTCMonth() !== monthIndex ||
-      valid.getUTCDate() !== day) return null;
-  return yearText + "-" + String(monthIndex + 1).padStart(2, "0") + "-" +
-    String(day).padStart(2, "0");
-}
-
 export function StepReview({
-  offers, citySlug, dateIso, quizDateKey, timeStart, timeEnd, venueMode, childName,
+  offers, citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName, childBirthDateIso,
   authenticated, authLoading, requestLogin, flowStateRef, busy, onBusyChange, sent, onSent,
 }: Props) {
   const total = catalogPriceSummary(offers);
+  const budgetWarning = partyBudgetWarning(total, maxBudget);
   const [date, setDate] = useState(dateIso ?? calendarDateKeyToIso(quizDateKey) ?? "");
   const [timeFrom, setTimeFrom] = useState(timeStart ?? "15:00");
   const [timeTo, setTimeTo] = useState(timeEnd ?? "18:00");
@@ -66,7 +56,8 @@ export function StepReview({
       await submitBirthdayParty(flowStateRef.current, {
         citySlug, venueMode, eventDate: date, timeFrom, timeTo,
         childrenCount: Number(children), adultsCount: Number(adults),
-        childName: childName || null, contactName: name, contactPhone: phone,
+        childName: childName || null, childAge: childAgeYearsOnDate(childBirthDateIso, date),
+        contactName: name, contactPhone: phone,
         anchorOfferId: offers[0].id, addonOfferIds: offers.slice(1).map((offer) => offer.id),
       });
       onSent();
@@ -77,10 +68,18 @@ export function StepReview({
     }
   }
 
-  if (sent) return <section role="status" className="mx-auto max-w-3xl space-y-4 py-10">
-    <h2 className="text-2xl font-semibold">Заявка основному исполнителю отправлена</h2>
-    <p>Остальные выбранные услуги сохранены в празднике. Заявки по ним пока не отправлены.</p>
-  </section>;
+  if (sent) {
+    // Read from the parent-owned ref so a remounted review step still links the same order.
+    const partyId = submittedPartyId(flowStateRef.current);
+    return <section role="status" className="mx-auto max-w-3xl space-y-4 py-10">
+      <h2 className="text-2xl font-semibold">Заявка основному исполнителю отправлена</h2>
+      <p>Остальные выбранные услуги сохранены в празднике. Заявки по ним пока не отправлены.</p>
+      <Link href={partyId ? "/me/birthdays/" + encodeURIComponent(partyId) : "/me/birthdays"}
+        className="inline-flex rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground">
+        {partyId ? "Открыть праздник" : "Мои праздники"}
+      </Link>
+    </section>;
+  }
 
   return (
     <section className="mx-auto max-w-3xl space-y-7">
@@ -115,7 +114,10 @@ export function StepReview({
           {total.minimumByn > 0 ? "От " + total.minimumByn.toLocaleString("ru-RU") + " BYN" : "Стоимость уточняется"}
         </p>
         {total.hasUnknownPrices && (
-          <p className="mt-2 text-sm text-stone-600">Некоторые услуги рассчитываются индивидуально и в эту сумму не включены.</p>
+          <p className="mt-2 text-sm text-stone-600">Некоторые услуги рассчитываются индивидуально и в эту сумму не включены, поэтому окончательная сумма пока неизвестна.</p>
+        )}
+        {budgetWarning && (
+          <p role="note" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">{budgetWarning}</p>
         )}
       </div>
       <form className="space-y-4" onSubmit={handleSubmit}>

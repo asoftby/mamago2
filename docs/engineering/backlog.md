@@ -5494,3 +5494,16 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Dependencies: деплой PR 1–3 на DEV, бэкфилл размеров (`pnpm media:backfill-dimensions`).
 - Acceptance criteria: Lighthouse mobile (Slow 4G, 4x CPU, 5 прогонов) на `/minsk/events` и `/minsk/events?page=2`: CLS < 0.05, LCP ≤ текущего `dev`; ручная проверка возврата с карточки события (позиция и колонки), поворота экрана, подгрузки; при необходимости — SSR-кладка по `Sec-CH-Viewport-Width`/UA для планшетов.
 - Source: ТЗ «Кладка постеров в афише», PR 3.
+
+## [BACKLOG-202] Удалить legacy-демо компоненты карточки праздника в ЛК
+
+- Status: OPEN
+- Priority: P3
+- Area: Birthday / Parent cabinet
+- Added: 2026-10-27
+- Reason deferred: вне scope исправлений P0 из аудита #818; удаление не влияет на поведение.
+- Context: `/me/birthdays/[id]` рендерит `PartyOrderStatusScreen` из `readPartyOrder` (с проверкой `ownerUserId`). Заглушка `getUserBirthdayPartyDetail` удалена в рамках #818; компоненты `BirthdayPartyDetailView`, `ScenarioFinalPage`, `BookingStatusPage` (`src/features/me/components/`) и демо-поля типа `UserBirthdayPartyDetail` больше нигде не импортируются.
+- Current state: мёртвый код, сборку не ломает.
+- Dependencies: нет.
+- Acceptance criteria: файлы и неиспользуемые типы удалены; `tsc`, lint и `test:birthday-catalog` зелёные.
+- Source: аудит #818.

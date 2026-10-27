@@ -17,6 +17,12 @@ export function getBudgetRange(
   return { min, max };
 }
 
+/** Upper bound the parent chose, in BYN; null when the group has no upper limit. */
+export function budgetMaxByn(budgetGroup: BirthdayBudgetGroup | null): number | null {
+  const range = getBudgetRange(budgetGroup);
+  return range && range.max < 99999 ? range.max : null;
+}
+
 export function formatBudgetRange(budgetGroup: BirthdayBudgetGroup | null): string {
   const range = getBudgetRange(budgetGroup);
   if (!range) return "—";
