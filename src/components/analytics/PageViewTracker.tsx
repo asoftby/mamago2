@@ -25,7 +25,7 @@ export function PageViewTracker() {
   const lastPathnameRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!pathname) return;
+    if (!pathname || (city && !city.isHydrated)) return;
     if (!isPublicPageViewPath(pathname)) return;
     if (!shouldEmitPageView(lastPathnameRef.current, pathname)) return;
     lastPathnameRef.current = pathname;
@@ -34,9 +34,9 @@ export function PageViewTracker() {
       citySlug,
       meta: { path: pathname },
     });
-    // citySlug is read at emit time; a city change without navigation is not a new page view.
+    // Re-run once stored territory is hydrated; pathname ref prevents duplicates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, [pathname, city?.isHydrated]);
 
   return null;
 }

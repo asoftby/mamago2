@@ -10,6 +10,7 @@ const STRONG_SEMANTIC_EVENTS = new Set<UserEventType>([
   "DETAIL_OPEN",
   "SAVE",
   "UNSAVE",
+  "DISMISS",
   "PLAN_ADD",
   "PLAN_REMOVE",
   "CTA_CLICK",
