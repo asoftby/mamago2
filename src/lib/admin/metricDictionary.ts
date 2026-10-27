@@ -47,6 +47,15 @@ const ANALYTICS_B_CHANGE = {
   note: "Единые определения (metricDefinitions.ts): сутки по Минску вместо UTC, исключён внутренний трафик",
 };
 
+const HONEST_GROWTH_CHANGE = {
+  date: "2026-10-27",
+  note: "Рост WoW/MoM считается по завершённым окнам (последние N полных минских суток против предыдущих N); раньше текущее окно с неполным днём сравнивалось с полным предыдущим, и рост занижался в начале недели",
+};
+const SAMPLE_TTL_CHANGE = {
+  date: "2026-10-27",
+  note: "Значение показывается, только если сэмпл свежее 3 интервалов коллектора; иначе «Нет данных»",
+};
+
 const TELEMETRY_WINDOW_NOTE = "Знаменатель — все клиентские запросы к /api/analytics/events за окно (принятые + отсеянные)";
 
 export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
@@ -78,9 +87,10 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     businessMeaning: "Уникальные пользователи/визиты продукта за 7 дней",
     formula: "DISTINCT canonical visitor за окно",
     source: "UserEvent (PAGE_VIEW)",
-    window: "Скользящие 7 дней",
+    window: "Скользящие 7 минских суток до текущего момента (включая неполные сегодняшние) — «на сейчас»; рост считается по завершённым окнам, см. audience.wau_completed",
     exclusions: EXCLUDES_STAFF,
-    version: "1.0.0",
+    version: "1.1.0",
+    changes: [HONEST_GROWTH_CHANGE, SAMPLE_TTL_CHANGE],
     verifiable: false,
   },
   "audience.mau": {
@@ -89,10 +99,51 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     businessMeaning: "Уникальные пользователи/визиты продукта за 30 дней",
     formula: "DISTINCT canonical visitor за окно",
     source: "UserEvent (PAGE_VIEW)",
-    window: "Скользящие 30 дней",
+    window: "Скользящие 30 минских суток до текущего момента (включая неполные сегодняшние) — «на сейчас»; рост считается по завершённым окнам, см. audience.mau_completed",
+    exclusions: EXCLUDES_STAFF,
+    version: "1.1.0",
+    changes: [HONEST_GROWTH_CHANGE, SAMPLE_TTL_CHANGE],
+    verifiable: false,
+  },
+  "audience.wau_completed": {
+    metricKey: "audience.wau_completed",
+    displayName: "Рост WAU (WoW)",
+    businessMeaning: "Изменение недельной аудитории: последние 7 завершённых минских суток против предыдущих 7",
+    formula:
+      "(WAU[последние 7 полных суток] − WAU[7 суток до них]) / WAU[7 суток до них]; метрики audience.wau_completed и audience.wau_completed_prev; при знаменателе 0 процента нет",
+    source: "UserEvent (PAGE_VIEW) — canonicalAudience.ts",
+    window: "Два соседних окна из 7 полных минских суток, заканчивающихся последней полночью по Минску",
     exclusions: EXCLUDES_STAFF,
     version: "1.0.0",
     verifiable: false,
+    changes: [HONEST_GROWTH_CHANGE],
+  },
+  "audience.mau_completed": {
+    metricKey: "audience.mau_completed",
+    displayName: "Рост MAU (MoM)",
+    businessMeaning: "Изменение месячной аудитории: последние 30 завершённых минских суток против предыдущих 30",
+    formula:
+      "(MAU[последние 30 полных суток] − MAU[30 суток до них]) / MAU[30 суток до них]; метрики audience.mau_completed и audience.mau_completed_prev; при знаменателе 0 процента нет",
+    source: "UserEvent (PAGE_VIEW) — canonicalAudience.ts",
+    window: "Два соседних окна из 30 полных минских суток, заканчивающихся последней полночью по Минску",
+    exclusions: EXCLUDES_STAFF,
+    version: "1.0.0",
+    verifiable: false,
+    changes: [HONEST_GROWTH_CHANGE],
+  },
+  "planning.wpf_completed": {
+    metricKey: "planning.wpf_completed",
+    displayName: "Рост WPF (WoW)",
+    businessMeaning: "Изменение числа семей, планировавших за неделю: последние 7 завершённых минских суток против предыдущих 7",
+    formula:
+      "(WPF[последние 7 полных суток] − WPF[7 суток до них]) / WPF[7 суток до них]; метрики planning.wpf_completed и planning.wpf_completed_prev; при знаменателе 0 процента нет",
+    source: "planningActivity.ts",
+    window: "Два соседних окна из 7 полных минских суток, заканчивающихся последней полночью по Минску",
+    exclusions: EXCLUDES_STAFF,
+    version: "1.0.0",
+    identityModel: "ACCOUNT_AS_FAMILY_PROXY",
+    verifiable: false,
+    changes: [HONEST_GROWTH_CHANGE],
   },
   "planning.wpf": {
     metricKey: "planning.wpf",
@@ -102,9 +153,10 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     formula:
       "DISTINCT userId по объединению: UserEvent(SAVE|PLAN_ADD) ∪ RouteIdea.createdAt ∪ DayScenario.createdAt|updatedAt ∪ PlanItem(routeId IS NOT NULL).createdAt",
     source: "UserEvent, RouteIdea, DayScenario, PlanItem — см. planningActivity.ts",
-    window: "Скользящие 7 дней",
+    window: "Скользящие 7 минских суток до текущего момента — «на сейчас»; WoW считается по завершённым окнам, см. planning.wpf_completed",
     exclusions: EXCLUDES_STAFF,
-    version: "1.0.0",
+    version: "1.1.0",
+    changes: [HONEST_GROWTH_CHANGE, SAMPLE_TTL_CHANGE],
     identityModel: "ACCOUNT_AS_FAMILY_PROXY",
     verifiable: false,
   },

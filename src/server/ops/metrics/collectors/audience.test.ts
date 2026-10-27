@@ -84,6 +84,18 @@ async function main() {
     assert.equal(wau?.value, 3, "WAU must include today's and this-week's users plus the anonymous session, not this-month-only");
     assert.equal(mau?.value, 4, "MAU must include all three in-window authenticated users plus the anonymous session");
 
+    // C1 fixtures: one visitor inside the completed window before last (Mon 3 .. Sun 9 Aug, Minsk).
+    const userPrevCompleted = await makeUser();
+    await makeEvent(userPrevCompleted, new Date("2026-08-05T09:00:00.000Z"));
+    const wauMauResult2 = await collectAudienceWeeklyMonthly({ prisma, now });
+
+    // C1: completed windows (whole Minsk days ending last midnight) ignore today's partial day.
+    const wauDone = wauMauResult2.find((s) => s.metric === "audience.wau_completed");
+    const wauDonePrev = wauMauResult2.find((s) => s.metric === "audience.wau_completed_prev");
+    assert.equal(wauDone?.value, 1, "completed WAU: only userThisWeekOnly (today's events are outside a completed window)");
+    assert.equal(wauDonePrev?.value, 1, "previous completed WAU window holds userPrevCompleted");
+    assert.equal(wauMauResult.some((s) => s.metric === "audience.wau_prev" || s.metric === "audience.mau_prev"), false);
+
     // Identity/filter semantics: dimKey stays global ("").
     assert.equal(dauResult[0].dimKey, undefined, "collector emits no dimKey -> collectorRun writes global dimKey=''");
 

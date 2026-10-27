@@ -73,6 +73,31 @@ async function main() {
       assert.equal(countAfter, countBefore, "projection is read-only and must never write a MetricSample row");
     }
 
+    // C2: a sample older than 3 x the collector's interval projects to null ("Нет данных").
+    {
+      const now = new Date("2026-10-27T12:00:00.000Z");
+      await prisma.metricSample.deleteMany({});
+      await prisma.metricSample.create({
+        data: { metric: "audience.dau", dimKey: "", value: 77, collectedAt: new Date(now.getTime() - 40 * 60_000) },
+      }); // dau interval 15 min -> TTL 45 min: fresh
+      await prisma.metricSample.create({
+        data: { metric: "audience.wau", dimKey: "", value: 500, collectedAt: new Date(now.getTime() - 4 * 3_600_000) },
+      }); // wau interval 60 min -> TTL 3 h: stale
+      await prisma.metricSample.create({
+        data: { metric: "queue.moderation.size", dimKey: "place", value: 9, collectedAt: new Date(now.getTime() - 16 * 60_000) },
+      }); // 5 min interval -> TTL 15 min: stale
+      const kpis = await projectOperationsKpis(prisma, now);
+      assert.equal(kpis["audience.dau"], 77);
+      assert.equal(kpis["audience.wau"], null, "stale sample must not be shown");
+      const queues = await projectOperationsQueues(prisma, now);
+      assert.equal(queues.moderation.place.size, null, "stale queue sample must not be shown");
+      // Re-collected -> visible again.
+      await prisma.metricSample.create({
+        data: { metric: "audience.wau", dimKey: "", value: 510, collectedAt: new Date(now.getTime() - 60_000) },
+      });
+      assert.equal((await projectOperationsKpis(prisma, now))["audience.wau"], 510);
+    }
+
     console.log("metricProjection.test.ts: OK");
   } finally {
     await prisma.metricSample.deleteMany({});

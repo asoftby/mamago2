@@ -88,11 +88,14 @@ import { organicRecoveryTooltipRows } from "./organicRecoveryTooltip";
 {
   const model = deriveGrowthOverview({
     "planning.wpf": 12,
-    "planning.wpf_prev": 10,
+    "planning.wpf_completed": 12,
+    "planning.wpf_completed_prev": 10,
     "audience.wau": 400,
-    "audience.wau_prev": 500,
+    "audience.wau_completed": 400,
+    "audience.wau_completed_prev": 500,
     "audience.mau": 1500,
-    "audience.mau_prev": 1500,
+    "audience.mau_completed": 1500,
+    "audience.mau_completed_prev": 1500,
     "audience.dau": 70,
     "audience.wau_weekly": [
       { isoWeek: "2026-W37", value: 380 },

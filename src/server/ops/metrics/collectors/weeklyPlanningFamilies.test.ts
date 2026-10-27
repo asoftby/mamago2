@@ -42,10 +42,13 @@ async function main() {
 
     const samples = await collectWeeklyPlanningFamilies({ prisma, now });
     const current = samples.find((s) => s.metric === "planning.wpf");
-    const prev = samples.find((s) => s.metric === "planning.wpf_prev");
+    const done = samples.find((s) => s.metric === "planning.wpf_completed");
+    const donePrev = samples.find((s) => s.metric === "planning.wpf_completed_prev");
 
     assert.equal(current?.value, 1, "current 7d window must count only userCurrent");
-    assert.equal(prev?.value, 1, "previous 7d window must count only userPrev");
+    assert.equal(done?.value, 1, "completed window (7 full Minsk days ending last midnight) must count userCurrent");
+    assert.equal(donePrev?.value, 1, "previous completed window must count only userPrev");
+    assert.equal(samples.some((s) => s.metric === "planning.wpf_prev"), false, "legacy live-vs-previous metric is gone");
     assert.equal(current?.dimKey, undefined, "collector emits no dimKey -> global dimKey=''");
 
     console.log("weeklyPlanningFamilies.test.ts: OK");
