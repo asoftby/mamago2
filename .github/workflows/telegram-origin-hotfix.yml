@@ -31,7 +31,7 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Telegram Origin and initData regressions
         run: |
-          NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/app/api/auth/telegram-webapp/route.test.ts
+          pnpm exec tsx src/app/api/auth/telegram-webapp/route.test.ts
           pnpm exec tsx src/lib/telegram/verifyWebAppInitData.test.ts
       - name: ESLint (changed files)
         run: pnpm exec eslint src/app/api/auth/telegram-webapp/route.ts src/app/api/auth/telegram-webapp/route.test.ts
