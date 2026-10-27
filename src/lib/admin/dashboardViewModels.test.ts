@@ -247,6 +247,22 @@ function main() {
     const stale = deriveDataQuality(true);
     assert.equal(stale.internalEventsOk, false);
     assert.equal(stale.overallHealthPercent, null, "a stale snapshot must never be graded as healthy");
+
+    // Telemetry ingestion shares: absent -> null, never a fabricated 0.
+    assert.equal(fresh.botRejectedShare24h, null);
+    assert.equal(fresh.botRejectedShare7d, null);
+    assert.equal(fresh.noIdentityRejectedShare24h, null);
+    assert.equal(fresh.storedWithoutIdentityShare24h, null);
+    const withShares = deriveDataQuality(false, {
+      "telemetry.bot_rejected_share_24h": 0.4,
+      "telemetry.bot_rejected_share_7d": 0.35,
+      "telemetry.no_identity_rejected_share_24h": 0,
+      "telemetry.stored_without_identity_share_24h": 0.02,
+    });
+    assert.equal(withShares.botRejectedShare24h, 0.4);
+    assert.equal(withShares.botRejectedShare7d, 0.35);
+    assert.equal(withShares.noIdentityRejectedShare24h, 0, "a real 0 stays 0");
+    assert.equal(withShares.storedWithoutIdentityShare24h, 0.02);
   }
 
   console.log("dashboardViewModels.test.ts: OK");
