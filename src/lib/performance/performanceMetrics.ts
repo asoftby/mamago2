@@ -38,9 +38,8 @@ export function resolvePerformanceWindow(
  * not depend on the weekday/hour the metric is computed (ТЗ «Аналитика
  * админки», C1).
  *
- * `end` / `previousEnd` are the last millisecond of their window (the next
- * midnight minus 1 ms) so they are safe for both `<` and `<=` consumers and
- * the two windows never share an instant.
+ * `end` / `previousEnd` are exclusive midnight bounds, matching SQL `createdAt < end`.
+ * Adjacent windows do not overlap or omit the final millisecond.
  */
 export function resolveCompletedWindow(dayCount: number, now = new Date(), timeZone = DEFAULT_TZ): PerformanceWindow {
   const todayKey = zonedDateKey(now, timeZone);
@@ -49,9 +48,9 @@ export function resolveCompletedWindow(dayCount: number, now = new Date(), timeZ
   const previousStart = startOfZonedDay(addDateKeyDays(todayKey, -2 * dayCount), timeZone);
   return {
     start,
-    end: new Date(todayStart.getTime() - 1),
+    end: todayStart,
     previousStart,
-    previousEnd: new Date(start.getTime() - 1),
+    previousEnd: start,
     dayCount,
   };
 }
