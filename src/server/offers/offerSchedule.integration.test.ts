@@ -392,7 +392,7 @@ test("переход разовые → регулярные сохраняет 
 
 test("одинаковое время с разными end-only периодами не теряется", async () => {
   const offerId = await newOffer({ productType: "REGULAR_ACTIVITY" });
-  const groups = ["2026-10-31", "2026-11-30"].map(to => ({ days: [1], time: "17:00", seats: 10, period: { from: null, to } }));
+  const groups = ["2026-10-31", "2026-11-30"].map((to, i) => ({ id: `end-only-${i}`, tariffs: [], days: [1], time: "17:00", seats: 10, period: { from: null, to } }));
   await db.$transaction(tx => applyOfferSchedule({ db: tx, offerId, externalUrlNeedsModeration: false, input: { classSchedule: {
     kind: "recurring", durationMin: 60, groups, dates: [], period: null, closedDates: [],
   } } }));
