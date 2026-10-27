@@ -9,6 +9,8 @@
 #   NEXT_DIST_DIR=<dir>         build dir for the gate (default node_modules/.cache/next-gate)
 #   NEXT_CACHE_MAX_GB=<n>       the gate dir is recreated when it grows above this (default 6)
 #   SKIP_NEXT_CACHE_CHECK=1     skip the .next size warning
+#   GATE_FULL=1                 run `pnpm check:push:full` (every suite + production build) instead of
+#                               the fast gate; the full set always runs in the required CI jobs
 #
 # Nothing under `.next` is ever deleted here.
 
@@ -66,7 +68,10 @@ for f in tsconfig.json next-env.d.ts; do
   [ -f "$f" ] && cp "$f" "$backup/$f"
 done
 
-NEXT_DIST_DIR="$gate_dir" pnpm check:push
+gate_script=check:push
+[ "${GATE_FULL:-}" = 1 ] && gate_script=check:push:full
+
+NEXT_DIST_DIR="$gate_dir" pnpm "$gate_script"
 status=$?
 
 for f in tsconfig.json next-env.d.ts; do

@@ -15,6 +15,7 @@
 - [ ] ESLint passed
 - [ ] Relevant automated tests passed
 - [ ] `pnpm check:push` passed (mandatory task verification; provide run result)
+- [ ] CI `gate-tests` and `production-build` green (all gate suites + `next build`)
 - [ ] If build-only validation was performed instead, document why and mark the mandatory check above incomplete
 - [ ] Manual validation (mobile and desktop where applicable)
 

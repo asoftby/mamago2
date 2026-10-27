@@ -292,3 +292,84 @@ jobs:
           pnpm test:abws-readonly-import-schedule
           pnpm test:abws-legacy-activities-route-readonly-wiring
           pnpm test:abws-shared-resync-guard
+
+  # Every suite of the local push gate (scripts/git/gate-steps.json), against a migrated
+  # throwaway Postgres like scripts/git/gate-env.sh. Reports all failing suites, not only the first.
+  # Must be a required status check on `dev`: the pre-push hook only runs the changed-area subset.
+  gate-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gate
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d gate"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      GATE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/gate
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.28.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply migrations to the throwaway database
+        run: DATABASE_URL="$GATE_DATABASE_URL" pnpm exec prisma migrate deploy
+
+      - name: Push gate regression suites
+        run: sh scripts/git/gate-env.sh node scripts/git/run-gate-steps.mjs --tests
+
+  # `next build` for every PR. Replaces the path-filtered typography-build.yml job of the same
+  # name and the `pnpm build` step that used to run in the pre-push hook. Must be required on `dev`.
+  production-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.28.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+        env:
+          CI: "true"
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mamago_ci

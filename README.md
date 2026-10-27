@@ -56,7 +56,11 @@ pnpm lint
 pnpm check:push
 ```
 
-`check:push` runs the project verification gate (typecheck, regression tests and production build). It can be resource-intensive.
+`check:push` is the fast local gate run by the pre-push hook: `tsc --noEmit` (incremental) plus the
+regression suites from `scripts/git/gate-steps.json` whose area the branch changes. It runs every step and
+reports all failures. The full set — every suite (`gate-tests`) and the production build
+(`production-build`) — runs in required CI jobs on every PR. Run the full set locally with
+`pnpm check:push:full` (or `GATE_FULL=1 git push`), e.g. at phase gates.
 
 Some regression checks read PostgreSQL. Use a dedicated local test database with
 synthetic data; never use DEV/PROD credentials or dumps for local verification.

@@ -354,8 +354,10 @@ conventions.
   сущности/фазы, не после каждого мелкого PR**.
 - Продуктовые решения из чек-листа агент не принимает сам — спрашивает Алексея.
 - **PR/Docker workflow для серии мелких fix-PR:** targeted tests + targeted
-  lint + `tsc --noEmit` для каждого PR; полный `pnpm build` не повторять
-  вручную, если тот же build уже прошёл через pre-push hook; один Docker
+  lint + `tsc --noEmit` для каждого PR; полный `pnpm build` вручную не
+  запускать — он идёт в обязательном CI-job `production-build`, все gate-сьюты
+  в `gate-tests` (pre-push hook гоняет только tsc + сьюты затронутых
+  областей; полный набор локально — `pnpm check:push:full`); один Docker
   Build & Push на merge SHA, дальше не ждать в сессии; отдельный docs-коммит
   после каждого PR — не делать, обновлять чек-лист пакетно; не polling
   GitHub Actions в цикле. Полный sweep/build/Docker обязателен только на
