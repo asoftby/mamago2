@@ -2,7 +2,7 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import { useOptionalCity } from "@/contexts/CityContext";
-import { DEFAULT_CITY_SLUG, resolveRouteCitySlug } from "@/lib/city/resolveCityContext";
+import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 import { isScopedEventBrowsing } from "@/lib/city/scopedEventBrowsing";
 
 /**
@@ -14,7 +14,7 @@ export function useEventListingCitySlug(): string {
   const searchParams = useSearchParams();
   const city = useOptionalCity()?.citySlug ?? DEFAULT_CITY_SLUG;
   if (isScopedEventBrowsing(pathname, searchParams.get("explore"))) {
-    return resolveRouteCitySlug(pathname) ?? city;
+    return pathname?.split("/")[1] ?? city;
   }
   return city;
 }
