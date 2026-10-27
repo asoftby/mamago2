@@ -12,7 +12,7 @@ import { dateRangeReducer, emptyDateRangeDraft } from "@/features/filters/discov
 import { computePresetRange, todayKeyIn } from "@/features/filters/discovery/quickFilterPresets";
 import { serializeAppliedToSearchParams, type DiscoveryFilters, type WhenPreset } from "@/features/filters/discovery/filters.store";
 import { addDateKeyDays } from "@/lib/stories/ranges";
-import { useOptionalCity } from "@/contexts/CityContext";
+import { useEventListingCitySlug } from "@/lib/city/useEventListingCitySlug";
 import { MobileOverlayResetAction } from "@/components/mobile/MobileOverlayResetAction";
 import { MobileOverlayPrimaryAction } from "@/components/mobile/MobileOverlayPrimaryAction";
 import { pluralize } from "@/lib/formatters/pluralize";
@@ -28,7 +28,7 @@ export function EventDateRangePicker({ applied, onApply }: { applied: DiscoveryF
   const [density, setDensity] = React.useState<Record<string, number>>({});
   const [resultCount, setResultCount] = React.useState<number | null>(null);
   const today = todayKeyIn(new Date());
-  const city = useOptionalCity()?.citySlug ?? "minsk";
+  const city = useEventListingCitySlug();
 
   React.useEffect(() => {
     if (open) dispatch({ type: "hydrate", from: applied.dateFrom, to: applied.dateTo });
