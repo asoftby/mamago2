@@ -6,6 +6,7 @@ import { redactPartyContacts } from "./partyPrivacy";
 import { isAutoConfirmMode } from "./partySelection";
 import { verifyPartyOffers } from "./partyDraft.service";
 import { clockMinutes, isFixedPriceReply } from "./partyFixedPrice";
+import { requestPartyAddonsAfterAnchor } from "./partyAddonFanout";
 
 
 export async function listBusinessPartyRequests(businessId: string, onlyAttention = false) {
@@ -84,6 +85,7 @@ export async function replyToPartyRequest(params: {
           partyOrder: { select: {
             id: true, ownerUserId: true, citySlug: true, eventDate: true,
             timeFrom: true, timeTo: true, venueMode: true, status: true,
+            childrenCount: true, adultsCount: true, childAge: true,
           } },
         },
       },
@@ -120,6 +122,8 @@ export async function replyToPartyRequest(params: {
   }
   if (!order.eventDate || !order.timeFrom) throw new PartyApiError(422, "Не задано время праздника");
   const startAt = partyStartAt(order.eventDate, order.timeFrom);
+  // Narrowed copy for the transaction callback (add-on fan-out after auto-confirmation).
+  const datedOrder = { ...order, eventDate: order.eventDate, timeFrom: order.timeFrom };
   if (startAt <= now) throw new PartyApiError(410, "Дата праздника уже прошла");
   const expiresAt = new Date(Math.min(now.getTime() + 24 * 3_600_000, startAt.getTime() - 3_600_000));
   if (input.type !== "DECLINED" && expiresAt <= now) {
@@ -221,6 +225,13 @@ export async function replyToPartyRequest(params: {
         data: { status: PartyItemStatus.CONFIRMED, confirmedBookingRequestId: requestId },
       });
       if (confirmedItem.count !== 1) throw new PartyApiError(409, "Услуга уже подтверждена другой заявкой");
+      // An automatically confirmed anchor starts the add-on requests exactly like a
+      // business confirmation does, in the same transaction.
+      if (item.role === "ANCHOR") {
+        await requestPartyAddonsAfterAnchor(tx, {
+          order: datedOrder, anchorRequestId: requestId, now,
+        });
+      }
     } else {
       await tx.partyOrderItem.update({
         where: { id: item.id },
