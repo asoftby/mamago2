@@ -78,7 +78,7 @@ assert.equal(buildScheduleInput(classForm, "REGULAR_ACTIVITY").hours, undefined)
 assert.deepEqual(buildScheduleInput(classForm, "REGULAR_ACTIVITY", "60 минут").classSchedule, {
   kind: "recurring",
   durationMin: 60,
-  groups: [{ days: [2, 4], time: "17:30", seats: 8 }],
+  groups: [{ id: "g1", tariffs: [], days: [2, 4], time: "17:30", seats: 8 }],
   dates: [],
   period: null,
   closedDates: ["2026-10-18"],
