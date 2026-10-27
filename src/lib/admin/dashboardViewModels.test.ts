@@ -3,6 +3,7 @@
  * Run: npx tsx src/lib/admin/dashboardViewModels.test.ts
  */
 import assert from "node:assert/strict";
+import { MIN_RATE_SAMPLE } from "./rateSample";
 import {
   deriveProductPulse,
   deriveEngagement,
@@ -153,9 +154,13 @@ function main() {
   {
     const model = deriveHabit({
       "retention.w1": 0.314,
+      "retention.w1_n": 120,
       "retention.w1_prev": 0.282,
+      "retention.w1_prev_n": 100,
       "retention.w4": 0.228,
+      "retention.w4_n": 80,
       "retention.w4_prev": 0.228,
+      "retention.w4_prev_n": 90,
       "habit.3of4week": 0.287,
       "habit.3of4week_prev": 0.255,
     });
@@ -163,6 +168,33 @@ function main() {
     assert.equal(model.w1DeltaPp, 3.2, "percentage-point delta, not relative %");
     assert.equal(model.w4DeltaPp, 0, "identical current/prev must yield exactly 0 pp, not a rounding artifact");
     assert.equal(model.habit3of4DeltaPp, 3.2);
+    assert.equal(model.w1CohortSize, 120);
+    assert.equal(model.w4CohortSize, 80);
+  }
+  // C4: a cohort below MIN_RATE_SAMPLE hides the percentage (and the delta) but still reports n.
+  {
+    const small = deriveHabit({
+      "retention.w1": 0.5,
+      "retention.w1_n": MIN_RATE_SAMPLE - 1,
+      "retention.w1_prev": 0.4,
+      "retention.w1_prev_n": 200,
+    });
+    assert.equal(small.w1, null, "n < 30 -> no percentage");
+    assert.equal(small.w1DeltaPp, null);
+    assert.equal(small.w1CohortSize, MIN_RATE_SAMPLE - 1, "n stays visible");
+    const edge = deriveHabit({ "retention.w1": 0.5, "retention.w1_n": MIN_RATE_SAMPLE });
+    assert.equal(edge.w1, 0.5, "n = 30 is enough");
+    assert.equal(edge.w1DeltaPp, null, "no prev cohort -> no delta");
+    const prevTiny = deriveHabit({
+      "retention.w1": 0.5,
+      "retention.w1_n": 100,
+      "retention.w1_prev": 0.9,
+      "retention.w1_prev_n": 3,
+    });
+    assert.equal(prevTiny.w1, 0.5);
+    assert.equal(prevTiny.w1DeltaPp, null, "a delta against a tiny previous cohort is noise");
+    const noSize = deriveHabit({ "retention.w1": 0.5 });
+    assert.equal(noSize.w1, null, "unknown cohort size -> cannot vouch for the rate");
   }
   {
     const model = deriveHabit({});

@@ -12,6 +12,7 @@
  * naturally comes out `null` ("Нет данных"), never a fabricated zero.
  */
 import { comparisonPercent } from "@/lib/performance/performanceMetrics";
+import { MIN_RATE_SAMPLE } from "./rateSample";
 
 function readNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -150,30 +151,47 @@ export function deriveNorthStar(kpis: Record<string, unknown>): NorthStarViewMod
   };
 }
 
-/** W1/W4 are registration-cohort retention (NOT "any time since signup") — see retention.ts. Deltas are percentage points, not relative %. */
+/**
+ * W1/W4 are WEEKLY registration-cohort retention (cohort = ISO week of
+ * registration, check = week N+1 / N+4 — see retention.ts). The percentage is
+ * hidden (null) when the cohort has fewer than MIN_RATE_SAMPLE users, but the
+ * cohort size is always exposed so the tile can say "n = 12". Deltas are
+ * percentage points between consecutive cohorts and need BOTH cohorts to be
+ * large enough.
+ */
 export interface HabitViewModel {
   w1: number | null;
   w1DeltaPp: number | null;
+  w1CohortSize: number | null;
   w4: number | null;
   w4DeltaPp: number | null;
-  /** Denominator is "activated planning families" (first qualifying action before the window), not all registrations — see habit.ts. */
+  w4CohortSize: number | null;
+  /** Denominator is "activated planning families" (first qualifying action in the 8 weeks before the window), not all registrations — see habit.ts. */
   habit3of4: number | null;
   /** 7-day-shifted comparison, not 28-day — see habit.ts. */
   habit3of4DeltaPp: number | null;
 }
 
+function reliableRate(rate: number | null, size: number | null): number | null {
+  return rate !== null && size !== null && size >= MIN_RATE_SAMPLE ? rate : null;
+}
+
 export function deriveHabit(kpis: Record<string, unknown>): HabitViewModel {
-  const w1 = readNumber(kpis["retention.w1"]);
-  const w1Prev = readNumber(kpis["retention.w1_prev"]);
-  const w4 = readNumber(kpis["retention.w4"]);
-  const w4Prev = readNumber(kpis["retention.w4_prev"]);
+  const w1Size = readNumber(kpis["retention.w1_n"]);
+  const w4Size = readNumber(kpis["retention.w4_n"]);
+  const w1 = reliableRate(readNumber(kpis["retention.w1"]), w1Size);
+  const w1Prev = reliableRate(readNumber(kpis["retention.w1_prev"]), readNumber(kpis["retention.w1_prev_n"]));
+  const w4 = reliableRate(readNumber(kpis["retention.w4"]), w4Size);
+  const w4Prev = reliableRate(readNumber(kpis["retention.w4_prev"]), readNumber(kpis["retention.w4_prev_n"]));
   const habit3of4 = readNumber(kpis["habit.3of4week"]);
   const habit3of4Prev = readNumber(kpis["habit.3of4week_prev"]);
   return {
     w1,
     w1DeltaPp: ratioDeltaPp(w1, w1Prev),
+    w1CohortSize: w1Size,
     w4,
     w4DeltaPp: ratioDeltaPp(w4, w4Prev),
+    w4CohortSize: w4Size,
     habit3of4,
     habit3of4DeltaPp: ratioDeltaPp(habit3of4, habit3of4Prev),
   };

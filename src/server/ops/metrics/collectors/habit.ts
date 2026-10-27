@@ -1,26 +1,27 @@
 /**
  * habit.3of4week / habit.3of4week_prev — every 24h.
  *
- * Denominator is "activated planning families" (accounts whose FIRST-EVER
- * qualifying planning action predates the measured window), not "everyone
- * ever registered ≥28 days ago" — the latter would slowly turn this into a
- * graveyard-of-old-registrations metric as the all-time user base grows
- * relative to the currently-active one. See planningActivity.ts and the
- * dashboard plan for the full rationale.
+ * Denominator (ТЗ «Аналитика админки», C5 / decision 4): "activated planning
+ * families" — accounts whose FIRST-EVER qualifying planning action fell in
+ * the 8 weeks BEFORE the measured 4-week window starts. Accounts activated
+ * earlier are not in the denominator (they would turn the metric into a
+ * graveyard of old accounts), accounts activated inside the window are not
+ * either (they have not had four weeks to form a habit). See
+ * planningActivity.ts.
  *
- * Habit rate = |eligible users active in >=3 of the trailing 4 weekly
- * buckets| / |eligible users|.
+ * Habit rate = |activated users active in >=3 of the trailing 4 weekly
+ * buckets| / |activated users|.
  *
  * `_prev` is the SAME 3-of-4 formula shifted by exactly 7 days (buckets
- * {1,2,3,4} instead of {0,1,2,3}), each against its own "eligible before
- * that window's start" denominator — answering "is habit improving week
+ * {1,2,3,4} instead of {0,1,2,3}), each against its own activation span
+ * (8 weeks before that window's start) — answering "is habit improving week
  * over week", not a noisier 28-day-apart comparison.
  *
- * An empty eligible set skips writing that metric this cycle (undefined
+ * An empty activated set skips writing that metric this cycle (undefined
  * rate, never a fabricated 0/0).
  */
 import {
-  getEligiblePlanningFamilies,
+  getActivatedPlanningFamilies,
   getPlanningActiveUserWeekBuckets,
 } from "@/server/services/analytics/planningActivity";
 import type { MetricCollector, MetricCollectorContext, MetricSampleDraft } from "../types";
@@ -29,6 +30,8 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const CURRENT_BUCKETS = [0, 1, 2, 3];
 const PREV_BUCKETS = [1, 2, 3, 4];
 const HABIT_THRESHOLD = 3;
+/** Activation span before the window start (decision 4). */
+const ACTIVATION_SPAN_WEEKS = 8;
 
 function countHabitual(
   eligible: Set<string>,
@@ -55,9 +58,10 @@ export async function collectHabit(ctx: MetricCollectorContext): Promise<MetricS
   const currentWindowStart = new Date(now.getTime() - CURRENT_BUCKETS.length * WEEK_MS);
   const prevWindowStart = new Date(now.getTime() - (PREV_BUCKETS[PREV_BUCKETS.length - 1]! + 1) * WEEK_MS);
 
+  const activationSpanMs = ACTIVATION_SPAN_WEEKS * WEEK_MS;
   const [eligibleCurrent, eligiblePrev] = await Promise.all([
-    getEligiblePlanningFamilies(prisma, currentWindowStart),
-    getEligiblePlanningFamilies(prisma, prevWindowStart),
+    getActivatedPlanningFamilies(prisma, new Date(currentWindowStart.getTime() - activationSpanMs), currentWindowStart),
+    getActivatedPlanningFamilies(prisma, new Date(prevWindowStart.getTime() - activationSpanMs), prevWindowStart),
   ]);
 
   const samples: MetricSampleDraft[] = [];

@@ -51,6 +51,10 @@ const HONEST_GROWTH_CHANGE = {
   date: "2026-10-27",
   note: "Рост WoW/MoM считается по завершённым окнам (последние N полных минских суток против предыдущих N); раньше текущее окно с неполным днём сравнивалось с полным предыдущим, и рост занижался в начале недели",
 };
+const PLANNING_ACTION_CHANGE = {
+  date: "2026-10-27",
+  note: "«Плановое действие»: учитываются все создания PlanItem (бот, ручные записи, статьи), а не только с маршрутом; SAVE больше не плановое действие (остаётся отдельной метрикой «Сохранения»). WPF, возврат и привычка могли измениться",
+};
 const SAMPLE_TTL_CHANGE = {
   date: "2026-10-27",
   note: "Значение показывается, только если сэмпл свежее 3 интервалов коллектора; иначе «Нет данных»",
@@ -151,37 +155,50 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     businessMeaning:
       "North Star: сколько уникальных аккаунтов совершили хотя бы одно значимое действие планирования за последние 7 дней",
     formula:
-      "DISTINCT userId по объединению: UserEvent(SAVE|PLAN_ADD) ∪ RouteIdea.createdAt ∪ DayScenario.createdAt|updatedAt ∪ PlanItem(routeId IS NOT NULL).createdAt",
+      "DISTINCT userId по объединению: UserEvent(PLAN_ADD) ∪ RouteIdea.createdAt ∪ DayScenario.createdAt|updatedAt ∪ PlanItem.createdAt (любое создание записи в плане: каталог, бот, ручная запись, статья); SAVE не входит; PLAN_ADD с последующим удалением продолжает считаться",
     source: "UserEvent, RouteIdea, DayScenario, PlanItem — см. planningActivity.ts",
     window: "Скользящие 7 минских суток до текущего момента — «на сейчас»; WoW считается по завершённым окнам, см. planning.wpf_completed",
     exclusions: EXCLUDES_STAFF,
-    version: "1.1.0",
-    changes: [HONEST_GROWTH_CHANGE, SAMPLE_TTL_CHANGE],
+    version: "1.2.0",
+    changes: [PLANNING_ACTION_CHANGE, HONEST_GROWTH_CHANGE, SAMPLE_TTL_CHANGE],
     identityModel: "ACCOUNT_AS_FAMILY_PROXY",
     verifiable: false,
   },
   "retention.w1": {
     metricKey: "retention.w1",
-    displayName: "W1 Retention",
-    businessMeaning:
-      "Доля новых аккаунтов, вернувшихся со значимым действием планирования на 2–7 день после регистрации (НЕ same-day/next-day-only)",
-    formula: "|{u ∈ cohort(D): qualifying action в [D+2, D+7]}| / |cohort(D)|",
+    displayName: "Возврат через неделю (W1)",
+    businessMeaning: "Доля новых пользователей, которые снова что-то запланировали через неделю после недели регистрации",
+    formula:
+      "|{u ∈ когорта(N): плановое действие на неделе N+1}| / |когорта(N)|; когорта(N) = аккаунты, зарегистрированные в ISO-неделю N (Пн–Вс по Минску); метрика retention.w1_n — размер когорты n",
     source: "User.createdAt (когорта) + planningActivity.ts",
-    window: "Когорта зарегистрированных ровно 7 дней назад; окно проверки [D+2, D+7]",
-    exclusions: EXCLUDES_STAFF,
-    version: "1.0.0",
+    window: "Последняя завершённая когорта: регистрация на неделе (текущая − 2), проверка на неделе (текущая − 1); сравнение — предыдущая недельная когорта",
+    exclusions: `${EXCLUDES_STAFF}; процент скрыт при размере когорты n < 30 (MIN_RATE_SAMPLE) — показывается только n`,
+    version: "2.0.0",
     verifiable: false,
+    changes: [
+      {
+        date: "2026-10-27",
+        note: "Недельные ISO-когорты вместо когорты одного дня и окна D+2…D+7; добавлен размер когорты n и скрытие процента при n < 30; плановое действие — по новому определению (PLAN_ADD, все PlanItem)",
+      },
+    ],
   },
   "retention.w4": {
     metricKey: "retention.w4",
-    displayName: "W4 Retention",
-    businessMeaning: "Доля новых аккаунтов, вернувшихся со значимым действием планирования на 22–30 день",
-    formula: "|{u ∈ cohort(D): qualifying action в [D+22, D+30]}| / |cohort(D)|",
+    displayName: "Возврат через 4 недели (W4)",
+    businessMeaning: "Доля новых пользователей, которые снова что-то запланировали на 4-й неделе после недели регистрации",
+    formula:
+      "|{u ∈ когорта(N): плановое действие на неделе N+4}| / |когорта(N)|; когорта(N) = аккаунты, зарегистрированные в ISO-неделю N (Пн–Вс по Минску); метрика retention.w4_n — размер когорты n",
     source: "User.createdAt (когорта) + planningActivity.ts",
-    window: "Когорта зарегистрированных ровно 30 дней назад; окно проверки [D+22, D+30]",
-    exclusions: EXCLUDES_STAFF,
-    version: "1.0.0",
+    window: "Последняя завершённая когорта: регистрация на неделе (текущая − 5), проверка на неделе (текущая − 1); сравнение — предыдущая недельная когорта",
+    exclusions: `${EXCLUDES_STAFF}; процент скрыт при размере когорты n < 30 (MIN_RATE_SAMPLE) — показывается только n`,
+    version: "2.0.0",
     verifiable: false,
+    changes: [
+      {
+        date: "2026-10-27",
+        note: "Недельные ISO-когорты вместо когорты одного дня и окна D+22…D+30; добавлен размер когорты n и скрытие процента при n < 30; плановое действие — по новому определению (PLAN_ADD, все PlanItem)",
+      },
+    ],
   },
   "habit.3of4week": {
     metricKey: "habit.3of4week",
@@ -189,11 +206,17 @@ export const METRIC_DICTIONARY: Record<string, MetricDictionaryEntry> = {
     businessMeaning:
       "Доля уже активированных планирующих аккаунтов, повторявших значимое действие планирования минимум в 3 из последних 4 недель",
     formula:
-      "|{u ∈ eligible: активен в ≥3 из 4 недельных бакетов}| / |eligible|, где eligible = аккаунты с первым qualifying action до начала 4-недельного окна",
-    source: "planningActivity.ts (getEligiblePlanningFamilies + getPlanningActiveUserWeekBuckets)",
+      "|{u ∈ activated: активен в ≥3 из 4 недельных бакетов}| / |activated|, где activated = аккаунты, чьё первое плановое действие пришлось на 8 недель до начала 4-недельного окна",
+    source: "planningActivity.ts (getActivatedPlanningFamilies + getPlanningActiveUserWeekBuckets)",
     window: "Трейлинг 4 недели (28 дней); сравнение co сдвигом на 7 дней (не на 28)",
-    exclusions: `${EXCLUDES_STAFF}; из знаменателя исключены аккаунты без первого qualifying action до начала окна`,
-    version: "1.0.0",
+    exclusions: `${EXCLUDES_STAFF}; из знаменателя исключены аккаунты без планового действия и активированные раньше чем за 8 недель до начала окна или внутри окна`,
+    version: "1.1.0",
+    changes: [
+      {
+        date: "2026-10-27",
+        note: "Знаменатель — активированные за 8 недель до начала окна (раньше — все активированные когда-либо); плановое действие — по новому определению",
+      },
+    ],
     identityModel: "ACCOUNT_AS_FAMILY_PROXY",
     verifiable: false,
   },
