@@ -15,6 +15,8 @@ export type PartySubmissionInput = {
   childrenCount: number;
   adultsCount: number;
   childName: string | null;
+  /** Full years on the party date, so the server can check offer age limits. */
+  childAge: number | null;
   contactName: string;
   contactPhone: string;
   anchorOfferId: string;
@@ -31,6 +33,11 @@ export async function partyRequest<T>(url: string, method: string, body?: object
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Не удалось отправить заявку");
   return data as T;
+}
+
+/** The PartyOrder this flow created; one draft is reused across retries and edits. */
+export function submittedPartyId(state: PartyFlowState): string | null {
+  return state.pending?.id ?? state.draft?.id ?? null;
 }
 
 export async function submitBirthdayParty(
