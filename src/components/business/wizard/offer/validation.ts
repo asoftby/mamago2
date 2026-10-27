@@ -227,15 +227,12 @@ function validateStep4(data: OfferFormData): ValidationResult {
     if (!data.classDuration || data.classDuration.trim().length === 0) {
       errors.push("Укажите продолжительность занятия");
     }
-    if (!data.classFormat) {
-      errors.push("Выберите формат занятия");
-    }
   }
 
   const isComplete = Boolean(
     data.productType === "ONE_TIME_ACTIVITY" ||
     data.productType === "REGULAR_ACTIVITY"
-      ? data.classDuration.trim() && data.classFormat
+      ? data.classDuration.trim()
       : true
   );
 
@@ -255,18 +252,26 @@ function validateStep5(data: OfferFormData, requireLegacyAction = true): Validat
   const participationErrors: string[] = [];
   const warnings: string[] = [];
   const isCampOffer = data.offerWizardType === "CAMP";
+  const isRegularClass = data.productType === "REGULAR_ACTIVITY";
+  const groupTariffs = data.schedule.classSchedule.groups.flatMap((group) => group.tariffs ?? []);
+  if (isRegularClass && groupTariffs.length === 0) {
+    pricingErrors.push("Добавьте хотя бы один тариф в расписание группы");
+  }
+  if (isRegularClass && groupTariffs.some((t) => !t.title.trim() || !t.price.trim() || !Number.isFinite(Number(t.price.replace(",", "."))) || Number(t.price.replace(",", ".")) < 0)) {
+    pricingErrors.push("Проверьте название и стоимость тарифов групп");
+  }
 
-  if (!isCampOffer && !data.pricingMode) {
+  if (!isCampOffer && !isRegularClass && !data.pricingMode) {
     pricingErrors.push("Выберите режим ценообразования");
   }
 
-  if (!isCampOffer && data.pricingMode === "single") {
+  if (!isCampOffer && !isRegularClass && data.pricingMode === "single") {
     if (!data.singlePrice || data.singlePrice.trim().length === 0) {
       pricingErrors.push("Укажите цену");
     }
   }
 
-  if (!isCampOffer && data.pricingMode === "multiple") {
+  if (!isCampOffer && !isRegularClass && data.pricingMode === "multiple") {
     if (data.pricingOptions.length === 0) {
       pricingErrors.push("Добавьте хотя бы один вариант цены");
     } else {
