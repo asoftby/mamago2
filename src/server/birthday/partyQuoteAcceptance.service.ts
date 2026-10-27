@@ -3,6 +3,7 @@ import { BookingKind, BookingStatus, PartyOrderStatus, PartyItemStatus } from "@
 import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt } from "./partyDraft.validation";
 import { partyResponseDeadline } from "./partyResponseDeadline";
+import { assertPartyConfirmationEnabled } from "./partyConfirmationFlag";
 
 /**
  * Parent accepts a particular quote/version, NOT a reservation.
@@ -16,6 +17,7 @@ export async function acceptPartyQuote(input: {
   expectedVersion: number;
 }) {
   const { userId, orderId, requestId, quoteId, expectedVersion } = input;
+  assertPartyConfirmationEnabled();
   const now = new Date();
   return prisma.$transaction(async (tx) => {
     // Lock request before order: consistent with response and expiry workers.

@@ -20,5 +20,8 @@ for (const invariant of [
 assert.match(route, /getMyBusiness\(user.id\)/);
 assert.match(route, /listPartyConfirmChoices\(business.id, id\)/);
 assert.match(confirm, /bookingUnitOffer.findMany/);
-assert.match(confirm, /BookingAllocation_no_active_overlap/);
+// The overlap error mapping lives in the shared unit allocation used by confirm.
+const unitAllocation = readFileSync(new URL("./partyUnitAllocation.ts", import.meta.url), "utf8");
+assert.match(confirm, /isAllocationOverlapError\(error\)/);
+assert.match(unitAllocation, /BookingAllocation_no_active_overlap/);
 console.log("Party confirmation room-choice API contracts: OK");

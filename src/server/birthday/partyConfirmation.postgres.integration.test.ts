@@ -227,12 +227,15 @@ test("quote acceptance and concurrent room confirmation are exclusive and idempo
   })).status, "CONFIRMED");
 });
 
-test("fixed-price auto-confirmation at home requests each add-on exactly once", async () => {
-  const ctx = await fixture();
+type Ctx = Awaited<ReturnType<typeof fixture>>;
+
+/** A home party performer: an exclusive BookingUnit working 09:00–20:00 on the party weekday. */
+async function homeSetup(ctx: Ctx, opts: { withUnit?: boolean; cleanupMinutes?: number } = {}) {
+  const tag = randomUUID().slice(0, 6);
   const partyOffer = (title: string, category: "ANIMATOR" | "PHOTO", priceFrom: number) =>
     db.offer.create({
       data: {
-        title: `${title} ${suffix}`, kind: "SERVICE", productType: "PARTY_SERVICE",
+        title: `${title} ${tag}`, kind: "SERVICE", productType: "PARTY_SERVICE",
         category, placeId: ctx.place.id, status: "PUBLISHED",
         priceFrom, priceMode: "FROM", currency: "BYN",
         placements: { create: { key: "BIRTHDAY", status: "APPROVED" } },
@@ -240,50 +243,72 @@ test("fixed-price auto-confirmation at home requests each add-on exactly once", 
     });
   const animator = await partyOffer("Animator", "ANIMATOR", 180);
   const photo = await partyOffer("Photographer", "PHOTO", 120);
+  const performer = opts.withUnit === false ? null : await db.bookingUnit.create({
+    data: {
+      businessId: ctx.business.id, name: `Animator Vasya ${tag}`, timezone: "Europe/Minsk",
+      cleanupMinutes: opts.cleanupMinutes ?? 0,
+      rules: { create: { weekday: eventDate.getUTCDay() || 7, startMinutes: 540, endMinutes: 1200 } },
+      offers: { create: { offerId: animator.id } },
+    },
+  });
+  return { animator, photo, performer };
+}
+
+async function homeOrder(ctx: Ctx, offers: { animator: { id: string }; photo?: { id: string } },
+  timeFrom: string, timeTo: string) {
   const order = await db.partyOrder.create({
     data: {
       ownerUserId: ctx.parent.id, citySlug: "minsk", venueMode: "HOME",
-      status: "ANCHOR_PENDING", eventDate, timeFrom: "10:00", timeTo: "11:00",
+      status: "ANCHOR_PENDING", eventDate, timeFrom, timeTo,
       childrenCount: 8, adultsCount: 2, childAge: 6,
       contactName: "Test Parent", contactPhone: "+375291112233",
     },
   });
   const anchor = await db.partyOrderItem.create({
     data: {
-      partyOrderId: order.id, category: "ANIMATOR", role: "ANCHOR", offerId: animator.id,
+      partyOrderId: order.id, category: "ANIMATOR", role: "ANCHOR", offerId: offers.animator.id,
       businessId: ctx.business.id, status: "REQUESTED", offerPriceSnapshot: 180, position: 0,
     },
   });
-  const addon = await db.partyOrderItem.create({
+  const addon = offers.photo ? await db.partyOrderItem.create({
     data: {
-      partyOrderId: order.id, category: "PHOTO", role: "STANDALONE", offerId: photo.id,
+      partyOrderId: order.id, category: "PHOTO", role: "STANDALONE", offerId: offers.photo.id,
       businessId: ctx.business.id, status: "PLANNED", offerPriceSnapshot: 120, position: 1,
     },
-  });
+  }) : null;
   const request = await db.bookingRequest.create({
     data: {
       businessId: ctx.business.id, userId: ctx.parent.id, publicationType: "OFFER",
-      offerId: animator.id, kind: "PARTY", partyOrderItemId: anchor.id,
+      offerId: offers.animator.id, kind: "PARTY", partyOrderItemId: anchor.id,
       status: "NEW", partyStage: "SENT", responseDueAt: oneDayLater(),
-      requestedDate: eventDate, requestedTime: "10:00",
+      requestedDate: eventDate, requestedTime: timeFrom,
       customerName: null, customerPhone: null,
     },
   });
+  return { order, anchor, addon, request };
+}
 
-  const reply = () => replyToPartyRequest({
-    businessId: ctx.business.id, actorUserId: ctx.owner.id, requestId: request.id,
-    idempotencyKey: `auto-${suffix}`,
+function fixedPriceReply(ctx: Ctx, requestId: string, durationMinutes: number, key: string = randomUUID()) {
+  return replyToPartyRequest({
+    businessId: ctx.business.id, actorUserId: ctx.owner.id, requestId, idempotencyKey: key,
     input: { type: "AS_REQUESTED", expectedStage: "SENT", expectedQuoteVersion: 0,
-      priceByn: 180, includes: "Programme for one hour", durationMinutes: 60 },
+      priceByn: 180, includes: "Programme", durationMinutes },
   });
-  const first = await reply();
+}
+
+test("fixed-price auto-confirmation at home requests each add-on exactly once", async () => {
+  const ctx = await fixture();
+  const setup = await homeSetup(ctx);
+  const { order, addon, request } = await homeOrder(ctx, setup, "10:00", "11:00");
+  const key = `auto-${suffix}`;
+  const first = await fixedPriceReply(ctx, request.id, 60, key);
   assert.equal(first.alreadyResponded, false);
   assert.equal(first.quote.status, "ACCEPTED");
   assert.equal((await db.partyOrder.findUniqueOrThrow({ where: { id: order.id } })).status,
     "ANCHOR_CONFIRMED");
 
   const addonRequests = () => db.bookingRequest.findMany({
-    where: { partyOrderItemId: addon.id },
+    where: { partyOrderItemId: addon!.id },
     select: { id: true, partyStage: true, status: true, childrenCount: true, childAge: true },
   });
   const sent = await addonRequests();
@@ -292,17 +317,119 @@ test("fixed-price auto-confirmation at home requests each add-on exactly once", 
     { stage: sent[0].partyStage, status: sent[0].status, children: sent[0].childrenCount, age: sent[0].childAge },
     { stage: "SENT", status: "NEW", children: 8, age: 6 },
   );
-  assert.equal((await db.partyOrderItem.findUniqueOrThrow({ where: { id: addon.id } })).status, "REQUESTED");
+  assert.equal((await db.partyOrderItem.findUniqueOrThrow({ where: { id: addon!.id } })).status, "REQUESTED");
   assert.equal(await db.partyOutbox.count({
     where: { eventType: "PARTY_REQUEST_SENT", aggregateId: sent[0].id },
   }), 1);
 
   // A replayed reply (lost response) and a repeated fan-out must not request the add-on again.
-  const replay = await reply();
+  const replay = await fixedPriceReply(ctx, request.id, 60, key);
   assert.equal(replay.alreadyResponded, true);
   const repeated = await db.$transaction((tx) => requestPartyAddonsAfterAnchor(tx, {
     order: { ...order, eventDate, timeFrom: "10:00" }, anchorRequestId: request.id, now: new Date(),
   }));
   assert.equal(repeated, 0);
   assert.equal((await addonRequests()).length, 1);
+});
+
+test("one performer cannot be auto-confirmed for two overlapping parties", async () => {
+  const ctx = await fixture();
+  const setup = await homeSetup(ctx, { cleanupMinutes: 30 });
+  const [a, b] = await Promise.all([
+    homeOrder(ctx, setup, "10:00", "11:00"),
+    homeOrder(ctx, setup, "10:30", "11:30"),
+  ]);
+  const results = await Promise.allSettled([
+    fixedPriceReply(ctx, a.request.id, 60), fixedPriceReply(ctx, b.request.id, 60),
+  ]);
+  assert.equal(results.filter((r) => r.status === "fulfilled").length, 1,
+    "exactly one concurrent auto-confirmation wins the performer");
+  const rejected = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+  assert.ok(isPartyError(409)(rejected.reason), String(rejected.reason));
+  const allocations = await db.bookingAllocation.findMany({
+    where: { bookingUnitId: setup.performer!.id, status: "CONFIRMED" },
+    select: { bookingRequestId: true },
+  });
+  assert.equal(allocations.length, 1);
+  const loser = results[0].status === "rejected" ? a : b;
+  const loserRequest = await db.bookingRequest.findUniqueOrThrow({ where: { id: loser.request.id } });
+  assert.equal(loserRequest.partyStage, "SENT", "the losing reply is rolled back, not half-applied");
+  assert.equal(await db.partyQuote.count({ where: { bookingRequestId: loser.request.id } }), 0);
+
+  // Cleanup (30 min) widens the 10:00–11:00 booking to 11:30: 11:15 overlaps, 11:30 does not.
+  const winner = results[0].status === "fulfilled" ? a : b;
+  const winnerEnd = winner === a ? "11:00" : "11:30";
+  const tooEarly = await homeOrder(ctx, setup, addMinutes(winnerEnd, 15), addMinutes(winnerEnd, 75));
+  await assert.rejects(fixedPriceReply(ctx, tooEarly.request.id, 60), isPartyError(409));
+  const afterCleanup = await homeOrder(ctx, setup, addMinutes(winnerEnd, 30), addMinutes(winnerEnd, 90));
+  assert.equal((await fixedPriceReply(ctx, afterCleanup.request.id, 60)).quote.status, "ACCEPTED");
+});
+
+test("manual confirmation cannot take a performer already booked by an auto-confirmation", async () => {
+  const ctx = await fixture();
+  const setup = await homeSetup(ctx);
+  const booked = await homeOrder(ctx, setup, "12:00", "13:00");
+  await fixedPriceReply(ctx, booked.request.id, 60);
+
+  const other = await homeOrder(ctx, setup, "12:30", "13:30");
+  // A modified price is not auto-confirmed: the parent accepts, then the business confirms.
+  const quoted = await replyToPartyRequest({
+    businessId: ctx.business.id, actorUserId: ctx.owner.id, requestId: other.request.id,
+    idempotencyKey: randomUUID(),
+    input: { type: "MODIFIED", expectedStage: "SENT", expectedQuoteVersion: 0,
+      priceByn: 200, includes: "Programme", changeReason: "Другая программа", durationMinutes: 60 },
+  });
+  assert.equal(quoted.quote.status, "ACTIVE");
+  await acceptPartyQuote({ userId: ctx.parent.id, orderId: other.order.id,
+    requestId: other.request.id, quoteId: quoted.quote.id, expectedVersion: quoted.quote.version });
+  await assert.rejects(confirmPartyRequest({
+    requestId: other.request.id, businessId: ctx.business.id, actorUserId: ctx.owner.id,
+    expectedQuoteVersion: quoted.quote.version, idempotencyKey: randomUUID(),
+    bookingUnitId: setup.performer!.id,
+  }), isPartyError(409));
+});
+
+test("without a performer resource the reply waits for a manual confirmation", async () => {
+  const ctx = await fixture();
+  const setup = await homeSetup(ctx, { withUnit: false });
+  const { order, request } = await homeOrder(ctx, setup, "15:00", "16:00");
+  const reply = await fixedPriceReply(ctx, request.id, 60);
+  assert.equal(reply.quote.status, "ACTIVE", "no auto-confirmation without an occupancy check");
+  assert.equal((await db.bookingRequest.findUniqueOrThrow({ where: { id: request.id } })).partyStage, "QUOTED");
+  assert.equal((await db.partyOrder.findUniqueOrThrow({ where: { id: order.id } })).status, "ANCHOR_PENDING");
+});
+
+function addMinutes(time: string, minutes: number): string {
+  const [h, m] = time.split(":").map(Number);
+  const total = h * 60 + m + minutes;
+  return String(Math.floor(total / 60)).padStart(2, "0") + ":" + String(total % 60).padStart(2, "0");
+}
+
+test("with PARTY_CONFIRMATION_ENABLED off nothing is accepted or confirmed", async () => {
+  const ctx = await fixture();
+  const previous = process.env.PARTY_CONFIRMATION_ENABLED;
+  process.env.PARTY_CONFIRMATION_ENABLED = "false";
+  try {
+    const venue = await ctx.requestWithQuote();
+    await assert.rejects(acceptPartyQuote({
+      userId: ctx.parent.id, orderId: venue.order.id, requestId: venue.request.id,
+      quoteId: venue.quote.id, expectedVersion: 1,
+    }), isPartyError(503));
+    await assert.rejects(confirmPartyRequest({
+      requestId: venue.request.id, businessId: ctx.business.id, actorUserId: ctx.owner.id,
+      expectedQuoteVersion: 1, idempotencyKey: randomUUID(), bookingUnitId: ctx.unit.id,
+    }), isPartyError(503));
+    assert.equal((await db.partyQuote.findUniqueOrThrow({ where: { id: venue.quote.id } })).status, "ACTIVE");
+
+    // A fixed-price reply is still recorded, but as an offer, not an automatic confirmation.
+    const setup = await homeSetup(ctx);
+    const home = await homeOrder(ctx, setup, "16:00", "17:00");
+    const reply = await fixedPriceReply(ctx, home.request.id, 60);
+    assert.equal(reply.quote.status, "ACTIVE");
+    assert.equal((await db.partyOrder.findUniqueOrThrow({ where: { id: home.order.id } })).status, "ANCHOR_PENDING");
+    assert.equal(await db.bookingAllocation.count({ where: { bookingUnitId: setup.performer!.id } }), 0);
+  } finally {
+    if (previous === undefined) delete process.env.PARTY_CONFIRMATION_ENABLED;
+    else process.env.PARTY_CONFIRMATION_ENABLED = previous;
+  }
 });
