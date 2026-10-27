@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { parsePriceData } from "@/lib/priceItems";
 import { BookingStatus, Prisma, PublicationType, ScheduleKind } from "@prisma/client";
 import { loadSlotSnapshot } from "./getSlots";
 import { calculateSlots, type SlotSnapshot } from "./slotAvailability";
@@ -9,6 +10,7 @@ const PHONE_RE = /^\+?[\d\s\-().]{7,20}$/;
 
 export type ReserveSlotInput = {
   offerId: string;
+  classTariffId?: string | null;
   startsAt: Date;
   endsAt: Date;
   seats?: number;
@@ -86,11 +88,18 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
     return await prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: input.offerId },
-        select: { status: true, place: { select: { ownerBusinessId: true } }, offerBooking: { select: { leadTimeHours: true } } },
+        select: { status: true, priceItems: true, place: { select: { ownerBusinessId: true } }, offerBooking: { select: { leadTimeHours: true } } },
       });
       const businessId = offer?.place?.ownerBusinessId;
       if (!offer || offer.status !== "PUBLISHED" || !businessId || !offer.offerBooking) {
         throw new SlotReservationError("OFFER_UNAVAILABLE", "Предложение сейчас недоступно для записи");
+      }
+      const tariffs = parsePriceData(offer.priceItems).items;
+      const tariff = input.classTariffId
+        ? tariffs.find((item) => item.id === input.classTariffId)
+        : null;
+      if ((tariffs.length > 0 && !tariff) || (input.classTariffId && !tariff)) {
+        throw new SlotReservationError("INVALID_SLOT", "Выберите доступный тариф");
       }
       const query = { offerId: input.offerId, from: input.startsAt, to: new Date(input.endsAt.getTime() + 1), requestedSeats: seats };
       const initial = await loadSlotSnapshot(query, tx);
@@ -146,6 +155,10 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
           planItemId: input.planItemId ?? null,
           publicationType: PublicationType.OFFER,
           offerId: input.offerId,
+          classTariffId: tariff?.id ?? null,
+          classTariffTitle: tariff?.label ?? null,
+          classTariffPrice: tariff?.price ?? null,
+          classTariffUnit: tariff?.unit ?? null,
           offerSessionId: sessionId,
           startsAt: input.startsAt,
           endsAt: input.endsAt,
