@@ -209,6 +209,10 @@ function mapBooking(raw: {
     currency: string | null;
   } | null;
   place: { id: string; title: string; slug: string | null } | null;
+  classTariffId: string | null;
+  classTariffTitle: string | null;
+  classTariffPrice: string | null;
+  classTariffUnit: string | null;
   campShiftId: string | null;
   campShiftTitle: string | null;
   campShiftDateFrom: Date | null;
@@ -233,6 +237,10 @@ function mapBooking(raw: {
     : null;
 
   const display = buildBookingDisplay({
+    classTariffId: raw.classTariffId,
+    classTariffTitle: raw.classTariffTitle,
+    classTariffPrice: raw.classTariffPrice,
+    classTariffUnit: raw.classTariffUnit,
     classTariffId: raw.classTariffId,
     classTariffTitle: raw.classTariffTitle,
     classTariffPrice: raw.classTariffPrice,
