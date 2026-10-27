@@ -32,14 +32,14 @@ async function main() {
 
   async function saveAt(userId: string, now: Date, daysAgo: number) {
     const event = await prisma.userEvent.create({
-      data: { userId, eventType: "SAVE", createdAt: new Date(now.getTime() - daysAgo * DAY_MS) },
+      data: { userId, eventType: "PLAN_ADD", createdAt: new Date(now.getTime() - daysAgo * DAY_MS) },
     });
     eventIds.push(event.id);
   }
 
   try {
     const now = new Date("2019-07-01T09:00:00.000Z");
-    const SEED_DAYS_AGO = 100; // well before both the 28d and 35d eligibility cutoffs
+    const SEED_DAYS_AGO = 70; // inside the 8-week activation span before both the current (28d) and prev (35d) window starts
 
     // Eligible, habitual in the CURRENT window (buckets {0,1,2,3}), active in {0,1,2}.
     const userCurrentHabitual = await makeUser();
@@ -71,6 +71,14 @@ async function main() {
     await saveAt(userNewNotEligible, now, 20); // bucket 2 — also this user's FIRST-EVER action
     await saveAt(userNewNotEligible, now, 10); // bucket 1
     await saveAt(userNewNotEligible, now, 3); // bucket 0
+
+    // NOT in the denominator (C5): activated MORE than 8 weeks before the window starts
+    // (first action 100 days ago), even though habitual now — old accounts do not dilute/inflate the rate.
+    const userOldTimer = await makeUser();
+    await saveAt(userOldTimer, now, 100);
+    await saveAt(userOldTimer, now, 2);
+    await saveAt(userOldTimer, now, 9);
+    await saveAt(userOldTimer, now, 16);
 
     // Excluded role — must not appear in either eligibility or bucket sets.
     const userAdmin = await makeUser("ADMIN");

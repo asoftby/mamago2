@@ -7,7 +7,11 @@
  * `AUDIENCE_EXCLUDED_ROLES` (ADMIN/MODERATOR, same constant as
  * canonicalAudience.ts):
  *
- *   - `UserEvent` rows with `eventType IN (SAVE, PLAN_ADD)` and a userId.
+ *   - `UserEvent` rows with `eventType = PLAN_ADD` and a userId. `SAVE` is
+ *     deliberately NOT a planning action (ТЗ «Аналитика админки», C3): a
+ *     bookmark is interest, not planning; it stays a separate metric
+ *     («Сохранения», funnel.saves). A PLAN_ADD that was later deleted keeps
+ *     counting (product decision 3).
  *   - `RouteIdea.createdAt` (saving a route to "Ideas" — this write path
  *     fires no UserEvent today, see docs/engineering/backlog.md, so it must
  *     be read from the source table directly).
@@ -15,8 +19,11 @@
  *     `updatedAt` only bumps on a real save/override, per
  *     dayScenario.service.ts, so it doubles as "returned to an existing
  *     plan with meaningful interaction").
- *   - `PlanItem` rows with a non-null `routeId` (saving a route into a
- *     dated plan — distinct from the RouteIdea-to-"Ideas" path above).
+ *   - EVERY `PlanItem` creation (C3): catalog events/routes/places added to
+ *     the plan, manual entries (`createManualPlanEntry`), Telegram-bot
+ *     entries (`createFromDraft`), articles (`addArticlePlanItem`). Not only
+ *     rows with a `routeId` — a record written from the bot or by hand is
+ *     planning too, and fires no PLAN_ADD UserEvent.
  *
  * All four sources are userId-keyed with no guest/anonymous concept, so
  * (unlike canonicalAudience.ts's PAGE_VIEW identity) no session-tainting
@@ -29,7 +36,7 @@
  * — these functions mechanically count/identify distinct accounts, used as
  * a proxy for "families" until a real household model exists.
  *
- * "First qualifying action" (used for habit eligibility) intentionally
+ * "First qualifying action" (used for habit activation) intentionally
  * uses `createdAt` only, not `updatedAt` — an edit to an existing
  * DayScenario is a return visit, not the user's first activation.
  */
@@ -43,7 +50,7 @@ const EXCLUDED_ROLES_SQL_LIST = Prisma.raw(AUDIENCE_EXCLUDED_ROLES.map((role) =>
 function qualifyingActionsWindowCte(start: Date, end: Date): Prisma.Sql {
   return Prisma.sql`
     SELECT "userId", "createdAt" AS ts FROM "UserEvent"
-      WHERE "eventType" IN ('SAVE', 'PLAN_ADD') AND "userId" IS NOT NULL
+      WHERE "eventType" = 'PLAN_ADD' AND "userId" IS NOT NULL
         AND "createdAt" >= ${start} AND "createdAt" < ${end}
     UNION ALL
     SELECT "userId", "createdAt" AS ts FROM "RouteIdea"
@@ -56,21 +63,21 @@ function qualifyingActionsWindowCte(start: Date, end: Date): Prisma.Sql {
       WHERE "updatedAt" >= ${start} AND "updatedAt" < ${end}
     UNION ALL
     SELECT "userId", "createdAt" AS ts FROM "PlanItem"
-      WHERE "routeId" IS NOT NULL AND "createdAt" >= ${start} AND "createdAt" < ${end}
+      WHERE "createdAt" >= ${start} AND "createdAt" < ${end}
   `;
 }
 
-/** One row per userId with >=1 qualifying action (by createdAt only — see file header) strictly before `before`. */
-function qualifyingActionsBeforeCte(before: Date): Prisma.Sql {
+/** One row per (userId, first-action candidate ts) — createdAt only, strictly before `before`. */
+function qualifyingActionTimesBeforeCte(before: Date): Prisma.Sql {
   return Prisma.sql`
-    SELECT "userId" FROM "UserEvent"
-      WHERE "eventType" IN ('SAVE', 'PLAN_ADD') AND "userId" IS NOT NULL AND "createdAt" < ${before}
+    SELECT "userId", "createdAt" AS ts FROM "UserEvent"
+      WHERE "eventType" = 'PLAN_ADD' AND "userId" IS NOT NULL AND "createdAt" < ${before}
     UNION ALL
-    SELECT "userId" FROM "RouteIdea" WHERE "createdAt" < ${before}
+    SELECT "userId", "createdAt" AS ts FROM "RouteIdea" WHERE "createdAt" < ${before}
     UNION ALL
-    SELECT "userId" FROM "DayScenario" WHERE "createdAt" < ${before}
+    SELECT "userId", "createdAt" AS ts FROM "DayScenario" WHERE "createdAt" < ${before}
     UNION ALL
-    SELECT "userId" FROM "PlanItem" WHERE "routeId" IS NOT NULL AND "createdAt" < ${before}
+    SELECT "userId", "createdAt" AS ts FROM "PlanItem" WHERE "createdAt" < ${before}
   `;
 }
 
@@ -113,20 +120,27 @@ export async function countUsersWithPlanningActivity(
 }
 
 /**
- * Eligible-role users whose first-ever qualifying action (createdAt only)
- * happened strictly before `before`. Used as the habit-metric denominator
- * ("activated planning families", not "everyone ever registered ≥28d ago").
+ * Habit denominator (ТЗ «Аналитика админки», C5 / decision 4): eligible-role
+ * users ACTIVATED in [from, before) — their first-ever qualifying action
+ * (createdAt only) falls inside that span. Users activated earlier are out
+ * (they would turn the metric into a graveyard of old accounts), users
+ * activated at/after `before` have not had a chance to form a habit yet.
  */
-export async function getEligiblePlanningFamilies(prisma: PrismaClient, before: Date): Promise<Set<string>> {
+export async function getActivatedPlanningFamilies(
+  prisma: PrismaClient,
+  from: Date,
+  before: Date,
+): Promise<Set<string>> {
   const rows = await prisma.$queryRaw<{ userId: string }[]>(Prisma.sql`
-    WITH qualifying AS (${qualifyingActionsBeforeCte(before)}),
-    eligible AS (
-      SELECT DISTINCT q."userId"
-      FROM qualifying q
-      LEFT JOIN "User" u ON u.id = q."userId"
+    WITH actions AS (${qualifyingActionTimesBeforeCte(before)}),
+    first_action AS (
+      SELECT a."userId", MIN(a.ts) AS first_ts
+      FROM actions a
+      LEFT JOIN "User" u ON u.id = a."userId"
       WHERE u.role IS NULL OR u.role NOT IN (${EXCLUDED_ROLES_SQL_LIST})
+      GROUP BY a."userId"
     )
-    SELECT "userId" FROM eligible
+    SELECT "userId" FROM first_action WHERE first_ts >= ${from}
   `);
   return new Set(rows.map((r) => r.userId));
 }

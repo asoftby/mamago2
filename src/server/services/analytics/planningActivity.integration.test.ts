@@ -8,7 +8,7 @@ import { PrismaClient } from "@prisma/client";
 import {
   countPlanningActiveUsers,
   countUsersWithPlanningActivity,
-  getEligiblePlanningFamilies,
+  getActivatedPlanningFamilies,
   getPlanningActiveUserWeekBuckets,
 } from "./planningActivity";
 
@@ -56,6 +56,7 @@ async function main() {
 
     const routeId = await makeRoute();
 
+    // SAVE is a bookmark, not planning (C3): must NOT count.
     const userSave = await makeUser();
     const savedEvent = await prisma.userEvent.create({
       data: { userId: userSave, eventType: "SAVE", createdAt: inWindow },
@@ -101,6 +102,18 @@ async function main() {
     });
     planItemIds.push(planItem.id);
 
+    // C3: PlanItem rows WITHOUT routeId — manual entry and Telegram-bot entry — count.
+    const userManualEntry = await makeUser();
+    const manualItem = await prisma.planItem.create({
+      data: { userId: userManualEntry, source: "MANUAL", entryType: "TASK", title: "Купить форму", date: "2019-03-05", createdAt: inWindow },
+    });
+    planItemIds.push(manualItem.id);
+    const userBotEntry = await makeUser();
+    const botItem = await prisma.planItem.create({
+      data: { userId: userBotEntry, source: "TELEGRAM_FORWARD", entryType: "EVENT", title: "Утренник", date: "2019-03-06", createdAt: inWindow },
+    });
+    planItemIds.push(botItem.id);
+
     // Excluded role — must NOT count even though the action is in-window.
     const userAdmin = await makeUser("ADMIN");
     const adminEvent = await prisma.userEvent.create({
@@ -126,53 +139,71 @@ async function main() {
     const activeCount = await countPlanningActiveUsers(prisma, start, end);
     assert.equal(
       activeCount,
-      6,
-      "SAVE + PLAN_ADD + RouteIdea + DayScenario-created + DayScenario-updated + PlanItem(route) must each count once, ADMIN/PAGE_VIEW/outside-window excluded",
+      7,
+      "PLAN_ADD + RouteIdea + DayScenario-created + DayScenario-updated + PlanItem(route) + PlanItem(manual) + PlanItem(bot) must each count once; SAVE-only, ADMIN, PAGE_VIEW, outside-window excluded",
     );
 
     // countUsersWithPlanningActivity — restrict to a specific candidate set.
-    const restricted = await countUsersWithPlanningActivity(prisma, [userSave, userOutside, userPageViewOnly], start, end);
-    assert.equal(restricted, 1, "only userSave from the candidate set is active in-window");
+    const restricted = await countUsersWithPlanningActivity(
+      prisma,
+      [userPlanAdd, userSave, userOutside, userPageViewOnly],
+      start,
+      end,
+    );
+    assert.equal(restricted, 1, "only userPlanAdd from the candidate set is active in-window (SAVE does not count)");
     assert.equal(await countUsersWithPlanningActivity(prisma, [], start, end), 0, "empty candidate list must short-circuit to 0");
 
-    // getEligiblePlanningFamilies — first-ever qualifying action (createdAt
-    // only) strictly before a cutoff.
-    const eligibleBeforeNow = await getEligiblePlanningFamilies(prisma, now);
-    assert.ok(eligibleBeforeNow.has(userSave), "userSave's action predates `now`");
-    assert.ok(!eligibleBeforeNow.has(userAdmin), "ADMIN must be excluded from eligibility");
+    // getActivatedPlanningFamilies — first-ever qualifying action (createdAt
+    // only) inside [from, before).
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    const activatedNow = await getActivatedPlanningFamilies(prisma, new Date(now.getTime() - 8 * weekMs), now);
+    assert.ok(activatedNow.has(userPlanAdd), "userPlanAdd's first action predates `now`");
+    assert.ok(!activatedNow.has(userSave), "SAVE-only user is not activated");
+    assert.ok(!activatedNow.has(userAdmin), "ADMIN must be excluded");
     // userScenarioUpdated's DayScenario was CREATED outside the window (before
-    // `start`), so it must be eligible using a cutoff of `start` even though
-    // its most recent activity (the update) is inside the window.
-    const eligibleBeforeStart = await getEligiblePlanningFamilies(prisma, start);
-    assert.ok(
-      eligibleBeforeStart.has(userScenarioUpdated),
-      "eligibility must use createdAt (first action), not updatedAt",
-    );
-    assert.ok(!eligibleBeforeStart.has(userSave), "userSave's only action is inside [start, end), not before start");
+    // `start`), so it is activated before `start` even though its latest
+    // activity (the update) is inside the window.
+    const activatedBeforeStart = await getActivatedPlanningFamilies(prisma, new Date(start.getTime() - 8 * weekMs), start);
+    assert.ok(activatedBeforeStart.has(userScenarioUpdated), "activation uses createdAt (first action), not updatedAt");
+    assert.ok(!activatedBeforeStart.has(userPlanAdd), "userPlanAdd's only action is inside [start, end), not before start");
+    // C5: activated MORE than 8 weeks before the window is out of the denominator.
+    const userOldTimer = await makeUser();
+    const oldEvent = await prisma.userEvent.create({
+      data: { userId: userOldTimer, eventType: "PLAN_ADD", createdAt: new Date(start.getTime() - 9 * weekMs) },
+    });
+    eventIds.push(oldEvent.id);
+    const userRecentActivated = await makeUser();
+    const recentEvent = await prisma.userEvent.create({
+      data: { userId: userRecentActivated, eventType: "PLAN_ADD", createdAt: new Date(start.getTime() - 3 * weekMs) },
+    });
+    eventIds.push(recentEvent.id);
+    const activatedSpan = await getActivatedPlanningFamilies(prisma, new Date(start.getTime() - 8 * weekMs), start);
+    assert.ok(activatedSpan.has(userRecentActivated), "activated 3 weeks before the window is in the 8-week span");
+    assert.ok(!activatedSpan.has(userOldTimer), "activated 9 weeks before the window is out of the 8-week span");
 
     // getPlanningActiveUserWeekBuckets — per-user weekly bucket membership
     // over a 5-week trailing span ending `now`.
     const userBucket0 = await makeUser();
     const bucket0Event = await prisma.userEvent.create({
-      data: { userId: userBucket0, eventType: "SAVE", createdAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000) },
+      data: { userId: userBucket0, eventType: "PLAN_ADD", createdAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000) },
     });
     eventIds.push(bucket0Event.id);
 
     const userBucket3 = await makeUser();
     const bucket3Event = await prisma.userEvent.create({
-      data: { userId: userBucket3, eventType: "SAVE", createdAt: new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000) },
+      data: { userId: userBucket3, eventType: "PLAN_ADD", createdAt: new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000) },
     });
     eventIds.push(bucket3Event.id);
 
     const userBucket4 = await makeUser();
     const bucket4Event = await prisma.userEvent.create({
-      data: { userId: userBucket4, eventType: "SAVE", createdAt: new Date(now.getTime() - 32 * 24 * 60 * 60 * 1000) },
+      data: { userId: userBucket4, eventType: "PLAN_ADD", createdAt: new Date(now.getTime() - 32 * 24 * 60 * 60 * 1000) },
     });
     eventIds.push(bucket4Event.id);
 
     const userBeyondSpan = await makeUser();
     const beyondSpanEvent = await prisma.userEvent.create({
-      data: { userId: userBeyondSpan, eventType: "SAVE", createdAt: new Date(now.getTime() - 40 * 24 * 60 * 60 * 1000) },
+      data: { userId: userBeyondSpan, eventType: "PLAN_ADD", createdAt: new Date(now.getTime() - 40 * 24 * 60 * 60 * 1000) },
     });
     eventIds.push(beyondSpanEvent.id);
 

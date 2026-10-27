@@ -1,6 +1,6 @@
 /**
  * planning.wpf — Weekly Planning Families (North Star), every 60 min (same
- * cadence as audience_wau_mau).
+ * cadence as audience_wau_mau). CI verification against dev after restacking.
  *
  * Counts distinct accounts with >=1 "meaningful planning action" in the
  * trailing 7 Minsk days — see planningActivity.ts for the exact qualifying-

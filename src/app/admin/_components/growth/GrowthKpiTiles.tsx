@@ -2,7 +2,23 @@ import type { ReactNode } from "react";
 import { AdminDashboardBlock } from "../AdminDashboardBlock";
 import { getDashboardBlock } from "@/lib/admin/dashboardBlocks";
 import type { GrowthOverviewViewModel } from "@/lib/admin/growthDashboardViewModel";
+import { MIN_RATE_SAMPLE } from "@/lib/admin/rateSample";
 import { DeltaPercent, DeltaPp, Sparkline, fmtInt, fmtPct } from "./growthFormat";
+
+const NO_DATA = "Нет данных";
+
+/** Percentage when the cohort is big enough; "—" when it is too small, "Нет данных" when unknown. */
+function retentionValue(rate: number | null, cohortSize: number | null): string {
+  if (rate !== null) return fmtPct(rate, NO_DATA);
+  return cohortSize === null ? NO_DATA : "—";
+}
+
+/** Cohort size n; when the percentage is hidden, says why. */
+function cohortLabel(rate: number | null, cohortSize: number | null): string {
+  if (cohortSize === null) return "нет данных";
+  const n = `${fmtInt(cohortSize)} чел.`;
+  return rate === null ? `${n} — процент от ${MIN_RATE_SAMPLE}` : n;
+}
 
 function Tile({
   label,
@@ -73,12 +89,13 @@ export function GrowthKpiTiles({ model }: { model: GrowthOverviewViewModel }) {
           delta={<DeltaPercent value={model.mauMoMPercent} suffix="за последние полные 30 суток к предыдущим 30" />}
         />
         <Tile
-          label="Новые пользователи вернулись через неделю"
-          value={fmtPct(model.w1, "Нет данных")}
+          label="Новые пользователи, которые снова что-то запланировали через неделю"
+          value={retentionValue(model.w1, model.w1CohortSize)}
           delta={<DeltaPp value={model.w1DeltaPp} />}
           footer={
             <>
-              Через 4 недели: {fmtPct(model.w4)} <DeltaPp value={model.w4DeltaPp} />
+              Когорта: {cohortLabel(model.w1, model.w1CohortSize)}. Через 4 недели: {retentionValue(model.w4, model.w4CohortSize)}{" "}
+              <DeltaPp value={model.w4DeltaPp} />
             </>
           }
         />
