@@ -10,6 +10,7 @@ import {
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { appendCityQuery as appendCityQueryToHref } from "@/lib/city/appendCityQuery";
+import { isScopedEventBrowsing } from "@/lib/city/scopedEventBrowsing";
 import {
   DEFAULT_CITY_SLUG,
   type ResolvedCityContext,
@@ -50,18 +51,19 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { cities } = usePublicCityOptions();
+  const scopedEvents = isScopedEventBrowsing(pathname, searchParams.get("explore"));
 
   // 1. Initial city from URL or default (SSR-safe source of truth)
   const cityFromQuery = searchParams.get("city");
   const initialResolved = useMemo(
     () =>
       resolveCityContext({
-        pathname,
-        cityFromQuery,
+        pathname: scopedEvents ? null : pathname,
+        cityFromQuery: scopedEvents ? null : cityFromQuery,
         preferredCitySlug: null, // Don't use storage on init to avoid hydration flicker
         allowedCitySlugs: cities.map((city) => city.slug),
       }),
-    [pathname, cityFromQuery, cities],
+    [pathname, cityFromQuery, cities, scopedEvents],
   );
 
   const [storedCity, setStoredCity] = useState<string | null>(null);
@@ -86,22 +88,22 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
     // If no city in URL, use storage as fallback (only after hydration)
     if (isInitialized && storedCity) {
       return resolveCityContext({
-        pathname,
-        cityFromQuery,
+        pathname: scopedEvents ? null : pathname,
+        cityFromQuery: scopedEvents ? null : cityFromQuery,
         preferredCitySlug: storedCity,
         allowedCitySlugs: cities.map((city) => city.slug),
       });
     }
 
     return initialResolved;
-  }, [initialResolved, isInitialized, storedCity, pathname, cityFromQuery, cities]);
+  }, [initialResolved, isInitialized, storedCity, pathname, cityFromQuery, cities, scopedEvents]);
 
   const citySlug = resolvedCity.citySlug ?? DEFAULT_CITY_SLUG;
   const cityName = resolvedCity.cityName ?? citySlug;
 
   // 3. Sync storage with stable city (but NO router.push/refresh here)
   useEffect(() => {
-    if (!isInitialized || !resolvedCity.citySlug) return;
+    if (!isInitialized || !resolvedCity.citySlug || scopedEvents) return;
     if (resolvedCity.citySlug === storedCity) return;
 
     // Only update storage if it's a route-based city or a default
@@ -109,7 +111,7 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
     queueMicrotask(() => {
       setStoredCity(resolvedCity.citySlug);
     });
-  }, [resolvedCity.citySlug, storedCity, isInitialized]);
+  }, [resolvedCity.citySlug, storedCity, isInitialized, scopedEvents]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production" && isInitialized) {
