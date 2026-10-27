@@ -233,6 +233,18 @@ export function getClassScheduleMissingFields(
     if (duration !== null && valid.some((group) => (timeToMinutes(group.time) ?? 0) + duration > 1440)) {
       missing.push("Занятие заканчивается после полуночи");
     }
+    const tariffIds = new Set<string>();
+    for (const group of form.groups) {
+      for (const tariff of group.tariffs ?? []) {
+        if (!tariff.title.trim()) missing.push("Название тарифа");
+        if (!/^\\d+(?:[.,]\\d{1,2})?$/.test(tariff.price.trim())) missing.push("Стоимость тарифа в BYN");
+        if (!tariff.unit.trim()) missing.push("Единица тарифа");
+        if (tariff.periodDays != null && (!Number.isInteger(tariff.periodDays) || tariff.periodDays < 1 || tariff.periodDays > 366)) missing.push("Срок тарифа от 1 до 366 дней");
+        const identity = group.id + ":" + tariff.id;
+        if (tariffIds.has(identity)) missing.push("Повторяющийся тариф группы");
+        tariffIds.add(identity);
+      }
+    }
     const periods = valid.map((group) => group.period === undefined
       ? { from: form.periodFrom, to: form.periodTo } : group.period);
     if (periods.some((period) => period?.from && period.to && period.to < period.from)) missing.push("Даты курса");
