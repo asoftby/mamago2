@@ -403,7 +403,9 @@ export function isStepComplete(
     case "price":
       {
         const hasValidPricing =
-          data.offerWizardType === "CAMP"
+          data.productType === "REGULAR_ACTIVITY"
+            ? data.schedule.classSchedule.groups.some((g) => (g.tariffs ?? []).some((t) => t.title.trim() && t.price.trim()))
+            : data.offerWizardType === "CAMP"
             ? true
             : !!data.pricingMode &&
               (data.pricingMode === "single"
