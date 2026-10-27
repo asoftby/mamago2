@@ -388,7 +388,7 @@ export function OfferPageView({
           onSave={handleSave}
           ctaRef={ctaRef}
           directSlot={
-            direct && !data.classSlotBookingEnabled && data.hasPrimaryAction !== false && data.resolvedCta?.actionKind !== "EXTERNAL" && (
+            direct && data.offerType !== "REGULAR" && !data.classSlotBookingEnabled && data.hasPrimaryAction !== false && data.resolvedCta?.actionKind !== "EXTERNAL" && (
               <DirectRequestCta
                 publicationRef={{ publicationType: "OFFER", offerId: direct.offerId }}
                 publicationTitle={direct.publicationTitle}
