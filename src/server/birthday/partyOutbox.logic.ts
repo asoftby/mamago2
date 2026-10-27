@@ -102,7 +102,7 @@ export function partyOutboxCopy(params: {
         title: "Клиент отменил праздник",
         body: "Заявка на услугу «" + params.offerTitle + "» на " + params.dateLabel +
           " отменена клиентом до подтверждения. Отвечать на неё не нужно.",
-        actionUrl: "/business/bookings?tab=action&kind=party",
+        actionUrl: "/business/bookings?tab=archive&kind=party",
       };
     case "PARTY_QUOTE_EXPIRED_BUSINESS":
       return {
@@ -111,7 +111,7 @@ export function partyOutboxCopy(params: {
         title: "Предложение закрыто по сроку",
         body: "Клиент не принял предложение по услуге «" + params.offerTitle + "» на " +
           params.dateLabel + " до окончания срока. Заявка закрыта, время не занято.",
-        actionUrl: "/business/bookings?tab=action&kind=party",
+        actionUrl: "/business/bookings?tab=archive&kind=party",
       };
     case "PARTY_REQUEST_DECLINED":
       return {

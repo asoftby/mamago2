@@ -28,6 +28,11 @@ assert.ok(heldPartyOutboxEventTypes({}).includes("PARTY_QUOTE_EXPIRED_BUSINESS")
 // #818 D1: a parent cancellation notifies the business about each closed request.
 assert.equal(isBusinessPartyEvent("PARTY_REQUEST_CANCELLED"), true);
 assert.equal(partyOutboxCopy({ type: "PARTY_REQUEST_CANCELLED", offerTitle: "Квест", dateLabel: "x" }).audience, "BUSINESS");
+// Closed requests are classified ARCHIVE by bookingBucket: their links must open that tab.
+for (const type of ["PARTY_REQUEST_CANCELLED", "PARTY_QUOTE_EXPIRED_BUSINESS"] as const) {
+  assert.equal(partyOutboxCopy({ type, offerTitle: "x", dateLabel: "y" }).actionUrl,
+    "/business/bookings?tab=archive&kind=party");
+}
 assert.equal(partyOutboxCopy({
   type: "PARTY_QUOTE_SENT", offerTitle: "Квест", dateLabel: "2026-10-20",
 }).body.includes("Бронирование ещё не подтверждено"), true);
