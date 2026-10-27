@@ -262,7 +262,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
 
   return (
     <div className="space-y-6 pb-1">
-      <EventTerritoryFilter onApply={onApply} filters={draft} />
+      <EventTerritoryFilter onApply={onApply} filters={draft} onBeforeNavigate={actions.cancelPendingWrite} />
       <DiscoveryWhoFilter inline />
 
       {(draft.occasionSlug === "halloween" || facets?.occasions.includes("halloween")) && (
