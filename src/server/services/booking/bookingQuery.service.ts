@@ -533,6 +533,8 @@ export async function updateBookingStatus(
   // Keep the request status and its resource allocation in one transaction.
   // A confirmed booking must never lose its resource when the original hold expires.
   const updated = await prisma.$transaction(async (tx) => {
+    // Serialize concurrent status updates for the same request before reading state.
+    await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${bookingId} FOR UPDATE`;
     const current = await tx.bookingRequest.findUnique({
       where: { id: bookingId },
       select: { status: true, businessId: true, kind: true },
