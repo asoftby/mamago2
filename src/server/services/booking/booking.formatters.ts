@@ -56,6 +56,8 @@ export function getBookingTypeLabel(sourceType: BookingSourceType): string {
 // ─── Display builder ──────────────────────────────────────────────────────────
 
 export interface BookingDisplayInput {
+  classGroupId?: string | null;
+  classGroupTitle?: string | null;
   classTariffId?: string | null;
   classTariffTitle?: string | null;
   classTariffPrice?: string | null;
