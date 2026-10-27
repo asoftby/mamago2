@@ -14,6 +14,20 @@ export function cityEventsListingPath(citySlug: string): string {
   return `/${citySlug}/events`;
 }
 
+/**
+ * Listing pagination SEO (same convention as /blog): page 1 is the clean path,
+ * page N ≥ 2 is self-canonical `?page=N` with a page suffix in the title.
+ */
+export function withListingPage(metadata: Metadata, canonicalPath: string, page: number): Metadata {
+  if (page <= 1) return metadata;
+  const title = typeof metadata.title === "string" ? `${metadata.title} — страница ${page}` : metadata.title;
+  return {
+    ...metadata,
+    title,
+    alternates: { ...metadata.alternates, canonical: `${publicSiteBase()}${canonicalPath}?page=${page}` },
+  };
+}
+
 /** Metadata for `/{city}/events` — primary indexable intent «kuda». */
 export async function buildCityEventsListingMetadata(
   citySlug: string,

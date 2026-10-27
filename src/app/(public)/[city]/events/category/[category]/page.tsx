@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CityShell } from "@/components/city/CityShell";
+import { withListingPage } from "@/lib/seo/cityKudaListingMetadata";
+import { parseListingPage } from "@/server/discovery/kudaListingPage";
 import prisma from "@/lib/prisma";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
 import { getBaseUrl } from "@/lib/routing/cityPaths";
@@ -61,11 +63,15 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
   const canonical = `${getBaseUrl("BY")}${eventCategoryHubPath(citySlug, hub.category.slug)}`;
   const hasExtraDiscoveryFilter = Object.keys(query).some((key) => DISCOVERY_FILTER_KEYS.has(key));
 
-  const metadata: Metadata = {
-    title: `${hubTitle} — mamaGo`,
-    description: `${hubTitle}: актуальная афиша, даты, возраст, стоимость и места проведения на mamaGo.`,
-    alternates: { canonical },
-  };
+  const metadata: Metadata = withListingPage(
+    {
+      title: `${hubTitle} — mamaGo`,
+      description: `${hubTitle}: актуальная афиша, даты, возраст, стоимость и места проведения на mamaGo.`,
+      alternates: { canonical },
+    },
+    eventCategoryHubPath(citySlug, hub.category.slug),
+    parseListingPage(query.page),
+  );
 
   // The clean category path is indexable. Additional discovery combinations
   // remain useful for users but must not create an indexable faceted-URL fanout.

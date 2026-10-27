@@ -78,6 +78,8 @@ export async function getKudaDiscoveryFeed(
   currentUserId: string | null,
   options?: {
     take?: number;
+    /** Max DB candidates ranked in memory (default 200). Paginated listings raise it. */
+    candidatePoolCap?: number;
     format?: ActivityFormat | null;
     nearby?: boolean;
     eventFilters?: EventRuntimeFilters;
@@ -111,7 +113,7 @@ export async function getKudaDiscoveryFeed(
   /** Пул кандидатов для сортировки; без избыточного findMany (было ×5 до 400 — долго на TTFB). */
   const rows = await prisma.activity.findMany({
     where,
-    take: Math.min(take * 3, 200),
+    take: Math.min(take * 3, options?.candidatePoolCap ?? 200),
     orderBy: [{ nextOccurrenceAt: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
     include: {
       images: {

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { Container } from "@/components/ui/Container";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { DiscoveryActivitiesGrid } from "@/components/discovery/DiscoveryActivitiesGrid";
+import type { KudaListingProps } from "@/components/discovery/KudaMasonryListing";
 import { Intent } from "@/lib/intent";
 import { H1 } from "@/components/ui/typography";
 import { CityTitle } from "@/components/ui/CityTitle";
@@ -97,6 +98,8 @@ interface CityDiscoveryShellProps {
   pageTitleOverride?: string;
   weekendPlannerEnabled?: boolean;
   halloweenEnabled?: boolean;
+  /** Afisha («kuda»): server-paginated masonry listing. */
+  kudaListing?: KudaListingProps;
 }
 
 export function CityDiscoveryShell({
@@ -112,6 +115,7 @@ export function CityDiscoveryShell({
   pageTitleOverride,
   weekendPlannerEnabled = false,
   halloweenEnabled = false,
+  kudaListing,
 }: CityDiscoveryShellProps) {
   const { applied } = useDiscoveryFilters();
   const budgetCtx = useOptionalDiscoveryBudgetConfig();
@@ -219,6 +223,7 @@ export function CityDiscoveryShell({
         ) : null}
         <DiscoveryActivitiesGrid
           activities={discoveryActivities ?? []}
+          kudaListing={intent === "kuda" ? kudaListing : undefined}
           coverRatio={intent === "classes" ? "1/1" : undefined}
           emptyTitle={
             intent === "classes"

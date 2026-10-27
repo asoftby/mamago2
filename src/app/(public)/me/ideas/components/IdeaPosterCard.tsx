@@ -98,6 +98,7 @@ export function IdeaPosterCard({
           <div
             className="relative w-full overflow-hidden rounded-[18px] bg-surface-muted"
             style={{ aspectRatio: poster.aspectRatio }}
+            data-masonry-media
             data-poster-crop={poster.cropped ? poster.objectPosition : "none"}
           >
             {activity.coverImageUrl ? (

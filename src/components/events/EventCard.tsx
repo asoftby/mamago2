@@ -124,6 +124,7 @@ export function EventCard({
         <div
           className="relative overflow-hidden rounded-[18px] bg-[#EDE8DF]"
           style={{ aspectRatio }}
+          data-masonry-media
           data-poster-crop={poster ? (poster.cropped ? poster.objectPosition : "none") : undefined}
         >
           {imageUrl && canOptimizeWithNextImage(imageUrl) ? (

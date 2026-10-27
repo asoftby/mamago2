@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import { CityShell } from "@/components/city/CityShell";
-import { buildCityEventsListingMetadata } from "@/lib/seo/cityKudaListingMetadata";
+import {
+  buildCityEventsListingMetadata,
+  cityEventsListingPath,
+  withListingPage,
+} from "@/lib/seo/cityKudaListingMetadata";
+import { parseListingPage } from "@/server/discovery/kudaListingPage";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
 interface PageProps {
@@ -19,7 +24,11 @@ export async function generateMetadata({
   const query = await searchParams;
   const discoveryKeys = new Set(["preset", "from", "to", "dateFrom", "dateTo", "when", "age", "category", "genre", "occasion", "format", "metro", "district", "nearby", "free", "priceMin", "priceMax", "adultOnly"]);
   const isFiltered = Object.keys(query).some((key) => discoveryKeys.has(key));
-  const metadata = await buildCityEventsListingMetadata(citySlug);
+  const metadata = withListingPage(
+    await buildCityEventsListingMetadata(citySlug),
+    cityEventsListingPath(citySlug),
+    parseListingPage(query.page),
+  );
   if (isFiltered) metadata.robots = { index: false, follow: true };
   return applyGlobalRobotsOverride(metadata);
 }

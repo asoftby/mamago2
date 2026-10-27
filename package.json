@@ -221,7 +221,7 @@
     "test:offer-operational-version": "tsx src/lib/offers/offerOperationalVersion.test.ts",
     "test:session-title": "tsx src/lib/event/sessionTitle.test.ts",
     "test:similar-events-persona": "tsx src/components/event-page/similarEventsPersonaFilter.test.ts",
-    "test:poster-frame": "tsx src/lib/media/posterFrame.test.ts",
+    "test:poster-frame": "tsx src/lib/media/posterFrame.test.ts && tsx src/components/ideas/orderedMasonryGeometry.test.ts && tsx src/lib/discovery/kudaListingPagination.test.ts",
     "test:recommendation-narrow-exposures": "tsx --test src/server/services/recommendations/narrowRunExposures.integration.test.ts",
     "test:article-actions": "tsx src/lib/save/parseArticleIdsForBatch.test.ts && tsx src/lib/post-auth/executePendingAction.test.ts && tsx src/server/services/articleSaveActions.test.ts && tsx src/features/save/persistArticleSave.test.ts && tsx src/components/activity/SaveToPlanModal.test.tsx",
     "test:save-status": "tsx src/features/save/saveStatusFetchGuard.test.ts && tsx src/features/save/saveStatusFetchGuardWiring.test.ts && tsx src/app/api/save/status/route.test.ts",
