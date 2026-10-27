@@ -198,8 +198,8 @@ const classInput = (overrides: Record<string, unknown> = {}) => ({
     kind: "recurring" as const,
     durationMin: 60,
     groups: [
-      { id: "g-weekdays", tariffs: [], days: [2, 4], time: "17:30", seats: 8 },
-      { id: "g-weekend", tariffs: [], days: [6], time: "11:00", seats: null },
+      { id: `g-weekdays-${randomUUID()}`, tariffs: [], days: [2, 4], time: "17:30", seats: 8 },
+      { id: `g-weekend-${randomUUID()}`, tariffs: [], days: [6], time: "11:00", seats: null },
     ],
     dates: [],
     period: { from: "2026-10-19", to: "2026-12-14" },
