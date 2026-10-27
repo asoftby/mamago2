@@ -11,7 +11,8 @@ type ClassSlot = {
   endsAt: string;
   remainingSeats: number | null;
 };
-type SlotsResponse = { slots?: ClassSlot[]; error?: string };
+type ClassGroup = { id: string; title: string; tariffs: Array<PriceItem & { periodDays?: number | null }>; slots: string[] };
+type SlotsResponse = { slots?: ClassSlot[]; groups?: ClassGroup[]; error?: string };
 type BookingResponse = { bookingId?: string; status?: string; error?: string };
 type PrefillResponse = {
   authenticated: boolean;
@@ -34,6 +35,8 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
   tariffs?: PriceItem[];
 }) {
   const [slots, setSlots] = useState<ClassSlot[]>([]);
+  const [groups, setGroups] = useState<ClassGroup[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState("");
   const [selectedTariffId, setSelectedTariffId] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -64,6 +67,7 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
         if (!response.ok) throw new Error(data.error || "Не удалось загрузить расписание");
         if (controller.signal.aborted) return;
         setSlots(data.slots ?? []);
+        setGroups(data.groups ?? []);
         setSelected((previous) => (data.slots ?? []).some((slot) => slot.startsAt === previous) ? previous : null);
         setError(null);
       } catch (reason) {
@@ -94,7 +98,10 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
     return () => controller.abort();
   }, [open]);
 
-  const chosen = useMemo(() => slots.find((slot) => slot.startsAt === selected) ?? null, [slots, selected]);
+  const group = groups.find((item) => item.id === selectedGroupId) ?? null;
+  const shownTariffs = group ? group.tariffs : groups.length > 0 ? [] : tariffs;
+  const visibleSlots = group ? slots.filter((slot) => group.slots.includes(slot.startsAt)) : groups.length > 0 ? [] : slots;
+  const chosen = useMemo(() => visibleSlots.find((slot) => slot.startsAt === selected) ?? null, [visibleSlots, selected]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -107,6 +114,7 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           startsAt: chosen.startsAt, endsAt: chosen.endsAt,
+          ...(selectedGroupId ? { classGroupId: selectedGroupId } : {}),
           ...(selectedTariffId ? { classTariffId: selectedTariffId } : {}),
           seats, customerName: name.trim(), customerPhone: phone.trim(),
           ...(email.trim() ? { customerEmail: email.trim() } : {}),
@@ -168,21 +176,32 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
               </select>
             </div>
           )}
-          {tariffs.length > 0 && (
+          {groups.length > 0 && (
+            <div className="space-y-2">
+              <label htmlFor="class-group" className="text-sm font-medium">Группа</label>
+              <select id="class-group" required value={selectedGroupId}
+                onChange={(event) => { setSelectedGroupId(event.target.value); setSelectedTariffId(""); setSelected(null); }}
+                className="w-full rounded-xl border bg-background p-3 text-sm">
+                <option value="">Выберите группу</option>
+                {groups.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+              </select>
+            </div>
+          )}
+          {shownTariffs.length > 0 && (
             <div className="space-y-2">
               <label htmlFor="class-tariff" className="text-sm font-medium">Тариф</label>
               <select id="class-tariff" required value={selectedTariffId} onChange={(event) => setSelectedTariffId(event.target.value)} className="w-full rounded-xl border bg-background p-3 text-sm">
                 <option value="">Выберите тариф</option>
-                {tariffs.map((tariff) => <option key={tariff.id} value={tariff.id}>{tariff.label} — {tariff.price} {tariff.unit}</option>)}
+                {shownTariffs.map((tariff) => <option key={tariff.id} value={tariff.id}>{tariff.label} — {tariff.price} {tariff.unit}</option>)}
               </select>
             </div>
           )}
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium">Дата и время (Минск)</legend>
             {loading && <p role="status" className="text-sm text-muted-foreground">Загружаем расписание…</p>}
-            {!loading && slots.length === 0 && !error && <p className="text-sm text-muted-foreground">Пока нет доступных занятий на ближайшие 30 дней.</p>}
+            {!loading && visibleSlots.length === 0 && !error && <p className="text-sm text-muted-foreground">Пока нет доступных занятий на ближайшие 30 дней.</p>}
             <div className="max-h-52 space-y-2 overflow-y-auto">
-              {slots.map((slot) => (
+              {visibleSlots.map((slot) => (
                 <label key={slot.startsAt} className="flex cursor-pointer items-center gap-3 rounded-xl border p-3 has-[:checked]:border-primary">
                   <input type="radio" name="class-slot" value={slot.startsAt} checked={selected === slot.startsAt}
                     onChange={() => setSelected(slot.startsAt)} />
@@ -201,7 +220,7 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
             <Input id="class-booking-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} />
           </div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={!chosen || loading || submitting || (tariffs.length > 0 && !selectedTariffId)}>
+          <Button type="submit" className="w-full" disabled={!chosen || loading || submitting || (groups.length > 0 && !selectedGroupId) || (shownTariffs.length > 0 && !selectedTariffId)}>
             {submitting ? "Отправляем…" : "Отправить заявку"}
           </Button>
           <p className="text-xs text-muted-foreground">Заявка ещё не означает подтверждённую запись.</p>
