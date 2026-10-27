@@ -7,7 +7,7 @@ import { CityDiscoveryShell } from "./CityDiscoveryShell";
 import { Intent } from "@/lib/intent";
 import { listPublicRoutesByCity } from "@/server/services/route.service";
 import { getCurrentUser } from "@/lib/auth/server";
-import { getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
+import { countKudaDiscoveryEvents, getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
 import { getClassesDiscoveryFeed } from "@/server/discovery/classesDiscoveryFeed";
 import { getBirthdayDiscoveryFeed } from "@/server/discovery/birthdayDiscoveryFeed";
 import {
@@ -30,9 +30,12 @@ import {
 } from "@/features/filters/discovery/discoveryFilterParams";
 import type { ActivityMock } from "@/types/activity";
 import type { KudaListingProps } from "@/components/discovery/KudaMasonryListing";
+import type { EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
 import { isHalloweenOccasionActive } from "@/server/discovery/activeHalloweenOccasion";
 
 export type BudgetConfig = { max: number; step: number } | null;
+
+const OTHER_REGION_CAPITALS = new Set(["minsk", "brest", "grodno", "vitebsk", "gomel", "mogilev"]);
 
 interface CityShellProps {
   citySlug: string;
@@ -76,6 +79,7 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
   let classChips = undefined;
   let activeClassChipSlug = undefined;
   let budgetConfig: BudgetConfig = null;
+  let alternativeEventFilters: EventRuntimeFilters | null = null;
   const halloweenEnabled = intent === "kuda"
     ? await isHalloweenOccasionActive()
     : false;
@@ -92,6 +96,7 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
   if (intent === "kuda") {
     const urlParams = toUrlSearchParams(searchParams);
     const eventFilters = buildKudaEventFilters(urlParams, halloweenEnabled);
+    alternativeEventFilters = { ...eventFilters, districtId: null, metroId: null };
     const listing = await loadKudaListingPage({
       cityId: city.id,
       citySlug: city.slug,
@@ -214,8 +219,21 @@ export async function CityShell({ citySlug, intent, searchParams, pageTitleOverr
     routesData = realRoutes;
   }
 
-  const alternativeCities = intent === "kuda" || intent === "classes"
-    ? (await listPublicCitySelectorOptions()).filter((option) => option.slug !== city.slug)
+  // Navigation to other regions is a separate, opt-in action at the end of the
+  // events feed. Only show oblast capitals with currently matching events.
+  const alternativeCities = intent === "kuda" && alternativeEventFilters
+    ? (await Promise.all(
+        (await listPublicCitySelectorOptions())
+          .filter((option) => OTHER_REGION_CAPITALS.has(option.slug) && option.slug !== city.slug)
+          .map(async (option) => ({
+            option,
+            count: await countKudaDiscoveryEvents(option.id, option.slug, {
+              eventFilters: alternativeEventFilters!,
+            }),
+          })),
+      ))
+        .filter(({ count }) => count > 0)
+        .map(({ option }) => option)
     : [];
 
   return (

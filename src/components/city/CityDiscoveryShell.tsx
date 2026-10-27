@@ -25,6 +25,8 @@ import { Plus } from "lucide-react";
 import { useOptionalDiscoveryBudgetConfig } from "@/features/filters/discovery/discoveryBudgetContext";
 import { EventQuickFilters } from "@/components/discovery/EventQuickFilters";
 import { MobileFilterButton } from "@/components/mobile/MobileFilterButton";
+import { buildScopedEventHref } from "@/lib/city/scopedEventBrowsing";
+import { useCity } from "@/contexts/CityContext";
 
 function BirthdayQuickStartBanner({ city }: { city: string }) {
   return (
@@ -118,6 +120,7 @@ export function CityDiscoveryShell({
   kudaListing,
 }: CityDiscoveryShellProps) {
   const { applied } = useDiscoveryFilters();
+  const { citySlug: globalCitySlug } = useCity();
   const budgetCtx = useOptionalDiscoveryBudgetConfig();
   const intentConfig = DISCOVERY_INTENT_CONFIG[intent];
   const pageTitle =
@@ -189,6 +192,7 @@ export function CityDiscoveryShell({
 
           <BirthdayQuickStartBanner city={city} />
           <DiscoveryActivitiesGrid
+            listingCitySlug={city}
             activities={discoveryActivities ?? []}
             coverRatio="1/1"
             emptyTitle="Пока нет предложений для праздника"
@@ -222,6 +226,7 @@ export function CityDiscoveryShell({
           <ClassesChipBar chips={classChips} activeChipSlug={activeClassChipSlug} />
         ) : null}
         <DiscoveryActivitiesGrid
+          listingCitySlug={city}
           activities={discoveryActivities ?? []}
           kudaListing={intent === "kuda" ? kudaListing : undefined}
           coverRatio={intent === "classes" ? "1/1" : undefined}
@@ -236,25 +241,23 @@ export function CityDiscoveryShell({
               : undefined
           }
         />
-        {(intent === "kuda" || intent === "classes") && alternativeCities.length > 0 && (
+        {intent === "kuda" && city !== globalCitySlug && (
+          <Link href={`/${globalCitySlug}/events`} className="inline-flex text-sm font-medium text-primary hover:underline">
+            Вернуться к событиям в своём городе
+          </Link>
+        )}
+        {intent === "kuda" && alternativeCities.length > 0 && (
           <section aria-label="Другие города" className="rounded-3xl border border-border bg-muted/30 p-5 sm:p-7">
-            <h2 className="font-serif text-2xl font-normal">Интересное есть и в других городах</h2>
+            <h2 className="text-xl font-semibold">Посмотреть события в других городах</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Вы посмотрели подборку своего города. Продолжите поиск в другом — ваши фильтры сохранятся.
+              Откройте афишу другого региона — ваш основной город не изменится.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
-              {alternativeCities.slice(0, 5).map((option) => {
-                const query = new URLSearchParams();
-                for (const [key, value] of Object.entries(listingSearchParams)) {
-                  if (!value || ["city", "district", "metro"].includes(key)) continue;
-                  if (Array.isArray(value)) value.forEach((entry) => query.append(key, entry));
-                  else query.set(key, value);
-                }
-                const suffix = query.size > 0 ? `?${query.toString()}` : "";
+              {alternativeCities.map((option) => {
                 return (
                   <Link
                     key={option.id}
-                    href={`/${option.slug}/${intent === "classes" ? "classes" : "events"}${suffix}`}
+                    href={buildScopedEventHref(option.slug, listingSearchParams)}
                     className="rounded-full border border-border bg-background px-4 py-2 text-sm font-medium transition-colors hover:border-primary hover:text-primary"
                   >
                     {option.name}

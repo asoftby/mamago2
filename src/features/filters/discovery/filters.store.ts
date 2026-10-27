@@ -9,6 +9,7 @@ import {
 import { whenLabel } from "./whenLabel";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { useOptionalCity } from "@/contexts/CityContext";
+import { isScopedEventBrowsing } from "@/lib/city/scopedEventBrowsing";
 import {
   getCityFromPath,
   getIntentFromPath,
@@ -586,7 +587,9 @@ export function useDiscoveryFilters() {
         writeAppliedToUrl(
           router,
           pathname,
-          new URLSearchParams() as unknown as ReadonlyURLSearchParams,
+          (isScopedEventBrowsing(pathname, searchParams.get("explore"))
+            ? new URLSearchParams({ explore: "1" })
+            : new URLSearchParams()) as unknown as ReadonlyURLSearchParams,
           defaultFilters,
           "replace",
         );
@@ -624,7 +627,9 @@ export function useDiscoveryFilters() {
         clearOverlayFailsafe();
         const path = pathnameOverride ?? pathname;
         setOptimisticFilters(next);
-        const empty = new URLSearchParams();
+        const empty = isScopedEventBrowsing(path, searchParams.get("explore"))
+          ? new URLSearchParams({ explore: "1" })
+          : new URLSearchParams();
         writeAppliedToUrl(
           router,
           path,

@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { isScopedEventBrowsing } from "@/lib/city/scopedEventBrowsing";
+import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { EventCard, EVENT_LISTING_IMAGE_SIZES, activityMockToEventCard } from "@/components/events";
 import { KudaMasonryListing, type KudaListingProps } from "@/components/discovery/KudaMasonryListing";
 import { discoveryFiltersSignature } from "@/features/filters/discovery/discoveryFilterParams";
@@ -28,6 +31,7 @@ import { publicActivityPath } from "@/lib/business/eventPublicLink";
 
 type DiscoveryActivitiesGridProps = {
   activities: ActivityMock[];
+  listingCitySlug?: string;
   className?: string;
   /** Соотношение обложки `ActivityCard` (по умолчанию 4/5, для «Занятия» — 1/1) */
   coverRatio?: string;
@@ -72,6 +76,7 @@ function masonrySkeletonAspect(index: number): string {
 
 export function DiscoveryActivitiesGrid({
   activities,
+  listingCitySlug,
   className,
   coverRatio,
   emptyTitle = "Пока нет событий по вашему запросу",
@@ -79,7 +84,10 @@ export function DiscoveryActivitiesGrid({
   kudaListing,
 }: DiscoveryActivitiesGridProps) {
   const cityCtx = useOptionalCity();
-  const citySlug = cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const scopedEvents = isScopedEventBrowsing(pathname, searchParams.get("explore"));
+  const citySlug = listingCitySlug ?? cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
   const ratio = coverRatio ?? "4/5";
   const { applied, actions, derived } = useDiscoveryFilters();
   const family = useFamilyPersona();
@@ -180,6 +188,17 @@ export function DiscoveryActivitiesGrid({
           {...activityMockToEventCard(activity, citySlug)}
           framing="poster"
           imageSizes={EVENT_LISTING_IMAGE_SIZES}
+          metaLabel={(() => {
+            const meta = activityMockToEventCard(activity, citySlug).metaLabel;
+            const location = activity.citySlug && activity.citySlug !== citySlug
+              ? getCityNominativeName(activity.citySlug)
+              : null;
+            return [meta, location].filter(Boolean).join(" · ") || undefined;
+          })()}
+          href={(() => {
+            const href = activityMockToEventCard(activity, citySlug).href;
+            return scopedEvents ? `${href}${href.includes("?") ? "&" : "?"}explore=1` : href;
+          })()}
           className="h-full"
           imagePriority={feedBucket === "primary" && position <= 4}
         />
