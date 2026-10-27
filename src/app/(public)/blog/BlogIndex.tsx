@@ -216,6 +216,7 @@ export function BlogIndex({ articles, locationOptions = [], activeLocation = nul
                   <span className="text-[10px] font-mono uppercase tracking-[.14em] text-muted-foreground shrink-0">все материалы</span>
                   <div className="flex-1 h-px bg-border" />
                 </div>
+                <div className="lg:hidden">
                 {rest.map((a, i) => (
                   <AnalyticsCardViewTracker
                     key={a.id}
@@ -228,6 +229,14 @@ export function BlogIndex({ articles, locationOptions = [], activeLocation = nul
                     <ArticleRow article={a} idx={i + 1} saveStatus={saveStatuses[a.id]} />
                   </AnalyticsCardViewTracker>
                 ))}
+                </div>
+                <div className="hidden grid-cols-4 gap-x-6 gap-y-12 lg:grid">
+                  {rest.map((a, i) => (
+                    <AnalyticsCardViewTracker key={a.id} entityType="ARTICLE" entityId={a.id} vertical="CITY" citySlug={citySlug} meta={{ section: "journal", position: i + 1 }}>
+                      <JournalGridCard article={a} saveStatus={saveStatuses[a.id]} />
+                    </AnalyticsCardViewTracker>
+                  ))}
+                </div>
               </div>
             )}
           </>
@@ -333,6 +342,33 @@ function FeaturedArticle({
       </div>
     </div>
     </div>
+  );
+}
+
+/** Desktop magazine feed: image-first four-column layout. */
+function JournalGridCard({ article, saveStatus }: { article: CityHomeJournalArticle; saveStatus?: ArticleSaveStatus }) {
+  return (
+    <article className="group min-w-0">
+      <div className="relative">
+        <Link href={article.href} className="block aspect-[4/3] overflow-hidden rounded-2xl bg-muted">
+          {article.coverImageUrl ? (
+            <img src={article.coverImageUrl} alt={article.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+          ) : (
+            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Обложка</div>
+          )}
+        </Link>
+        <div className="absolute right-3 top-3 z-10">
+          <ArticleSaveHeart articleId={article.id} articleTitle={article.title} coverImageUrl={article.coverImageUrl} initialStatus={saveStatus} skipOwnFetch source="blog-index-grid" className="h-9 w-9 bg-white/90 shadow-sm backdrop-blur-[4px]" />
+        </div>
+      </div>
+      <Link href={article.href} className="mt-4 block">
+        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+          {article.isBreakingNews && <BreakingPill />}
+          <span className="text-[11px] font-medium uppercase tracking-[.1em] text-muted-foreground">{article.category?.name ?? (article.contentType === "NEWS" ? "Новость" : "Статья")}</span>
+        </div>
+        <h3 className="font-heading m-0 text-[24px] font-semibold leading-[1.18] tracking-[-0.025em] text-foreground transition-colors group-hover:text-primary">{article.title}</h3>
+      </Link>
+    </article>
   );
 }
 
