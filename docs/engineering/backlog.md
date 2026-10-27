@@ -5453,3 +5453,18 @@ distributor_company_id=550) и хотели бы уточнить несколь
   helpers only it used) in PR 6; any new city creation path writes Territory directly
   (admin city creation is decided in PR 3).
 - Source: Territory rollout PR 2 (`feat/territory-core-dual-write-20261026`).
+
+## [BACKLOG-200] Журнал: продажа мест в редакционных подборках (B2B)
+- Status: OPEN
+- Priority: P2
+- Area: Journal / B2B billing
+- Added: 2026-10-27
+- Context: PR 1 ТЗ «Журнал» добавил `ArticleLinkedItem` с редакторским `position` для
+  публикаций типа `COLLECTION`. Платные места (исторически 400/300 BYN за год) в коде
+  не реализованы: `PromotionPublicationType` знает только `EVENT/OFFER`.
+- Reason deferred: ТЗ явно исключает «продажу мест через баланс»; нужна модель
+  оплаченного слота (срок, позиция, связь с балансом бизнеса).
+- Acceptance criteria: оплаченный слот привязан к `ArticleLinkedItem` (или его позиции),
+  списание с баланса, метка «Реклама»/«Партнёр» на элементе, срок действия; органический
+  порядок не меняется без оплаты.
+- Source: аудит #787.
