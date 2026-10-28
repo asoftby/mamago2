@@ -15,10 +15,12 @@ export function BreakingNewsLazyNext() {
   const [hasMore, setHasMore] = useState(true);
   const cursorRef = useRef<string | null>(null);
   const initialPathRef = useRef<string>("");
+  const cityRef = useRef<string>("");
 
   useEffect(() => {
     cursorRef.current = document.querySelector<HTMLElement>("[data-breaking-news-article-id]")?.dataset.breakingNewsArticleId ?? null;
     initialPathRef.current = window.location.pathname.split("/").slice(0, -1).join("/");
+    cityRef.current = window.location.pathname.split("/")[1] ?? "";
   }, []);
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export function BreakingNewsLazyNext() {
       setLoading(true);
       const controller = new AbortController();
       const timeout = window.setTimeout(() => controller.abort(), 8000);
-      fetch(`/api/journal/breaking-news/next?cursor=${encodeURIComponent(cursorRef.current)}`, { signal: controller.signal })
+      fetch(`/api/journal/breaking-news/next?cursor=${encodeURIComponent(cursorRef.current)}&city=${encodeURIComponent(cityRef.current)}`, { signal: controller.signal })
         .then(async (response) => {
           if (!response.ok) throw new Error("Failed to load next stories");
           return response.json() as Promise<Page>;
