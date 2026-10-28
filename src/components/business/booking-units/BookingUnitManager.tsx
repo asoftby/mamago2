@@ -172,6 +172,7 @@ export function BookingUnitManager({ offers }: { offers: OfferOption[] }) {
           ) : null}
         </BusinessSurfaceCard>
       ) : (
+        <>
         <form onSubmit={event => void save(event)} className="space-y-5">
           <BusinessSurfaceCard className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -319,14 +320,14 @@ export function BookingUnitManager({ offers }: { offers: OfferOption[] }) {
             <p className="text-sm text-stone-600">Закрытые даты можно добавить сразу после создания ресурса через «Изменить».</p>
           )}
 
-          {editingId ? <BookingUnitCalendar unitId={editingId} /> : null}
-
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={busy}>{busy ? "Сохранение…" : editingId ? "Сохранить изменения" : "Создать ресурс"}</Button>
             <Button type="button" variant="outline" disabled={busy} onClick={() => { setForm(null); setEditingId(null); setError(""); }}>Отмена</Button>
             {editingId ? <Button type="button" variant="ghost" disabled={busy} onClick={() => void editUnit(editingId)}><RefreshCw /> Загрузить актуальную версию</Button> : null}
           </div>
         </form>
+        {editingId ? <BookingUnitCalendar unitId={editingId} /> : null}
+        </>
       )}
     </div>
   );
