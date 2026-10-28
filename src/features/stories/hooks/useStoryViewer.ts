@@ -28,6 +28,7 @@ export function useStoryViewer(stories: StoryCollection[]) {
   const [seenGroupStart, setSeenGroupStart] = useState<number | null>(null);
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const [paused, setPaused] = useState(false);
+  const [newsComplete, setNewsComplete] = useState(false);
   // Incremented on every manual nav to reset the CSS animation
   const [progressKey, setProgressKey] = useState(0);
 
@@ -67,6 +68,7 @@ export function useStoryViewer(stories: StoryCollection[]) {
       const story = stories[storyIndex];
       if (!story) return;
       setPaused(false);
+      setNewsComplete(false);
       setActiveItems(orderBySeen(story.items, seenIds));
       setSeenGroupStart(resolveSeenGroupStart(story.items, seenIds));
       setActiveStoryIndex(storyIndex);
@@ -78,6 +80,7 @@ export function useStoryViewer(stories: StoryCollection[]) {
 
   const close = useCallback(() => {
     setPaused(false);
+    setNewsComplete(false);
     setActiveStoryIndex(null);
     setActiveItemIndex(0);
     setActiveItems([]);
@@ -92,6 +95,10 @@ export function useStoryViewer(stories: StoryCollection[]) {
     const isLastItem = activeItemIndex >= activeStory.items.length - 1;
     if (!isLastItem) {
       setActiveItemIndex((i) => i + 1);
+      return;
+    }
+    if (activeStory.intent === "breaking_news") {
+      setNewsComplete(true);
       return;
     }
     const nextStoryIndex = activeStoryIndex + 1;
@@ -143,6 +150,8 @@ export function useStoryViewer(stories: StoryCollection[]) {
 
   return {
     isOpen,
+    newsComplete,
+    continueAfterNews: close,
     activeStory,
     activeStoryIndex,
     activeItemIndex,
