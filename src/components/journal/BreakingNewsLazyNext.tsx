@@ -22,14 +22,38 @@ export function BreakingNewsLazyNext() {
   const cursorRef = useRef<string | null>(null);
   const initialPathRef = useRef<string>("");
   const cityRef = useRef<string>("");
+  const initialArticleHrefRef = useRef<string>("");
+  const firstArticleIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     cursorRef.current = document.querySelector<HTMLElement>("[data-breaking-news-article-id]")?.dataset.breakingNewsArticleId ?? null;
+    firstArticleIdRef.current = cursorRef.current;
     initialPathRef.current = window.location.pathname.split("/").slice(0, -1).join("/");
     cityRef.current = window.location.pathname.split("/")[1] ?? "";
+    initialArticleHrefRef.current = window.location.pathname;
   }, []);
 
   useEffect(() => () => { abortRef.current?.abort(); fullAbortRef.current?.abort(); }, []);
+
+  useEffect(() => {
+    const root = document.querySelector<HTMLElement>(".journal-news-panel");
+    if (!root || articles.length === 0) return;
+    const nodes = Array.from(root.querySelectorAll<HTMLElement>("[data-breaking-news-article-id]"));
+    const articleUrls = new Map(articles.map((article) => [article.articleId, article.articleHref]));
+    const updateActiveArticle = () => {
+      const rootTop = root.getBoundingClientRect().top;
+      const active = nodes.filter((node) => node.getBoundingClientRect().top <= rootTop + 120).at(-1) ?? nodes[0];
+      const id = active?.dataset.breakingNewsArticleId;
+      if (!id) return;
+      const target = articleUrls.get(id) ?? (id === firstArticleIdRef.current ? initialArticleHrefRef.current : null);
+      if (target && window.location.pathname !== target) {
+        window.history.replaceState(window.history.state, "", target);
+      }
+    };
+    root.addEventListener("scroll", updateActiveArticle, { passive: true });
+    updateActiveArticle();
+    return () => root.removeEventListener("scroll", updateActiveArticle);
+  }, [articles]);
 
   useEffect(() => {
     const node = fullSentinelRef.current;
