@@ -63,7 +63,7 @@ export async function dispatchPartyCandidateWave(input: {
     const invitedBusinessIds = current.requests.map(r => r.businessId);
     const activeBusinessIds = current.requests
       .filter(r => r.status === BookingStatus.NEW &&
-        ["SENT", "QUOTED", "AWAITING_RECONFIRM"].includes(r.partyStage))
+        r.partyStage !== null && ["SENT", "QUOTED", "AWAITING_RECONFIRM"].includes(r.partyStage))
       .map(r => r.businessId);
     const wave = selectPartyInvitationWave({
       ranked: proposal.candidates,
