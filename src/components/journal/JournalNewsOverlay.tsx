@@ -29,7 +29,7 @@ export function JournalNewsOverlay({ children }: { children: React.ReactNode }) 
       { transform: `translate(${x}px, ${y}px) scale(${Math.max(.08, origin.width / target.width)}, ${Math.max(.08, origin.height / target.height)})`, opacity: .65, borderRadius: "18px" },
     ], { duration: 280, easing: "cubic-bezier(.4,0,.8,.2)", fill: "forwards" });
     animation.finished.then(() => router.back()).catch(() => router.back());
-  }, [close]);
+  }, [router]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
