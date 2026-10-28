@@ -118,6 +118,7 @@ export function OfferPageView({
   const { isAuthenticated } = useAuthMe();
   const ctaRef = useRef<HTMLElement | null>(null);
   const [localSave, setLocalSave] = useState<LocalOfferSaveState | null>(null);
+  const [planItemId, setPlanItemId] = useState<string | null>(null);
   const [bookingShift, setBookingShift] = useState<ShiftCtaContext | null>(null);
   const [classBookingOpen, setClassBookingOpen] = useState(false);
   const [saveTargetShift, setSaveTargetShift] = useState<ShiftCtaContext | null>(null);
@@ -137,6 +138,7 @@ export function OfferPageView({
       if (!res.ok) return;
       const json = await res.json();
       setIsIdeaSaved(Boolean(json.isIdea));
+      setPlanItemId(typeof json.planItemId === "string" ? json.planItemId : null);
       setLocalSave(json.inPlan ? { kind: "plan", dateISO: json.planDate ?? null } : null);
     } catch {
       // ignore auth/network errors for guests
@@ -293,6 +295,14 @@ export function OfferPageView({
 
   const handleSavePersist = useCallback((result: SaveToPlanResult) => {
     if (result.action === "cancel") return;
+    if (result.action === "remove-plan") {
+      const id = planItemId ?? result.planItemId;
+      if (!id) return;
+      void fetch(`/api/save/plan?planItemId=${encodeURIComponent(id)}`, { method: "DELETE", credentials: "include" })
+        .then((res) => { if (!res.ok) throw new Error("offer_plan_remove_failed"); setLocalSave(null); setPlanItemId(null); toast("Убрано из плана"); })
+        .catch(() => toast.error("Не удалось удалить из плана"));
+      return;
+    }
 
     if (result.action === "remove-idea") {
       void fetch(`/api/save/idea?offerId=${data.id}`, {
@@ -345,9 +355,10 @@ export function OfferPageView({
     }).then(async (response) => {
       if (!response.ok) throw new Error("offer_plan_save_failed");
       setLocalSave({ kind: "plan", dateISO: result.dateISO });
+      void loadIdeaStatus();
       toast.success("Добавлено в «Мой план»");
     }).catch(() => toast.error("Не удалось добавить предложение в «Мой план»"));
-  }, [data.id]);
+  }, [data.id, planItemId, loadIdeaStatus]);
 
   const isSaved = isIdeaSaved || Boolean(localSave);
   useRegisterHeaderSaveAction(isSaved, handleSave, data.title, { entityNoun: "предложением" });
