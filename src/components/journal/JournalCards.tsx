@@ -98,6 +98,7 @@ export function JournalNewsCard({ article }: { article: CityHomeJournalArticle }
   return (
     <Link
       href={article.href}
+      data-journal-news-card={article.id}
       className="group relative block aspect-[3/5] overflow-hidden rounded-[18px] bg-muted text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <Cover article={article} tone={1} className="absolute inset-0 h-full w-full transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none" />
