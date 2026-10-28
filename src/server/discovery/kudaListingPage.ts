@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { withImageDimensions } from "@/server/media/loadImageDimensionsByUrl";
 import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 import { parseAppliedFromUrl } from "@/features/filters/discovery/discoveryFilterParams";
@@ -83,14 +84,28 @@ export async function loadKudaListingPage(input: {
   // Family personas never reach the server listing (no persona IDs in URLs,
   // #799): the partition uses only explicit filters (manual age chips), so
   // `?page=N`, infinite scroll and guests all see the same membership/order.
-  const feed = await getKudaDiscoveryFeed(input.cityId, input.citySlug, input.userId, {
+  // Reuse the expensive global order across SSR and infinite-scroll requests
+  // with identical *explicit* filters. Do not key on user/persona: the public
+  // candidate set and its ranking must be independent of family membership.
+  const format = parseActivityFormatQuery(input.searchParams.get("format"));
+  const feed = await unstable_cache(
+    async () => getKudaDiscoveryFeed(input.cityId, input.citySlug, null, {
       allCandidates: true,
       hydrateImages: false,
-      format: parseActivityFormatQuery(input.searchParams.get("format")),
+      format,
       nearby: false,
       explicitTerritorySlug: input.explicitTerritorySlug ?? null,
       eventFilters,
-  });
+    }),
+    [
+      "kuda-ranked-candidates-v1",
+      input.cityId,
+      input.citySlug,
+      input.explicitTerritorySlug ?? "",
+      JSON.stringify({ format, eventFilters }),
+    ],
+    { revalidate: 60 },
+  )();
   const partition = partitionDiscoveryFeed(filters, feed);
   const page = paginateKudaFeed(partition, input.page, input.pageSize ?? KUDA_LISTING_PAGE_SIZE);
   const items = await withImageDimensions(page.items, (card) => card.image);
