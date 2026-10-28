@@ -71,8 +71,9 @@ export function PlanItemCard({
     item.planAvailability === "missing_activity"
   );
 
-  const href =
-    item.activityId && !unavailable
+  const href = item.offerId && item.offer?.slug
+    ? `/${item.offer.place?.city?.slug ?? "minsk"}/offers/${item.offer.slug}`
+    : item.activityId && !unavailable
       ? publicActivityPath(item.activityId, "minsk", item.activity?.slug)
       : null;
 
