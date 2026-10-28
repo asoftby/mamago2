@@ -6,6 +6,8 @@ on:
     paths:
       - ".github/workflows/birthday-confirmation-db-integration.yml"
       - "src/server/birthday/**"
+      - "src/features/birthday/builder/components/steps/StepReview.tsx"
+      - "src/features/birthday/builder/components/steps/StepReviewAvailability.test.ts"
       - "src/app/api/public/party-availability/**"
       - "src/app/api/business/booking-units/**"
       - "src/components/business/booking-units/**"
@@ -22,6 +24,8 @@ on:
     paths:
       - ".github/workflows/birthday-confirmation-db-integration.yml"
       - "src/server/birthday/**"
+      - "src/features/birthday/builder/components/steps/StepReview.tsx"
+      - "src/features/birthday/builder/components/steps/StepReviewAvailability.test.ts"
       - "src/app/api/public/party-availability/**"
       - "src/app/api/business/booking-units/**"
       - "src/components/business/booking-units/**"
@@ -76,6 +80,8 @@ jobs:
         run: pnpm exec prisma migrate deploy
       - name: Verify calendar block business UI contract
         run: pnpm exec tsx src/components/business/booking-units/bookingUnitCalendar.test.ts
+      - name: Verify step-five preview UI contract
+        run: pnpm exec tsx src/features/birthday/builder/components/steps/StepReviewAvailability.test.ts
       - name: Verify public availability preview contract
         run: pnpm exec tsx src/server/birthday/partyAvailabilityPreview.test.ts
       - name: Verify manual calendar block contracts
