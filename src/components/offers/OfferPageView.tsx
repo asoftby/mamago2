@@ -363,10 +363,8 @@ export function OfferPageView({
     }
 
     if (result.action !== "plan") return;
-    persistLocalSave({
-      kind: "plan",
-      dateISO: result.dateISO,
-      shiftId: saveTargetShift?.shiftId ?? null,
+    toast.error("Не удалось добавить предложение в «Мой план»", {
+      description: "Сохранение предложений в семейном плане пока не поддерживается. Можно сохранить предложение в идеи.",
     });
   }, [data.id, persistLocalSave, saveTargetShift?.shiftId]);
 
