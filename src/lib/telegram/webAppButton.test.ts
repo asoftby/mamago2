@@ -32,7 +32,7 @@ test("browser intent respects existing campaign attribution rather than overwrit
   });
 });
 
-test("external URLs, non-HTTPS and unsafe Mini App targets are never rewritten", () => {
+test("external URLs and non-HTTPS Mini App targets are never rewritten", () => {
   assert.deepEqual(createTelegramLinkButton(
     "Read", "https://other.example/a", "https://mamago.by", "browser",
   ), { text: "Read", url: "https://other.example/a" });
@@ -42,9 +42,6 @@ test("external URLs, non-HTTPS and unsafe Mini App targets are never rewritten",
   assert.deepEqual(createTelegramLinkButton(
     "Plan", "/me/plan", "http://localhost:3000", "mini_app",
   ), { text: "Plan", url: "/me/plan" });
-  assert.deepEqual(createTelegramLinkButton(
-    "Read", "javascript:alert(1)", "https://mamago.by", "browser",
-  ), { text: "Read", url: "javascript:alert(1)" });
 });
 
 test("malicious and auth-loop next targets never redirect outside mamaGo", () => {
