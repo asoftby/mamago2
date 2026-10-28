@@ -976,7 +976,7 @@ export function BreakingNewsView({
   const marqueeItems = ["BREAKING NEWS"];
 
   return (
-    <div style={{ background: "#fff", color: C.ink, minHeight: "100vh", position: "relative" }}>
+    <div data-breaking-news-article-id={articleId} style={{ background: "#fff", color: C.ink, minHeight: "100vh", position: "relative" }}>
       <GlobalStyles />
       <style>{`[role="dialog"][aria-label="Публикация Breaking News"] .bn-standalone-close { display: none; }`}</style>
 
