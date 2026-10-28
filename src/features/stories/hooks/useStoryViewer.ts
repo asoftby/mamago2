@@ -87,6 +87,19 @@ export function useStoryViewer(stories: StoryCollection[]) {
     setSeenGroupStart(null);
   }, []);
 
+  const continueAfterNews = useCallback(() => {
+    if (activeStoryIndex === null) return;
+    const nextIndex = activeStoryIndex + 1;
+    setNewsComplete(false);
+    if (nextIndex >= stories.length) { close(); return; }
+    const story = stories[nextIndex];
+    setActiveItems(orderBySeen(story.items, seenIds));
+    setSeenGroupStart(resolveSeenGroupStart(story.items, seenIds));
+    setActiveStoryIndex(nextIndex);
+    setActiveItemIndex(0);
+    setProgressKey((k) => k + 1);
+  }, [activeStoryIndex, stories, seenIds, close]);
+
   const next = useCallback(() => {
     if (activeStoryIndex === null || !activeStory) return;
     setPaused(false);
@@ -151,7 +164,7 @@ export function useStoryViewer(stories: StoryCollection[]) {
   return {
     isOpen,
     newsComplete,
-    continueAfterNews: close,
+    continueAfterNews,
     activeStory,
     activeStoryIndex,
     activeItemIndex,
