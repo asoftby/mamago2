@@ -99,12 +99,19 @@ export async function GET(request: NextRequest) {
         });
       }
       const isIdea = await hasOfferIdea(user.id, offerId);
+      const planItems = await prisma.planItem.findMany({
+        where: { ...(await activePlanScopeFor(user.id)), offerId },
+        select: { id: true, date: true, startsAt: true },
+        orderBy: { date: "asc" },
+      });
+      const planState = resolveIdeaPlanState(planItems.map((item) => ({ id: item.id, date: item.date })));
       return NextResponse.json({
-        isSaved: isIdea,
+        isSaved: isIdea || planItems.length > 0,
         isIdea,
-        inPlan: false,
-        planDate: null,
-        planStartsAt: null,
+        inPlan: planState.isPlanned,
+        planDate: planState.plannedDate ?? null,
+        planStartsAt: planItems.find((item) => item.id === planState.planItemId)?.startsAt ?? null,
+        planItemId: planState.planItemId ?? null,
       });
     }
 
