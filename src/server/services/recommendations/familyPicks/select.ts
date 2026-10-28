@@ -1,4 +1,5 @@
 import { getSystemInterestLabel } from "@/lib/config/interests";
+import { AGE_OPTIONS } from "@/lib/config/ages";
 import { EXPERIENCE_AFFINITY_MAX, MAX_INTEREST_BOOST } from "@/server/services/recommendations/rankingSignals";
 import { minskIsoWeekday } from "./window";
 import type { ShowWindow } from "./window";
@@ -85,6 +86,8 @@ export type FamilyPickItem = {
   isNovelty: boolean;
   reasonCodes: ReasonCode[];
   reasonText: string | null;
+  /** До двух коротких чипов для карточки (из тех же кодов причин). */
+  reasonChips: string[];
 };
 
 export type FamilyPicksResult = {
@@ -300,6 +303,46 @@ export function buildReasonText(input: {
   return null;
 }
 
+/** До `max` чипов: приоритет — новинка, возраст, интерес, история, дата, бесплатно. Без «Подходит» для UNKNOWN. */
+export function buildReasonChips(input: {
+  codes: readonly ReasonCode[];
+  matchedChildren: readonly FamilyChild[];
+  matchedInterestSlugs: readonly string[];
+  max?: number;
+}): string[] {
+  const { codes } = input;
+  const chips: string[] = [];
+  if (codes.includes("NEW_CATEGORY")) chips.push("Попробуйте новое");
+  if (codes.includes("AGE_MATCH") && input.matchedChildren.length > 0) {
+    chips.push(`Подходит: ${formatChildNames(input.matchedChildren)}`);
+  } else if (codes.includes("AGE_UNKNOWN")) {
+    chips.push("Возраст не указан");
+  }
+  if (codes.includes("INTEREST_MATCH") && input.matchedInterestSlugs.length > 0) {
+    chips.push(getSystemInterestLabel(input.matchedInterestSlugs[0]!));
+  }
+  if (codes.includes("HISTORY_POSITIVE")) chips.push("Похоже на то, что вам понравилось");
+  if (codes.includes("DATE_WEEKEND")) chips.push("В эти выходные");
+  else if (codes.includes("DATE_SOON")) chips.push("Скоро");
+  if (codes.includes("FREE")) chips.push("Бесплатно");
+  if (chips.length === 0 && codes.includes("POPULAR")) chips.push("Популярно");
+  return chips.slice(0, input.max ?? 2);
+}
+
+/** Ключи возрастных групп каталога (`age=`), в которые попадают дети с известной датой рождения. */
+export function ageFilterKeysForChildren(children: readonly Pick<FamilyChild, "ageMonths">[]): string[] {
+  const keys = new Set<string>();
+  for (const child of children) {
+    if (child.ageMonths == null) continue;
+    for (const option of AGE_OPTIONS) {
+      if (child.ageMonths >= option.minMonths && (option.maxMonths == null || child.ageMonths <= option.maxMonths)) {
+        keys.add(option.key);
+      }
+    }
+  }
+  return AGE_OPTIONS.map((o) => o.key).filter((key) => keys.has(key));
+}
+
 export function titleForLevel(level: PickLevel, window: ShowWindow): string | null {
   switch (level) {
     case "PERSONAL":
@@ -456,6 +499,11 @@ export function selectFamilyPicks(
       scoreBreakdown: s.breakdown,
       isNovelty: novelty,
       reasonCodes,
+      reasonChips: buildReasonChips({
+        codes: reasonCodes,
+        matchedChildren,
+        matchedInterestSlugs: s.matchedInterestSlugs,
+      }),
       reasonText: buildReasonText({
         codes: reasonCodes,
         matchedChildren,

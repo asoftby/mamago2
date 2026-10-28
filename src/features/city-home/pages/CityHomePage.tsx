@@ -2,6 +2,7 @@ import { ptSerifHome } from "@/lib/fonts";
 import { Suspense } from "react";
 import { Container } from "@/components/ui/Container";
 import { StoriesSection } from "@/features/stories/components/StoriesSection";
+import { CityHomeFamilyPicks } from "@/features/city-home/components/CityHomeFamilyPicks";
 import { CityHomeBirthdayCta } from "@/features/city-home/components/CityHomeBirthdayCta";
 import { ActivationBannerHost } from "@/features/city-home/components/ActivationBannerHost";
 import { getFallbackHeroModel, getHeroContext } from "@/features/hero-weather/lib/get-hero-context";
@@ -224,6 +225,8 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
         <div className="px-1">
           <ActivationBannerHost />
         </div>
+
+        <CityHomeFamilyPicks citySlug={city.slug} />
 
         <StoriesSection cityId={city.id} citySlug={city.slug} />
 
