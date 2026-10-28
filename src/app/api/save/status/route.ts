@@ -89,16 +89,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (offerId) {
-      if (!hasOfferIdeaSupport()) {
-        return NextResponse.json({
-          isSaved: false,
-          isIdea: false,
-          inPlan: false,
-          planDate: null,
-          planStartsAt: null,
-        });
-      }
-      const isIdea = await hasOfferIdea(user.id, offerId);
+      const isIdea = hasOfferIdeaSupport() ? await hasOfferIdea(user.id, offerId) : false;
       const planItems = await prisma.planItem.findMany({
         where: { ...(await activePlanScopeFor(user.id)), offerId },
         select: { id: true, date: true, startsAt: true },
