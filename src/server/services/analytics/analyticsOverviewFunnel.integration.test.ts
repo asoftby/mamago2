@@ -116,6 +116,18 @@ async function main() {
     const segF = await getAnalyticsFunnels({ ...filters, segment: SEGMENT });
     assert.deepEqual(segF.globalFunnel.raw, { view: 2, open: 1, save: 1, plan: 1, click: 1 });
 
+    // E: anonymous open followed by authenticated save in the same browser.
+    // Both events must count as ONE person, with a converted save branch.
+    const e = await makeUser();
+    const eSession = `fn-${marker}-login`;
+    await ev({ sessionId: eSession }, "DETAIL_OPEN");
+    await ev({ userId: e.userId, sessionId: eSession }, "SAVE");
+    const linkedOverview = await getAnalyticsOverview(filters);
+    assert.deepEqual(linkedOverview.funnel.map((s) => s.count), [5, 4, 2, 1, 2]);
+    assert.equal(linkedOverview.saveRate, 1 / 2);
+    const linkedFunnels = await getAnalyticsFunnels(filters);
+    assert.deepEqual(linkedFunnels.globalFunnel.raw, { view: 5, open: 4, save: 2, plan: 1, click: 2 });
+
     // A segment nobody belongs to: empty, still no division by zero.
     const none = await getAnalyticsOverview({ ...filters, segment: `NONE${marker}` });
     assert.equal(none.saveRate, null);
