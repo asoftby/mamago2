@@ -21,7 +21,7 @@ assert.equal(bookingUnitCreateSchema.safeParse({ ...base, rules: [{ weekday: 2, 
 const api = readFileSync("src/app/api/business/booking-units/route.ts", "utf8");
 for (const token of [
   "getCurrentUser()", "getMyBusiness(user.id)", 'operationalStatus !== "ACTIVE"',
-  "businessId: access.business!.id", "id: { in: offerIds }, businessId",
+  "businessId: access.business!.id", "id: { in: offerIds }, place: { ownerBusinessId: businessId }",
   "bookingUnitCreateSchema.safeParse(body)", "rules: { create: rules }",
 ]) assert.ok(api.includes(token), "Missing isolation or validation guard: " + token);
 console.log("bookingUnitInput.test.ts: OK");
