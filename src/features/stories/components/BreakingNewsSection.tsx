@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { readSeen, writeSeen, markSeen } from "../lib/seen";
 import { BreakingNewsRingItem } from "./BreakingNewsRingItem";
 import { BreakingNewsModal } from "./BreakingNewsModal";
 import type { BreakingNewsItem } from "../lib/listBreakingNews";
-
-const SEEN_STORAGE_KEY = "mamago.breaking-news.seen";
 
 interface BreakingNewsSectionProps {
   items: BreakingNewsItem[];
@@ -13,33 +12,28 @@ interface BreakingNewsSectionProps {
 
 export function BreakingNewsSection({ items }: BreakingNewsSectionProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [seenIds, setSeenIds] = useState<Set<string>>(() => {
-    if (typeof window === "undefined") return new Set();
-    try {
-      const raw = localStorage.getItem(SEEN_STORAGE_KEY);
-      if (raw) return new Set<string>(JSON.parse(raw));
-    } catch {}
-    return new Set();
-  });
+  const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
+  useEffect(() => { setSeenIds(readSeen(window.localStorage)); }, []);
 
   // Если нет новостей — кружок всегда muted (нет контента)
   // Если все новости просмотрены — кружок muted
-  const allSeen = items.length === 0 || items.every((item) => seenIds.has(item.id));
+  const allSeen = items.length === 0 || items.every((item) => seenIds.has(`article:${item.id}`));
   const latestCoverImageUrl = items[0]?.imageUrl ?? null;
 
   const open = useCallback(() => {
     if (items.length === 0) return; // Не открывать модалку, если нет новостей
     setIsOpen(true);
-    // Помечаем все текущие breaking news как просмотренные
-    setSeenIds((prev) => {
-      const next = new Set(prev);
-      items.forEach((item) => next.add(item.id));
-      try {
-        localStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify([...next]));
-      } catch {}
+
+  }, [items]);
+
+  const onItemShown = useCallback((id: string) => {
+    const key = `article:${id}`;
+    setSeenIds((previous) => {
+      const next = markSeen(previous, key);
+      writeSeen(window.localStorage, next);
       return next;
     });
-  }, [items]);
+  }, []);
 
   const close = useCallback(() => {
     setIsOpen(false);
@@ -65,7 +59,7 @@ export function BreakingNewsSection({ items }: BreakingNewsSectionProps) {
         coverImageUrl={latestCoverImageUrl}
       />
 
-      {isOpen && <BreakingNewsModal newsItems={items} onClose={close} />}
+      {isOpen && <BreakingNewsModal newsItems={items} onClose={close} onItemShown={onItemShown} />}
     </>
   );
 }
