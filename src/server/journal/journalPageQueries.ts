@@ -48,7 +48,12 @@ export function journalBlockWheres(input: {
   const scoped = (where: Prisma.ArticleWhereInput): Prisma.ArticleWhereInput =>
     input.scopeWhere ? { AND: [input.scopeWhere, where] } : where;
   const feedParts: Prisma.ArticleWhereInput[] = [];
-  if (input.typeFilter) {\n    feedParts.push({ publicationType: input.typeFilter });\n  } else {\n    // Breaking News has its own carousel and news archive; do not mix into the general article feed.\n    feedParts.push({ publicationType: { not: "BREAKING_NEWS" } });\n  }
+  if (input.typeFilter) {
+    feedParts.push({ publicationType: input.typeFilter });
+  } else {
+    // Breaking News has its own carousel and news archive; do not mix into the general article feed.
+    feedParts.push({ publicationType: { not: "BREAKING_NEWS" } });
+  }
   if (input.mainId) feedParts.push({ id: { not: input.mainId } });
   return {
     /** «Главное»: самый свежий featured любого типа. */
