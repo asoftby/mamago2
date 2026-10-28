@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 
 export function JournalNewsOverlay({ children }: { children: React.ReactNode }) {
@@ -10,6 +10,26 @@ export function JournalNewsOverlay({ children }: { children: React.ReactNode }) 
   const closeRef = useRef<HTMLButtonElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const originRef = useRef<DOMRect | null>(null);
+  const closingRef = useRef(false);
+
+  const close = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    const panel = dialogRef.current;
+    const origin = originRef.current;
+    if (!panel || !origin || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      router.back();
+      return;
+    }
+    const target = panel.getBoundingClientRect();
+    const x = origin.left + origin.width / 2 - (target.left + target.width / 2);
+    const y = origin.top + origin.height / 2 - (target.top + target.height / 2);
+    const animation = panel.animate([
+      { transform: "translate(0, 0) scale(1)", opacity: 1 },
+      { transform: `translate(${x}px, ${y}px) scale(${Math.max(.08, origin.width / target.width)}, ${Math.max(.08, origin.height / target.height)})`, opacity: .65, borderRadius: "18px" },
+    ], { duration: 280, easing: "cubic-bezier(.4,0,.8,.2)", fill: "forwards" });
+    animation.finished.then(() => router.back()).catch(() => router.back());
+  }, [close]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -38,7 +58,7 @@ export function JournalNewsOverlay({ children }: { children: React.ReactNode }) 
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        router.back();
+        close();
       }
       if (event.key !== "Tab") return;
       const elements = dialogRef.current?.querySelectorAll<HTMLElement>(
@@ -69,7 +89,7 @@ export function JournalNewsOverlay({ children }: { children: React.ReactNode }) 
       aria-modal="true"
       aria-label="Публикация Breaking News"
       className="journal-news-backdrop fixed inset-0 z-[100] bg-black/60 md:p-5"
-      onMouseDown={(event) => { if (event.target === event.currentTarget) router.back(); }}
+      onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}
     >
       <div
         ref={dialogRef}
@@ -80,7 +100,7 @@ export function JournalNewsOverlay({ children }: { children: React.ReactNode }) 
           ref={closeRef}
           type="button"
           aria-label="Закрыть публикацию"
-          onClick={() => router.back()}
+          onClick={close}
           className="fixed right-5 top-[max(1rem,env(safe-area-inset-top))] z-[120] flex h-11 w-11 items-center justify-center rounded-full bg-white text-neutral-900 shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:right-[max(2rem,calc((100vw-64rem)/2))]"
         >
           <X aria-hidden size={22} />
