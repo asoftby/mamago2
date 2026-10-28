@@ -9,14 +9,19 @@ export type AnalyticsFunnelStepMetrics = {
   key: AnalyticsFunnelStepKey;
   label: string;
   count: number;
-  /** Доля от предыдущего шага, %; у первого шага 100 */
+  /**
+   * Доля от родительского шага, %: «Открыли» — от «Видели контент»; «Сохранили»,
+   * «Добавили в план», «Перешли к партнёру» — от «Открыли» (отдельные ветки, не цепочка).
+   * У первого шага 100.
+   */
   pctFromPrevious: number;
-  /** Доля от первого шага (views), % */
+  /** Доля от первого шага («Видели контент»), % */
   pctFromFirst: number;
 };
 
 export type AnalyticsFunnelSeries = {
   steps: AnalyticsFunnelStepMetrics[];
+  /** Уникальные люди (userId, иначе анонимный sessionId), не события */
   raw: {
     view: number;
     open: number;
@@ -81,8 +86,8 @@ export type AnalyticsFunnelsResult = {
     byEntity: {
       viewToOpen: AnalyticsFunnelWorstEntity[];
       openToSave: AnalyticsFunnelWorstEntity[];
-      saveToPlan: AnalyticsFunnelWorstEntity[];
-      planToClick: AnalyticsFunnelWorstEntity[];
+      openToPlan: AnalyticsFunnelWorstEntity[];
+      openToClick: AnalyticsFunnelWorstEntity[];
     };
     byVertical: AnalyticsFunnelVerticalDrop[];
   };

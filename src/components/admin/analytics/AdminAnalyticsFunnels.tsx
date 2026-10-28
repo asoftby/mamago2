@@ -299,7 +299,7 @@ export function AdminAnalyticsFunnels({
           </TabsContent>
           <TabsContent value="city" className="mt-4 space-y-3">
             {bd.byCity.length === 0 ? (
-              <p className="text-xs text-gray-500">No city-tagged events</p>
+              <p className="text-xs text-gray-500">Нет событий с привязкой к городу</p>
             ) : (
               bd.byCity.map((c) => (
                 <div key={c.citySlug}>
@@ -393,8 +393,7 @@ export function AdminAnalyticsFunnels({
                     {STEP_LABEL(t.from)} → {STEP_LABEL(t.to)}
                   </span>
                   <span className="tabular-nums">
-                    −{t.lost.toLocaleString()} events · {pct(t.dropOffPct)}{" "}
-                    lost
+                    −{t.lost.toLocaleString("ru-RU")} чел. · потеряно {pct(t.dropOffPct)}
                   </span>
                 </li>
               ))}
@@ -403,24 +402,24 @@ export function AdminAnalyticsFunnels({
 
           <div className="grid gap-4 lg:grid-cols-2">
             <DropEntityBlock
-              title="Views → opens (worst)"
+              title="Видели → открыли (хуже всего)"
               rows={data.dropOff.byEntity.viewToOpen}
-              hint="Low open rate vs views"
+              hint="Низкая доля открывших среди видевших"
             />
             <DropEntityBlock
-              title="Opens → saves (worst)"
+              title="Открыли → сохранили (хуже всего)"
               rows={data.dropOff.byEntity.openToSave}
-              hint="Low save rate vs opens"
+              hint="Низкая доля сохранивших среди открывших"
             />
             <DropEntityBlock
-              title="Saves → plan (worst)"
-              rows={data.dropOff.byEntity.saveToPlan}
-              hint="Low plan rate vs saves"
+              title="Открыли → добавили в план (хуже всего)"
+              rows={data.dropOff.byEntity.openToPlan}
+              hint="Низкая доля добавивших в план среди открывших"
             />
             <DropEntityBlock
-              title="Plan → CTA (worst)"
-              rows={data.dropOff.byEntity.planToClick}
-              hint="Low CTA rate vs plan adds"
+              title="Открыли → перешли к партнёру (хуже всего)"
+              rows={data.dropOff.byEntity.openToClick}
+              hint="Низкая доля перешедших среди открывших"
             />
           </div>
 
@@ -455,7 +454,7 @@ export function AdminAnalyticsFunnels({
       </Section>
 
       {loading ? (
-        <p className="text-center text-xs text-gray-400">Refreshing…</p>
+        <p className="text-center text-xs text-gray-400">Обновляем…</p>
       ) : null}
     </div>
   );
@@ -463,11 +462,11 @@ export function AdminAnalyticsFunnels({
 
 function STEP_LABEL(k: string): string {
   const m: Record<string, string> = {
-    view: "View",
-    open: "Open",
-    save: "Save",
-    plan: "Plan",
-    click: "CTA",
+    view: "Видели",
+    open: "Открыли",
+    save: "Сохранили",
+    plan: "В план",
+    click: "К партнёру",
   };
   return m[k] ?? k;
 }
@@ -486,7 +485,7 @@ function DropEntityBlock({
       <div className="text-xs font-semibold text-gray-800">{title}</div>
       <p className="mt-0.5 text-[11px] text-gray-500">{hint}</p>
       {rows.length === 0 ? (
-        <p className="mt-2 text-xs text-gray-400">Not enough volume</p>
+        <p className="mt-2 text-xs text-gray-400">Мало данных</p>
       ) : (
         <ul className="mt-2 space-y-1.5 text-[11px]">
           {rows.map((r) => (

@@ -1,4 +1,3 @@
-import type { Prisma, UserEventType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AnalyticsOverviewFilters } from "@/lib/analytics/adminOverviewTypes";
 import type {
@@ -12,6 +11,8 @@ import type {
 } from "@/lib/analytics/analyticsFunnelsTypes";
 import {
   analyticsEntityMap,
+  analyticsEventWhereSql,
+  analyticsIdentityWhereSql,
   analyticsVerticalMap,
   applyAnalyticsUserFilter,
   buildAnalyticsBaseEventWhere,
@@ -27,8 +28,12 @@ import {
   resolveInternalTrafficExclusion,
   type InternalTrafficExclusion,
 } from "@/server/services/analytics/canonicalAudience";
-
-const VIEW_TYPES: UserEventType[] = ["PAGE_VIEW", "CARD_VIEW"];
+import {
+  EMPTY_ORDERED_FUNNEL,
+  countOrderedFunnel,
+  countOrderedFunnelByEntity,
+  type OrderedFunnelCounts,
+} from "@/server/services/analytics/orderedUserFunnel";
 
 const STEP_ORDER: AnalyticsFunnelStepKey[] = [
   "view",
@@ -38,13 +43,18 @@ const STEP_ORDER: AnalyticsFunnelStepKey[] = [
   "click",
 ];
 
-/** Подписи шагов = типы UserEvent (view = PAGE_VIEW + CARD_VIEW). */
+/**
+ * Подписи шагов. Воронка пользовательская (D8): считаются уникальные люди, а не
+ * события; «Сохранили», «Добавили в план» и «Перешли к партнёру» — отдельные
+ * ветки от «Открыли» (действие не раньше первого открытия), поэтому каждая доля
+ * этих шагов — доля открывших и не превышает 100%.
+ */
 const STEP_LABELS: Record<AnalyticsFunnelStepKey, string> = {
-  view: "Views (PAGE + CARD)",
-  open: "DETAIL_OPEN",
-  save: "SAVE",
-  plan: "PLAN_ADD",
-  click: "CTA_CLICK",
+  view: "Видели контент",
+  open: "Открыли карточку",
+  save: "Сохранили (после открытия)",
+  plan: "Добавили в план (после открытия)",
+  click: "Перешли к партнёру (после открытия)",
 };
 
 /** Сегменты для вкладки Funnels (основные продуктовые). */
@@ -76,13 +86,7 @@ const VERTICAL_SLUGS = [
   "seasonal",
 ] as const;
 
-type FunnelCounts = {
-  view: number;
-  open: number;
-  save: number;
-  plan: number;
-  click: number;
-};
+type FunnelCounts = OrderedFunnelCounts;
 
 function intersectSets<T>(a: Set<T> | null, b: Set<T>): Set<T> | null {
   if (!a) return b;
@@ -97,29 +101,6 @@ function round2(x: number): number {
   return Math.round(x * 100) / 100;
 }
 
-async function countFunnel(
-  where: Prisma.UserEventWhereInput,
-): Promise<FunnelCounts> {
-  const [view, open, save, plan, click] = await Promise.all([
-    prisma.userEvent.count({
-      where: { ...where, eventType: { in: VIEW_TYPES } },
-    }),
-    prisma.userEvent.count({
-      where: { ...where, eventType: "DETAIL_OPEN" },
-    }),
-    prisma.userEvent.count({
-      where: { ...where, eventType: "SAVE" },
-    }),
-    prisma.userEvent.count({
-      where: { ...where, eventType: "PLAN_ADD" },
-    }),
-    prisma.userEvent.count({
-      where: { ...where, eventType: "CTA_CLICK" },
-    }),
-  ]);
-  return { view, open, save, plan, click };
-}
-
 function toFunnelSeries(raw: FunnelCounts): AnalyticsFunnelSeries {
   const vals: number[] = [
     raw.view,
@@ -130,9 +111,10 @@ function toFunnelSeries(raw: FunnelCounts): AnalyticsFunnelSeries {
   ];
   const steps = STEP_ORDER.map((key, i) => {
     const count = vals[i]!;
-    const prev = i > 0 ? vals[i - 1]! : null;
+    // save / plan / click are branches of "open": their parent is "open", not the previous step.
+    const parent = i === 0 ? null : i === 1 ? raw.view : raw.open;
     const pctFromPrevious =
-      i === 0 ? 100 : prev! > 0 ? round2((count / prev!) * 100) : 0;
+      i === 0 ? 100 : parent! > 0 ? round2((count / parent!) * 100) : 0;
     const pctFromFirst =
       raw.view > 0 ? round2((count / raw.view) * 100) : 0;
     return {
@@ -152,8 +134,8 @@ function transitionsFromRaw(raw: FunnelCounts): AnalyticsFunnelDropTransition[] 
   > = [
     ["view", "open", raw.view, raw.open],
     ["open", "save", raw.open, raw.save],
-    ["save", "plan", raw.save, raw.plan],
-    ["plan", "click", raw.plan, raw.click],
+    ["open", "plan", raw.open, raw.plan],
+    ["open", "click", raw.open, raw.click],
   ];
   return pairs.map(([from, to, fromCount, toCount]) => {
     const lost = Math.max(0, fromCount - toCount);
@@ -177,11 +159,9 @@ async function funnelForScopedFilters(
   const cityId = await resolveCityIdFromSlug(filters.city);
   const allowed = await resolveAnalyticsAllowedUserIds(filters);
   if (allowed && allowed.size === 0) {
-    return { view: 0, open: 0, save: 0, plan: 0, click: 0 };
+    return { ...EMPTY_ORDERED_FUNNEL };
   }
-  const base = buildAnalyticsBaseEventWhere(start, end, filters, cityId, exclusion);
-  const where = applyAnalyticsUserFilter(base, allowed);
-  return countFunnel(where);
+  return countOrderedFunnel(analyticsEventWhereSql(start, end, filters, cityId, null, exclusion), analyticsIdentityWhereSql(start, end, exclusion), allowed);
 }
 
 type AggRow = {
@@ -197,7 +177,7 @@ type AggRow = {
 function toWorstEntities(
   rows: AggRow[],
   titles: Map<string, string>,
-  kind: "vo" | "os" | "sp" | "pc",
+  kind: "vo" | "os" | "op" | "oc",
   minDenom: number,
   take: number,
 ): AnalyticsFunnelWorstEntity[] {
@@ -217,12 +197,12 @@ function toWorstEntities(
       } else if (kind === "os") {
         denom = opens;
         transitionRate = opens > 0 ? saves / opens : 0;
-      } else if (kind === "sp") {
-        denom = saves;
-        transitionRate = saves > 0 ? planAdds / saves : 0;
+      } else if (kind === "op") {
+        denom = opens;
+        transitionRate = opens > 0 ? planAdds / opens : 0;
       } else {
-        denom = planAdds;
-        transitionRate = planAdds > 0 ? cta / planAdds : 0;
+        denom = opens;
+        transitionRate = opens > 0 ? cta / opens : 0;
       }
       return {
         entityType: r.entity_type,
@@ -260,13 +240,7 @@ function emptyFunnelsResult(
   start: Date,
   end: Date,
 ): AnalyticsFunnelsResult {
-  const zero = toFunnelSeries({
-    view: 0,
-    open: 0,
-    save: 0,
-    plan: 0,
-    click: 0,
-  });
+  const zero = toFunnelSeries({ ...EMPTY_ORDERED_FUNNEL });
   return {
     range: { start: start.toISOString(), end: end.toISOString() },
     globalFunnel: zero,
@@ -282,8 +256,8 @@ function emptyFunnelsResult(
       byEntity: {
         viewToOpen: [],
         openToSave: [],
-        saveToPlan: [],
-        planToClick: [],
+        openToPlan: [],
+        openToClick: [],
       },
       byVertical: [],
     },
@@ -305,9 +279,11 @@ export async function getAnalyticsFunnels(
   }
   const exclusion = await resolveInternalTrafficExclusion(prisma, start, end);
 
-  const baseWhere = buildAnalyticsBaseEventWhere(start, end, filters, cityId, exclusion);
-  const where = applyAnalyticsUserFilter(baseWhere, allowed);
-  const globalRaw = await countFunnel(where);
+  const globalRaw = await countOrderedFunnel(
+    analyticsEventWhereSql(start, end, filters, cityId, null, exclusion),
+    analyticsIdentityWhereSql(start, end, exclusion),
+    allowed,
+  );
   const globalFunnel = toFunnelSeries(globalRaw);
   const biggestSteps = sortBiggestDrops(transitionsFromRaw(globalRaw));
 
@@ -363,15 +339,11 @@ export async function getAnalyticsFunnels(
           return [segKey, toFunnelSeries(zeroCounts())] as const;
         }
         const cityIdNs = await resolveCityIdFromSlug(filtersNoSegment.city);
-        const baseNs = buildAnalyticsBaseEventWhere(
-          start,
-          end,
-          filtersNoSegment,
-          cityIdNs,
-          exclusion,
+        const raw = await countOrderedFunnel(
+          analyticsEventWhereSql(start, end, filtersNoSegment, cityIdNs, null, exclusion),
+          analyticsIdentityWhereSql(start, end, exclusion),
+          merged,
         );
-        const whereNs = applyAnalyticsUserFilter(baseNs, merged);
-        const raw = await countFunnel(whereNs);
         return [segKey, toFunnelSeries(raw)] as const;
       }),
     ),
@@ -406,8 +378,8 @@ export async function getAnalyticsFunnels(
   const dropOffByEntity = {
     viewToOpen: toWorstEntities(aggRows, titles, "vo", 20, 8),
     openToSave: toWorstEntities(aggRows, titles, "os", 15, 8),
-    saveToPlan: toWorstEntities(aggRows, titles, "sp", 8, 8),
-    planToClick: toWorstEntities(aggRows, titles, "pc", 5, 8),
+    openToPlan: toWorstEntities(aggRows, titles, "op", 15, 8),
+    openToClick: toWorstEntities(aggRows, titles, "oc", 15, 8),
   };
 
   return {
@@ -429,7 +401,7 @@ export async function getAnalyticsFunnels(
 }
 
 function zeroCounts(): FunnelCounts {
-  return { view: 0, open: 0, save: 0, plan: 0, click: 0 };
+  return { ...EMPTY_ORDERED_FUNNEL };
 }
 
 async function loadCityFunnels(
@@ -483,11 +455,11 @@ async function loadCityFunnels(
   for (const id of ids) {
     const c = byId.get(id);
     if (!c) continue;
-    const w = applyAnalyticsUserFilter(
-      buildAnalyticsBaseEventWhere(start, end, filtersNoCity, id, exclusion),
+    const raw = await countOrderedFunnel(
+      analyticsEventWhereSql(start, end, filtersNoCity, id, null, exclusion),
+      analyticsIdentityWhereSql(start, end, exclusion),
       allowed,
     );
-    const raw = await countFunnel(w);
     out.push({
       citySlug: c.slug,
       cityName: c.name,
@@ -596,74 +568,20 @@ async function loadAggRowsForWorst(
   allowed: Set<string> | null,
   exclusion: InternalTrafficExclusion,
 ): Promise<AggRow[]> {
-  const base = buildAnalyticsBaseEventWhere(start, end, filters, cityId, exclusion);
-  const where = applyAnalyticsUserFilter(base, allowed);
-
-  const types: UserEventType[] = [
-    ...VIEW_TYPES,
-    "DETAIL_OPEN",
-    "SAVE",
-    "PLAN_ADD",
-    "CTA_CLICK",
-  ];
-
-  const rows = await prisma.userEvent.groupBy({
-    by: ["entityType", "entityId", "eventType"],
-    where: {
-      ...where,
-      entityType: { not: null },
-      entityId: { not: null },
-      eventType: { in: types },
-    },
-    _count: { _all: true },
-  });
-
-  const map = new Map<
-    string,
-    {
-      entity_type: string;
-      entity_id: string;
-      views: bigint;
-      opens: bigint;
-      saves: bigint;
-      plan_adds: bigint;
-      cta_clicks: bigint;
-    }
-  >();
-
-  for (const r of rows) {
-    const et = r.entityType;
-    const eid = r.entityId;
-    if (!et || !eid) continue;
-    const k = `${et}:${eid}`;
-    let row = map.get(k);
-    if (!row) {
-      row = {
-        entity_type: et,
-        entity_id: eid,
-        views: BigInt(0),
-        opens: BigInt(0),
-        saves: BigInt(0),
-        plan_adds: BigInt(0),
-        cta_clicks: BigInt(0),
-      };
-      map.set(k, row);
-    }
-    const c = BigInt(r._count._all);
-    if (r.eventType === "PAGE_VIEW" || r.eventType === "CARD_VIEW") {
-      row.views += c;
-    } else if (r.eventType === "DETAIL_OPEN") {
-      row.opens += c;
-    } else if (r.eventType === "SAVE") {
-      row.saves += c;
-    } else if (r.eventType === "PLAN_ADD") {
-      row.plan_adds += c;
-    } else if (r.eventType === "CTA_CLICK") {
-      row.cta_clicks += c;
-    }
-  }
-
-  return [...map.values()].filter(
-    (r) => Number(r.views) + Number(r.opens) > 0,
-  ) as AggRow[];
+  const rows = await countOrderedFunnelByEntity(
+    analyticsEventWhereSql(start, end, filters, cityId, null, exclusion),
+    analyticsIdentityWhereSql(start, end, exclusion),
+    allowed,
+  );
+  return rows
+    .filter((r) => r.view > 0)
+    .map((r) => ({
+      entity_type: r.entityType,
+      entity_id: r.entityId,
+      views: BigInt(r.view),
+      opens: BigInt(r.open),
+      saves: BigInt(r.save),
+      plan_adds: BigInt(r.plan),
+      cta_clicks: BigInt(r.click),
+    }));
 }

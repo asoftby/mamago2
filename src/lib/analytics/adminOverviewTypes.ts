@@ -20,7 +20,11 @@ export type AnalyticsFunnelStep = {
   key: "view" | "open" | "save" | "plan" | "click";
   label: string;
   count: number;
-  /** 0..100 относительно первого шага (views) */
+  /** Уникальные люди (не события) */
+  /**
+   * 0..100: «Открыли» — доля от «Видели контент»; «Сохранили», «Добавили в план»,
+   * «Перешли к партнёру» — доля от «Открыли» (отдельные ветки, не цепочка).
+   */
   percentOfTop: number;
 };
 
@@ -53,9 +57,12 @@ export type AnalyticsOverviewResult = {
   saves: number;
   planAdds: number;
   ctaClicks: number;
-  saveRate: number;
-  planRate: number;
-  clickRate: number;
+  /** Доля открывших (люди), сохранивших после открытия; null, если открывших нет */
+  saveRate: number | null;
+  /** Доля открывших (люди), добавивших в план после открытия; null, если открывших нет */
+  planRate: number | null;
+  /** Доля открывших (люди), перешедших к партнёру после открытия; null, если открывших нет */
+  clickRate: number | null;
   funnel: AnalyticsFunnelStep[];
   /** Агрегаты из UserBehaviorProfile за период (lastSeen в окне) */
   profilesActiveInRange: number;

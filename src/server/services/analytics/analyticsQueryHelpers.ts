@@ -78,7 +78,7 @@ function bandFromAgeYears(age: number): string {
   return "10+";
 }
 
-async function youngestChildBandByUser(): Promise<Map<string, string>> {
+export async function youngestChildBandByUser(): Promise<Map<string, string>> {
   const births = await youngestChildBirthByUser();
   const map = new Map<string, string>();
   for (const [userId, youngest] of births) {
@@ -164,6 +164,21 @@ export function applyAnalyticsUserFilter(
     ...w,
     userId: { in: [...allowed] },
   };
+}
+
+/** Identity ownership must be resolved across the entire reporting window, before
+ * city/entity/vertical/segment filters. Otherwise a shared browser can appear
+ * to belong to one user simply because another user's events were filtered out.
+ */
+export function analyticsIdentityWhereSql(
+  start: Date,
+  end: Date,
+  exclusion: InternalTrafficExclusion | null = null,
+): Prisma.Sql {
+  const dates = Prisma.sql`e."createdAt" >= ${start} AND e."createdAt" <= ${end}`;
+  return exclusion
+    ? Prisma.sql`${dates} AND ${internalTrafficExclusionSql(exclusion, "e")}`
+    : dates;
 }
 
 export function analyticsEventWhereSql(
