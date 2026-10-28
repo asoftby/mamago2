@@ -358,6 +358,43 @@ async function resolvePlaceForUserSave(
 /**
  * Добавить место в план на дату (дедупликация по userId + placeId).
  */
+/** Persist an offer as a dated, family-visible catalog plan item. */
+export async function addOfferPlanItem(
+  userId: string,
+  offerId: string,
+  date: string,
+  options?: { visibility?: PlanVisibility },
+): Promise<{ id: string }> {
+  const offer = await prisma.offer.findFirst({
+    where: { id: offerId, status: "PUBLISHED", archivedAt: null },
+    select: { id: true, title: true, coverImage: true },
+  });
+  if (!offer) throw new Error("Offer not found");
+  const existing = await prisma.planItem.findFirst({
+    where: { ...(await activePlanScopeFor(userId)), offerId },
+    select: { id: true },
+  });
+  if (existing) {
+    return prisma.planItem.update({
+      where: { id: existing.id },
+      data: { date, title: offer.title, coverImageUrl: offer.coverImage },
+      select: { id: true },
+    });
+  }
+  return prisma.planItem.create({
+    data: {
+      userId,
+      familyId: await familyIdForWrite(userId),
+      ...(options?.visibility ? { visibility: options.visibility } : {}),
+      offerId,
+      date,
+      title: offer.title,
+      coverImageUrl: offer.coverImage,
+    },
+    select: { id: true },
+  });
+}
+
 export async function addPlacePlanItem(
   userId: string,
   placeId: string,
