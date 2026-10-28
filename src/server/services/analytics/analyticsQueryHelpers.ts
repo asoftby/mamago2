@@ -166,6 +166,21 @@ export function applyAnalyticsUserFilter(
   };
 }
 
+/** Identity ownership must be resolved across the entire reporting window, before
+ * city/entity/vertical/segment filters. Otherwise a shared browser can appear
+ * to belong to one user simply because another user's events were filtered out.
+ */
+export function analyticsIdentityWhereSql(
+  start: Date,
+  end: Date,
+  exclusion: InternalTrafficExclusion | null = null,
+): Prisma.Sql {
+  const dates = Prisma.sql`e."createdAt" >= ${start} AND e."createdAt" <= ${end}`;
+  return exclusion
+    ? Prisma.sql`${dates} AND ${internalTrafficExclusionSql(exclusion, "e")}`
+    : dates;
+}
+
 export function analyticsEventWhereSql(
   start: Date,
   end: Date,
