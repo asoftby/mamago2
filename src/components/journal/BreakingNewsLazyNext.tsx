@@ -14,9 +14,11 @@ export function BreakingNewsLazyNext() {
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const cursorRef = useRef<string | null>(null);
+  const initialPathRef = useRef<string>("");
 
   useEffect(() => {
     cursorRef.current = document.querySelector<HTMLElement>("[data-breaking-news-article-id]")?.dataset.breakingNewsArticleId ?? null;
+    initialPathRef.current = window.location.pathname.split("/").slice(0, -1).join("/");
   }, []);
 
   useEffect(() => {
@@ -57,7 +59,7 @@ export function BreakingNewsLazyNext() {
       <h2 className="mb-5 text-xl font-semibold">Далее в Breaking News</h2>
       <div className="grid gap-3">
         {items.map((item) => (
-          <Link key={item.id} href={`${window.location.pathname.split("/").slice(0, -1).join("/")}/${item.slug}`} className="rounded-xl border border-neutral-200 p-4 hover:bg-neutral-50">
+          <Link key={item.id} href={`${initialPathRef.current}/${item.slug}`} className="rounded-xl border border-neutral-200 p-4 hover:bg-neutral-50">
             <strong className="block">{item.title}</strong>
             {item.excerpt && <span className="mt-1 block text-sm text-neutral-600">{item.excerpt}</span>}
           </Link>
