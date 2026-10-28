@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { BreakingNewsView, type BreakingNewsViewProps } from "@/components/article/mvp/BreakingNewsView";
 import { useEffect, useRef, useState } from "react";
 
 type NextItem = { id: string; slug: string | null; title: string; excerpt: string | null };
@@ -11,6 +11,10 @@ export function BreakingNewsLazyNext() {
   const requestedRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const [items, setItems] = useState<NextItem[]>([]);
+  const [articles, setArticles] = useState<Array<BreakingNewsViewProps>>([]);
+  const fullRequestRef = useRef(false);
+  const fullAbortRef = useRef<AbortController | null>(null);
+  const fullSentinelRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -24,7 +28,32 @@ export function BreakingNewsLazyNext() {
     cityRef.current = window.location.pathname.split("/")[1] ?? "";
   }, []);
 
-  useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(() => () => { abortRef.current?.abort(); fullAbortRef.current?.abort(); }, []);
+
+  useEffect(() => {
+    const node = fullSentinelRef.current;
+    const next = items.find((item) => !articles.some((article) => article.articleId === item.id));
+    if (!node || !next || fullRequestRef.current) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting || fullRequestRef.current) return;
+      fullRequestRef.current = true;
+      const controller = new AbortController();
+      fullAbortRef.current = controller;
+      fetch(`/api/journal/breaking-news/article?id=${encodeURIComponent(next.id)}&city=${encodeURIComponent(cityRef.current)}`, { signal: controller.signal })
+        .then(async (response) => {
+          if (!response.ok) throw new Error("Article unavailable");
+          return response.json() as Promise<{ article: Omit<BreakingNewsViewProps, "articleId" | "related" | "articleHref" | "citySlug"> & { id: string; slug: string } }>;
+        })
+        .then(({ article }) => {
+          if (controller.signal.aborted) return;
+          setArticles((previous) => [...previous, { ...article, articleId: article.id, publishedAt: article.publishedAt ? new Date(article.publishedAt) : null, related: [], citySlug: cityRef.current, articleHref: `${initialPathRef.current}/${article.slug}` }].slice(-8));
+        })
+        .catch(() => { if (!controller.signal.aborted) setError(true); })
+        .finally(() => { fullRequestRef.current = false; });
+    }, { root: document.querySelector(".journal-news-panel"), rootMargin: "0px 0px 240px 0px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [items, articles]);
 
   useEffect(() => {
     const node = sentinelRef.current;
@@ -64,14 +93,12 @@ export function BreakingNewsLazyNext() {
   return (
     <section aria-label="Следующие Breaking News" className="mx-auto max-w-3xl px-5 pb-12 pt-8">
       <h2 className="mb-5 text-xl font-semibold">Далее в Breaking News</h2>
-      <div className="grid gap-3">
-        {items.map((item) => (
-          <Link key={item.id} href={`${initialPathRef.current}/${item.slug}`} className="rounded-xl border border-neutral-200 p-4 hover:bg-neutral-50">
-            <strong className="block">{item.title}</strong>
-            {item.excerpt && <span className="mt-1 block text-sm text-neutral-600">{item.excerpt}</span>}
-          </Link>
-        ))}
-      </div>
+      {articles.map((article) => (
+        <section key={article.articleId} data-news-continuation={article.articleId}>
+          <BreakingNewsView {...article} />
+        </section>
+      ))}
+      {!error && items.some((item) => !articles.some((article) => article.articleId === item.id)) && <div ref={fullSentinelRef} className="h-px" aria-hidden />}
       {loading && <p role="status" className="py-5 text-sm text-neutral-500">Загружаем следующие публикации…</p>}
       {error && <button type="button" onClick={() => setError(false)} className="py-5 text-sm underline">Повторить загрузку</button>}
       {hasMore && <div ref={sentinelRef} aria-hidden className="h-px" />}
