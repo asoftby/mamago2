@@ -688,6 +688,7 @@ model PlanItem {
 model PlanRecurrenceSeries {
   id             String @id @default(cuid())
   ownerUserId    String
+  requestKey     String? @unique
   familyId       String?
   visibility     PlanVisibility @default(FAMILY)
   timezone       String @default("Europe/Minsk")
