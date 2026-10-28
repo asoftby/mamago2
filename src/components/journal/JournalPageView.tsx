@@ -51,10 +51,15 @@ export function JournalPageView({
   const saveStatuses = useArticleSaveStatusBatch([...(main ? [main.id] : []), ...feed.map((a) => a.id)]);
   const [seenNewsIds, setSeenNewsIds] = useState<Set<string>>(new Set());
   useEffect(() => {
-    const refresh = () => setSeenNewsIds(readSeenBreakingNews(window.localStorage));
+    const refresh = () => {
+      try { setSeenNewsIds(readSeenBreakingNews(window.localStorage)); }
+      catch { setSeenNewsIds(new Set()); }
+    };
+    refresh();
     window.addEventListener("focus", refresh);
     window.addEventListener("pageshow", refresh);
-    return () => { window.removeEventListener("focus", refresh); window.removeEventListener("pageshow", refresh); };
+    window.addEventListener("storage", refresh);
+    return () => { window.removeEventListener("focus", refresh); window.removeEventListener("pageshow", refresh); window.removeEventListener("storage", refresh); };
   }, []);
   const currentNews = typeFilter === "BREAKING_NEWS" ? feed.filter((article) => article.expiresAt && new Date(article.expiresAt).getTime() > Date.now()) : [];
   const rankedCurrentNews = orderBreakingNewsBySeen(currentNews, seenNewsIds);
