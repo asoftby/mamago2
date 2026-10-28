@@ -54,7 +54,15 @@ async function buildTelegramPayload(prepared: PreparedNotificationPayload): Prom
     text,
     parseMode,
     replyMarkup: {
-      inline_keyboard: [[createTelegramLinkButton(prepared.content.ctaLabel ?? "Открыть", ctaUrl, getCanonicalPublicAppUrl())]],
+      inline_keyboard: [[createTelegramLinkButton(
+        prepared.content.ctaLabel ?? "Открыть",
+        ctaUrl,
+        getCanonicalPublicAppUrl(),
+        prepared.scenario === "PLAN_EVENT_2H_BEFORE" || prepared.scenario === "PLAN_TOMORROW_DIGEST"
+          ? "mini_app"
+          : "browser",
+        `notification_${prepared.scenario.toLowerCase()}`,
+      )]],
     },
   };
 }
