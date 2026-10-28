@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 import { X } from "lucide-react";
+import { BreakingNewsLazyNext } from "./BreakingNewsLazyNext";
 
 export function JournalNewsOverlay({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -106,6 +107,7 @@ export function JournalNewsOverlay({ children }: { children: React.ReactNode }) 
           <X aria-hidden size={22} />
         </button>
         {children}
+        <BreakingNewsLazyNext />
       </div>
       <style jsx>{`
         .journal-news-backdrop { animation: journal-backdrop-in 220ms ease-out both; }
