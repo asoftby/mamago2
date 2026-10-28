@@ -12,9 +12,9 @@
  *
  * `save`, `plan` and `click` are independent branches of `open` (a CTA is not
  * "after plan"), exactly like funnel.* in engagementFunnel.ts, so each of them
- * is a share of the people who opened a card. Identity = userId, else the
- * anonymous sessionId (the browser id); rows with neither are not counted
- * (same rule as the canonical audience).
+ * is a share of the people who opened a card. Identity = userId, else the unique authenticated user linked to that session
+ * within the filtered reporting window, else anonymous sessionId. Ambiguous
+ * shared sessions remain anonymous to avoid attributing events to wrong users.
  *
  * The caller passes the shared event filter (`analyticsEventWhereSql`: window,
  * internal-traffic exclusion, city/entity/vertical and the segment / child-age
@@ -33,7 +33,22 @@ export type OrderedFunnelCounts = {
 
 export const EMPTY_ORDERED_FUNNEL: OrderedFunnelCounts = { view: 0, open: 0, save: 0, plan: 0, click: 0 };
 
-const IDENTITY = Prisma.sql`COALESCE(e."userId", CASE WHEN e."sessionId" IS NOT NULL THEN 'anon:' || e."sessionId" END)`;
+const IDENTITY = Prisma.sql`COALESCE(e."userId", linked."user_id", CASE WHEN e."sessionId" IS NOT NULL THEN 'anon:' || e."sessionId" END)`;
+
+// Resolve session identity once across the filtered reporting window, not per event.
+// Only link sessions associated with exactly one authenticated user.
+const MATCHED_AND_LINKED = (eventWhere: Prisma.Sql) => Prisma.sql`
+  WITH matched AS (
+    SELECT e.* FROM "UserEvent" e
+    WHERE ${eventWhere} AND ${FUNNEL_TYPES}
+  ), linked AS (
+    SELECT "sessionId", MIN("userId") AS user_id
+    FROM matched
+    WHERE "sessionId" IS NOT NULL AND "userId" IS NOT NULL
+    GROUP BY "sessionId"
+    HAVING COUNT(DISTINCT "userId") = 1
+  )
+`;
 const FUNNEL_TYPES = Prisma.sql`e."eventType" IN ('PAGE_VIEW', 'CARD_VIEW', 'DETAIL_OPEN', 'SAVE', 'PLAN_ADD', 'CTA_CLICK')`;
 
 const PER_IDENTITY_COLUMNS = Prisma.sql`
@@ -67,10 +82,11 @@ const toCounts = (row: CountsRow | undefined): OrderedFunnelCounts =>
 /** Ordered unique-people funnel for the events matched by `eventWhere` (alias `e`). */
 export async function countOrderedFunnel(eventWhere: Prisma.Sql): Promise<OrderedFunnelCounts> {
   const rows = await prisma.$queryRaw<CountsRow[]>(Prisma.sql`
-    WITH per AS (
+    ${MATCHED_AND_LINKED(eventWhere)}, per AS (
       SELECT ${IDENTITY} AS ident, ${PER_IDENTITY_COLUMNS}
-      FROM "UserEvent" e
-      WHERE ${eventWhere} AND ${FUNNEL_TYPES} AND ${IDENTITY} IS NOT NULL
+      FROM matched e
+      LEFT JOIN linked ON linked."sessionId" = e."sessionId"
+      WHERE ${IDENTITY} IS NOT NULL
       GROUP BY 1
     )
     SELECT ${STEP_COUNTS} FROM per
@@ -83,10 +99,11 @@ export type EntityFunnelRow = OrderedFunnelCounts & { entityType: string; entity
 /** The same funnel per (entityType, entityId): unique people per card. */
 export async function countOrderedFunnelByEntity(eventWhere: Prisma.Sql): Promise<EntityFunnelRow[]> {
   const rows = await prisma.$queryRaw<Array<CountsRow & { entityType: string; entityId: string }>>(Prisma.sql`
-    WITH per AS (
+    ${MATCHED_AND_LINKED(eventWhere)}, per AS (
       SELECT e."entityType"::text AS et, e."entityId" AS eid, ${IDENTITY} AS ident, ${PER_IDENTITY_COLUMNS}
-      FROM "UserEvent" e
-      WHERE ${eventWhere} AND ${FUNNEL_TYPES} AND ${IDENTITY} IS NOT NULL
+      FROM matched e
+      LEFT JOIN linked ON linked."sessionId" = e."sessionId"
+      WHERE ${IDENTITY} IS NOT NULL
         AND e."entityType" IS NOT NULL AND e."entityId" IS NOT NULL
       GROUP BY 1, 2, 3
     )
