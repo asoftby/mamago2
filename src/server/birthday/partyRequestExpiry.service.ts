@@ -1,7 +1,7 @@
 import "server-only";
 
 import prisma from "@/lib/prisma";
-import { PartyOrderStatus } from "@prisma/client";
+import { PartyOrderStatus, type Prisma } from "@prisma/client";
 
 /** Expire unanswered requests by server time; never rely on a browser timer. */
 export async function expirePartyRequests(limit = 50) {
@@ -36,10 +36,8 @@ export async function expirePartyRequests(limit = 50) {
       });
       if (changed.count !== 1) return false;
       if (request.partyOrderItem) {
-        await tx.partyOrderItem.update({
-          where: { id: request.partyOrderItem.id },
-          data: { status: "EXPIRED" },
-        });
+        await settleExpiredPartyItem(tx, request.partyOrderItem.id,
+          request.partyOrderItem.role === "ANCHOR");
         if (request.partyOrderItem.role === "ANCHOR") {
           await tx.partyOrder.updateMany({
             where: {
@@ -122,10 +120,8 @@ async function expirePartyQuotes(now: Date, limit: number) {
         });
         if (closed.count !== 1) throw new QuoteRaceLost();
         if (request.partyOrderItem) {
-          await tx.partyOrderItem.update({
-            where: { id: request.partyOrderItem.id },
-            data: { status: "EXPIRED" },
-          });
+          await settleExpiredPartyItem(tx, request.partyOrderItem.id,
+            request.partyOrderItem.role === "ANCHOR");
           if (request.partyOrderItem.role === "ANCHOR") {
             await tx.partyOrder.updateMany({
               where: {
@@ -160,4 +156,39 @@ async function expirePartyQuotes(now: Date, limit: number) {
     }
   }
   return expired;
+}
+
+/**
+ * A timeout belongs to one request, not the entire service. Another invited
+ * business may still have a live request or quote. Serialize the final item
+ * transition with confirmations and candidate dispatch.
+ */
+async function settleExpiredPartyItem(
+  tx: Prisma.TransactionClient, itemId: string, isAnchor: boolean,
+) {
+  await tx.$queryRaw`SELECT "id" FROM "PartyOrderItem"
+    WHERE "id" = ${itemId} FOR UPDATE`;
+  const item = await tx.partyOrderItem.findUnique({
+    where: { id: itemId },
+    select: { status: true, confirmedBookingRequestId: true },
+  });
+  if (!item || item.confirmedBookingRequestId ||
+      item.status === "CONFIRMED" || item.status === "CANCELLED") return;
+  if (!isAnchor) {
+    const active = await tx.bookingRequest.count({
+      where: { partyOrderItemId: itemId, kind: "PARTY", status: "NEW",
+        partyStage: { in: ["SENT", "QUOTED", "AWAITING_RECONFIRM"] } },
+    });
+    if (active > 0) {
+      if (item.status !== "REQUESTED") {
+        await tx.partyOrderItem.update({
+          where: { id: itemId }, data: { status: "REQUESTED" },
+        });
+      }
+      return;
+    }
+  }
+  await tx.partyOrderItem.update({
+    where: { id: itemId }, data: { status: "EXPIRED" },
+  });
 }
