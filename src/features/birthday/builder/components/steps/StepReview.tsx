@@ -10,7 +10,8 @@ import { calendarDateKeyToIso, childAgeYearsOnDate } from "../../lib/partyDate";
 
 type Slot = { start: string; end: string };
 type AvailabilityState =
-  | { status: "idle" | "loading" }
+  | { status: "idle" }
+  | { status: "loading" }
   | { status: "ready"; mode: "REQUEST_ONLY" | "SCHEDULED"; slots: Slot[] }
   | { status: "error" };
 
