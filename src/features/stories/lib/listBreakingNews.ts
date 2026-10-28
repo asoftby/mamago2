@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { notExpiredJournalPublicationWhere } from "@/lib/journal/publicationType";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
 import { parseArticleContentJson } from "@/lib/publications/articleMvp";
@@ -44,14 +45,7 @@ export async function listBreakingNewsArticles(
   const rows = await prisma.article.findMany({
     where: {
       ...getPublicPublishedArticleWhere(),
-      AND: [
-        {
-          OR: [
-            { cityContext: citySlug },
-            { cityContext: null },
-          ],
-        },
-      ],
+      AND: [notExpiredJournalPublicationWhere(now), { OR: [{ cityContext: citySlug }, { cityContext: null }] }],
       OR: [
         { publicationType: "BREAKING_NEWS" },
         { subtitle: BREAKING_NEWS_SUBTITLE },
