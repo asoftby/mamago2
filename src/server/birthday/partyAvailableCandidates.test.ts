@@ -8,6 +8,6 @@ assert.ok(avail.includes("previewPartyOfferAvailability"), "reuse existing booki
 assert.ok(avail.includes("start += 5"), "bound request concurrency");
 assert.ok(avail.includes('availability === "AVAILABLE"'));
 assert.ok(avail.includes('selectCheckedPartyCandidates(checked)'));
-assert.ok(avail.includes("if (availableCount >= 5) break"));
+assert.ok(avail.includes("if (availableBusinesses.size >= 5) break"));
 assert.ok(!avail.includes("bookingRequest.create"), "selection must not send requests");
 console.log("partyAvailableCandidates.test.ts: OK");
