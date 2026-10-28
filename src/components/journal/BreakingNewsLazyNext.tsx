@@ -65,6 +65,7 @@ export function BreakingNewsLazyNext() {
       observer.disconnect();
       const controller = new AbortController();
       fullAbortRef.current = controller;
+      const timeout = window.setTimeout(() => controller.abort(), 8000);
       fetch(`/api/journal/breaking-news/article?id=${encodeURIComponent(next.id)}&city=${encodeURIComponent(cityRef.current)}`, { signal: controller.signal })
         .then(async (response) => {
           if (!response.ok) throw new Error("Article unavailable");
@@ -75,7 +76,11 @@ export function BreakingNewsLazyNext() {
           setArticles((previous) => [...previous, { ...article, articleId: article.id, publishedAt: article.publishedAt ? new Date(article.publishedAt) : null, related: [], citySlug: cityRef.current, articleHref: `${initialPathRef.current}/${article.slug}` }]);
         })
         .catch(() => { if (!controller.signal.aborted) setError(true); })
-        .finally(() => { fullRequestRef.current = false; });
+        .finally(() => {
+          window.clearTimeout(timeout);
+          if (fullAbortRef.current === controller) fullAbortRef.current = null;
+          fullRequestRef.current = false;
+        });
     }, { root: document.querySelector(".journal-news-panel"), rootMargin: "0px 0px 240px 0px" });
     observer.observe(node);
     return () => observer.disconnect();
@@ -126,7 +131,7 @@ export function BreakingNewsLazyNext() {
       ))}
       {!error && items.some((item) => !articles.some((article) => article.articleId === item.id)) && <div ref={fullSentinelRef} className="h-px" aria-hidden />}
       {loading && <p role="status" className="py-5 text-sm text-neutral-500">Загружаем следующие публикации…</p>}
-      {error && <button type="button" onClick={() => setError(false)} className="py-5 text-sm underline">Повторить загрузку</button>}
+      {error && <button type="button" onClick={() => { setError(false); requestedRef.current = false; fullRequestRef.current = false; }} className="py-5 text-sm underline">Повторить загрузку</button>}
       {hasMore && <div ref={sentinelRef} aria-hidden className="h-px" />}
     </section>
   );
