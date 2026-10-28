@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import type { BirthdayCatalogItem } from "../../lib/realCatalog";
 import { catalogPriceLabel, catalogPriceSummary, partyBudgetWarning } from "../../lib/catalogSelection";
@@ -44,6 +44,52 @@ export function StepReview({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [availability, setAvailability] = useState<"AVAILABLE" | "UNAVAILABLE" | "UNKNOWN" | "LOADING" | null>(null);
+  const anchorOfferId = offers[0]?.id;
+  const checkVenue = venueMode === "VENUE" || venueMode === "PACKAGE";
+  const partySize = Number(children) + Number(adults);
+
+  useEffect(() => {
+    if (!checkVenue || !anchorOfferId || !date || !timeFrom || !timeTo ||
+        timeFrom >= timeTo || !children || !adults || !Number.isFinite(partySize) ||
+        partySize < 1 || partySize > 1000) {
+      return;
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      try {
+        const query = new URLSearchParams({
+          offerId: anchorOfferId, date, timeFrom, timeTo,
+          childrenCount: children, adultsCount: adults,
+        });
+        const response = await fetch("/api/public/party-availability?" + query, {
+          signal: controller.signal, cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Preview unavailable");
+        const result: { availability?: string } = await response.json();
+        if (!controller.signal.aborted) {
+          setLastPreviewKey([anchorOfferId, checkVenue, date, timeFrom, timeTo, children, adults].join("|"));
+          setAvailability(
+            result.availability === "AVAILABLE" || result.availability === "UNAVAILABLE"
+              ? result.availability : "UNKNOWN"
+          );
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setLastPreviewKey([anchorOfferId, checkVenue, date, timeFrom, timeTo, children, adults].join("|"));
+          setAvailability("UNKNOWN");
+        }
+      }
+    }, 350);
+    return () => { controller.abort(); clearTimeout(timeout); };
+  }, [anchorOfferId, checkVenue, date, timeFrom, timeTo, children, adults, partySize]);
+
+  const previewKey = [anchorOfferId, checkVenue, date, timeFrom, timeTo, children, adults].join("|");
+  const [lastPreviewKey, setLastPreviewKey] = useState("");
+  const visibleAvailability = checkVenue && children && adults
+    ? previewKey === lastPreviewKey ? availability : "LOADING"
+    : null;
+
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -131,6 +177,14 @@ export function StepReview({
           <label className="text-sm">Ваше имя<input required maxLength={120} value={name} onChange={e => setName(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
           <label className="text-sm sm:col-span-2">Телефон<input required type="tel" maxLength={40} value={phone} onChange={e => setPhone(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
         </fieldset>
+        {checkVenue && visibleAvailability && (
+          <p role="status" className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm text-stone-700">
+            {visibleAvailability === "LOADING" ? "Проверяем доступность выбранного времени…" :
+             visibleAvailability === "AVAILABLE" ? "Предварительно свободно на выбранное время. Окончательно подтвердит исполнитель." :
+             visibleAvailability === "UNAVAILABLE" ? "По текущему расписанию время занято. Можно изменить дату или отправить запрос исполнителю для уточнения." :
+             "Нельзя автоматически подтвердить доступность. Исполнитель уточнит её после получения заявки."}
+          </p>
+        )}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <button type="submit" disabled={busy || authLoading || !offers.length} className="w-full rounded-xl bg-primary p-4 font-semibold text-primary-foreground disabled:opacity-50">
           {busy ? "Отправляем…" : authenticated ? "Отправить заявку основному исполнителю" : "Войти и отправить заявку"}
