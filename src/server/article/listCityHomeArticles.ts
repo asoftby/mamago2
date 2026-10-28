@@ -49,6 +49,7 @@ export type CityHomeJournalArticle = {
   isBreakingNews: boolean;
   publishedAt: Date | null;
   updatedAt: Date;
+  expiresAt: Date | null;
   coverImageUrl: string | null;
 };
 
@@ -118,6 +119,7 @@ const JOURNAL_SELECT = {
   contentJson: true,
   publishedAt: true,
   updatedAt: true,
+  expiresAt: true,
   heroImage: true,
   coverImage: { select: { publicUrl: true } },
   category: { select: { id: true, slug: true, nameRu: true } },
@@ -186,6 +188,7 @@ export function toJournalArticle(
     readTime: estimateReadTimeMinutes(extractArticlePlainText(row.contentJson, row.excerpt)),
     publishedAt: row.publishedAt,
     updatedAt: row.updatedAt,
+    expiresAt: row.expiresAt,
     coverImageUrl: row.coverImage?.publicUrl ?? row.heroImage ?? null,
   };
 }
