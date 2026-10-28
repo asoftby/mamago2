@@ -12,6 +12,7 @@ import type {
 import {
   analyticsEntityMap,
   analyticsEventWhereSql,
+  analyticsIdentityWhereSql,
   analyticsVerticalMap,
   applyAnalyticsUserFilter,
   buildAnalyticsBaseEventWhere,
@@ -160,7 +161,7 @@ async function funnelForScopedFilters(
   if (allowed && allowed.size === 0) {
     return { ...EMPTY_ORDERED_FUNNEL };
   }
-  return countOrderedFunnel(analyticsEventWhereSql(start, end, filters, cityId, allowed, exclusion));
+  return countOrderedFunnel(analyticsEventWhereSql(start, end, filters, cityId, allowed, exclusion), analyticsIdentityWhereSql(start, end, exclusion));
 }
 
 type AggRow = {
@@ -280,6 +281,7 @@ export async function getAnalyticsFunnels(
 
   const globalRaw = await countOrderedFunnel(
     analyticsEventWhereSql(start, end, filters, cityId, allowed, exclusion),
+    analyticsIdentityWhereSql(start, end, exclusion),
   );
   const globalFunnel = toFunnelSeries(globalRaw);
   const biggestSteps = sortBiggestDrops(transitionsFromRaw(globalRaw));
@@ -338,6 +340,7 @@ export async function getAnalyticsFunnels(
         const cityIdNs = await resolveCityIdFromSlug(filtersNoSegment.city);
         const raw = await countOrderedFunnel(
           analyticsEventWhereSql(start, end, filtersNoSegment, cityIdNs, merged, exclusion),
+          analyticsIdentityWhereSql(start, end, exclusion),
         );
         return [segKey, toFunnelSeries(raw)] as const;
       }),
@@ -452,6 +455,7 @@ async function loadCityFunnels(
     if (!c) continue;
     const raw = await countOrderedFunnel(
       analyticsEventWhereSql(start, end, filtersNoCity, id, allowed, exclusion),
+      analyticsIdentityWhereSql(start, end, exclusion),
     );
     out.push({
       citySlug: c.slug,
@@ -563,6 +567,7 @@ async function loadAggRowsForWorst(
 ): Promise<AggRow[]> {
   const rows = await countOrderedFunnelByEntity(
     analyticsEventWhereSql(start, end, filters, cityId, allowed, exclusion),
+    analyticsIdentityWhereSql(start, end, exclusion),
   );
   return rows
     .filter((r) => r.view > 0)
