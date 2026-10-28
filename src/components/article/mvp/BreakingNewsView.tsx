@@ -966,7 +966,16 @@ export function BreakingNewsView({
   coverImageUrl,
 }: BreakingNewsViewProps) {
   useEffect(() => {
-    if (!draftWatermark) markBreakingNewsSeen(window.localStorage, articleId);
+    if (draftWatermark) return;
+    const node = document.querySelector<HTMLElement>(`[data-breaking-news-article-id="${CSS.escape(articleId)}"]`);
+    if (!node) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      try { markBreakingNewsSeen(window.localStorage, articleId); } catch { /* Storage unavailable. */ }
+      observer.disconnect();
+    }, { threshold: 0.25, root: document.querySelector(".journal-news-panel") });
+    observer.observe(node);
+    return () => observer.disconnect();
   }, [articleId, draftWatermark]);
   const cityHomeHref = getCityHomeHref(citySlug);
   const journalHref = citySlug?.trim() ? `/${citySlug.trim()}/blog` : "/blog";
