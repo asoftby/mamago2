@@ -81,6 +81,7 @@ jobs:
           pnpm exec tsx src/server/birthday/partyTelegramEndToEnd.contract.test.ts
           pnpm exec tsx src/features/me/components/PartyOrderStatusScreen.contract.test.ts
           pnpm exec tsx src/server/services/booking/bookingBucket.contract.test.ts
+          pnpm exec tsx src/server/services/booking/businessInboxScan.test.ts
 
       - name: Classes schedule and capacity regressions
         run: |

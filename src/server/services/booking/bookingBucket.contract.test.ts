@@ -104,12 +104,16 @@ assert.ok(compareBookingDecisions(
 
 // API and privacy wiring must stay unified.
 const inbox = readFileSync("src/server/services/booking/businessInbox.service.ts", "utf8");
+const scan = readFileSync("src/server/services/booking/businessInboxScan.ts", "utf8");
 const route = readFileSync("src/app/api/business/bookings/inbox/route.ts", "utf8");
 const outcome = readFileSync("src/server/services/booking/bookingOutcome.service.ts", "utf8");
 const resolution = readFileSync("src/server/birthday/partyQuoteResolution.service.ts", "utf8");
 assert.ok(inbox.includes("bookingBucket("));
-assert.ok(inbox.includes("menuBadge: customerWaiting"));
-assert.ok(inbox.includes("totals[decision.bucket]++"));
+assert.ok(inbox.includes("menuBadge: result.menuBadge"));
+assert.ok(scan.includes("menuBadge: customerWaiting"));
+assert.ok(scan.includes("totals[decision.bucket]++"));
+assert.ok(scan.includes("counts[decision.bucket]++"));
+assert.ok(inbox.includes("scanBusinessInboxPages("));
 assert.ok(!inbox.includes("customerPhone: true") && !inbox.includes("contactPhone: true"));
 assert.ok(route.includes("getMyBusiness"));
 assert.ok(outcome.includes("BookingStatus.CANCELLED") && outcome.includes('reason: "BUSINESS_CANCELLED"') === false);
