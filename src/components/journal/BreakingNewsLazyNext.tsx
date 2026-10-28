@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 type NextItem = { id: string; slug: string | null; title: string; excerpt: string | null };
 type Page = { items: NextItem[]; nextCursor: string | null };
+type NewsPayload = Omit<BreakingNewsViewProps, "articleId" | "related" | "articleHref" | "citySlug" | "publishedAt"> & { id: string; slug: string; publishedAt: string | null };
 
 export function BreakingNewsLazyNext() {
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -42,7 +43,7 @@ export function BreakingNewsLazyNext() {
       fetch(`/api/journal/breaking-news/article?id=${encodeURIComponent(next.id)}&city=${encodeURIComponent(cityRef.current)}`, { signal: controller.signal })
         .then(async (response) => {
           if (!response.ok) throw new Error("Article unavailable");
-          return response.json() as Promise<{ article: Omit<BreakingNewsViewProps, "articleId" | "related" | "articleHref" | "citySlug"> & { id: string; slug: string } }>;
+          return response.json() as Promise<{ article: NewsPayload }>;
         })
         .then(({ article }) => {
           if (controller.signal.aborted) return;
