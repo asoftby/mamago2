@@ -32,7 +32,7 @@ async function main() {
 
     const base = Date.now() - 60 * 60 * 1000; // one hour ago: inside "7d" whatever the Minsk clock says
     let tick = 0;
-    async function ev(who: { userId?: string; sessionId?: string }, eventType: EvType, entityId = `e-${marker}`) {
+    async function ev(who: { userId?: string; sessionId?: string }, eventType: EvType, entityId = `e-${marker}`, entityType: "PLACE" | "EVENT" = "PLACE") {
       tick += 1000;
       await prisma.userEvent.create({
         data: {
@@ -40,7 +40,7 @@ async function main() {
           sessionId: who.sessionId ?? null,
           eventType,
           cityId,
-          entityType: "PLACE",
+          entityType,
           entityId,
           createdAt: new Date(base + tick),
         },
@@ -127,6 +127,21 @@ async function main() {
     assert.equal(linkedOverview.saveRate, 1 / 2);
     const linkedFunnels = await getAnalyticsFunnels(filters);
     assert.deepEqual(linkedFunnels.globalFunnel.raw, { view: 5, open: 4, save: 2, plan: 1, click: 2 });
+
+    // Shared browser: a different authenticated user appears only in EVENT.
+    // PLACE-only filtering must NOT hide this ambiguity and attribute the
+    // anonymous PLACE open to the user who saved the PLACE.
+    const sharedOwner = await makeUser();
+    const sharedOther = await makeUser();
+    const sharedSession = `fn-${marker}-shared`;
+    await ev({ sessionId: sharedSession }, "DETAIL_OPEN");
+    await ev({ userId: sharedOwner.userId, sessionId: sharedSession }, "SAVE");
+    await ev({ userId: sharedOther.userId, sessionId: sharedSession }, "CARD_VIEW", `event-${marker}`, "EVENT");
+    const placeOnly = { ...filters, entity: "place" };
+    const placeOverview = await getAnalyticsOverview(placeOnly);
+    assert.deepEqual(placeOverview.funnel.map((s) => s.count), [7, 5, 2, 1, 2], "shared session remains ambiguous across entity filters");
+    const placeFunnels = await getAnalyticsFunnels(placeOnly);
+    assert.deepEqual(placeFunnels.globalFunnel.raw, { view: 7, open: 5, save: 2, plan: 1, click: 2 });
 
     // A segment nobody belongs to: empty, still no division by zero.
     const none = await getAnalyticsOverview({ ...filters, segment: `NONE${marker}` });
