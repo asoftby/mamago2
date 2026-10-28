@@ -72,7 +72,8 @@ export function pickPartyProviders(params: {
       offerId: offer.id,
       businessId: offer.businessId,
       priceByn: offer.priceByn,
-      availability: offer.availability,
+      // UNAVAILABLE candidates were filtered above; preserve narrow public type.
+      availability: offer.availability === "AVAILABLE" ? "AVAILABLE" : "UNKNOWN",
       category: offer.category,
     });
     if (result.length >= limit) break;
