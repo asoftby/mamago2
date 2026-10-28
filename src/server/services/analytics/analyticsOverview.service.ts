@@ -73,7 +73,8 @@ export async function getAnalyticsOverview(
       ? Prisma.sql`AND FALSE`
       : Prisma.sql`AND e."userId" IN (${Prisma.join([...allowed])})`
     : Prisma.empty;
-  const contentEventSql = analyticsEventWhereSql(start, end, filters, cityId, allowed, exclusion);
+  // Funnel audience membership is applied after resolving anonymous sessions.
+  const contentEventSql = analyticsEventWhereSql(start, end, filters, cityId, null, exclusion);
 
   const [
     audience,
@@ -95,7 +96,7 @@ export async function getAnalyticsOverview(
     countByType(base, SAVE_EVENT),
     countByType(base, PLAN_ADD_EVENT),
     countByType(base, CTA_CLICK_EVENT),
-    countOrderedFunnel(contentEventSql, analyticsIdentityWhereSql(start, end, exclusion)),
+    countOrderedFunnel(contentEventSql, analyticsIdentityWhereSql(start, end, exclusion), allowed),
     prisma.userBehaviorProfile.count({
       where: {
         lastSeenAt: { gte: start, lte: end },
