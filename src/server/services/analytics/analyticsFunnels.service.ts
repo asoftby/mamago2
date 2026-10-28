@@ -161,7 +161,7 @@ async function funnelForScopedFilters(
   if (allowed && allowed.size === 0) {
     return { ...EMPTY_ORDERED_FUNNEL };
   }
-  return countOrderedFunnel(analyticsEventWhereSql(start, end, filters, cityId, allowed, exclusion), analyticsIdentityWhereSql(start, end, exclusion));
+  return countOrderedFunnel(analyticsEventWhereSql(start, end, filters, cityId, null, exclusion), analyticsIdentityWhereSql(start, end, exclusion), allowed);
 }
 
 type AggRow = {
@@ -280,8 +280,9 @@ export async function getAnalyticsFunnels(
   const exclusion = await resolveInternalTrafficExclusion(prisma, start, end);
 
   const globalRaw = await countOrderedFunnel(
-    analyticsEventWhereSql(start, end, filters, cityId, allowed, exclusion),
+    analyticsEventWhereSql(start, end, filters, cityId, null, exclusion),
     analyticsIdentityWhereSql(start, end, exclusion),
+    allowed,
   );
   const globalFunnel = toFunnelSeries(globalRaw);
   const biggestSteps = sortBiggestDrops(transitionsFromRaw(globalRaw));
@@ -339,8 +340,9 @@ export async function getAnalyticsFunnels(
         }
         const cityIdNs = await resolveCityIdFromSlug(filtersNoSegment.city);
         const raw = await countOrderedFunnel(
-          analyticsEventWhereSql(start, end, filtersNoSegment, cityIdNs, merged, exclusion),
+          analyticsEventWhereSql(start, end, filtersNoSegment, cityIdNs, null, exclusion),
           analyticsIdentityWhereSql(start, end, exclusion),
+          merged,
         );
         return [segKey, toFunnelSeries(raw)] as const;
       }),
@@ -454,8 +456,9 @@ async function loadCityFunnels(
     const c = byId.get(id);
     if (!c) continue;
     const raw = await countOrderedFunnel(
-      analyticsEventWhereSql(start, end, filtersNoCity, id, allowed, exclusion),
+      analyticsEventWhereSql(start, end, filtersNoCity, id, null, exclusion),
       analyticsIdentityWhereSql(start, end, exclusion),
+      allowed,
     );
     out.push({
       citySlug: c.slug,
@@ -566,8 +569,9 @@ async function loadAggRowsForWorst(
   exclusion: InternalTrafficExclusion,
 ): Promise<AggRow[]> {
   const rows = await countOrderedFunnelByEntity(
-    analyticsEventWhereSql(start, end, filters, cityId, allowed, exclusion),
+    analyticsEventWhereSql(start, end, filters, cityId, null, exclusion),
     analyticsIdentityWhereSql(start, end, exclusion),
+    allowed,
   );
   return rows
     .filter((r) => r.view > 0)
