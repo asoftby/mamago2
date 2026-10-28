@@ -1,12 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import type { BirthdayCatalogItem } from "../../lib/realCatalog";
 import { catalogPriceLabel, catalogPriceSummary, partyBudgetWarning } from "../../lib/catalogSelection";
 import { submitBirthdayParty, submittedPartyId, type PartyFlowState } from "../../lib/partySubmitFlow";
 import { calendarDateKeyToIso, childAgeYearsOnDate } from "../../lib/partyDate";
+
+type Slot = { start: string; end: string };
+type AvailabilityState =
+  | { status: "idle" | "loading" }
+  | { status: "ready"; mode: "REQUEST_ONLY" | "SCHEDULED"; slots: Slot[] }
+  | { status: "error" };
+
+function durationOf(from: string, to: string): number {
+  const asMinutes = (time: string): number | null => {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return null;
+    const [hours, minutes] = time.split(":").map(Number);
+    return hours * 60 + minutes;
+  };
+  const start = asMinutes(from);
+  const end = asMinutes(to);
+  return start == null || end == null ? 0 : end - start;
+}
 
 type Props = {
   offers: BirthdayCatalogItem[];
@@ -44,6 +61,35 @@ export function StepReview({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [availability, setAvailability] = useState<AvailabilityState>({ status: "idle" });
+  const selectedOfferId = offers[0]?.id;
+  const durationMinutes = durationOf(timeFrom, timeTo);
+  const guestCount = children !== "" && adults !== "" ? Number(children) + Number(adults) : 0;
+
+  useEffect(() => {
+    if (!selectedOfferId || !date || !Number.isInteger(guestCount) || guestCount < 1 ||
+        guestCount > 1000 || durationMinutes < 30 || durationMinutes > 720) {
+      setAvailability({ status: "idle" });
+      return;
+    }
+    const controller = new AbortController();
+    const query = new URLSearchParams({
+      city: citySlug, offerId: selectedOfferId, date,
+      durationMinutes: String(durationMinutes), guestCount: String(guestCount),
+    });
+    setAvailability({ status: "loading" });
+    fetch("/api/public/birthday/availability?" + query.toString(), {
+      cache: "no-store", signal: controller.signal,
+    })
+      .then(async response => {
+        if (!response.ok) throw new Error("Availability failed");
+        return response.json() as Promise<{ mode: "REQUEST_ONLY" | "SCHEDULED"; slots: Slot[] }>;
+      })
+      .then(data => { if (!controller.signal.aborted) setAvailability({ status: "ready", ...data }); })
+      .catch(() => { if (!controller.signal.aborted) setAvailability({ status: "error" }); });
+    return () => controller.abort();
+  }, [selectedOfferId, citySlug, date, durationMinutes, guestCount]);
+
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -131,6 +177,51 @@ export function StepReview({
           <label className="text-sm">Ваше имя<input required maxLength={120} value={name} onChange={e => setName(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
           <label className="text-sm sm:col-span-2">Телефон<input required type="tel" maxLength={40} value={phone} onChange={e => setPhone(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
         </fieldset>
+        <section aria-label="Предварительная доступность" className="rounded-xl border border-stone-200 bg-white p-4">
+          <h4 className="font-semibold text-stone-900">Свободное время</h4>
+          <p className="mt-1 text-xs text-stone-600">
+            Подсказка по расписанию основного исполнителя на выбранную дату.
+            Время не резервируется до подтверждения заказа.
+          </p>
+          {availability.status === "idle" ? (
+            <p className="mt-3 text-sm text-stone-600">Укажите дату, количество гостей и продолжительность праздника.</p>
+          ) : availability.status === "loading" ? (
+            <p role="status" className="mt-3 text-sm text-stone-600">Проверяем свободные интервалы…</p>
+          ) : availability.status === "error" ? (
+            <p role="status" className="mt-3 text-sm text-stone-600">
+              Сейчас не удалось проверить расписание. Можно отправить заявку, время уточнит исполнитель.
+            </p>
+          ) : availability.mode === "REQUEST_ONLY" ? (
+            <p className="mt-3 text-sm text-stone-600">
+              У исполнителя пока нет настроенного календаря бронирования. Доступность уточняется по заявке.
+            </p>
+          ) : availability.slots.length === 0 ? (
+            <p className="mt-3 text-sm text-stone-600">
+              На эту дату свободных интервалов указанной длительности не найдено. Попробуйте другую дату или время;
+              заявку также можно отправить для уточнения.
+            </p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-stone-600">Выберите подходящий интервал:</p>
+              <div role="group" aria-label="Предварительно свободные интервалы" className="flex max-h-44 flex-wrap gap-2 overflow-y-auto">
+                {availability.slots.map(slot => (
+                  <button
+                    key={slot.start + "-" + slot.end}
+                    type="button"
+                    aria-pressed={timeFrom === slot.start && timeTo === slot.end}
+                    className={"rounded-full border px-3 py-2 text-sm font-medium transition " +
+                      (timeFrom === slot.start && timeTo === slot.end
+                        ? "border-stone-950 bg-stone-950 text-white"
+                        : "border-stone-200 bg-stone-50 text-stone-900 hover:border-stone-500")}
+                    onClick={() => { setTimeFrom(slot.start); setTimeTo(slot.end); }}
+                  >
+                    {slot.start}–{slot.end}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <button type="submit" disabled={busy || authLoading || !offers.length} className="w-full rounded-xl bg-primary p-4 font-semibold text-primary-foreground disabled:opacity-50">
           {busy ? "Отправляем…" : authenticated ? "Отправить заявку основному исполнителю" : "Войти и отправить заявку"}
