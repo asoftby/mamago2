@@ -9,7 +9,6 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { PublicationTagChips } from "@/components/article/PublicationTagChips";
@@ -965,7 +964,6 @@ export function BreakingNewsView({
   articleHref,
   coverImageUrl,
 }: BreakingNewsViewProps) {
-  const router = useRouter();
   const cityHomeHref = getCityHomeHref(citySlug);
   const journalHref = citySlug?.trim() ? `/${citySlug.trim()}/blog` : "/blog";
 
@@ -993,13 +991,7 @@ export function BreakingNewsView({
         href={journalHref}
         aria-label="Закрыть публикацию и вернуться в Журнал"
         className="fixed right-4 top-[max(1rem,env(safe-area-inset-top))] z-[110] flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-neutral-900 shadow-lg backdrop-blur-sm transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        onClick={(event) => {
-          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-          if (window.history.state?.__mamagoJournalOrigin === articleHref) {
-            event.preventDefault();
-            router.back();
-          }
-        }}
+
       >
         <X size={22} aria-hidden />
       </Link>
