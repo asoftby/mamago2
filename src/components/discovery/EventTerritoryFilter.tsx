@@ -66,7 +66,6 @@ export function EventTerritoryFilter({ onApply, onBeforeNavigate, filters }: { o
   const chosen = items.find((item) => item.slug === selectedSlug);
   const currentLabel = selectedSlug === "belarus" ? "Вся Беларусь"
     : chosen?.name ?? (listingCity === "minsk" ? "Минск и область" : listingCity);
-  const showSelectedRegion = activeRegionId === regionId;
 
   return (
     <div className="space-y-2">
@@ -118,11 +117,11 @@ export function EventTerritoryFilter({ onApply, onBeforeNavigate, filters }: { o
                       {region.name}
                     </button>
                     <button type="button" aria-label={`Показать города: ${region.name}`}
-                      aria-expanded={showSelectedRegion}
-                      onClick={() => setRegionId(showSelectedRegion ? null : region.id)}
+                      aria-expanded={activeRegionId === region.id}
+                      onClick={() => setRegionId(activeRegionId === region.id ? null : region.id)}
                       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg hover:bg-muted/40">⌄</button>
                   </div>
-                  {showSelectedRegion && (
+                  {activeRegionId === region.id && (
                     <div className="ml-4 space-y-1 border-l border-border pl-3">
                       {cities.map((city) => (
                         <button key={city.id} type="button" onClick={() => setSelection(city.slug)}
