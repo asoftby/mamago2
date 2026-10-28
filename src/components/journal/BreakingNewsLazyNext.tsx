@@ -52,13 +52,12 @@ export function BreakingNewsLazyNext() {
     return () => observer.disconnect();
   }, [hasMore, error, items.length]);
 
-  if (!cursorRef.current && !items.length) return <div ref={sentinelRef} />;
   return (
     <section aria-label="Следующие Breaking News" className="mx-auto max-w-3xl px-5 pb-12 pt-8">
       <h2 className="mb-5 text-xl font-semibold">Далее в Breaking News</h2>
       <div className="grid gap-3">
         {items.map((item) => (
-          <Link key={item.id} href={`/blog/${item.slug}`} className="rounded-xl border border-neutral-200 p-4 hover:bg-neutral-50">
+          <Link key={item.id} href={`${window.location.pathname.split("/").slice(0, -1).join("/")}/${item.slug}`} className="rounded-xl border border-neutral-200 p-4 hover:bg-neutral-50">
             <strong className="block">{item.title}</strong>
             {item.excerpt && <span className="mt-1 block text-sm text-neutral-600">{item.excerpt}</span>}
           </Link>
