@@ -513,6 +513,7 @@ export function OfferPageView({
         isIdea={isIdeaSaved}
         inPlan={isPlanSaved}
         planDate={planDate}
+        planItemId={planItemId}
         planStartsAt={null}
       />
 
