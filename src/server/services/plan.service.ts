@@ -15,6 +15,8 @@ import {
 import { fanOutItemsToDigestTargets, fanOutItemsToFamilyMembers } from "@/server/family/planRecipients";
 
 /** Статья в плане: slug и город — для ссылки, рубрика и анонс — для экрана пункта (без contentJson). */
+const planOfferSelect = { id: true, title: true, slug: true, coverImage: true, priceFrom: true, priceText: true, place: { select: { city: { select: { slug: true } } } } } as const;
+
 const planArticleSelect = {
   slug: true,
   excerpt: true,
@@ -81,6 +83,8 @@ export type PlanItemWithActivity = {
   id: string;
   userId: string;
   activityId: string | null;
+  offerId?: string | null;
+  offer?: { id: string; title: string; slug: string | null; coverImage: string | null; priceFrom: number | null; priceText: string | null; place: { city: { slug: string } | null } | null } | null;
   /** Present on persisted rows; synthetic UI items may omit */
   routeId?: string | null;
   planRouteSlug?: string | null;
@@ -571,6 +575,7 @@ export async function listPlanItemsByWeek(
     include: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
+      offer: { select: planOfferSelect },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -585,6 +590,7 @@ export async function listAllPlanItems(userId: string): Promise<PlanItemWithActi
     include: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
+      offer: { select: planOfferSelect },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -608,6 +614,7 @@ export async function listUpcomingPlanItems(
     include: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
+      offer: { select: planOfferSelect },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -627,6 +634,7 @@ export async function listPlanItemsInRange(
     include: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
+      offer: { select: planOfferSelect },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -644,6 +652,7 @@ export async function listPlanItemsByDate(
     include: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
+      offer: { select: planOfferSelect },
     },
     orderBy: { startsAt: "asc" },
   })) as PlanItemWithActivity[];
@@ -689,6 +698,7 @@ export async function listPlanItemsDueForReminder(args: {
     include: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
+      offer: { select: planOfferSelect },
     },
     orderBy: { startsAt: "asc" },
   })) as PlanReminderCandidate[];
@@ -746,6 +756,7 @@ export async function listPlanItemsForTomorrowDigest(args: {
     include: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
+      offer: { select: planOfferSelect },
     },
     orderBy: { startsAt: "asc" },
   })) as PlanTomorrowDigestCandidate[];
