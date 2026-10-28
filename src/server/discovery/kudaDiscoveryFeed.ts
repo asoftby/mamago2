@@ -104,6 +104,10 @@ export async function getKudaDiscoveryFeed(
     take?: number;
     /** Max DB candidates ranked in memory (default 200). Paginated listings raise it. */
     candidatePoolCap?: number;
+    /** Only public paginated listings: rank every matching event, without the homepage candidate ceiling. */
+    allCandidates?: boolean;
+    /** Listing pages resolve image dimensions only for the visible 24 cards. */
+    hydrateImages?: boolean;
     format?: ActivityFormat | null;
     nearby?: boolean;
     eventFilters?: EventRuntimeFilters;
@@ -140,8 +144,8 @@ export async function getKudaDiscoveryFeed(
   /** Пул кандидатов для сортировки; без избыточного findMany (было ×5 до 400 — долго на TTFB). */
   const rows = await prisma.activity.findMany({
     where,
-    take: Math.min(take * 3, options?.candidatePoolCap ?? 200),
-    orderBy: [{ nextOccurrenceAt: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
+    ...(!options?.allCandidates ? { take: Math.min(take * 3, options?.candidatePoolCap ?? 200) } : {}),
+    orderBy: [{ nextOccurrenceAt: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }, { id: "asc" }],
     include: {
       images: {
         orderBy: { sortOrder: "asc" },
@@ -240,7 +244,8 @@ export async function getKudaDiscoveryFeed(
     return ta - tb || a.id.localeCompare(b.id);
   });
 
-  const result = await withImageDimensions(cards.slice(0, take), (card) => card.image);
+  const selected = options?.allCandidates ? cards : cards.slice(0, take);
+  const result = options?.hydrateImages === false ? selected : await withImageDimensions(selected, (card) => card.image);
   perf.mark("mapSort");
   perf.log({
     citySlug,
