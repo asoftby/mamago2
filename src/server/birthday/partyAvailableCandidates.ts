@@ -1,10 +1,9 @@
 import "server-only";
 import { previewPartyOfferAvailability } from "./partyAvailabilityPreview.service";
-import { rankPartyCandidates, type PartyCandidateQuery, type RankedPartyCandidate } from "./partyCandidateRanking";
+import { rankPartyCandidates, type PartyCandidateQuery } from "./partyCandidateRanking";
+import { selectCheckedPartyCandidates, type CheckedPartyCandidate, type CandidateAvailability } from "./partyCandidateSelection";
 
-export type AvailablePartyCandidate = RankedPartyCandidate & {
-  availability: "AVAILABLE" | "UNKNOWN";
-};
+export type AvailablePartyCandidate = CheckedPartyCandidate;
 
 export type PartyAvailableCandidateQuery = PartyCandidateQuery & {
   date: string;
@@ -30,8 +29,8 @@ export async function findAvailablePartyCandidates(
       !Number.isInteger(input.adultsCount) || input.adultsCount < 0 || input.adultsCount > 500) return [];
 
   const candidates = await rankPartyCandidates({ ...input, includeAllRanked: true });
-  const available: AvailablePartyCandidate[] = [];
-  const unknown: AvailablePartyCandidate[] = [];
+  const checked: { candidate: (typeof candidates)[number]; availability: CandidateAvailability }[] = [];
+  let availableCount = 0;
   // Use small, bounded bursts instead of one database fan-out for the entire city.
   for (let start = 0; start < candidates.length; start += 5) {
     const batch = candidates.slice(start, start + 5);
@@ -47,10 +46,11 @@ export async function findAvailablePartyCandidates(
       }
     }));
     batch.forEach((candidate, index) => {
-      if (states[index] === "AVAILABLE") available.push({ ...candidate, availability: "AVAILABLE" });
-      else if (states[index] === "UNKNOWN") unknown.push({ ...candidate, availability: "UNKNOWN" });
+      const availability = states[index];
+      if (availability === "AVAILABLE") availableCount++;
+      checked.push({ candidate, availability });
     });
-    if (available.length >= 5) break;
+    if (availableCount >= 5) break;
   }
-  return [...available.slice(0, 5), ...unknown.slice(0, Math.max(0, 5 - available.length))];
+  return selectCheckedPartyCandidates(checked);
 }
