@@ -7,6 +7,7 @@ import type {
 import { analyticsDayKeys } from "@/server/services/analytics/analyticsDateRange";
 import {
   analyticsEventWhereSql,
+  analyticsIdentityWhereSql,
   applyAnalyticsUserFilter,
   buildAnalyticsBaseEventWhere,
   loadAnalyticsScope,
@@ -94,7 +95,7 @@ export async function getAnalyticsOverview(
     countByType(base, SAVE_EVENT),
     countByType(base, PLAN_ADD_EVENT),
     countByType(base, CTA_CLICK_EVENT),
-    countOrderedFunnel(contentEventSql),
+    countOrderedFunnel(contentEventSql, analyticsIdentityWhereSql(start, end, exclusion)),
     prisma.userBehaviorProfile.count({
       where: {
         lastSeenAt: { gte: start, lte: end },
