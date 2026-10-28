@@ -43,7 +43,11 @@ export async function POST(request: NextRequest) {
   const parsed = bookingUnitCreateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Некорректное расписание", issues: parsed.error.flatten() }, { status: 422 });
   const { rules, offerIds, ...fields } = parsed.data;
-  const owned = await prisma.offer.count({ where: { id: { in: offerIds }, businessId } });
+  // Offer belongs to a business through its linked Place, not a direct businessId.
+  // Keep this guard for every offer: no cross-business resource mappings.
+  const owned = await prisma.offer.count({
+    where: { id: { in: offerIds }, place: { ownerBusinessId: businessId } },
+  });
   if (owned !== offerIds.length)
     return NextResponse.json({ error: "Услуги не принадлежат бизнесу" }, { status: 403 });
   const unit = await prisma.bookingUnit.create({
