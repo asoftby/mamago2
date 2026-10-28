@@ -11,6 +11,7 @@ import type { BreakingNewsItem } from "../lib/listBreakingNews";
 interface BreakingNewsModalProps {
   newsItems: BreakingNewsItem[];
   onClose: () => void;
+  onItemShown?: (id: string) => void;
 }
 
 function relativeTime(isoString: string): string {
@@ -32,6 +33,7 @@ function relativeTime(isoString: string): string {
 export function BreakingNewsModal({
   newsItems,
   onClose,
+  onItemShown,
 }: BreakingNewsModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
 
@@ -145,7 +147,7 @@ export function BreakingNewsModal({
                     {item.href ? (
                       <Link
                         href={item.href}
-                        onClick={onClose}
+                        onClick={() => { onItemShown?.(item.id); onClose(); }}
                         className="inline-flex items-center gap-1 text-[12px] font-medium text-blue-600 hover:text-blue-700 transition-colors shrink-0"
                       >
                         Подробнее
