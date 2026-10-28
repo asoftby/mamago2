@@ -111,6 +111,9 @@ jobs:
           pnpm exec tsx src/server/notifications/notification-action-resolver.test.ts
           pnpm exec tsx src/features/notifications/store/notification-actions.test.ts
 
+      - name: Breaking News stories regressions
+        run: pnpm exec tsx src/components/journal/JournalNewsCard.test.tsx
+
       - name: Article performance analytics regressions
         run: |
           pnpm exec tsx src/lib/publications/articleMvp.test.ts
