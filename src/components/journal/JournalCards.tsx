@@ -99,6 +99,11 @@ export function JournalNewsCard({ article }: { article: CityHomeJournalArticle }
     <Link
       href={article.href}
       data-journal-news-card={article.id}
+      onClick={(event) => {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        sessionStorage.setItem("mamago.journal.news.origin", JSON.stringify({ id: article.id, path: article.href, at: Date.now(), x: rect.x, y: rect.y, width: rect.width, height: rect.height }));
+      }}
       className="group relative block aspect-[3/5] overflow-hidden rounded-[18px] bg-muted text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <Cover article={article} tone={1} className="absolute inset-0 h-full w-full transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none" />
