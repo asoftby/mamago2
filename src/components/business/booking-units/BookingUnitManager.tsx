@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { CalendarClock, Pencil, Plus, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,10 +20,10 @@ async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     throw new Error(body.error || "Не удалось выполнить действие");
   }
-  return body as T;
+  return body as unknown as T;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block space-y-1.5 text-sm font-medium text-stone-700">
       <span>{label}</span>
@@ -252,7 +252,13 @@ export function BookingUnitManager({ offers }: { offers: OfferOption[] }) {
                         <div className="flex flex-wrap items-center gap-2" key={index}>
                           <input aria-label={day + ": начало"} type="time" required className="h-10 rounded-md border border-stone-300 bg-white px-2 text-sm" value={asTime(rule.startMinutes)} onChange={e => patchRule(index, { startMinutes: asMinutes(e.target.value) })} />
                           <span className="text-stone-500">—</span>
-                          <input aria-label={day + ": окончание"} type="time" required className="h-10 rounded-md border border-stone-300 bg-white px-2 text-sm" value={asTime(rule.endMinutes)} onChange={e => patchRule(index, { endMinutes: asMinutes(e.target.value) })} />
+                          {rule.endMinutes === 1440 ? <span className="text-sm font-medium">24:00</span> : (
+                            <input aria-label={day + ": окончание"} type="time" required className="h-10 rounded-md border border-stone-300 bg-white px-2 text-sm" value={asTime(rule.endMinutes)} onChange={e => patchRule(index, { endMinutes: asMinutes(e.target.value) })} />
+                          )}
+                          <label className="flex items-center gap-1 text-xs text-stone-600">
+                            <input type="checkbox" checked={rule.endMinutes === 1440} onChange={e => patchRule(index, { endMinutes: e.target.checked ? 1440 : 1080 })} />
+                            До 24:00
+                          </label>
                           <Button type="button" aria-label={day + ": удалить интервал"} variant="ghost" size="icon" onClick={() => patch({ rules: form.rules.filter((_, i) => i !== index) })}><X /></Button>
                         </div>
                       ))}
@@ -293,7 +299,13 @@ export function BookingUnitManager({ offers }: { offers: OfferOption[] }) {
                     <div className="flex flex-wrap items-center gap-2">
                       <input aria-label="Начало исключения" type="time" required className="h-10 rounded-md border border-stone-300 px-2 text-sm" value={asTime(exception.startMinutes)} onChange={e => patchException(index, { startMinutes: asMinutes(e.target.value) })} />
                       <span>—</span>
-                      <input aria-label="Конец исключения" type="time" required className="h-10 rounded-md border border-stone-300 px-2 text-sm" value={asTime(exception.endMinutes)} onChange={e => patchException(index, { endMinutes: asMinutes(e.target.value) })} />
+                      {exception.endMinutes === 1440 ? <span className="text-sm font-medium">24:00</span> : (
+                        <input aria-label="Конец исключения" type="time" required className="h-10 rounded-md border border-stone-300 px-2 text-sm" value={asTime(exception.endMinutes)} onChange={e => patchException(index, { endMinutes: asMinutes(e.target.value) })} />
+                      )}
+                      <label className="flex items-center gap-1 text-xs text-stone-600">
+                        <input type="checkbox" checked={exception.endMinutes === 1440} onChange={e => patchException(index, { endMinutes: e.target.checked ? 1440 : 1080 })} />
+                        До 24:00
+                      </label>
                     </div>
                   ) : null}
                 </div>
