@@ -15,6 +15,7 @@ import {
   DataCardRow,
   DataCardActions,
 } from "@/components/ui/data-card-list";
+import { formatAdminDate } from "@/lib/admin/formatRu";
 
 type Business = {
   id: string;
@@ -241,7 +242,7 @@ export function BusinessVerificationRequestsPage({
                         </td>
                         <td className="px-4 py-3 align-top text-gray-500">
                           {business.submittedAt
-                            ? new Date(business.submittedAt).toLocaleDateString("ru-RU")
+                            ? formatAdminDate(business.submittedAt)
                             : "—"}
                         </td>
                         <td className="px-4 py-3 text-right align-top font-medium">
@@ -287,7 +288,7 @@ export function BusinessVerificationRequestsPage({
                       label="Дата подачи"
                       value={
                         business.submittedAt
-                          ? new Date(business.submittedAt).toLocaleDateString("ru-RU")
+                          ? formatAdminDate(business.submittedAt)
                           : "—"
                       }
                     />

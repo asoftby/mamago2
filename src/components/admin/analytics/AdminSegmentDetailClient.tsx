@@ -8,6 +8,7 @@ import {
   segmentDescription,
   segmentTitle,
 } from "@/lib/analytics/segmentCatalog";
+import { formatAdminDate } from "@/lib/admin/formatRu";
 
 function buildQuery(sp: URLSearchParams): string {
   const q = new URLSearchParams();
@@ -102,24 +103,24 @@ export function AdminSegmentDetailClient({
           {segmentDescription(data.key)}
         </p>
         <p className="mt-1 text-xs text-gray-400">
-          Range: {new Date(data.range.start).toLocaleDateString()} —{" "}
-          {new Date(data.range.end).toLocaleDateString()}
+          Range: {formatAdminDate(data.range.start)} —{" "}
+          {formatAdminDate(data.range.end)}
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Users in segment" value={data.usersCount.toLocaleString()} />
+        <Kpi label="Users in segment" value={data.usersCount.toLocaleString("ru-RU")} />
         <Kpi
           label="Avg saves"
-          value={data.avgSaves.toLocaleString()}
+          value={data.avgSaves.toLocaleString("ru-RU")}
         />
         <Kpi
           label="Avg plan adds"
-          value={data.avgPlanAdds.toLocaleString()}
+          value={data.avgPlanAdds.toLocaleString("ru-RU")}
         />
         <Kpi
           label="Avg CTA clicks"
-          value={data.avgCtaClicks.toLocaleString()}
+          value={data.avgCtaClicks.toLocaleString("ru-RU")}
         />
       </div>
 
@@ -176,7 +177,7 @@ export function AdminSegmentDetailClient({
                 />
               </div>
               <span className="w-16 text-right text-xs tabular-nums text-gray-800">
-                {count.toLocaleString()}
+                {count.toLocaleString("ru-RU")}
               </span>
             </div>
           ))}
@@ -212,7 +213,7 @@ export function AdminSegmentDetailClient({
                   </p>
                 </div>
                 <span className="shrink-0 tabular-nums text-sm text-gray-700">
-                  {row.eventsCount.toLocaleString()}
+                  {row.eventsCount.toLocaleString("ru-RU")}
                 </span>
               </li>
             ))}
@@ -261,7 +262,7 @@ function TopBlock({
             >
               <span className="min-w-0 truncate">{i.label}</span>
               <span className="shrink-0 tabular-nums text-gray-600">
-                {i.count.toLocaleString()}
+                {i.count.toLocaleString("ru-RU")}
               </span>
             </li>
           ))}

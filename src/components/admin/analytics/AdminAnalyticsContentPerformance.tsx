@@ -7,6 +7,7 @@ import type { AnalyticsContentPerformanceResult } from "@/lib/analytics/analytic
 import { cn } from "@/lib/utils";
 import { TableContainer } from "@/components/ui/table";
 import { PublicationAnalyticsDrawer } from "@/components/analytics/PublicationAnalyticsDrawer";
+import { formatAdminDate } from "@/lib/admin/formatRu";
 
 function buildQuery(
   filters: AnalyticsOverviewFilters,
@@ -146,8 +147,8 @@ export function AdminAnalyticsContentPerformance({
     <div className="space-y-6">
       <p className="text-xs text-gray-500">
         Агрегаты событий (не сырые строки). Показы в ленте — только показы карточки в ленте, без просмотров страниц.{" "}
-        {new Date(data.range.start).toLocaleDateString()} —{" "}
-        {new Date(data.range.end).toLocaleDateString()}
+        {formatAdminDate(data.range.start)} —{" "}
+        {formatAdminDate(data.range.end)}
         {loading ? " · updating…" : ""}
       </p>
 
@@ -172,7 +173,7 @@ export function AdminAnalyticsContentPerformance({
           Performance table
         </h2>
         <p className="mt-1 text-xs text-gray-500">
-          {data.performanceTotal.toLocaleString()} entities (max 400). Page{" "}
+          {data.performanceTotal.toLocaleString("ru-RU")} entities (max 400). Page{" "}
           {data.page} of {totalPages}.
         </p>
         <div className="mt-3">
@@ -394,7 +395,7 @@ function TopBlock({
                 {it.cityName ? ` · ${it.cityName}` : ""}
               </p>
               <p className="text-[10px] tabular-nums text-gray-700">
-                {metric}: {it.primaryMetric.toLocaleString()} · saves{" "}
+                {metric}: {it.primaryMetric.toLocaleString("ru-RU")} · saves{" "}
                 {it.saves} · plan {it.planAdds}
               </p>
             </li>

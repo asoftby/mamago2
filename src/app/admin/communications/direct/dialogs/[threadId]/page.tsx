@@ -13,6 +13,7 @@ import {
   HideMessageButton,
   SystemMessageForm,
 } from "./DialogActions";
+import { formatAdminDateTime } from "@/lib/admin/formatRu";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -98,7 +99,7 @@ export default async function AdminDirectDialogDetailPage({
             {risk.signals.map((s) => (
               <span
                 key={s.id}
-                title={new Date(s.createdAt).toLocaleString("ru-RU")}
+                title={formatAdminDateTime(s.createdAt)}
                 className={cn("rounded-full px-2 py-0.5 text-xs font-medium", SEVERITY_CLASSES[s.severity])}
               >
                 {SIGNAL_LABELS[s.signalType]} (+{s.score})
@@ -146,14 +147,14 @@ export default async function AdminDirectDialogDetailPage({
               <div className="flex items-center justify-between gap-2 text-xs text-stone-400">
                 <span>
                   {SENDER_LABELS[m.senderType] ?? m.senderType}
-                  {m.senderUserId ? ` · ${m.senderUserId}` : ""} · {new Date(m.createdAt).toLocaleString("ru-RU")}
+                  {m.senderUserId ? ` · ${m.senderUserId}` : ""} · {formatAdminDateTime(m.createdAt)}
                 </span>
                 {!m.hiddenAt && <HideMessageButton messageId={m.id} />}
               </div>
               <p className="mt-1 whitespace-pre-wrap text-stone-800">{m.body}</p>
               {m.hiddenAt && (
                 <p className="mt-1 text-xs font-medium text-red-600">
-                  Скрыто ({m.hiddenReason ?? "—"}) · {new Date(m.hiddenAt).toLocaleString("ru-RU")}
+                  Скрыто ({m.hiddenReason ?? "—"}) · {formatAdminDateTime(m.hiddenAt)}
                 </p>
               )}
             </div>

@@ -238,7 +238,7 @@ export default function ZeroResultsPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
-                          {new Date(item.lastSearched).toLocaleDateString("ru-RU", {
+                          {new Date(item.lastSearched).toLocaleDateString("ru-RU", { timeZone: "Europe/Minsk",
                             day: "numeric",
                             month: "short",
                             year: "numeric",

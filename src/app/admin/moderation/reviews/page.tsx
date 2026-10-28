@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { formatAdminDate, formatAdminDateTime } from "@/lib/admin/formatRu";
 
 interface Review {
   id: string;
@@ -369,7 +370,7 @@ export default function ReviewsPage() {
                       <p className="text-sm font-medium text-blue-900">Ответ места</p>
                       <p className="text-xs text-blue-700">
                         {review.ownerReplyCreatedAt &&
-                          new Date(review.ownerReplyCreatedAt).toLocaleDateString("ru-RU")}
+                          formatAdminDate(review.ownerReplyCreatedAt)}
                       </p>
                     </div>
                     <p className="text-gray-700 whitespace-pre-line">{review.ownerReplyText}</p>
@@ -378,7 +379,7 @@ export default function ReviewsPage() {
 
                 {/* Meta */}
                 <div className="text-sm text-gray-500">
-                  {new Date(review.createdAt).toLocaleString("ru-RU")}
+                  {formatAdminDateTime(review.createdAt)}
                 </div>
 
                 {/* Actions */}

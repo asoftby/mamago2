@@ -33,7 +33,7 @@ export const IMPORT_SECTION_NAV_CONFIG: AdminSectionNavConfig = {
     },
     {
       id: "debug",
-      label: "Debug",
+      label: "Отладка",
       href: adminPath("/import/debug/parser"),
       matchers: [{ type: "prefix", value: adminPath("/import/debug") }],
     },

@@ -191,7 +191,7 @@ export function EventScheduleCard({
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "Выберите дату";
     const date = new Date(dateStr);
-    return date.toLocaleDateString("ru-RU", {
+    return date.toLocaleDateString("ru-RU", { timeZone: "Europe/Minsk",
       day: "numeric",
       month: "long",
       year: "numeric",

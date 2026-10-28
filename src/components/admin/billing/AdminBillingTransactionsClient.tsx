@@ -164,14 +164,14 @@ export function AdminBillingTransactionsClient({ transactions }: Props) {
               {transactions.map((tx) => (
                 <tr key={tx.id} className="hover:bg-gray-50">
                   <td className="py-3 px-4 text-gray-900">
-                    {new Date(tx.occurredAt).toLocaleDateString("ru-RU", {
+                    {new Date(tx.occurredAt).toLocaleDateString("ru-RU", { timeZone: "Europe/Minsk",
                       day: "2-digit",
                       month: "2-digit",
                       year: "numeric",
                     })}
                     <br />
                     <span className="text-xs text-gray-500">
-                      {new Date(tx.occurredAt).toLocaleTimeString("ru-RU", {
+                      {new Date(tx.occurredAt).toLocaleTimeString("ru-RU", { timeZone: "Europe/Minsk",
                         hour: "2-digit",
                         minute: "2-digit",
                       })}

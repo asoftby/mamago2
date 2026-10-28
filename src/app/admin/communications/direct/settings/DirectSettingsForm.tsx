@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { formatAdminDateTime } from "@/lib/admin/formatRu";
 
 type DirectCommunicationMode = "CONTACTS_ONLY" | "DIRECT_ONLY" | "DIRECT_AND_CONTACTS" | "EXTERNAL_BOOKING";
 type DirectContactVisibility = "ALWAYS" | "AFTER_FIRST_REQUEST" | "AFTER_BUSINESS_CONFIRMATION" | "NEVER";
@@ -70,7 +71,7 @@ export function DirectSettingsForm({ initialSettings }: { initialSettings: Direc
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
 
-  const lastUpdated = useMemo(() => new Date(settings.updatedAt).toLocaleString("ru-RU"), [settings.updatedAt]);
+  const lastUpdated = useMemo(() => formatAdminDateTime(settings.updatedAt), [settings.updatedAt]);
 
   function updateTypePolicy(type: DirectPolicyPublicationType, patch: Partial<DirectTypePolicy>) {
     setSettings((prev) => ({
@@ -121,7 +122,7 @@ export function DirectSettingsForm({ initialSettings }: { initialSettings: Direc
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-stone-500">Последнее изменение: {lastUpdated}</p>
         <div className="flex items-center gap-3">
-          {savedAt && <span className="text-xs text-emerald-600">Сохранено {savedAt.toLocaleTimeString("ru-RU")}</span>}
+          {savedAt && <span className="text-xs text-emerald-600">Сохранено {savedAt.toLocaleTimeString("ru-RU", { timeZone: "Europe/Minsk" })}</span>}
           {error && <span className="text-xs text-red-600">{error}</span>}
           <Button onClick={handleSave} disabled={isSaving} className="rounded-xl">
             {isSaving ? "Сохранение…" : "Сохранить изменения"}

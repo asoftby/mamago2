@@ -7,6 +7,7 @@ import type {
   BehaviorGapItem,
 } from "@/lib/analytics/analyticsBehaviorTypes";
 import { cn } from "@/lib/utils";
+import { formatAdminDate } from "@/lib/admin/formatRu";
 
 function buildQuery(filters: AnalyticsOverviewFilters): string {
   const q = new URLSearchParams();
@@ -45,7 +46,7 @@ function HBar({
         />
       </div>
       <span className="w-14 shrink-0 text-right text-xs tabular-nums text-gray-700">
-        {value.toLocaleString()}
+        {value.toLocaleString("ru-RU")}
       </span>
     </div>
   );
@@ -152,8 +153,8 @@ export function AdminAnalyticsBehavior({
     <div className="space-y-4">
       <p className="text-xs text-gray-500">
         {data.timezoneNote}. Range:{" "}
-        {new Date(data.range.start).toLocaleDateString()} —{" "}
-        {new Date(data.range.end).toLocaleDateString()}
+        {formatAdminDate(data.range.start)} —{" "}
+        {formatAdminDate(data.range.end)}
       </p>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -184,7 +185,7 @@ export function AdminAnalyticsBehavior({
             {data.activityByDay.map((row) => (
               <HBar
                 key={row.isoDow}
-                label={`${row.label} · users ${row.activeUsers.toLocaleString()}`}
+                label={`${row.label} · users ${row.activeUsers.toLocaleString("ru-RU")}`}
                 value={row.events}
                 max={maxDow}
                 className="bg-violet-500/70"
@@ -420,8 +421,8 @@ function GapList({
                 {r.entityType} · rate {(r.rate * 100).toFixed(1)}%
               </p>
               <p className="text-[11px] text-gray-600">
-                {aLabel}: {r.metricA.toLocaleString()} · {bLabel}:{" "}
-                {r.metricB.toLocaleString()}
+                {aLabel}: {r.metricA.toLocaleString("ru-RU")} · {bLabel}:{" "}
+                {r.metricB.toLocaleString("ru-RU")}
               </p>
             </li>
           ))

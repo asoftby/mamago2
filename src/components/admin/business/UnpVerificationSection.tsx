@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { BusinessUnpVerificationStatus } from "@prisma/client";
+import { formatAdminDateTime } from "@/lib/admin/formatRu";
 
 const BADGE_CLASS_BY_STATUS: Record<BusinessUnpVerificationStatus, string> = {
   VERIFIED: "border-green-200 bg-green-100 text-green-800",
@@ -102,7 +103,7 @@ export function UnpVerificationSection({
         <div className="text-sm font-medium text-gray-500 mb-1">Последняя проверка</div>
         <div className="text-base">
           {state.unpLastCheckedAt
-            ? new Date(state.unpLastCheckedAt).toLocaleString("ru-RU")
+            ? formatAdminDateTime(state.unpLastCheckedAt)
             : "—"}
         </div>
       </div>

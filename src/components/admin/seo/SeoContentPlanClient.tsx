@@ -24,6 +24,7 @@ import {
   planItemIdsForGeoScope,
   resolvePlanCreateGeoConfig,
 } from "@/lib/admin/seo/plan/planCreateGeo";
+import { formatAdminDate } from "@/lib/admin/formatRu";
 
 export type PlanItemRow = {
   id: string;
@@ -331,7 +332,7 @@ export function SeoContentPlanClient(props: Props) {
                     <tr key={row.id}>
                       <td className="whitespace-nowrap px-3 py-2.5 text-xs text-gray-600">
                         {row.scheduledFor
-                          ? new Date(row.scheduledFor).toLocaleDateString("ru-RU")
+                          ? formatAdminDate(row.scheduledFor)
                           : "—"}
                       </td>
                       <td className="px-3 py-2.5 font-medium text-gray-900">{row.title}</td>

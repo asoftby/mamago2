@@ -8,6 +8,7 @@ import { ru } from "date-fns/locale";
 import { toast } from "@/lib/toast";
 import type { AdminBroadcast } from "@prisma/client";
 import { TableContainer } from "@/components/ui/table";
+import { formatAdminDateTime } from "@/lib/admin/formatRu";
 
 const TYPE_LABELS: Record<string, string> = {
   NEWS: "Новость",
@@ -182,7 +183,7 @@ export function BroadcastsListClient({ initialItems, total }: Props) {
                   </td>
                   <td className="py-3 px-4 text-gray-500 text-xs">
                     {item.status === "SCHEDULED" && item.scheduledAt
-                      ? `Публикация ${new Date(item.scheduledAt).toLocaleString("ru-RU")}`
+                      ? `Публикация ${formatAdminDateTime(item.scheduledAt)}`
                       : item.publishedAt
                       ? formatDistanceToNow(new Date(item.publishedAt), { addSuffix: true, locale: ru })
                       : formatDistanceToNow(new Date(item.createdAt), { addSuffix: true, locale: ru })}

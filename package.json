@@ -74,6 +74,8 @@
     "db:reset:dev": "prisma migrate reset",
     "ui:audit": "node scripts/ui-usage-audit.mjs",
     "ui:design-audit": "node scripts/design-system-audit.mjs",
+    "check:admin-ru": "node scripts/check-admin-ru.mjs",
+    "test:admin-ru": "node --test scripts/check-admin-ru.test.mjs && tsx src/lib/admin/formatRu.test.ts && tsx src/lib/admin/labels.ru.test.ts",
     "test:design-system-audit": "node --test scripts/design-system-audit.test.mjs",
     "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
     "cleanup:otp": "tsx scripts/db/cleanup-phone-otps.ts",
