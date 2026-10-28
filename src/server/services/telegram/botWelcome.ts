@@ -58,7 +58,7 @@ export function openPlanReplyMarkup(baseUrl: string = getCanonicalPublicAppUrl()
   const host = url.hostname;
   const isLocal = host === "localhost" || host.endsWith(".local") || host.endsWith(".localhost") || host === "127.0.0.1";
   if (url.protocol !== "https:" || isLocal) return undefined;
-  return { inline_keyboard: [[createTelegramLinkButton(OPEN_PLAN_BUTTON_TEXT, url.toString(), baseUrl)]] };
+  return { inline_keyboard: [[createTelegramLinkButton(OPEN_PLAN_BUTTON_TEXT, url.toString(), baseUrl, "mini_app")]] };
 }
 
 /** Persistence for "welcome sent once"; injectable for tests. */
