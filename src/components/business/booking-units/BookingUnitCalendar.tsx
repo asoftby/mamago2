@@ -31,18 +31,20 @@ export function BookingUnitCalendar({ unitId }: { unitId: string }) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [note, setNote] = useState("");
+  const [rangeFrom, setRangeFrom] = useState("");
+  const listingUrl = rangeFrom ? endpoint + "?from=" + encodeURIComponent(rangeFrom + "T00:00:00+03:00") : endpoint;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
     let active = true;
-    api<ResponseData>(endpoint).then(data => { if (active) setWindows(data); })
+    api<ResponseData>(listingUrl).then(data => { if (active) setWindows(data); })
       .catch(e => { if (active) setError(e instanceof Error ? e.message : "Не удалось загрузить занятость"); });
     return () => { active = false; };
-  }, [endpoint]);
+  }, [listingUrl]);
 
-  async function refresh() { setWindows(await api<ResponseData>(endpoint)); }
+  async function refresh(url = listingUrl) { setWindows(await api<ResponseData>(url)); }
   async function add(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
@@ -50,7 +52,10 @@ export function BookingUnitCalendar({ unitId }: { unitId: string }) {
     try {
       await api(endpoint, { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ blockStart: minskISO(start), blockEnd: minskISO(end), note: note.trim() || null }) });
-      await refresh(); setStart(""); setEnd(""); setNote(""); setNotice("Время закрыто для бронирования");
+      const chosenDate = start.slice(0, 10);
+      setRangeFrom(chosenDate);
+      await refresh(endpoint + "?from=" + encodeURIComponent(chosenDate + "T00:00:00+03:00"));
+      setStart(""); setEnd(""); setNote(""); setNotice("Время закрыто для бронирования");
     } catch (e) { setError(e instanceof Error ? e.message : "Ошибка"); }
     finally { setBusy(false); }
   }
@@ -76,6 +81,9 @@ export function BookingUnitCalendar({ unitId }: { unitId: string }) {
         <label className="text-sm md:col-span-2">Причина (необязательно) <Input maxLength={500} value={note} onChange={event => setNote(event.target.value)} placeholder="Например, частный праздник" /></label>
         <div className="md:col-span-2"><Button type="submit" disabled={busy}>{busy ? "Сохранение…" : "Закрыть время"}</Button></div>
       </form>
+      <label className="block text-sm">Показать занятость с даты
+        <Input type="date" value={rangeFrom} onChange={event => setRangeFrom(event.target.value)} />
+      </label>
       {!windows ? <p className="text-sm text-stone-600">Загрузка занятости…</p> : (
         <div className="space-y-2">
           {windows.blocks.length + windows.allocations.length === 0 ? <p className="text-sm text-stone-600">Занятых интервалов нет.</p> : null}
