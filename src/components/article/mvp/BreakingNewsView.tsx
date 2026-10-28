@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { markBreakingNewsSeen } from "@/features/stories/lib/seen";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { PublicationTagChips } from "@/components/article/PublicationTagChips";
@@ -964,6 +965,9 @@ export function BreakingNewsView({
   articleHref,
   coverImageUrl,
 }: BreakingNewsViewProps) {
+  useEffect(() => {
+    if (!draftWatermark) markBreakingNewsSeen(window.localStorage, articleId);
+  }, [articleId, draftWatermark]);
   const cityHomeHref = getCityHomeHref(citySlug);
   const journalHref = citySlug?.trim() ? `/${citySlug.trim()}/blog` : "/blog";
 
