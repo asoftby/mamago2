@@ -141,6 +141,20 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
         }
       }
 
+      // Multiple businesses may quote one party item. Serialize its final
+      // confirmation independently of the individual request row.
+      await tx.$queryRaw`SELECT "id" FROM "PartyOrderItem"
+        WHERE "id" = ${item.id} FOR UPDATE`;
+      const currentItem = await tx.partyOrderItem.findUnique({
+        where: { id: item.id },
+        select: { status: true, confirmedBookingRequestId: true },
+      });
+      if (!currentItem || currentItem.confirmedBookingRequestId ||
+          currentItem.status === PartyItemStatus.CONFIRMED ||
+          currentItem.status === PartyItemStatus.CANCELLED) {
+        throw new PartyApiError(409, "Для этой услуги уже выбран исполнитель или она отменена");
+      }
+
       const claimed = await tx.bookingRequest.updateMany({
         where: { id: requestId, businessId, status: BookingStatus.NEW,
           partyStage: "AWAITING_RECONFIRM", lastActivityAt: req.lastActivityAt,
