@@ -14,7 +14,14 @@ export function JournalNewsOverlay({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    originRef.current = restoreFocusRef.current?.closest("[data-journal-news-card]")?.getBoundingClientRect() ?? null;
+    const stored = sessionStorage.getItem("mamago.journal.news.origin");
+    sessionStorage.removeItem("mamago.journal.news.origin");
+    try {
+      const origin = stored ? JSON.parse(stored) as { at: number; path: string; x: number; y: number; width: number; height: number } : null;
+      originRef.current = origin && Date.now() - origin.at < 5000 && origin.path === window.location.pathname
+        ? new DOMRect(origin.x, origin.y, origin.width, origin.height)
+        : null;
+    } catch { originRef.current = null; }
     if (originRef.current && dialogRef.current && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       const origin = originRef.current;
       const target = dialogRef.current.getBoundingClientRect();
