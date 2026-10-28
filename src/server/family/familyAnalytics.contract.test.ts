@@ -12,7 +12,7 @@ for (const [file, src] of [
   ["analyticsBehavior.service.ts", behavior],
   ["analyticsQueryHelpers.ts", helpers],
 ]) {
-  assert.doesNotMatch(src, /GROUP BY c\\."parentId"/, `${file} must not group by parentId`);
+  assert.doesNotMatch(src, /GROUP BY c\."parentId"/, `${file} must not group by parentId`);
 }
 assert.match(read("src/server/services/analytics/SegmentResolverService.ts"), /childScopeFor/);
 const plan = read("src/server/services/plan.service.ts");
