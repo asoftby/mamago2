@@ -18,4 +18,9 @@ assert.deepEqual(selectCheckedPartyCandidates(checks, 2).map(c => c.offerId), ["
 assert.deepEqual(selectCheckedPartyCandidates([{ candidate: candidate(1), availability: "UNKNOWN" }]),
   [{ ...candidate(1), availability: "UNKNOWN" }]);
 assert.deepEqual(selectCheckedPartyCandidates([{ candidate: candidate(1), availability: "UNAVAILABLE" }]), []);
+assert.deepEqual(selectCheckedPartyCandidates([
+  { candidate: candidate(1), availability: "UNKNOWN" },
+  { candidate: { ...candidate(2), businessId: "b1" }, availability: "AVAILABLE" },
+  { candidate: candidate(3), availability: "AVAILABLE" },
+]).map(c => c.offerId), ["o2", "o3"], "an available second offer should replace an unknown first offer from the same business");
 console.log("partyCandidateSelection.behavior.test.ts: OK");
