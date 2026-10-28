@@ -30,7 +30,7 @@ export async function createRecurringTaskSeries(owner: PlanOwner, input: NewRecu
   const validated = validateRecurringTask(input);
   const { key, title, time, reminderEnabled, lead, rule } = validated;
   const familyId = await familyIdForWrite(owner.userId);
-  const template = { title, time, reminderEnabled, lead };
+  const template = { title, time, reminderEnabled, lead, rule: { frequency: rule.frequency, interval: rule.interval, startDate: rule.startDate, weekdays: rule.weekdays ?? [], untilDate: rule.untilDate ?? null, maxOccurrences: rule.maxOccurrences ?? null } };
   const existing = await prisma.planRecurrenceSeries.findUnique({ where: { requestKey: key }, select: { id: true, ownerUserId: true, template: true } });
   if (existing) {
     if (existing.ownerUserId !== owner.userId || JSON.stringify(existing.template) !== JSON.stringify(template)) throw new Error("idempotency_conflict");
