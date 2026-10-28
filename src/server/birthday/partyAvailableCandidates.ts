@@ -30,7 +30,7 @@ export async function findAvailablePartyCandidates(
 
   const candidates = await rankPartyCandidates({ ...input, includeAllRanked: true });
   const checked: { candidate: (typeof candidates)[number]; availability: CandidateAvailability }[] = [];
-  let availableCount = 0;
+  const availableBusinesses = new Set<string>();
   // Use small, bounded bursts instead of one database fan-out for the entire city.
   for (let start = 0; start < candidates.length; start += 5) {
     const batch = candidates.slice(start, start + 5);
@@ -47,10 +47,10 @@ export async function findAvailablePartyCandidates(
     }));
     batch.forEach((candidate, index) => {
       const availability = states[index];
-      if (availability === "AVAILABLE") availableCount++;
+      if (availability === "AVAILABLE") availableBusinesses.add(candidate.businessId);
       checked.push({ candidate, availability });
     });
-    if (availableCount >= 5) break;
+    if (availableBusinesses.size >= 5) break;
   }
   return selectCheckedPartyCandidates(checked);
 }
