@@ -5724,6 +5724,22 @@ enum PartyItemRole {
   INCLUDED
   ADDON
 }
+enum PartyProviderDispatchMode {
+  PARALLEL
+  SEQUENTIAL
+}
+
+enum PartyProviderInviteStatus {
+  QUEUED
+  SENT
+  QUOTED
+  ACCEPTED
+  CONFIRMED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
 enum PartyItemStatus {
   PLANNED
   REQUESTED
@@ -5865,6 +5881,7 @@ model PartyOrderItem {
   parentItem PartyOrderItem? @relation("PartyItemComponents", fields: [parentItemId], references: [id], onDelete: SetNull)
   includedItems PartyOrderItem[] @relation("PartyItemComponents")
   requests BookingRequest[] @relation("PartyItemRequests")
+  providerInvites PartyProviderInvite[]
   confirmedBooking BookingRequest? @relation("ConfirmedPartyBooking", fields: [confirmedBookingRequestId], references: [id], onDelete: SetNull)
   prepaidMarkedBy User? @relation("PartyItemPrepaidMarker", fields: [prepaidMarkedByUserId], references: [id], onDelete: SetNull)
 
@@ -5908,6 +5925,30 @@ model PartyQuote {
   @@unique([bookingRequestId, idempotencyKey])
   @@index([bookingUnitId, serviceStart, serviceEnd])
   @@index([status, validUntil])
+}
+
+/// Durable queue record. Does not send anything until the separate dispatch worker is enabled.
+model PartyProviderInvite {
+  id String @id @default(cuid())
+  partyOrderItemId String
+  businessId String
+  offerId String
+  position Int
+  mode PartyProviderDispatchMode
+  status PartyProviderInviteStatus @default(QUEUED)
+  bookingRequestId String? @unique
+  responseDueAt DateTime?
+  sentAt DateTime?
+  resolvedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  item PartyOrderItem @relation(fields: [partyOrderItemId], references: [id], onDelete: Cascade)
+  request BookingRequest? @relation(fields: [bookingRequestId], references: [id], onDelete: SetNull)
+
+  @@unique([partyOrderItemId, businessId])
+  @@unique([partyOrderItemId, position])
+  @@index([status, responseDueAt])
 }
 
 model PartyOutbox {
@@ -6136,6 +6177,7 @@ model BookingRequest {
   directThread DirectThread?
   partyOrderItem PartyOrderItem? @relation("PartyItemRequests", fields: [partyOrderItemId], references: [id], onDelete: SetNull)
   partyQuotes PartyQuote[]
+  providerInvite PartyProviderInvite?
   allocations BookingAllocation[]
   confirmedForPartyItem PartyOrderItem? @relation("ConfirmedPartyBooking")
 
