@@ -324,7 +324,7 @@ export async function DELETE(request: NextRequest) {
 
     const existing = await prisma.planItem.findFirst({
       where: { id: planItemId, ...(await planScopeFor(user.id)) },
-      select: { activityId: true, placeId: true, routeId: true, date: true },
+      select: { activityId: true, offerId: true, placeId: true, routeId: true, date: true },
     });
 
     await removePlanItem(user.id, planItemId);
