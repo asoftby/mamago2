@@ -11,7 +11,7 @@ type RecordRow = {
 };
 
 function createRows(n: number): RecordRow[] {
-  return Array.from({ length: n }, (_, i) => {
+  return Array.from({ length: n }, (_, i): RecordRow => {
     const party = i % 3 === 0;
     const variant = i % 6;
     const stage = party ? (variant === 0 ? "SENT" : variant === 3 ? "QUOTED" : "CONFIRMED") : null;
