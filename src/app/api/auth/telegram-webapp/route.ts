@@ -16,8 +16,33 @@ function rejectAuth(reason: "INVALID_ORIGIN" | "TELEGRAM_NOT_LINKED" | "ACCOUNT_
 }
 
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== request.nextUrl.origin) {
+  // NEXTAUTH_URL is the configured public HTTPS origin. request.nextUrl.origin
+  // may describe the internal HTTP reverse-proxy hop and cannot be used for CSRF.
+  // Fail closed for missing/malformed configuration; never consult forwarded headers.
+  const publicUrl = process.env.NEXTAUTH_URL?.trim();
+  let expectedOrigin: string | null = null;
+  if (publicUrl) {
+    try {
+      const parsed = new URL(publicUrl);
+      if (
+        parsed.protocol === "https:" &&
+        parsed.hostname &&
+        !parsed.username &&
+        !parsed.password &&
+        parsed.pathname === "/" &&
+        !parsed.search &&
+        !parsed.hash
+      ) {
+        expectedOrigin = parsed.origin;
+      }
+    } catch {
+      // Invalid deployment configuration must not allow authentication.
+    }
+  }
+  if (!expectedOrigin) {
+    return NextResponse.json({ error: "AUTH_UNAVAILABLE" }, { status: 503, headers: noStore });
+  }
+  if (request.headers.get("origin") !== expectedOrigin) {
     return rejectAuth("INVALID_ORIGIN");
   }
   if (!request.headers.get("content-type")?.startsWith("application/json")) {
