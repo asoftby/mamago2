@@ -23,3 +23,13 @@ test("ranked catalog reuse is keyed only on public explicit filters and has fini
   const cacheKeys = listing.slice(listing.indexOf('"kuda-ranked-candidates-v1"'), listing.indexOf("{ revalidate: 60 }"));
   assert.doesNotMatch(cacheKeys, /input\.userId|selectedPersonaIds|familyId/);
 });
+
+test("full-card and media hydration is bounded to current page IDs", () => {
+  const listing = readFileSync("src/server/discovery/kudaListingPage.ts", "utf8");
+  const feed = readFileSync("src/server/discovery/kudaDiscoveryFeed.ts", "utf8");
+  assert.match(listing, /rankOnly:\s*true/);
+  assert.match(listing, /onlyIds:\s*visibleIds/);
+  assert.match(feed, /options\?\.rankOnly \? 0 : GALLERY_FOR_COVER/);
+  assert.match(feed, /id: \{ in: options\.onlyIds \}/);
+  assert.match(listing, /page\.items\.map\(\(item\) => item\.id\)/);
+});
