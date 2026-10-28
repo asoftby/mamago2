@@ -29,3 +29,25 @@ export async function getPartyDeliveryHealth(now = new Date()) {
     requiresAttention: exhaustedOutbox > 0 || failedChannels > 0 || stalePendingChannels > 0,
   };
 }
+
+/**
+ * Turn abandoned outbound attempts into explicit reconciliation work.
+ * A provider may have accepted a message before our process died, so
+ * the transition is PENDING -> FAILED only; NEVER send automatically.
+ *
+ * The updatedAt guard avoids touching an attempt still being processed.
+ * Runs only for notifications produced by the party outbox.
+ */
+export async function reconcileStalePartyDeliveries(now = new Date()) {
+  const staleBefore = new Date(now.getTime() - 10 * 60_000);
+  const result = await prisma.notificationDelivery.updateMany({
+    where: {
+      notification: { is: { metadata: { path: ["source"], equals: "PARTY_OUTBOX" } } },
+      channel: { in: ["EMAIL", "TELEGRAM"] },
+      status: "PENDING",
+      updatedAt: { lt: staleBefore },
+    },
+    data: { status: "FAILED", errorMessage: "STALE_PENDING_RECONCILED" },
+  });
+  return { markedForManualReconciliation: result.count };
+}
