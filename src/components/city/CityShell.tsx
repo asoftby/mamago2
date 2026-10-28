@@ -84,6 +84,7 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
 
   let discoveryActivities = undefined;
   let birthdayPagination: { page: number; totalPages: number; total: number } | undefined;
+  let kudaPagination: { page: number; totalPages: number; total: number } | undefined;
   let classChips = undefined;
   let activeClassChipSlug = undefined;
   let budgetConfig: BudgetConfig = null;
@@ -263,6 +264,7 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
       routesData={routesData}
       discoveryActivities={discoveryActivities}
       birthdayPagination={birthdayPagination}
+      kudaPagination={kudaPagination}
       classChips={classChips}
       activeClassChipSlug={activeClassChipSlug}
       budgetConfig={budgetConfig}
