@@ -142,7 +142,15 @@ function buildReplyMarkup(
     inline_keyboard: [
       [
         {
-          ...createTelegramLinkButton(registryEntry.ctaLabel, absoluteUrl, getPublicAppBaseUrl()),
+          ...createTelegramLinkButton(
+            registryEntry.ctaLabel,
+            absoluteUrl,
+            getPublicAppBaseUrl(),
+            notification.audience === "USER" && registryEntry.audience === "USER"
+              ? registryEntry.telegramOpenIntent ?? "browser"
+              : "browser",
+            `notification_${notification.type.toLowerCase()}`,
+          ),
         },
       ],
     ],
