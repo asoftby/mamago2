@@ -13,3 +13,13 @@ test("SSR and infinite-scroll listing use the existing uncapped ranked feed, not
   assert.match(listing, /withImageDimensions\(page\.items,/);
   assert.match(feed, /id:\s*"asc"/);
 });
+
+test("ranked catalog reuse is keyed only on public explicit filters and has finite TTL", () => {
+  const listing = readFileSync("src/server/discovery/kudaListingPage.ts", "utf8");
+  assert.match(listing, /unstable_cache\(/);
+  assert.match(listing, /revalidate:\s*60/);
+  assert.match(listing, /JSON\.stringify\(\{ format, eventFilters \}\)/);
+  assert.match(listing, /getKudaDiscoveryFeed\(input\.cityId, input\.citySlug, null,/);
+  const cacheKeys = listing.slice(listing.indexOf('"kuda-ranked-candidates-v1"'), listing.indexOf("{ revalidate: 60 }"));
+  assert.doesNotMatch(cacheKeys, /input\.userId|selectedPersonaIds|familyId/);
+});
