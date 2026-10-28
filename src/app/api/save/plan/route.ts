@@ -8,6 +8,7 @@ import {
 } from "@/server/services/analytics/AnalyticsEventService";
 import {
   addPlacePlanItem,
+  addOfferPlanItem,
   addPlanItem,
   addRoutePlanItem,
   removePlanItem,
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       activityId,
+      offerId,
       routeId,
       planRouteSlug,
       placeId,
@@ -67,6 +69,7 @@ export async function POST(request: NextRequest) {
       visibility: visibilityRaw,
     } = body as {
       activityId?: string;
+      offerId?: string;
       routeId?: string;
       planRouteSlug?: string;
       placeId?: string;
@@ -118,9 +121,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "date is required" }, { status: 400 });
     }
 
-    if (!activityId && !routeId && !placeId) {
+    if (!activityId && !offerId && !routeId && !placeId) {
       return NextResponse.json(
-        { error: "activityId, routeId or placeId is required" },
+        { error: "activityId, offerId, routeId or placeId is required" },
         { status: 400 },
       );
     }
@@ -139,7 +142,9 @@ export async function POST(request: NextRequest) {
         : {};
     let planItem;
 
-    if (placeId) {
+    if (offerId) {
+      planItem = await addOfferPlanItem(user.id, offerId, date, { visibility });
+    } else if (placeId) {
       planItem = await addPlacePlanItem(user.id, placeId, date, planPlaceSlug ?? null, {
         title: title ?? null,
         coverImageUrl: coverImageUrl ?? null,
