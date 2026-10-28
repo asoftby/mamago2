@@ -9,6 +9,7 @@ type Page = { items: NextItem[]; nextCursor: string | null };
 export function BreakingNewsLazyNext() {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const requestedRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
   const [items, setItems] = useState<NextItem[]>([]);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -23,6 +24,8 @@ export function BreakingNewsLazyNext() {
     cityRef.current = window.location.pathname.split("/")[1] ?? "";
   }, []);
 
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   useEffect(() => {
     const node = sentinelRef.current;
     if (!node || !hasMore || error) return;
@@ -31,6 +34,7 @@ export function BreakingNewsLazyNext() {
       requestedRef.current = true;
       setLoading(true);
       const controller = new AbortController();
+      abortRef.current = controller;
       const timeout = window.setTimeout(() => controller.abort(), 8000);
       fetch(`/api/journal/breaking-news/next?cursor=${encodeURIComponent(cursorRef.current)}&city=${encodeURIComponent(cityRef.current)}`, { signal: controller.signal })
         .then(async (response) => {
@@ -45,9 +49,10 @@ export function BreakingNewsLazyNext() {
           cursorRef.current = page.nextCursor;
           setHasMore(Boolean(page.nextCursor));
         })
-        .catch(() => setError(true))
+.catch(() => { if (!controller.signal.aborted) setError(true); })
         .finally(() => {
           window.clearTimeout(timeout);
+          if (abortRef.current === controller) abortRef.current = null;
           requestedRef.current = false;
           setLoading(false);
         });
