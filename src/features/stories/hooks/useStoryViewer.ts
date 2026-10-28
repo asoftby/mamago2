@@ -57,7 +57,7 @@ export function useStoryViewer(stories: StoryCollection[]) {
     setSeenIds((prev) => {
       const next = addSeenOfferId(prev, offerId);
       if (next === prev) return prev;
-      writeSeen(browserStorage(), next);
+      writeSeen(browserStorage(), new Set([...next].filter((id) => !id.startsWith("article:"))));
       return next;
     });
   }, []);
