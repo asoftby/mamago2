@@ -37,6 +37,13 @@ export async function discoverPartyProviders(
   const now = new Date();
   if (window.serviceStart <= now) return [];
 
+  const candidates: ProviderOffer[] = [];
+  let cursor: string | undefined;
+  const dateKey = input.date.toISOString().slice(0, 10);
+  const localDay = new Date(dateKey + "T00:00:00+03:00");
+  const rangeStart = new Date(localDay.getTime() - 240 * 60_000);
+  const rangeEnd = new Date(localDay.getTime() + (24 * 60 + 240) * 60_000);
+  while (true) {
   const offers = await db.offer.findMany({
     where: {
       AND: [
@@ -54,17 +61,19 @@ export async function discoverPartyProviders(
       place: { select: { ownerBusinessId: true } },
     },
     orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
-    take: 250,
+    take: 200,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
   });
 
   const offerIds = offers.map(offer => offer.id);
   if (!offerIds.length) return [];
   const businessIds = Array.from(new Set(offers.map(o => o.place?.ownerBusinessId).filter(
     (id): id is string => id !== null && id !== undefined)));
-  const dateKey = input.date.toISOString().slice(0, 10);
-  const localDay = new Date(dateKey + "T00:00:00+03:00");
-  const rangeStart = new Date(localDay.getTime() - 240 * 60_000);
-  const rangeEnd = new Date(localDay.getTime() + (24 * 60 + 240) * 60_000);
+
+    if (!offers.length) break;
+    const offerIds = offers.map(offer => offer.id);
+    const businessIds = Array.from(new Set(offers.map(o => o.place?.ownerBusinessId).filter(
+      (id): id is string => id !== null && id !== undefined)));
   const units = await db.bookingUnit.findMany({
     where: {
       businessId: { in: businessIds },
@@ -95,7 +104,7 @@ export async function discoverPartyProviders(
     bucket.push(unit);
     byOffer.set(link.offerId, bucket);
   }
-  const candidates: ProviderOffer[] = offers.flatMap(offer => {
+  candidates.push(...offers.flatMap(offer => {
     const businessId = offer.place?.ownerBusinessId;
     if (!businessId || !offer.category) return [];
     const mapped = (byOffer.get(offer.id) ?? []).filter(u => u.businessId === businessId);
@@ -126,7 +135,13 @@ export async function discoverPartyProviders(
       minChildren: offer.minChildren, maxChildren: offer.maxChildren,
       priceByn, availability,
     }];
-  });
+  }));
+
+    const lastId = offers[offers.length - 1].id;
+    if (lastId === cursor) throw new Error("Provider matching cursor did not advance");
+    cursor = lastId;
+    if (offers.length < 200) break;
+  }
   return pickPartyProviders({
     offers: candidates, category: input.category, venueMode: input.venueMode,
     childAgeYears: input.childAgeYears, childrenCount: input.childrenCount,
