@@ -45,6 +45,7 @@ export async function loadFamilyCalendarRange(input: {
       select: {
         id: true,
         activityId: true,
+        offerId: true,
         routeId: true,
         placeId: true,
         articleId: true,
