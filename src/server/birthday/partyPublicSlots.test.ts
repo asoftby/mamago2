@@ -16,6 +16,10 @@ function preview(units: PreviewUnit[] = [unit], guests = 8) {
 }
 assert.deepEqual(preview().map(s => s.start), ["10:00", "11:00", "12:00", "13:00", "14:00", "15:00"]);
 assert.deepEqual(preview().map(s => s.end), ["13:00", "14:00", "15:00", "16:00", "17:00", "18:00"]);
+assert.deepEqual(preview([{ ...unit, rules: [
+  { weekday: 1, startMinutes: 630, endMinutes: 1110 },
+] }]).map(s => s.start), ["10:30", "11:30", "12:30", "13:30", "14:30", "15:30"],
+"steps must be relative to opening time (e.g. 10:30), not midnight");
 assert.deepEqual(preview([unit], 13), [], "capacity must be respected");
 assert.deepEqual(preview([{ ...unit, status: "INACTIVE" }]), [], "inactive resources cannot appear");
 assert.deepEqual(preview([{ ...unit, timezone: "UTC" }]), [], "timezone must be Minsk");
@@ -48,4 +52,11 @@ for (const s of [
 ]) assert.ok(service.includes(s), "missing public visibility/booking safety guard " + s);
 assert.ok(endpoint.includes('"Cache-Control": "private, no-store"'), "availability is not cacheable");
 assert.ok(!endpoint.includes("unitId"), "never expose resource identifiers");
+const ui = readFileSync("src/features/birthday/builder/components/steps/StepReview.tsx", "utf8");
+for (const token of [
+  "/api/public/birthday/availability?", 'cache: "no-store"',
+  'controller.abort()', 'aria-label="Предварительно свободные интервалы"',
+  'onClick={() => { setTimeFrom(slot.start); setTimeTo(slot.end); }}',
+  "Время не резервируется до подтверждения заказа.",
+]) assert.ok(ui.includes(token), "Missing preview UI safety/wiring: " + token);
 console.log("partyPublicSlots.test.ts: OK");
