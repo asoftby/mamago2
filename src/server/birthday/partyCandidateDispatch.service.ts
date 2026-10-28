@@ -23,7 +23,12 @@ export async function dispatchPartyCandidateWave(input: {
     select: { category: true },
   });
   if (!item) throw new PartyApiError(404, "Услуга праздника не найдена");
-  const proposal = await findCandidatesForParty(input.ownerUserId, input.partyId, item.category);
+  const historical = await prisma.bookingRequest.findMany({
+    where: { kind: BookingKind.PARTY, partyOrderItemId: input.itemId },
+    select: { businessId: true },
+  });
+  const proposal = await findCandidatesForParty(input.ownerUserId, input.partyId, item.category,
+    historical.map(request => request.businessId));
   const now = new Date();
   return prisma.$transaction(async tx => {
     // Serializes all dispatch attempts for this party item, even when different
