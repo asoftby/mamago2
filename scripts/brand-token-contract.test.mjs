@@ -22,3 +22,13 @@ test("primary tokens delegate to canonical brand tokens", () => {
   assert.equal(token("primary-hover"), "var(--brand-hover)");
   assert.equal(token("primary-active"), "var(--brand-active)");
 });
+
+test("family plan accents preserve independent light and dark colors", () => {
+  const light = css.match(/:root\\s*\\{[^}]*--plan-family-accent:\\s*(#[\\da-fA-F]+);[^}]*--plan-accent:\\s*var\\(--plan-family-accent\\);/);
+  const dark = css.match(/\\.dark\\s*\\{[^}]*--plan-family-accent:\\s*(#[\\da-fA-F]+);[^}]*--plan-accent:\\s*var\\(--plan-family-accent\\);/);
+  assert.ok(light, "Light family accent must delegate to its dedicated token");
+  assert.ok(dark, "Dark family accent must delegate to its dedicated token");
+  assert.equal(light[1].toLowerCase(), "#e86a3a");
+  assert.equal(dark[1].toLowerCase(), "#f07f52");
+  assert.notEqual(light[1], dark[1]);
+});
