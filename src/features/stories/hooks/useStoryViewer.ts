@@ -8,6 +8,8 @@ import {
   readSeen,
   seenGroupStart as resolveSeenGroupStart,
   writeSeen,
+  readSeenBreakingNews,
+  markBreakingNewsSeen,
 } from "../lib/seen";
 
 function browserStorage(): Storage | null {
@@ -32,7 +34,10 @@ export function useStoryViewer(stories: StoryCollection[]) {
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
-      if (!cancelled) setSeenIds(readSeen(browserStorage()));
+      if (!cancelled) {
+        const storage = browserStorage();
+        setSeenIds(new Set([...readSeen(storage), ...[...readSeenBreakingNews(storage)].map((id) => `article:${id}`)]));
+      }
     });
     return () => {
       cancelled = true;
@@ -48,6 +53,7 @@ export function useStoryViewer(stories: StoryCollection[]) {
   // ── helpers ──────────────────────────────────────────────────────────────
 
   const markSeen = useCallback((offerId: string) => {
+    if (offerId.startsWith("article:")) markBreakingNewsSeen(browserStorage(), offerId.slice("article:".length));
     setSeenIds((prev) => {
       const next = addSeenOfferId(prev, offerId);
       if (next === prev) return prev;
