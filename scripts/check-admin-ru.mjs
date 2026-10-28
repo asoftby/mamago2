@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// CI verification after retargeting PR #851 to dev.
 /**
  * Проверка русификации админки (ТЗ «Аналитика админки», блок E).
  *
