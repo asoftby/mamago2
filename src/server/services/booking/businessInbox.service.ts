@@ -1,6 +1,7 @@
 import "server-only";
 import prisma from "@/lib/prisma";
-import { BookingKind, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { scanBusinessInboxPages } from "./businessInboxScan";
 import {
   bookingBucket, compareBookingDecisions,
   type BookingBucket,
@@ -69,49 +70,26 @@ function mapDecision(row: InboxRow, now: Date) {
   return { row, createdAt: row.createdAt, decision, serviceEndsAt: date };
 }
 
-function emptyCounts() {
-  return { ACTION_REQUIRED: 0, UPCOMING: 0, AWAITING_CUSTOMER: 0, ARCHIVE: 0 };
-}
-
 export async function getBusinessInbox({
   businessId, bucket = "ACTION_REQUIRED", kind = "all", limit = 100, now = new Date(),
 }: BusinessInboxOptions) {
-  // Fetch a narrow, contact-free projection: PARTY parent contacts must not leak
-  // to the business before confirmation. Counts are computed from ALL rows (not the
-  // first page), so badges and filters always agree with the same classifier.
-  const rows = await prisma.bookingRequest.findMany({
-    where: { businessId },
-    select: INBOX_SELECT,
-    orderBy: { createdAt: "desc" },
+  // Scan every booking for exact deadline-dependent counts. Only one page and
+  // bounded top-K rows are retained; a LIMIT on the initial query would change
+  // bucket membership and badge counts for businesses with long histories.
+  const result = await scanBusinessInboxPages({
+    fetchPage: (cursor?: string) => prisma.bookingRequest.findMany({
+      where: { businessId },
+      select: INBOX_SELECT,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 200,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    }),
+    classify: (row: InboxRow) => mapDecision(row, now),
+    bucket, kind, limit,
   });
-  const decisions = rows.map((row) => mapDecision(row, now));
-  const totals = emptyCounts();
-  const typeTotals = emptyCounts();
-  let customerWaiting = 0;
-  let housekeeping = 0;
-  let filteredCustomerWaiting = 0;
-  let filteredHousekeeping = 0;
 
-  for (const item of decisions) {
-    const { decision } = item;
-    totals[decision.bucket]++;
-    const matchesKind = kind === "all" ||
-      item.row.kind === (kind === "party" ? BookingKind.PARTY : BookingKind.STANDARD);
-    if (decision.urgency === "CUSTOMER_WAITING") customerWaiting++;
-    if (decision.urgency === "HOUSEKEEPING") housekeeping++;
-    if (!matchesKind) continue;
-    typeTotals[decision.bucket]++;
-    if (decision.urgency === "CUSTOMER_WAITING") filteredCustomerWaiting++;
-    if (decision.urgency === "HOUSEKEEPING") filteredHousekeeping++;
-  }
-
-  const items = decisions
-    .filter(({ row, decision }) =>
-      decision.bucket === bucket &&
-      (kind === "all" || row.kind === (kind === "party" ? BookingKind.PARTY : BookingKind.STANDARD)))
-    .sort(compareBookingDecisions)
-    .slice(0, Math.min(100, Math.max(1, limit)))
-    .map(({ row, decision, serviceEndsAt }) => ({
+  return {
+    items: result.items.map(({ row, decision, serviceEndsAt }) => ({
       id: row.id,
       kind: row.kind,
       status: row.status,
@@ -130,31 +108,18 @@ export async function getBusinessInbox({
       urgency: decision.urgency,
       nextAction: decision.action,
       deadline: decision.deadline,
-    }));
-
-  const nearestUpcoming = bucket === "ACTION_REQUIRED"
-    ? decisions
-        .filter(({ row, decision }) => decision.bucket === "UPCOMING" &&
-          (kind === "all" || row.kind === (kind === "party" ? BookingKind.PARTY : BookingKind.STANDARD)))
-        .sort(compareBookingDecisions)
-        .slice(0, 3)
-        .map(({ row, serviceEndsAt }) => ({
-          id: row.id, kind: row.kind,
-          title: row.offer?.title ?? row.activity?.title ?? row.place?.title ?? null,
-          serviceEndsAt,
-        }))
-    : [];
-  return {
-    items,
-    counts: typeTotals,
-    totals,
-    actionGroups: { customerWaiting: filteredCustomerWaiting, housekeeping: filteredHousekeeping },
-    menuBadge: customerWaiting, // housekeeping is deliberately excluded
-    housekeepingTotal: housekeeping,
-    nearestUpcoming,
-    hasMore: decisions.some(({ row, decision }) =>
-      decision.bucket === bucket &&
-      (kind === "all" || row.kind === (kind === "party" ? BookingKind.PARTY : BookingKind.STANDARD))) &&
-      typeTotals[bucket] > items.length,
+    })),
+    counts: result.counts,
+    totals: result.totals,
+    actionGroups: result.actionGroups,
+    menuBadge: result.menuBadge,
+    housekeepingTotal: result.housekeepingTotal,
+    nearestUpcoming: result.nearestUpcoming.map(({ row, serviceEndsAt }) => ({
+      id: row.id,
+      kind: row.kind,
+      title: row.offer?.title ?? row.activity?.title ?? row.place?.title ?? null,
+      serviceEndsAt,
+    })),
+    hasMore: result.hasMore,
   };
 }
