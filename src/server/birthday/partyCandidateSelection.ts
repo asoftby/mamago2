@@ -14,5 +14,13 @@ export function selectCheckedPartyCandidates(
     if (availability === "AVAILABLE") available.push({ ...candidate, availability });
     if (availability === "UNKNOWN") unknown.push({ ...candidate, availability });
   }
-  return [...available.slice(0, limit), ...unknown.slice(0, Math.max(0, limit - available.length))];
+  const seen = new Set<string>();
+  const selected: CheckedPartyCandidate[] = [];
+  for (const candidate of [...available, ...unknown]) {
+    if (seen.has(candidate.businessId)) continue;
+    seen.add(candidate.businessId);
+    selected.push(candidate);
+    if (selected.length >= limit) break;
+  }
+  return selected;
 }
