@@ -94,6 +94,7 @@ interface CityDiscoveryShellProps {
   /** Лента «Куда пойти»: только данные с сервера (БД) */
   discoveryActivities?: ActivityMock[];
   birthdayPagination?: { page: number; totalPages: number; total: number };
+  kudaPagination?: { page: number; totalPages: number; total: number };
   classChips?: Array<{ id: string; title: string; slug: string }>;
   activeClassChipSlug?: string;
   /** Конфигурация бюджетного фильтра; null = фильтр выключен в админке. */
@@ -116,6 +117,7 @@ export function CityDiscoveryShell({
   routesData,
   discoveryActivities,
   birthdayPagination,
+  kudaPagination,
   classChips,
   activeClassChipSlug,
   budgetConfig,
@@ -263,6 +265,17 @@ export function CityDiscoveryShell({
               : undefined
           }
         />
+        {intent === "kuda" && kudaPagination && kudaPagination.totalPages > 1 ? (
+          <nav aria-label="Страницы афиши" className="flex flex-wrap items-center justify-center gap-3 pt-4">
+            {kudaPagination.page > 1 ? (
+              <Link className="rounded-full border px-5 py-2 text-sm" href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(listingSearchParams).map(([key, value]) => [key, Array.isArray(value) ? value[0] ?? "" : value ?? ""])), page: String(kudaPagination.page - 1) }).toString()}`}>Назад</Link>
+            ) : null}
+            <span className="text-sm text-muted-foreground">Страница {kudaPagination.page} из {kudaPagination.totalPages}</span>
+            {kudaPagination.page < kudaPagination.totalPages ? (
+              <Link className="rounded-full border px-5 py-2 text-sm" href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(listingSearchParams).map(([key, value]) => [key, Array.isArray(value) ? value[0] ?? "" : value ?? ""])), page: String(kudaPagination.page + 1) }).toString()}`}>Далее</Link>
+            ) : null}
+          </nav>
+        ) : null}
         {intent === "kuda" && city !== globalCitySlug && (
           <Link href={`/${globalCitySlug}/events`} className="inline-flex text-sm font-medium text-primary hover:underline">
             Вернуться к событиям в своём городе
