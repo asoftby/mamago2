@@ -26,7 +26,17 @@ export async function getClassesListingPage(
       boosts: { where: { startAt: { lte: now }, endAt: { gt: now } }, select: { id: true } },
     } as const;
     // Only ID, date signals and boost membership: never fetch full offer cards.
-    const candidates = await prisma.offer.findMany({ where, select });
+    const candidates = await prisma.offer.findMany({ where, select }).catch((error: unknown) => {
+      // Match the existing class-feed fallback for installations pending the
+      // classChipSlugs migration. Never silently ignore unrelated DB failures.
+      const msg = error instanceof Error ? error.message : String(error);
+      if (!msg.includes("classChipSlugs") && !msg.includes("P2022")) throw error;
+      const fallbackWhere = buildClassesDiscoveryWhere({
+        publicWhereParts, cityId, targetRegionId, chipSlug: null, now,
+        free: options.free, priceMax, skipChipSlugsSelect: true,
+      });
+      return prisma.offer.findMany({ where: fallbackWhere, select });
+    });
     return candidates.map((offer) => ({
       id: offer.id,
       boosted: offer.boosts.length > 0,
