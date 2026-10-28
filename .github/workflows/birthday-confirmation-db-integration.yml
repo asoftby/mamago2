@@ -82,6 +82,10 @@ jobs:
         run: pnpm exec tsx src/components/business/booking-units/bookingUnitCalendar.test.ts
       - name: Verify step-five preview UI contract
         run: pnpm exec tsx src/features/birthday/builder/components/steps/StepReviewAvailability.test.ts
+      - name: Verify availability-aware selection behavior
+        run: pnpm exec tsx src/server/birthday/partyCandidateSelection.behavior.test.ts
+      - name: Verify availability-aware candidate selection contracts
+        run: pnpm exec tsx src/server/birthday/partyAvailableCandidates.test.ts
       - name: Verify candidate matching contracts
         run: pnpm exec tsx src/server/birthday/partyCandidateRanking.test.ts
       - name: Verify public availability preview contract

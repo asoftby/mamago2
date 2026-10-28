@@ -12,6 +12,8 @@ export type PartyCandidateQuery = {
   childAge: number | null;
   budgetByn: number | null;
   excludedBusinessIds?: string[];
+  /** Internal use: availability stage needs the full ranked set before selecting five. */
+  includeAllRanked?: boolean;
 };
 
 export type RankedPartyCandidate = {
@@ -54,6 +56,7 @@ export async function rankPartyCandidates(input: PartyCandidateQuery): Promise<R
     ]),
   ] };
   const best = new Map<string, RankedPartyCandidate>();
+  const allOffers: RankedPartyCandidate[] = [];
   let cursor: string | undefined;
   while (true) {
     const page = await prisma.offer.findMany({
@@ -72,6 +75,10 @@ export async function rankPartyCandidates(input: PartyCandidateQuery): Promise<R
       if (input.budgetByn !== null && price !== null && price > input.budgetByn) continue;
       const candidate = { offerId: offer.id, businessId,
         priceByn: price, score: scorePartyCandidate(price, input.budgetByn) };
+      if (input.includeAllRanked) {
+        allOffers.push(candidate);
+        continue;
+      }
       const previous = best.get(businessId);
       if (!previous || candidate.score > previous.score ||
           (candidate.score === previous.score && candidate.offerId < previous.offerId))
@@ -80,6 +87,7 @@ export async function rankPartyCandidates(input: PartyCandidateQuery): Promise<R
     cursor = page[page.length - 1].id;
     if (page.length < 200) break;
   }
-  return [...best.values()].sort((a, b) => b.score - a.score ||
-    a.businessId.localeCompare(b.businessId) || a.offerId.localeCompare(b.offerId)).slice(0, 5);
+  const ranked = (input.includeAllRanked ? allOffers : [...best.values()]).sort((a, b) => b.score - a.score ||
+    a.businessId.localeCompare(b.businessId) || a.offerId.localeCompare(b.offerId));
+  return input.includeAllRanked ? ranked : ranked.slice(0, 5);
 }
