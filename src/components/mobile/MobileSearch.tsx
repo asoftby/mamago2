@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { MobileSearchHeroRow } from "@/components/mobile/MobileSearchHeroRow";
 import { ComingSoonBadge } from "@/components/city/ComingSoonBadge";
@@ -257,6 +258,15 @@ export function MobileSearch({
 
       {showAutocomplete ? (
         <div className="relative z-10 flex min-h-0 flex-1 flex-col px-4 pb-2">
+          {citySlug && queryTrim.length >= 2 ? (
+            <Link
+              href={`/${citySlug}/search?${new URLSearchParams({ q: queryTrim })}`}
+              className="mb-2 rounded-xl bg-white px-4 py-3 text-center text-sm font-medium text-primary"
+              onClick={handleDismissSearch}
+            >
+              Показать все результаты
+            </Link>
+          ) : null}
           <SearchResults
             variant="sheet"
             query={searchText}
