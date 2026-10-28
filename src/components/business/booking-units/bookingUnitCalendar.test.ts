@@ -7,4 +7,6 @@ assert.ok(manager.indexOf("</form>\n        {editingId ? <BookingUnitCalendar") 
 for (const check of ["datetime-local", "minskISO(start)", "minskISO(end)", 'method: "POST"', 'method: "DELETE"', "encodeURIComponent(unitId)", 'entry.source === "MANUAL"', "window.confirm"]) {
   assert.ok(calendar.includes(check), "Missing calendar UI contract: " + check);
 }
+assert.ok(calendar.includes("setRangeFrom(chosenDate)"), "newly created future blocks must remain visible");
+assert.ok(calendar.includes("type=\"date\" value={rangeFrom}"), "owner must be able to navigate future dates");
 console.log("bookingUnitCalendar.test.ts: OK");
