@@ -62,6 +62,7 @@ export function BreakingNewsLazyNext() {
     const observer = new IntersectionObserver(([entry]) => {
       if (!entry.isIntersecting || fullRequestRef.current) return;
       fullRequestRef.current = true;
+      observer.disconnect();
       const controller = new AbortController();
       fullAbortRef.current = controller;
       fetch(`/api/journal/breaking-news/article?id=${encodeURIComponent(next.id)}&city=${encodeURIComponent(cityRef.current)}`, { signal: controller.signal })
@@ -71,7 +72,7 @@ export function BreakingNewsLazyNext() {
         })
         .then(({ article }) => {
           if (controller.signal.aborted) return;
-          setArticles((previous) => [...previous, { ...article, articleId: article.id, publishedAt: article.publishedAt ? new Date(article.publishedAt) : null, related: [], citySlug: cityRef.current, articleHref: `${initialPathRef.current}/${article.slug}` }].slice(-8));
+          setArticles((previous) => [...previous, { ...article, articleId: article.id, publishedAt: article.publishedAt ? new Date(article.publishedAt) : null, related: [], citySlug: cityRef.current, articleHref: `${initialPathRef.current}/${article.slug}` }]);
         })
         .catch(() => { if (!controller.signal.aborted) setError(true); })
         .finally(() => { fullRequestRef.current = false; });
