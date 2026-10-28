@@ -92,6 +92,7 @@ export async function loadKudaListingPage(input: {
     async () => getKudaDiscoveryFeed(input.cityId, input.citySlug, null, {
       allCandidates: true,
       hydrateImages: false,
+      rankOnly: true,
       format,
       nearby: false,
       explicitTerritorySlug: input.explicitTerritorySlug ?? null,
@@ -108,6 +109,27 @@ export async function loadKudaListingPage(input: {
   )();
   const partition = partitionDiscoveryFeed(filters, feed);
   const page = paginateKudaFeed(partition, input.page, input.pageSize ?? KUDA_LISTING_PAGE_SIZE);
-  const items = await withImageDimensions(page.items, (card) => card.image);
+  // The cached ranked pool has no media relation payloads. Hydrate only the
+  // visible page, then restore its global rank, bucket and age hint.
+  const visibleIds = page.items.map((item) => item.id);
+  const details = visibleIds.length
+    ? await getKudaDiscoveryFeed(input.cityId, input.citySlug, null, {
+        onlyIds: visibleIds,
+        take: visibleIds.length,
+        format,
+        nearby: false,
+        explicitTerritorySlug: input.explicitTerritorySlug ?? null,
+        eventFilters,
+        hydrateImages: false,
+      })
+    : [];
+  const byId = new Map(details.map((card) => [card.id, card]));
+  const hydrated = page.items.map((item) => ({
+    ...item,
+    ...(byId.get(item.id) ?? {}),
+    feedBucket: item.feedBucket,
+    ageHintBadge: item.ageHintBadge,
+  }));
+  const items = await withImageDimensions(hydrated, (card) => card.image);
   return { ...page, items, pool: [...partition.primary, ...partition.secondary] };
 }
