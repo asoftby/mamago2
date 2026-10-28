@@ -504,8 +504,8 @@ export function PlanPageClient({
           className="plan-hero-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr) min(320px, 35%)",
-            gap: 48,
+            gridTemplateColumns: "minmax(0, 1fr)",
+            gap: 0,
             alignItems: "flex-end",
           }}
         >
@@ -531,20 +531,86 @@ export function PlanPageClient({
             >
               Мой план
             </h1>
-            <p style={{
-              maxWidth: 520,
-              marginTop: 22,
-              marginBottom: 0,
-              fontSize: 18,
-              lineHeight: 1.5,
-              color: "#3A332B",
-            }}>
-              Планируйте день и&nbsp;сохраняйте активности на&nbsp;нужные даты.
-              Напомним накануне — чтобы ничего не&nbsp;потерялось.
-            </p>
+
           </div>
 
-          <div className="flex flex-col items-end">
+
+        </div>
+      </Container>
+
+      {/* Week Calendar */}
+      <Container className="pb-4">
+        <PlanCalendar value={selectedDate} onChange={selectDate} variant="page" markerScope={familyUi ? scope : "all"} />
+        {loadingWeek != null ? <span role="status" className="mt-2 block text-xs text-neutral-500">Загрузка…</span> : null}
+        <PlanPersonFilter
+          className="mt-3"
+          options={planPersonFilterOptions([
+            { value: "family", label: "Я" },
+            ...familyChildren.map((child) => ({ value: `child:${child.id}`, label: child.name })),
+          ])}
+          value={calendarFilter}
+          onChange={(value) => setCalendarFilter(value as FamilyCalendarFilter)}
+        />
+      </Container>
+
+      {familyUi && (
+        <Container>
+          <div role="tablist" aria-label="Что показывать в плане" className="flex gap-2 pb-6">
+            {(
+              [
+                ["all", "Всё"],
+                ["family", "Семья"],
+                ["mine", "Моё"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={scope === value}
+                onClick={() => changeScope(value)}
+                className="rounded-full border px-4 py-1.5 text-[13px] font-semibold"
+                style={{
+                  borderColor: scope === value ? "#141210" : "rgba(20,18,16,.18)",
+                  background: scope === value ? "#141210" : "transparent",
+                  color: scope === value ? "#fff" : "#3A332B",
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </Container>
+      )}
+
+      {/* Main: day list + ideas sidebar */}
+      <Container className="pb-20">
+        <div
+          className="plan-main-grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr)",
+            gap: 24,
+            alignItems: "flex-start",
+          }}
+        >
+          <PlanDayList
+            date={selectedDate}
+            items={dayItems}
+            onRemove={handleRemoveItem}
+            familyView={familyUi ? familyView : null}
+            onVisibilityChange={handleVisibilityChange}
+            onEditManual={openEdit}
+            conflictIds={conflictIds}
+            scenarioStatus={scenarioStatuses[selectedDate]}
+          />
+          {hasIdeas && <div className="w-full max-w-[320px]"><IdeasSidebar ideas={initialIdeas} /></div>}
+        </div>
+      </Container>
+
+      {/* Secondary views follow the selected day's schedule. */}
+      <Container className="pb-6">
+          <div className="flex flex-col items-start">
             <div
               className="w-full max-w-[320px] overflow-hidden rounded-[14px] border border-[rgba(20,18,16,.10)] bg-[#FAF7F1]"
             >
@@ -588,7 +654,6 @@ export function PlanPageClient({
               </button>
             </div>
           </div>
-        </div>
       </Container>
 
       {/* Explicit post-event check-in; never opened as an automatic modal. */}
@@ -608,74 +673,19 @@ export function PlanPageClient({
         )}
       </Container>
 
-      {familyUi && (
-        <Container>
-          <div role="tablist" aria-label="Что показывать в плане" className="flex gap-2 pb-6">
-            {(
-              [
-                ["all", "Всё"],
-                ["family", "Семья"],
-                ["mine", "Моё"],
-              ] as const
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={scope === value}
-                onClick={() => changeScope(value)}
-                className="rounded-full border px-4 py-1.5 text-[13px] font-semibold"
-                style={{
-                  borderColor: scope === value ? "#141210" : "rgba(20,18,16,.18)",
-                  background: scope === value ? "#141210" : "transparent",
-                  color: scope === value ? "#fff" : "#3A332B",
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </Container>
-      )}
-
-      {/* Week Calendar */}
-      <Container className="pb-4">
-        <PlanCalendar value={selectedDate} onChange={selectDate} variant="page" markerScope={familyUi ? scope : "all"} />
-        {loadingWeek != null ? <span role="status" className="mt-2 block text-xs text-neutral-500">Загрузка…</span> : null}
-        <PlanPersonFilter
-          className="mt-3"
-          options={planPersonFilterOptions([
-            { value: "family", label: "Я" },
-            ...familyChildren.map((child) => ({ value: `child:${child.id}`, label: child.name })),
-          ])}
-          value={calendarFilter}
-          onChange={(value) => setCalendarFilter(value as FamilyCalendarFilter)}
-        />
-      </Container>
-
-      {/* Main: day list + ideas sidebar */}
-      <Container className="pb-20">
-        <div
-          className="plan-main-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: hasIdeas ? "minmax(0, 1fr) 300px" : "minmax(0, 1fr)",
-            gap: 48,
-            alignItems: "flex-start",
-          }}
-        >
-          <PlanDayList
-            date={selectedDate}
-            items={dayItems}
-            onRemove={handleRemoveItem}
-            familyView={familyUi ? familyView : null}
-            onVisibilityChange={handleVisibilityChange}
-            onEditManual={openEdit}
-            conflictIds={conflictIds}
-            scenarioStatus={scenarioStatuses[selectedDate]}
-          />
-          {hasIdeas && <IdeasSidebar ideas={initialIdeas} />}
-        </div>
+      {/* Intro copy stays available without pushing the calendar below the fold. */}
+      <Container className="pb-10">
+            <p style={{
+              maxWidth: 520,
+              marginTop: 22,
+              marginBottom: 0,
+              fontSize: 18,
+              lineHeight: 1.5,
+              color: "#3A332B",
+            }}>
+              Планируйте день и&nbsp;сохраняйте активности на&nbsp;нужные даты.
+              Напомним накануне — чтобы ничего не&nbsp;потерялось.
+            </p>
       </Container>
 
       <PlanOverviewDialog
