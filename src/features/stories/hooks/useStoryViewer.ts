@@ -33,15 +33,19 @@ export function useStoryViewer(stories: StoryCollection[]) {
   const [progressKey, setProgressKey] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) {
-        const storage = browserStorage();
-        setSeenIds(new Set([...readSeen(storage), ...[...readSeenBreakingNews(storage)].map((id) => `article:${id}`)]));
-      }
-    });
+    const refresh = () => {
+      const storage = browserStorage();
+      setSeenIds(new Set([...readSeen(storage), ...[...readSeenBreakingNews(storage)].map((id) => `article:${id}`)]));
+    };
+    const id = window.setTimeout(refresh, 0);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", refresh);
+    window.addEventListener("storage", refresh);
     return () => {
-      cancelled = true;
+      window.clearTimeout(id);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", refresh);
+      window.removeEventListener("storage", refresh);
     };
   }, []);
 
