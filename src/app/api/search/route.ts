@@ -69,7 +69,7 @@ export async function GET(request: Request) {
     const findDocs = (query: string, take: number) => prisma.searchDocument.findMany({
       where: { isPublished: true, ...buildSearchTextWhere(query) },
       take,
-      orderBy: [{ boost: "desc" }, { updatedAt: "desc" }],
+      orderBy: [{ boost: "desc" }, { updatedAt: "desc" }, { entityType: "asc" }, { entityId: "asc" }],
       select: {
         entityId: true,
         entityType: true,
