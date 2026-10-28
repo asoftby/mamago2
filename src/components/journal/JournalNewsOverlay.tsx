@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 
-export function JournalNewsOverlay({ children, fallbackHref }: { children: React.ReactNode; fallbackHref: string }) {
+export function JournalNewsOverlay({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
