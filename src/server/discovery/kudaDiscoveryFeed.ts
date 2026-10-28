@@ -102,6 +102,8 @@ export async function getKudaDiscoveryFeed(
   currentUserId: string | null,
   options?: {
     take?: number;
+    /** Explicit DB page offset; omit for existing recommendation feed behavior. */
+    offset?: number;
     /** Max DB candidates ranked in memory (default 200). Paginated listings raise it. */
     candidatePoolCap?: number;
     format?: ActivityFormat | null;
@@ -140,8 +142,8 @@ export async function getKudaDiscoveryFeed(
   /** Пул кандидатов для сортировки; без избыточного findMany (было ×5 до 400 — долго на TTFB). */
   const rows = await prisma.activity.findMany({
     where,
-    take: Math.min(take * 3, options?.candidatePoolCap ?? 200),
-    orderBy: [{ nextOccurrenceAt: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
+    ...(options?.offset !== undefined ? { skip: Math.max(0, Math.trunc(options.offset)), take } : { take: Math.min(take * 3, options?.candidatePoolCap ?? 200) }),
+    orderBy: [{ nextOccurrenceAt: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }, { id: "asc" }],
     include: {
       images: {
         orderBy: { sortOrder: "asc" },
