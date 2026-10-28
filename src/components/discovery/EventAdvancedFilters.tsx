@@ -359,7 +359,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
         )}
       </fieldset>}
 
-      <div className="fixed bottom-0 left-0 right-0 z-10 flex items-center gap-2 border-t bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 lg:sticky lg:mx-0 lg:justify-between lg:bg-white/95 lg:px-0 lg:pb-0 lg:pt-4 lg:backdrop-blur-none">
+      <div className="fixed bottom-0 left-0 right-0 z-20 flex items-center gap-2 border-t border-white/50 bg-white/75 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_32px_rgba(0,0,0,0.07)] backdrop-blur-2xl supports-[backdrop-filter]:bg-white/65 lg:sticky lg:-mx-6 lg:-mb-6 lg:justify-between lg:px-6 lg:pb-6 lg:pt-4">
         <MobileOverlayResetAction
           className="min-h-11 px-2 lg:min-h-0 lg:rounded-none lg:px-0 lg:py-0 lg:font-semibold lg:text-foreground lg:underline lg:hover:bg-transparent lg:hover:text-foreground lg:active:bg-transparent"
           onClick={() => {
