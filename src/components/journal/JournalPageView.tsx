@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { orderBreakingNewsBySeen, readSeenBreakingNews } from "@/features/stories/lib/seen";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { HorizontalCardRow } from "@/features/city-home/components/HorizontalCardRow";
@@ -47,7 +49,15 @@ export function JournalPageView({
   const typeHref = (type: JournalTypeFilter) => journalTypeFilterHref(basePath, type);
   const resetHref = basePath;
   const saveStatuses = useArticleSaveStatusBatch([...(main ? [main.id] : []), ...feed.map((a) => a.id)]);
+  const [seenNewsIds, setSeenNewsIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const refresh = () => setSeenNewsIds(readSeenBreakingNews(window.localStorage));
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", refresh);
+    return () => { window.removeEventListener("focus", refresh); window.removeEventListener("pageshow", refresh); };
+  }, []);
   const currentNews = typeFilter === "BREAKING_NEWS" ? feed.filter((article) => article.expiresAt && new Date(article.expiresAt).getTime() > Date.now()) : [];
+  const rankedCurrentNews = orderBreakingNewsBySeen(currentNews, seenNewsIds);
   const archivedNews = typeFilter === "BREAKING_NEWS" ? feed.filter((article) => !article.expiresAt || new Date(article.expiresAt).getTime() <= Date.now()) : [];
   const empty = !main && news.length === 0 && collections.length === 0 && feed.length === 0;
 
@@ -98,7 +108,7 @@ export function JournalPageView({
               </Link>
             }
           >
-            {news.map((article, index) => (
+            {orderBreakingNewsBySeen(news, seenNewsIds).map((article, index) => (
               <div key={article.id} className={NEWS_CARD_SHELL}>
                 <AnalyticsCardViewTracker
                   entityType="ARTICLE"
@@ -127,7 +137,7 @@ export function JournalPageView({
             <div className="space-y-4">
               <h2 className="font-heading text-2xl">Актуальные новости</h2>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                {currentNews.map((article) => <JournalNewsCard key={article.id} article={article} />)}
+                {rankedCurrentNews.map((article) => <JournalNewsCard key={article.id} article={article} />)}
               </div>
             </div>
           )}
