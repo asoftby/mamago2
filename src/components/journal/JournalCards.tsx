@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback } from "react";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
 import { ArticleSaveHeart, type ArticleSaveStatus } from "@/features/save/ArticleSaveHeart";
 import { formatJournalPublishedDate } from "@/lib/article/formatJournalPublishedDate";
@@ -94,20 +92,12 @@ export function JournalMainCard({ article, saveStatus }: { article: CityHomeJour
 
 /** Breaking News: обложка stories, время и двухстрочный заголовок. */
 export function JournalNewsCard({ article }: { article: CityHomeJournalArticle }) {
-  const router = useRouter();
-  const openArticle = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    if (!document.startViewTransition || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    event.preventDefault();
-    document.startViewTransition(() => router.push(article.href));
-  }, [article.href, router]);
   const relative = article.publishedAt
     ? formatJournalRelativeTime(article.publishedAt).replace(/^(\d+ (?:мин|ч))$/, "$1 назад")
     : null;
   return (
     <Link
       href={article.href}
-      onClick={openArticle}
       className="group relative block aspect-[3/5] overflow-hidden rounded-[18px] bg-muted text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <Cover article={article} tone={1} className="absolute inset-0 h-full w-full transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none" />
