@@ -27,6 +27,7 @@ export function EventTerritoryFilter({ onApply, onBeforeNavigate, filters }: { o
   const [query, setQuery] = React.useState("");
   const [regionId, setRegionId] = React.useState<string | null>(null);
   const [selection, setSelection] = React.useState<string | null>(null);
+  const [expanded, setExpanded] = React.useState(false);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -40,8 +41,7 @@ export function EventTerritoryFilter({ onApply, onBeforeNavigate, filters }: { o
 
   const regions = items.filter((item) => item.type === "REGION" && item.supported && item.counts.events > 0);
   const selected = items.find((item) => item.slug === listingCity && item.type !== "COUNTRY");
-  const activeRegionId = regionId ?? (selected?.type === "REGION" ? selected.id : selected?.parentId ?? regions[0]?.id ?? null);
-  const activeRegion = regions.find((region) => region.id === activeRegionId);
+  const activeRegionId = regionId;
   const cities = items.filter((item) => item.type === "CITY" && item.parentId === activeRegionId && item.supported && item.counts.events > 0);
   const matchesQuery = query.trim().toLocaleLowerCase("ru");
   const matching = matchesQuery
@@ -63,74 +63,86 @@ export function EventTerritoryFilter({ onApply, onBeforeNavigate, filters }: { o
     onApply?.();
   }
 
+  const chosen = items.find((item) => item.slug === selectedSlug);
+  const currentLabel = selectedSlug === "belarus" ? "Вся Беларусь"
+    : chosen?.name ?? (listingCity === "minsk" ? "Минск и область" : listingCity);
+
   return (
-    <fieldset className="space-y-3">
-      <legend className="text-sm font-semibold">Где искать</legend>
-      <p className="text-xs text-muted-foreground">Домашний город в шапке не изменится.</p>
-      <input
-        type="search"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Найти город или область"
-        aria-label="Найти город или область"
-        className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary"
-      />
-      {loading && <p className="text-sm text-muted-foreground">Загрузка регионов…</p>}
-      {error && <p role="alert" className="text-sm text-muted-foreground">Не удалось загрузить регионы. Откройте фильтры повторно.</p>}
-      {!loading && !error && (
-        <>
-          <button type="button" onClick={() => setSelection("belarus")}
-            aria-pressed={selectedSlug === "belarus"}
-            className={`min-h-11 w-full rounded-xl border px-3 text-left text-sm font-semibold ${selectedSlug === "belarus" ? "border-primary bg-primary/10 text-primary" : "border-gray-200 hover:bg-gray-50"}`}>
-            Не знаю, куда поехать · Вся Беларусь
-          </button>
-          {matchesQuery ? (
-            <div className="max-h-52 space-y-1 overflow-y-auto">
-              {matching.length === 0 && <p className="text-sm text-muted-foreground">Ничего не найдено</p>}
-              {matching.map((item) => (
-                <button key={item.id} type="button" onClick={() => setSelection(item.slug)}
-                  aria-pressed={selectedSlug === item.slug}
-                  className={`flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm ${selectedSlug === item.slug ? "bg-primary/10 font-semibold text-primary" : "hover:bg-gray-50"}`}>
-                  <span>{item.name}</span><span className="text-xs text-muted-foreground">{item.counts.events}</span>
-                </button>
+    <div className="space-y-2">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls="event-territory-options"
+        onClick={() => setExpanded((value) => !value)}
+        className="flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border border-border bg-white px-4 text-left text-sm font-medium text-foreground hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+      >
+        <span className="min-w-0 truncate">{currentLabel}</span>
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={expanded ? "shrink-0 rotate-180" : "shrink-0"}>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {expanded && (
+        <div id="event-territory-options" className="space-y-3 rounded-xl border border-border bg-white p-3">
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Найти город или область"
+            aria-label="Найти город или область"
+            className="h-11 w-full rounded-xl border border-border bg-white px-3 text-sm outline-none focus:border-primary"
+          />
+          {loading && <p className="text-sm text-muted-foreground">Загрузка регионов…</p>}
+          {error && <p role="alert" className="text-sm text-muted-foreground">Не удалось загрузить регионы</p>}
+          {!loading && !error && (
+            <div className="max-h-60 space-y-1 overflow-y-auto">
+              <button type="button" onClick={() => setSelection("belarus")}
+                aria-pressed={selectedSlug === "belarus"}
+                className={`min-h-11 w-full rounded-lg px-3 text-left text-sm ${selectedSlug === "belarus" ? "bg-primary/10 font-semibold text-primary" : "hover:bg-muted/40"}`}>
+                Вся Беларусь
+              </button>
+              {matchesQuery ? (
+                matching.length ? matching.map((item) => (
+                  <button key={item.id} type="button" onClick={() => setSelection(item.slug)}
+                    aria-pressed={selectedSlug === item.slug}
+                    className={`min-h-11 w-full rounded-lg px-3 text-left text-sm ${selectedSlug === item.slug ? "bg-primary/10 font-semibold text-primary" : "hover:bg-muted/40"}`}>
+                    {item.name}
+                  </button>
+                )) : <p className="px-3 py-2 text-sm text-muted-foreground">Ничего не найдено</p>
+              ) : regions.map((region) => (
+                <div key={region.id}>
+                  <div className="flex items-center gap-1">
+                    <button type="button" onClick={() => { setRegionId(region.id); setSelection(region.slug); }}
+                      aria-pressed={selectedSlug === region.slug}
+                      className={`min-h-11 min-w-0 flex-1 rounded-lg px-3 text-left text-sm ${selectedSlug === region.slug ? "bg-primary/10 font-semibold text-primary" : "hover:bg-muted/40"}`}>
+                      {region.name}
+                    </button>
+                    <button type="button" aria-label={`Показать города: ${region.name}`}
+                      aria-expanded={activeRegionId === region.id}
+                      onClick={() => setRegionId(activeRegionId === region.id ? null : region.id)}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg hover:bg-muted/40">⌄</button>
+                  </div>
+                  {activeRegionId === region.id && (
+                    <div className="ml-4 space-y-1 border-l border-border pl-3">
+                      {cities.map((city) => (
+                        <button key={city.id} type="button" onClick={() => setSelection(city.slug)}
+                          aria-pressed={selectedSlug === city.slug}
+                          className={`min-h-10 w-full rounded-lg px-3 text-left text-sm ${selectedSlug === city.slug ? "bg-primary/10 font-semibold text-primary" : "hover:bg-muted/40"}`}>
+                          {city.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
-          ) : (
-            <>
-              <div className="space-y-1">
-                {regions.map((region) => (
-                  <button key={region.id} type="button" onClick={() => { setRegionId(region.id); setSelection(region.slug); }}
-                    aria-expanded={activeRegionId === region.id}
-                    className={`flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm ${activeRegionId === region.id ? "bg-gray-100 font-semibold" : "hover:bg-gray-50"}`}>
-                    <span>{region.name}</span><span className="text-xs text-muted-foreground">{region.counts.events}</span>
-                  </button>
-                ))}
-              </div>
-              {activeRegion && (
-                <div className="space-y-1 border-l-2 border-gray-100 pl-3">
-                  <button type="button" onClick={() => setSelection(activeRegion.slug)}
-                    aria-pressed={selectedSlug === activeRegion.slug}
-                    className={`min-h-11 w-full rounded-xl px-3 text-left text-sm ${selectedSlug === activeRegion.slug ? "bg-primary/10 font-semibold text-primary" : "hover:bg-gray-50"}`}>
-                    Вся область
-                  </button>
-                  {cities.map((city) => (
-                    <button key={city.id} type="button" onClick={() => setSelection(city.slug)}
-                      aria-pressed={selectedSlug === city.slug}
-                      className={`flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm ${selectedSlug === city.slug ? "bg-primary/10 font-semibold text-primary" : "hover:bg-gray-50"}`}>
-                      <span>{city.name}</span><span className="text-xs text-muted-foreground">{city.counts.events}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
           )}
           <button type="button" disabled={!selection || (selection === currentSlug && params.get("explore") === "1")}
             onClick={() => selection && navigate(selection)}
             className="min-h-11 w-full rounded-full bg-primary px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">
-            Применить территорию
+            Применить
           </button>
-        </>
+        </div>
       )}
-    </fieldset>
+    </div>
   );
 }

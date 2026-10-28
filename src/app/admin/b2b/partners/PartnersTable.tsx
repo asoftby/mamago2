@@ -13,6 +13,7 @@ import {
   DataCardBody,
   DataCardRow,
 } from "@/components/ui/data-card-list";
+import { formatAdminDate } from "@/lib/admin/formatRu";
 
 type Business = {
   id: string;
@@ -113,7 +114,7 @@ export function PartnersTable({ businesses }: PartnersTableProps) {
                       {business.owner?.phoneE164 || "—"}
                     </td>
                     <td className="px-4 py-3 text-gray-600">
-                      {new Date(business.updatedAt).toLocaleDateString("ru-RU")}
+                      {formatAdminDate(business.updatedAt)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Link href={`/admin/b2b/partners/${business.id}`}>
@@ -160,7 +161,7 @@ export function PartnersTable({ businesses }: PartnersTableProps) {
                   <DataCardRow label="УНП" value={business.unp} />
                   <DataCardRow label="Email владельца" value={business.owner?.email} />
                   <DataCardRow label="Телефон" value={business.owner?.phoneE164} />
-                  <DataCardRow label="Обновлено" value={new Date(business.updatedAt).toLocaleDateString("ru-RU")} />
+                  <DataCardRow label="Обновлено" value={formatAdminDate(business.updatedAt)} />
                 </DataCardBody>
               </DataCard>
             </Link>

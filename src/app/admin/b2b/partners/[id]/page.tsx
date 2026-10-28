@@ -20,6 +20,7 @@ import {
   getBusinessResolvedBillingActionPrices,
   listBillingActionRates,
 } from "@/server/services/billing/billingActionRateResolver.service";
+import { formatAdminDate, formatAdminDateTime } from "@/lib/admin/formatRu";
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-800",
@@ -462,7 +463,7 @@ export default async function PartnerDetailPage({
                 Дата создания
               </div>
               <div className="text-base">
-                {new Date(business.createdAt).toLocaleString("ru-RU")}
+                {formatAdminDateTime(business.createdAt)}
               </div>
             </div>
 
@@ -471,7 +472,7 @@ export default async function PartnerDetailPage({
                 Последнее обновление
               </div>
               <div className="text-base">
-                {new Date(business.updatedAt).toLocaleString("ru-RU")}
+                {formatAdminDateTime(business.updatedAt)}
               </div>
             </div>
           </div>
@@ -503,7 +504,7 @@ export default async function PartnerDetailPage({
               </div>
               <div className="text-base">
                 {business.submittedAt
-                  ? new Date(business.submittedAt).toLocaleString("ru-RU")
+                  ? formatAdminDateTime(business.submittedAt)
                   : "—"}
               </div>
             </div>
@@ -514,7 +515,7 @@ export default async function PartnerDetailPage({
               </div>
               <div className="text-base">
                 {business.reviewedAt
-                  ? new Date(business.reviewedAt).toLocaleString("ru-RU")
+                  ? formatAdminDateTime(business.reviewedAt)
                   : "—"}
               </div>
             </div>
@@ -525,7 +526,7 @@ export default async function PartnerDetailPage({
               </div>
               <div className="text-base">
                 {business.approvedAt
-                  ? new Date(business.approvedAt).toLocaleString("ru-RU")
+                  ? formatAdminDateTime(business.approvedAt)
                   : "—"}
               </div>
             </div>
@@ -536,7 +537,7 @@ export default async function PartnerDetailPage({
                   Дата отклонения
                 </div>
                 <div className="text-base">
-                  {new Date(business.rejectedAt).toLocaleString("ru-RU")}
+                  {formatAdminDateTime(business.rejectedAt)}
                 </div>
               </div>
             )}
@@ -598,7 +599,7 @@ export default async function PartnerDetailPage({
                       )}
                     </div>
                     <div className="text-gray-500 text-xs whitespace-nowrap ml-4">
-                      {new Date(log.createdAt).toLocaleString("ru-RU")}
+                      {formatAdminDateTime(log.createdAt)}
                     </div>
                   </div>
                 ))}
@@ -647,7 +648,7 @@ export default async function PartnerDetailPage({
                       <td className="px-4 py-3 text-gray-600">{place.city?.name || "—"}</td>
                       <td className="px-4 py-3 text-gray-600">{place.formattedAddr || place.customAddress || "—"}</td>
                       <td className="px-4 py-3 text-gray-600">{place.activities.length}</td>
-                      <td className="px-4 py-3 text-gray-600">{new Date(place.createdAt).toLocaleDateString("ru-RU")}</td>
+                      <td className="px-4 py-3 text-gray-600">{formatAdminDate(place.createdAt)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -683,7 +684,7 @@ export default async function PartnerDetailPage({
                             {STATUS_LABELS[activity.status] || activity.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-gray-600">{new Date(activity.createdAt).toLocaleDateString("ru-RU")}</td>
+                        <td className="px-4 py-3 text-gray-600">{formatAdminDate(activity.createdAt)}</td>
                       </tr>
                     ))
                   )}
@@ -725,7 +726,7 @@ export default async function PartnerDetailPage({
                       </td>
                       <td className="px-4 py-3 text-gray-600">
                         {event.nextOccurrenceAt
-                          ? new Date(event.nextOccurrenceAt).toLocaleDateString("ru-RU")
+                          ? formatAdminDate(event.nextOccurrenceAt)
                           : "—"}
                       </td>
                       <td className="px-4 py-3 text-gray-600">
@@ -735,7 +736,7 @@ export default async function PartnerDetailPage({
                             ? renderCurrencyText(`от ${event.priceFrom} ${BYN_SYMBOL}`, { iconSize: "sm" })
                             : "—"}
                       </td>
-                      <td className="px-4 py-3 text-gray-600">{new Date(event.createdAt).toLocaleDateString("ru-RU")}</td>
+                      <td className="px-4 py-3 text-gray-600">{formatAdminDate(event.createdAt)}</td>
                     </tr>
                   ))}
                 </tbody>

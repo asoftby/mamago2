@@ -174,7 +174,7 @@ export function OperationsSignalCard({ signal, now, canResolve }: OperationsSign
         {signal.release && (
           <span>
             Рядом с релизом {signal.release.buildId} ·{" "}
-            {signal.release.detectedAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+            {signal.release.detectedAt.toLocaleTimeString("ru-RU", { timeZone: "Europe/Minsk", hour: "2-digit", minute: "2-digit" })}
           </span>
         )}
       </div>

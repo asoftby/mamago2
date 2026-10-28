@@ -3,7 +3,7 @@ import type { AdminSectionNavConfig } from "./adminSectionNav";
 
 export const DIRECT_SECTION_NAV_CONFIG: AdminSectionNavConfig = {
   id: "direct",
-  label: "Direct",
+  label: "Прямые сообщения",
   href: adminPath("/communications/direct"),
   items: [
     {

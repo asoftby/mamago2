@@ -6,10 +6,11 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { EditorialRequestStatusBadge } from "@/components/admin/editorial/EditorialRequestStatusBadge";
 import { listEditorialRequests } from "@/server/editorial/editorialRequestService";
 import { TableContainer } from "@/components/ui/table";
+import { formatAdminDateTime } from "@/lib/admin/formatRu";
 
 function formatDate(value: string | null) {
   if (!value) return "—";
-  return new Date(value).toLocaleString("ru-RU");
+  return formatAdminDateTime(value);
 }
 
 export default async function AdminEditorialRequestsPage() {

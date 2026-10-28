@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { AdminBroadcast } from "@prisma/client";
+import { formatAdminDateTime } from "@/lib/admin/formatRu";
 
 interface Props {
   mode: "create" | "edit";
@@ -407,7 +408,7 @@ export function BroadcastForm({ mode, broadcast }: Props) {
           <div>
             Сообщение опубликовано
             {broadcast?.publishedAt
-              ? ` · ${new Date(broadcast.publishedAt).toLocaleString("ru-RU")}`
+              ? ` · ${formatAdminDateTime(broadcast.publishedAt)}`
               : ""}
           </div>
           {publishedEditMeta ? (

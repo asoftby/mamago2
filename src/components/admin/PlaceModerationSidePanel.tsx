@@ -6,6 +6,7 @@ import { formatAgeKeys } from "@/lib/config/ages";
 import { Textarea } from "@/components/ui/textarea";
 import { getFormatLabel } from "@/lib/placeChips";
 import { GoogleReviewsStatusBadge } from "@/components/admin/moderation/GoogleReviewsStatusBadge";
+import { formatAdminDateTime } from "@/lib/admin/formatRu";
 
 type PlaceDetail = {
   id: string;
@@ -466,7 +467,7 @@ export function PlaceModerationSidePanel({
                             {ACTION_LABELS[log.action]}
                           </span>
                           <span className="text-gray-500 text-xs">
-                            {new Date(log.createdAt).toLocaleString("ru-RU")}
+                            {formatAdminDateTime(log.createdAt)}
                           </span>
                         </div>
                         {log.message && (

@@ -9,6 +9,7 @@ import { getFormatLabel } from "@/lib/placeChips";
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
 import { isGoogleReviewsEnabled } from "@/lib/place/googleReviewsMeta";
 import Link from "next/link";
+import { formatAdminDate } from "@/lib/admin/formatRu";
 
 interface PlacePreviewCardProps {
   place: {
@@ -333,7 +334,7 @@ export function PlacePreviewCard({ place }: PlacePreviewCardProps) {
                     <div>
                       <div className="font-medium text-gray-900">{review.authorName}</div>
                       <div className="mt-1 text-xs text-gray-500">
-                        {new Date(review.createdAt).toLocaleDateString("ru-RU")} · {review.source}
+                        {formatAdminDate(review.createdAt)} · {review.source}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 text-amber-500">

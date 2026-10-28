@@ -6,6 +6,7 @@ import {
   type DirectAuditEntityTypeFilter,
 } from "@/server/services/direct/directAdmin.service";
 import { TableContainer } from "@/components/ui/table";
+import { formatAdminDateTime } from "@/lib/admin/formatRu";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -68,7 +69,7 @@ export default async function AdminDirectLogsPage({
           <tbody className="divide-y divide-stone-100">
             {logs.map((log) => (
               <tr key={log.id} className="hover:bg-stone-50/60">
-                <td className="px-4 py-3 text-stone-500">{new Date(log.createdAt).toLocaleString("ru-RU")}</td>
+                <td className="px-4 py-3 text-stone-500">{formatAdminDateTime(log.createdAt)}</td>
                 <td className="px-4 py-3 font-medium text-stone-900">{log.action}</td>
                 <td className="px-4 py-3 text-stone-500">{log.entityType}</td>
                 <td className="px-4 py-3 text-stone-700">

@@ -20,6 +20,16 @@ sh scripts/git/task-check.sh
 sh scripts/git/task-finish.sh
 ```
 
+### Safe fast-forward of stale canonical dev (Codex / Claude / GitHub parallel work)
+
+GitHub `origin/dev` is the single source of truth. Other agents can merge PRs directly through GitHub while Codex/Claude has an older local checkout. A clean local `dev` that is **only behind** `origin/dev` is normal, not a task failure requiring manual permission.
+
+- **Preferred:** from the canonical `dev` checkout run `sh scripts/git/task-start.sh <slug> [prefix]`. This script already fetches via `session-start-gate.sh`, and if its exit code is **4 (behind-only)**, performs `git merge --ff-only origin/dev`, reruns the gate and creates a new isolated task worktree. Do **not** reimplement sync in every task.
+- If running the gate directly and it returns **4**, the agent may perform the *same* fast-forward without asking the user **only when** the branch is `dev`, the fetch succeeded, `ahead=0`, `behind>0`, and tracked/staged files are clean. Then rerun the gate and require PASS before starting a task.
+- Any other STOP result, including local commits, divergence, failed fetch, tracked/staged WIP, wrong branch, or fast-forward failure: **STOP and report**, without automatic reset/rebase/pull/force or changes to existing worktrees. Untracked files are never deleted; inspect and preserve them.
+- Never fast-forward an active task branch/worktree using this shortcut. Use `task-sync.sh` with overlap checks and task-specific verification; never silently overwrite concurrent GitHub changes.
+- A successful local sync does **not** deploy code. All task changes still require a separate PR into `dev`, CI/review and a verified DEV deployment SHA.
+
 `task-start.sh` wraps the freshness gate, captures exact `BASE_HEAD`, creates the isolated dated branch/worktree, and verifies its base. `task-sync.sh` automatically merges non-overlapping fresh `origin/dev` changes but stops when the same files changed on both sides. `task-check.sh` runs the shared push gate; task-specific tests are still required. `task-finish.sh` performs the final freshness/diff checks and normal push/PR handoff. Each worktree owns its `node_modules` and Prisma Client (`task-start.sh` runs `pnpm install --frozen-lockfile` + `prisma generate`; `task-sync.sh` regenerates when the schema changes). **Never symlink `node_modules` to another checkout** — the shared generated client makes `tsc` results random; the push gate fails on it (`scripts/git/worktree-deps.sh`). Never bypass a safety stop. Human shortcuts `mgtask`, `mgcheck`, and `mgfinish` are documented in `docs/engineering/one-command-task-workflow.md`.
 
 1. In the canonical `dev` checkout run:
