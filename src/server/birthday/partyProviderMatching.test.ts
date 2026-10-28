@@ -58,4 +58,15 @@ for (const token of [
 ]) assert.ok(service.includes(token), "provider discovery missing guard: " + token);
 assert.ok(!service.includes("bookingRequest.create") && !service.includes("partyOutbox.create"),
   "candidate discovery must be read-only; dispatch happens in a separate step");
+
+// Regression: viable providers beyond the former 250-offer cutoff remain eligible.
+const largePool = Array.from({ length: 300 }, (_, i) =>
+  make(i + 1, { availability: i < 250 ? "UNAVAILABLE" : "AVAILABLE", priceByn: 100 }));
+assert.deepEqual(pickPartyProviders({ ...base, offers: largePool }).map(x => x.offerId),
+  ["offer251", "offer252", "offer253", "offer254", "offer255"]);
+assert.match(service, /take: 200/);
+assert.match(service, /cursor: \{ id: cursor \}, skip: 1/);
+assert.match(service, /if \(offers\.length < 200\) break/);
+assert.ok(!service.includes("take: 250"), "Matching must not truncate candidates to newest 250");
+
 console.log("partyProviderMatching.test.ts: OK");
