@@ -35,7 +35,7 @@ export function projectOfferAudience(offer: {
   return { ...bounds, agePolicy: offer.agePolicy };
 }
 
-function extractOfferDateRange(input: {
+export function extractOfferDateRange(input: {
   dateFrom: Date | null;
   dateTo: Date | null;
   campSessions: unknown;
