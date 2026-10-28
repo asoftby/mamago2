@@ -13,5 +13,7 @@ const delivery = readFileSync(
   "utf8",
 );
 assert.match(delivery, /const connection = mayUseFamilyTelegramBot\(notification\.audience\)/);
-assert.match(delivery, /if \(businessRecipient\) \{\s*await sendBusinessTelegramMessage/);
+assert.match(delivery, /if \(businessRecipient\) \{[\s\S]*?await sendBusinessTelegramMessage/, "business messages must use the business bot");
+assert.match(delivery, /mayUseFamilyTelegramBot\(delivery\.notification\.audience\)/, "retry must enforce audience isolation");
+assert.match(delivery, /partyMarkup \?\? rendered\.replyMarkup/, "party confirmation keyboard must survive retry");
 console.log("Business Telegram / Info Bot audience isolation: OK");
