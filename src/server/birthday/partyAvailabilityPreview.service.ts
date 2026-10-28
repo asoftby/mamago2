@@ -1,6 +1,7 @@
 import "server-only";
 import prisma from "@/lib/prisma";
 import { minskBookingWindow, isWithinSchedule } from "./partyConfirmationAvailability";
+import { overlapsBookingWindow } from "./partyAvailabilityPreview.logic";
 
 /** Informational only. Final booking always locks and rechecks in lockAvailablePartyUnit. */
 export async function previewPartyOfferAvailability(input: {
@@ -23,6 +24,7 @@ export async function previewPartyOfferAvailability(input: {
   });
   if (mapped.length === 0) return { availability: "UNKNOWN" as const };
   const now = new Date();
+  const eligible = [];
   for (const { bookingUnit: unit } of mapped) {
     if (unit.status !== "ACTIVE" || unit.timezone !== "Europe/Minsk" ||
       (unit.capacity !== null && input.childrenCount + input.adultsCount > unit.capacity)) continue;
@@ -30,23 +32,38 @@ export async function previewPartyOfferAvailability(input: {
     if (window.serviceStart <= now ||
       (unit.minDurationMinutes !== null &&
         (window.serviceEnd.getTime() - window.serviceStart.getTime()) / 60000 < unit.minDurationMinutes)) continue;
-    const [exceptions, blocked, reserved] = await Promise.all([
-      prisma.availabilityException.findMany({
-        where: { bookingUnitId: unit.id, date },
-        select: { kind: true, startMinutes: true, endMinutes: true },
-      }),
-      prisma.calendarBlock.findFirst({
-        where: { bookingUnitId: unit.id, blockStart: { lt: window.blockEnd }, blockEnd: { gt: window.blockStart } },
-        select: { id: true },
-      }),
-      prisma.bookingAllocation.findFirst({
-        where: { bookingUnitId: unit.id, blockStart: { lt: window.blockEnd }, blockEnd: { gt: window.blockStart },
-          OR: [{ status: "CONFIRMED" }, { status: "HELD", expiresAt: { gt: now } }] },
-        select: { id: true },
-      }),
-    ]);
-    if (!blocked && !reserved && isWithinSchedule(window, unit.rules, exceptions))
-      return { availability: "AVAILABLE" as const };
+    eligible.push({ unit, window });
+  }
+  if (eligible.length === 0) return { availability: "UNAVAILABLE" as const };
+
+  // One bounded batch per relation, instead of three queries per booking unit.
+  // Apply the exact per-unit overlap in memory after the broad DB range filter.
+  const ids = [...new Set(eligible.map(({ unit }) => unit.id))];
+  const blockStart = new Date(Math.min(...eligible.map(({ window }) => window.blockStart.getTime())));
+  const blockEnd = new Date(Math.max(...eligible.map(({ window }) => window.blockEnd.getTime())));
+  const [exceptions, blocks, allocations] = await Promise.all([
+    prisma.availabilityException.findMany({
+      where: { bookingUnitId: { in: ids }, date },
+      select: { bookingUnitId: true, kind: true, startMinutes: true, endMinutes: true },
+    }),
+    prisma.calendarBlock.findMany({
+      where: { bookingUnitId: { in: ids }, blockStart: { lt: blockEnd }, blockEnd: { gt: blockStart } },
+      select: { bookingUnitId: true, blockStart: true, blockEnd: true },
+    }),
+    prisma.bookingAllocation.findMany({
+      where: {
+        bookingUnitId: { in: ids }, blockStart: { lt: blockEnd }, blockEnd: { gt: blockStart },
+        OR: [{ status: "CONFIRMED" }, { status: "HELD", expiresAt: { gt: now } }],
+      },
+      select: { bookingUnitId: true, blockStart: true, blockEnd: true },
+    }),
+  ]);
+  for (const { unit, window } of eligible) {
+    const blocked = blocks.some((item) => item.bookingUnitId === unit.id && overlapsBookingWindow(item, window));
+    const reserved = allocations.some((item) => item.bookingUnitId === unit.id && overlapsBookingWindow(item, window));
+    if (!blocked && !reserved && isWithinSchedule(
+      window, unit.rules, exceptions.filter((item) => item.bookingUnitId === unit.id),
+    )) return { availability: "AVAILABLE" as const };
   }
   return { availability: "UNAVAILABLE" as const };
 }
