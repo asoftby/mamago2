@@ -75,6 +75,7 @@ export async function getAnalyticsOverview(
     : Prisma.empty;
   // Funnel audience membership is applied after resolving anonymous sessions.
   const contentEventSql = analyticsEventWhereSql(start, end, filters, cityId, null, exclusion);
+  const filteredContentEventSql = analyticsEventWhereSql(start, end, filters, cityId, allowed, exclusion);
 
   const [
     audience,
@@ -136,7 +137,7 @@ export async function getAnalyticsOverview(
     prisma.$queryRaw<{ day: string; c: bigint }[]>(Prisma.sql`
       SELECT to_char((e."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${ANALYTICS_TIME_ZONE}, 'YYYY-MM-DD') AS day, count(*)::bigint AS c
       FROM "UserEvent" e
-      WHERE e."eventType" = 'DETAIL_OPEN' AND ${contentEventSql}
+      WHERE e."eventType" = 'DETAIL_OPEN' AND ${filteredContentEventSql}
       GROUP BY 1
     `),
   ]);
