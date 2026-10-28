@@ -9,10 +9,22 @@ export function JournalNewsOverlay({ children }: { children: React.ReactNode }) 
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const originRef = useRef<DOMRect | null>(null);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    originRef.current = restoreFocusRef.current?.closest("[data-journal-news-card]")?.getBoundingClientRect() ?? null;
+    if (originRef.current && dialogRef.current && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const origin = originRef.current;
+      const target = dialogRef.current.getBoundingClientRect();
+      const x = origin.left + origin.width / 2 - (target.left + target.width / 2);
+      const y = origin.top + origin.height / 2 - (target.top + target.height / 2);
+      dialogRef.current.animate([
+        { transform: `translate(${x}px, ${y}px) scale(${Math.max(.08, origin.width / target.width)}, ${Math.max(.08, origin.height / target.height)})`, borderRadius: "18px", opacity: .8 },
+        { transform: "translate(0, 0) scale(1)", opacity: 1 },
+      ], { duration: 380, easing: "cubic-bezier(.2,.8,.2,1)" });
+    }
     document.body.style.overflow = "hidden";
     closeRef.current?.focus();
 
