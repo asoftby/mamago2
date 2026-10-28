@@ -5,6 +5,7 @@ import { CalendarClock, Pencil, Plus, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
+import { BookingUnitCalendar } from "./BookingUnitCalendar";
 import {
   WEEKDAYS, asMinutes, asTime, emptyUnitForm, fromUnitDetail, toUnitPayload,
   type DateException, type UnitDetail, type UnitForm, type UnitSummary, type WeekRule,
@@ -171,6 +172,7 @@ export function BookingUnitManager({ offers }: { offers: OfferOption[] }) {
           ) : null}
         </BusinessSurfaceCard>
       ) : (
+        <>
         <form onSubmit={event => void save(event)} className="space-y-5">
           <BusinessSurfaceCard className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -324,6 +326,8 @@ export function BookingUnitManager({ offers }: { offers: OfferOption[] }) {
             {editingId ? <Button type="button" variant="ghost" disabled={busy} onClick={() => void editUnit(editingId)}><RefreshCw /> Загрузить актуальную версию</Button> : null}
           </div>
         </form>
+        {editingId ? <BookingUnitCalendar unitId={editingId} /> : null}
+        </>
       )}
     </div>
   );

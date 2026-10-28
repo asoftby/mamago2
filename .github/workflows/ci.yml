@@ -64,12 +64,14 @@ jobs:
 
       - name: Birthday party API and outbox regressions
         run: |
+          pnpm exec tsx src/lib/plan/recurrence.test.ts
           pnpm exec tsx src/server/birthday/partyDraft.contract.test.ts
           pnpm exec tsx src/server/birthday/partyBusiness.contract.test.ts
           pnpm exec tsx src/server/birthday/partyOutbox.contract.test.ts
           pnpm exec tsx src/server/birthday/partyQuoteAcceptance.contract.test.ts
           pnpm exec tsx src/server/birthday/partyConfirmationAvailability.test.ts
           pnpm exec tsx src/server/birthday/partyInviteDispatchPolicy.test.ts
+          pnpm exec tsx src/server/birthday/partyProviderMatching.test.ts
           pnpm exec tsx src/server/birthday/bookingUnitInput.test.ts
           pnpm exec tsx src/server/birthday/bookingUnitUpdate.test.ts
           pnpm exec tsx src/components/business/booking-units/bookingUnitForm.test.ts
@@ -82,6 +84,8 @@ jobs:
           pnpm exec tsx src/server/birthday/partyTelegramEndToEnd.contract.test.ts
           pnpm exec tsx src/features/me/components/PartyOrderStatusScreen.contract.test.ts
           pnpm exec tsx src/server/services/booking/bookingBucket.contract.test.ts
+          pnpm exec tsx src/server/services/planActivityCountsQuery.test.ts
+          pnpm exec tsx src/server/services/booking/businessInboxScan.test.ts
 
       - name: Classes schedule and capacity regressions
         run: |

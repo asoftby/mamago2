@@ -7,6 +7,7 @@ import { buildRouteDocument } from "@/lib/search/builders/buildRouteDocument";
 import type { SearchDocUpsertFields } from "@/lib/search/builders/buildActivityDocument";
 import { isServerSavePerfEnabled } from "@/server/utils/requestPerf";
 import { SearchIndexQueue } from "@/lib/search/SearchIndexQueue";
+import { walkSearchIndexIds } from "@/lib/search/reindexBatches";
 
 const BATCH = 25;
 
@@ -185,39 +186,33 @@ export class SearchIndexerService {
   }
 
   async reindexAll(): Promise<void> {
-    const [activities, offers, places, routes, articles] = await Promise.all([
-      this.db.activity.findMany({ select: { id: true } }),
-      this.db.offer.findMany({ select: { id: true } }),
-      this.db.place.findMany({ select: { id: true } }),
-      this.db.route.findMany({ select: { id: true } }),
-      this.db.article.findMany({ select: { id: true } }),
-    ]);
+    // Traverse IDs in bounded pages: previously this held all IDs of all five
+    // catalog tables in memory before the first document was indexed.
+    const page = (cursor?: string) => ({
+      take: BATCH,
+      orderBy: { id: "asc" as const },
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      select: { id: true as const },
+    });
 
-    const runBatch = async (ids: string[], fn: (id: string) => Promise<void>) => {
-      for (let i = 0; i < ids.length; i += BATCH) {
-        const chunk = ids.slice(i, i + BATCH);
-        await Promise.all(chunk.map((id) => fn(id)));
-      }
-    };
-
-    await runBatch(
-      activities.map((a) => a.id),
+    await walkSearchIndexIds(
+      (cursor) => this.db.activity.findMany(page(cursor)),
       (id) => this.upsertActivity(id),
     );
-    await runBatch(
-      offers.map((o) => o.id),
+    await walkSearchIndexIds(
+      (cursor) => this.db.offer.findMany(page(cursor)),
       (id) => this.upsertOffer(id),
     );
-    await runBatch(
-      places.map((p) => p.id),
+    await walkSearchIndexIds(
+      (cursor) => this.db.place.findMany(page(cursor)),
       (id) => this.upsertPlace(id),
     );
-    await runBatch(
-      routes.map((r) => r.id),
+    await walkSearchIndexIds(
+      (cursor) => this.db.route.findMany(page(cursor)),
       (id) => this.upsertRoute(id),
     );
-    await runBatch(
-      articles.map((a) => a.id),
+    await walkSearchIndexIds(
+      (cursor) => this.db.article.findMany(page(cursor)),
       (id) => this.upsertArticle(id),
     );
   }
