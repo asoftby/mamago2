@@ -6,6 +6,7 @@ import { findCandidatesForParty } from "./partyOrderCandidates.service";
 import { selectPartyInvitationWave } from "./partyInvitationPolicy";
 import { partyResponseDeadline } from "./partyResponseDeadline";
 import { verifyPartyOffers } from "./partyDraft.service";
+import { partyRequirementsProblem } from "./partySelection";
 
 /**
  * Explicit server-side dispatch primitive. Deliberately not exposed as a route,
@@ -36,7 +37,7 @@ export async function dispatchPartyCandidateWave(input: {
         id: true, category: true, role: true, status: true,
         confirmedBookingRequestId: true,
         partyOrder: { select: {
-          id: true, status: true, ownerUserId: true, citySlug: true,
+          id: true, status: true, version: true, ownerUserId: true, citySlug: true,
           eventDate: true, timeFrom: true, timeTo: true,
           childrenCount: true, adultsCount: true, childAge: true,
         } },
@@ -45,6 +46,11 @@ export async function dispatchPartyCandidateWave(input: {
     });
     if (!current) throw new PartyApiError(404, "Услуга праздника не найдена");
     const order = current.partyOrder;
+    // Candidate selection was computed before the transaction. A changed party
+    // must not dispatch invitations for stale date, time or guest requirements.
+    if (order.version !== proposal.partyVersion) {
+      throw new PartyApiError(409, "Параметры праздника изменились, повторите подбор");
+    }
     if ((current.role !== PartyItemRole.ADDON && current.role !== PartyItemRole.STANDALONE) ||
         order.status !== PartyOrderStatus.ANCHOR_CONFIRMED ||
         current.confirmedBookingRequestId ||
@@ -69,7 +75,9 @@ export async function dispatchPartyCandidateWave(input: {
       const published = await verifyPartyOffers(order.citySlug, [candidate.offerId], tx);
       const offer = published.get(candidate.offerId);
       if (!offer || offer.category !== current.category ||
-          offer.place?.ownerBusinessId !== candidate.businessId) continue;
+          offer.place?.ownerBusinessId !== candidate.businessId ||
+          partyRequirementsProblem(offer, { childrenCount: order.childrenCount,
+            childAge: order.childAge })) continue;
       const request = await tx.bookingRequest.create({
         data: {
           kind: BookingKind.PARTY, publicationType: "OFFER",
