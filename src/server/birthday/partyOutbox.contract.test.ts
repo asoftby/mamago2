@@ -47,7 +47,7 @@ const worker = readFileSync("src/server/birthday/partyOutbox.service.ts", "utf8"
 for (const invariant of [
   "skipDuplicates: true", "partyNotificationId(row.id, user.id)",
   "nextAttemptAt: { lte: now }", "attempts: { increment: 1 }",
-  "notificationDelivery.count", "await dispatchDelivery(notification, user)",
+  "notificationDelivery.findMany", "await dispatchDelivery(notification, user)",
   "getActiveTelegramConnection", // absence expected, dispatcher handles this
 ]) {
   if (invariant === "getActiveTelegramConnection") {
@@ -56,6 +56,9 @@ for (const invariant of [
     assert.ok(worker.includes(invariant), "Missing outbox invariant: " + invariant);
   }
 }
+assert.match(worker, /where: \{ notificationId: \{ in: ids \} \}/);
+assert.match(worker, /alreadyAttempted\.has\(notification\.id\)/);
+assert.ok(!worker.includes("notificationDelivery.count("), "Delivery presence must be batched per event");
 assert.ok(!worker.includes("contactPhone: true"));
 assert.ok(!worker.includes("customerPhone: true"));
 // Business notifications deep-link into the unified inbox: held until the UI is released.
