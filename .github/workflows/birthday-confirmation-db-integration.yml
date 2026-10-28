@@ -7,6 +7,7 @@ on:
       - ".github/workflows/birthday-confirmation-db-integration.yml"
       - "src/server/birthday/**"
       - "src/app/api/business/booking-units/**"
+      - "src/components/business/booking-units/**"
       - "scripts/it/seedPartyIT.ts"
       - "src/app/api/parent/parties/**"
       - "src/app/api/business/party-requests/**"
@@ -21,6 +22,7 @@ on:
       - ".github/workflows/birthday-confirmation-db-integration.yml"
       - "src/server/birthday/**"
       - "src/app/api/business/booking-units/**"
+      - "src/components/business/booking-units/**"
       - "scripts/it/seedPartyIT.ts"
       - "src/app/api/parent/parties/**"
       - "src/app/api/business/party-requests/**"
@@ -70,6 +72,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Apply migrations to disposable PostgreSQL
         run: pnpm exec prisma migrate deploy
+      - name: Verify calendar block business UI contract
+        run: pnpm exec tsx src/components/business/booking-units/bookingUnitCalendar.test.ts
       - name: Verify manual calendar block contracts
         run: pnpm exec tsx src/server/birthday/bookingUnitBlocks.test.ts
       - name: Verify real quote acceptance and exclusive confirmation
