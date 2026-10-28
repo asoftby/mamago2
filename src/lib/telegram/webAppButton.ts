@@ -1,5 +1,8 @@
 import { getSafeRedirectPath } from "@/lib/auth/redirectTo";
 
+/** Browser opens a normal Telegram URL; mini_app needs signed initData. */
+export type TelegramLinkOpenIntent = "browser" | "mini_app";
+
 export type TelegramLinkButton =
   | { text: string; url: string; web_app?: never }
   | { text: string; web_app: { url: string }; url?: never };
@@ -32,8 +35,29 @@ export function createTelegramLinkButton(
   text: string,
   targetUrl: string,
   publicBaseUrl: string,
+  intent: TelegramLinkOpenIntent,
+  campaign?: string,
 ): TelegramLinkButton {
   const fallback: TelegramLinkButton = { text, url: targetUrl };
+  // Browser links retain shareable, canonical destinations. Attribute only
+  // first-party HTTPS links, never arbitrary external or unsafe schemes.
+  if (intent === "browser") {
+    try {
+      const base = new URL(publicBaseUrl);
+      const target = new URL(targetUrl, base);
+      if (base.protocol !== "https:" || target.protocol !== "https:" || target.origin !== base.origin) {
+        return fallback;
+      }
+      if (!target.searchParams.has("utm_source")) target.searchParams.set("utm_source", "telegram");
+      if (!target.searchParams.has("utm_medium")) target.searchParams.set("utm_medium", "bot");
+      if (campaign && /^[a-z0-9_-]{1,64}$/iu.test(campaign) && !target.searchParams.has("utm_campaign")) {
+        target.searchParams.set("utm_campaign", campaign);
+      }
+      return { text, url: target.toString() };
+    } catch {
+      return fallback;
+    }
+  }
   try {
     const base = new URL(publicBaseUrl);
     const target = new URL(targetUrl, base);
