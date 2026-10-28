@@ -12,6 +12,8 @@ export type PartyCandidateQuery = {
   childAge: number | null;
   budgetByn: number | null;
   excludedBusinessIds?: string[];
+  /** Internal use: availability stage needs the full ranked set before selecting five. */
+  includeAllRanked?: boolean;
 };
 
 export type RankedPartyCandidate = {
@@ -80,6 +82,7 @@ export async function rankPartyCandidates(input: PartyCandidateQuery): Promise<R
     cursor = page[page.length - 1].id;
     if (page.length < 200) break;
   }
-  return [...best.values()].sort((a, b) => b.score - a.score ||
-    a.businessId.localeCompare(b.businessId) || a.offerId.localeCompare(b.offerId)).slice(0, 5);
+  const ranked = [...best.values()].sort((a, b) => b.score - a.score ||
+    a.businessId.localeCompare(b.businessId) || a.offerId.localeCompare(b.offerId));
+  return input.includeAllRanked ? ranked : ranked.slice(0, 5);
 }
