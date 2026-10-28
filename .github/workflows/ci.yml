@@ -65,6 +65,7 @@ jobs:
       - name: Birthday party API and outbox regressions
         run: |
           pnpm exec tsx src/lib/plan/recurrence.test.ts
+          pnpm exec tsx src/lib/plan/recurrenceInput.test.ts
           pnpm exec tsx src/server/birthday/partyDraft.contract.test.ts
           pnpm exec tsx src/server/birthday/partyBusiness.contract.test.ts
           pnpm exec tsx src/server/birthday/partyOutbox.contract.test.ts
