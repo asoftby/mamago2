@@ -12,6 +12,7 @@ export async function findCandidatesForParty(
   ownerUserId: string,
   partyId: string,
   category: PartyCategory,
+  additionalExcludedBusinessIds: readonly string[] = [],
 ) {
   const party = await prisma.partyOrder.findFirst({
     where: { id: partyId, ownerUserId },
@@ -27,9 +28,9 @@ export async function findCandidatesForParty(
     throw new PartyApiError(422, "Укажите дату, время и количество гостей");
 
   // Exclude the already-selected businesses; never recommend the same company twice.
-  const excludedBusinessIds = [...new Set(party.items
+  const excludedBusinessIds = [...new Set([...additionalExcludedBusinessIds, ...party.items
     .map(item => item.businessId)
-    .filter((id): id is string => Boolean(id)))];
+    .filter((id): id is string => Boolean(id))])];
   const candidates = await findAvailablePartyCandidates({
     citySlug: party.citySlug,
     category,
