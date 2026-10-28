@@ -16,7 +16,7 @@ export async function findCandidatesForParty(
   const party = await prisma.partyOrder.findFirst({
     where: { id: partyId, ownerUserId },
     select: {
-      id: true, citySlug: true, eventDate: true, timeFrom: true, timeTo: true,
+      id: true, version: true, citySlug: true, eventDate: true, timeFrom: true, timeTo: true,
       childrenCount: true, adultsCount: true, childAge: true, budgetByn: true,
       items: { select: { businessId: true, category: true, role: true } },
     },
@@ -42,5 +42,5 @@ export async function findCandidatesForParty(
     budgetByn: party.budgetByn === null ? null : Number(party.budgetByn),
     excludedBusinessIds,
   });
-  return { partyId: party.id, category, candidates, finalConfirmationRequired: true };
+  return { partyId: party.id, partyVersion: party.version, category, candidates, finalConfirmationRequired: true };
 }

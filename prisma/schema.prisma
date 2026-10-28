@@ -627,6 +627,8 @@ model PlanItem {
   /// За сколько минут до начала напомнить об этой записи. null = по общему расписанию
   /// уведомлений пользователя (UserNotificationSchedule). Только для ручных записей с временем.
   reminderLeadMinutes Int?
+  /// Explicit reminder instant; delivery wiring follows separately.
+  reminderAt        DateTime?
   /// Взрослый член семьи, на кого записано дело («Я»). null = не задано / вся семья.
   /// childId задаёт ребёнка, assigneeUserId — взрослого; вместе не используются.
   assigneeUserId    String?
