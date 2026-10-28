@@ -9,6 +9,7 @@ import { listPublicRoutesByCity } from "@/server/services/route.service";
 import { getCurrentUser } from "@/lib/auth/server";
 import { countKudaDiscoveryEvents, getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
 import { getClassesDiscoveryFeed } from "@/server/discovery/classesDiscoveryFeed";
+import { getClassesListingPage } from "@/server/discovery/classesListingPage";
 import { getBirthdayDiscoveryPage } from "@/server/discovery/birthdayDiscoveryFeed";
 import {
   listDiscoveryClassChips,
@@ -83,6 +84,7 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
   const budgetEnabled = systemFilters.some((f) => f.type === "BUDGET");
 
   let discoveryActivities = undefined;
+  let classesPagination: { page: number; totalPages: number; total: number } | undefined;
   let birthdayPagination: { page: number; totalPages: number; total: number } | undefined;
   let classChips = undefined;
   let activeClassChipSlug = undefined;
@@ -173,12 +175,18 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
     classChips = await listDiscoveryClassChips();
     activeClassChipSlug = resolveDiscoveryClassChipSlug(requestedChip, classChips);
     const chipTitleBySlug = new Map(classChips.map((chip) => [chip.slug, chip.title]));
-    discoveryActivities = await getClassesDiscoveryFeed(city.id, city.slug, {
+    const rawPage = Array.isArray(searchParams.page) ? searchParams.page[0] : searchParams.page;
+    const requestedPage = Number(rawPage);
+    const listing = await getClassesListingPage(city.id, city.slug, {
+      page: Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1,
       chipSlug: activeClassChipSlug,
       chipTitleBySlug,
       free: classFree,
       priceMax: classPriceMax,
     });
+    if (listing.page > listing.totalPages && listing.total > 0) notFound();
+    discoveryActivities = listing.activities;
+    classesPagination = { page: listing.page, totalPages: listing.totalPages, total: listing.total };
     if (budgetEnabled && discoveryActivities) {
       let budgetActivities = discoveryActivities;
       if (classPriceMax != null) {
@@ -263,6 +271,7 @@ export async function CityShell({ citySlug, intent, searchParams: rawSearchParam
       routesData={routesData}
       discoveryActivities={discoveryActivities}
       birthdayPagination={birthdayPagination}
+      classesPagination={classesPagination}
       classChips={classChips}
       activeClassChipSlug={activeClassChipSlug}
       budgetConfig={budgetConfig}
