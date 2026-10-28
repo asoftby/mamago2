@@ -3,6 +3,7 @@ import {
   BarChart3,
   Bell,
   CalendarDays,
+  CalendarRange,
   CircleHelp,
   ClipboardList,
   LayoutDashboard,
@@ -45,6 +46,7 @@ export const BUSINESS_PUBLICATIONS_PLACES_HREF = businessRoute("/publications/pl
 export const BUSINESS_PUBLICATIONS_OFFERS_HREF = businessRoute("/publications/offers");
 export const BUSINESS_EVENTS_HREF = businessRoute("/events");
 export const BUSINESS_BOOKINGS_HREF = businessRoute("/bookings");
+export const BUSINESS_BOOKING_UNITS_HREF = businessRoute("/booking-units");
 export const BUSINESS_NOTIFICATIONS_HREF = businessRoute("/notifications");
 export const BUSINESS_REVIEWS_HREF = businessRoute("/reviews");
 export const BUSINESS_TEAM_HREF = businessRoute("/team");
@@ -102,6 +104,13 @@ export const businessNavigation: BusinessNavItem[] = [
     href: BUSINESS_BOOKINGS_HREF,
     icon: CalendarDays,
     match: [businessRoute("/bookings")],
+  },
+  {
+    type: "item",
+    label: "Ресурсы и расписание",
+    href: BUSINESS_BOOKING_UNITS_HREF,
+    icon: CalendarRange,
+    match: [businessRoute("/booking-units")],
   },
   {
     type: "item",
@@ -164,6 +173,7 @@ export const businessQuickActions = {
   publicationsOffers: BUSINESS_PUBLICATIONS_OFFERS_HREF,
   events: BUSINESS_EVENTS_HREF,
   bookings: BUSINESS_BOOKINGS_HREF,
+  bookingUnits: BUSINESS_BOOKING_UNITS_HREF,
   reviews: BUSINESS_REVIEWS_HREF,
   notifications: BUSINESS_NOTIFICATIONS_HREF,
   promotion: BUSINESS_PROMOTION_OVERVIEW_HREF,
