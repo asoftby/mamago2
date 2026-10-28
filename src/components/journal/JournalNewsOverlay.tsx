@@ -34,9 +34,9 @@ export function JournalNewsOverlay({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const stored = sessionStorage.getItem("mamago.journal.news.origin");
-    sessionStorage.removeItem("mamago.journal.news.origin");
     try {
+      const stored = sessionStorage.getItem("mamago.journal.news.origin");
+      sessionStorage.removeItem("mamago.journal.news.origin");
       const origin = stored ? JSON.parse(stored) as { at: number; path: string; x: number; y: number; width: number; height: number } : null;
       originRef.current = origin && Date.now() - origin.at < 5000 && origin.path === window.location.pathname
         ? new DOMRect(origin.x, origin.y, origin.width, origin.height)
@@ -81,7 +81,7 @@ export function JournalNewsOverlay({ children }: { children: React.ReactNode }) 
       document.removeEventListener("keydown", onKey);
       restoreFocusRef.current?.focus({ preventScroll: true });
     };
-  }, [router]);
+  }, [close]);
 
   return (
     <div
