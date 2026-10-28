@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/birthday-confirmation-db-integration.yml"
       - "src/server/birthday/**"
+      - "src/app/api/business/booking-units/**"
       - "scripts/it/seedPartyIT.ts"
       - "src/app/api/parent/parties/**"
       - "src/app/api/business/party-requests/**"
@@ -19,6 +20,7 @@ on:
     paths:
       - ".github/workflows/birthday-confirmation-db-integration.yml"
       - "src/server/birthday/**"
+      - "src/app/api/business/booking-units/**"
       - "scripts/it/seedPartyIT.ts"
       - "src/app/api/parent/parties/**"
       - "src/app/api/business/party-requests/**"
@@ -68,6 +70,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Apply migrations to disposable PostgreSQL
         run: pnpm exec prisma migrate deploy
+      - name: Verify manual calendar block contracts
+        run: pnpm exec tsx src/server/birthday/bookingUnitBlocks.test.ts
       - name: Verify real quote acceptance and exclusive confirmation
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyConfirmation.postgres.integration.test.ts
       - name: Verify server closes offers not accepted in time
