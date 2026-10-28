@@ -235,6 +235,7 @@ jobs:
           NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/telegram/botWelcome.test.ts
           pnpm exec tsx src/lib/telegram/webAppButton.test.ts
           pnpm exec tsx src/lib/telegram/verifyWebAppInitData.test.ts
+          pnpm exec tsx src/app/api/auth/telegram-webapp/route.test.ts
           pnpm exec tsx src/lib/my-plan/planItemTimezoneRepair.test.ts
           bash -n scripts/deploy/run-prod-notification-jobs.sh
           bash -n scripts/deploy/install-prod-notification-cron.sh
