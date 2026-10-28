@@ -629,6 +629,8 @@ model PlanItem {
   reminderLeadMinutes Int?
   /// Explicit reminder instant; delivery wiring follows separately.
   reminderAt        DateTime?
+  recurrenceSeriesId String?
+  recurrenceDate    String?
   /// Взрослый член семьи, на кого записано дело («Я»). null = не задано / вся семья.
   /// childId задаёт ребёнка, assigneeUserId — взрослого; вместе не используются.
   assigneeUserId    String?
@@ -659,6 +661,7 @@ model PlanItem {
   user              User                      @relation("PlanItemOwner", fields: [userId], references: [id], onDelete: Cascade)
   child             Child?                    @relation(fields: [childId], references: [id], onDelete: SetNull)
   assignee          User?                     @relation("PlanItemAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull)
+  recurrenceSeries  PlanRecurrenceSeries? @relation(fields: [recurrenceSeriesId], references: [id], onDelete: SetNull)
   scenarioOverrides DayScenarioItemOverride[]
   requirements      PlanItemRequirement[]
 
@@ -679,6 +682,36 @@ model PlanItem {
   @@index([familyId, visibility, status])
   @@index([activityId, cancelledAt, status, familyId])
   @@unique([id, familyId])
+  @@unique([recurrenceSeriesId, recurrenceDate])
+}
+
+model PlanRecurrenceSeries {
+  id             String @id @default(cuid())
+  ownerUserId    String
+  familyId       String?
+  visibility     PlanVisibility @default(FAMILY)
+  timezone       String @default("Europe/Minsk")
+  frequency      PlanRecurrenceFrequency
+  interval       Int @default(1)
+  weekdays       Int[] @default([])
+  startDate      String
+  untilDate      String?
+  maxOccurrences Int?
+  template       Json
+  stoppedAt      DateTime?
+  version        Int @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  items          PlanItem[]
+
+  @@index([ownerUserId, stoppedAt])
+  @@index([familyId, stoppedAt])
+}
+
+enum PlanRecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
 }
 
 model PlanItemRequirement {
