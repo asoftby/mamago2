@@ -117,34 +117,13 @@ export function OfferPageView({
 }: OfferPageViewProps) {
   const { isAuthenticated } = useAuthMe();
   const ctaRef = useRef<HTMLElement | null>(null);
-  const storageKey = `mamago:offer-plan:${data.id}`;
-  const [localSave, setLocalSave] = useState<LocalOfferSaveState | null>(() => {
-    if (typeof window === "undefined") return null;
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      return raw ? (JSON.parse(raw) as LocalOfferSaveState) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [localSave, setLocalSave] = useState<LocalOfferSaveState | null>(null);
   const [bookingShift, setBookingShift] = useState<ShiftCtaContext | null>(null);
   const [classBookingOpen, setClassBookingOpen] = useState(false);
   const [saveTargetShift, setSaveTargetShift] = useState<ShiftCtaContext | null>(null);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [isIdeaSaved, setIsIdeaSaved] = useState(false);
   const [callModalOpen, setCallModalOpen] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    queueMicrotask(() => {
-      try {
-        const raw = window.localStorage.getItem(storageKey);
-        setLocalSave(raw ? (JSON.parse(raw) as LocalOfferSaveState) : null);
-      } catch {
-        setLocalSave(null);
-      }
-    });
-  }, [storageKey]);
 
   const loadIdeaStatus = useCallback(async () => {
     if (!shouldFetchOwnSaveStatus(isAuthenticated)) {
@@ -158,6 +137,7 @@ export function OfferPageView({
       if (!res.ok) return;
       const json = await res.json();
       setIsIdeaSaved(Boolean(json.isIdea));
+      setLocalSave(json.inPlan ? { kind: "plan", dateISO: json.planDate ?? null } : null);
     } catch {
       // ignore auth/network errors for guests
     }
@@ -168,16 +148,6 @@ export function OfferPageView({
       void loadIdeaStatus();
     });
   }, [loadIdeaStatus]);
-
-  const persistLocalSave = useCallback((next: LocalOfferSaveState | null) => {
-    setLocalSave(next);
-    if (typeof window === "undefined") return;
-    if (!next) {
-      window.localStorage.removeItem(storageKey);
-      return;
-    }
-    window.localStorage.setItem(storageKey, JSON.stringify(next));
-  }, [storageKey]);
 
   const shiftDateOptions = useMemo(() => {
     return (data.schedule?.items ?? [])
@@ -363,12 +333,21 @@ export function OfferPageView({
     }
 
     if (result.action !== "plan") return;
-    persistLocalSave({
-      kind: "plan",
-      dateISO: result.dateISO,
-      shiftId: saveTargetShift?.shiftId ?? null,
-    });
-  }, [data.id, persistLocalSave, saveTargetShift?.shiftId]);
+    if (!result.dateISO) {
+      toast.error("Выберите дату для семейного плана");
+      return;
+    }
+    void fetch("/api/save/plan", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ offerId: data.id, date: result.dateISO }),
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("offer_plan_save_failed");
+      setLocalSave({ kind: "plan", dateISO: result.dateISO });
+      toast.success("Добавлено в «Мой план»");
+    }).catch(() => toast.error("Не удалось добавить предложение в «Мой план»"));
+  }, [data.id]);
 
   const isSaved = isIdeaSaved || Boolean(localSave);
   useRegisterHeaderSaveAction(isSaved, handleSave, data.title, { entityNoun: "предложением" });
