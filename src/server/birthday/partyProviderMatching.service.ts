@@ -65,11 +65,6 @@ export async function discoverPartyProviders(
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
   });
 
-  const offerIds = offers.map(offer => offer.id);
-  if (!offerIds.length) return [];
-  const businessIds = Array.from(new Set(offers.map(o => o.place?.ownerBusinessId).filter(
-    (id): id is string => id !== null && id !== undefined)));
-
     if (!offers.length) break;
     const offerIds = offers.map(offer => offer.id);
     const businessIds = Array.from(new Set(offers.map(o => o.place?.ownerBusinessId).filter(
