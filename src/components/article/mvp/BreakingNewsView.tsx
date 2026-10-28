@@ -991,7 +991,7 @@ export function BreakingNewsView({
       <Link
         href={journalHref}
         aria-label="Закрыть публикацию и вернуться в Журнал"
-        className="bn-standalone-close fixed right-4 top-[max(1rem,env(safe-area-inset-top))] z-[110] flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-neutral-900 shadow-lg backdrop-blur-sm transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="bn-standalone-close fixed right-4 top-[max(4.5rem,calc(env(safe-area-inset-top) + 4.5rem))] z-[110] flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-neutral-900 shadow-lg backdrop-blur-sm transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
 
       >
         <X size={22} aria-hidden />
