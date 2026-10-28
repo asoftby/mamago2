@@ -5,6 +5,7 @@ import { CalendarClock, Pencil, Plus, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BusinessSurfaceCard } from "@/components/business/ui/BusinessSurfaceCard";
+import { BookingUnitCalendar } from "./BookingUnitCalendar";
 import {
   WEEKDAYS, asMinutes, asTime, emptyUnitForm, fromUnitDetail, toUnitPayload,
   type DateException, type UnitDetail, type UnitForm, type UnitSummary, type WeekRule,
@@ -317,6 +318,8 @@ export function BookingUnitManager({ offers }: { offers: OfferOption[] }) {
           ) : (
             <p className="text-sm text-stone-600">Закрытые даты можно добавить сразу после создания ресурса через «Изменить».</p>
           )}
+
+          {editingId ? <BookingUnitCalendar unitId={editingId} /> : null}
 
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={busy}>{busy ? "Сохранение…" : editingId ? "Сохранить изменения" : "Создать ресурс"}</Button>
