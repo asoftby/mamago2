@@ -93,6 +93,7 @@ export function buildCanonicalOfferPriceWhere(
 
 type GetClassesDiscoveryFeedOptions = {
   take?: number;
+  onlyIds?: string[];
   chipSlug?: string | null;
   chipTitleBySlug?: Map<string, string>;
   free?: boolean;
@@ -138,7 +139,7 @@ export async function getClassesDiscoveryFeed(
   let classChipSlugsAvailable = true;
 
   try {
-    rows = await runQuery({ publicWhereParts, cityId, targetRegionId, chipSlug, now, free, priceMax });
+    rows = await runQuery({ publicWhereParts, cityId, targetRegionId, chipSlug, now, free, priceMax, take, onlyIds: options?.onlyIds });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const isMissingColumn =
@@ -159,6 +160,8 @@ export async function getClassesDiscoveryFeed(
           free,
           priceMax,
           skipChipSlugsSelect: true,
+          take,
+          onlyIds: options?.onlyIds,
         });
       } catch {
         return [];
@@ -258,6 +261,8 @@ type RunQueryParams = {
   free: boolean;
   priceMax: number | null;
   skipChipSlugsSelect?: boolean;
+  take?: number;
+  onlyIds?: string[];
 };
 
 export function buildClassesDiscoveryWhere(input: Pick<RunQueryParams, "publicWhereParts" | "cityId" | "targetRegionId" | "chipSlug" | "now" | "free" | "priceMax" | "skipChipSlugsSelect">): Prisma.OfferWhereInput {
@@ -301,11 +306,13 @@ async function runQuery({
   free,
   priceMax,
   skipChipSlugsSelect = false,
+  take = 80,
+  onlyIds,
 }: RunQueryParams) {
   const where = buildClassesDiscoveryWhere({ publicWhereParts, cityId, targetRegionId, chipSlug, now, free, priceMax, skipChipSlugsSelect });
   return prisma.offer.findMany({
-    where,
-    take: 120,
+    where: onlyIds ? { AND: [where, { id: { in: onlyIds } }] } : where,
+    take: onlyIds ? onlyIds.length : Math.max(120, take),
     orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
     select: {
       id: true,
