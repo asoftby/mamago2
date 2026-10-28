@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { PublicationTagChips } from "@/components/article/PublicationTagChips";
@@ -964,6 +965,7 @@ export function BreakingNewsView({
   articleHref,
   coverImageUrl,
 }: BreakingNewsViewProps) {
+  const router = useRouter();
   const cityHomeHref = getCityHomeHref(citySlug);
   const journalHref = citySlug?.trim() ? `/${citySlug.trim()}/blog` : "/blog";
 
@@ -985,6 +987,22 @@ export function BreakingNewsView({
         backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .35 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")`,
         opacity: .055, mixBlendMode: "multiply",
       }} aria-hidden />
+
+      {/* Close to Journal. Direct links retain a reliable destination. */}
+      <Link
+        href={journalHref}
+        aria-label="Закрыть публикацию и вернуться в Журнал"
+        className="fixed right-4 top-[max(1rem,env(safe-area-inset-top))] z-[110] flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-neutral-900 shadow-lg backdrop-blur-sm transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        onClick={(event) => {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          if (window.history.state?.__mamagoJournalOrigin === articleHref) {
+            event.preventDefault();
+            router.back();
+          }
+        }}
+      >
+        <X size={22} aria-hidden />
+      </Link>
 
       {/* Reading progress bar */}
       <ReadingProgress />
