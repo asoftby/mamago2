@@ -260,20 +260,10 @@ type RunQueryParams = {
   skipChipSlugsSelect?: boolean;
 };
 
-async function runQuery({
-  publicWhereParts,
-  cityId,
-  targetRegionId,
-  chipSlug,
-  now,
-  free,
-  priceMax,
-  skipChipSlugsSelect = false,
-}: RunQueryParams) {
+export function buildClassesDiscoveryWhere(input: Pick<RunQueryParams, "publicWhereParts" | "cityId" | "targetRegionId" | "chipSlug" | "now" | "free" | "priceMax" | "skipChipSlugsSelect">): Prisma.OfferWhereInput {
+  const { publicWhereParts, cityId, targetRegionId, chipSlug, now, free, priceMax, skipChipSlugsSelect = false } = input;
   const priceWhere = buildCanonicalOfferPriceWhere({ free, priceMax });
-
-  return prisma.offer.findMany({
-    where: {
+  return {
       AND: [
         ...publicWhereParts,
         { kind: "SERVICE" },
@@ -299,7 +289,22 @@ async function runQuery({
           ? [{ classChipSlugs: { has: chipSlug } } as Prisma.OfferWhereInput]
           : []),
       ],
-    },
+    };
+}
+
+async function runQuery({
+  publicWhereParts,
+  cityId,
+  targetRegionId,
+  chipSlug,
+  now,
+  free,
+  priceMax,
+  skipChipSlugsSelect = false,
+}: RunQueryParams) {
+  const where = buildClassesDiscoveryWhere({ publicWhereParts, cityId, targetRegionId, chipSlug, now, free, priceMax, skipChipSlugsSelect });
+  return prisma.offer.findMany({
+    where,
     take: 120,
     orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
     select: {
