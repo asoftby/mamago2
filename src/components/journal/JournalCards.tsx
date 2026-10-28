@@ -90,19 +90,24 @@ export function JournalMainCard({ article, saveStatus }: { article: CityHomeJour
   );
 }
 
-/** Компактная карточка новости: тёмный бейдж «НОВОСТЬ · 2 ч». */
+/** Breaking News: обложка stories, время и двухстрочный заголовок. */
 export function JournalNewsCard({ article }: { article: CityHomeJournalArticle }) {
-  const relative = article.publishedAt ? formatJournalRelativeTime(article.publishedAt) : null;
+  const relative = article.publishedAt
+    ? formatJournalRelativeTime(article.publishedAt).replace(/^(\d+ (?:мин|ч))$/, "$1 назад")
+    : null;
   return (
     <Link
       href={article.href}
-      className="group flex h-full min-h-11 flex-col gap-3 rounded-2xl border border-border bg-background p-3 transition-colors hover:border-foreground/30"
+      className="group relative block aspect-[3/5] overflow-hidden rounded-[18px] bg-muted text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <Cover article={article} tone={1} className="aspect-[16/10] rounded-xl" />
-      <JournalBadge variant="news" detail={relative} className="self-start" />
-      <h3 className="m-0 line-clamp-3 text-[15px] font-semibold leading-snug text-foreground transition-colors group-hover:text-primary">
-        {article.title}
-      </h3>
+      <Cover article={article} tone={1} className="absolute inset-0 h-full w-full transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none" />
+      <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1.5 p-3 sm:p-4">
+        {relative ? <span className="text-[11px] leading-normal text-white/80">{relative}</span> : null}
+        <h3 className="m-0 line-clamp-2 text-[13px] font-semibold leading-snug sm:text-[14px]">
+          {article.title}
+        </h3>
+      </div>
     </Link>
   );
 }

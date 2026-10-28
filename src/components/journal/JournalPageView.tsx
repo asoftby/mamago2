@@ -13,10 +13,10 @@ import {
 import { JournalFeedGridCard, JournalFeedRow, JournalMainCard, JournalNewsCard } from "./JournalCards";
 import { JournalCollectionsCarousel } from "./JournalCollectionsCarousel";
 
-const NEWS_CARD_SHELL = "shrink-0 snap-start w-[64vw] min-w-[200px] max-w-[280px] lg:w-[calc((100%-6rem)/5)] lg:max-w-none";
+const NEWS_CARD_SHELL = "shrink-0 snap-start w-[42vw] min-w-[140px] max-w-[200px] lg:w-[calc((100%-6rem)/5)] lg:max-w-none";
 
 /**
- * Страница журнала: H1 + подзаголовок → «Главное» → «Новости» → «Подборки mamaGo»
+ * Страница журнала: H1 + подзаголовок → «Главное» → «Breaking News» → «Подборки mamaGo»
  * → «Свежие материалы». Каждый пустой блок скрыт целиком. Чипы рубрик — в layout.
  */
 export function JournalPageView({
@@ -81,18 +81,21 @@ export function JournalPageView({
 
       {news.length > 0 ? (
         <section aria-labelledby="journal-news-title" className="space-y-4">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 id="journal-news-title" className="m-0 font-heading text-[24px] leading-tight tracking-[-0.02em] sm:text-[28px]">
-              Новости
-            </h2>
-            <Link
-              href={typeHref("BREAKING_NEWS")}
-              className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-brand-ink hover:underline"
-            >
-              Все →
-            </Link>
-          </div>
-          <HorizontalCardRow>
+          <HorizontalCardRow
+            headerTitle={
+              <h2 id="journal-news-title" className="m-0 font-heading text-[24px] leading-tight tracking-[-0.02em] sm:text-[28px]">
+                Breaking News
+              </h2>
+            }
+            navLeading={
+              <Link
+                href={typeHref("BREAKING_NEWS")}
+                className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap text-sm font-semibold text-brand-ink hover:underline"
+              >
+                Все →
+              </Link>
+            }
+          >
             {news.map((article, index) => (
               <div key={article.id} className={NEWS_CARD_SHELL}>
                 <AnalyticsCardViewTracker
