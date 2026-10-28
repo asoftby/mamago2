@@ -1,5 +1,5 @@
 import { PlanItemSource, type PlanVisibility } from "@prisma/client";
-import { planCountUnit } from "@/server/family/familyAnalyticsPure";
+import { planActivityCountsQuery } from "@/server/services/planActivityCountsQuery";
 import { prisma } from "@/lib/prisma";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { resolveRouteForUserSave } from "@/server/services/route.service";
@@ -172,23 +172,13 @@ export async function countPlanUsersByActivity(
 ): Promise<Map<string, number>> {
   if (activityIds.length === 0) return new Map();
 
-  const familyUnit = familyReadsEnabled();
-  const rows = await prisma.planItem.findMany({
-    where: { activityId: { in: activityIds }, ...(familyUnit ? NOT_CANCELLED : {}) },
-    select: { activityId: true, userId: true, familyId: true },
-    distinct: ["activityId", "userId", "familyId"],
-  });
-
-  const seen = new Set<string>();
-  const counts = new Map<string, number>();
-  for (const row of rows) {
-    if (!row.activityId) continue;
-    const key = `${row.activityId}|${familyUnit ? planCountUnit(row) : row.userId}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    counts.set(row.activityId, (counts.get(row.activityId) ?? 0) + 1);
-  }
-  return counts;
+  // SQL deduplicates the same plan counting unit that planCountUnit uses:
+  // family ID when present, otherwise user ID. Legacy (flag off) counts users
+  // across all statuses; family reads exclude CANCELLED.
+  const rows = await prisma.$queryRaw<Array<{ activityId: string; total: bigint }>>(
+    planActivityCountsQuery(activityIds, familyReadsEnabled()),
+  );
+  return new Map(rows.map(({ activityId, total }) => [activityId, Number(total)]));
 }
 
 /**
