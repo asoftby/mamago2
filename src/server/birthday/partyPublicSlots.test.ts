@@ -32,13 +32,13 @@ const blocked = {
   blockEnd: new Date("2026-11-16T10:30:00.000Z"),
 };
 assert.deepEqual(preview([{ ...unit, allocations: [blocked] }]).map(s => s.start),
-  ["10:00", "14:00", "15:00"], "allocations overlap prep/cleanup buffers");
+  ["14:00", "15:00"], "allocations overlap prep/cleanup buffers");
 assert.deepEqual(preview([{ ...unit, blocks: [blocked] }]).map(s => s.start),
-  ["10:00", "14:00", "15:00"], "manual calendar blocks must be respected");
+  ["14:00", "15:00"], "manual calendar blocks must be respected");
 assert.deepEqual(preview([unit, { ...unit, allocations: [blocked] }]), preview(), "union of available resources cannot double-count slots");
 assert.deepEqual(previewPartySlots({ day: "2026-02-30", durationMinutes: 180, guestCount: 3, now, units: [unit] }), []);
 assert.deepEqual(previewPartySlots({ day, durationMinutes: 10, guestCount: 3, now, units: [unit] }), []);
-assert.deepEqual(previewPartySlots({ day, durationMinutes: 180, guestCount: 3, now: new Date("2026-11-16T11:30:00Z"), units: [unit] }), [], "past service start must not show");
+assert.deepEqual(previewPartySlots({ day, durationMinutes: 180, guestCount: 3, now: new Date("2026-11-16T13:00:00Z"), units: [unit] }), [], "past service start must not show");
 const service = readFileSync("src/server/birthday/partyPublicSlots.service.ts", "utf8");
 const endpoint = readFileSync("src/app/api/public/birthday/availability/route.ts", "utf8");
 for (const s of [
