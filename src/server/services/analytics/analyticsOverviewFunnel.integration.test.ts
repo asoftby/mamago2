@@ -118,7 +118,7 @@ async function main() {
 
     // E: anonymous open followed by authenticated save in the same browser.
     // Both events must count as ONE person, with a converted save branch.
-    const e = await makeUser();
+    const e = await makeUser([SEGMENT]);
     const eSession = `fn-${marker}-login`;
     await ev({ sessionId: eSession }, "DETAIL_OPEN");
     await ev({ userId: e.userId, sessionId: eSession }, "SAVE");
@@ -127,6 +127,13 @@ async function main() {
     assert.equal(linkedOverview.saveRate, 1 / 2);
     const linkedFunnels = await getAnalyticsFunnels(filters);
     assert.deepEqual(linkedFunnels.globalFunnel.raw, { view: 5, open: 4, save: 2, plan: 1, click: 2 });
+
+    // Segment membership must be applied to the resolved user, not to raw
+    // event.userId: the anonymous opening belongs to segment member E.
+    const linkedSegment = await getAnalyticsOverview({ ...filters, segment: SEGMENT });
+    assert.deepEqual(linkedSegment.funnel.map((s) => s.count), [3, 2, 2, 1, 1]);
+    const linkedSegmentFunnels = await getAnalyticsFunnels({ ...filters, segment: SEGMENT });
+    assert.deepEqual(linkedSegmentFunnels.globalFunnel.raw, { view: 3, open: 2, save: 2, plan: 1, click: 1 });
 
     // Shared browser: a different authenticated user appears only in EVENT.
     // PLACE-only filtering must NOT hide this ambiguity and attribute the
