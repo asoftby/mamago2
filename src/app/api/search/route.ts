@@ -47,6 +47,12 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = (searchParams.get("q")?.trim() ?? "").slice(0, MAX_QUERY_LENGTH);
   const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "8", 10), 1), 20);
+  const full = searchParams.get("mode") === "full";
+  const rawPage = Number(searchParams.get("page") ?? "1");
+  const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? Math.min(rawPage, 100000) : 1;
+  const pageSize = 24;
+  let total = 0;
+  let totalPages = 1;
   const citySlug = searchParams.get("citySlug");
   const legacyCityId = searchParams.get("cityId");
 
@@ -66,35 +72,52 @@ export async function GET(request: Request) {
 
     // Prefer the literal query; only fill remaining slots from the alternate
     // physical keyboard layout. Never let a guessed layout displace exact hits.
-    const findDocs = (query: string, take: number) => prisma.searchDocument.findMany({
-      where: { isPublished: true, ...buildSearchTextWhere(query) },
-      take,
-      orderBy: [{ boost: "desc" }, { updatedAt: "desc" }, { entityType: "asc" }, { entityId: "asc" }],
-      select: {
-        entityId: true,
-        entityType: true,
-        title: true,
-        urlPath: true,
-        imageUrl: true,
-        summaryLine: true,
-        metaLine: true,
-      },
-    });
-
-    const literalDocs = await findDocs(q, limit);
+    const orderBy = [{ boost: "desc" }, { updatedAt: "desc" }, { entityType: "asc" }, { entityId: "asc" }] as const;
+    const select = {
+      entityId: true, entityType: true, title: true, urlPath: true,
+      imageUrl: true, summaryLine: true, metaLine: true,
+    } as const;
+    const literalWhere = { isPublished: true, ...buildSearchTextWhere(q) };
     const alternate = swapKeyboardLayout(q);
-    // An overlapping literal hit must not consume an alternate-result slot.
-    // Fetch up to the full page size and deduplicate after ranking.
-    const additionalDocs = alternate && literalDocs.length < limit
-      ? await findDocs(alternate, limit)
-      : [];
-    const seen = new Set<string>();
-    const docs = [...literalDocs, ...additionalDocs].filter((doc) => {
-      const key = `${doc.entityType}:${doc.entityId}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).slice(0, limit);
+    // Fallback matches must not repeat literal matches, including across pages.
+    const alternateWhere = alternate && alternate !== q
+      ? { AND: [{ isPublished: true }, buildSearchTextWhere(alternate), { NOT: buildSearchTextWhere(q) }] }
+      : null;
+    const findDocs = (where: import("@prisma/client").Prisma.SearchDocumentWhereInput, take: number, skip = 0) =>
+      prisma.searchDocument.findMany({ where, take, skip, orderBy: [...orderBy], select });
+
+    let docs: Awaited<ReturnType<typeof findDocs>>;
+    if (full) {
+      const [literalCount, alternateCount] = await Promise.all([
+        prisma.searchDocument.count({ where: literalWhere }),
+        alternateWhere ? prisma.searchDocument.count({ where: alternateWhere }) : Promise.resolve(0),
+      ]);
+      total = literalCount + alternateCount;
+      totalPages = Math.max(1, Math.ceil(total / pageSize));
+      const offset = (page - 1) * pageSize;
+      const literalTake = Math.max(0, Math.min(pageSize, literalCount - offset));
+      const literalDocs = literalTake
+        ? await findDocs(literalWhere, literalTake, offset)
+        : [];
+      const alternateTake = pageSize - literalDocs.length;
+      const alternateSkip = Math.max(0, offset - literalCount);
+      const alternateDocs = alternateWhere && alternateTake > 0 && alternateSkip < alternateCount
+        ? await findDocs(alternateWhere, alternateTake, alternateSkip)
+        : [];
+      docs = [...literalDocs, ...alternateDocs];
+    } else {
+      const literalDocs = await findDocs(literalWhere, limit);
+      const additionalDocs = alternateWhere && literalDocs.length < limit
+        ? await findDocs({ isPublished: true, ...buildSearchTextWhere(alternate!) }, limit)
+        : [];
+      const seen = new Set<string>();
+      docs = [...literalDocs, ...additionalDocs].filter((doc) => {
+        const key = `${doc.entityType}:${doc.entityId}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).slice(0, limit);
+    }
 
     const activityIds = docs
       .filter((d) => d.entityType === "activity")
@@ -313,7 +336,7 @@ export async function GET(request: Request) {
       // sessionId can be added later from cookies/headers
     }).catch((err) => console.error("Search logging failed:", err));
 
-    return NextResponse.json({ results });
+    return NextResponse.json(full ? { results, page, pageSize, total, totalPages } : { results });
   } catch (e) {
     console.error("[api/search]", e);
     return NextResponse.json({ results: [] satisfies SearchResultItem[] });
