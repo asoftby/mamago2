@@ -17,7 +17,7 @@ export async function loadSlotSnapshot(
       campPlacesCount: true,
       openingHoursId: true,
       inheritPlaceOpeningHours: true,
-      place: { select: { openingHoursId: true } },
+      place: { select: { openingHoursId: true, ownerBusinessId: true } },
       offerBooking: {
         include: { rules: { where: input.classGroupId ? { classGroupId: input.classGroupId } : {} }, exceptions: true },
       },
@@ -43,7 +43,7 @@ export async function loadSlotSnapshot(
       },
     }),
     db.bookingUnitOffer.findMany({
-      where: { offerId: input.offerId, bookingUnit: { status: "ACTIVE", type: "EXCLUSIVE" } },
+      where: { offerId: input.offerId, bookingUnit: { status: "ACTIVE", type: "EXCLUSIVE", businessId: offer.place?.ownerBusinessId ?? "__no_business__" } },
       include: {
         bookingUnit: {
           include: {
