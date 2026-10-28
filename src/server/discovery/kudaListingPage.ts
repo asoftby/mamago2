@@ -1,3 +1,4 @@
+import { withImageDimensions } from "@/server/media/loadImageDimensionsByUrl";
 import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 import { parseAppliedFromUrl } from "@/features/filters/discovery/discoveryFilterParams";
 import { partitionDiscoveryFeed } from "@/lib/discovery/partitionDiscoveryFeed";
@@ -9,13 +10,6 @@ import {
   paginateKudaFeed,
   type KudaListingPage,
 } from "@/lib/discovery/kudaListingPagination";
-
-/**
- * Candidates ranked per request. The DB query and temporal/engagement ranking
- * stay exactly as in `getKudaDiscoveryFeed`; only the pool is larger so that
- * pagination has a stable, complete order (previously 200 candidates → 80 cards).
- */
-export const KUDA_LISTING_POOL = 360;
 
 export type ListingSearchParams = Record<string, string | string[] | undefined>;
 
@@ -90,8 +84,8 @@ export async function loadKudaListingPage(input: {
   // #799): the partition uses only explicit filters (manual age chips), so
   // `?page=N`, infinite scroll and guests all see the same membership/order.
   const feed = await getKudaDiscoveryFeed(input.cityId, input.citySlug, input.userId, {
-      take: KUDA_LISTING_POOL,
-      candidatePoolCap: KUDA_LISTING_POOL,
+      allCandidates: true,
+      hydrateImages: false,
       format: parseActivityFormatQuery(input.searchParams.get("format")),
       nearby: false,
       explicitTerritorySlug: input.explicitTerritorySlug ?? null,
@@ -99,5 +93,6 @@ export async function loadKudaListingPage(input: {
   });
   const partition = partitionDiscoveryFeed(filters, feed);
   const page = paginateKudaFeed(partition, input.page, input.pageSize ?? KUDA_LISTING_PAGE_SIZE);
-  return { ...page, pool: [...partition.primary, ...partition.secondary] };
+  const items = await withImageDimensions(page.items, (card) => card.image);
+  return { ...page, items, pool: [...partition.primary, ...partition.secondary] };
 }
