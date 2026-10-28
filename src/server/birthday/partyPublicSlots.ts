@@ -55,8 +55,15 @@ export function previewPartySlots(params: {
 
     const step = unit.stepMinutes;
     if (!Number.isInteger(step) || step < 5 || step > 240) continue;
+    // Each resource's step is relative to the opening of each weekly/override interval,
+    // not necessarily midnight (e.g. 10:30 opening with 60-minute steps).
+    const weekday = dayDate.getUTCDay() || 7;
+    const anchors = [
+      ...unit.rules.filter(rule => rule.weekday === weekday).map(rule => rule.startMinutes),
+      ...unit.exceptions.filter(item => item.kind === "OPEN_OVERRIDE").map(item => item.startMinutes ?? 0),
+    ];
     // End at or before 23:59: 24:00 is not accepted by the final booking window.
-    for (let start = 0; start + durationMinutes < 1440; start += step) {
+    for (const anchor of new Set(anchors)) for (let start = anchor; start + durationMinutes < 1440; start += step) {
       const end = start + durationMinutes;
       const startTime = timeAt(start);
       const endTime = timeAt(end);
