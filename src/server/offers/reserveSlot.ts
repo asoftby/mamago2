@@ -169,7 +169,8 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
         pricing = calculateBookingPrice({
           currency: offer.currency, seats,
           durationMinutes,
-          baseDurationMinutes: offer.offerBooking.durationMin ?? durationMinutes,
+          baseDurationMinutes: offer.offerBooking.scheduleKind === "ON_REQUEST_WINDOWS"
+            ? (offer.offerBooking.durationMin ?? durationMinutes) : durationMinutes,
           extensionHourPriceByn: offer.offerBooking.extensionHourPriceByn?.toString() ?? null,
           extensionDiscountPercent: offer.offerBooking.extensionDiscountPercent,
           basePriceByn: offer.offerBooking.basePriceByn?.toString() ?? null,
