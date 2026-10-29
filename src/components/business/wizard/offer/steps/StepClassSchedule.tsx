@@ -24,6 +24,7 @@ interface StepClassScheduleProps {
   data: OfferFormData;
   onChange: (updates: Partial<OfferFormData>) => void;
   isEditable: boolean;
+  showTariffs?: boolean;
 }
 
 const WEEKDAYS: Array<{ iso: number; label: string }> = [
@@ -47,7 +48,7 @@ function dateToKey(date: Date): string {
 }
 
 /** Блоки «Когда проходят занятия» и «Выходные и особые дни» для занятий. */
-export function StepClassSchedule({ data, onChange, isEditable }: StepClassScheduleProps) {
+export function StepClassSchedule({ data, onChange, isEditable, showTariffs = true }: StepClassScheduleProps) {
   const schedule = data.schedule;
   const classSchedule = schedule.classSchedule;
   const regular = data.productType === "REGULAR_ACTIVITY";
@@ -144,6 +145,7 @@ export function StepClassSchedule({ data, onChange, isEditable }: StepClassSched
                       />
                     </div>
                   </div>
+                  {showTariffs && (
                   <div className="space-y-3 border-t border-border pt-3">
                     <p className="text-sm font-medium">Тарифы группы</p>
                     {(group.tariffs ?? []).map((tariff) => (
@@ -177,6 +179,7 @@ export function StepClassSchedule({ data, onChange, isEditable }: StepClassSched
                       <Plus className="mr-1 h-4 w-4" /> Добавить тариф
                     </Button>
                   </div>
+                  )}
                   {separatePeriods && (
                     <div className="space-y-2">
                       <Label htmlFor={`class-period-${group.id}`}>Даты курса группы (необязательно)</Label>
