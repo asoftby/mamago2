@@ -729,6 +729,7 @@ export function PlanPageClient({
         date={selectedDate}
         familyChildren={familyChildren}
         item={editingManualItem}
+        currentUserId={currentUserId}
         onSaved={replaceCachedItem}
         onConflict={() => {
           setManualDialogOpen(false);
