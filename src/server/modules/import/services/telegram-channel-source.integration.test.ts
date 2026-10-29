@@ -83,3 +83,41 @@ test("run context returns stored image hashes of this source's posts only", asyn
   assert.deepEqual(known.get("minsk_kids/1"), [{ url: "https://cdn4.telesco.pe/file/x.jpg", sha256: sha }], "images without a hash are not reused");
   assert.equal((await buildParserRunContext(mine.id).loadKnownImages([])).size, 0);
 });
+
+test("unchanged content still refreshes image URLs without touching statuses or review", async () => {
+  const { refreshUnchangedRecordPayload } = await import("./import-record-refresh");
+  const source = await createImportSource({ name: `ref ${tag}`, slug: `ref-${tag}`, type: "WEBSITE", parserKey: "telegram-channel-event", baseUrl: "https://t.me/s/minsk_kids" });
+  createdSourceIds.push(source.id);
+
+  const sha = "c".repeat(64);
+  const record = await prisma.importedRecord.create({
+    data: {
+      sourceId: source.id,
+      externalId: "minsk_kids/10",
+      contentHash: "same-hash",
+      parseStatus: "SUCCESS",
+      normalizeStatus: "SUCCESS",
+      matchStatus: "MATCHED",
+      reviewStatus: "IN_REVIEW",
+      rawPayload: { text: "t", images: [{ url: "https://cdn4.telesco.pe/file/old.jpg", sha256: sha }] },
+    },
+  });
+
+  // CDN rotated the URL; bytes (and therefore the hash) are the same.
+  const next = { text: "t", images: [{ url: "https://cdn5.telesco.pe/file/new.jpg", sha256: sha }] };
+  assert.equal(await refreshUnchangedRecordPayload(record.id, next), true);
+  const after = await prisma.importedRecord.findUniqueOrThrow({ where: { id: record.id } });
+  assert.deepEqual(after.rawPayload, next);
+  assert.equal(after.normalizeStatus, "SUCCESS", "normalization is not reset");
+  assert.equal(after.matchStatus, "MATCHED", "matching is not reset");
+  assert.equal(after.reviewStatus, "IN_REVIEW", "review state is not reset");
+  assert.equal(after.contentHash, "same-hash");
+
+  // The next run now finds the new URL in the cache: no second download.
+  const known = await buildParserRunContext(source.id).loadKnownImages(["minsk_kids/10"]);
+  assert.deepEqual(known.get("minsk_kids/10"), [{ url: "https://cdn5.telesco.pe/file/new.jpg", sha256: sha }]);
+
+  // Identical payload: no write at all.
+  assert.equal(await refreshUnchangedRecordPayload(record.id, next), false);
+  assert.equal(await refreshUnchangedRecordPayload("missing-id", next), false);
+});

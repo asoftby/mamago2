@@ -81,6 +81,14 @@ async function main() {
   assert.equal(parseChannelPage(synthetic('<div class="tgme_widget_message_poll"></div>'), "minsk_kids")[0].flags.poll, true);
   assert.equal(parseChannelPage(synthetic('<div class="tgme_widget_message_forwarded_from"></div>'), "minsk_kids")[0].flags.forwarded, true);
   assert.equal(parseChannelPage(synthetic("", "Скидка! #реклама erid: 2Vtzq"), "minsk_kids")[0].flags.advertisement, true);
+  // Русский маркер сам по себе (без erid): в конце текста, перед пунктуацией и с заглавной.
+  for (const text of ["Скидка #реклама", "Скидка #реклама.", "Реклама", "реклама: магазин", "Купите! #Реклама\nМагазин"]) {
+    assert.equal(parseChannelPage(synthetic("", text), "minsk_kids")[0].flags.advertisement, true, text);
+  }
+  // Слова, содержащие маркер, рекламой не считаются.
+  for (const text of ["Рекламация принята", "Программа без рекламы", "Мериды erided"]) {
+    assert.equal(parseChannelPage(synthetic("", text), "minsk_kids")[0].flags.advertisement, false, text);
+  }
   assert.equal(parseChannelPage(synthetic('<div class="tgme_widget_message_video_wrap"></div>'), "minsk_kids")[0].flags.video, true);
   const plain = parseChannelPage(synthetic(""), "minsk_kids")[0];
   assert.deepEqual(plain.flags, { poll: false, forwarded: false, advertisement: false, video: false });

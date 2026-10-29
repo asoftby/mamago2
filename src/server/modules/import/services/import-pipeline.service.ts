@@ -16,6 +16,7 @@ import prisma from "@/lib/prisma";
 import { GlobalLock } from "@/server/ops/lock/GlobalLock";
 import { computeContentHash } from "../utils/content-hash";
 import { buildParserRunContext } from "./parser-run-context";
+import { refreshUnchangedRecordPayload } from "./import-record-refresh";
 import { getParser } from "../parsers/registry";
 import { normalizeRunRecords } from "./import-normalization.service";
 import { matchRunRecords } from "./import-matching.service";
@@ -186,7 +187,10 @@ export async function runImportForSource(
           });
 
           if (existing && existing.contentHash === contentHash) {
-            // Контент не изменился — пропускаем без записи
+            // Контент не изменился — пропускаем без записи. Исключение: источники
+            // с hashInput хранят в rawPayload данные вне хэша (адреса картинок),
+            // их актуализируем, не трогая статусы и ревью.
+            if (raw.hashInput) await refreshUnchangedRecordPayload(existing.id, raw.rawPayload);
             totalSkipped++;
             continue;
           }

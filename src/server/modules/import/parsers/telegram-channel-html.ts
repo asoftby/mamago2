@@ -31,6 +31,9 @@ export interface TelegramPost {
   flags: TelegramPostFlags;
 }
 
+// JS `\b` знает только ASCII-слова даже с флагом `u`, поэтому границы заданы явно.
+const ADVERTISEMENT_MARKER = /(?<![\p{L}\p{N}_])#?(?:реклама|erid)(?![\p{L}\p{N}_])/iu;
+
 const MESSAGE_SPLIT = '<div class="tgme_widget_message_wrap';
 
 const NAMED_ENTITIES: Record<string, string> = {
@@ -130,7 +133,7 @@ export function parseChannelPage(html: string, channel: string): TelegramPost[] 
       flags: {
         poll: block.includes("tgme_widget_message_poll"),
         forwarded: block.includes("tgme_widget_message_forwarded_from"),
-        advertisement: /(^|\s)#?(реклама|erid)\b/iu.test(text),
+        advertisement: ADVERTISEMENT_MARKER.test(text),
         video: block.includes("tgme_widget_message_video"),
       },
     });
