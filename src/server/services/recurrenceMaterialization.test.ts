@@ -19,6 +19,6 @@ const many = Array.from({ length: 100 }, (_, index) => ({
   id: `s-${index}`,
   maxOccurrences: null,
 }));
-const boundedRows = planRecurrenceInsertRows(many, "2026-10-29", "2026-11-10");
-assert.equal(boundedRows.length, 1300);
+const boundedRows = planRecurrenceInsertRows(many, "2026-10-29", "2026-11-28");
+assert.equal(boundedRows.length, 2000);
 assert.ok(boundedRows.length <= 2000);
