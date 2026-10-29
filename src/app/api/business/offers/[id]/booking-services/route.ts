@@ -63,7 +63,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     currency: offer.currency,
     bookingEnabled: offer.bookingEnabled,
     bookingMode: offer.bookingMode,
-    resourceExtrasAllowed: offer.classGroups.length === 0 &&\n      offer.offerBooking?.scheduleKind === "ON_REQUEST_WINDOWS",
+    resourceExtrasAllowed: offer.classGroups.length === 0 &&
+      offer.offerBooking?.scheduleKind === "ON_REQUEST_WINDOWS",
     revision: offer.offerBooking?.pricingRevision ?? 0,
     basePriceByn: offer.offerBooking?.basePriceByn?.toFixed(2) ?? null,
     options: (offer.offerBooking?.options ?? []).map(option => ({
