@@ -4,6 +4,7 @@ import { after, test } from "node:test";
 import { BookingStatus, PrismaClient } from "@prisma/client";
 import { updateBookingStatus } from "@/server/services/booking/bookingQuery.service";
 import { reserveSlot, SlotReservationError } from "./reserveSlot";
+import { saveBookingServices } from "./bookingServices.service";
 
 const url = process.env.DATABASE_URL;
 if (!url || !["127.0.0.1", "localhost"].includes(new URL(url).hostname)) {
@@ -102,16 +103,24 @@ test("server-calculated options and price snapshot persist atomically with addit
   const projector = await unit("Priced projector");
   const offerId = await offer([room, projector]);
   const booking = await db.offerBooking.findUniqueOrThrow({ where: { offerId } });
-  await db.offerBooking.update({
-    where: { id: booking.id }, data: { basePriceByn: "150.00" },
+  const edited = await saveBookingServices({
+    offerId, businessId, data: {
+      revision: 0, basePriceByn: "150.00",
+      options: [
+        { title: "Projector", mode: "OPTIONAL", priceByn: "25.50",
+          bookingUnitId: projector, active: true },
+        { title: "Setup", mode: "INCLUDED", priceByn: "0.00",
+          bookingUnitId: null, active: true },
+      ],
+    },
   });
-  const optional = await db.offerBookingOption.create({ data: {
-    offerBookingId: booking.id, title: "Projector", mode: "OPTIONAL",
-    priceByn: "25.50", bookingUnitId: projector,
-  } });
-  const included = await db.offerBookingOption.create({ data: {
-    offerBookingId: booking.id, title: "Setup", mode: "INCLUDED", priceByn: "0.00",
-  } });
+  assert.equal(edited.status, 200);
+  const options = await db.offerBookingOption.findMany({
+    where: { offerBookingId: booking.id }, orderBy: { position: "asc" },
+  });
+  const [optional, included] = options;
+  assert.equal(optional.title, "Projector");
+  assert.equal(included.mode, "INCLUDED");
   const result = await reserveSlot({
     offerId, startsAt: start, endsAt: end, unitId: room,
     selectedOptionIds: [optional.id], ...contact,
@@ -129,7 +138,17 @@ test("server-calculated options and price snapshot persist atomically with addit
   assert.equal((await db.bookingAllocation.count({ where: { bookingRequestId: row.id } })), 2);
 
   // Repricing must never mutate the already accepted quote.
-  await db.offerBookingOption.update({ where: { id: optional.id }, data: { priceByn: "90.00" } });
+  assert.equal((await saveBookingServices({
+    offerId, businessId, data: {
+      revision: edited.revision!, basePriceByn: "150.00",
+      options: [
+        { id: optional.id, title: "Projector", mode: "OPTIONAL", priceByn: "90.00",
+          bookingUnitId: projector, active: true },
+        { id: included.id, title: "Setup", mode: "INCLUDED", priceByn: "0.00",
+          bookingUnitId: null, active: true },
+      ],
+    },
+  })).status, 200);
   const unchanged = await db.bookingRequest.findUniqueOrThrow({ where: { id: row.id } });
   assert.equal((unchanged.bookingPriceSnapshot as { totalByn: string }).totalByn, "175.50");
   assert.equal(unchanged.bookingTotalByn?.toString(), "175.5");
@@ -251,4 +270,96 @@ test("an unlinked resource may not be included in a required bundle", async () =
     offerId, startsAt: start, endsAt: end, unitIds: [linked, unlinked], ...contact,
   }), (error: unknown) => error instanceof SlotReservationError && error.code === "SLOT_UNAVAILABLE");
   assert.equal(await db.bookingRequest.count({ where: { offerId } }), 0);
+});
+
+
+test("services editor rejects stale edits and foreign business resources without side effects", async () => {
+  const room = await unit("Editor guard room");
+  const foreign = await unit("Unlinked editor resource");
+  const offerId = await offer([room]);
+  const base = { revision: 0, basePriceByn: "75.00", options: [] };
+  assert.equal((await saveBookingServices({ offerId, businessId, data: base })).status, 200);
+  assert.equal((await saveBookingServices({ offerId, businessId, data: base })).status, 409);
+  const conflict = await saveBookingServices({
+    offerId, businessId, data: {
+      revision: 1, basePriceByn: "999.00",
+      options: [{ title: "Foreign device", mode: "OPTIONAL",
+        priceByn: "10.00", bookingUnitId: foreign, active: true }],
+    },
+  });
+  assert.equal(conflict.status, 422);
+  const booking = await db.offerBooking.findUniqueOrThrow({ where: { offerId } });
+  assert.equal(booking.basePriceByn?.toString(), "75");
+  assert.equal(booking.pricingRevision, 1);
+  assert.equal(await db.offerBookingOption.count({ where: { offerBookingId: booking.id } }), 0);
+  const wrongTenant = await saveBookingServices({
+    offerId, businessId: "not-" + businessId, data: {
+      revision: 1, basePriceByn: "999.00", options: [],
+    },
+  });
+  assert.equal(wrongTenant.status, 404);
+  assert.equal((await db.offerBooking.findUniqueOrThrow({ where: { offerId } })).pricingRevision, 1);
+});
+
+test("group offers cannot attach an exclusive resource to an add-on", async () => {
+  const room = await unit("Group resource guard");
+  const offerId = await offer([room]);
+  await db.offerClassGroup.create({ data: { offerId, title: "Group with seats" } });
+  const edited = await saveBookingServices({
+    offerId, businessId, data: {
+      revision: 0, basePriceByn: "35.00",
+      options: [{ title: "Private room", mode: "OPTIONAL",
+        priceByn: "10.00", bookingUnitId: room, active: true }],
+    },
+  });
+  assert.equal(edited.status, 422);
+  assert.equal(await db.offerBookingOption.count({ where: { offerBooking: { offerId } } }), 0);
+});
+
+
+test("resource-linked add-ons require ON_REQUEST_WINDOWS rather than just no class groups", async () => {
+  const room = await unit("Scheduled resource guard");
+  const offerId = await offer([room]);
+  await db.offerBooking.update({
+    where: { offerId }, data: { scheduleKind: "DATED_SESSIONS" },
+  });
+  const saved = await saveBookingServices({
+    offerId, businessId, data: {
+      revision: 0, basePriceByn: "20.00",
+      options: [{
+        title: "Projector", mode: "OPTIONAL", priceByn: "5.00",
+        bookingUnitId: room, active: true,
+      }],
+    },
+  });
+  assert.equal(saved.status, 422);
+  assert.equal(await db.offerBookingOption.count({
+    where: { offerBooking: { offerId } },
+  }), 0);
+});
+
+test("business may disable a linked add-on after the resource becomes inactive", async () => {
+  const room = await unit("Inactive option room");
+  const offerId = await offer([room]);
+  const added = await saveBookingServices({ offerId, businessId, data: {
+    revision: 0, basePriceByn: "25.00", options: [{
+      title: "Projector", mode: "OPTIONAL", priceByn: "10.00",
+      active: true, bookingUnitId: room,
+    }],
+  } });
+  assert.equal(added.status, 200);
+  const linked = await db.offerBookingOption.findFirstOrThrow({
+    where: { offerBooking: { offerId } },
+  });
+  await db.bookingUnit.update({ where: { id: room }, data: { status: "INACTIVE" } });
+  const disabled = await saveBookingServices({ offerId, businessId, data: {
+    revision: added.revision!, basePriceByn: "25.00", options: [{
+      id: linked.id, title: linked.title, mode: "OPTIONAL",
+      priceByn: "10.00", active: false, bookingUnitId: room,
+    }],
+  } });
+  assert.equal(disabled.status, 200);
+  assert.equal((await db.offerBookingOption.findUniqueOrThrow({
+    where: { id: linked.id },
+  })).active, false);
 });

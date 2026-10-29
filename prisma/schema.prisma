@@ -2872,6 +2872,8 @@ model OfferBooking {
   externalUrl String?
   /// Optional base price for fixed-price reservation offers; class tariffs remain authoritative for classes.
   basePriceByn Decimal? @db.Decimal(10, 2)
+  /// Optimistic editor revision, independent of content moderation and main wizard snapshot.
+  pricingRevision Int @default(0)
   offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
   options OfferBookingOption[]
   rules OfferScheduleRule[]

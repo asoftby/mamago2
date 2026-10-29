@@ -14,6 +14,14 @@ type ClassSlot = {
 type ClassGroup = { id: string; title: string; tariffs: Array<PriceItem & { periodDays?: number | null }>; slots: ClassSlot[] };
 type SlotsResponse = { slots?: ClassSlot[]; groups?: ClassGroup[]; error?: string };
 type BookingResponse = { bookingId?: string; status?: string; error?: string };
+type PublicBookingOption = {
+  id: string; title: string; mode: "INCLUDED" | "OPTIONAL"; priceByn: string;
+};
+type OptionsResponse = { options?: PublicBookingOption[]; error?: string };
+type PriceQuoteResponse = { quote?: {
+  status: "FIXED" | "QUOTE_REQUIRED"; totalByn: string | null;
+  options: Array<{ id: string; title: string; amountByn: string }>;
+}; error?: string };
 type PrefillResponse = {
   authenticated: boolean;
   user: { displayName: string | null; email: string | null; phone: string | null; phoneVerified: boolean } | null;
@@ -50,6 +58,13 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
   const [children, setChildren] = useState<PrefillResponse["children"]>([]);
   const [selectedChildId, setSelectedChildId] = useState("");
   const [refresh, setRefresh] = useState(0);
+  const [bookingOptions, setBookingOptions] = useState<PublicBookingOption[]>([]);
+  const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [priceQuote, setPriceQuote] = useState<PriceQuoteResponse["quote"] | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -103,9 +118,68 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
   const visibleSlots = group ? group.slots : groups.length > 0 ? [] : slots;
   const chosen = useMemo(() => visibleSlots.find((slot) => slot.startsAt === selected) ?? null, [visibleSlots, selected]);
 
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    setOptionsLoading(true);
+    setOptionsError(null);
+    void fetch(`/api/public/offers/${encodeURIComponent(offerId)}/price-quote`,
+      { signal: controller.signal, cache: "no-store" }).then(async response => {
+        const json = await response.json() as OptionsResponse;
+        if (!response.ok) throw new Error(json.error ?? "Не удалось загрузить допуслуги");
+        if (controller.signal.aborted) return;
+        setBookingOptions(json.options ?? []);
+        setSelectedOptionIds([]);
+      }).catch(error => {
+        if (!controller.signal.aborted) {
+          setBookingOptions([]);
+          setOptionsError(error instanceof Error ? error.message : "Ошибка загрузки допуслуг");
+        }
+      }).finally(() => {
+        if (!controller.signal.aborted) setOptionsLoading(false);
+      });
+    return () => controller.abort();
+  }, [open, offerId]);
+
+  // Price preview is never a booking. The reservation endpoint revalidates
+  // the selected IDs and all amounts under its own transaction.
+  useEffect(() => {
+    if (!open || !chosen || (groups.length > 0 && !selectedGroupId) ||
+        (shownTariffs.length > 0 && !selectedTariffId) || optionsLoading || optionsError) {
+      setPriceQuote(null); setQuoteLoading(false); setQuoteError(null);
+      return;
+    }
+    const controller = new AbortController();
+    setQuoteLoading(true);
+    setPriceQuote(null);
+    setQuoteError(null);
+    void fetch(`/api/public/offers/${encodeURIComponent(offerId)}/price-quote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        startsAt: chosen.startsAt, endsAt: chosen.endsAt, seats,
+        ...(selectedGroupId ? { classGroupId: selectedGroupId } : {}),
+        ...(selectedTariffId ? { classTariffId: selectedTariffId } : {}),
+        selectedOptionIds,
+      }),
+      signal: controller.signal,
+    }).then(async response => {
+      const json = await response.json() as PriceQuoteResponse;
+      if (!response.ok || !json.quote) throw new Error(json.error ?? "Не удалось рассчитать стоимость");
+      if (!controller.signal.aborted) setPriceQuote(json.quote);
+    }).catch(error => {
+      if (!controller.signal.aborted) setQuoteError(
+        error instanceof Error ? error.message : "Не удалось рассчитать стоимость");
+    }).finally(() => {
+      if (!controller.signal.aborted) setQuoteLoading(false);
+    });
+    return () => controller.abort();
+  }, [open, offerId, chosen?.startsAt, chosen?.endsAt, seats, selectedGroupId,
+    selectedTariffId, selectedOptionIds, optionsLoading, optionsError, groups.length, shownTariffs.length]);
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!chosen || submitting) return;
+    if (!chosen || submitting || quoteLoading || !priceQuote || optionsLoading || optionsError) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -116,6 +190,7 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
           startsAt: chosen.startsAt, endsAt: chosen.endsAt,
           ...(selectedGroupId ? { classGroupId: selectedGroupId } : {}),
           ...(selectedTariffId ? { classTariffId: selectedTariffId } : {}),
+          selectedOptionIds,
           seats, customerName: name.trim(), customerPhone: phone.trim(),
           ...(email.trim() ? { customerEmail: email.trim() } : {}),
           ...(seats === 1 && selectedChildId ? { childId: selectedChildId } : {}),
@@ -197,6 +272,31 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
             </div>
           )}
           <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">Что входит и дополнительные услуги</legend>
+            {optionsLoading && <p role="status" className="text-sm text-muted-foreground">Загружаем допуслуги…</p>}
+            {optionsError && <p role="alert" className="text-sm text-destructive">{optionsError}</p>}
+            {!optionsLoading && !optionsError && bookingOptions.length === 0 && (
+              <p className="text-sm text-muted-foreground">Дополнительных услуг нет.</p>
+            )}
+            {bookingOptions.map(option => (
+              <label key={option.id} className="flex items-center gap-3 rounded-xl border p-3">
+                <input type="checkbox" checked={option.mode === "INCLUDED" ||
+                  selectedOptionIds.includes(option.id)}
+                  disabled={option.mode === "INCLUDED" || submitting || optionsLoading}
+                  onChange={e => setSelectedOptionIds(old =>
+                    e.target.checked ? [...old, option.id] : old.filter(id => id !== option.id))} />
+                <span className="flex-1 text-sm">
+                  {option.title}
+                  {option.mode === "INCLUDED" &&
+                    <span className="block text-xs text-muted-foreground">Уже включено</span>}
+                </span>
+                <span className="text-sm">
+                  {option.mode === "INCLUDED" ? "Включено" : `+${option.priceByn} BYN`}
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          <fieldset className="space-y-2">
             <legend className="text-sm font-medium">Дата и время (Минск)</legend>
             {loading && <p role="status" className="text-sm text-muted-foreground">Загружаем расписание…</p>}
             {!loading && visibleSlots.length === 0 && !error && <p className="text-sm text-muted-foreground">Пока нет доступных занятий на ближайшие 30 дней.</p>}
@@ -219,8 +319,21 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
             <label htmlFor="class-booking-email" className="text-sm font-medium">Email (необязательно)</label>
             <Input id="class-booking-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} />
           </div>
+          {chosen && (
+            <div aria-live="polite" className="rounded-xl border border-border/70 p-3 text-sm">
+              {quoteLoading ? "Пересчитываем стоимость…" :
+                quoteError ? <span className="text-destructive">{quoteError}</span> :
+                priceQuote?.status === "FIXED" && priceQuote.totalByn !== null
+                  ? <strong>Стоимость заявки: {priceQuote.totalByn} BYN</strong>
+                  : priceQuote ? <span>Стоимость уточняется у организатора</span>
+                  : <span>Выберите тариф и время</span>}
+              <p className="mt-1 text-xs text-muted-foreground">
+                Сумма подтверждается сервером при отправке. Предварительная цена не резервирует место.
+              </p>
+            </div>
+          )}
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={!chosen || loading || submitting || (groups.length > 0 && !selectedGroupId) || (shownTariffs.length > 0 && !selectedTariffId)}>
+          <Button type="submit" className="w-full" disabled={!chosen || loading || submitting || optionsLoading || Boolean(optionsError) || quoteLoading || !priceQuote || Boolean(quoteError) || (groups.length > 0 && !selectedGroupId) || (shownTariffs.length > 0 && !selectedTariffId)}>
             {submitting ? "Отправляем…" : "Отправить заявку"}
           </Button>
           <p className="text-xs text-muted-foreground">Заявка ещё не означает подтверждённую запись.</p>
