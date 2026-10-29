@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
-import { PrismaClient } from "@prisma/client";
+import { BookingStatus, PrismaClient } from "@prisma/client";
+import { updateBookingStatus } from "@/server/services/booking/bookingQuery.service";
 import { reserveSlot, SlotReservationError } from "./reserveSlot";
 
 const url = process.env.DATABASE_URL;
@@ -94,6 +95,24 @@ test("a room and equipment are held atomically with individual prep/cleanup wind
   assert.equal(byId.get(equipment)?.blockStart.getTime(), start.getTime());
   assert.equal(byId.get(equipment)?.blockEnd.getTime(), end.getTime() + 15 * 60_000);
   assert.equal(await db.bookingRequest.count({ where: { id: bookingId, status: "NEW" } }), 1);
+});
+
+test("business confirmation and rejection transition ALL held bundle resources", async () => {
+  const room = await unit("Transition room");
+  const equipment = await unit("Transition equipment");
+  const offerId = await offer([room, equipment]);
+  const { bookingId } = await reserveSlot({
+    offerId, startsAt: start, endsAt: end, unitIds: [room, equipment], ...contact,
+  });
+  await updateBookingStatus(bookingId, businessId, BookingStatus.CONFIRMED);
+  const confirmed = await db.bookingAllocation.findMany({ where: { bookingRequestId: bookingId } });
+  assert.equal(confirmed.length, 2);
+  assert.ok(confirmed.every(a => a.status === "CONFIRMED" && a.expiresAt === null));
+  await updateBookingStatus(bookingId, businessId, BookingStatus.REJECTED);
+  const released = await db.bookingAllocation.findMany({ where: { bookingRequestId: bookingId } });
+  assert.equal(released.length, 2);
+  assert.ok(released.every(a => a.status === "RELEASED" && a.expiresAt === null));
+  assert.equal((await db.bookingRequest.findUniqueOrThrow({ where: { id: bookingId } })).status, "REJECTED");
 });
 
 test("an occupied required resource rejects the bundle without booking or partial hold", async () => {
