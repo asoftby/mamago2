@@ -34,7 +34,6 @@ import {
 import {
   filterFamilyCalendarItems,
   findFamilyCalendarConflictIds,
-  type FamilyCalendarFilter,
 } from "@/features/my-plan/lib/familyCalendar";
 import { toast } from "@/lib/toast";
 
@@ -330,7 +329,6 @@ export function PlanPageClient({
   });
   const [scenarioStatuses, setScenarioStatuses] = useState(scenarioStatusByDate);
   const [loadingWeek, setLoadingWeek] = useState<string | null>(null);
-  const [calendarFilter, setCalendarFilter] = useState<FamilyCalendarFilter>("all");
   const [includedPeople, setIncludedPeople] = useState<string[]>([]);
   const [excludedPeople, setExcludedPeople] = useState<string[]>([]);
   const [visibilityFilter, setVisibilityFilter] = useState<"ALL" | "PRIVATE" | "FAMILY">("ALL");
@@ -562,7 +560,7 @@ export function PlanPageClient({
             ...familyChildren.map((child) => ({ value: `child:${child.id}`, label: child.name })),
           ])}
           selectedValues={includedPeople}
-          onSelectionChange={(next) => { setIncludedPeople(next); setCalendarFilter(next.length === 1 ? next[0] as FamilyCalendarFilter : "all"); }}
+          onSelectionChange={setIncludedPeople}
           excludedValues={excludedPeople}
           onExclusionsChange={setExcludedPeople}
           visibility={visibilityFilter}
