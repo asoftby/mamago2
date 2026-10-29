@@ -1,0 +1,66 @@
+name: Plan recurrence DB integration
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - ".github/workflows/plan-recurrence-db-integration.yml"
+      - "src/server/services/recurrenceMaterialization*"
+      - "src/server/services/recurringTask.service.ts"
+      - "src/server/services/familyCalendar.service.ts"
+      - "src/server/family/**"
+      - "prisma/**"
+  push:
+    branches: [dev]
+    paths:
+      - ".github/workflows/plan-recurrence-db-integration.yml"
+      - "src/server/services/recurrenceMaterialization*"
+      - "src/server/services/recurringTask.service.ts"
+      - "src/server/services/familyCalendar.service.ts"
+      - "src/server/family/**"
+      - "prisma/**"
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mamago_plan_recurrence_it
+        ports:
+          - 55444:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mamago_plan_recurrence_it"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55444/mamago_plan_recurrence_it
+      NODE_ENV: test
+      CI: "true"
+      FAMILY_CORE_READS: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.28.2
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Apply migrations to disposable PostgreSQL
+        run: pnpm exec prisma migrate deploy
+      - name: Verify recurrence concurrency and family ACL in PostgreSQL
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/recurrenceMaterialization.postgres.integration.test.ts

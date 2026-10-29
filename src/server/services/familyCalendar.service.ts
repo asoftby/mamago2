@@ -14,6 +14,7 @@ import {
   ManualPlanEntryError,
 } from "./manualPlanEntry.service";
 import type { PlanOwner } from "./planOwner";
+import { materializeRecurrencesForRange } from "./recurrenceMaterialization.service";
 
 export type FamilyCalendarRangePayload = {
   items: FamilyCalendarItemDto[];
@@ -31,6 +32,7 @@ export async function loadFamilyCalendarRange(input: {
   to: string;
 }): Promise<FamilyCalendarRangePayload> {
   const { from, to } = validateFamilyCalendarRange(input.from, input.to);
+  await materializeRecurrencesForRange(input.owner, from, to);
   const [items, scenarios, fingerprintRows] = await Promise.all([
     listFamilyCalendarItems({ owner: input.owner, from, to }),
     prisma.dayScenario.findMany({
