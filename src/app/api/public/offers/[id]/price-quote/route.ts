@@ -129,7 +129,8 @@ export async function GET(_request: NextRequest, { params }: {
   const options = offer.currency === "BYN"
     ? offer.offerBooking.options.filter(option =>
       option.mode !== "STANDALONE" &&
-      !(option.bookingUnitId && (offer.classGroups.length > 0 ||\n        offer.offerBooking?.scheduleKind !== "ON_REQUEST_WINDOWS"))).map(option => ({
+      !(option.bookingUnitId && (offer.classGroups.length > 0 ||
+        offer.offerBooking?.scheduleKind !== "ON_REQUEST_WINDOWS"))).map(option => ({
         id: option.id, title: option.title, mode: option.mode,
         priceByn: option.priceByn.toFixed(2),
       }))
