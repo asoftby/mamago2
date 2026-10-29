@@ -7,16 +7,11 @@ export const CROSS_REGION_FAMILY_THRESHOLD = 50;
 
 async function readQualifiedActivityIds(hubCityId: string, homeCityIds: string[]): Promise<string[]> {
   if (homeCityIds.length === 0) return [];
-  const configured = await prisma.city.findUnique({
-    where: { id: hubCityId },
-    select: { region: { select: { crossRegionFamilyThreshold: true } } },
-  });
-  const threshold = configured?.region?.crossRegionFamilyThreshold ?? CROSS_REGION_FAMILY_THRESHOLD;
-  const overrides = configured?.region ? await prisma.crossRegionEditorialOverride.findMany({
+  const overrides = await prisma.crossRegionEditorialOverride.findMany({
     where: { region: { cities: { some: { id: hubCityId } } }, expiresAt: { gt: new Date() } },
     select: { activityId: true },
     take: 300,
-  }) : [];
+  });
   const rows = await prisma.$queryRaw<Array<{ activityId: string }>>(Prisma.sql`
     SELECT pi."activityId" AS "activityId"
     FROM "PlanItem" pi
@@ -27,7 +22,7 @@ async function readQualifiedActivityIds(hubCityId: string, homeCityIds: string[]
       AND f."archivedAt" IS NULL
       AND f."homeCityId" IN (${Prisma.join(homeCityIds)})
     GROUP BY pi."activityId"
-    HAVING COUNT(DISTINCT pi."familyId") >= ${threshold}
+    HAVING COUNT(DISTINCT pi."familyId") >= ${CROSS_REGION_FAMILY_THRESHOLD}
     LIMIT 300
   `);
   return [...new Set([...rows.map((row) => row.activityId), ...overrides.map((row) => row.activityId)])];
@@ -36,7 +31,7 @@ async function readQualifiedActivityIds(hubCityId: string, homeCityIds: string[]
 export async function getCrossRegionPopularActivityIds(hubCityId: string, homeCityIds: string[]): Promise<string[]> {
   return unstable_cache(
     () => readQualifiedActivityIds(hubCityId, homeCityIds),
-    ["cross-region-plan-config-v2", hubCityId, ...homeCityIds.slice().sort()],
+    ["cross-region-plan-50-editorial-v3", hubCityId, ...homeCityIds.slice().sort()],
     { revalidate: 300 },
   )();
 }
