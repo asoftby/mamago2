@@ -2,6 +2,8 @@ import "server-only";
 import prisma from "@/lib/prisma";
 import { dispatchPartyCandidateWave } from "./partyCandidateDispatch.service";
 import { dispatchQueuedPartyInvites } from "./partyInviteTransactionalDispatch.service";
+import { queuePartyProviderCandidates } from "./partyInviteQueue.service";
+import { findCandidatesForParty } from "./partyOrderCandidates.service";
 import { PartyApiError } from "./partyDraft.validation";
 
 /**
@@ -13,6 +15,43 @@ export async function replenishPartyCandidateWaves(limit = 10) {
   if (process.env.PARTY_CANDIDATE_AUTO_REPLENISH_ENABLED !== "true")
     return { scanned: 0, sent: 0, skipped: true };
   const boundedLimit = Math.max(1, Math.min(20, limit));
+  // Initialize a durable five-provider queue only for category-only add-ons.
+  // Explicitly selected fixed offers and legacy started waves retain their old flow.
+  const toInitialize = await prisma.partyOrderItem.findMany({
+    where: {
+      role: "ADDON", status: "PLANNED", offerId: null, businessId: null,
+      confirmedBookingRequestId: null,
+      partyOrder: { status: "ANCHOR_CONFIRMED", cancelledAt: null },
+      requests: { none: {} }, providerInvites: { none: {} },
+    },
+    orderBy: { updatedAt: "asc" }, take: boundedLimit,
+    select: { id: true, category: true, partyOrderId: true,
+      partyOrder: { select: { ownerUserId: true } } },
+  });
+  for (const item of toInitialize) {
+    try {
+      const proposal = await findCandidatesForParty(
+        item.partyOrder.ownerUserId, item.partyOrderId, item.category,
+      );
+      const chosen = proposal.candidates.slice(0, 5).map(c => ({
+        offerId: c.offerId, businessId: c.businessId,
+      }));
+      if (!chosen.length) continue;
+      await prisma.$transaction(async tx => {
+        const order = await tx.partyOrder.findUnique({
+          where: { id: item.partyOrderId }, select: { version: true },
+        });
+        if (!order || order.version !== proposal.partyVersion)
+          throw new PartyApiError(409, "Праздник изменился во время подбора");
+        await queuePartyProviderCandidates(tx, {
+          partyOrderItemId: item.id, mode: "PARALLEL", candidates: chosen,
+        });
+      });
+    } catch (error) {
+      if (error instanceof PartyApiError && [404, 409, 410, 422].includes(error.status)) continue;
+      console.error("[party-replenish] durable queue initialization failed");
+    }
+  }
   // Durable queues own their items: use the existing cron, never create a second scheduler.
   const queuedItems = await prisma.partyOrderItem.findMany({
     where: {
@@ -74,5 +113,5 @@ export async function replenishPartyCandidateWaves(limit = 10) {
       console.error("[party-replenish] candidate dispatch failed");
     }
   }
-  return { scanned: queuedItems.length + items.length, sent, skipped: false };
+  return { scanned: toInitialize.length + queuedItems.length + items.length, sent, skipped: false };
 }
