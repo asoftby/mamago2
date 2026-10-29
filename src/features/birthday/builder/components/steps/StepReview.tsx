@@ -10,7 +10,7 @@ import { calendarDateKeyToIso, childAgeYearsOnDate } from "../../lib/partyDate";
 
 type Props = {
   offers: BirthdayCatalogItem[];
-  addonCategories: PartyCategoryKey[];
+  addonCategories?: PartyCategoryKey[];
   citySlug: string;
   dateIso: string | null;
   quizDateKey: string | null;
@@ -32,7 +32,7 @@ type Props = {
 };
 
 export function StepReview({
-  offers, addonCategories, citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName, childBirthDateIso,
+  offers, addonCategories = [], citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName, childBirthDateIso,
   authenticated, authLoading, requestLogin, flowStateRef, busy, onBusyChange, sent, onSent,
 }: Props) {
   const total = catalogPriceSummary(offers);
