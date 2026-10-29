@@ -129,6 +129,8 @@ export function OfferPageView({
   const loadIdeaStatus = useCallback(async () => {
     if (!shouldFetchOwnSaveStatus(isAuthenticated)) {
       setIsIdeaSaved(false);
+      setLocalSave(null);
+      setPlanItemId(null);
       return;
     }
     try {
