@@ -198,6 +198,35 @@ test("reserved item: cosmetic edit passes, breaking edit/removal needs confirmat
   assert.equal((await db.wishlistReservation.findUniqueOrThrow({ where: { id: r1.id } })).status, "ITEM_REMOVED");
 });
 
+test("confirmed URL replacement removes every reservation, even with simultaneous quantity change", async () => {
+  const owner = await makeUser("url-replacement");
+  const created = await createWishlist(owner, wl(), deps);
+  const view = await addWishlistItem(owner, created.id, item("Old gift", {
+    url: "https://21vek.by/old", quantity: 3,
+  }), deps);
+  const itemId = view.items[0].id;
+  const reserved = await reserve(itemId, { status: "RESERVED", quantity: 1 });
+  const purchased = await reserve(itemId, { status: "PURCHASED", quantity: 2 });
+  await assert.rejects(
+    () => updateWishlistItem(owner, created.id, itemId, {
+      url: "https://21vek.by/new", quantity: 1,
+    }, deps),
+    (e: unknown) => e instanceof WishlistError && e.code === "item_reserved",
+  );
+  const updated = await updateWishlistItem(owner, created.id, itemId, {
+    url: "https://21vek.by/new", quantity: 1, confirmReserved: true,
+  }, deps);
+  assert.equal(updated.items[0].url, "https://21vek.by/new");
+  assert.equal(updated.items[0].quantity, 1);
+  assert.equal(updated.items[0].state, "FREE");
+  assert.equal(updated.items[0].takenQuantity, 0);
+  const statuses = await db.wishlistReservation.findMany({
+    where: { id: { in: [reserved.id, purchased.id] } },
+    select: { status: true },
+  });
+  assert.deepEqual(statuses.map(r => r.status), ["ITEM_REMOVED", "ITEM_REMOVED"]);
+});
+
 test("quantity below taken: earliest reservations kept, newest dropped on confirm", async () => {
   const owner = await makeUser("qty");
   const created = await createWishlist(owner, wl(), deps);
