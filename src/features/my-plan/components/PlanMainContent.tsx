@@ -20,7 +20,7 @@ import { LiquidNotification } from "@/components/ui/liquid-notification";
 import { PlanCalendar } from "@/features/plan-calendar";
 import { PlanPersonFilter, planPersonFilterOptions } from "./PlanPersonFilter";
 import { PlanEmptyDayMessage } from "./PlanEmptyDayMessage";
-import { filterPlanEntriesByPerson } from "../lib/filterPlanEntriesByPerson";
+import { filterVisiblePlanEntries, type PlanPersonSelection } from "../lib/filterPlanEntriesByPerson";
 import { pluralRu, relativeLabel } from "@/lib/date/dateKey";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { QuickAddChildModal } from "@/components/children/QuickAddChildModal";
@@ -451,6 +451,9 @@ export function PlanMainContent({
   }, [openedEventId, planItemsByDate]);
   /** Фильтр дня по человеку: «Все» либо id персоны (ребёнок — childId, взрослый — assigneeUserId). */
   const [personFilter, setPersonFilter] = useState<string>("all");
+  const [includedPeople, setIncludedPeople] = useState<string[]>([]);
+  const [excludedPeople, setExcludedPeople] = useState<string[]>([]);
+  const [planVisibilityFilter, setPlanVisibilityFilter] = useState<"ALL" | "PRIVATE" | "FAMILY">("ALL");
   const [experienceFeed, setExperienceFeed] = useState<PlanExperienceFeed | null>(null);
   const reloadExperienceFeed = useCallback(async () => {
     setExperienceFeed(await fetchPlanExperienceFeed());
@@ -985,21 +988,28 @@ export function PlanMainContent({
     [dayItems],
   );
 
-  const visibleDayItems = useMemo(() => {
-    if (personFilter === "all") return dayItemsSorted;
-    const person = personas.find((persona) => persona.id === personFilter);
-    if (!person) return dayItemsSorted;
-    return filterPlanEntriesByPerson(dayItemsSorted, { kind: person.kind, id: person.id });
-  }, [dayItemsSorted, personFilter, personas]);
+  const audienceSelection = useMemo(() => {
+    const person = (id: string): PlanPersonSelection | null => {
+      const persona = personas.find((p) => p.id === id);
+      return persona ? { kind: persona.kind, id: persona.id } as PlanPersonSelection : null;
+    };
+    return {
+      include: includedPeople.map(person).filter((p): p is PlanPersonSelection => Boolean(p)),
+      exclude: excludedPeople.map(person).filter((p): p is PlanPersonSelection => Boolean(p)),
+      visibility: planVisibilityFilter,
+    };
+  }, [includedPeople, excludedPeople, planVisibilityFilter, personas]);
 
-  const visibleCurrentWeekItems = useMemo(() => {
-    const entries = currentWeekItems.filter((item) => !hiddenPlanItemIds.has(item.id));
-    if (personFilter === "all") return entries;
-    const person = personas.find((persona) => persona.id === personFilter);
-    return person ? filterPlanEntriesByPerson(entries, { kind: person.kind, id: person.id }) : entries;
-  }, [currentWeekItems, personFilter, personas, hiddenPlanItemIds]);
+  const visibleDayItems = useMemo(
+    () => filterVisiblePlanEntries(dayItemsSorted, audienceSelection),
+    [dayItemsSorted, audienceSelection],
+  );
+  const visibleCurrentWeekItems = useMemo(() =>
+    filterVisiblePlanEntries(currentWeekItems.filter(item => !hiddenPlanItemIds.has(item.id)), audienceSelection),
+    [currentWeekItems, hiddenPlanItemIds, audienceSelection],
+  );
   const currentWeekCount =
-    personFilter === "all" && hiddenPlanItemIds.size === 0
+    includedPeople.length === 0 && excludedPeople.length === 0 && planVisibilityFilter === "ALL" && hiddenPlanItemIds.size === 0
       ? currentWeekItemsCount
       : visibleCurrentWeekItems.length;
 
@@ -1126,8 +1136,12 @@ export function PlanMainContent({
     personas.length < 2 ? null : (
       <PlanPersonFilter
         options={personFilterOptions}
-        value={personFilter}
-        onChange={setPersonFilter}
+        selectedValues={includedPeople}
+        onSelectionChange={(next) => { setIncludedPeople(next); setPersonFilter(next.length === 1 ? next[0] : "all"); }}
+        excludedValues={excludedPeople}
+        onExclusionsChange={setExcludedPeople}
+        visibility={planVisibilityFilter}
+        onVisibilityChange={setPlanVisibilityFilter}
       />
     );
 
