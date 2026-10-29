@@ -81,7 +81,8 @@ export async function POST(request: NextRequest, { params }: {
   try {
     const { snapshot, optionUnitIds } = calculateBookingPrice({
       currency: offer.currency, seats: input.data.seats, durationMinutes,
-      baseDurationMinutes: offer.offerBooking.durationMin ?? durationMinutes,
+      baseDurationMinutes: offer.offerBooking.scheduleKind === "ON_REQUEST_WINDOWS"
+            ? (offer.offerBooking.durationMin ?? durationMinutes) : durationMinutes,
       extensionHourPriceByn: offer.offerBooking.extensionHourPriceByn?.toString() ?? null,
       extensionDiscountPercent: offer.offerBooking.extensionDiscountPercent,
       basePriceByn: offer.offerBooking.basePriceByn?.toString() ?? null,
