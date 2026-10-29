@@ -1127,7 +1127,7 @@ export function PlanMainContent({
   const personFilterOptions = planPersonFilterOptions(
     personas.map((persona) => ({
       value: persona.id,
-      label: persona.kind === "adult" ? "Я" : personShortName(persona),
+      label: personShortName(persona) || (persona.kind === "adult" ? "Взрослый" : "Ребёнок"),
     })),
   );
 
