@@ -52,9 +52,7 @@ Guest listing exposures do not gain a new authenticated identity/attribution mod
 
 ## Advertising and pagination
 
-EventCard and OfferCard use the existing outline Badge: `Реклама` (title: `Платное продвижение Boost`).
-The adapter passes disclosure to public event consumers; offer consumers pass the
-same flag explicitly. UI Lab previews the existing Badge state. No pricing change.
+Boost is internal catalog ranking/placement and does not automatically add an advertising badge on public cards. `isPromoted` remains internal to ranking and impression diagnostics; other separately contracted advertising formats require their own labeling rules. No pricing change.
 
 A stable composition pass reserves one paid slot per four cards while comparable
 organic inventory exists. Events compose only within contiguous ten-point bands
