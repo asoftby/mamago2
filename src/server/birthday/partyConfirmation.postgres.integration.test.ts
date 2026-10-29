@@ -433,3 +433,66 @@ test("with PARTY_CONFIRMATION_ENABLED off nothing is accepted or confirmed", asy
     else process.env.PARTY_CONFIRMATION_ENABLED = previous;
   }
 });
+
+test("two businesses cannot confirm the same standalone party item concurrently", async () => {
+  const ctx = await fixture();
+  const photoA = (await homeSetup(ctx, { withUnit: false })).photo;
+  const otherOwner = await db.user.create({ data: { email: `party-other-${randomUUID()}@example.test` } });
+  const otherBusiness = await db.business.create({
+    data: { name: "Second party provider", ownerUserId: otherOwner.id, operationalStatus: "ACTIVE" },
+  });
+  const otherPlace = await db.place.create({ data: {
+    title: "Second provider", shortDesc: "Isolated confirmation race fixture",
+    status: "PUBLISHED", cityId: ctx.place.cityId, ownerBusinessId: otherBusiness.id,
+    createdByUserId: otherOwner.id, activityTypes: [], ageTags: [], visitFormats: [],
+  } });
+  const photoB = await db.offer.create({ data: {
+    title: "Second photographer", kind: "SERVICE", productType: "PARTY_SERVICE",
+    category: "PHOTO", placeId: otherPlace.id, status: "PUBLISHED",
+    priceFrom: 120, priceMode: "FROM", currency: "BYN",
+    placements: { create: { key: "BIRTHDAY", status: "APPROVED" } },
+  } });
+  const order = await db.partyOrder.create({ data: {
+    ownerUserId: ctx.parent.id, citySlug: "minsk", venueMode: "HOME",
+    status: "ANCHOR_CONFIRMED", eventDate, timeFrom: "14:00", timeTo: "15:00",
+    childrenCount: 8, adultsCount: 2,
+  } });
+  const item = await db.partyOrderItem.create({ data: {
+    partyOrderId: order.id, category: "PHOTO", role: "STANDALONE", status: "NEEDS_DECISION",
+  } });
+  const entries = await Promise.all([
+    { businessId: ctx.business.id, actorUserId: ctx.owner.id, offerId: photoA.id },
+    { businessId: otherBusiness.id, actorUserId: otherOwner.id, offerId: photoB.id },
+  ].map(async (provider) => {
+    const request = await db.bookingRequest.create({ data: {
+      businessId: provider.businessId, userId: ctx.parent.id,
+      publicationType: "OFFER", offerId: provider.offerId, kind: "PARTY",
+      partyOrderItemId: item.id, status: "NEW", partyStage: "AWAITING_RECONFIRM",
+      responseDueAt: oneDayLater(), requestedDate: eventDate, requestedTime: "14:00",
+    } });
+    await db.partyQuote.create({ data: {
+      bookingRequestId: request.id, version: 1, type: "AS_REQUESTED",
+      status: "ACCEPTED", priceByn: 120, includes: "Photography",
+      idempotencyKey: randomUUID(), respondedByUserId: provider.actorUserId,
+      decidedByUserId: ctx.parent.id, decidedAt: new Date(),
+      validUntil: oneDayLater(),
+    } });
+    return { request, ...provider };
+  }));
+  const attempts = await Promise.allSettled(entries.map(e => confirmPartyRequest({
+    requestId: e.request.id, businessId: e.businessId, actorUserId: e.actorUserId,
+    expectedQuoteVersion: 1, idempotencyKey: randomUUID(),
+  })));
+  assert.equal(attempts.filter(x => x.status === "fulfilled").length, 1,
+    "Exactly one performer must be confirmed for one party item");
+  const winner = await db.partyOrderItem.findUniqueOrThrow({ where: { id: item.id } });
+  assert.equal(winner.status, "CONFIRMED");
+  assert.ok(entries.some(e => e.request.id === winner.confirmedBookingRequestId));
+  assert.equal(await db.bookingRequest.count({
+    where: { partyOrderItemId: item.id, status: "CONFIRMED" },
+  }), 1);
+  assert.equal(await db.partyOutbox.count({
+    where: { aggregateId: { in: entries.map(e => e.request.id) },
+      eventType: "PARTY_BOOKING_CONFIRMED" },
+  }), 1);
+});
