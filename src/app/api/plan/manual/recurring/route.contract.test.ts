@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const route = readFileSync("src/app/api/plan/manual/recurring/route.ts", "utf8");
+assert.match(route, /getCurrentUser\(\)/);
+assert.match(route, /if \(!user\).*401/);
+assert.match(route, /resolvePlanOwner\(user\.id\)/);
+assert.match(route, /createRecurringTaskSeries\(owner,/);
+assert.match(route, /idempotency_conflict/);
+assert.match(route, /status: 409/);
+assert.match(route, /status: 400/);
+const normal = readFileSync("src/app/api/plan/manual/route.ts", "utf8");
+assert.doesNotMatch(normal, /createRecurringTaskSeries/);

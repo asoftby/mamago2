@@ -25,6 +25,16 @@ export function validateRecurringTask(value: NewRecurringTask) {
   return { key, title: value.title.trim(), time: value.startTime || null, reminderEnabled: value.reminderEnabled === true, lead: lead ?? null, rule };
 }
 
+/** PostgreSQL JSONB does not preserve object key insertion order. */
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return "[" + value.map(stableJson).join(",") + "]";
+  if (value !== null && typeof value === "object") {
+    const object = value as Record<string, unknown>;
+    return "{" + Object.keys(object).sort().map(key => JSON.stringify(key) + ":" + stableJson(object[key])).join(",") + "}";
+  }
+  return JSON.stringify(value);
+}
+
 /** Internal-only, atomic creation. Keep API hidden until family/series lifecycle wiring is ready. */
 export async function createRecurringTaskSeries(owner: PlanOwner, input: NewRecurringTask) {
   const validated = validateRecurringTask(input);
@@ -33,7 +43,7 @@ export async function createRecurringTaskSeries(owner: PlanOwner, input: NewRecu
   const template = { title, time, reminderEnabled, lead, rule: { frequency: rule.frequency, interval: rule.interval, startDate: rule.startDate, weekdays: rule.weekdays ?? [], untilDate: rule.untilDate ?? null, maxOccurrences: rule.maxOccurrences ?? null } };
   const existing = await prisma.planRecurrenceSeries.findUnique({ where: { requestKey: key }, select: { id: true, ownerUserId: true, template: true } });
   if (existing) {
-    if (existing.ownerUserId !== owner.userId || JSON.stringify(existing.template) !== JSON.stringify(template)) throw new Error("idempotency_conflict");
+    if (existing.ownerUserId !== owner.userId || stableJson(existing.template) !== stableJson(template)) throw new Error("idempotency_conflict");
     return existing.id;
   }
   try {
@@ -61,7 +71,7 @@ export async function createRecurringTaskSeries(owner: PlanOwner, input: NewRecu
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const current = await prisma.planRecurrenceSeries.findUnique({ where: { requestKey: key }, select: { id: true, ownerUserId: true, template: true } });
-      if (current?.ownerUserId === owner.userId && JSON.stringify(current.template) === JSON.stringify(template)) return current.id;
+      if (current?.ownerUserId === owner.userId && stableJson(current.template) === stableJson(template)) return current.id;
       throw new Error("idempotency_conflict");
     }
     throw error;
