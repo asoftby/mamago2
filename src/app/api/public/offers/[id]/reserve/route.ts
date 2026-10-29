@@ -14,6 +14,8 @@ const reservationSchema = z.object({
   startsAt: z.string().datetime({ offset: true }),
   classGroupId: z.string().trim().min(1).max(128).optional(),
   classTariffId: z.string().trim().min(1).max(128).optional(),
+  selectedOptionIds: z.array(z.string().min(1).max(128)).max(20).optional(),
+  idempotencyKey: z.string().uuid().optional(),
   endsAt: z.string().datetime({ offset: true }),
   seats: z.number().int().min(1).max(100).default(1),
   customerName: z.string().trim().min(1).max(150),
@@ -44,6 +46,8 @@ export async function POST(
       offerId: id,
       classGroupId: payload.data.classGroupId,
       classTariffId: payload.data.classTariffId,
+      selectedOptionIds: payload.data.selectedOptionIds,
+      idempotencyKey: payload.data.idempotencyKey,
       startsAt: new Date(payload.data.startsAt),
       endsAt: new Date(payload.data.endsAt),
       seats: payload.data.seats,
@@ -57,7 +61,7 @@ export async function POST(
     });
     return NextResponse.json({
       bookingId: result.bookingId,
-      status: "NEW",
+      status: result.status,
       holdUntil: result.holdUntil.toISOString(),
     }, { status: 201 });
   } catch (error) {

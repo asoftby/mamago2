@@ -6,7 +6,7 @@ import { extendPrismaWithSearchIndexing } from "@/lib/search/prismaSearchExtensi
 // that requires a fresh PrismaClient in the dev hot-reload cycle.
 // Bump: UserEvent.familyId/planVisibility (Family Core A1, 2026-10-03)
 // GSC query cache (2026-10-22).
-// Wishlist (2026-10-29).
+// Wishlist models (2026-10-29).
 const PRISMA_CACHE_VERSION = "v20";
 
 const globalForPrisma = globalThis as unknown as {

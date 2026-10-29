@@ -151,3 +151,29 @@ test("held reservation remains occupied until TTL boundary, then may be previewe
   assert.equal(calculateSlots(snapshot, input, now).length, 0);
   assert.equal(calculateSlots(snapshot, input, new Date(now.getTime() + 1)).length, 1);
 });
+
+test("extension duration checks the entire exclusive-unit interval and buffers", () => {
+  const unit: SlotSnapshot["units"][number] = {
+    id: "room-ext", timezone: "Europe/Minsk", stepMinutes: 15,
+    prepMinutes: 0, cleanupMinutes: 0, minDurationMinutes: 60,
+    rules: [{ weekday: 1, startMinutes: 600, endMinutes: 720 }],
+    exceptions: [], blocks: [], allocations: [],
+  };
+  const snapshot = base({
+    scheduleKind: ScheduleKind.ON_REQUEST_WINDOWS, durationMin: 60,
+    maxExtensionHours: 1, extensionHourPriceByn: "25.00",
+    extensionDiscountPercent: 10, units: [unit],
+  });
+  const from = new Date("2026-03-23T00:00:00Z"), to = new Date("2026-03-24T00:00:00Z");
+  const regular = calculateSlots(snapshot, { from, to, requestedDurationMinutes: 60 }, now);
+  const extended = calculateSlots(snapshot, { from, to, requestedDurationMinutes: 120 }, now);
+  assert.equal(regular.length, 5);
+  assert.equal(extended.length, 1);
+  assert.equal(extended[0].startsAt.toISOString(), "2026-03-23T07:00:00.000Z");
+  assert.equal(extended[0].endsAt.toISOString(), "2026-03-23T09:00:00.000Z");
+  assert.equal(calculateSlots(snapshot, { from, to, requestedDurationMinutes: 90 }, now).length, 0);
+  unit.blocks = [{ blockStart: new Date("2026-03-23T08:00:00Z"),
+    blockEnd: new Date("2026-03-23T09:00:00Z") }];
+  assert.equal(calculateSlots(snapshot, { from, to, requestedDurationMinutes: 120 }, now).length, 0);
+  assert.ok(calculateSlots(snapshot, { from, to, requestedDurationMinutes: 60 }, now).length > 0);
+});

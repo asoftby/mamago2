@@ -178,6 +178,18 @@ const dateOnly = (key: string) => new Date(`${key}T00:00:00.000Z`);
  * Способ записи не трогаем: слоты онлайн-записи в фазе 1 скрыты.
  */
 async function applyClassSchedule(db: Db, offerId: string, schedule: ClassScheduleInput): Promise<void> {
+  // Once active resource-linked extras exist, silently switching to a
+  // capacity/session schedule would make INCLUDED extras block every booking.
+  // Require the business to unlink or disable them before changing kinds.
+  const resourceExtras = await db.offerBookingOption.count({
+    where: { offerBooking: { offerId }, active: true,
+      mode: { in: ["INCLUDED", "OPTIONAL"] }, bookingUnitId: { not: null } },
+  });
+  if (resourceExtras > 0) {
+    throw new OfferScheduleValidationError(
+      "Перед изменением расписания отключите допуслуги с отдельными ресурсами",
+    );
+  }
   const scheduleKind = schedule.kind === "recurring" ? "RECURRING_SESSIONS" : "DATED_SESSIONS";
   const booking = await db.offerBooking.upsert({
     where: { offerId },
