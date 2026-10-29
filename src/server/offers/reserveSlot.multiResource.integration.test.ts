@@ -315,3 +315,25 @@ test("group offers cannot attach an exclusive resource to an add-on", async () =
   assert.equal(edited.status, 422);
   assert.equal(await db.offerBookingOption.count({ where: { offerBooking: { offerId } } }), 0);
 });
+
+
+test("resource-linked add-ons require ON_REQUEST_WINDOWS rather than just no class groups", async () => {
+  const room = await unit("Scheduled resource guard");
+  const offerId = await offer([room]);
+  await db.offerBooking.update({
+    where: { offerId }, data: { scheduleKind: "DATED_SESSIONS" },
+  });
+  const saved = await saveBookingServices({
+    offerId, businessId, data: {
+      revision: 0, basePriceByn: "20.00",
+      options: [{
+        title: "Projector", mode: "OPTIONAL", priceByn: "5.00",
+        bookingUnitId: room, active: true,
+      }],
+    },
+  });
+  assert.equal(saved.status, 422);
+  assert.equal(await db.offerBookingOption.count({
+    where: { offerBooking: { offerId } },
+  }), 0);
+});
