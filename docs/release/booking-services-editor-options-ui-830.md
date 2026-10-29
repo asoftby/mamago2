@@ -3,10 +3,12 @@
 ## Retained single sources of truth
 
 - Offer editor: use existing **«Услуги и цены»** wizard step
-  (`Step5Pricing`), not a second publishing workflow. Existing
-  `Offer.priceItems`, `OfferClassGroup/OfferClassTariff`, `campSessions`,
-  `PackageComponent` remain unchanged and continue their current UI and
-  request-only/camp/party flows.
+  (`Step5Pricing`), not a second publishing workflow. In the new v2
+  master, group `OfferClassTariff` rows are **edited on this step** through
+  the same `data.schedule.classSchedule.groups` model; the duplicate
+  tariff editor is hidden only in the v2 Schedule step. The legacy wizard
+  continues unchanged. `Offer.priceItems`, `campSessions` and
+  `PackageComponent` remain intact.
 - Booking pricing: `OfferBooking.basePriceByn`,
   `OfferBookingOption` and `BookingRequest.bookingPriceSnapshot` from
   PR #941. This editor saves **only operational booking pricing**, without
