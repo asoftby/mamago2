@@ -96,7 +96,40 @@ export async function materializeRecurrencesForRange(owner: PlanOwner, from: str
       where: { id: { in: ids }, stoppedAt: null, startDate: { lte: to } },
       orderBy: { createdAt: "asc" },
     });
-    const rows = planRecurrenceInsertRows(active, from, to);
+    // A child may be deleted or an adult may leave the family after the
+    // recurring series was created. Never let stale template assignments
+    // break every calendar read or assign future tasks outside the family.
+    const templates = active.map(series =>
+      series.template && typeof series.template === "object" && !Array.isArray(series.template)
+        ? series.template as Record<string, unknown> : {});
+    const childIds = [...new Set(templates.map(t => t.childId).filter((v): v is string => typeof v === "string"))];
+    const adultIds = [...new Set(templates.map(t => t.assigneeUserId).filter((v): v is string => typeof v === "string"))];
+    const children = childIds.length ? await tx.child.findMany({
+      where: { id: { in: childIds } }, select: { id: true, parentId: true, familyId: true },
+    }) : [];
+    const memberRows = adultIds.length && familyReadsEnabled() ? await tx.familyMembership.findMany({
+      where: { userId: { in: adultIds }, familyId: { in: active.map(s => s.familyId).filter((v): v is string => Boolean(v)) }, leftAt: null },
+      select: { userId: true, familyId: true },
+    }) : [];
+    const permittedChildren = new Map(children.map(child => [child.id, child]));
+    const permittedAdults = new Set(memberRows.map(member => `${member.familyId}:${member.userId}`));
+    const sanitized = active.map((series, index) => {
+      const template = templates[index]!;
+      const childId = typeof template.childId === "string" ? template.childId : null;
+      const assigneeUserId = typeof template.assigneeUserId === "string" ? template.assigneeUserId : null;
+      const child = childId ? permittedChildren.get(childId) : null;
+      const childAllowed = child && (familyReadsEnabled()
+        ? Boolean(series.familyId && child.familyId === series.familyId)
+        : child.parentId === series.ownerUserId);
+      const adultAllowed = assigneeUserId && (familyReadsEnabled()
+        ? Boolean(series.familyId && permittedAdults.has(`${series.familyId}:${assigneeUserId}`))
+        : assigneeUserId === series.ownerUserId);
+      return { ...series, template: { ...template,
+        childId: childAllowed ? childId : null,
+        assigneeUserId: adultAllowed ? assigneeUserId : null,
+      } };
+    });
+    const rows = planRecurrenceInsertRows(sanitized, from, to);
     if (rows.length) await tx.planItem.createMany({ data: rows, skipDuplicates: true });
   });
 
