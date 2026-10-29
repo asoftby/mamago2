@@ -23,11 +23,6 @@ export async function expirePartyRequests(limit = 50) {
   let expired = 0;
   for (const request of due) {
     const didExpire = await prisma.$transaction(async (tx) => {
-      // Lock the canonical item first, matching queue dispatch and final confirmation.
-      if (request.partyOrderItem) {
-        await tx.$queryRaw`SELECT "id" FROM "PartyOrderItem"
-          WHERE "id" = ${request.partyOrderItem.id} FOR UPDATE`;
-      }
       const changed = await tx.bookingRequest.updateMany({
         where: {
           id: request.id, kind: "PARTY",
