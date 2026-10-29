@@ -8,7 +8,7 @@ import type { PlanBookingState } from "@/server/family/planBookingPure";
 import { Container } from "@/components/ui/Container";
 import { PlanCalendar, invalidatePlanDayMarkers } from "@/features/plan-calendar";
 import { PlanPersonFilter, planPersonFilterOptions } from "@/features/my-plan/components/PlanPersonFilter";
-import { filterPlanEntriesByPerson } from "@/features/my-plan/lib/filterPlanEntriesByPerson";
+import { filterVisiblePlanEntries, type PlanPersonSelection } from "@/features/my-plan/lib/filterPlanEntriesByPerson";
 import { PlanDayList } from "./PlanDayList";
 import { PlanOverviewDialog } from "./PlanOverviewDialog";
 import { PlanProfileCompletionGate } from "./PlanProfileCompletionGate";
@@ -329,6 +329,9 @@ export function PlanPageClient({
   const [scenarioStatuses, setScenarioStatuses] = useState(scenarioStatusByDate);
   const [loadingWeek, setLoadingWeek] = useState<string | null>(null);
   const [calendarFilter, setCalendarFilter] = useState<FamilyCalendarFilter>("all");
+  const [includedPeople, setIncludedPeople] = useState<string[]>([]);
+  const [excludedPeople, setExcludedPeople] = useState<string[]>([]);
+  const [visibilityFilter, setVisibilityFilter] = useState<"ALL" | "PRIVATE" | "FAMILY">("ALL");
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
   const [editingManualItem, setEditingManualItem] = useState<SerializedPlanItem | null>(null);
@@ -421,14 +424,17 @@ export function PlanPageClient({
     }, {});
   }, [visibleItems]);
 
-  const dayItems = filterPlanEntriesByPerson(
-    itemsByDate[selectedDate] ?? [],
-    calendarFilter === "all"
-      ? { kind: "all" }
-      : calendarFilter === "family"
-        ? { kind: "adult", id: currentUserId }
-        : { kind: "child", id: calendarFilter.slice("child:".length) },
-  );
+  const toSelection = (value: string): PlanPersonSelection | null =>
+    value === "family" ? { kind: "adult", id: currentUserId } :
+    value.startsWith("child:") ? { kind: "child", id: value.slice("child:".length) } : null;
+  const selection = {
+    include: includedPeople.map(toSelection).filter((p): p is PlanPersonSelection => p !== null),
+    exclude: excludedPeople.map(toSelection).filter((p): p is PlanPersonSelection => p !== null),
+    visibility: visibilityFilter,
+  };
+  // The server returns only records accessible to the current account.
+  // The local participant/scope selection can only narrow that set.
+  const dayItems = filterVisiblePlanEntries(itemsByDate[selectedDate] ?? [], selection);
   const conflictIds = useMemo(() => findFamilyCalendarConflictIds(dayItems), [dayItems]);
   const todayISO = todayKey();
   const selectedWeekStart = startOfWeek(selectedDate);
@@ -552,8 +558,12 @@ export function PlanPageClient({
             { value: "family", label: "Я" },
             ...familyChildren.map((child) => ({ value: `child:${child.id}`, label: child.name })),
           ])}
-          value={calendarFilter}
-          onChange={(value) => setCalendarFilter(value as FamilyCalendarFilter)}
+          selectedValues={includedPeople}
+          onSelectionChange={(next) => { setIncludedPeople(next); setCalendarFilter(next.length === 1 ? next[0] as FamilyCalendarFilter : "all"); }}
+          excludedValues={excludedPeople}
+          onExclusionsChange={setExcludedPeople}
+          visibility={visibilityFilter}
+          onVisibilityChange={setVisibilityFilter}
         />
       </Container>
 
