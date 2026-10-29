@@ -112,6 +112,7 @@ type Props = {
   initialSelectedDate: string;
   initialRange: { from: string; to: string };
   familyChildren: Array<{ id: string; name: string }>;
+  familyAdults: Array<{ id: string; name: string }>;
   accountDisplayName?: string | null;
   ideaActivityIds: string[];
   childrenAges: number[];
@@ -304,6 +305,7 @@ export function PlanPageClient({
   initialSelectedDate,
   initialRange,
   familyChildren,
+  familyAdults,
   accountDisplayName,
   initialIdeas = [],
   scenarioStatusByDate = {},
@@ -425,6 +427,7 @@ export function PlanPageClient({
   }, [visibleItems]);
 
   const toSelection = (value: string): PlanPersonSelection | null =>
+    value.startsWith("adult:") ? { kind: "adult", id: value.slice("adult:".length) } :
     value === "family" ? { kind: "adult", id: currentUserId } :
     value.startsWith("child:") ? { kind: "child", id: value.slice("child:".length) } : null;
   const selection = {
@@ -555,7 +558,7 @@ export function PlanPageClient({
         <PlanPersonFilter
           className="mt-3"
           options={planPersonFilterOptions([
-            { value: "family", label: "Я" },
+            ...familyAdults.map((adult) => ({ value: `adult:${adult.id}`, label: adult.name })),
             ...familyChildren.map((child) => ({ value: `child:${child.id}`, label: child.name })),
           ])}
           selectedValues={includedPeople}
