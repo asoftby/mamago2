@@ -42,7 +42,8 @@ test("auto-deploy is opt-in and never cancels in-flight migrations", () => {
   assert.match(workflow,/Preserve encrypted database backup[\s\S]*?Apply target-image migrations/);
   const host=readFileSync("scripts/release/ci-dev-host-deploy.sh","utf8");
   assert.match(host,/\/opt\/mamago\/dev/);
-  assert.match(host,/docker compose -p dev run --rm --no-deps migrate/);
+  assert.match(host,/docker compose -p dev run --rm --no-deps migrate < \/dev\/null/);
+  assert.match(host,/migrate -c 'pnpm prisma migrate status' < \/dev\/null/);
   assert.match(host,/docker compose -p dev up -d --no-deps app worker/);
   assert.doesNotMatch(host,/docker compose.*\bdown\b/);
 });
