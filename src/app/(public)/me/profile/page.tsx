@@ -9,6 +9,7 @@ import { childScopeFor } from "@/server/family/familyAccess";
 import { familyInvitesEnabled, familyReadsEnabled } from "@/server/family/familyScope";
 import { listFamilyForUser } from "@/server/family/familyMembers.service";
 import { FamilyMembersCard } from "@/features/family/components/FamilyMembersCard";
+import { wishlistEnabled } from "@/server/wishlist/wishlistPure";
 
 export default async function FamilyProfilePage() {
   const user = await getCurrentUser();
@@ -62,6 +63,11 @@ export default async function FamilyProfilePage() {
       <Link href="/me/settings/family-city" className="mb-5 inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline">
         Домашний город семьи →
       </Link>
+      {wishlistEnabled() ? (
+        <Link href="/me/wishlists" className="mb-5 flex min-h-11 items-center text-sm font-medium text-primary hover:underline">
+          Списки желаний: подарки на день рождения →
+        </Link>
+      ) : null}
       {familyView ? (
         <FamilyMembersCard
           myRole={familyView.myRole}
