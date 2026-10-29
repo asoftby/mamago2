@@ -36,7 +36,8 @@ export function planRecurrenceInsertRows(series: Series[], from: string, to: str
       weekdays: item.weekdays, untilDate: item.untilDate, maxOccurrences: item.maxOccurrences,
     };
     for (const date of expandRecurrence(rule, from, to)) {
-      if (rows.length >= MAX_INSERTS) throw Error("recurrence_insert_limit");
+      // Never fail the calendar read solely because expansion reached its budget.
+      if (rows.length >= MAX_INSERTS) return rows;
       rows.push({
         recurrenceSeriesId: item.id,
         recurrenceDate: date,
@@ -73,10 +74,9 @@ export async function materializeRecurrencesForRange(owner: PlanOwner, from: str
         ...(shared ? [shared] : []),
       ],
     },
-    take: MAX_SERIES + 1,
+    take: MAX_SERIES,
     orderBy: { createdAt: "asc" },
   });
-  if (series.length > MAX_SERIES) throw Error("recurrence_series_limit");
   const rows = planRecurrenceInsertRows(series, from, to);
   if (rows.length) await prisma.planItem.createMany({ data: rows, skipDuplicates: true });
 }
