@@ -10,6 +10,8 @@ import type { EventPageData } from "@/lib/event/eventPageTypes";
 import { EventBreadcrumbs } from "./EventBreadcrumbs";
 import { OwnerEditDropdown } from "./OwnerEditDropdown";
 import { PlaceInfoRow } from "@/components/shared/PlaceInfoRow";
+import { PUBLICATION_PRIMARY_ACTION_CLASS, PUBLICATION_BADGE_CLASS } from "@/components/publication-page/publicationStyles";
+import { PublicationTitle } from "@/components/publication-page/PublicationTitle";
 import { SidebarCard, SidebarCardTopSection } from "@/components/shared/SidebarCard";
 import { ShareModal } from "@/components/shared/ShareModal";
 import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
@@ -152,7 +154,7 @@ export function EventDecisionPanel({
         )}
       >
         {data.categoryLabel && (
-          <span className="inline-flex h-7 items-center rounded-full bg-[#FFE8DC] px-3 text-[12px] font-semibold text-[#E86A3A]">
+          <span className={PUBLICATION_BADGE_CLASS}>
             {data.categoryLabel}
           </span>
         )}
@@ -177,11 +179,7 @@ export function EventDecisionPanel({
       />
 
       {/* Editorial display title */}
-      <h1
-        style={{ margin: 0, fontFamily: "var(--font-sans)", fontSize: 40, fontWeight: 600, lineHeight: 1.1, letterSpacing: "-0.025em", color: "#141210" }}
-      >
-        {data.title}
-      </h1>
+      <PublicationTitle>{data.title}</PublicationTitle>
 
       {/* Decision sticky card */}
       <SidebarCard sticky className="lg:sticky lg:top-6">
@@ -306,7 +304,7 @@ export function EventDecisionPanel({
               target="_blank"
               rel="noopener noreferrer"
               onClick={onBuy}
-              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-[#E86A3A] text-[16px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+              className={PUBLICATION_PRIMARY_ACTION_CLASS}
             >
               {data.cta.buyLabel}
             </a>
@@ -316,7 +314,7 @@ export function EventDecisionPanel({
             <button
               type="button"
               onClick={() => setBookingOpen(true)}
-              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-[#E86A3A] text-[16px] font-semibold text-white transition-colors hover:bg-[#C24E22] active:translate-y-px"
+              className={PUBLICATION_PRIMARY_ACTION_CLASS}
             >
               Записаться
             </button>

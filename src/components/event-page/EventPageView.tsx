@@ -43,6 +43,7 @@ import { Container } from "@/components/ui/Container";
 import { PublicationPageLayout } from "@/components/publication-page/PublicationPageLayout";
 import { PublicationHeroLayout } from "@/components/publication-page/PublicationHeroLayout";
 import { PublicationFactsStrip } from "@/components/publication-page/PublicationFactsStrip";
+import { PublicationAboutSection } from "@/components/publication-page/PublicationAboutSection";
 import { PublicationSection } from "@/components/publication-page/PublicationSection";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { toastAddedToPlan } from "@/lib/my-plan/toastAddedToPlan";
@@ -105,50 +106,32 @@ function EventAboutEditorial({
   descriptionHtml?: string;
 }) {
   return (
-    <PublicationSection className="py-16 md:py-20">
-      <div className="mb-4 flex items-center gap-3.5">
-        <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-          О событии
-        </span>
-        <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
-      </div>
-      <div className="grid grid-cols-1 gap-10 md:grid-cols-[320px_1fr] md:gap-14">
-        <div>
-          <h2
-            style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
-          >
-            Описание события
-          </h2>
-        </div>
+    <PublicationAboutSection kicker="О событии" title="Описание события">
+      {descriptionHtml ? (
+        <EventRichDescription
+          htmlContent={descriptionHtml}
+          collapsedHeight={960}
+          className="border-t-0 pt-0"
+        />
+      ) : about.summary ? (
+        <p className="text-[20px] leading-[1.5] tracking-[-0.005em] text-[#141210]">
+          {about.summary}
+        </p>
+      ) : null}
 
-        <div>
-          {descriptionHtml ? (
-            <EventRichDescription
-              htmlContent={descriptionHtml}
-              collapsedHeight={960}
-              className="border-t-0 pt-0"
-            />
-          ) : about.summary ? (
-            <p className="text-[20px] leading-[1.5] tracking-[-0.005em] text-[#141210]">
-              {about.summary}
-            </p>
-          ) : null}
-
-          {about.highlights && about.highlights.length > 0 && (
-            <div className="mt-8 flex flex-wrap gap-2.5">
-              {about.highlights.map((h, i) => (
-                <span
-                  key={i}
-                  className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] bg-[#FAF7F1] px-3 text-[13px] text-[#141210]"
-                >
-                  {h}
-                </span>
-              ))}
-            </div>
-          )}
+      {about.highlights && about.highlights.length > 0 && (
+        <div className="mt-8 flex flex-wrap gap-2.5">
+          {about.highlights.map((h, i) => (
+            <span
+              key={i}
+              className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] bg-[#FAF7F1] px-3 text-[13px] text-[#141210]"
+            >
+              {h}
+            </span>
+          ))}
         </div>
-      </div>
-    </PublicationSection>
+      )}
+    </PublicationAboutSection>
   );
 }
 
