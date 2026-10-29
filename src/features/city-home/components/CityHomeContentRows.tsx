@@ -106,7 +106,7 @@ export function CityHomeKudaSection({
   const eventsLabel = "[все события]";
   const halloweenHref = appendCityQuery(`/${citySlug}/events?occasion=halloween`);
   const halloweenChip = halloweenEnabled ? (
-    <div className="mb-4 flex items-center px-1">
+    <div className="mb-4 mt-4 flex items-center px-1">
       <HalloweenChip
         aria-label="Показать мероприятия на Хэллоуин"
         onClick={() => router.push(halloweenHref)}
@@ -117,7 +117,7 @@ export function CityHomeKudaSection({
   if (preview.length === 0) {
     return (
       <CityHomeSection
-        className="pt-[5px]"
+        className="pt-[5px]" innerClassName="pt-[10px]"
         title={title}
         titleCitySlug={citySlug}
         actionLabel={eventsLabel}
@@ -134,7 +134,7 @@ export function CityHomeKudaSection({
 
   return (
     <CityHomeSection
-      className="pt-[5px]"
+      className="pt-[5px]" innerClassName="pt-[10px]"
       title={title}
       titleCitySlug={citySlug}
       reserveCarouselControls={!halloweenEnabled}
@@ -299,6 +299,7 @@ export function CityHomeJournalSection({
   return (
     <CityHomeSection
       title="Статьи и обзоры"
+      innerClassName="pt-[10px]"
       reserveCarouselControls
     >
       <HorizontalCardRow
