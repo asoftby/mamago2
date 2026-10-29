@@ -82,10 +82,10 @@ export function calculateBookingPrice(input: {
   let base: number | null = null;
   if (input.tariff) {
     basis = "CLASS_TARIFF";
-    base = kopeks(input.tariff.price);
+    base = input.currency === "BYN" ? kopeks(input.tariff.price) : null;
   } else if (input.basePriceByn !== null) {
     basis = "OFFER_BASE";
-    base = kopeks(input.basePriceByn);
+    base = input.currency === "BYN" ? kopeks(input.basePriceByn) : null;
   }
   // An OfferClassTariff may be a multi-visit/monthly package, not a
   // per-person ticket. Do not multiply it by seats without a defined unit.
