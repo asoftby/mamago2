@@ -121,10 +121,8 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
         await tx.$queryRaw<Array<{ locked: number }>>`
           SELECT 1 AS "locked" FROM pg_advisory_xact_lock(${advisoryKey}::bigint)
         `;
-        const previous = await tx.bookingRequest.findUnique({
-          where: { offerId_slotIdempotencyKey: {
-            offerId: input.offerId, slotIdempotencyKey: input.idempotencyKey,
-          } },
+        const previous = await tx.bookingRequest.findFirst({
+          where: { offerId: input.offerId, slotIdempotencyKey: input.idempotencyKey },
           select: { id: true, slotRequestHash: true, holdUntil: true, status: true },
         });
         if (previous) {
