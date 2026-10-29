@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import type { StoryItem } from "../types/story";
 import {
   LEGACY_STORIES_SEEN_STORAGE_KEY,
+  BREAKING_NEWS_SEEN_STORAGE_KEY,
+  readSeenBreakingNews,
+  markBreakingNewsSeen,
+  orderBreakingNewsBySeen,
   STORIES_SEEN_STORAGE_KEY,
   isSeen,
   markSeen,
@@ -122,3 +126,14 @@ assert.deepEqual([...readSeen(legacy)], []);
 assert.equal(legacy.getItem(LEGACY_STORIES_SEEN_STORAGE_KEY), null);
 
 console.log("stories seen tests: OK");
+
+const newsStorage = new MemoryStorage();
+const chronologicalNews = [{ id: "newest" }, { id: "middle" }, { id: "oldest" }];
+assert.deepEqual(orderBreakingNewsBySeen(chronologicalNews, readSeenBreakingNews(newsStorage)), chronologicalNews);
+markBreakingNewsSeen(newsStorage, "newest");
+markBreakingNewsSeen(newsStorage, "newest");
+assert.deepEqual(JSON.parse(newsStorage.getItem(BREAKING_NEWS_SEEN_STORAGE_KEY)!), ["newest"]);
+assert.deepEqual(orderBreakingNewsBySeen(chronologicalNews, readSeenBreakingNews(newsStorage)).map((item) => item.id), ["middle", "oldest", "newest"]);
+assert.deepEqual(orderBreakingNewsBySeen(chronologicalNews, new Set(["newest", "middle", "oldest"])), chronologicalNews);
+newsStorage.setItem(BREAKING_NEWS_SEEN_STORAGE_KEY, "{broken");
+assert.equal(readSeenBreakingNews(newsStorage).size, 0);

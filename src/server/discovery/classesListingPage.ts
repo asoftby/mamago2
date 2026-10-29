@@ -1,8 +1,11 @@
+import { recordDiscoveryExposures } from "@/server/services/recommendations/RecommendationTraceService";
+import { composePromotedCards } from "@/lib/discovery/promotionComposition";
 import { placeInTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
 import { unstable_cache } from "next/cache";
 import prisma from "@/lib/prisma";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
-import { getDiscoveryRegionContext } from "@/server/geo/boostRegionTargeting";
+import { resolveTerritoryCityIds } from "@/server/territory/resolveTerritoryCityIds";
+import { getDiscoveryRegionContext, isBoostForDiscoveryRegion } from "@/server/geo/boostRegionTargeting";
 import { buildClassesDiscoveryWhere, extractOfferDateRange, getClassesDiscoveryFeed } from "@/server/discovery/classesDiscoveryFeed";
 
 /** Rank all public candidate IDs using the established boost/date/ID ordering,
@@ -23,9 +26,11 @@ export async function getClassesListingPage(
     const placeWhere = scope ? placeInTerritoryScopeWhere(scope.territoryIds) : { cityId };
     const publicWhereParts = (publicWhere.AND ?? []) as import("@prisma/client").Prisma.OfferWhereInput[];
     const where = buildClassesDiscoveryWhere({ publicWhereParts, cityId, placeWhere, targetRegionId, chipSlug, now, free: options.free, priceMax });
+    const homeCityIds = scope ? await resolveTerritoryCityIds({ id: scope.territoryId, type: scope.type }) : [cityId];
     const select = {
+      place: { select: { cityId: true } },
       id: true, dateFrom: true, dateTo: true, campSessions: true,
-      boosts: { where: { startAt: { lte: now }, endAt: { gt: now } }, select: { id: true } },
+      boosts: { where: { startAt: { lte: now }, endAt: { gt: now } }, select: { id: true, isFreeDaily: true, purchaseRequestKey: true, targetRegionIds: true } },
     } as const;
     // Only ID, date signals and boost membership: never fetch full offer cards.
     const candidates = await prisma.offer.findMany({ where, select }).catch((error: unknown) => {
@@ -39,15 +44,20 @@ export async function getClassesListingPage(
       });
       return prisma.offer.findMany({ where: fallbackWhere, select });
     });
-    return candidates.map((offer) => ({
-      id: offer.id,
-      boosted: offer.boosts.length > 0,
-      date: extractOfferDateRange(offer).dateStart ?? null,
-    })).sort((a, b) =>
+    return composePromotedCards(candidates.map((offer) => {
+      const local = Boolean(offer.place?.cityId && homeCityIds.includes(offer.place.cityId));
+      const boosts = offer.boosts.filter(boost => isBoostForDiscoveryRegion(boost, targetRegionId, local));
+      return {
+        id: offer.id,
+        boosted: boosts.length > 0,
+        isPromoted: boosts.some(boost => !boost.isFreeDaily),
+        date: extractOfferDateRange(offer).dateStart ?? null,
+      };
+    }).sort((a, b) =>
       Number(b.boosted) - Number(a.boosted)
       || (b.date ? Date.parse(b.date) : 0) - (a.date ? Date.parse(a.date) : 0)
       || b.id.localeCompare(a.id)
-    ).map((offer) => offer.id);
+    )).map((offer) => offer.id);
   }, ["classes-ranked-ids-v1", cityId, citySlug, chipSlug ?? "", String(options.free), String(priceMax ?? "")], { revalidate: 60 })();
 
   const total = orderedIds.length;
@@ -59,11 +69,13 @@ export async function getClassesListingPage(
       })
     : [];
   const cardsById = new Map(cards.map((card) => [card.id, card]));
-  return {
-    activities: visibleIds.flatMap((id) => {
+  const activities = visibleIds.flatMap((id) => {
       const card = cardsById.get(id);
       return card ? [card] : [];
-    }),
+    });
+  await recordDiscoveryExposures(activities, cityId, citySlug, "classes", null, (page - 1) * pageSize);
+  return {
+    activities,
     page, total, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)),
   };
 }

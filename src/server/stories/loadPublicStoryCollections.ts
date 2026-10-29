@@ -98,7 +98,7 @@ export async function loadPublicStoryCollections(input: {
   const [rail, configs, breakingNews, city] = await Promise.all([
     buildStoryRailData({ cityId: input.cityId, now, bypassCache: input.bypassCache }),
     getPublicStoryIntentConfigs(),
-    listBreakingNewsArticles(input.citySlug, 6, now).catch(() => []),
+    listBreakingNewsArticles(input.citySlug, 5, now).catch(() => []),
     prisma.city.findUnique({ where: { id: input.cityId }, select: { name: true } }),
   ]);
   const cityName = city?.name ?? null;
@@ -259,7 +259,7 @@ export async function loadPublicStoryCollections(input: {
   }
   const breakingConfig = configByIntent.get("breaking_news");
   if (breakingConfig?.enabled !== false && breakingNews.length > 0) {
-    collections.push({ id: "breaking-news", intent: "breaking_news", title: breakingConfig?.title || "breaking news", items: breakingNews.slice(0, 6).map((row) => ({ id: `article:${row.id}`, offerId: `article:${row.id}`, type: "breaking-news", eyebrow: "BREAKING NEWS", title: row.title, description: plain(row.description, row.excerpt), image: row.imageUrl ?? "", href: row.href, datetime: row.publishedAt ? new Date(row.publishedAt).toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }) : undefined })) });
+    collections.push({ id: "breaking-news", intent: "breaking_news", title: breakingConfig?.title || "breaking news", items: breakingNews.slice(0, 5).map((row) => ({ id: `article:${row.id}`, offerId: `article:${row.id}`, type: "breaking-news", eyebrow: "BREAKING NEWS", title: row.title, description: plain(row.description, row.excerpt), image: row.imageUrl ?? "", href: row.href, datetime: row.publishedAt ? new Date(row.publishedAt).toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }) : undefined })) });
   }
   return collections.sort((a, b) => (configByIntent.get(a.intent)?.order ?? 999) - (configByIntent.get(b.intent)?.order ?? 999));
 }

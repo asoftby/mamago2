@@ -1,3 +1,6 @@
+import { resolveTerritoryCityIds } from "@/server/territory/resolveTerritoryCityIds";
+import { composePromotedCards } from "@/lib/discovery/promotionComposition";
+import { recordDiscoveryExposures } from "@/server/services/recommendations/RecommendationTraceService";
 import { placeInTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
 import { ActivityFormat, type AgePolicy, type Prisma, type PublicationPriceMode } from "@prisma/client";
 import prisma from "@/lib/prisma";
@@ -5,7 +8,7 @@ import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import type { ActivityMock } from "@/types/activity";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
 import { getBusinessQualityBoostMap, applyActivePublicationBoost } from "@/server/services/ranking/businessQualityBoost";
-import { ALL_BELARUS_REGIONS, getDiscoveryRegionContext } from "@/server/geo/boostRegionTargeting";
+import { ALL_BELARUS_REGIONS, getDiscoveryRegionContext, isBoostForDiscoveryRegion } from "@/server/geo/boostRegionTargeting";
 
 function ageBoundsFromOffer(offer: {
   ageMinMonths: number | null;
@@ -187,6 +190,7 @@ export async function getClassesDiscoveryFeed(
   );
   const qualityBoostMap = await getBusinessQualityBoostMap(offerBusinessIds);
 
+  const homeCityIds = scope ? await resolveTerritoryCityIds({ id: scope.territoryId, type: scope.type }) : [cityId];
   const cards = rows.map<ActivityMock>((offer) => {
     const audience = projectOfferAudience(offer);
     const cityForPath = (offer.place as { city?: { slug: string } | null }).city?.slug ?? citySlug;
@@ -201,7 +205,10 @@ export async function getClassesDiscoveryFeed(
       dateTo: offer.dateTo,
       campSessions: offer.campSessions,
     });
-    const isBoosted = offer.boosts.length > 0;
+    const crossRegion = offer.place?.cityId != null && !homeCityIds.includes(offer.place.cityId);
+    const applicableBoosts = offer.boosts.filter(boost => isBoostForDiscoveryRegion(boost, targetRegionId, !crossRegion));
+    const isBoosted = applicableBoosts.length > 0;
+    const isPromoted = applicableBoosts.some(boost => !boost.isFreeDaily);
     const baseEngagement = 0;
 
     // Apply quality boost (capped at +10%, no effect on promoted boosts)
@@ -236,6 +243,8 @@ export async function getClassesDiscoveryFeed(
         chipTitles[0] ??
         (offer.campProgramType ? "Лагерь" : "Занятие"),
       engagementScore: finalEngagement,
+      isPromoted,
+      crossRegionReason: crossRegion && isPromoted ? "PAID_BOOST" : undefined,
     };
   });
 
@@ -250,7 +259,9 @@ export async function getClassesDiscoveryFeed(
     return right.id.localeCompare(left.id);
   });
 
-  return cards.slice(0, take);
+  const selected = (options?.onlyIds ? cards : composePromotedCards(cards)).slice(0, take);
+  if (!options?.onlyIds) await recordDiscoveryExposures(selected, cityId, citySlug, "classes");
+  return selected;
 }
 
 // ─── Internal query helper ────────────────────────────────────────────────────
@@ -342,6 +353,7 @@ async function runQuery({
       place: {
         select: {
           ownerBusinessId: true,
+          cityId: true,
           city: {
             select: { slug: true },
           },
@@ -352,7 +364,7 @@ async function runQuery({
           startAt: { lte: now },
           endAt: { gt: now },
         },
-        select: { id: true, targetRegionIds: true },
+        select: { id: true, targetRegionIds: true, isFreeDaily: true, purchaseRequestKey: true },
       },
     },
   });

@@ -226,11 +226,16 @@ export function KudaMasonryListing({
         ratio: resolvePosterFrame(card.imageWidth, card.imageHeight).ratio,
         content: (
           <AnalyticsCardViewTracker
+            threshold={0.5}
+            dwellMs={1000}
             entityType={activity.analyticsEntityType ?? "EVENT"}
             entityId={activity.id}
             vertical="CITY"
             citySlug={citySlug}
             meta={{
+        isPromoted: activity.isPromoted ?? false,
+        crossRegionReason: activity.crossRegionReason ?? null,
+        exposureId: activity.exposureId ?? null,
               section: "afisha",
               position,
               filterSummary,

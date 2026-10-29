@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ResponsiveOverlay } from "@/components/ui/responsive-overlay";
@@ -13,13 +13,14 @@ type ClassSlot = {
 };
 type ClassGroup = { id: string; title: string; tariffs: Array<PriceItem & { periodDays?: number | null }>; slots: ClassSlot[] };
 type SlotsResponse = { slots?: ClassSlot[]; groups?: ClassGroup[]; error?: string };
-type BookingResponse = { bookingId?: string; status?: string; error?: string };
+type BookingResponse = { bookingId?: string; status?: string; holdUntil?: string; error?: string };
 type PublicBookingOption = {
   id: string; title: string; mode: "INCLUDED" | "OPTIONAL"; priceByn: string;
 };
-type OptionsResponse = { options?: PublicBookingOption[]; error?: string };
+type OptionsResponse = { options?: PublicBookingOption[]; durationOptionsMinutes?: number[]; error?: string };
 type PriceQuoteResponse = { quote?: {
   status: "FIXED" | "QUOTE_REQUIRED"; totalByn: string | null;
+  extension?: { hours: number; amountByn: string; discountPercent: number } | null;
   options: Array<{ id: string; title: string; amountByn: string }>;
 }; error?: string };
 type PrefillResponse = {
@@ -55,11 +56,18 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [bookingId, setBookingId] = useState<string | null>(null);
+  const [bookingStatus, setBookingStatus] = useState("NEW");
+  const [bookingHoldUntil, setBookingHoldUntil] = useState<string | null>(null);
   const [children, setChildren] = useState<PrefillResponse["children"]>([]);
   const [selectedChildId, setSelectedChildId] = useState("");
   const [refresh, setRefresh] = useState(0);
+  // Reuse the same token for network retries of an identical intent. Any
+  // change in attendee details, date, tariff or extras produces a fresh token.
+  const pendingIntentRef = useRef<{ signature: string; key: string } | null>(null);
   const [bookingOptions, setBookingOptions] = useState<PublicBookingOption[]>([]);
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
+  const [durationOptions, setDurationOptions] = useState<number[]>([]);
+  const [durationMinutes, setDurationMinutes] = useState<number | null>(null);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [optionsError, setOptionsError] = useState<string | null>(null);
   const [priceQuote, setPriceQuote] = useState<PriceQuoteResponse["quote"] | null>(null);
@@ -72,6 +80,9 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
     const from = new Date();
     const to = new Date(from.getTime() + 30 * 86_400_000);
     const params = new URLSearchParams({ from: from.toISOString(), to: to.toISOString(), seats: String(seats) });
+    if (durationMinutes !== null && durationOptions.length > 1) {
+      params.set("durationMinutes", String(durationMinutes));
+    }
     // Defer state updates into the asynchronous request, and cancel stale responses.
     void (async () => {
       try {
@@ -93,7 +104,7 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
       }
     })();
     return () => controller.abort();
-  }, [open, offerId, seats, refresh]);
+  }, [open, offerId, seats, durationMinutes, durationOptions.length, refresh]);
 
   useEffect(() => {
     if (!open) return;
@@ -130,6 +141,9 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
         if (controller.signal.aborted) return;
         setBookingOptions(json.options ?? []);
         setSelectedOptionIds([]);
+        const durations = json.durationOptionsMinutes ?? [];
+        setDurationOptions(durations);
+        setDurationMinutes(durations[0] ?? null);
       }).catch(error => {
         if (!controller.signal.aborted) {
           setBookingOptions([]);
@@ -183,18 +197,22 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(`/api/public/offers/${encodeURIComponent(offerId)}/reserve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          startsAt: chosen.startsAt, endsAt: chosen.endsAt,
-          ...(selectedGroupId ? { classGroupId: selectedGroupId } : {}),
+      const intent = {
+          startsAt: chosen.startsAt, endsAt: chosen.endsAt,          ...(selectedGroupId ? { classGroupId: selectedGroupId } : {}),
           ...(selectedTariffId ? { classTariffId: selectedTariffId } : {}),
           selectedOptionIds,
           seats, customerName: name.trim(), customerPhone: phone.trim(),
           ...(email.trim() ? { customerEmail: email.trim() } : {}),
           ...(seats === 1 && selectedChildId ? { childId: selectedChildId } : {}),
-        }),
+      };
+      const signature = JSON.stringify(intent);
+      if (!pendingIntentRef.current || pendingIntentRef.current.signature !== signature) {
+        pendingIntentRef.current = { signature, key: crypto.randomUUID() };
+      }
+      const response = await fetch(`/api/public/offers/${encodeURIComponent(offerId)}/reserve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...intent, idempotencyKey: pendingIntentRef.current.key }),
       });
       const result = await response.json() as BookingResponse;
       if (!response.ok) {
@@ -202,7 +220,10 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
         throw new Error(result.error || "Не получилось отправить заявку");
       }
       if (!result.bookingId) throw new Error("Не удалось получить номер заявки");
+      pendingIntentRef.current = null;
       setBookingId(result.bookingId);
+      setBookingStatus(result.status ?? "NEW");
+      setBookingHoldUntil(result.holdUntil ?? null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось отправить заявку");
     } finally {
@@ -214,7 +235,7 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
     <ResponsiveOverlay
       open={open}
       onOpenChange={(next) => {
-        if (!next) { setBookingId(null); setSelected(null); setError(null); }
+        if (!next) { setBookingId(null); setBookingStatus("NEW"); setBookingHoldUntil(null); setSelected(null); setError(null); pendingIntentRef.current = null; }
         else setLoading(true);
         onOpenChange(next);
       }}
@@ -227,8 +248,13 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
     >
       {bookingId ? (
         <div role="status" className="space-y-3 p-5">
-          <h3 className="text-lg font-semibold">Заявка отправлена</h3>
-          <p>Место временно удерживается. Дождитесь подтверждения организатора.</p>
+          <h3 className="text-lg font-semibold">{bookingStatus === "CONFIRMED" ? "Запись подтверждена" :
+            bookingStatus === "NEW" ? "Заявка отправлена" : "Состояние заявки обновлено"}</h3>
+          <p>{bookingStatus === "NEW" && bookingHoldUntil && new Date(bookingHoldUntil) > new Date()
+            ? "Место временно удерживается. Дождитесь подтверждения организатора."
+            : bookingStatus === "NEW" ? "Время удержания истекло. Проверьте состояние бронирования."
+            : bookingStatus === "CONFIRMED" ? "Организатор подтвердил вашу запись."
+            : "Повторная отправка не создала новую заявку. Проверьте её текущий статус в личном кабинете."}</p>
           <p className="text-sm text-muted-foreground">Номер заявки: {bookingId}</p>
           <Button className="w-full" onClick={() => onOpenChange(false)}>Готово</Button>
         </div>
@@ -269,6 +295,28 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
                 <option value="">Выберите тариф</option>
                 {shownTariffs.map((tariff) => <option key={tariff.id} value={tariff.id}>{tariff.label} — {tariff.price} {tariff.unit}</option>)}
               </select>
+            </div>
+          )}
+          {durationOptions.length > 1 && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="class-booking-duration">
+                Продолжительность услуги
+              </label>
+              <select id="class-booking-duration" className="w-full rounded-xl border bg-background p-3 text-sm"
+                value={durationMinutes ?? durationOptions[0]}
+                onChange={event => {
+                  setDurationMinutes(Number(event.target.value)); setSelected(null);
+                  setLoading(true); setPriceQuote(null);
+                }}>
+                {durationOptions.map((minutes, index) => (
+                  <option key={minutes} value={minutes}>
+                    {minutes} мин{index > 0 ? ` · +${index} ч` : " · базовая"}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Продление оплачивается по тарифу организатора. Доступность времени пересчитывается.
+              </p>
             </div>
           )}
           <fieldset className="space-y-2">
@@ -324,7 +372,14 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
               {quoteLoading ? "Пересчитываем стоимость…" :
                 quoteError ? <span className="text-destructive">{quoteError}</span> :
                 priceQuote?.status === "FIXED" && priceQuote.totalByn !== null
-                  ? <strong>Стоимость заявки: {priceQuote.totalByn} BYN</strong>
+                  ? <div className="space-y-1">
+                    <strong>Стоимость заявки: {priceQuote.totalByn} BYN</strong>
+                    {priceQuote.extension && <p className="text-xs text-muted-foreground">
+                      Продление {priceQuote.extension.hours} ч — {priceQuote.extension.amountByn} BYN
+                      {priceQuote.extension.discountPercent > 0
+                        ? ` (скидка ${priceQuote.extension.discountPercent}%)` : ""}
+                    </p>}
+                  </div>
                   : priceQuote ? <span>Стоимость уточняется у организатора</span>
                   : <span>Выберите тариф и время</span>}
               <p className="mt-1 text-xs text-muted-foreground">

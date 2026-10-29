@@ -2874,6 +2874,12 @@ model OfferBooking {
   basePriceByn Decimal? @db.Decimal(10, 2)
   /// Optimistic editor revision, independent of content moderation and main wizard snapshot.
   pricingRevision Int @default(0)
+  /// Additional full hours past durationMin; zero preserves fixed-duration offers.
+  maxExtensionHours Int @default(0)
+  /// Price per additional full hour in BYN; NULL disables paid extensions.
+  extensionHourPriceByn Decimal? @db.Decimal(10, 2)
+  /// Percentage reduction applied only to additional hours, not the base fee.
+  extensionDiscountPercent Int @default(0)
   offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
   options OfferBookingOption[]
   rules OfferScheduleRule[]
@@ -6190,6 +6196,10 @@ model BookingRequest {
   bookingPriceSnapshot Json?
   /// Only set for a fully priced BYN booking. NULL = price on request, not zero.
   bookingTotalByn Decimal? @db.Decimal(10, 2)
+  /// Optional per-offer idempotency key for public slot reservations.
+  slotIdempotencyKey String?
+  /// Canonical SHA-256 intent fingerprint; no raw customer identifiers are stored here.
+  slotRequestHash String?
   campShiftId       String?
   /// Название смены (snapshot)
   campShiftTitle    String?
@@ -6264,6 +6274,7 @@ model BookingRequest {
   @@index([userId])
   @@index([activityId])
   @@index([offerId])
+  @@unique([offerId, slotIdempotencyKey])
   @@index([placeId])
   @@index([selectedSessionId])
   @@index([offerSessionId, status, holdUntil])

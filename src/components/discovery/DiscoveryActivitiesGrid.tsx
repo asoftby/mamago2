@@ -141,12 +141,17 @@ export function DiscoveryActivitiesGrid({
     feedBucket: "primary" | "secondary",
   ) => (
     <AnalyticsCardViewTracker
+            threshold={0.5}
+            dwellMs={1000}
       key={activity.id}
       entityType={activity.analyticsEntityType ?? "EVENT"}
       entityId={activity.id}
       vertical="CITY"
       citySlug={citySlug}
       meta={{
+        isPromoted: activity.isPromoted ?? false,
+        crossRegionReason: activity.crossRegionReason ?? null,
+        exposureId: activity.exposureId ?? null,
         section: activity.analyticsEntityType === "OFFER" ? "offers" : "afisha",
         position,
         filterSummary,
@@ -161,6 +166,7 @@ export function DiscoveryActivitiesGrid({
     >
       {activity.analyticsEntityType === "OFFER" ? (
         <OfferCard
+                  isPromoted={activity.isPromoted}
           id={activity.id}
           title={activity.title}
           href={

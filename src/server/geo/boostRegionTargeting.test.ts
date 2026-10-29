@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import { isBoostForDiscoveryRegion } from "./boostRegionTargeting";
+const paid = { isFreeDaily: false, purchaseRequestKey: "purchase", targetRegionIds: ["minsk-region"] };
+assert.equal(isBoostForDiscoveryRegion(paid, "minsk-region", false), true);
+assert.equal(isBoostForDiscoveryRegion(paid, "brest-region", false), false);
+assert.equal(isBoostForDiscoveryRegion(paid, "brest-region", true), false, "a Boost targeted elsewhere cannot raise local organic relevance");
+assert.equal(isBoostForDiscoveryRegion({ ...paid, targetRegionIds: [] }, "brest-region", true), true);
+assert.equal(isBoostForDiscoveryRegion({ ...paid, targetRegionIds: [] }, "brest-region", false), false);
+assert.equal(isBoostForDiscoveryRegion({ ...paid, targetRegionIds: ["*"] }, "brest-region", false), true);
+assert.equal(isBoostForDiscoveryRegion({ ...paid, purchaseRequestKey: null }, "minsk-region", false), false);
+assert.equal(isBoostForDiscoveryRegion({ ...paid, isFreeDaily: true }, "minsk-region", false), false);
+assert.equal(isBoostForDiscoveryRegion({ ...paid, isFreeDaily: true, targetRegionIds: [] }, "minsk-region", true), true);
+console.log("Boost geography applicability: OK");

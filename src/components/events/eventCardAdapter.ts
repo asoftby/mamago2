@@ -80,7 +80,7 @@ export function activityMockToEventCard(
   activity: ActivityMock,
   fallbackCitySlug: string,
 ): EventCardProps {
-  return eventListingToEventCard({
+  return { ...eventListingToEventCard({
     id: activity.id,
     title: activity.title,
     slug: activity.slug,
@@ -99,5 +99,5 @@ export function activityMockToEventCard(
     priceMax: activity.priceMax ?? null,
     priceListUsesOt: activity.priceListUsesOt ?? null,
     priceMode: activity.priceMode ?? null,
-  });
+  }), isPromoted: activity.isPromoted };
 }

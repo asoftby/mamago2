@@ -11,6 +11,9 @@ const amount = z.string().regex(/^(?:0|[1-9]\d{0,7})(?:\.\d{1,2})?$/);
 const editorSchema = z.object({
   revision: z.number().int().nonnegative(),
   basePriceByn: amount.nullable(),
+  maxExtensionHours: z.number().int().min(0).max(8).optional(),
+  extensionHourPriceByn: amount.nullable().optional(),
+  extensionDiscountPercent: z.number().int().min(0).max(90).optional(),
   options: z.array(z.object({
     id: z.string().min(1).max(128).optional(),
     title: z.string().trim().min(1).max(120),
@@ -29,7 +32,7 @@ async function ownedOffer(id: string) {
     select: {
       id: true, currency: true, bookingEnabled: true, bookingMode: true,
       productType: true, classGroups: { where: { active: true }, select: { id: true } }, offerBooking: {
-        select: { id: true, pricingRevision: true, basePriceByn: true, scheduleKind: true,
+        select: { id: true, pricingRevision: true, basePriceByn: true, scheduleKind: true, durationMin: true, maxExtensionHours: true, extensionHourPriceByn: true, extensionDiscountPercent: true,
           options: { orderBy: { position: "asc" }, select: {
             id: true, title: true, mode: true, priceByn: true,
             bookingUnitId: true, active: true,
@@ -67,6 +70,12 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       offer.offerBooking?.scheduleKind === "ON_REQUEST_WINDOWS",
     revision: offer.offerBooking?.pricingRevision ?? 0,
     basePriceByn: offer.offerBooking?.basePriceByn?.toFixed(2) ?? null,
+    minimumDurationMinutes: offer.offerBooking?.durationMin ?? null,
+    durationExtensionAllowed: offer.offerBooking?.scheduleKind === "ON_REQUEST_WINDOWS" &&
+      offer.classGroups.length === 0,
+    maxExtensionHours: offer.offerBooking?.maxExtensionHours ?? 0,
+    extensionHourPriceByn: offer.offerBooking?.extensionHourPriceByn?.toFixed(2) ?? null,
+    extensionDiscountPercent: offer.offerBooking?.extensionDiscountPercent ?? 0,
     options: (offer.offerBooking?.options ?? []).map(option => ({
       ...option, priceByn: option.priceByn.toFixed(2),
     })),
