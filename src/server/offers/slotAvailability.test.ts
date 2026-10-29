@@ -99,3 +99,55 @@ test("lead time and horizon clip the preview", () => {
   });
   assert.deepEqual(slots(snapshot, "2026-03-20T00:00:00Z", "2026-03-27T00:00:00Z").map((slot) => slot.sessionId), ["allowed"]);
 });
+
+
+test("same resource occupied by another offer is unavailable, but a separate linked resource remains", () => {
+  // The unit allocation snapshot is business-scoped and includes allocations
+  // independently of the current offer. A second offer cannot reuse room A.
+  const window = [{ weekday: 1, startMinutes: 600, endMinutes: 660 }];
+  const makeUnit = (id: string): SlotSnapshot["units"][number] => ({
+    id, timezone: "Europe/Minsk", prepMinutes: 0, cleanupMinutes: 0,
+    stepMinutes: 30, minDurationMinutes: null, rules: window,
+    exceptions: [], blocks: [], allocations: [],
+  });
+  const a = makeUnit("shared-room");
+  const b = makeUnit("other-room");
+  a.allocations.push({
+    blockStart: new Date("2026-03-23T07:00:00Z"),
+    blockEnd: new Date("2026-03-23T08:00:00Z"),
+    status: "CONFIRMED", expiresAt: null,
+  });
+  const snapshot = base({
+    scheduleKind: ScheduleKind.ON_REQUEST_WINDOWS, durationMin: 60, units: [a, b],
+  });
+  const result = slots(snapshot, "2026-03-23T07:00:00Z", "2026-03-23T09:00:00Z");
+  assert.equal(result.length, 1);
+  assert.deepEqual(result[0].unitIds, ["other-room"]);
+
+  // Once the other room is blocked manually, no publicly bookable resource remains.
+  b.blocks.push({
+    blockStart: new Date("2026-03-23T07:15:00Z"),
+    blockEnd: new Date("2026-03-23T07:45:00Z"),
+  });
+  assert.equal(slots(snapshot, "2026-03-23T07:00:00Z", "2026-03-23T09:00:00Z").length, 0);
+});
+
+test("held reservation remains occupied until TTL boundary, then may be previewed again", () => {
+  const unit: SlotSnapshot["units"][number] = {
+    id: "exclusive", timezone: "Europe/Minsk", prepMinutes: 0,
+    cleanupMinutes: 0, stepMinutes: 30, minDurationMinutes: null,
+    rules: [{ weekday: 1, startMinutes: 600, endMinutes: 660 }],
+    exceptions: [], blocks: [],
+    allocations: [{
+      blockStart: new Date("2026-03-23T07:00:00Z"),
+      blockEnd: new Date("2026-03-23T08:00:00Z"),
+      status: "HELD", expiresAt: new Date(now.getTime() + 1),
+    }],
+  };
+  const snapshot = base({
+    scheduleKind: ScheduleKind.ON_REQUEST_WINDOWS, durationMin: 60, units: [unit],
+  });
+  const input = { from: new Date("2026-03-23T07:00:00Z"), to: new Date("2026-03-23T08:01:00Z") };
+  assert.equal(calculateSlots(snapshot, input, now).length, 0);
+  assert.equal(calculateSlots(snapshot, input, new Date(now.getTime() + 1)).length, 1);
+});

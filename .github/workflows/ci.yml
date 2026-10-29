@@ -119,8 +119,11 @@ jobs:
         run: |
           pnpm exec tsx src/server/services/booking/pendingCampContacts.test.ts
           pnpm exec tsx src/lib/offers/offerClassSchedule.test.ts
+          pnpm exec tsx src/server/services/booking/allocationTransition.test.ts
+          pnpm exec tsx src/server/services/booking/bookingHold.test.ts
           pnpm exec tsx src/server/offers/slotAvailability.test.ts
           pnpm exec tsx src/server/offers/getSlots.businessIsolation.test.ts
+          pnpm exec tsx src/server/offers/reserveSlot.resourceLock.contract.test.ts
 
       - name: GSC DEV credential staging regressions
         run: python3 scripts/deploy/stage-gsc-dev.test.py

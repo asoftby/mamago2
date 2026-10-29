@@ -193,3 +193,43 @@ test("camp projection preserves booked OfferSession identity across edits", asyn
   assert.equal(cancelled.isCancelled, true);
   assert.equal(await db.bookingRequest.count({ where: { offerSessionId: original.id } }), 1);
 });
+
+
+test("manual calendar block racing a standard reservation cannot both claim the unit", async () => {
+  await fixture();
+  const unit = await db.bookingUnit.create({ data: {
+    businessId, placeId, name: `Raced room ${run}`, timezone: "Europe/Minsk", stepMinutes: 15,
+    rules: { create: { weekday: 2, startMinutes: 600, endMinutes: 720 } },
+  } });
+  unitIds.push(unit.id);
+  const offerId = await resourceOffer(unit.id);
+  let signalLocked!: () => void;
+  let allowBlock!: () => void;
+  const locked = new Promise<void>((resolve) => { signalLocked = resolve; });
+  const release = new Promise<void>((resolve) => { allowBlock = resolve; });
+
+  // Mirrors the live business block endpoint: it locks BookingUnit before
+  // recording an unavailable window. The booking must wait then recheck.
+  const manuallyBlocking = db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "BookingUnit" WHERE "id" = ${unit.id} FOR UPDATE`;
+    signalLocked();
+    await release;
+    await tx.calendarBlock.create({ data: {
+      bookingUnitId: unit.id, blockStart: nextTuesday, blockEnd: nextTuesdayEnd, source: "MANUAL",
+    } });
+  }, { timeout: 30_000 });
+
+  await locked;
+  const reserving = reserveSlot({
+    offerId, startsAt: nextTuesday, endsAt: nextTuesdayEnd, unitId: unit.id, ...contact,
+  });
+  // Give reservation time to read its unlocked preview before the manual
+  // block commits. Correctness does not depend on this delay.
+  await new Promise((resolve) => setTimeout(resolve, 75));
+  allowBlock();
+  await manuallyBlocking;
+  await assert.rejects(reserving,
+    (error: unknown) => error instanceof SlotReservationError && error.code === "SLOT_UNAVAILABLE");
+  assert.equal(await db.calendarBlock.count({ where: { bookingUnitId: unit.id } }), 1);
+  assert.equal(await db.bookingAllocation.count({ where: { bookingUnitId: unit.id, status: "HELD" } }), 0);
+});

@@ -63,3 +63,7 @@ jobs:
         env:
           RUN_BOOKING_LOCK_DB_TEST: "1"
         run: pnpm exec tsx src/server/services/booking/bookingStatusLock.db.test.ts
+      - name: Booking hold expiry and cancellation allocation integrity
+        env:
+          NODE_OPTIONS: "--conditions=react-server"
+        run: pnpm exec tsx src/server/services/booking/bookingLifecycle.postgres.integration.test.ts

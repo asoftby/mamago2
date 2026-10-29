@@ -19,6 +19,7 @@ import {
   BookingStatusTransitionError,
   BookingOwnershipError,
 } from "@/server/services/booking/bookingQuery.service";
+import { BookingHoldExpiredError } from "@/server/services/booking/bookingHold";
 
 const bodySchema = z.object({
   status: z.enum([
@@ -68,6 +69,9 @@ export async function PATCH(
   } catch (err) {
     if (err instanceof BookingOwnershipError) {
       return NextResponse.json({ error: err.message }, { status: 403 });
+    }
+    if (err instanceof BookingHoldExpiredError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
     }
     if (err instanceof BookingStatusTransitionError) {
       return NextResponse.json({ error: err.message }, { status: 422 });
