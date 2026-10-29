@@ -5640,3 +5640,24 @@ distributor_company_id=550) и хотели бы уточнить несколь
   Related stale analytics/visibility contracts now follow the existing SQL
   aggregation and Offer visibility path. Full push gate/CI is checked before
   PR #784 is declared ready.
+
+## [BACKLOG-214] Telegram-группы как источник событий (Bot API)
+
+- Status: OPEN
+- Priority: P2
+- Area: Import / Telegram
+- Added: 2026-10-29
+- Reason deferred: решено вести этап 3 только после пилота импорта публичных
+  каналов (`docs/engineering/telegram-channels-import-spec.md`); в текущий
+  релиз группы не входят.
+- Context: Capture принимает только личные чаты (`NOT_PRIVATE_CHAT` в
+  `telegramUpdateParser.ts`). Для групп нужен отдельный маршрут webhook, Bot
+  API без чтения истории до подключения бота, идемпотентность по
+  `chatId/messageId`, сборка альбомов, отдельный `ImportSource` на группу.
+  Только группы организаторов с согласия администраторов; сообщения частных
+  лиц — персональные данные (Закон № 99-З), нужен отдельный юридический
+  разбор.
+- Acceptance criteria: пилот на 1–2 группах организаторов; результат идёт
+  через общий мультимодальный модуль и существующую очередь ревью без новых
+  параллельных сущностей; лимиты Capture на группы не переносятся.
+- Source: ТЗ автосбора событий из Telegram-каналов, 2026-10-29.
