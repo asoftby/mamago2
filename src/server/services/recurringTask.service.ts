@@ -127,6 +127,22 @@ export async function cancelRecurringTaskSeries(
         if (item.updatedAt.getTime() !== expected.getTime()) {
           throw new RecurrenceMutationError("CONFLICT", "conflict");
         }
+        // FOR UPDATE conflicts with the materializer's FOR SHARE. When a
+        // calendar read is already inserting occurrences, wait for its commit
+        // before cancelling rows; subsequent reads wait for this mutation.
+        await tx.$queryRaw`SELECT "id" FROM "PlanRecurrenceSeries"
+          WHERE "id" = ${item.recurrenceSeriesId} FOR UPDATE`;
+
+        // A previous cancellation may have committed while we acquired the
+        // lock. Re-check the occurrence against its latest version.
+        const fresh = await tx.planItem.findFirst({
+          where: { id: itemId, ...planScope, source: "MANUAL", status: "CONFIRMED" },
+          select: { updatedAt: true },
+        });
+        if (!fresh) throw new RecurrenceMutationError("NOT_FOUND", "recurrence_not_found");
+        if (fresh.updatedAt.getTime() !== expected.getTime()) {
+          throw new RecurrenceMutationError("CONFLICT", "conflict");
+        }
         const series = await tx.planRecurrenceSeries.findFirst({
           where: { id: item.recurrenceSeriesId, ownerUserId: owner.userId, stoppedAt: null },
           select: { id: true, version: true, untilDate: true },
@@ -151,7 +167,7 @@ export async function cancelRecurringTaskSeries(
           },
           data: { status: "CANCELLED", cancelledAt, updatedAt: cancelledAt },
         });
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      });
       return;
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034" && attempt < 4) continue;
