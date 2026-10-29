@@ -1,9 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { unstable_cache } from "next/cache";
 import prisma from "@/lib/prisma";
+import { getCrossRegionFamilyThreshold } from "./crossRegionThreshold";
 
-/** Fifty DISTINCT families in the viewer's city/oblast; repeat plan items count once. */
-export const CROSS_REGION_FAMILY_THRESHOLD = 50;
 
 async function readQualifiedActivityIds(hubCityId: string, homeCityIds: string[]): Promise<string[]> {
   if (homeCityIds.length === 0) return [];
@@ -13,6 +12,8 @@ async function readQualifiedActivityIds(hubCityId: string, homeCityIds: string[]
     const minskOblast = await prisma.region.findFirst({ where: { countryId: city.countryId, slug: "minskaya-oblast", isActive: true }, select: { id: true } });
     discoveryRegionId = minskOblast?.id ?? discoveryRegionId;
   }
+  const region = discoveryRegionId ? await prisma.region.findUnique({ where: { id: discoveryRegionId }, select: { slug: true } }) : null;
+  const threshold = getCrossRegionFamilyThreshold(region?.slug);
   const overrides = discoveryRegionId ? await prisma.crossRegionEditorialOverride.findMany({
     where: { regionId: discoveryRegionId, expiresAt: { gt: new Date() } },
     select: { activityId: true },
@@ -28,7 +29,7 @@ async function readQualifiedActivityIds(hubCityId: string, homeCityIds: string[]
       AND f."archivedAt" IS NULL
       AND f."homeCityId" IN (${Prisma.join(homeCityIds)})
     GROUP BY pi."activityId"
-    HAVING COUNT(DISTINCT pi."familyId") >= ${CROSS_REGION_FAMILY_THRESHOLD}
+    HAVING COUNT(DISTINCT pi."familyId") >= ${threshold}
     LIMIT 300
   `);
   return [...new Set([...rows.map((row) => row.activityId), ...overrides.map((row) => row.activityId)])];
@@ -37,7 +38,7 @@ async function readQualifiedActivityIds(hubCityId: string, homeCityIds: string[]
 export async function getCrossRegionPopularActivityIds(hubCityId: string, homeCityIds: string[]): Promise<string[]> {
   return unstable_cache(
     () => readQualifiedActivityIds(hubCityId, homeCityIds),
-    ["cross-region-plan-50-editorial-v3", hubCityId, ...homeCityIds.slice().sort()],
+    ["cross-region-plan-threshold-v4", process.env.CROSS_REGION_FAMILY_THRESHOLDS ?? "", hubCityId, ...homeCityIds.slice().sort()],
     { revalidate: 300 },
   )();
 }
