@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { SerializedPlanItem } from "./PlanPageClient";
+import { todayKey } from "@/lib/date/dateKey";
 
 type ChildOption = { id: string; name: string };
 type SeriesRule = {
@@ -73,7 +74,7 @@ export function ManualPlanEntryDialog({
   const [weekdays, setWeekdays] = useState<number[]>([]);
   const [repeatUntil, setRepeatUntil] = useState("");
   const [repeatCount, setRepeatCount] = useState("");
-  const isSeriesOwner = Boolean(item?.recurrenceSeriesId && (!item.authorId || item.authorId === currentUserId));
+  const isSeriesOwner = Boolean(item?.recurrenceSeriesId && item.date >= todayKey() && (!item.authorId || item.authorId === currentUserId));
   const editFollowing = scope === "FUTURE" && isSeriesOwner;
   const weekdayOf = (dateKey: string) => new Date(dateKey + "T00:00:00.000Z").getUTCDay() || 7;
 
