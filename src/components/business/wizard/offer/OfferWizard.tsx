@@ -876,7 +876,7 @@ export function OfferWizard({
         case "openingHours":
           return <StepOpeningHours {...commonProps} />;
         case "classSchedule":
-          return <StepClassSchedule {...commonProps} />;
+          return <StepClassSchedule {...commonProps} showTariffs={variant !== "v2"} />;
         case "bookingMethod":
           return (
             <StepBookingMethod
