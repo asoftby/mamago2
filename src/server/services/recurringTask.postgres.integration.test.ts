@@ -152,3 +152,18 @@ test("concurrent calendar materialization and series cancellation never resurrec
   await materializeRecurrencesForRange(owner,"2026-10-29","2026-11-05");
   assert.equal(await db.planItem.count({where:{recurrenceSeriesId:id,status:"CONFIRMED"}}),0);
 });
+
+test("deleted child never breaks recurrence materialization or future calendar reads", async () => {
+  const owner=await fixture();
+  const familyId=await familyIdForWrite(owner.userId);
+  const child=await db.child.create({data:{name:"Child removed",parentId:owner.userId,familyId}});
+  const id=await createRecurringTaskSeries(owner,{
+    ...base,requestKey:"repeat_"+randomUUID().replaceAll("-"),childId:child.id,
+    recurrence:{frequency:"DAILY",interval:1,startDate:"2026-10-29"},
+  });
+  await db.child.delete({where:{id:child.id}});
+  await materializeRecurrencesForRange(owner,"2026-11-01","2026-11-04");
+  const future=await db.planItem.findMany({where:{recurrenceSeriesId:id,recurrenceDate:{gte:"2026-11-01"}}});
+  assert.equal(future.length,4);
+  assert.ok(future.every(item=>item.childId===null));
+});
