@@ -588,6 +588,7 @@ model PlanItem {
   id                String                    @id @default(cuid())
   userId            String
   activityId        String?
+  offerId           String?
   /// YYYY-MM-DD. null = запись без даты («намерение без даты», Family Core B0);
   /// ни один текущий writer не создаёт такие строки.
   date              String?
@@ -654,6 +655,7 @@ model PlanItem {
   family            Family?                   @relation(fields: [familyId], references: [id], onDelete: Cascade)
   bookingRequests   BookingRequest[]
   activity          Activity?                 @relation(fields: [activityId], references: [id])
+  offer             Offer?                    @relation(fields: [offerId], references: [id], onDelete: SetNull)
   route             Route?                    @relation(fields: [routeId], references: [id])
   place             Place?                    @relation("PlanItemToPlace", fields: [placeId], references: [id])
   venuePlace        Place?                    @relation("PlanItemVenue", fields: [venuePlaceId], references: [id], onDelete: SetNull)
@@ -668,6 +670,7 @@ model PlanItem {
   @@index([userId, date])
   @@index([userId])
   @@index([activityId])
+  @@index([offerId])
   @@index([routeId])
   @@index([userId, planRouteSlug])
   @@index([placeId])
@@ -2713,6 +2716,7 @@ model Offer {
   bookingRequests BookingRequest[]
   partyOrderItems PartyOrderItem[]
   bookingUnitOffers BookingUnitOffer[]
+  offerPlanItems  PlanItem[]
   offerIdeas      OfferIdea[]
   archivedBy      User?              @relation("OfferArchiver", fields: [archivedByUserId], references: [id])
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])

@@ -7,6 +7,9 @@ on:
       - ".github/workflows/plan-recurrence-db-integration.yml"
       - "src/server/services/recurrenceMaterialization*"
       - "src/server/services/recurringTask.service.ts"
+      - "src/server/services/plan.service.ts"
+      - "src/server/services/planOffer.postgres.integration.test.ts"
+      - "src/app/api/save/plan/**"
       - "src/server/services/familyCalendar.service.ts"
       - "src/server/family/**"
       - "prisma/**"
@@ -16,6 +19,9 @@ on:
       - ".github/workflows/plan-recurrence-db-integration.yml"
       - "src/server/services/recurrenceMaterialization*"
       - "src/server/services/recurringTask.service.ts"
+      - "src/server/services/plan.service.ts"
+      - "src/server/services/planOffer.postgres.integration.test.ts"
+      - "src/app/api/save/plan/**"
       - "src/server/services/familyCalendar.service.ts"
       - "src/server/family/**"
       - "prisma/**"
@@ -64,3 +70,5 @@ jobs:
         run: pnpm exec prisma migrate deploy
       - name: Verify recurrence concurrency and family ACL in PostgreSQL
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/recurrenceMaterialization.postgres.integration.test.ts
+      - name: Verify offer plan persistence, concurrency and family ACL in PostgreSQL
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/planOffer.postgres.integration.test.ts

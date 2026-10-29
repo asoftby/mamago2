@@ -70,3 +70,15 @@ test("conflicts require the same date and same family/child scope with two real 
   ]);
   assert.deepEqual([...conflicts].sort(), ["a", "b"]);
 });
+
+
+test("saved offer remains a catalog entry with its own title and is included in family filters", () => {
+  const offer = { ...base, id: "offer-plan-a", source: PlanItemSource.CATALOG, entryType: null,
+    title: "Гимнастика «Сильфида»", activityId: null, offerId: "offer-a", activity: null };
+  const display = buildFamilyCalendarItemPresentation(offer);
+  assert.equal(display.title, "Гимнастика «Сильфида»");
+  assert.equal(display.isCatalog, true);
+  assert.equal(display.canEdit, false);
+  assert.equal(filterFamilyCalendarItems([offer], "child:child-a").length, 1);
+  assert.equal(filterFamilyCalendarItems([offer], "family").length, 0);
+});
