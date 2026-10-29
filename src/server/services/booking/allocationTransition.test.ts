@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BookingAllocationStatus as A, BookingStatus as B } from "@prisma/client";
 import { allocationTransition } from "./allocationTransition";
+import { BookingHoldExpiredError } from "./bookingHold";
 
 const now = new Date("2026-10-27T12:00:00.000Z");
 const held = (expiresAt: Date | null) => [{ status: A.HELD, expiresAt }];
@@ -58,4 +59,11 @@ test("cancellation releases allocations for every resource in a booking", () => 
 test("no allocation is invented for an unallocated booking", () => {
   assert.equal(allocationTransition(B.CONFIRMED, [], now), A.CONFIRMED);
   // The caller's updateMany only touches existing HELD rows.
+});
+
+// The public business status routes must surface the same typed 409 for a
+// released/expired BookingAllocation as for an expired group hold.
+test("invalid allocation uses the recoverable hold-expired error", () => {
+  assert.throws(() => allocationTransition(B.CONFIRMED,
+    [{ status: A.EXPIRED, expiresAt: null }], now), BookingHoldExpiredError);
 });
