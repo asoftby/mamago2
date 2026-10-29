@@ -97,6 +97,83 @@ test("a room and equipment are held atomically with individual prep/cleanup wind
   assert.equal(await db.bookingRequest.count({ where: { id: bookingId, status: "NEW" } }), 1);
 });
 
+test("server-calculated options and price snapshot persist atomically with additional unit", async () => {
+  const room = await unit("Priced room");
+  const projector = await unit("Priced projector");
+  const offerId = await offer([room, projector]);
+  const booking = await db.offerBooking.findUniqueOrThrow({ where: { offerId } });
+  await db.offerBooking.update({
+    where: { id: booking.id }, data: { basePriceByn: "150.00" },
+  });
+  const optional = await db.offerBookingOption.create({ data: {
+    offerBookingId: booking.id, title: "Projector", mode: "OPTIONAL",
+    priceByn: "25.50", bookingUnitId: projector,
+  } });
+  const included = await db.offerBookingOption.create({ data: {
+    offerBookingId: booking.id, title: "Setup", mode: "INCLUDED", priceByn: "0.00",
+  } });
+  const result = await reserveSlot({
+    offerId, startsAt: start, endsAt: end, unitId: room,
+    selectedOptionIds: [optional.id], ...contact,
+  });
+  const row = await db.bookingRequest.findUniqueOrThrow({ where: { id: result.bookingId } });
+  assert.equal(row.bookingTotalByn?.toString(), "175.5");
+  const snapshot = row.bookingPriceSnapshot as {
+    version: number; status: string; totalByn: string;
+    options: Array<{ id: string; amountByn: string }>;
+  };
+  assert.equal(snapshot.version, 1);
+  assert.equal(snapshot.status, "FIXED");
+  assert.equal(snapshot.totalByn, "175.50");
+  assert.deepEqual(snapshot.options.map(o => o.id).sort(), [optional.id, included.id].sort());
+  assert.equal((await db.bookingAllocation.count({ where: { bookingRequestId: row.id } })), 2);
+
+  // Repricing must never mutate the already accepted quote.
+  await db.offerBookingOption.update({ where: { id: optional.id }, data: { priceByn: "90.00" } });
+  const unchanged = await db.bookingRequest.findUniqueOrThrow({ where: { id: row.id } });
+  assert.equal((unchanged.bookingPriceSnapshot as { totalByn: string }).totalByn, "175.50");
+  assert.equal(unchanged.bookingTotalByn?.toString(), "175.5");
+});
+
+test("paid option cannot become the only resource when main unit selection is ambiguous", async () => {
+  const room = await unit("Main choice room");
+  const equipment = await unit("Main choice equipment");
+  const offerId = await offer([room, equipment]);
+  const booking = await db.offerBooking.findUniqueOrThrow({ where: { offerId } });
+  const extra = await db.offerBookingOption.create({ data: {
+    offerBookingId: booking.id, title: "Extra equipment",
+    mode: "OPTIONAL", priceByn: "15.00", bookingUnitId: equipment,
+  } });
+  await assert.rejects(reserveSlot({
+    offerId, startsAt: start, endsAt: end,
+    selectedOptionIds: [extra.id], ...contact,
+  }), (error: unknown) => error instanceof SlotReservationError &&
+    error.code === "UNIT_REQUIRED");
+  assert.equal(await db.bookingRequest.count({ where: { offerId } }), 0);
+  assert.equal(await db.bookingAllocation.count({ where: { bookingUnitId: equipment } }), 0);
+});
+
+test("unavailable selected option resource creates no partial booking or price snapshot", async () => {
+  const room = await unit("Paid room");
+  const equipment = await unit("Paid equipment");
+  const offerId = await offer([room, equipment]);
+  const booking = await db.offerBooking.findUniqueOrThrow({ where: { offerId } });
+  const paid = await db.offerBookingOption.create({ data: {
+    offerBookingId: booking.id, title: "Equipment", mode: "OPTIONAL",
+    priceByn: "40.00", bookingUnitId: equipment,
+  } });
+  await db.calendarBlock.create({ data: {
+    bookingUnitId: equipment, blockStart: start, blockEnd: end, source: "MANUAL",
+  } });
+  await assert.rejects(reserveSlot({
+    offerId, startsAt: start, endsAt: end, unitId: room,
+    selectedOptionIds: [paid.id], ...contact,
+  }), (error: unknown) => error instanceof SlotReservationError &&
+    error.code === "SLOT_UNAVAILABLE");
+  assert.equal(await db.bookingRequest.count({ where: { offerId } }), 0);
+  assert.equal(await db.bookingAllocation.count({ where: { bookingUnitId: room } }), 0);
+});
+
 test("business confirmation and rejection transition ALL held bundle resources", async () => {
   const room = await unit("Transition room");
   const equipment = await unit("Transition equipment");

@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { parsePriceData } from "@/lib/priceItems";
+import { calculateBookingPrice, BookingPriceError } from "./bookingPrice";
 import { BookingStatus, Prisma, PublicationType, ScheduleKind } from "@prisma/client";
 import { loadSlotSnapshot } from "./getSlots";
 import { calculateSlots, type SlotSnapshot } from "./slotAvailability";
@@ -12,6 +13,7 @@ export type ReserveSlotInput = {
   offerId: string;
   classGroupId?: string | null;
   classTariffId?: string | null;
+  selectedOptionIds?: string[];
   startsAt: Date;
   endsAt: Date;
   seats?: number;
@@ -98,7 +100,7 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
     return await prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: input.offerId },
-        select: { status: true, priceItems: true, classGroups: { include: { tariffs: true, rules: true } }, place: { select: { ownerBusinessId: true } }, offerBooking: { select: { leadTimeHours: true, timezone: true } } },
+        select: { status: true, currency: true, priceItems: true, classGroups: { include: { tariffs: true, rules: true } }, place: { select: { ownerBusinessId: true } }, offerBooking: { select: { leadTimeHours: true, timezone: true, basePriceByn: true, options: true } } },
       });
       const businessId = offer?.place?.ownerBusinessId;
       if (!offer || offer.status !== "PUBLISHED" || !businessId || !offer.offerBooking) {
@@ -116,6 +118,29 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
         throw new SlotReservationError("INVALID_SLOT", "Выберите доступный тариф");
       }
       if (input.classTariffId && !tariff) throw new SlotReservationError("INVALID_SLOT", "Тариф недоступен для выбранной группы");
+      let pricing: ReturnType<typeof calculateBookingPrice>;
+      try {
+        pricing = calculateBookingPrice({
+          currency: offer.currency, seats,
+          durationMinutes: (input.endsAt.getTime() - input.startsAt.getTime()) / MINUTE_MS,
+          basePriceByn: offer.offerBooking.basePriceByn?.toString() ?? null,
+          tariff: tariff ? {
+            id: tariff.id, title: "title" in tariff ? tariff.title : tariff.label,
+            price: tariff.price, unit: tariff.unit,
+          } : null,
+          options: offer.offerBooking.options.map(item => ({
+            id: item.id, title: item.title, mode: item.mode,
+            priceByn: item.priceByn.toString(), bookingUnitId: item.bookingUnitId,
+            active: item.active,
+          })),
+          selectedOptionIds: input.selectedOptionIds,
+        });
+      } catch (error) {
+        if (error instanceof BookingPriceError) {
+          throw new SlotReservationError("INVALID_SLOT", error.message);
+        }
+        throw error;
+      }
       if (group && group.rules.length === 0) throw new SlotReservationError("INVALID_SLOT", "Расписание группы не задано");
       if (group) {
         const date = dateKeyInZone(input.startsAt, offer.offerBooking.timezone);
@@ -147,9 +172,16 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       const allocations: Array<{ unitId: string; blockStart: Date; blockEnd: Date }> = [];
       let selectedUnitIds: string[] = [];
       if (initial.scheduleKind === ScheduleKind.ON_REQUEST_WINDOWS) {
-        selectedUnitIds = requestedUnits ??
+        const baseUnits = requestedUnits ??
           (input.unitId ? [input.unitId] :
             candidate.unitIds.length === 1 ? [candidate.unitIds[0]] : []);
+        // Option resources supplement, never replace, the required main unit.
+        // Until the public main-unit picker exists, ambiguous base selection
+        // must fail closed rather than reserving only an optional accessory.
+        if (baseUnits.length === 0) {
+          throw new SlotReservationError("UNIT_REQUIRED", "Выберите основной ресурс для бронирования");
+        }
+        selectedUnitIds = [...new Set([...baseUnits, ...pricing.optionUnitIds])];
         if (selectedUnitIds.length === 0) {
           throw new SlotReservationError("UNIT_REQUIRED", "Выберите конкретный ресурс для бронирования");
         }
@@ -180,7 +212,7 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
           });
         }
       } else {
-        if (input.unitId !== undefined || requestedUnits !== undefined) {
+        if (input.unitId !== undefined || requestedUnits !== undefined || pricing.optionUnitIds.length > 0) {
           throw new SlotReservationError("INVALID_SLOT", "Для групповой записи ресурсы выбирать не нужно");
         }
         const capacity = sessionCapacity(initial, input.startsAt);
@@ -220,6 +252,8 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
           classTariffTitle: tariff ? ('title' in tariff ? tariff.title : tariff.label) : null,
           classTariffPrice: tariff?.price ?? null,
           classTariffUnit: tariff?.unit ?? null,
+          bookingPriceSnapshot: pricing.snapshot as unknown as Prisma.InputJsonValue,
+          bookingTotalByn: pricing.snapshot.totalByn,
           offerSessionId: sessionId,
           startsAt: input.startsAt,
           endsAt: input.endsAt,

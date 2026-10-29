@@ -275,6 +275,7 @@ export async function createPublicClassSlotBooking(input: {
   offerId: string;
   classGroupId?: string | null;
   classTariffId?: string | null;
+  selectedOptionIds?: string[];
   startsAt: Date;
   endsAt: Date;
   seats: number;
@@ -342,6 +343,7 @@ export async function createPublicClassSlotBooking(input: {
     offerId: offer.id,
     classGroupId: input.classGroupId,
     classTariffId: input.classTariffId,
+    selectedOptionIds: input.selectedOptionIds,
     startsAt: input.startsAt,
     endsAt: input.endsAt,
     seats: input.seats,
