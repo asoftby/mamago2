@@ -15,7 +15,7 @@ assert.match(schema, /homeCityId\s+String\?/);
 assert.match(migration, /ADD COLUMN "targetRegionIds"/);
 assert.match(migration, /ADD COLUMN "homeCityId"/);
 assert.match(signal, /getCrossRegionFamilyThreshold/);
-assert.match(signal, /HAVING COUNT\\(DISTINCT pi\\."familyId"\\) >= \\x24\\{threshold\\}/);
+assert.ok(signal.includes('HAVING COUNT(DISTINCT pi."familyId") >= ${threshold}'));
 assert.match(signal, /COUNT\(DISTINCT pi\."familyId"\)/);
 assert.match(signal, /f\."homeCityId" IN/);
 assert.match(signal, /pi\.status = 'CONFIRMED'/);
