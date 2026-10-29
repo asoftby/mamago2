@@ -1484,11 +1484,22 @@ export function PlanMainContent({
         todayIso={todayKey}
         initialDate={movingNote.date < todayKey ? todayKey : movingNote.date}
         editItem={movingNote}
-        people={personas.map((persona) => ({
-          id: persona.id,
-          name: persona.displayName?.trim() || (persona.kind === "adult" ? "Я" : ""),
-          kind: persona.kind,
-        }))}
+        people={[
+          ...(familyAdults.length ? familyAdults.map(adult => ({
+            id: adult.userId,
+            name: adult.isMe ? "Я" : adult.displayName?.trim() || "Взрослый",
+            kind: "adult" as const,
+          })) : personas.filter(persona => persona.kind === "adult").map(persona => ({
+            id: persona.id,
+            name: persona.displayName?.trim() || "Я",
+            kind: "adult" as const,
+          }))),
+          ...personas.filter(persona => persona.kind === "child").map(persona => ({
+            id: persona.id,
+            name: persona.displayName?.trim() || "Ребёнок",
+            kind: "child" as const,
+          })),
+        ]}
         onBack={() => setMovingItem(null)}
         onSaved={(date) => {
           setMovingItem(null);
@@ -1665,11 +1676,22 @@ export function PlanMainContent({
               todayIso={todayKey}
               initialDate={editingNote ? (editingNote.date < todayKey ? todayKey : editingNote.date) : selectedDate < todayKey ? todayKey : selectedDate}
               editItem={editingNote}
-              people={personas.map((persona) => ({
-                id: persona.id,
-                name: persona.displayName?.trim() || (persona.kind === "adult" ? "Я" : ""),
-                kind: persona.kind,
-              }))}
+              people={[
+          ...(familyAdults.length ? familyAdults.map(adult => ({
+            id: adult.userId,
+            name: adult.isMe ? "Я" : adult.displayName?.trim() || "Взрослый",
+            kind: "adult" as const,
+          })) : personas.filter(persona => persona.kind === "adult").map(persona => ({
+            id: persona.id,
+            name: persona.displayName?.trim() || "Я",
+            kind: "adult" as const,
+          }))),
+          ...personas.filter(persona => persona.kind === "child").map(persona => ({
+            id: persona.id,
+            name: persona.displayName?.trim() || "Ребёнок",
+            kind: "child" as const,
+          })),
+        ]}
               onBack={closeNestedScreen}
               onSaved={(date) => {
                 onChangeDate?.(date);
