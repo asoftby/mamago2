@@ -58,7 +58,23 @@ for (const needle of [
   'rule: "FIXED_PRICE"', "auto: true", '"PARTY_BOOKING_CONFIRMED"', '"party:" + requestId + ":confirmed"',
   "lastActivityAt: existing.lastActivityAt",
 ]) assert.ok(service.includes(needle), "Missing auto-confirm invariant: " + needle);
-assert.ok(!service.includes("addonRequests") && !service.includes('"PARTY_REQUEST_SENT"'), "No fan-out on auto-confirm (PR 3)");
+// Auto-confirmation needs exactly one performer BookingUnit, locked and allocated in the
+// same transaction as the claim; the DB exclusion error maps to 409 (#818 double booking).
+assert.match(service, /const autoConfirm = fixedPrice && performerUnitId !== null;/);
+assert.match(service, /performerUnits\.length === 1 \? performerUnits\[0\]\.bookingUnitId : null/);
+// Lock order matches confirmPartyRequest: request row first, then the performer unit.
+assert.ok(service.indexOf('FROM "BookingRequest" WHERE "id" = ${requestId} FOR UPDATE') !== -1 &&
+  service.indexOf('FROM "BookingRequest" WHERE "id" = ${requestId} FOR UPDATE') < service.indexOf("lockAvailablePartyUnit(tx"),
+  "The request is locked before the performer");
+assert.ok(service.indexOf("lockAvailablePartyUnit(tx") < service.indexOf("tx.bookingRequest.updateMany"),
+  "The performer is locked and checked before the request is claimed");
+assert.ok(service.indexOf("await allocatePartyUnit(tx") > service.indexOf("confirmedItem.count !== 1"));
+assert.match(service, /isAllocationOverlapError\(error\)\) throw new PartyApiError\(409/);
+// An auto-confirmed anchor requests the add-ons in the same transaction (deferred "PR 3", #818 F1).
+assert.match(service, /if \(item\.role === "ANCHOR"\) \{\s*await requestPartyAddonsAfterAnchor\(tx, \{/,
+  "Auto-confirmed anchor must fan out add-ons");
+assert.ok(service.indexOf("requestPartyAddonsAfterAnchor(tx") > service.indexOf("confirmedItem.count !== 1"),
+  "Fan-out runs only after the anchor item is confirmed");
 // Retry with the same Idempotency-Key short-circuits before any write.
 assert.ok(service.indexOf("bookingRequestId_idempotencyKey") < service.indexOf("prisma.$transaction"));
 // Auto-confirm repeats confirmPartyRequest's live check inside the transaction, before the claim:

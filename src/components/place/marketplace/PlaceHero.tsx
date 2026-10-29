@@ -1,6 +1,6 @@
 "use client";
 
-import { Instagram, Link2, Phone, Share2 } from "lucide-react";
+import { Instagram, Link2, Phone, Share2, Star } from "lucide-react";
 import { useState } from "react";
 import { ShareModal } from "@/components/shared/ShareModal";
 import { PlaceSaveHeart } from "@/features/save/PlaceSaveHeart";
@@ -26,6 +26,7 @@ interface PlaceHeroProps {
   title: string;
   shortDesc: string;
   categoryLabel?: string;
+  ageRange?: string;
   city?: string;
   district?: string;
   address?: string;
@@ -67,6 +68,7 @@ export function PlaceHero({
   title,
   shortDesc,
   categoryLabel,
+  ageRange,
   district,
   address,
   metro,
@@ -184,39 +186,26 @@ export function PlaceHero({
                 {categoryLabel}
               </span>
             )}
-            {district && (
-              <span
-                style={{
-                  fontFamily: "var(--font-mono, monospace)",
-                  textTransform: "uppercase",
-                  fontSize: 11,
-                  letterSpacing: ".14em",
-                  color: "rgba(20,18,16,.55)",
-                }}
-              >
-                {district}
-              </span>
+            {(reputationSummary?.googleRating != null && (reputationSummary.googleCount ?? 0) > 0) || (rating != null && (reviewCount ?? 0) > 0) ? (
+              <div className="inline-flex items-center gap-2 text-[14px] sm:text-[16px]">
+                <Star className="h-4 w-4 shrink-0 fill-primary text-primary" aria-hidden />
+                <span className="font-semibold text-foreground">
+                  {(reputationSummary?.googleRating ?? rating)?.toFixed(1)}
+                </span>
+                <a
+                  href={reputationSummary ? "#place-reputation" : "#reviews"}
+                  className="text-muted-foreground underline decoration-dashed underline-offset-4 transition-colors hover:text-foreground"
+                >
+                  {(reputationSummary?.googleCount ?? reviewCount)?.toLocaleString("ru-RU")} {(() => { const count = reputationSummary?.googleCount ?? reviewCount ?? 0; return count % 100 >= 11 && count % 100 <= 14 ? "отзывов" : count % 10 === 1 ? "отзыв" : count % 10 >= 2 && count % 10 <= 4 ? "отзыва" : "отзывов"; })()}
+                </a>
+              </div>
+            ) : null}
+            {ageRange?.trim() && (
+              <>
+                <span className="text-muted-foreground/50" aria-hidden>·</span>
+                <span className="text-[14px] font-semibold text-foreground sm:text-[16px]">{ageRange}</span>
+              </>
             )}
-            {/* Desktop: «Сохранить» и «Поделиться» справа в строке категории; на мобильном — иконки в хедере. */}
-            <div className="ml-auto hidden items-center gap-5 lg:flex">
-              <PlaceSaveHeart
-                variant="text"
-                registerInHeader
-                placeId={placeId}
-                placeSlug={placeSlug}
-                placeTitle={title}
-                coverImageUrl={logoUrl}
-                source="place-detail"
-              />
-              <button
-                type="button"
-                onClick={() => setShareOpen(true)}
-                className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
-              >
-                <Share2 size={18} strokeWidth={1.75} aria-hidden />
-                Поделиться
-              </button>
-            </div>
           </div>
           <ShareModal
             open={shareOpen}
@@ -341,6 +330,30 @@ export function PlaceHero({
                 <OwnerPlaceEditDropdown placeId={ownerEditPlaceId} className="w-full h-14 rounded-full" />
               </SidebarCardTopSection>
             )}
+
+            {/* Save/share live alongside primary CTA actions. */}
+            <SidebarCardTopSection mt={20} pt={20}>
+            {/* Desktop actions in CTA card; mobile actions remain in publication header. */}
+            <div className="hidden items-center justify-between gap-5 lg:flex">
+              <PlaceSaveHeart
+                variant="text"
+                registerInHeader
+                placeId={placeId}
+                placeSlug={placeSlug}
+                placeTitle={title}
+                coverImageUrl={logoUrl}
+                source="place-detail"
+              />
+              <button
+                type="button"
+                onClick={() => setShareOpen(true)}
+                className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
+              >
+                <Share2 size={18} strokeWidth={1.75} aria-hidden />
+                Поделиться
+              </button>
+            </div>
+            </SidebarCardTopSection>
 
             {/* Source-separated reputation link, no blended star average. */}
             {reputationSummary ? (

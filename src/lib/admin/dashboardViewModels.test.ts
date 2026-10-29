@@ -3,6 +3,7 @@
  * Run: npx tsx src/lib/admin/dashboardViewModels.test.ts
  */
 import assert from "node:assert/strict";
+import { MIN_RATE_SAMPLE } from "./rateSample";
 import {
   deriveProductPulse,
   deriveEngagement,
@@ -127,7 +128,12 @@ function main() {
 
   // ---- North Star (WPF) ----
   {
-    const model = deriveNorthStar({ "planning.wpf": 220, "planning.wpf_prev": 200, "audience.wau": 1000 });
+    const model = deriveNorthStar({
+      "planning.wpf": 220,
+      "planning.wpf_completed": 220,
+      "planning.wpf_completed_prev": 200,
+      "audience.wau": 1000,
+    });
     assert.equal(model.wpf, 220);
     assert.equal(model.wpfWoWPercent, 10, "220 vs 200 is +10%");
     assert.equal(model.planningPenetration, 0.22, "220 / 1000");
@@ -148,9 +154,13 @@ function main() {
   {
     const model = deriveHabit({
       "retention.w1": 0.314,
+      "retention.w1_n": 120,
       "retention.w1_prev": 0.282,
+      "retention.w1_prev_n": 100,
       "retention.w4": 0.228,
+      "retention.w4_n": 80,
       "retention.w4_prev": 0.228,
+      "retention.w4_prev_n": 90,
       "habit.3of4week": 0.287,
       "habit.3of4week_prev": 0.255,
     });
@@ -158,6 +168,33 @@ function main() {
     assert.equal(model.w1DeltaPp, 3.2, "percentage-point delta, not relative %");
     assert.equal(model.w4DeltaPp, 0, "identical current/prev must yield exactly 0 pp, not a rounding artifact");
     assert.equal(model.habit3of4DeltaPp, 3.2);
+    assert.equal(model.w1CohortSize, 120);
+    assert.equal(model.w4CohortSize, 80);
+  }
+  // C4: a cohort below MIN_RATE_SAMPLE hides the percentage (and the delta) but still reports n.
+  {
+    const small = deriveHabit({
+      "retention.w1": 0.5,
+      "retention.w1_n": MIN_RATE_SAMPLE - 1,
+      "retention.w1_prev": 0.4,
+      "retention.w1_prev_n": 200,
+    });
+    assert.equal(small.w1, null, "n < 30 -> no percentage");
+    assert.equal(small.w1DeltaPp, null);
+    assert.equal(small.w1CohortSize, MIN_RATE_SAMPLE - 1, "n stays visible");
+    const edge = deriveHabit({ "retention.w1": 0.5, "retention.w1_n": MIN_RATE_SAMPLE });
+    assert.equal(edge.w1, 0.5, "n = 30 is enough");
+    assert.equal(edge.w1DeltaPp, null, "no prev cohort -> no delta");
+    const prevTiny = deriveHabit({
+      "retention.w1": 0.5,
+      "retention.w1_n": 100,
+      "retention.w1_prev": 0.9,
+      "retention.w1_prev_n": 3,
+    });
+    assert.equal(prevTiny.w1, 0.5);
+    assert.equal(prevTiny.w1DeltaPp, null, "a delta against a tiny previous cohort is noise");
+    const noSize = deriveHabit({ "retention.w1": 0.5 });
+    assert.equal(noSize.w1, null, "unknown cohort size -> cannot vouch for the rate");
   }
   {
     const model = deriveHabit({});
@@ -187,11 +224,14 @@ function main() {
   {
     const model = deriveGrowth({
       "audience.mau": 1100,
-      "audience.mau_prev": 1000,
+      "audience.mau_completed": 1100,
+      "audience.mau_completed_prev": 1000,
       "audience.wau": 540,
-      "audience.wau_prev": 500,
+      "audience.wau_completed": 540,
+      "audience.wau_completed_prev": 500,
       "planning.wpf": 220,
-      "planning.wpf_prev": 200,
+      "planning.wpf_completed": 220,
+      "planning.wpf_completed_prev": 200,
     });
     assert.equal(model.mauGrowthPercent, 10);
     assert.equal(model.wauGrowthPercent, 8);
@@ -202,6 +242,22 @@ function main() {
     assert.equal(model.mauGrowthPercent, null);
     assert.equal(model.wauGrowthPercent, null);
     assert.equal(model.wpfGrowthPercent, null);
+  }
+
+  // C1: a partial-day live value must not move the growth percentage — only completed windows count.
+  {
+    const base = {
+      "audience.wau_completed": 700,
+      "audience.wau_completed_prev": 700,
+      "planning.wpf_completed": 100,
+      "planning.wpf_completed_prev": 100,
+    };
+    const monday = deriveGrowth({ ...base, "audience.wau": 120 });
+    const sunday = deriveGrowth({ ...base, "audience.wau": 690 });
+    assert.equal(monday.wauGrowthPercent, 0);
+    assert.equal(sunday.wauGrowthPercent, 0, "same traffic -> same WoW regardless of the live reading");
+    assert.equal(deriveGrowth({ "audience.wau": 540, "audience.wau_completed": 540 }).wauGrowthPercent, null);
+    assert.equal(deriveGrowth({ ...base, "audience.wau_completed_prev": 0 }).wauGrowthPercent, null, "prev = 0 -> no percentage");
   }
 
   // ---- Supply Health ----
@@ -247,6 +303,22 @@ function main() {
     const stale = deriveDataQuality(true);
     assert.equal(stale.internalEventsOk, false);
     assert.equal(stale.overallHealthPercent, null, "a stale snapshot must never be graded as healthy");
+
+    // Telemetry ingestion shares: absent -> null, never a fabricated 0.
+    assert.equal(fresh.botRejectedShare24h, null);
+    assert.equal(fresh.botRejectedShare7d, null);
+    assert.equal(fresh.noIdentityRejectedShare24h, null);
+    assert.equal(fresh.storedWithoutIdentityShare24h, null);
+    const withShares = deriveDataQuality(false, {
+      "telemetry.bot_rejected_share_24h": 0.4,
+      "telemetry.bot_rejected_share_7d": 0.35,
+      "telemetry.no_identity_rejected_share_24h": 0,
+      "telemetry.stored_without_identity_share_24h": 0.02,
+    });
+    assert.equal(withShares.botRejectedShare24h, 0.4);
+    assert.equal(withShares.botRejectedShare7d, 0.35);
+    assert.equal(withShares.noIdentityRejectedShare24h, 0, "a real 0 stays 0");
+    assert.equal(withShares.storedWithoutIdentityShare24h, 0.02);
   }
 
   console.log("dashboardViewModels.test.ts: OK");

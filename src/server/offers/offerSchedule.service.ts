@@ -195,6 +195,53 @@ async function applyClassSchedule(db: Db, offerId: string, schedule: ClassSchedu
   }
 
   if (schedule.kind === "recurring") {
+    const groupIds = new Set<string>();
+    const tariffIds = new Set<string>();
+    for (const group of schedule.groups) {
+      if (groupIds.has(group.id)) throw new OfferScheduleValidationError("Повторяющийся ID группы");
+      groupIds.add(group.id);
+      for (const tariff of group.tariffs) {
+        if (tariffIds.has(tariff.id)) throw new OfferScheduleValidationError("Повторяющийся ID тарифа");
+        tariffIds.add(tariff.id);
+      }
+    }
+    // Preserve stable wizard IDs; never remove groups referenced by historical bookings.
+    const existingGroups = await db.offerClassGroup.findMany({
+      where: { offerId }, select: { id: true },
+    });
+    const wantedIds = new Set(schedule.groups.map((group) => group.id));
+    for (const [position, group] of schedule.groups.entries()) {
+      const existingById = existingGroups.some((item) => item.id === group.id);
+      if (!existingById) {
+        const ownedElsewhere = await db.offerClassGroup.findUnique({ where: { id: group.id }, select: { offerId: true } });
+        if (ownedElsewhere) throw new OfferScheduleValidationError("Идентификатор группы принадлежит другому предложению");
+      }
+      await db.offerClassGroup.upsert({
+        where: { id: group.id },
+        create: { id: group.id, offerId, title: group.title?.trim() || `Группа ${position + 1}`, position },
+        update: { title: group.title?.trim() || `Группа ${position + 1}`, position, active: true },
+      });
+      const tariffs = group.tariffs ?? [];
+      for (const [tariffPosition, tariff] of tariffs.entries()) {
+        const old = await db.offerClassTariff.findUnique({ where: { id: tariff.id }, select: { groupId: true } });
+        if (old && old.groupId !== group.id) throw new OfferScheduleValidationError("Тариф относится к другой группе");
+        await db.offerClassTariff.upsert({
+          where: { id: tariff.id },
+          create: { id: tariff.id, groupId: group.id, title: tariff.title, price: tariff.price,
+            unit: tariff.unit, periodDays: tariff.periodDays ?? null, visitsCount: tariff.visitsCount ?? null, position: tariffPosition },
+          update: { title: tariff.title, price: tariff.price, unit: tariff.unit,
+            periodDays: tariff.periodDays ?? null, visitsCount: tariff.visitsCount ?? null, position: tariffPosition, active: true },
+        });
+      }
+      await db.offerClassTariff.updateMany({
+        where: { groupId: group.id, id: { notIn: tariffs.map((tariff) => tariff.id) } },
+        data: { active: false },
+      });
+    }
+    await db.offerClassGroup.updateMany({
+      where: { offerId, id: { in: existingGroups.filter((group) => !wantedIds.has(group.id)).map((group) => group.id) } },
+      data: { active: false },
+    });
     await db.offerScheduleRule.deleteMany({ where: { offerBookingId: booking.id } });
 
     const rows = schedule.groups.flatMap((group) => {
@@ -205,6 +252,7 @@ async function applyClassSchedule(db: Db, offerId: string, schedule: ClassSchedu
       if (start === null) return [];
       return [...new Set(group.days)].map((weekday) => ({
         offerBookingId: booking.id,
+        classGroupId: group.id,
         weekday,
         startMinutes: start,
         endMinutes: start + schedule.durationMin,
@@ -213,28 +261,16 @@ async function applyClassSchedule(db: Db, offerId: string, schedule: ClassSchedu
         capacity: group.seats,
       }));
     });
-    // Разные периоды одного слота допустимы. Не теряем их при дедупликации.
-    // Конфликтующие значения одного ключа отклоняем, а не выбираем первое молча.
-    const seen = new Map<string, (typeof rows)[number]>();
-    const unique = rows.filter((row) => {
-      const key = JSON.stringify([row.weekday, row.startMinutes, row.endMinutes, row.validFrom,
-        row.validFrom === null ? row.validTo : null]);
-      const previous = seen.get(key);
-      if (previous) {
-        if (previous.capacity !== row.capacity || previous.validTo?.getTime() !== row.validTo?.getTime()) {
-          throw new OfferScheduleValidationError("У групп с одинаковым началом курса различаются даты или число мест");
-        }
-        return false;
-      }
-      seen.set(key, row);
-      return true;
-    });
+    // Group-specific rules are separate even when their weekday/time overlap.
+    const unique = rows;
     if (unique.length > 0) await db.offerScheduleRule.createMany({ data: unique });
     // Сохраняем историю и ссылки заявок, но прежние разовые даты больше не активны.
     await db.offerSession.updateMany({ where: { offerId, isCancelled: false }, data: { isCancelled: true } });
     return;
   }
 
+  // Regular groups no longer available when switching to dated sessions; preserve IDs for history.
+  await db.offerClassGroup.updateMany({ where: { offerId, active: true }, data: { active: false } });
   // Удаляем прежнее регулярное представление при переходе к разовым датам.
   await db.offerScheduleRule.deleteMany({ where: { offerBookingId: booking.id } });
   // Разовые занятия — OfferSession по датам.

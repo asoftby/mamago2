@@ -8,12 +8,14 @@ import {
 } from "@/server/services/analytics/AnalyticsEventService";
 import {
   addPlacePlanItem,
+  addOfferPlanItem,
   addPlanItem,
   addRoutePlanItem,
   removePlanItem,
 } from "@/server/services/plan.service";
 import { prisma } from "@/lib/prisma";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { validateFamilyCalendarRange } from "@/server/services/manualPlanEntry.service";
 import {
   buildSubjectsSnapshot,
   findMostRecentSubjectsSnapshot,
@@ -50,6 +52,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       activityId,
+      offerId,
       routeId,
       planRouteSlug,
       placeId,
@@ -67,6 +70,7 @@ export async function POST(request: NextRequest) {
       visibility: visibilityRaw,
     } = body as {
       activityId?: string;
+      offerId?: string;
       routeId?: string;
       planRouteSlug?: string;
       placeId?: string;
@@ -118,11 +122,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "date is required" }, { status: 400 });
     }
 
-    if (!activityId && !routeId && !placeId) {
+    if (!activityId && !offerId && !routeId && !placeId) {
       return NextResponse.json(
-        { error: "activityId, routeId or placeId is required" },
+        { error: "activityId, offerId, routeId or placeId is required" },
         { status: 400 },
       );
+    }
+
+    // Offers must never create rows with an invalid calendar date.
+    // Leave the existing activity/place/route validation contracts unchanged.
+    if (offerId) {
+      try {
+        validateFamilyCalendarRange(date, date);
+      } catch {
+        return NextResponse.json({ error: "invalid_date" }, { status: 400 });
+      }
     }
 
     const planDateMeta = planDateAnalyticsMeta(date);
@@ -139,7 +153,9 @@ export async function POST(request: NextRequest) {
         : {};
     let planItem;
 
-    if (placeId) {
+    if (offerId) {
+      planItem = await addOfferPlanItem(user.id, offerId, date, { visibility });
+    } else if (placeId) {
       planItem = await addPlacePlanItem(user.id, placeId, date, planPlaceSlug ?? null, {
         title: title ?? null,
         coverImageUrl: coverImageUrl ?? null,
@@ -319,7 +335,7 @@ export async function DELETE(request: NextRequest) {
 
     const existing = await prisma.planItem.findFirst({
       where: { id: planItemId, ...(await planScopeFor(user.id)) },
-      select: { activityId: true, placeId: true, routeId: true, date: true },
+      select: { activityId: true, offerId: true, placeId: true, routeId: true, date: true },
     });
 
     await removePlanItem(user.id, planItemId);

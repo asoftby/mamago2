@@ -56,9 +56,8 @@ export function OfferSchedule({
             </span>
             <span className="flex-1 h-px bg-gray-100 max-w-[180px]" />
           </div>
-          <h2 className="tracking-[-0.02em] leading-[1] text-gray-900" style={{ fontFamily: "var(--font-sans)", fontWeight: 400, fontSize: 30 }}>
-            Выбери{" "}
-            своё лето.
+          <h2 className="tracking-[-0.02em] leading-tight text-gray-900" style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 30 }}>
+            {type === "shifts" ? "Выбери своё лето" : "Выберите подходящую группу"}
           </h2>
         </div>
       </div>

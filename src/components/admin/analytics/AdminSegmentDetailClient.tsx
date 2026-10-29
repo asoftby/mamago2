@@ -8,6 +8,7 @@ import {
   segmentDescription,
   segmentTitle,
 } from "@/lib/analytics/segmentCatalog";
+import { formatAdminDate } from "@/lib/admin/formatRu";
 
 function buildQuery(sp: URLSearchParams): string {
   const q = new URLSearchParams();
@@ -102,33 +103,33 @@ export function AdminSegmentDetailClient({
           {segmentDescription(data.key)}
         </p>
         <p className="mt-1 text-xs text-gray-400">
-          Range: {new Date(data.range.start).toLocaleDateString()} —{" "}
-          {new Date(data.range.end).toLocaleDateString()}
+          Range: {formatAdminDate(data.range.start)} —{" "}
+          {formatAdminDate(data.range.end)}
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Users in segment" value={data.usersCount.toLocaleString()} />
+        <Kpi label="Users in segment" value={data.usersCount.toLocaleString("ru-RU")} />
         <Kpi
           label="Avg saves"
-          value={data.avgSaves.toLocaleString()}
+          value={data.avgSaves.toLocaleString("ru-RU")}
         />
         <Kpi
           label="Avg plan adds"
-          value={data.avgPlanAdds.toLocaleString()}
+          value={data.avgPlanAdds.toLocaleString("ru-RU")}
         />
         <Kpi
           label="Avg CTA clicks"
-          value={data.avgCtaClicks.toLocaleString()}
+          value={data.avgCtaClicks.toLocaleString("ru-RU")}
         />
       </div>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold text-gray-900">
-          Last activity by day (UTC)
+          Активные пользователи сегмента по дням
         </h2>
         <p className="mb-3 text-xs text-gray-500">
-          Users counted on the calendar day of their last seen timestamp.
+          Уникальные пользователи сегмента, совершившие хотя бы одно действие в этот день (сутки по Минску).
         </p>
         <div className="flex h-40 items-end gap-px overflow-x-auto pb-1">
           {data.trend.map((t) => (
@@ -153,20 +154,20 @@ export function AdminSegmentDetailClient({
 
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold text-gray-900">
-          Funnel (sum of profile totals)
+          Воронка (события за выбранный период)
         </h2>
         <div className="space-y-2">
           {(
             [
-              ["Views", data.funnel.views],
-              ["Opens", data.funnel.opens],
-              ["Saves", data.funnel.saves],
-              ["Plan adds", data.funnel.planAdds],
-              ["CTA clicks", data.funnel.ctaClicks],
+              ["Показы в ленте", data.funnel.views],
+              ["Открытия", data.funnel.opens],
+              ["Сохранения", data.funnel.saves],
+              ["В план", data.funnel.planAdds],
+              ["Переходы к партнёру", data.funnel.ctaClicks],
             ] as const
           ).map(([label, count]) => (
             <div key={label} className="flex items-center gap-3">
-              <span className="w-24 text-xs text-gray-500">{label}</span>
+              <span className="w-36 text-xs text-gray-500">{label}</span>
               <div className="h-8 min-w-0 flex-1 rounded-lg bg-muted/40">
                 <div
                   className="h-full rounded-lg bg-primary/30"
@@ -176,7 +177,7 @@ export function AdminSegmentDetailClient({
                 />
               </div>
               <span className="w-16 text-right text-xs tabular-nums text-gray-800">
-                {count.toLocaleString()}
+                {count.toLocaleString("ru-RU")}
               </span>
             </div>
           ))}
@@ -212,7 +213,7 @@ export function AdminSegmentDetailClient({
                   </p>
                 </div>
                 <span className="shrink-0 tabular-nums text-sm text-gray-700">
-                  {row.eventsCount.toLocaleString()}
+                  {row.eventsCount.toLocaleString("ru-RU")}
                 </span>
               </li>
             ))}
@@ -261,7 +262,7 @@ function TopBlock({
             >
               <span className="min-w-0 truncate">{i.label}</span>
               <span className="shrink-0 tabular-nums text-gray-600">
-                {i.count.toLocaleString()}
+                {i.count.toLocaleString("ru-RU")}
               </span>
             </li>
           ))}

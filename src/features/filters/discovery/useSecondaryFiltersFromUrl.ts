@@ -14,6 +14,7 @@ import {
   type SecondaryValues,
   type SecondaryByIntentState,
 } from "@/lib/discovery/secondaryFiltersUrl";
+import { resetListingPage } from "./discoveryFilterParams";
 
 function writeSecondaryToUrl(
   router: ReturnType<typeof useRouter>,
@@ -21,7 +22,7 @@ function writeSecondaryToUrl(
   searchParams: URLSearchParams,
   nextAll: SecondaryByIntentState,
 ) {
-  const params = new URLSearchParams(searchParams.toString());
+  const params = resetListingPage(new URLSearchParams(searchParams.toString()));
   if (Object.keys(nextAll).length === 0) {
     params.delete(SECONDARY_FILTERS_URL_KEY);
   } else {

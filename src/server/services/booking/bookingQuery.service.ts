@@ -4,6 +4,7 @@
  */
 
 import prisma from "@/lib/prisma";
+import { allocationTransition } from "./allocationTransition";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 import { BookingKind, BookingStatus, Prisma } from "@prisma/client";
 import { buildBookingDisplay } from "./booking.formatters";
@@ -53,7 +54,13 @@ export interface BusinessBookingItem {
   } | null;
   place: { id: string; title: string; slug: string | null } | null;
 
-  // Camp shift snapshot
+  // Class group and tariff snapshot
+  classGroupId: string | null;
+  classGroupTitle: string | null;
+  classTariffId: string | null;
+  classTariffTitle: string | null;
+  classTariffPrice: string | null;
+  classTariffUnit: string | null;
   campShiftId: string | null;
   campShiftTitle: string | null;
   campShiftDateFrom: string | null;
@@ -133,6 +140,12 @@ const BOOKING_SELECT = {
   },
   place: { select: { id: true, title: true, slug: true } },
 
+  classGroupId: true,
+  classGroupTitle: true,
+  classTariffId: true,
+  classTariffTitle: true,
+  classTariffPrice: true,
+  classTariffUnit: true,
   campShiftId: true,
   campShiftTitle: true,
   campShiftDateFrom: true,
@@ -201,6 +214,12 @@ function mapBooking(raw: {
     currency: string | null;
   } | null;
   place: { id: string; title: string; slug: string | null } | null;
+  classGroupId: string | null;
+  classGroupTitle: string | null;
+  classTariffId: string | null;
+  classTariffTitle: string | null;
+  classTariffPrice: string | null;
+  classTariffUnit: string | null;
   campShiftId: string | null;
   campShiftTitle: string | null;
   campShiftDateFrom: Date | null;
@@ -225,6 +244,12 @@ function mapBooking(raw: {
     : null;
 
   const display = buildBookingDisplay({
+    classGroupId: raw.classGroupId,
+    classGroupTitle: raw.classGroupTitle,
+    classTariffId: raw.classTariffId,
+    classTariffTitle: raw.classTariffTitle,
+    classTariffPrice: raw.classTariffPrice,
+    classTariffUnit: raw.classTariffUnit,
     campShiftId: raw.campShiftId,
     campShiftTitle: raw.campShiftTitle,
     campShiftDateFrom,
@@ -259,6 +284,12 @@ function mapBooking(raw: {
     activity: raw.activity,
     place: raw.place,
 
+    classGroupId: raw.classGroupId,
+    classGroupTitle: raw.classGroupTitle,
+    classTariffId: raw.classTariffId,
+    classTariffTitle: raw.classTariffTitle,
+    classTariffPrice: raw.classTariffPrice,
+    classTariffUnit: raw.classTariffUnit,
     campShiftId: raw.campShiftId,
     campShiftTitle: raw.campShiftTitle,
     campShiftDateFrom,
@@ -500,10 +531,49 @@ export async function updateBookingStatus(
   }
 
   // 5. Обновляем
-  const updated = await prisma.bookingRequest.update({
-    where: { id: bookingId },
-    data: { status: newStatus, ...derivedData },
-    select: BOOKING_SELECT,
+  // Keep the request status and its resource allocation in one transaction.
+  // A confirmed booking must never lose its resource when the original hold expires.
+  const updated = await prisma.$transaction(async (tx) => {
+    // Serialize concurrent status updates for the same request before reading state.
+    await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${bookingId} FOR UPDATE`;
+    const current = await tx.bookingRequest.findUnique({
+      where: { id: bookingId },
+      select: { status: true, businessId: true, kind: true },
+    });
+    if (!current || current.businessId !== businessId) throw new BookingOwnershipError();
+    if (current.kind !== BookingKind.STANDARD ||
+        !ALLOWED_TRANSITIONS[current.status]?.includes(newStatus)) {
+      throw new BookingStatusTransitionError(current.status, newStatus);
+    }
+
+    const allocations = await tx.bookingAllocation.findMany({
+      where: { bookingRequestId: bookingId },
+      select: { id: true, status: true, expiresAt: true },
+    });
+    const allocationTarget = allocationTransition(newStatus, allocations, now);
+    if (allocationTarget === "CONFIRMED") {
+      await tx.bookingAllocation.updateMany({
+        where: { bookingRequestId: bookingId, status: "HELD" },
+        data: { status: "CONFIRMED", expiresAt: null },
+      });
+    } else if (allocationTarget === "RELEASED") {
+      await tx.bookingAllocation.updateMany({
+        where: { bookingRequestId: bookingId, status: { in: ["HELD", "CONFIRMED"] } },
+        data: { status: "RELEASED", expiresAt: null },
+      });
+    }
+
+    const result = await tx.bookingRequest.updateMany({
+      where: { id: bookingId, status: current.status },
+      data: { status: newStatus, ...derivedData },
+    });
+    if (result.count !== 1) {
+      throw new BookingStatusTransitionError(current.status, newStatus);
+    }
+    return tx.bookingRequest.findUniqueOrThrow({
+      where: { id: bookingId },
+      select: BOOKING_SELECT,
+    });
   });
 
   await logAdminAudit({

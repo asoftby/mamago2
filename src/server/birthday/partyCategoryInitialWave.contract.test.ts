@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const validation = readFileSync("src/server/birthday/partyDraft.validation.ts", "utf8");
+const draft = readFileSync("src/server/birthday/partyDraft.service.ts", "utf8");
+const replenish = readFileSync("src/server/birthday/partyCandidateReplenishment.service.ts", "utf8");
+const dispatch = readFileSync("src/server/birthday/partyCandidateDispatch.service.ts", "utf8");
+assert.ok(validation.includes("addonCategories: z.array(z.nativeEnum(PartyCategory))"));
+assert.ok(draft.includes("role: \"ADDON\", position: position++"));
+assert.ok(draft.includes("category,") && draft.includes("input.addonCategories ?? []"));
+assert.ok(replenish.includes('offerId: null, businessId: null'));
+assert.ok(replenish.includes('requests: { none: {} }'));
+assert.ok(replenish.includes('PARTY_CANDIDATE_AUTO_REPLENISH_ENABLED !== "true"'));
+assert.ok(dispatch.includes("current.confirmedBookingRequestId"));
+assert.ok(dispatch.includes('status: "REQUESTED"'));
+console.log("partyCategoryInitialWave.contract.test.ts: OK");

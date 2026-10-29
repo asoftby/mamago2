@@ -28,7 +28,8 @@ export type BreakingNewsItem = {
 
 /**
  * Fetches up to 6 published breaking news articles for a given city.
- * Breaking news is identified by subtitle === "__breaking_news__".
+ * Breaking news is identified by publicationType === BREAKING_NEWS (legacy rows
+ * keep the subtitle === "__breaking_news__" marker).
  * Stories only keep breaking news for 14 days from publishedAt; the article
  * itself remains published and available in the journal after that window.
  * The caller may inject the collection clock so historical/future previews
@@ -51,7 +52,10 @@ export async function listBreakingNewsArticles(
           ],
         },
       ],
-      subtitle: BREAKING_NEWS_SUBTITLE,
+      OR: [
+        { publicationType: "BREAKING_NEWS" },
+        { subtitle: BREAKING_NEWS_SUBTITLE },
+      ],
       publishedAt: { not: null, ...getBreakingNewsStoriesPublishedWindow(now) },
     },
     orderBy: { publishedAt: "desc" },

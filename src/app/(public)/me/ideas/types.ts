@@ -10,6 +10,9 @@ export type IdeaItem = {
     type: "EVENT" | "PLACE" | "ROUTE" | "OFFER" | "ARTICLE";
     /** resolved cover image url */
     coverImageUrl?: string | null;
+    /** Stored pixel size of the cover; null/undefined = unknown. */
+    imageWidth?: number | null;
+    imageHeight?: number | null;
     /** for ActivityCard: activity.slug */
     slug?: string | null;
     /** for ActivityCard: city slug for public path */

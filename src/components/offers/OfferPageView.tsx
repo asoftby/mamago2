@@ -30,6 +30,7 @@ import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { useRegisterHeaderSaveAction } from "@/contexts/PublicationIntentContext";
 import { shouldFetchOwnSaveStatus } from "@/features/save/saveStatusFetchGuard";
+import { parsePriceData } from "@/lib/priceItems";
 
 export interface OfferDirectCtaInfo {
   offerId: string;
@@ -116,16 +117,8 @@ export function OfferPageView({
 }: OfferPageViewProps) {
   const { isAuthenticated } = useAuthMe();
   const ctaRef = useRef<HTMLElement | null>(null);
-  const storageKey = `mamago:offer-plan:${data.id}`;
-  const [localSave, setLocalSave] = useState<LocalOfferSaveState | null>(() => {
-    if (typeof window === "undefined") return null;
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      return raw ? (JSON.parse(raw) as LocalOfferSaveState) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [localSave, setLocalSave] = useState<LocalOfferSaveState | null>(null);
+  const [planItemId, setPlanItemId] = useState<string | null>(null);
   const [bookingShift, setBookingShift] = useState<ShiftCtaContext | null>(null);
   const [classBookingOpen, setClassBookingOpen] = useState(false);
   const [saveTargetShift, setSaveTargetShift] = useState<ShiftCtaContext | null>(null);
@@ -133,21 +126,11 @@ export function OfferPageView({
   const [isIdeaSaved, setIsIdeaSaved] = useState(false);
   const [callModalOpen, setCallModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    queueMicrotask(() => {
-      try {
-        const raw = window.localStorage.getItem(storageKey);
-        setLocalSave(raw ? (JSON.parse(raw) as LocalOfferSaveState) : null);
-      } catch {
-        setLocalSave(null);
-      }
-    });
-  }, [storageKey]);
-
   const loadIdeaStatus = useCallback(async () => {
     if (!shouldFetchOwnSaveStatus(isAuthenticated)) {
       setIsIdeaSaved(false);
+      setLocalSave(null);
+      setPlanItemId(null);
       return;
     }
     try {
@@ -157,6 +140,8 @@ export function OfferPageView({
       if (!res.ok) return;
       const json = await res.json();
       setIsIdeaSaved(Boolean(json.isIdea));
+      setPlanItemId(typeof json.planItemId === "string" ? json.planItemId : null);
+      setLocalSave(json.inPlan ? { kind: "plan", dateISO: json.planDate ?? null } : null);
     } catch {
       // ignore auth/network errors for guests
     }
@@ -167,16 +152,6 @@ export function OfferPageView({
       void loadIdeaStatus();
     });
   }, [loadIdeaStatus]);
-
-  const persistLocalSave = useCallback((next: LocalOfferSaveState | null) => {
-    setLocalSave(next);
-    if (typeof window === "undefined") return;
-    if (!next) {
-      window.localStorage.removeItem(storageKey);
-      return;
-    }
-    window.localStorage.setItem(storageKey, JSON.stringify(next));
-  }, [storageKey]);
 
   const shiftDateOptions = useMemo(() => {
     return (data.schedule?.items ?? [])
@@ -322,6 +297,14 @@ export function OfferPageView({
 
   const handleSavePersist = useCallback((result: SaveToPlanResult) => {
     if (result.action === "cancel") return;
+    if (result.action === "remove-plan") {
+      const id = planItemId ?? result.planItemId;
+      if (!id) return;
+      void fetch(`/api/save/plan?planItemId=${encodeURIComponent(id)}`, { method: "DELETE", credentials: "include" })
+        .then((res) => { if (!res.ok) throw new Error("offer_plan_remove_failed"); setLocalSave(null); setPlanItemId(null); toast("Убрано из плана"); })
+        .catch(() => toast.error("Не удалось удалить из плана"));
+      return;
+    }
 
     if (result.action === "remove-idea") {
       void fetch(`/api/save/idea?offerId=${data.id}`, {
@@ -362,12 +345,22 @@ export function OfferPageView({
     }
 
     if (result.action !== "plan") return;
-    persistLocalSave({
-      kind: "plan",
-      dateISO: result.dateISO,
-      shiftId: saveTargetShift?.shiftId ?? null,
-    });
-  }, [data.id, persistLocalSave, saveTargetShift?.shiftId]);
+    if (!result.dateISO) {
+      toast.error("Выберите дату для семейного плана");
+      return;
+    }
+    void fetch("/api/save/plan", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ offerId: data.id, date: result.dateISO }),
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("offer_plan_save_failed");
+      setLocalSave({ kind: "plan", dateISO: result.dateISO });
+      void loadIdeaStatus();
+      toast.success("Добавлено в «Мой план»");
+    }).catch(() => toast.error("Не удалось добавить предложение в «Мой план»"));
+  }, [data.id, planItemId, loadIdeaStatus]);
 
   const isSaved = isIdeaSaved || Boolean(localSave);
   useRegisterHeaderSaveAction(isSaved, handleSave, data.title, { entityNoun: "предложением" });
@@ -388,7 +381,7 @@ export function OfferPageView({
           onSave={handleSave}
           ctaRef={ctaRef}
           directSlot={
-            direct && !data.classSlotBookingEnabled && data.hasPrimaryAction !== false && data.resolvedCta?.actionKind !== "EXTERNAL" && (
+            direct && data.offerType !== "REGULAR" && !data.classSlotBookingEnabled && data.hasPrimaryAction !== false && data.resolvedCta?.actionKind !== "EXTERNAL" && (
               <DirectRequestCta
                 publicationRef={{ publicationType: "OFFER", offerId: direct.offerId }}
                 publicationTitle={direct.publicationTitle}
@@ -496,6 +489,7 @@ export function OfferPageView({
         onOpenChange={setClassBookingOpen}
         offerId={data.id}
         offerTitle={data.title}
+        tariffs={parsePriceData(data.pricing.rawPriceItems).items}
       />
 
       <CampShiftBookingOverlay
@@ -521,6 +515,7 @@ export function OfferPageView({
         isIdea={isIdeaSaved}
         inPlan={isPlanSaved}
         planDate={planDate}
+        planItemId={planItemId}
         planStartsAt={null}
       />
 

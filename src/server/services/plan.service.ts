@@ -1,5 +1,5 @@
-import { PlanItemSource, type PlanVisibility } from "@prisma/client";
-import { planCountUnit } from "@/server/family/familyAnalyticsPure";
+import { Prisma, PlanItemSource, type PlanVisibility } from "@prisma/client";
+import { planActivityCountsQuery } from "@/server/services/planActivityCountsQuery";
 import { prisma } from "@/lib/prisma";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
 import { resolveRouteForUserSave } from "@/server/services/route.service";
@@ -15,6 +15,8 @@ import {
 import { fanOutItemsToDigestTargets, fanOutItemsToFamilyMembers } from "@/server/family/planRecipients";
 
 /** Статья в плане: slug и город — для ссылки, рубрика и анонс — для экрана пункта (без contentJson). */
+const planOfferSelect = { id: true, title: true, slug: true, coverImage: true, priceFrom: true, priceText: true, place: { select: { city: { select: { slug: true } } } } } as const;
+
 const planArticleSelect = {
   slug: true,
   excerpt: true,
@@ -81,6 +83,8 @@ export type PlanItemWithActivity = {
   id: string;
   userId: string;
   activityId: string | null;
+  offerId?: string | null;
+  offer?: { id: string; title: string; slug: string | null; coverImage: string | null; priceFrom: number | null; priceText: string | null; place: { city: { slug: string } | null } | null } | null;
   /** Present on persisted rows; synthetic UI items may omit */
   routeId?: string | null;
   planRouteSlug?: string | null;
@@ -172,23 +176,13 @@ export async function countPlanUsersByActivity(
 ): Promise<Map<string, number>> {
   if (activityIds.length === 0) return new Map();
 
-  const familyUnit = familyReadsEnabled();
-  const rows = await prisma.planItem.findMany({
-    where: { activityId: { in: activityIds }, ...(familyUnit ? NOT_CANCELLED : {}) },
-    select: { activityId: true, userId: true, familyId: true },
-    distinct: ["activityId", "userId", "familyId"],
-  });
-
-  const seen = new Set<string>();
-  const counts = new Map<string, number>();
-  for (const row of rows) {
-    if (!row.activityId) continue;
-    const key = `${row.activityId}|${familyUnit ? planCountUnit(row) : row.userId}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    counts.set(row.activityId, (counts.get(row.activityId) ?? 0) + 1);
-  }
-  return counts;
+  // SQL deduplicates the same plan counting unit that planCountUnit uses:
+  // family ID when present, otherwise user ID. Legacy (flag off) counts users
+  // across all statuses; family reads exclude CANCELLED.
+  const rows = await prisma.$queryRaw<Array<{ activityId: string; total: bigint }>>(
+    planActivityCountsQuery(activityIds, familyReadsEnabled()),
+  );
+  return new Map(rows.map(({ activityId, total }) => [activityId, Number(total)]));
 }
 
 /**
@@ -358,6 +352,59 @@ async function resolvePlaceForUserSave(
 /**
  * Добавить место в план на дату (дедупликация по userId + placeId).
  */
+/** Persist an offer as a dated catalog item, with idempotency across concurrent saves. */
+export async function addOfferPlanItem(
+  userId: string,
+  offerId: string,
+  date: string,
+  options?: { visibility?: PlanVisibility },
+): Promise<{ id: string }> {
+  const offer = await prisma.offer.findFirst({
+    where: { id: offerId, status: "PUBLISHED", archivedAt: null },
+    select: { id: true, title: true, coverImage: true },
+  });
+  if (!offer) throw new Error("Offer not found");
+  const familyId = await familyIdForWrite(userId);
+  const scope = await activePlanScopeFor(userId);
+
+  // Serializable transactions make the read-before-create safe even when two
+  // requests arrive simultaneously. A conflicting transaction retries and
+  // observes the item inserted by the winner, rather than inserting a duplicate.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const existing = await tx.planItem.findFirst({
+          where: { ...scope, offerId },
+          select: { id: true },
+        });
+        if (existing) {
+          return tx.planItem.update({
+            where: { id: existing.id },
+            data: { date, title: offer.title, coverImageUrl: offer.coverImage },
+            select: { id: true },
+          });
+        }
+        return tx.planItem.create({
+          data: {
+            userId,
+            familyId,
+            ...(options?.visibility ? { visibility: options.visibility } : {}),
+            offerId,
+            date,
+            title: offer.title,
+            coverImageUrl: offer.coverImage,
+          },
+          select: { id: true },
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) ||
+          error.code !== "P2034" || attempt === 2) throw error;
+    }
+  }
+  throw new Error("offer_plan_conflict");
+}
+
 export async function addPlacePlanItem(
   userId: string,
   placeId: string,
@@ -534,6 +581,7 @@ export async function listPlanItemsByWeek(
     include: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
+      offer: { select: planOfferSelect },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -548,6 +596,7 @@ export async function listAllPlanItems(userId: string): Promise<PlanItemWithActi
     include: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
+      offer: { select: planOfferSelect },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -571,6 +620,7 @@ export async function listUpcomingPlanItems(
     include: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
+      offer: { select: planOfferSelect },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -590,6 +640,7 @@ export async function listPlanItemsInRange(
     include: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
+      offer: { select: planOfferSelect },
     },
     orderBy: [{ date: "asc" }, { startsAt: "asc" }],
   })) as PlanItemWithActivity[];
@@ -607,6 +658,7 @@ export async function listPlanItemsByDate(
     include: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
+      offer: { select: planOfferSelect },
     },
     orderBy: { startsAt: "asc" },
   })) as PlanItemWithActivity[];
@@ -652,6 +704,7 @@ export async function listPlanItemsDueForReminder(args: {
     include: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
+      offer: { select: planOfferSelect },
     },
     orderBy: { startsAt: "asc" },
   })) as PlanReminderCandidate[];
@@ -709,6 +762,7 @@ export async function listPlanItemsForTomorrowDigest(args: {
     include: {
       activity: { select: planActivitySelect },
       article: { select: planArticleSelect },
+      offer: { select: planOfferSelect },
     },
     orderBy: { startsAt: "asc" },
   })) as PlanTomorrowDigestCandidate[];

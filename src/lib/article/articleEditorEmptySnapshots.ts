@@ -8,6 +8,7 @@ import type { ArticleEditorSnapshot } from "@/lib/article/articleAdminTypes";
 /** Редактор «новая статья» без записи в БД до первого сохранения. */
 export function buildEmptyArticleEditorSnapshot(opts?: {
   defaultAuthorUserId?: string | null;
+  publicationType?: "ARTICLE" | "COLLECTION";
 }): ArticleEditorSnapshot {
   const now = new Date().toISOString();
   return {
@@ -27,6 +28,11 @@ export function buildEmptyArticleEditorSnapshot(opts?: {
     additionalCategoryIds: [],
     additionalGeographyTargets: [],
     tagIds: [],
+    publicationType: opts?.publicationType ?? "ARTICLE",
+    featured: false,
+    pinned: false,
+    expiresAt: null,
+    linkedItems: [],
     geoScope: null,
     cityId: null,
     regionId: null,
@@ -68,6 +74,11 @@ export function buildEmptyBreakingNewsEditorSnapshot(): ArticleEditorSnapshot {
     additionalCategoryIds: [],
     additionalGeographyTargets: [],
     tagIds: [],
+    publicationType: "BREAKING_NEWS",
+    featured: false,
+    pinned: false,
+    expiresAt: null,
+    linkedItems: [],
     geoScope: null,
     cityId: null,
     regionId: null,

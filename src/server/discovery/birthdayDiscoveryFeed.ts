@@ -1,5 +1,5 @@
-import { ActivityFormat, type AgePolicy, type PartyCategory, type PublicationPriceMode } from "@prisma/client";
 import { resolveTerritoryScope } from "@/server/territory/territoryScope";
+import { ActivityFormat, type AgePolicy, type PartyCategory, type PublicationPriceMode } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import type { ActivityMock } from "@/types/activity";
@@ -63,24 +63,41 @@ export function projectBirthdayOfferCard(offer: BirthdayCardOffer, citySlug: str
   };
 }
 
-/** Published offers approved for the birthday section — no events and no mock fill. */
-export async function getBirthdayDiscoveryFeed(cityId: string, citySlug: string): Promise<ActivityMock[]> {
+/** Stable, database-paginated public birthday catalog. */
+export async function getBirthdayDiscoveryPage(
+  cityId: string,
+  citySlug: string,
+  requestedPage: number,
+  requestedPageSize = 24,
+) {
+  const pageSize = Math.max(1, Math.min(60, Math.trunc(requestedPageSize) || 24));
+  const page = Math.max(1, Math.trunc(requestedPage) || 1);
   const scope = await resolveTerritoryScope(citySlug);
-  const rows = await prisma.offer.findMany({
-    where: getPublicBirthdayOfferWhere(cityId, scope?.territoryIds),
-    select: {
-      id: true, slug: true, title: true, description: true, coverImage: true,
-      productType: true, category: true, ageMinMonths: true, ageMaxMonths: true,
-      agePolicy: true, priceMode: true, priceFrom: true, priceTo: true, currency: true,
-      place: { select: { city: { select: { slug: true } } } },
-    },
-    orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
-    take: 80,
-  });
+  const where = getPublicBirthdayOfferWhere(cityId, scope?.territoryIds);
+  const [total, rows] = await prisma.$transaction([
+    prisma.offer.count({ where }),
+    prisma.offer.findMany({
+      where,
+      select: {
+        id: true, slug: true, title: true, description: true, coverImage: true,
+        place: { select: { city: { select: { slug: true } } } },
+        productType: true, category: true, ageMinMonths: true, ageMaxMonths: true,
+        agePolicy: true, priceMode: true, priceFrom: true, priceTo: true, currency: true,
+      },
+      orderBy: [{ publishedAt: "desc" }, { id: "asc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+  const activities = rows.flatMap((offer): ActivityMock[] =>
+    offer.slug && (offer.productType === "PARTY_SERVICE" || offer.productType === "PARTY_PACKAGE")
+      ? [projectBirthdayOfferCard({ ...offer, productType: offer.productType }, offer.place?.city?.slug ?? citySlug)]
+      : [],
+  );
+  return { activities, page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
+}
 
-  return rows.flatMap((offer): ActivityMock[] => {
-    if (!offer.slug || (offer.productType !== "PARTY_SERVICE" && offer.productType !== "PARTY_PACKAGE")) return [];
-    // The offer lives in its own place city, which may differ from the territory page (`/minsk` covers its region).
-    return [projectBirthdayOfferCard({ ...offer, productType: offer.productType }, offer.place?.city?.slug ?? citySlug)];
-  });
+/** @deprecated Use getBirthdayDiscoveryPage for visible catalog pages. */
+export async function getBirthdayDiscoveryFeed(cityId: string, citySlug: string): Promise<ActivityMock[]> {
+  return (await getBirthdayDiscoveryPage(cityId, citySlug, 1, 80)).activities;
 }

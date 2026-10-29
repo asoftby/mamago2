@@ -41,7 +41,7 @@ function pct(value: number | null): string {
 
 function date(value: string | null): string {
   if (!value) return "—";
-  return new Date(value).toLocaleString("ru-RU", {
+  return new Date(value).toLocaleString("ru-RU", { timeZone: "Europe/Minsk",
     day: "numeric",
     month: "long",
     year: "numeric",

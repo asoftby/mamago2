@@ -78,11 +78,22 @@ assert.equal(buildScheduleInput(classForm, "REGULAR_ACTIVITY").hours, undefined)
 assert.deepEqual(buildScheduleInput(classForm, "REGULAR_ACTIVITY", "60 минут").classSchedule, {
   kind: "recurring",
   durationMin: 60,
-  groups: [{ days: [2, 4], time: "17:30", seats: 8 }],
+  // Since #815 the API contract carries the stable group id (required) and its tariffs.
+  groups: [{ id: "g1", tariffs: [], days: [2, 4], time: "17:30", seats: 8 }],
   dates: [],
   period: null,
   closedDates: ["2026-10-18"],
 });
+// название группы и тарифы проходят через общий шаг расписания без потерь
+const titledClass = structuredClone(classForm);
+titledClass.classSchedule.groups = [{
+  id: "g2", title: "Младшая группа", days: [1], time: "10:00", seats: "",
+  tariffs: [{ id: "t1", title: "Месяц", price: "120", unit: "BYN", periodDays: 30 }],
+}];
+assert.deepEqual(buildScheduleInput(titledClass, "REGULAR_ACTIVITY", "60 минут").classSchedule?.groups, [{
+  id: "g2", title: "Младшая группа", days: [1], time: "10:00", seats: null,
+  tariffs: [{ id: "t1", title: "Месяц", price: "120", unit: "BYN", periodDays: 30 }],
+}]);
 
 // прежний режим записи: bookingMethod не отправляется
 const legacy = defaultOfferSchedule();

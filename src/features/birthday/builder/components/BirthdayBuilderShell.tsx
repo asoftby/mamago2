@@ -19,6 +19,8 @@ import {
   catalogPriceSummary, compatibleCatalogSelection, eligibleAddons, hasValidCatalogAnchor,
   isLocationCompatible, selectedCatalogOffers,
 } from "../lib/catalogSelection";
+import { ageMonthsOnDate, calendarDateKeyToIso } from "../lib/partyDate";
+import { budgetMaxByn } from "../lib/budgetRanges";
 import { BuilderProgressDots } from "./BuilderProgressDots";
 import { BuilderSummaryBar } from "./BuilderSummaryBar";
 import type { BuilderStep } from "../types/builder";
@@ -95,35 +97,26 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
   });
 
   const catalog = useRealBirthdayCatalog(citySlug);
-  const maxBudget = state.quiz.budgetGroup === "up300" ? 300
-    : state.quiz.budgetGroup === "300-600" ? 600
-    : state.quiz.budgetGroup === "600-1000" ? 1000 : null;
+  // Soft budget: compared with the whole party in review, never used to hide single offers.
+  const maxBudget = budgetMaxByn(state.quiz.budgetGroup);
 
-  const ageMonths = useMemo(() => {
-    const dob = state.quiz.partyForChild?.birthDateIso;
-    const partyDate = state.quiz.dateRangeFrom;
-    if (!dob || !partyDate) return null;
-    const birth = new Date(dob + "T00:00:00Z");
-    const party = new Date(partyDate + "T00:00:00Z");
-    if (Number.isNaN(birth.valueOf()) || Number.isNaN(party.valueOf())) return null;
-    const fullMonths = (party.getUTCFullYear() - birth.getUTCFullYear()) * 12 +
-      (party.getUTCMonth() - birth.getUTCMonth());
-    return Math.max(0, fullMonths - Number(party.getUTCDate() < birth.getUTCDate()));
-  }, [state.quiz.partyForChild?.birthDateIso, state.quiz.dateRangeFrom]);
+  const ageMonths = useMemo(() => ageMonthsOnDate(
+    state.quiz.partyForChild?.birthDateIso, calendarDateKeyToIso(state.quiz.dateRangeFrom),
+  ), [state.quiz.partyForChild?.birthDateIso, state.quiz.dateRangeFrom]);
 
   const guests = GUESTS_RANGE[state.quiz.guestsGroup ?? ""] ?? null;
 
   const visibleOffers = useMemo(() => catalog.offers.filter((offer) =>
     isLocationCompatible(offer, state.quiz.placeType) &&
     matchesBirthdayRequirements(offer, {
-      ageMonths, maxBudget: offer.currency === "BYN" ? maxBudget : null,
-      childrenMin: guests?.min, childrenMax: guests?.max,
+      ageMonths, childrenMin: guests?.min, childrenMax: guests?.max,
     })),
-    [catalog.offers, state.quiz.placeType, ageMonths, maxBudget, guests?.min, guests?.max]);
+    [catalog.offers, state.quiz.placeType, ageMonths, guests?.min, guests?.max]);
 
   const validBase = hasValidCatalogAnchor(
     visibleOffers, state.selection.selectedBaseId, state.quiz.placeType,
   );
+  const [categoryRequests, setCategoryRequests] = useState<Array<import("../lib/realCatalog").PartyCategoryKey>>([]);
   const selectedOffers = useMemo(() => {
     if (!validBase) return [];
     const allowedAddonIds = new Set(eligibleAddons(
@@ -265,14 +258,26 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
               selectedBaseId={state.selection.selectedBaseId}
               selectedAddonIds={state.selection.selectedAddonIds}
               onSelectBase={builder.selectBase}
-              onToggleAddon={builder.toggleAddon}
+              onToggleAddon={(id) => {
+                const offer = visibleOffers.find(item => item.id === id);
+                if (offer?.category && !state.selection.selectedAddonIds.includes(id)) {
+                  setCategoryRequests(current => current.filter(category => category !== offer.category));
+                }
+                builder.toggleAddon(id);
+              }}
+              selectedCategoryKeys={categoryRequests}
+              onToggleCategory={(category) => setCategoryRequests(current => current.includes(category)
+                ? current.filter(value => value !== category) : [...current, category])}
             />
           )}
           {currentStep === "done" && <StepReview
             offers={selectedOffers}
+            addonCategories={categoryRequests.filter(category => !selectedOffers.slice(1).some(offer => offer.category === category))}
             citySlug={citySlug}
             dateIso={state.partyPlanning.dateIso}
             quizDateKey={state.quiz.dateRangeFrom}
+            maxBudget={maxBudget}
+            childBirthDateIso={state.quiz.partyForChild?.birthDateIso ?? null}
             timeStart={state.partyPlanning.timeStart}
             timeEnd={state.partyPlanning.timeEnd}
             venueMode={state.quiz.placeType === "HOME" ? "HOME" : state.quiz.placeType === "OUTDOOR" ? "OUTDOOR" : state.quiz.placeType === "PACKAGE" ? "PACKAGE" : "VENUE"}

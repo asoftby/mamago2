@@ -1,20 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import type { FormEvent, RefObject } from "react";
-import type { BirthdayCatalogItem } from "../../lib/realCatalog";
-import { catalogPriceLabel, catalogPriceSummary } from "../../lib/catalogSelection";
-import { submitBirthdayParty, type PartyFlowState } from "../../lib/partySubmitFlow";
+import type { BirthdayCatalogItem, PartyCategoryKey } from "../../lib/realCatalog";
+import { catalogPriceLabel, catalogPriceSummary, partyBudgetWarning } from "../../lib/catalogSelection";
+import { submitBirthdayParty, submittedPartyId, type PartyFlowState } from "../../lib/partySubmitFlow";
+import { calendarDateKeyToIso, childAgeYearsOnDate } from "../../lib/partyDate";
 
 type Props = {
   offers: BirthdayCatalogItem[];
+  addonCategories?: PartyCategoryKey[];
   citySlug: string;
   dateIso: string | null;
   quizDateKey: string | null;
+  /** Upper bound of the chosen budget group in BYN; informational only. */
+  maxBudget: number | null;
   timeStart: string | null;
   timeEnd: string | null;
   venueMode: "VENUE" | "PACKAGE" | "HOME" | "OUTDOOR";
   childName: string | null;
+  childBirthDateIso: string | null;
   authenticated: boolean;
   authLoading: boolean;
   requestLogin: () => void;
@@ -25,27 +31,12 @@ type Props = {
   onSent: () => void;
 };
 
-// The range calendar persists YYYY-(zero-based month)-D keys, not ISO dates.
-export function calendarDateKeyToIso(key: string | null): string | null {
-  if (!key) return null;
-  const match = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(key);
-  if (!match) return null;
-  const [, yearText, monthText, dayText] = match;
-  const year = Number(yearText);
-  const monthIndex = Number(monthText);
-  const day = Number(dayText);
-  const valid = new Date(Date.UTC(year, monthIndex, day));
-  if (valid.getUTCFullYear() !== year || valid.getUTCMonth() !== monthIndex ||
-      valid.getUTCDate() !== day) return null;
-  return yearText + "-" + String(monthIndex + 1).padStart(2, "0") + "-" +
-    String(day).padStart(2, "0");
-}
-
 export function StepReview({
-  offers, citySlug, dateIso, quizDateKey, timeStart, timeEnd, venueMode, childName,
+  offers, addonCategories = [], citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName, childBirthDateIso,
   authenticated, authLoading, requestLogin, flowStateRef, busy, onBusyChange, sent, onSent,
 }: Props) {
   const total = catalogPriceSummary(offers);
+  const budgetWarning = partyBudgetWarning(total, maxBudget);
   const [date, setDate] = useState(dateIso ?? calendarDateKeyToIso(quizDateKey) ?? "");
   const [timeFrom, setTimeFrom] = useState(timeStart ?? "15:00");
   const [timeTo, setTimeTo] = useState(timeEnd ?? "18:00");
@@ -54,6 +45,52 @@ export function StepReview({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [availability, setAvailability] = useState<"AVAILABLE" | "UNAVAILABLE" | "UNKNOWN" | "LOADING" | null>(null);
+  const anchorOfferId = offers[0]?.id;
+  const checkVenue = venueMode === "VENUE" || venueMode === "PACKAGE";
+  const partySize = Number(children) + Number(adults);
+
+  useEffect(() => {
+    if (!checkVenue || !anchorOfferId || !date || !timeFrom || !timeTo ||
+        timeFrom >= timeTo || !children || !adults || !Number.isFinite(partySize) ||
+        partySize < 1 || partySize > 1000) {
+      return;
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      try {
+        const query = new URLSearchParams({
+          offerId: anchorOfferId, date, timeFrom, timeTo,
+          childrenCount: children, adultsCount: adults,
+        });
+        const response = await fetch("/api/public/party-availability?" + query, {
+          signal: controller.signal, cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Preview unavailable");
+        const result: { availability?: string } = await response.json();
+        if (!controller.signal.aborted) {
+          setLastPreviewKey([anchorOfferId, checkVenue, date, timeFrom, timeTo, children, adults].join("|"));
+          setAvailability(
+            result.availability === "AVAILABLE" || result.availability === "UNAVAILABLE"
+              ? result.availability : "UNKNOWN"
+          );
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setLastPreviewKey([anchorOfferId, checkVenue, date, timeFrom, timeTo, children, adults].join("|"));
+          setAvailability("UNKNOWN");
+        }
+      }
+    }, 350);
+    return () => { controller.abort(); clearTimeout(timeout); };
+  }, [anchorOfferId, checkVenue, date, timeFrom, timeTo, children, adults, partySize]);
+
+  const previewKey = [anchorOfferId, checkVenue, date, timeFrom, timeTo, children, adults].join("|");
+  const [lastPreviewKey, setLastPreviewKey] = useState("");
+  const visibleAvailability = checkVenue && children && adults
+    ? previewKey === lastPreviewKey ? availability : "LOADING"
+    : null;
+
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,8 +103,10 @@ export function StepReview({
       await submitBirthdayParty(flowStateRef.current, {
         citySlug, venueMode, eventDate: date, timeFrom, timeTo,
         childrenCount: Number(children), adultsCount: Number(adults),
-        childName: childName || null, contactName: name, contactPhone: phone,
+        childName: childName || null, childAge: childAgeYearsOnDate(childBirthDateIso, date),
+        contactName: name, contactPhone: phone,
         anchorOfferId: offers[0].id, addonOfferIds: offers.slice(1).map((offer) => offer.id),
+        addonCategories,
       });
       onSent();
     } catch (cause) {
@@ -77,10 +116,18 @@ export function StepReview({
     }
   }
 
-  if (sent) return <section role="status" className="mx-auto max-w-3xl space-y-4 py-10">
-    <h2 className="text-2xl font-semibold">Заявка основному исполнителю отправлена</h2>
-    <p>Остальные выбранные услуги сохранены в празднике. Заявки по ним пока не отправлены.</p>
-  </section>;
+  if (sent) {
+    // Read from the parent-owned ref so a remounted review step still links the same order.
+    const partyId = submittedPartyId(flowStateRef.current);
+    return <section role="status" className="mx-auto max-w-3xl space-y-4 py-10">
+      <h2 className="text-2xl font-semibold">Заявка основному исполнителю отправлена</h2>
+      <p>Остальные выбранные услуги сохранены в празднике. Заявки по ним пока не отправлены.</p>
+      <Link href={partyId ? "/me/birthdays/" + encodeURIComponent(partyId) : "/me/birthdays"}
+        className="inline-flex rounded-xl bg-primary px-5 py-3 font-semibold text-primary-foreground">
+        {partyId ? "Открыть праздник" : "Мои праздники"}
+      </Link>
+    </section>;
+  }
 
   return (
     <section className="mx-auto max-w-3xl space-y-7">
@@ -109,13 +156,19 @@ export function StepReview({
           </div>
         ))}
       </div>
+      {addonCategories.length > 0 && <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-stone-800">
+        Дополнительно подберём исполнителей: {addonCategories.join(", ")}. Приглашения отправим после подтверждения основной услуги.
+      </div>}
       <div className="rounded-xl bg-stone-100 p-5">
         <p className="text-sm text-stone-600">Предварительная сумма известных начальных цен</p>
         <p className="mt-1 text-2xl font-bold">
           {total.minimumByn > 0 ? "От " + total.minimumByn.toLocaleString("ru-RU") + " BYN" : "Стоимость уточняется"}
         </p>
         {total.hasUnknownPrices && (
-          <p className="mt-2 text-sm text-stone-600">Некоторые услуги рассчитываются индивидуально и в эту сумму не включены.</p>
+          <p className="mt-2 text-sm text-stone-600">Некоторые услуги рассчитываются индивидуально и в эту сумму не включены, поэтому окончательная сумма пока неизвестна.</p>
+        )}
+        {budgetWarning && (
+          <p role="note" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">{budgetWarning}</p>
         )}
       </div>
       <form className="space-y-4" onSubmit={handleSubmit}>
@@ -129,6 +182,14 @@ export function StepReview({
           <label className="text-sm">Ваше имя<input required maxLength={120} value={name} onChange={e => setName(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
           <label className="text-sm sm:col-span-2">Телефон<input required type="tel" maxLength={40} value={phone} onChange={e => setPhone(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
         </fieldset>
+        {checkVenue && visibleAvailability && (
+          <p role="status" className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm text-stone-700">
+            {visibleAvailability === "LOADING" ? "Проверяем доступность выбранного времени…" :
+             visibleAvailability === "AVAILABLE" ? "Предварительно свободно на выбранное время. Окончательно подтвердит исполнитель." :
+             visibleAvailability === "UNAVAILABLE" ? "По текущему расписанию время занято. Можно изменить дату или отправить запрос исполнителю для уточнения." :
+             "Нельзя автоматически подтвердить доступность. Исполнитель уточнит её после получения заявки."}
+          </p>
+        )}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <button type="submit" disabled={busy || authLoading || !offers.length} className="w-full rounded-xl bg-primary p-4 font-semibold text-primary-foreground disabled:opacity-50">
           {busy ? "Отправляем…" : authenticated ? "Отправить заявку основному исполнителю" : "Войти и отправить заявку"}

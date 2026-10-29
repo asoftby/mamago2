@@ -1,116 +1,107 @@
-import type {
-  AnalyticsEntityType,
-  AnalyticsVertical,
-  Prisma,
-  UserEventType,
-} from "@prisma/client";
-import {
-  eachDayOfInterval,
-  endOfDay,
-  min as minDate,
-  startOfDay,
-  subDays,
-} from "date-fns";
+import { Prisma, type UserEventType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type {
   AnalyticsOverviewFilters,
   AnalyticsOverviewResult,
 } from "@/lib/analytics/adminOverviewTypes";
+import { analyticsDayKeys } from "@/server/services/analytics/analyticsDateRange";
 import {
-  resolveAnalyticsDateRange,
-  resolveCityIdFromSlug,
-} from "@/server/services/analytics/analyticsDateRange";
+  analyticsEventWhereSql,
+  analyticsIdentityWhereSql,
+  applyAnalyticsUserFilter,
+  buildAnalyticsBaseEventWhere,
+  loadAnalyticsScope,
+} from "@/server/services/analytics/analyticsQueryHelpers";
+import {
+  countOrderedFunnel,
+  share,
+} from "@/server/services/analytics/orderedUserFunnel";
+import {
+  AUDIENCE_EXCLUDED_ROLES,
+  computeCanonicalAudience,
+  internalTrafficExclusionSql,
+} from "@/server/services/analytics/canonicalAudience";
+import {
+  ANALYTICS_TIME_ZONE,
+  CTA_CLICK_EVENT,
+  DETAIL_OPEN_EVENT,
+  FEED_IMPRESSION_EVENT,
+  PLAN_ADD_EVENT,
+  SAVE_EVENT,
+} from "@/server/services/analytics/metricDefinitions";
 
-function buildBaseWhere(
-  start: Date,
-  end: Date,
-  filters: AnalyticsOverviewFilters,
-  cityId: string | null,
-): Prisma.UserEventWhereInput {
-  const where: Prisma.UserEventWhereInput = {
-    createdAt: { gte: start, lte: end },
-  };
-
-  if (filters.entity && filters.entity !== "all") {
-    const map: Record<string, AnalyticsEntityType> = {
-      event: "EVENT",
-      place: "PLACE",
-      offer: "OFFER",
-      route: "ROUTE",
-      article: "ARTICLE",
-    };
-    const et = map[filters.entity];
-    if (et) where.entityType = et;
-  }
-
-  if (filters.vertical && filters.vertical !== "all") {
-    const vmap: Record<string, AnalyticsVertical> = {
-      city: "CITY",
-      travel: "TRAVEL",
-      birthday: "BIRTHDAY",
-      education: "EDUCATION",
-      weekend: "WEEKEND",
-      seasonal: "SEASONAL",
-    };
-    const v = vmap[filters.vertical];
-    if (v) where.vertical = v;
-  }
-
-  if (cityId) where.cityId = cityId;
-
-  return where;
+async function countByType(base: Prisma.UserEventWhereInput, type: UserEventType): Promise<number> {
+  return prisma.userEvent.count({ where: { ...base, eventType: type } });
 }
 
-const VIEW_TYPES: UserEventType[] = ["PAGE_VIEW", "CARD_VIEW"];
-
-async function countByType(
-  base: Prisma.UserEventWhereInput,
-  types: UserEventType | UserEventType[],
-): Promise<number> {
-  const t = Array.isArray(types) ? { in: types } : types;
-  return prisma.userEvent.count({
-    where: { ...base, eventType: t },
+function shortDayLabel(dateKey: string): string {
+  // Format the civil date itself (noon UTC), never re-zoned.
+  return new Date(`${dateKey}T12:00:00Z`).toLocaleDateString("ru-RU", {
+    timeZone: "UTC",
+    day: "numeric",
+    month: "short",
   });
 }
 
 /**
  * Агрегированные метрики для вкладки Analytics → Overview.
+ *
+ * Определения — `metricDefinitions.ts` (B): визиторы, просмотры страниц и
+ * устройства — из `computeCanonicalAudience` (те же, что на /admin, для
+ * выбранного города); показы в ленте (CARD_VIEW) — отдельно; внутренний
+ * трафик (ADMIN/MODERATOR + tainted-сессии) исключён из всех цифр; сутки —
+ * по Минску. Фильтры сущности/вертикали относятся к контентным событиям и к
+ * аудитории (PAGE_VIEW без сущности) не применяются.
+ *
+ * D6: фильтры «сегмент» и «возраст ребёнка» применяются ко всем цифрам вкладки
+ * (аудитория, события, ряд по дням) — раньше они молча игнорировались.
+ * D7: воронка и конверсии — по уникальным людям, доли считаются от открывших
+ * и не превышают 100%; при нуле открывших доля — null («—»), а не 0%.
  */
 export async function getAnalyticsOverview(
   filters: AnalyticsOverviewFilters,
 ): Promise<AnalyticsOverviewResult> {
-  const { start, end } = resolveAnalyticsDateRange(filters.dateRange);
-  const cityId = await resolveCityIdFromSlug(filters.city);
-  const base = buildBaseWhere(start, end, filters, cityId);
+  const { start, end, cityId, allowed, exclusion } = await loadAnalyticsScope(filters);
+  const base = applyAnalyticsUserFilter(
+    buildAnalyticsBaseEventWhere(start, end, filters, cityId, exclusion),
+    allowed,
+  );
+  const exclusionSql = internalTrafficExclusionSql(exclusion, "e");
+  const cityPageViewSql = cityId ? Prisma.sql`AND e."cityId" = ${cityId}` : Prisma.empty;
+  const allowedPageViewSql = allowed
+    ? allowed.size === 0
+      ? Prisma.sql`AND FALSE`
+      : Prisma.sql`AND e."userId" IN (${Prisma.join([...allowed])})`
+    : Prisma.empty;
+  // Funnel audience membership is applied after resolving anonymous sessions.
+  const contentEventSql = analyticsEventWhereSql(start, end, filters, cityId, null, exclusion);
+  const filteredContentEventSql = analyticsEventWhereSql(start, end, filters, cityId, allowed, exclusion);
 
   const [
-    views,
+    audience,
+    feedImpressions,
     opens,
     saves,
     planAdds,
     ctaClicks,
-    activeUserRows,
-    sessionRows,
+    people,
     profilesActiveInRange,
     topVerticalRows,
     topEntityRows,
+    dailyPageViewRows,
+    dailyOpenRows,
   ] = await Promise.all([
-    countByType(base, VIEW_TYPES),
-    countByType(base, "DETAIL_OPEN"),
-    countByType(base, "SAVE"),
-    countByType(base, "PLAN_ADD"),
-    countByType(base, "CTA_CLICK"),
-    prisma.userEvent.groupBy({
-      by: ["userId"],
-      where: { ...base, userId: { not: null } },
-    }),
-    prisma.userEvent.groupBy({
-      by: ["sessionId"],
-      where: { ...base, sessionId: { not: null } },
-    }),
+    computeCanonicalAudience(prisma, start, end, { cityId, allowedUserIds: allowed }),
+    countByType(base, FEED_IMPRESSION_EVENT),
+    countByType(base, DETAIL_OPEN_EVENT),
+    countByType(base, SAVE_EVENT),
+    countByType(base, PLAN_ADD_EVENT),
+    countByType(base, CTA_CLICK_EVENT),
+    countOrderedFunnel(contentEventSql, analyticsIdentityWhereSql(start, end, exclusion), allowed),
     prisma.userBehaviorProfile.count({
       where: {
         lastSeenAt: { gte: start, lte: end },
+        user: { role: { notIn: [...AUDIENCE_EXCLUDED_ROLES] } },
       },
     }),
     prisma.userEvent.groupBy({
@@ -131,49 +122,40 @@ export async function getAnalyticsOverview(
       orderBy: { _count: { entityId: "desc" } },
       take: 5,
     }),
+    // PAGE_VIEW per Minsk day: same exclusion; rows with neither user nor session never count (canonical rule).
+    prisma.$queryRaw<{ day: string; c: bigint }[]>(Prisma.sql`
+      SELECT to_char((e."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${ANALYTICS_TIME_ZONE}, 'YYYY-MM-DD') AS day, count(*)::bigint AS c
+      FROM "UserEvent" e
+      WHERE e."eventType" = 'PAGE_VIEW'
+        AND e."createdAt" >= ${start} AND e."createdAt" <= ${end}
+        AND (e."sessionId" IS NOT NULL OR e."userId" IS NOT NULL)
+        ${cityPageViewSql}
+        ${allowedPageViewSql}
+        AND ${exclusionSql}
+      GROUP BY 1
+    `),
+    prisma.$queryRaw<{ day: string; c: bigint }[]>(Prisma.sql`
+      SELECT to_char((e."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${ANALYTICS_TIME_ZONE}, 'YYYY-MM-DD') AS day, count(*)::bigint AS c
+      FROM "UserEvent" e
+      WHERE e."eventType" = 'DETAIL_OPEN' AND ${filteredContentEventSql}
+      GROUP BY 1
+    `),
   ]);
 
-  const activeUsers = activeUserRows.length;
-  const sessions = sessionRows.length;
+  const pageViews = audience.pageViews;
+  // D7: доли — от уникальных открывших; ветки save/plan/click не короче 100%.
+  const saveRate = share(people.save, people.open);
+  const planRate = share(people.plan, people.open);
+  const clickRate = share(people.click, people.open);
 
-  const denomViews = Math.max(views, 1);
-  const denomSaves = Math.max(saves, 1);
-  const saveRate = saves / denomViews;
-  const planRate = planAdds / denomSaves;
-  const clickRate = ctaClicks / denomViews;
-
-  const top = Math.max(views, 1);
+  const pctOfTop = (n: number, top: number) =>
+    top > 0 ? Math.round((n / top) * 1000) / 10 : 0;
   const funnel = [
-    {
-      key: "view" as const,
-      label: "Views",
-      count: views,
-      percentOfTop: 100,
-    },
-    {
-      key: "open" as const,
-      label: "Opens",
-      count: opens,
-      percentOfTop: Math.round((opens / top) * 1000) / 10,
-    },
-    {
-      key: "save" as const,
-      label: "Saves",
-      count: saves,
-      percentOfTop: Math.round((saves / top) * 1000) / 10,
-    },
-    {
-      key: "plan" as const,
-      label: "Plan",
-      count: planAdds,
-      percentOfTop: Math.round((planAdds / top) * 1000) / 10,
-    },
-    {
-      key: "click" as const,
-      label: "CTA",
-      count: ctaClicks,
-      percentOfTop: Math.round((ctaClicks / top) * 1000) / 10,
-    },
+    { key: "view" as const, label: "Видели контент", count: people.view, percentOfTop: people.view > 0 ? 100 : 0 },
+    { key: "open" as const, label: "Открыли карточку", count: people.open, percentOfTop: pctOfTop(people.open, people.view) },
+    { key: "save" as const, label: "Сохранили", count: people.save, percentOfTop: pctOfTop(people.save, people.open) },
+    { key: "plan" as const, label: "Добавили в план", count: people.plan, percentOfTop: pctOfTop(people.plan, people.open) },
+    { key: "click" as const, label: "Перешли к партнёру", count: people.click, percentOfTop: pctOfTop(people.click, people.open) },
   ];
 
   const topVerticals = topVerticalRows.map((r) => ({
@@ -187,44 +169,21 @@ export async function getAnalyticsOverview(
     count: r._count._all,
   }));
 
-  const rangeDays = eachDayOfInterval({
-    start: startOfDay(start),
-    end: startOfDay(end),
-  });
-  const cappedDays = rangeDays.slice(-90);
-  const dailySeries: AnalyticsOverviewResult["dailySeries"] = [];
-
-  const dayChunks = await Promise.all(
-    cappedDays.map(async (d) => {
-      const ds = startOfDay(d);
-      const de = minDate([endOfDay(ds), end]);
-      const dayWhere: Prisma.UserEventWhereInput = {
-        ...base,
-        createdAt: { gte: ds, lte: de },
-      };
-      const [v, o] = await Promise.all([
-        prisma.userEvent.count({
-          where: { ...dayWhere, eventType: { in: VIEW_TYPES } },
-        }),
-        prisma.userEvent.count({
-          where: { ...dayWhere, eventType: "DETAIL_OPEN" },
-        }),
-      ]);
-      return {
-        day: ds.toLocaleDateString("en-CA", { month: "short", day: "numeric" }),
-        date: ds.toISOString().slice(0, 10),
-        views: v,
-        opens: o,
-      };
-    }),
-  );
-  dailySeries.push(...dayChunks);
+  const viewsByDay = new Map(dailyPageViewRows.map((r) => [r.day, Number(r.c)]));
+  const opensByDay = new Map(dailyOpenRows.map((r) => [r.day, Number(r.c)]));
+  const dailySeries = analyticsDayKeys(start, end, 90).map((date) => ({
+    day: shortDayLabel(date),
+    date,
+    pageViews: viewsByDay.get(date) ?? 0,
+    opens: opensByDay.get(date) ?? 0,
+  }));
 
   return {
     range: { start: start.toISOString(), end: end.toISOString() },
-    activeUsers,
-    sessions,
-    views,
+    visitors: audience.visitors,
+    devices: audience.devices,
+    pageViews,
+    feedImpressions,
     opens,
     saves,
     planAdds,

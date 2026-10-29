@@ -130,7 +130,11 @@ export function AdminAnalyticsAudienceSegments({
                   : sort.key === "trend7d"
                     ? b.trend7d
                     : b.trend30d;
-      return mult * (va - vb);
+      // A segment without a comparable previous window ("—") sorts below every real value.
+      const na = va ?? Number.NEGATIVE_INFINITY;
+      const nb = vb ?? Number.NEGATIVE_INFINITY;
+      if (na === nb) return 0;
+      return mult * (na < nb ? -1 : 1);
     });
     return copy;
   }, [rows, sort]);
@@ -163,7 +167,7 @@ export function AdminAnalyticsAudienceSegments({
       <p className="text-xs text-gray-500">
         Profiles in range:{" "}
         <span className="font-medium text-gray-800">
-          {totalProfiles.toLocaleString()}
+          {totalProfiles.toLocaleString("ru-RU")}
         </span>
       </p>
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -238,7 +242,7 @@ export function AdminAnalyticsAudienceSegments({
                   </div>
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums text-gray-800">
-                  {row.usersCount.toLocaleString()}
+                  {row.usersCount.toLocaleString("ru-RU")}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums text-gray-700">
                   {formatShare(row.share)}
@@ -301,7 +305,14 @@ function Th({
   );
 }
 
-function TrendPill({ v }: { v: number }) {
+function TrendPill({ v }: { v: number | null }) {
+  if (v === null) {
+    return (
+      <span className="text-xs text-gray-400" title="В предыдущем периоде не было активных пользователей — сравнивать не с чем">
+        —
+      </span>
+    );
+  }
   const up = v > 0.5;
   const down = v < -0.5;
   return (

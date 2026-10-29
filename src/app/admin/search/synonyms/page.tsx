@@ -7,6 +7,7 @@ import { ArrowRight, Plus, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SynonymModal } from "@/components/admin/search/SynonymModal";
 import type { SearchSynonym } from "@/types/search-synonym";
+import { formatAdminDate } from "@/lib/admin/formatRu";
 
 export default function SynonymsPage() {
   const searchParams = useSearchParams();
@@ -217,7 +218,7 @@ export default function SynonymsPage() {
                     </div>
 
                     <div className="mt-3 text-xs text-gray-500">
-                      Обновлено {new Date(synonym.updatedAt).toLocaleDateString("ru-RU")}
+                      Обновлено {formatAdminDate(synonym.updatedAt)}
                     </div>
                   </div>
 

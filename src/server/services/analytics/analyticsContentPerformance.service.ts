@@ -21,9 +21,12 @@ import {
   resolveAnalyticsDateRange,
   resolveCityIdFromSlug,
 } from "@/server/services/analytics/analyticsDateRange";
+import { resolveInternalTrafficExclusion } from "@/server/services/analytics/canonicalAudience";
+import { FEED_IMPRESSION_EVENT } from "@/server/services/analytics/metricDefinitions";
 import { labelForCtaTargetAction } from "@/lib/analytics/ctaTargetActionLabels";
 
-const VIEW_TYPES: UserEventType[] = ["PAGE_VIEW", "CARD_VIEW"];
+/** D9: «Показы в ленте» — только CARD_VIEW; PAGE_VIEW карточкой не считается. */
+const VIEW_TYPES: UserEventType[] = [FEED_IMPRESSION_EVENT];
 
 type AggRow = {
   entity_type: string;
@@ -130,7 +133,7 @@ function sortRows(
   const k = keys.has(sortKey) ? sortKey : "views";
   return [...rows].sort((a, b) => {
     if (k === "title") {
-      return mult * a.title.localeCompare(b.title, "en");
+      return mult * a.title.localeCompare(b.title, "ru");
     }
     // null (unmeasured rate) sorts as lowest, never as if it were a real 0.
     const va = (a[k as keyof ContentPerformanceEntityRow] as number | null) ?? -1;
@@ -160,17 +163,18 @@ export async function getAnalyticsContentPerformance(
   if (allowed && allowed.size === 0) {
     return emptyResult(start, end, page, pageSize, sortKey, sortDir);
   }
+  const exclusion = await resolveInternalTrafficExclusion(prisma, start, end);
 
-  const baseWhere = buildAnalyticsBaseEventWhere(start, end, filters, cityId);
+  const baseWhere = buildAnalyticsBaseEventWhere(start, end, filters, cityId, exclusion);
   const where = applyAnalyticsUserFilter(baseWhere, allowed);
-  const wsql = analyticsEventWhereSql(start, end, filters, cityId, allowed);
+  const wsql = analyticsEventWhereSql(start, end, filters, cityId, allowed, exclusion);
 
   const [aggRows, metaRows] = await Promise.all([
     prisma.$queryRaw<AggRow[]>`
       SELECT
         e."entityType"::text AS entity_type,
         e."entityId"::text AS entity_id,
-        SUM(CASE WHEN e."eventType" IN ('PAGE_VIEW','CARD_VIEW') THEN 1 ELSE 0 END)::bigint AS views,
+        SUM(CASE WHEN e."eventType" = 'CARD_VIEW' THEN 1 ELSE 0 END)::bigint AS views,
         SUM(CASE WHEN e."eventType" = 'DETAIL_OPEN' THEN 1 ELSE 0 END)::bigint AS opens,
         SUM(CASE WHEN e."eventType" = 'SAVE' THEN 1 ELSE 0 END)::bigint AS saves,
         SUM(CASE WHEN e."eventType" = 'PLAN_ADD' THEN 1 ELSE 0 END)::bigint AS plan_adds,
@@ -181,9 +185,9 @@ export async function getAnalyticsContentPerformance(
         AND e."entityType" IS NOT NULL
       GROUP BY e."entityType", e."entityId"
       HAVING
-        SUM(CASE WHEN e."eventType" IN ('PAGE_VIEW','CARD_VIEW') THEN 1 ELSE 0 END)
+        SUM(CASE WHEN e."eventType" = 'CARD_VIEW' THEN 1 ELSE 0 END)
         + SUM(CASE WHEN e."eventType" = 'DETAIL_OPEN' THEN 1 ELSE 0 END) > 0
-      ORDER BY SUM(CASE WHEN e."eventType" IN ('PAGE_VIEW','CARD_VIEW') THEN 1 ELSE 0 END) DESC
+      ORDER BY SUM(CASE WHEN e."eventType" = 'CARD_VIEW' THEN 1 ELSE 0 END) DESC
       LIMIT 400
     `,
     prisma.$queryRaw<MetaRow[]>`
@@ -382,8 +386,7 @@ async function buildVerticalComparison(
     if (!byVert[v])
       byVert[v] = { views: 0, opens: 0, saves: 0, planAdds: 0, cta: 0 };
     const c = r._count._all;
-    if (r.eventType === "PAGE_VIEW" || r.eventType === "CARD_VIEW")
-      byVert[v].views += c;
+    if (r.eventType === FEED_IMPRESSION_EVENT) byVert[v].views += c;
     if (r.eventType === "DETAIL_OPEN") byVert[v].opens += c;
     if (r.eventType === "SAVE") byVert[v].saves += c;
     if (r.eventType === "PLAN_ADD") byVert[v].planAdds += c;
@@ -497,7 +500,7 @@ export async function getPublicationAnalyticsDetail(params: {
   let ctaClicks = 0;
   for (const r of countRows) {
     const c = r._count._all;
-    if (r.eventType === "PAGE_VIEW" || r.eventType === "CARD_VIEW") impressions += c;
+    if (r.eventType === FEED_IMPRESSION_EVENT) impressions += c;
     else if (r.eventType === "DETAIL_OPEN") opens += c;
     else if (r.eventType === "SAVE") saves += c;
     else if (r.eventType === "PLAN_ADD") planAdds += c;

@@ -55,7 +55,7 @@ const TX_TYPE_LABELS: Partial<Record<BillingTransactionType, string>> = {
 };
 
 function formatDateTime(value: string) {
-  return new Date(value).toLocaleString("ru-RU", {
+  return new Date(value).toLocaleString("ru-RU", { timeZone: "Europe/Minsk",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",

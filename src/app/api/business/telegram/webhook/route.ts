@@ -57,7 +57,9 @@ export async function POST(request: NextRequest) {
           ? "Заявка подтверждена."
           : result.reason === "STALE_REQUEST"
             ? "Заявка уже изменилась. Откройте бизнес-кабинет."
-            : responseText;
+            : result.reason === "CONFIRMATION_DISABLED"
+              ? "Подтверждение заявок временно недоступно."
+              : responseText;
       } catch {
         // Never expose Telegram identity, signed token or customer details.
         console.error("[business-telegram] Party confirmation callback failed");
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest) {
   const response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chat_id: msg.chat.id, text: accepted
-      ? "mamaGo Business подключён. Уведомления компании будут доступны после включения доставки."
+      ? "Добро пожаловать в mamaGo Business!\n\nВаш Telegram успешно подключён к бизнес-кабинету mamaGo.\n\nЗдесь вы сможете получать уведомления о новых заявках, бронированиях и важных изменениях, а также подтверждать заявки прямо в Telegram.\n\nНастроить уведомления можно в бизнес-кабинете: Настройки → Уведомления."
       : "Ссылка недействительна или срок её действия истёк. Создайте новую в бизнес-кабинете." }),
     cache: "no-store",
   });

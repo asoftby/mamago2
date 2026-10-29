@@ -62,7 +62,7 @@ function EmptyState() {
 
 function formatUpdatedAt(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("ru-RU", {
+    return new Date(iso).toLocaleString("ru-RU", { timeZone: "Europe/Minsk",
       day: "2-digit",
       month: "2-digit",
       year: "numeric",

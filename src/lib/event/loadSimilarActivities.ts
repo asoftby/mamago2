@@ -8,6 +8,7 @@
  */
 
 import prisma from "@/lib/prisma";
+import { withImageDimensions } from "@/server/media/loadImageDimensionsByUrl";
 import {
   AnalyticsEntityType,
   PublicationPriceMode,
@@ -263,10 +264,13 @@ export async function loadSimilarActivitiesWithTrace(opts: {
   })) as SimilarRow[];
 
   const rowById = new Map(rows.map((row) => [row.id, row]));
-  const results = selectedRanked
-    .map((item) => rowById.get(item.activity.id))
-    .filter((row): row is SimilarRow => Boolean(row))
-    .map((row) => rowToSimilar(row, citySlug));
+  const results = await withImageDimensions(
+    selectedRanked
+      .map((item) => rowById.get(item.activity.id))
+      .filter((row): row is SimilarRow => Boolean(row))
+      .map((row) => rowToSimilar(row, citySlug)),
+    (item) => item.imageUrl,
+  );
 
   const rankedById = new Map<string, RankedPlanSuggestion>(
     selectedRanked.map((item) => [item.activity.id, item]),

@@ -1,10 +1,4 @@
-import type { Prisma } from "@prisma/client";
-import {
-  eachDayOfInterval,
-  endOfDay,
-  startOfDay,
-  subDays,
-} from "date-fns";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isSegmentKey, SEGMENT_KEYS } from "@/lib/analytics/segmentCatalog";
 import type {
@@ -12,10 +6,25 @@ import type {
   AnalyticsSegmentRow,
   AnalyticsSegmentsFilters,
 } from "@/lib/analytics/analyticsSegmentsTypes";
+import { resolveCompletedWindow } from "@/lib/performance/performanceMetrics";
 import {
+  analyticsDayKeys,
   resolveAnalyticsDateRange,
   resolveCityIdFromSlug,
 } from "@/server/services/analytics/analyticsDateRange";
+import { AUDIENCE_EXCLUDED_ROLES } from "@/server/services/analytics/canonicalAudience";
+import {
+  ANALYTICS_TIME_ZONE,
+  CTA_CLICK_EVENT,
+  DETAIL_OPEN_EVENT,
+  FEED_IMPRESSION_EVENT,
+  PLAN_ADD_EVENT,
+  SAVE_EVENT,
+} from "@/server/services/analytics/metricDefinitions";
+
+// "createdAt" is timestamp WITHOUT time zone holding UTC: read it as UTC first, then convert to Minsk wall time.
+const MINSK_TZ = Prisma.raw(`'${ANALYTICS_TIME_ZONE}'`);
+const STAFF_ROLES_SQL = Prisma.join([...AUDIENCE_EXCLUDED_ROLES]);
 
 function mergeCountMaps(
   rows: Array<{ preferredCategories: Prisma.JsonValue | null }>,
@@ -74,154 +83,140 @@ function topFromMap(map: Record<string, number>, take: number) {
     .map(([label, count]) => ({ label, count }));
 }
 
-async function userIdsActiveInCity(
-  cityId: string,
-  start: Date,
-  end: Date,
-): Promise<string[]> {
-  const rows = await prisma.userEvent.findMany({
-    where: {
-      cityId,
-      createdAt: { gte: start, lte: end },
-      userId: { not: null },
-    },
-    select: { userId: true },
-    distinct: ["userId"],
-  });
-  return rows.map((r) => r.userId!).filter(Boolean);
+/** Percent change of active users vs the previous window; null when there is no previous activity to compare with. */
+export function trendPct(activeNow: number, activePrev: number): number | null {
+  if (activePrev <= 0) return null;
+  return Math.round(((activeNow - activePrev) / activePrev) * 1000) / 10;
 }
 
-function trendPct(activeNow: number, activePrev: number): number {
-  const prev = Math.max(1, activePrev);
-  return Math.round(((activeNow - activePrev) / prev) * 1000) / 10;
-}
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
- * Список сегментов с агрегатами по UserBehaviorProfile.
+ * SQL membership of "users in the selected period": a non-staff profile
+ * last seen inside [start, end] and, with a city filter, with at least one
+ * event in that city inside the period. Expects aliases p = UserBehaviorProfile,
+ * u = User.
+ */
+function periodMemberSql(start: Date, end: Date, cityId: string | null): Prisma.Sql {
+  const city = cityId
+    ? Prisma.sql`AND EXISTS (
+        SELECT 1 FROM "UserEvent" ce
+        WHERE ce."userId" = p."userId" AND ce."cityId" = ${cityId}
+          AND ce."createdAt" >= ${start} AND ce."createdAt" <= ${end}
+      )`
+    : Prisma.empty;
+  return Prisma.sql`u.role NOT IN (${STAFF_ROLES_SQL}) AND p."lastSeenAt" >= ${start} AND p."lastSeenAt" <= ${end} ${city}`;
+}
+
+type SegmentUserRow = {
+  segmentKeys: string[];
+  inPeriod: boolean;
+  saves: bigint;
+  planAdds: bigint;
+  ctaClicks: bigint;
+  active7: boolean;
+  active7Prev: boolean;
+  active30: boolean;
+  active30Prev: boolean;
+};
+
+type SegmentAgg = {
+  users: number;
+  sumSaves: number;
+  sumPlan: number;
+  sumCta: number;
+  active7: number;
+  prev7: number;
+  active30: number;
+  prev30: number;
+};
+
+const emptyAgg = (): SegmentAgg => ({
+  users: 0,
+  sumSaves: 0,
+  sumPlan: 0,
+  sumCta: 0,
+  active7: 0,
+  prev7: 0,
+  active30: 0,
+  prev30: 0,
+});
+
+/**
+ * Список сегментов.
+ *
+ * Состав сегмента — по `UserBehaviorProfile.segmentKeys` (профиль), а ВСЕ
+ * числа поведения — по `UserEvent`:
+ *  - «Пользователей» — профили, чей последний визит попал в выбранный период;
+ *  - средние сохранения / в план / переходы — события пользователей сегмента
+ *    за ВЫБРАННЫЙ период, делённые на число пользователей (D3);
+ *  - тренд 7д / 30д — активные пользователи сегмента (хотя бы одно событие)
+ *    в последних 7 / 30 завершённых минских сутках против предыдущих,
+ *    независимо от выбранного периода; без активности в предыдущем окне — null (D1).
  */
 export async function getAnalyticsSegments(
   filters: AnalyticsSegmentsFilters,
+  now: Date = new Date(),
 ): Promise<{ totalProfiles: number; segments: AnalyticsSegmentRow[] }> {
-  const { start, end } = resolveAnalyticsDateRange(filters.dateRange);
+  const { start, end } = resolveAnalyticsDateRange(filters.dateRange, now);
   const cityId = await resolveCityIdFromSlug(filters.city);
-  const now = new Date();
-  const d7 = startOfDay(subDays(now, 7));
-  const d14 = startOfDay(subDays(now, 14));
-  const d30 = startOfDay(subDays(now, 30));
-  const d60 = startOfDay(subDays(now, 60));
+  const w7 = resolveCompletedWindow(7, now);
+  const w30 = resolveCompletedWindow(30, now);
+  const minStart = new Date(Math.min(start.getTime(), w7.previousStart.getTime(), w30.previousStart.getTime()));
+  const cityEvent = cityId ? Prisma.sql`AND e."cityId" = ${cityId}` : Prisma.empty;
+  const inRange = Prisma.sql`e."createdAt" >= ${start} AND e."createdAt" <= ${end}`;
+  const inWindow = (w: { start: Date; end: Date }) =>
+    Prisma.sql`COALESCE(BOOL_OR(e."createdAt" >= ${w.start} AND e."createdAt" <= ${w.end}), false)`;
 
-  let cityUserIds: string[] | null = null;
-  if (cityId) {
-    cityUserIds = await userIdsActiveInCity(cityId, start, end);
-    if (cityUserIds.length === 0) {
-      return {
-        totalProfiles: 0,
-        segments: SEGMENT_KEYS.map((key) => ({
-          key,
-          usersCount: 0,
-          share: 0,
-          avgSaves: 0,
-          avgPlanAdds: 0,
-          avgCtaClicks: 0,
-          trend7d: 0,
-          trend30d: 0,
-        })),
-      };
-    }
-  }
+  const rows = await prisma.$queryRaw<SegmentUserRow[]>`
+    SELECT p."segmentKeys" AS "segmentKeys",
+      (${periodMemberSql(start, end, cityId)}) AS "inPeriod",
+      COUNT(e.id) FILTER (WHERE e."eventType" = ${SAVE_EVENT}::"UserEventType" AND ${inRange})::bigint AS saves,
+      COUNT(e.id) FILTER (WHERE e."eventType" = ${PLAN_ADD_EVENT}::"UserEventType" AND ${inRange})::bigint AS "planAdds",
+      COUNT(e.id) FILTER (WHERE e."eventType" = ${CTA_CLICK_EVENT}::"UserEventType" AND ${inRange})::bigint AS "ctaClicks",
+      ${inWindow(w7)} AS "active7",
+      ${inWindow({ start: w7.previousStart, end: w7.previousEnd })} AS "active7Prev",
+      ${inWindow(w30)} AS "active30",
+      ${inWindow({ start: w30.previousStart, end: w30.previousEnd })} AS "active30Prev"
+    FROM "UserBehaviorProfile" p
+    JOIN "User" u ON u.id = p."userId"
+    LEFT JOIN "UserEvent" e
+      ON e."userId" = p."userId" AND e."createdAt" >= ${minStart} AND e."createdAt" <= ${now} ${cityEvent}
+    WHERE u.role NOT IN (${STAFF_ROLES_SQL}) AND p."lastSeenAt" >= ${minStart}
+    GROUP BY p."userId", p."segmentKeys", p."lastSeenAt", u.role
+  `;
 
-  const baseWhere: Prisma.UserBehaviorProfileWhereInput = {
-    lastSeenAt: { gte: start, lte: end },
-    ...(cityUserIds ? { userId: { in: cityUserIds } } : {}),
-  };
-
-  const totalProfiles = await prisma.userBehaviorProfile.count({
-    where: baseWhere,
-  });
-
-  const profiles = await prisma.userBehaviorProfile.findMany({
-    where: baseWhere,
-    select: {
-      segmentKeys: true,
-      totalSaves: true,
-      totalPlanAdds: true,
-      totalCtaClicks: true,
-      lastSeenAt: true,
-    },
-  });
-
-  const byKey = new Map<
-    string,
-    {
-      users: number;
-      sumSaves: number;
-      sumPlan: number;
-      sumCta: number;
-      last7: number;
-      prev7: number;
-      last30: number;
-      prev30: number;
-    }
-  >();
-
-  for (const k of SEGMENT_KEYS) {
-    byKey.set(k, {
-      users: 0,
-      sumSaves: 0,
-      sumPlan: 0,
-      sumCta: 0,
-      last7: 0,
-      prev7: 0,
-      last30: 0,
-      prev30: 0,
-    });
-  }
-
-  for (const p of profiles) {
-    const ls = p.lastSeenAt;
-    const inLast7 = ls && ls >= d7;
-    const inPrev7 = ls && ls >= d14 && ls < d7;
-    const inLast30 = ls && ls >= d30;
-    const inPrev30 = ls && ls >= d60 && ls < d30;
-
-    for (const key of p.segmentKeys) {
-      if (!byKey.has(key)) {
-        byKey.set(key, {
-          users: 0,
-          sumSaves: 0,
-          sumPlan: 0,
-          sumCta: 0,
-          last7: 0,
-          prev7: 0,
-          last30: 0,
-          prev30: 0,
-        });
-      }
-      const agg = byKey.get(key)!;
+  const byKey = new Map<string, SegmentAgg>(SEGMENT_KEYS.map((k) => [k, emptyAgg()]));
+  let totalProfiles = 0;
+  for (const row of rows) {
+    if (row.inPeriod) totalProfiles += 1;
+    for (const key of row.segmentKeys) {
+      const agg = byKey.get(key) ?? emptyAgg();
+      byKey.set(key, agg);
+      // Trends count activity of segment members regardless of the selected period.
+      if (row.active7) agg.active7 += 1;
+      if (row.active7Prev) agg.prev7 += 1;
+      if (row.active30) agg.active30 += 1;
+      if (row.active30Prev) agg.prev30 += 1;
+      if (!row.inPeriod) continue;
       agg.users += 1;
-      agg.sumSaves += p.totalSaves;
-      agg.sumPlan += p.totalPlanAdds;
-      agg.sumCta += p.totalCtaClicks;
-      if (inLast7) agg.last7 += 1;
-      if (inPrev7) agg.prev7 += 1;
-      if (inLast30) agg.last30 += 1;
-      if (inPrev30) agg.prev30 += 1;
+      agg.sumSaves += Number(row.saves);
+      agg.sumPlan += Number(row.planAdds);
+      agg.sumCta += Number(row.ctaClicks);
     }
   }
 
-  const denom = Math.max(1, totalProfiles);
   const segments: AnalyticsSegmentRow[] = SEGMENT_KEYS.map((key) => {
     const a = byKey.get(key)!;
-    const avgUsers = Math.max(1, a.users);
     return {
       key,
       usersCount: a.users,
-      share: Math.round((a.users / denom) * 10000) / 10000,
-      avgSaves: Math.round((a.sumSaves / avgUsers) * 100) / 100,
-      avgPlanAdds: Math.round((a.sumPlan / avgUsers) * 100) / 100,
-      avgCtaClicks: Math.round((a.sumCta / avgUsers) * 100) / 100,
-      trend7d: trendPct(a.last7, a.prev7),
-      trend30d: trendPct(a.last30, a.prev30),
+      share: totalProfiles > 0 ? Math.round((a.users / totalProfiles) * 10000) / 10000 : 0,
+      avgSaves: a.users > 0 ? round2(a.sumSaves / a.users) : 0,
+      avgPlanAdds: a.users > 0 ? round2(a.sumPlan / a.users) : 0,
+      avgCtaClicks: a.users > 0 ? round2(a.sumCta / a.users) : 0,
+      trend7d: trendPct(a.active7, a.prev7),
+      trend30d: trendPct(a.active30, a.prev30),
     };
   });
 
@@ -229,11 +224,14 @@ export async function getAnalyticsSegments(
 }
 
 /**
- * Детализация сегмента: агрегаты профиля + срез UserEvent для топ контента.
+ * Детализация сегмента. График — дневные активные пользователи сегмента по
+ * `UserEvent` (минские сутки, D2); средние и воронка — события за выбранный
+ * период (D3), а не накопленные за всё время счётчики профиля.
  */
 export async function getAnalyticsSegmentDetail(
   segmentKey: string,
   filters: AnalyticsSegmentsFilters,
+  now: Date = new Date(),
 ): Promise<AnalyticsSegmentDetailResult | null> {
   const normalized = decodeURIComponent(segmentKey)
     .toUpperCase()
@@ -243,88 +241,63 @@ export async function getAnalyticsSegmentDetail(
   }
   const key = normalized;
 
-  const { start, end } = resolveAnalyticsDateRange(filters.dateRange);
+  const { start, end } = resolveAnalyticsDateRange(filters.dateRange, now);
   const cityId = await resolveCityIdFromSlug(filters.city);
+  const cityEvent = cityId ? Prisma.sql`AND e."cityId" = ${cityId}` : Prisma.empty;
+  const member = Prisma.sql`${key} = ANY(p."segmentKeys")`;
+  const periodMember = periodMemberSql(start, end, cityId);
 
-  let cityUserIds: string[] | null = null;
-  if (cityId) {
-    cityUserIds = await userIdsActiveInCity(cityId, start, end);
-    if (cityUserIds.length === 0) {
-      return {
-        key,
-        range: { start: start.toISOString(), end: end.toISOString() },
-        usersCount: 0,
-        trend: [],
-        avgSaves: 0,
-        avgPlanAdds: 0,
-        avgCtaClicks: 0,
-        topCategories: [],
-        topFormats: [],
-        topVerticals: [],
-        topContent: [],
-        funnel: {
-          views: 0,
-          opens: 0,
-          saves: 0,
-          planAdds: 0,
-          ctaClicks: 0,
-        },
-      };
-    }
-  }
-
-  const baseWhere: Prisma.UserBehaviorProfileWhereInput = {
-    lastSeenAt: { gte: start, lte: end },
-    segmentKeys: { has: key },
-    ...(cityUserIds ? { userId: { in: cityUserIds } } : {}),
-  };
-
-  const rows = await prisma.userBehaviorProfile.findMany({
-    where: baseWhere,
-    select: {
-      totalViews: true,
-      totalOpens: true,
-      totalSaves: true,
-      totalPlanAdds: true,
-      totalCtaClicks: true,
-      preferredCategories: true,
-      preferredVerticals: true,
-      preferredFormats: true,
-      lastSeenAt: true,
-      userId: true,
-    },
-  });
+  const [rows, dailyRows, eventCounts] = await Promise.all([
+    prisma.$queryRaw<
+      Array<{
+        userId: string;
+        preferredCategories: Prisma.JsonValue | null;
+        preferredVerticals: Prisma.JsonValue | null;
+        preferredFormats: Prisma.JsonValue | null;
+      }>
+    >`
+      SELECT p."userId" AS "userId", p."preferredCategories" AS "preferredCategories",
+        p."preferredVerticals" AS "preferredVerticals", p."preferredFormats" AS "preferredFormats"
+      FROM "UserBehaviorProfile" p
+      JOIN "User" u ON u.id = p."userId"
+      WHERE ${member} AND ${periodMember}
+    `,
+    prisma.$queryRaw<Array<{ day: string; users: bigint }>>`
+      SELECT to_char((e."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${MINSK_TZ}, 'YYYY-MM-DD') AS day,
+        COUNT(DISTINCT e."userId")::bigint AS users
+      FROM "UserEvent" e
+      JOIN "UserBehaviorProfile" p ON p."userId" = e."userId"
+      JOIN "User" u ON u.id = e."userId"
+      WHERE e."createdAt" >= ${start} AND e."createdAt" <= ${end}
+        AND ${member} AND u.role NOT IN (${STAFF_ROLES_SQL}) ${cityEvent}
+      GROUP BY 1
+    `,
+    prisma.$queryRaw<Array<{ eventType: string; c: bigint }>>`
+      SELECT e."eventType"::text AS "eventType", COUNT(*)::bigint AS c
+      FROM "UserEvent" e
+      JOIN "UserBehaviorProfile" p ON p."userId" = e."userId"
+      JOIN "User" u ON u.id = e."userId"
+      WHERE e."createdAt" >= ${start} AND e."createdAt" <= ${end}
+        AND e."eventType" IN (
+          ${FEED_IMPRESSION_EVENT}::"UserEventType", ${DETAIL_OPEN_EVENT}::"UserEventType",
+          ${SAVE_EVENT}::"UserEventType", ${PLAN_ADD_EVENT}::"UserEventType", ${CTA_CLICK_EVENT}::"UserEventType")
+        AND ${member} AND ${periodMember} ${cityEvent}
+      GROUP BY 1
+    `,
+  ]);
 
   const usersCount = rows.length;
-  const denom = Math.max(1, usersCount);
-
+  const count = (type: string) => Number(eventCounts.find((r) => r.eventType === type)?.c ?? 0);
   const funnel = {
-    views: rows.reduce((a, r) => a + r.totalViews, 0),
-    opens: rows.reduce((a, r) => a + r.totalOpens, 0),
-    saves: rows.reduce((a, r) => a + r.totalSaves, 0),
-    planAdds: rows.reduce((a, r) => a + r.totalPlanAdds, 0),
-    ctaClicks: rows.reduce((a, r) => a + r.totalCtaClicks, 0),
+    views: count(FEED_IMPRESSION_EVENT),
+    opens: count(DETAIL_OPEN_EVENT),
+    saves: count(SAVE_EVENT),
+    planAdds: count(PLAN_ADD_EVENT),
+    ctaClicks: count(CTA_CLICK_EVENT),
   };
 
-  const trendDays = eachDayOfInterval({
-    start: startOfDay(start),
-    end: startOfDay(end),
-  }).slice(-90);
-
-  const trend = trendDays.map((day) => {
-    const ds = startOfDay(day);
-    const next = endOfDay(ds);
-    const c = rows.filter(
-      (r) =>
-        r.lastSeenAt &&
-        r.lastSeenAt >= ds &&
-        r.lastSeenAt <= next,
-    ).length;
-    return {
-      date: ds.toISOString().slice(0, 10),
-      usersCount: c,
-    };
-  });
+  const activeByDay = new Map(dailyRows.map((r) => [r.day, Number(r.users)]));
+  const trend = analyticsDayKeys(start, end, 90).map((date) => ({ date, usersCount: activeByDay.get(date) ?? 0 }));
 
   const userIds = rows.map((r) => r.userId);
 
@@ -383,23 +356,15 @@ export async function getAnalyticsSegmentDetail(
     };
   });
 
+  const denom = Math.max(1, usersCount);
   return {
     key,
     range: { start: start.toISOString(), end: end.toISOString() },
     usersCount,
     trend,
-    avgSaves:
-      Math.round(
-        (rows.reduce((a, r) => a + r.totalSaves, 0) / denom) * 100,
-      ) / 100,
-    avgPlanAdds:
-      Math.round(
-        (rows.reduce((a, r) => a + r.totalPlanAdds, 0) / denom) * 100,
-      ) / 100,
-    avgCtaClicks:
-      Math.round(
-        (rows.reduce((a, r) => a + r.totalCtaClicks, 0) / denom) * 100,
-      ) / 100,
+    avgSaves: round2(funnel.saves / denom),
+    avgPlanAdds: round2(funnel.planAdds / denom),
+    avgCtaClicks: round2(funnel.ctaClicks / denom),
     topCategories: topFromMap(mergeCountMaps(rows), 8),
     topFormats: topFromMap(mergeFormatMaps(rows), 8),
     topVerticals: topFromMap(mergeVerticalMaps(rows), 8),

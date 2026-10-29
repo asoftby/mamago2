@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { serializeAppliedToSearchParams, type DiscoveryFilters } from "./filters.store";
-import { useOptionalCity } from "@/contexts/CityContext";
+import { useEventListingCitySlug, useEventListingExplore } from "@/lib/city/useEventListingCitySlug";
 
 export type EventAvailableFacets = {
   categories: string[];
@@ -17,12 +17,14 @@ const cache = new Map<string, EventAvailableFacets>();
 const pending = new Map<string, Promise<EventAvailableFacets>>();
 
 export function useEventAvailableFacets(filters: DiscoveryFilters, enabled = true) {
-  const city = useOptionalCity()?.citySlug ?? "minsk";
+  const city = useEventListingCitySlug();
+  const explore = useEventListingExplore();
   const key = useMemo(() => {
     const params = serializeAppliedToSearchParams(new URLSearchParams(), filters);
     params.set("city", city);
+    if (explore) params.set("explore", "1");
     return params.toString();
-  }, [city, filters]);
+  }, [city, explore, filters]);
   const [result, setResult] = useState<{ key: string; value: EventAvailableFacets } | null>(null);
 
   useEffect(() => {

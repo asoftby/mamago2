@@ -554,9 +554,12 @@ export async function retryFailedDelivery(
       const businessRecipient = delivery.notification.audience === "BUSINESS"
         ? await getActiveBusinessTelegramRecipient(delivery.userId)
         : null;
-      const connection = businessRecipient
-        ? null
-        : await getActiveTelegramConnectionForCurrentEnvironment(delivery.userId);
+      // Retry must preserve audience isolation: BUSINESS messages must never
+      // fall back to the family Telegram bot, even when its business bot is
+      // disabled, disconnected, or temporarily unavailable.
+      const connection = mayUseFamilyTelegramBot(delivery.notification.audience)
+        ? await getActiveTelegramConnectionForCurrentEnvironment(delivery.userId)
+        : null;
       if (!businessRecipient && !connection?.isActive) {
         await prisma.notificationDelivery.update({
           where: { id: deliveryId },
@@ -567,10 +570,13 @@ export async function retryFailedDelivery(
 
       const rendered = await buildTelegramMessageForNotification(delivery.notification);
       if (businessRecipient) {
+        const partyMarkup = await buildPartyConfirmationTelegramKeyboard(
+          delivery.notification, businessRecipient,
+        );
         await sendBusinessTelegramMessage({
           chatId: businessRecipient.chatId,
           text: rendered.text,
-          replyMarkup: rendered.replyMarkup,
+          replyMarkup: partyMarkup ?? rendered.replyMarkup,
           parseMode: rendered.parseMode,
         });
       } else if (connection) {

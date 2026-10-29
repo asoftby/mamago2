@@ -259,6 +259,8 @@ export type RecommendationOutcomeLinkInput = {
   entityId: string;
   userEventId: string;
   eventType: UserEventType;
+  /** Квалифицированный показ (meta.impression: ≥50% ≥1 с). Только он ставит deliveredAt. */
+  impression?: boolean;
   userId?: string | null;
   sessionId?: string | null;
   anonymousId?: string | null;
@@ -278,6 +280,15 @@ export async function linkRecommendationOutcome(
 
     const verified = await verifyRecommendationAttribution(input);
     if (!verified) return false;
+
+    // Квалифицированный показ (CARD_VIEW с meta.impression, ≥50% ≥1 с на клиенте):
+    // фиксируем первый момент доставки, повторные показы его не перетирают.
+    if (input.eventType === "CARD_VIEW" && input.impression === true) {
+      await prisma.recommendationExposure.updateMany({
+        where: { id: verified.exposureId, deliveredAt: null },
+        data: { deliveredAt: new Date() },
+      });
+    }
 
     await prisma.recommendationOutcome.upsert({
       where: { userEventId: input.userEventId },

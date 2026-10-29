@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ContentStatus, GeoScope } from "@prisma/client";
+import { ArticleLinkedItemKind, ArticlePublicationType, ContentStatus, GeoScope } from "@prisma/client";
 import {
   ArticleContentPayloadSchema,
   deriveArticleExcerptFromContent,
@@ -40,6 +40,14 @@ export const ArticleAdminPutBodySchema = z.object({
   seoRobots: z.string().nullable().optional(),
   noindex: z.boolean(),
   tagIds: z.array(z.string()).optional(),
+  publicationType: z.nativeEnum(ArticlePublicationType).optional(),
+  featured: z.boolean().optional(),
+  pinned: z.boolean().optional(),
+  expiresAt: z.string().nullable().optional(),
+  linkedItems: z
+    .array(z.object({ kind: z.nativeEnum(ArticleLinkedItemKind), id: z.string().min(1) }).strict())
+    .max(100)
+    .optional(),
 });
 
 export function articleSaveInputFromPutBody(
@@ -76,5 +84,10 @@ export function articleSaveInputFromPutBody(
     seoRobots: data.seoRobots ?? null,
     noindex: data.noindex,
     tagIds: data.tagIds,
+    publicationType: data.publicationType,
+    featured: data.featured,
+    pinned: data.pinned,
+    expiresAt: data.expiresAt,
+    linkedItems: data.linkedItems,
   };
 }

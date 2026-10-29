@@ -59,6 +59,11 @@ function baseSnapshot(overrides: Partial<ArticleEditorSnapshot> = {}): ArticleEd
     seoRobots: null,
     noindex: false,
     tagIds: ["tag-1", "tag-2"],
+    publicationType: "ARTICLE",
+    featured: false,
+    pinned: false,
+    expiresAt: null,
+    linkedItems: [],
     views: 42,
     updatedAt: "2026-08-20T10:00:00.000Z",
     ...overrides,
@@ -92,7 +97,36 @@ function currentStateShapeFromSnapshot(snap: ArticleEditorSnapshot) {
     seoDescription: snap.seoDescription ?? "",
     seoCanonicalUrl: snap.seoCanonicalUrl ?? "",
     noindex: snap.noindex,
+    publicationType: snap.publicationType,
+    featured: snap.featured,
+    pinned: snap.pinned,
+    expiresAtLocal: toLocalDatetimeValue(snap.expiresAt),
+    linkedItems: snap.linkedItems.map(({ kind, id }) => ({ kind, id })),
   };
+}
+
+// ── Journal fields round-trip and changes mark the editor dirty ──────────────
+{
+  const snap = baseSnapshot({
+    publicationType: "COLLECTION",
+    featured: true,
+    pinned: true,
+    linkedItems: [
+      { kind: "EVENT", id: "e1", title: "Событие" },
+      { kind: "OFFER", id: "o1", title: null },
+      { kind: "ARTICLE", id: "a2", title: "Статья" },
+    ],
+  });
+  const saved = buildSavedComparable(snap);
+  assert.equal(saved, buildEditorComparable(currentStateShapeFromSnapshot(snap)), "journal fields round-trip");
+  const reordered = currentStateShapeFromSnapshot(snap);
+  reordered.linkedItems = [reordered.linkedItems[1], reordered.linkedItems[0], reordered.linkedItems[2]];
+  assert.notEqual(saved, buildEditorComparable(reordered), "reordering collection items is a change");
+  assert.notEqual(
+    saved,
+    buildEditorComparable({ ...currentStateShapeFromSnapshot(snap), pinned: false }),
+    "unpinning is a change",
+  );
 }
 
 // ── Regression: authorUserId === null must not leave dirty stuck true ──────

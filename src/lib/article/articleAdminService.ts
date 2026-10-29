@@ -1,7 +1,12 @@
 import type { ContentStatus, GeoScope } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import prisma, { searchIndexer } from "@/lib/prisma";
-import type { ArticleEditorSnapshot, ArticleSaveInput } from "@/lib/article/articleAdminTypes";
+import type {
+  ArticleEditorSnapshot,
+  ArticleLinkedItemInput,
+  ArticleLinkedItemSnapshot,
+  ArticleSaveInput,
+} from "@/lib/article/articleAdminTypes";
 import {
   parseArticleContentJson,
   normalizeLegacyArticleInfoBlocks,
@@ -22,6 +27,14 @@ import {
 } from "@/lib/article/articleWriteAtomicity";
 import { assertArticleCategorySelectionShape } from "@/lib/article/articleCategorySelection";
 import { assertArticleGeographyTargetShape, geographyTargetKey, type ArticleGeographyTargetInput } from "@/lib/article/articleGeographyTargets";
+import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
+import {
+  assertCollectionItemCount,
+  assertJournalExpiryShape,
+  assertJournalLinkedItemsShape,
+  resolveBreakingNewsExpiresAtOnPublish,
+  resolveJournalExpiresAt,
+} from "@/lib/journal/publicationType";
 
 export type { ArticleEditorSnapshot, ArticleSaveInput } from "@/lib/article/articleAdminTypes";
 export {
@@ -62,6 +75,11 @@ function toSnapshot(row: {
   seoRobots: string | null;
   noindex: boolean;
   tags: Array<{ id: string }>;
+  publicationType: ArticleEditorSnapshot["publicationType"];
+  featured: boolean;
+  pinned: boolean;
+  expiresAt: Date | null;
+  linkedItems: ArticleLinkedItemSnapshot[];
   views: number;
   updatedAt: Date;
 }): ArticleEditorSnapshot {
@@ -103,6 +121,11 @@ function toSnapshot(row: {
     seoRobots: row.seoRobots,
     noindex: row.noindex,
     tagIds: row.tags.map((tag) => tag.id),
+    publicationType: row.publicationType,
+    featured: row.featured,
+    pinned: row.pinned,
+    expiresAt: row.expiresAt?.toISOString() ?? null,
+    linkedItems: row.linkedItems,
     views: row.views,
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -144,8 +167,86 @@ const articleSelect = {
   tags: {
     select: { id: true },
   },
+  publicationType: true,
+  featured: true,
+  pinned: true,
+  expiresAt: true,
+  linkedItems: {
+    orderBy: { position: "asc" as const },
+    select: {
+      kind: true,
+      activityId: true,
+      offerId: true,
+      linkedArticleId: true,
+      activity: { select: { title: true } },
+      offer: { select: { title: true } },
+      linkedArticle: { select: { title: true } },
+    },
+  },
   updatedAt: true,
 } as const;
+
+type LinkedItemRow = {
+  kind: ArticleLinkedItemInput["kind"];
+  activityId: string | null;
+  offerId: string | null;
+  linkedArticleId: string | null;
+  activity: { title: string } | null;
+  offer: { title: string } | null;
+  linkedArticle: { title: string } | null;
+};
+
+function toLinkedItemSnapshot(row: LinkedItemRow): ArticleLinkedItemSnapshot {
+  if (row.kind === "EVENT") return { kind: "EVENT", id: row.activityId ?? "", title: row.activity?.title ?? null };
+  if (row.kind === "OFFER") return { kind: "OFFER", id: row.offerId ?? "", title: row.offer?.title ?? null };
+  return { kind: "ARTICLE", id: row.linkedArticleId ?? "", title: row.linkedArticle?.title ?? null };
+}
+
+function linkedItemCreateData(item: ArticleLinkedItemInput, position: number) {
+  return {
+    kind: item.kind,
+    position,
+    activityId: item.kind === "EVENT" ? item.id : null,
+    offerId: item.kind === "OFFER" ? item.id : null,
+    linkedArticleId: item.kind === "ARTICLE" ? item.id : null,
+  };
+}
+
+/** Объекты элементов должны существовать (событие — Activity типа EVENT). */
+async function assertLinkedItemsExist(
+  tx: Prisma.TransactionClient,
+  items: ArticleLinkedItemInput[],
+): Promise<void> {
+  const ids = (kind: ArticleLinkedItemInput["kind"]) => items.filter((i) => i.kind === kind).map((i) => i.id);
+  const [events, offers, articles] = await Promise.all([
+    ids("EVENT").length ? tx.activity.findMany({ where: { id: { in: ids("EVENT") }, type: "EVENT" }, select: { id: true } }) : [],
+    ids("OFFER").length ? tx.offer.findMany({ where: { id: { in: ids("OFFER") } }, select: { id: true } }) : [],
+    ids("ARTICLE").length ? tx.article.findMany({ where: { id: { in: ids("ARTICLE") } }, select: { id: true } }) : [],
+  ]);
+  const found = new Set([
+    ...events.map((r) => `EVENT:${r.id}`),
+    ...offers.map((r) => `OFFER:${r.id}`),
+    ...articles.map((r) => `ARTICLE:${r.id}`),
+  ]);
+  if (items.some((i) => !found.has(`${i.kind}:${i.id}`))) {
+    throw new Error("Некоторые элементы подборки не найдены");
+  }
+}
+
+/** Тип при создании: явный, иначе по маркеру редактора новостей. */
+function resolveCreatePublicationType(input: ArticleSaveInput): ArticleEditorSnapshot["publicationType"] {
+  if (input.publicationType) return input.publicationType;
+  return input.subtitle === BREAKING_NEWS_SUBTITLE ? "BREAKING_NEWS" : "ARTICLE";
+}
+
+function assertRequiredJournalCategory(
+  categoryId: string | null,
+  publicationType: ArticleEditorSnapshot["publicationType"],
+): void {
+  if (publicationType !== "BREAKING_NEWS" && !categoryId) {
+    throw new Error("Для публикации статьи обязательно выберите раздел журнала");
+  }
+}
 
 async function assertArticleCategoryValid(categoryId: string | null): Promise<void> {
   if (!categoryId) return;
@@ -362,6 +463,7 @@ export async function getArticleForEditor(id: string): Promise<ArticleEditorSnap
   perf.mark("media");
   const snapshot = toSnapshot({
     ...row,
+    linkedItems: row.linkedItems.map(toLinkedItemSnapshot),
     coverImageId: mvp.coverImageId,
     coverImage: mvp.coverImageId ? { publicUrl: coverImageUrl } : null,
     cityContext: mvp.cityContext,
@@ -426,10 +528,21 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
     resolvedGeo.cityId ?? null,
     resolvedGeo.regionId ?? null,
   );
-  if (isPublishLikeStatus(input.status) && !input.categoryId) throw new Error("Для публикации статьи обязательно выберите раздел журнала");
+  const publicationType = resolveCreatePublicationType(input);
+  if (isPublishLikeStatus(input.status)) assertRequiredJournalCategory(input.categoryId, publicationType);
   await assertArticleCategoryValid(input.categoryId);
+  const linkedItems = input.linkedItems ?? [];
+  const expiresAt = resolveJournalExpiresAt({
+    publicationType,
+    expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+    // Публикуемая новость без явной даты получает срок от текущего момента.
+    publishedAt: publishedAt ?? (isPublishLikeStatus(input.status) ? new Date() : null),
+  });
+  assertJournalExpiryShape({ publicationType, expiresAt, publishedAt, publishLike: isPublishLikeStatus(input.status) });
+  assertJournalLinkedItemsShape({ publicationType, items: linkedItems });
 
   const created = await runArticleCriticalWrite(prisma, async (tx) => {
+    await assertLinkedItemsExist(tx, linkedItems);
     const additionalCategoryIds = input.additionalCategoryIds ?? [];
     const additionalGeographyTargets = input.additionalGeographyTargets ?? [];
     await assertAdditionalCategoriesValid(tx, input.categoryId, additionalCategoryIds, new Set());
@@ -468,6 +581,13 @@ export async function createArticleFromSaveInput(input: ArticleSaveInput): Promi
           create: additionalGeographyTargets.map((target, position) => ({ ...target, position })),
         } : undefined,
         noindex: input.noindex,
+        publicationType,
+        featured: input.featured ?? false,
+        pinned: input.pinned ?? false,
+        expiresAt,
+        linkedItems: linkedItems.length
+          ? { create: linkedItems.map((item, position) => linkedItemCreateData(item, position)) }
+          : undefined,
         tags:
           input.tagIds && input.tagIds.length > 0
             ? { connect: input.tagIds.map((id) => ({ id })) }
@@ -496,7 +616,10 @@ export async function saveArticleDraft(
   input: ArticleSaveInput,
 ): Promise<ArticleEditorSnapshot> {
   const perf = createRequestPerf("save-article:service:update");
-  const previous = await prisma.article.findUnique({ where: { id }, select: { status: true } });
+  const previous = await prisma.article.findUnique({
+    where: { id },
+    select: { status: true, publicationType: true, expiresAt: true, _count: { select: { linkedItems: true } } },
+  });
   if (!previous) throw new Error("Article not found");
   const resolvedGeo = resolvedGeoScope(input);
   const currentGeo = await fetchArticleGeoScope(id);
@@ -532,7 +655,25 @@ export async function saveArticleDraft(
       ? await resolveCityContextForGeo(input, resolvedGeo)
       : input.cityContext;
 
+  const publicationType = input.publicationType ?? previous.publicationType;
+  if (isPublishLikeStatus(input.status)) assertRequiredJournalCategory(input.categoryId, publicationType);
+  const expiresAt = resolveJournalExpiresAt({
+    publicationType,
+    expiresAt: input.expiresAt !== undefined
+      ? (input.expiresAt ? new Date(input.expiresAt) : null)
+      : previous.expiresAt,
+    publishedAt: publishedAt ?? (isPublishLikeStatus(input.status) ? new Date() : null),
+  });
+  assertJournalExpiryShape({ publicationType, expiresAt, publishedAt, publishLike: isPublishLikeStatus(input.status) });
+  if (input.linkedItems !== undefined) {
+    assertJournalLinkedItemsShape({ articleId: id, publicationType, items: input.linkedItems });
+  } else if (publicationType === "COLLECTION") {
+    // Элементы не передавались — проверяем уже сохранённые.
+    assertCollectionItemCount(publicationType, previous._count.linkedItems);
+  }
+
   await runArticleCriticalWrite(prisma, async (tx) => {
+    if (input.linkedItems !== undefined) await assertLinkedItemsExist(tx, input.linkedItems);
     const additionalCategoryIds = input.additionalCategoryIds;
     const additionalGeographyTargets = input.additionalGeographyTargets;
     if (additionalCategoryIds !== undefined) {
@@ -588,10 +729,22 @@ export async function saveArticleDraft(
             }
           : {}),
         categoryId: input.categoryId,
+        publicationType,
+        expiresAt,
+        ...(input.featured !== undefined ? { featured: input.featured } : {}),
+        ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
         tags: { set: (input.tagIds ?? []).map((tagId) => ({ id: tagId })) },
       },
       select: { id: true },
     });
+    if (input.linkedItems !== undefined) {
+      await tx.articleLinkedItem.deleteMany({ where: { articleId: id } });
+      if (input.linkedItems.length > 0) {
+        await tx.articleLinkedItem.createMany({
+          data: input.linkedItems.map((item, position) => ({ articleId: id, ...linkedItemCreateData(item, position) })),
+        });
+      }
+    }
     if (additionalCategoryIds !== undefined) {
       await tx.articleCategoryLink.deleteMany({ where: { articleId: id } });
       if (additionalCategoryIds.length > 0) {
@@ -629,11 +782,15 @@ export async function submitArticleForModeration(id: string): Promise<ArticleEdi
   await runArticleCriticalWrite(prisma, async (tx) => {
     const row = await tx.article.findUnique({
       where: { id },
-      select: { title: true, slug: true, categoryId: true, geoScope: true, cityId: true, regionId: true },
+      select: {
+        title: true, slug: true, categoryId: true, publicationType: true, geoScope: true, cityId: true, regionId: true,
+        _count: { select: { linkedItems: true } },
+      },
     });
     if (!row) throw new Error("Article not found");
-    if (!row.categoryId) throw new Error("Для публикации статьи обязательно выберите раздел журнала");
+    assertRequiredJournalCategory(row.categoryId, row.publicationType);
     assertGeoScopeValidForPublish(row.geoScope, row.cityId, row.regionId);
+    assertCollectionItemCount(row.publicationType, row._count.linkedItems);
     if (!row.slug?.trim()) {
       await resolveArticleSlugOnSaveInTransaction(tx, id, row.title, null);
     }
@@ -669,17 +826,31 @@ export async function moderateArticle(
   await runArticleCriticalWrite(prisma, async (tx) => {
     const row = await tx.article.findUnique({
       where: { id },
-      select: { title: true, slug: true, geoScope: true, cityId: true, regionId: true },
+      select: {
+        title: true, slug: true, geoScope: true, cityId: true, regionId: true,
+        categoryId: true, publicationType: true, expiresAt: true, _count: { select: { linkedItems: true } },
+      },
     });
     if (!row) throw new Error("Article not found");
+    assertRequiredJournalCategory(row.categoryId, row.publicationType);
     assertGeoScopeValidForPublish(row.geoScope, row.cityId, row.regionId);
+    if (row.publicationType === "COLLECTION") {
+      assertCollectionItemCount("COLLECTION", row._count.linkedItems);
+    }
     if (!row.slug?.trim()) {
       await resolveArticleSlugOnSaveInTransaction(tx, id, row.title, null);
     }
     await syncArticleCanonicalInTransaction(tx, id);
+    const publishedAt = new Date();
     await tx.article.update({
       where: { id },
-      data: { status: "PUBLISHED", publishedAt: new Date() },
+      data: {
+        status: "PUBLISHED",
+        publishedAt,
+        ...(row.publicationType === "BREAKING_NEWS"
+          ? { expiresAt: resolveBreakingNewsExpiresAtOnPublish(row.expiresAt, publishedAt) }
+          : {}),
+      },
       select: { id: true },
     });
   });
@@ -689,4 +860,19 @@ export async function moderateArticle(
   const published = await getArticleForEditor(id);
   if (!published) throw new Error("Article missing after publish");
   return published;
+}
+
+/** Быстрые отметки журнала из списка публикаций (без полной формы). */
+export async function setArticleJournalFlags(
+  id: string,
+  flags: { featured?: boolean; pinned?: boolean },
+): Promise<{ id: string; featured: boolean; pinned: boolean }> {
+  return prisma.article.update({
+    where: { id },
+    data: {
+      ...(flags.featured !== undefined ? { featured: flags.featured } : {}),
+      ...(flags.pinned !== undefined ? { pinned: flags.pinned } : {}),
+    },
+    select: { id: true, featured: true, pinned: true },
+  });
 }

@@ -12,6 +12,7 @@
  */
 
 import { z } from "zod";
+import type { TelegramLinkOpenIntent } from "@/lib/telegram/webAppButton";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,8 @@ export interface NotificationRegistryEntry {
   entityType?: string;
   /** Текст кнопки CTA */
   ctaLabel?: string;
+  /** Explicit Telegram CTA launch mode. Absence means ordinary browser URL. */
+  telegramOpenIntent?: TelegramLinkOpenIntent;
   /** Функция для построения href из notification */
   resolveHref?: (notification: { entityType?: string; entityId?: string; ctaAction?: string }) => string | null;
   telegram: NotificationTelegramConfig;
@@ -87,6 +90,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     description: "Важные системные сообщения",
     defaultChannels: { inApp: true, email: false, telegram: true },
     ctaLabel: "Настройки",
+    telegramOpenIntent: "mini_app",
     resolveHref: () => "/settings",
     telegram: {
       enabledByDefault: true,
@@ -105,6 +109,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     description: "Напоминания о событиях и планах",
     defaultChannels: { inApp: true, email: false, telegram: true },
     ctaLabel: "Мои планы",
+    telegramOpenIntent: "mini_app",
     resolveHref: () => "/me/plan",
     telegram: {
       enabledByDefault: true,
@@ -124,6 +129,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: false, telegram: true },
     entityType: "PLAN_DIGEST",
     ctaLabel: "Открыть мой план",
+    telegramOpenIntent: "mini_app",
     resolveHref: () => "/me/plan",
     telegram: {
       enabledByDefault: true,
@@ -602,6 +608,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: false, telegram: true },
     entityType: "BOOKING",
     ctaLabel: "Мои записи",
+    telegramOpenIntent: "mini_app",
     resolveHref: () => "/me/bookings",
     telegram: {
       enabledByDefault: true,
@@ -622,6 +629,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: false, telegram: true },
     entityType: "BOOKING",
     ctaLabel: "Мои записи",
+    telegramOpenIntent: "mini_app",
     resolveHref: () => "/me/bookings",
     telegram: {
       enabledByDefault: true,
@@ -642,6 +650,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: false, telegram: false },
     entityType: "BOOKING",
     ctaLabel: "Мои записи",
+    telegramOpenIntent: "mini_app",
     resolveHref: () => "/me/bookings",
     telegram: {
       enabledByDefault: false,
@@ -662,6 +671,7 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     defaultChannels: { inApp: true, email: false, telegram: true },
     entityType: "BOOKING",
     ctaLabel: "Оставить отзыв",
+    telegramOpenIntent: "mini_app",
     resolveHref: () => "/me/bookings",
     telegram: {
       enabledByDefault: true,

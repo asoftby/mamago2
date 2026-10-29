@@ -25,10 +25,9 @@ test("selected facets remain visible and removable even when there are zero matc
   assert.match(age, /applied\.age\.includes\(group\.value\)/);
 });
 
-test("URL hydration does not undo manual family selection on unrelated filter changes", () => {
+test("family selection never silently activates discovery filters or leaks ID in URL", () => {
   const sync = source("../../components/family/FamilyDerivedAgeSync.tsx");
-  assert.match(sync, /lastUrlRef\.current === urlSignature/);
-  assert.match(sync, /searchParams\.get\("profile"\)/);
-  assert.doesNotMatch(sync, /urlSignature = .*searchParams\.toString\(\)/);
-  assert.match(sync, /awaitingUrlHydrationRef/);
+  assert.doesNotMatch(sync, /useEffect\s*\(/);
+  assert.doesNotMatch(sync, /setDraft\s*\(/);
+  assert.doesNotMatch(sync, /searchParams\.get\("profile"\)/);
 });

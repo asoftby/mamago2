@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PlaceSearchAutocomplete } from "@/components/business/wizard/event/steps/location/PlaceSearchAutocomplete";
+import { QuickPlaceCreate } from "@/components/business/wizard/event/steps/location/QuickPlaceCreate";
 import { MultiPhoneFields } from "@/components/business/wizard/shared/MultiPhoneFields";
 import { createDefaultSocialLink } from "../defaults";
 import type { OfferFormData, SocialLink } from "../types";
@@ -66,6 +67,8 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [isLoadingPlace, setIsLoadingPlace] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false);
+  const [quickCreateName, setQuickCreateName] = useState("");
 
   useEffect(() => {
     if (!data.placeId) {
@@ -384,11 +387,8 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
             ownPlacesOnly
             placeholder="Название вашего места"
             onCreatePlace={(initialName) => {
-              toast.message(
-                initialName.trim()
-                  ? `Сначала создайте место «${initialName.trim()}», затем выберите его здесь.`
-                  : "Сначала создайте место, затем выберите его здесь.",
-              );
+              setQuickCreateName(initialName);
+              setIsQuickCreateOpen(true);
             }}
             onPlaceSelect={(place) => {
               onChange({
@@ -399,6 +399,22 @@ export function Step6Contacts({ data, onChange, isEditable }: Step6ContactsProps
               setIsPickerOpen(false);
             }}
           />
+          {isQuickCreateOpen && (
+            <QuickPlaceCreate
+              initialName={quickCreateName}
+              placeCreateSource="offer_wizard"
+              onCancel={() => setIsQuickCreateOpen(false)}
+              onPlaceCreated={(place) => {
+                if (!place.id) {
+                  toast.error("Место не было создано");
+                  return;
+                }
+                onChange({ placeId: place.id, placeTitle: place.title, contactSource: "place" });
+                setIsQuickCreateOpen(false);
+                setIsPickerOpen(false);
+              }}
+            />
+          )}
         </div>
       ) : null}
 

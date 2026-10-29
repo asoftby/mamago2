@@ -128,7 +128,11 @@ const calendarItemSelect = {
   reminderEnabled: true,
   reminderLeadMinutes: true,
   assigneeUserId: true,
+  recurrenceSeriesId: true,
+  recurrenceDate: true,
   activityId: true,
+  offerId: true,
+  offer: { select: { id: true, slug: true, title: true, place: { select: { city: { select: { slug: true } } } } } },
   coverImageUrl: true,
   createdAt: true,
   userId: true,
@@ -156,6 +160,8 @@ export type FamilyCalendarItemDto = {
   childId: string | null;
   childName: string | null;
   assigneeUserId: string | null;
+  recurrenceSeriesId: string | null;
+  recurrenceDate: string | null;
   reminderLeadMinutes: number | null;
   locationText: string | null;
   notes: string | null;
@@ -163,6 +169,8 @@ export type FamilyCalendarItemDto = {
   category: string | null;
   reminderEnabled: boolean | null;
   activityId: string | null;
+  offerId: string | null;
+  offer: { id: string; slug: string | null; title: string; place: { city: { slug: string } | null } | null } | null;
   coverImageUrl: string | null;
   visibility: "PRIVATE" | "FAMILY";
   status: "PROPOSED" | "CONFIRMED" | "CANCELLED";
@@ -554,6 +562,8 @@ export function toFamilyCalendarItemDto(row: CalendarRow, authorName: string | n
     childId: row.childId,
     childName: row.child?.name?.trim() || null,
     assigneeUserId: row.assigneeUserId,
+    recurrenceSeriesId: row.recurrenceSeriesId,
+    recurrenceDate: row.recurrenceDate,
     reminderLeadMinutes: row.reminderLeadMinutes,
     locationText: row.locationText,
     notes: row.notes,
@@ -561,6 +571,8 @@ export function toFamilyCalendarItemDto(row: CalendarRow, authorName: string | n
     category: row.category,
     reminderEnabled: row.reminderEnabled,
     activityId: row.activityId,
+    offerId: row.offerId,
+    offer: row.offer,
     coverImageUrl: row.coverImageUrl,
     planAvailability: getPlanActivityPublicAvailability(row.activity),
     activity: row.activity ? {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { formatAdminDateRange } from "@/lib/admin/formatRu";
 import type {
   AnalyticsOverviewFilters,
   AnalyticsOverviewResult,
@@ -18,19 +19,12 @@ function buildQuery(filters: AnalyticsOverviewFilters): string {
   return q.toString();
 }
 
-function formatPct(x: number): string {
-  return `${(x * 100).toFixed(1)}%`;
+function formatPct(x: number | null): string {
+  return x == null ? "—" : `${(x * 100).toFixed(1)}%`;
 }
 
 function formatRangeLabel(isoStart: string, isoEnd: string): string {
-  const a = new Date(isoStart);
-  const b = new Date(isoEnd);
-  const opts: Intl.DateTimeFormatOptions = {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  };
-  return `${a.toLocaleDateString("en-CA", opts)} — ${b.toLocaleDateString("en-CA", opts)}`;
+  return formatAdminDateRange(isoStart, isoEnd);
 }
 
 function KpiCard({
@@ -122,7 +116,7 @@ export function AdminAnalyticsOverview({
 
   const maxDaily = Math.max(
     1,
-    ...data.dailySeries.map((d) => Math.max(d.views, d.opens)),
+    ...data.dailySeries.map((d) => Math.max(d.pageViews, d.opens)),
   );
 
   return (
@@ -137,42 +131,47 @@ export function AdminAnalyticsOverview({
         </h2>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <KpiCard
-            label="Active users"
-            value={data.activeUsers.toLocaleString()}
-            subtitle={`Profiles seen: ${data.profilesActiveInRange.toLocaleString()}`}
+            label="Визиторы"
+            value={data.visitors.toLocaleString("ru-RU")}
+            subtitle={`Profiles seen: ${data.profilesActiveInRange.toLocaleString("ru-RU")}`}
           />
           <KpiCard
-            label="Sessions"
-            value={data.sessions.toLocaleString()}
+            label="Устройства"
+            value={data.devices.toLocaleString("ru-RU")}
+            subtitle="Браузеры (не сессии)"
           />
-          <KpiCard label="Views" value={data.views.toLocaleString()} />
-          <KpiCard label="Opens" value={data.opens.toLocaleString()} />
-          <KpiCard label="Saves" value={data.saves.toLocaleString()} />
+          <KpiCard label="Просмотры страниц" value={data.pageViews.toLocaleString("ru-RU")} />
+          <KpiCard label="Показы в ленте" value={data.feedImpressions.toLocaleString("ru-RU")} />
+          <KpiCard label="Открытия" value={data.opens.toLocaleString("ru-RU")} />
+          <KpiCard label="Сохранения" value={data.saves.toLocaleString("ru-RU")} />
           <KpiCard
-            label="Plan adds"
-            value={data.planAdds.toLocaleString()}
+            label="Добавления в план"
+            value={data.planAdds.toLocaleString("ru-RU")}
           />
           <KpiCard
-            label="CTA clicks"
-            value={data.ctaClicks.toLocaleString()}
+            label="Переходы к партнёру"
+            value={data.ctaClicks.toLocaleString("ru-RU")}
           />
           <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-            <p className="text-xs text-gray-600">Conversion rates</p>
+            <p className="text-xs text-gray-600">Конверсии</p>
+            <p className="mt-0.5 text-[11px] text-gray-400">
+              Доля людей, открывших карточку и затем сохранивших / добавивших в план / перешедших к партнёру.
+            </p>
             <dl className="mt-2 space-y-1.5 text-sm">
               <div className="flex justify-between gap-2 tabular-nums">
-                <dt className="text-gray-500">Save rate</dt>
+                <dt className="text-gray-500">Сохранили</dt>
                 <dd className="font-medium text-gray-900">
                   {formatPct(data.saveRate)}
                 </dd>
               </div>
               <div className="flex justify-between gap-2 tabular-nums">
-                <dt className="text-gray-500">Plan rate</dt>
+                <dt className="text-gray-500">В план</dt>
                 <dd className="font-medium text-gray-900">
                   {formatPct(data.planRate)}
                 </dd>
               </div>
               <div className="flex justify-between gap-2 tabular-nums">
-                <dt className="text-gray-500">Click rate</dt>
+                <dt className="text-gray-500">К партнёру</dt>
                 <dd className="font-medium text-gray-900">
                   {formatPct(data.clickRate)}
                 </dd>
@@ -184,7 +183,10 @@ export function AdminAnalyticsOverview({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <h3 className="mb-4 text-sm font-semibold text-gray-900">Funnel</h3>
+          <h3 className="mb-1 text-sm font-semibold text-gray-900">Воронка</h3>
+          <p className="mb-4 text-[11px] text-gray-500">
+            Уникальные люди. «Открыли» — от видевших; остальное — от открывших.
+          </p>
           <div className="space-y-3">
             {data.funnel.map((step) => (
               <div key={step.key} className="flex items-center gap-3">
@@ -197,10 +199,10 @@ export function AdminAnalyticsOverview({
                     style={{ width: `${Math.min(100, step.percentOfTop)}%` }}
                   />
                 </div>
-                <span className="w-24 shrink-0 text-right text-xs text-gray-600">
+                <span className="w-32 shrink-0 text-right text-xs text-gray-600">
                   {step.label}{" "}
                   <span className="font-medium text-gray-900">
-                    {step.count.toLocaleString()}
+                    {step.count.toLocaleString("ru-RU")}
                   </span>
                 </span>
               </div>
@@ -217,13 +219,13 @@ export function AdminAnalyticsOverview({
               <div
                 key={d.date}
                 className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-end gap-1"
-                title={`${d.date}: views ${d.views}, opens ${d.opens}`}
+                title={`${d.date}: просмотры страниц ${d.pageViews}, открытия ${d.opens}`}
               >
                 <div className="flex h-[140px] w-full items-end justify-center gap-0.5">
                   <div
                     className="w-1/2 max-w-[8px] rounded-t-sm bg-primary/60"
                     style={{
-                      height: `${Math.max(2, (d.views / maxDaily) * 100)}%`,
+                      height: `${Math.max(2, (d.pageViews / maxDaily) * 100)}%`,
                     }}
                   />
                   <div
@@ -242,7 +244,7 @@ export function AdminAnalyticsOverview({
           <div className="mt-2 flex flex-wrap gap-4 text-xs text-gray-600">
             <span className="inline-flex items-center gap-1.5">
               <span className="inline-block size-2 rounded-sm bg-primary/60" />
-              Views
+              Просмотры страниц
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="inline-block size-2 rounded-sm bg-amber-500/70" />
@@ -270,7 +272,7 @@ export function AdminAnalyticsOverview({
                     {row.label}
                   </span>
                   <span className="shrink-0 tabular-nums text-gray-600">
-                    {row.count.toLocaleString()}
+                    {row.count.toLocaleString("ru-RU")}
                   </span>
                 </li>
               ))
@@ -300,7 +302,7 @@ export function AdminAnalyticsOverview({
                     ) : null}
                   </div>
                   <span className="shrink-0 tabular-nums text-gray-600">
-                    {row.count.toLocaleString()}
+                    {row.count.toLocaleString("ru-RU")}
                   </span>
                 </li>
               ))

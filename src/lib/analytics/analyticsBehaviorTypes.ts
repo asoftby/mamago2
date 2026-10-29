@@ -18,13 +18,13 @@ export type BehaviorActivityByDay = {
 };
 
 export type BehaviorPlanning = {
-  /** 0..1, среднее по профилям пользователей с событиями в фильтре */
-  sameDayShare: number;
+  /** 0..1, среднее по профилям пользователей с событиями в фильтре; null — нет профилей */
+  sameDayShare: number | null;
   /** доля PLAN_ADD с meta.planningTiming === next_day (если нет данных — null) */
   nextDayShare: number | null;
   /** «заранее» из профиля (advance bucket) */
-  advanceShare: number;
-  weekendShare: number;
+  advanceShare: number | null;
+  weekendShare: number | null;
 };
 
 export type BehaviorGapItem = {

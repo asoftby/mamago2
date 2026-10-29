@@ -3,10 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useHydrated } from "@/hooks/use-hydrated";
-import {
-  NewsPublicationEditor,
-  CollectionPublicationEditor,
-} from "@/components/admin/publications/PublicationTypeEditors";
+import { NewsPublicationEditor } from "@/components/admin/publications/PublicationTypeEditors";
 import { PublicationTypePicker } from "@/components/admin/publications/PublicationTypePicker";
 
 const TITLES: Record<string, string> = {
@@ -17,7 +14,6 @@ const TITLES: Record<string, string> = {
 
 const SUBTITLES: Record<string, string> = {
   news: "Breaking news · короткий формат",
-  collection: "Foundation UI · без сохранения на сервер",
 };
 
 export function PublicationNewClient({
@@ -40,6 +36,10 @@ export function PublicationNewClient({
     if (type === "article") {
       router.replace("/admin/content/articles/new");
     }
+    // Подборка — публикация журнала типа COLLECTION в редакторе статьи.
+    if (type === "collection") {
+      router.replace("/admin/content/articles/new?type=collection");
+    }
   }, [type, router]);
 
   if (!valid) {
@@ -49,14 +49,14 @@ export function PublicationNewClient({
           <h1 className="text-2xl md:text-xl font-bold text-gray-900">Тип публикации</h1>
         </div>
         <p className="text-sm text-gray-600">
-          Выберите формат. Статьи и Breaking news сохраняются в БД; подборки — foundation.
+          Выберите формат публикации журнала.
         </p>
         <PublicationTypePicker />
       </div>
     );
   }
 
-  if (type === "article") {
+  if (type === "article" || type === "collection") {
     return (
       <div className="p-6 text-sm text-gray-500">Переход к редактору статьи…</div>
     );
@@ -72,14 +72,13 @@ export function PublicationNewClient({
               : TITLES[type] ?? "Публикация"}
           </h1>
           <p className="text-sm text-gray-600 mt-1">
-            {SUBTITLES[type] ?? "Foundation UI · без сохранения на сервер"}
+            {SUBTITLES[type] ?? ""}
           </p>
         </div>
       </div>
       {type === "news" && (
         <NewsPublicationEditor articleId={articleId} title={newsTitle} onTitleChange={setNewsTitle} />
       )}
-      {type === "collection" && <CollectionPublicationEditor />}
     </div>
   );
 }

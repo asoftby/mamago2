@@ -8,6 +8,7 @@ import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import type { OfferPageData, OfferScheduleItem } from "@/lib/offer/offerPageTypes";
 import { PublicationMediaColumn } from "@/components/media/PublicationMediaColumn";
+import { RegularClassHero } from "./RegularClassHero";
 import { mapOfferPageMedia } from "@/lib/media/mapOfferPageMedia";
 import { Button } from "@/components/ui/button";
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
@@ -65,6 +66,21 @@ export function OfferHero({
         return "Предложение";
     }
   }, [data.offerType]);
+
+  if (data.offerType === "REGULAR") {
+    return (
+      <RegularClassHero
+        data={data}
+        canEditOffer={canEditOffer}
+        isPrimaryLoading={isPrimaryLoading}
+        isSaved={isSaved}
+        onPrimary={onPrimary}
+        onSave={onSave}
+        ctaRef={ctaRef}
+        directSlot={directSlot}
+      />
+    );
+  }
 
   return (
     <section className="space-y-6 lg:space-y-10">

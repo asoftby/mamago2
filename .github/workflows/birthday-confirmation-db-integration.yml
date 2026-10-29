@@ -6,6 +6,12 @@ on:
     paths:
       - ".github/workflows/birthday-confirmation-db-integration.yml"
       - "src/server/birthday/**"
+      - "src/features/birthday/builder/components/steps/StepReview.tsx"
+      - "src/features/birthday/builder/components/steps/StepReviewAvailability.test.ts"
+      - "src/app/api/public/party-availability/**"
+      - "src/app/api/business/booking-units/**"
+      - "src/components/business/booking-units/**"
+      - "scripts/it/seedPartyIT.ts"
       - "src/app/api/parent/parties/**"
       - "src/app/api/business/party-requests/**"
       - "src/server/public/publicContentVisibility.ts"
@@ -18,6 +24,12 @@ on:
     paths:
       - ".github/workflows/birthday-confirmation-db-integration.yml"
       - "src/server/birthday/**"
+      - "src/features/birthday/builder/components/steps/StepReview.tsx"
+      - "src/features/birthday/builder/components/steps/StepReviewAvailability.test.ts"
+      - "src/app/api/public/party-availability/**"
+      - "src/app/api/business/booking-units/**"
+      - "src/components/business/booking-units/**"
+      - "scripts/it/seedPartyIT.ts"
       - "src/app/api/parent/parties/**"
       - "src/app/api/business/party-requests/**"
       - "prisma/**"
@@ -48,6 +60,8 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5434/mamago_birthday_it
       NODE_ENV: test
       CI: "true"
+      # Confirmations are gated server-side; the integration flows exercise them enabled.
+      PARTY_CONFIRMATION_ENABLED: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -64,5 +78,87 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Apply migrations to disposable PostgreSQL
         run: pnpm exec prisma migrate deploy
+      - name: Verify calendar block business UI contract
+        run: pnpm exec tsx src/components/business/booking-units/bookingUnitCalendar.test.ts
+      - name: Verify step-five preview UI contract
+        run: pnpm exec tsx src/features/birthday/builder/components/steps/StepReviewAvailability.test.ts
+      - name: Verify sibling request expiry contracts
+        run: pnpm exec tsx src/server/birthday/partyMultiRequestExpiry.contract.test.ts
+      - name: Verify competing birthday invitation closure
+        run: pnpm exec tsx src/server/birthday/partyConfirmSiblings.contract.test.ts
+      - name: Verify category-only initial invitation contracts
+        run: pnpm exec tsx src/server/birthday/partyCategoryInitialWave.contract.test.ts
+      - name: Verify auto replenishment cron contracts
+        run: pnpm exec tsx src/server/birthday/partyCandidateAutoReplenish.contract.test.ts
+      - name: Verify candidate replenishment contracts
+        run: pnpm exec tsx src/server/birthday/partyCandidateReplenishment.contract.test.ts
+      - name: Verify transactional candidate dispatch contracts
+        run: pnpm exec tsx src/server/birthday/partyCandidateDispatch.contract.test.ts
+      - name: Verify invitation selection policy behavior
+        run: pnpm exec tsx src/server/birthday/partyInvitationPolicy.behavior.test.ts
+      - name: Verify order-scoped candidate API contracts
+        run: pnpm exec tsx src/server/birthday/partyOrderCandidates.test.ts
+      - name: Verify availability-aware selection behavior
+        run: pnpm exec tsx src/server/birthday/partyCandidateSelection.behavior.test.ts
+      - name: Verify availability-aware candidate selection contracts
+        run: pnpm exec tsx src/server/birthday/partyAvailableCandidates.test.ts
+      - name: Verify candidate matching contracts
+        run: pnpm exec tsx src/server/birthday/partyCandidateRanking.test.ts
+      - name: Verify public availability preview contract
+        run: pnpm exec tsx src/server/birthday/partyAvailabilityPreview.test.ts
+      - name: Verify manual calendar block contracts
+        run: pnpm exec tsx src/server/birthday/bookingUnitBlocks.test.ts
       - name: Verify real quote acceptance and exclusive confirmation
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyConfirmation.postgres.integration.test.ts
+      - name: Verify server closes offers not accepted in time
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyQuoteExpiry.postgres.integration.test.ts
+      - name: Verify parent cancellation before confirmation
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyCancel.postgres.integration.test.ts
+
+  # End-to-end party flow (add-on fan-out, races, manual home/outdoor, cross-tenant,
+  # expiry). The test and its seed only accept 127.0.0.1:55443/mamago_birthday_it.
+  party-full-flow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mamago_birthday_it
+        ports:
+          - 55443:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mamago_birthday_it"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55443/mamago_birthday_it
+      NODE_ENV: test
+      CI: "true"
+      # Confirmations are gated server-side; the integration flows exercise them enabled.
+      PARTY_CONFIRMATION_ENABLED: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.28.2
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Apply migrations to disposable PostgreSQL
+        run: pnpm exec prisma migrate deploy
+      - name: Seed isolated party fixtures
+        run: pnpm exec tsx scripts/it/seedPartyIT.ts
+      - name: Verify full party flow
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyFullFlow.integration.test.ts
+      - name: Verify competing durable queue dispatch and replay
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyInviteDispatch.postgres.integration.test.ts

@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { Container } from "@/components/ui/Container";
 import { RouteCard } from "@/components/routes/RouteCard";
 import { DiscoveryActivitiesGrid } from "@/components/discovery/DiscoveryActivitiesGrid";
+import type { KudaListingProps } from "@/components/discovery/KudaMasonryListing";
+import type { ImplicitListingFilters } from "@/features/filters/discovery/discoveryFilterParams";
 import { Intent } from "@/lib/intent";
 import { H1 } from "@/components/ui/typography";
 import { CityTitle } from "@/components/ui/CityTitle";
@@ -24,6 +26,8 @@ import { Plus } from "lucide-react";
 import { useOptionalDiscoveryBudgetConfig } from "@/features/filters/discovery/discoveryBudgetContext";
 import { EventQuickFilters } from "@/components/discovery/EventQuickFilters";
 import { MobileFilterButton } from "@/components/mobile/MobileFilterButton";
+import { buildScopedEventHref } from "@/lib/city/scopedEventBrowsing";
+import { useCity } from "@/contexts/CityContext";
 
 function BirthdayQuickStartBanner({ city }: { city: string }) {
   return (
@@ -89,6 +93,8 @@ interface CityDiscoveryShellProps {
   routesData?: PublicRouteCardModel[];
   /** Лента «Куда пойти»: только данные с сервера (БД) */
   discoveryActivities?: ActivityMock[];
+  birthdayPagination?: { page: number; totalPages: number; total: number };
+  classesPagination?: { page: number; totalPages: number; total: number };
   classChips?: Array<{ id: string; title: string; slug: string }>;
   activeClassChipSlug?: string;
   /** Конфигурация бюджетного фильтра; null = фильтр выключен в админке. */
@@ -97,6 +103,10 @@ interface CityDiscoveryShellProps {
   pageTitleOverride?: string;
   weekendPlannerEnabled?: boolean;
   halloweenEnabled?: boolean;
+  /** Afisha («kuda»): server-paginated masonry listing. */
+  kudaListing?: KudaListingProps;
+  /** Route-implied filters (category hub) — part of the effective client filters. */
+  implicitFilters?: ImplicitListingFilters;
 }
 
 export function CityDiscoveryShell({
@@ -106,14 +116,19 @@ export function CityDiscoveryShell({
   listingSearchParams = {},
   routesData,
   discoveryActivities,
+  birthdayPagination,
+  classesPagination,
   classChips,
   activeClassChipSlug,
   budgetConfig,
   pageTitleOverride,
   weekendPlannerEnabled = false,
   halloweenEnabled = false,
+  kudaListing,
+  implicitFilters,
 }: CityDiscoveryShellProps) {
   const { applied } = useDiscoveryFilters();
+  const { citySlug: globalCitySlug } = useCity();
   const budgetCtx = useOptionalDiscoveryBudgetConfig();
   const intentConfig = DISCOVERY_INTENT_CONFIG[intent];
   const pageTitle =
@@ -185,11 +200,27 @@ export function CityDiscoveryShell({
 
           <BirthdayQuickStartBanner city={city} />
           <DiscoveryActivitiesGrid
+            listingCitySlug={city}
             activities={discoveryActivities ?? []}
             coverRatio="1/1"
             emptyTitle="Пока нет предложений для праздника"
             emptyDescription="В этом городе пока нет опубликованных услуг и пакетов для праздников. Собрать свой праздник можно в конструкторе выше."
           />
+          {birthdayPagination && birthdayPagination.totalPages > 1 ? (
+            <nav aria-label="Страницы предложений для праздника" className="flex flex-wrap items-center justify-center gap-3 pt-4">
+              {birthdayPagination.page > 1 ? (
+                <Link className="rounded-full border px-5 py-2 text-sm" href={birthdayPagination.page === 2 ? `/${city}/birthday` : `/${city}/birthday?page=${birthdayPagination.page - 1}`}>
+                  Назад
+                </Link>
+              ) : null}
+              <span className="text-sm text-muted-foreground">Страница {birthdayPagination.page} из {birthdayPagination.totalPages}</span>
+              {birthdayPagination.page < birthdayPagination.totalPages ? (
+                <Link className="rounded-full border px-5 py-2 text-sm" href={`/${city}/birthday?page=${birthdayPagination.page + 1}`}>
+                  Далее
+                </Link>
+              ) : null}
+            </nav>
+          ) : null}
         </Container>
       </main>
     );
@@ -218,7 +249,10 @@ export function CityDiscoveryShell({
           <ClassesChipBar chips={classChips} activeChipSlug={activeClassChipSlug} />
         ) : null}
         <DiscoveryActivitiesGrid
+          listingCitySlug={city}
           activities={discoveryActivities ?? []}
+          kudaListing={intent === "kuda" ? kudaListing : undefined}
+          implicitFilters={implicitFilters}
           coverRatio={intent === "classes" ? "1/1" : undefined}
           emptyTitle={
             intent === "classes"
@@ -231,25 +265,34 @@ export function CityDiscoveryShell({
               : undefined
           }
         />
-        {(intent === "kuda" || intent === "classes") && alternativeCities.length > 0 && (
+        {intent === "classes" && classesPagination && classesPagination.totalPages > 1 ? (
+          <nav aria-label="Страницы занятий" className="flex flex-wrap items-center justify-center gap-3 pt-4">
+            {classesPagination.page > 1 ? (
+              <Link className="rounded-full border px-5 py-2 text-sm" href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(listingSearchParams).map(([key, value]) => [key, Array.isArray(value) ? value[0] ?? "" : value ?? ""])), page: String(classesPagination.page - 1) }).toString()}`}>Назад</Link>
+            ) : null}
+            <span className="text-sm text-muted-foreground">Страница {classesPagination.page} из {classesPagination.totalPages}</span>
+            {classesPagination.page < classesPagination.totalPages ? (
+              <Link className="rounded-full border px-5 py-2 text-sm" href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(listingSearchParams).map(([key, value]) => [key, Array.isArray(value) ? value[0] ?? "" : value ?? ""])), page: String(classesPagination.page + 1) }).toString()}`}>Далее</Link>
+            ) : null}
+          </nav>
+        ) : null}
+        {intent === "kuda" && city !== globalCitySlug && (
+          <Link href={`/${globalCitySlug}/events`} className="inline-flex text-sm font-medium text-primary hover:underline">
+            Вернуться к событиям в своём городе
+          </Link>
+        )}
+        {intent === "kuda" && alternativeCities.length > 0 && (
           <section aria-label="Другие города" className="rounded-3xl border border-border bg-muted/30 p-5 sm:p-7">
-            <h2 className="font-serif text-2xl font-normal">Интересное есть и в других городах</h2>
+            <h2 className="text-xl font-semibold">Посмотреть события в других городах</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Вы посмотрели подборку своего города. Продолжите поиск в другом — ваши фильтры сохранятся.
+              Откройте афишу другого региона — ваш основной город не изменится.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
-              {alternativeCities.slice(0, 5).map((option) => {
-                const query = new URLSearchParams();
-                for (const [key, value] of Object.entries(listingSearchParams)) {
-                  if (!value || ["city", "district", "metro"].includes(key)) continue;
-                  if (Array.isArray(value)) value.forEach((entry) => query.append(key, entry));
-                  else query.set(key, value);
-                }
-                const suffix = query.size > 0 ? `?${query.toString()}` : "";
+              {alternativeCities.map((option) => {
                 return (
                   <Link
                     key={option.id}
-                    href={`/${option.slug}/${intent === "classes" ? "classes" : "events"}${suffix}`}
+                    href={buildScopedEventHref(option.slug, listingSearchParams)}
                     className="rounded-full border border-border bg-background px-4 py-2 text-sm font-medium transition-colors hover:border-primary hover:text-primary"
                   >
                     {option.name}

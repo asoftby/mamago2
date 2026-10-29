@@ -12,7 +12,9 @@ export async function GET(request: NextRequest) {
   if (!city) return NextResponse.json({ error: "CITY_NOT_FOUND" }, { status: 404 });
   const window = resolveEventDateRange({ from: p.get("windowFrom"), to: p.get("windowTo") });
   if (!window) return NextResponse.json({ error: "INVALID_WINDOW" }, { status: 400 });
+  const explicitTerritorySlug = p.get("explore") === "1" ? city.slug : null;
   const { where } = await buildKudaDiscoveryWhere(city.id, city.slug, {
+    explicitTerritorySlug,
     format: parseActivityFormatQuery(p.get("format")),
     eventFilters: {
       categorySlugs: p.get("category")?.split(",").filter(Boolean) ?? [],

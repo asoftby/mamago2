@@ -1,38 +1,43 @@
 /**
- * planning.wpf / planning.wpf_prev — Weekly Planning Families (North Star),
- * every 60 min (same cadence as audience_wau_mau).
+ * planning.wpf — Weekly Planning Families (North Star), every 60 min (same
+ * cadence as audience_wau_mau). CI verification against dev after restacking.
  *
  * Counts distinct accounts with >=1 "meaningful planning action" in the
- * trailing 7 days — see planningActivity.ts for the exact qualifying-action
- * union and the ACCOUNT_AS_FAMILY_PROXY identity caveat (this is
+ * trailing 7 Minsk days — see planningActivity.ts for the exact qualifying-
+ * action union and the ACCOUNT_AS_FAMILY_PROXY identity caveat (this is
  * mechanically Weekly Planning USERS; "Families" is the product name until
  * a real household entity exists).
  *
- * `_prev` uses `resolvePerformanceWindow`'s `previousStart`/`previousEnd`
- * (the immediately-preceding, equally-sized 7-day window) so WoW growth can
- * be derived without any new MetricSample range-query machinery.
+ * `planning.wpf` is the "right now" value (partial current day included).
+ * Week-over-week growth uses `planning.wpf_completed` /
+ * `planning.wpf_completed_prev`: the last 7 COMPLETED Minsk days vs the 7
+ * before them (ТЗ «Аналитика админки», C1), so the percentage does not
+ * depend on the weekday/hour of the sample.
  */
-import { resolvePerformanceWindow } from "@/lib/performance/performanceMetrics";
+import { resolveCompletedWindow, resolvePerformanceWindow } from "@/lib/performance/performanceMetrics";
 import { countPlanningActiveUsers } from "@/server/services/analytics/planningActivity";
 import type { MetricCollector, MetricCollectorContext, MetricSampleDraft } from "../types";
 
 export async function collectWeeklyPlanningFamilies(ctx: MetricCollectorContext): Promise<MetricSampleDraft[]> {
   const window = resolvePerformanceWindow("7d", ctx.now);
+  const done = resolveCompletedWindow(7, ctx.now);
 
-  const [current, previous] = await Promise.all([
+  const [current, completed, completedPrev] = await Promise.all([
     countPlanningActiveUsers(ctx.prisma, window.start, window.end),
-    countPlanningActiveUsers(ctx.prisma, window.previousStart, window.previousEnd),
+    countPlanningActiveUsers(ctx.prisma, done.start, done.end),
+    countPlanningActiveUsers(ctx.prisma, done.previousStart, done.previousEnd),
   ]);
 
   return [
     { metric: "planning.wpf", value: current },
-    { metric: "planning.wpf_prev", value: previous },
+    { metric: "planning.wpf_completed", value: completed },
+    { metric: "planning.wpf_completed_prev", value: completedPrev },
   ];
 }
 
 export const weeklyPlanningFamiliesCollector: MetricCollector = {
   name: "weekly_planning_families",
   intervalSec: 3_600,
-  timeoutMs: 20_000,
+  timeoutMs: 30_000,
   collect: collectWeeklyPlanningFamilies,
 };

@@ -4,7 +4,8 @@ import { PartyOutboxStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { dispatchDelivery } from "@/server/services/notificationDelivery.service";
 import {
-  heldPartyOutboxEventTypes, isPartyOutboxEventType, partyNotificationId, partyOutboxBackoff, partyOutboxCopy,
+  heldPartyOutboxEventTypes, isBusinessPartyEvent, isPartyOutboxEventType, partyNotificationId,
+  partyOutboxBackoff, partyOutboxCopy,
 } from "./partyOutbox.logic";
 
 const MAX_ATTEMPTS = 5;
@@ -55,7 +56,7 @@ async function processOne(row: PartyOutboxRow): Promise<"sent" | "skipped" | "fa
     }
 
     const order = request.partyOrderItem.partyOrder;
-    const recipients = (row.eventType === "PARTY_REQUEST_SENT" || row.eventType === "PARTY_QUOTE_ACCEPTED")
+    const recipients = isBusinessPartyEvent(row.eventType)
       ? (await prisma.businessMember.findMany({
           where: { businessId: request.businessId, isActive: true,
             role: { in: ["OWNER", "MANAGER"] } },
@@ -111,13 +112,19 @@ async function processOne(row: PartyOutboxRow): Promise<"sent" | "skipped" | "fa
       where: { id: { in: ids } },
     });
 
+    // Fetch delivery existence once for the claimed outbox event. Any existing
+    // delivery state (including ambiguous PENDING) suppresses automatic retries.
+    const existingDeliveries = await prisma.notificationDelivery.findMany({
+      where: { notificationId: { in: ids } },
+      select: { notificationId: true },
+      distinct: ["notificationId"],
+    });
+    const alreadyAttempted = new Set(existingDeliveries.map((row) => row.notificationId));
+    const usersById = new Map(users.map((user) => [user.id, user]));
     for (const notification of notifications) {
-      const user = users.find((u) => u.id === notification.userId);
+      const user = usersById.get(notification.userId);
       if (!user) continue;
-      const prior = await prisma.notificationDelivery.count({
-        where: { notificationId: notification.id },
-      });
-      if (prior > 0) {
+      if (alreadyAttempted.has(notification.id)) {
         // A crash between Telegram's sendMessage and SENT marking cannot be
         // retried automatically without risking duplicate messages. Existing
         // delivery records (including ambiguous PENDING) require reconciliation.

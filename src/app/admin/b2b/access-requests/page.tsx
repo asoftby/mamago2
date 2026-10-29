@@ -83,7 +83,7 @@ export default async function BusinessAccessRequestsPage({
               {requests.map((request) => (
                 <tr key={request.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-gray-500">
-                    {request.createdAt.toLocaleDateString("ru-RU")}
+                    {request.createdAt.toLocaleDateString("ru-RU", { timeZone: "Europe/Minsk" })}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-gray-900">{request.unp}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-gray-900">

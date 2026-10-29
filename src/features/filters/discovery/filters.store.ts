@@ -9,6 +9,7 @@ import {
 import { whenLabel } from "./whenLabel";
 import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import { useOptionalCity } from "@/contexts/CityContext";
+import { isScopedEventBrowsing } from "@/lib/city/scopedEventBrowsing";
 import {
   getCityFromPath,
   getIntentFromPath,
@@ -18,49 +19,16 @@ import {
   type Intent,
 } from "@/lib/intent";
 import { parseActivityFormatQuery, serializeActivityFormatQuery } from "@/domain/activities/activity-format";
+import {
+  defaultFilters,
+  parseAppliedFromUrl,
+  resetListingPage,
+  type DiscoveryFilters,
+  type WhenPreset,
+} from "./discoveryFilterParams";
 
-export type WhenPreset = "TODAY" | "TOMORROW" | "WEEKEND" | null;
-
-/** Primary discovery filters — источник правды: URL (searchParams) */
-export type DiscoveryFilters = {
-  categories: string[];
-  genres: string[];
-  /** Seasonal occasion quick-filter (presently Halloween). */
-  occasionSlug?: string | null;
-  /** Selected family persona IDs (comma-separated when multiple); shareable URL. */
-  profile: string | null;
-  dateFrom: string | null;
-  dateTo: string | null;
-  whenPreset: WhenPreset;
-  age: string[];
-  format: "OFFLINE" | "ONLINE" | "HYBRID" | null;
-  metro: string | null;
-  district: string | null;
-  nearby: boolean;
-  free: boolean;
-  priceMin: number | null;
-  priceMax: number | null;
-  adultOnly: boolean;
-};
-
-export const defaultFilters: DiscoveryFilters = {
-  categories: [],
-  genres: [],
-  occasionSlug: null,
-  profile: null,
-  dateFrom: null,
-  dateTo: null,
-  whenPreset: null,
-  age: [],
-  format: null,
-  metro: null,
-  district: null,
-  nearby: false,
-  free: false,
-  priceMin: null,
-  priceMax: null,
-  adultOnly: false,
-};
+export type { WhenPreset, DiscoveryFilters } from "./discoveryFilterParams";
+export { defaultFilters, parseAppliedFromUrl } from "./discoveryFilterParams";
 
 export function isDiscoveryFiltersEmpty(f: DiscoveryFilters): boolean {
   return (
@@ -179,7 +147,7 @@ export function normalizeStoredDiscoveryFilters(parsed: Partial<DiscoveryFilters
     age: Array.isArray(parsed.age) ? parsed.age : [],
     categories: Array.isArray(parsed.categories) ? parsed.categories : [],
     genres: Array.isArray(parsed.genres) ? parsed.genres : [],
-    profile: typeof parsed.profile === "string" ? parsed.profile : null,
+    profile: null,
   };
 }
 
@@ -295,92 +263,6 @@ export function mergeDiscoveryPatch(
   return next;
 }
 
-export function parseAppliedFromUrl(
-  searchParams: ReadonlyURLSearchParams,
-): DiscoveryFilters {
-  let dFrom = searchParams.get("from") || searchParams.get("dateFrom");
-  let dTo = searchParams.get("to") || searchParams.get("dateTo");
-
-  if (!dFrom && !dTo) {
-    const w = searchParams.get("when");
-    if (w) {
-      if (w.includes(",")) {
-        const parts = w.split(",");
-        dFrom = parts[0];
-        dTo = parts[1];
-      } else {
-        dFrom = w;
-      }
-    }
-  }
-
-  const ageRaw = searchParams.get("age")?.split(",").filter(Boolean) || [];
-  const categories = searchParams.get("category")?.split(",").filter(Boolean) || [];
-  const genres = searchParams.get("genre")?.split(",").filter(Boolean) || [];
-  const occasionSlug = searchParams.get("occasion") === "halloween" ? "halloween" : null;
-  const profile = searchParams.get("profile") || null;
-
-  const legacyAgeMap: Record<string, string> = {
-    "0+": "0-1",
-    "6+": "5-7",
-    "12+": "12-14",
-    "18_plus": "18+",
-  };
-
-  const ageNormalized = ageRaw.map((id) => legacyAgeMap[id] ?? id);
-
-  const validAgeIds = new Set(AGE_GROUPS.map((g) => g.value));
-  const mappedAge = ageNormalized.filter((id) => validAgeIds.has(id));
-
-  const metroParam = searchParams.get("metro");
-  const metro = metroParam
-    ? metroParam.includes(",")
-      ? metroParam.split(",")[0]
-      : metroParam
-    : null;
-
-  const district = searchParams.get("district") || null;
-  const format = parseActivityFormatQuery(searchParams.get("format"));
-
-  const nearby = searchParams.get("nearby") === "true";
-  const free = searchParams.get("free") === "true";
-  const priceMinRaw = searchParams.get("priceMin");
-  const parsedPriceMin = priceMinRaw == null ? NaN : Number(priceMinRaw);
-  const priceMaxRaw = searchParams.get("priceMax");
-  const parsedPriceMax = priceMaxRaw == null ? NaN : Number(priceMaxRaw);
-  const priceMin = !free && Number.isFinite(parsedPriceMin) && parsedPriceMin > 0 ? parsedPriceMin : null;
-  const priceMax = !free && Number.isFinite(parsedPriceMax) && parsedPriceMax >= 0 ? parsedPriceMax : null;
-  const adultOnly = searchParams.get("adultOnly") === "true";
-
-  const presetParam = searchParams.get("preset");
-  let whenPreset: WhenPreset = null;
-  if (
-    presetParam === "TODAY" ||
-    presetParam === "TOMORROW" ||
-    presetParam === "WEEKEND"
-  ) {
-    whenPreset = presetParam;
-  }
-
-  return {
-    categories: [...new Set(categories)],
-    genres: [...new Set(genres)],
-    occasionSlug,
-    profile,
-    dateFrom: dFrom || null,
-    dateTo: dTo || null,
-    whenPreset,
-    age: mappedAge,
-    format,
-    metro,
-    district,
-    nearby,
-    free,
-    priceMin,
-    priceMax,
-    adultOnly,
-  };
-}
 
 function writeAppliedToUrl(
   router: ReturnType<typeof useRouter>,
@@ -402,7 +284,8 @@ export function serializeAppliedToSearchParams(
   searchParams: Pick<URLSearchParams, "toString">,
   next: DiscoveryFilters,
 ): URLSearchParams {
-  const params = new URLSearchParams(searchParams.toString());
+  // A new filter combination always starts from the first listing page.
+  const params = resetListingPage(new URLSearchParams(searchParams.toString()));
 
   if (next.dateFrom) params.set("from", next.dateFrom);
   else params.delete("from");
@@ -424,8 +307,8 @@ export function serializeAppliedToSearchParams(
   else params.delete("genre");
   if (next.occasionSlug === "halloween") params.set("occasion", next.occasionSlug);
   else params.delete("occasion");
-  if (next.profile) params.set("profile", next.profile);
-  else params.delete("profile");
+  // Legacy persona identifiers must never be exposed in shareable URLs.
+  params.delete("profile");
 
   const formatQuery = serializeActivityFormatQuery(next.format);
   if (formatQuery) params.set("format", formatQuery);
@@ -704,7 +587,9 @@ export function useDiscoveryFilters() {
         writeAppliedToUrl(
           router,
           pathname,
-          new URLSearchParams() as unknown as ReadonlyURLSearchParams,
+          (isScopedEventBrowsing(pathname, searchParams.get("explore"))
+            ? new URLSearchParams({ explore: "1" })
+            : new URLSearchParams()) as unknown as ReadonlyURLSearchParams,
           defaultFilters,
           "replace",
         );
@@ -742,7 +627,9 @@ export function useDiscoveryFilters() {
         clearOverlayFailsafe();
         const path = pathnameOverride ?? pathname;
         setOptimisticFilters(next);
-        const empty = new URLSearchParams();
+        const empty = isScopedEventBrowsing(path, searchParams.get("explore"))
+          ? new URLSearchParams({ explore: "1" })
+          : new URLSearchParams();
         writeAppliedToUrl(
           router,
           path,
@@ -753,6 +640,15 @@ export function useDiscoveryFilters() {
         if (shouldClearStoredDiscoveryState(next)) clearSessionForCurrentRoute();
         stripAgeFromStoredDiscoverySession(cityForSession, path, next);
         scheduleOverlayFailsafe();
+      },
+      /** Cancel a debounced URL write before navigation to another territory. */
+      cancelPendingWrite: () => {
+        if (writeTimerRef.current) {
+          clearTimeout(writeTimerRef.current);
+          writeTimerRef.current = null;
+        }
+        pendingWriteRef.current = null;
+        clearOverlayFailsafe();
       },
       /** Закрыть панель без отката URL */
       close: () => {},

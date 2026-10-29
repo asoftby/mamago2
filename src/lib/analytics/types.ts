@@ -2,6 +2,7 @@ import type {
   AnalyticsEntityType,
   AnalyticsVertical,
   PlanVisibility,
+  UserEventClientClass,
   UserEventType,
 } from "@prisma/client";
 import type { Subject } from "@/lib/decision/decisionContext";
@@ -24,7 +25,9 @@ export type AnalyticsMetaPayload = {
   /** Recommendation attribution. These IDs point to the shared trace layer. */
   recommendationRunId?: string;
   recommendationExposureId?: string;
-  recommendationSurface?: "home" | "discovery" | "my_plan" | "telegram";
+  recommendationSurface?: "home" | "discovery" | "my_plan" | "telegram" | "journal";
+  /** CARD_VIEW, посчитанный как показ: ≥50% площади ≥1 с (impressionGate). */
+  impression?: boolean;
 
   /** Small, normalized user/context dimensions useful for later ranking. */
   selectedPersonaIds?: string[];
@@ -73,6 +76,11 @@ export type TrackUserEventInput = {
   /** Резолвится в cityId на сервере, если cityId не передан */
   citySlug?: string | null;
   meta?: AnalyticsMetaPayload | null;
+  /**
+   * Класс клиента (по User-Agent), только для событий из `/api/analytics/events`.
+   * `bot` никогда не пишется. Серверные события оставляют null.
+   */
+  clientClass?: UserEventClientClass | null;
 };
 
 export type TrackUserEventResult = { ok: true } | { ok: false; error: string };

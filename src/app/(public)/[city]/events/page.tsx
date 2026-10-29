@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import { CityShell } from "@/components/city/CityShell";
-import { buildCityEventsListingMetadata } from "@/lib/seo/cityKudaListingMetadata";
+import { BelarusTripIdeas } from "@/components/discovery/BelarusTripIdeas";
+import {
+  buildCityEventsListingMetadata,
+  cityEventsListingPath,
+  withListingPage,
+} from "@/lib/seo/cityKudaListingMetadata";
+import { parseListingPage } from "@/server/discovery/kudaListingPage";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
 
 interface PageProps {
@@ -17,9 +23,16 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { city: citySlug } = await params;
   const query = await searchParams;
-  const discoveryKeys = new Set(["preset", "from", "to", "dateFrom", "dateTo", "when", "age", "category", "genre", "occasion", "format", "metro", "district", "nearby", "free", "priceMin", "priceMax", "adultOnly"]);
+  const discoveryKeys = new Set(["preset", "from", "to", "dateFrom", "dateTo", "when", "age", "category", "genre", "occasion", "format", "metro", "district", "nearby", "free", "priceMin", "priceMax", "adultOnly", "explore"]);
   const isFiltered = Object.keys(query).some((key) => discoveryKeys.has(key));
-  const metadata = await buildCityEventsListingMetadata(citySlug);
+  if (citySlug === "belarus") {
+    return applyGlobalRobotsOverride({ title: "Куда поехать с детьми по Беларуси — mamaGo", robots: { index: false, follow: true } });
+  }
+  const metadata = withListingPage(
+    await buildCityEventsListingMetadata(citySlug),
+    cityEventsListingPath(citySlug),
+    parseListingPage(query.page),
+  );
   if (isFiltered) metadata.robots = { index: false, follow: true };
   return applyGlobalRobotsOverride(metadata);
 }
@@ -34,6 +47,7 @@ export default async function CityEventsListingPage({
 }: PageProps) {
   const { city: citySlug } = await params;
   const resolvedSearchParams = await searchParams;
+  if (citySlug === "belarus") return <BelarusTripIdeas searchParams={resolvedSearchParams} />;
 
   return (
     <CityShell

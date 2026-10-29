@@ -13,6 +13,8 @@ type HorizontalCardRowProps = {
   navLeading?: React.ReactNode;
   /** Align the desktop controls with the title even when the header has a subtitle. */
   headerHasSubtitle?: boolean;
+  /** Render a shared, in-flow header; avoids positioned controls overlapping links. */
+  headerTitle?: React.ReactNode;
 };
 
 /**
@@ -24,6 +26,7 @@ export function HorizontalCardRow({
   padded = true,
   navLeading,
   headerHasSubtitle = false,
+  headerTitle,
 }: HorizontalCardRowProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [canLeft, setCanLeft] = useState(false);
@@ -114,7 +117,15 @@ export function HorizontalCardRow({
 
   return (
     <div className={cn("relative -mx-4 px-4 sm:mx-0 sm:px-0", padded && "pb-1")}>
-      {navLeading ? (
+      {headerTitle ? (
+        <div className="mb-4 flex min-h-11 items-center justify-between gap-3">
+          <div className="min-w-0">{headerTitle}</div>
+          <div className="flex shrink-0 items-center gap-4">
+            {navLeading}
+            <div className="hidden sm:block">{navigationControls}</div>
+          </div>
+        </div>
+      ) : navLeading ? (
         <div className={cn(
           "mb-4 flex min-h-9 items-center justify-between gap-3 px-1 sm:px-0",
           "lg:absolute lg:right-0 lg:mb-0 lg:px-0",

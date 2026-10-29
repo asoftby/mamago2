@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { ADMIN_DASHBOARD_BLOCKS, getEnabledDashboardBlocks, getDashboardBlock } from "./dashboardBlocks";
 
-const ENABLED_IDS = ["operations", "organic", "growthKpis", "valuePath", "supply", "workload"] as const;
+const ENABLED_IDS = ["operations", "organic", "growthKpis", "valuePath", "supply", "workload", "dataQuality"] as const;
 const DISABLED_IDS = ["traffic", "engagement", "finance"] as const;
 
 function main() {

@@ -187,7 +187,7 @@ export default function SearchOverviewPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-500">
-                          {new Date(item.lastSearched).toLocaleDateString("ru-RU", {
+                          {new Date(item.lastSearched).toLocaleDateString("ru-RU", { timeZone: "Europe/Minsk",
                             day: "numeric",
                             month: "short",
                             hour: "2-digit",

@@ -128,7 +128,7 @@ export function SidebarCardAddressRow({
         )}
         {(district || metro) && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", marginTop: 4, fontSize: 13, color: "#3A332B" }}>
-            {district && <span><span style={{ color: "#E86A3A" }}>●</span> {district} р-н</span>}
+            {district && <span>{district} р-н</span>}
             {metro && <span><span style={{ color: "#E86A3A" }}>●</span> ст. м. «{metro}»</span>}
           </div>
         )}

@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import {
   MODERATION_NAV_ITEMS,
   moderationItemHref,
-  type ModerationNavItemId,
 } from "@/lib/admin/moderationSidebarConfig";
 import {
   CONTENT_NAV_ITEMS,
@@ -18,10 +17,6 @@ import { adminPath } from "@/lib/routing/surface";
 
 export { adminPath };
 
-
-const MODERATION_NAV_EN: Record<ModerationNavItemId, string> = {
-  queue: "Queue",
-};
 
 interface NavItem {
   label: string;
@@ -35,14 +30,14 @@ interface NavSection {
 
 const NAV_SECTIONS: NavSection[] = [
   {
-    title: "Moderation",
+    title: "Модерация",
     items: MODERATION_NAV_ITEMS.map((item) => ({
-      label: MODERATION_NAV_EN[item.id],
+      label: item.label,
       href: moderationItemHref(item.path),
     })),
   },
   {
-    title: "Users",
+    title: "Пользователи",
     items: [
       { label: "Пользователи", href: adminPath("/users") },
     ],
@@ -55,52 +50,52 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: "Billing",
+    title: "Биллинг",
     items: [
-      { label: "Overview", href: adminPath("/billing") },
+      { label: "Обзор", href: adminPath("/billing") },
       { label: "Транзакции", href: adminPath("/billing/transactions") },
       { label: "Балансы", href: adminPath("/billing/businesses") },
       { label: "Тарификация", href: adminPath("/billing/plans") },
     ],
   },
   {
-    title: "Commercial",
+    title: "Коммерция",
     items: [
-      { label: "Overview", href: adminPath("/commercial") },
+      { label: "Обзор", href: adminPath("/commercial") },
       { label: "Договоры", href: adminPath("/commercial/contracts") },
       { label: "Размещения", href: adminPath("/commercial/placements") },
       { label: "Услуги", href: adminPath("/commercial/service-placements") },
     ],
   },
   {
-    title: "Content",
+    title: "Контент",
     items: CONTENT_NAV_ITEMS.map((item) => ({
       label: item.label,
       href: contentItemHref(item.path),
     })),
   },
   {
-    title: "Ranking",
+    title: "Ранжирование",
     items: [
-      { label: "Stories", href: adminPath("/ranking/stories-intents") },
+      { label: "Истории", href: adminPath("/ranking/stories-intents") },
       { label: "Telegram", href: adminPath("/ranking/telegram") },
-      { label: "Weights (read-only)", href: adminPath("/ranking/weights") },
-      { label: "Boost (read-only)", href: adminPath("/ranking/boost") },
+      { label: "Веса (только просмотр)", href: adminPath("/ranking/weights") },
+      { label: "Продвижение (только просмотр)", href: adminPath("/ranking/boost") },
     ],
   },
   {
-    title: "Communications",
+    title: "Коммуникации",
     items: [
-      { label: "Overview", href: adminPath("/communications") },
+      { label: "Обзор", href: adminPath("/communications") },
       { label: "Каналы → Email", href: adminPath("/communications/channels/email") },
       { label: "Уведомления", href: adminPath("/communications/notifications") },
       { label: "Telegram", href: adminPath("/communications/telegram") },
-      { label: "Deliveries", href: adminPath("/communications/notifications/deliveries") },
-      { label: "Direct", href: adminPath("/communications/direct") },
+      { label: "Доставки", href: adminPath("/communications/notifications/deliveries") },
+      { label: "Прямые сообщения", href: adminPath("/communications/direct") },
     ],
   },
   {
-    title: "Discovery",
+    title: "Поиск и подборки",
     items: [
       { label: "Сигналы", href: adminPath("/taxonomy/signals") },
       { label: "Категории", href: adminPath("/taxonomy/categories") },
@@ -112,10 +107,10 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: "Geography",
+    title: "География",
     items: [
-      { label: "Districts", href: adminPath("/taxonomy/districts") },
-      { label: "Metro Stations", href: adminPath("/taxonomy/metro-stations") },
+      { label: "Районы", href: adminPath("/taxonomy/districts") },
+      { label: "Станции метро", href: adminPath("/taxonomy/metro-stations") },
     ],
   },
   {

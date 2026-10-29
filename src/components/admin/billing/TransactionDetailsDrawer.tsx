@@ -9,6 +9,7 @@ import { AdminSidePanel } from "@/components/admin/ui/AdminSidePanel";
 import { TransactionStatusBadge } from "./TransactionStatusBadge";
 import { TransactionTypeBadge } from "./TransactionTypeBadge";
 import { TransactionAmount } from "./TransactionAmount";
+import { formatAdminDateTime } from "@/lib/admin/formatRu";
 
 interface RefundSummary {
   originalAmount: number;
@@ -208,13 +209,13 @@ export function TransactionDetailsDrawer({
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-2">Дата операции</h3>
                 <p className="text-sm text-gray-900">
-                  {new Date(transaction.occurredAt).toLocaleString("ru-RU")}
+                  {formatAdminDateTime(transaction.occurredAt)}
                 </p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-2">Создано</h3>
                 <p className="text-sm text-gray-900">
-                  {new Date(transaction.createdAt).toLocaleString("ru-RU")}
+                  {formatAdminDateTime(transaction.createdAt)}
                 </p>
               </div>
             </div>
@@ -327,7 +328,7 @@ export function TransactionDetailsDrawer({
                         <div>
                           <p className="font-medium text-gray-900">{refund.description}</p>
                           <p className="text-xs text-gray-500">
-                            {new Date(refund.occurredAt).toLocaleString("ru-RU")}
+                            {formatAdminDateTime(refund.occurredAt)}
                           </p>
                         </div>
                         <p className="font-semibold text-green-700">
@@ -455,7 +456,7 @@ export function TransactionDetailsDrawer({
                           </p>
                         </div>
                         <p className="text-xs text-gray-500">
-                          {new Date(log.createdAt).toLocaleString("ru-RU")}
+                          {formatAdminDateTime(log.createdAt)}
                         </p>
                       </div>
                       {log.reason && (

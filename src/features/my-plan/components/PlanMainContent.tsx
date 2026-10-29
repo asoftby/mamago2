@@ -1475,19 +1475,19 @@ export function PlanMainContent({
           {renderPersonFilter(false)}
 
           {selectedDate === todayKey ? <PlanDayBar items={dayItemsSorted} /> : null}
-          <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
 
           {isPastDay ? (
             renderPastDay(false)
           ) : (
             <>
               {renderDayList(false)}
-              {renderWeekTeaser()}
               {renderOwnIdeas()}
               {renderIdeas()}
               {renderBottomActions()}
+              {renderWeekTeaser()}
             </>
           )}
+          <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
         </div>
 
         <PlanStickyCounter
@@ -1541,19 +1541,19 @@ export function PlanMainContent({
         {renderPersonFilter(true)}
 
         {selectedDate === todayKey ? <PlanDayBar items={dayItemsSorted} /> : null}
-        <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
 
         {isPastDay ? (
           renderPastDay(true)
         ) : (
           <>
             {renderDayList(true)}
-            {renderWeekTeaser()}
             {renderOwnIdeas()}
             {renderIdeas()}
             {renderBottomActions()}
+            {renderWeekTeaser()}
           </>
         )}
+        <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
       </div>
 
       <PlanStickyCounter

@@ -55,3 +55,11 @@ jobs:
         run: pnpm exec prisma migrate deploy
       - name: Run concurrent reservation integration tests
         run: pnpm exec tsx src/server/offers/reserveSlot.integration.test.ts
+      - name: Class group schedule, tariffs and independent capacity integration
+        env:
+          NODE_OPTIONS: "--conditions=react-server"
+        run: pnpm exec tsx src/server/offers/offerSchedule.integration.test.ts
+      - name: Booking status row-lock concurrency regression
+        env:
+          RUN_BOOKING_LOCK_DB_TEST: "1"
+        run: pnpm exec tsx src/server/services/booking/bookingStatusLock.db.test.ts

@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const ranking = readFileSync("src/server/birthday/partyCandidateRanking.ts", "utf8");
+const avail = readFileSync("src/server/birthday/partyAvailableCandidates.ts", "utf8");
+assert.ok(ranking.includes("includeAllRanked ? ranked : ranked.slice(0, 5)"));
+assert.ok(avail.includes("includeAllRanked: true"), "must inspect full ranked pool");
+assert.ok(avail.includes("previewPartyOfferAvailability"), "reuse existing booking preview checks");
+assert.ok(avail.includes("start += 5"), "bound request concurrency");
+assert.ok(avail.includes('availability === "AVAILABLE"'));
+assert.ok(avail.includes('selectCheckedPartyCandidates(checked)'));
+assert.ok(avail.includes("if (availableBusinesses.size >= 5) break"));
+assert.ok(!avail.includes("bookingRequest.create"), "selection must not send requests");
+console.log("partyAvailableCandidates.test.ts: OK");

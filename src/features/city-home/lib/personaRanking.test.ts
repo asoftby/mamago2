@@ -52,108 +52,42 @@ function child(id: string, ageYears: number): FamilyPersona {
   };
 }
 
-test("only adult selection filters child-only events before ranking", () => {
-  const me = adult();
-  const result = applyPersonaRanking(
-    [
-      activity("zero-to-18", "SPECIFIC", 0, 18),
-      activity("five-to-18", "SPECIFIC", 5, 18),
-      activity("adult-range", "SPECIFIC", 18, 99),
-      activity("strict", "ADULT_ONLY", 18, 99),
-      activity("unrestricted", "UNRESTRICTED", 0, 12),
-    ],
-    {
-      personas: [me],
-      selectedPersonaIds: [me.id],
-    },
-  );
-
-  assert.deepEqual(
-    result.map((item) => item.id).sort(),
-    ["adult-range", "strict", "unrestricted"],
-  );
-});
-
-test("adult accompanying a child does not broaden eligibility to adult-only content", () => {
+test("family scoring never removes items outside selected ages", () => {
   const me = adult();
   const kid = child("kid", 6);
-  const result = applyPersonaRanking(
-    [
-      activity("strict-adult", "ADULT_ONLY", 18, 99),
-      activity("adult-range", "SPECIFIC", 18, 99),
-      activity("kid", "SPECIFIC", 5, 7),
-      activity("family", "SPECIFIC", 5, 99),
-      activity("unrestricted", "UNRESTRICTED", 0, 12),
-    ],
-    {
-      personas: [me, kid],
-      selectedPersonaIds: [me.id, kid.id],
-    },
-  );
-
-  assert.deepEqual(
-    result.map((item) => item.id).sort(),
-    ["family", "kid", "unrestricted"],
-  );
-});
-
-test("two selected children require an event that suits both exact ages", () => {
-  const younger = child("younger", 4);
-  const older = child("older", 9);
-  const result = applyPersonaRanking(
-    [
-      activity("young-only", "SPECIFIC", 3, 5),
-      activity("older-only", "SPECIFIC", 8, 12),
-      activity("both", "SPECIFIC", 3, 12),
-      activity("unrestricted", "UNRESTRICTED", 0, 12),
-    ],
-    {
-      personas: [younger, older],
-      selectedPersonaIds: [younger.id, older.id],
-    },
-  );
-
-  assert.deepEqual(
-    result.map((item) => item.id).sort(),
-    ["both", "unrestricted"],
-  );
-});
-
-test("no selected personas preserves the unfiltered list", () => {
-  const activities = [
-    activity("kid", "SPECIFIC", 3, 7),
-    activity("adult", "ADULT_ONLY", 18, 99),
+  const candidates = [
+    activity("strict-adult", "ADULT_ONLY", 18, 99),
+    activity("young-only", "SPECIFIC", 0, 3),
+    activity("school", "SPECIFIC", 6, 12),
+    activity("unknown", "UNRESTRICTED", 0, 99),
   ];
-
-  assert.deepEqual(
-    applyPersonaRanking(activities, {
-      personas: [],
-      selectedPersonaIds: [],
-    }),
-    activities,
-  );
+  for (const selectedPersonaIds of [[me.id], [kid.id], [me.id, kid.id], []]) {
+    const ranked = applyPersonaRanking(candidates, {
+      personas: [me, kid],
+      selectedPersonaIds,
+    });
+    assert.deepEqual(
+      ranked.map((item) => item.id).sort(),
+      candidates.map((item) => item.id).sort(),
+    );
+  }
 });
 
+test("multiple children use a union of interests instead of age intersection", () => {
+  const children = [child("younger", 4), child("older", 9)];
+  const candidates = [
+    activity("young-only", "SPECIFIC", 3, 5),
+    activity("older-only", "SPECIFIC", 8, 12),
+    activity("all", "SPECIFIC", 3, 12),
+  ];
+  const ranked = applyPersonaRanking(candidates, {
+    personas: children,
+    selectedPersonaIds: children.map((c) => c.id),
+  });
+  assert.deepEqual(new Set(ranked.map((a) => a.id)), new Set(candidates.map((a) => a.id)));
+});
 
-test("selected child without birth date does not admit numeric specific ranges", () => {
-  const kid: FamilyPersona = {
-    id: "unknown-age",
-    kind: "child",
-    displayName: "Ребёнок",
-    birthDate: null,
-  };
-
-  const result = applyPersonaRanking(
-    [
-      activity("adult-range", "SPECIFIC", 18, 99),
-      activity("child-range", "SPECIFIC", 3, 7),
-      activity("unrestricted", "UNRESTRICTED", 0, 12),
-    ],
-    {
-      personas: [kid],
-      selectedPersonaIds: [kid.id],
-    },
-  );
-
-  assert.deepEqual(result.map((item) => item.id), ["unrestricted"]);
+test("no selected personas preserves original order", () => {
+  const candidates = [activity("kid", "SPECIFIC", 3, 7), activity("adult", "ADULT_ONLY", 18, 99)];
+  assert.deepEqual(applyPersonaRanking(candidates, { personas: [], selectedPersonaIds: [] }), candidates);
 });

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { PUBLIC_SEARCH_DEBOUNCE_MS } from "@/lib/search/constants";
 import { buildPublicSearchApiUrl } from "@/lib/search/buildPublicSearchApiUrl";
-import { rememberPublicSearchQuery } from "@/lib/search/recentPublicSearch";
+import { rememberLastOpenedPublicSearchResult } from "@/lib/search/recentPublicSearch";
 import type { SearchResultItem as SearchResultItemType } from "@/lib/search/types";
 import { SearchInput } from "./SearchInput";
 import { SearchResults } from "./SearchResults";
@@ -84,11 +84,19 @@ export function SearchOverlay({
   const navigateTo = useCallback(
     (item: SearchResultItemType) => {
       const q = query.trim();
-      if (q.length >= 2) rememberPublicSearchQuery(q);
+      if (q.length >= 2) rememberLastOpenedPublicSearchResult(item, q);
       router.push(item.url);
       close();
     },
     [router, close, query],
+  );
+
+  const navigateToLastResult = useCallback(
+    (url: string) => {
+      router.push(url);
+      close();
+    },
+    [router, close],
   );
 
   useEffect(() => {
@@ -153,6 +161,11 @@ export function SearchOverlay({
               loading={(loading || debouncing) && queryTrim.length >= 2}
               open={open}
             />
+            {trimmed.length >= 2 ? (
+              <button type="button" className="mt-2 w-full rounded-xl bg-white/95 px-4 py-3 text-sm font-medium text-primary shadow-sm" onClick={() => { router.push(`/${citySlug}/search?${new URLSearchParams({ q: query.trim() })}`); close(); }}>
+                Показать все результаты
+              </button>
+            ) : null}
             <SearchResults
               query={query}
               trimmedQuery={queryTrim}
@@ -161,6 +174,7 @@ export function SearchOverlay({
               activeIndex={activeIndex}
               onPopularPick={(term) => setQuery(term)}
               onSelectResult={navigateTo}
+              onLastResultNavigate={navigateToLastResult}
             />
           </div>
         </div>

@@ -3,8 +3,12 @@ import { eventTemporalScore, KUDA_DEFAULT_HORIZON_DAYS, KUDA_SEASONAL_HORIZON_DA
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
-import { activityInCityWhere } from "@/server/discovery/activityInCityWhere";
-import { activityInTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
+import { activityInAnyOfCitiesWhere, activityInExactCitiesWhere } from "@/server/discovery/activityInCityWhere";
+import { activityInTerritoryScopeWhere, activityInExactTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
+import { resolveTerritoryBySlug } from "@/server/territory/resolveTerritory";
+import { resolveTerritoryCityIds } from "@/server/territory/resolveTerritoryCityIds";
+import { getCrossRegionPopularActivityIds } from "@/server/discovery/crossRegionFamilySignal";
+import { ALL_BELARUS_REGIONS, getDiscoveryRegionContext } from "@/server/geo/boostRegionTargeting";
 import { createDiscoveryPerf } from "@/server/discovery/discoveryPerf";
 import type { ActivityMock } from "@/types/activity";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
@@ -17,6 +21,7 @@ import {
 import type { TimeOfDay } from "@/features/hero-weather/model/types";
 import { mapDiscoveryEventToActivityMock } from "@/server/discovery/mapDiscoveryEventToActivityMock";
 import { buildEventRuntimeWhere, type EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
+import { withImageDimensions } from "@/server/media/loadImageDimensionsByUrl";
 
 function hasActiveEventRuntimeFilters(filters: EventRuntimeFilters): boolean {
   return Boolean(
@@ -33,12 +38,20 @@ function hasActiveEventRuntimeFilters(filters: EventRuntimeFilters): boolean {
   );
 }
 
-export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, options: { format?: ActivityFormat | null; nearby?: boolean; eventFilters: EventRuntimeFilters }) {
+export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, options: { format?: ActivityFormat | null; nearby?: boolean; eventFilters: EventRuntimeFilters; explicitTerritorySlug?: string | null }) {
   const now = new Date();
-  // `/minsk` = the whole territory (city + its region); unknown territory falls back to the legacy city.
-  const scope = await resolveTerritoryScope(citySlug);
+  const explicitTerritory = options.explicitTerritorySlug ? await resolveTerritoryBySlug(options.explicitTerritorySlug) : null;
+  if (options.explicitTerritorySlug && !explicitTerritory) throw new Error("Unknown explicit territory");
+  const scope = await resolveTerritoryScope(options.explicitTerritorySlug ?? citySlug);
   const primaryCityId = cityId;
-  const inScope = scope ? activityInTerritoryScopeWhere(scope.territoryIds) : activityInCityWhere(cityId);
+  const expandedCityIds = explicitTerritory
+    ? await resolveTerritoryCityIds(explicitTerritory)
+    : scope ? await resolveTerritoryCityIds({ id: scope.territoryId, type: scope.type }) : [cityId];
+  const strictGeo = Boolean(explicitTerritory);
+  const [crossRegionPopularIds, targetRegionId] = await Promise.all([
+    options.nearby || strictGeo ? Promise.resolve([] as string[]) : getCrossRegionPopularActivityIds(primaryCityId, expandedCityIds),
+    options.nearby || strictGeo ? Promise.resolve(null) : getDiscoveryRegionContext(cityId, citySlug),
+  ]);
   const pub = getPublicListingActivityWhere(now);
   // Explicit date selection is authoritative. Without it, discover the next
   // 45 days plus editorially tagged holiday/season events up to 90 days away.
@@ -65,7 +78,20 @@ export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, 
     ],
   }];
   const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
-  const where: Prisma.ActivityWhereInput = { AND: [{ type: ActivityType.EVENT }, ...(options.format ? [{ format: options.format }] : options.nearby ? [{ format: { in: [ActivityFormat.OFFLINE, ActivityFormat.HYBRID] } }] : []), inScope, ...buildEventRuntimeWhere(options.eventFilters), ...defaultWindow, ...pubParts] };
+  const where: Prisma.ActivityWhereInput = { AND: [{ type: ActivityType.EVENT }, ...(options.format ? [{ format: options.format }] : options.nearby ? [{ format: { in: [ActivityFormat.OFFLINE, ActivityFormat.HYBRID] } }] : []), { OR: [
+    scope
+      ? strictGeo ? activityInExactTerritoryScopeWhere(scope.territoryIds) : activityInTerritoryScopeWhere(scope.territoryIds)
+      : strictGeo ? activityInExactCitiesWhere(expandedCityIds) : activityInAnyOfCitiesWhere(expandedCityIds),
+    ...(crossRegionPopularIds.length > 0 ? [{ id: { in: crossRegionPopularIds } }] : []),
+    ...(targetRegionId ? [{ boosts: { some: {
+      isFreeDaily: false, purchaseRequestKey: { not: null },
+      startAt: { lte: now }, endAt: { gt: now },
+      OR: [
+        { targetRegionIds: { has: targetRegionId } },
+        { targetRegionIds: { has: ALL_BELARUS_REGIONS } },
+      ],
+    } } } satisfies Prisma.ActivityWhereInput] : []),
+  ] }, ...buildEventRuntimeWhere(options.eventFilters), ...defaultWindow, ...pubParts] };
   return { where, primaryCityId };
 }
 
@@ -80,9 +106,20 @@ export async function getKudaDiscoveryFeed(
   currentUserId: string | null,
   options?: {
     take?: number;
+    /** Max DB candidates ranked in memory (default 200). Paginated listings raise it. */
+    candidatePoolCap?: number;
+    /** Only public paginated listings: rank every matching event, without the homepage candidate ceiling. */
+    allCandidates?: boolean;
+    /** Listing pages resolve image dimensions only for the visible 24 cards. */
+    hydrateImages?: boolean;
+    /** Rank-only projection skips media joins; card details are fetched for visible IDs. */
+    rankOnly?: boolean;
+    /** Hydrate only these explicit candidate IDs, preserving public visibility conditions. */
+    onlyIds?: string[];
     format?: ActivityFormat | null;
     nearby?: boolean;
     eventFilters?: EventRuntimeFilters;
+    explicitTerritorySlug?: string | null;
     weather?: {
       scenario: HomeWeatherScenario;
       timeOfDay: TimeOfDay;
@@ -104,7 +141,9 @@ export async function getKudaDiscoveryFeed(
         metroId: null,
         adultOnly: false,
       };
-  const { where, primaryCityId } = await buildKudaDiscoveryWhere(cityId, citySlug, { format: options?.format ?? null, nearby: options?.nearby, eventFilters: runtimeFilters });
+  // Candidate selection is a function of explicit discovery choices only.
+  // The authenticated user ID is intentionally absent from this query.
+  const { where, primaryCityId } = await buildKudaDiscoveryWhere(cityId, citySlug, { format: options?.format ?? null, nearby: options?.nearby, eventFilters: runtimeFilters, explicitTerritorySlug: options?.explicitTerritorySlug });
   perf.mark("where");
 
   /** Достаточно изображений, чтобы сопоставить coverImageId с ActivityImage (как на detail). */
@@ -112,13 +151,13 @@ export async function getKudaDiscoveryFeed(
 
   /** Пул кандидатов для сортировки; без избыточного findMany (было ×5 до 400 — долго на TTFB). */
   const rows = await prisma.activity.findMany({
-    where,
-    take: Math.min(take * 3, 200),
-    orderBy: [{ nextOccurrenceAt: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
+    where: options?.onlyIds ? { AND: [where, { id: { in: options.onlyIds } }] } : where,
+    ...(!options?.allCandidates ? { take: Math.min(take * 3, options?.candidatePoolCap ?? 200) } : {}),
+    orderBy: [{ nextOccurrenceAt: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }, { id: "asc" }],
     include: {
       images: {
         orderBy: { sortOrder: "asc" },
-        take: GALLERY_FOR_COVER,
+        take: options?.rankOnly ? 0 : GALLERY_FOR_COVER,
         select: { id: true, url: true, mediaAssetId: true },
       },
       sessions: { where: { withdrawnAt: null }, orderBy: { startsAt: "asc" }, take: 100 },
@@ -213,7 +252,8 @@ export async function getKudaDiscoveryFeed(
     return ta - tb || a.id.localeCompare(b.id);
   });
 
-  const result = cards.slice(0, take);
+  const selected = options?.allCandidates ? cards : cards.slice(0, take);
+  const result = options?.hydrateImages === false ? selected : await withImageDimensions(selected, (card) => card.image);
   perf.mark("mapSort");
   perf.log({
     citySlug,
@@ -236,7 +276,7 @@ export async function getKudaDiscoveryFeed(
 export async function countKudaDiscoveryEvents(
   cityId: string,
   citySlug: string,
-  options: { format?: ActivityFormat | null; eventFilters: EventRuntimeFilters },
+  options: { format?: ActivityFormat | null; eventFilters: EventRuntimeFilters; explicitTerritorySlug?: string | null },
 ): Promise<number> {
   const perf = createDiscoveryPerf("kuda-count");
   const { where } = await buildKudaDiscoveryWhere(cityId, citySlug, options);

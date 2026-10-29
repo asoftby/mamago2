@@ -20,7 +20,11 @@ export type AnalyticsFunnelStep = {
   key: "view" | "open" | "save" | "plan" | "click";
   label: string;
   count: number;
-  /** 0..100 относительно первого шага (views) */
+  /** Уникальные люди (не события) */
+  /**
+   * 0..100: «Открыли» — доля от «Видели контент»; «Сохранили», «Добавили в план»,
+   * «Перешли к партнёру» — доля от «Открыли» (отдельные ветки, не цепочка).
+   */
   percentOfTop: number;
 };
 
@@ -32,24 +36,33 @@ export type AnalyticsOverviewTopItem = {
 
 export type AnalyticsOverviewDayPoint = {
   day: string;
-  /** ISO date YYYY-MM-DD */
+  /** Минский календарный день YYYY-MM-DD */
   date: string;
-  views: number;
+  /** PAGE_VIEW без внутреннего трафика */
+  pageViews: number;
   opens: number;
 };
 
 export type AnalyticsOverviewResult = {
   range: { start: string; end: string };
-  activeUsers: number;
-  sessions: number;
-  views: number;
+  /** computeCanonicalAudience().visitors (как на /admin) */
+  visitors: number;
+  /** DISTINCT sessionId (вечный id браузера) — «Устройства», не сессии */
+  devices: number;
+  /** Только PAGE_VIEW — computeCanonicalAudience().pageViews */
+  pageViews: number;
+  /** CARD_VIEW — «Показы в ленте», отдельно от просмотров */
+  feedImpressions: number;
   opens: number;
   saves: number;
   planAdds: number;
   ctaClicks: number;
-  saveRate: number;
-  planRate: number;
-  clickRate: number;
+  /** Доля открывших (люди), сохранивших после открытия; null, если открывших нет */
+  saveRate: number | null;
+  /** Доля открывших (люди), добавивших в план после открытия; null, если открывших нет */
+  planRate: number | null;
+  /** Доля открывших (люди), перешедших к партнёру после открытия; null, если открывших нет */
+  clickRate: number | null;
   funnel: AnalyticsFunnelStep[];
   /** Агрегаты из UserBehaviorProfile за период (lastSeen в окне) */
   profilesActiveInRange: number;

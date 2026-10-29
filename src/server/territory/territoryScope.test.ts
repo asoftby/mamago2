@@ -3,7 +3,7 @@
  * Scope resolution against an in-memory Territory table.
  */
 import assert from "node:assert/strict";
-import { activityInTerritoryScopeWhere, collectDescendantIds, placeInTerritoryScopeWhere, resolveTerritoryScope } from "./territoryScope";
+import { activityInExactTerritoryScopeWhere, activityInTerritoryScopeWhere, collectDescendantIds, placeInTerritoryScopeWhere, resolveTerritoryScope } from "./territoryScope";
 
 const rows = [
   { id: "c", type: "COUNTRY", slug: "belarus", name: "Беларусь", nameIn: null, parentId: null, isActive: true, isIndexable: true },
@@ -55,6 +55,21 @@ async function main() {
   assert.deepEqual(placeInTerritoryScopeWhere(["a", "b"]), { territoryId: { in: ["a", "b"] } });
   assert.deepEqual(activityInTerritoryScopeWhere(["a"]), {
     OR: [{ territoryId: { in: ["a"] } }, { place: { territoryId: { in: ["a"] } } }, { venue: { territoryId: { in: ["a"] } } }],
+  });
+  // Explicit geography must use the same precedence as the displayed card city.
+  assert.deepEqual(activityInExactTerritoryScopeWhere(["a"]), {
+    OR: [
+      { venue: { territoryId: { in: ["a"] } } },
+      { AND: [
+        { OR: [{ venue: null }, { venue: { territoryId: null } }] },
+        { place: { territoryId: { in: ["a"] } } },
+      ] },
+      { AND: [
+        { OR: [{ venue: null }, { venue: { territoryId: null } }] },
+        { OR: [{ placeId: null }, { place: { territoryId: null } }] },
+        { territoryId: { in: ["a"] } },
+      ] },
+    ],
   });
   console.log("territoryScope.test: ok");
 }

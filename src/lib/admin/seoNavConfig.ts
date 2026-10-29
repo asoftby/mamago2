@@ -70,7 +70,7 @@ export const SEO_SETTINGS_NAV: SeoNavItem[] = [
   },
   {
     href: `${SEO_SETTINGS}/ai-search`,
-    label: "AI Search",
+    label: "AI-поиск",
     description: "llms.txt и готовность к AI-поиску",
   },
 ];

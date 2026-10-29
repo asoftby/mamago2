@@ -69,6 +69,7 @@ export async function resolveTerritoryScope(
   let value: TerritoryScope | null = null;
   if (territory) {
     const all: ScopeRow[] = await (db ?? prisma).territory.findMany({
+      where: { isActive: true, isLegacyNonCity: false },
       select: { id: true, parentId: true, type: true, slug: true },
     });
     const byId = new Map(all.map((row) => [row.id, row]));
@@ -108,4 +109,23 @@ export function activityInTerritoryScopeWhere(territoryIds: readonly string[]): 
 /** Offer is located in the scope through its place (classes / birthday feed shape). */
 export function placeInTerritoryScopeWhere(territoryIds: readonly string[]): Prisma.PlaceWhereInput {
   return { territoryId: { in: [...territoryIds] } };
+}
+
+/** Explicit selection follows the displayed location: venue, then place, then activity. */
+export function activityInExactTerritoryScopeWhere(territoryIds: readonly string[]): Prisma.ActivityWhereInput {
+  const ids = { in: [...territoryIds] };
+  return {
+    OR: [
+      { venue: { territoryId: ids } },
+      { AND: [
+        { OR: [{ venue: null }, { venue: { territoryId: null } }] },
+        { place: { territoryId: ids } },
+      ] },
+      { AND: [
+        { OR: [{ venue: null }, { venue: { territoryId: null } }] },
+        { OR: [{ placeId: null }, { place: { territoryId: null } }] },
+        { territoryId: ids },
+      ] },
+    ],
+  };
 }

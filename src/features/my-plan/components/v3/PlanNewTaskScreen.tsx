@@ -32,6 +32,13 @@ const REMIND_OPTIONS: Array<{ minutes: number | null; label: string }> = [
 ];
 
 const WD = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
+type RepeatFrequency = "NONE" | "DAILY" | "WEEKLY" | "MONTHLY";
+type RepeatEnd = "NEVER" | "UNTIL" | "COUNT";
+
+function weekdayOf(isoDate: string): number {
+  const weekday = new Date(`${isoDate}T00:00:00.000Z`).getUTCDay();
+  return weekday === 0 ? 7 : weekday;
+}
 
 function iso(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -97,6 +104,13 @@ export function PlanNewTaskScreen({
   const [customLeadMinutes, setCustomLeadMinutes] = useState(initialCustomLead == null ? "" : String(initialCustomLead % 60));
   const [leadTouched, setLeadTouched] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [repeat, setRepeat] = useState<RepeatFrequency>("NONE");
+  const [repeatEnd, setRepeatEnd] = useState<RepeatEnd>("NEVER");
+  const [repeatUntil, setRepeatUntil] = useState(initialDate);
+  const [repeatCount, setRepeatCount] = useState("10");
+  const [repeatDays, setRepeatDays] = useState<number[]>([weekdayOf(initialDate)]);
+  // Keep a stable key if the network fails and the user retries.
+  const recurrenceRequestKey = useRef<string | null>(null);
   const timeRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
   // Экран монтируется за краем обрезанной дорожки слайда: нативный autoFocus прокручивает её к полю
@@ -129,7 +143,11 @@ export function PlanNewTaskScreen({
     customLeadTotal >= 1 &&
     customLeadTotal <= 1440
   );
-  const can = Boolean(text.trim() && day && (!timed || timeValid) && customLeadValid);
+  const repeatValid = repeat === "NONE" || Boolean(day &&
+    (repeat !== "WEEKLY" || repeatDays.includes(weekdayOf(day))) &&
+    (repeatEnd !== "UNTIL" || repeatUntil >= day) &&
+    (repeatEnd !== "COUNT" || (/^[0-9]+$/.test(repeatCount) && Number(repeatCount) >= 1 && Number(repeatCount) <= 10000)));
+  const can = Boolean(text.trim() && day && (!timed || timeValid) && customLeadValid && repeatValid);
   const whenWord = when === "today" ? "сегодня" : when === "tomorrow" ? "завтра" : day ? longDay(day) : "";
   const label = !text.trim()
     ? "Напишите, что нужно сделать"
@@ -179,6 +197,17 @@ export function PlanNewTaskScreen({
             };
           })()
         : fields;
+      const recurrence = repeat !== "NONE" && day ? {
+        frequency: repeat,
+        interval: 1,
+        startDate: day,
+        weekdays: repeat === "WEEKLY" ? [...repeatDays].sort((a, b) => a - b) : [],
+        untilDate: repeatEnd === "UNTIL" ? repeatUntil : null,
+        maxOccurrences: repeatEnd === "COUNT" ? Number(repeatCount) : null,
+      } : null;
+      if (!editItem && recurrence && !recurrenceRequestKey.current) {
+        recurrenceRequestKey.current = crypto.randomUUID().replaceAll("-", "");
+      }
       const response = editItem
         ? await fetch(`/api/plan/${editItem.source === "TELEGRAM_FORWARD" ? "telegram" : "manual"}/${editItem.id}`, {
             method: "PATCH",
@@ -189,11 +218,20 @@ export function PlanNewTaskScreen({
               expectedUpdatedAt: new Date(editItem.updatedAt ?? Date.now()).toISOString(),
             }),
           })
-        : await fetch("/api/plan/manual", {
+        : await fetch(recurrence ? "/api/plan/manual/recurring" : "/api/plan/manual", {
             method: "POST",
             headers: { "content-type": "application/json" },
             credentials: "include",
-            body: JSON.stringify({
+            body: JSON.stringify(recurrence ? {
+              requestKey: recurrenceRequestKey.current,
+              title: fields.title,
+              startTime: fields.startsAt,
+              childId: fields.childId,
+              assigneeUserId: fields.assigneeUserId,
+              reminderEnabled: fields.reminderEnabled,
+              reminderLeadMinutes: fields.reminderLeadMinutes,
+              recurrence,
+            } : {
               ...fields,
               tags: [],
               category: detectPlanItemCategory(text.trim()),
@@ -367,6 +405,75 @@ export function PlanNewTaskScreen({
             })}
           </div>
         </div>
+
+        {!isMove && (
+          <div className="mb-[22px]">
+            <div className={SECTION_LABEL}>Повторять</div>
+            <div className="flex flex-wrap gap-2">
+              {([
+                ["NONE", "Никогда"],
+                ["DAILY", "Каждый день"],
+                ["WEEKLY", "Каждую неделю"],
+                ["MONTHLY", "Каждый месяц"],
+              ] as const).map(([value, name]) => (
+                <button key={value} type="button" aria-pressed={repeat === value}
+                  onClick={() => {
+                    if (value === "WEEKLY" && day && !repeatDays.includes(weekdayOf(day))) setRepeatDays([weekdayOf(day)]);
+                    setRepeat(value);
+                  }}
+                  className={cn(PLAN_CHIP, repeat === value ? PLAN_CHIP_ON : PLAN_CHIP_OFF)}>
+                  {name}
+                </button>
+              ))}
+            </div>
+            {repeat === "WEEKLY" && (
+              <>
+                <div className="mt-3 flex flex-wrap gap-2" aria-label="Дни недели">
+                  {WD.map((name, index) => {
+                    const value = index + 1;
+                    const selected = repeatDays.includes(value);
+                    return (
+                      <button key={value} type="button" aria-pressed={selected}
+                        onClick={() => setRepeatDays(days => selected ? days.filter(d => d !== value) : [...days, value])}
+                        className={cn("h-11 min-w-11 rounded-full px-2 text-sm font-semibold", PLAN_FOCUS,
+                          selected ? PLAN_CHIP_ON : PLAN_CHIP_OFF)}>{name}</button>
+                    );
+                  })}
+                </div>
+                {!repeatValid && <p role="alert" className="mt-2 text-sm text-danger">Выберите день начала и дни повторений.</p>}
+              </>
+            )}
+            {repeat !== "NONE" && (
+              <div className="mt-3 grid gap-3">
+                <label className="grid gap-1.5 text-sm font-semibold">
+                  Окончание повторений
+                  <select value={repeatEnd} onChange={e => setRepeatEnd(e.target.value as RepeatEnd)}
+                    className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3">
+                    <option value="NEVER">Без даты окончания</option>
+                    <option value="UNTIL">До даты</option>
+                    <option value="COUNT">После количества повторений</option>
+                  </select>
+                </label>
+                {repeatEnd === "UNTIL" && (
+                  <label className="grid gap-1.5 text-sm font-semibold">
+                    Последний день
+                    <input type="date" min={day ?? todayIso} value={repeatUntil}
+                      onChange={e => setRepeatUntil(e.target.value)}
+                      className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3" />
+                  </label>
+                )}
+                {repeatEnd === "COUNT" && (
+                  <label className="grid gap-1.5 text-sm font-semibold">
+                    Количество повторений
+                    <input type="number" min={1} max={10000} value={repeatCount}
+                      onChange={e => setRepeatCount(e.target.value)}
+                      className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3" />
+                  </label>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mb-[22px]">
           <div className={SECTION_LABEL}>Когда напомнить?</div>

@@ -9,10 +9,41 @@ export const runtime = "nodejs";
 
 const noStore = { "Cache-Control": "no-store" };
 
+function rejectAuth(reason: "INVALID_ORIGIN" | "TELEGRAM_NOT_LINKED" | "ACCOUNT_UNAVAILABLE") {
+  // Never log Telegram IDs, initData, session cookies or tokens.
+  console.warn("[telegram-webapp] Authentication rejected:", reason);
+  return NextResponse.json({ error: reason }, { status: 403, headers: noStore });
+}
+
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== request.nextUrl.origin) {
-    return NextResponse.json({ error: "INVALID_ORIGIN" }, { status: 403, headers: noStore });
+  // NEXTAUTH_URL is the configured public HTTPS origin. request.nextUrl.origin
+  // may describe the internal HTTP reverse-proxy hop and cannot be used for CSRF.
+  // Fail closed for missing/malformed configuration; never consult forwarded headers.
+  const publicUrl = process.env.NEXTAUTH_URL?.trim();
+  let expectedOrigin: string | null = null;
+  if (publicUrl) {
+    try {
+      const parsed = new URL(publicUrl);
+      if (
+        parsed.protocol === "https:" &&
+        parsed.hostname &&
+        !parsed.username &&
+        !parsed.password &&
+        parsed.pathname === "/" &&
+        !parsed.search &&
+        !parsed.hash
+      ) {
+        expectedOrigin = parsed.origin;
+      }
+    } catch {
+      // Invalid deployment configuration must not allow authentication.
+    }
+  }
+  if (!expectedOrigin) {
+    return NextResponse.json({ error: "AUTH_UNAVAILABLE" }, { status: 503, headers: noStore });
+  }
+  if (request.headers.get("origin") !== expectedOrigin) {
+    return rejectAuth("INVALID_ORIGIN");
   }
   if (!request.headers.get("content-type")?.startsWith("application/json")) {
     return NextResponse.json({ error: "INVALID_CONTENT_TYPE" }, { status: 415, headers: noStore });
@@ -55,7 +86,7 @@ export async function POST(request: NextRequest) {
     connection.telegramUserId !== verified.telegramUserId ||
     connection.botUsername.replace(/^@/u, "").toLowerCase() !== config.botUsername.toLowerCase()
   ) {
-    return NextResponse.json({ error: "TELEGRAM_NOT_LINKED" }, { status: 403, headers: noStore });
+    return rejectAuth("TELEGRAM_NOT_LINKED");
   }
 
   try {
@@ -73,7 +104,7 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     if (error instanceof Error && error.message === "ACCOUNT_NOT_SESSION_ELIGIBLE") {
-      return NextResponse.json({ error: "ACCOUNT_UNAVAILABLE" }, { status: 403, headers: noStore });
+      return rejectAuth("ACCOUNT_UNAVAILABLE");
     }
     console.error("[telegram-webapp] Failed to create account session", error);
     return NextResponse.json({ error: "AUTH_FAILED" }, { status: 500, headers: noStore });

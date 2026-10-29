@@ -1,6 +1,7 @@
 import type { IdeaItem } from "../types";
 import { IdeaPosterCard } from "./IdeaPosterCard";
 import { OrderedMasonryGrid } from "@/components/ideas/OrderedMasonryGrid";
+import { resolvePosterFrame } from "@/lib/media/posterFrame";
 
 type IdeasGridProps = {
   ideas: IdeaItem[];
@@ -9,7 +10,7 @@ type IdeasGridProps = {
   onSchedule: (ideaId: string) => void;
 };
 
-/** Ordered Pinterest-style masonry: native poster ratios, two columns mobile / four desktop. */
+/** Ordered shortest-column masonry: poster ratios (16:9…2:3), 2/3/4 columns. */
 export function IdeasGrid({
   ideas,
   planningIdeaId,
@@ -17,17 +18,20 @@ export function IdeasGrid({
   onSchedule,
 }: IdeasGridProps) {
   return (
-    <OrderedMasonryGrid itemClassName="pb-5 sm:pb-8">
-      {ideas.map((idea) => (
-        <div key={idea.id} className="min-w-0">
+    <OrderedMasonryGrid
+      itemClassName="pb-2 sm:pb-4"
+      items={ideas.map((idea) => ({
+        key: idea.id,
+        ratio: resolvePosterFrame(idea.activity.imageWidth, idea.activity.imageHeight).ratio,
+        content: (
           <IdeaPosterCard
             idea={idea}
             isScheduling={planningIdeaId === idea.id}
             isRemoving={removingIdeaId === idea.id}
             onSchedule={() => onSchedule(idea.id)}
           />
-        </div>
-      ))}
-    </OrderedMasonryGrid>
+        ),
+      }))}
+    />
   );
 }

@@ -5453,3 +5453,145 @@ distributor_company_id=550) и хотели бы уточнить несколь
   helpers only it used) in PR 6; any new city creation path writes Territory directly
   (admin city creation is decided in PR 3).
 - Source: Territory rollout PR 2 (`feat/territory-core-dual-write-20261026`).
+
+## [BACKLOG-200] Журнал: продажа мест в редакционных подборках (B2B)
+- Status: OPEN
+- Priority: P2
+- Area: Journal / B2B billing
+- Added: 2026-10-27
+- Context: PR 1 ТЗ «Журнал» добавил `ArticleLinkedItem` с редакторским `position` для
+  публикаций типа `COLLECTION`. Платные места (исторически 400/300 BYN за год) в коде
+  не реализованы: `PromotionPublicationType` знает только `EVENT/OFFER`.
+- Reason deferred: ТЗ явно исключает «продажу мест через баланс»; нужна модель
+  оплаченного слота (срок, позиция, связь с балансом бизнеса).
+- Acceptance criteria: оплаченный слот привязан к `ArticleLinkedItem` (или его позиции),
+  списание с баланса, метка «Реклама»/«Партнёр» на элементе, срок действия; органический
+  порядок не меняется без оплаты.
+- Source: аудит #787.
+
+## [BACKLOG-199] Карточка события: перенос цены и лайка с постера в текстовый блок
+
+- Status: OPEN
+- Priority: P2
+- Area: Events / Design system
+- Added: 2026-10-27
+- Reason deferred: владелец отложил раздел 5 ТЗ «Кладка постеров в афише» («пока»); в PR 2–3 оверлеи (сердце сверху справа, цена/«Бесплатно» снизу) остаются на постере во всех местах.
+- Context: целевая вёрстка — на постере ни одного оверлея; сверху вниз: постер; строка «категория слева, лайк справа» (та же `SaveHeart`, зона ≥ 44×44px); название до 2 строк; мета «возраст · дата · цена» (`Бесплатно` / `от 30 BYN`). Затрагивает `src/components/events/EventCard.tsx`, `src/app/(public)/me/ideas/components/IdeaPosterCard.tsx`; журнал (`ArticlePlaceEmbed`) визуально не меняется (вариант через prop), карусели — по решению. Аудит: `docs/engineering/poster-masonry-audit.md`.
+- Current state: PR 2 добавил только правило пропорций; на низких кадрах (< 3:4) цена переезжает в левый нижний угол, чтобы не наслаиваться на сердце (`posterPriceBadgeSide`).
+- Dependencies: решение владельца по возврату к задаче.
+- Acceptance criteria: на постере нет оверлеев во всех листингах событий и в избранном; кладка (`OrderedMasonryGrid`) корректно учитывает новую высоту текстового блока; журнал и карусель на главной не меняются визуально.
+- Source: ТЗ «Кладка постеров в афише», ответ владельца на вопросы PR #786.
+
+## [BACKLOG-201] Кладка афиши: замер CLS/LCP на DEV и нативный CSS masonry
+
+- Status: OPEN
+- Priority: P2
+- Area: Events / Performance
+- Added: 2026-10-27
+- Reason deferred: в окружении агента нет браузера и БД — целевые метрики ТЗ (мобильный CLS < 0.05, LCP не хуже текущего) не измерены; нативный CSS masonry (`display: grid-lanes`/`masonry`) не включён — ТЗ допускает его только как прогрессивное улучшение.
+- Context: PR 3 «кладка постеров» (`feat/poster-masonry-feed-20261027`): `OrderedMasonryGrid` («самая короткая колонка», 2/3/4), пагинация афиши по 24 (`?page=N` + догрузка), восстановление позиции из sessionStorage. На ≥640px до гидрации рендерится сетка в порядке выдачи, после гидрации — кладка (возможен сдвиг на планшете/десктопе; на мобильном SSR = клиент).
+- Current state: unit-тесты раскладки/пагинации есть; Lighthouse/Web Vitals не сняты.
+- Dependencies: деплой PR 1–3 на DEV, бэкфилл размеров (`pnpm media:backfill-dimensions`).
+- Acceptance criteria: Lighthouse mobile (Slow 4G, 4x CPU, 5 прогонов) на `/minsk/events` и `/minsk/events?page=2`: CLS < 0.05, LCP ≤ текущего `dev`; ручная проверка возврата с карточки события (позиция и колонки), поворота экрана, подгрузки; при необходимости — SSR-кладка по `Sec-CH-Viewport-Width`/UA для планшетов.
+- Source: ТЗ «Кладка постеров в афише», PR 3.
+
+## [BACKLOG-202] Удалить legacy-демо компоненты карточки праздника в ЛК
+
+- Status: OPEN
+- Priority: P3
+- Area: Birthday / Parent cabinet
+- Added: 2026-10-27
+- Reason deferred: вне scope исправлений P0 из аудита #818; удаление не влияет на поведение.
+- Context: `/me/birthdays/[id]` рендерит `PartyOrderStatusScreen` из `readPartyOrder` (с проверкой `ownerUserId`). Заглушка `getUserBirthdayPartyDetail` удалена в рамках #818; компоненты `BirthdayPartyDetailView`, `ScenarioFinalPage`, `BookingStatusPage` (`src/features/me/components/`) и демо-поля типа `UserBirthdayPartyDetail` больше нигде не импортируются.
+- Current state: мёртвый код, сборку не ломает.
+- Dependencies: нет.
+- Acceptance criteria: файлы и неиспользуемые типы удалены; `tsc`, lint и `test:birthday-catalog` зелёные.
+- Source: аудит #818.
+
+## [BACKLOG-203] Новость с publicationType из полной формы рендерится шаблоном статьи
+
+- Status: OPEN
+- Priority: P2
+- Area: Journal / Public article pages
+- Added: 2026-10-27
+- Reason deferred: вне scope PR журнала (#834); найдено при исправлении Stories.
+- Context: страницы `src/app/(public)/[city]/blog/[slug]/page.tsx` и `src/app/(public)/blog/[slug]/page.tsx` выбирают шаблон новости (`BreakingNewsView`), `isNews` для JSON-LD и `editHref` только по `subtitle === BREAKING_NEWS_SUBTITLE`. Новость, у которой `publicationType = BREAKING_NEWS` выставлен в полной форме, но legacy-маркера в `subtitle` нет, открывается шаблоном статьи.
+- Current state: Stories, ленты журнала и публичные фильтры уже учитывают `publicationType`; страницы деталей — нет. Также `loadRelatedBreakingNews` ищет по маркеру.
+- Dependencies: нет.
+- Acceptance criteria: шаблон новости, `isNews` и ссылка редактирования определяются по `publicationType = BREAKING_NEWS` (с поддержкой legacy-маркера); `loadRelatedBreakingNews` тоже; тест на выбор шаблона.
+- Source: ревью PR #792/#834 (Codex P2), координатор.
+
+## [BACKLOG-204] Автоназначение категории и интересов событиям из импортов 24afisha и family.by
+
+- Status: OPEN
+- Priority: P1
+- Area: Events import / Recommendations
+- Added: 2026-10-27
+- Reason deferred: решение владельца при снятии стоп-правила ТЗ «Для вашей семьи» — алгоритм строится при низком покрытии, улучшение данных — отдельной задачей.
+- Context: фильтры и баллы подбора «Для вашей семьи» (интересы 25, возраст 25) опираются на категорию и интересы события; у импортированных событий (24afisha, family.by) они часто пустые, из-за чего события выпадают из подбора или получают UNKNOWN.
+- Current state: импорт сохраняет события без автоматического назначения категории и интересов.
+- Dependencies: схема импортов 24afisha (BACKLOG-147), SYSTEM_INTERESTS.
+- Acceptance criteria: при импорте событию автоматически назначаются категория и интересы (правила по жанру/ключевым словам источника, с флагом «авто» для ручной правки); покрытие измеряется SQL из аудита (#794) до/после; ручные значения не перетираются.
+- Source: ТЗ «Для вашей семьи», решение владельца.
+
+## [BACKLOG-205] «Для вашей семьи»: предложения (Offer) как кандидаты подбора
+
+- Status: OPEN
+- Priority: P2
+- Area: Recommendations / Offers
+- Added: 2026-10-27
+- Reason deferred: общий движок `rankPlanSuggestionsForCity` работает только с событиями (EVENT); PR 2 ТЗ «Для вашей семьи» не расширял его на `Offer`, чтобы не форкать ранжирование.
+- Context: чистый слой `familyPicks/select.ts` уже поддерживает `entityType: "OFFER"` (возраст, интересы, окно, разнообразие); не хватает загрузчика офферов (публичный `getPublicPublishedOfferWhere`, возраст `ageMinMonths/ageMaxMonths/agePolicy`, `interestSlugs`, бизнес `Place.ownerBusinessId`, ссылка `getOfferPublicPath`) и расчёта популярности/истории для офферов.
+- Current state: в подбор попадают только события.
+- Dependencies: решение по общему engagement-скорингу офферов.
+- Acceptance criteria: офферы участвуют в `loadFamilyPicks` теми же фильтрами и весами; unit-тесты слоя расширены; экспозиции пишутся с `entityType = OFFER`.
+- Source: ТЗ «Для вашей семьи», PR 2.
+
+## [BACKLOG-210] Кабинет бизнеса и отчёты по бусту: перевести на новые определения аналитики
+
+- Status: OPEN
+- Priority: P2
+- Area: Analytics / Business cabinet / Promotion
+- Added: 2026-10-27
+- Reason deferred: решение 1 ТЗ «Аналитика админки и русификация» — кабинет
+  бизнеса и отчёты по бусту не входят в это ТЗ. ТЗ обязывает только сохранить
+  поступление DETAIL_OPEN для них (PR 1 сохранил пропсы `AnalyticsDetailBeacon`
+  и `meta.source="detail"`; событие идёт через `trackUserEvent`, так что
+  промо-действия и профиль поведения работают как раньше).
+- Context: `businessWorkspace.service.ts`, `boostPerformance.service.ts`,
+  `dailyFreeBoost.service.ts` считают «просмотры» как `PAGE_VIEW + CARD_VIEW`,
+  не исключают внутренний трафик (ADMIN/MODERATOR, tainted-сессии) и используют
+  сутки по UTC сервера. После PR 1 DETAIL_OPEN приходят только от браузеров
+  (боты отсекаются), поэтому «открытия» в кабинете бизнеса упадут относительно
+  периода до релиза — без пометки в кабинете.
+- Current state: не начато.
+- Dependencies: PR 1–2 ТЗ (клиентский DETAIL_OPEN, `metricDefinitions.ts`,
+  исключение внутреннего трафика).
+- Acceptance criteria: кабинет бизнеса и отчёты по бусту используют
+  `metricDefinitions.ts` (показы в ленте ≠ просмотры страниц), исключают
+  внутренний трафик, считают по минским суткам, показывают пометку для
+  периодов до исправления трекинга; тесты буста/кабинета обновлены.
+- Source: ТЗ «Аналитика админки и русификация», решение 1; PR 1.
+
+## [BACKLOG-211] Настоящие 30-минутные сессии в продуктовой аналитике
+
+- Status: OPEN
+- Priority: P3
+- Area: Analytics
+- Added: 2026-10-27
+- Reason deferred: решение 2 ТЗ «Аналитика админки и русификация» — метрика
+  «Sessions» переименована в «Устройства», настоящие сессии в этом ТЗ не
+  вводятся.
+- Context: `UserEvent.sessionId` с клиента — `mg_analytics_sid` из
+  localStorage, вечный id браузера (не истекает), с сервера — id auth-сессии.
+  Поэтому DISTINCT sessionId — это устройства/браузеры, а не визиты. В
+  Analytics это «Устройства» (`computeCanonicalAudience().devices`,
+  `metricDefinitions.ts`).
+- Current state: не начато.
+- Dependencies: решение по определению сессии (30 минут неактивности,
+  разрыв на полуночи по Минску или нет, смена UTM).
+- Acceptance criteria: клиент выдаёт отдельный id визита с таймаутом
+  неактивности (или он вычисляется в отчётах по разрывам между событиями
+  устройства); метрика «Сессии» в Analytics и словаре метрик с формулой;
+  «Устройства» остаются отдельной метрикой.
+- Source: ТЗ «Аналитика админки и русификация», решение 2; PR 2.

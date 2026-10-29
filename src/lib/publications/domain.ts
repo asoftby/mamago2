@@ -53,6 +53,11 @@ export type PublicationListRow = {
   missingJournalCategory?: boolean;
   geoScope?: GeoScope | null;
   citySlug?: string | null;
+  /** Отметки журнала. */
+  featured?: boolean;
+  pinned?: boolean;
+  /** Создано в коротком редакторе Breaking news (маркер subtitle) — открывать там же. */
+  usesNewsEditor?: boolean;
 };
 
 /** Блоки статьи — расширяемый union */

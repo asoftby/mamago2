@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ContentStatus, type GeoScope } from "@prisma/client";
+import { ContentStatus, type ArticlePublicationType, type GeoScope } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Loader2 } from "lucide-react";
@@ -14,6 +14,7 @@ import { CardMultiSelect } from "@/components/ui/card-multiselect";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -22,7 +23,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type { ArticleEditorSnapshot } from "@/lib/article/articleAdminTypes";
+import type { ArticleEditorSnapshot, ArticleLinkedItemSnapshot } from "@/lib/article/articleAdminTypes";
+import { ArticleLinkedItemsEditor } from "@/components/admin/articles/ArticleLinkedItemsEditor";
+import {
+  BREAKING_NEWS_DEFAULT_TTL_DAYS,
+  COLLECTION_MIN_ITEMS,
+  defaultBreakingNewsExpiresAt,
+} from "@/lib/journal/publicationType";
 import { geographyTargetKey, type ArticleGeographyTargetInput } from "@/lib/article/articleGeographyTargets";
 import {
   deriveArticleExcerptFromContent,
@@ -97,6 +104,11 @@ function applySnapshot(setters: {
   setSeoCanonicalUrl: (v: string) => void;
   setNoindex: (v: boolean) => void;
   setViews: (v: number) => void;
+  setPublicationType: (v: ArticlePublicationType) => void;
+  setFeatured: (v: boolean) => void;
+  setPinned: (v: boolean) => void;
+  setExpiresAtLocal: (v: string) => void;
+  setLinkedItems: (v: ArticleLinkedItemSnapshot[]) => void;
 }, snap: ArticleEditorSnapshot) {
   setters.setTitle(snap.title);
   setters.setSlug(snap.slug ?? "");
@@ -120,7 +132,18 @@ function applySnapshot(setters: {
   setters.setSeoCanonicalUrl(snap.seoCanonicalUrl ?? "");
   setters.setNoindex(snap.noindex);
   setters.setViews(snap.views);
+  setters.setPublicationType(snap.publicationType);
+  setters.setFeatured(snap.featured);
+  setters.setPinned(snap.pinned);
+  setters.setExpiresAtLocal(toLocalDatetimeValue(snap.expiresAt));
+  setters.setLinkedItems(snap.linkedItems);
 }
+
+const PUBLICATION_TYPE_OPTIONS: Array<{ value: ArticlePublicationType; label: string; hint: string }> = [
+  { value: "ARTICLE", label: "Статья", hint: "Обычный материал журнала, без бейджа." },
+  { value: "COLLECTION", label: "Подборка", hint: `Бейдж «Подборка», блок «Подборки mamaGo». Минимум ${COLLECTION_MIN_ITEMS} элемента.` },
+  { value: "BREAKING_NEWS", label: "Новость", hint: `Бейдж «Новость», блок «Новости» до даты «Актуально до» (по умолчанию +${BREAKING_NEWS_DEFAULT_TTL_DAYS} дней).` },
+];
 
 export function ArticleEditorClient({
   initial,
@@ -182,6 +205,11 @@ export function ArticleEditorClient({
   const [seoDescription, setSeoDescription] = useState(initial.seoDescription ?? "");
   const [seoCanonicalUrl, setSeoCanonicalUrl] = useState(initial.seoCanonicalUrl ?? "");
   const [noindex, setNoindex] = useState(initial.noindex);
+  const [publicationType, setPublicationType] = useState<ArticlePublicationType>(initial.publicationType);
+  const [featured, setFeatured] = useState(initial.featured);
+  const [pinned, setPinned] = useState(initial.pinned);
+  const [expiresAtLocal, setExpiresAtLocal] = useState(toLocalDatetimeValue(initial.expiresAt));
+  const [linkedItems, setLinkedItems] = useState<ArticleLinkedItemSnapshot[]>(initial.linkedItems);
 
   const hydrated = useHydrated();
 
@@ -231,6 +259,11 @@ export function ArticleEditorClient({
         seoDescription,
         seoCanonicalUrl,
         noindex,
+        publicationType,
+        featured,
+        pinned,
+        expiresAtLocal,
+        linkedItems,
       }),
     [
       title,
@@ -254,6 +287,11 @@ export function ArticleEditorClient({
       seoDescription,
       seoCanonicalUrl,
       noindex,
+      publicationType,
+      featured,
+      pinned,
+      expiresAtLocal,
+      linkedItems,
     ],
   );
 
@@ -375,6 +413,11 @@ export function ArticleEditorClient({
       setSeoCanonicalUrl,
       setNoindex,
       setViews,
+      setPublicationType,
+      setFeatured,
+      setPinned,
+      setExpiresAtLocal,
+      setLinkedItems,
     }),
     [],
   );
@@ -459,6 +502,11 @@ export function ArticleEditorClient({
       seoOgDescription: null as string | null,
       seoRobots: null as string | null,
       noindex,
+      publicationType,
+      featured,
+      pinned,
+      expiresAt: publicationType === "BREAKING_NEWS" ? fromLocalDatetimeValue(expiresAtLocal) : null,
+      linkedItems: linkedItems.map(({ kind, id }) => ({ kind, id })),
     }),
     [
       title,
@@ -483,6 +531,11 @@ export function ArticleEditorClient({
       seoDescription,
       seoCanonicalUrl,
       noindex,
+      publicationType,
+      featured,
+      pinned,
+      expiresAtLocal,
+      linkedItems,
     ],
   );
 
@@ -537,6 +590,16 @@ export function ArticleEditorClient({
         return false;
       }
       setHasContentValidationError(false);
+      const journalError = publicationType === "COLLECTION" && linkedItems.length < COLLECTION_MIN_ITEMS
+        ? `В подборке должно быть минимум ${COLLECTION_MIN_ITEMS} элемента`
+        : publicationType === "BREAKING_NEWS" && !expiresAtLocal.trim()
+          ? "Для новости укажите «Актуально до»"
+          : null;
+      if (journalError) {
+        setError(journalError);
+        toast.error(journalError);
+        return false;
+      }
       const requestPayload = { ...payload, content: contentResult.data };
       if (!opts?.skipLoading) setSaving(true);
       setError(null);
@@ -613,10 +676,13 @@ export function ArticleEditorClient({
     },
     [
       applyEditorSnapshot,
+      expiresAtLocal,
       hasPersistedId,
       initial.id,
+      linkedItems.length,
       payload,
       persistComparableFromSnapshot,
+      publicationType,
       router,
       showArticleSuccess,
       status,
@@ -862,7 +928,9 @@ export function ArticleEditorClient({
     <div className={cn("w-full max-w-4xl space-y-6 px-4 py-4 sm:space-y-8 sm:px-6 sm:py-6", everDirty && "pb-[calc(8rem+env(safe-area-inset-bottom))] md:pb-24")}>
       <div className="flex flex-wrap items-start justify-between gap-3 gap-y-2">
         <div className="min-w-0 flex-1 pr-2">
-          <p className="text-xs font-medium text-muted-foreground mb-1">Статья</p>
+          <p className="text-xs font-medium text-muted-foreground mb-1">
+            {PUBLICATION_TYPE_OPTIONS.find((option) => option.value === publicationType)?.label ?? "Статья"}
+          </p>
           <h1 className="text-2xl md:text-xl font-bold text-gray-900 line-clamp-3 break-words">
             {displayTitle}
           </h1>
@@ -1150,6 +1218,93 @@ export function ArticleEditorClient({
                 allowClear
               />
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Тип публикации журнала */}
+      <Card className="border-gray-200 shadow-sm">
+        <CardHeader className="px-4 sm:px-6">
+          <CardTitle className="text-lg">Тип публикации</CardTitle>
+          <CardDescription>
+            Формат материала в журнале. Не зависит от рубрики (раздела) и не меняет адрес страницы.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5 px-4 sm:px-6">
+          <div
+            role="radiogroup"
+            aria-label="Тип публикации"
+            className="grid gap-2 sm:grid-cols-3"
+          >
+            {PUBLICATION_TYPE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={publicationType === option.value}
+                onClick={() => {
+                  setPublicationType(option.value);
+                  if (option.value === "BREAKING_NEWS" && !expiresAtLocal) {
+                    const base = fromLocalDatetimeValue(publishedAtLocal);
+                    setExpiresAtLocal(toLocalDatetimeValue(
+                      defaultBreakingNewsExpiresAt(base ? new Date(base) : new Date()).toISOString(),
+                    ));
+                  }
+                }}
+                className={cn(
+                  "min-h-11 rounded-lg border px-3 py-2.5 text-left transition-colors",
+                  publicationType === option.value
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "border-gray-200 bg-white hover:border-gray-300",
+                )}
+              >
+                <span className="block text-sm font-semibold text-gray-900">{option.label}</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">{option.hint}</span>
+              </button>
+            ))}
+          </div>
+
+          {publicationType === "BREAKING_NEWS" ? (
+            <div className="space-y-2">
+              <Label htmlFor="article-expires-at">Актуально до</Label>
+              <Input
+                id="article-expires-at"
+                type="datetime-local"
+                required
+                value={expiresAtLocal}
+                onChange={(e) => setExpiresAtLocal(e.target.value)}
+                className="sm:max-w-xs"
+              />
+              <p className="text-xs text-muted-foreground">
+                Обязательно. После этой даты новость исчезает из блоков и ленты журнала (страница остаётся по прежнему адресу).
+              </p>
+            </div>
+          ) : null}
+
+          {publicationType === "COLLECTION" || linkedItems.length > 0 ? (
+            <ArticleLinkedItemsEditor
+              items={linkedItems}
+              onChange={setLinkedItems}
+              articleId={hasPersistedId ? initial.id : null}
+              required={publicationType === "COLLECTION"}
+            />
+          ) : null}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="flex min-h-11 items-start gap-3 rounded-lg border border-gray-200 px-3 py-2.5">
+              <Switch checked={featured} onCheckedChange={setFeatured} aria-label="Главное" className="mt-0.5" />
+              <span>
+                <span className="block text-sm font-semibold text-gray-900">Главное</span>
+                <span className="block text-xs text-muted-foreground">Кандидат в большую карточку «★ Главное» — показывается самый свежий.</span>
+              </span>
+            </label>
+            <label className="flex min-h-11 items-start gap-3 rounded-lg border border-gray-200 px-3 py-2.5">
+              <Switch checked={pinned} onCheckedChange={setPinned} aria-label="Закрепить" className="mt-0.5" />
+              <span>
+                <span className="block text-sm font-semibold text-gray-900">Закрепить</span>
+                <span className="block text-xs text-muted-foreground">В начале ленты «Свежие материалы».</span>
+              </span>
+            </label>
           </div>
         </CardContent>
       </Card>

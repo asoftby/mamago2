@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
 import { useState } from "react";
+import { formatAdminDate } from "@/lib/admin/formatRu";
 
 export interface ImprovementRequest {
   id: string;
@@ -116,7 +117,7 @@ export function ImprovementRequestList({
 
             {request.dueAt && (
               <div className="text-xs text-gray-600 mb-2">
-                Срок: {new Date(request.dueAt).toLocaleDateString("ru-RU")}
+                Срок: {formatAdminDate(request.dueAt)}
               </div>
             )}
 
@@ -147,7 +148,7 @@ export function ImprovementRequestList({
 
             {request.resolvedAt && (
               <div className="text-xs text-green-600 mt-2">
-                Решён: {new Date(request.resolvedAt).toLocaleDateString("ru-RU")}
+                Решён: {formatAdminDate(request.resolvedAt)}
               </div>
             )}
           </div>

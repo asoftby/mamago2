@@ -6,8 +6,11 @@ import {
 import prisma from "@/lib/prisma";
 import { PartyApiError, partyStartAt } from "./partyDraft.validation";
 import { verifyPartyOffers } from "./partyDraft.service";
-import { isWithinSchedule, minskBookingWindow } from "./partyConfirmationAvailability";
-import { partyResponseDeadline } from "./partyResponseDeadline";
+import {
+  allocatePartyUnit, isAllocationOverlapError, lockAvailablePartyUnit, type PartyUnitWindow,
+} from "./partyUnitAllocation";
+import { requestPartyAddonsAfterAnchor } from "./partyAddonFanout";
+import { assertPartyConfirmationEnabled } from "./partyConfirmationFlag";
 
 export interface ConfirmPartyRequestInput {
   requestId: string;
@@ -18,13 +21,6 @@ export interface ConfirmPartyRequestInput {
   bookingUnitId?: string;
 }
 
-function exclusionViolation(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const value = error as { code?: string; message?: string; meta?: { code?: string } };
-  return value.code === "23P01" ||
-    (value.code === "P2010" && value.meta?.code === "23P01") ||
-    Boolean(value.message?.includes("BookingAllocation_no_active_overlap"));
-}
 
 /**
  * Actual business confirmation. Re-checks the accepted quote and unit under
@@ -33,6 +29,8 @@ function exclusionViolation(error: unknown): boolean {
  */
 export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
   const { requestId, businessId, actorUserId, expectedQuoteVersion, idempotencyKey } = input;
+  // Covers the site and the Telegram confirmation, which both call this service.
+  assertPartyConfirmationEnabled();
   const dedupeKey = `party:${requestId}:confirmed:${idempotencyKey}`;
   try {
     return await prisma.$transaction(async (tx) => {
@@ -131,74 +129,30 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
         throw new PartyApiError(409, "Выбранный ресурс отличается от предложения");
       }
 
-      let serviceStart: Date | null = null;
-      let serviceEnd: Date | null = null;
-      let blockStart: Date | null = null;
-      let blockEnd: Date | null = null;
+      let window: PartyUnitWindow | null = null;
       if (unit) {
-        // Lock the canonical resource *before* reading availability; a stale
-        // preflight snapshot must not authorize a room just disabled by admin.
-        await tx.$queryRaw`SELECT "id" FROM "BookingUnit" WHERE "id" = ${unit.id} FOR UPDATE`;
-        const locked = await tx.bookingUnit.findUnique({
-          where: { id: unit.id },
-          select: {
-            id: true, businessId: true, status: true, timezone: true,
-            prepMinutes: true, cleanupMinutes: true,
-            capacity: true, minDurationMinutes: true,
-            rules: { select: { weekday: true, startMinutes: true, endMinutes: true } },
-          },
+        window = await lockAvailablePartyUnit(tx, {
+          unitId: unit.id, businessId, offerId: req.offerId, order: { ...order,
+            eventDate: order.eventDate, timeFrom: order.timeFrom, timeTo: order.timeTo }, now,
         });
-        if (!locked || locked.status !== "ACTIVE" || locked.businessId !== businessId ||
-            !(await tx.bookingUnitOffer.findUnique({
-              where: { bookingUnitId_offerId: { bookingUnitId: unit.id, offerId: req.offerId } },
-            }))) {
-          throw new PartyApiError(409, "Ресурс больше не доступен");
-        }
-        if (locked.timezone !== "Europe/Minsk") {
-          throw new PartyApiError(422, "Для ресурса требуется настройка часового пояса");
-        }
-        const times = minskBookingWindow(order.eventDate, order.timeFrom, order.timeTo,
-          locked.prepMinutes, locked.cleanupMinutes);
-        serviceStart = times.serviceStart;
-        serviceEnd = times.serviceEnd;
-        blockStart = times.blockStart;
-        blockEnd = times.blockEnd;
-        if ((locked.capacity !== null && (order.childrenCount ?? 0) + (order.adultsCount ?? 0) > locked.capacity) ||
-            serviceStart <= now ||
-            (locked.minDurationMinutes !== null &&
-              serviceEnd.getTime() - serviceStart.getTime() < locked.minDurationMinutes * 60_000)) {
-          throw new PartyApiError(422, "Недоступная продолжительность праздника");
-        }
-        if (quote.serviceStart && quote.serviceStart.getTime() !== serviceStart.getTime() ||
-            quote.serviceEnd && quote.serviceEnd.getTime() !== serviceEnd.getTime()) {
+        if (quote.serviceStart && quote.serviceStart.getTime() !== window.serviceStart.getTime() ||
+            quote.serviceEnd && quote.serviceEnd.getTime() !== window.serviceEnd.getTime()) {
           throw new PartyApiError(409, "Время отличается от принятого предложения");
         }
+      }
 
-        // PostgreSQL exclusion constraint remains the final line of defense
-        // against concurrent bookings through other reservation pathways.
-        await tx.$executeRaw`UPDATE "BookingAllocation"
-          SET "status" = 'EXPIRED', "updatedAt" = (now() AT TIME ZONE 'UTC')
-          WHERE "bookingUnitId" = ${unit.id} AND "status" = 'HELD'
-          AND "expiresAt" < (now() AT TIME ZONE 'UTC')`;
-        const exceptions = await tx.availabilityException.findMany({
-          where: { bookingUnitId: unit.id, date: order.eventDate },
-          select: { kind: true, startMinutes: true, endMinutes: true },
-        });
-        if (!isWithinSchedule(times, locked.rules, exceptions)) {
-          throw new PartyApiError(409, "Площадка закрыта в выбранное время");
-        }
-        const [block, allocation] = await Promise.all([
-          tx.calendarBlock.findFirst({
-            where: { bookingUnitId: unit.id, blockStart: { lt: blockEnd }, blockEnd: { gt: blockStart } },
-            select: { id: true },
-          }),
-          tx.bookingAllocation.findFirst({
-            where: { bookingUnitId: unit.id, blockStart: { lt: blockEnd }, blockEnd: { gt: blockStart },
-              OR: [{ status: "CONFIRMED" }, { status: "HELD", expiresAt: { gt: now } }] },
-            select: { id: true },
-          }),
-        ]);
-        if (block || allocation) throw new PartyApiError(409, "Этот ресурс уже занят");
+      // Multiple businesses may quote one party item. Serialize its final
+      // confirmation independently of the individual request row.
+      await tx.$queryRaw`SELECT "id" FROM "PartyOrderItem"
+        WHERE "id" = ${item.id} FOR UPDATE`;
+      const currentItem = await tx.partyOrderItem.findUnique({
+        where: { id: item.id },
+        select: { status: true, confirmedBookingRequestId: true },
+      });
+      if (!currentItem || currentItem.confirmedBookingRequestId ||
+          currentItem.status === PartyItemStatus.CONFIRMED ||
+          currentItem.status === PartyItemStatus.CANCELLED) {
+        throw new PartyApiError(409, "Для этой услуги уже выбран исполнитель или она отменена");
       }
 
       const claimed = await tx.bookingRequest.updateMany({
@@ -224,15 +178,43 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
         data: { status: PartyItemStatus.CONFIRMED, confirmedBookingRequestId: requestId,
           offerPriceSnapshot: quote.priceByn },
       });
-      if (unit && serviceStart && serviceEnd && blockStart && blockEnd) {
-        await tx.bookingAllocation.create({
-          data: { bookingUnitId: unit.id, bookingRequestId: requestId,
-            partyQuoteId: quote.id, blockStart, blockEnd, status: "CONFIRMED" },
+      // Close all competing invitations only after the winner is claimed.
+      // The PartyOrderItem row is locked above: no subsequent wave can start
+      // while we commit the winning booking and close its siblings.
+      const competing = await tx.bookingRequest.findMany({
+        where: { partyOrderItemId: item.id, kind: BookingKind.PARTY,
+          id: { not: requestId }, status: BookingStatus.NEW,
+          partyStage: { in: ["SENT", "QUOTED", "AWAITING_RECONFIRM"] } },
+        select: { id: true, partyStage: true },
+      });
+      for (const sibling of competing) {
+        const closed = await tx.bookingRequest.updateMany({
+          where: { id: sibling.id, status: BookingStatus.NEW,
+            partyStage: { in: ["SENT", "QUOTED", "AWAITING_RECONFIRM"] } },
+          data: { status: BookingStatus.CANCELLED, partyStage: "NOT_ACCEPTED",
+            partyCloseReason: "NOT_SELECTED", responseDueAt: null,
+            lastActivityAt: now },
         });
-        await tx.partyQuote.update({
-          where: { id: quote.id },
-          data: { bookingUnitId: unit.id, serviceStart, serviceEnd },
+        if (closed.count !== 1) throw new PartyApiError(409, "Конкурирующая заявка изменилась");
+        await tx.partyQuote.updateMany({
+          where: { bookingRequestId: sibling.id, status: { in: ["ACTIVE", "ACCEPTED"] } },
+          data: { status: "WITHDRAWN", decidedAt: now },
         });
+        await tx.bookingActivity.create({
+          data: { bookingId: sibling.id, type: "REQUEST_WITHDRAWN",
+            actorType: "SYSTEM",
+            payload: { reason: "NOT_SELECTED", winningRequestId: requestId } },
+        });
+        await tx.partyOutbox.create({
+          data: { eventType: "PARTY_REQUEST_CANCELLED",
+            aggregateId: sibling.id,
+            dedupeKey: "party:" + sibling.id + ":not-selected",
+            payload: { requestId: sibling.id, partyOrderId: order.id,
+              reason: "NOT_SELECTED" } },
+        });
+      }
+      if (unit && window) {
+        await allocatePartyUnit(tx, { unitId: unit.id, requestId, quoteId: quote.id, window });
       }
 
       await tx.bookingActivity.create({
@@ -249,76 +231,14 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
 
       // The first business confirmation activates parallel add-on requests.
       // A failure during fan-out rolls the whole confirmation back.
-      let addonRequests = 0;
-      if (isAnchor) {
-        await tx.partyOrderItem.updateMany({
-          where: { partyOrderId: order.id, role: PartyItemRole.INCLUDED,
-            status: PartyItemStatus.PLANNED },
-          data: { status: PartyItemStatus.CONFIRMED },
-        });
-        const addons = await tx.partyOrderItem.findMany({
-          where: { partyOrderId: order.id, role: { in: [PartyItemRole.ADDON, PartyItemRole.STANDALONE] },
-            status: PartyItemStatus.PLANNED },
-          select: { id: true, offerId: true, businessId: true, note: true },
-        });
-        if (addons.length) {
-          const live = new Map<string, Awaited<ReturnType<typeof verifyPartyOffers>> extends Map<string, infer T> ? T : never>();
-          // One discontinued add-on must not roll back a confirmed venue. It
-          // remains NEEDS_DECISION so the parent can select a replacement.
-          for (const addon of addons) {
-            if (!addon.offerId) continue;
-            try {
-              const checked = await verifyPartyOffers(order.citySlug, [addon.offerId], tx);
-              const candidate = checked.get(addon.offerId);
-              if (candidate) live.set(addon.offerId, candidate);
-            } catch (error) {
-              if (!(error instanceof PartyApiError) || error.status !== 422) throw error;
-            }
-          }
-          const due = partyResponseDeadline(now, partyStartAt(order.eventDate, order.timeFrom));
-          for (const addon of addons) {
-            const published = addon.offerId ? live.get(addon.offerId) : null;
-            if (!addon.businessId || !addon.offerId || !published ||
-                published.place?.ownerBusinessId !== addon.businessId || due <= now) {
-              await tx.partyOrderItem.update({
-                where: { id: addon.id }, data: { status: PartyItemStatus.NEEDS_DECISION },
-              });
-              continue;
-            }
-            const child = await tx.bookingRequest.create({
-              data: {
-                kind: BookingKind.PARTY, publicationType: "OFFER",
-                userId: order.ownerUserId, businessId: addon.businessId,
-                offerId: addon.offerId, partyOrderItemId: addon.id,
-                partyStage: "SENT", status: BookingStatus.NEW,
-                requestedDate: order.eventDate, requestedTime: order.timeFrom,
-                adultsCount: order.adultsCount ?? 0, childrenCount: order.childrenCount ?? 0,
-                childAge: order.childAge,
-                customerName: null, customerPhone: null, customerComment: null,
-                responseDueAt: due,
-              },
-              select: { id: true },
-            });
-            await tx.partyOrderItem.update({
-              where: { id: addon.id }, data: { status: PartyItemStatus.REQUESTED },
-            });
-            await tx.bookingActivity.create({
-              data: { bookingId: child.id, type: "CREATED", actorType: "SYSTEM",
-                payload: { partyOrderId: order.id, afterAnchorConfirmation: requestId } },
-            });
-            await tx.partyOutbox.create({
-              data: { eventType: "PARTY_REQUEST_SENT", aggregateId: child.id,
-                dedupeKey: "party:" + child.id + ":sent",
-                payload: { partyOrderId: order.id, requestId: child.id, businessId: addon.businessId } },
-            });
-            addonRequests++;
-          }
-        }
-      }
+      const addonRequests = isAnchor ? await requestPartyAddonsAfterAnchor(tx, {
+        order: { ...order, eventDate: order.eventDate, timeFrom: order.timeFrom },
+        anchorRequestId: requestId, now,
+      }) : 0;
       return { requestId, confirmed: true, alreadyConfirmed: false, addonRequests };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 30_000 });
   } catch (error) {
-    if (exclusionViolation(error)) throw new PartyApiError(409, "Этот ресурс только что заняли");
+    if (isAllocationOverlapError(error)) throw new PartyApiError(409, "Этот ресурс только что заняли");
     throw error;
   }
 }

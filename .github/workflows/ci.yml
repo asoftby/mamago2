@@ -13,6 +13,21 @@ on:
 jobs:
   typecheck:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      seo-postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: seo_redirect_test
+          POSTGRES_PASSWORD: synthetic_only
+          POSTGRES_DB: seo_redirect_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U seo_redirect_test -d seo_redirect_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     permissions:
       contents: read
 
@@ -37,6 +52,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Admin Russian-language check
+        run: |
+          node --test scripts/check-admin-ru.test.mjs
+          node scripts/check-admin-ru.mjs
+          pnpm exec tsx src/lib/admin/formatRu.test.ts
+          pnpm exec tsx src/lib/admin/labels.ru.test.ts
+
       - name: UI Lab access and route regressions
         run: |
           pnpm exec tsx src/lib/ui-lab/accessPolicy.test.ts
@@ -57,11 +79,23 @@ jobs:
 
       - name: Birthday party API and outbox regressions
         run: |
+          pnpm exec tsx src/lib/plan/recurrence.test.ts
+          pnpm exec tsx src/lib/plan/recurrenceInput.test.ts
+          pnpm exec tsx src/server/services/recurringTask.service.test.ts
+          pnpm exec tsx src/server/services/recurrenceMaterialization.test.ts
+          pnpm exec tsx src/app/api/plan/manual/recurring/route.contract.test.ts
           pnpm exec tsx src/server/birthday/partyDraft.contract.test.ts
           pnpm exec tsx src/server/birthday/partyBusiness.contract.test.ts
           pnpm exec tsx src/server/birthday/partyOutbox.contract.test.ts
           pnpm exec tsx src/server/birthday/partyQuoteAcceptance.contract.test.ts
           pnpm exec tsx src/server/birthday/partyConfirmationAvailability.test.ts
+          pnpm exec tsx src/server/birthday/partyInviteDispatchPolicy.test.ts
+          pnpm exec tsx src/server/birthday/partyInviteTransactionalDispatch.contract.test.ts
+          pnpm exec tsx src/server/birthday/partyDurableQueueCron.contract.test.ts
+          pnpm exec tsx src/server/birthday/partyProviderMatching.test.ts
+          pnpm exec tsx src/server/birthday/bookingUnitInput.test.ts
+          pnpm exec tsx src/server/birthday/bookingUnitUpdate.test.ts
+          pnpm exec tsx src/components/business/booking-units/bookingUnitForm.test.ts
           pnpm exec tsx src/server/birthday/partyResponseDeadline.test.ts
           pnpm exec tsx src/server/birthday/partyConfirm.contract.test.ts
           pnpm exec tsx src/server/birthday/partyConfirmChoices.contract.test.ts
@@ -71,12 +105,15 @@ jobs:
           pnpm exec tsx src/server/birthday/partyTelegramEndToEnd.contract.test.ts
           pnpm exec tsx src/features/me/components/PartyOrderStatusScreen.contract.test.ts
           pnpm exec tsx src/server/services/booking/bookingBucket.contract.test.ts
+          pnpm exec tsx src/server/services/planActivityCountsQuery.test.ts
+          pnpm exec tsx src/server/services/booking/businessInboxScan.test.ts
 
       - name: Classes schedule and capacity regressions
         run: |
           pnpm exec tsx src/server/services/booking/pendingCampContacts.test.ts
           pnpm exec tsx src/lib/offers/offerClassSchedule.test.ts
           pnpm exec tsx src/server/offers/slotAvailability.test.ts
+          pnpm exec tsx src/server/offers/getSlots.businessIsolation.test.ts
 
       - name: GSC DEV credential staging regressions
         run: python3 scripts/deploy/stage-gsc-dev.test.py
@@ -110,6 +147,9 @@ jobs:
           pnpm exec tsx src/server/notifications/notification-action-resolver.test.ts
           pnpm exec tsx src/features/notifications/store/notification-actions.test.ts
 
+      - name: Breaking News stories regressions
+        run: pnpm exec tsx src/components/journal/JournalNewsCard.test.tsx
+
       - name: Article performance analytics regressions
         run: |
           pnpm exec tsx src/lib/publications/articleMvp.test.ts
@@ -128,6 +168,8 @@ jobs:
       - name: Cache and discovery performance regressions
         run: |
           pnpm exec tsx src/server/article/publicArticleListCacheWiring.test.ts
+          pnpm exec tsx src/lib/city/scopedEventBrowsing.test.ts
+          pnpm exec tsx src/server/discovery/crossRegionFamilySignal.contract.test.ts
           pnpm exec tsx src/server/discovery/discoveryPerf.test.ts
           pnpm exec tsx src/lib/discovery/partitionDiscoveryFeed.agePolicy.test.ts
           pnpm exec tsx src/server/discovery/classesDiscoveryFeed.agePolicy.test.ts
@@ -231,7 +273,9 @@ jobs:
           NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/telegram/telegramNotificationBootstrap.service.test.ts
           NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/services/telegram/botWelcome.test.ts
           pnpm exec tsx src/lib/telegram/webAppButton.test.ts
+          pnpm exec tsx src/lib/telegram/expandMiniApp.test.ts
           pnpm exec tsx src/lib/telegram/verifyWebAppInitData.test.ts
+          pnpm exec tsx src/app/api/auth/telegram-webapp/route.test.ts
           pnpm exec tsx src/lib/my-plan/planItemTimezoneRepair.test.ts
           bash -n scripts/deploy/run-prod-notification-jobs.sh
           bash -n scripts/deploy/install-prod-notification-cron.sh
@@ -289,3 +333,18 @@ jobs:
           pnpm test:abws-readonly-import-schedule
           pnpm test:abws-legacy-activities-route-readonly-wiring
           pnpm test:abws-shared-resync-guard
+
+      - name: SEO pre-stream regressions
+        run: pnpm test:seo-recovery
+
+      - name: Build production application for HTTP integration
+        run: pnpm build:ci
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+          APP_ENV: test
+          SITE_INDEXING_ENABLED: 'true'
+
+      - name: Real editorial redirect HTTP integration (isolated synthetic PostgreSQL)
+        run: pnpm test:seo-http
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test

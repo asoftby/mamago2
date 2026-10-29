@@ -59,6 +59,14 @@ Negative actions (`UNSAVE`, `PLAN_REMOVE`, cancellation, negative feedback) affe
 
 `RecommendationOutcome` attributes an existing `UserEvent` to the exposure that caused it. Outcome rows do not replace or duplicate `UserEvent`.
 
+### Impressions and dismissals
+
+An **impression** is a `CARD_VIEW` sent when a card is ≥50% visible continuously for ≥1 s (`src/lib/analytics/impressionGate.ts`, `AnalyticsCardViewTracker` with `dwellMs`; meta `impression: true`). For a verified exposure the first qualified impression (`meta.impression === true`) sets `RecommendationExposure.deliveredAt`; later ones do not overwrite it. Actions are existing `UserEvent`s (`DETAIL_OPEN`, `SAVE`, `PLAN_ADD`, `CTA_CLICK`, ...) linked through `RecommendationOutcome`. `UserEventType.DISMISS` ("не интересно") is a client-sendable negative signal (`BEHAVIOR_AFFINITY_WEIGHTS.DISMISS = -2`) and is attributed the same way. The journal collections carousel and My Plan recommendation cards use the impression rule.
+
+### «Для вашей семьи» (HOME, `family-picks-v1`)
+
+Политика поверхности поверх общего движка, не отдельный engine: кандидаты и сигналы (популярность, интересы, история) берёт `rankPlanSuggestionsForCity`; слой `src/server/services/recommendations/familyPicks/` добавляет жёсткие фильтры (скрытое/в плане, 18+, возраст MISMATCH у всех детей, вне окна), возраст по каждому ребёнку (MATCH / UNKNOWN / MISMATCH; MATCH всегда выше UNKNOWN), баллы с весами из `config.ts` (возраст 25, интересы 25, дата 30, территория 10, история 10, бюджет 0), разнообразие (≤2 на категорию, ≤1 на бизнес, 1 слот «Попробуйте новое» последним), уровни fallback (`PERSONAL` → `AGE` → `POPULAR` → скрыт при < 3 карточек) с честными заголовками и коды причин с шаблонами («Подходит: …» только при AGE_MATCH). Окно показа: чт–вс → ближайшие сб–вс, пн–ср → 7 дней. Выдача: `GET /api/recommendations/family-picks`; запуск пишется в `RecommendationRun`/`Exposure` (`exposureId` = impressionId, `intent = family_picks`, `scoreBreakdown.isPromoted` под PR 5).
+
 ## Versioning
 
 Every production recommendation run must have an `algorithmVersion`.
@@ -75,6 +83,7 @@ Current enum:
 - `DISCOVERY`
 - `MY_PLAN`
 - `TELEGRAM`
+- `JOURNAL`
 
 When a new surface is added, prefer reusing the shared candidate/ranking path and adding a surface policy. Creating a new `*RecommendationEngine` is an architecture violation unless the domain has genuinely different entities/objectives and the decision is explicitly documented.
 

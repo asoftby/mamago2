@@ -1,10 +1,11 @@
-import { ActivityFormat, type AgePolicy, type Prisma, type PublicationPriceMode } from "@prisma/client";
 import { placeInTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
+import { ActivityFormat, type AgePolicy, type Prisma, type PublicationPriceMode } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import type { ActivityMock } from "@/types/activity";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
 import { getBusinessQualityBoostMap, applyActivePublicationBoost } from "@/server/services/ranking/businessQualityBoost";
+import { ALL_BELARUS_REGIONS, getDiscoveryRegionContext } from "@/server/geo/boostRegionTargeting";
 
 function ageBoundsFromOffer(offer: {
   ageMinMonths: number | null;
@@ -35,7 +36,7 @@ export function projectOfferAudience(offer: {
   return { ...bounds, agePolicy: offer.agePolicy };
 }
 
-function extractOfferDateRange(input: {
+export function extractOfferDateRange(input: {
   dateFrom: Date | null;
   dateTo: Date | null;
   campSessions: unknown;
@@ -93,6 +94,7 @@ export function buildCanonicalOfferPriceWhere(
 
 type GetClassesDiscoveryFeedOptions = {
   take?: number;
+  onlyIds?: string[];
   chipSlug?: string | null;
   chipTitleBySlug?: Map<string, string>;
   free?: boolean;
@@ -129,11 +131,8 @@ export async function getClassesDiscoveryFeed(
   const publicWhere = getPublicPublishedOfferWhere();
   const publicWhereParts = (publicWhere.AND ?? []) as Prisma.OfferWhereInput[];
   const now = new Date();
-  // `/minsk` = the whole territory (city + region); unknown territory falls back to the legacy city.
-  const scope = await resolveTerritoryScope(citySlug);
-  const placeWhere: Prisma.PlaceWhereInput = scope
-    ? placeInTerritoryScopeWhere(scope.territoryIds)
-    : { cityId };
+  const [scope, targetRegionId] = await Promise.all([resolveTerritoryScope(citySlug), getDiscoveryRegionContext(cityId, citySlug)]);
+  const placeWhere = scope ? placeInTerritoryScopeWhere(scope.territoryIds) : { cityId };
 
   // classChipSlugs column may not exist yet (pending migration).
   // We try the full query first; if it fails with a missing-column error we
@@ -142,7 +141,7 @@ export async function getClassesDiscoveryFeed(
   let classChipSlugsAvailable = true;
 
   try {
-    rows = await runQuery({ publicWhereParts, placeWhere, chipSlug, now, free, priceMax });
+    rows = await runQuery({ publicWhereParts, cityId, placeWhere, targetRegionId, chipSlug, now, free, priceMax, take, onlyIds: options?.onlyIds });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const isMissingColumn =
@@ -156,12 +155,16 @@ export async function getClassesDiscoveryFeed(
       try {
         rows = await runQuery({
           publicWhereParts,
+          cityId,
           placeWhere,
+          targetRegionId,
           chipSlug: null,
           now,
           free,
           priceMax,
           skipChipSlugsSelect: true,
+          take,
+          onlyIds: options?.onlyIds,
         });
       } catch {
         return [];
@@ -254,39 +257,67 @@ export async function getClassesDiscoveryFeed(
 
 type RunQueryParams = {
   publicWhereParts: Prisma.OfferWhereInput[];
-  placeWhere: Prisma.PlaceWhereInput;
+  cityId: string;
+  placeWhere?: Prisma.PlaceWhereInput;
+  targetRegionId: string | null;
   chipSlug: string | null;
   now: Date;
   free: boolean;
   priceMax: number | null;
   skipChipSlugsSelect?: boolean;
+  take?: number;
+  onlyIds?: string[];
 };
 
-async function runQuery({
-  publicWhereParts,
-  placeWhere,
-  chipSlug,
-  now,
-  free,
-  priceMax,
-  skipChipSlugsSelect = false,
-}: RunQueryParams) {
+export function buildClassesDiscoveryWhere(input: Pick<RunQueryParams, "publicWhereParts" | "cityId" | "placeWhere" | "targetRegionId" | "chipSlug" | "now" | "free" | "priceMax" | "skipChipSlugsSelect">): Prisma.OfferWhereInput {
+  const { publicWhereParts, cityId, placeWhere, targetRegionId, chipSlug, now, free, priceMax, skipChipSlugsSelect = false } = input;
   const priceWhere = buildCanonicalOfferPriceWhere({ free, priceMax });
-
-  return prisma.offer.findMany({
-    where: {
+  return {
       AND: [
         ...publicWhereParts,
         { kind: "SERVICE" },
-        { place: placeWhere },
+        {
+          OR: [
+            { place: placeWhere ?? { cityId } },
+            ...(targetRegionId ? [{
+              boosts: { some: {
+                isFreeDaily: false,
+                purchaseRequestKey: { not: null },
+                startAt: { lte: now }, endAt: { gt: now },
+                OR: [
+                  { targetRegionIds: { has: targetRegionId } },
+                  { targetRegionIds: { has: ALL_BELARUS_REGIONS } },
+                ],
+              } },
+            } satisfies Prisma.OfferWhereInput] : []),
+          ],
+        },
         ...(priceWhere ? [priceWhere] : []),
         // Only add chip filter when column exists and chip is requested
         ...(chipSlug && !skipChipSlugsSelect
           ? [{ classChipSlugs: { has: chipSlug } } as Prisma.OfferWhereInput]
           : []),
       ],
-    },
-    take: 120,
+    };
+}
+
+async function runQuery({
+  publicWhereParts,
+  cityId,
+  placeWhere,
+  targetRegionId,
+  chipSlug,
+  now,
+  free,
+  priceMax,
+  skipChipSlugsSelect = false,
+  take = 80,
+  onlyIds,
+}: RunQueryParams) {
+  const where = buildClassesDiscoveryWhere({ publicWhereParts, cityId, placeWhere, targetRegionId, chipSlug, now, free, priceMax, skipChipSlugsSelect });
+  return prisma.offer.findMany({
+    where: onlyIds ? { AND: [where, { id: { in: onlyIds } } ] } : where,
+    take: onlyIds ? onlyIds.length : Math.max(120, take),
     orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
     select: {
       id: true,
@@ -321,7 +352,7 @@ async function runQuery({
           startAt: { lte: now },
           endAt: { gt: now },
         },
-        select: { id: true },
+        select: { id: true, targetRegionIds: true },
       },
     },
   });

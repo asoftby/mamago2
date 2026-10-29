@@ -7,6 +7,9 @@ import { OrderedMasonryGrid } from "@/components/ideas/OrderedMasonryGrid";
 import { visibleInCollection, type CollectionSummary, type CollectionMemberships } from "../collectionState";
 import type { IdeaItem } from "../types";
 
+/** CollectionCover and the "new collection" tile are 3:2 (height/width = 2/3). */
+const COLLECTION_COVER_RATIO = 2 / 3;
+
 type Props = {
   collections: CollectionSummary[];
   ideas: IdeaItem[];
@@ -23,22 +26,29 @@ export function IdeasCollectionsBar({ collections, ideas, memberships, onCreate,
   return (
     <section aria-label="Мои коллекции" className="min-w-0 space-y-4">
       <h2 className="text-lg font-semibold">Мои коллекции</h2>
-      <OrderedMasonryGrid itemClassName="pb-4">
-        {collections.map((item) => {
+      <OrderedMasonryGrid
+        itemClassName="pb-4"
+        items={[
+          ...collections.map((item) => {
           const covers = ideas
             .filter((idea) => visibleInCollection(idea, item.id, memberships))
             .map((idea) => idea.activity.coverImageUrl)
             .filter((url): url is string => Boolean(url))
             .slice(0, 4);
 
-          return (
-            <div key={item.id} className="min-w-0">
+          return {
+            key: item.id,
+            ratio: COLLECTION_COVER_RATIO,
+            content: (
+            <div className="min-w-0">
               <Link
                 href={`/me/ideas/collections/${encodeURIComponent(item.id)}`}
                 className="group block w-full min-w-0 rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 aria-label={`Открыть коллекцию «${item.title}»`}
               >
-                <CollectionCover covers={covers} className="transition-shadow group-hover:shadow-md" />
+                <span data-masonry-media className="block">
+                  <CollectionCover covers={covers} className="transition-shadow group-hover:shadow-md" />
+                </span>
                 <span className="mt-3 block break-words text-base font-semibold">{item.title}</span>
                 <span className="text-xs text-muted-foreground">{item.count} сохранено</span>
               </Link>
@@ -51,19 +61,27 @@ export function IdeasCollectionsBar({ collections, ideas, memberships, onCreate,
                 <MoreHorizontal className="size-5" />
               </button>
             </div>
-          );
-        })}
+            ),
+          };
+        }),
+          {
+            key: "__new-collection",
+            ratio: COLLECTION_COVER_RATIO,
+            content: (
         <button
           type="button"
           onClick={onCreate}
           className="group min-w-0 self-start rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
-          <span className="flex aspect-[3/2] items-center justify-center rounded-2xl border-2 border-dashed border-border bg-surface-muted transition-colors group-hover:bg-surface-hover">
+          <span data-masonry-media className="flex aspect-[3/2] items-center justify-center rounded-2xl border-2 border-dashed border-border bg-surface-muted transition-colors group-hover:bg-surface-hover">
             <Plus className="size-9 text-muted-foreground" />
           </span>
           <span className="mt-3 block text-base font-semibold">Новая коллекция</span>
         </button>
-      </OrderedMasonryGrid>
+            ),
+          },
+        ]}
+      />
     </section>
   );
 }

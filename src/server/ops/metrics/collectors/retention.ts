@@ -1,99 +1,87 @@
 /**
- * retention.w1 / retention.w1_prev, retention.w4 / retention.w4_prev —
+ * retention.w1 / retention.w4 (+ `_n` cohort size, + `_prev` / `_prev_n`) —
  * every 24h.
  *
- * Registration-date cohort retention, deliberately NOT "any qualifying
- * action since signup" (that would be far too generous — see the Metric
- * Dictionary / dashboard plan for why this is named "W1/W4", not "D7/D30"):
+ * Weekly ISO cohorts (ТЗ «Аналитика админки», C4), Minsk weeks Mon-Sun:
  *
- *   W1: cohort = accounts registered on day D = today-7; retained if they
- *       have >=1 qualifying planning action in [D+2, D+7] — i.e. a single
- *       next-day-only return does NOT count as retained.
- *   W4: cohort = accounts registered on day D = today-30; retained if
- *       active in [D+22, D+30].
+ *   W1: cohort = accounts registered in ISO week N; retained if they have
+ *       >=1 qualifying planning action in week N+1.
+ *   W4: same cohort definition; retained if active in week N+4.
  *
- * `_prev` is the same formula for the cohort registered exactly one day
- * earlier (D-1), giving a same-shaped day-over-day comparison — "compare
- * cohorts, not arbitrary date ranges" per the product spec.
+ * Only cohorts whose check week is already COMPLETE are measured, so the
+ * newest W1 cohort is week (current - 2) and the newest W4 cohort is week
+ * (current - 5); the check week is always the last completed week.
+ * `_prev` is the same formula for the previous weekly cohort (N-1) — a
+ * cohort-to-cohort comparison, not arbitrary date ranges.
  *
- * An empty cohort (no signups on that calendar day) skips writing that
- * metric for this cycle entirely — a retention rate is undefined for zero
- * registrants, never a fabricated 0/0 — mirroring search.ts's
- * skip-when-undefined convention for zero_result_rate.
+ * `*_n` is the cohort size. Small cohorts are noisy, so the dashboard hides
+ * the percentage when n < MIN_RATE_SAMPLE (30) and shows n instead (see
+ * dashboardViewModels.deriveHabit).
+ *
+ * An empty cohort (no signups that week) writes no samples for that cohort
+ * — a retention rate is undefined for zero registrants, never a fabricated
+ * 0/0 — mirroring search.ts's skip-when-undefined convention.
+ *
+ * "Qualifying planning action" is planningActivity.ts's single definition.
  */
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
-import { addDateKeyDays, startOfZonedDay, zonedDateKey, zonedDayRange } from "@/lib/stories/ranges";
+import { addDateKeyDays, zonedDateKey } from "@/lib/stories/ranges";
 import { AUDIENCE_EXCLUDED_ROLES } from "@/server/services/analytics/canonicalAudience";
+import { isoWeekMondayKey, isoWeekRange } from "@/server/services/analytics/isoWeeks";
 import { countUsersWithPlanningActivity } from "@/server/services/analytics/planningActivity";
 import type { MetricCollector, MetricCollectorContext, MetricSampleDraft } from "../types";
 
-interface RetentionWindowSpec {
-  /** Date key of the registration cohort day, e.g. "today - 7". */
-  cohortDateKey: string;
-  /** Offsets (inclusive) from the cohort day defining the check window. */
-  checkStartOffsetDays: number;
-  checkEndOffsetDaysExclusive: number;
+interface CohortResult {
+  rate: number;
+  size: number;
 }
 
-async function computeRetentionRate(
+/**
+ * Retention of the cohort registered in the ISO week starting `cohortMondayKey`,
+ * measured in the week `weeksAfter` weeks later. null for an empty cohort.
+ */
+async function computeCohortRetention(
   ctx: MetricCollectorContext,
-  spec: RetentionWindowSpec,
-): Promise<number | null> {
+  cohortMondayKey: string,
+  weeksAfter: number,
+): Promise<CohortResult | null> {
   const { prisma } = ctx;
-  const cohortRange = zonedDayRange(spec.cohortDateKey, 1, DEFAULT_TZ);
+  const cohortWeek = isoWeekRange(cohortMondayKey, DEFAULT_TZ);
 
   const cohortUsers = await prisma.user.findMany({
     where: {
-      createdAt: { gte: cohortRange.start, lt: cohortRange.end },
+      createdAt: { gte: cohortWeek.start, lt: cohortWeek.end },
       role: { notIn: [...AUDIENCE_EXCLUDED_ROLES] },
     },
     select: { id: true },
   });
   if (cohortUsers.length === 0) return null;
 
-  const checkStart = startOfZonedDay(addDateKeyDays(spec.cohortDateKey, spec.checkStartOffsetDays), DEFAULT_TZ);
-  const checkEnd = startOfZonedDay(addDateKeyDays(spec.cohortDateKey, spec.checkEndOffsetDaysExclusive), DEFAULT_TZ);
-
+  const checkWeek = isoWeekRange(addDateKeyDays(cohortMondayKey, 7 * weeksAfter), DEFAULT_TZ);
   const retained = await countUsersWithPlanningActivity(
     prisma,
     cohortUsers.map((u) => u.id),
-    checkStart,
-    checkEnd,
+    checkWeek.start,
+    checkWeek.end,
   );
-  return retained / cohortUsers.length;
+  return { rate: retained / cohortUsers.length, size: cohortUsers.length };
+}
+
+function pushCohort(samples: MetricSampleDraft[], metric: string, result: CohortResult | null): void {
+  if (result === null) return;
+  samples.push({ metric, value: result.rate }, { metric: `${metric}_n`, value: result.size });
 }
 
 export async function collectRetention(ctx: MetricCollectorContext): Promise<MetricSampleDraft[]> {
-  const todayKey = zonedDateKey(ctx.now, DEFAULT_TZ);
+  const currentMonday = isoWeekMondayKey(zonedDateKey(ctx.now, DEFAULT_TZ));
+  const weeksBack = (n: number) => addDateKeyDays(currentMonday, -7 * n);
   const samples: MetricSampleDraft[] = [];
 
-  const w1 = await computeRetentionRate(ctx, {
-    cohortDateKey: addDateKeyDays(todayKey, -7),
-    checkStartOffsetDays: 2,
-    checkEndOffsetDaysExclusive: 8, // [D+2, D+7] inclusive of day D+7
-  });
-  if (w1 !== null) samples.push({ metric: "retention.w1", value: w1 });
-
-  const w1Prev = await computeRetentionRate(ctx, {
-    cohortDateKey: addDateKeyDays(todayKey, -8),
-    checkStartOffsetDays: 2,
-    checkEndOffsetDaysExclusive: 8,
-  });
-  if (w1Prev !== null) samples.push({ metric: "retention.w1_prev", value: w1Prev });
-
-  const w4 = await computeRetentionRate(ctx, {
-    cohortDateKey: addDateKeyDays(todayKey, -30),
-    checkStartOffsetDays: 22,
-    checkEndOffsetDaysExclusive: 31, // [D+22, D+30] inclusive of day D+30
-  });
-  if (w4 !== null) samples.push({ metric: "retention.w4", value: w4 });
-
-  const w4Prev = await computeRetentionRate(ctx, {
-    cohortDateKey: addDateKeyDays(todayKey, -31),
-    checkStartOffsetDays: 22,
-    checkEndOffsetDaysExclusive: 31,
-  });
-  if (w4Prev !== null) samples.push({ metric: "retention.w4_prev", value: w4Prev });
+  // Check week = the last completed week: cohort N = current - (weeksAfter + 1).
+  pushCohort(samples, "retention.w1", await computeCohortRetention(ctx, weeksBack(2), 1));
+  pushCohort(samples, "retention.w1_prev", await computeCohortRetention(ctx, weeksBack(3), 1));
+  pushCohort(samples, "retention.w4", await computeCohortRetention(ctx, weeksBack(5), 4));
+  pushCohort(samples, "retention.w4_prev", await computeCohortRetention(ctx, weeksBack(6), 4));
 
   return samples;
 }

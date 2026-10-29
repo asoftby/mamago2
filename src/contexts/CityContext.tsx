@@ -10,6 +10,7 @@ import {
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { appendCityQuery as appendCityQueryToHref } from "@/lib/city/appendCityQuery";
+import { isScopedEventBrowsing } from "@/lib/city/scopedEventBrowsing";
 import {
   DEFAULT_CITY_SLUG,
   type ResolvedCityContext,
@@ -39,6 +40,7 @@ function readStoredSelection(): string | null {
 type CityContextValue = ResolvedCityContext & {
   citySlug: string;
   cityName: string;
+  isHydrated: boolean;
   setCity: (slug: string) => void;
   appendCityQuery: (href: string) => string;
 };
@@ -50,18 +52,19 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { cities } = usePublicCityOptions();
+  const scopedEvents = isScopedEventBrowsing(pathname, searchParams.get("explore"));
 
   // 1. Initial city from URL or default (SSR-safe source of truth)
   const cityFromQuery = searchParams.get("city");
   const initialResolved = useMemo(
     () =>
       resolveCityContext({
-        pathname,
-        cityFromQuery,
+        pathname: scopedEvents ? null : pathname,
+        cityFromQuery: scopedEvents ? null : cityFromQuery,
         preferredCitySlug: null, // Don't use storage on init to avoid hydration flicker
         allowedCitySlugs: cities.map((city) => city.slug),
       }),
-    [pathname, cityFromQuery, cities],
+    [pathname, cityFromQuery, cities, scopedEvents],
   );
 
   const [storedCity, setStoredCity] = useState<string | null>(null);
@@ -86,30 +89,21 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
     // If no city in URL, use storage as fallback (only after hydration)
     if (isInitialized && storedCity) {
       return resolveCityContext({
-        pathname,
-        cityFromQuery,
+        pathname: scopedEvents ? null : pathname,
+        cityFromQuery: scopedEvents ? null : cityFromQuery,
         preferredCitySlug: storedCity,
         allowedCitySlugs: cities.map((city) => city.slug),
       });
     }
 
     return initialResolved;
-  }, [initialResolved, isInitialized, storedCity, pathname, cityFromQuery, cities]);
+  }, [initialResolved, isInitialized, storedCity, pathname, cityFromQuery, cities, scopedEvents]);
 
   const citySlug = resolvedCity.citySlug ?? DEFAULT_CITY_SLUG;
   const cityName = resolvedCity.cityName ?? citySlug;
 
-  // 3. Sync storage with stable city (but NO router.push/refresh here)
-  useEffect(() => {
-    if (!isInitialized || !resolvedCity.citySlug) return;
-    if (resolvedCity.citySlug === storedCity) return;
-
-    // Only update storage if it's a route-based city or a default
-    writeTerritoryCookieClient(resolvedCity.citySlug);
-    queueMicrotask(() => {
-      setStoredCity(resolvedCity.citySlug);
-    });
-  }, [resolvedCity.citySlug, storedCity, isInitialized]);
+  // A route is not consent to change the persisted catalog territory.
+  // Only the explicit global header setCity() action writes mg_territory.
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production" && isInitialized) {
@@ -124,7 +118,7 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
 
   const setCity = useCallback(
     (slug: string) => {
-      if (slug === citySlug) return;
+      if (slug === citySlug && !scopedEvents) return;
 
       if (process.env.NODE_ENV !== "production") {
         console.debug("[CityContext] user city change", { from: citySlug, to: slug });
@@ -134,7 +128,7 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
       setStoredCity(slug);
       router.push(`/${slug}`);
     },
-    [router, citySlug],
+    [router, citySlug, scopedEvents],
   );
 
   const appendCityQuery = useCallback(
@@ -143,8 +137,8 @@ function CityProviderInner({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ ...resolvedCity, citySlug, cityName, setCity, appendCityQuery }),
-    [resolvedCity, citySlug, cityName, setCity, appendCityQuery],
+    () => ({ ...resolvedCity, citySlug, cityName, isHydrated: isInitialized, setCity, appendCityQuery }),
+    [resolvedCity, citySlug, cityName, isInitialized, setCity, appendCityQuery],
   );
 
   return <CityContext.Provider value={value}>{children}</CityContext.Provider>;
@@ -178,6 +172,7 @@ export function useCity(): CityContextValue {
       ...resolvedCity,
       citySlug,
       cityName,
+      isHydrated: true,
       setCity: (slug: string) => {
         writeTerritoryCookieClient(slug);
         router.push(`/${slug}`);

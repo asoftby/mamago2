@@ -6,6 +6,11 @@ import { redactPartyContacts } from "./partyPrivacy";
 import { isAutoConfirmMode } from "./partySelection";
 import { verifyPartyOffers } from "./partyDraft.service";
 import { clockMinutes, isFixedPriceReply } from "./partyFixedPrice";
+import { requestPartyAddonsAfterAnchor } from "./partyAddonFanout";
+import { isPartyConfirmationEnabled } from "./partyConfirmationFlag";
+import {
+  allocatePartyUnit, isAllocationOverlapError, lockAvailablePartyUnit, type PartyUnitWindow,
+} from "./partyUnitAllocation";
 
 
 export async function listBusinessPartyRequests(businessId: string, onlyAttention = false) {
@@ -84,6 +89,7 @@ export async function replyToPartyRequest(params: {
           partyOrder: { select: {
             id: true, ownerUserId: true, citySlug: true, eventDate: true,
             timeFrom: true, timeTo: true, venueMode: true, status: true,
+            childrenCount: true, adultsCount: true, childAge: true,
           } },
         },
       },
@@ -120,6 +126,8 @@ export async function replyToPartyRequest(params: {
   }
   if (!order.eventDate || !order.timeFrom) throw new PartyApiError(422, "Не задано время праздника");
   const startAt = partyStartAt(order.eventDate, order.timeFrom);
+  // Narrowed copy for the transaction callback (add-on fan-out after auto-confirmation).
+  const datedOrder = { ...order, eventDate: order.eventDate, timeFrom: order.timeFrom };
   if (startAt <= now) throw new PartyApiError(410, "Дата праздника уже прошла");
   const expiresAt = new Date(Math.min(now.getTime() + 24 * 3_600_000, startAt.getTime() - 3_600_000));
   if (input.type !== "DECLINED" && expiresAt <= now) {
@@ -129,132 +137,196 @@ export async function replyToPartyRequest(params: {
   const declined = input.type === "DECLINED";
   const from = clockMinutes(order.timeFrom);
   const to = clockMinutes(order.timeTo);
-  const autoConfirm = !declined && isAutoConfirmMode(order.venueMode) &&
+  // With confirmations switched off the reply is still recorded, but only as a QUOTED offer.
+  const fixedPrice = !declined && isPartyConfirmationEnabled() && isAutoConfirmMode(order.venueMode) &&
     !item.confirmedBookingRequestId && isFixedPriceReply({
       type: input.type, pricingMode: item.pricingMode, snapshot: item.offerPriceSnapshot,
       priceByn: input.priceByn, replyDurationMinutes: input.durationMinutes,
       orderDurationMinutes: from != null && to != null && to > from ? to - from : null,
     });
+  // A performer is an exclusive BookingUnit. The system confirms on its own only when the
+  // offer has exactly one active performer whose occupancy it can check and record;
+  // otherwise the reply waits for a manual confirmation with an explicit unit choice.
+  const performerUnits = fixedPrice && existing.offerId && order.timeTo
+    ? await prisma.bookingUnitOffer.findMany({
+        where: { offerId: existing.offerId, bookingUnit: { businessId, status: "ACTIVE" } },
+        select: { bookingUnitId: true },
+      })
+    : [];
+  const performerUnitId = performerUnits.length === 1 ? performerUnits[0].bookingUnitId : null;
+  const autoConfirm = fixedPrice && performerUnitId !== null;
+  const partyTimeTo = order.timeTo;
 
-  return prisma.$transaction(async (tx) => {
-    // Automatic confirmation skips confirmPartyRequest, so repeat its live check:
-    // a withdrawn or reassigned publication must not become a confirmed booking.
-    if (autoConfirm) {
-      const offerId = existing.offerId;
-      const verified = offerId ? await verifyPartyOffers(order.citySlug, [offerId], tx) : null;
-      if (!offerId || verified?.get(offerId)?.place?.ownerBusinessId !== businessId) {
-        throw new PartyApiError(422, "Услуга больше не доступна у этого исполнителя");
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // Lock the request before any resource, in the same order as confirmPartyRequest,
+      // quote acceptance and expiry: concurrent paths must conflict (409), not deadlock.
+      await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${requestId} FOR UPDATE`;
+      let performerWindow: PartyUnitWindow | null = null;
+      // Automatic confirmation skips confirmPartyRequest, so repeat its live check:
+      // a withdrawn or reassigned publication must not become a confirmed booking.
+      if (autoConfirm) {
+        const offerId = existing.offerId;
+        const verified = offerId ? await verifyPartyOffers(order.citySlug, [offerId], tx) : null;
+        if (!offerId || verified?.get(offerId)?.place?.ownerBusinessId !== businessId) {
+          throw new PartyApiError(422, "Услуга больше не доступна у этого исполнителя");
+        }
+        // Same lock and checks as the business confirmation: the performer must be free
+        // for the party time widened by prep/cleanup, or the reply is rejected (409).
+        performerWindow = await lockAvailablePartyUnit(tx, {
+          unitId: performerUnitId!, businessId, offerId,
+          order: { ...datedOrder, timeTo: partyTimeTo! }, now,
+        });
       }
-    }
-    // Compare-and-swap prevents two concurrent replies from both producing quotes.
-    const claimed = await tx.bookingRequest.updateMany({
-      where: {
-        id: requestId, businessId, kind: BookingKind.PARTY,
-        partyStage: input.expectedStage,
-        lastActivityAt: existing.lastActivityAt,
-        responseDueAt: { gt: now },
-      },
-      data: {
-        partyStage: declined ? "DECLINED" : autoConfirm ? "CONFIRMED" : "QUOTED",
-        ...(declined ? { status: BookingStatus.REJECTED, rejectedAt: now,
-          partyCloseReason: "BUSINESS_DECLINED" } : autoConfirm ? {
-          status: BookingStatus.CONFIRMED, partyCloseReason: null, responseDueAt: null,
-        } : {
-          status: BookingStatus.NEW,
-          partyCloseReason: null,
-        }),
-        lastActivityAt: now,
-        ...(existing.firstResponseAt ? {} : {
-          firstResponseAt: now,
-          responseTimeMinutes: Math.max(0, Math.round((now.getTime() - existing.createdAt.getTime()) / 60_000)),
-        }),
-      },
-    });
-    if (claimed.count !== 1) throw new PartyApiError(409, "Заявка уже изменена");
-
-    // Lock the order after the request, matching the expiry worker lock order.
-    // If the parent cancelled meanwhile, the transaction rolls back the claim.
-    const orderClaim = await tx.partyOrder.updateMany({
-      where: {
-        id: order.id,
-        status: { in: [PartyOrderStatus.ANCHOR_PENDING, PartyOrderStatus.ANCHOR_CONFIRMED] },
-      },
-      data: {
-        version: { increment: 1 },
-        ...(item.role === "ANCHOR" ? {
-          status: declined ? PartyOrderStatus.NEEDS_ALTERNATIVE
-            : autoConfirm ? PartyOrderStatus.ANCHOR_CONFIRMED : PartyOrderStatus.ANCHOR_PENDING,
-        } : {}),
-      },
-    });
-    if (orderClaim.count !== 1) throw new PartyApiError(409, "Праздник уже изменён");
-
-    await tx.partyQuote.updateMany({
-      where: { bookingRequestId: requestId, status: { in: ["ACTIVE", "ACCEPTED"] } },
-      data: { status: "SUPERSEDED", decidedAt: now },
-    });
-    const quote = await tx.partyQuote.create({
-      data: {
-        bookingRequestId: requestId, version, idempotencyKey,
-        respondedByUserId: actorUserId, type: input.type,
-        status: declined ? "REJECTED" : autoConfirm ? "ACCEPTED" : "ACTIVE",
-        ...(autoConfirm ? { decidedAt: now, decidedByUserId: null } : {}),
-        ...(declined ? {
-          declineReason: input.declineReason,
-          declineComment: input.declineComment ?? null,
-        } : {
-          priceByn: new Prisma.Decimal(input.priceByn),
-          includes: input.includes,
-          durationMinutes: input.durationMinutes ?? null,
-          prepaymentTerms: input.prepaymentTerms ?? null,
-          cancellationTerms: input.cancellationTerms ?? null,
-          changeReason: input.type === "MODIFIED" ? input.changeReason : null,
-          validUntil: expiresAt,
-        }),
-      },
-      select: { id: true, version: true, type: true, status: true },
-    });
-    if (autoConfirm) {
-      // confirmedBookingRequestId is unique: a second confirmed request for the item cannot win.
-      const confirmedItem = await tx.partyOrderItem.updateMany({
-        where: { id: item.id, confirmedBookingRequestId: null },
-        data: { status: PartyItemStatus.CONFIRMED, confirmedBookingRequestId: requestId },
-      });
-      if (confirmedItem.count !== 1) throw new PartyApiError(409, "Услуга уже подтверждена другой заявкой");
-    } else {
-      await tx.partyOrderItem.update({
-        where: { id: item.id },
-        data: { status: declined ? PartyItemStatus.DECLINED : PartyItemStatus.NEEDS_DECISION },
-      });
-    }
-    await tx.bookingActivity.create({
-      data: {
-        bookingId: requestId,
-        type: declined ? "STATUS_CHANGED" : "QUOTE_SENT",
-        actorType: "BUSINESS", actorId: actorUserId,
-        payload: { quoteId: quote.id, version, type: input.type,
-          fromStage: input.expectedStage,
-          toStage: declined ? "DECLINED" : autoConfirm ? "CONFIRMED" : "QUOTED" },
-      },
-    });
-    if (autoConfirm) {
-      await tx.bookingActivity.create({
+      // Compare-and-swap prevents two concurrent replies from both producing quotes.
+      const claimed = await tx.bookingRequest.updateMany({
+        where: {
+          id: requestId, businessId, kind: BookingKind.PARTY,
+          partyStage: input.expectedStage,
+          lastActivityAt: existing.lastActivityAt,
+          responseDueAt: { gt: now },
+        },
         data: {
-          bookingId: requestId, type: "QUOTE_ACCEPTED", actorType: "SYSTEM",
-          payload: { quoteId: quote.id, version, auto: true, rule: "FIXED_PRICE" },
+          partyStage: declined ? "DECLINED" : autoConfirm ? "CONFIRMED" : "QUOTED",
+          ...(declined ? { status: BookingStatus.REJECTED, rejectedAt: now,
+            partyCloseReason: "BUSINESS_DECLINED" } : autoConfirm ? {
+            status: BookingStatus.CONFIRMED, partyCloseReason: null, responseDueAt: null,
+          } : {
+            status: BookingStatus.NEW,
+            partyCloseReason: null,
+          }),
+          lastActivityAt: now,
+          ...(existing.firstResponseAt ? {} : {
+            firstResponseAt: now,
+            responseTimeMinutes: Math.max(0, Math.round((now.getTime() - existing.createdAt.getTime()) / 60_000)),
+          }),
         },
       });
-    }
-    await tx.partyOutbox.create({
-      data: {
-        eventType: declined ? "PARTY_REQUEST_DECLINED"
-          : autoConfirm ? "PARTY_BOOKING_CONFIRMED" : "PARTY_QUOTE_SENT",
-        aggregateId: requestId,
-        dedupeKey: autoConfirm ? "party:" + requestId + ":confirmed"
-          : "party:" + requestId + ":quote:" + quote.id,
-        payload: { partyOrderId: order.id, requestId, quoteId: quote.id, userId: order.ownerUserId },
-      },
+      if (claimed.count !== 1) throw new PartyApiError(409, "Заявка уже изменена");
+      // Keep the durable invitation in sync with its BookingRequest.
+      // Retry/competing replies are rejected by the request CAS above.
+      await tx.partyProviderInvite.updateMany({
+        where: { bookingRequestId: requestId, status: "SENT" },
+        data: {
+          status: declined ? "DECLINED" : autoConfirm ? "CONFIRMED" : "QUOTED",
+          ...(declined || autoConfirm ? { resolvedAt: now } : {}),
+        },
+      });
+
+
+      // Lock the order after the request, matching the expiry worker lock order.
+      // If the parent cancelled meanwhile, the transaction rolls back the claim.
+      const orderClaim = await tx.partyOrder.updateMany({
+        where: {
+          id: order.id,
+          status: { in: [PartyOrderStatus.ANCHOR_PENDING, PartyOrderStatus.ANCHOR_CONFIRMED] },
+        },
+        data: {
+          version: { increment: 1 },
+          ...(item.role === "ANCHOR" ? {
+            status: declined ? PartyOrderStatus.NEEDS_ALTERNATIVE
+              : autoConfirm ? PartyOrderStatus.ANCHOR_CONFIRMED : PartyOrderStatus.ANCHOR_PENDING,
+          } : {}),
+        },
+      });
+      if (orderClaim.count !== 1) throw new PartyApiError(409, "Праздник уже изменён");
+
+      await tx.partyQuote.updateMany({
+        where: { bookingRequestId: requestId, status: { in: ["ACTIVE", "ACCEPTED"] } },
+        data: { status: "SUPERSEDED", decidedAt: now },
+      });
+      const quote = await tx.partyQuote.create({
+        data: {
+          bookingRequestId: requestId, version, idempotencyKey,
+          respondedByUserId: actorUserId, type: input.type,
+          status: declined ? "REJECTED" : autoConfirm ? "ACCEPTED" : "ACTIVE",
+          ...(autoConfirm ? { decidedAt: now, decidedByUserId: null } : {}),
+          ...(declined ? {
+            declineReason: input.declineReason,
+            declineComment: input.declineComment ?? null,
+          } : {
+            priceByn: new Prisma.Decimal(input.priceByn),
+            includes: input.includes,
+            durationMinutes: input.durationMinutes ?? null,
+            prepaymentTerms: input.prepaymentTerms ?? null,
+            cancellationTerms: input.cancellationTerms ?? null,
+            changeReason: input.type === "MODIFIED" ? input.changeReason : null,
+            validUntil: expiresAt,
+          }),
+        },
+        select: { id: true, version: true, type: true, status: true },
+      });
+      if (autoConfirm) {
+        // confirmedBookingRequestId is unique: a second confirmed request for the item cannot win.
+        const confirmedItem = await tx.partyOrderItem.updateMany({
+          where: { id: item.id, confirmedBookingRequestId: null },
+          data: { status: PartyItemStatus.CONFIRMED, confirmedBookingRequestId: requestId },
+        });
+        if (confirmedItem.count !== 1) throw new PartyApiError(409, "Услуга уже подтверждена другой заявкой");
+        await allocatePartyUnit(tx, {
+          unitId: performerUnitId!, requestId, quoteId: quote.id, window: performerWindow!,
+        });
+        // An automatically confirmed anchor starts the add-on requests exactly like a
+        // business confirmation does, in the same transaction.
+        if (item.role === "ANCHOR") {
+          await requestPartyAddonsAfterAnchor(tx, {
+            order: datedOrder, anchorRequestId: requestId, now,
+          });
+        }
+      } else {
+        // A declined invitation does not close the service while another
+        // candidate remains queued for an alternative attempt.
+        const queuedAlternatives = declined ? await tx.partyProviderInvite.count({
+          where: { partyOrderItemId: item.id, status: "QUEUED" },
+        }) : 0;
+        const otherActiveRequests = declined ? await tx.bookingRequest.count({
+          where: {
+            partyOrderItemId: item.id, id: { not: requestId }, kind: BookingKind.PARTY,
+            status: BookingStatus.NEW,
+            partyStage: { in: ["SENT", "QUOTED", "AWAITING_RECONFIRM"] },
+          },
+        }) : 0;
+        await tx.partyOrderItem.update({
+          where: { id: item.id },
+          data: { status: declined
+            ? queuedAlternatives > 0 || otherActiveRequests > 0
+              ? PartyItemStatus.REQUESTED : PartyItemStatus.DECLINED
+            : PartyItemStatus.NEEDS_DECISION },
+        });
+      }
+      await tx.bookingActivity.create({
+        data: {
+          bookingId: requestId,
+          type: declined ? "STATUS_CHANGED" : "QUOTE_SENT",
+          actorType: "BUSINESS", actorId: actorUserId,
+          payload: { quoteId: quote.id, version, type: input.type,
+            fromStage: input.expectedStage,
+            toStage: declined ? "DECLINED" : autoConfirm ? "CONFIRMED" : "QUOTED" },
+        },
+      });
+      if (autoConfirm) {
+        await tx.bookingActivity.create({
+          data: {
+            bookingId: requestId, type: "QUOTE_ACCEPTED", actorType: "SYSTEM",
+            payload: { quoteId: quote.id, version, auto: true, rule: "FIXED_PRICE" },
+          },
+        });
+      }
+      await tx.partyOutbox.create({
+        data: {
+          eventType: declined ? "PARTY_REQUEST_DECLINED"
+            : autoConfirm ? "PARTY_BOOKING_CONFIRMED" : "PARTY_QUOTE_SENT",
+          aggregateId: requestId,
+          dedupeKey: autoConfirm ? "party:" + requestId + ":confirmed"
+            : "party:" + requestId + ":quote:" + quote.id,
+          payload: { partyOrderId: order.id, requestId, quoteId: quote.id, userId: order.ownerUserId },
+        },
+      });
+      return { requestId, quote, alreadyResponded: false };
     });
-    return { requestId, quote, alreadyResponded: false };
-  });
+  } catch (error) {
+    // The DB exclusion constraint is the final guard against a concurrent booking.
+    if (isAllocationOverlapError(error)) throw new PartyApiError(409, "Исполнитель уже занят в это время");
+    throw error;
+  }
 }

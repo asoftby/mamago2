@@ -113,6 +113,21 @@ export function ChildrenCard({
   const [editingAdult, setEditingAdult] = useState(false);
   const [highlightChildId, setHighlightChildId] = useState<string | null>(null);
   const [highlightAdult, setHighlightAdult] = useState(false);
+  const [otherAdults, setOtherAdults] = useState<Array<{ userId: string; displayName: string | null; role: "OWNER" | "ADULT" }>>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch("/api/family", { credentials: "include", cache: "no-store", signal: controller.signal });
+        if (!response.ok) return;
+        const data = (await response.json()) as { family?: { adults?: Array<{ userId: string; displayName: string | null; role: "OWNER" | "ADULT"; isMe: boolean }> } | null };
+        if (!controller.signal.aborted) setOtherAdults((data.family?.adults ?? []).filter((m) => !m.isMe).map(({ userId, displayName, role }) => ({ userId, displayName, role })));
+      } catch {
+        // The family endpoint can be disabled; the existing profile stays usable.
+      }
+    })();
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     if (!highlightChildId) return;
@@ -219,6 +234,20 @@ export function ChildrenCard({
             </div>
           </button>
 
+          {otherAdults.map((member) => {
+            const name = member.displayName?.trim() || "Участник семьи";
+            return (
+              <div key={member.userId} className={cn(CARD_W, GLASS_MEMBER_CARD, "cursor-default")} aria-label={`Участник семьи: ${name}`}>
+                <div className="flex items-center gap-3">
+                  <div className={cn(AVATAR, "bg-white/55 text-primary ring-1 ring-white/70")}>{name.charAt(0).toUpperCase()}</div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-neutral-900 truncate">{name}</p>
+                    <p className="text-xs text-neutral-500 mt-0.5">{member.role === "OWNER" ? "Владелец семьи" : "Взрослый"}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
           {/* 2. Дети */}
           {childrenList.map((child, index) => {
             const interests = formatChildInterests(child);

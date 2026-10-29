@@ -6,6 +6,40 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AnalyticsOverviewFilters } from "@/lib/analytics/adminOverviewTypes";
+import {
+  internalTrafficExclusionSql,
+  internalTrafficExclusionWhere,
+  resolveInternalTrafficExclusion,
+  type InternalTrafficExclusion,
+} from "@/server/services/analytics/canonicalAudience";
+import {
+  resolveAnalyticsDateRange,
+  resolveCityIdFromSlug,
+} from "@/server/services/analytics/analyticsDateRange";
+
+/**
+ * Everything a `/admin/analytics` report needs to scope its queries, resolved
+ * once: Minsk-day window (B2), city, segment/child-age users, and the
+ * internal-traffic exclusion (B1). Every tab goes through this so the same
+ * filters give the same population.
+ */
+export interface AnalyticsScope {
+  start: Date;
+  end: Date;
+  cityId: string | null;
+  allowed: Set<string> | null;
+  exclusion: InternalTrafficExclusion;
+}
+
+export async function loadAnalyticsScope(filters: AnalyticsOverviewFilters): Promise<AnalyticsScope> {
+  const { start, end } = resolveAnalyticsDateRange(filters.dateRange);
+  const [cityId, allowed, exclusion] = await Promise.all([
+    resolveCityIdFromSlug(filters.city),
+    resolveAnalyticsAllowedUserIds(filters),
+    resolveInternalTrafficExclusion(prisma, start, end),
+  ]);
+  return { start, end, cityId, allowed, exclusion };
+}
 
 export function analyticsEntityMap(): Record<string, AnalyticsEntityType> {
   return {
@@ -44,7 +78,7 @@ function bandFromAgeYears(age: number): string {
   return "10+";
 }
 
-async function youngestChildBandByUser(): Promise<Map<string, string>> {
+export async function youngestChildBandByUser(): Promise<Map<string, string>> {
   const births = await youngestChildBirthByUser();
   const map = new Map<string, string>();
   for (const [userId, youngest] of births) {
@@ -100,9 +134,11 @@ export function buildAnalyticsBaseEventWhere(
   end: Date,
   filters: AnalyticsOverviewFilters,
   cityId: string | null,
+  exclusion: InternalTrafficExclusion | null = null,
 ): Prisma.UserEventWhereInput {
   const w: Prisma.UserEventWhereInput = {
     createdAt: { gte: start, lte: end },
+    ...(exclusion ? internalTrafficExclusionWhere(exclusion) : {}),
   };
   if (cityId) w.cityId = cityId;
   if (filters.entity && filters.entity !== "all") {
@@ -130,17 +166,34 @@ export function applyAnalyticsUserFilter(
   };
 }
 
+/** Identity ownership must be resolved across the entire reporting window, before
+ * city/entity/vertical/segment filters. Otherwise a shared browser can appear
+ * to belong to one user simply because another user's events were filtered out.
+ */
+export function analyticsIdentityWhereSql(
+  start: Date,
+  end: Date,
+  exclusion: InternalTrafficExclusion | null = null,
+): Prisma.Sql {
+  const dates = Prisma.sql`e."createdAt" >= ${start} AND e."createdAt" <= ${end}`;
+  return exclusion
+    ? Prisma.sql`${dates} AND ${internalTrafficExclusionSql(exclusion, "e")}`
+    : dates;
+}
+
 export function analyticsEventWhereSql(
   start: Date,
   end: Date,
   filters: AnalyticsOverviewFilters,
   cityId: string | null,
   allowed: Set<string> | null,
+  exclusion: InternalTrafficExclusion | null = null,
 ): Prisma.Sql {
   const parts: Prisma.Sql[] = [
     Prisma.sql`e."createdAt" >= ${start}`,
     Prisma.sql`e."createdAt" <= ${end}`,
   ];
+  if (exclusion) parts.push(internalTrafficExclusionSql(exclusion, "e"));
   if (cityId) parts.push(Prisma.sql`e."cityId" = ${cityId}`);
   if (filters.entity && filters.entity !== "all") {
     const et = analyticsEntityMap()[filters.entity];

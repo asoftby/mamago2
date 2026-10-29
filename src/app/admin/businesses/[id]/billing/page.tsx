@@ -12,6 +12,7 @@ import { AlertTriangle, CreditCard, Wallet, TrendingDown } from "lucide-react";
 import Link from "next/link";
 import { BYN_SYMBOL, formatPrice } from "@/lib/formatters/format-price";
 import { TableContainer } from "@/components/ui/table";
+import { formatAdminDate } from "@/lib/admin/formatRu";
 
 export default async function AdminBusinessBillingPage({
   params,
@@ -135,7 +136,7 @@ export default async function AdminBusinessBillingPage({
           </p>
           {currentSubscription && (
             <p className="text-sm text-gray-500 mt-1">
-              До {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString("ru-RU")}
+              До {formatAdminDate(currentSubscription.currentPeriodEnd)}
             </p>
           )}
         </div>
@@ -192,7 +193,7 @@ export default async function AdminBusinessBillingPage({
               {transactions.slice(0, 10).map((tx) => (
                 <tr key={tx.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-2 px-3 text-sm text-gray-900">
-                    {new Date(tx.occurredAt).toLocaleDateString("ru-RU")}
+                    {formatAdminDate(tx.occurredAt)}
                   </td>
                   <td className="py-2 px-3 text-sm">
                     <TransactionTypeBadge type={tx.type} />

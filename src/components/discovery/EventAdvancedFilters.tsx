@@ -5,6 +5,7 @@ import { serializeAppliedToSearchParams, useDiscoveryFilters, getDiscoveryFilter
 import { toggleEventCategory, useEventTaxonomy } from "@/features/filters/discovery/eventTaxonomy";
 import { Chip } from "@/components/ui/Chip";
 import { DiscoveryWhoFilter } from "./DiscoveryWhoFilter";
+import { EventTerritoryFilter } from "./EventTerritoryFilter";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { pluralize } from "@/lib/formatters/pluralize";
 import { useEventAvailableFacets } from "@/features/filters/discovery/useEventAvailableFacets";
@@ -15,6 +16,7 @@ import { MobileOverlayPrimaryAction } from "@/components/mobile/MobileOverlayPri
 import { formatPrice } from "@/lib/formatters/format-price";
 import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
 import { cn } from "@/lib/utils";
+import { useEventListingExplore } from "@/lib/city/useEventListingCitySlug";
 
 type PriceDistribution = {
   max: number | null;
@@ -62,85 +64,82 @@ export function priceSliderValueFromKey(key: string, current: number, domainMax:
   return undefined;
 }
 
+/** In a single-price range, keep the immovable thumbs at the track ends. */
+export function priceThumbPercent(thumb: "min" | "max", value: number, lower: number, upper: number): number {
+  if (upper <= lower) return thumb === "min" ? 0 : 100;
+  return Math.min(100, Math.max(0, ((value - lower) / (upper - lower)) * 100));
+}
+
 function PriceRangeControl({
   distribution,
   value,
   onChange,
   showHistogram = true,
+  inactive = false,
 }: {
   distribution: PriceDistribution;
   value: PriceRangeValue;
   onChange: (next: PriceRangeValue) => void;
   showHistogram?: boolean;
+  inactive?: boolean;
 }) {
   const trackRef = React.useRef<HTMLDivElement>(null);
-  const domainMax = distribution.max ?? 0;
-  const step = Math.max(1, distribution.step ?? 1);
-  const minValue = Math.min(Math.max(0, value.min ?? 0), domainMax);
-  const maxValue = Math.max(minValue, Math.min(value.max ?? domainMax, domainMax));
+  // Integer thumb positions enclose fractional prices without excluding events.
+  const lower = Math.floor(distribution.minPaid ?? 0);
+  const upper = Math.ceil(distribution.maxPrice ?? distribution.max ?? lower);
+  const locked = lower >= upper;
+  const disabled = inactive || locked;
+  const minValue = Math.min(upper, Math.max(lower, value.min ?? lower));
+  const maxValue = Math.max(minValue, Math.min(upper, value.max ?? upper));
   const peak = Math.max(1, ...distribution.buckets.map((item) => item.count));
-  const pct = (n: number) => domainMax > 0 ? (n / domainMax) * 100 : 0;
-
+  const minPercent = priceThumbPercent("min", minValue, lower, upper);
+  const maxPercent = priceThumbPercent("max", maxValue, lower, upper);
   const emit = (thumb: "min" | "max", raw: number) => {
+    if (disabled) return;
     if (thumb === "min") {
-      const nextMin = Math.min(maxValue, Math.max(0, raw));
-      onChange({
-        min: normalizePriceMinSliderValue(String(nextMin)),
-        max: maxValue >= domainMax ? null : maxValue,
-      });
-      return;
+      const nextMin = Math.min(maxValue, Math.max(lower, raw));
+      onChange({ min: nextMin <= lower ? null : nextMin, max: maxValue >= upper ? null : maxValue });
+    } else {
+      const nextMax = Math.max(minValue, Math.min(upper, raw));
+      onChange({ min: minValue <= lower ? null : minValue, max: nextMax >= upper ? null : nextMax });
     }
-    const nextMax = Math.max(minValue, Math.min(domainMax, raw));
-    onChange({
-      min: minValue <= 0 ? null : minValue,
-      max: normalizePriceSliderValue(String(nextMax), domainMax),
-    });
   };
-
   const valueFromPointer = (clientX: number) => {
     const rect = trackRef.current?.getBoundingClientRect();
-    if (!rect || rect.width <= 0) return null;
-    return priceSliderValueFromPosition(clientX, rect.left, rect.width, domainMax, step);
+    if (disabled || !rect || rect.width <= 0) return null;
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    return Math.min(upper, Math.max(lower, lower + Math.round(ratio * (upper - lower))));
   };
-
   const moveNearestThumb = (clientX: number) => {
     const next = valueFromPointer(clientX);
     if (next == null) return;
     emit(Math.abs(next - minValue) <= Math.abs(next - maxValue) ? "min" : "max", next);
   };
-
-  const handleThumbPointer = (
-    thumb: "min" | "max",
-    event: React.PointerEvent<HTMLButtonElement>,
-  ) => {
+  const handleThumbPointer = (thumb: "min" | "max", event: React.PointerEvent<HTMLButtonElement>) => {
+    if (disabled) return;
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
     const next = valueFromPointer(event.clientX);
     if (next != null) emit(thumb, next);
   };
-
-  const handleThumbMove = (
-    thumb: "min" | "max",
-    event: React.PointerEvent<HTMLButtonElement>,
-  ) => {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+  const handleThumbMove = (thumb: "min" | "max", event: React.PointerEvent<HTMLButtonElement>) => {
+    if (disabled || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
     const next = valueFromPointer(event.clientX);
     if (next != null) emit(thumb, next);
   };
-
-  const handleThumbKey = (
-    thumb: "min" | "max",
-    event: React.KeyboardEvent<HTMLButtonElement>,
-  ) => {
+  const handleThumbKey = (thumb: "min" | "max", event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (disabled) return;
     const current = thumb === "min" ? minValue : maxValue;
-    const next = priceSliderValueFromKey(event.key, current, domainMax, step);
+    const next = event.key === "Home" ? lower : event.key === "End" ? upper
+      : event.key === "ArrowLeft" || event.key === "ArrowDown" ? Math.max(lower, current - 1)
+      : event.key === "ArrowRight" || event.key === "ArrowUp" ? Math.min(upper, current + 1) : null;
     if (next == null) return;
     event.preventDefault();
     emit(thumb, next);
   };
 
   return (
-    <div className="space-y-4">
+    <div className={cn("space-y-4", inactive && "opacity-40")} aria-disabled={disabled}>
       <div className="relative pt-2">
         {showHistogram && distribution.buckets.length > 0 && <div className="flex h-24 items-end gap-1 px-5" aria-hidden>
           {distribution.buckets.map((bucket, index) => {
@@ -161,15 +160,15 @@ function PriceRangeControl({
 
         <div
           ref={trackRef}
-          className="relative mx-5 h-12 touch-none select-none"
+          className={cn("relative mx-5 h-12 touch-none select-none", disabled && "pointer-events-none")}
           onPointerDown={(event) => moveNearestThumb(event.clientX)}
         >
           <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-primary/25" />
           <div
             className="absolute top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-primary"
             style={{
-              left: `${pct(minValue)}%`,
-              right: `${100 - pct(maxValue)}%`,
+              left: `${minPercent}%`,
+              right: `${100 - maxPercent}%`,
             }}
           />
 
@@ -181,10 +180,12 @@ function PriceRangeControl({
                 type="button"
                 role="slider"
                 aria-label={thumb === "min" ? "Минимальная цена" : "Максимальная цена"}
-                aria-valuemin={thumb === "min" ? 0 : minValue}
-                aria-valuemax={thumb === "min" ? maxValue : domainMax}
+                aria-valuemin={thumb === "min" ? lower : minValue}
+                aria-valuemax={thumb === "min" ? maxValue : upper}
                 aria-valuenow={current}
                 aria-valuetext={formatPrice(current)}
+                aria-disabled={disabled}
+                disabled={disabled}
                 className={cn(
                   "absolute top-1/2 z-10 h-11 w-11 -translate-x-1/2 -translate-y-1/2 rounded-full sm:h-9 sm:w-9",
                   "border-2 border-primary bg-background shadow-[0_6px_20px_rgba(0,0,0,0.14)]",
@@ -192,7 +193,7 @@ function PriceRangeControl({
                   "focus-visible:ring-4 focus-visible:ring-primary/20",
                   "active:scale-95",
                 )}
-                style={{ left: `${pct(current)}%` }}
+                style={{ left: `${thumb === "min" ? minPercent : maxPercent}%` }}
                 onPointerDown={(event) => handleThumbPointer(thumb, event)}
                 onPointerMove={(event) => handleThumbMove(thumb, event)}
                 onKeyDown={(event) => handleThumbKey(thumb, event)}
@@ -207,18 +208,14 @@ function PriceRangeControl({
       </div>
 
       <div className="flex items-start justify-between gap-3">
-        <div className="flex max-w-[calc(50%-0.375rem)] flex-col items-start gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Минимум</span>
+        <div className="flex max-w-[calc(50%-0.375rem)] flex-col items-center gap-2">
+          <span className="text-center text-xs font-normal text-muted-foreground">Минимум</span>
           <div className="inline-flex h-9 max-w-full items-center justify-center rounded-full border border-border bg-white px-4 text-sm font-normal text-foreground">
-            {minValue > 0
-              ? renderPriceWithIcon(formatPrice(minValue), { iconSize: "text" })
-              : distribution.minPaid != null
-                ? renderPriceWithIcon(formatPrice(distribution.minPaid), { iconSize: "text" })
-                : "Нет платных"}
+            {renderPriceWithIcon(formatPrice(value.min == null ? (distribution.minPaid ?? minValue) : minValue), { iconSize: "text" })}
           </div>
         </div>
-        <div className="flex max-w-[calc(50%-0.375rem)] flex-col items-end gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Максимум</span>
+        <div className="flex max-w-[calc(50%-0.375rem)] flex-col items-center gap-2">
+          <span className="text-center text-xs font-normal text-muted-foreground">Максимум</span>
           <div className="inline-flex h-9 max-w-full items-center justify-center rounded-full border border-border bg-white px-4 text-sm font-normal text-foreground">
             {renderPriceWithIcon(formatPrice(value.max == null ? (distribution.maxPrice ?? maxValue) : maxValue), { iconSize: "text" })}
           </div>
@@ -232,6 +229,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
   const { applied: draft, actions } = useDiscoveryFilters();
   const family = useFamilyPersona();
   const facets = useEventAvailableFacets(draft);
+  const explore = useEventListingExplore();
   const { categories, loading: taxonomyLoading } = useEventTaxonomy(citySlug);
   const [count, setCount] = React.useState<number | null>(null);
   const [distribution, setDistribution] = React.useState<PriceDistribution>({ max: null, maxPrice: null, minPaid: null, step: null, buckets: [] });
@@ -242,6 +240,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
     const timer = setTimeout(() => {
       const params = serializeAppliedToSearchParams(new URLSearchParams(), draft);
       params.set("city", citySlug);
+      if (explore) params.set("explore", "1");
       fetch(`/api/discovery/events/count?${params}`, { signal: controller.signal })
         .then((response) => response.ok ? response.json() : null)
         .then((data) => setCount(data?.count ?? null))
@@ -249,6 +248,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
 
       params.delete("priceMin");
       params.delete("priceMax");
+      params.delete("free");
       fetch(`/api/discovery/events/price-distribution?${params}`, { signal: controller.signal })
         .then((response) => response.ok ? response.json() : null)
         .then((data: PriceDistribution | null) => {
@@ -258,10 +258,11 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
         .catch(() => {});
     }, 150);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [citySlug, draft]);
+  }, [citySlug, draft, explore]);
 
   return (
     <div className="space-y-6 pb-1">
+      <EventTerritoryFilter onApply={onApply} filters={draft} onBeforeNavigate={actions.cancelPendingWrite} />
       <DiscoveryWhoFilter inline />
 
       {(draft.occasionSlug === "halloween" || facets?.occasions.includes("halloween")) && (
@@ -343,10 +344,11 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
           Бесплатно
         </Chip>}
 
-        {!draft.free && distribution.max != null && distribution.max > 0 && (
+        {distribution.minPaid != null && distribution.maxPrice != null && (
           <PriceRangeControl
             distribution={distribution}
             value={{ min: draft.priceMin, max: draft.priceMax }}
+            inactive={draft.free}
             showHistogram={distribution.buckets.some(bucket => bucket.count > 0)}
             onChange={(next) => patch({
               free: false,
@@ -357,7 +359,7 @@ export function EventAdvancedFilters({ citySlug, onApply }: { citySlug: string; 
         )}
       </fieldset>}
 
-      <div className="sticky bottom-0 z-10 -mx-4 flex items-center gap-2 border-t bg-white/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:mx-0 lg:justify-between lg:px-0 lg:pb-0 lg:pt-4 lg:backdrop-blur-none">
+      <div className="fixed bottom-0 left-0 right-0 z-20 flex items-center gap-2 border-t border-white/50 bg-white/75 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_32px_rgba(0,0,0,0.07)] backdrop-blur-2xl supports-[backdrop-filter]:bg-white/65 lg:sticky lg:-mx-6 lg:-mb-6 lg:justify-between lg:px-6 lg:pb-6 lg:pt-4">
         <MobileOverlayResetAction
           className="min-h-11 px-2 lg:min-h-0 lg:rounded-none lg:px-0 lg:py-0 lg:font-semibold lg:text-foreground lg:underline lg:hover:bg-transparent lg:hover:text-foreground lg:active:bg-transparent"
           onClick={() => {

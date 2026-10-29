@@ -30,6 +30,31 @@ export function resolvePerformanceWindow(
   return { start, end, previousStart, previousEnd: start, dayCount };
 }
 
+/**
+ * Window of `dayCount` COMPLETED Minsk days ending at the last midnight, plus
+ * the equally-sized window right before it. Unlike `resolvePerformanceWindow`
+ * (which ends "now" and therefore holds a partial current day), both windows
+ * here are whole days, so a week-over-week / month-over-month comparison does
+ * not depend on the weekday/hour the metric is computed (ТЗ «Аналитика
+ * админки», C1).
+ *
+ * `end` / `previousEnd` are exclusive midnight bounds, matching SQL `createdAt < end`.
+ * Adjacent windows do not overlap or omit the final millisecond.
+ */
+export function resolveCompletedWindow(dayCount: number, now = new Date(), timeZone = DEFAULT_TZ): PerformanceWindow {
+  const todayKey = zonedDateKey(now, timeZone);
+  const todayStart = startOfZonedDay(todayKey, timeZone);
+  const start = startOfZonedDay(addDateKeyDays(todayKey, -dayCount), timeZone);
+  const previousStart = startOfZonedDay(addDateKeyDays(todayKey, -2 * dayCount), timeZone);
+  return {
+    start,
+    end: todayStart,
+    previousStart,
+    previousEnd: start,
+    dayCount,
+  };
+}
+
 export function ratioPercent(numerator: number, denominator: number): number | null {
   return denominator > 0 ? Math.round((numerator / denominator) * 1000) / 10 : null;
 }

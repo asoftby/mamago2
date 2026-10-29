@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  heldPartyOutboxEventTypes, isPartyOutboxEventType, partyNotificationId, partyOutboxBackoff, partyOutboxCopy,
+  heldPartyOutboxEventTypes, isBusinessPartyEvent, isPartyOutboxEventType, partyNotificationId,
+  partyOutboxBackoff, partyOutboxCopy,
 } from "./partyOutbox.logic";
 import { authorizeCronRequest } from "@/server/cron/authorizeCron";
 
@@ -18,6 +19,20 @@ for (const type of ["PARTY_REQUEST_SENT", "PARTY_QUOTE_SENT", "PARTY_REQUEST_DEC
   assert.doesNotMatch(copy.body, /телефон|\+375/i);
 }
 assert.equal(isPartyOutboxEventType("UNKNOWN"), false);
+// An expired quote notifies both sides; the business copy links to the gated inbox.
+assert.equal(partyOutboxCopy({ type: "PARTY_QUOTE_EXPIRED", offerTitle: "Квест", dateLabel: "x" }).audience, "USER");
+assert.equal(partyOutboxCopy({ type: "PARTY_QUOTE_EXPIRED_BUSINESS", offerTitle: "Квест", dateLabel: "x" }).audience, "BUSINESS");
+assert.equal(isBusinessPartyEvent("PARTY_QUOTE_EXPIRED_BUSINESS"), true);
+assert.equal(isBusinessPartyEvent("PARTY_QUOTE_EXPIRED"), false);
+assert.ok(heldPartyOutboxEventTypes({}).includes("PARTY_QUOTE_EXPIRED_BUSINESS"));
+// #818 D1: a parent cancellation notifies the business about each closed request.
+assert.equal(isBusinessPartyEvent("PARTY_REQUEST_CANCELLED"), true);
+assert.equal(partyOutboxCopy({ type: "PARTY_REQUEST_CANCELLED", offerTitle: "Квест", dateLabel: "x" }).audience, "BUSINESS");
+// Closed requests are classified ARCHIVE by bookingBucket: their links must open that tab.
+for (const type of ["PARTY_REQUEST_CANCELLED", "PARTY_QUOTE_EXPIRED_BUSINESS"] as const) {
+  assert.equal(partyOutboxCopy({ type, offerTitle: "x", dateLabel: "y" }).actionUrl,
+    "/business/bookings?tab=archive&kind=party");
+}
 assert.equal(partyOutboxCopy({
   type: "PARTY_QUOTE_SENT", offerTitle: "Квест", dateLabel: "2026-10-20",
 }).body.includes("Бронирование ещё не подтверждено"), true);
@@ -32,7 +47,7 @@ const worker = readFileSync("src/server/birthday/partyOutbox.service.ts", "utf8"
 for (const invariant of [
   "skipDuplicates: true", "partyNotificationId(row.id, user.id)",
   "nextAttemptAt: { lte: now }", "attempts: { increment: 1 }",
-  "notificationDelivery.count", "await dispatchDelivery(notification, user)",
+  "notificationDelivery.findMany", "await dispatchDelivery(notification, user)",
   "getActiveTelegramConnection", // absence expected, dispatcher handles this
 ]) {
   if (invariant === "getActiveTelegramConnection") {
@@ -41,11 +56,14 @@ for (const invariant of [
     assert.ok(worker.includes(invariant), "Missing outbox invariant: " + invariant);
   }
 }
+assert.match(worker, /where: \{ notificationId: \{ in: ids \} \}/);
+assert.match(worker, /alreadyAttempted\.has\(notification\.id\)/);
+assert.ok(!worker.includes("notificationDelivery.count("), "Delivery presence must be batched per event");
 assert.ok(!worker.includes("contactPhone: true"));
 assert.ok(!worker.includes("customerPhone: true"));
 // Business notifications deep-link into the unified inbox: held until the UI is released.
-assert.deepEqual(heldPartyOutboxEventTypes({}), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED"]);
-assert.deepEqual(heldPartyOutboxEventTypes({ BUSINESS_BOOKINGS_INBOX_UI: "false" }), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED"]);
+assert.deepEqual(heldPartyOutboxEventTypes({}), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED", "PARTY_QUOTE_EXPIRED_BUSINESS", "PARTY_REQUEST_CANCELLED"]);
+assert.deepEqual(heldPartyOutboxEventTypes({ BUSINESS_BOOKINGS_INBOX_UI: "false" }), ["PARTY_REQUEST_SENT", "PARTY_QUOTE_ACCEPTED", "PARTY_QUOTE_EXPIRED_BUSINESS", "PARTY_REQUEST_CANCELLED"]);
 assert.deepEqual(heldPartyOutboxEventTypes({ BUSINESS_BOOKINGS_INBOX_UI: "true" }), []);
 assert.ok(worker.includes("notIn: heldPartyOutboxEventTypes(process.env)"), "Inbox-linked events must be gated");
 for (const type of heldPartyOutboxEventTypes({})) {
