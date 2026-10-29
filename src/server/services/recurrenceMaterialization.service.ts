@@ -48,6 +48,8 @@ export function planRecurrenceInsertRows(series: Series[], from: string, to: str
         entryType: PlanEntryType.TASK,
         title: template.title,
         date,
+        childId: typeof template.childId === "string" ? template.childId : null,
+        assigneeUserId: typeof template.assigneeUserId === "string" ? template.assigneeUserId : null,
         startsAt: template.time ? localWallClockToUtc(date, template.time) : null,
         reminderEnabled: template.reminderEnabled,
         reminderLeadMinutes: template.lead as number | null,
