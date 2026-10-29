@@ -2874,6 +2874,12 @@ model OfferBooking {
   basePriceByn Decimal? @db.Decimal(10, 2)
   /// Optimistic editor revision, independent of content moderation and main wizard snapshot.
   pricingRevision Int @default(0)
+  /// Additional full hours past durationMin; zero preserves fixed-duration offers.
+  maxExtensionHours Int @default(0)
+  /// Price per additional full hour in BYN; NULL disables paid extensions.
+  extensionHourPriceByn Decimal? @db.Decimal(10, 2)
+  /// Percentage reduction applied only to additional hours, not the base fee.
+  extensionDiscountPercent Int @default(0)
   offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
   options OfferBookingOption[]
   rules OfferScheduleRule[]

@@ -4,6 +4,9 @@ import prisma from "@/lib/prisma";
 export type BookingServicesInput = {
   revision: number;
   basePriceByn: string | null;
+  maxExtensionHours?: number;
+  extensionHourPriceByn?: string | null;
+  extensionDiscountPercent?: number;
   options: Array<{
     id?: string;
     title: string;
@@ -50,6 +53,18 @@ export async function saveBookingServices(input: {
     });
     if (!offer || offer.place?.ownerBusinessId !== businessId) return { status: 404 };
     if (offer.currency !== "BYN") return { status: 422 };
+    if (data.maxExtensionHours !== undefined || data.extensionHourPriceByn !== undefined ||
+        data.extensionDiscountPercent !== undefined) {
+      if (!Number.isInteger(data.maxExtensionHours) || data.maxExtensionHours! < 0 ||
+          data.maxExtensionHours! > 8 || !Number.isInteger(data.extensionDiscountPercent) ||
+          data.extensionDiscountPercent! < 0 || data.extensionDiscountPercent! > 90 ||
+          (data.maxExtensionHours! > 0 && (!data.extensionHourPriceByn ||
+            offer.offerBooking?.scheduleKind !== "ON_REQUEST_WINDOWS" ||
+            offer.classGroups.length > 0)) ||
+          (data.maxExtensionHours === 0 && data.extensionHourPriceByn !== null)) {
+        return { status: 422 };
+      }
+    }
     const previous = offer.offerBooking;
     if ((previous?.pricingRevision ?? 0) !== data.revision) return { status: 409 };
 
@@ -77,6 +92,12 @@ export async function saveBookingServices(input: {
       data: {
         basePriceByn: data.basePriceByn === null ? null : new Prisma.Decimal(data.basePriceByn),
         pricingRevision: { increment: 1 },
+        ...(data.maxExtensionHours !== undefined ? {
+          maxExtensionHours: data.maxExtensionHours,
+          extensionHourPriceByn: data.extensionHourPriceByn === null
+            ? null : new Prisma.Decimal(data.extensionHourPriceByn!),
+          extensionDiscountPercent: data.extensionDiscountPercent,
+        } : {}),
       },
     });
     if (changed.count !== 1) return { status: 409 };

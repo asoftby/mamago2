@@ -6,6 +6,7 @@ import { loadSlotSnapshot } from "./getSlots";
 import { calculateSlots, type SlotSnapshot } from "./slotAvailability";
 import { dateKeyInZone, isoWeekday, localMinuteKey } from "./slotTime";
 import { slotIntentHash, slotKeyLock, validSlotKey } from "./slotIdempotency";
+import { assertBookingDuration } from "./bookingDuration";
 
 const MINUTE_MS = 60_000;
 const PHONE_RE = /^\+?[\d\s\-().]{7,20}$/;
@@ -50,6 +51,9 @@ function availableSlot(snapshot: SlotSnapshot, input: ReserveSlotInput, now: Dat
     from: input.startsAt,
     to: new Date(input.startsAt.getTime() + 1),
     requestedSeats: input.seats ?? 1,
+    ...(snapshot.scheduleKind === ScheduleKind.ON_REQUEST_WINDOWS ? {
+      requestedDurationMinutes: (input.endsAt.getTime() - input.startsAt.getTime()) / MINUTE_MS,
+    } : {}),
   }, now);
   return slots.find((slot) =>
     slot.startsAt.getTime() === input.startsAt.getTime() &&
@@ -108,7 +112,9 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
     return await prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: input.offerId },
-        select: { status: true, currency: true, priceItems: true, classGroups: { include: { tariffs: true, rules: true } }, place: { select: { ownerBusinessId: true } }, offerBooking: { select: { leadTimeHours: true, timezone: true, basePriceByn: true, options: true } } },
+        select: { status: true, currency: true, priceItems: true, classGroups: { include: { tariffs: true, rules: true } }, place: { select: { ownerBusinessId: true } }, offerBooking: { select: { leadTimeHours: true, timezone: true, scheduleKind: true,
+          durationMin: true, maxExtensionHours: true, extensionHourPriceByn: true,
+          extensionDiscountPercent: true, basePriceByn: true, options: true } } },
       });
       const businessId = offer?.place?.ownerBusinessId;
       if (!offer || offer.status !== "PUBLISHED" || !businessId || !offer.offerBooking) {
@@ -145,11 +151,28 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
         throw new SlotReservationError("INVALID_SLOT", "Выберите доступный тариф");
       }
       if (input.classTariffId && !tariff) throw new SlotReservationError("INVALID_SLOT", "Тариф недоступен для выбранной группы");
+      const durationMinutes = (input.endsAt.getTime() - input.startsAt.getTime()) / MINUTE_MS;
+      if (offer.offerBooking.scheduleKind === ScheduleKind.ON_REQUEST_WINDOWS) try {
+        assertBookingDuration({
+          scheduleKind: offer.offerBooking.scheduleKind,
+          durationMin: offer.offerBooking.durationMin,
+          maxExtensionHours: offer.offerBooking.maxExtensionHours,
+          extensionHourPriceByn: offer.offerBooking.extensionHourPriceByn?.toString() ?? null,
+          extensionDiscountPercent: offer.offerBooking.extensionDiscountPercent,
+          hasClassGroups: groups.length > 0,
+        }, durationMinutes);
+      } catch {
+        throw new SlotReservationError("INVALID_SLOT", "Выбранная продолжительность недоступна");
+      }
       let pricing: ReturnType<typeof calculateBookingPrice>;
       try {
         pricing = calculateBookingPrice({
           currency: offer.currency, seats,
-          durationMinutes: (input.endsAt.getTime() - input.startsAt.getTime()) / MINUTE_MS,
+          durationMinutes,
+          baseDurationMinutes: offer.offerBooking.scheduleKind === "ON_REQUEST_WINDOWS"
+            ? (offer.offerBooking.durationMin ?? durationMinutes) : durationMinutes,
+          extensionHourPriceByn: offer.offerBooking.extensionHourPriceByn?.toString() ?? null,
+          extensionDiscountPercent: offer.offerBooking.extensionDiscountPercent,
           basePriceByn: offer.offerBooking.basePriceByn?.toString() ?? null,
           tariff: tariff ? {
             id: tariff.id, title: "title" in tariff ? tariff.title : tariff.label,
@@ -183,7 +206,7 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       if (group) {
         await tx.$queryRaw`SELECT "id" FROM "OfferClassGroup" WHERE "id" = ${group.id} AND "offerId" = ${input.offerId} FOR UPDATE`;
       }
-      const query = { offerId: input.offerId, ...(group ? { classGroupId: group.id } : {}), from: input.startsAt, to: new Date(input.endsAt.getTime() + 1), requestedSeats: seats };
+      const query = { offerId: input.offerId, ...(group ? { classGroupId: group.id } : {}), from: input.startsAt, to: new Date(input.endsAt.getTime() + 1), requestedSeats: seats, ...(offer.offerBooking.scheduleKind === ScheduleKind.ON_REQUEST_WINDOWS ? { requestedDurationMinutes: durationMinutes } : {}) };
       const initial = await loadSlotSnapshot(query, tx);
       if (!initial) throw new SlotReservationError("OFFER_UNAVAILABLE", "Запись по расписанию не включена");
       const candidate = availableSlot(initial, input, now);

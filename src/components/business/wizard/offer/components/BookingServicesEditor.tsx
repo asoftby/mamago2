@@ -21,6 +21,11 @@ type Catalog = {
   bookingMode: string | null;
   resourceExtrasAllowed: boolean;
   basePriceByn: string | null;
+  minimumDurationMinutes: number | null;
+  durationExtensionAllowed: boolean;
+  maxExtensionHours: number;
+  extensionHourPriceByn: string | null;
+  extensionDiscountPercent: number;
   options: Array<Omit<EditorOption, "key">>;
   units: Array<{ id: string; name: string }>;
   error?: string;
@@ -35,6 +40,9 @@ const formatOption = (o: Catalog["options"][number]): EditorOption => ({ ...o, k
 export function BookingServicesEditor({ offerId }: { offerId: string | null }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [base, setBase] = useState("");
+  const [extensionHours, setExtensionHours] = useState(0);
+  const [extensionRate, setExtensionRate] = useState("");
+  const [extensionDiscount, setExtensionDiscount] = useState(0);
   const [options, setOptions] = useState<EditorOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -50,6 +58,9 @@ export function BookingServicesEditor({ offerId }: { offerId: string | null }) {
     if (signal?.aborted) return;
     setCatalog(result);
     setBase(result.basePriceByn ?? "");
+    setExtensionHours(result.maxExtensionHours ?? 0);
+    setExtensionRate(result.extensionHourPriceByn ?? "");
+    setExtensionDiscount(result.extensionDiscountPercent ?? 0);
     setOptions(result.options.map(formatOption));
     setDirty(false);
   };
@@ -82,6 +93,9 @@ export function BookingServicesEditor({ offerId }: { offerId: string | null }) {
         body: JSON.stringify({
           revision: catalog.revision,
           basePriceByn: base.trim() === "" ? null : base.trim().replace(",", "."),
+          maxExtensionHours: extensionHours,
+          extensionHourPriceByn: extensionHours > 0 ? extensionRate.trim().replace(",", ".") : null,
+          extensionDiscountPercent: extensionHours > 0 ? extensionDiscount : 0,
           options: options.map(({ key: _key, ...option }) => ({
             ...option, priceByn: option.priceByn.trim().replace(",", "."),
           })),
@@ -131,6 +145,52 @@ export function BookingServicesEditor({ offerId }: { offerId: string | null }) {
                   если он выбран; его стоимость редактируется в расписании группы.
                 </p>
               </div>
+              {catalog.minimumDurationMinutes !== null && (
+                <div className="space-y-3 rounded-xl border border-border/70 p-3">
+                  <h4 className="font-medium">Продолжительность и дополнительные часы</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Минимальная длительность: {catalog.minimumDurationMinutes} мин.
+                    Её задаёт расписание услуги. Продление не изменяет цену базового времени.
+                  </p>
+                  {catalog.durationExtensionAllowed ? (
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="booking-extension-hours">Максимум дополнительных часов</Label>
+                        <select id="booking-extension-hours" value={extensionHours} disabled={saving}
+                          className="w-full rounded-xl border bg-background px-3 py-2 text-sm"
+                          onChange={event => {
+                            const hours = Number(event.target.value);
+                            setExtensionHours(hours); setDirty(true);
+                            if (!hours) { setExtensionRate(""); setExtensionDiscount(0); }
+                          }}>
+                          {Array.from({ length: 9 }, (_, n) =>
+                            <option key={n} value={n}>{n === 0 ? "Без продления" : n}</option>)}
+                        </select>
+                      </div>
+                      {extensionHours > 0 && <>
+                        <div className="space-y-1">
+                          <Label htmlFor="booking-extension-rate">За дополнительный час, BYN</Label>
+                          <Input id="booking-extension-rate" value={extensionRate} inputMode="decimal"
+                            disabled={saving} placeholder="Например, 30.00"
+                            onChange={event => { setExtensionRate(event.target.value); setDirty(true); }} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="booking-extension-discount">Скидка на доп. часы, %</Label>
+                          <Input id="booking-extension-discount" type="number" min={0} max={90}
+                            value={extensionDiscount} disabled={saving}
+                            onChange={event => {
+                              setExtensionDiscount(Math.max(0, Math.min(90, Number(event.target.value) || 0)));
+                              setDirty(true);
+                            }} />
+                        </div>
+                      </>}
+                    </div>
+                  ) : <p className="text-xs text-muted-foreground">
+                    Почасовое продление доступно для услуги с отдельными ресурсами
+                    и расписанием по свободным временным окнам.
+                  </p>}
+                </div>
+              )}
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <h4 className="font-medium">Состав услуги и допуслуги</h4>
