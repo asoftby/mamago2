@@ -32,7 +32,7 @@ export async function saveBookingServices(input: {
   }
   const resourceIds = [...new Set(data.options.flatMap(o =>
     o.bookingUnitId ? [o.bookingUnitId] : []))];
-  return prisma.$transaction(async tx => {
+  return prisma.$transaction(async (tx): Promise<BookingServicesResult> => {
     // Serializes first-write creation, concurrent edits, and resource validation.
     await tx.$queryRaw`SELECT "id" FROM "Offer" WHERE "id" = ${offerId} FOR UPDATE`;
     const offer = await tx.offer.findUnique({
