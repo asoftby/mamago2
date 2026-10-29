@@ -112,6 +112,11 @@ export function ManualPlanEntryDialog({
           <DialogDescription>Запишите то, что нужно сделать или не забыть</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4 px-5 pb-5 pt-4">
+          {item?.recurrenceSeriesId && (
+            <p className="rounded-xl bg-neutral-50 px-3 py-2 text-sm text-neutral-600">
+              Изменения применятся только к этому делу. Другие повторения останутся прежними.
+            </p>
+          )}
           <label className={labelClass}>
             Что?
             <input autoFocus required maxLength={160} value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} aria-describedby={error ? "manual-entry-error" : undefined} />
