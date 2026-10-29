@@ -26,8 +26,8 @@ type Props = {
   selectedAddonIds: string[];
   onSelectBase: (id: string) => void;
   onToggleAddon: (id: string) => void;
-  selectedCategoryKeys: PartyCategoryKey[];
-  onToggleCategory: (category: PartyCategoryKey) => void;
+  selectedCategoryKeys?: PartyCategoryKey[];
+  onToggleCategory?: (category: PartyCategoryKey) => void;
 };
 
 const priceLabel = catalogPriceLabel;
@@ -96,7 +96,7 @@ function OfferCard({
 export function StepPick({
   citySlug, offers, allOfferCount, loading, error, onRetry, placeType,
   selectedBaseId, selectedAddonIds, onSelectBase, onToggleAddon,
-  selectedCategoryKeys, onToggleCategory,
+  selectedCategoryKeys = [], onToggleCategory = () => {},
 }: Props) {
   const venueMode = placeType === "VENUE" || placeType === "PACKAGE";
   const bases = offers.filter((offer) => isAllowedBase(offer, placeType));
