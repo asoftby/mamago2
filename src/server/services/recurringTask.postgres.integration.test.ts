@@ -5,7 +5,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
 import { PrismaClient } from "@prisma/client";
-import { createRecurringTaskSeries } from "./recurringTask.service";
+import { createRecurringTaskSeries, cancelRecurringTaskSeries } from "./recurringTask.service";
+import { materializeRecurrencesForRange } from "./recurrenceMaterialization.service";
 import { familyIdForWrite } from "@/server/family/familyAccess";
 
 const raw = process.env.DATABASE_URL ?? "";
@@ -91,4 +92,47 @@ test("recurring child assignment verifies family ownership and persists", async 
   await assert.rejects(createRecurringTaskSeries(owner,{
     ...base,requestKey:"repeat_"+randomUUID().replaceAll("-",""),childId:wrongChild.id,
   }),/child_not_found/);
+});
+
+test("stop this-and-following keeps earlier days, cancels materialized future and never recreates", async () => {
+  const owner=await fixture(), key="repeat_"+randomUUID().replaceAll("-","");
+  const id=await createRecurringTaskSeries(owner,{
+    ...base,requestKey:key,
+    recurrence:{frequency:"DAILY",interval:1,startDate:"2026-10-29"},
+  });
+  await materializeRecurrencesForRange(owner,"2026-10-29","2026-11-05");
+  const target=await db.planItem.findFirstOrThrow({where:{recurrenceSeriesId:id,recurrenceDate:"2026-11-02"}});
+  await cancelRecurringTaskSeries(owner,target.id,"FUTURE",target.updatedAt.toISOString());
+  const earlier=await db.planItem.findMany({where:{recurrenceSeriesId:id,recurrenceDate:{lt:"2026-11-02"}}});
+  assert.equal(earlier.length,4);
+  assert.ok(earlier.every(item=>item.status==="CONFIRMED"));
+  assert.equal(await db.planItem.count({where:{recurrenceSeriesId:id,recurrenceDate:{gte:"2026-11-02"},status:"CONFIRMED"}}),0);
+  await materializeRecurrencesForRange(owner,"2026-10-29","2026-11-05");
+  assert.equal(await db.planItem.count({where:{recurrenceSeriesId:id,recurrenceDate:{gte:"2026-11-02"},status:"CONFIRMED"}}),0);
+  const series=await db.planRecurrenceSeries.findUniqueOrThrow({where:{id}});
+  assert.equal(series.untilDate,"2026-11-01");
+  await assert.rejects(cancelRecurringTaskSeries(owner,target.id,"FUTURE",target.updatedAt.toISOString()),/recurrence_not_found/);
+});
+
+test("whole series cancels all materialized days and prevents future generation", async () => {
+  const owner=await fixture();
+  const id=await createRecurringTaskSeries(owner,{
+    ...base,requestKey:"repeat_"+randomUUID().replaceAll("-"),
+    recurrence:{frequency:"DAILY",interval:1,startDate:"2026-10-29"},
+  });
+  await materializeRecurrencesForRange(owner,"2026-10-29","2026-11-05");
+  const target=await db.planItem.findFirstOrThrow({where:{recurrenceSeriesId:id}});
+  await cancelRecurringTaskSeries(owner,target.id,"ALL",target.updatedAt.toISOString());
+  assert.equal(await db.planItem.count({where:{recurrenceSeriesId:id,status:"CONFIRMED"}}),0);
+  assert.ok((await db.planRecurrenceSeries.findUniqueOrThrow({where:{id}})).stoppedAt);
+  await materializeRecurrencesForRange(owner,"2026-10-29","2026-11-05");
+  assert.equal(await db.planItem.count({where:{recurrenceSeriesId:id,status:"CONFIRMED"}}),0);
+});
+
+test("unrelated account cannot cancel another user's recurrence", async () => {
+  const owner=await fixture(), stranger=await fixture();
+  const id=await createRecurringTaskSeries(owner,{...base,requestKey:"repeat_"+randomUUID().replaceAll("-")});
+  const item=await db.planItem.findFirstOrThrow({where:{recurrenceSeriesId:id}});
+  await assert.rejects(cancelRecurringTaskSeries(stranger,item.id,"ALL",item.updatedAt.toISOString()),/recurrence_not_found/);
+  assert.equal(await db.planItem.count({where:{recurrenceSeriesId:id,status:"CONFIRMED"}}),1);
 });
