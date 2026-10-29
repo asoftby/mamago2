@@ -25,6 +25,7 @@ import {
   filterActivityNonDestructiveUpdates,
   isPlaceholderZeroPriceFrom,
 } from "../publish/event-field-mapper";
+import { classifyImportSource } from "../publish/source-field-priority";
 import { loadFieldOverrides, loadActivityFieldOverrides, applyOverrideFilter, isFieldAllowed } from "../publish/field-override-checker";
 import { lookupCityId } from "../publish/city-lookup";
 import { lookupVenuePlace } from "../publish/venue-place-lookup";
@@ -531,9 +532,14 @@ async function updateExistingActivityFromImport(
   const { fields, warnings } = mappingResult;
 
   // Non-destructive filter
+  const recordSource = await prisma.importedRecord.findUnique({
+    where: { id: record.id },
+    select: { source: { select: { parserKey: true, isOrganizerSource: true } } },
+  });
   const { updates: candidateUpdates, skipped: skippedNonDestructive } = filterActivityNonDestructiveUpdates(
     fields,
     existingActivity as unknown as Record<string, unknown>,
+    { incomingSourceKind: recordSource ? classifyImportSource(recordSource.source) : undefined },
   );
 
   // A remote cover is provenance, not a public Activity field. Pull it out of
