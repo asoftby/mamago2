@@ -128,6 +128,8 @@ const calendarItemSelect = {
   reminderEnabled: true,
   reminderLeadMinutes: true,
   assigneeUserId: true,
+  recurrenceSeriesId: true,
+  recurrenceDate: true,
   activityId: true,
   offerId: true,
   offer: { select: { id: true, slug: true, title: true, place: { select: { city: { select: { slug: true } } } } } },
@@ -158,6 +160,8 @@ export type FamilyCalendarItemDto = {
   childId: string | null;
   childName: string | null;
   assigneeUserId: string | null;
+  recurrenceSeriesId: string | null;
+  recurrenceDate: string | null;
   reminderLeadMinutes: number | null;
   locationText: string | null;
   notes: string | null;
@@ -558,6 +562,8 @@ export function toFamilyCalendarItemDto(row: CalendarRow, authorName: string | n
     childId: row.childId,
     childName: row.child?.name?.trim() || null,
     assigneeUserId: row.assigneeUserId,
+    recurrenceSeriesId: row.recurrenceSeriesId,
+    recurrenceDate: row.recurrenceDate,
     reminderLeadMinutes: row.reminderLeadMinutes,
     locationText: row.locationText,
     notes: row.notes,
