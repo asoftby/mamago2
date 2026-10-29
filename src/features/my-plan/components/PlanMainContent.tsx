@@ -1182,11 +1182,12 @@ export function PlanMainContent({
       <PlanItemRow
         key={item.id}
         item={item}
+        participantId={item.childId ? `child:${item.childId}` : item.assigneeUserId ? `adult:${item.assigneeUserId}` : null}
         participantLabel={
           item.childId
             ? childrenList.find((child) => child.id === item.childId)?.name ?? null
             : item.assigneeUserId
-              ? (personas.find((persona) => persona.id === item.assigneeUserId)?.displayName?.trim() || "Взрослый")
+              ? (familyAdults.find((adult) => adult.userId === item.assigneeUserId)?.displayName?.trim() || personas.find((persona) => persona.id === item.assigneeUserId)?.displayName?.trim() || "Взрослый")
               : null
         }
         onRemove={() => handleRemoveFromPlan(item.id)}
