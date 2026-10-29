@@ -78,6 +78,9 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mamago_ci
 
+      - name: Business support authorization regressions
+        run: pnpm exec tsx src/server/support/supportAccess.test.ts
+
       - name: Business authorization architecture regressions
         run: |
           pnpm exec tsx src/lib/auth/businessEventAuthorizationWiring.test.ts
