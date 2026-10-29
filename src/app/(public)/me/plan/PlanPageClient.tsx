@@ -437,6 +437,10 @@ export function PlanPageClient({
   // The server returns only records accessible to the current account.
   // The local participant/scope selection can only narrow that set.
   const dayItems = filterVisiblePlanEntries(itemsByDate[selectedDate] ?? [], selection);
+  const participantNameById = new Map<string, string>([
+    ...familyAdults.map((adult) => [`adult:${adult.id}`, adult.name] as const),
+    ...familyChildren.map((child) => [`child:${child.id}`, child.name] as const),
+  ]);
   const conflictIds = useMemo(() => findFamilyCalendarConflictIds(dayItems), [dayItems]);
   const todayISO = todayKey();
   const selectedWeekStart = startOfWeek(selectedDate);
@@ -613,6 +617,7 @@ export function PlanPageClient({
           <PlanDayList
             date={selectedDate}
             items={dayItems}
+            participantNameById={participantNameById}
             onRemove={handleRemoveItem}
             familyView={familyUi ? familyView : null}
             onVisibilityChange={handleVisibilityChange}
