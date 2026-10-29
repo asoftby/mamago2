@@ -30,7 +30,10 @@ export async function saveBookingServices(input: {
       option.mode === "STANDALONE" && option.bookingUnitId !== null)) {
     return { status: 422 };
   }
-  const resourceIds = [...new Set(data.options.flatMap(o =>
+  // Disabled extras may retain historical resource links; allow businesses
+  // to turn them off even if a room was deactivated or schedule changed.
+  // Validate and lock down only resources that can actually be booked.
+  const resourceIds = [...new Set(data.options.filter(o => o.active).flatMap(o =>
     o.bookingUnitId ? [o.bookingUnitId] : []))];
   return prisma.$transaction(async (tx): Promise<BookingServicesResult> => {
     // Serializes first-write creation, concurrent edits, and resource validation.
