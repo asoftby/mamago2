@@ -29,4 +29,11 @@ const sent = queued.map((x, i) => i === 0
 assert.deepEqual(decidePartyInviteDispatch(sent, "SEQUENTIAL", now).dispatchIds, []);
 assert.deepEqual(decidePartyInviteDispatch(sent.map((x,i) =>
   i === 0 ? { ...x, status: "CONFIRMED" as const } : x), "PARALLEL", now).dispatchIds, []);
+const expiry = readFileSync("src/server/birthday/partyRequestExpiry.service.ts", "utf8");
+for (const guard of [
+  'FROM "PartyOrderItem"', 'FOR UPDATE',
+  'bookingRequestId: request.id, status: "SENT"',
+  'data: { status: "EXPIRED", resolvedAt: now }',
+  'status: "QUEUED"', 'status: "REQUESTED"',
+]) assert.ok(expiry.includes(guard), "Expiry must keep request and queue consistent: " + guard);
 console.log("partyInviteTransactionalDispatch.contract.test.ts: OK");
