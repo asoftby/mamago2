@@ -1,6 +1,6 @@
 import { Prisma, PlanEntryType, PlanItemSource } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { familyIdForWrite } from "@/server/family/familyAccess";
+import { activeFamilyUserIds, childScopeFor, familyIdForWrite } from "@/server/family/familyAccess";
 import { localWallClockToUtc } from "@/lib/date/localDateKey";
 import { validateRecurrenceInput } from "@/lib/plan/recurrenceInput";
 import type { PlanOwner } from "@/server/services/planOwner";
@@ -12,6 +12,8 @@ export type NewRecurringTask = {
   reminderEnabled?: boolean;
   reminderLeadMinutes?: number | null;
   recurrence: unknown;
+  childId?: string | null;
+  assigneeUserId?: string | null;
 };
 
 export function validateRecurringTask(value: NewRecurringTask) {
@@ -21,8 +23,13 @@ export function validateRecurringTask(value: NewRecurringTask) {
   if (value.startTime != null && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value.startTime)) throw new Error("invalid_start_time");
   const lead = value.reminderLeadMinutes;
   if (lead != null && (!Number.isInteger(lead) || lead < 1 || lead > 1440 || !value.startTime || value.reminderEnabled !== true)) throw new Error("invalid_reminder");
+  const childId = value.childId ?? null;
+  const assigneeUserId = value.assigneeUserId ?? null;
+  if (childId !== null && (typeof childId !== "string" || !childId || childId.length > 128)) throw new Error("invalid_child");
+  if (assigneeUserId !== null && (typeof assigneeUserId !== "string" || !assigneeUserId || assigneeUserId.length > 128)) throw new Error("invalid_assignee");
+  if (childId && assigneeUserId) throw new Error("assignee_and_child");
   const rule = validateRecurrenceInput(value.recurrence);
-  return { key, title: value.title.trim(), time: value.startTime || null, reminderEnabled: value.reminderEnabled === true, lead: lead ?? null, rule };
+  return { key, title: value.title.trim(), time: value.startTime || null, reminderEnabled: value.reminderEnabled === true, lead: lead ?? null, rule, childId, assigneeUserId };
 }
 
 /** PostgreSQL JSONB does not preserve object key insertion order. */
@@ -38,9 +45,13 @@ function stableJson(value: unknown): string {
 /** Internal-only, atomic creation. Keep API hidden until family/series lifecycle wiring is ready. */
 export async function createRecurringTaskSeries(owner: PlanOwner, input: NewRecurringTask) {
   const validated = validateRecurringTask(input);
-  const { key, title, time, reminderEnabled, lead, rule } = validated;
+  const { key, title, time, reminderEnabled, lead, rule, childId, assigneeUserId } = validated;
+  if (childId && !(await prisma.child.findFirst({
+    where: { id: childId, ...(await childScopeFor(owner.userId)) }, select: { id: true },
+  }))) throw new Error("child_not_found");
+  if (assigneeUserId && !(await activeFamilyUserIds(owner.userId)).includes(assigneeUserId)) throw new Error("assignee_not_found");
   const familyId = await familyIdForWrite(owner.userId);
-  const template = { title, time, reminderEnabled, lead, rule: { frequency: rule.frequency, interval: rule.interval, startDate: rule.startDate, weekdays: rule.weekdays ?? [], untilDate: rule.untilDate ?? null, maxOccurrences: rule.maxOccurrences ?? null } };
+  const template = { title, time, reminderEnabled, lead, ...(childId ? { childId } : {}), ...(assigneeUserId ? { assigneeUserId } : {}), rule: { frequency: rule.frequency, interval: rule.interval, startDate: rule.startDate, weekdays: rule.weekdays ?? [], untilDate: rule.untilDate ?? null, maxOccurrences: rule.maxOccurrences ?? null } };
   const existing = await prisma.planRecurrenceSeries.findUnique({ where: { requestKey: key }, select: { id: true, ownerUserId: true, template: true } });
   if (existing) {
     if (existing.ownerUserId !== owner.userId || stableJson(existing.template) !== stableJson(template)) throw new Error("idempotency_conflict");
@@ -61,6 +72,7 @@ export async function createRecurringTaskSeries(owner: PlanOwner, input: NewRecu
         data: {
           userId: owner.userId, familyId, visibility: "FAMILY", source: PlanItemSource.MANUAL,
           entryType: PlanEntryType.TASK, title, date: rule.startDate,
+          childId, assigneeUserId,
           startsAt: time ? localWallClockToUtc(rule.startDate, time) : null,
           reminderEnabled, reminderLeadMinutes: lead,
           recurrenceSeriesId: series.id, recurrenceDate: rule.startDate,
