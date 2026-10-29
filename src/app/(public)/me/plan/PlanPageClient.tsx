@@ -54,6 +54,8 @@ export type SerializedPlanItem = {
   dueHasTime: boolean;
   activityId: string | null;
   offerId?: string | null;
+  recurrenceSeriesId?: string | null;
+  recurrenceDate?: string | null;
   offer?: { id: string; slug: string | null; title: string; place: { city: { slug: string } | null } | null } | null;
   title: string | null;
   childId: string | null;
