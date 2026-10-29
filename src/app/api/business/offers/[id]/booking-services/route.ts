@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canManagePlaceAsync } from "@/lib/auth/placeAccess";
 import prisma from "@/lib/prisma";
+import { saveBookingServices } from "@/server/offers/bookingServices.service";
 
 export const runtime = "nodejs";
 
@@ -89,68 +89,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (ctx.offer!.currency !== "BYN") {
     return NextResponse.json({ error: "Стоимость бронирования доступна только в BYN" }, { status: 422 });
   }
-  const ids = input.options.flatMap(o => o.id ? [o.id] : []);
-  if (new Set(ids).size !== ids.length || input.options.some(o =>
-      o.mode === "INCLUDED" && o.priceByn !== "0" && Number(o.priceByn) !== 0 ||
-      o.mode === "STANDALONE" && o.bookingUnitId !== null)) {
-    return NextResponse.json({ error: "Некорректные настройки допуслуг" }, { status: 422 });
-  }
-  const resourceIds = [...new Set(input.options.flatMap(o => o.bookingUnitId ? [o.bookingUnitId] : []))];
   try {
-    const result = await prisma.$transaction(async tx => {
-      // Serialize simultaneous editors even on an offer without OfferBooking.
-      await tx.$queryRaw`SELECT "id" FROM "Offer" WHERE "id" = ${id} FOR UPDATE`;
-      const current = await tx.offer.findUnique({
-        where: { id }, select: { place: { select: { ownerBusinessId: true } },
-          offerBooking: { select: { id: true, pricingRevision: true,
-            options: { select: { id: true } } } } },
-      });
-      if (!current || current.place?.ownerBusinessId !== ctx.businessId) {
-        return { status: 404 as const };
-      }
-      const present = current.offerBooking;
-      if ((present?.pricingRevision ?? 0) !== input.revision) return { status: 409 as const };
-      if (resourceIds.length > 0) {
-        const linked = await tx.bookingUnitOffer.count({ where: {
-          offerId: id, bookingUnitId: { in: resourceIds },
-          bookingUnit: { businessId: ctx.businessId!, status: "ACTIVE", type: "EXCLUSIVE" },
-        } });
-        if (linked !== resourceIds.length) return { status: 422 as const };
-      }
-      const previousIds = new Set((present?.options ?? []).map(o => o.id));
-      if (ids.some(x => !previousIds.has(x))) return { status: 422 as const };
-      const booking = present ?? await tx.offerBooking.create({ data: { offerId: id },
-        select: { id: true, pricingRevision: true } });
-      // SQL/CAS-style revision; each edit is all-or-nothing.
-      const changed = await tx.offerBooking.updateMany({ where: {
-        id: booking.id, pricingRevision: input.revision,
-      }, data: {
-        basePriceByn: input.basePriceByn === null ? null : new Prisma.Decimal(input.basePriceByn),
-        pricingRevision: { increment: 1 },
-      } });
-      if (changed.count !== 1) return { status: 409 as const };
-      const retained = new Set(ids);
-      await tx.offerBookingOption.deleteMany({ where: {
-        offerBookingId: booking.id,
-        ...(retained.size > 0 ? { id: { notIn: [...retained] } } : {}),
-      } });
-      for (const [position, option] of input.options.entries()) {
-        const data = {
-          title: option.title, mode: option.mode, active: option.active,
-          position, bookingUnitId: option.bookingUnitId,
-          priceByn: new Prisma.Decimal(option.priceByn),
-        };
-        if (option.id) {
-          await tx.offerBookingOption.update({
-            where: { id: option.id, offerBookingId: booking.id },
-            data,
-          });
-        } else {
-          await tx.offerBookingOption.create({ data: { ...data, offerBookingId: booking.id } });
-        }
-      }
-      return { status: 200 as const, revision: input.revision + 1 };
-    }, { timeout: 20_000 });
+    const result = await saveBookingServices({
+      offerId: id, businessId: ctx.businessId!, data: input,
+    });
     if (result.status !== 200) return NextResponse.json({
       error: result.status === 409 ? "Цены изменились в другом окне. Обновите данные." :
         "Не удалось сохранить настройки — проверьте ресурсы и услуги",
