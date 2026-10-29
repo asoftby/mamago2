@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Bell, CalendarClock, Trash2 } from "lucide-react";
-import { PlanParticipantChip } from "./PlanParticipantChip";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
@@ -24,7 +23,6 @@ interface PlanItemRowProps {
   onOpen?: () => void;
   /** Имя ребёнка, для кого пункт. Нет → «Вся семья». */
   participantLabel?: string | null;
-  participantId?: string | null;
 }
 
 export type PlanItemVisualKind = "event" | "note";
@@ -44,7 +42,7 @@ const twoLineTitleStyle = {
   overflow: "hidden",
 } as const;
 
-export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, participantId }: PlanItemRowProps) {
+export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel }: PlanItemRowProps) {
   const cityCtx = useOptionalCity();
   const city = cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
   const activityDetailHref = item.activity?.id
@@ -138,7 +136,7 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
           )}
 
           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[13px] leading-4 text-[var(--mp-tx2)]">
-            <PlanParticipantChip id={participantId} name={participantLabel} />
+            <span className="min-w-0 truncate">{participantLabel || "Вся семья"}</span>
             {showReminder ? (
               <span className="inline-flex shrink-0 items-center gap-1">
                 <span aria-hidden>·</span>
