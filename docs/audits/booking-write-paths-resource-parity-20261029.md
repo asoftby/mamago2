@@ -11,6 +11,7 @@ canonical entities remain `BookingRequest`, `BookingUnit`,
 | `/api/public/offers/[id]/slots` | `getSlots` → `loadSlotSnapshot` → `calculateSlots`; read-only | Offer/group capacity and exclusive-unit allocation included; preview is never a hold |
 | `/api/public/offers/[id]/reserve` | `createPublicClassSlotBooking` → `reserveSlot`; transactional NEW/HELD or group-seat hold | Existing exclusion constraint and group session row locks. **Fix**: explicit BookingUnit row lock before final snapshot to serialize against manual `CalendarBlock` |
 | `/api/public/bookings` | Legacy `createPublicBooking` creates request/lead; does not use exclusive BookingUnit | Request-only flow must not be presented as guaranteed availability; keep compatibility |
+| `/api/public/bookings/camp-shift` | `createCampShiftBooking` uses legacy campSessions snapshot; records a request, not a capacity hold | Existing code explicitly does not decrement capacity; keep it labelled as **request-only** until a capacity-aware migration is designed |
 | `/api/business/bookings/[id]` PATCH | `updateBookingStatus` | Shares transactional lifecycle; **fix** expired `holdUntil` confirmation on group seats without allocations |
 | `/api/business/bookings/[id]/status` PATCH | Same `updateBookingStatus` | Same 409 on expired hold; no second status service |
 | `/api/business/bookings/[id]/outcome` POST | `closePastStandardBooking`: past CONFIRMED → COMPLETED or CANCELLED | **Fix**: NOT_HELD/CANCELLED now releases active allocations in the same transaction; COMPLETED retains history |
