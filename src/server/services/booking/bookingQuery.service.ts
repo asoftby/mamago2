@@ -62,6 +62,8 @@ export interface BusinessBookingItem {
   classTariffTitle: string | null;
   classTariffPrice: string | null;
   classTariffUnit: string | null;
+  bookingPriceSnapshot: Prisma.JsonValue | null;
+  bookingTotalByn: string | null;
   campShiftId: string | null;
   campShiftTitle: string | null;
   campShiftDateFrom: string | null;
@@ -147,6 +149,8 @@ const BOOKING_SELECT = {
   classTariffTitle: true,
   classTariffPrice: true,
   classTariffUnit: true,
+  bookingPriceSnapshot: true,
+  bookingTotalByn: true,
   campShiftId: true,
   campShiftTitle: true,
   campShiftDateFrom: true,
@@ -221,6 +225,8 @@ function mapBooking(raw: {
   classTariffTitle: string | null;
   classTariffPrice: string | null;
   classTariffUnit: string | null;
+  bookingPriceSnapshot: Prisma.JsonValue | null;
+  bookingTotalByn: Prisma.Decimal | null;
   campShiftId: string | null;
   campShiftTitle: string | null;
   campShiftDateFrom: Date | null;
@@ -251,6 +257,8 @@ function mapBooking(raw: {
     classTariffTitle: raw.classTariffTitle,
     classTariffPrice: raw.classTariffPrice,
     classTariffUnit: raw.classTariffUnit,
+    bookingPriceSnapshot: raw.bookingPriceSnapshot,
+    bookingTotalByn: raw.bookingTotalByn?.toString() ?? null,
     campShiftId: raw.campShiftId,
     campShiftTitle: raw.campShiftTitle,
     campShiftDateFrom,
