@@ -25,6 +25,7 @@ import {
 } from "../ctaStepMapper";
 import { resolveOfferPricingCtaRenderMode } from "../ctaStepFeatureFlag";
 import type { OfferFormData, PricingOption } from "../types";
+import { ClassTariffsEditor } from "../components/ClassTariffsEditor";
 
 interface Step5PricingProps {
   data: OfferFormData;
@@ -158,30 +159,7 @@ export function Step5Pricing({
   };
 
   if (data.productType === "REGULAR_ACTIVITY" && hideCta) {
-    const groups = data.schedule.classSchedule.groups;
-    return (
-      <div className="space-y-3">
-        <h2 className="text-xl font-semibold">Тарифы занятий</h2>
-        <p className="text-sm text-muted-foreground">
-          Стоимость задаётся отдельно для каждой группы на шаге «Расписание».
-          Здесь ничего дублировать не нужно: на странице предложения покажем минимальную цену тарифа.
-        </p>
-        {groups.length === 0 && <p className="text-sm text-muted-foreground">Сначала добавьте группу на шаге «Расписание».</p>}
-        {groups.map((group, index) => (
-          <div key={group.id} className="space-y-2 rounded-xl border border-border/70 p-3">
-            <p className="font-medium text-sm">{group.title?.trim() || `Группа ${index + 1}`}</p>
-            {(group.tariffs ?? []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">Добавьте тариф в расписании группы.</p>
-            ) : (group.tariffs ?? []).map((tariff) => (
-              <div key={tariff.id} className="flex flex-wrap justify-between gap-2 text-sm">
-                <span>{tariff.title || "Без названия"}</span>
-                <span>{tariff.price} BYN{tariff.unit ? ` / ${tariff.unit}` : ""}</span>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    );
+    return <ClassTariffsEditor data={data} onChange={onChange} isEditable={isEditable} />;
   }
 
   if (data.offerWizardType === "CAMP" && hideCta) {
