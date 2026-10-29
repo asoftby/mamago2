@@ -11,7 +11,7 @@ case "$*" in
   *"docker info"*)
     case "${MOCK_MODE}" in ssh_fail) exit 255;; docker_fail) exit 1;; esac
     ;;
-  *"docker container inspect"*)
+  *"docker container inspect --format"*)
     case "${MOCK_MODE}" in missing) exit 1;; stopped) printf 'false\n';; *) printf 'true\n';; esac
     ;;
   *"docker exec"*)
