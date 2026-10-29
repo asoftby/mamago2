@@ -30,9 +30,6 @@ export function DesignSystemFoundationSection() {
         Navigate with Tab to inspect focus states. Check mobile widths before approving global changes.
       </p>
       <InventoryGrid>
-        <RenderSafe title="Paid discovery disclosure" file="src/components/events/EventCard.tsx">
-          <Badge variant="outline" title="Платное продвижение Boost">Реклама</Badge>
-        </RenderSafe>
         <RenderSafe title="Buttons — variants" file="src/components/ui/button.tsx">
           <div className="flex flex-wrap items-center gap-3">
             <Button>Основная</Button>
