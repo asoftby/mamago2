@@ -23,6 +23,11 @@ export async function expirePartyRequests(limit = 50) {
   let expired = 0;
   for (const request of due) {
     const didExpire = await prisma.$transaction(async (tx) => {
+      // Lock the canonical item first, matching queue dispatch and final confirmation.
+      if (request.partyOrderItem) {
+        await tx.$queryRaw`SELECT "id" FROM "PartyOrderItem"
+          WHERE "id" = ${request.partyOrderItem.id} FOR UPDATE`;
+      }
       const changed = await tx.bookingRequest.updateMany({
         where: {
           id: request.id, kind: "PARTY",
@@ -35,9 +40,28 @@ export async function expirePartyRequests(limit = 50) {
         },
       });
       if (changed.count !== 1) return false;
+      // One transaction closes the request and its durable invitation.
+      // A late or repeated expiry cannot overwrite a new quote/confirmation.
+      await tx.partyProviderInvite.updateMany({
+        where: { bookingRequestId: request.id, status: "SENT" },
+        data: { status: "EXPIRED", resolvedAt: now },
+      });
       if (request.partyOrderItem) {
         await settleExpiredPartyItem(tx, request.partyOrderItem.id,
           request.partyOrderItem.role === "ANCHOR");
+        // Do not terminally expire an add-on item when queued alternatives remain.
+        if (request.partyOrderItem.role !== "ANCHOR") {
+          const pending = await tx.partyProviderInvite.count({
+            where: { partyOrderItemId: request.partyOrderItem.id, status: "QUEUED" },
+          });
+          if (pending > 0) {
+            await tx.partyOrderItem.updateMany({
+              where: { id: request.partyOrderItem.id, status: "EXPIRED",
+                confirmedBookingRequestId: null },
+              data: { status: "REQUESTED" },
+            });
+          }
+        }
         if (request.partyOrderItem.role === "ANCHOR") {
           await tx.partyOrder.updateMany({
             where: {
