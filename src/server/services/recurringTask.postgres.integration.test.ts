@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { after, test } from "node:test";
 import { PrismaClient } from "@prisma/client";
 import { createRecurringTaskSeries } from "./recurringTask.service";
+import { familyIdForWrite } from "@/server/family/familyAccess";
 
 const raw = process.env.DATABASE_URL ?? "";
 let url: URL;
@@ -72,4 +73,22 @@ test("failed first occurrence rolls back series", async () => {
   // *after* the series insert, proving transactional rollback.
   await assert.rejects(createRecurringTaskSeries(owner,{...base,requestKey:key,startTime:"02:99"}),/invalid_start_time/);
   assert.equal(await db.planRecurrenceSeries.count({where:{requestKey:key}}),0);
+});
+
+test("recurring child assignment verifies family ownership and persists", async () => {
+  const owner=await fixture();
+  const familyId=await familyIdForWrite(owner.userId);
+  const child=await db.child.create({data:{name:"Child test",parentId:owner.userId,familyId}});
+  const id=await createRecurringTaskSeries(owner,{
+    ...base,requestKey:"repeat_"+randomUUID().replaceAll("-",""),childId:child.id,
+  });
+  const item=await db.planItem.findFirstOrThrow({where:{recurrenceSeriesId:id}});
+  assert.equal(item.childId,child.id);
+
+  const other=await fixture();
+  const wrongChild=await db.child.create({data:{name:"Other child",parentId:other.userId,
+    familyId:await familyIdForWrite(other.userId)}});
+  await assert.rejects(createRecurringTaskSeries(owner,{
+    ...base,requestKey:"repeat_"+randomUUID().replaceAll("-",""),childId:wrongChild.id,
+  }),/child_not_found/);
 });
