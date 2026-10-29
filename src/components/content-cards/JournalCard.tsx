@@ -1,10 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Glasses } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 
-export function JournalCard({ href, title, imageUrl, categoryLabel, geographyLabel, readTime, tone = 0, homeCard = false }: {
+export function JournalCard({ href, title, imageUrl, categoryLabel, geographyLabel, tone = 0, homeCard = false }: {
   href: string; title: string; imageUrl?: string | null; categoryLabel?: string | null; geographyLabel?: string | null;
   readTime?: number | null; tone?: number; homeCard?: boolean;
 }) {
@@ -54,11 +53,6 @@ export function JournalCard({ href, title, imageUrl, categoryLabel, geographyLab
                     {categoryLabel}
                   </p>
                 )}
-                {readTime != null && <p className="ml-auto flex shrink-0 items-center gap-1 font-mono text-[11px] text-[rgba(20,18,16,0.55)]">
-                  <Glasses className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span aria-hidden="true">~</span>
-                  {readTime} мин чтения
-                </p>}
               </div>
               {geographyLabel && (
                 <p className="mb-1 text-xs text-muted-foreground">{geographyLabel}</p>
