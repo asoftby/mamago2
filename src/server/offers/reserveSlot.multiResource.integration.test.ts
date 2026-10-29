@@ -135,6 +135,24 @@ test("server-calculated options and price snapshot persist atomically with addit
   assert.equal(unchanged.bookingTotalByn?.toString(), "175.5");
 });
 
+test("paid option cannot become the only resource when main unit selection is ambiguous", async () => {
+  const room = await unit("Main choice room");
+  const equipment = await unit("Main choice equipment");
+  const offerId = await offer([room, equipment]);
+  const booking = await db.offerBooking.findUniqueOrThrow({ where: { offerId } });
+  const extra = await db.offerBookingOption.create({ data: {
+    offerBookingId: booking.id, title: "Extra equipment",
+    mode: "OPTIONAL", priceByn: "15.00", bookingUnitId: equipment,
+  } });
+  await assert.rejects(reserveSlot({
+    offerId, startsAt: start, endsAt: end,
+    selectedOptionIds: [extra.id], ...contact,
+  }), (error: unknown) => error instanceof SlotReservationError &&
+    error.code === "UNIT_REQUIRED");
+  assert.equal(await db.bookingRequest.count({ where: { offerId } }), 0);
+  assert.equal(await db.bookingAllocation.count({ where: { bookingUnitId: equipment } }), 0);
+});
+
 test("unavailable selected option resource creates no partial booking or price snapshot", async () => {
   const room = await unit("Paid room");
   const equipment = await unit("Paid equipment");
