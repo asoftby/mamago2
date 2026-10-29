@@ -81,7 +81,7 @@ function isExclusionViolation(error: unknown): boolean {
  * Reserve a slot using the existing BookingRequest and BookingAllocation tables.
  * The preview is recalculated under the transaction; only this path commits a hold.
  */
-export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId: string; holdUntil: Date; replayed: boolean }> {
+export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId: string; holdUntil: Date; replayed: boolean; status: BookingStatus }> {
   const seats = input.seats ?? 1;
   const holdMinutes = input.holdMinutes ?? 24 * 60;
   const requestedUnits = input.unitIds;
@@ -125,14 +125,14 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
           where: { offerId_slotIdempotencyKey: {
             offerId: input.offerId, slotIdempotencyKey: input.idempotencyKey,
           } },
-          select: { id: true, slotRequestHash: true, holdUntil: true },
+          select: { id: true, slotRequestHash: true, holdUntil: true, status: true },
         });
         if (previous) {
           if (previous.slotRequestHash !== intentHash || !previous.holdUntil) {
             throw new SlotReservationError("INVALID_SLOT", "Ключ уже использован для другой заявки");
           }
           // Even when a hold expired, replay must not create a fresh booking.
-          return { bookingId: previous.id, holdUntil: previous.holdUntil, replayed: true };
+          return { bookingId: previous.id, holdUntil: previous.holdUntil, replayed: true, status: previous.status };
         }
       }
       const groups = offer.classGroups.filter((group) => group.active);
@@ -318,7 +318,7 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
           },
         });
       }
-      return { bookingId: booking.id, holdUntil, replayed: false };
+      return { bookingId: booking.id, holdUntil, replayed: false, status: BookingStatus.NEW };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 30_000 });
   } catch (error) {
     if (isExclusionViolation(error)) {
