@@ -15,6 +15,7 @@ import {
 } from "@/server/services/plan.service";
 import { prisma } from "@/lib/prisma";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
+import { validateFamilyCalendarRange } from "@/server/services/manualPlanEntry.service";
 import {
   buildSubjectsSnapshot,
   findMostRecentSubjectsSnapshot,
@@ -126,6 +127,16 @@ export async function POST(request: NextRequest) {
         { error: "activityId, offerId, routeId or placeId is required" },
         { status: 400 },
       );
+    }
+
+    // Offers must never create rows with an invalid calendar date.
+    // Leave the existing activity/place/route validation contracts unchanged.
+    if (offerId) {
+      try {
+        validateFamilyCalendarRange(date, date);
+      } catch {
+        return NextResponse.json({ error: "invalid_date" }, { status: 400 });
+      }
     }
 
     const planDateMeta = planDateAnalyticsMeta(date);
