@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { SaveHeart } from "@/features/save/SaveHeart";
@@ -12,6 +13,7 @@ import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 export type OfferCardProps = {
   id: string;
   title: string;
+  isPromoted?: boolean;
   href: string;
   imageUrl?: string | null;
   /** Label shown below image in mono caps, e.g. "Лагерь", "Курс" */
@@ -37,6 +39,7 @@ export type OfferCardProps = {
 export function OfferCard({
   id,
   title,
+  isPromoted = false,
   href,
   imageUrl,
   categoryLabel,
@@ -53,6 +56,7 @@ export function OfferCard({
 }: OfferCardProps) {
   return (
     <div className={cn("group relative flex flex-col gap-3", className)}>
+      {isPromoted && <Badge variant="outline">Реклама · Boost</Badge>}
       <Link href={href} className="block focus:outline-none">
         {/* Image / placeholder */}
         <div

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { SaveHeart } from "@/features/save/SaveHeart";
@@ -15,6 +16,7 @@ import { resolvePosterFrame } from "@/lib/media/posterFrame";
 export type EventCardProps = {
   id: string;
   title: string;
+  isPromoted?: boolean;
   href: string;
   imageUrl?: string | null;
   /** Keep genuinely above-the-fold covers eager and high priority. */
@@ -98,6 +100,7 @@ function EventCardCategoryLabel({
 export function EventCard({
   id,
   title,
+  isPromoted = false,
   href,
   imageUrl,
   imagePriority = false,
@@ -119,6 +122,7 @@ export function EventCard({
   const isFree = Boolean(priceLabel && /бесплатно|^free$/i.test(priceLabel.trim()));
   return (
     <div className={cn("group relative select-none", className)}>
+      {isPromoted && <Badge variant="outline">Реклама · Boost</Badge>}
       <Link href={href} className="block focus:outline-none">
         {/* Cover */}
         <div

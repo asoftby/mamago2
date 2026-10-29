@@ -3441,6 +3441,11 @@ P3 — cleanup / polish / optional
   Additional findings include React hook purity/rules and prefer-const.
   Deferred under this existing debt item; unrelated fixes are outside #705.
 
+- Update 2026-10-29 (#795 / PR #935): full `pnpm exec eslint src --quiet`
+  reports 12 errors in five files at verified base `b8f91c1c3543`:
+  search/page.tsx, EventCrossRegionOverrides.tsx, RefinementFiltersModal.tsx,
+  BreakingNewsSection.tsx (set-state-in-effect), syncLegacyGeo.test.ts (8 any).
+  All five files are unchanged from origin/dev; fixes remain outside #795.
 - Dependencies: none.
 - Acceptance criteria: fix all 14 pre-existing findings (or their
   root causes) so `pnpm lint` is repo-wide green; then add an ESLint

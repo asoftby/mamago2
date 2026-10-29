@@ -26,8 +26,7 @@ export async function validateBoostTargetRegions(input: string[]): Promise<strin
 export async function getDiscoveryRegionContext(cityId: string, citySlug: string) {
   const city = await prisma.city.findUnique({ where: { id: cityId }, select: { regionId: true, country: { select: { slug: true } } } });
   if (!city || city.country.slug !== "belarus") return null;
-  if (city.regionId) return city.regionId;
-  if (citySlug !== "minsk") return null;
+  if (citySlug !== "minsk") return city.regionId;
   const minsk = await prisma.region.findFirst({ where: { country: { slug: "belarus" }, slug: "minskaya-oblast", isActive: true }, select: { id: true } });
   return minsk?.id ?? null;
 }

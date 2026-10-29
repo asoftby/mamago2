@@ -1,3 +1,4 @@
+import { recordDiscoveryExposures } from "@/server/services/recommendations/RecommendationTraceService";
 import { unstable_cache } from "next/cache";
 import { withImageDimensions } from "@/server/media/loadImageDimensionsByUrl";
 import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
@@ -100,6 +101,7 @@ export async function loadKudaListingPage(input: {
     }),
     [
       "kuda-ranked-candidates-v1",
+      process.env.CROSS_REGION_FAMILY_THRESHOLDS ?? "",
       input.cityId,
       input.citySlug,
       input.explicitTerritorySlug ?? "",
@@ -124,12 +126,13 @@ export async function loadKudaListingPage(input: {
       })
     : [];
   const byId = new Map(details.map((card) => [card.id, card]));
-  const hydrated = page.items.map((item) => ({
+  const hydrated = page.items.filter(item => byId.has(item.id)).map((item) => ({
     ...item,
     ...(byId.get(item.id) ?? {}),
     feedBucket: item.feedBucket,
     ageHintBadge: item.ageHintBadge,
   }));
   const items = await withImageDimensions(hydrated, (card) => card.image);
+  await recordDiscoveryExposures(items, input.cityId, input.citySlug, "kuda", null, page.offset - 1);
   return { ...page, items, pool: [...partition.primary, ...partition.secondary] };
 }

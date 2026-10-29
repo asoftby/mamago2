@@ -1,3 +1,5 @@
+import { recordDiscoveryExposures } from "@/server/services/recommendations/RecommendationTraceService";
+import { composePromotedCards } from "@/lib/discovery/promotionComposition";
 import { placeInTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
 import { unstable_cache } from "next/cache";
 import prisma from "@/lib/prisma";
@@ -25,7 +27,7 @@ export async function getClassesListingPage(
     const where = buildClassesDiscoveryWhere({ publicWhereParts, cityId, placeWhere, targetRegionId, chipSlug, now, free: options.free, priceMax });
     const select = {
       id: true, dateFrom: true, dateTo: true, campSessions: true,
-      boosts: { where: { startAt: { lte: now }, endAt: { gt: now } }, select: { id: true } },
+      boosts: { where: { startAt: { lte: now }, endAt: { gt: now } }, select: { id: true, isFreeDaily: true, purchaseRequestKey: true } },
     } as const;
     // Only ID, date signals and boost membership: never fetch full offer cards.
     const candidates = await prisma.offer.findMany({ where, select }).catch((error: unknown) => {
@@ -39,15 +41,16 @@ export async function getClassesListingPage(
       });
       return prisma.offer.findMany({ where: fallbackWhere, select });
     });
-    return candidates.map((offer) => ({
+    return composePromotedCards(candidates.map((offer) => ({
       id: offer.id,
       boosted: offer.boosts.length > 0,
+      isPromoted: offer.boosts.some(boost => !boost.isFreeDaily && boost.purchaseRequestKey != null),
       date: extractOfferDateRange(offer).dateStart ?? null,
     })).sort((a, b) =>
       Number(b.boosted) - Number(a.boosted)
       || (b.date ? Date.parse(b.date) : 0) - (a.date ? Date.parse(a.date) : 0)
       || b.id.localeCompare(a.id)
-    ).map((offer) => offer.id);
+    )).map((offer) => offer.id);
   }, ["classes-ranked-ids-v1", cityId, citySlug, chipSlug ?? "", String(options.free), String(priceMax ?? "")], { revalidate: 60 })();
 
   const total = orderedIds.length;
@@ -59,11 +62,13 @@ export async function getClassesListingPage(
       })
     : [];
   const cardsById = new Map(cards.map((card) => [card.id, card]));
-  return {
-    activities: visibleIds.flatMap((id) => {
+  const activities = visibleIds.flatMap((id) => {
       const card = cardsById.get(id);
       return card ? [card] : [];
-    }),
+    });
+  await recordDiscoveryExposures(activities, cityId, citySlug, "classes", null, (page - 1) * pageSize);
+  return {
+    activities,
     page, total, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)),
   };
 }

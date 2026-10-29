@@ -20,7 +20,7 @@ assert.match(signal, /COUNT\(DISTINCT pi\."familyId"\)/);
 assert.match(signal, /f\."homeCityId" IN/);
 assert.match(signal, /pi\.status = 'CONFIRMED'/);
 assert.match(signal, /pi\."cancelledAt" IS NULL/);
-assert.match(feed, /getCrossRegionPopularActivityIds/);
+assert.match(feed, /readCrossRegionEligibility/);
 assert.match(feed, /activityInAnyOfCitiesWhere\(expandedCityIds\)/);
 assert.match(classes, /purchaseRequestKey: \{ not: null \}/);
 assert.match(classes, /targetRegionIds: \{ has: targetRegionId \}/);
