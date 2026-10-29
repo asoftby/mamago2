@@ -33,14 +33,45 @@ export function normalizeWebsiteDomain(raw: string): string | null {
   }
 }
 
+// JS `\b` не работает для кириллицы — границы слов задаём явно.
+const WORD_BEFORE = "(?<![а-яёa-z0-9])";
+const WORD_AFTER = "(?![а-яёa-z0-9])";
+
+const ADDRESS_NOISE = new RegExp(
+  `${WORD_BEFORE}(?:пр-кт|пр-т|улица|проспект|переулок|бульвар|площадь|ул|пр|пер|бул|пл|трц|тц)${WORD_AFTER}`,
+  "g",
+);
+const ADDRESS_FLOOR = new RegExp(`${WORD_BEFORE}(?:\\d+\\s*-?\\s*й?\\s*этаж|этаж\\s*\\d+)${WORD_AFTER}`, "g");
+
 /** Нормализовать адрес для сравнения */
 export function normalizeAddress(raw: string): string {
   return raw
     .toLowerCase()
     .replace(/[.,]/g, " ")
-    .replace(/\b(ул|улица|пр|проспект|пер|переулок|бул|бульвар|пл|площадь|пр-т|пр-кт)\b\.?/g, "")
+    .replace(ADDRESS_FLOOR, " ")
+    .replace(ADDRESS_NOISE, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+const EVENT_TITLE_SERVICE_WORDS = new RegExp(
+  `${WORD_BEFORE}(?:спектакль|премьера|мастер[\\s-]?класс|мк|шоу|концерт|квиз)${WORD_AFTER}`,
+  "g",
+);
+
+/**
+ * Название события для сравнения: без эмодзи, возрастных меток («6+»,
+ * «(0+)») и служебных слов. Если после чистки ничего не осталось,
+ * возвращается обычная нормализация, чтобы «Квиз» не стал пустой строкой.
+ */
+export function normalizeEventTitle(raw: string): string {
+  const cleaned = raw
+    .toLowerCase()
+    .replace(/\p{Extended_Pictographic}|\uFE0F|\u200D/gu, " ")
+    .replace(/\(?\s*\d{1,2}\s*\+\s*\)?/g, " ")
+    .replace(EVENT_TITLE_SERVICE_WORDS, " ");
+  const result = normalizeTitle(cleaned);
+  return result || normalizeTitle(raw);
 }
 
 /**

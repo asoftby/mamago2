@@ -273,6 +273,12 @@ export interface EventMatchSignals {
    */
   startDateDeltaDays: number | null;
   /**
+   * Разница во времени начала в минутах для ближайшей пары сеансов, если они
+   * в пределах суток и у записи время известно (не только дата). null — не
+   * определено; сильное совпадение по времени тогда не утверждается.
+   */
+  startTimeDeltaMinutes?: number | null;
+  /**
    * Флаг риска: похожее название + похожая площадка + РАЗНЫЕ даты.
    * Указывает на возможный повтор/occurrence, а не дубль master-event.
    */
@@ -299,6 +305,11 @@ export interface EventMatchResult {
   matchStatus: "NO_MATCH" | "MATCHED" | "AMBIGUOUS" | "FAILED";
   suggestedAction: "CREATE_NEW" | "UPDATE_EXISTING" | "MERGE" | "REJECT";
   confidenceScore: number;
+  /**
+   * Возможные дубли среди ещё не разобранных записей других источников.
+   * Только в памяти результата матчинга: в БД и в UI ревью пока не попадают.
+   */
+  pendingDuplicates?: import("../matching/pending-record-candidates").PendingRecordDuplicate[];
 }
 
 /** @deprecated используй PlaceMatchCandidate */
