@@ -71,7 +71,7 @@ export async function loadSlotSnapshot(
     leadTimeHours: booking.leadTimeHours,
     horizonDays: booking.horizonDays,
     durationMin: booking.durationMin,
-    hasClassGroups: offer.classGroups.length > 0,
+    hasClassGroups: (offer.classGroups?.length ?? 0) > 0,
     maxExtensionHours: booking.maxExtensionHours,
     extensionHourPriceByn: booking.extensionHourPriceByn?.toString() ?? null,
     extensionDiscountPercent: booking.extensionDiscountPercent,
