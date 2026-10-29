@@ -1,5 +1,6 @@
 import { partyResponseDeadline } from "./partyResponseDeadline";
 import { z } from "zod";
+import { PartyCategory } from "@prisma/client";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Дата в формате ГГГГ-ММ-ДД")
   .refine((date) => {
@@ -28,8 +29,12 @@ export const updatePartyDraftSchema = z.object({
   contactPhone: z.string().max(40).nullable().optional(),
   anchorOfferId: z.string().min(1).nullable().optional(),
   addonOfferIds: z.array(z.string().min(1)).max(15).optional(),
+  addonCategories: z.array(z.nativeEnum(PartyCategory)).max(15).refine(
+    values => new Set(values).size === values.length,
+    "Категории услуг не должны повторяться",
+  ).optional(),
 }).strict().refine(
-  (value) => (value.anchorOfferId === undefined) === (value.addonOfferIds === undefined),
+  (value) => (value.anchorOfferId === undefined) === (value.addonOfferIds === undefined && value.addonCategories === undefined),
   "Передайте основную и дополнительные услуги вместе",
 );
 
