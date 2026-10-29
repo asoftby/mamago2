@@ -276,6 +276,7 @@ export async function createPublicClassSlotBooking(input: {
   classGroupId?: string | null;
   classTariffId?: string | null;
   selectedOptionIds?: string[];
+  idempotencyKey?: string;
   startsAt: Date;
   endsAt: Date;
   seats: number;
@@ -286,7 +287,7 @@ export async function createPublicClassSlotBooking(input: {
   userId?: string | null;
   planItemId?: string | null;
   childId?: string | null;
-}): Promise<{ bookingId: string; holdUntil: Date }> {
+}): Promise<{ bookingId: string; holdUntil: Date; status: BookingStatus }> {
   const { customerName, customerPhone } = validateBookingCustomer(input);
   const offer = await prisma.offer.findFirst({
     where: {
@@ -344,6 +345,8 @@ export async function createPublicClassSlotBooking(input: {
     classGroupId: input.classGroupId,
     classTariffId: input.classTariffId,
     selectedOptionIds: input.selectedOptionIds,
+    idempotencyKey: input.idempotencyKey,
+    childId: input.childId,
     startsAt: input.startsAt,
     endsAt: input.endsAt,
     seats: input.seats,
@@ -358,7 +361,8 @@ export async function createPublicClassSlotBooking(input: {
     childAge,
   });
 
-  triggerBookingCreatedSideEffects({
+  if (!result.replayed) {
+    triggerBookingCreatedSideEffects({
     planItemId: planLink.planItemId,
     bookingId: result.bookingId,
     userId: input.userId ?? null,
@@ -387,7 +391,8 @@ export async function createPublicClassSlotBooking(input: {
     customerEmail: normalizeOptionalString(input.customerEmail),
     metadata: { source: "public_class_slot", startsAt: input.startsAt.toISOString(), seats: input.seats },
   });
-  return result;
+  }
+  return { bookingId: result.bookingId, holdUntil: result.holdUntil, status: result.status };
 }
 
 // ─── Generic public booking ──────────────────────────────────────────────────
