@@ -116,6 +116,7 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
   const validBase = hasValidCatalogAnchor(
     visibleOffers, state.selection.selectedBaseId, state.quiz.placeType,
   );
+  const [categoryRequests, setCategoryRequests] = useState<Array<import("../lib/realCatalog").PartyCategoryKey>>([]);
   const selectedOffers = useMemo(() => {
     if (!validBase) return [];
     const allowedAddonIds = new Set(eligibleAddons(
@@ -257,11 +258,21 @@ function BirthdayBuilderShellInner({ citySlug }: Props) {
               selectedBaseId={state.selection.selectedBaseId}
               selectedAddonIds={state.selection.selectedAddonIds}
               onSelectBase={builder.selectBase}
-              onToggleAddon={builder.toggleAddon}
+              onToggleAddon={(id) => {
+                const offer = visibleOffers.find(item => item.id === id);
+                if (offer?.category && !state.selection.selectedAddonIds.includes(id)) {
+                  setCategoryRequests(current => current.filter(category => category !== offer.category));
+                }
+                builder.toggleAddon(id);
+              }}
+              selectedCategoryKeys={categoryRequests}
+              onToggleCategory={(category) => setCategoryRequests(current => current.includes(category)
+                ? current.filter(value => value !== category) : [...current, category])}
             />
           )}
           {currentStep === "done" && <StepReview
             offers={selectedOffers}
+            addonCategories={categoryRequests.filter(category => !selectedOffers.slice(1).some(offer => offer.category === category))}
             citySlug={citySlug}
             dateIso={state.partyPlanning.dateIso}
             quizDateKey={state.quiz.dateRangeFrom}
