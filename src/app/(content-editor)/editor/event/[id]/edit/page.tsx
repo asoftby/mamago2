@@ -16,6 +16,7 @@ import { TOTAL_EVENT_WIZARD_STEPS } from "@/components/business/wizard/event/eve
 import { buildSurfaceRedirectDestination, resolveSurfaceFromHostAndPathname } from "@/lib/routing/surface";
 import { getCurrentRequestRoutingContext } from "@/lib/routing/requestContext";
 import { ExternalLink } from "lucide-react";
+import { EventCrossRegionOverrides } from "@/components/admin/events/EventCrossRegionOverrides";
 import { getEventStep1Taxonomies } from "@/server/admin/activities/get-activity-form-data";
 import { resolveCanonicalEventPublicPathById } from "@/lib/business/resolveCanonicalEventPublicPath";
 import { toAbsolutePublicUrl } from "@/lib/business/eventPublicLink";
@@ -239,6 +240,7 @@ export default async function EditorEditEventPage({
         ctaStepEnabled={ctaStepEnabled}
         initialScheduleSourceState={initialScheduleSourceState}
       />
+      {isPrivilegedUser && surface === "admin" ? <EventCrossRegionOverrides activityId={event.id} /> : null}
     </ContentEditorChrome>
   );
 }
