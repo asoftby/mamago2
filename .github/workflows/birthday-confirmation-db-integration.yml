@@ -152,3 +152,5 @@ jobs:
         run: pnpm exec tsx scripts/it/seedPartyIT.ts
       - name: Verify full party flow
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyFullFlow.integration.test.ts
+      - name: Verify competing durable queue dispatch and replay
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyInviteDispatch.postgres.integration.test.ts
