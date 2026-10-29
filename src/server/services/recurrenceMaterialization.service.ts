@@ -67,18 +67,37 @@ export async function materializeRecurrencesForRange(owner: PlanOwner, from: str
   const shared = familyReadsEnabled() && scope.familyId
     ? { familyId: scope.familyId, visibility: "FAMILY" as const }
     : null;
-  const series = await prisma.planRecurrenceSeries.findMany({
-    where: {
-      stoppedAt: null,
-      startDate: { lte: to },
-      OR: [
-        { ownerUserId: owner.userId },
-        ...(shared ? [shared] : []),
-      ],
-    },
-    take: MAX_SERIES,
-    orderBy: { createdAt: "asc" },
+  await prisma.$transaction(async tx => {
+    const initial = await tx.planRecurrenceSeries.findMany({
+      where: {
+        stoppedAt: null,
+        startDate: { lte: to },
+        OR: [
+          { ownerUserId: owner.userId },
+          ...(shared ? [shared] : []),
+        ],
+      },
+      take: MAX_SERIES,
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    if (initial.length === 0) return;
+
+    // Shared locks can coexist across calendar reads. A series cancellation
+    // needs an exclusive row lock, so it either waits for the inserts to finish
+    // and cancels them, or completes before the fresh series read below.
+    const ids = initial.map(item => item.id);
+    await tx.$queryRaw`SELECT "id" FROM "PlanRecurrenceSeries"
+      WHERE "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR SHARE`;
+
+    // Re-read after lock acquisition: an update may have changed untilDate or
+    // stoppedAt between the initial query and acquiring the shared lock.
+    const active = await tx.planRecurrenceSeries.findMany({
+      where: { id: { in: ids }, stoppedAt: null, startDate: { lte: to } },
+      orderBy: { createdAt: "asc" },
+    });
+    const rows = planRecurrenceInsertRows(active, from, to);
+    if (rows.length) await tx.planItem.createMany({ data: rows, skipDuplicates: true });
   });
-  const rows = planRecurrenceInsertRows(series, from, to);
-  if (rows.length) await prisma.planItem.createMany({ data: rows, skipDuplicates: true });
+
 }
