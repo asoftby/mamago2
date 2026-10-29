@@ -6190,6 +6190,10 @@ model BookingRequest {
   bookingPriceSnapshot Json?
   /// Only set for a fully priced BYN booking. NULL = price on request, not zero.
   bookingTotalByn Decimal? @db.Decimal(10, 2)
+  /// Optional per-offer idempotency key for public slot reservations.
+  slotIdempotencyKey String?
+  /// Canonical SHA-256 intent fingerprint; no raw customer identifiers are stored here.
+  slotRequestHash String?
   campShiftId       String?
   /// Название смены (snapshot)
   campShiftTitle    String?
@@ -6264,6 +6268,7 @@ model BookingRequest {
   @@index([userId])
   @@index([activityId])
   @@index([offerId])
+  @@unique([offerId, slotIdempotencyKey])
   @@index([placeId])
   @@index([selectedSessionId])
   @@index([offerSessionId, status, holdUntil])
