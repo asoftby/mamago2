@@ -41,6 +41,7 @@ export async function dispatchPartyCandidateWave(input: {
       select: {
         id: true, category: true, role: true, status: true,
         confirmedBookingRequestId: true,
+        providerInvites: { select: { id: true }, take: 1 },
         partyOrder: { select: {
           id: true, status: true, version: true, ownerUserId: true, citySlug: true,
           eventDate: true, timeFrom: true, timeTo: true,
@@ -50,6 +51,9 @@ export async function dispatchPartyCandidateWave(input: {
       },
     });
     if (!current) throw new PartyApiError(404, "Услуга праздника не найдена");
+    // Durable invite queues must never be contacted through the legacy path.
+    if (current.providerInvites.length > 0)
+      throw new PartyApiError(409, "Услуга использует очередь приглашений");
     const order = current.partyOrder;
     // Candidate selection was computed before the transaction. A changed party
     // must not dispatch invitations for stale date, time or guest requirements.
