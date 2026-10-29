@@ -11,7 +11,8 @@ async function main() {
   const owner = await prisma.user.findUniqueOrThrow({ where: { email: "parent@it.test" } });
   const offer = await prisma.offer.findUniqueOrThrow({ where: { id: "it-offer-photo" },
     select: { id: true, place: { select: { ownerBusinessId: true } } } });
-  assert.ok(offer.place?.ownerBusinessId);
+  const providerBusinessId = offer.place?.ownerBusinessId;
+  assert.ok(providerBusinessId);
   const date = new Date(Date.now() + 12 * 86_400_000).toISOString().slice(0, 10);
   const order = await prisma.partyOrder.create({ data: {
     ownerUserId: owner.id, citySlug: "minsk", venueMode: "HOME", status: "ANCHOR_CONFIRMED",
@@ -24,7 +25,7 @@ async function main() {
   try {
     await prisma.partyProviderInvite.create({ data: {
       partyOrderItemId: item.id, offerId: offer.id,
-      businessId: offer.place.ownerBusinessId!, position: 0, mode: "SEQUENTIAL",
+      businessId: providerBusinessId, position: 0, mode: "SEQUENTIAL",
     } });
     // Both invocations compete for the same item lock. Only one BookingRequest
     // and one outbox event may be created.
@@ -47,11 +48,11 @@ async function main() {
     console.log("PASS competing queued dispatch and replay: exactly one request/outbox");
 
     const business = await prisma.business.findUniqueOrThrow({
-      where: { id: offer.place.ownerBusinessId! }, select: { ownerUserId: true },
+      where: { id: providerBusinessId }, select: { ownerUserId: true },
     });
     const respond = (type: "DECLINED" | "AS_REQUESTED", key: string) =>
       replyToPartyRequest({
-        businessId: offer.place.ownerBusinessId!, actorUserId: business.ownerUserId,
+        businessId: providerBusinessId, actorUserId: business.ownerUserId,
         requestId: invite.bookingRequestId!, idempotencyKey: key,
         input: type === "DECLINED"
           ? { expectedStage: "SENT", expectedQuoteVersion: 0,
