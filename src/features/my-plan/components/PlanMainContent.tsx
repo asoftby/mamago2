@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { LiquidNotification } from "@/components/ui/liquid-notification";
 import { PlanCalendar } from "@/features/plan-calendar";
 import { PlanPersonFilter, planPersonFilterOptions } from "./PlanPersonFilter";
+import { useSharedPlanAudienceFilters } from "../hooks/useSharedPlanAudienceFilters";
 import { PlanEmptyDayMessage } from "./PlanEmptyDayMessage";
 import { filterVisiblePlanEntries, type PlanPersonSelection } from "../lib/filterPlanEntriesByPerson";
 import { pluralRu, relativeLabel } from "@/lib/date/dateKey";
@@ -451,9 +452,20 @@ export function PlanMainContent({
   }, [openedEventId, planItemsByDate]);
   /** Фильтр дня по человеку: «Все» либо id персоны (ребёнок — childId, взрослый — assigneeUserId). */
   const [personFilter, setPersonFilter] = useState<string>("all");
-  const [includedPeople, setIncludedPeople] = useState<string[]>([]);
-  const [excludedPeople, setExcludedPeople] = useState<string[]>([]);
-  const [planVisibilityFilter, setPlanVisibilityFilter] = useState<"ALL" | "PRIVATE" | "FAMILY">("ALL");
+  const { filters: audienceFilters, update: updateAudienceFilters } = useSharedPlanAudienceFilters(family?.primaryAdultPersonaId);
+  const includedPeople = audienceFilters.include;
+  const excludedPeople = audienceFilters.exclude;
+  const planVisibilityFilter = audienceFilters.visibility;
+  const [familyAdults, setFamilyAdults] = useState<Array<{ userId: string; displayName: string | null; isMe: boolean }>>([]);
+  useEffect(() => {
+    if (!family?.primaryAdultPersonaId) { setFamilyAdults([]); return; }
+    const controller = new AbortController();
+    fetch("/api/family", { credentials: "include", cache: "no-store", signal: controller.signal })
+      .then(res => res.ok ? res.json() as Promise<{ family?: { adults?: Array<{ userId: string; displayName: string | null; isMe: boolean }> } }> : null)
+      .then(data => { if (!controller.signal.aborted) setFamilyAdults(data?.family?.adults ?? []); })
+      .catch(() => { if (!controller.signal.aborted) setFamilyAdults([]); });
+    return () => controller.abort();
+  }, [family?.primaryAdultPersonaId]);
   const [experienceFeed, setExperienceFeed] = useState<PlanExperienceFeed | null>(null);
   const reloadExperienceFeed = useCallback(async () => {
     setExperienceFeed(await fetchPlanExperienceFeed());
@@ -990,15 +1002,22 @@ export function PlanMainContent({
 
   const audienceSelection = useMemo(() => {
     const person = (id: string): PlanPersonSelection | null => {
-      const persona = personas.find((p) => p.id === id);
-      return persona ? { kind: persona.kind, id: persona.id } as PlanPersonSelection : null;
+      if (id.startsWith("adult:")) {
+        const userId = id.slice(6);
+        return familyAdults.some(adult => adult.userId === userId) || userId === family?.primaryAdultPersonaId ? { kind: "adult", id: userId } : null;
+      }
+      if (id.startsWith("child:")) {
+        const childId = id.slice(6);
+        return personas.some(p => p.kind === "child" && p.id === childId) ? { kind: "child", id: childId } : null;
+      }
+      return null;
     };
     return {
       include: includedPeople.map(person).filter((p): p is PlanPersonSelection => Boolean(p)),
       exclude: excludedPeople.map(person).filter((p): p is PlanPersonSelection => Boolean(p)),
       visibility: planVisibilityFilter,
     };
-  }, [includedPeople, excludedPeople, planVisibilityFilter, personas]);
+  }, [includedPeople, excludedPeople, planVisibilityFilter, personas, familyAdults, family?.primaryAdultPersonaId]);
 
   const visibleDayItems = useMemo(
     () => filterVisiblePlanEntries(dayItemsSorted, audienceSelection),
@@ -1124,24 +1143,29 @@ export function PlanMainContent({
     return filterPerson ? `${label} · ${filterPerson.kind === "adult" ? "мои дела" : personShortName(filterPerson)}` : label;
   })();
 
-  const personFilterOptions = planPersonFilterOptions(
-    personas.map((persona) => ({
-      value: persona.id,
-      label: personShortName(persona) || (persona.kind === "adult" ? "Взрослый" : "Ребёнок"),
+  const personFilterOptions = planPersonFilterOptions([
+    ...familyAdults.map(adult => ({
+      value: `adult:${adult.userId}`,
+      label: adult.isMe ? "Я" : adult.displayName?.trim() || "Взрослый",
     })),
-  );
+    ...personas.filter(persona => persona.kind === "child").map(persona => ({
+      value: `child:${persona.id}`,
+      label: personShortName(persona) || "Ребёнок",
+    })),
+    ...(!familyAdults.length && family?.primaryAdultPersonaId ? [{ value: `adult:${family.primaryAdultPersonaId}`, label: "Я" }] : []),
+  ]);
 
   /** Same filter UI as /me/plan, only the outer spacing depends on the sheet. */
   const renderPersonFilter = (_compact: boolean) =>
-    personas.length < 2 ? null : (
+    personFilterOptions.length < 3 ? null : (
       <PlanPersonFilter
         options={personFilterOptions}
         selectedValues={includedPeople}
-        onSelectionChange={(next) => { setIncludedPeople(next); setPersonFilter(next.length === 1 ? next[0] : "all"); }}
+        onSelectionChange={(include) => updateAudienceFilters({ ...audienceFilters, include })}
         excludedValues={excludedPeople}
-        onExclusionsChange={setExcludedPeople}
+        onExclusionsChange={(exclude) => updateAudienceFilters({ ...audienceFilters, exclude })}
         visibility={planVisibilityFilter}
-        onVisibilityChange={setPlanVisibilityFilter}
+        onVisibilityChange={(visibility) => updateAudienceFilters({ ...audienceFilters, visibility })}
       />
     );
 
