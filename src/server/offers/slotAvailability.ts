@@ -7,6 +7,7 @@ import {
   parseClockMinutes,
   shiftDateKey,
 } from "./slotTime";
+import { durationChoices } from "./bookingDuration";
 
 const MINUTE_MS = 60_000;
 const DAY_MS = 86_400_000;
@@ -27,6 +28,7 @@ export type GetSlotsInput = {
   from: Date;
   to: Date;
   requestedSeats?: number;
+  requestedDurationMinutes?: number;
 };
 
 type LocalInterval = { startMinutes: number; endMinutes: number };
@@ -39,6 +41,9 @@ export type SlotSnapshot = {
   leadTimeHours: number;
   horizonDays: number;
   durationMin: number | null;
+  maxExtensionHours?: number;
+  extensionHourPriceByn?: string | null;
+  extensionDiscountPercent?: number;
   bufferMin: number;
   capacity: number | null;
   rules: Array<{
@@ -268,7 +273,7 @@ function isUnitFree(
 /** Pure calculation. reserveSlot must repeat these checks inside its transaction. */
 export function calculateSlots(
   snapshot: SlotSnapshot,
-  input: Pick<GetSlotsInput, "from" | "to" | "requestedSeats">,
+  input: Pick<GetSlotsInput, "from" | "to" | "requestedSeats" | "requestedDurationMinutes">,
   now = new Date(),
 ): Slot[] {
   const requestedSeats = input.requestedSeats ?? 1;
@@ -279,6 +284,14 @@ export function calculateSlots(
   }
   if (snapshot.mode !== "USE_PUBLICATION_DATES" && snapshot.mode !== "USE_PUBLICATION_SLOTS") return [];
   if (!snapshot.scheduleKind) return [];
+  if (input.requestedDurationMinutes !== undefined &&
+      !durationChoices({
+        scheduleKind: snapshot.scheduleKind, durationMin: snapshot.durationMin,
+        maxExtensionHours: snapshot.maxExtensionHours ?? 0,
+        extensionHourPriceByn: snapshot.extensionHourPriceByn ?? null,
+        extensionDiscountPercent: snapshot.extensionDiscountPercent ?? 0,
+        hasClassGroups: false,
+      }).includes(input.requestedDurationMinutes)) return [];
   if (snapshot.horizonDays < 1 || snapshot.horizonDays > 366) throw new RangeError("Invalid horizonDays");
   const lower = maxDate(input.from, new Date(now.getTime() + snapshot.leadTimeHours * 60 * MINUTE_MS));
   const upper = minDate(input.to, new Date(now.getTime() + snapshot.horizonDays * DAY_MS));
@@ -337,7 +350,7 @@ export function calculateSlots(
       }
     }
   } else if (snapshot.scheduleKind === "ON_REQUEST_WINDOWS") {
-    const duration = snapshot.durationMin;
+    const duration = input.requestedDurationMinutes ?? snapshot.durationMin;
     if (!duration || duration <= 0) return [];
     for (const unit of snapshot.units) {
       if (unit.minDurationMinutes != null && duration < unit.minDurationMinutes) continue;
