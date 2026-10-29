@@ -9,6 +9,13 @@ test("new editor extends the existing offer wizard Services and Prices step", ()
   assert.match(wizard, /case "price":/);
   assert.match(wizard, /<Step5Pricing/);
   assert.match(wizard, /<BookingServicesEditor offerId=\{offerId\}/);
+  const priceStep = source("src/components/business/wizard/offer/steps/Step5Pricing.tsx");
+  assert.match(priceStep, /<ClassTariffsEditor/);
+  assert.match(wizard, /showTariffs=\{variant !== "v2"\}/);
+  const scheduleStep = source("src/components/business/wizard/offer/steps/StepClassSchedule.tsx");
+  assert.match(scheduleStep, /showTariffs &&/);
+  const tariffEditor = source("src/components/business/wizard/offer/components/ClassTariffsEditor.tsx");
+  assert.match(tariffEditor, /classSchedule\.groups\.map/);
   const editor = source("src/components/business/wizard/offer/components/BookingServicesEditor.tsx");
   assert.match(editor, /Сохранить услуги и стоимость/);
   assert.match(editor, /pricingRevision|revision: catalog\.revision/);
