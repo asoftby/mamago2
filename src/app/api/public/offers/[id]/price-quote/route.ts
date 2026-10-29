@@ -101,3 +101,39 @@ export async function POST(request: NextRequest, { params }: {
     return NextResponse.json({ error: "Не удалось рассчитать стоимость" }, { status: 500 });
   }
 }
+
+/**
+ * Public selection catalog: only optional / included items, never resource IDs,
+ * standalone products, unpublished offers, or private B2B data.
+ */
+export async function GET(_request: NextRequest, { params }: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const offer = await prisma.offer.findFirst({
+    where: { id, ...getPublicPublishedOfferWhere(), bookingEnabled: true,
+      bookingMode: { in: ["USE_PUBLICATION_DATES", "USE_PUBLICATION_SLOTS"] } },
+    select: { currency: true, place: { select: { ownerBusinessId: true } },
+      classGroups: { where: { active: true }, select: { id: true } },
+      offerBooking: { select: { options: { where: { active: true },
+        orderBy: { position: "asc" }, select: {
+          id: true, title: true, mode: true, priceByn: true, bookingUnitId: true,
+        } } } },
+    },
+  });
+  if (!offer?.place?.ownerBusinessId || !offer.offerBooking) {
+    return NextResponse.json({ error: "Предложение недоступно" }, { status: 404 });
+  }
+  // A group session has capacity seats, not an exclusive resource slot.
+  // Never advertise an optional resource the class reservation cannot hold.
+  const options = offer.currency === "BYN"
+    ? offer.offerBooking.options.filter(option =>
+      option.mode !== "STANDALONE" &&
+      !(option.bookingUnitId && offer.classGroups.length > 0)).map(option => ({
+        id: option.id, title: option.title, mode: option.mode,
+        priceByn: option.priceByn.toFixed(2),
+      }))
+    : [];
+  return NextResponse.json({ options, currency: offer.currency },
+    { headers: { "Cache-Control": "private, no-store" } });
+}
