@@ -1,3 +1,4 @@
+import { placeInTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
 import { unstable_cache } from "next/cache";
 import prisma from "@/lib/prisma";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
@@ -18,9 +19,10 @@ export async function getClassesListingPage(
   const orderedIds = await unstable_cache(async () => {
     const now = new Date();
     const publicWhere = getPublicPublishedOfferWhere();
-    const targetRegionId = await getDiscoveryRegionContext(cityId, citySlug);
+    const [scope, targetRegionId] = await Promise.all([resolveTerritoryScope(citySlug), getDiscoveryRegionContext(cityId, citySlug)]);
+    const placeWhere = scope ? placeInTerritoryScopeWhere(scope.territoryIds) : { cityId };
     const publicWhereParts = (publicWhere.AND ?? []) as import("@prisma/client").Prisma.OfferWhereInput[];
-    const where = buildClassesDiscoveryWhere({ publicWhereParts, cityId, targetRegionId, chipSlug, now, free: options.free, priceMax });
+    const where = buildClassesDiscoveryWhere({ publicWhereParts, cityId, placeWhere, targetRegionId, chipSlug, now, free: options.free, priceMax });
     const select = {
       id: true, dateFrom: true, dateTo: true, campSessions: true,
       boosts: { where: { startAt: { lte: now }, endAt: { gt: now } }, select: { id: true } },
@@ -32,7 +34,7 @@ export async function getClassesListingPage(
       const msg = error instanceof Error ? error.message : String(error);
       if (!msg.includes("classChipSlugs") && !msg.includes("P2022")) throw error;
       const fallbackWhere = buildClassesDiscoveryWhere({
-        publicWhereParts, cityId, targetRegionId, chipSlug: null, now,
+        publicWhereParts, cityId, placeWhere, targetRegionId, chipSlug: null, now,
         free: options.free, priceMax, skipChipSlugsSelect: true,
       });
       return prisma.offer.findMany({ where: fallbackWhere, select });

@@ -7,6 +7,12 @@ const where = getPublicBirthdayOfferWhere("city-minsk");
 const parts = where.AND;
 assert.ok(Array.isArray(parts), "birthday query requires all publication checks");
 assert.deepEqual(parts[1], { place: { cityId: "city-minsk", ownerBusiness: { isNot: null } } });
+
+// A territory scope replaces the legacy city filter (a region page covers its cities).
+const scoped = getPublicBirthdayOfferWhere("city-minsk", ["ter-a", "ter-b"]);
+assert.deepEqual((scoped.AND as unknown[])[1], {
+  place: { territoryId: { in: ["ter-a", "ter-b"] }, ownerBusiness: { isNot: null } },
+});
 assert.deepEqual(parts[2], {
   OR: [{ productType: "PARTY_PACKAGE" }, { productType: "PARTY_SERVICE", category: { not: null } }],
 });

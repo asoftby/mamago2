@@ -51,3 +51,18 @@ test("feed buckets: pinned first, then city relevance; no city → single bucket
   assert.deepEqual(buildJournalFeedBuckets(null), [{ group: null, where: {} }]);
   assert.equal(buildJournalFeedBuckets(city).length, 4, "without pinnedFirst the order is geography only");
 });
+
+test("territory journal keeps pinned-first ordering and regional relevance together", () => {
+  const territoryScope = {
+    territoryId: "region-minsk", type: "REGION" as const, slug: "minsk",
+    territoryIds: ["region-minsk", "city-minsk", "city-suburb"],
+    cityTerritoryId: "city-minsk", regionTerritoryId: "region-minsk",
+    regionScopeIds: ["region-minsk", "city-minsk", "city-suburb"],
+  };
+  const buckets = buildJournalFeedBuckets({ id: "legacy-minsk" }, { pinnedFirst: true, territoryScope });
+  assert.deepEqual(buckets[0], { group: null, where: { pinned: true } });
+  assert.deepEqual(buckets.slice(1).map(bucket => bucket.group), ["CITY", "REGION", "OTHER_CITY", "BELARUS"]);
+  for (const bucket of buckets.slice(1)) assert.deepEqual((bucket.where.AND as unknown[])[1], { pinned: false });
+  assert.match(JSON.stringify(buckets[2].where), /city-suburb/);
+  assert.doesNotMatch(JSON.stringify(buckets), /legacy-minsk/);
+});

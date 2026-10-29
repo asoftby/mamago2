@@ -8,12 +8,15 @@ import {
   getPublicPublishedPlaceWhere,
   getPublicRouteIndexWhere,
 } from "@/server/public/publicContentVisibility";
+import { getPublicBirthdayOfferWhere } from "@/server/birthday/birthdayOfferVisibility";
 
 /** Published content a territory holds, per product section. */
 export type TerritorySectionCounts = {
   events: number;
   /** «Занятия»: the classes feed pool — public SERVICE offers (see classesDiscoveryFeed). */
   classes: number;
+  /** «Праздник»: the birthday feed pool (see getPublicBirthdayOfferWhere). */
+  birthday: number;
   places: number;
   /** Remaining public offers (kind EVENT) that are not part of the classes feed. */
   offers: number;
@@ -22,16 +25,16 @@ export type TerritorySectionCounts = {
 };
 
 export const EMPTY_SECTION_COUNTS: TerritorySectionCounts = {
-  events: 0, classes: 0, places: 0, offers: 0, routes: 0, articles: 0,
+  events: 0, classes: 0, birthday: 0, places: 0, offers: 0, routes: 0, articles: 0,
 };
 
 export function totalSectionCounts(counts: TerritorySectionCounts): number {
-  return counts.events + counts.classes + counts.places + counts.offers + counts.routes + counts.articles;
+  return counts.events + counts.classes + counts.birthday + counts.places + counts.offers + counts.routes + counts.articles;
 }
 
 export function addSectionCounts(a: TerritorySectionCounts, b: TerritorySectionCounts): TerritorySectionCounts {
   return {
-    events: a.events + b.events, classes: a.classes + b.classes, places: a.places + b.places,
+    events: a.events + b.events, classes: a.classes + b.classes, birthday: a.birthday + b.birthday, places: a.places + b.places,
     offers: a.offers + b.offers, routes: a.routes + b.routes, articles: a.articles + b.articles,
   };
 }
@@ -66,15 +69,16 @@ export async function countPublicContentForTerritory(
   // classes = SERVICE offers (classesDiscoveryFeed); both on top of the public visibility predicates.
   const listing = (getPublicListingActivityWhere().AND ?? []) as Prisma.ActivityWhereInput[];
   const publicOffers = getPublicPublishedOfferWhere();
-  const [events, classes, places, offers, routes, articles] = await Promise.all([
+  const [events, classes, birthday, places, offers, routes, articles] = await Promise.all([
     db.activity.count({ where: { AND: [{ type: ActivityType.EVENT }, ...listing, activityInTerritory(territoryId)] } }),
     db.offer.count({ where: { AND: [publicOffers, { kind: "SERVICE" }, { place: { territoryId } }] } }),
+    db.offer.count({ where: getPublicBirthdayOfferWhere("", [territoryId]) }),
     db.place.count({ where: { territoryId, AND: getPublicPublishedPlaceWhere().AND } }),
     db.offer.count({ where: { AND: [publicOffers, { kind: { not: "SERVICE" } }, { place: { territoryId } }] } }),
     db.route.count({ where: { AND: [getPublicRouteIndexWhere(), { territoryId }] } }),
     db.article.count({ where: { AND: [getPublicPublishedArticleWhere(), articleInTerritory(territoryId)] } }),
   ]);
-  return { events, classes, places, offers, routes, articles };
+  return { events, classes, birthday, places, offers, routes, articles };
 }
 
 /** National articles (geoScope COUNTRY) belong to the country territory. */

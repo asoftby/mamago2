@@ -1,3 +1,4 @@
+import { resolveTerritoryScope } from "@/server/territory/territoryScope";
 import { ActivityFormat, type AgePolicy, type PartyCategory, type PublicationPriceMode } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
@@ -71,13 +72,15 @@ export async function getBirthdayDiscoveryPage(
 ) {
   const pageSize = Math.max(1, Math.min(60, Math.trunc(requestedPageSize) || 24));
   const page = Math.max(1, Math.trunc(requestedPage) || 1);
-  const where = getPublicBirthdayOfferWhere(cityId);
+  const scope = await resolveTerritoryScope(citySlug);
+  const where = getPublicBirthdayOfferWhere(cityId, scope?.territoryIds);
   const [total, rows] = await prisma.$transaction([
     prisma.offer.count({ where }),
     prisma.offer.findMany({
       where,
       select: {
         id: true, slug: true, title: true, description: true, coverImage: true,
+        place: { select: { city: { select: { slug: true } } } },
         productType: true, category: true, ageMinMonths: true, ageMaxMonths: true,
         agePolicy: true, priceMode: true, priceFrom: true, priceTo: true, currency: true,
       },
@@ -88,7 +91,7 @@ export async function getBirthdayDiscoveryPage(
   ]);
   const activities = rows.flatMap((offer): ActivityMock[] =>
     offer.slug && (offer.productType === "PARTY_SERVICE" || offer.productType === "PARTY_PACKAGE")
-      ? [projectBirthdayOfferCard({ ...offer, productType: offer.productType }, citySlug)]
+      ? [projectBirthdayOfferCard({ ...offer, productType: offer.productType }, offer.place?.city?.slug ?? citySlug)]
       : [],
   );
   return { activities, page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
