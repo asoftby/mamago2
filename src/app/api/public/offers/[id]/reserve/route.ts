@@ -61,7 +61,7 @@ export async function POST(
     });
     return NextResponse.json({
       bookingId: result.bookingId,
-      status: "NEW",
+      status: result.status,
       holdUntil: result.holdUntil.toISOString(),
     }, { status: 201 });
   } catch (error) {
