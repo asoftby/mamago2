@@ -90,8 +90,8 @@ PY
 
 # No dependency reconciliation: the healthy database container cannot be
 # recreated by any of these Compose commands. Never call 'down' or 'up db'.
-docker compose -p dev run --rm --no-deps migrate
-docker compose -p dev run --rm --no-deps --entrypoint sh migrate -c 'pnpm prisma migrate status'
+docker compose -p dev run --rm --no-deps migrate < /dev/null
+docker compose -p dev run --rm --no-deps --entrypoint sh migrate -c 'pnpm prisma migrate status' < /dev/null
 docker compose -p dev up -d --no-deps app worker
 
 for service in app worker; do
