@@ -49,7 +49,7 @@ export default function CrossRegionSettingsPage() {
     setError(""); setNotice("");
     const response = await fetch("/api/admin/discovery/cross-region-overrides", {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ activityId, regionId, reason, expiresAt: new Date(expiresAt).toISOString() }),
+      body: JSON.stringify({ activityId, regionId, reason, expiresAt: expiresAt && Number.isFinite(new Date(expiresAt).getTime()) ? new Date(expiresAt).toISOString() : "" }),
     });
     if (!response.ok) { setError("Не удалось сохранить исключение"); return; }
     setNotice("Исключение сохранено");
