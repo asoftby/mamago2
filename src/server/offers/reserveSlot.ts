@@ -16,6 +16,8 @@ export type ReserveSlotInput = {
   endsAt: Date;
   seats?: number;
   unitId?: string;
+  /** Explicit all-or-nothing set of exclusive resources; cannot combine with unitId. */
+  unitIds?: string[];
   customerName: string;
   customerPhone: string;
   customerEmail?: string | null;
@@ -76,6 +78,13 @@ function isExclusionViolation(error: unknown): boolean {
 export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId: string; holdUntil: Date }> {
   const seats = input.seats ?? 1;
   const holdMinutes = input.holdMinutes ?? 24 * 60;
+  const requestedUnits = input.unitIds;
+  if (requestedUnits !== undefined &&
+      (!Array.isArray(requestedUnits) || requestedUnits.length === 0 || requestedUnits.length > 8 ||
+        requestedUnits.some((id) => typeof id !== "string" || !id.trim() || id.length > 128) ||
+        new Set(requestedUnits).size !== requestedUnits.length || input.unitId !== undefined)) {
+    throw new SlotReservationError("INVALID_SLOT", "Некорректный выбор ресурсов");
+  }
   if (!Number.isInteger(seats) || seats < 1 || seats > 100 ||
       !Number.isInteger(holdMinutes) || holdMinutes < 1 || holdMinutes > 24 * 60 ||
       !(input.startsAt instanceof Date) || !(input.endsAt instanceof Date) ||
@@ -135,30 +144,45 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       if (holdUntil <= now) throw new SlotReservationError("SLOT_UNAVAILABLE", "Время записи на этот слот истекло");
 
       let sessionId: string | null = null;
-      let unitId: string | null = null;
-      let blockStart: Date | null = null;
-      let blockEnd: Date | null = null;
+      const allocations: Array<{ unitId: string; blockStart: Date; blockEnd: Date }> = [];
+      let selectedUnitIds: string[] = [];
       if (initial.scheduleKind === ScheduleKind.ON_REQUEST_WINDOWS) {
-        unitId = input.unitId ?? (candidate.unitIds.length === 1 ? candidate.unitIds[0] : null);
-        if (!unitId) throw new SlotReservationError("UNIT_REQUIRED", "Выберите конкретный ресурс для бронирования");
-        if (!candidate.unitIds.includes(unitId)) throw new SlotReservationError("SLOT_UNAVAILABLE", "Ресурс уже занят");
-        // Use the same BookingUnit row-lock protocol as manual CalendarBlock
-        // insertion, party confirmation and resource edits. Without this lock,
-        // a manual block may commit after our preview but before allocation.
-        const lockedUnits = await tx.$queryRaw<Array<{ id: string }>>`
-          SELECT "id" FROM "BookingUnit" WHERE "id" = ${unitId} FOR UPDATE
-        `;
-        if (lockedUnits.length !== 1) {
-          throw new SlotReservationError("SLOT_UNAVAILABLE", "Ресурс больше не доступен");
+        selectedUnitIds = requestedUnits ??
+          (input.unitId ? [input.unitId] :
+            candidate.unitIds.length === 1 ? [candidate.unitIds[0]] : []);
+        if (selectedUnitIds.length === 0) {
+          throw new SlotReservationError("UNIT_REQUIRED", "Выберите конкретный ресурс для бронирования");
         }
-        // The exclusion constraint cannot depend on now(). Release expired holds
-        // inside this transaction before the availability recheck and insert.
-        await tx.$executeRaw`UPDATE "BookingAllocation" SET "status" = 'EXPIRED', "updatedAt" = (now() AT TIME ZONE 'UTC')
-          WHERE "bookingUnitId" = ${unitId} AND "status" = 'HELD' AND "expiresAt" < (now() AT TIME ZONE 'UTC')`;
-        const unit = initial.units.find((item) => item.id === unitId)!;
-        blockStart = new Date(input.startsAt.getTime() - unit.prepMinutes * MINUTE_MS);
-        blockEnd = new Date(input.endsAt.getTime() + (unit.cleanupMinutes + initial.bufferMin) * MINUTE_MS);
+        if (selectedUnitIds.some((id) => !candidate.unitIds.includes(id))) {
+          throw new SlotReservationError("SLOT_UNAVAILABLE", "Один из ресурсов уже занят");
+        }
+        // All reservation pathways (including manual blocks and party confirmation)
+        // lock BookingUnit before checking availability. Lock resources in a stable
+        // order to avoid multi-resource deadlocks across concurrent bookings.
+        for (const unitId of [...selectedUnitIds].sort()) {
+          const lockedUnits = await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT "id" FROM "BookingUnit" WHERE "id" = ${unitId} FOR UPDATE
+          `;
+          if (lockedUnits.length !== 1) {
+            throw new SlotReservationError("SLOT_UNAVAILABLE", "Ресурс больше не доступен");
+          }
+          // Expired HELD rows remain in the exclusion constraint until released.
+          await tx.$executeRaw`UPDATE "BookingAllocation"
+            SET "status" = 'EXPIRED', "updatedAt" = (now() AT TIME ZONE 'UTC')
+            WHERE "bookingUnitId" = ${unitId} AND "status" = 'HELD'
+              AND "expiresAt" < (now() AT TIME ZONE 'UTC')`;
+          const unit = initial.units.find((item) => item.id === unitId)!;
+          allocations.push({
+            unitId,
+            blockStart: new Date(input.startsAt.getTime() - unit.prepMinutes * MINUTE_MS),
+            blockEnd: new Date(input.endsAt.getTime() +
+              (unit.cleanupMinutes + initial.bufferMin) * MINUTE_MS),
+          });
+        }
       } else {
+        if (input.unitId !== undefined || requestedUnits !== undefined) {
+          throw new SlotReservationError("INVALID_SLOT", "Для групповой записи ресурсы выбирать не нужно");
+        }
         const capacity = sessionCapacity(initial, input.startsAt);
         if (capacity == null || capacity < seats) throw new SlotReservationError("SLOT_UNAVAILABLE", "Нет свободных мест");
         const session = await tx.offerSession.upsert({
@@ -173,9 +197,14 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
         sessionId = session.id;
       }
 
+      // The row-lock wait may outlast the original preview or hold deadline.
+      const checkedAt = new Date();
+      if (holdUntil <= checkedAt) {
+        throw new SlotReservationError("SLOT_UNAVAILABLE", "Время удержания слота истекло");
+      }
       const current = await loadSlotSnapshot(query, tx);
-      const checked = current && availableSlot(current, input, now);
-      if (!checked || (unitId && !checked.unitIds.includes(unitId))) {
+      const checked = current && availableSlot(current, input, checkedAt);
+      if (!checked || selectedUnitIds.some((id) => !checked.unitIds.includes(id))) {
         throw new SlotReservationError("SLOT_UNAVAILABLE", "Слот только что заняли");
       }
       const booking = await tx.bookingRequest.create({
@@ -210,7 +239,9 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       await tx.bookingActivity.create({
         data: { bookingId: booking.id, type: "CREATED", actorType: "SYSTEM", payload: Prisma.JsonNull, createdAt: now },
       });
-      if (unitId && blockStart && blockEnd) {
+      // The request and EVERY required resource hold commit atomically.
+      // A conflict on any later allocation rolls back all previous holds.
+      for (const { unitId, blockStart, blockEnd } of allocations) {
         await tx.bookingAllocation.create({
           data: {
             bookingUnitId: unitId,
