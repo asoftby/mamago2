@@ -245,12 +245,24 @@ export async function updateOwnReservation(
   const allowed = hashes.has(reservation.claimTokenHash) || (!!viewer.userId && reservation.userId === viewer.userId);
   if (!allowed) throw new WishlistError("forbidden", "Это не ваша бронь");
 
+  // Transitions are conditional on the stored status, so a concurrent author release or
+  // item edit (CANCELLED / ITEM_REMOVED) can never be overwritten by a stale read.
   if (action === "cancel") {
     if (reservation.status === "CANCELLED" || reservation.status === "ITEM_REMOVED") return;
-    await c.db.wishlistReservation.update({ where: { id: reservation.id }, data: { status: "CANCELLED" } });
+    await c.db.wishlistReservation.updateMany({
+      where: { id: reservation.id, status: { in: ["RESERVED", "PURCHASED"] } },
+      data: { status: "CANCELLED" },
+    });
     return;
   }
   if (reservation.status === "PURCHASED") return;
   if (reservation.status !== "RESERVED") throw new WishlistError("not_found");
-  await c.db.wishlistReservation.update({ where: { id: reservation.id }, data: { status: "PURCHASED" } });
+  const moved = await c.db.wishlistReservation.updateMany({
+    where: { id: reservation.id, status: "RESERVED" },
+    data: { status: "PURCHASED" },
+  });
+  if (moved.count === 0) {
+    const now = await c.db.wishlistReservation.findUnique({ where: { id: reservation.id }, select: { status: true } });
+    if (now?.status !== "PURCHASED") throw new WishlistError("not_found");
+  }
 }

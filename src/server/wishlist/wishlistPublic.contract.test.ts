@@ -35,4 +35,18 @@ assert.match(page, /index: false/);
 assert.match(page, /no-referrer/);
 assert.match(page, /wishlistEnabled\(\)\) notFound\(\)/);
 
+// Review fixes: no shared "unknown" IP bucket, capability URLs stay out of analytics, atomic transitions.
+{
+  const route = read("src/server/wishlist/wishlistPublicRoute.ts");
+  assert.doesNotMatch(route, /\?\? "unknown"/, "no shared unknown-IP bucket");
+  assert.match(route, /ip \? checkRateLimit/, "per-IP bucket only with a trusted IP");
+  const provider = read("src/components/providers/cookie-consent-provider.tsx");
+  assert.match(provider, /isCapabilityUrlPath\(pathname\)/, "analytics skipped on capability URLs");
+  assert.match(read("src/lib/analytics/privatePaths.ts"), /"\/w\/"/);
+  const pub = read("src/server/wishlist/wishlistPublic.service.ts");
+  const upd = pub.slice(pub.indexOf("export async function updateOwnReservation"));
+  assert.match(upd, /updateMany\([\s\S]*?status: "RESERVED"/, "purchased is a conditional update");
+  assert.doesNotMatch(upd, /wishlistReservation\.update\(/, "no unconditional status writes");
+}
+
 console.log("wishlistPublic contract ok");

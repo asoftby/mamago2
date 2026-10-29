@@ -13,6 +13,8 @@
  * Скрипты аналитики/маркетинга: см. AnalyticsLoader / MarketingLoader.
  */
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
+import { isCapabilityUrlPath } from "@/lib/analytics/privatePaths";
 import { initCookieConsent } from "@/lib/cookies/consent-manager";
 import { AnalyticsLoader } from "@/components/analytics/analytics-loader";
 import { MarketingLoader } from "@/components/analytics/marketing-loader";
@@ -28,6 +30,10 @@ export function CookieConsentProvider({
   children: React.ReactNode;
   externalAnalytics: ExternalAnalyticsConfig;
 }) {
+  const pathname = usePathname();
+  // Capability links (/w/{token}) never reach third-party analytics or pixels.
+  const analyticsAllowed = !isCapabilityUrlPath(pathname);
+
   useEffect(() => {
     if (TEMP_DISABLE_COOKIE_CONSENT) return;
 
@@ -40,8 +46,8 @@ export function CookieConsentProvider({
     <>
       {children}
       {!TEMP_DISABLE_COOKIE_CONSENT ? <CookieConsentShell /> : null}
-      <AnalyticsLoader config={externalAnalytics} />
-      <MarketingLoader />
+      {analyticsAllowed ? <AnalyticsLoader config={externalAnalytics} /> : null}
+      {analyticsAllowed ? <MarketingLoader /> : null}
     </>
   );
 }

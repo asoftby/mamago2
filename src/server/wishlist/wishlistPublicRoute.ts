@@ -29,10 +29,12 @@ export async function withGuest(
   if (!wishlistEnabled()) return NextResponse.json({ error: "not_found" }, { status: 404 });
   try {
     if (rate) {
-      // IP is only an ephemeral key part (never stored); the per-list bucket caps abuse without it.
-      const ip = getTrustedClientIp(request) ?? "unknown";
+      // IP is only an ephemeral key part (never stored). Without a trusted IP (no proxy
+      // headers configured) there is no per-IP bucket: a shared "unknown" key would turn
+      // it into a site-wide limit. The per-list bucket still caps abuse.
+      const ip = getTrustedClientIp(request);
       const [perIp, perList] = await Promise.all([
-        checkRateLimit(`wl:${rate.bucket}:ip:${ip}`, rate.limit, rate.windowMs),
+        ip ? checkRateLimit(`wl:${rate.bucket}:ip:${ip}`, rate.limit, rate.windowMs) : Promise.resolve({ allowed: true }),
         checkRateLimit(`wl:${rate.bucket}:list:${shareToken.slice(0, 8)}`, rate.limit * 10, rate.windowMs),
       ]);
       if (!perIp.allowed || !perList.allowed) {

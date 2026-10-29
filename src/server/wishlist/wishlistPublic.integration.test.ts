@@ -130,6 +130,22 @@ test("only the claim holder (or owning account) may cancel / mark purchased", as
   await reserveItem(s.token, s.itemId, guest("Боря"), {}, deps);
 });
 
+test("a released reservation is never resurrected by purchased or cancel", async () => {
+  const s = await setup();
+  const a = await reserveItem(s.token, s.itemId, guest("Аня"), {}, deps);
+  await db.wishlistReservation.update({ where: { id: a.reservationId }, data: { status: "ITEM_REMOVED" } });
+  await assert.rejects(
+    updateOwnReservation(s.token, a.reservationId, "purchased", { rawClaims: [a.rawClaimToken] }, deps),
+    (e: unknown) => e instanceof WishlistError && e.code === "not_found",
+  );
+  await updateOwnReservation(s.token, a.reservationId, "cancel", { rawClaims: [a.rawClaimToken] }, deps);
+  assert.equal(
+    (await db.wishlistReservation.findUniqueOrThrow({ where: { id: a.reservationId } })).status,
+    "ITEM_REMOVED",
+    "author-side status is kept",
+  );
+});
+
 test("reservation from another wishlist is not reachable through this token", async () => {
   const s1 = await setup();
   const s2 = await setup();
