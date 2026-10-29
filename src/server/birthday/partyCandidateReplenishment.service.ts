@@ -5,7 +5,7 @@ import { PartyApiError } from "./partyDraft.validation";
 
 /**
  * Called only from the existing authenticated party-outbox cron.
- * Replenishes previously STARTED candidate waves, never ordinary fixed-offer
+ * Starts category-only waves or replenishes previously STARTED waves; never fixed-offer
  * add-ons. Bounded DB scan, sequential execution, no new scheduler.
  */
 export async function replenishPartyCandidateWaves(limit = 10) {
@@ -20,9 +20,15 @@ export async function replenishPartyCandidateWaves(limit = 10) {
       // The initial fanout has a normal CREATED activity; only our wave
       // dispatcher writes candidateWave:true. Never contact extra sellers
       // for a manually selected single-offer booking.
-      requests: { some: { activities: { some: {
-        type: "CREATED", payload: { path: ["candidateWave"], equals: true },
-      } } } },
+      OR: [
+        // First wave: category-only request without any fixed business/offer.
+        { role: "ADDON", offerId: null, businessId: null,
+          requests: { none: {} } },
+        // Follow-up waves: only requests created by our candidate dispatcher.
+        { requests: { some: { activities: { some: {
+          type: "CREATED", payload: { path: ["candidateWave"], equals: true },
+        } } } } },
+      ],
     },
     orderBy: { updatedAt: "asc" },
     take: Math.max(1, Math.min(20, limit)),

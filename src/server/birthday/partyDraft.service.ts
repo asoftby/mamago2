@@ -114,9 +114,10 @@ export async function updatePartyDraft(
     throw new PartyApiError(422, "Для дополнительных услуг выберите основную");
   }
 
-  const { version, anchorOfferId, addonOfferIds, ...changes } = input;
+  const { version, anchorOfferId, addonOfferIds, addonCategories, ...changes } = input;
   void anchorOfferId;
   void addonOfferIds;
+  void addonCategories;
   const data: Prisma.PartyOrderUpdateManyMutationInput = {
     ...changes,
     eventDate: changes.eventDate === undefined
@@ -157,6 +158,16 @@ export async function updatePartyDraft(
               partyOrderId: partyId, category, businessId, parentItemId: anchorItem.id,
               role: "INCLUDED", position: position++,
             },
+          });
+        }
+        const selectedCategories = new Set(addons.map(addon => addon.category));
+        for (const category of input.addonCategories ?? []) {
+          if (selectedCategories.has(category) || includedCategories(anchor).includes(category)) {
+            throw new PartyApiError(422, "Услуга этой категории уже выбрана");
+          }
+          await tx.partyOrderItem.create({
+            data: { partyOrderId: partyId, category,
+              role: "ADDON", position: position++ },
           });
         }
         for (const addon of addons) {
