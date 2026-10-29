@@ -3,6 +3,7 @@
  * Scope resolution against an in-memory Territory table.
  */
 import assert from "node:assert/strict";
+import type { PrismaClient } from "@prisma/client";
 import { activityInExactTerritoryScopeWhere, activityInTerritoryScopeWhere, collectDescendantIds, placeInTerritoryScopeWhere, resolveTerritoryScope } from "./territoryScope";
 
 const rows = [
@@ -15,14 +16,14 @@ const rows = [
 ];
 const db = {
   territory: {
-    findMany: async ({ where, select }: any) => {
+    findMany: async ({ where, select }: { where?: { slug?: string }; select?: Record<string, boolean> }) => {
       // resolver: slug lookup; scope: whole table
       let found = rows;
       if (where?.slug) found = rows.filter((r) => r.slug === where.slug);
-      return found.map((r) => (select ? Object.fromEntries(Object.keys(select).map((k) => [k, (r as any)[k]])) : r));
+      return found.map((r) => (select ? Object.fromEntries(Object.entries(r).filter(([key]) => select[key])) : r));
     },
   },
-} as any;
+} as unknown as Pick<PrismaClient, "territory">;
 
 assert.deepEqual(collectDescendantIds(rows, "rm").sort(), ["cm", "cmg", "rm"]);
 assert.deepEqual(collectDescendantIds(rows, "cm"), ["cm"]);
