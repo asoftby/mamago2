@@ -36,7 +36,11 @@ for (const required of [
   "partyStage: input.expectedStage", "tx.partyQuote.create",
   "tx.bookingActivity.create", "tx.partyOutbox.create",
   "responseDueAt: { gt: now }", "firstResponseAt: now",
-  "status: declined ? PartyItemStatus.DECLINED : PartyItemStatus.NEEDS_DECISION",
+  'partyOrderItemId: item.id, status: "QUEUED"',
+  "queuedAlternatives > 0 ? PartyItemStatus.REQUESTED : PartyItemStatus.DECLINED",
+  "PartyItemStatus.NEEDS_DECISION",
+  'bookingRequestId: requestId, status: "SENT"',
+  'status: declined ? "DECLINED" : autoConfirm ? "CONFIRMED" : "QUOTED"',
 ]) assert.ok(service.includes(required), "Missing transactional invariant: " + required);
 assert.ok(service.includes('status: { in: ["ACTIVE", "ACCEPTED"] }'), "A revised offer must supersede previously accepted terms");
 assert.ok(route.includes("getMyBusiness"), "Business membership must be verified");
