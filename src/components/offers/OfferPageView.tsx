@@ -31,6 +31,7 @@ import { toast } from "@/lib/toast";
 import { CallModal } from "@/components/shared/CallModal";
 import { FaqSection } from "@/components/public/FaqSection";
 import { DirectRequestCta } from "@/components/direct/DirectRequestCta";
+import { AddOfferToWishlist } from "@/features/wishlist/components/AddOfferToWishlist";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { useRegisterHeaderSaveAction } from "@/contexts/PublicationIntentContext";
@@ -46,6 +47,8 @@ export interface OfferDirectCtaInfo {
 export interface OfferPageViewProps {
   /** Public routes opt in; owner preview keeps its existing layout and fallbacks. */
   presentation?: "preview" | "public";
+  /** Show "В список желаний" on the public page (wishlist feature flag, resolved on the server). */
+  wishlistEnabled?: boolean;
   otherOffers?: Array<{ id: string; title: string; href: string; image: string | null; price: string | null }>;
   data: OfferPageData;
   isPrimaryLoading?: boolean;
@@ -113,6 +116,7 @@ function sortShiftContextsByNearest(shifts: ShiftCtaContext[]): ShiftCtaContext[
 export function OfferPageView({
   data,
   presentation = "preview",
+  wishlistEnabled = false,
   isPrimaryLoading,
   isSecondaryLoading,
   canEditOffer = false,
@@ -467,6 +471,12 @@ export function OfferPageView({
 
           </>
         )}
+
+        {wishlistEnabled && isPublicPage ? (
+          <div className="flex justify-center lg:justify-start">
+            <AddOfferToWishlist offerId={data.id} title={data.title} />
+          </div>
+        ) : null}
 
         {(!isPublicPage || hasSupportingContent) && <OfferSupportingContentContainer publicPage={presentation === "public"}>
         {data.reviews && (presentation === "preview" || data.reviews.length > 0) && (

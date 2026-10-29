@@ -413,3 +413,53 @@ test("a failing notifier never fails the author's edit", async () => {
   const view = await removeWishlistItem(owner, w.id, id, { confirmReserved: true }, boom as never);
   assert.equal(view.items.length, 0);
 });
+
+const catalog: { countries: string[]; cities: string[]; places: string[]; offers: string[] } = {
+  countries: [],
+  cities: [],
+  places: [],
+  offers: [],
+};
+after(async () => {
+  await db.offer.deleteMany({ where: { id: { in: catalog.offers } } });
+  await db.place.deleteMany({ where: { id: { in: catalog.places } } });
+  await db.city.deleteMany({ where: { id: { in: catalog.cities } } });
+  await db.country.deleteMany({ where: { id: { in: catalog.countries } } });
+});
+
+test("catalog offer becomes a gift idea; unpublished or unknown offers are refused", async () => {
+  const country = await db.country.create({ data: { name: `C ${run}`, slug: `c-${run}` } });
+  const city = await db.city.create({ data: { name: `Town ${run}`, slug: `town-${run}`, countryId: country.id } });
+  const placeCreator = await makeUser("placeowner");
+  const place = await db.place.create({ data: { title: "Place", shortDesc: "x", createdByUserId: placeCreator, cityId: city.id, status: "PUBLISHED", slug: `p-${run}` } });
+  const published = await db.offer.create({
+    data: { title: "Мастер-класс", kind: "EVENT", status: "PUBLISHED", placeId: place.id, slug: `mk-${run}` },
+  });
+  const draft = await db.offer.create({
+    data: { title: "Черновик", kind: "EVENT", status: "DRAFT", placeId: place.id, slug: `dr-${run}` },
+  });
+  catalog.countries.push(country.id);
+  catalog.cities.push(city.id);
+  catalog.places.push(place.id);
+  catalog.offers.push(published.id, draft.id);
+
+  const owner = await makeUser("offer");
+  const w = await createWishlist(owner, wl(), deps);
+
+  const view = await addWishlistItem(owner, w.id, item("Мастер-класс", { offerId: published.id }), deps);
+  const row = await db.wishlistItem.findUniqueOrThrow({ where: { id: view.items[0].id } });
+  assert.equal(row.offerId, published.id);
+  assert.ok(row.url?.endsWith(`/town-${run}/offers/mk-${run}`), "the catalog page is the link");
+
+  // an explicit link wins over the catalog page
+  const own = await addWishlistItem(owner, w.id, item("Свой", { offerId: published.id, url: "https://shop.example.test/x" }), deps);
+  assert.equal(own.items.find((i) => i.title === "Свой")!.url, "https://shop.example.test/x");
+
+  for (const offerId of [draft.id, "no-such-offer"]) {
+    await assert.rejects(
+      addWishlistItem(owner, w.id, item("X", { offerId }), deps),
+      (e: unknown) => e instanceof WishlistError && e.code === "invalid_input",
+    );
+  }
+  assert.equal((await getWishlist(owner, w.id, deps)).items.length, 2, "refused offers add nothing");
+});

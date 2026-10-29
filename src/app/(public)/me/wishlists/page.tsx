@@ -16,13 +16,16 @@ export async function generateMetadata() {
   return applyGlobalRobotsOverride({ title: "Списки желаний" });
 }
 
-type PageProps = { searchParams: Promise<{ childId?: string }> };
+type PageProps = { searchParams: Promise<{ childId?: string; title?: string; date?: string }> };
 
 export default async function WishlistsPage({ searchParams }: PageProps) {
   if (!wishlistEnabled()) notFound();
   const user = await getCurrentUser();
   if (!user) redirect("/login?redirectTo=/me/wishlists");
-  const { childId } = await searchParams;
+  const { childId, title, date } = await searchParams;
+  // Prefill from the birthday-party screen; anything malformed is simply ignored.
+  const defaultDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "";
+  const defaultTitle = title ? title.trim().slice(0, 120) : "";
 
   const [wishlists, children] = await Promise.all([
     listWishlists(user.id, { includeArchived: true }),
@@ -57,7 +60,7 @@ export default async function WishlistsPage({ searchParams }: PageProps) {
         </ul>
       ) : null}
 
-      <CreateWishlistForm childrenList={children} defaultChildId={childId ?? null} />
+      <CreateWishlistForm childrenList={children} defaultChildId={childId ?? null} defaultTitle={defaultTitle} defaultDate={defaultDate} />
 
       {archived.length > 0 ? (
         <section className="mt-8">

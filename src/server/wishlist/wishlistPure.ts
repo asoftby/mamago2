@@ -145,6 +145,8 @@ export const createItemSchema = z.object({
   quantity: z.number().int().min(1).max(99).default(1),
   priority: z.enum(["LOW", "NORMAL", "HIGH"]).default("NORMAL"),
   imageUrl: wishlistUrlSchema,
+  /** Catalog offer added as a gift idea; resolved and validated server-side. */
+  offerId: z.string().trim().min(1).max(64).optional(),
 });
 
 export const updateItemSchema = z.object({

@@ -1,6 +1,9 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 
 import { prisma as defaultPrisma } from "@/lib/prisma";
+import { isOfferPubliclyVisible } from "@/lib/offers/offerVisibility";
+import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
+import { getBaseUrl } from "@/lib/routing/cityPaths";
 import { ensureFamilyForUser } from "@/server/family/ensureFamily";
 import { childScopeWhere, familyReadsEnabled } from "@/server/family/familyScope";
 
@@ -326,6 +329,31 @@ export async function setWishlistArchived(
 
 // ─── Items ───────────────────────────────────────────────────────────────────
 
+/** Only publicly visible catalog offers can become gift ideas (no leaking drafts). */
+async function resolvePublicOffer(c: Ctx, offerId: string): Promise<{ id: string; url: string } | null> {
+  const offer = await c.db.offer.findUnique({
+    where: { id: offerId },
+    select: {
+      id: true,
+      slug: true,
+      status: true,
+      archivedAt: true,
+      place: {
+        select: {
+          status: true,
+          archivedAt: true,
+          ownerBusiness: { select: { operationalStatus: true } },
+          city: { select: { slug: true } },
+        },
+      },
+    },
+  });
+  if (!offer || !offer.slug || !offer.place?.city?.slug || !isOfferPubliclyVisible(offer)) {
+    throw new WishlistError("invalid_input", "Это предложение недоступно");
+  }
+  return { id: offer.id, url: `${getBaseUrl()}${getOfferPublicPath(offer, offer.place.city.slug)}` };
+}
+
 export async function addWishlistItem(
   userId: string,
   wishlistId: string,
@@ -335,6 +363,7 @@ export async function addWishlistItem(
   const c = ctx(deps);
   const wishlist = await loadAccessible(c, userId, wishlistId);
   assertEditable(wishlist);
+  const offer = input.offerId ? await resolvePublicOffer(c, input.offerId) : null;
   const last = await c.db.wishlistItem.findFirst({
     where: { wishlistId: wishlist.id, deletedAt: null },
     orderBy: { sortOrder: "desc" },
@@ -345,7 +374,9 @@ export async function addWishlistItem(
       wishlistId: wishlist.id,
       sortOrder: (last?.sortOrder ?? -1) + 1,
       title: input.title,
-      url: input.url ?? null,
+      offerId: offer?.id ?? null,
+      // The catalog page is the product link for an offer; an explicit link still wins.
+      url: input.url ?? offer?.url ?? null,
       comment: input.comment ?? null,
       priceApprox: input.priceApprox ?? null,
       quantity: input.quantity,
