@@ -16,14 +16,16 @@ on:
       - "docs/**"
       - "**/*.md"
 
-# Only the newest DEV image matters. A newer push cancels an older in-flight
-# build instead of burning a second runner and competing for the same GHA cache.
+# Do not cancel in-flight runs: with automatic DEV deployment enabled a newer
+# push must never terminate a release halfway through migrations.
 concurrency:
   group: docker-build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-and-push:
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     runs-on: ubuntu-latest
     # Healthy builds are currently ~12–15 min. Fail closed if buildx genuinely
     # hangs instead of leaving a runner stuck indefinitely.
@@ -61,6 +63,7 @@ jobs:
             type=raw,value=dev-${{ github.run_number }}
             type=raw,value=dev
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: .
@@ -82,3 +85,111 @@ jobs:
             GIT_COMMIT_SHA=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Opt-in only. Keep disabled until host Compose, SSH host keys, encrypted
+  # backup recovery and DEV rehearsal pass. Never deploys PROD.
+  deploy-dev:
+    if: ${{ github.ref == 'refs/heads/dev' && vars.MAMAGO_AUTO_DEPLOY_DEV == 'true' }}
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: dev-auto-deploy
+    concurrency:
+      group: mamago-dev-auto-deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    env:
+      TAG: dev-${{ github.run_number }}
+      EXPECTED_SHA: ${{ github.sha }}
+      EXPECTED_DIGEST: ${{ needs.build-and-push.outputs.digest }}
+    steps:
+      - name: Checkout exact release SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Validate release scripts
+        run: |
+          bash -n scripts/release/ci-dev-host-deploy.sh
+          bash -n scripts/release/ci-dev-backup.sh
+          bash -n scripts/release/migrate-with-backup.sh
+          bash -n scripts/deploy/backup-remote-db.sh
+      - name: Ensure build still matches current dev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/dev" --jq '.object.sha')"
+          test "$current" = "$EXPECTED_SHA" || {
+            echo "::error::DEV advanced; refusing to deploy superseded build"
+            exit 1
+          }
+          [[ "$TAG" =~ ^dev-[0-9]+$ && "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ && "$EXPECTED_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+      - name: Configure pinned SSH identity
+        env:
+          SSH_HOST: ${{ secrets.MAMAGO_DEV_SSH_HOST }}
+          SSH_USER: ${{ secrets.MAMAGO_DEV_SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.MAMAGO_DEV_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.MAMAGO_DEV_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_HOST" && test -n "$SSH_USER" && test -n "$SSH_PRIVATE_KEY" && test -n "$SSH_KNOWN_HOSTS"
+          [[ "$SSH_HOST" =~ ^[a-zA-Z0-9._-]+$ && "$SSH_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/mamago_dev_ci"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/mamago_dev_known_hosts"
+          chmod 600 "$HOME/.ssh/mamago_dev_ci" "$HOME/.ssh/mamago_dev_known_hosts"
+          {
+            echo 'Host mamago-dev-release'
+            echo "  HostName $SSH_HOST"
+            echo "  User $SSH_USER"
+            echo "  IdentityFile $HOME/.ssh/mamago_dev_ci"
+            echo "  UserKnownHostsFile $HOME/.ssh/mamago_dev_known_hosts"
+            echo '  IdentitiesOnly yes'
+            echo '  BatchMode yes'
+            echo '  StrictHostKeyChecking yes'
+          } >> "$HOME/.ssh/config"
+          chmod 600 "$HOME/.ssh/config"
+          ssh -o ConnectTimeout=10 mamago-dev-release 'test -d /opt/mamago/dev && docker info >/dev/null'
+      - name: Install backup encryption
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq age
+      - name: Produce verified encrypted off-host DEV backup
+        env:
+          AGE_RECIPIENT: ${{ secrets.MAMAGO_DEV_BACKUP_AGE_RECIPIENT }}
+        run: bash scripts/release/ci-dev-backup.sh "$TAG" "$AGE_RECIPIENT" mamago-dev-release
+      # Durable encrypted artifact MUST upload successfully BEFORE migration.
+      - name: Preserve encrypted database backup
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dev-database-backup-${{ github.run_number }}
+          path: ${{ env.BACKUP_ARCHIVE }}
+          if-no-files-found: error
+          retention-days: 14
+      - name: Recheck latest dev before mutation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/dev" --jq '.object.sha')"
+          test "$current" = "$EXPECTED_SHA" || {
+            echo "::error::DEV advanced after backup; refusing host cutover"
+            exit 1
+          }
+      - name: Apply target-image migrations and cut over DEV
+        run: |
+          ssh mamago-dev-release \
+            "cd /opt/mamago/dev && bash -s -- '$TAG' '$EXPECTED_SHA' '$EXPECTED_DIGEST'" \
+            < scripts/release/ci-dev-host-deploy.sh
+      - name: Verify live DEV SHA and build ID
+        run: |
+          for attempt in $(seq 1 24); do
+            if node scripts/release/verify-dev-runtime.mjs https://dev.mamago.by/api/health "$EXPECTED_SHA" "$TAG"; then
+              echo "DEV_RELEASE_VERIFIED sha=$EXPECTED_SHA image=$TAG digest=$EXPECTED_DIGEST"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::DEV runtime is not on expected SHA/build; manual recovery required"
+          exit 1
+      - name: Remove transient credentials and dumps
+        if: always()
+        run: |
+          rm -rf "${RUNNER_TEMP}/mamago-dev-backup-$TAG"
+          rm -f "$HOME/.ssh/mamago_dev_ci" "$HOME/.ssh/mamago_dev_known_hosts"
