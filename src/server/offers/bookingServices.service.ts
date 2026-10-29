@@ -52,7 +52,8 @@ export async function saveBookingServices(input: {
 
     // Group seats are not BookingUnits; cannot promise resource-linked
     // extras that class reservation cannot hold atomically.
-    if (resourceIds.length > 0 && (offer.classGroups.length > 0 ||\n        offer.offerBooking?.scheduleKind !== "ON_REQUEST_WINDOWS")) {
+    if (resourceIds.length > 0 && (offer.classGroups.length > 0 ||
+        offer.offerBooking?.scheduleKind !== "ON_REQUEST_WINDOWS")) {
       return { status: 422 };
     }
     if (resourceIds.length > 0) {
