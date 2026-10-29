@@ -15,7 +15,7 @@
       "markdown-it@<=14.1.1": "14.2.0",
       "@babel/core@<=7.29.0": "7.29.6",
       "esbuild@<0.28.1": "0.28.1",
-      "@react-email/preview-server>next": "16.3.8",
+      "@react-email/preview-server>next": "16.4.1",
       "sharp": "0.35.5",
       "postcss": "8.5.23",
       "effect": "3.20.0",
@@ -38,14 +38,15 @@
       "@hono/node-server@<1.19.15": "1.19.15",
       "postcss-selector-parser@>=7.0.0 <7.1.6": "7.1.6",
       "@humanfs/node@<0.16.8": "0.16.8",
-      "body-parser@>=2.0.0 <2.3.0": "2.3.0",
+      "body-parser@>=2.0.0 <2.3.0": "2.4.0",
       "@opentelemetry/instrumentation-pg@<0.73.0": "0.73.0",
       "@opentelemetry/instrumentation-mysql2@<0.67.0": "0.67.0",
       "@opentelemetry/instrumentation-knex@<0.65.0": "0.65.0",
       "@opentelemetry/instrumentation-mysql@<0.67.0": "0.67.0",
       "@opentelemetry/instrumentation-mongoose@<0.67.0": "0.67.0",
       "@opentelemetry/instrumentation-tedious@<0.40.0": "0.40.0",
-      "@opentelemetry/core": "2.8.0"
+      "@opentelemetry/core": "2.8.0",
+      "zod@<4.6.6": "4.6.6"
     }
   },
   "scripts": {
@@ -200,7 +201,8 @@
     "test:redirect-manifest": "tsx src/lib/seo/redirectManifest.test.ts",
     "test:migrated-article-slug-recovery": "tsx src/lib/seo/migratedArticleSlugRecovery.test.ts",
     "test:city-article-public-route": "tsx src/lib/article/resolveCityArticlePublicRoute.test.ts",
-    "test:seo-recovery": "tsx src/lib/seo/redirectConfiguration.test.ts && tsx src/lib/routing/trailingSlashPolicy.test.ts && tsx src/lib/seo/validateStoredCanonical.test.ts && tsx src/lib/seo/globalNoindex.test.ts && tsx src/lib/routing/wpLegacyCatchAll.test.ts",
+    "test:seo-http": "tsx scripts/test-editorial-route-http.ts",
+    "test:seo-recovery": "tsx src/lib/seo/redirectConfiguration.test.ts && tsx src/lib/routing/trailingSlashPolicy.test.ts && tsx src/lib/seo/validateStoredCanonical.test.ts && tsx src/lib/seo/globalNoindex.test.ts && tsx src/lib/routing/wpLegacyCatchAll.test.ts && tsx src/lib/routing/prestreamEditorialRouteRedirect.test.ts",
     "test:wp-catch-all": "tsx src/lib/routing/wpLegacyCatchAll.test.ts",
     "test:rate-limit": "tsx src/lib/security/rateLimit.test.ts",
     "test:offer-published-edit-gate": "tsx src/lib/offers/offerPublishedEditGate.test.ts",
@@ -309,7 +311,7 @@
     "@radix-ui/react-tooltip": "^1.1.8",
     "@react-email/components": "^1.0.11",
     "@react-email/render": "^2.0.5",
-    "@sentry/nextjs": "^10.52.0",
+    "@sentry/nextjs": "^10.75.2",
     "@tiptap/core": "^3.31.3",
     "@tiptap/extension-link": "^3.31.3",
     "@tiptap/extension-placeholder": "^3.31.3",
@@ -331,7 +333,7 @@
     "isbot": "5.2.2",
     "libphonenumber-js": "^1.12.40",
     "lucide-react": "^0.575.0",
-    "next": "16.3.8",
+    "next": "16.4.1",
     "next-themes": "^0.4.6",
     "pg": "^8.23.0",
     "prisma": "6.19.2",
@@ -350,7 +352,7 @@
     "tailwind-merge": "^3.5.0",
     "vanilla-cookieconsent": "^3.0.1",
     "vaul": "^1.1.2",
-    "zod": "^4.3.6",
+    "zod": "^4.6.6",
     "zustand": "^5.0.11"
   },
   "devDependencies": {

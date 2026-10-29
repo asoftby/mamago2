@@ -161,6 +161,11 @@ export function SearchOverlay({
               loading={(loading || debouncing) && queryTrim.length >= 2}
               open={open}
             />
+            {trimmed.length >= 2 ? (
+              <button type="button" className="mt-2 w-full rounded-xl bg-white/95 px-4 py-3 text-sm font-medium text-primary shadow-sm" onClick={() => { router.push(`/${citySlug}/search?${new URLSearchParams({ q: query.trim() })}`); close(); }}>
+                Показать все результаты
+              </button>
+            ) : null}
             <SearchResults
               query={query}
               trimmedQuery={queryTrim}

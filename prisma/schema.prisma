@@ -628,6 +628,10 @@ model PlanItem {
   /// За сколько минут до начала напомнить об этой записи. null = по общему расписанию
   /// уведомлений пользователя (UserNotificationSchedule). Только для ручных записей с временем.
   reminderLeadMinutes Int?
+  /// Explicit reminder instant; delivery wiring follows separately.
+  reminderAt        DateTime?
+  recurrenceSeriesId String?
+  recurrenceDate    String?
   /// Взрослый член семьи, на кого записано дело («Я»). null = не задано / вся семья.
   /// childId задаёт ребёнка, assigneeUserId — взрослого; вместе не используются.
   assigneeUserId    String?
@@ -659,6 +663,7 @@ model PlanItem {
   user              User                      @relation("PlanItemOwner", fields: [userId], references: [id], onDelete: Cascade)
   child             Child?                    @relation(fields: [childId], references: [id], onDelete: SetNull)
   assignee          User?                     @relation("PlanItemAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull)
+  recurrenceSeries  PlanRecurrenceSeries? @relation(fields: [recurrenceSeriesId], references: [id], onDelete: SetNull)
   scenarioOverrides DayScenarioItemOverride[]
   requirements      PlanItemRequirement[]
 
@@ -680,6 +685,37 @@ model PlanItem {
   @@index([familyId, visibility, status])
   @@index([activityId, cancelledAt, status, familyId])
   @@unique([id, familyId])
+  @@unique([recurrenceSeriesId, recurrenceDate])
+}
+
+model PlanRecurrenceSeries {
+  id             String @id @default(cuid())
+  ownerUserId    String
+  requestKey     String? @unique
+  familyId       String?
+  visibility     PlanVisibility @default(FAMILY)
+  timezone       String @default("Europe/Minsk")
+  frequency      PlanRecurrenceFrequency
+  interval       Int @default(1)
+  weekdays       Int[] @default([])
+  startDate      String
+  untilDate      String?
+  maxOccurrences Int?
+  template       Json
+  stoppedAt      DateTime?
+  version        Int @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  items          PlanItem[]
+
+  @@index([ownerUserId, stoppedAt])
+  @@index([familyId, stoppedAt])
+}
+
+enum PlanRecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
 }
 
 model PlanItemRequirement {
@@ -1118,6 +1154,7 @@ model Region {
   type      RegionType @default(REGION)
   isActive  Boolean    @default(false)
   priority  Int        @default(0)
+  crossRegionOverrides CrossRegionEditorialOverride[]
   cities    City[]
   articles  Article[]  @relation("ArticleRegion")
   seoContentPlanItems SeoContentPlanItem[] @relation("SeoContentPlanRegion")
@@ -1384,6 +1421,7 @@ model Activity {
   venue                EventVenue?
   importedRecords      ImportedRecord[]          @relation("ImportedRecordActivity")
   planItems            PlanItem[]
+  crossRegionOverrides CrossRegionEditorialOverride[]
   occasionLinks        ActivityOccasion[]
   /// Сигналы DISCOVERY домена (entityType=EVENT или OFFER), ID SignalDefinition
   discoverySignalIds   String[]                  @default([])
@@ -5728,6 +5766,22 @@ enum PartyItemRole {
   INCLUDED
   ADDON
 }
+enum PartyProviderDispatchMode {
+  PARALLEL
+  SEQUENTIAL
+}
+
+enum PartyProviderInviteStatus {
+  QUEUED
+  SENT
+  QUOTED
+  ACCEPTED
+  CONFIRMED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
 enum PartyItemStatus {
   PLANNED
   REQUESTED
@@ -5869,6 +5923,7 @@ model PartyOrderItem {
   parentItem PartyOrderItem? @relation("PartyItemComponents", fields: [parentItemId], references: [id], onDelete: SetNull)
   includedItems PartyOrderItem[] @relation("PartyItemComponents")
   requests BookingRequest[] @relation("PartyItemRequests")
+  providerInvites PartyProviderInvite[]
   confirmedBooking BookingRequest? @relation("ConfirmedPartyBooking", fields: [confirmedBookingRequestId], references: [id], onDelete: SetNull)
   prepaidMarkedBy User? @relation("PartyItemPrepaidMarker", fields: [prepaidMarkedByUserId], references: [id], onDelete: SetNull)
 
@@ -5912,6 +5967,30 @@ model PartyQuote {
   @@unique([bookingRequestId, idempotencyKey])
   @@index([bookingUnitId, serviceStart, serviceEnd])
   @@index([status, validUntil])
+}
+
+/// Durable queue record. Does not send anything until the separate dispatch worker is enabled.
+model PartyProviderInvite {
+  id String @id @default(cuid())
+  partyOrderItemId String
+  businessId String
+  offerId String
+  position Int
+  mode PartyProviderDispatchMode
+  status PartyProviderInviteStatus @default(QUEUED)
+  bookingRequestId String? @unique
+  responseDueAt DateTime?
+  sentAt DateTime?
+  resolvedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  item PartyOrderItem @relation(fields: [partyOrderItemId], references: [id], onDelete: Cascade)
+  request BookingRequest? @relation(fields: [bookingRequestId], references: [id], onDelete: SetNull)
+
+  @@unique([partyOrderItemId, businessId])
+  @@unique([partyOrderItemId, position])
+  @@index([status, responseDueAt])
 }
 
 model PartyOutbox {
@@ -6140,6 +6219,7 @@ model BookingRequest {
   directThread DirectThread?
   partyOrderItem PartyOrderItem? @relation("PartyItemRequests", fields: [partyOrderItemId], references: [id], onDelete: SetNull)
   partyQuotes PartyQuote[]
+  providerInvite PartyProviderInvite?
   allocations BookingAllocation[]
   confirmedForPartyItem PartyOrderItem? @relation("ConfirmedPartyBooking")
 
@@ -7181,4 +7261,21 @@ model BusinessTelegramLinkToken {
   createdAt   DateTime            @default(now())
 
   @@index([userId, environment, expiresAt])
+}
+
+/// Time-bounded editorial eligibility for an event in a target region.
+model CrossRegionEditorialOverride {
+  id String @id @default(cuid())
+  activityId String
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  regionId String
+  region Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  reason String
+  expiresAt DateTime
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([activityId, regionId])
+  @@index([regionId, expiresAt])
 }

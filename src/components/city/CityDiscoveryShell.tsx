@@ -94,6 +94,7 @@ interface CityDiscoveryShellProps {
   /** Лента «Куда пойти»: только данные с сервера (БД) */
   discoveryActivities?: ActivityMock[];
   birthdayPagination?: { page: number; totalPages: number; total: number };
+  classesPagination?: { page: number; totalPages: number; total: number };
   classChips?: Array<{ id: string; title: string; slug: string }>;
   activeClassChipSlug?: string;
   /** Конфигурация бюджетного фильтра; null = фильтр выключен в админке. */
@@ -116,6 +117,7 @@ export function CityDiscoveryShell({
   routesData,
   discoveryActivities,
   birthdayPagination,
+  classesPagination,
   classChips,
   activeClassChipSlug,
   budgetConfig,
@@ -263,6 +265,17 @@ export function CityDiscoveryShell({
               : undefined
           }
         />
+        {intent === "classes" && classesPagination && classesPagination.totalPages > 1 ? (
+          <nav aria-label="Страницы занятий" className="flex flex-wrap items-center justify-center gap-3 pt-4">
+            {classesPagination.page > 1 ? (
+              <Link className="rounded-full border px-5 py-2 text-sm" href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(listingSearchParams).map(([key, value]) => [key, Array.isArray(value) ? value[0] ?? "" : value ?? ""])), page: String(classesPagination.page - 1) }).toString()}`}>Назад</Link>
+            ) : null}
+            <span className="text-sm text-muted-foreground">Страница {classesPagination.page} из {classesPagination.totalPages}</span>
+            {classesPagination.page < classesPagination.totalPages ? (
+              <Link className="rounded-full border px-5 py-2 text-sm" href={`?${new URLSearchParams({ ...Object.fromEntries(Object.entries(listingSearchParams).map(([key, value]) => [key, Array.isArray(value) ? value[0] ?? "" : value ?? ""])), page: String(classesPagination.page + 1) }).toString()}`}>Далее</Link>
+            ) : null}
+          </nav>
+        ) : null}
         {intent === "kuda" && city !== globalCitySlug && (
           <Link href={`/${globalCitySlug}/events`} className="inline-flex text-sm font-medium text-primary hover:underline">
             Вернуться к событиям в своём городе

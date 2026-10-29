@@ -21,6 +21,7 @@ export type PartySubmissionInput = {
   contactPhone: string;
   anchorOfferId: string;
   addonOfferIds: string[];
+  addonCategories?: string[];
 };
 export type PartyRequest = <T>(url: string, method: string, body?: object, key?: string) => Promise<T>;
 

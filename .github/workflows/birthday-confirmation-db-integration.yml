@@ -6,7 +6,11 @@ on:
     paths:
       - ".github/workflows/birthday-confirmation-db-integration.yml"
       - "src/server/birthday/**"
+      - "src/features/birthday/builder/components/steps/StepReview.tsx"
+      - "src/features/birthday/builder/components/steps/StepReviewAvailability.test.ts"
+      - "src/app/api/public/party-availability/**"
       - "src/app/api/business/booking-units/**"
+      - "src/components/business/booking-units/**"
       - "scripts/it/seedPartyIT.ts"
       - "src/app/api/parent/parties/**"
       - "src/app/api/business/party-requests/**"
@@ -20,7 +24,11 @@ on:
     paths:
       - ".github/workflows/birthday-confirmation-db-integration.yml"
       - "src/server/birthday/**"
+      - "src/features/birthday/builder/components/steps/StepReview.tsx"
+      - "src/features/birthday/builder/components/steps/StepReviewAvailability.test.ts"
+      - "src/app/api/public/party-availability/**"
       - "src/app/api/business/booking-units/**"
+      - "src/components/business/booking-units/**"
       - "scripts/it/seedPartyIT.ts"
       - "src/app/api/parent/parties/**"
       - "src/app/api/business/party-requests/**"
@@ -70,6 +78,34 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Apply migrations to disposable PostgreSQL
         run: pnpm exec prisma migrate deploy
+      - name: Verify calendar block business UI contract
+        run: pnpm exec tsx src/components/business/booking-units/bookingUnitCalendar.test.ts
+      - name: Verify step-five preview UI contract
+        run: pnpm exec tsx src/features/birthday/builder/components/steps/StepReviewAvailability.test.ts
+      - name: Verify sibling request expiry contracts
+        run: pnpm exec tsx src/server/birthday/partyMultiRequestExpiry.contract.test.ts
+      - name: Verify competing birthday invitation closure
+        run: pnpm exec tsx src/server/birthday/partyConfirmSiblings.contract.test.ts
+      - name: Verify category-only initial invitation contracts
+        run: pnpm exec tsx src/server/birthday/partyCategoryInitialWave.contract.test.ts
+      - name: Verify auto replenishment cron contracts
+        run: pnpm exec tsx src/server/birthday/partyCandidateAutoReplenish.contract.test.ts
+      - name: Verify candidate replenishment contracts
+        run: pnpm exec tsx src/server/birthday/partyCandidateReplenishment.contract.test.ts
+      - name: Verify transactional candidate dispatch contracts
+        run: pnpm exec tsx src/server/birthday/partyCandidateDispatch.contract.test.ts
+      - name: Verify invitation selection policy behavior
+        run: pnpm exec tsx src/server/birthday/partyInvitationPolicy.behavior.test.ts
+      - name: Verify order-scoped candidate API contracts
+        run: pnpm exec tsx src/server/birthday/partyOrderCandidates.test.ts
+      - name: Verify availability-aware selection behavior
+        run: pnpm exec tsx src/server/birthday/partyCandidateSelection.behavior.test.ts
+      - name: Verify availability-aware candidate selection contracts
+        run: pnpm exec tsx src/server/birthday/partyAvailableCandidates.test.ts
+      - name: Verify candidate matching contracts
+        run: pnpm exec tsx src/server/birthday/partyCandidateRanking.test.ts
+      - name: Verify public availability preview contract
+        run: pnpm exec tsx src/server/birthday/partyAvailabilityPreview.test.ts
       - name: Verify manual calendar block contracts
         run: pnpm exec tsx src/server/birthday/bookingUnitBlocks.test.ts
       - name: Verify real quote acceptance and exclusive confirmation
@@ -124,3 +160,5 @@ jobs:
         run: pnpm exec tsx scripts/it/seedPartyIT.ts
       - name: Verify full party flow
         run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyFullFlow.integration.test.ts
+      - name: Verify competing durable queue dispatch and replay
+        run: NODE_OPTIONS=--conditions=react-server pnpm exec tsx src/server/birthday/partyInviteDispatch.postgres.integration.test.ts

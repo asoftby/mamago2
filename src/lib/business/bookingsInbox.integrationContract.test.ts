@@ -8,6 +8,7 @@ const ui = source("../../components/business/bookings/inbox/BookingsInbox.tsx");
 const detail = source("../../components/business/bookings/inbox/StandardBookingDetails.tsx");
 const confirm = source("../../components/business/bookings/inbox/PartyConfirmOverlay.tsx");
 const service = source("../../server/services/booking/businessInbox.service.ts");
+const scan = source("../../server/services/booking/businessInboxScan.ts");
 const bookings = source("../../server/services/booking/bookingQuery.service.ts");
 const api = source("../../app/api/business/bookings/[id]/route.ts");
 
@@ -26,8 +27,11 @@ assert.match(ui, /Предложить другие условия/);
 assert.doesNotMatch(ui, /Подтвердить условия/);
 assert.doesNotMatch(ui, /\?view=calendar&id/);
 
-assert.match(service, /decision\.bucket === "UPCOMING" &&/);
-assert.match(service, /kind === "all" \|\| row\.kind ===/);
+assert.match(service, /scanBusinessInboxPages\(/);
+assert.match(scan, /decision\.bucket === "UPCOMING"\)/);
+assert.match(scan, /insertTopK\(nearestUpcoming, entry, 3\)/);
+assert.match(scan, /input\.kind === "all" \|\|/);
+assert.match(scan, /row\.kind === \(input\.kind === "party"/);
 
 assert.match(api, /export async function GET/);
 assert.match(api, /getBusinessBookingById\(id, business\.id\)/);

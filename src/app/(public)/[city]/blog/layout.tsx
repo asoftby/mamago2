@@ -5,9 +5,11 @@ import { BlogPersistentNav } from "../../blog/BlogPersistentNav";
 
 export default async function CityJournalLayout({
   children,
+  modal,
   params,
 }: {
   children: React.ReactNode;
+  modal: React.ReactNode;
   params: Promise<{ city: string }>;
 }) {
   const { city: citySlug } = await params;
@@ -22,6 +24,7 @@ export default async function CityJournalLayout({
     <>
       <BlogPersistentNav citySlug={city.slug} categories={categories} />
       {children}
+      {modal}
     </>
   );
 }

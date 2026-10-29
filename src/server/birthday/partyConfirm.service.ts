@@ -141,6 +141,20 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
         }
       }
 
+      // Multiple businesses may quote one party item. Serialize its final
+      // confirmation independently of the individual request row.
+      await tx.$queryRaw`SELECT "id" FROM "PartyOrderItem"
+        WHERE "id" = ${item.id} FOR UPDATE`;
+      const currentItem = await tx.partyOrderItem.findUnique({
+        where: { id: item.id },
+        select: { status: true, confirmedBookingRequestId: true },
+      });
+      if (!currentItem || currentItem.confirmedBookingRequestId ||
+          currentItem.status === PartyItemStatus.CONFIRMED ||
+          currentItem.status === PartyItemStatus.CANCELLED) {
+        throw new PartyApiError(409, "Для этой услуги уже выбран исполнитель или она отменена");
+      }
+
       const claimed = await tx.bookingRequest.updateMany({
         where: { id: requestId, businessId, status: BookingStatus.NEW,
           partyStage: "AWAITING_RECONFIRM", lastActivityAt: req.lastActivityAt,
@@ -164,6 +178,41 @@ export async function confirmPartyRequest(input: ConfirmPartyRequestInput) {
         data: { status: PartyItemStatus.CONFIRMED, confirmedBookingRequestId: requestId,
           offerPriceSnapshot: quote.priceByn },
       });
+      // Close all competing invitations only after the winner is claimed.
+      // The PartyOrderItem row is locked above: no subsequent wave can start
+      // while we commit the winning booking and close its siblings.
+      const competing = await tx.bookingRequest.findMany({
+        where: { partyOrderItemId: item.id, kind: BookingKind.PARTY,
+          id: { not: requestId }, status: BookingStatus.NEW,
+          partyStage: { in: ["SENT", "QUOTED", "AWAITING_RECONFIRM"] } },
+        select: { id: true, partyStage: true },
+      });
+      for (const sibling of competing) {
+        const closed = await tx.bookingRequest.updateMany({
+          where: { id: sibling.id, status: BookingStatus.NEW,
+            partyStage: { in: ["SENT", "QUOTED", "AWAITING_RECONFIRM"] } },
+          data: { status: BookingStatus.CANCELLED, partyStage: "NOT_ACCEPTED",
+            partyCloseReason: "NOT_SELECTED", responseDueAt: null,
+            lastActivityAt: now },
+        });
+        if (closed.count !== 1) throw new PartyApiError(409, "Конкурирующая заявка изменилась");
+        await tx.partyQuote.updateMany({
+          where: { bookingRequestId: sibling.id, status: { in: ["ACTIVE", "ACCEPTED"] } },
+          data: { status: "WITHDRAWN", decidedAt: now },
+        });
+        await tx.bookingActivity.create({
+          data: { bookingId: sibling.id, type: "REQUEST_WITHDRAWN",
+            actorType: "SYSTEM",
+            payload: { reason: "NOT_SELECTED", winningRequestId: requestId } },
+        });
+        await tx.partyOutbox.create({
+          data: { eventType: "PARTY_REQUEST_CANCELLED",
+            aggregateId: sibling.id,
+            dedupeKey: "party:" + sibling.id + ":not-selected",
+            payload: { requestId: sibling.id, partyOrderId: order.id,
+              reason: "NOT_SELECTED" } },
+        });
+      }
       if (unit && window) {
         await allocatePartyUnit(tx, { unitId: unit.id, requestId, quoteId: quote.id, window });
       }

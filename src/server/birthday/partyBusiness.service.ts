@@ -203,6 +203,16 @@ export async function replyToPartyRequest(params: {
         },
       });
       if (claimed.count !== 1) throw new PartyApiError(409, "Заявка уже изменена");
+      // Keep the durable invitation in sync with its BookingRequest.
+      // Retry/competing replies are rejected by the request CAS above.
+      await tx.partyProviderInvite.updateMany({
+        where: { bookingRequestId: requestId, status: "SENT" },
+        data: {
+          status: declined ? "DECLINED" : autoConfirm ? "CONFIRMED" : "QUOTED",
+          ...(declined || autoConfirm ? { resolvedAt: now } : {}),
+        },
+      });
+
 
       // Lock the order after the request, matching the expiry worker lock order.
       // If the parent cancelled meanwhile, the transaction rolls back the claim.
@@ -264,9 +274,24 @@ export async function replyToPartyRequest(params: {
           });
         }
       } else {
+        // A declined invitation does not close the service while another
+        // candidate remains queued for an alternative attempt.
+        const queuedAlternatives = declined ? await tx.partyProviderInvite.count({
+          where: { partyOrderItemId: item.id, status: "QUEUED" },
+        }) : 0;
+        const otherActiveRequests = declined ? await tx.bookingRequest.count({
+          where: {
+            partyOrderItemId: item.id, id: { not: requestId }, kind: BookingKind.PARTY,
+            status: BookingStatus.NEW,
+            partyStage: { in: ["SENT", "QUOTED", "AWAITING_RECONFIRM"] },
+          },
+        }) : 0;
         await tx.partyOrderItem.update({
           where: { id: item.id },
-          data: { status: declined ? PartyItemStatus.DECLINED : PartyItemStatus.NEEDS_DECISION },
+          data: { status: declined
+            ? queuedAlternatives > 0 || otherActiveRequests > 0
+              ? PartyItemStatus.REQUESTED : PartyItemStatus.DECLINED
+            : PartyItemStatus.NEEDS_DECISION },
         });
       }
       await tx.bookingActivity.create({

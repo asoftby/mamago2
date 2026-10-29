@@ -1,3 +1,5 @@
+import { unstable_cache } from "next/cache";
+import { withImageDimensions } from "@/server/media/loadImageDimensionsByUrl";
 import { parseActivityFormatQuery } from "@/domain/activities/activity-format";
 import { parseAppliedFromUrl } from "@/features/filters/discovery/discoveryFilterParams";
 import { partitionDiscoveryFeed } from "@/lib/discovery/partitionDiscoveryFeed";
@@ -9,13 +11,6 @@ import {
   paginateKudaFeed,
   type KudaListingPage,
 } from "@/lib/discovery/kudaListingPagination";
-
-/**
- * Candidates ranked per request. The DB query and temporal/engagement ranking
- * stay exactly as in `getKudaDiscoveryFeed`; only the pool is larger so that
- * pagination has a stable, complete order (previously 200 candidates → 80 cards).
- */
-export const KUDA_LISTING_POOL = 360;
 
 export type ListingSearchParams = Record<string, string | string[] | undefined>;
 
@@ -89,15 +84,52 @@ export async function loadKudaListingPage(input: {
   // Family personas never reach the server listing (no persona IDs in URLs,
   // #799): the partition uses only explicit filters (manual age chips), so
   // `?page=N`, infinite scroll and guests all see the same membership/order.
-  const feed = await getKudaDiscoveryFeed(input.cityId, input.citySlug, input.userId, {
-      take: KUDA_LISTING_POOL,
-      candidatePoolCap: KUDA_LISTING_POOL,
-      format: parseActivityFormatQuery(input.searchParams.get("format")),
+  // Reuse the expensive global order across SSR and infinite-scroll requests
+  // with identical *explicit* filters. Do not key on user/persona: the public
+  // candidate set and its ranking must be independent of family membership.
+  const format = parseActivityFormatQuery(input.searchParams.get("format"));
+  const feed = await unstable_cache(
+    async () => getKudaDiscoveryFeed(input.cityId, input.citySlug, null, {
+      allCandidates: true,
+      hydrateImages: false,
+      rankOnly: true,
+      format,
       nearby: false,
       explicitTerritorySlug: input.explicitTerritorySlug ?? null,
       eventFilters,
-  });
+    }),
+    [
+      "kuda-ranked-candidates-v1",
+      input.cityId,
+      input.citySlug,
+      input.explicitTerritorySlug ?? "",
+      JSON.stringify({ format, eventFilters }),
+    ],
+    { revalidate: 60 },
+  )();
   const partition = partitionDiscoveryFeed(filters, feed);
   const page = paginateKudaFeed(partition, input.page, input.pageSize ?? KUDA_LISTING_PAGE_SIZE);
-  return { ...page, pool: [...partition.primary, ...partition.secondary] };
+  // The cached ranked pool has no media relation payloads. Hydrate only the
+  // visible page, then restore its global rank, bucket and age hint.
+  const visibleIds = page.items.map((item) => item.id);
+  const details = visibleIds.length
+    ? await getKudaDiscoveryFeed(input.cityId, input.citySlug, null, {
+        onlyIds: visibleIds,
+        take: visibleIds.length,
+        format,
+        nearby: false,
+        explicitTerritorySlug: input.explicitTerritorySlug ?? null,
+        eventFilters,
+        hydrateImages: false,
+      })
+    : [];
+  const byId = new Map(details.map((card) => [card.id, card]));
+  const hydrated = page.items.map((item) => ({
+    ...item,
+    ...(byId.get(item.id) ?? {}),
+    feedBucket: item.feedBucket,
+    ageHintBadge: item.ageHintBadge,
+  }));
+  const items = await withImageDimensions(hydrated, (card) => card.image);
+  return { ...page, items, pool: [...partition.primary, ...partition.secondary] };
 }

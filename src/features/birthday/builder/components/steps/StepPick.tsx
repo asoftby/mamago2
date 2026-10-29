@@ -26,6 +26,8 @@ type Props = {
   selectedAddonIds: string[];
   onSelectBase: (id: string) => void;
   onToggleAddon: (id: string) => void;
+  selectedCategoryKeys?: PartyCategoryKey[];
+  onToggleCategory?: (category: PartyCategoryKey) => void;
 };
 
 const priceLabel = catalogPriceLabel;
@@ -94,6 +96,7 @@ function OfferCard({
 export function StepPick({
   citySlug, offers, allOfferCount, loading, error, onRetry, placeType,
   selectedBaseId, selectedAddonIds, onSelectBase, onToggleAddon,
+  selectedCategoryKeys = [], onToggleCategory = () => {},
 }: Props) {
   const venueMode = placeType === "VENUE" || placeType === "PACKAGE";
   const bases = offers.filter((offer) => isAllowedBase(offer, placeType));
@@ -154,10 +157,31 @@ export function StepPick({
       </div>
       {selectedBaseId && GROUPS.map((group) => {
         const groupOffers = additions.filter((offer) => offer.category && group.categories.includes(offer.category));
-        if (groupOffers.length === 0) return null;
+        if (groupOffers.length === 0 && group.categories.every(category => category === "OTHER")) return null;
         return (
           <div key={group.title} className="space-y-4">
             <h3 className="text-xl font-semibold">{group.title} <span className="text-sm font-normal text-stone-500">· необязательно</span></h3>
+            <div className="flex flex-wrap gap-2">
+              {group.categories.filter(category => category !== "OTHER").map(category => {
+                const labels: Partial<Record<PartyCategoryKey, string>> = {
+                  ANIMATOR: "Аниматор", SHOW: "Шоу", MASTER_CLASS: "Мастер-класс",
+                  PROGRAM: "Программа", CAKE: "Торт", FOOD: "Угощения",
+                  DECOR: "Декор", PHOTO: "Фотограф",
+                };
+                const selected = selectedCategoryKeys.includes(category);
+                const alreadyChosen = additions.some(offer =>
+                  offer.category === category && selectedAddonIds.includes(offer.id));
+                return <button type="button" key={category}
+                  disabled={alreadyChosen}
+                  aria-pressed={selected}
+                  onClick={() => onToggleCategory(category)}
+                  className={"rounded-full border px-4 py-2 text-sm font-medium disabled:opacity-40 " +
+                    (selected ? "border-orange-600 bg-orange-50 text-orange-900" :
+                      "border-stone-300 text-stone-800")}>
+                  {selected ? "✓ " : ""}{labels[category]} · Подобрать исполнителя
+                </button>;
+              })}
+            </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {groupOffers.map((offer) => (
                 <OfferCard key={offer.id} offer={offer} selected={selectedAddonIds.includes(offer.id)}
