@@ -12,3 +12,13 @@ assert.equal(rows[0]?.reminderLeadMinutes,60);
 assert.equal(rows[0]?.recurrenceSeriesId,"s1");
 assert.equal(rows[0]?.visibility,"FAMILY");
 assert.throws(()=>planRecurrenceInsertRows([series],"2026-10-29","2027-11-01"),/invalid_window/);
+
+// A large set of daily series must honor the insertion budget without throwing.
+const many = Array.from({ length: 100 }, (_, index) => ({
+  ...series,
+  id: `s-${index}`,
+  maxOccurrences: null,
+}));
+const boundedRows = planRecurrenceInsertRows(many, "2026-10-29", "2026-11-10");
+assert.equal(boundedRows.length, 1300);
+assert.ok(boundedRows.length <= 2000);
