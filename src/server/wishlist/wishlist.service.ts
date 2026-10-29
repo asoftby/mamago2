@@ -479,3 +479,22 @@ export async function reorderWishlistItems(
 async function touch(c: Ctx, wishlistId: string) {
   await c.db.wishlist.update({ where: { id: wishlistId }, data: { updatedAt: new Date() } });
 }
+
+/** Author releases a guest's reservation (e.g. the gift was already bought elsewhere). */
+export async function cancelReservationAsOwner(
+  userId: string,
+  wishlistId: string,
+  reservationId: string,
+  deps?: WishlistDeps,
+): Promise<WishlistView> {
+  const c = ctx(deps);
+  const wishlist = await loadAccessible(c, userId, wishlistId);
+  assertEditable(wishlist);
+  const res = await c.db.wishlistReservation.updateMany({
+    where: { id: reservationId, item: { wishlistId: wishlist.id }, status: { in: ["RESERVED", "PURCHASED"] } },
+    data: { status: "CANCELLED" },
+  });
+  if (res.count === 0) throw new WishlistError("not_found");
+  await touch(c, wishlist.id);
+  return getWishlist(userId, wishlist.id, { db: c.db, env: c.env });
+}

@@ -2,11 +2,17 @@ import assert from "node:assert/strict";
 
 import {
   SHARE_TOKEN_PATTERN,
+  MAX_CLAIMS_PER_COOKIE,
   breakingItemChange,
   createItemSchema,
   createWishlistSchema,
   dateKeyToDate,
   generateShareToken,
+  guestItemState,
+  guestReserveSchema,
+  parseClaimCookie,
+  serializeClaimCookie,
+  wishlistErrorStatus,
   summarizeItemForOwner,
   updateItemSchema,
   wishlistEnabled,
@@ -90,5 +96,25 @@ assert.equal(breakingItemChange({ url: "https://a", quantity: 1 }, { url: "https
 assert.equal(breakingItemChange({ url: null, quantity: 1 }, { url: null }, 1), null);
 assert.equal(breakingItemChange({ url: null, quantity: 3 }, { quantity: 1 }, 2), "quantity_below_taken");
 assert.equal(breakingItemChange({ url: null, quantity: 3 }, { quantity: 2 }, 2), null);
+
+// guest helpers (PR 2)
+{
+  const raw = "a".repeat(64);
+  assert.deepEqual(parseClaimCookie(`${raw},bad,${raw},${"b".repeat(64)}`), [raw, "b".repeat(64)], "dedupe, drop malformed");
+  assert.deepEqual(parseClaimCookie(undefined), []);
+  const many = Array.from({ length: 40 }, (_, i) => i.toString(16).padStart(64, "0"));
+  assert.equal(parseClaimCookie(many.join(",")).length, MAX_CLAIMS_PER_COOKIE);
+  assert.equal(serializeClaimCookie([raw, raw]), raw);
+  assert.equal(guestItemState(2, 0), "FREE");
+  assert.equal(guestItemState(2, 1), "PARTIAL");
+  assert.equal(guestItemState(2, 2), "TAKEN");
+  assert.equal(guestReserveSchema.parse({ displayName: " Аня " }).displayName, "Аня");
+  assert.equal(guestReserveSchema.parse({ displayName: "Аня", contactEmail: "" }).contactEmail, null);
+  assert.throws(() => guestReserveSchema.parse({ displayName: "  " }));
+  assert.throws(() => guestReserveSchema.parse({ displayName: "A", contactEmail: "nope" }));
+  assert.equal(wishlistErrorStatus("sold_out"), 409);
+  assert.equal(wishlistErrorStatus("forbidden"), 403);
+  assert.equal(wishlistErrorStatus("rate_limited"), 429);
+}
 
 console.log("wishlistPure ok");
