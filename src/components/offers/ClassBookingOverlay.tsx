@@ -17,9 +17,10 @@ type BookingResponse = { bookingId?: string; status?: string; holdUntil?: string
 type PublicBookingOption = {
   id: string; title: string; mode: "INCLUDED" | "OPTIONAL"; priceByn: string;
 };
-type OptionsResponse = { options?: PublicBookingOption[]; error?: string };
+type OptionsResponse = { options?: PublicBookingOption[]; durationOptionsMinutes?: number[]; error?: string };
 type PriceQuoteResponse = { quote?: {
   status: "FIXED" | "QUOTE_REQUIRED"; totalByn: string | null;
+  extension?: { hours: number; amountByn: string; discountPercent: number } | null;
   options: Array<{ id: string; title: string; amountByn: string }>;
 }; error?: string };
 type PrefillResponse = {
@@ -65,6 +66,8 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
   const pendingIntentRef = useRef<{ signature: string; key: string } | null>(null);
   const [bookingOptions, setBookingOptions] = useState<PublicBookingOption[]>([]);
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
+  const [durationOptions, setDurationOptions] = useState<number[]>([]);
+  const [durationMinutes, setDurationMinutes] = useState<number | null>(null);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [optionsError, setOptionsError] = useState<string | null>(null);
   const [priceQuote, setPriceQuote] = useState<PriceQuoteResponse["quote"] | null>(null);
@@ -77,6 +80,9 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
     const from = new Date();
     const to = new Date(from.getTime() + 30 * 86_400_000);
     const params = new URLSearchParams({ from: from.toISOString(), to: to.toISOString(), seats: String(seats) });
+    if (durationMinutes !== null && durationOptions.length > 1) {
+      params.set("durationMinutes", String(durationMinutes));
+    }
     // Defer state updates into the asynchronous request, and cancel stale responses.
     void (async () => {
       try {
@@ -98,7 +104,7 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
       }
     })();
     return () => controller.abort();
-  }, [open, offerId, seats, refresh]);
+  }, [open, offerId, seats, durationMinutes, durationOptions.length, refresh]);
 
   useEffect(() => {
     if (!open) return;
@@ -135,6 +141,9 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
         if (controller.signal.aborted) return;
         setBookingOptions(json.options ?? []);
         setSelectedOptionIds([]);
+        const durations = json.durationOptionsMinutes ?? [];
+        setDurationOptions(durations);
+        setDurationMinutes(durations[0] ?? null);
       }).catch(error => {
         if (!controller.signal.aborted) {
           setBookingOptions([]);
@@ -288,6 +297,28 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
               </select>
             </div>
           )}
+          {durationOptions.length > 1 && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="class-booking-duration">
+                Продолжительность услуги
+              </label>
+              <select id="class-booking-duration" className="w-full rounded-xl border bg-background p-3 text-sm"
+                value={durationMinutes ?? durationOptions[0]}
+                onChange={event => {
+                  setDurationMinutes(Number(event.target.value)); setSelected(null);
+                  setLoading(true); setPriceQuote(null);
+                }}>
+                {durationOptions.map((minutes, index) => (
+                  <option key={minutes} value={minutes}>
+                    {minutes} мин{index > 0 ? ` · +${index} ч` : " · базовая"}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Продление оплачивается по тарифу организатора. Доступность времени пересчитывается.
+              </p>
+            </div>
+          )}
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium">Что входит и дополнительные услуги</legend>
             {optionsLoading && <p role="status" className="text-sm text-muted-foreground">Загружаем допуслуги…</p>}
@@ -341,7 +372,14 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
               {quoteLoading ? "Пересчитываем стоимость…" :
                 quoteError ? <span className="text-destructive">{quoteError}</span> :
                 priceQuote?.status === "FIXED" && priceQuote.totalByn !== null
-                  ? <strong>Стоимость заявки: {priceQuote.totalByn} BYN</strong>
+                  ? <div className="space-y-1">
+                    <strong>Стоимость заявки: {priceQuote.totalByn} BYN</strong>
+                    {priceQuote.extension && <p className="text-xs text-muted-foreground">
+                      Продление {priceQuote.extension.hours} ч — {priceQuote.extension.amountByn} BYN
+                      {priceQuote.extension.discountPercent > 0
+                        ? ` (скидка ${priceQuote.extension.discountPercent}%)` : ""}
+                    </p>}
+                  </div>
                   : priceQuote ? <span>Стоимость уточняется у организатора</span>
                   : <span>Выберите тариф и время</span>}
               <p className="mt-1 text-xs text-muted-foreground">
