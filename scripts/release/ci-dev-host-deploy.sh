@@ -16,7 +16,7 @@ if [[ "$(pwd -P)" != "/opt/mamago/dev" ]]; then
   echo "ABORT: not in /opt/mamago/dev" >&2; exit 2
 fi
 umask 077
-exec 9>/tmp/mamago-ci-dev-deploy.lock
+exec 9>.ci-dev-deploy.lock
 flock -n 9 || { echo "ABORT: another DEV CI deployment holds the lock" >&2; exit 1; }
 
 image="ghcr.io/asoftby/mamago2:$tag"
@@ -31,11 +31,12 @@ health="$(docker inspect --type container --format '{{if .State.Health}}{{.State
 docker compose -p dev config --quiet
 before="$(docker compose -p dev config --format json)"
 after="$(APP_VERSION="$tag" docker compose -p dev config --format json)"
-printf '%s\n' "$before" > /tmp/mamago-ci-dev-compose-before-$$.json
-printf '%s\n' "$after" > /tmp/mamago-ci-dev-compose-after-$$.json
-trap 'rm -f /tmp/mamago-ci-dev-compose-before-$$.json /tmp/mamago-ci-dev-compose-after-$$.json' EXIT
+scratch="$(mktemp -d /tmp/mamago-dev-ci.XXXXXXXX)"
+trap 'rm -rf "$scratch"' EXIT
+printf '%s\n' "$before" > "$scratch/before.json"
+printf '%s\n' "$after" > "$scratch/after.json"
 
-python3 - "$image" /tmp/mamago-ci-dev-compose-before-$$.json /tmp/mamago-ci-dev-compose-after-$$.json <<'PY'
+python3 - "$image" "$scratch/before.json" "$scratch/after.json" <<'PY'
 import json, sys
 image, before, after = sys.argv[1:]
 old = json.load(open(before))
@@ -54,10 +55,12 @@ printf '%s\n' "$actual_digest" | grep -Fqx "ghcr.io/asoftby/mamago2@$digest" || 
 }
 image_id="$(docker image inspect "$image" --format '{{.Id}}')"
 revision="$(docker image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
-build="$(docker image inspect "$image" --format '{{index .Config.Env}}' | grep -o 'BUILD_ID=dev-[0-9]*' | head -1 || true)"
+build="$(docker image inspect "$image" --format '{{json .Config.Env}}' | python3 -c 'import json,sys; print(next((v for v in json.load(sys.stdin) if v.startswith("BUILD_ID=")), ""))')"
 [[ "$revision" == "$sha" && "$build" == "BUILD_ID=$tag" ]] || {
   echo "ABORT: image SHA/build does not match expected release" >&2; exit 1;
 }
+previous_image="$(docker inspect --type container --format '{{.Config.Image}}' dev-app-1)"
+echo "DEV_PREVIOUS_IMAGE=$previous_image"
 echo "DEV_IMAGE_VERIFIED tag=$tag sha=$sha digest=$digest"
 
 # Only the APP_VERSION assignment changes. Preserve other .env values and mode.
