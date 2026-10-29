@@ -11,6 +11,7 @@ import {
 } from "./telegram-channel-constants";
 import { parseChannelPage } from "./telegram-channel-html";
 import { createTelegramChannelEventParser } from "./telegram-channel-event.parser";
+import { webImageRequestHeaders } from "../../../ai/extraction/images";
 
 const FIXTURE_DIR = join(process.cwd(), "src/server/modules/import/parsers/__fixtures__/telegram-minsk-kids");
 const pages = [1, 2, 3, 4, 5].map((n) => readFileSync(join(FIXTURE_DIR, `page${n}.html`), "utf8"));
@@ -211,6 +212,37 @@ async function main() {
     const partialResult = await partial.parse(source());
     assert.equal(partialResult.records.length, 10);
     assert.equal(partialResult.error, undefined);
+  }
+
+  // ── Следы: ничего, что выдаёт сборщика или проект ────────────────────────
+  {
+    const headers = webImageRequestHeaders();
+    assert.match(headers["User-Agent"], /^Mozilla\/5\.0 /, "browser-like User-Agent for images");
+    assert.ok(!Object.keys(headers).some((k) => k.toLowerCase() === "referer"), "no Referer");
+    assert.ok(!Object.values(headers).some((v) => /mamago|bot|crawler|scrap/i.test(v)), "no project/bot markers");
+
+    // Исходники парсера и адаптера не называют проект (заголовки, URL, query).
+    for (const file of [
+      "src/server/modules/import/parsers/telegram-channel-event.parser.ts",
+      "src/server/modules/import/parsers/telegram-channel-html.ts",
+      "src/server/modules/import/parsers/telegram-channel-constants.ts",
+      "src/server/ai/extraction/images.ts",
+    ]) {
+      assert.ok(!/mamago/i.test(readFileSync(join(process.cwd(), file), "utf8")), `${file} must not name the project`);
+    }
+
+    // Паузы между страницами не ровные и держатся в пределах ±30%.
+    const sleeps: number[] = [];
+    let n = 0;
+    const randoms = [0, 0.5, 1];
+    await createTelegramChannelEventParser({
+      fetchPage: servePages().fetchPage,
+      loadImage: okImage,
+      sleep: async (ms) => { sleeps.push(ms); },
+      now: NOW,
+      random: () => randoms[n++ % randoms.length],
+    }).parse(source({ crawlMaxPages: 4, rateLimitMs: 1000 }));
+    assert.deepEqual(sleeps, [700, 1000, 1300]);
   }
 
   console.log("telegram-channel-event parser tests: OK");

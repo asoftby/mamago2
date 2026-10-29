@@ -63,6 +63,13 @@ const DEFAULT_HEADERS: Record<string, string> = {
   "Pragma": "no-cache",
 };
 
+/**
+ * Заголовки обычного браузера для любых запросов парсеров к чужим сайтам.
+ * Не добавлять сюда и в вызовы парсеров ничего, что называет проект или
+ * выдаёт сборщика (свой User-Agent, Referer, имена в query).
+ */
+export const BROWSER_LIKE_HEADERS: Readonly<Record<string, string>> = DEFAULT_HEADERS;
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

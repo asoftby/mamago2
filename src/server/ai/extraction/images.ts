@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { fetchBinary } from "@/server/modules/import/parsers/fetchHtml";
+import { BROWSER_LIKE_HEADERS, fetchBinary } from "@/server/modules/import/parsers/fetchHtml";
 import type { TelegramCaptureClient } from "@/server/services/telegram/capture/telegramCaptureClient.core";
 
 /**
@@ -55,6 +55,15 @@ export function createTelegramFileImageSource(
   };
 }
 
+/** Заголовки запроса картинки: как у браузера, без признаков сборщика и проекта. */
+export function webImageRequestHeaders(): Record<string, string> {
+  return {
+    "User-Agent": BROWSER_LIKE_HEADERS["User-Agent"],
+    "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+    "Accept-Language": BROWSER_LIKE_HEADERS["Accept-Language"],
+  };
+}
+
 export type WebImageSourceOptions = {
   maxBytes: number;
   /** Разрешённые хосты картинок; всё остальное отклоняется до запроса и на каждом редиректе. */
@@ -82,7 +91,7 @@ export function createWebImageSource(options: WebImageSourceOptions): ImageSourc
         const response = await fetchBinary(url, {
           maxBytes: options.maxBytes,
           timeoutMs: options.timeoutMs,
-          headers: { Accept: "image/*" },
+          headers: webImageRequestHeaders(),
           validateUrl: (candidate) => {
             if (candidate.protocol !== "https:" || !options.isAllowedHost(candidate.hostname.toLowerCase())) {
               throw new Error("Image host is not allowed");

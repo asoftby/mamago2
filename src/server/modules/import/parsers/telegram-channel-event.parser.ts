@@ -47,6 +47,8 @@ export interface TelegramChannelParserDeps {
   loadImage?: (url: string) => Promise<{ ok: true; sha256: string } | { ok: false }>;
   sleep?: (ms: number) => Promise<void>;
   now?: () => Date;
+  /** Источник случайности для разброса пауз; в тестах подменяется. */
+  random?: () => number;
 }
 
 interface PostImage {
@@ -97,6 +99,7 @@ export function createTelegramChannelEventParser(deps: TelegramChannelParserDeps
   const loadImage = deps.loadImage ?? defaultLoadImage();
   const sleep = deps.sleep ?? defaultSleep;
   const now = deps.now ?? (() => new Date());
+  const random = deps.random ?? Math.random;
 
   return {
     parserKey: TELEGRAM_CHANNEL_PARSER_KEY,
@@ -120,7 +123,8 @@ export function createTelegramChannelEventParser(deps: TelegramChannelParserDeps
       const posts: TelegramPost[] = [];
       let before: number | null = null;
       for (let page = 0; page < maxPages; page++) {
-        if (page > 0) await sleep(pauseMs);
+        // Пауза с разбросом ±30%: ровный интервал выдаёт скрипт.
+        if (page > 0) await sleep(Math.round(pauseMs * (0.7 + random() * 0.6)));
         const url: string = `https://t.me/s/${channel}${before ? `?before=${before}` : ""}`;
         let html: string;
         try {
