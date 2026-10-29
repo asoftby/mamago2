@@ -125,14 +125,20 @@ export async function loadKudaListingPage(input: {
         hydrateImages: false,
       })
     : [];
-  const byId = new Map(details.map((card) => [card.id, card]));
-  const hydrated = page.items.filter(item => byId.has(item.id)).map((item) => ({
-    ...item,
-    ...(byId.get(item.id) ?? {}),
-    feedBucket: item.feedBucket,
-    ageHintBadge: item.ageHintBadge,
-  }));
+  const hydrated = restoreHydratedKudaItems(page.items, details);
   const items = await withImageDimensions(hydrated, (card) => card.image);
   await recordDiscoveryExposures(items, input.cityId, input.citySlug, "kuda", null, page.offset - 1);
   return { ...page, items, pool: [...partition.primary, ...partition.secondary] };
+}
+
+/** Keep cached ordering/buckets only. Admission, paid status and reasons are live. */
+export function restoreHydratedKudaItems(
+  cached: KudaListingPage<ActivityMock>["items"],
+  details: ActivityMock[],
+): KudaListingPage<ActivityMock>["items"] {
+  const byId = new Map(details.map(card => [card.id, card]));
+  return cached.flatMap(item => {
+    const card = byId.get(item.id);
+    return card ? [{ ...card, feedBucket: item.feedBucket, ageHintBadge: item.ageHintBadge }] : [];
+  });
 }

@@ -69,7 +69,8 @@ Boost geography helper is also used by the cached classes ordering.
 
 Ranked ID pools retain their existing 60-second TTL. Visible IDs are checked live
 on hydration; a revoked/expired candidate is omitted, never reconstructed from
-cached metadata. Counts/new admissions may lag up to that TTL, and a revocation
+cached metadata. Hydration retains only cached order/age buckets, preventing a
+local/moved event from inheriting an old cross-region reason or family count. Counts/new admissions may lag up to that TTL, and a revocation
 can temporarily leave a short page. Threshold configuration is part of the pool
 cache key. No renumbering or cursor rewrite is introduced.
 
@@ -112,6 +113,7 @@ under BACKLOG-122; changed task files are checked separately.
 - `src/server/discovery/kudaDiscoveryFeed.ts`
 - `src/server/discovery/kudaListingCompleteness.contract.test.ts`
 - `src/server/discovery/kudaListingPage.ts`
+- `src/server/discovery/kudaListingHydration.test.ts`
 - `src/server/geo/boostRegionTargeting.test.ts`
 - `src/server/geo/boostRegionTargeting.ts`
 - `src/server/services/recommendations/RecommendationTraceService.ts`
