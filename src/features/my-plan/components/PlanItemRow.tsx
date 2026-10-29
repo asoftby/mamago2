@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bell, CalendarClock, Trash2, Users } from "lucide-react";
+import { Bell, CalendarClock, Trash2 } from "lucide-react";
+import { PlanParticipantChip } from "./PlanParticipantChip";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
@@ -23,6 +24,7 @@ interface PlanItemRowProps {
   onOpen?: () => void;
   /** Имя ребёнка, для кого пункт. Нет → «Вся семья». */
   participantLabel?: string | null;
+  participantId?: string | null;
 }
 
 export type PlanItemVisualKind = "event" | "note";
@@ -42,18 +44,7 @@ const twoLineTitleStyle = {
   overflow: "hidden",
 } as const;
 
-function Avatar({ name }: { name: string | null }) {
-  return (
-    <span
-      aria-hidden
-      className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-[var(--mp-ac-soft)] text-[10px] font-bold leading-none text-[var(--mp-ac-dark)]"
-    >
-      {name ? name.trim().charAt(0).toUpperCase() : <Users className="h-2.5 w-2.5" />}
-    </span>
-  );
-}
-
-export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel }: PlanItemRowProps) {
+export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, participantId }: PlanItemRowProps) {
   const cityCtx = useOptionalCity();
   const city = cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
   const activityDetailHref = item.activity?.id
@@ -147,8 +138,7 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel }
           )}
 
           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[13px] leading-4 text-[var(--mp-tx2)]">
-            <Avatar name={participantLabel ?? null} />
-            <span className="min-w-0 truncate">{participantLabel || "Вся семья"}</span>
+            <PlanParticipantChip id={participantId} name={participantLabel} />
             {showReminder ? (
               <span className="inline-flex shrink-0 items-center gap-1">
                 <span aria-hidden>·</span>
