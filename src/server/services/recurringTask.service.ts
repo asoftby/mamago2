@@ -1,6 +1,6 @@
 import { Prisma, PlanEntryType, PlanItemSource } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { activeFamilyUserIds, childScopeFor, familyIdForWrite } from "@/server/family/familyAccess";
+import { activeFamilyUserIds, activePlanScopeFor, childScopeFor, familyIdForWrite } from "@/server/family/familyAccess";
 import { localWallClockToUtc } from "@/lib/date/localDateKey";
 import { validateRecurrenceInput } from "@/lib/plan/recurrenceInput";
 import type { PlanOwner } from "@/server/services/planOwner";
@@ -87,5 +87,75 @@ export async function createRecurringTaskSeries(owner: PlanOwner, input: NewRecu
       throw new Error("idempotency_conflict");
     }
     throw error;
+  }
+}
+
+export type RecurrenceCancelScope = "FUTURE" | "ALL";
+
+export class RecurrenceMutationError extends Error {
+  constructor(public readonly code: "NOT_FOUND" | "CONFLICT" | "INVALID_INPUT", message: string) {
+    super(message);
+  }
+}
+
+/** Stop upcoming occurrences or the whole series; do not delete tombstones.
+ * Only the series owner can change the shared recurrence rule.
+ */
+export async function cancelRecurringTaskSeries(
+  owner: PlanOwner,
+  itemId: string,
+  scope: RecurrenceCancelScope,
+  expectedUpdatedAt: string,
+): Promise<void> {
+  if (scope !== "FUTURE" && scope !== "ALL") throw new RecurrenceMutationError("INVALID_INPUT", "invalid_scope");
+  const expected = new Date(expectedUpdatedAt);
+  if (typeof expectedUpdatedAt !== "string" || !/^\d{4}-\d{2}-\d{2}T/.test(expectedUpdatedAt) ||
+      Number.isNaN(expected.getTime()) || expected.toISOString() !== expectedUpdatedAt) {
+    throw new RecurrenceMutationError("INVALID_INPUT", "invalid_expected_updated_at");
+  }
+  const planScope = await activePlanScopeFor(owner.userId);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await prisma.$transaction(async tx => {
+        const item = await tx.planItem.findFirst({
+          where: { id: itemId, ...planScope, source: "MANUAL", status: "CONFIRMED" },
+          select: { id: true, recurrenceSeriesId: true, recurrenceDate: true, updatedAt: true },
+        });
+        if (!item?.recurrenceSeriesId || !item.recurrenceDate) {
+          throw new RecurrenceMutationError("NOT_FOUND", "recurrence_not_found");
+        }
+        if (item.updatedAt.getTime() !== expected.getTime()) {
+          throw new RecurrenceMutationError("CONFLICT", "conflict");
+        }
+        const series = await tx.planRecurrenceSeries.findFirst({
+          where: { id: item.recurrenceSeriesId, ownerUserId: owner.userId, stoppedAt: null },
+          select: { id: true, version: true, untilDate: true },
+        });
+        if (!series) throw new RecurrenceMutationError("NOT_FOUND", "recurrence_not_found");
+        const cancelledAt = new Date();
+        const cutoff = item.recurrenceDate;
+        const before = new Date(Date.parse(`${cutoff}T00:00:00.000Z`) - 86_400_000).toISOString().slice(0, 10);
+        const result = await tx.planRecurrenceSeries.updateMany({
+          where: { id: series.id, ownerUserId: owner.userId, stoppedAt: null, version: series.version },
+          data: scope === "ALL"
+            ? { stoppedAt: cancelledAt, version: { increment: 1 } }
+            : { untilDate: series.untilDate && series.untilDate < before ? series.untilDate : before,
+                version: { increment: 1 } },
+        });
+        if (result.count !== 1) throw new RecurrenceMutationError("CONFLICT", "conflict");
+        await tx.planItem.updateMany({
+          where: {
+            recurrenceSeriesId: series.id,
+            ...(scope === "FUTURE" ? { recurrenceDate: { gte: cutoff } } : {}),
+            status: { not: "CANCELLED" },
+          },
+          data: { status: "CANCELLED", cancelledAt, updatedAt: cancelledAt },
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      return;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034" && attempt < 4) continue;
+      throw error;
+    }
   }
 }
