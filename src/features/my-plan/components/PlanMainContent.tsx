@@ -1157,7 +1157,7 @@ export function PlanMainContent({
 
   /** Same filter UI as /me/plan, only the outer spacing depends on the sheet. */
   const renderPersonFilter = (_compact: boolean) =>
-    personFilterOptions.length < 3 ? null : (
+    personFilterOptions.length < 2 ? null : (
       <PlanPersonFilter
         options={personFilterOptions}
         selectedValues={includedPeople}
