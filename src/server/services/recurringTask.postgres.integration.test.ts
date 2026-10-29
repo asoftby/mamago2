@@ -269,3 +269,45 @@ test("concurrent split and calendar materialization never restore old future occ
   assert.equal(await db.planItem.count({where:{recurrenceSeriesId:id,recurrenceDate:{gte:"2026-11-02"},status:"CONFIRMED"}}),0);
   assert.equal(await db.planRecurrenceSeries.count({where:{ownerUserId:owner.userId}}),2);
 });
+
+test("bounded recurrence keeps only the remaining occurrence count after splitting", async () => {
+  const owner=await fixture();
+  const id=await createRecurringTaskSeries(owner,{
+    ...base,requestKey:"repeat_"+randomUUID().replaceAll("-",""),
+    recurrence:{frequency:"DAILY",interval:1,startDate:"2026-10-29",maxOccurrences:5},
+  });
+  await materializeRecurrencesForRange(owner,"2026-10-29","2026-11-06");
+  const target=await db.planItem.findFirstOrThrow({where:{recurrenceSeriesId:id,recurrenceDate:"2026-11-01"}});
+  const s=await getRecurringTaskSeriesForEdit(owner,target.id);
+  assert.equal(s.recurrence.maxOccurrences,2,"remaining count excludes the three completed dates");
+  const changed=await editRecurringTaskFollowing(owner,target.id,{
+    expectedUpdatedAt:s.expectedUpdatedAt,expectedSeriesVersion:s.expectedSeriesVersion,
+    title:"Remainder only",startTime:"18:00",reminderEnabled:false,reminderLeadMinutes:null,
+    childId:null,assigneeUserId:null,recurrence:s.recurrence,
+  });
+  await materializeRecurrencesForRange(owner,"2026-10-29","2026-11-06");
+  assert.deepEqual((await db.planItem.findMany({where:{recurrenceSeriesId:changed.seriesId},orderBy:{recurrenceDate:"asc"}}))
+    .map(x=>x.recurrenceDate),["2026-11-01","2026-11-02"]);
+});
+
+test("reassignment to a family child applies to all future materialized instances", async () => {
+  const owner=await fixture();
+  const familyId=await familyIdForWrite(owner.userId);
+  const child=await db.child.create({data:{name:"New learner",parentId:owner.userId,familyId}});
+  const id=await createRecurringTaskSeries(owner,{
+    ...base,requestKey:"repeat_"+randomUUID().replaceAll("-",""),
+    recurrence:{frequency:"DAILY",interval:1,startDate:"2026-10-29"},
+  });
+  await materializeRecurrencesForRange(owner,"2026-10-29","2026-11-03");
+  const target=await db.planItem.findFirstOrThrow({where:{recurrenceSeriesId:id,recurrenceDate:"2026-11-02"}});
+  const s=await getRecurringTaskSeriesForEdit(owner,target.id);
+  const updated=await editRecurringTaskFollowing(owner,target.id,{
+    expectedUpdatedAt:s.expectedUpdatedAt,expectedSeriesVersion:s.expectedSeriesVersion,
+    title:"Child homework",startTime:"19:00",reminderEnabled:false,reminderLeadMinutes:null,
+    childId:child.id,assigneeUserId:null,recurrence:s.recurrence,
+  });
+  await materializeRecurrencesForRange(owner,"2026-11-02","2026-11-05");
+  const rows=await db.planItem.findMany({where:{recurrenceSeriesId:updated.seriesId}});
+  assert.equal(rows.length,4);
+  assert.ok(rows.every(row=>row.childId===child.id));
+});
