@@ -17,6 +17,7 @@ import { findPlaceCandidates } from "../matching/place-candidate-search";
 import { scorePlaceCandidate } from "../matching/place-match-scorer";
 import { determineSuggestedAction } from "../matching/suggested-action";
 import { findEventCandidates } from "../matching/event-candidate-search";
+import { findPendingRecordDuplicates } from "../matching/pending-record-candidates";
 import { scoreEventCandidate } from "../matching/event-match-scorer";
 import { determineEventSuggestedAction } from "../matching/event-suggested-action";
 import {
@@ -135,7 +136,7 @@ async function matchPlaceRecord(
 // ── EVENT matching ────────────────────────────────────────────────────────────
 
 async function matchEventRecord(
-  record: { id: string; normalizedData: unknown; qualityScore: number | null },
+  record: { id: string; sourceId: string; normalizedData: unknown; qualityScore: number | null },
 ): Promise<MatchRecordResult> {
   try {
     const normalized = record.normalizedData as unknown as NormalizedEventImport;
@@ -150,9 +151,18 @@ async function matchEventRecord(
     const qualityScore = record.qualityScore ?? 0;
     const actionResult = determineEventSuggestedAction(scored, qualityScore);
 
+    // Дубли среди ожидающих записей других источников: сбой поиска не должен
+    // ронять основной матчинг.
+    const pendingDuplicates = await findPendingRecordDuplicates({
+      recordId: record.id,
+      sourceId: record.sourceId,
+      normalized,
+    }).catch(() => []);
+
     const matchResult: EventMatchResult = {
       recordId: record.id,
       candidates: scored,
+      pendingDuplicates,
       topCandidate: scored[0] ?? null,
       matchStatus: actionResult.matchStatus,
       suggestedAction: actionResult.suggestedAction,

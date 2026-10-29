@@ -12,7 +12,7 @@
 
 import type { NormalizedEventImport, EventMatchCandidate, EventMatchSignals } from "../types";
 import type { ActivityCandidate } from "./event-candidate-search";
-import { normalizeTitle, normalizeAddress, tokenJaccard } from "../utils/string-normalize";
+import { normalizeTitle, normalizeEventTitle, normalizeAddress, tokenJaccard } from "../utils/string-normalize";
 
 // ── Веса компонентов (сумма = 1.0) ───────────────────────────────────────────
 const W = {
@@ -62,6 +62,11 @@ function dateProximityScore(deltaDays: number): number {
   return 1 - (deltaDays - DATE_CLOSE_DAYS) / (DATE_FAR_DAYS - DATE_CLOSE_DAYS);
 }
 
+/** true, если в ISO-строке есть время суток, а не только дата. */
+function hasTimeOfDay(iso: string): boolean {
+  return /T\d{2}:\d{2}/.test(iso);
+}
+
 function buildReason(signals: EventMatchSignals, score: number): string {
   const parts: string[] = [];
   if (signals.titleSimilarity >= 0.8) parts.push(`title ~${Math.round(signals.titleSimilarity * 100)}%`);
@@ -73,6 +78,7 @@ function buildReason(signals: EventMatchSignals, score: number): string {
     if (signals.startDateDeltaDays <= DATE_CLOSE_DAYS) parts.push(`date match (Δ${signals.startDateDeltaDays.toFixed(1)}d)`);
     else parts.push(`date Δ${signals.startDateDeltaDays.toFixed(0)}d`);
   }
+  if (signals.startTimeDeltaMinutes != null) parts.push(`time Δ${signals.startTimeDeltaMinutes}min`);
   if (signals.possibleOccurrenceRisk) parts.push("⚠ occurrence risk");
   if (parts.length === 0) parts.push("weak signals");
   return `score=${score.toFixed(2)}: ${parts.join(", ")}`;
@@ -84,7 +90,7 @@ export function scoreEventCandidate(
 ): EventMatchCandidate {
   // ── Title similarity ─────────────────────────────────────────────────────
   const titleSimilarity = normalized.title && candidate.title
-    ? tokenJaccard(normalizeTitle(normalized.title), normalizeTitle(candidate.title))
+    ? tokenJaccard(normalizeEventTitle(normalized.title), normalizeEventTitle(candidate.title))
     : 0;
 
   // ── Venue similarity ─────────────────────────────────────────────────────
@@ -134,13 +140,26 @@ export function scoreEventCandidate(
         ? [normalized.startAt]
         : [];
 
+  // Сеансы кандидата сравниваем наравне с nextOccurrenceAt: событие может
+  // идти в несколько дат, а ближайшая — не обязательно та, что в анонсе.
+  const candidateTimes: Date[] = [
+    ...(candidate.sessionStarts ?? []),
+    ...(candidate.nextOccurrenceAt ? [candidate.nextOccurrenceAt] : []),
+  ];
+
   let startDateDeltaDays: number | null = null;
+  let startTimeDeltaMinutes: number | null = null;
   let dateScore = 0;
-  if (candidateStartDates.length > 0 && candidate.nextOccurrenceAt) {
+  if (candidateStartDates.length > 0 && candidateTimes.length > 0) {
     for (const startAt of candidateStartDates) {
-      const delta = dateDeltaDays(startAt, candidate.nextOccurrenceAt);
-      if (delta != null && (startDateDeltaDays == null || delta < startDateDeltaDays)) {
-        startDateDeltaDays = delta;
+      for (const candidateTime of candidateTimes) {
+        const delta = dateDeltaDays(startAt, candidateTime);
+        if (delta != null && (startDateDeltaDays == null || delta < startDateDeltaDays)) {
+          startDateDeltaDays = delta;
+          // Время сравнимо, только если у записи оно есть (не «2026-07-01») и пара в пределах суток.
+          startTimeDeltaMinutes =
+            delta < 1 && hasTimeOfDay(startAt) ? Math.round(delta * 24 * 60) : null;
+        }
       }
     }
     if (startDateDeltaDays != null) {
@@ -170,6 +189,7 @@ export function scoreEventCandidate(
     addressSimilarity:   Math.round(addressSimilarity * 10000) / 10000,
     organizerSimilarity: Math.round(organizerSimilarity * 10000) / 10000,
     startDateDeltaDays:  startDateDeltaDays != null ? Math.round(startDateDeltaDays * 10) / 10 : null,
+    startTimeDeltaMinutes,
     possibleOccurrenceRisk,
   };
 
