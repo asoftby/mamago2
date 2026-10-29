@@ -10,7 +10,7 @@ set -euo pipefail
 #
 # Example:
 #   scripts/release/migrate-with-backup.sh mamago-dev dev-db-1 -- \
-#     ssh mamago-dev 'docker compose -p dev run --rm migrate'
+#     ssh mamago-dev 'cd /opt/mamago/dev && docker compose -p dev run --rm --no-deps migrate'
 
 USAGE="Usage: $0 <ssh-host-alias> <db-container> [--backup-dir DIR] -- <migration command...>"
 SSH_HOST="${1:?${USAGE}}"
