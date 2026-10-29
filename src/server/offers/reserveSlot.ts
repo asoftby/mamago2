@@ -142,6 +142,15 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
         unitId = input.unitId ?? (candidate.unitIds.length === 1 ? candidate.unitIds[0] : null);
         if (!unitId) throw new SlotReservationError("UNIT_REQUIRED", "Выберите конкретный ресурс для бронирования");
         if (!candidate.unitIds.includes(unitId)) throw new SlotReservationError("SLOT_UNAVAILABLE", "Ресурс уже занят");
+        // Use the same BookingUnit row-lock protocol as manual CalendarBlock
+        // insertion, party confirmation and resource edits. Without this lock,
+        // a manual block may commit after our preview but before allocation.
+        const lockedUnits = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "BookingUnit" WHERE "id" = ${unitId} FOR UPDATE
+        `;
+        if (lockedUnits.length !== 1) {
+          throw new SlotReservationError("SLOT_UNAVAILABLE", "Ресурс больше не доступен");
+        }
         // The exclusion constraint cannot depend on now(). Release expired holds
         // inside this transaction before the availability recheck and insert.
         await tx.$executeRaw`UPDATE "BookingAllocation" SET "status" = 'EXPIRED', "updatedAt" = (now() AT TIME ZONE 'UTC')

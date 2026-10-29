@@ -1,4 +1,5 @@
 import { BookingAllocationStatus, BookingStatus } from "@prisma/client";
+import { BookingHoldExpiredError } from "./bookingHold";
 
 type Allocation = { status: BookingAllocationStatus; expiresAt: Date | null };
 
@@ -14,7 +15,7 @@ export function allocationTransition(
       (allocation.status === BookingAllocationStatus.HELD &&
         allocation.expiresAt !== null && allocation.expiresAt <= now),
     );
-    if (invalid) throw new Error("Резерв истёк или освобождён. Выберите свободное время заново.");
+    if (invalid) throw new BookingHoldExpiredError();
     return BookingAllocationStatus.CONFIRMED;
   }
   if (nextStatus === BookingStatus.REJECTED || nextStatus === BookingStatus.CANCELLED) {

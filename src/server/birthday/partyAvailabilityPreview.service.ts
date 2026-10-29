@@ -11,11 +11,12 @@ export async function previewPartyOfferAvailability(input: {
   const date = new Date(input.date + "T00:00:00.000Z");
   const offer = await prisma.offer.findFirst({
     where: { id: input.offerId, status: "PUBLISHED" },
-    select: { id: true },
+    select: { id: true, place: { select: { ownerBusinessId: true } } },
   });
-  if (!offer) return { availability: "UNKNOWN" as const };
+  const businessId = offer?.place?.ownerBusinessId;
+  if (!businessId) return { availability: "UNKNOWN" as const };
   const mapped = await prisma.bookingUnitOffer.findMany({
-    where: { offerId: input.offerId },
+    where: { offerId: input.offerId, bookingUnit: { businessId } },
     select: { bookingUnit: { select: {
       id: true, status: true, timezone: true, capacity: true,
       prepMinutes: true, cleanupMinutes: true, minDurationMinutes: true,
