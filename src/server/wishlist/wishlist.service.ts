@@ -21,6 +21,7 @@ import {
   type UpdateItemInput,
   type UpdateWishlistInput,
 } from "./wishlistPure";
+import { isProvisionalTitle } from "./linkPreviewPure";
 
 /**
  * Wishlist author side (PR 1): create/edit lists and items. Public page and
@@ -31,6 +32,8 @@ import {
 export type WishlistDeps = {
   db?: PrismaClient;
   env?: Record<string, string | undefined>;
+  /** Test seam for link previews; defaults to the real SSRF-safe fetcher. */
+  fetchPreview?: (url: string, ownerUserId: string) => Promise<{ title: string | null; imageUrl: string | null } | null>;
 };
 
 type Ctx = { db: PrismaClient; env: Record<string, string | undefined> };
@@ -505,4 +508,46 @@ export async function cancelReservationAsOwner(
   if (res.count === 0) throw new WishlistError("not_found");
   await touch(c, wishlist.id);
   return getWishlist(userId, wishlist.id, { db: c.db, env: c.env });
+}
+
+export type PreviewStatus = "ok" | "unavailable" | "no_url";
+
+/**
+ * Fills the item's photo (and a placeholder title) from its product link.
+ * Never changes the link, quantity or reservations. A shop that blocks us just
+ * yields "unavailable": the author keeps typing the title / photo by hand.
+ */
+export async function refreshItemPreview(
+  userId: string,
+  wishlistId: string,
+  itemId: string,
+  deps?: WishlistDeps,
+): Promise<{ wishlist: WishlistView; preview: PreviewStatus }> {
+  const c = ctx(deps);
+  const wishlist = await loadAccessible(c, userId, wishlistId);
+  assertEditable(wishlist);
+  const item = await c.db.wishlistItem.findFirst({
+    where: { id: itemId, wishlistId: wishlist.id, deletedAt: null },
+    select: { id: true, url: true, title: true },
+  });
+  if (!item) throw new WishlistError("not_found");
+  const view = async (preview: PreviewStatus) => ({
+    wishlist: await getWishlist(userId, wishlist.id, { db: c.db, env: c.env }),
+    preview,
+  });
+  if (!item.url) return view("no_url");
+
+  const fetcher = deps?.fetchPreview ?? (await import("./linkPreview")).fetchLinkPreview;
+  const found = await fetcher(item.url, userId);
+  if (!found) return view("unavailable");
+
+  const data: Prisma.WishlistItemUpdateManyMutationInput = {};
+  if (found.imageUrl) data.imageUrl = found.imageUrl;
+  if (found.title && isProvisionalTitle(item.title, item.url)) data.title = found.title.slice(0, 200);
+  // Guard on the link we fetched for: if the author changed it meanwhile, write nothing.
+  const written = await c.db.wishlistItem.updateMany({
+    where: { id: item.id, url: item.url, deletedAt: null },
+    data,
+  });
+  return view(written.count > 0 ? "ok" : "unavailable");
 }

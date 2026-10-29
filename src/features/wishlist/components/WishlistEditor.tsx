@@ -91,6 +91,17 @@ export function WishlistEditor({ initial }: { initial: WishlistView }) {
     }
   }
 
+  /** Pulls photo/title from the item's link; a blocked shop just leaves the manual fields. */
+  async function loadPreview(itemId: string) {
+    const res = await call(`/api/wishlists/${wishlist.id}/items/${itemId}/preview`, "POST");
+    if (res.ok && res.data.wishlist) {
+      setWishlist(res.data.wishlist as WishlistView);
+      if (res.data.preview === "unavailable") {
+        toast.message("Не удалось получить фото по ссылке. Название и фото можно указать вручную.");
+      }
+    }
+  }
+
   async function addItem(e: React.FormEvent) {
     e.preventDefault();
     const { title, url } = parseQuickLine(quickLine);
@@ -100,6 +111,7 @@ export function WishlistEditor({ initial }: { initial: WishlistView }) {
       toast.error("Проверьте цену.");
       return;
     }
+    const knownIds = new Set(wishlist.items.map((i) => i.id));
     await run(
       () =>
         call(`/api/wishlists/${wishlist.id}/items`, "POST", {
@@ -108,10 +120,14 @@ export function WishlistEditor({ initial }: { initial: WishlistView }) {
           priceApprox: price,
           quantity: Math.min(99, Math.max(1, Number.parseInt(quickQty, 10) || 1)),
         }),
-      () => {
+      (data) => {
         setQuickLine("");
         setQuickPrice("");
         setQuickQty("1");
+        if (url) {
+          const created = (data.wishlist as WishlistView).items.find((i) => !knownIds.has(i.id));
+          if (created) void loadPreview(created.id);
+        }
       },
     );
   }
@@ -135,6 +151,8 @@ export function WishlistEditor({ initial }: { initial: WishlistView }) {
       });
     } else if (res.ok) {
       setEditingId(null);
+      const before = wishlist.items.find((i) => i.id === itemId)?.url ?? null;
+      if (typeof patch.url === "string" && patch.url && patch.url !== before) void loadPreview(itemId);
     }
   }
 
@@ -377,6 +395,7 @@ function SortableItem(props: {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, disabled });
   const [title, setTitle] = useState(item.title);
   const [url, setUrl] = useState(item.url ?? "");
+  const [image, setImage] = useState(item.imageUrl ?? "");
   const [comment, setComment] = useState(item.comment ?? "");
   const [price, setPrice] = useState(item.priceApprox === null ? "" : String(item.priceApprox));
   const [qty, setQty] = useState(String(item.quantity));
@@ -385,9 +404,15 @@ function SortableItem(props: {
 
   function save() {
     const parsedPrice = price.trim() ? Number(price.replace(",", ".")) : null;
+    const nextUrl = url.trim() || null;
+    const typedImage = image.trim() || null;
+    const imageChanged = typedImage !== (item.imageUrl ?? null);
+    const urlChanged = nextUrl !== (item.url ?? null);
     props.onSave({
       title: title.trim() || item.title,
-      url: url.trim() || null,
+      url: nextUrl,
+      // A new link means a different product: drop the old photo unless the author set a new one.
+      ...(imageChanged ? { imageUrl: typedImage } : urlChanged ? { imageUrl: null } : {}),
       comment: comment.trim() || null,
       priceApprox: parsedPrice !== null && Number.isFinite(parsedPrice) ? parsedPrice : null,
       quantity: Math.min(99, Math.max(1, Number.parseInt(qty, 10) || 1)),
@@ -411,6 +436,10 @@ function SortableItem(props: {
         >
           ⋮⋮
         </button>
+        {item.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+        ) : null}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-neutral-950">{item.title}</span>
@@ -474,6 +503,7 @@ function SortableItem(props: {
         <div className="mt-3 grid gap-2 border-t border-neutral-100 pt-3 sm:grid-cols-2">
           <input className={field} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Название" maxLength={200} aria-label="Название" />
           <input className={field} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Ссылка" maxLength={2048} aria-label="Ссылка" />
+          <input className={field} value={image} onChange={(e) => setImage(e.target.value)} placeholder="Ссылка на фото (если превью не подтянулось)" maxLength={2048} aria-label="Ссылка на фото" />
           <input className={field} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Комментарий (размер, цвет…)" maxLength={1000} aria-label="Комментарий" />
           <div className="grid grid-cols-2 gap-2">
             <input className={field} value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Цена" inputMode="decimal" aria-label="Цена" />

@@ -49,4 +49,15 @@ assert.match(page, /wishlistEnabled\(\)\) notFound\(\)/);
   assert.doesNotMatch(upd, /wishlistReservation\.update\(/, "no unconditional status writes");
 }
 
+// Link previews (PR 3): reuse the pinned SSRF-safe transport; image stored on our side.
+const preview = read("src/server/wishlist/linkPreview.ts");
+assert.match(preview, /fetchHtml\(/, "previews reuse the import transport");
+assert.match(preview, /uploadImageFromUrl\(/, "preview image is stored locally, never hotlinked");
+assert.match(preview, /assertSafeRemoteImageUrl/, "generic public-http(s) policy for images");
+assert.doesNotMatch(preview, /\bfetch\(/, "no raw fetch");
+const previewRoute = read("src/app/api/wishlists/[id]/items/[itemId]/preview/route.ts");
+assert.match(previewRoute, /withWishlistUser/);
+assert.match(previewRoute, /checkRateLimit/);
+assert.match(read("src/lib/upload/uploadFromUrl.ts"), /options\.validateUrl \?\?/, "default Instagram policy is kept");
+
 console.log("wishlistPublic contract ok");
