@@ -41,6 +41,7 @@ for (const guard of [
   'bookingRequestId: requestId, status: "SENT"',
   'status: declined ? "DECLINED" : autoConfirm ? "CONFIRMED" : "QUOTED"',
   'partyOrderItemId: item.id, status: "QUEUED"',
-  'queuedAlternatives > 0 ? PartyItemStatus.REQUESTED',
+  'queuedAlternatives > 0 || otherActiveRequests > 0',
+  'partyOrderItemId: item.id, id: { not: requestId }',
 ]) assert.ok(business.includes(guard), "Business replies must synchronize invite state: " + guard);
 console.log("partyInviteTransactionalDispatch.contract.test.ts: OK");
