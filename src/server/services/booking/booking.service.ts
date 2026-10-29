@@ -287,7 +287,7 @@ export async function createPublicClassSlotBooking(input: {
   userId?: string | null;
   planItemId?: string | null;
   childId?: string | null;
-}): Promise<{ bookingId: string; holdUntil: Date }> {
+}): Promise<{ bookingId: string; holdUntil: Date; status: BookingStatus }> {
   const { customerName, customerPhone } = validateBookingCustomer(input);
   const offer = await prisma.offer.findFirst({
     where: {
@@ -392,7 +392,7 @@ export async function createPublicClassSlotBooking(input: {
     metadata: { source: "public_class_slot", startsAt: input.startsAt.toISOString(), seats: input.seats },
   });
   }
-  return { bookingId: result.bookingId, holdUntil: result.holdUntil };
+  return { bookingId: result.bookingId, holdUntil: result.holdUntil, status: result.status };
 }
 
 // ─── Generic public booking ──────────────────────────────────────────────────
