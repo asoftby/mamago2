@@ -70,6 +70,9 @@ export async function loadSlotSnapshot(
     leadTimeHours: booking.leadTimeHours,
     horizonDays: booking.horizonDays,
     durationMin: booking.durationMin,
+    maxExtensionHours: booking.maxExtensionHours,
+    extensionHourPriceByn: booking.extensionHourPriceByn?.toString() ?? null,
+    extensionDiscountPercent: booking.extensionDiscountPercent,
     bufferMin: booking.bufferMin,
     capacity: booking.capacity ?? (booking.scheduleKind === "SHIFTS" ? offer.campPlacesCount : null),
     rules: booking.rules.map((rule) => ({
