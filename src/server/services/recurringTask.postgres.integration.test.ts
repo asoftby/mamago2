@@ -117,7 +117,7 @@ test("stop this-and-following keeps earlier days, cancels materialized future an
 test("whole series cancels all materialized days and prevents future generation", async () => {
   const owner=await fixture();
   const id=await createRecurringTaskSeries(owner,{
-    ...base,requestKey:"repeat_"+randomUUID().replaceAll("-"),
+    ...base,requestKey:"repeat_"+randomUUID().replaceAll("-",""),
     recurrence:{frequency:"DAILY",interval:1,startDate:"2026-10-29"},
   });
   await materializeRecurrencesForRange(owner,"2026-10-29","2026-11-05");
@@ -131,7 +131,7 @@ test("whole series cancels all materialized days and prevents future generation"
 
 test("unrelated account cannot cancel another user's recurrence", async () => {
   const owner=await fixture(), stranger=await fixture();
-  const id=await createRecurringTaskSeries(owner,{...base,requestKey:"repeat_"+randomUUID().replaceAll("-")});
+  const id=await createRecurringTaskSeries(owner,{...base,requestKey:"repeat_"+randomUUID().replaceAll("-","")});
   const item=await db.planItem.findFirstOrThrow({where:{recurrenceSeriesId:id}});
   await assert.rejects(cancelRecurringTaskSeries(stranger,item.id,"ALL",item.updatedAt.toISOString()),/recurrence_not_found/);
   assert.equal(await db.planItem.count({where:{recurrenceSeriesId:id,status:"CONFIRMED"}}),1);
@@ -140,7 +140,7 @@ test("unrelated account cannot cancel another user's recurrence", async () => {
 test("concurrent calendar materialization and series cancellation never resurrect future days", async () => {
   const owner=await fixture();
   const id=await createRecurringTaskSeries(owner,{
-    ...base,requestKey:"repeat_"+randomUUID().replaceAll("-"),
+    ...base,requestKey:"repeat_"+randomUUID().replaceAll("-",""),
     recurrence:{frequency:"DAILY",interval:1,startDate:"2026-10-29"},
   });
   const first=await db.planItem.findFirstOrThrow({where:{recurrenceSeriesId:id}});
@@ -158,7 +158,7 @@ test("deleted child never breaks recurrence materialization or future calendar r
   const familyId=await familyIdForWrite(owner.userId);
   const child=await db.child.create({data:{name:"Child removed",parentId:owner.userId,familyId}});
   const id=await createRecurringTaskSeries(owner,{
-    ...base,requestKey:"repeat_"+randomUUID().replaceAll("-"),childId:child.id,
+    ...base,requestKey:"repeat_"+randomUUID().replaceAll("-",""),childId:child.id,
     recurrence:{frequency:"DAILY",interval:1,startDate:"2026-10-29"},
   });
   await db.child.delete({where:{id:child.id}});
