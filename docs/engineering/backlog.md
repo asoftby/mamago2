@@ -5595,3 +5595,36 @@ distributor_company_id=550) и хотели бы уточнить несколь
   устройства); метрика «Сессии» в Analytics и словаре метрик с формулой;
   «Устройства» остаются отдельной метрикой.
 - Source: ТЗ «Аналитика админки и русификация», решение 2; PR 2.
+
+## [BACKLOG-212] Align Kuda completeness guard with page-card hydration
+
+- Status: OPEN
+- Priority: P3
+- Area: Discovery / regression tests
+- Added: 2026-10-29
+- Reason deferred: pre-existing static-test mismatch, outside Territory PR #784.
+- Context: `src/server/discovery/kudaListingCompleteness.contract.test.ts`
+  expects `withImageDimensions(page.items, ...)`, but `kudaListingPage.ts`
+  hydrates full cards into `hydrated` before loading image dimensions.
+  Reproduced against unchanged `origin/dev` at
+  `223992efef57652b7bcdedef6d66f19a6a98fc45` (2 pass, 1 fail).
+- Acceptance criteria: verify bounded full-card/media hydration and global
+  ordering with a behavioral regression; keep all completeness guarantees.
+- Source: PR #784 reconciliation, supplementary Discovery regressions.
+
+## [BACKLOG-213] Family reads gate does not cover the transactional offer save
+
+- Status: BLOCKED
+- Priority: P1
+- Area: Family / push gate regression
+- Added: 2026-10-29
+- Reason deferred: needs an explicit scope decision; unrelated to Territory #784.
+- Context: `familyCoreReads.contract.test.ts:31` expects four `planItem.create`
+  calls. `plan.service.ts` now has four direct creates plus one transactional
+  offer create using a previously resolved `familyId`.
+  Reproduced on unchanged `origin/dev` at
+  `223992efef57652b7bcdedef6d66f19a6a98fc45` (actual 5, expected 4).
+- Acceptance criteria: retain coverage of all ownership/active-plan guarantees,
+  validate familyId for all five create paths, and pass `test:family-core-reads`
+  plus the full push gate. Do not bypass the hook or weaken ownership checks.
+- Source: PR #784 reconciliation; full `task-check.sh` stopped at this contract.
