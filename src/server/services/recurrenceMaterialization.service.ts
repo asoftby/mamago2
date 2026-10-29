@@ -124,10 +124,14 @@ export async function materializeRecurrencesForRange(owner: PlanOwner, from: str
       const adultAllowed = assigneeUserId && (familyReadsEnabled()
         ? Boolean(series.familyId && permittedAdults.has(`${series.familyId}:${assigneeUserId}`))
         : assigneeUserId === series.ownerUserId);
-      return { ...series, template: { ...template,
+      // Existing template is already a Prisma JSON value. We only replace
+      // two entries with strings or null, retaining JSON compatibility.
+      const sanitizedTemplate: Prisma.JsonValue = {
+        ...template,
         childId: childAllowed ? childId : null,
         assigneeUserId: adultAllowed ? assigneeUserId : null,
-      } };
+      } as Prisma.JsonObject;
+      return { ...series, template: sanitizedTemplate };
     });
     const rows = planRecurrenceInsertRows(sanitized, from, to);
     if (rows.length) await tx.planItem.createMany({ data: rows, skipDuplicates: true });
