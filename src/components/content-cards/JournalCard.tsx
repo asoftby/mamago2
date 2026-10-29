@@ -3,7 +3,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 
-export function JournalCard({ href, title, imageUrl, categoryLabel, geographyLabel, readTime, tone = 0, homeCard = false }: {
+export function JournalCard({ href, title, imageUrl, categoryLabel, geographyLabel, tone = 0, homeCard = false }: {
   href: string; title: string; imageUrl?: string | null; categoryLabel?: string | null; geographyLabel?: string | null;
   readTime?: number | null; tone?: number; homeCard?: boolean;
 }) {
