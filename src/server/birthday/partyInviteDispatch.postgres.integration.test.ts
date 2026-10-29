@@ -82,8 +82,16 @@ async function main() {
         in: ["PARTY_REQUEST_DECLINED", "PARTY_QUOTE_SENT"],
       } },
     }), 1);
-    const replayAfterReply = await dispatchQueuedPartyInvites(item.id);
-    assert.equal(replayAfterReply.sent, 0);
+    // A fully declined item is terminal; a quoted item remains in decision mode.
+    // Neither outcome may generate another request.
+    const afterReply = await Promise.allSettled([dispatchQueuedPartyInvites(item.id)]);
+    if (request.partyStage === "QUOTED") {
+      assert.equal(afterReply[0].status, "fulfilled");
+      if (afterReply[0].status === "fulfilled") assert.equal(afterReply[0].value.sent, 0);
+    } else {
+      assert.equal(afterReply[0].status, "rejected");
+    }
+    assert.equal(await prisma.bookingRequest.count({ where: { partyOrderItemId: item.id } }), 1);
     console.log("PASS competing decline/quote: one winner, consistent queue and outbox");
   } finally {
     await prisma.partyOrder.delete({ where: { id: order.id } });
