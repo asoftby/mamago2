@@ -5,6 +5,7 @@ import { BookingStatus, Prisma, PublicationType, ScheduleKind } from "@prisma/cl
 import { loadSlotSnapshot } from "./getSlots";
 import { calculateSlots, type SlotSnapshot } from "./slotAvailability";
 import { dateKeyInZone, isoWeekday, localMinuteKey } from "./slotTime";
+import { slotIntentHash, slotKeyLock, validSlotKey } from "./slotIdempotency";
 
 const MINUTE_MS = 60_000;
 const PHONE_RE = /^\+?[\d\s\-().]{7,20}$/;
@@ -14,6 +15,9 @@ export type ReserveSlotInput = {
   classGroupId?: string | null;
   classTariffId?: string | null;
   selectedOptionIds?: string[];
+  /** A single UUID per customer intent; retries of the same intent return the first result. */
+  idempotencyKey?: string;
+  childId?: string | null;
   startsAt: Date;
   endsAt: Date;
   seats?: number;
@@ -77,7 +81,7 @@ function isExclusionViolation(error: unknown): boolean {
  * Reserve a slot using the existing BookingRequest and BookingAllocation tables.
  * The preview is recalculated under the transaction; only this path commits a hold.
  */
-export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId: string; holdUntil: Date }> {
+export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId: string; holdUntil: Date; replayed: boolean }> {
   const seats = input.seats ?? 1;
   const holdMinutes = input.holdMinutes ?? 24 * 60;
   const requestedUnits = input.unitIds;
@@ -95,6 +99,10 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       !PHONE_RE.test(input.customerPhone?.trim() ?? "")) {
     throw new SlotReservationError("INVALID_SLOT", "Некорректные данные для бронирования");
   }
+  if (input.idempotencyKey !== undefined && !validSlotKey(input.idempotencyKey)) {
+    throw new SlotReservationError("INVALID_SLOT", "Некорректный ключ повторной отправки");
+  }
+  const intentHash = input.idempotencyKey ? slotIntentHash(input) : null;
   const now = new Date();
   try {
     return await prisma.$transaction(async (tx) => {
@@ -105,6 +113,27 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       const businessId = offer?.place?.ownerBusinessId;
       if (!offer || offer.status !== "PUBLISHED" || !businessId || !offer.offerBooking) {
         throw new SlotReservationError("OFFER_UNAVAILABLE", "Предложение сейчас недоступно для записи");
+      }
+      if (input.idempotencyKey) {
+        // Serialize identical retry keys BEFORE availability/holds are inspected.
+        // A unique DB index is the final guard against duplicate commits.
+        const advisoryKey = slotKeyLock(input.offerId, input.idempotencyKey);
+        await tx.$queryRaw<Array<{ locked: number }>>`
+          SELECT 1 AS "locked" FROM pg_advisory_xact_lock(${advisoryKey}::bigint)
+        `;
+        const previous = await tx.bookingRequest.findUnique({
+          where: { offerId_slotIdempotencyKey: {
+            offerId: input.offerId, slotIdempotencyKey: input.idempotencyKey,
+          } },
+          select: { id: true, slotRequestHash: true, holdUntil: true },
+        });
+        if (previous) {
+          if (previous.slotRequestHash !== intentHash || !previous.holdUntil) {
+            throw new SlotReservationError("INVALID_SLOT", "Ключ уже использован для другой заявки");
+          }
+          // Even when a hold expired, replay must not create a fresh booking.
+          return { bookingId: previous.id, holdUntil: previous.holdUntil, replayed: true };
+        }
       }
       const groups = offer.classGroups.filter((group) => group.active);
       const group = input.classGroupId ? groups.find((item) => item.id === input.classGroupId) : null;
@@ -254,6 +283,8 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
           classTariffUnit: tariff?.unit ?? null,
           bookingPriceSnapshot: pricing.snapshot as unknown as Prisma.InputJsonValue,
           bookingTotalByn: pricing.snapshot.totalByn,
+          slotIdempotencyKey: input.idempotencyKey ?? null,
+          slotRequestHash: intentHash,
           offerSessionId: sessionId,
           startsAt: input.startsAt,
           endsAt: input.endsAt,
@@ -287,7 +318,7 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
           },
         });
       }
-      return { bookingId: booking.id, holdUntil };
+      return { bookingId: booking.id, holdUntil, replayed: false };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 30_000 });
   } catch (error) {
     if (isExclusionViolation(error)) {
