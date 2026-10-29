@@ -75,6 +75,38 @@ export function WishlistEditor({ initial }: { initial: WishlistView }) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  async function copyForNextYear() {
+    setBusy(true);
+    try {
+      const res = await call(`/api/wishlists/${wishlist.id}/copy`, "POST");
+      const created = res.data.wishlist as WishlistView | undefined;
+      if (res.ok && created) {
+        toast.success("Копия создана. Бронирований в ней нет.");
+        window.location.assign(`/me/wishlists/${created.id}`);
+        return;
+      }
+      toast.error(wishlistErrorMessage(res.data.error as string | undefined));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function thankGuests() {
+    if (!window.confirm("Отправить «Спасибо» всем, кто взял подарок и оставил контакт или вошёл в аккаунт?")) return;
+    setBusy(true);
+    try {
+      const res = await call(`/api/wishlists/${wishlist.id}/thanks`, "POST", {});
+      if (!res.ok) {
+        toast.error(wishlistErrorMessage(res.data.error as string | undefined));
+        return;
+      }
+      const n = res.data.notified;
+      toast.success(typeof n === "number" ? `Спасибо отправлено: ${n}` : "Спасибо отправлено");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function run(fn: () => Promise<ApiResult>, onOk?: (data: Record<string, unknown>) => void) {
     setBusy(true);
     try {
@@ -231,6 +263,13 @@ export function WishlistEditor({ initial }: { initial: WishlistView }) {
             </p>
             {archived ? <p className="mt-1 text-sm font-medium text-amber-700">В архиве</p> : null}
           </div>
+          <div className="flex flex-wrap gap-2">
+          <button type="button" className={btn} disabled={busy} onClick={() => void thankGuests()}>
+            Сказать «Спасибо»
+          </button>
+          <button type="button" className={btn} disabled={busy} onClick={() => void copyForNextYear()}>
+            Копия на следующий год
+          </button>
           <button
             type="button"
             className={btn}
@@ -239,6 +278,7 @@ export function WishlistEditor({ initial }: { initial: WishlistView }) {
           >
             {archived ? "Вернуть из архива" : "В архив"}
           </button>
+          </div>
         </div>
 
         <div className="mt-5 space-y-4 border-t border-neutral-100 pt-4">

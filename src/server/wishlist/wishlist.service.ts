@@ -9,11 +9,13 @@ import { childScopeWhere, familyReadsEnabled } from "@/server/family/familyScope
 
 import {
   WishlistError,
+  archiveCutoff,
   breakingItemChange,
   dateKeyToDate,
   dateToDateKey,
   generateShareToken,
   isActiveReservation,
+  sameDayNextYear,
   summarizeItemForOwner,
   wishlistEnabled,
   wishlistScopeWhere,
@@ -39,6 +41,9 @@ export type WishlistDeps = {
   /** Test seam for link previews; defaults to the real SSRF-safe fetcher. */
   /** Test seam: guest notices after the author releases reservations. */
   notifyReleased?: (db: PrismaClient, released: ReleasedReservation[]) => Promise<void>;
+  /** Test seam: thank-you delivery to guests. */
+  notifyThanks?: (db: PrismaClient, reservationIds: string[], message: string | null) => Promise<number>;
+  now?: () => Date;
   fetchPreview?: (url: string, ownerUserId: string) => Promise<{ title: string | null; imageUrl: string | null } | null>;
 };
 
@@ -325,6 +330,98 @@ export async function setWishlistArchived(
     data: archived ? { status: "ARCHIVED", archivedAt: new Date() } : { status: "ACTIVE", archivedAt: null },
   });
   return getWishlist(userId, wishlist.id, { db: c.db, env: c.env });
+}
+
+/** Daily job: lists whose event was more than ARCHIVE_AFTER_DAYS ago move to the archive. */
+export async function archiveExpiredWishlists(
+  deps: WishlistDeps = {},
+): Promise<{ archived: number; skipped: boolean }> {
+  const env = deps.env ?? process.env;
+  if (!wishlistEnabled(env)) return { archived: 0, skipped: true };
+  const db = deps.db ?? (defaultPrisma as unknown as PrismaClient);
+  const now = (deps.now ?? (() => new Date()))();
+  const result = await db.wishlist.updateMany({
+    where: { status: "ACTIVE", eventDate: { not: null, lt: archiveCutoff(now) } },
+    data: { status: "ARCHIVED", archivedAt: now },
+  });
+  return { archived: result.count, skipped: false };
+}
+
+/**
+ * "Same list for next year": a new list with a fresh link, the date moved one year
+ * ahead and the items copied without any reservations. The source list is untouched.
+ */
+export async function copyWishlist(userId: string, wishlistId: string, deps?: WishlistDeps): Promise<WishlistView> {
+  const c = ctx(deps);
+  const source = await c.db.wishlist.findFirst({
+    where: { id: wishlistId, ...(await scopeWhere(c, userId)) },
+    include: { items: { where: { deletedAt: null }, orderBy: { sortOrder: "asc" } } },
+  });
+  if (!source) throw new WishlistError("not_found");
+  const familyId = await ensureFamilyForUser(c.db, userId);
+  const eventKey = source.eventDate ? source.eventDate.toISOString().slice(0, 10) : null;
+  const created = await c.db.wishlist.create({
+    data: {
+      ownerUserId: userId,
+      familyId,
+      title: source.title,
+      note: source.note,
+      recipientChildId: source.recipientChildId,
+      recipientName: source.recipientName,
+      occasion: source.occasion,
+      eventDate: eventKey ? dateKeyToDate(sameDayNextYear(eventKey)) : null,
+      visibility: source.visibility,
+      hideReservationsFromOwner: source.hideReservationsFromOwner,
+      showReserverNamesToGuests: source.showReserverNamesToGuests,
+      shareToken: generateShareToken(),
+      items: {
+        create: source.items.map((item, index) => ({
+          sortOrder: index,
+          title: item.title,
+          url: item.url,
+          comment: item.comment,
+          priceApprox: item.priceApprox,
+          currency: item.currency,
+          quantity: item.quantity,
+          priority: item.priority,
+          imageUrl: item.imageUrl,
+          offerId: item.offerId,
+        })),
+      },
+    },
+    select: { id: true },
+  });
+  return getWishlist(userId, created.id, { db: c.db, env: c.env });
+}
+
+/**
+ * The author thanks everyone holding a gift. In surprise mode the count is hidden
+ * so the reply does not reveal how many gifts are taken.
+ */
+export async function sendWishlistThanks(
+  userId: string,
+  wishlistId: string,
+  message: string | null,
+  deps?: WishlistDeps,
+): Promise<{ notified: number | null }> {
+  const c = ctx(deps);
+  const wishlist = await loadAccessible(c, userId, wishlistId);
+  const reservations = await c.db.wishlistReservation.findMany({
+    where: {
+      status: { in: ["RESERVED", "PURCHASED"] },
+      item: { wishlistId: wishlist.id, deletedAt: null },
+    },
+    select: { id: true },
+  });
+  const ids = reservations.map((r) => r.id);
+  let notified = 0;
+  try {
+    const send = deps?.notifyThanks ?? (await import("./wishlistNotify")).notifyThanksGuests;
+    notified = await send(c.db, ids, message);
+  } catch (error) {
+    console.error("[wishlist] thanks failed", error instanceof Error ? error.name : typeof error);
+  }
+  return { notified: wishlist.hideReservationsFromOwner ? null : notified };
 }
 
 // ─── Items ───────────────────────────────────────────────────────────────────

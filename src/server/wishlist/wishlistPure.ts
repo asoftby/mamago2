@@ -311,3 +311,27 @@ export function guestItemState(quantity: number, taken: number): GuestItemState 
   if (taken >= quantity) return "TAKEN";
   return taken > 0 ? "PARTIAL" : "FREE";
 }
+
+// ─── Lifecycle (PR 6) ────────────────────────────────────────────────────────
+
+/** A list is archived this many days after its event date (never before). */
+export const ARCHIVE_AFTER_DAYS = 7;
+
+export const thanksSchema = z.object({
+  message: z
+    .union([z.string().trim().max(300), z.null()])
+    .optional()
+    .transform((v) => (v ? v : null)),
+});
+
+/** Same calendar day one year later (29 Feb → 1 Mar). */
+export function sameDayNextYear(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(y + 1, m - 1, d)).toISOString().slice(0, 10);
+}
+
+/** Lists whose event date is before this day are archived by the daily job. */
+export function archiveCutoff(now: Date): Date {
+  const midnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return new Date(midnight - ARCHIVE_AFTER_DAYS * 86_400_000);
+}

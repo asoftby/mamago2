@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 
 import {
+  archiveCutoff,
+  sameDayNextYear,
+  thanksSchema,
   SHARE_TOKEN_PATTERN,
   MAX_CLAIMS_PER_COOKIE,
   breakingItemChange,
@@ -115,6 +118,17 @@ assert.equal(breakingItemChange({ url: null, quantity: 3 }, { quantity: 2 }, 2),
   assert.equal(wishlistErrorStatus("sold_out"), 409);
   assert.equal(wishlistErrorStatus("forbidden"), 403);
   assert.equal(wishlistErrorStatus("rate_limited"), 429);
+}
+
+// lifecycle (PR 6)
+{
+  assert.equal(sameDayNextYear("2026-11-03"), "2027-11-03");
+  assert.equal(sameDayNextYear("2028-02-29"), "2029-03-01", "29 Feb rolls to 1 Mar");
+  assert.equal(archiveCutoff(new Date("2026-11-10T15:30:00Z")).toISOString(), "2026-11-03T00:00:00.000Z");
+  assert.equal(thanksSchema.parse({}).message, null);
+  assert.equal(thanksSchema.parse({ message: "  Спасибо!  " }).message, "Спасибо!");
+  assert.equal(thanksSchema.parse({ message: "" }).message, null);
+  assert.throws(() => thanksSchema.parse({ message: "x".repeat(301) }));
 }
 
 console.log("wishlistPure ok");

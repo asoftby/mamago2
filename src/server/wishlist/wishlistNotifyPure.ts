@@ -56,6 +56,21 @@ export function buildGuestReleaseMessage(input: {
   };
 }
 
+export function buildThanksMessage(input: {
+  itemTitle: string;
+  listTitle: string;
+  message: string | null;
+  listUrl: string;
+}): { subject: string; text: string } {
+  return {
+    subject: `Спасибо за подарок: ${input.itemTitle}`,
+    text:
+      `Спасибо за подарок «${input.itemTitle}» (список «${input.listTitle}»)!` +
+      (input.message ? `\n\n${input.message}` : "") +
+      `\n${input.listUrl}`,
+  };
+}
+
 export function buildAuthorReservedMessage(input: {
   listTitle: string;
   itemTitle: string;
