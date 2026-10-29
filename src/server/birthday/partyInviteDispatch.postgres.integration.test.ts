@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import prisma from "@/lib/prisma";
 import { dispatchQueuedPartyInvites } from "./partyInviteTransactionalDispatch.service";
 import { replyToPartyRequest } from "./partyBusiness.service";
+import { replenishPartyCandidateWaves } from "./partyCandidateReplenishment.service";
 
 const url = new URL(process.env.DATABASE_URL ?? "http://invalid");
 if (url.hostname !== "127.0.0.1" || url.port !== "55443" ||
@@ -19,6 +20,35 @@ async function main() {
     eventDate: new Date(date + "T00:00:00Z"), timeFrom: "12:00", timeTo: "15:00",
     childrenCount: 8, adultsCount: 3, childAge: 7,
   } });
+  // End-to-end: existing cron initializes a category-only queue and dispatches it.
+  const autoItem = await prisma.partyOrderItem.create({ data: {
+    partyOrderId: order.id, role: "ADDON", category: "PHOTO", status: "PLANNED",
+    position: 1,
+  } });
+  const previousFlag = process.env.PARTY_CANDIDATE_AUTO_REPLENISH_ENABLED;
+  process.env.PARTY_CANDIDATE_AUTO_REPLENISH_ENABLED = "true";
+  try {
+    await replenishPartyCandidateWaves(10);
+    const autoInvites = await prisma.partyProviderInvite.findMany({
+      where: { partyOrderItemId: autoItem.id },
+    });
+    assert.ok(autoInvites.length >= 1 && autoInvites.length <= 5,
+      "Category-only add-on must initialize a bounded durable queue");
+    assert.ok(autoInvites.some(x => x.status === "SENT"),
+      "Existing cron must dispatch at least one initialized invitation");
+    const created = await prisma.bookingRequest.findMany({
+      where: { partyOrderItemId: autoItem.id },
+    });
+    assert.equal(created.length, autoInvites.filter(x => x.status === "SENT").length);
+    await replenishPartyCandidateWaves(10);
+    assert.equal(await prisma.bookingRequest.count({
+      where: { partyOrderItemId: autoItem.id },
+    }), created.length, "cron replay must not send duplicate requests");
+    console.log("PASS automatic category-only queue initialization and cron dispatch");
+  } finally {
+    if (previousFlag === undefined) delete process.env.PARTY_CANDIDATE_AUTO_REPLENISH_ENABLED;
+    else process.env.PARTY_CANDIDATE_AUTO_REPLENISH_ENABLED = previousFlag;
+  }
   const item = await prisma.partyOrderItem.create({ data: {
     partyOrderId: order.id, role: "STANDALONE", category: "PHOTO", status: "PLANNED",
   } });
