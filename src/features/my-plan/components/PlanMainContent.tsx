@@ -1182,7 +1182,6 @@ export function PlanMainContent({
       <PlanItemRow
         key={item.id}
         item={item}
-        participantId={item.childId ? `child:${item.childId}` : item.assigneeUserId ? `adult:${item.assigneeUserId}` : null}
         participantLabel={
           item.childId
             ? childrenList.find((child) => child.id === item.childId)?.name ?? null
