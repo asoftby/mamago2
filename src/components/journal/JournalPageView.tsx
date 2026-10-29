@@ -182,7 +182,7 @@ export function JournalPageView({
                   index={index + 1}
                   saveStatus={saveStatuses[article.id]}
                   typeHref={
-                    article.publicationType === "BREAKING_NEWS" && typeFilter !== "BREAKING_NEWS"
+                    article.publicationType === "BREAKING_NEWS"
                       ? typeHref("BREAKING_NEWS")
                       : article.publicationType === "COLLECTION" && typeFilter !== "COLLECTION"
                         ? typeHref("COLLECTION")
@@ -207,7 +207,7 @@ export function JournalPageView({
                   index={index + 1}
                   saveStatus={saveStatuses[article.id]}
                   typeHref={
-                    article.publicationType === "BREAKING_NEWS" && typeFilter !== "BREAKING_NEWS"
+                    article.publicationType === "BREAKING_NEWS"
                       ? typeHref("BREAKING_NEWS")
                       : article.publicationType === "COLLECTION" && typeFilter !== "COLLECTION"
                         ? typeHref("COLLECTION")
@@ -217,14 +217,12 @@ export function JournalPageView({
               </AnalyticsCardViewTracker>
             ))}
           </div>
-          {typeFilter !== "BREAKING_NEWS" ? (
-            <Link
-              href={typeHref("BREAKING_NEWS")}
-              className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-ink hover:underline"
-            >
-              Все новости →
-            </Link>
-          ) : null}
+          <Link
+            href={typeHref("BREAKING_NEWS")}
+            className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-ink hover:underline"
+          >
+            Все новости →
+          </Link>
         </section>
       ) : null}
 
