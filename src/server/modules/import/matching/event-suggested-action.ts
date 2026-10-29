@@ -20,6 +20,9 @@ const THRESHOLDS = {
   AMBIGUITY_GAP: 0.15,
 } as const;
 
+/** Время начала считается совпавшим, если разница не больше этого (мин). */
+export const STRONG_TIME_TOLERANCE_MINUTES = 30;
+
 export type EventSuggestedAction = "CREATE_NEW" | "UPDATE_EXISTING" | "MERGE" | "REJECT";
 export type EventMatchStatus = "NO_MATCH" | "MATCHED" | "AMBIGUOUS" | "FAILED";
 
@@ -71,6 +74,22 @@ export function determineEventSuggestedAction(
       requiresReview: true,
       reviewPriority: 9, // высокий приоритет — нужно разобраться
       reason: `Occurrence risk: similar title+venue but different date. ${top.entityTitle} (score=${top.score.toFixed(2)})`,
+    };
+  }
+
+  // ── Тот же день, но другое время — другой сеанс, не обновление ────────────
+  if (
+    top.score >= THRESHOLDS.STRONG_MATCH &&
+    top.signals.startTimeDeltaMinutes != null &&
+    top.signals.startTimeDeltaMinutes > STRONG_TIME_TOLERANCE_MINUTES
+  ) {
+    return {
+      matchStatus: "AMBIGUOUS",
+      suggestedAction: "MERGE",
+      confidenceScore: top.score,
+      requiresReview: true,
+      reviewPriority: 6,
+      reason: `Similar event but start time differs by ${top.signals.startTimeDeltaMinutes} min: ${top.entityTitle} (score=${top.score.toFixed(2)})`,
     };
   }
 
