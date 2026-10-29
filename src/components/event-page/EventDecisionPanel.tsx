@@ -167,26 +167,7 @@ export function EventDecisionPanel({
             {data.factChips[0].label}
           </span>
         )}
-        {/* Desktop: «Сохранить» и «Поделиться» справа от категории (на мобильном — иконки в хедере). */}
-        <div className="ml-auto hidden items-center gap-5 lg:flex">
-          <button
-            type="button"
-            onClick={onPlan}
-            aria-pressed={isPlanned}
-            className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
-          >
-            <Heart size={18} strokeWidth={1.75} className={isPlanned ? "fill-[#E86A3A] text-[#E86A3A]" : ""} aria-hidden />
-            {isPlanned ? "Сохранено" : "Сохранить"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShareOpen(true)}
-            className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
-          >
-            <Share2 size={18} strokeWidth={1.75} aria-hidden />
-            Поделиться
-          </button>
-        </div>
+
       </div>
       <ShareModal
         open={shareOpen}
@@ -374,6 +355,27 @@ export function EventDecisionPanel({
             booking={data.cta.simpleBooking}
           />
         )}
+
+        {/* Secondary actions follow the primary CTA, visually matching the countdown panel. */}
+        <div className="mt-4 grid grid-cols-2 gap-1.5 rounded-xl border border-dashed border-[rgba(20,18,16,0.18)] bg-[#F6F2EA] px-3 py-3">
+          <button
+            type="button"
+            onClick={onPlan}
+            aria-pressed={isPlanned}
+            className="flex min-h-11 items-center justify-center gap-2 rounded-lg text-[14px] font-medium text-[rgba(20,18,16,0.70)] transition-colors hover:bg-white/60 hover:text-[#141210] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E86A3A]"
+          >
+            <Heart size={18} strokeWidth={1.75} className={isPlanned ? "fill-[#E86A3A] text-[#E86A3A]" : ""} aria-hidden />
+            {isPlanned ? "Сохранено" : "Сохранить"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="flex min-h-11 items-center justify-center gap-2 rounded-lg text-[14px] font-medium text-[rgba(20,18,16,0.70)] transition-colors hover:bg-white/60 hover:text-[#141210] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E86A3A]"
+          >
+            <Share2 size={18} strokeWidth={1.75} aria-hidden />
+            Поделиться
+          </button>
+        </div>
 
         {/* Owner edit */}
         {data.ownerEditHref && (

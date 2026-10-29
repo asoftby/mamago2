@@ -8,7 +8,7 @@ import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { renderCurrencyText } from "@/components/icons/BelarusianRubleIcon";
 import { EVENT_CARD_IMAGE_SIZES } from "@/components/events/eventCardLayout";
 import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
-import { posterPriceBadgeSide, resolvePosterFrame } from "@/lib/media/posterFrame";
+import { resolvePosterFrame } from "@/lib/media/posterFrame";
 
 // ─── Public props ────────────────────────────────────────────────────────────
 
@@ -116,7 +116,7 @@ export function EventCard({
   const aspectRatio = poster ? poster.aspectRatio : coverRatio;
   // Fixed framing keeps the legacy default (center) without extra classes.
   const objectPositionClass = poster?.objectPosition === "top" ? "object-top" : undefined;
-  const badgeSide = poster ? posterPriceBadgeSide(poster) : "right";
+  const isFree = Boolean(priceLabel && /бесплатно|^free$/i.test(priceLabel.trim()));
   return (
     <div className={cn("group relative select-none", className)}>
       <Link href={href} className="block focus:outline-none">
@@ -163,17 +163,7 @@ export function EventCard({
             </div>
           )}
 
-          {/* Price badge — bottom right */}
-          {priceLabel && (
-            <span
-              className={cn(
-                "absolute bottom-3 inline-flex h-7 items-center rounded-full bg-[rgba(20,18,16,0.72)] px-3 font-mono text-[11px] font-medium text-white backdrop-blur-[4px]",
-                badgeSide === "left" ? "left-3" : "right-3",
-              )}
-            >
-              {renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })}
-            </span>
-          )}
+
         </div>
 
         {/* Text */}
@@ -182,9 +172,15 @@ export function EventCard({
           <div className="line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors duration-150 group-hover:text-[#C24E22]">
             {title}
           </div>
-          {metaLabel && (
-            <div className="mt-0.5 font-mono text-[12px] text-[rgba(20,18,16,0.55)]">
-              {metaLabel}
+          {(metaLabel || priceLabel) && (
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-1 font-mono text-[12px] text-[rgba(20,18,16,0.55)]">
+              {metaLabel && <span>{metaLabel}</span>}
+              {metaLabel && priceLabel && <span aria-hidden="true">·</span>}
+              {priceLabel && (
+                <span className={isFree ? "font-medium text-[var(--success)]" : undefined}>
+                  {renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })}
+                </span>
+              )}
             </div>
           )}
         </div>
