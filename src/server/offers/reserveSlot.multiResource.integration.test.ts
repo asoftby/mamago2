@@ -363,3 +363,49 @@ test("business may disable a linked add-on after the resource becomes inactive",
     where: { id: linked.id },
   })).active, false);
 });
+
+
+test("same idempotency key serializes parallel retries and creates one allocation", async () => {
+  const room = await unit("Idempotency guarded room");
+  const offerId = await offer([room]);
+  const idempotencyKey = randomUUID();
+  const input = {
+    offerId, unitId: room, startsAt: start, endsAt: end,
+    ...contact, idempotencyKey, holdMinutes: 120,
+  };
+  const [first, retry] = await Promise.all([reserveSlot(input), reserveSlot(input)]);
+  assert.equal(first.bookingId, retry.bookingId);
+  assert.equal(first.holdUntil.toISOString(), retry.holdUntil.toISOString());
+  assert.equal(Number(first.replayed) + Number(retry.replayed), 1);
+  const saved = await db.bookingRequest.findUniqueOrThrow({ where: { id: first.bookingId } });
+  assert.equal(saved.slotIdempotencyKey, idempotencyKey);
+  assert.match(saved.slotRequestHash ?? "", /^[a-f0-9]{64}$/);
+  assert.equal(await db.bookingRequest.count({ where: { offerId } }), 1);
+  assert.equal(await db.bookingAllocation.count({ where: { bookingRequestId: first.bookingId } }), 1);
+  assert.equal(await db.bookingActivity.count({ where: { bookingId: first.bookingId, type: "CREATED" } }), 1);
+});
+
+test("idempotency key may not be reused for changed booking intent", async () => {
+  const room = await unit("Idempotency conflict room");
+  const offerId = await offer([room]);
+  const input = { offerId, unitId: room, startsAt: start, endsAt: end,
+    ...contact, idempotencyKey: randomUUID() };
+  const original = await reserveSlot(input);
+  await assert.rejects(reserveSlot({ ...input, customerPhone: "+375291119999" }),
+    (error: unknown) => error instanceof SlotReservationError &&
+      error.code === "INVALID_SLOT");
+  assert.equal(await db.bookingRequest.count({ where: { offerId } }), 1);
+  assert.equal((await reserveSlot(input)).bookingId, original.bookingId);
+});
+
+test("new idempotency key is a new booking attempt, not a replay", async () => {
+  const room = await unit("Idempotency new attempt room");
+  const offerId = await offer([room]);
+  const input = { offerId, unitId: room, startsAt: start, endsAt: end,
+    ...contact, idempotencyKey: randomUUID() };
+  await reserveSlot(input);
+  await assert.rejects(reserveSlot({ ...input, idempotencyKey: randomUUID() }),
+    (error: unknown) => error instanceof SlotReservationError &&
+      error.code === "SLOT_UNAVAILABLE");
+  assert.equal(await db.bookingRequest.count({ where: { offerId } }), 1);
+});
