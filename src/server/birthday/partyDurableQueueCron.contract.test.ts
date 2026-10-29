@@ -7,6 +7,9 @@ for (const invariant of [
   'PARTY_CANDIDATE_AUTO_REPLENISH_ENABLED',
   'providerInvites: { some: { status: "QUEUED" } }',
   'dispatchQueuedPartyInvites(item.id)',
+  'queuePartyProviderCandidates(tx, {',
+  'findCandidatesForParty(',
+  'candidates.slice(0, 5)',
   'providerInvites: { none: {} }',
   'dispatchPartyCandidateWave(',
 ]) assert.ok(cron.includes(invariant), "Missing isolated dispatch invariant: " + invariant);
