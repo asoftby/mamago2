@@ -175,6 +175,12 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
         const baseUnits = requestedUnits ??
           (input.unitId ? [input.unitId] :
             candidate.unitIds.length === 1 ? [candidate.unitIds[0]] : []);
+        // Option resources supplement, never replace, the required main unit.
+        // Until the public main-unit picker exists, ambiguous base selection
+        // must fail closed rather than reserving only an optional accessory.
+        if (baseUnits.length === 0) {
+          throw new SlotReservationError("UNIT_REQUIRED", "Выберите основной ресурс для бронирования");
+        }
         selectedUnitIds = [...new Set([...baseUnits, ...pricing.optionUnitIds])];
         if (selectedUnitIds.length === 0) {
           throw new SlotReservationError("UNIT_REQUIRED", "Выберите конкретный ресурс для бронирования");
