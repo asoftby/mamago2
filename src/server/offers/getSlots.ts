@@ -14,6 +14,7 @@ export async function loadSlotSnapshot(
     select: {
       bookingEnabled: true,
       bookingMode: true,
+      classGroups: { where: { active: true }, select: { id: true } },
       campPlacesCount: true,
       openingHoursId: true,
       inheritPlaceOpeningHours: true,
@@ -70,6 +71,7 @@ export async function loadSlotSnapshot(
     leadTimeHours: booking.leadTimeHours,
     horizonDays: booking.horizonDays,
     durationMin: booking.durationMin,
+    hasClassGroups: offer.classGroups.length > 0,
     maxExtensionHours: booking.maxExtensionHours,
     extensionHourPriceByn: booking.extensionHourPriceByn?.toString() ?? null,
     extensionDiscountPercent: booking.extensionDiscountPercent,
