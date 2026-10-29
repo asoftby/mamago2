@@ -41,7 +41,7 @@ export async function saveBookingServices(input: {
         currency: true, place: { select: { ownerBusinessId: true } },
         classGroups: { where: { active: true }, select: { id: true } },
         offerBooking: { select: {
-          id: true, pricingRevision: true, options: { select: { id: true } },
+          id: true, pricingRevision: true, scheduleKind: true, options: { select: { id: true } },
         } },
       },
     });
@@ -52,7 +52,7 @@ export async function saveBookingServices(input: {
 
     // Group seats are not BookingUnits; cannot promise resource-linked
     // extras that class reservation cannot hold atomically.
-    if (resourceIds.length > 0 && offer.classGroups.length > 0) {
+    if (resourceIds.length > 0 && (offer.classGroups.length > 0 ||\n        offer.offerBooking?.scheduleKind !== "ON_REQUEST_WINDOWS")) {
       return { status: 422 };
     }
     if (resourceIds.length > 0) {
