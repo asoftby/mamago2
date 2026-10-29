@@ -10,7 +10,8 @@ test("SSR and infinite-scroll listing use the existing uncapped ranked feed, not
   assert.match(listing, /hydrateImages:\s*false/);
   assert.match(feed, /!options\?\.allCandidates\s*\?\s*\{\s*take:/);
   assert.match(listing, /paginateKudaFeed\(partition,/);
-  assert.match(listing, /withImageDimensions\(page\.items,/);
+  assert.match(listing, /withImageDimensions\(hydrated,/);
+  assert.match(listing, /restoreHydratedKudaItems\(page\.items, details\)/, "revoked cached cards must not be resurrected");
   assert.match(feed, /id:\s*"asc"/);
 });
 
@@ -30,6 +31,7 @@ test("full-card and media hydration is bounded to current page IDs", () => {
   assert.match(listing, /rankOnly:\s*true/);
   assert.match(listing, /onlyIds:\s*visibleIds/);
   assert.match(feed, /options\?\.rankOnly \? 0 : GALLERY_FOR_COVER/);
+  assert.match(listing, /restoreHydratedKudaItems\(page\.items, details\)/, "revoked cached cards must not be resurrected");
   assert.match(feed, /id: \{ in: options\.onlyIds \}/);
   assert.match(listing, /page\.items\.map\(\(item\) => item\.id\)/);
 });

@@ -87,3 +87,26 @@ export function seenGroupStart(
   const unseenItems = items.filter((item) => !isSeen(item, seenOfferIds)).length;
   return unseenItems > 0 && unseenItems < items.length ? unseenItems : null;
 }
+
+/** Breaking News shares a single seen state between the Journal and the homepage story entry. */
+export const BREAKING_NEWS_SEEN_STORAGE_KEY = "mamago.breaking-news.seen.v1";
+
+export function readSeenBreakingNews(storage: StoriesStorage | null): Set<string> {
+  if (!storage) return new Set();
+  try {
+    const raw = storage.getItem(BREAKING_NEWS_SEEN_STORAGE_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string" && id.length > 0) : []);
+  } catch { return new Set(); }
+}
+
+export function markBreakingNewsSeen(storage: StoriesStorage | null, articleId: string): void {
+  if (!storage || !articleId) return;
+  const next = readSeenBreakingNews(storage);
+  next.add(articleId);
+  try { storage.setItem(BREAKING_NEWS_SEEN_STORAGE_KEY, JSON.stringify([...next])); } catch {}
+}
+
+export function orderBreakingNewsBySeen<T extends { id: string }>(items: readonly T[], seenIds: ReadonlySet<string>): T[] {
+  return [...items.filter((item) => !seenIds.has(item.id)), ...items.filter((item) => seenIds.has(item.id))];
+}

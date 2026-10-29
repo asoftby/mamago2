@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { orderBreakingNewsBySeen, readSeenBreakingNews } from "@/features/stories/lib/seen";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { HorizontalCardRow } from "@/features/city-home/components/HorizontalCardRow";
@@ -47,6 +49,21 @@ export function JournalPageView({
   const typeHref = (type: JournalTypeFilter) => journalTypeFilterHref(basePath, type);
   const resetHref = basePath;
   const saveStatuses = useArticleSaveStatusBatch([...(main ? [main.id] : []), ...feed.map((a) => a.id)]);
+  const [seenNewsIds, setSeenNewsIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const refresh = () => {
+      try { setSeenNewsIds(readSeenBreakingNews(window.localStorage)); }
+      catch { setSeenNewsIds(new Set()); }
+    };
+    refresh();
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", refresh);
+    window.addEventListener("storage", refresh);
+    return () => { window.removeEventListener("focus", refresh); window.removeEventListener("pageshow", refresh); window.removeEventListener("storage", refresh); };
+  }, []);
+  const currentNews = typeFilter === "BREAKING_NEWS" ? feed.filter((article) => article.expiresAt && new Date(article.expiresAt).getTime() > Date.now()) : [];
+  const rankedCurrentNews = orderBreakingNewsBySeen(currentNews, seenNewsIds);
+  const archivedNews = typeFilter === "BREAKING_NEWS" ? feed.filter((article) => !article.expiresAt || new Date(article.expiresAt).getTime() <= Date.now()) : [];
   const empty = !main && news.length === 0 && collections.length === 0 && feed.length === 0;
 
   return (
@@ -96,7 +113,7 @@ export function JournalPageView({
               </Link>
             }
           >
-            {news.map((article, index) => (
+            {orderBreakingNewsBySeen(news, seenNewsIds).map((article, index) => (
               <div key={article.id} className={NEWS_CARD_SHELL}>
                 <AnalyticsCardViewTracker
                   entityType="ARTICLE"
@@ -119,7 +136,33 @@ export function JournalPageView({
         citySlug={citySlug}
       />
 
-      {feed.length > 0 ? (
+      {typeFilter === "BREAKING_NEWS" ? (
+        <section aria-label="Все новости" className="space-y-8">
+          {currentNews.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="font-heading text-2xl">Актуальные новости</h2>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                {rankedCurrentNews.map((article) => <JournalNewsCard key={article.id} article={article} />)}
+              </div>
+            </div>
+          )}
+          {archivedNews.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="font-heading text-2xl">Архив новостей</h2>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                {archivedNews.map((article) => (
+                  <div key={article.id} className="space-y-2">
+                    <JournalNewsCard article={article} />
+                    <p className="text-xs text-muted-foreground"><span className="font-semibold">Архив</span> · {article.publishedAt ? new Date(article.publishedAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Minsk" }) : ""}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {typeFilter !== "BREAKING_NEWS" && feed.length > 0 ? (
         <section aria-labelledby="journal-feed-title" className="space-y-2">
           <h2 id="journal-feed-title" className="m-0 font-heading text-[24px] leading-tight tracking-[-0.02em] sm:text-[28px]">
             {typeFilter ? "Все материалы" : "Свежие материалы"}
@@ -139,7 +182,7 @@ export function JournalPageView({
                   index={index + 1}
                   saveStatus={saveStatuses[article.id]}
                   typeHref={
-                    article.publicationType === "BREAKING_NEWS" && typeFilter !== "BREAKING_NEWS"
+                    article.publicationType === "BREAKING_NEWS"
                       ? typeHref("BREAKING_NEWS")
                       : article.publicationType === "COLLECTION" && typeFilter !== "COLLECTION"
                         ? typeHref("COLLECTION")
@@ -164,7 +207,7 @@ export function JournalPageView({
                   index={index + 1}
                   saveStatus={saveStatuses[article.id]}
                   typeHref={
-                    article.publicationType === "BREAKING_NEWS" && typeFilter !== "BREAKING_NEWS"
+                    article.publicationType === "BREAKING_NEWS"
                       ? typeHref("BREAKING_NEWS")
                       : article.publicationType === "COLLECTION" && typeFilter !== "COLLECTION"
                         ? typeHref("COLLECTION")
@@ -174,14 +217,12 @@ export function JournalPageView({
               </AnalyticsCardViewTracker>
             ))}
           </div>
-          {typeFilter !== "BREAKING_NEWS" ? (
-            <Link
-              href={typeHref("BREAKING_NEWS")}
-              className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-ink hover:underline"
-            >
-              Все новости →
-            </Link>
-          ) : null}
+          <Link
+            href={typeHref("BREAKING_NEWS")}
+            className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-ink hover:underline"
+          >
+            Все новости →
+          </Link>
         </section>
       ) : null}
 

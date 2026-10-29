@@ -1,9 +1,12 @@
 import prisma from "@/lib/prisma";
 import { parsePriceData } from "@/lib/priceItems";
+import { calculateBookingPrice, BookingPriceError } from "./bookingPrice";
 import { BookingStatus, Prisma, PublicationType, ScheduleKind } from "@prisma/client";
 import { loadSlotSnapshot } from "./getSlots";
 import { calculateSlots, type SlotSnapshot } from "./slotAvailability";
 import { dateKeyInZone, isoWeekday, localMinuteKey } from "./slotTime";
+import { slotIntentHash, slotKeyLock, validSlotKey } from "./slotIdempotency";
+import { assertBookingDuration } from "./bookingDuration";
 
 const MINUTE_MS = 60_000;
 const PHONE_RE = /^\+?[\d\s\-().]{7,20}$/;
@@ -12,10 +15,16 @@ export type ReserveSlotInput = {
   offerId: string;
   classGroupId?: string | null;
   classTariffId?: string | null;
+  selectedOptionIds?: string[];
+  /** A single UUID per customer intent; retries of the same intent return the first result. */
+  idempotencyKey?: string;
+  childId?: string | null;
   startsAt: Date;
   endsAt: Date;
   seats?: number;
   unitId?: string;
+  /** Explicit all-or-nothing set of exclusive resources; cannot combine with unitId. */
+  unitIds?: string[];
   customerName: string;
   customerPhone: string;
   customerEmail?: string | null;
@@ -42,6 +51,9 @@ function availableSlot(snapshot: SlotSnapshot, input: ReserveSlotInput, now: Dat
     from: input.startsAt,
     to: new Date(input.startsAt.getTime() + 1),
     requestedSeats: input.seats ?? 1,
+    ...(snapshot.scheduleKind === ScheduleKind.ON_REQUEST_WINDOWS ? {
+      requestedDurationMinutes: (input.endsAt.getTime() - input.startsAt.getTime()) / MINUTE_MS,
+    } : {}),
   }, now);
   return slots.find((slot) =>
     slot.startsAt.getTime() === input.startsAt.getTime() &&
@@ -73,9 +85,16 @@ function isExclusionViolation(error: unknown): boolean {
  * Reserve a slot using the existing BookingRequest and BookingAllocation tables.
  * The preview is recalculated under the transaction; only this path commits a hold.
  */
-export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId: string; holdUntil: Date }> {
+export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId: string; holdUntil: Date; replayed: boolean; status: BookingStatus }> {
   const seats = input.seats ?? 1;
   const holdMinutes = input.holdMinutes ?? 24 * 60;
+  const requestedUnits = input.unitIds;
+  if (requestedUnits !== undefined &&
+      (!Array.isArray(requestedUnits) || requestedUnits.length === 0 || requestedUnits.length > 8 ||
+        requestedUnits.some((id) => typeof id !== "string" || !id.trim() || id.length > 128) ||
+        new Set(requestedUnits).size !== requestedUnits.length || input.unitId !== undefined)) {
+    throw new SlotReservationError("INVALID_SLOT", "Некорректный выбор ресурсов");
+  }
   if (!Number.isInteger(seats) || seats < 1 || seats > 100 ||
       !Number.isInteger(holdMinutes) || holdMinutes < 1 || holdMinutes > 24 * 60 ||
       !(input.startsAt instanceof Date) || !(input.endsAt instanceof Date) ||
@@ -84,16 +103,41 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       !PHONE_RE.test(input.customerPhone?.trim() ?? "")) {
     throw new SlotReservationError("INVALID_SLOT", "Некорректные данные для бронирования");
   }
+  if (input.idempotencyKey !== undefined && !validSlotKey(input.idempotencyKey)) {
+    throw new SlotReservationError("INVALID_SLOT", "Некорректный ключ повторной отправки");
+  }
+  const intentHash = input.idempotencyKey ? slotIntentHash(input) : null;
   const now = new Date();
   try {
     return await prisma.$transaction(async (tx) => {
       const offer = await tx.offer.findUnique({
         where: { id: input.offerId },
-        select: { status: true, priceItems: true, classGroups: { include: { tariffs: true, rules: true } }, place: { select: { ownerBusinessId: true } }, offerBooking: { select: { leadTimeHours: true, timezone: true } } },
+        select: { status: true, currency: true, priceItems: true, classGroups: { include: { tariffs: true, rules: true } }, place: { select: { ownerBusinessId: true } }, offerBooking: { select: { leadTimeHours: true, timezone: true, scheduleKind: true,
+          durationMin: true, maxExtensionHours: true, extensionHourPriceByn: true,
+          extensionDiscountPercent: true, basePriceByn: true, options: true } } },
       });
       const businessId = offer?.place?.ownerBusinessId;
       if (!offer || offer.status !== "PUBLISHED" || !businessId || !offer.offerBooking) {
         throw new SlotReservationError("OFFER_UNAVAILABLE", "Предложение сейчас недоступно для записи");
+      }
+      if (input.idempotencyKey) {
+        // Serialize identical retry keys BEFORE availability/holds are inspected.
+        // A unique DB index is the final guard against duplicate commits.
+        const advisoryKey = slotKeyLock(input.offerId, input.idempotencyKey);
+        await tx.$queryRaw<Array<{ locked: number }>>`
+          SELECT 1 AS "locked" FROM pg_advisory_xact_lock(${advisoryKey}::bigint)
+        `;
+        const previous = await tx.bookingRequest.findFirst({
+          where: { offerId: input.offerId, slotIdempotencyKey: input.idempotencyKey },
+          select: { id: true, slotRequestHash: true, holdUntil: true, status: true },
+        });
+        if (previous) {
+          if (previous.slotRequestHash !== intentHash || !previous.holdUntil) {
+            throw new SlotReservationError("INVALID_SLOT", "Ключ уже использован для другой заявки");
+          }
+          // Even when a hold expired, replay must not create a fresh booking.
+          return { bookingId: previous.id, holdUntil: previous.holdUntil, replayed: true, status: previous.status };
+        }
       }
       const groups = offer.classGroups.filter((group) => group.active);
       const group = input.classGroupId ? groups.find((item) => item.id === input.classGroupId) : null;
@@ -107,6 +151,46 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
         throw new SlotReservationError("INVALID_SLOT", "Выберите доступный тариф");
       }
       if (input.classTariffId && !tariff) throw new SlotReservationError("INVALID_SLOT", "Тариф недоступен для выбранной группы");
+      const durationMinutes = (input.endsAt.getTime() - input.startsAt.getTime()) / MINUTE_MS;
+      if (offer.offerBooking.scheduleKind === ScheduleKind.ON_REQUEST_WINDOWS) try {
+        assertBookingDuration({
+          scheduleKind: offer.offerBooking.scheduleKind,
+          durationMin: offer.offerBooking.durationMin,
+          maxExtensionHours: offer.offerBooking.maxExtensionHours,
+          extensionHourPriceByn: offer.offerBooking.extensionHourPriceByn?.toString() ?? null,
+          extensionDiscountPercent: offer.offerBooking.extensionDiscountPercent,
+          hasClassGroups: groups.length > 0,
+        }, durationMinutes);
+      } catch {
+        throw new SlotReservationError("INVALID_SLOT", "Выбранная продолжительность недоступна");
+      }
+      let pricing: ReturnType<typeof calculateBookingPrice>;
+      try {
+        pricing = calculateBookingPrice({
+          currency: offer.currency, seats,
+          durationMinutes,
+          baseDurationMinutes: offer.offerBooking.scheduleKind === "ON_REQUEST_WINDOWS"
+            ? (offer.offerBooking.durationMin ?? durationMinutes) : durationMinutes,
+          extensionHourPriceByn: offer.offerBooking.extensionHourPriceByn?.toString() ?? null,
+          extensionDiscountPercent: offer.offerBooking.extensionDiscountPercent,
+          basePriceByn: offer.offerBooking.basePriceByn?.toString() ?? null,
+          tariff: tariff ? {
+            id: tariff.id, title: "title" in tariff ? tariff.title : tariff.label,
+            price: tariff.price, unit: tariff.unit,
+          } : null,
+          options: offer.offerBooking.options.map(item => ({
+            id: item.id, title: item.title, mode: item.mode,
+            priceByn: item.priceByn.toString(), bookingUnitId: item.bookingUnitId,
+            active: item.active,
+          })),
+          selectedOptionIds: input.selectedOptionIds,
+        });
+      } catch (error) {
+        if (error instanceof BookingPriceError) {
+          throw new SlotReservationError("INVALID_SLOT", error.message);
+        }
+        throw error;
+      }
       if (group && group.rules.length === 0) throw new SlotReservationError("INVALID_SLOT", "Расписание группы не задано");
       if (group) {
         const date = dateKeyInZone(input.startsAt, offer.offerBooking.timezone);
@@ -122,7 +206,7 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       if (group) {
         await tx.$queryRaw`SELECT "id" FROM "OfferClassGroup" WHERE "id" = ${group.id} AND "offerId" = ${input.offerId} FOR UPDATE`;
       }
-      const query = { offerId: input.offerId, ...(group ? { classGroupId: group.id } : {}), from: input.startsAt, to: new Date(input.endsAt.getTime() + 1), requestedSeats: seats };
+      const query = { offerId: input.offerId, ...(group ? { classGroupId: group.id } : {}), from: input.startsAt, to: new Date(input.endsAt.getTime() + 1), requestedSeats: seats, ...(offer.offerBooking.scheduleKind === ScheduleKind.ON_REQUEST_WINDOWS ? { requestedDurationMinutes: durationMinutes } : {}) };
       const initial = await loadSlotSnapshot(query, tx);
       if (!initial) throw new SlotReservationError("OFFER_UNAVAILABLE", "Запись по расписанию не включена");
       const candidate = availableSlot(initial, input, now);
@@ -135,21 +219,52 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       if (holdUntil <= now) throw new SlotReservationError("SLOT_UNAVAILABLE", "Время записи на этот слот истекло");
 
       let sessionId: string | null = null;
-      let unitId: string | null = null;
-      let blockStart: Date | null = null;
-      let blockEnd: Date | null = null;
+      const allocations: Array<{ unitId: string; blockStart: Date; blockEnd: Date }> = [];
+      let selectedUnitIds: string[] = [];
       if (initial.scheduleKind === ScheduleKind.ON_REQUEST_WINDOWS) {
-        unitId = input.unitId ?? (candidate.unitIds.length === 1 ? candidate.unitIds[0] : null);
-        if (!unitId) throw new SlotReservationError("UNIT_REQUIRED", "Выберите конкретный ресурс для бронирования");
-        if (!candidate.unitIds.includes(unitId)) throw new SlotReservationError("SLOT_UNAVAILABLE", "Ресурс уже занят");
-        // The exclusion constraint cannot depend on now(). Release expired holds
-        // inside this transaction before the availability recheck and insert.
-        await tx.$executeRaw`UPDATE "BookingAllocation" SET "status" = 'EXPIRED', "updatedAt" = (now() AT TIME ZONE 'UTC')
-          WHERE "bookingUnitId" = ${unitId} AND "status" = 'HELD' AND "expiresAt" < (now() AT TIME ZONE 'UTC')`;
-        const unit = initial.units.find((item) => item.id === unitId)!;
-        blockStart = new Date(input.startsAt.getTime() - unit.prepMinutes * MINUTE_MS);
-        blockEnd = new Date(input.endsAt.getTime() + (unit.cleanupMinutes + initial.bufferMin) * MINUTE_MS);
+        const baseUnits = requestedUnits ??
+          (input.unitId ? [input.unitId] :
+            candidate.unitIds.length === 1 ? [candidate.unitIds[0]] : []);
+        // Option resources supplement, never replace, the required main unit.
+        // Until the public main-unit picker exists, ambiguous base selection
+        // must fail closed rather than reserving only an optional accessory.
+        if (baseUnits.length === 0) {
+          throw new SlotReservationError("UNIT_REQUIRED", "Выберите основной ресурс для бронирования");
+        }
+        selectedUnitIds = [...new Set([...baseUnits, ...pricing.optionUnitIds])];
+        if (selectedUnitIds.length === 0) {
+          throw new SlotReservationError("UNIT_REQUIRED", "Выберите конкретный ресурс для бронирования");
+        }
+        if (selectedUnitIds.some((id) => !candidate.unitIds.includes(id))) {
+          throw new SlotReservationError("SLOT_UNAVAILABLE", "Один из ресурсов уже занят");
+        }
+        // All reservation pathways (including manual blocks and party confirmation)
+        // lock BookingUnit before checking availability. Lock resources in a stable
+        // order to avoid multi-resource deadlocks across concurrent bookings.
+        for (const unitId of [...selectedUnitIds].sort()) {
+          const lockedUnits = await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT "id" FROM "BookingUnit" WHERE "id" = ${unitId} FOR UPDATE
+          `;
+          if (lockedUnits.length !== 1) {
+            throw new SlotReservationError("SLOT_UNAVAILABLE", "Ресурс больше не доступен");
+          }
+          // Expired HELD rows remain in the exclusion constraint until released.
+          await tx.$executeRaw`UPDATE "BookingAllocation"
+            SET "status" = 'EXPIRED', "updatedAt" = (now() AT TIME ZONE 'UTC')
+            WHERE "bookingUnitId" = ${unitId} AND "status" = 'HELD'
+              AND "expiresAt" < (now() AT TIME ZONE 'UTC')`;
+          const unit = initial.units.find((item) => item.id === unitId)!;
+          allocations.push({
+            unitId,
+            blockStart: new Date(input.startsAt.getTime() - unit.prepMinutes * MINUTE_MS),
+            blockEnd: new Date(input.endsAt.getTime() +
+              (unit.cleanupMinutes + initial.bufferMin) * MINUTE_MS),
+          });
+        }
       } else {
+        if (input.unitId !== undefined || requestedUnits !== undefined || pricing.optionUnitIds.length > 0) {
+          throw new SlotReservationError("INVALID_SLOT", "Для групповой записи ресурсы выбирать не нужно");
+        }
         const capacity = sessionCapacity(initial, input.startsAt);
         if (capacity == null || capacity < seats) throw new SlotReservationError("SLOT_UNAVAILABLE", "Нет свободных мест");
         const session = await tx.offerSession.upsert({
@@ -164,9 +279,14 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
         sessionId = session.id;
       }
 
+      // The row-lock wait may outlast the original preview or hold deadline.
+      const checkedAt = new Date();
+      if (holdUntil <= checkedAt) {
+        throw new SlotReservationError("SLOT_UNAVAILABLE", "Время удержания слота истекло");
+      }
       const current = await loadSlotSnapshot(query, tx);
-      const checked = current && availableSlot(current, input, now);
-      if (!checked || (unitId && !checked.unitIds.includes(unitId))) {
+      const checked = current && availableSlot(current, input, checkedAt);
+      if (!checked || selectedUnitIds.some((id) => !checked.unitIds.includes(id))) {
         throw new SlotReservationError("SLOT_UNAVAILABLE", "Слот только что заняли");
       }
       const booking = await tx.bookingRequest.create({
@@ -182,6 +302,10 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
           classTariffTitle: tariff ? ('title' in tariff ? tariff.title : tariff.label) : null,
           classTariffPrice: tariff?.price ?? null,
           classTariffUnit: tariff?.unit ?? null,
+          bookingPriceSnapshot: pricing.snapshot as unknown as Prisma.InputJsonValue,
+          bookingTotalByn: pricing.snapshot.totalByn,
+          slotIdempotencyKey: input.idempotencyKey ?? null,
+          slotRequestHash: intentHash,
           offerSessionId: sessionId,
           startsAt: input.startsAt,
           endsAt: input.endsAt,
@@ -201,7 +325,9 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       await tx.bookingActivity.create({
         data: { bookingId: booking.id, type: "CREATED", actorType: "SYSTEM", payload: Prisma.JsonNull, createdAt: now },
       });
-      if (unitId && blockStart && blockEnd) {
+      // The request and EVERY required resource hold commit atomically.
+      // A conflict on any later allocation rolls back all previous holds.
+      for (const { unitId, blockStart, blockEnd } of allocations) {
         await tx.bookingAllocation.create({
           data: {
             bookingUnitId: unitId,
@@ -213,7 +339,7 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
           },
         });
       }
-      return { bookingId: booking.id, holdUntil };
+      return { bookingId: booking.id, holdUntil, replayed: false, status: BookingStatus.NEW };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 30_000 });
   } catch (error) {
     if (isExclusionViolation(error)) {

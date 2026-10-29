@@ -8,7 +8,7 @@ import type { ArticleLinkedItemKind, ArticlePublicationType, Prisma } from "@pri
 export const JOURNAL_PUBLICATION_TYPES = ["ARTICLE", "COLLECTION", "BREAKING_NEWS"] as const satisfies readonly ArticlePublicationType[];
 
 /** Срок актуальности новости по умолчанию. */
-export const BREAKING_NEWS_DEFAULT_TTL_DAYS = 7;
+export const BREAKING_NEWS_DEFAULT_TTL_DAYS = 14;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Минимум элементов в подборке. */
@@ -25,7 +25,7 @@ export function defaultBreakingNewsExpiresAt(publishedAt: Date): Date {
 
 /**
  * Итоговый expiresAt при сохранении: для новости с датой публикации обязателен
- * (если не задан — publishedAt + 7 дней). Черновик новости без даты публикации
+ * (если не задан — publishedAt + 14 дней). Черновик новости без даты публикации
  * может оставаться без срока — он проставится при публикации
  * ({@link resolveBreakingNewsExpiresAtOnPublish}). Для остальных типов — как есть.
  */

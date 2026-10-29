@@ -7,9 +7,14 @@ import {
 import {
   type CaptureModelConfig,
   type OpenRouterClient,
-  type OpenRouterErrorCode,
   type OpenRouterResponseFormat,
 } from "@/lib/ai/openrouterClient";
+import {
+  createExtractionCall,
+  createTelegramFileImageSource,
+  imageToDataUrl,
+  type ExtractionUsage,
+} from "@/server/ai/extraction";
 import { CAPTURE_LIMITS } from "./captureLimits";
 import { loadCaptureContext, type CaptureContextDeps } from "./captureContext";
 import { buildCaptureUserParts, CAPTURE_SYSTEM_PROMPT } from "./capturePrompt";
@@ -63,25 +68,7 @@ export type CaptureRunResult =
     }
   | { ok: false; code: CaptureFailureCode; escalated: boolean; model: string | null; tokensIn: number | null; tokensOut: number | null };
 
-type Usage = { tokensIn: number | null; tokensOut: number | null; model: string | null };
-
-type Attempt =
-  | { kind: "parsed"; draft: CaptureDraft }
-  | { kind: "invalid" }
-  | { kind: "infra"; code: OpenRouterErrorCode; notConfigured: boolean; retryable: boolean };
-
-function addUsage(total: Usage, tokensIn: number | null, tokensOut: number | null, model: string): void {
-  if (tokensIn !== null) total.tokensIn = (total.tokensIn ?? 0) + tokensIn;
-  if (tokensOut !== null) total.tokensOut = (total.tokensOut ?? 0) + tokensOut;
-  total.model = model;
-}
-
-function imageMime(filePath: string): string {
-  const lower = filePath.toLowerCase();
-  if (lower.endsWith(".png")) return "image/png";
-  if (lower.endsWith(".webp")) return "image/webp";
-  return "image/jpeg";
-}
+type Usage = ExtractionUsage;
 
 function sourceText(parts: Pick<InboxItemPart, "text">[]): string {
   return parts
@@ -94,15 +81,15 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
   const { db } = deps;
   const now = deps.now ?? (() => new Date());
 
+  const imageSource = createTelegramFileImageSource(deps.telegram, { maxBytes: CAPTURE_LIMITS.maxPhotoBytes });
+
   async function loadImages(parts: InboxItemPart[]): Promise<string[] | null> {
     const urls: string[] = [];
     for (const part of parts) {
       if (part.kind !== "PHOTO" || !part.telegramFileId) continue;
-      const file = await deps.telegram.getFile(part.telegramFileId);
-      if (!file.ok) return null;
-      const bytes = await deps.telegram.downloadFile(file.value.filePath, { maxBytes: CAPTURE_LIMITS.maxPhotoBytes });
-      if (!bytes.ok) return null;
-      urls.push(`data:${imageMime(file.value.filePath)};base64,${Buffer.from(bytes.value).toString("base64")}`);
+      const image = await imageSource.load(part.telegramFileId);
+      if (!image.ok) return null;
+      urls.push(imageToDataUrl(image.value));
     }
     return urls;
   }
@@ -139,64 +126,30 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
         ? { type: "json_schema", name: "capture_draft", schema: captureDraftJsonSchema() }
         : { type: "json_object" };
 
-    const attempt = async (model: string): Promise<Attempt> => {
-      const response = await deps.openrouter.chat({
-        model,
-        systemPrompt: CAPTURE_SYSTEM_PROMPT,
-        userParts,
-        responseFormat,
-      });
-      if (!response.ok) {
-        // A non-retryable failure (not configured, auth/4xx) is final; retryable ones are retried once.
-        return {
-          kind: "infra",
-          code: response.code,
-          notConfigured: response.code === "OPENROUTER_NOT_CONFIGURED",
-          retryable: response.retryable,
-        };
-      }
-      addUsage(usage, response.tokensIn, response.tokensOut, response.model);
-      const parsed = parseCaptureDraft(response.content);
-      return parsed.ok ? { kind: "parsed", draft: parsed.draft } : { kind: "invalid" };
-    };
+    const call = createExtractionCall<CaptureDraft>({
+      openrouter: deps.openrouter,
+      systemPrompt: CAPTURE_SYSTEM_PROMPT,
+      userParts,
+      responseFormat,
+      parse: (content) => {
+        const parsed = parseCaptureDraft(content);
+        return parsed.ok ? { ok: true, value: parsed.draft } : { ok: false };
+      },
+      usage,
+    });
 
-    // Normal model, one retry.
-    let first = await attempt(models.fast);
-    if (first.kind === "infra" && first.notConfigured) return fail("CAPTURE_MODEL_NOT_CONFIGURED");
-    if (first.kind === "invalid" || (first.kind === "infra" && first.retryable)) first = await attempt(models.fast);
+    // Fast model, one retry, then the strong model once (escalation 1 / bad response).
+    const outcome = await call.runWithRetry({ fast: models.fast, strong: models.strong });
     const escalationCodes: string[] = [];
-    let current: CaptureDraft | null = null;
-
-    if (first.kind === "infra") {
-      if (first.notConfigured) return fail("CAPTURE_MODEL_NOT_CONFIGURED");
-      // A structurally bad provider response is model-specific rather than a
-      // transport outage. After the fast-model retry is exhausted, give the
-      // configured strong model one chance before failing the item.
-      if (first.code === "OPENROUTER_BAD_RESPONSE" && models.strong) {
-        escalated = true;
-        escalationCodes.push(RULE_CODES.escalateBadResponse);
-        const strong = await attempt(models.strong);
-        if (strong.kind === "infra") return fail("OPENROUTER_FAILED");
-        if (strong.kind === "invalid") return fail("INVALID_MODEL_OUTPUT");
-        current = strong.draft;
-      } else {
-        return fail("OPENROUTER_FAILED");
-      }
-    } else if (first.kind === "invalid") {
-
-      // Escalation 1: invalid JSON / schema after the retry. Strong model, once.
-      if (!models.strong) return fail("INVALID_MODEL_OUTPUT");
-      escalated = true;
-      escalationCodes.push(RULE_CODES.escalateInvalidJson);
-      const strong = await attempt(models.strong);
-      if (strong.kind === "infra") return fail("OPENROUTER_FAILED");
-      if (strong.kind === "invalid") return fail("INVALID_MODEL_OUTPUT");
-      current = strong.draft;
-    } else if (first.kind === "parsed") {
-      current = first.draft;
+    if (outcome.escalation === "BAD_RESPONSE") escalationCodes.push(RULE_CODES.escalateBadResponse);
+    if (outcome.escalation === "INVALID_JSON") escalationCodes.push(RULE_CODES.escalateInvalidJson);
+    if (!outcome.ok) {
+      escalated = outcome.escalated;
+      if (outcome.reason === "NOT_CONFIGURED") return fail("CAPTURE_MODEL_NOT_CONFIGURED");
+      return fail(outcome.reason === "INFRA" ? "OPENROUTER_FAILED" : "INVALID_MODEL_OUTPUT");
     }
-
-    if (!current) return fail("PROCESSOR_ERROR");
+    escalated = outcome.escalation !== null;
+    const current: CaptureDraft = outcome.value;
     let rules: RuleResult = applyPostLlmRules(current, context);
 
     // Escalations 2 and 3, only if the strong model has not been used yet.
@@ -205,9 +158,9 @@ export function createCaptureInboxProcessor(deps: CaptureProcessorDeps): InboxPr
       if (reason) {
         escalated = true;
         escalationCodes.push(reason === "ESCALATE_EVENT_DATE" ? RULE_CODES.escalateEventDate : RULE_CODES.escalateMatch);
-        const strong = await attempt(models.strong);
+        const strong = await call.attempt(models.strong);
         // If the strong call fails, the already valid first result stands.
-        if (strong.kind === "parsed") rules = applyPostLlmRules(strong.draft, context);
+        if (strong.kind === "parsed") rules = applyPostLlmRules(strong.value, context);
       }
     }
 

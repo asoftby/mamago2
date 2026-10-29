@@ -120,8 +120,15 @@ jobs:
           pnpm exec tsx src/server/services/booking/pendingCampContacts.test.ts
           pnpm exec tsx src/lib/offers/offerClassSchedule.test.ts
           pnpm exec tsx src/server/services/booking/allocationTransition.test.ts
+          pnpm exec tsx src/server/services/booking/bookingHold.test.ts
+          pnpm exec tsx src/server/offers/bookingPrice.test.ts
+          pnpm test:wishlist
+          pnpm exec tsx src/server/offers/bookingDuration.test.ts
+          pnpm exec tsx src/server/offers/slotIdempotency.test.ts
+          pnpm exec tsx src/server/offers/bookingServices.contract.test.ts
           pnpm exec tsx src/server/offers/slotAvailability.test.ts
           pnpm exec tsx src/server/offers/getSlots.businessIsolation.test.ts
+          pnpm exec tsx src/server/offers/reserveSlot.resourceLock.contract.test.ts
 
       - name: GSC DEV credential staging regressions
         run: python3 scripts/deploy/stage-gsc-dev.test.py
@@ -134,7 +141,7 @@ jobs:
 
       - name: Type check
         # GitHub ubuntu runners abort TypeScript at Node's default heap ceiling.
-        run: NODE_OPTIONS=--max-old-space-size=5120 pnpm tsc --noEmit
+        run: NODE_OPTIONS=--max-old-space-size=6144 pnpm tsc --noEmit
 
       - name: Feedback model and multi-source reputation regressions
         run: pnpm test:feedback-foundation
@@ -178,6 +185,7 @@ jobs:
           pnpm exec tsx src/server/article/publicArticleListCacheWiring.test.ts
           pnpm exec tsx src/lib/city/scopedEventBrowsing.test.ts
           pnpm exec tsx src/server/discovery/crossRegionFamilySignal.contract.test.ts
+          pnpm exec tsx src/server/discovery/crossRegionThreshold.test.ts
           pnpm exec tsx src/server/discovery/discoveryPerf.test.ts
           pnpm exec tsx src/lib/discovery/partitionDiscoveryFeed.agePolicy.test.ts
           pnpm exec tsx src/server/discovery/classesDiscoveryFeed.agePolicy.test.ts
@@ -356,3 +364,14 @@ jobs:
         run: pnpm test:seo-http
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+
+      - name: Cross-region eligibility PostgreSQL behavior
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/server/discovery/crossRegionFamilySignal.integration.test.ts
+          pnpm exec tsx src/lib/discovery/promotionComposition.test.ts
+          pnpm exec tsx src/server/geo/boostRegionTargeting.test.ts
+          pnpm exec tsx src/server/discovery/kudaListingHydration.test.ts
+

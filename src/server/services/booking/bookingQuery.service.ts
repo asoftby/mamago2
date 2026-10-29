@@ -5,6 +5,7 @@
 
 import prisma from "@/lib/prisma";
 import { allocationTransition } from "./allocationTransition";
+import { assertActiveBookingHold, BookingHoldExpiredError } from "./bookingHold";
 import { logAdminAudit } from "@/server/services/adminAuditLog.service";
 import { BookingKind, BookingStatus, Prisma } from "@prisma/client";
 import { buildBookingDisplay } from "./booking.formatters";
@@ -61,6 +62,8 @@ export interface BusinessBookingItem {
   classTariffTitle: string | null;
   classTariffPrice: string | null;
   classTariffUnit: string | null;
+  bookingPriceSnapshot: Prisma.JsonValue | null;
+  bookingTotalByn: string | null;
   campShiftId: string | null;
   campShiftTitle: string | null;
   campShiftDateFrom: string | null;
@@ -146,6 +149,8 @@ const BOOKING_SELECT = {
   classTariffTitle: true,
   classTariffPrice: true,
   classTariffUnit: true,
+  bookingPriceSnapshot: true,
+  bookingTotalByn: true,
   campShiftId: true,
   campShiftTitle: true,
   campShiftDateFrom: true,
@@ -220,6 +225,8 @@ function mapBooking(raw: {
   classTariffTitle: string | null;
   classTariffPrice: string | null;
   classTariffUnit: string | null;
+  bookingPriceSnapshot: Prisma.JsonValue | null;
+  bookingTotalByn: Prisma.Decimal | null;
   campShiftId: string | null;
   campShiftTitle: string | null;
   campShiftDateFrom: Date | null;
@@ -290,6 +297,8 @@ function mapBooking(raw: {
     classTariffTitle: raw.classTariffTitle,
     classTariffPrice: raw.classTariffPrice,
     classTariffUnit: raw.classTariffUnit,
+    bookingPriceSnapshot: raw.bookingPriceSnapshot,
+    bookingTotalByn: raw.bookingTotalByn?.toString() ?? null,
     campShiftId: raw.campShiftId,
     campShiftTitle: raw.campShiftTitle,
     campShiftDateFrom,
@@ -538,7 +547,7 @@ export async function updateBookingStatus(
     await tx.$queryRaw`SELECT "id" FROM "BookingRequest" WHERE "id" = ${bookingId} FOR UPDATE`;
     const current = await tx.bookingRequest.findUnique({
       where: { id: bookingId },
-      select: { status: true, businessId: true, kind: true },
+      select: { status: true, businessId: true, kind: true, holdUntil: true },
     });
     if (!current || current.businessId !== businessId) throw new BookingOwnershipError();
     if (current.kind !== BookingKind.STANDARD ||
@@ -546,11 +555,16 @@ export async function updateBookingStatus(
       throw new BookingStatusTransitionError(current.status, newStatus);
     }
 
+    // Evaluate after acquiring the request row lock: a wait on a competing
+    // status update must not allow confirmation using a stale pre-lock clock.
+    const checkedAt = new Date();
+    assertActiveBookingHold(newStatus, current.holdUntil, checkedAt);
+
     const allocations = await tx.bookingAllocation.findMany({
       where: { bookingRequestId: bookingId },
       select: { id: true, status: true, expiresAt: true },
     });
-    const allocationTarget = allocationTransition(newStatus, allocations, now);
+    const allocationTarget = allocationTransition(newStatus, allocations, checkedAt);
     if (allocationTarget === "CONFIRMED") {
       await tx.bookingAllocation.updateMany({
         where: { bookingRequestId: bookingId, status: "HELD" },
@@ -564,10 +578,18 @@ export async function updateBookingStatus(
     }
 
     const result = await tx.bookingRequest.updateMany({
-      where: { id: bookingId, status: current.status },
+      where: {
+        id: bookingId, status: current.status,
+        ...(newStatus === BookingStatus.CONFIRMED && current.holdUntil
+          ? { holdUntil: { gt: checkedAt } } : {}),
+      },
       data: { status: newStatus, ...derivedData },
     });
     if (result.count !== 1) {
+      // Only NEW -> CONFIRMED can be guarded by holdUntil here.
+      if (newStatus === BookingStatus.CONFIRMED && current.holdUntil) {
+        throw new BookingHoldExpiredError();
+      }
       throw new BookingStatusTransitionError(current.status, newStatus);
     }
     return tx.bookingRequest.findUniqueOrThrow({

@@ -55,6 +55,10 @@ jobs:
         run: pnpm exec prisma migrate deploy
       - name: Run concurrent reservation integration tests
         run: pnpm exec tsx src/server/offers/reserveSlot.integration.test.ts
+      - name: Atomic multi-resource holds and concurrent bundle reservations
+        env:
+          NODE_OPTIONS: "--conditions=react-server"
+        run: pnpm exec tsx src/server/offers/reserveSlot.multiResource.integration.test.ts
       - name: Class group schedule, tariffs and independent capacity integration
         env:
           NODE_OPTIONS: "--conditions=react-server"
@@ -63,3 +67,7 @@ jobs:
         env:
           RUN_BOOKING_LOCK_DB_TEST: "1"
         run: pnpm exec tsx src/server/services/booking/bookingStatusLock.db.test.ts
+      - name: Booking hold expiry and cancellation allocation integrity
+        env:
+          NODE_OPTIONS: "--conditions=react-server"
+        run: pnpm exec tsx src/server/services/booking/bookingLifecycle.postgres.integration.test.ts

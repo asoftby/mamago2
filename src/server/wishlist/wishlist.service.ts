@@ -391,7 +391,15 @@ export async function updateWishlistItem(
     if (breaking && !input.confirmReserved) {
       throw reservedConflict(breaking, active, wishlist.hideReservationsFromOwner);
     }
-    if (breaking === "quantity_below_taken" && input.quantity !== undefined) {
+    if (breaking === "url_changed") {
+      // A changed product link represents a different gift. Invalidate every
+      // existing commitment before writing the replacement URL and quantity.
+      // This is in the same row-locked transaction, so no stale reservation survives.
+      await tx.wishlistReservation.updateMany({
+        where: { id: { in: active.map((r) => r.id) } },
+        data: { status: "ITEM_REMOVED" },
+      });
+    } else if (breaking === "quantity_below_taken" && input.quantity !== undefined) {
       // Keep the earliest reservations; the newest ones lose the item.
       let kept = 0;
       const dropped: string[] = [];

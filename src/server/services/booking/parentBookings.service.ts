@@ -6,7 +6,7 @@
  */
 
 import prisma from "@/lib/prisma";
-import { BookingStatus } from "@prisma/client";
+import { BookingStatus, Prisma } from "@prisma/client";
 import { buildBookingDisplay } from "./booking.formatters";
 import type { BookingDisplay } from "./booking.types";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
@@ -51,6 +51,14 @@ export interface ParentBookingItem {
   campShiftTitle: string | null;
   campShiftDateFrom: string | null;
   campShiftDateTo: string | null;
+
+  // Price chosen at reservation time; never recompute old bookings from today's offer.
+  bookingPrice: {
+    status: "FIXED" | "QUOTE_REQUIRED";
+    currency: "BYN";
+    totalByn: string | null;
+    options: Array<{ title: string; amountByn: string }>;
+  } | null;
 
   // Child info
   childName: string | null;
@@ -174,6 +182,8 @@ const PARENT_BOOKING_SELECT = {
   campShiftTitle: true,
   campShiftDateFrom: true,
   campShiftDateTo: true,
+  bookingPriceSnapshot: true,
+  bookingTotalByn: true,
 
   childName: true,
   childAge: true,
@@ -185,6 +195,25 @@ const PARENT_BOOKING_SELECT = {
   business: { select: { name: true, phone: true } },
   feedback: { select: { rating: true } },
 } as const;
+
+/** Exclude resource IDs and internal booking metadata from the parent's price view. */
+function toParentPrice(snapshot: Prisma.JsonValue | null, totalByn: Prisma.Decimal | null):
+  ParentBookingItem["bookingPrice"] {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) return null;
+  const data = snapshot as Record<string, unknown>;
+  if (data.status !== "FIXED" && data.status !== "QUOTE_REQUIRED") return null;
+  const extras = Array.isArray(data.options) ? data.options : [];
+  return {
+    status: data.status, currency: "BYN",
+    totalByn: totalByn?.toString() ?? null,
+    options: extras.flatMap((value): Array<{ title: string; amountByn: string }> => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+      const opt = value as Record<string, unknown>;
+      return typeof opt.title === "string" && typeof opt.amountByn === "string"
+        ? [{ title: opt.title, amountByn: opt.amountByn }] : [];
+    }),
+  };
+}
 
 function mapRow(raw: {
   id: string;
@@ -273,6 +302,8 @@ function mapRow(raw: {
   campShiftTitle: string | null;
   campShiftDateFrom: Date | null;
   campShiftDateTo: Date | null;
+  bookingPriceSnapshot: Prisma.JsonValue | null;
+  bookingTotalByn: Prisma.Decimal | null;
   childName: string | null;
   childAge: number | null;
   requestedDate: Date | null;
@@ -446,6 +477,7 @@ function mapRow(raw: {
     campShiftTitle: raw.campShiftTitle,
     campShiftDateFrom,
     campShiftDateTo,
+    bookingPrice: toParentPrice(raw.bookingPriceSnapshot, raw.bookingTotalByn),
     childName: raw.childName,
     childAge: raw.childAge,
     requestedDate,

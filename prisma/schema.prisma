@@ -151,9 +151,9 @@ model User {
   directComplaintsReviewed          DirectComplaint[]                @relation("DirectComplaintReviewer")
   directRiskSignalsAsCustomer       DirectRiskSignal[]               @relation("DirectRiskSignalCustomer")
   directPlatformSettingsUpdated     DirectPlatformSettings[]         @relation("DirectPlatformSettingsUpdatedBy")
-  wishlistsOwned                    Wishlist[]                       @relation("WishlistOwner")
-  wishlistReservations              WishlistReservation[]
 
+  wishlistsOwned Wishlist[] @relation("WishlistOwner")
+  wishlistReservations WishlistReservation[]
   @@index([email])
   @@index([resetToken])
   @@index([emailVerificationToken])
@@ -409,8 +409,8 @@ model Family {
   invites     FamilyInvite[]
   consents    ConsentRecord[]
   partyOrders PartyOrder[]
-  wishlists   Wishlist[]
 
+  wishlists Wishlist[]
   @@index([homeCityId])
 }
 
@@ -498,8 +498,8 @@ model Child {
   customInterests ChildCustomInterest[]
   systemInterests ChildInterest[]
   planItems       PlanItem[]
-  wishlists       Wishlist[]
 
+  wishlists Wishlist[]
   @@unique([id, familyId])
   @@index([parentId])
   @@index([familyId])
@@ -2721,7 +2721,6 @@ model Offer {
   partyOrderItems PartyOrderItem[]
   bookingUnitOffers BookingUnitOffer[]
   offerPlanItems  PlanItem[]
-  wishlistItems   WishlistItem[]
   offerIdeas      OfferIdea[]
   archivedBy      User?              @relation("OfferArchiver", fields: [archivedByUserId], references: [id])
   openingHours    OpeningHours?      @relation(fields: [openingHoursId], references: [id])
@@ -2736,6 +2735,7 @@ model Offer {
   referencedBy    PackageComponent[] @relation("ReferencedBy")
   directThreads   DirectThread[]
 
+  wishlistItems WishlistItem[]
   @@unique([cityId, slug])
   @@index([placeId])
   @@index([status])
@@ -2875,9 +2875,45 @@ model OfferBooking {
   horizonDays Int @default(60)
   externalKind ExternalLinkKind?
   externalUrl String?
+  /// Optional base price for fixed-price reservation offers; class tariffs remain authoritative for classes.
+  basePriceByn Decimal? @db.Decimal(10, 2)
+  /// Optimistic editor revision, independent of content moderation and main wizard snapshot.
+  pricingRevision Int @default(0)
+  /// Additional full hours past durationMin; zero preserves fixed-duration offers.
+  maxExtensionHours Int @default(0)
+  /// Price per additional full hour in BYN; NULL disables paid extensions.
+  extensionHourPriceByn Decimal? @db.Decimal(10, 2)
+  /// Percentage reduction applied only to additional hours, not the base fee.
+  extensionDiscountPercent Int @default(0)
   offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  options OfferBookingOption[]
   rules OfferScheduleRule[]
   exceptions OfferScheduleException[]
+}
+
+/// Included options are always selected; OPTIONAL is selectable only with a main booking.
+/// STANDALONE identifies catalogue items sold through their own Offer; it cannot
+/// be purchased as an extra through the main booking reservation endpoint.
+enum OfferBookingOptionMode {
+  INCLUDED
+  OPTIONAL
+  STANDALONE
+}
+
+model OfferBookingOption {
+  id String @id @default(cuid())
+  offerBookingId String
+  offerBooking OfferBooking @relation(fields: [offerBookingId], references: [id], onDelete: Cascade)
+  title String
+  mode OfferBookingOptionMode @default(OPTIONAL)
+  priceByn Decimal @default(0) @db.Decimal(10, 2)
+  /// One extra exclusive unit required when this option is selected (nullable for non-resource extras).
+  bookingUnitId String?
+  bookingUnit BookingUnit? @relation(fields: [bookingUnitId], references: [id], onDelete: Restrict)
+  active Boolean @default(true)
+  position Int @default(0)
+  @@index([offerBookingId, active, position])
+  @@index([bookingUnitId])
 }
 
 /// Group sessions have no BookingUnit; resource windows remain in AvailabilityRule.
@@ -6036,6 +6072,7 @@ model BookingUnit {
   exceptions AvailabilityException[]
   blocks CalendarBlock[]
   allocations BookingAllocation[]
+  bookingOptions OfferBookingOption[]
   quotes PartyQuote[]
 
   @@index([businessId, status])
@@ -6160,6 +6197,14 @@ model BookingRequest {
   classTariffTitle String?
   classTariffPrice String?
   classTariffUnit String?
+  /// Immutable server-calculated components and quote status at the moment of reservation.
+  bookingPriceSnapshot Json?
+  /// Only set for a fully priced BYN booking. NULL = price on request, not zero.
+  bookingTotalByn Decimal? @db.Decimal(10, 2)
+  /// Optional per-offer idempotency key for public slot reservations.
+  slotIdempotencyKey String?
+  /// Canonical SHA-256 intent fingerprint; no raw customer identifiers are stored here.
+  slotRequestHash String?
   campShiftId       String?
   /// Название смены (snapshot)
   campShiftTitle    String?
@@ -6234,6 +6279,7 @@ model BookingRequest {
   @@index([userId])
   @@index([activityId])
   @@index([offerId])
+  @@unique([offerId, slotIdempotencyKey])
   @@index([placeId])
   @@index([selectedSessionId])
   @@index([offerSessionId, status, holdUntil])
