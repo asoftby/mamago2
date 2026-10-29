@@ -44,3 +44,14 @@ test("pricing mutations require owner, CAS revision and linked business inventor
   assert.match(command, /bookingUnit: \{ businessId, type: "EXCLUSIVE", status: "ACTIVE" \}/);
   assert.match(command, /current\.place|offer\.place\?\.ownerBusinessId !== businessId/);
 });
+
+test("resource extras follow the canonical ON_REQUEST_WINDOWS booking schedule", () => {
+  const service = source("src/server/offers/bookingServices.service.ts");
+  assert.match(service, /scheduleKind !== "ON_REQUEST_WINDOWS"/);
+  const editorApi = source("src/app/api/business/offers/[id]/booking-services/route.ts");
+  assert.match(editorApi, /scheduleKind === "ON_REQUEST_WINDOWS"/);
+  const catalog = source("src/app/api/public/offers/[id]/price-quote/route.ts");
+  assert.match(catalog, /scheduleKind !== "ON_REQUEST_WINDOWS"/);
+  const schedule = source("src/server/offers/offerSchedule.service.ts");
+  assert.match(schedule, /Перед изменением расписания отключите допуслуги/);
+});
