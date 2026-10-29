@@ -55,8 +55,8 @@ assert.ok(!endpoint.includes("unitId"), "never expose resource identifiers");
 const ui = readFileSync("src/features/birthday/builder/components/steps/StepReview.tsx", "utf8");
 for (const token of [
   "/api/public/birthday/availability?", 'cache: "no-store"',
-  'controller.abort()', 'aria-label="Предварительно свободные интервалы"',
+  'controller.abort()', 'Возможное время праздника',
   'onClick={() => { setTimeFrom(slot.start); setTimeTo(slot.end); }}',
-  "Время не резервируется до подтверждения заказа.",
+  "Это предварительная доступность, не бронь.",
 ]) assert.ok(ui.includes(token), "Missing preview UI safety/wiring: " + token);
 console.log("partyPublicSlots.test.ts: OK");
