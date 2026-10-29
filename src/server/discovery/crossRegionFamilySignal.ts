@@ -7,11 +7,17 @@ export const CROSS_REGION_FAMILY_THRESHOLD = 50;
 
 async function readQualifiedActivityIds(hubCityId: string, homeCityIds: string[]): Promise<string[]> {
   if (homeCityIds.length === 0) return [];
-  const overrides = await prisma.crossRegionEditorialOverride.findMany({
-    where: { region: { cities: { some: { id: hubCityId } } }, expiresAt: { gt: new Date() } },
+  const city = await prisma.city.findUnique({ where: { id: hubCityId }, select: { regionId: true, countryId: true, slug: true } });
+  let discoveryRegionId = city?.regionId ?? null;
+  if (city?.slug === "minsk") {
+    const minskOblast = await prisma.region.findFirst({ where: { countryId: city.countryId, slug: "minskaya-oblast", isActive: true }, select: { id: true } });
+    discoveryRegionId = minskOblast?.id ?? discoveryRegionId;
+  }
+  const overrides = discoveryRegionId ? await prisma.crossRegionEditorialOverride.findMany({
+    where: { regionId: discoveryRegionId, expiresAt: { gt: new Date() } },
     select: { activityId: true },
     take: 300,
-  });
+  }) : [];
   const rows = await prisma.$queryRaw<Array<{ activityId: string }>>(Prisma.sql`
     SELECT pi."activityId" AS "activityId"
     FROM "PlanItem" pi
