@@ -1151,8 +1151,6 @@ model Region {
   type      RegionType @default(REGION)
   isActive  Boolean    @default(false)
   priority  Int        @default(0)
-  /// Optional per-region eligibility threshold; null means the product default (50).
-  crossRegionFamilyThreshold Int?
   crossRegionOverrides CrossRegionEditorialOverride[]
   cities    City[]
   articles  Article[]  @relation("ArticleRegion")
