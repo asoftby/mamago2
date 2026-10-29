@@ -41,6 +41,7 @@ export type SlotSnapshot = {
   leadTimeHours: number;
   horizonDays: number;
   durationMin: number | null;
+  hasClassGroups?: boolean;
   maxExtensionHours?: number;
   extensionHourPriceByn?: string | null;
   extensionDiscountPercent?: number;
@@ -290,7 +291,7 @@ export function calculateSlots(
         maxExtensionHours: snapshot.maxExtensionHours ?? 0,
         extensionHourPriceByn: snapshot.extensionHourPriceByn ?? null,
         extensionDiscountPercent: snapshot.extensionDiscountPercent ?? 0,
-        hasClassGroups: false,
+        hasClassGroups: snapshot.hasClassGroups ?? false,
       }).includes(input.requestedDurationMinutes)) return [];
   if (snapshot.horizonDays < 1 || snapshot.horizonDays > 366) throw new RangeError("Invalid horizonDays");
   const lower = maxDate(input.from, new Date(now.getTime() + snapshot.leadTimeHours * 60 * MINUTE_MS));
