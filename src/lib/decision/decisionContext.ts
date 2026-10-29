@@ -69,6 +69,8 @@ export const SubjectSchema = z.object({
 export type Subject = z.infer<typeof SubjectSchema>;
 
 export const DECISION_INTENTS = [
+  "discovery_kuda",
+  "discovery_classes",
   "my_plan_suggestions",
   "guest_plan_generate",
   "related_event_suggestions",

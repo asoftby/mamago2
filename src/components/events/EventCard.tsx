@@ -15,6 +15,7 @@ import { resolvePosterFrame } from "@/lib/media/posterFrame";
 export type EventCardProps = {
   id: string;
   title: string;
+  isPromoted?: boolean;
   href: string;
   imageUrl?: string | null;
   /** Keep genuinely above-the-fold covers eager and high priority. */

@@ -42,6 +42,11 @@ export interface ActivityMock {
   badge?: string;
   geoBadge?: string;
   ageHintBadge?: string;
+  isPromoted?: boolean;
+  crossRegionReason?: "PAID_BOOST" | "FAMILY_SIGNAL" | "EDITORIAL_OVERRIDE";
+  crossRegionFamilyCount?: number;
+  crossRegionOverrideId?: string;
+  exposureId?: string;
   engagementScore?: number;
   rating?: number;
   reviewsCount?: number;

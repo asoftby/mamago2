@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import { composePromotedCards } from "./promotionComposition";
+const paid = Array.from({ length: 8 }, (_, i) => ({ id: `paid${i}`, isPromoted: true }));
+const organic = Array.from({ length: 24 }, (_, i) => ({ id: `organic${i}`, isPromoted: false }));
+const result = composePromotedCards([...paid, ...organic]);
+assert.equal(result.length, 32);
+assert.equal(new Set(result.map(row => row.id)).size, 32);
+for (let n = 1; n <= 32; n++) assert.ok(result.slice(0, n).filter(row => row.isPromoted).length <= Math.floor(n / 4));
+assert.deepEqual(result.filter(row => row.isPromoted), paid);
+assert.deepEqual(result.filter(row => !row.isPromoted), organic);
+assert.deepEqual(composePromotedCards(paid), paid, "scarcity does not fabricate inventory");
+assert.deepEqual(composePromotedCards([...paid, ...organic], row => row.isPromoted ? "tomorrow" : "next-month"), [...paid, ...organic], "never substitute worse temporal relevance");
+console.log("promotion composition: OK");

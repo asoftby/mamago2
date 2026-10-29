@@ -7,8 +7,8 @@ import { activityInAnyOfCitiesWhere, activityInExactCitiesWhere } from "@/server
 import { activityInTerritoryScopeWhere, activityInExactTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
 import { resolveTerritoryBySlug } from "@/server/territory/resolveTerritory";
 import { resolveTerritoryCityIds } from "@/server/territory/resolveTerritoryCityIds";
-import { getCrossRegionPopularActivityIds } from "@/server/discovery/crossRegionFamilySignal";
-import { ALL_BELARUS_REGIONS, getDiscoveryRegionContext } from "@/server/geo/boostRegionTargeting";
+import { readCrossRegionEligibility } from "@/server/discovery/crossRegionFamilySignal";
+import { ALL_BELARUS_REGIONS, getDiscoveryRegionContext, isBoostForDiscoveryRegion } from "@/server/geo/boostRegionTargeting";
 import { createDiscoveryPerf } from "@/server/discovery/discoveryPerf";
 import type { ActivityMock } from "@/types/activity";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
@@ -21,6 +21,8 @@ import {
 import type { TimeOfDay } from "@/features/hero-weather/model/types";
 import { mapDiscoveryEventToActivityMock } from "@/server/discovery/mapDiscoveryEventToActivityMock";
 import { buildEventRuntimeWhere, type EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
+import { composePromotedCards } from "@/lib/discovery/promotionComposition";
+import { recordDiscoveryExposures } from "@/server/services/recommendations/RecommendationTraceService";
 import { withImageDimensions } from "@/server/media/loadImageDimensionsByUrl";
 
 function hasActiveEventRuntimeFilters(filters: EventRuntimeFilters): boolean {
@@ -48,8 +50,8 @@ export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, 
     ? await resolveTerritoryCityIds(explicitTerritory)
     : scope ? await resolveTerritoryCityIds({ id: scope.territoryId, type: scope.type }) : [cityId];
   const strictGeo = Boolean(explicitTerritory);
-  const [crossRegionPopularIds, targetRegionId] = await Promise.all([
-    options.nearby || strictGeo ? Promise.resolve([] as string[]) : getCrossRegionPopularActivityIds(primaryCityId, expandedCityIds),
+  const [eligibility, targetRegionId] = await Promise.all([
+    options.nearby || strictGeo ? Promise.resolve([]) : readCrossRegionEligibility(primaryCityId, expandedCityIds),
     options.nearby || strictGeo ? Promise.resolve(null) : getDiscoveryRegionContext(cityId, citySlug),
   ]);
   const pub = getPublicListingActivityWhere(now);
@@ -82,7 +84,7 @@ export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, 
     scope
       ? strictGeo ? activityInExactTerritoryScopeWhere(scope.territoryIds) : activityInTerritoryScopeWhere(scope.territoryIds)
       : strictGeo ? activityInExactCitiesWhere(expandedCityIds) : activityInAnyOfCitiesWhere(expandedCityIds),
-    ...(crossRegionPopularIds.length > 0 ? [{ id: { in: crossRegionPopularIds } }] : []),
+    ...(eligibility.length > 0 ? [{ id: { in: eligibility.map(row => row.activityId) } }] : []),
     ...(targetRegionId ? [{ boosts: { some: {
       isFreeDaily: false, purchaseRequestKey: { not: null },
       startAt: { lte: now }, endAt: { gt: now },
@@ -92,7 +94,7 @@ export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, 
       ],
     } } } satisfies Prisma.ActivityWhereInput] : []),
   ] }, ...buildEventRuntimeWhere(options.eventFilters), ...defaultWindow, ...pubParts] };
-  return { where, primaryCityId };
+  return { where, primaryCityId, eligibility, expandedCityIds, targetRegionId };
 }
 
 /**
@@ -143,7 +145,7 @@ export async function getKudaDiscoveryFeed(
       };
   // Candidate selection is a function of explicit discovery choices only.
   // The authenticated user ID is intentionally absent from this query.
-  const { where, primaryCityId } = await buildKudaDiscoveryWhere(cityId, citySlug, { format: options?.format ?? null, nearby: options?.nearby, eventFilters: runtimeFilters, explicitTerritorySlug: options?.explicitTerritorySlug });
+  const { where, primaryCityId, eligibility, expandedCityIds, targetRegionId } = await buildKudaDiscoveryWhere(cityId, citySlug, { format: options?.format ?? null, nearby: options?.nearby, eventFilters: runtimeFilters, explicitTerritorySlug: options?.explicitTerritorySlug });
   perf.mark("where");
 
   /** Достаточно изображений, чтобы сопоставить coverImageId с ActivityImage (как на detail). */
@@ -170,7 +172,7 @@ export async function getKudaDiscoveryFeed(
       },
       boosts: {
         where: { startAt: { lte: now }, endAt: { gt: now } },
-        select: { id: true },
+        select: { id: true, isFreeDaily: true, purchaseRequestKey: true, targetRegionIds: true },
       },
     },
   });
@@ -215,9 +217,14 @@ export async function getKudaDiscoveryFeed(
     ]),
   );
 
+  const displayRegionId = targetRegionId ?? await getDiscoveryRegionContext(cityId, citySlug);
+  const eligibilityById = new Map(eligibility.map(row => [row.activityId, row]));
   const cards = rows.map((a) => {
+    const physicalCityId = a.venue?.cityId ?? a.place?.cityId ?? a.cityId;
+    const crossRegion = physicalCityId != null && !expandedCityIds.includes(physicalCityId);
+    const applicableBoosts = a.boosts.filter(boost => isBoostForDiscoveryRegion(boost, displayRegionId, !crossRegion));
     const baseEngagement = (scoreMap.get(a.id) ?? 0) + (occasionBoostMap.get(a.id) ?? 0);
-    const isBoosted = a.boosts.length > 0;
+    const isBoosted = applicableBoosts.length > 0;
     const qualityMultiplier = activityQualityBoost.get(a.id) ?? 1.0;
     const finalEngagement = applyActivePublicationBoost(
       baseEngagement,
@@ -225,12 +232,16 @@ export async function getKudaDiscoveryFeed(
       qualityMultiplier,
     );
 
-    return mapDiscoveryEventToActivityMock(a, {
+    const organic = eligibilityById.get(a.id);
+    const isPromoted = applicableBoosts.some(boost => !boost.isFreeDaily);
+    return { ...mapDiscoveryEventToActivityMock(a, {
       ownerFirst: Boolean(currentUserId && a.ownerUserId === currentUserId),
       hubPrimaryCityId: primaryCityId,
       engagementScore: finalEngagement,
       citySlugById,
-    });
+    }), isPromoted,
+      ...(crossRegion ? { crossRegionReason: organic?.reason ?? (isPromoted ? "PAID_BOOST" as const : undefined), crossRegionFamilyCount: organic?.familyCount, crossRegionOverrideId: organic?.overrideId } : {}),
+    };
   });
 
   const temporalById = new Map(rows.map((row) => [
@@ -252,7 +263,10 @@ export async function getKudaDiscoveryFeed(
     return ta - tb || a.id.localeCompare(b.id);
   });
 
-  const selected = options?.allCandidates ? cards : cards.slice(0, take);
+  // Compose within temporal relevance bands; no irrelevant replacement or candidate loss.
+  const composed = options?.onlyIds ? cards : composePromotedCards(cards, card => String(Math.floor((temporalById.get(card.id) ?? 0) / 10)));
+  const selected = options?.allCandidates ? composed : composed.slice(0, take);
+  if (!options?.rankOnly && !options?.onlyIds) await recordDiscoveryExposures(selected, cityId, citySlug, "kuda", currentUserId);
   const result = options?.hydrateImages === false ? selected : await withImageDimensions(selected, (card) => card.image);
   perf.mark("mapSort");
   perf.log({

@@ -184,6 +184,7 @@ jobs:
           pnpm exec tsx src/server/article/publicArticleListCacheWiring.test.ts
           pnpm exec tsx src/lib/city/scopedEventBrowsing.test.ts
           pnpm exec tsx src/server/discovery/crossRegionFamilySignal.contract.test.ts
+          pnpm exec tsx src/server/discovery/crossRegionThreshold.test.ts
           pnpm exec tsx src/server/discovery/discoveryPerf.test.ts
           pnpm exec tsx src/lib/discovery/partitionDiscoveryFeed.agePolicy.test.ts
           pnpm exec tsx src/server/discovery/classesDiscoveryFeed.agePolicy.test.ts
@@ -362,3 +363,14 @@ jobs:
         run: pnpm test:seo-http
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+
+      - name: Cross-region eligibility PostgreSQL behavior
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/server/discovery/crossRegionFamilySignal.integration.test.ts
+          pnpm exec tsx src/lib/discovery/promotionComposition.test.ts
+          pnpm exec tsx src/server/geo/boostRegionTargeting.test.ts
+          pnpm exec tsx src/server/discovery/kudaListingHydration.test.ts
+

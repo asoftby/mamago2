@@ -12,6 +12,7 @@ import { canOptimizeWithNextImage } from "@/lib/media/nextImagePolicy";
 export type OfferCardProps = {
   id: string;
   title: string;
+  isPromoted?: boolean;
   href: string;
   imageUrl?: string | null;
   /** Label shown below image in mono caps, e.g. "Лагерь", "Курс" */

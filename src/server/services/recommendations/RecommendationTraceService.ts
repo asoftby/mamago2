@@ -395,3 +395,21 @@ export async function narrowRunExposuresToShown(
     return { ok: true as const, kept, removed: removed.count };
   });
 }
+
+/** Reuse the existing trace for server-verified discovery eligibility, without family identities. */
+export async function recordDiscoveryExposures(cards: import("@/types/activity").ActivityMock[], cityId: string, citySlug: string, intent: "kuda" | "classes", userId: string | null = null, positionOffset = 0) {
+  if (!cards.length) return;
+  const trace = await recordRecommendationRun({
+    surface: "DISCOVERY", cityId, citySlug, userId,
+    algorithmVersion: "discovery-existing-ranking-region-policy-v1",
+    candidateCount: cards.length,
+    decisionContext: { intent: intent === "kuda" ? "discovery_kuda" : "discovery_classes", subjects: [], actor: { kind: userId ? "user" : "guest", id: userId } },
+    items: cards.map((card, index) => ({
+      entityType: card.analyticsEntityType ?? "EVENT", entityId: card.id, position: positionOffset + index + 1,
+      score: card.engagementScore,
+      reasonCodes: card.crossRegionReason ? [card.crossRegionReason] : [],
+      scoreBreakdown: { isPromoted: card.isPromoted ?? false, familyCount: card.crossRegionFamilyCount ?? null, overrideId: card.crossRegionOverrideId ?? null },
+    })),
+  });
+  for (const card of cards) card.exposureId = trace?.exposureIdByEntityKey.get(`${card.analyticsEntityType ?? "EVENT"}:${card.id}`);
+}
