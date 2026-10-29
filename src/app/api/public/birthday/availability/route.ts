@@ -21,9 +21,9 @@ export async function GET(request: NextRequest) {
   if (!Number.isFinite(dayDate.getTime()) || dayDate.toISOString().slice(0, 10) !== parsed.data.day) return NextResponse.json({ error: "Invalid date" }, { status: 422 });
   try {
     const result = await getPublicPartySlotPreview(parsed.data);
-    if (!result) return NextResponse.json({ error: "Not found" }, { status: 404, headers: { "Cache-Control": "no-store" } });
-    return NextResponse.json({ ...result, finalConfirmationRequired: true }, { headers: { "Cache-Control": "no-store" } });
+    if (!result) return NextResponse.json({ error: "Not found" }, { status: 404, headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({ ...result, finalConfirmationRequired: true }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
-    return NextResponse.json({ mode: "REQUEST_ONLY", slots: [], finalConfirmationRequired: true }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ mode: "REQUEST_ONLY", slots: [], finalConfirmationRequired: true }, { headers: { "Cache-Control": "private, no-store" } });
   }
 }
