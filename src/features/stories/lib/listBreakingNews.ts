@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { notExpiredJournalPublicationWhere } from "@/lib/journal/publicationType";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
 import { parseArticleContentJson } from "@/lib/publications/articleMvp";
@@ -38,25 +39,18 @@ export type BreakingNewsItem = {
  */
 export async function listBreakingNewsArticles(
   citySlug: string,
-  limit = 6,
+  limit = 5,
   now = new Date(),
 ): Promise<BreakingNewsItem[]> {
   const rows = await prisma.article.findMany({
     where: {
       ...getPublicPublishedArticleWhere(),
-      AND: [
-        {
-          OR: [
-            { cityContext: citySlug },
-            { cityContext: null },
-          ],
-        },
-      ],
+      AND: [notExpiredJournalPublicationWhere(now), { OR: [{ cityContext: citySlug }, { cityContext: null }] }],
       OR: [
         { publicationType: "BREAKING_NEWS" },
         { subtitle: BREAKING_NEWS_SUBTITLE },
       ],
-      publishedAt: { not: null, ...getBreakingNewsStoriesPublishedWindow(now) },
+      publishedAt: { not: null, lte: now },
     },
     orderBy: { publishedAt: "desc" },
     take: limit,

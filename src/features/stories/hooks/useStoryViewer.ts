@@ -8,6 +8,8 @@ import {
   readSeen,
   seenGroupStart as resolveSeenGroupStart,
   writeSeen,
+  readSeenBreakingNews,
+  markBreakingNewsSeen,
 } from "../lib/seen";
 
 function browserStorage(): Storage | null {
@@ -26,16 +28,24 @@ export function useStoryViewer(stories: StoryCollection[]) {
   const [seenGroupStart, setSeenGroupStart] = useState<number | null>(null);
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const [paused, setPaused] = useState(false);
+  const [newsComplete, setNewsComplete] = useState(false);
   // Incremented on every manual nav to reset the CSS animation
   const [progressKey, setProgressKey] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) setSeenIds(readSeen(browserStorage()));
-    });
+    const refresh = () => {
+      const storage = browserStorage();
+      setSeenIds(new Set([...readSeen(storage), ...[...readSeenBreakingNews(storage)].map((id) => `article:${id}`)]));
+    };
+    const id = window.setTimeout(refresh, 0);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", refresh);
+    window.addEventListener("storage", refresh);
     return () => {
-      cancelled = true;
+      window.clearTimeout(id);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", refresh);
+      window.removeEventListener("storage", refresh);
     };
   }, []);
 
@@ -48,10 +58,11 @@ export function useStoryViewer(stories: StoryCollection[]) {
   // ── helpers ──────────────────────────────────────────────────────────────
 
   const markSeen = useCallback((offerId: string) => {
+    if (offerId.startsWith("article:")) markBreakingNewsSeen(browserStorage(), offerId.slice("article:".length));
     setSeenIds((prev) => {
       const next = addSeenOfferId(prev, offerId);
       if (next === prev) return prev;
-      writeSeen(browserStorage(), next);
+      writeSeen(browserStorage(), new Set([...next].filter((id) => !id.startsWith("article:"))));
       return next;
     });
   }, []);
@@ -61,6 +72,7 @@ export function useStoryViewer(stories: StoryCollection[]) {
       const story = stories[storyIndex];
       if (!story) return;
       setPaused(false);
+      setNewsComplete(false);
       setActiveItems(orderBySeen(story.items, seenIds));
       setSeenGroupStart(resolveSeenGroupStart(story.items, seenIds));
       setActiveStoryIndex(storyIndex);
@@ -72,11 +84,25 @@ export function useStoryViewer(stories: StoryCollection[]) {
 
   const close = useCallback(() => {
     setPaused(false);
+    setNewsComplete(false);
     setActiveStoryIndex(null);
     setActiveItemIndex(0);
     setActiveItems([]);
     setSeenGroupStart(null);
   }, []);
+
+  const continueAfterNews = useCallback(() => {
+    if (activeStoryIndex === null) return;
+    const nextIndex = activeStoryIndex + 1;
+    setNewsComplete(false);
+    if (nextIndex >= stories.length) { close(); return; }
+    const story = stories[nextIndex];
+    setActiveItems(orderBySeen(story.items, seenIds));
+    setSeenGroupStart(resolveSeenGroupStart(story.items, seenIds));
+    setActiveStoryIndex(nextIndex);
+    setActiveItemIndex(0);
+    setProgressKey((k) => k + 1);
+  }, [activeStoryIndex, stories, seenIds, close]);
 
   const next = useCallback(() => {
     if (activeStoryIndex === null || !activeStory) return;
@@ -86,6 +112,10 @@ export function useStoryViewer(stories: StoryCollection[]) {
     const isLastItem = activeItemIndex >= activeStory.items.length - 1;
     if (!isLastItem) {
       setActiveItemIndex((i) => i + 1);
+      return;
+    }
+    if (activeStory.intent === "breaking_news") {
+      setNewsComplete(true);
       return;
     }
     const nextStoryIndex = activeStoryIndex + 1;
@@ -137,6 +167,8 @@ export function useStoryViewer(stories: StoryCollection[]) {
 
   return {
     isOpen,
+    newsComplete,
+    continueAfterNews,
     activeStory,
     activeStoryIndex,
     activeItemIndex,

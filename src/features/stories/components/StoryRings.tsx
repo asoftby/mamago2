@@ -15,6 +15,8 @@ interface StoryRingsProps {
 export function StoryRings({ stories }: StoryRingsProps) {
   const {
     isOpen,
+    newsComplete,
+    continueAfterNews,
     activeStory,
     activeStoryIndex,
     activeItemIndex,
@@ -56,7 +58,16 @@ export function StoryRings({ stories }: StoryRingsProps) {
         />
       })}
 
-      {isOpen && activeStory && activeStoryIndex !== null && (
+      {isOpen && newsComplete && activeStory?.intent === "breaking_news" && (
+        <div role="dialog" aria-modal="true" aria-label="Новости просмотрены" className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 px-4">
+          <div className="w-full max-w-sm space-y-5 rounded-3xl bg-white p-8 text-center text-foreground">
+            <h2 className="font-heading text-2xl">Вы посмотрели все новости</h2>
+            <button type="button" onClick={continueAfterNews} className="min-h-11 w-full rounded-full bg-primary px-5 font-semibold text-primary-foreground">Смотреть дальше</button>
+            <button type="button" onClick={close} className="min-h-11 w-full rounded-full border border-border px-5 font-semibold">Закрыть</button>
+          </div>
+        </div>
+      )}
+      {isOpen && !newsComplete && activeStory && activeStoryIndex !== null && (
         <StoryModal
           activeStory={activeStory}
           activeStoryIndex={activeStoryIndex}
