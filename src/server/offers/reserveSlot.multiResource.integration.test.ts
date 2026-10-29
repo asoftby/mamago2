@@ -337,3 +337,29 @@ test("resource-linked add-ons require ON_REQUEST_WINDOWS rather than just no cla
     where: { offerBooking: { offerId } },
   }), 0);
 });
+
+test("business may disable a linked add-on after the resource becomes inactive", async () => {
+  const room = await unit("Inactive option room");
+  const offerId = await offer([room]);
+  const added = await saveBookingServices({ offerId, businessId, data: {
+    revision: 0, basePriceByn: "25.00", options: [{
+      title: "Projector", mode: "OPTIONAL", priceByn: "10.00",
+      active: true, bookingUnitId: room,
+    }],
+  } });
+  assert.equal(added.status, 200);
+  const linked = await db.offerBookingOption.findFirstOrThrow({
+    where: { offerBooking: { offerId } },
+  });
+  await db.bookingUnit.update({ where: { id: room }, data: { status: "INACTIVE" } });
+  const disabled = await saveBookingServices({ offerId, businessId, data: {
+    revision: added.revision!, basePriceByn: "25.00", options: [{
+      id: linked.id, title: linked.title, mode: "OPTIONAL",
+      priceByn: "10.00", active: false, bookingUnitId: room,
+    }],
+  } });
+  assert.equal(disabled.status, 200);
+  assert.equal((await db.offerBookingOption.findUniqueOrThrow({
+    where: { id: linked.id },
+  })).active, false);
+});
