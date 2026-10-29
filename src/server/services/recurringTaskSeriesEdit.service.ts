@@ -2,8 +2,6 @@ import { Prisma, PlanEntryType, PlanItemSource } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { localWallClockToUtc, getLocalDateKey } from "@/lib/date/localDateKey";
 import { activePlanScopeFor, activeFamilyUserIds, childScopeFor } from "@/server/family/familyAccess";
-import { validateRecurrenceInput } from "@/lib/plan/recurrenceInput";
-import { expandRecurrence, type RecurrenceRule } from "@/lib/plan/recurrence";
 import type { PlanOwner } from "@/server/services/planOwner";
 import { RecurrenceMutationError, validateRecurringTask } from "./recurringTask.service";
 
@@ -69,12 +67,19 @@ async function recurrenceTarget(owner: PlanOwner, itemId: string) {
 /** Owners only; needed to pre-fill the edit form and enforce version checks. */
 export async function getRecurringTaskSeriesForEdit(owner: PlanOwner, itemId: string) {
   const { row, series } = await recurrenceTarget(owner, itemId);
+  const members = await activeFamilyUserIds(owner.userId);
+  const users = await prisma.user.findMany({ where: { id: { in: members } },
+    select: { id: true, displayName: true } });
+  const people = users.map(user => ({
+    id: user.id, name: user.id === owner.userId ? "Я" : user.displayName?.trim() || "Взрослый",
+  }));
   const template = series.template && typeof series.template === "object" && !Array.isArray(series.template)
     ? series.template as Record<string, unknown> : {};
   return {
     expectedUpdatedAt: row.updatedAt.toISOString(),
     expectedSeriesVersion: series.version,
     cutoff: row.recurrenceDate!,
+    people,
     title: typeof template.title === "string" ? template.title : "",
     startTime: typeof template.time === "string" ? template.time : null,
     childId: typeof template.childId === "string" ? template.childId : null,
