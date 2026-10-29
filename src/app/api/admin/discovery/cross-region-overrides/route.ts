@@ -8,7 +8,10 @@ export async function GET(request: Request) {
   const auth = await requireAdminOrModeratorApiUser();
   if (auth instanceof NextResponse) return auth;
   const activityId = new URL(request.url).searchParams.get("activityId");
-  if (!activityId) return NextResponse.json({ error: "activityId required" }, { status: 400 });
+  if (!activityId) {
+    const regions = await prisma.region.findMany({ where: { type: "OBLAST", isActive: true }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+    return NextResponse.json({ regions });
+  }
   const rows = await prisma.crossRegionEditorialOverride.findMany({
     where: { activityId },
     orderBy: { expiresAt: "desc" },
