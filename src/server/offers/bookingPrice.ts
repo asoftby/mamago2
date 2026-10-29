@@ -26,6 +26,10 @@ export type BookingPriceSnapshot = {
   basis: "CLASS_TARIFF" | "OFFER_BASE" | "UNPRICED";
   seats: number;
   durationMinutes: number;
+  extension: {
+    hours: number; hourlyRateByn: string | null;
+    discountPercent: number; amountByn: string;
+  } | null;
   base: {
     tariffId: string | null; title: string | null;
     amountByn: string | null; unit: string | null;
@@ -51,12 +55,30 @@ export function calculateBookingPrice(input: {
   currency: string;
   seats: number;
   durationMinutes: number;
+  baseDurationMinutes?: number;
+  extensionHourPriceByn?: string | null;
+  extensionDiscountPercent?: number;
   basePriceByn: string | null;
   tariff: { id: string; title: string; price: string; unit: string } | null;
   options: readonly BookingPricedOption[];
   selectedOptionIds?: readonly string[];
 }): { snapshot: BookingPriceSnapshot; optionUnitIds: string[] } {
   const selected = input.selectedOptionIds ?? [];
+  const baseDuration = input.baseDurationMinutes ?? input.durationMinutes;
+  const discount = input.extensionDiscountPercent ?? 0;
+  const delta = input.durationMinutes - baseDuration;
+  if (!Number.isInteger(baseDuration) || baseDuration <= 0 ||
+      !Number.isInteger(discount) || discount < 0 || discount > 90 ||
+      delta < 0 || delta % 60 !== 0 || delta > 8 * 60 ||
+      (delta > 0 && input.extensionHourPriceByn == null)) {
+    throw new BookingPriceError("Продолжительность или ставка продления недоступна");
+  }
+  const extensionHours = delta / 60;
+  const rate = input.extensionHourPriceByn == null ? null : kopeks(input.extensionHourPriceByn);
+  if (delta > 0 && (rate == null || input.currency !== "BYN")) {
+    throw new BookingPriceError("Продление доступно только по тарифу в BYN");
+  }
+  const extensionAmount = Math.round((rate ?? 0) * extensionHours * (100 - discount) / 100);
   if (!Number.isInteger(input.seats) || input.seats < 1 || input.seats > 100 ||
       !Number.isInteger(input.durationMinutes) || input.durationMinutes < 1 ||
       input.durationMinutes > 7 * 24 * 60 || selected.length > 20 ||
@@ -113,11 +135,15 @@ export function calculateBookingPrice(input: {
       amountByn: money(amount), bookingUnitId: option.bookingUnitId,
     });
   }
-  const total = base === null ? null : base + addons;
+  const total = base === null ? null : base + addons + extensionAmount;
   if (total !== null && total > 999_999_999) throw new BookingPriceError("Сумма заказа превышает лимит");
   const snapshot: BookingPriceSnapshot = {
     version: 1, currency: "BYN", status: exact ? "FIXED" : "QUOTE_REQUIRED",
     basis, seats: input.seats, durationMinutes: input.durationMinutes,
+    extension: extensionHours > 0 ? {
+      hours: extensionHours, hourlyRateByn: rate === null ? null : money(rate),
+      discountPercent: discount, amountByn: money(extensionAmount),
+    } : null,
     base: {
       tariffId: input.tariff?.id ?? null,
       title: input.tariff?.title ?? null,
