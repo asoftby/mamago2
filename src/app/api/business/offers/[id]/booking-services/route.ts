@@ -28,7 +28,7 @@ async function ownedOffer(id: string) {
     where: { id },
     select: {
       id: true, currency: true, bookingEnabled: true, bookingMode: true,
-      productType: true, offerBooking: {
+      productType: true, classGroups: { where: { active: true }, select: { id: true } }, offerBooking: {
         select: { id: true, pricingRevision: true, basePriceByn: true,
           options: { orderBy: { position: "asc" }, select: {
             id: true, title: true, mode: true, priceByn: true,
@@ -63,6 +63,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     currency: offer.currency,
     bookingEnabled: offer.bookingEnabled,
     bookingMode: offer.bookingMode,
+    resourceExtrasAllowed: offer.classGroups.length === 0,
     revision: offer.offerBooking?.pricingRevision ?? 0,
     basePriceByn: offer.offerBooking?.basePriceByn?.toFixed(2) ?? null,
     options: (offer.offerBooking?.options ?? []).map(option => ({
