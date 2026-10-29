@@ -4,7 +4,8 @@ import { placeInTerritoryScopeWhere, resolveTerritoryScope } from "@/server/terr
 import { unstable_cache } from "next/cache";
 import prisma from "@/lib/prisma";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
-import { getDiscoveryRegionContext } from "@/server/geo/boostRegionTargeting";
+import { resolveTerritoryCityIds } from "@/server/territory/resolveTerritoryCityIds";
+import { getDiscoveryRegionContext, isBoostForDiscoveryRegion } from "@/server/geo/boostRegionTargeting";
 import { buildClassesDiscoveryWhere, extractOfferDateRange, getClassesDiscoveryFeed } from "@/server/discovery/classesDiscoveryFeed";
 
 /** Rank all public candidate IDs using the established boost/date/ID ordering,
@@ -25,9 +26,11 @@ export async function getClassesListingPage(
     const placeWhere = scope ? placeInTerritoryScopeWhere(scope.territoryIds) : { cityId };
     const publicWhereParts = (publicWhere.AND ?? []) as import("@prisma/client").Prisma.OfferWhereInput[];
     const where = buildClassesDiscoveryWhere({ publicWhereParts, cityId, placeWhere, targetRegionId, chipSlug, now, free: options.free, priceMax });
+    const homeCityIds = scope ? await resolveTerritoryCityIds({ id: scope.territoryId, type: scope.type }) : [cityId];
     const select = {
+      place: { select: { cityId: true } },
       id: true, dateFrom: true, dateTo: true, campSessions: true,
-      boosts: { where: { startAt: { lte: now }, endAt: { gt: now } }, select: { id: true, isFreeDaily: true, purchaseRequestKey: true } },
+      boosts: { where: { startAt: { lte: now }, endAt: { gt: now } }, select: { id: true, isFreeDaily: true, purchaseRequestKey: true, targetRegionIds: true } },
     } as const;
     // Only ID, date signals and boost membership: never fetch full offer cards.
     const candidates = await prisma.offer.findMany({ where, select }).catch((error: unknown) => {
@@ -41,12 +44,16 @@ export async function getClassesListingPage(
       });
       return prisma.offer.findMany({ where: fallbackWhere, select });
     });
-    return composePromotedCards(candidates.map((offer) => ({
-      id: offer.id,
-      boosted: offer.boosts.length > 0,
-      isPromoted: offer.boosts.some(boost => !boost.isFreeDaily && boost.purchaseRequestKey != null),
-      date: extractOfferDateRange(offer).dateStart ?? null,
-    })).sort((a, b) =>
+    return composePromotedCards(candidates.map((offer) => {
+      const local = Boolean(offer.place?.cityId && homeCityIds.includes(offer.place.cityId));
+      const boosts = offer.boosts.filter(boost => isBoostForDiscoveryRegion(boost, targetRegionId, local));
+      return {
+        id: offer.id,
+        boosted: boosts.length > 0,
+        isPromoted: boosts.some(boost => !boost.isFreeDaily),
+        date: extractOfferDateRange(offer).dateStart ?? null,
+      };
+    }).sort((a, b) =>
       Number(b.boosted) - Number(a.boosted)
       || (b.date ? Date.parse(b.date) : 0) - (a.date ? Date.parse(a.date) : 0)
       || b.id.localeCompare(a.id)

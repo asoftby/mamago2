@@ -1,3 +1,4 @@
+import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCrossRegionFamilyThreshold } from "./crossRegionThreshold";
@@ -34,6 +35,7 @@ export async function readCrossRegionEligibility(hubCityId: string, homeCityIds:
     JOIN "FamilyMembership" fm ON fm."familyId" = f.id AND fm."userId" = u.id AND fm."leftAt" IS NULL
     WHERE pi."activityId" IS NOT NULL
       AND pi."cancelledAt" IS NULL
+      AND (pi."startsAt" >= ${now} OR (pi."startsAt" IS NULL AND (pi.date IS NULL OR pi.date >= ${getLocalDateKey(now)})))
       AND pi.status = 'CONFIRMED'::"PlanDecisionStatus"
       AND f."archivedAt" IS NULL
       AND f."homeCityId" IN (${Prisma.join(homeCityIds)})

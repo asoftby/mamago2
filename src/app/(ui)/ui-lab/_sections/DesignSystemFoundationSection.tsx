@@ -31,7 +31,7 @@ export function DesignSystemFoundationSection() {
       </p>
       <InventoryGrid>
         <RenderSafe title="Paid discovery disclosure" file="src/components/events/EventCard.tsx">
-          <Badge variant="outline">Реклама · Boost</Badge>
+          <Badge variant="outline" title="Платное продвижение Boost">Реклама</Badge>
         </RenderSafe>
         <RenderSafe title="Buttons — variants" file="src/components/ui/button.tsx">
           <div className="flex flex-wrap items-center gap-3">

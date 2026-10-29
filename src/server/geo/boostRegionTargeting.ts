@@ -30,3 +30,11 @@ export async function getDiscoveryRegionContext(cityId: string, citySlug: string
   const minsk = await prisma.region.findFirst({ where: { country: { slug: "belarus" }, slug: "minskaya-oblast", isActive: true }, select: { id: true } });
   return minsk?.id ?? null;
 }
+
+/** Active rows are supplied by the caller; geography gates the existing multiplier. */
+export function isBoostForDiscoveryRegion(boost: { isFreeDaily: boolean; purchaseRequestKey: string | null; targetRegionIds: string[] }, regionId: string | null, local: boolean): boolean {
+  if (boost.targetRegionIds.length === 0) return local;
+  if (boost.isFreeDaily) return local;
+  if (!local && !boost.purchaseRequestKey) return false;
+  return Boolean(regionId && (boost.targetRegionIds.includes(regionId) || boost.targetRegionIds.includes(ALL_BELARUS_REGIONS)));
+}

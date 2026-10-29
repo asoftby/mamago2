@@ -8,7 +8,7 @@ import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
 import type { ActivityMock } from "@/types/activity";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
 import { getBusinessQualityBoostMap, applyActivePublicationBoost } from "@/server/services/ranking/businessQualityBoost";
-import { ALL_BELARUS_REGIONS, getDiscoveryRegionContext } from "@/server/geo/boostRegionTargeting";
+import { ALL_BELARUS_REGIONS, getDiscoveryRegionContext, isBoostForDiscoveryRegion } from "@/server/geo/boostRegionTargeting";
 
 function ageBoundsFromOffer(offer: {
   ageMinMonths: number | null;
@@ -205,11 +205,10 @@ export async function getClassesDiscoveryFeed(
       dateTo: offer.dateTo,
       campSessions: offer.campSessions,
     });
-    const isBoosted = offer.boosts.length > 0;
     const crossRegion = offer.place?.cityId != null && !homeCityIds.includes(offer.place.cityId);
-    const isPromoted = offer.boosts.some(boost => !boost.isFreeDaily && boost.purchaseRequestKey != null && (
-      boost.targetRegionIds.length === 0 ? !crossRegion : Boolean(targetRegionId && (boost.targetRegionIds.includes(targetRegionId) || boost.targetRegionIds.includes(ALL_BELARUS_REGIONS)))
-    ));
+    const applicableBoosts = offer.boosts.filter(boost => isBoostForDiscoveryRegion(boost, targetRegionId, !crossRegion));
+    const isBoosted = applicableBoosts.length > 0;
+    const isPromoted = applicableBoosts.some(boost => !boost.isFreeDaily);
     const baseEngagement = 0;
 
     // Apply quality boost (capped at +10%, no effect on promoted boosts)

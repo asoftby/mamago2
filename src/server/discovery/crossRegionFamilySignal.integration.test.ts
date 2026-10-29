@@ -78,6 +78,16 @@ async function main() {
     await db.family.update({ where: { id: families[49] }, data: { createdAt: now } });
     assert.equal((await signal()).length, 0, "new family excluded");
     await db.family.update({ where: { id: families[49] }, data: { createdAt: old } });
+    for (const role of ["ADMIN", "MODERATOR"] as const) {
+      await db.user.update({ where: { id: ids[50] }, data: { role } });
+      assert.equal((await signal()).length, 0, `${role} is excluded from family promotion`);
+    }
+    await db.user.update({ where: { id: ids[50] }, data: { role: "USER", deletedAt: now } });
+    assert.equal((await signal()).length, 0, "deleted contributor is excluded");
+    await db.user.update({ where: { id: ids[50] }, data: { deletedAt: null } });
+    await db.family.update({ where: { id: families[49] }, data: { archivedAt: now } });
+    assert.equal((await signal()).length, 0, "archived family is excluded");
+    await db.family.update({ where: { id: families[49] }, data: { archivedAt: null } });
     const organiserMembership = await db.familyMembership.create({ data: { familyId: families[49], userId: owner.id, joinedAt: old } });
     assert.equal((await signal()).length, 0, "organiser family cannot inflate own event through another parent");
     await db.familyMembership.delete({ where: { id: organiserMembership.id } });
@@ -87,6 +97,11 @@ async function main() {
     await db.family.update({ where: { id: families[49] }, data: { homeCityId: brest.id } });
     assert.equal((await signal()).length, 0, "families in another home region do not count");
     await db.family.update({ where: { id: families[49] }, data: { homeCityId: minsk.id } });
+    await db.planItem.updateMany({ where: { familyId: families[49] }, data: { date: "2000-01-01" } });
+    assert.equal((await signal()).length, 0, "past session plans cannot promote a future recurrence");
+    await db.planItem.updateMany({ where: { familyId: families[49] }, data: { date: null, status: "PROPOSED" } });
+    assert.equal((await signal()).length, 0, "unconfirmed proposals do not count");
+    await db.planItem.updateMany({ where: { familyId: families[49] }, data: { status: "CONFIRMED" } });
     const filters = { categorySlugs: [], genreSlugs: [], dateRange: null, free: false, priceMin: null, priceMax: null, districtId: null, metroId: null, adultOnly: false };
     const list = async (strict = false) => {
       const { where } = await buildKudaDiscoveryWhere(minsk.id, tag, { eventFilters: filters, ...(strict ? { explicitTerritorySlug: `${tag}-strict` } : {}) });

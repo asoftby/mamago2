@@ -355,6 +355,7 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec tsx src/server/discovery/crossRegionFamilySignal.integration.test.ts
           pnpm exec tsx src/lib/discovery/promotionComposition.test.ts
+          pnpm exec tsx src/server/geo/boostRegionTargeting.test.ts
 
       - name: Build production application for HTTP integration
         run: pnpm build:ci

@@ -8,7 +8,7 @@ import { activityInTerritoryScopeWhere, activityInExactTerritoryScopeWhere, reso
 import { resolveTerritoryBySlug } from "@/server/territory/resolveTerritory";
 import { resolveTerritoryCityIds } from "@/server/territory/resolveTerritoryCityIds";
 import { readCrossRegionEligibility } from "@/server/discovery/crossRegionFamilySignal";
-import { ALL_BELARUS_REGIONS, getDiscoveryRegionContext } from "@/server/geo/boostRegionTargeting";
+import { ALL_BELARUS_REGIONS, getDiscoveryRegionContext, isBoostForDiscoveryRegion } from "@/server/geo/boostRegionTargeting";
 import { createDiscoveryPerf } from "@/server/discovery/discoveryPerf";
 import type { ActivityMock } from "@/types/activity";
 import { getEventEngagementScores } from "@/server/discovery/eventEngagementScores";
@@ -220,8 +220,11 @@ export async function getKudaDiscoveryFeed(
   const displayRegionId = targetRegionId ?? await getDiscoveryRegionContext(cityId, citySlug);
   const eligibilityById = new Map(eligibility.map(row => [row.activityId, row]));
   const cards = rows.map((a) => {
+    const physicalCityId = a.venue?.cityId ?? a.place?.cityId ?? a.cityId;
+    const crossRegion = physicalCityId != null && !expandedCityIds.includes(physicalCityId);
+    const applicableBoosts = a.boosts.filter(boost => isBoostForDiscoveryRegion(boost, displayRegionId, !crossRegion));
     const baseEngagement = (scoreMap.get(a.id) ?? 0) + (occasionBoostMap.get(a.id) ?? 0);
-    const isBoosted = a.boosts.length > 0;
+    const isBoosted = applicableBoosts.length > 0;
     const qualityMultiplier = activityQualityBoost.get(a.id) ?? 1.0;
     const finalEngagement = applyActivePublicationBoost(
       baseEngagement,
@@ -229,12 +232,8 @@ export async function getKudaDiscoveryFeed(
       qualityMultiplier,
     );
 
-    const physicalCityId = a.venue?.cityId ?? a.place?.cityId ?? a.cityId;
-    const crossRegion = physicalCityId != null && !expandedCityIds.includes(physicalCityId);
     const organic = eligibilityById.get(a.id);
-    const isPromoted = a.boosts.some(boost => !boost.isFreeDaily && boost.purchaseRequestKey != null && (
-      boost.targetRegionIds.length === 0 ? !crossRegion : Boolean(displayRegionId && (boost.targetRegionIds.includes(displayRegionId) || boost.targetRegionIds.includes(ALL_BELARUS_REGIONS)))
-    ));
+    const isPromoted = applicableBoosts.some(boost => !boost.isFreeDaily);
     return { ...mapDiscoveryEventToActivityMock(a, {
       ownerFirst: Boolean(currentUserId && a.ownerUserId === currentUserId),
       hubPrimaryCityId: primaryCityId,

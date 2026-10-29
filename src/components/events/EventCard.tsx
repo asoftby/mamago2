@@ -122,7 +122,6 @@ export function EventCard({
   const isFree = Boolean(priceLabel && /бесплатно|^free$/i.test(priceLabel.trim()));
   return (
     <div className={cn("group relative select-none", className)}>
-      {isPromoted && <Badge variant="outline">Реклама · Boost</Badge>}
       <Link href={href} className="block focus:outline-none">
         {/* Cover */}
         <div
@@ -131,6 +130,7 @@ export function EventCard({
           data-masonry-media
           data-poster-crop={poster ? (poster.cropped ? poster.objectPosition : "none") : undefined}
         >
+          {isPromoted && <Badge variant="outline" title="Платное продвижение Boost" className="absolute left-3 top-3 z-10 bg-background">Реклама</Badge>}
           {imageUrl && canOptimizeWithNextImage(imageUrl) ? (
             <Image
               src={imageUrl}

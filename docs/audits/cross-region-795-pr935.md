@@ -6,6 +6,7 @@ Reuses Territory/legacy mapping, Family/FamilyMembership, PlanItem, Boost,
 CrossRegionEditorialOverride, User moderation/phone verification, and the
 existing RecommendationRun/Exposure + UserEvent impression pipeline. No schema,
 pricing, billing, new admin surface, or separate recommendation engine.
+Reconciled with `origin/dev` at `e8bee6c0f898ed0a18f0faeb6c3947a945e621be`.
 
 ## Family signal rules
 
@@ -14,7 +15,8 @@ pricing, billing, new admin surface, or separate recommendation engine.
   slug, overrides the threshold; invalid values use 50. Never infer home from IP,
   browsing city, or Boost targets. Minsk uses `minskaya-oblast` for thresholds and
   paid targeting, including when legacy Minsk has a separate administrative region.
-- Only current, non-cancelled CONFIRMED PlanItems for future events count. Multiple
+- Only current, non-cancelled CONFIRMED PlanItems for future events count. Past
+  dated/session plans cannot qualify a future recurrence (Europe/Minsk civil day). Multiple
   dates, repeated additions, and both parents still count once per family/event.
 - Family must be unarchived and at least seven days old. Contributor must be an
   active family member since before the plan addition, ACTIVE, not deleted, not
@@ -50,7 +52,7 @@ Guest listing exposures do not gain a new authenticated identity/attribution mod
 
 ## Advertising and pagination
 
-EventCard and OfferCard use the existing outline Badge: `Реклама · Boost`.
+EventCard and OfferCard use the existing outline Badge: `Реклама` (title: `Платное продвижение Boost`).
 The adapter passes disclosure to public event consumers; offer consumers pass the
 same flag explicitly. UI Lab previews the existing Badge state. No pricing change.
 
@@ -61,6 +63,9 @@ no candidate is discarded, duplicated, or replaced with worse temporal inventory
 Scarcity can exceed 25%; this is intentionally a relevance-aware composition limit,
 not a promise of an absolute share on every page/filter or infinite-scroll chunk.
 The existing score formula, age partition, personal context and pagination remain.
+The existing multiplier is applied only to geographically applicable Boost rows;
+a campaign for another region cannot silently raise organic relevance. The shared
+Boost geography helper is also used by the cached classes ordering.
 
 Ranked ID pools retain their existing 60-second TTL. Visible IDs are checked live
 on hydration; a revoked/expired candidate is omitted, never reconstructed from
@@ -78,6 +83,36 @@ price relevance, all three reasons and persisted exposure audit. Existing
 pagination, age policy, threshold/configuration and impression-gate tests remain.
 
 DEV smoke/visual approval is still a pre-merge acceptance step from #795; this PR
-completion does not merge or deploy. Browser checks of the Badge across supported
-viewports have not been claimed. Full repository ESLint has existing debt recorded
+completion does not merge or deploy. Static previews of the actual paid/organic EventCard and OfferCard with production
+CSS were checked at 320/375/768/1200 px; this is not a live DEV flow or owner visual approval. Full repository ESLint has existing debt recorded
 under BACKLOG-122; changed task files are checked separately.
+
+## Changed files
+
+- `.github/workflows/ci.yml`
+- `docs/audits/cross-region-795-pr935.md`
+- `docs/engineering/backlog.md`
+- `src/app/(ui)/ui-lab/_sections/DesignSystemFoundationSection.tsx`
+- `src/components/discovery/DiscoveryActivitiesGrid.tsx`
+- `src/components/discovery/KudaMasonryListing.tsx`
+- `src/components/events/EventCard.tsx`
+- `src/components/events/eventCardAdapter.ts`
+- `src/components/offers/OfferCard.tsx`
+- `src/features/city-home/components/CityHomeContentRows.tsx`
+- `src/lib/decision/decisionContext.ts`
+- `src/lib/discovery/promotionComposition.test.ts`
+- `src/lib/discovery/promotionComposition.ts`
+- `src/server/discovery/classesDiscoveryFeed.ts`
+- `src/server/discovery/classesListingPage.ts`
+- `src/server/discovery/crossRegionFamilySignal.contract.test.ts`
+- `src/server/discovery/crossRegionFamilySignal.integration.test.ts`
+- `src/server/discovery/crossRegionFamilySignal.ts`
+- `src/server/discovery/crossRegionThreshold.test.ts`
+- `src/server/discovery/crossRegionThreshold.ts`
+- `src/server/discovery/kudaDiscoveryFeed.ts`
+- `src/server/discovery/kudaListingCompleteness.contract.test.ts`
+- `src/server/discovery/kudaListingPage.ts`
+- `src/server/geo/boostRegionTargeting.test.ts`
+- `src/server/geo/boostRegionTargeting.ts`
+- `src/server/services/recommendations/RecommendationTraceService.ts`
+- `src/types/activity.ts`

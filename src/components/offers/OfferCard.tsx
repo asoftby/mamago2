@@ -56,13 +56,13 @@ export function OfferCard({
 }: OfferCardProps) {
   return (
     <div className={cn("group relative flex flex-col gap-3", className)}>
-      {isPromoted && <Badge variant="outline">Реклама · Boost</Badge>}
       <Link href={href} className="block focus:outline-none">
         {/* Image / placeholder */}
         <div
           className="relative overflow-hidden rounded-[18px] bg-[#EDE8DF]"
           style={{ aspectRatio: "4/5" }}
         >
+          {isPromoted && <Badge variant="outline" title="Платное продвижение Boost" className="absolute left-3 top-3 z-10 bg-background">Реклама</Badge>}
           {imageUrl && canOptimizeWithNextImage(imageUrl) ? (
             <Image
               src={imageUrl}
