@@ -2870,9 +2870,37 @@ model OfferBooking {
   horizonDays Int @default(60)
   externalKind ExternalLinkKind?
   externalUrl String?
+  /// Optional base price for fixed-price reservation offers; class tariffs remain authoritative for classes.
+  basePriceByn Decimal? @db.Decimal(10, 2)
   offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  options OfferBookingOption[]
   rules OfferScheduleRule[]
   exceptions OfferScheduleException[]
+}
+
+/// Included options are always selected; OPTIONAL is selectable only with a main booking.
+/// STANDALONE identifies catalogue items sold through their own Offer; it cannot
+/// be purchased as an extra through the main booking reservation endpoint.
+enum OfferBookingOptionMode {
+  INCLUDED
+  OPTIONAL
+  STANDALONE
+}
+
+model OfferBookingOption {
+  id String @id @default(cuid())
+  offerBookingId String
+  offerBooking OfferBooking @relation(fields: [offerBookingId], references: [id], onDelete: Cascade)
+  title String
+  mode OfferBookingOptionMode @default(OPTIONAL)
+  priceByn Decimal @default(0) @db.Decimal(10, 2)
+  /// One extra exclusive unit required when this option is selected (nullable for non-resource extras).
+  bookingUnitId String?
+  bookingUnit BookingUnit? @relation(fields: [bookingUnitId], references: [id], onDelete: Restrict)
+  active Boolean @default(true)
+  position Int @default(0)
+  @@index([offerBookingId, active, position])
+  @@index([bookingUnitId])
 }
 
 /// Group sessions have no BookingUnit; resource windows remain in AvailabilityRule.
@@ -6031,6 +6059,7 @@ model BookingUnit {
   exceptions AvailabilityException[]
   blocks CalendarBlock[]
   allocations BookingAllocation[]
+  bookingOptions OfferBookingOption[]
   quotes PartyQuote[]
 
   @@index([businessId, status])
@@ -6155,6 +6184,10 @@ model BookingRequest {
   classTariffTitle String?
   classTariffPrice String?
   classTariffUnit String?
+  /// Immutable server-calculated components and quote status at the moment of reservation.
+  bookingPriceSnapshot Json?
+  /// Only set for a fully priced BYN booking. NULL = price on request, not zero.
+  bookingTotalByn Decimal? @db.Decimal(10, 2)
   campShiftId       String?
   /// Название смены (snapshot)
   campShiftTitle    String?
