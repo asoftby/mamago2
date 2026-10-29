@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { SaveHeart } from "@/features/save/SaveHeart";
@@ -39,7 +38,6 @@ export type OfferCardProps = {
 export function OfferCard({
   id,
   title,
-  isPromoted = false,
   href,
   imageUrl,
   categoryLabel,
@@ -62,7 +60,6 @@ export function OfferCard({
           className="relative overflow-hidden rounded-[18px] bg-[#EDE8DF]"
           style={{ aspectRatio: "4/5" }}
         >
-          {isPromoted && <Badge variant="outline" title="Платное продвижение Boost" className="absolute left-3 top-3 z-10 bg-background">Реклама</Badge>}
           {imageUrl && canOptimizeWithNextImage(imageUrl) ? (
             <Image
               src={imageUrl}
