@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
   if (rejected) return rejected;
   try {
     const expired = await expirePartyRequests();
+    const replenishment = await replenishPartyCandidateWaves();
     const result = await dispatchPartyOutbox();
     // Counts only, no identities, messages, or delivery errors. A successful
     // outbox dispatch does not imply that external channels succeeded.
