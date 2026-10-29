@@ -232,7 +232,19 @@ export function ManualPlanEntryDialog({
               <legend className="px-1 text-sm font-semibold">К каким делам применить изменения?</legend>
               <label className="flex min-h-11 items-center gap-2 text-sm">
                 <input type="radio" name="recurrence-edit-scope" checked={scope === "THIS"}
-                  onChange={() => setScope("THIS")} />
+                  onChange={() => {
+                    setScope("THIS");
+                    setTitle(item?.title ?? "");
+                    setChildId(item?.childId ?? "");
+                    setStartsAt(timeValue(item?.startsAt ?? null));
+                    setEndsAt(timeValue(item?.endsAt ?? null));
+                    setReminderEnabled(item?.reminderEnabled === true);
+                    setEntryDate(item?.date ?? date);
+                    setLocationText(item?.locationText ?? "");
+                    setNotes(item?.notes ?? "");
+                    setTagsText((item?.tags ?? []).join(", "));
+                    setError("");
+                  }} />
                 Только это дело
               </label>
               <label className="flex min-h-11 items-center gap-2 text-sm">
