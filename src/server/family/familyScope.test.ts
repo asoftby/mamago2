@@ -73,3 +73,40 @@ test("flag on without a family matches nothing", () => {
 test("not-cancelled filter uses status, not cancelledAt", () => {
   assert.deepEqual(NOT_CANCELLED, { status: { not: "CANCELLED" } });
 });
+
+
+test("two adults: each may read shared plan, but private branch is restricted to own user", () => {
+  const a = planItemScopeWhere({ userId: "adult-a", familyId: "family-one" }, true);
+  const b = planItemScopeWhere({ userId: "adult-b", familyId: "family-one" }, true);
+  assert.deepEqual(a, { familyId: "family-one", OR: [{ visibility: "FAMILY" }, { userId: "adult-a" }] });
+  assert.deepEqual(b, { familyId: "family-one", OR: [{ visibility: "FAMILY" }, { userId: "adult-b" }] });
+  assert.ok(!JSON.stringify(a).includes('"userId":"adult-b"'));
+  assert.ok(!JSON.stringify(b).includes('"userId":"adult-a"'));
+});
+
+test("leaving family: membership scope prevents reading old shared records", () => {
+  const before = planItemScopeWhere({ userId: "adult-b", familyId: "family-one" }, true);
+  const after = planItemScopeWhere({ userId: "adult-b", familyId: "new-solo-family" }, true);
+  assert.equal((before as {familyId?: string}).familyId, "family-one");
+  assert.equal((after as {familyId?: string}).familyId, "new-solo-family");
+  assert.deepEqual(planItemScopeWhere({ userId: "adult-b", familyId: null }, true), { id: { in: [] } });
+});
+
+test("restricted new adult: FROM_JOIN history boundary applies to shared items, not own PRIVATE", () => {
+  const joinedAt = new Date("2026-10-20T08:00:00Z");
+  const where = planItemScopeWhere({ userId: "adult-b", familyId: "family-one", sharedHistoryFrom: joinedAt }, true);
+  assert.deepEqual(where, {
+    familyId: "family-one",
+    OR: [
+      {
+        visibility: "FAMILY",
+        OR: [
+          { date: { gte: "2026-10-20" } },
+          { date: null },
+          { createdAt: { gte: joinedAt } },
+        ],
+      },
+      { userId: "adult-b" },
+    ],
+  });
+});
