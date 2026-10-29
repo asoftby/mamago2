@@ -1,5 +1,5 @@
 import type { AuthActor } from "@/lib/auth/safeUser";
-import { canAccessBusinessResource } from "@/server/permissions/business-permissions";
+import { canAccessBusiness } from "@/server/permissions/business-permissions";
 import { prisma } from "@/lib/prisma";
 
 export class SupportAccessError extends Error {
@@ -20,7 +20,7 @@ export async function requireSupportBusinessAccess(
 ): Promise<void> {
   if (!actor) throw new SupportAccessError(401, "Authentication required");
   if (isSupportStaff(actor)) return;
-  if (!await canAccessBusinessResource(actor, businessId)) {
+  if (!await canAccessBusiness(actor.id, businessId)) {
     throw new SupportAccessError(404, "Support conversation not found");
   }
 }
