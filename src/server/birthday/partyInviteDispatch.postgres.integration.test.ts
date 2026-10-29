@@ -36,14 +36,33 @@ async function main() {
       "Category-only add-on must initialize a bounded durable queue");
     assert.ok(autoInvites.some(x => x.status === "SENT"),
       "Existing cron must dispatch at least one initialized invitation");
+    assert.equal(new Set(autoInvites.map(x => x.businessId)).size, autoInvites.length,
+      "Initial wave must not invite the same business twice");
+    assert.equal(new Set(autoInvites.map(x => x.offerId)).size, autoInvites.length,
+      "Initial wave must not duplicate the same offer");
+    const activeInvites = autoInvites.filter(x => x.status === "SENT");
+    assert.ok(activeInvites.length <= 5, "At most five active invitations");
+    assert.ok(activeInvites.every(x => x.bookingRequestId),
+      "Each sent invitation must reference a persisted booking request");
     const created = await prisma.bookingRequest.findMany({
       where: { partyOrderItemId: autoItem.id },
     });
     assert.equal(created.length, autoInvites.filter(x => x.status === "SENT").length);
+    assert.equal(await prisma.partyOutbox.count({
+      where: { aggregateId: { in: created.map(x => x.id) }, eventType: "PARTY_REQUEST_SENT" },
+    }), created.length, "Every initial booking request must have exactly one outbox event");
+    assert.deepEqual(
+      [...created.map(x => x.id)].sort(),
+      [...activeInvites.map(x => x.bookingRequestId!)].sort(),
+      "The queue and booking requests must describe the same invitation wave",
+    );
     await replenishPartyCandidateWaves(10);
     assert.equal(await prisma.bookingRequest.count({
       where: { partyOrderItemId: autoItem.id },
     }), created.length, "cron replay must not send duplicate requests");
+    assert.equal(await prisma.partyOutbox.count({
+      where: { aggregateId: { in: created.map(x => x.id) }, eventType: "PARTY_REQUEST_SENT" },
+    }), created.length, "Cron replay must not create duplicate delivery events");
     console.log("PASS automatic category-only queue initialization and cron dispatch");
   } finally {
     if (previousFlag === undefined) delete process.env.PARTY_CANDIDATE_AUTO_REPLENISH_ENABLED;
