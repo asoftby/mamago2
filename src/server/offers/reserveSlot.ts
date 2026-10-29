@@ -51,7 +51,9 @@ function availableSlot(snapshot: SlotSnapshot, input: ReserveSlotInput, now: Dat
     from: input.startsAt,
     to: new Date(input.startsAt.getTime() + 1),
     requestedSeats: input.seats ?? 1,
-    requestedDurationMinutes: (input.endsAt.getTime() - input.startsAt.getTime()) / MINUTE_MS,
+    ...(snapshot.scheduleKind === ScheduleKind.ON_REQUEST_WINDOWS ? {
+      requestedDurationMinutes: (input.endsAt.getTime() - input.startsAt.getTime()) / MINUTE_MS,
+    } : {}),
   }, now);
   return slots.find((slot) =>
     slot.startsAt.getTime() === input.startsAt.getTime() &&
@@ -150,7 +152,7 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       }
       if (input.classTariffId && !tariff) throw new SlotReservationError("INVALID_SLOT", "Тариф недоступен для выбранной группы");
       const durationMinutes = (input.endsAt.getTime() - input.startsAt.getTime()) / MINUTE_MS;
-      try {
+      if (offer.offerBooking.scheduleKind === ScheduleKind.ON_REQUEST_WINDOWS) try {
         assertBookingDuration({
           scheduleKind: offer.offerBooking.scheduleKind,
           durationMin: offer.offerBooking.durationMin,
@@ -203,7 +205,7 @@ export async function reserveSlot(input: ReserveSlotInput): Promise<{ bookingId:
       if (group) {
         await tx.$queryRaw`SELECT "id" FROM "OfferClassGroup" WHERE "id" = ${group.id} AND "offerId" = ${input.offerId} FOR UPDATE`;
       }
-      const query = { offerId: input.offerId, ...(group ? { classGroupId: group.id } : {}), from: input.startsAt, to: new Date(input.endsAt.getTime() + 1), requestedSeats: seats, requestedDurationMinutes: durationMinutes };
+      const query = { offerId: input.offerId, ...(group ? { classGroupId: group.id } : {}), from: input.startsAt, to: new Date(input.endsAt.getTime() + 1), requestedSeats: seats, ...(offer.offerBooking.scheduleKind === ScheduleKind.ON_REQUEST_WINDOWS ? { requestedDurationMinutes: durationMinutes } : {}) };
       const initial = await loadSlotSnapshot(query, tx);
       if (!initial) throw new SlotReservationError("OFFER_UNAVAILABLE", "Запись по расписанию не включена");
       const candidate = availableSlot(initial, input, now);
