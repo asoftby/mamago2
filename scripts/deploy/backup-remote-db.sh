@@ -31,8 +31,35 @@ OUT_FILE="${LOCAL_DIR}/${DB_CONTAINER}-${TIMESTAMP}.sql.gz"
 CHECKSUM_FILE="${OUT_FILE}.sha256"
 
 echo "Verifying container '${DB_CONTAINER}' is running on ${SSH_HOST}..."
-if ! ssh "${SSH_HOST}" "docker ps --format '{{.Names}}'" | grep -qx "${DB_CONTAINER}"; then
-  echo "Error: container '${DB_CONTAINER}' is not running on ${SSH_HOST}" >&2
+# Do not pipe SSH into grep: a transport failure must never look like a stopped DB.
+# Docker itself is checked independently so daemon errors cannot look like a
+# missing container either. No backup output is opened until all checks pass.
+if ssh "${SSH_HOST}" "docker info >/dev/null 2>&1"; then
+  :
+else
+  status=$?
+  if [ "${status}" -eq 255 ]; then
+    echo "Error: SSH connection/check failed on ${SSH_HOST}" >&2
+  else
+    echo "Error: remote Docker command failed on ${SSH_HOST} (exit ${status})" >&2
+  fi
+  exit 1
+fi
+
+if container_state=$(ssh "${SSH_HOST}" "docker container inspect --type container --format '{{.State.Running}}' '${DB_CONTAINER}'" 2>/dev/null); then
+  :
+else
+  status=$?
+  if [ "${status}" -eq 255 ]; then
+    echo "Error: SSH connection/check failed while inspecting ${DB_CONTAINER}" >&2
+  else
+    echo "Error: container '${DB_CONTAINER}' does not exist on ${SSH_HOST} (or inspect failed)" >&2
+  fi
+  exit 1
+fi
+
+if [ "${container_state}" != "true" ]; then
+  echo "Error: container '${DB_CONTAINER}' exists but is not running on ${SSH_HOST}" >&2
   exit 1
 fi
 
