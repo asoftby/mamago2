@@ -86,6 +86,8 @@ jobs:
         run: pnpm exec tsx src/server/birthday/partyMultiRequestExpiry.contract.test.ts
       - name: Verify competing birthday invitation closure
         run: pnpm exec tsx src/server/birthday/partyConfirmSiblings.contract.test.ts
+      - name: Verify category-only initial invitation contracts
+        run: pnpm exec tsx src/server/birthday/partyCategoryInitialWave.contract.test.ts
       - name: Verify auto replenishment cron contracts
         run: pnpm exec tsx src/server/birthday/partyCandidateAutoReplenish.contract.test.ts
       - name: Verify candidate replenishment contracts
