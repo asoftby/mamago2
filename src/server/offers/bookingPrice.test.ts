@@ -82,3 +82,13 @@ test("non-BYN options and malformed or negative money fail closed", () => {
   assert.equal(kopeks("9,99 руб."), 999);
   assert.equal(kopeks("0"), 0);
 });
+
+test("foreign-currency tariff is never silently labeled BYN", () => {
+  const { snapshot } = calculateBookingPrice({
+    ...base, currency: "EUR", options: [],
+    tariff: { id: "eur-tariff", title: "Foreign", price: "20", unit: "visit" },
+  });
+  assert.equal(snapshot.status, "QUOTE_REQUIRED");
+  assert.equal(snapshot.totalByn, null);
+  assert.equal(snapshot.base.amountByn, null);
+});
