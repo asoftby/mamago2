@@ -15,6 +15,8 @@ model Healthcheck {
 model User {
   id                                String                           @id @default(cuid())
   email                             String                           @unique
+  supportThreadsAuthored            SupportThread[]                 @relation("SupportThreadCreator")
+  supportMessagesAuthored           SupportMessage[]                @relation("SupportMessageAuthor")
   passwordHash                      String?
   role                              Role                             @default(USER)
   createdAt                         DateTime                         @default(now())
@@ -1623,6 +1625,7 @@ model Business {
   claimRequests           PlaceClaimRequest[]           @relation("ClaimedPlaces")
   accessRequests          BusinessAccessRequest[]
   directThreads           DirectThread[]
+  supportThreads          SupportThread[]
   directRiskSignals       DirectRiskSignal[]
   boosts                  Boost[]
 
@@ -7447,4 +7450,46 @@ model WishlistReservation {
 
   @@index([itemId, status])
   @@index([userId])
+}
+
+
+/// Business↔mamaGo support channel. Never reuse customer DirectThread.
+enum SupportThreadStatus {
+  NEW
+  IN_PROGRESS
+  CLOSED
+}
+
+enum SupportMessageActor {
+  BUSINESS
+  STAFF
+}
+
+model SupportThread {
+  id            String              @id @default(cuid())
+  businessId    String
+  createdById   String
+  subject       String
+  status        SupportThreadStatus @default(NEW)
+  lastMessageAt DateTime            @default(now())
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  business      Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdBy     User                @relation("SupportThreadCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  messages      SupportMessage[]
+
+  @@index([businessId, status, lastMessageAt])
+}
+
+model SupportMessage {
+  id         String              @id @default(cuid())
+  threadId   String
+  authorId   String
+  actor      SupportMessageActor
+  body       String
+  createdAt  DateTime            @default(now())
+  thread     SupportThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author     User                @relation("SupportMessageAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([threadId, createdAt, id])
 }
