@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
       "invalid_recurrence", "invalid_frequency", "invalid_start_date",
       "invalid_interval", "invalid_until_date", "invalid_count",
       "invalid_weekdays", "unexpected_weekdays", "recurrence_start_not_in_series",
-      "invalid_date", "invalid_window",
+      "invalid_date", "invalid_window", "invalid_child", "invalid_assignee",
+      "assignee_and_child", "child_not_found", "assignee_not_found",
     ].includes(error.message)) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
