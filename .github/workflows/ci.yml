@@ -122,6 +122,7 @@ jobs:
           pnpm exec tsx src/server/services/booking/allocationTransition.test.ts
           pnpm exec tsx src/server/services/booking/bookingHold.test.ts
           pnpm exec tsx src/server/offers/bookingPrice.test.ts
+          pnpm test:wishlist
           pnpm exec tsx src/server/offers/bookingDuration.test.ts
           pnpm exec tsx src/server/offers/slotIdempotency.test.ts
           pnpm exec tsx src/server/offers/bookingServices.contract.test.ts
@@ -140,7 +141,7 @@ jobs:
 
       - name: Type check
         # GitHub ubuntu runners abort TypeScript at Node's default heap ceiling.
-        run: NODE_OPTIONS=--max-old-space-size=5120 pnpm tsc --noEmit
+        run: NODE_OPTIONS=--max-old-space-size=6144 pnpm tsc --noEmit
 
       - name: Feedback model and multi-source reputation regressions
         run: pnpm test:feedback-foundation

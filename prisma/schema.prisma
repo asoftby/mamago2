@@ -152,6 +152,8 @@ model User {
   directRiskSignalsAsCustomer       DirectRiskSignal[]               @relation("DirectRiskSignalCustomer")
   directPlatformSettingsUpdated     DirectPlatformSettings[]         @relation("DirectPlatformSettingsUpdatedBy")
 
+  wishlistsOwned Wishlist[] @relation("WishlistOwner")
+  wishlistReservations WishlistReservation[]
   @@index([email])
   @@index([resetToken])
   @@index([emailVerificationToken])
@@ -408,6 +410,7 @@ model Family {
   consents    ConsentRecord[]
   partyOrders PartyOrder[]
 
+  wishlists Wishlist[]
   @@index([homeCityId])
 }
 
@@ -496,6 +499,7 @@ model Child {
   systemInterests ChildInterest[]
   planItems       PlanItem[]
 
+  wishlists Wishlist[]
   @@unique([id, familyId])
   @@index([parentId])
   @@index([familyId])
@@ -2731,6 +2735,7 @@ model Offer {
   referencedBy    PackageComponent[] @relation("ReferencedBy")
   directThreads   DirectThread[]
 
+  wishlistItems WishlistItem[]
   @@unique([cityId, slug])
   @@index([placeId])
   @@index([status])
@@ -7324,4 +7329,122 @@ model CrossRegionEditorialOverride {
 
   @@unique([activityId, regionId])
   @@index([regionId, expiresAt])
+}
+
+// ─── Вишлист подарков ────────────────────────────────────────────────────────
+
+enum WishlistOccasion {
+  BIRTHDAY
+  OTHER
+}
+
+/// PRIVATE — только автор/семья; LINK — по ссылке /w/{token}; PROFILE — зарезервировано (фаза 2).
+enum WishlistVisibility {
+  PRIVATE
+  LINK
+  PROFILE
+}
+
+enum WishlistStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum WishlistItemPriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+/// RESERVED/PURCHASED занимают количество позиции; CANCELLED/ITEM_REMOVED — нет.
+enum WishlistReservationStatus {
+  RESERVED
+  PURCHASED
+  CANCELLED
+  ITEM_REMOVED
+}
+
+/// Список желаний (подарки). Одна сущность для конструктора, «Моего плана» и профиля.
+/// ACL как у Child: familyId при включённых FAMILY_CORE_READS, иначе ownerUserId.
+model Wishlist {
+  id                        String             @id @default(cuid())
+  ownerUserId               String
+  familyId                  String?
+  /// Получатель: ребёнок семьи или свободное имя (взрослый). Оба null — «для себя».
+  recipientChildId          String?
+  recipientName             String?            @db.VarChar(60)
+  occasion                  WishlistOccasion   @default(BIRTHDAY)
+  eventDate                 DateTime?          @db.Date
+  title                     String             @db.VarChar(120)
+  note                      String?            @db.VarChar(1000)
+  /// Capability-токен публичной ссылки (base64url). Хранится открыто, чтобы автор
+  /// мог в любой момент скопировать ссылку; ротация отключает старую.
+  shareToken                String             @unique
+  visibility                WishlistVisibility @default(LINK)
+  /// Режим сюрприза: автор не видит, кто и что забронировал.
+  hideReservationsFromOwner Boolean            @default(false)
+  /// Показывать гостям имена бронирующих (по умолчанию только «Занято»).
+  showReserverNamesToGuests Boolean            @default(false)
+  status                    WishlistStatus     @default(ACTIVE)
+  archivedAt                DateTime?
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+  owner                     User               @relation("WishlistOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  family                    Family?            @relation(fields: [familyId], references: [id], onDelete: SetNull)
+  recipientChild            Child?             @relation(fields: [recipientChildId], references: [id], onDelete: SetNull)
+  items                     WishlistItem[]
+
+  @@index([ownerUserId, status])
+  @@index([familyId, status])
+  @@index([recipientChildId])
+}
+
+model WishlistItem {
+  id           String                @id @default(cuid())
+  wishlistId   String
+  sortOrder    Int                   @default(0)
+  title        String                @db.VarChar(200)
+  url          String?               @db.VarChar(2048)
+  comment      String?               @db.VarChar(1000)
+  priceApprox  Decimal?              @db.Decimal(10, 2)
+  currency     String                @default("BYN") @db.VarChar(3)
+  /// CHECK 1..99 в миграции.
+  quantity     Int                   @default(1)
+  priority     WishlistItemPriority  @default(NORMAL)
+  imageUrl     String?               @db.VarChar(2048)
+  /// Подарок-впечатление из каталога mamaGo.
+  offerId      String?
+  /// Мягкое удаление: брони уходят в ITEM_REMOVED.
+  deletedAt    DateTime?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  wishlist     Wishlist              @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  offer        Offer?                @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  reservations WishlistReservation[]
+
+  @@index([wishlistId, sortOrder])
+  @@index([offerId])
+}
+
+/// Бронь подарка. Гость без регистрации идентифицируется claim-токеном (в БД — только хеш).
+model WishlistReservation {
+  id                 String                    @id @default(cuid())
+  itemId             String
+  /// CHECK 1..99 в миграции.
+  quantity           Int                       @default(1)
+  userId             String?
+  displayName        String                    @db.VarChar(60)
+  contactEmail       String?                   @db.VarChar(254)
+  telegramChatId     String?
+  claimTokenHash     String                    @unique
+  status             WishlistReservationStatus @default(RESERVED)
+  consentAt          DateTime?
+  consentTextVersion String?                   @db.VarChar(32)
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  item               WishlistItem              @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user               User?                     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([itemId, status])
+  @@index([userId])
 }
