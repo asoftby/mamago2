@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { FormEvent, RefObject } from "react";
-import type { BirthdayCatalogItem } from "../../lib/realCatalog";
+import type { BirthdayCatalogItem, PartyCategoryKey } from "../../lib/realCatalog";
 import { catalogPriceLabel, catalogPriceSummary, partyBudgetWarning } from "../../lib/catalogSelection";
 import { submitBirthdayParty, submittedPartyId, type PartyFlowState } from "../../lib/partySubmitFlow";
 import { calendarDateKeyToIso, childAgeYearsOnDate } from "../../lib/partyDate";
 
 type Props = {
   offers: BirthdayCatalogItem[];
+  addonCategories: PartyCategoryKey[];
   citySlug: string;
   dateIso: string | null;
   quizDateKey: string | null;
@@ -31,7 +32,7 @@ type Props = {
 };
 
 export function StepReview({
-  offers, citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName, childBirthDateIso,
+  offers, addonCategories, citySlug, dateIso, quizDateKey, maxBudget, timeStart, timeEnd, venueMode, childName, childBirthDateIso,
   authenticated, authLoading, requestLogin, flowStateRef, busy, onBusyChange, sent, onSent,
 }: Props) {
   const total = catalogPriceSummary(offers);
@@ -105,6 +106,7 @@ export function StepReview({
         childName: childName || null, childAge: childAgeYearsOnDate(childBirthDateIso, date),
         contactName: name, contactPhone: phone,
         anchorOfferId: offers[0].id, addonOfferIds: offers.slice(1).map((offer) => offer.id),
+        addonCategories,
       });
       onSent();
     } catch (cause) {
@@ -154,6 +156,9 @@ export function StepReview({
           </div>
         ))}
       </div>
+      {addonCategories.length > 0 && <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-stone-800">
+        Дополнительно подберём исполнителей: {addonCategories.join(", ")}. Приглашения отправим после подтверждения основной услуги.
+      </div>}
       <div className="rounded-xl bg-stone-100 p-5">
         <p className="text-sm text-stone-600">Предварительная сумма известных начальных цен</p>
         <p className="mt-1 text-2xl font-bold">
