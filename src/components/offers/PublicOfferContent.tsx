@@ -11,7 +11,7 @@ import { OfferUniqueSections } from "./OfferAccordion";
 import { OfferSchedule } from "./OfferSchedule";
 import { parsePriceData } from "@/lib/priceItems";
 import { isRichTextMeaningful } from "@/lib/richtext/utils";
-import { publicOfferPriceLabel } from "./publicOfferPriceLabel";
+import { publicOfferPriceLabel, publicOfferShowsPaidPrices } from "./publicOfferPriceLabel";
 
 type Props = PublicOfferHeroProps & {
   onShiftCta: (ctx: ShiftCtaContext) => void;
@@ -27,13 +27,16 @@ export function PublicOfferContent(props: Props) {
     data.description ||
     "";
   const priceData = parsePriceData(data.pricing.rawPriceItems);
-  const priceItems = priceData.items.length
-    ? priceData.items
-    : (data.pricing.options ?? []).map((item) => ({
-        ...item,
-        label: item.title,
-        unit: "",
-      }));
+  const showTariffs = publicOfferShowsPaidPrices(data.pricing);
+  const priceItems = !showTariffs
+    ? []
+    : priceData.items.length
+      ? priceData.items
+      : (data.pricing.options ?? []).map((item) => ({
+          ...item,
+          label: item.title,
+          unit: "",
+        }));
   const priceDetails = [
     data.pricing.priceCaption,
     data.pricing.promotionDetails,
@@ -85,7 +88,7 @@ export function PublicOfferContent(props: Props) {
       {priceItems.length > 0 ||
       isRichTextMeaningful(priceDetails) ||
       priceData.note.trim() ||
-      data.pricing.discounts?.length ? (
+      (showTariffs && data.pricing.discounts?.length) ? (
         <PublicationSection className="py-14 md:py-16">
           <PublicationSectionHeading
             kicker="Стоимость"
@@ -97,12 +100,13 @@ export function PublicOfferContent(props: Props) {
             note={priceData.note}
             showHeader={false}
           />
-          {data.pricing.discounts?.map((discount, index) => (
-            <p key={index} className="my-3 text-sm text-text-main">
-              <strong className="mr-3 text-brand">{discount.rate}</strong>
-              {discount.label}
-            </p>
-          ))}
+          {showTariffs &&
+            data.pricing.discounts?.map((discount, index) => (
+              <p key={index} className="my-3 text-sm text-text-main">
+                <strong className="mr-3 text-brand">{discount.rate}</strong>
+                {discount.label}
+              </p>
+            ))}
           {data.pricing.promotionSubtitle && (
             <p className="text-sm text-text-muted">
               {data.pricing.promotionSubtitle}

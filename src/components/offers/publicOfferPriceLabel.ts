@@ -13,3 +13,8 @@ export function publicOfferPriceLabel(
     ? `от ${text}`
     : text;
 }
+
+/** Explicit non-paid modes must not expose stale paid display fields. */
+export function publicOfferShowsPaidPrices(pricing: OfferPageData["pricing"]): boolean {
+  return !["FREE", "NONE", "ON_REQUEST"].includes(pricing.priceMode ?? "");
+}

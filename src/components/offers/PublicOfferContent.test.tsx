@@ -140,11 +140,51 @@ console.log(
   "Public Offer presentation: empty sections, no mock fallbacks, preview compatibility, real content, prices, tariffs and action callbacks OK",
 );
 
-assert.equal(publicOfferPriceLabel({ priceMode: "FROM" }, "25 BYN"), publicOfferPriceLabel({ priceMode: "FROM" }, "от 25 BYN"));
+assert.equal(
+  publicOfferPriceLabel({ priceMode: "FROM" }, "25 BYN"),
+  publicOfferPriceLabel({ priceMode: "FROM" }, "от 25 BYN"),
+);
 assert.equal(publicOfferPriceLabel({ priceMode: "NONE" }, "25 BYN"), "");
-assert.match(render({ schedule: { type: "classes", items: [{ id: "group", groupName: "Реальная группа", days: "Понедельник", time: "12:00", ctaEnabled: true }] } }), /Реальная группа/);
+assert.match(
+  render({
+    schedule: {
+      type: "classes",
+      items: [
+        {
+          id: "group",
+          groupName: "Реальная группа",
+          days: "Понедельник",
+          time: "12:00",
+          ctaEnabled: true,
+        },
+      ],
+    },
+  }),
+  /Реальная группа/,
+);
 
 assert.equal(
   renderToStaticMarkup(createElement(PublicationTitle, null, "Эталон Event")),
   '<h1 style="margin:0;font-family:var(--font-sans);font-size:40px;font-weight:600;line-height:1.1;letter-spacing:-0.025em;color:#141210">Эталон Event</h1>',
 );
+
+const staleTariffs = {
+  items: [
+    { id: "stale", label: "Старый платный тариф", price: "975", unit: "месяц" },
+  ],
+  note: "",
+};
+for (const mode of ["FREE", "NONE", "ON_REQUEST"] as const) {
+  const html = render({
+    pricing: {
+      priceMode: mode,
+      rawPriceItems: staleTariffs,
+      oldPrice: "999",
+      discounts: [{ rate: "50%", label: "Старая скидка" }],
+    },
+  });
+  assert.ok(!html.includes("Старый платный тариф"));
+  assert.ok(!html.includes("999"));
+  assert.ok(!html.includes("Старая скидка"));
+  assert.ok(!html.includes("Сколько это стоит"));
+}

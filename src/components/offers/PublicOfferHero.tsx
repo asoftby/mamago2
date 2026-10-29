@@ -1,3 +1,4 @@
+import { publicOfferShowsPaidPrices } from "./publicOfferPriceLabel";
 import { BookingCountdown, pluralReviews } from "./OfferHero";
 import type { ReactNode, RefObject } from "react";
 import Link from "next/link";
@@ -124,13 +125,14 @@ export function PublicOfferHero({
                       <p className="font-pt-serif text-[40px] leading-tight tracking-[-1px] text-text-main">
                         {renderCurrencyText(priceLabel, { iconSize: "sm" })}
                       </p>
-                      {data.pricing.oldPrice && (
-                        <p className="text-sm text-text-muted line-through">
-                          {renderCurrencyText(data.pricing.oldPrice, {
-                            iconSize: "sm",
-                          })}
-                        </p>
-                      )}
+                      {data.pricing.oldPrice &&
+                        publicOfferShowsPaidPrices(data.pricing) && (
+                          <p className="text-sm text-text-muted line-through">
+                            {renderCurrencyText(data.pricing.oldPrice, {
+                              iconSize: "sm",
+                            })}
+                          </p>
+                        )}
                     </div>
                   )}
                 </div>
