@@ -229,9 +229,12 @@ test("changing weekdays starts replacement at next selected weekday, without ext
 
 test("following edit rejects outsiders and outdated series version without modifying rows", async () => {
   const owner=await fixture(), outsider=await fixture();
+  // Keep the target occurrence in the future so the series-version guard is exercised,
+  // rather than the separate rule that forbids editing past occurrences.
+  const futureStartDate = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
   const id=await createRecurringTaskSeries(owner,{
     ...base,requestKey:"repeat_"+randomUUID().replaceAll("-",""),
-    recurrence:{frequency:"DAILY",interval:1,startDate:"2026-10-29"},
+    recurrence:{frequency:"DAILY",interval:1,startDate:futureStartDate},
   });
   const item=await db.planItem.findFirstOrThrow({where:{recurrenceSeriesId:id}});
   const input={
