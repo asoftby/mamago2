@@ -84,6 +84,8 @@ jobs:
         run: pnpm exec tsx src/features/birthday/builder/components/steps/StepReviewAvailability.test.ts
       - name: Verify sibling request expiry contracts
         run: pnpm exec tsx src/server/birthday/partyMultiRequestExpiry.contract.test.ts
+      - name: Verify competing birthday invitation closure
+        run: pnpm exec tsx src/server/birthday/partyConfirmSiblings.contract.test.ts
       - name: Verify auto replenishment cron contracts
         run: pnpm exec tsx src/server/birthday/partyCandidateAutoReplenish.contract.test.ts
       - name: Verify candidate replenishment contracts
