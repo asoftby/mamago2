@@ -32,24 +32,37 @@ fi
 # Validate the actual host compose configuration before any mutating action.
 docker compose -p "$project" config --quiet
 db_config_before="$(docker compose -p "$project" config --format json | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["services"]["db"],sort_keys=True))')"
+# Validate all service images before migration OR cutover.
+config_json="$(docker compose -p "$project" config --format json)"
+service_images="$(printf '%s' "$config_json" | python3 -c 'import json,sys; s=json.load(sys.stdin)["services"]; print("\n".join(s[n].get("image","") for n in ("app","worker","migrate")))')"
+app_image="$(printf '%s\n' "$service_images" | sed -n '1p')"
+worker_image="$(printf '%s\n' "$service_images" | sed -n '2p')"
+migrate_image="$(printf '%s\n' "$service_images" | sed -n '3p')"
+if [ -z "$app_image" ] || [ "$app_image" != "$worker_image" ] || [ "$app_image" != "$migrate_image" ]; then
+  echo "ABORT: app, worker and migrate must share the selected immutable image" >&2
+  exit 1
+fi
+case "$app_image" in
+  ghcr.io/asoftby/mamago2:dev-[0-9]*|ghcr.io/asoftby/mamago2:prod-[0-9]*|ghcr.io/asoftby/mamago2@sha256:*) ;;
+  *) echo "ABORT: unsupported release image: $app_image" >&2; exit 1 ;;
+esac
+echo "Selected release image: $app_image"
+
+check_migration_status() {
+  docker compose -p "$project" run --rm --no-deps --entrypoint sh migrate -c 'pnpm prisma migrate status'
+}
+
 if [ "$action" = cutover ]; then
-  images="$(docker compose -p "$project" config --images)"
-  # The app and worker must be the same exact immutable image, enforced below.
-  app_image="$(docker compose -p "$project" config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["app"].get("image",""))')"
-  worker_image="$(docker compose -p "$project" config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["worker"].get("image",""))')"
-  if [ -z "$app_image" ] || [ "$app_image" != "$worker_image" ]; then
-    echo "ABORT: app and worker must use the same pinned image" >&2; exit 1
-  fi
-  case "$app_image" in
-    ghcr.io/asoftby/mamago2:dev-[0-9]*|ghcr.io/asoftby/mamago2:prod-[0-9]*|ghcr.io/asoftby/mamago2@sha256:*) ;;
-    *) echo "ABORT: image is not an approved immutable release: $app_image" >&2; exit 1;;
-  esac
+  # Fail closed if the selected release image has unapplied migrations.
+  check_migration_status
   echo "Cutting over app + worker: $app_image"
   docker compose -p "$project" pull app worker
   docker compose -p "$project" up -d --no-deps app worker
 else
-  echo "Running one-shot migration without starting/recreating dependencies"
+  echo "Pulling migration image for selected release: $migrate_image"
+  docker compose -p "$project" pull migrate
   docker compose -p "$project" run --rm --no-deps migrate
+  check_migration_status
 fi
 
 db_id_after="$(docker inspect --type container --format '{{.Id}}' "$db_container")"
