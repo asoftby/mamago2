@@ -409,3 +409,65 @@ test("new idempotency key is a new booking attempt, not a replay", async () => {
       error.code === "SLOT_UNAVAILABLE");
   assert.equal(await db.bookingRequest.count({ where: { offerId } }), 1);
 });
+
+test("2-hour exclusive booking holds the full window and snapshots discounted extension price", async () => {
+  const room = await unit("Hourly extension room");
+  const offerId = await offer([room]);
+  const edited = await saveBookingServices({ offerId, businessId, data: {
+    revision: 0, basePriceByn: "100.00",
+    maxExtensionHours: 2, extensionHourPriceByn: "60.00",
+    extensionDiscountPercent: 10, options: [],
+  } });
+  assert.equal(edited.status, 200);
+  const extendedEnd = new Date(end.getTime() + 60 * 60_000);
+  const { bookingId } = await reserveSlot({
+    offerId, unitId: room, startsAt: start, endsAt: extendedEnd, ...contact,
+  });
+  const booking = await db.bookingRequest.findUniqueOrThrow({ where: { id: bookingId } });
+  assert.equal(booking.bookingTotalByn?.toFixed(2), "154.00");
+  const snapshot = booking.bookingPriceSnapshot as { durationMinutes: number;
+    totalByn: string; extension: { hours: number; amountByn: string; discountPercent: number } };
+  assert.equal(snapshot.durationMinutes, 120);
+  assert.equal(snapshot.extension.hours, 1);
+  assert.equal(snapshot.extension.amountByn, "54.00");
+  assert.equal(snapshot.extension.discountPercent, 10);
+  const allocation = await db.bookingAllocation.findFirstOrThrow({ where: { bookingRequestId: bookingId } });
+  assert.equal(allocation.blockEnd.toISOString(), extendedEnd.toISOString());
+  assert.equal((await saveBookingServices({ offerId, businessId, data: {
+    revision: edited.revision!, basePriceByn: "150.00",
+    maxExtensionHours: 2, extensionHourPriceByn: "100.00",
+    extensionDiscountPercent: 0, options: [],
+  } })).status, 200);
+  const original = await db.bookingRequest.findUniqueOrThrow({ where: { id: bookingId } });
+  assert.equal(original.bookingTotalByn?.toFixed(2), "154.00");
+});
+
+test("extension not configured or longer than hourly cap cannot create a booking", async () => {
+  const room = await unit("Extension validation room");
+  const offerId = await offer([room]);
+  const invalidEnds = [new Date(end.getTime() + 30 * 60_000), new Date(end.getTime() + 60 * 60_000)];
+  for (const endsAt of invalidEnds) {
+    await assert.rejects(reserveSlot({
+      offerId, unitId: room, startsAt: start, endsAt, ...contact,
+    }), (error: unknown) => error instanceof SlotReservationError && error.code === "INVALID_SLOT");
+  }
+  assert.equal(await db.bookingRequest.count({ where: { offerId } }), 0);
+});
+
+test("manual block in extension hour rejects entire booking, never only the extra time", async () => {
+  const room = await unit("Extension conflict room");
+  const offerId = await offer([room]);
+  assert.equal((await saveBookingServices({ offerId, businessId, data: {
+    revision: 0, basePriceByn: "60.00", maxExtensionHours: 1,
+    extensionHourPriceByn: "25.00", extensionDiscountPercent: 0, options: [],
+  } })).status, 200);
+  await db.calendarBlock.create({ data: {
+    bookingUnitId: room, blockStart: end,
+    blockEnd: new Date(end.getTime() + 60 * 60_000), source: "MANUAL",
+  } });
+  await assert.rejects(reserveSlot({ offerId, unitId: room, startsAt: start,
+    endsAt: new Date(end.getTime() + 60 * 60_000), ...contact }),
+    (error: unknown) => error instanceof SlotReservationError && error.code === "SLOT_UNAVAILABLE");
+  assert.equal(await db.bookingRequest.count({ where: { offerId } }), 0);
+  assert.equal(await db.bookingAllocation.count({ where: { bookingUnitId: room } }), 0);
+});
