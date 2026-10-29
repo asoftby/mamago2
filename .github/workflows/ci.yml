@@ -365,6 +365,14 @@ jobs:
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
 
+      - name: Family plan PostgreSQL access isolation
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+          FAMILY_CORE_READS: '1'
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/server/family/familyPlanAcl.integration.test.ts
+
       - name: Cross-region eligibility PostgreSQL behavior
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
