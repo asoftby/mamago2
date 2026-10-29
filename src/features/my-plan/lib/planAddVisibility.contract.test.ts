@@ -11,7 +11,15 @@ assert.match(route, /familyReadsEnabled\(\) && \(visibilityRaw === "PRIVATE" \|\
 assert.equal((route.match(/eventType: "PLAN_ADD",\n\s+planVisibility: visibility,/g) ?? []).length, 3);
 
 const plan = read("src/server/services/plan.service.ts");
-assert.equal((plan.match(/\.\.\.\(options\?\.visibility \? \{ visibility: options\.visibility \} : \{\}\)/g) ?? []).length, 2);
+const visibilityWriters = ["addRoutePlanItem", "addOfferPlanItem", "addPlacePlanItem"];
+const optionVisibility = /\.\.\.\(options\?\.visibility \? \{ visibility: options\.visibility \} : \{\}\)/g;
+assert.equal((plan.match(optionVisibility) ?? []).length, visibilityWriters.length);
+for (const writer of visibilityWriters) {
+  const start = plan.indexOf(`export async function ${writer}(`);
+  assert.ok(start >= 0, `${writer}: expected plan writer`);
+  const end = plan.indexOf("\nexport async function ", start + 1);
+  assert.match(plan.slice(start, end < 0 ? undefined : end), new RegExp(optionVisibility.source), `${writer}: create must preserve requested visibility`);
+}
 assert.match(plan, /\.\.\.\(visibility \? \{ visibility \} : \{\}\)/);
 
 // Client: the switch exists only for flows that forward `visibility` to the server.

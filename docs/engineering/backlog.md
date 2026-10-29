@@ -5614,11 +5614,11 @@ distributor_company_id=550) и хотели бы уточнить несколь
 
 ## [BACKLOG-213] Family reads gate does not cover the transactional offer save
 
-- Status: BLOCKED
+- Status: DONE
 - Priority: P1
 - Area: Family / push gate regression
 - Added: 2026-10-29
-- Reason deferred: needs an explicit scope decision; unrelated to Territory #784.
+- Resolution: approved by the user in PR #784 on 2026-10-29; contracts updated without changing family business logic.
 - Context: `familyCoreReads.contract.test.ts:31` expects four `planItem.create`
   calls. `plan.service.ts` now has four direct creates plus one transactional
   offer create using a previously resolved `familyId`.
@@ -5628,3 +5628,10 @@ distributor_company_id=550) и хотели бы уточнить несколь
   validate familyId for all five create paths, and pass `test:family-core-reads`
   plus the full push gate. Do not bypass the hook or weaken ownership checks.
 - Source: PR #784 reconciliation; full `task-check.sh` stopped at this contract.
+- Verification: all five named writes validate caller-derived familyId and active
+  dedup scope; all five foreign-family/user mutations are rejected. Full
+  `test:family-core-reads`, SQL aggregation regression and PostgreSQL Offer
+  PRIVATE/FAMILY, cross-family ACL and concurrency integration pass.
+  Related stale analytics/visibility contracts now follow the existing SQL
+  aggregation and Offer visibility path. Full push gate/CI is checked before
+  PR #784 is declared ready.

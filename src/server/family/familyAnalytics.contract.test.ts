@@ -16,8 +16,13 @@ for (const [file, src] of [
 }
 assert.match(read("src/server/services/analytics/SegmentResolverService.ts"), /childScopeFor/);
 const plan = read("src/server/services/plan.service.ts");
-assert.match(plan, /planCountUnit/);
-assert.match(plan, /familyAnalyticsPure/);
+// Counts now aggregate in SQL; verify the family-aware query is wired in and
+// keeps the same family-or-owner unit instead of requiring the old JS import.
+assert.match(plan, /planActivityCountsQuery\(activityIds, familyReadsEnabled\(\)\)/);
+const countsQuery = read("src/server/services/planActivityCountsQuery.ts");
+assert.match(countsQuery, /COUNT\(DISTINCT/);
+assert.match(countsQuery, /CASE WHEN "familyId" IS NOT NULL THEN 'f:' \|\| "familyId" ELSE 'u:' \|\| "userId" END/);
+assert.match(countsQuery, /"status" <> 'CANCELLED'/);
 const helper = read("src/server/family/familyAnalytics.ts");
 assert.match(helper, /familyReadsEnabled\(\)/);
 assert.match(helper, /"leftAt" IS NULL/);
