@@ -19,6 +19,7 @@ type Catalog = {
   currency: string;
   bookingEnabled: boolean;
   bookingMode: string | null;
+  resourceExtrasAllowed: boolean;
   basePriceByn: string | null;
   options: Array<Omit<EditorOption, "key">>;
   units: Array<{ id: string; name: string }>;
@@ -182,7 +183,7 @@ export function BookingServicesEditor({ offerId }: { offerId: string | null }) {
                           onChange={e => setOption(option.key, { priceByn: e.target.value })} />
                       </div>
                     </div>
-                    {option.mode !== "STANDALONE" && (
+                    {option.mode !== "STANDALONE" && catalog.resourceExtrasAllowed && (
                       <div className="space-y-1">
                         <Label htmlFor={`option-resource-${index}`}>Дополнительный ресурс (при необходимости)</Label>
                         <select id={`option-resource-${index}`} value={option.bookingUnitId ?? ""}
