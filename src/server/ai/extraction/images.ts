@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { fetchBinary } from "@/server/modules/import/parsers/fetchHtml";
 import type { TelegramCaptureClient } from "@/server/services/telegram/capture/telegramCaptureClient.core";
 
 /**
@@ -10,7 +11,7 @@ export type LoadedImage = {
   bytes: Uint8Array;
   mime: string;
   sha256: string;
-  origin: "telegram-file";
+  origin: "telegram-file" | "web";
 };
 
 export type ImageLoadResult = { ok: true; value: LoadedImage } | { ok: false; code: string };
@@ -50,6 +51,59 @@ export function createTelegramFileImageSource(
           origin: "telegram-file",
         },
       };
+    },
+  };
+}
+
+export type WebImageSourceOptions = {
+  maxBytes: number;
+  /** Разрешённые хосты картинок; всё остальное отклоняется до запроса и на каждом редиректе. */
+  isAllowedHost: (hostname: string) => boolean;
+  timeoutMs?: number;
+};
+
+const WEB_IMAGE_FETCH_FAILED = "IMAGE_FETCH_FAILED";
+const WEB_IMAGE_NOT_AN_IMAGE = "IMAGE_NOT_AN_IMAGE";
+
+function mimeFromContentType(contentType: string | undefined): string | null {
+  const type = contentType?.split(";")[0]?.trim().toLowerCase();
+  return type && /^image\/(png|jpeg|jpg|webp|gif)$/.test(type) ? type.replace("image/jpg", "image/jpeg") : null;
+}
+
+/**
+ * URL картинки -> `fetchBinary` (SSRF-защита, лимит размера, проверка хоста на
+ * каждом редиректе). Ошибки приводятся к безопасным кодам: адрес с токенами и
+ * тексты сетевых ошибок наружу не попадают.
+ */
+export function createWebImageSource(options: WebImageSourceOptions): ImageSource<string> {
+  return {
+    async load(url) {
+      try {
+        const response = await fetchBinary(url, {
+          maxBytes: options.maxBytes,
+          timeoutMs: options.timeoutMs,
+          headers: { Accept: "image/*" },
+          validateUrl: (candidate) => {
+            if (candidate.protocol !== "https:" || !options.isAllowedHost(candidate.hostname.toLowerCase())) {
+              throw new Error("Image host is not allowed");
+            }
+          },
+        });
+        const mime = mimeFromContentType(response.headers["content-type"]) ?? null;
+        if (!mime) return { ok: false, code: WEB_IMAGE_NOT_AN_IMAGE };
+        const bytes = new Uint8Array(response.buffer);
+        return {
+          ok: true,
+          value: {
+            bytes,
+            mime,
+            sha256: createHash("sha256").update(bytes).digest("hex"),
+            origin: "web",
+          },
+        };
+      } catch {
+        return { ok: false, code: WEB_IMAGE_FETCH_FAILED };
+      }
     },
   };
 }

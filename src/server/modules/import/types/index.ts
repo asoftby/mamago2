@@ -204,6 +204,25 @@ export interface ParsedRawRecord {
   rawPayload: Record<string, unknown>;
   rawText?: string;
   sourceUpdatedAt?: Date;
+  /**
+   * Стабильное содержимое для `contentHash`. Если задано, хэш считается от него,
+   * а не от `rawPayload` (так CDN-адреса картинок Telegram не меняют хэш поста).
+   * Только плоские значения: строки и массивы строк. Для family.by и ABWS не
+   * задаётся, их хэш считается от `rawPayload`, как раньше.
+   */
+  hashInput?: Record<string, string | string[]>;
+}
+
+/** Изображение поста, уже известное по предыдущему запуску (для повторного использования sha256). */
+export interface KnownPostImage {
+  url: string;
+  sha256: string;
+}
+
+/** Контекст запуска, который пайплайн передаёт парсеру. Парсеры могут его игнорировать. */
+export interface ParserRunContext {
+  /** Известные изображения ранее сохранённых записей по `externalId`. */
+  loadKnownImages(externalIds: string[]): Promise<Map<string, KnownPostImage[]>>;
 }
 
 /** Результат парсинга всего источника */

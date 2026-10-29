@@ -15,6 +15,7 @@
 import prisma from "@/lib/prisma";
 import { GlobalLock } from "@/server/ops/lock/GlobalLock";
 import { computeContentHash } from "../utils/content-hash";
+import { buildParserRunContext } from "./parser-run-context";
 import { getParser } from "../parsers/registry";
 import { normalizeRunRecords } from "./import-normalization.service";
 import { matchRunRecords } from "./import-matching.service";
@@ -158,7 +159,7 @@ export async function runImportForSource(
 
   try {
     // 2-3. Парсинг
-    const parserResult = await parser.parse(source);
+    const parserResult = await parser.parse(source, buildParserRunContext(source.id));
     totalFetched = parserResult.totalFound;
 
     if (parserResult.error) {
@@ -168,7 +169,7 @@ export async function runImportForSource(
     // 4. Сохранить сырые записи
     for (const raw of parserResult.records) {
       try {
-        const contentHash = computeContentHash(raw.rawPayload);
+        const contentHash = computeContentHash(raw.hashInput ?? raw.rawPayload);
 
         if (raw.externalId) {
           // Non-authoritative fast path: only decides whether to skip an
@@ -405,7 +406,7 @@ export async function previewImportForSource(
     throw new Error(`No parser registered for key: "${source.parserKey}"`);
   }
 
-  const parserResult = await parser.parse(source);
+  const parserResult = await parser.parse(source, buildParserRunContext(source.id));
   const toProcess = parserResult.records.slice(0, limit);
 
   let totalParsed = 0;
