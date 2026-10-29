@@ -1153,6 +1153,7 @@ model Region {
   priority  Int        @default(0)
   /// Optional per-region eligibility threshold; null means the product default (50).
   crossRegionFamilyThreshold Int?
+  crossRegionOverrides CrossRegionEditorialOverride[]
   cities    City[]
   articles  Article[]  @relation("ArticleRegion")
   seoContentPlanItems SeoContentPlanItem[] @relation("SeoContentPlanRegion")
@@ -1419,6 +1420,7 @@ model Activity {
   venue                EventVenue?
   importedRecords      ImportedRecord[]          @relation("ImportedRecordActivity")
   planItems            PlanItem[]
+  crossRegionOverrides CrossRegionEditorialOverride[]
   occasionLinks        ActivityOccasion[]
   /// Сигналы DISCOVERY домена (entityType=EVENT или OFFER), ID SignalDefinition
   discoverySignalIds   String[]                  @default([])
@@ -7257,4 +7259,21 @@ model BusinessTelegramLinkToken {
   createdAt   DateTime            @default(now())
 
   @@index([userId, environment, expiresAt])
+}
+
+/// Time-bounded editorial eligibility for an event in a target region.
+model CrossRegionEditorialOverride {
+  id String @id @default(cuid())
+  activityId String
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  regionId String
+  region Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  reason String
+  expiresAt DateTime
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([activityId, regionId])
+  @@index([regionId, expiresAt])
 }
