@@ -36,4 +36,11 @@ for (const guard of [
   'data: { status: "EXPIRED", resolvedAt: now }',
   'status: "QUEUED"', 'status: "REQUESTED"',
 ]) assert.ok(expiry.includes(guard), "Expiry must keep request and queue consistent: " + guard);
+const business = readFileSync("src/server/birthday/partyBusiness.service.ts", "utf8");
+for (const guard of [
+  'bookingRequestId: requestId, status: "SENT"',
+  'status: declined ? "DECLINED" : autoConfirm ? "CONFIRMED" : "QUOTED"',
+  'partyOrderItemId: item.id, status: "QUEUED"',
+  'queuedAlternatives > 0 ? PartyItemStatus.REQUESTED',
+]) assert.ok(business.includes(guard), "Business replies must synchronize invite state: " + guard);
 console.log("partyInviteTransactionalDispatch.contract.test.ts: OK");
