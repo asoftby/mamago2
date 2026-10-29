@@ -192,6 +192,11 @@ export interface EventImportOccurrence {
   priceMaxCents?: number | null;
   buyUrl?: string;
   isSaleOpen?: boolean;
+  /**
+   * Название подсобытия (день фестиваля, фильм, показ). Необязательно: если не
+   * задано, `ActivitySession.title` при повторной записи не меняется.
+   */
+  title?: string;
 }
 
 // ─── Parser ───────────────────────────────────────────────────────────────────
