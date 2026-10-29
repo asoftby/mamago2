@@ -136,3 +136,19 @@ test("unrelated account cannot cancel another user's recurrence", async () => {
   await assert.rejects(cancelRecurringTaskSeries(stranger,item.id,"ALL",item.updatedAt.toISOString()),/recurrence_not_found/);
   assert.equal(await db.planItem.count({where:{recurrenceSeriesId:id,status:"CONFIRMED"}}),1);
 });
+
+test("concurrent calendar materialization and series cancellation never resurrect future days", async () => {
+  const owner=await fixture();
+  const id=await createRecurringTaskSeries(owner,{
+    ...base,requestKey:"repeat_"+randomUUID().replaceAll("-"),
+    recurrence:{frequency:"DAILY",interval:1,startDate:"2026-10-29"},
+  });
+  const first=await db.planItem.findFirstOrThrow({where:{recurrenceSeriesId:id}});
+  const result=await Promise.allSettled([
+    ...Array.from({length:5},()=>materializeRecurrencesForRange(owner,"2026-10-29","2026-11-05")),
+    cancelRecurringTaskSeries(owner,first.id,"FUTURE",first.updatedAt.toISOString()),
+  ]);
+  assert.ok(result.every(item=>item.status==="fulfilled"),JSON.stringify(result.filter(x=>x.status==="rejected")));
+  await materializeRecurrencesForRange(owner,"2026-10-29","2026-11-05");
+  assert.equal(await db.planItem.count({where:{recurrenceSeriesId:id,status:"CONFIRMED"}}),0);
+});
