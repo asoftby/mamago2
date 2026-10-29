@@ -20,4 +20,7 @@ assert.equal(overlapsBookingWindow({ blockStart: at(120), blockEnd: at(180) }, w
 assert.equal(overlapsBookingWindow({ blockStart: at(59), blockEnd: at(61) }, window), true);
 assert.equal(overlapsBookingWindow({ blockStart: at(119), blockEnd: at(121) }, window), true);
 assert.equal(overlapsBookingWindow({ blockStart: at(60), blockEnd: at(120) }, window), true);
+// Public preview must not expose free rooms owned by a different business.
+assert.match(service, /place:\s*\{ select: \{ ownerBusinessId: true \} \}/);
+assert.match(service, /bookingUnit:\s*\{ businessId \}/);
 console.log("partyAvailabilityPreview.test.ts: OK");
