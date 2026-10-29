@@ -2,10 +2,12 @@
 
 import Script from "next/script";
 import { useCallback, useRef, useState } from "react";
+import { expandMiniApp } from "@/lib/telegram/expandMiniApp";
 
 type WebApp = {
   initData: string;
   ready: () => void;
+  expand?: () => void;
 };
 declare global {
   interface Window {
@@ -27,6 +29,7 @@ export function TelegramOpenClient({ destination }: { destination: string }) {
 
     started.current = true;
     try {
+      expandMiniApp(webApp);
       webApp.ready();
       const response = await fetch("/api/auth/telegram-webapp", {
         method: "POST",
