@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import prisma from "@/lib/prisma";
 import { dispatchQueuedPartyInvites } from "./partyInviteTransactionalDispatch.service";
+import { replyToPartyRequest } from "./partyBusiness.service";
 
 const url = new URL(process.env.DATABASE_URL ?? "http://invalid");
 if (url.hostname !== "127.0.0.1" || url.port !== "55443" ||
@@ -44,6 +45,46 @@ async function main() {
     assert.equal(replay.sent, 0);
     assert.equal(await prisma.bookingRequest.count({ where: { partyOrderItemId: item.id } }), 1);
     console.log("PASS competing queued dispatch and replay: exactly one request/outbox");
+
+    const business = await prisma.business.findUniqueOrThrow({
+      where: { id: offer.place.ownerBusinessId! }, select: { ownerUserId: true },
+    });
+    const respond = (type: "DECLINED" | "AS_REQUESTED", key: string) =>
+      replyToPartyRequest({
+        businessId: offer.place.ownerBusinessId!, actorUserId: business.ownerUserId,
+        requestId: invite.bookingRequestId!, idempotencyKey: key,
+        input: type === "DECLINED"
+          ? { expectedStage: "SENT", expectedQuoteVersion: 0,
+              type: "DECLINED", declineReason: "DATE_BUSY" }
+          : { expectedStage: "SENT", expectedQuoteVersion: 0,
+              type: "AS_REQUESTED", priceByn: 120, includes: "Фотосъёмка" },
+      });
+    // Two mutually exclusive business replies race for the same BookingRequest.
+    const replies = await Promise.allSettled([
+      respond("DECLINED", "race_decline_" + item.id),
+      respond("AS_REQUESTED", "race_quote_" + item.id),
+    ]);
+    assert.equal(replies.filter(x => x.status === "fulfilled").length, 1,
+      "Exactly one competing business response should commit");
+    const request = await prisma.bookingRequest.findUniqueOrThrow({
+      where: { id: invite.bookingRequestId! },
+    });
+    const persistedInvite = await prisma.partyProviderInvite.findUniqueOrThrow({
+      where: { id: invite.id },
+    });
+    assert.ok(request.partyStage === "DECLINED" || request.partyStage === "QUOTED");
+    assert.equal(persistedInvite.status, request.partyStage);
+    assert.equal(await prisma.partyQuote.count({
+      where: { bookingRequestId: request.id },
+    }), 1);
+    assert.equal(await prisma.partyOutbox.count({
+      where: { aggregateId: request.id, eventType: {
+        in: ["PARTY_REQUEST_DECLINED", "PARTY_QUOTE_SENT"],
+      } },
+    }), 1);
+    const replayAfterReply = await dispatchQueuedPartyInvites(item.id);
+    assert.equal(replayAfterReply.sent, 0);
+    console.log("PASS competing decline/quote: one winner, consistent queue and outbox");
   } finally {
     await prisma.partyOrder.delete({ where: { id: order.id } });
   }
