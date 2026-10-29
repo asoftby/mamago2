@@ -28,12 +28,13 @@
 - independently versioned `OfferBooking.pricingRevision` (safe additive
   migration). Two tabs cannot silently overwrite prices;
 - all inputs validated; rejects cross-tenant / unlinked / inactive resource,
-  and resource extras for active group sessions; max 20 options; INCLUDED=0;
+  unless the actual schedule is `ON_REQUEST_WINDOWS` with no active class groups; max 20 options; INCLUDED=0;
 - writes base and options transactionally under an Offer row lock;
 - deleting an option never deletes the immutable snapshot in previous
   `BookingRequest` rows.
 - The editor's save button is explicit and separate from offer text draft.
   A 409 prompts refreshing data rather than silent conflict overwrite.
+- Switching to a capacity/session schedule is blocked while active resource-linked extras remain; turn them off first.
 
 ## Customer choice and price preview
 
