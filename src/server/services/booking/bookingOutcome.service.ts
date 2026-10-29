@@ -69,6 +69,15 @@ export async function closePastStandardBooking(input: {
         ...(nextStatus === BookingStatus.COMPLETED ? { completedAt: now } : {}) },
     });
     if (claimed.count !== 1) throw new BookingOutcomeError(409, "Эта заявка уже изменена");
+    // Closing a past visit as NOT_HELD is a cancellation. Release all active
+    // resource allocations atomically, just like the standard status endpoint.
+    // A COMPLETED visit retains its historical confirmed allocation.
+    if (nextStatus === BookingStatus.CANCELLED) {
+      await tx.bookingAllocation.updateMany({
+        where: { bookingRequestId: row.id, status: { in: ["HELD", "CONFIRMED"] } },
+        data: { status: "RELEASED", expiresAt: null },
+      });
+    }
     await tx.bookingActivity.create({
       data: {
         bookingId: row.id, type: "STATUS_CHANGED", actorType: "BUSINESS",
