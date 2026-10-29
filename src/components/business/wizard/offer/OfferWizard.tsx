@@ -81,6 +81,7 @@ import { Step2Information } from "./steps/Step2Information";
 import { Step3Media } from "./steps/Step3Media";
 import { Step4Conditions } from "./steps/Step4Conditions";
 import { Step5Pricing } from "./steps/Step5Pricing";
+import { BookingServicesEditor } from "./components/BookingServicesEditor";
 import { Step6Contacts } from "./steps/Step6Contacts";
 import { FaqStep } from "../shared/FaqStep";
 
@@ -864,11 +865,18 @@ export function OfferWizard({
         case "accommodation":
           return <Step5Accommodation {...commonProps} />;
         case "price":
-          return <Step5Pricing {...commonProps} hideCta={variant === "v2"} />;
+          return (
+            <div className="space-y-6">
+              <Step5Pricing {...commonProps} hideCta={variant === "v2"} />
+              {formData.productType !== "CAMP" && (
+                <BookingServicesEditor offerId={offerId} />
+              )}
+            </div>
+          );
         case "openingHours":
           return <StepOpeningHours {...commonProps} />;
         case "classSchedule":
-          return <StepClassSchedule {...commonProps} />;
+          return <StepClassSchedule {...commonProps} showTariffs={variant !== "v2"} />;
         case "bookingMethod":
           return (
             <StepBookingMethod
