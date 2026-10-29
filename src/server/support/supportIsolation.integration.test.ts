@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { canAccessBusiness } from "@/server/permissions/business-permissions";
+import { requireSupportThreadAccess, SupportAccessError } from "./supportAccess";
 
 if (!process.env.DATABASE_URL) throw new Error("Isolated PostgreSQL database required");
 const tag = randomUUID();
@@ -30,8 +31,11 @@ async function main() {
     } });
     threadIds.push(thread.id);
     assert.equal(await canAccessBusiness(ownerA.id, a.id), true);
+    assert.equal((await requireSupportThreadAccess({ id: ownerA.id, role: "USER" }, thread.id)).id, thread.id);
     assert.equal(await canAccessBusiness(ownerB.id, a.id), false);
     assert.equal(await canAccessBusiness(outsider.id, a.id), false);
+    await assert.rejects(requireSupportThreadAccess({ id: ownerB.id, role: "USER" }, thread.id), (e: unknown) => e instanceof SupportAccessError && e.status === 404);
+    await assert.rejects(requireSupportThreadAccess({ id: outsider.id, role: "USER" }, thread.id), (e: unknown) => e instanceof SupportAccessError && e.status === 404);
     const rowsForB = await prisma.supportThread.findMany({
       where: { businessId: { in: [b.id] } }, select: { id: true },
     });
@@ -46,6 +50,7 @@ async function main() {
       data: { isActive: false },
     });
     assert.equal(await canAccessBusiness(ownerA.id, a.id), false, "revoked member loses access");
+    await assert.rejects(requireSupportThreadAccess({ id: ownerA.id, role: "USER" }, thread.id), (e: unknown) => e instanceof SupportAccessError && e.status === 404);
     console.log("Support cross-business PostgreSQL isolation: passed");
   } finally {
     if (threadIds.length) await prisma.supportThread.deleteMany({ where: { id: { in: threadIds } } });
