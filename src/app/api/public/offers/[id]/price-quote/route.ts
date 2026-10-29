@@ -6,6 +6,7 @@ import { checkRateLimit } from "@/lib/security/rateLimit";
 import { getTrustedClientIp } from "@/lib/security/clientIp";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
 import { calculateBookingPrice, BookingPriceError } from "@/server/offers/bookingPrice";
+import { assertBookingDuration, durationChoices } from "@/server/offers/bookingDuration";
 
 const requestSchema = z.object({
   startsAt: z.string().datetime({ offset: true }),
@@ -39,15 +40,26 @@ export async function POST(request: NextRequest, { params }: {
       id: true, currency: true, priceItems: true,
       place: { select: { ownerBusinessId: true } },
       classGroups: { include: { tariffs: true } },
-      offerBooking: { select: { basePriceByn: true, options: true, durationMin: true } },
+      offerBooking: { select: { basePriceByn: true, options: true, durationMin: true, scheduleKind: true, maxExtensionHours: true, extensionHourPriceByn: true, extensionDiscountPercent: true } },
     },
   });
   if (!offer?.place?.ownerBusinessId || !offer.offerBooking) {
     return NextResponse.json({ error: "Предложение недоступно" }, { status: 404 });
   }
-  // No dynamic duration pricing until the corresponding server-side slot
-  // duration validation is implemented. Avoid previewing an impossible term.
-  if (offer.offerBooking.durationMin !== null &&
+  if (offer.offerBooking.scheduleKind === "ON_REQUEST_WINDOWS") {
+    try {
+      assertBookingDuration({
+        scheduleKind: offer.offerBooking.scheduleKind,
+        durationMin: offer.offerBooking.durationMin,
+        maxExtensionHours: offer.offerBooking.maxExtensionHours,
+        extensionHourPriceByn: offer.offerBooking.extensionHourPriceByn?.toString() ?? null,
+        extensionDiscountPercent: offer.offerBooking.extensionDiscountPercent,
+        hasClassGroups: offer.classGroups.some(group => group.active),
+      }, durationMinutes);
+    } catch {
+      return NextResponse.json({ error: "Продолжительность недоступна" }, { status: 422 });
+    }
+  } else if (offer.offerBooking.durationMin !== null &&
       durationMinutes !== offer.offerBooking.durationMin) {
     return NextResponse.json({ error: "Продолжительность недоступна" }, { status: 422 });
   }
@@ -69,6 +81,9 @@ export async function POST(request: NextRequest, { params }: {
   try {
     const { snapshot, optionUnitIds } = calculateBookingPrice({
       currency: offer.currency, seats: input.data.seats, durationMinutes,
+      baseDurationMinutes: offer.offerBooking.durationMin ?? durationMinutes,
+      extensionHourPriceByn: offer.offerBooking.extensionHourPriceByn?.toString() ?? null,
+      extensionDiscountPercent: offer.offerBooking.extensionDiscountPercent,
       basePriceByn: offer.offerBooking.basePriceByn?.toString() ?? null,
       tariff: tariff ? {
         id: tariff.id, title: "title" in tariff ? tariff.title : tariff.label,
@@ -115,7 +130,10 @@ export async function GET(_request: NextRequest, { params }: {
       bookingMode: { in: ["USE_PUBLICATION_DATES", "USE_PUBLICATION_SLOTS"] } },
     select: { currency: true, place: { select: { ownerBusinessId: true } },
       classGroups: { where: { active: true }, select: { id: true } },
-      offerBooking: { select: { scheduleKind: true, options: { where: { active: true },
+      offerBooking: { select: {
+        durationMin: true, maxExtensionHours: true, extensionHourPriceByn: true,
+        extensionDiscountPercent: true,
+        scheduleKind: true, options: { where: { active: true },
         orderBy: { position: "asc" }, select: {
           id: true, title: true, mode: true, priceByn: true, bookingUnitId: true,
         } } } },
@@ -135,6 +153,14 @@ export async function GET(_request: NextRequest, { params }: {
         priceByn: option.priceByn.toFixed(2),
       }))
     : [];
-  return NextResponse.json({ options, currency: offer.currency },
+  const durations = durationChoices({
+    scheduleKind: offer.offerBooking.scheduleKind,
+    durationMin: offer.offerBooking.durationMin,
+    maxExtensionHours: offer.offerBooking.maxExtensionHours,
+    extensionHourPriceByn: offer.offerBooking.extensionHourPriceByn?.toString() ?? null,
+    extensionDiscountPercent: offer.offerBooking.extensionDiscountPercent,
+    hasClassGroups: offer.classGroups.length > 0,
+  });
+  return NextResponse.json({ options, currency: offer.currency, durationOptionsMinutes: durations },
     { headers: { "Cache-Control": "private, no-store" } });
 }
