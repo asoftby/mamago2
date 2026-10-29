@@ -11,6 +11,7 @@ import {
   addWishlistItem,
   createWishlist,
   getWishlist,
+  cancelReservationAsOwner,
   listWishlists,
   refreshItemPreview,
   removeWishlistItem,
@@ -32,7 +33,7 @@ const db = new PrismaClient({ datasourceUrl: databaseUrl });
 const run = randomUUID().slice(0, 8);
 const userIds: string[] = [];
 const env = { WISHLIST_ENABLED: "1", FAMILY_CORE_READS: "1" };
-const deps = { db, env };
+const deps = { db, env, notifyReleased: async () => {} };
 
 async function makeUser(label: string): Promise<string> {
   const user = await db.user.create({ data: { email: `wl-${run}-${label}@example.test` } });
@@ -362,4 +363,53 @@ test("link preview: blocked shop, missing link, stale link and foreign user", as
     refreshItemPreview(stranger, w.id, withUrl, { ...deps, fetchPreview: async () => null }),
     (e: unknown) => e instanceof WishlistError && e.code === "not_found",
   );
+});
+
+test("author release notifies the affected guests with the right reason", async () => {
+  const owner = await makeUser("notif");
+  const w = await createWishlist(owner, wl(), deps);
+  const calls: Array<{ id: string; reason: string }> = [];
+  const rec = { ...deps, notifyReleased: async (_db: unknown, released: Array<{ reservationId: string; reason: string }>) => {
+    calls.push(...released.map((r) => ({ id: r.reservationId, reason: r.reason })));
+  } };
+
+  // replaced link
+  const a = (await addWishlistItem(owner, w.id, item("Книга", { url: "https://shop.example.test/a" }), deps)).items[0].id;
+  const ra = await reserve(a);
+  await updateWishlistItem(owner, w.id, a, { url: "https://shop.example.test/b", confirmReserved: true }, rec as never);
+  assert.deepEqual(calls.splice(0), [{ id: ra.id, reason: "replaced" }]);
+
+  // removed item
+  const b = (await addWishlistItem(owner, w.id, item("Мяч"), deps)).items.find((i) => i.title === "Мяч")!.id;
+  const rb = await reserve(b);
+  await removeWishlistItem(owner, w.id, b, { confirmReserved: true }, rec as never);
+  assert.deepEqual(calls.splice(0), [{ id: rb.id, reason: "removed" }]);
+
+  // quantity cut: only the newest reservation is dropped and told
+  const c = (await addWishlistItem(owner, w.id, item("Кубики", { quantity: 2 }), deps)).items.find((i) => i.title === "Кубики")!.id;
+  const first = await reserve(c);
+  const second = await reserve(c);
+  await updateWishlistItem(owner, w.id, c, { quantity: 1, confirmReserved: true }, rec as never);
+  assert.deepEqual(calls.splice(0), [{ id: second.id, reason: "quantity" }]);
+  assert.equal((await db.wishlistReservation.findUniqueOrThrow({ where: { id: first.id } })).status, "RESERVED");
+
+  // author releases one reservation: marked as author-side, guest is told
+  const rc = await cancelReservationAsOwner(owner, w.id, first.id, rec as never);
+  assert.ok(rc);
+  assert.deepEqual(calls.splice(0), [{ id: first.id, reason: "released" }]);
+  assert.equal((await db.wishlistReservation.findUniqueOrThrow({ where: { id: first.id } })).status, "ITEM_REMOVED");
+
+  // a cosmetic edit tells nobody
+  await updateWishlistItem(owner, w.id, a, { comment: "размер M" }, rec as never);
+  assert.deepEqual(calls, []);
+});
+
+test("a failing notifier never fails the author's edit", async () => {
+  const owner = await makeUser("notif2");
+  const w = await createWishlist(owner, wl(), deps);
+  const id = (await addWishlistItem(owner, w.id, item("Книга"), deps)).items[0].id;
+  await reserve(id);
+  const boom = { ...deps, notifyReleased: async () => { throw new Error("smtp down: secret@example.test"); } };
+  const view = await removeWishlistItem(owner, w.id, id, { confirmReserved: true }, boom as never);
+  assert.equal(view.items.length, 0);
 });

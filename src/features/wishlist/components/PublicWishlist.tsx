@@ -44,9 +44,11 @@ async function send(url: string, method: string, body: unknown): Promise<{ ok: b
 export function PublicWishlist({
   token,
   wishlist,
+  telegramUrls,
 }: {
   token: string;
   wishlist: PublicWishlistView;
+  telegramUrls: Record<string, string>;
 }) {
   const router = useRouter();
   const [openItem, setOpenItem] = useState<string | null>(null);
@@ -84,6 +86,11 @@ export function PublicWishlist({
           Выберите подарок и отметьте, что берёте его. Регистрация не нужна, достаточно имени.
         </p>
       )}
+      {wishlist.notices.map((n) => (
+        <p key={n.reservationId} role="status" className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+          Автор изменил или убрал подарок «{n.itemTitle}», поэтому ваша бронь снята. Можно выбрать другой подарок.
+        </p>
+      ))}
       {message ? (
         <p role="status" className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
           {message}
@@ -98,6 +105,7 @@ export function PublicWishlist({
             item={item}
             archived={wishlist.archived}
             busy={busy}
+            telegramUrls={telegramUrls}
             open={openItem === item.id}
             onToggle={() => setOpenItem(openItem === item.id ? null : item.id)}
             onReserve={(body) =>
@@ -121,6 +129,7 @@ function ItemCard(props: {
   item: PublicItemView;
   archived: boolean;
   busy: boolean;
+  telegramUrls: Record<string, string>;
   open: boolean;
   onToggle: () => void;
   onReserve: (body: { displayName: string; quantity: number; contactEmail: string | null; consent: boolean }) => Promise<boolean>;
@@ -180,6 +189,21 @@ function ItemCard(props: {
               </button>
             </span>
           ) : null}
+          <p className="basis-full text-xs text-emerald-800">
+            {r.contact === "telegram"
+              ? "Напишем в Telegram, если автор что-то изменит."
+              : r.contact === "email"
+                ? "Напишем на email, если автор что-то изменит."
+                : "Если автор изменит подарок, вы увидите это здесь при следующем заходе."}
+            {r.contact !== "telegram" && props.telegramUrls[r.id] ? (
+              <>
+                {" "}
+                <a href={props.telegramUrls[r.id]} target="_blank" rel="noopener noreferrer" className="underline">
+                  Получать уведомления в Telegram
+                </a>
+              </>
+            ) : null}
+          </p>
         </div>
       ))}
 

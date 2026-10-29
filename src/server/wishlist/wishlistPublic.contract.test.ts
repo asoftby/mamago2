@@ -12,7 +12,15 @@ assert.match(svc, /FOR UPDATE/, "reserve locks the item row");
 assert.match(svc, /hashToken\(rawClaimToken\)/, "only the hash of the claim token is stored");
 assert.doesNotMatch(svc, /claimToken:/, "no raw claim token column");
 assert.match(svc, /visibility === "PRIVATE"[\s\S]{0,80}not_found/, "private lists look missing");
-assert.doesNotMatch(svc, /contactEmail: true|telegramChatId: true/, "public view never selects guest contacts");
+assert.match(svc, /contact: r\.telegramChatId \? \("telegram" as const\) : r\.contactEmail \? \("email" as const\) : null/, "public view exposes only the contact kind");
+assert.doesNotMatch(svc, /contactEmail: r\.contactEmail|telegramChatId: r\.telegramChatId/, "raw guest contacts never reach the public view");
+
+// Notifications (PR 4)
+const notify = read("src/server/wishlist/wishlistNotify.ts");
+assert.match(notify, /hideReservationsFromOwner\) return/, "surprise mode: author is never told about reservations");
+assert.match(notify, /parseTelegramLinkPayload/, "telegram binding requires the signed payload");
+assert.doesNotMatch(notify, /console\.(log|error)\([^)]*(contactEmail|telegramChatId|displayName)/, "no contacts in logs");
+assert.match(read("src/server/services/telegram/TelegramWebhookService.ts"), /startsWith\("wl_"\)/, "webhook routes wl_ payloads");
 
 // Routes: rate limited, cookie httpOnly, no auth required.
 const helper = read("src/server/wishlist/wishlistPublicRoute.ts");
