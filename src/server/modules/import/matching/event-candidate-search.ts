@@ -210,5 +210,29 @@ export async function findEventCandidates(
     }
   }
 
-  return candidates.slice(0, CANDIDATE_LIMIT);
+  return rankCandidatesForLimit(candidates, normalized.title);
+}
+
+/**
+ * Кандидаты приходят из нескольких запросов (место, дата, название). Лимит
+ * нельзя применять в порядке поступления: 20 несвязанных событий той же
+ * площадки вытеснили бы точное совпадение по названию. Сначала ранжируем по
+ * похожести названия (порядок внутри равных сохраняется), потом режем.
+ */
+export function rankCandidatesForLimit(
+  candidates: ActivityCandidate[],
+  importTitle: string | undefined,
+  limit: number = CANDIDATE_LIMIT,
+): ActivityCandidate[] {
+  if (!importTitle) return candidates.slice(0, limit);
+  const target = normalizeEventTitle(importTitle);
+  return candidates
+    .map((candidate, index) => ({
+      candidate,
+      index,
+      similarity: tokenJaccard(target, normalizeEventTitle(candidate.title)),
+    }))
+    .sort((a, b) => b.similarity - a.similarity || a.index - b.index)
+    .slice(0, limit)
+    .map((entry) => entry.candidate);
 }
