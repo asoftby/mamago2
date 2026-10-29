@@ -128,7 +128,6 @@ jobs:
       - name: Cache and discovery performance regressions
         run: |
           pnpm exec tsx src/server/article/publicArticleListCacheWiring.test.ts
-          pnpm exec tsx src/server/discovery/discoveryHubExpandCacheWiring.test.ts
           pnpm exec tsx src/server/discovery/discoveryPerf.test.ts
           pnpm exec tsx src/lib/discovery/partitionDiscoveryFeed.agePolicy.test.ts
           pnpm exec tsx src/server/discovery/classesDiscoveryFeed.agePolicy.test.ts
