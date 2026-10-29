@@ -46,7 +46,7 @@ else
   exit 1
 fi
 
-if container_state=$(ssh "${SSH_HOST}" "docker container inspect --type container --format '{{.State.Running}}' '${DB_CONTAINER}'" 2>/dev/null); then
+if container_state=$(ssh "${SSH_HOST}" "docker container inspect --format '{{.State.Running}}' '${DB_CONTAINER}'" 2>/dev/null); then
   :
 else
   status=$?
