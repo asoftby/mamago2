@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import ts from "typescript";
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
 
@@ -28,8 +29,56 @@ assert.match(create, /familyId,\s*\n\s*createdById: user\.id/);
 // plan.service: no raw userId ownership, no cancelledAt, every create sets familyId.
 const plan = read("src/server/services/plan.service.ts");
 assert.doesNotMatch(plan, /cancelledAt/);
-assert.equal((plan.match(/planItem\.create\(/g) ?? []).length, 4);
-assert.equal((plan.match(/familyId: await familyIdForWrite\(userId\)/g) ?? []).length, 4);
+// Check the data of each write, including the transactional Offer path. A
+// global count alone cannot prove that the fifth write carries its own family.
+const planAst = ts.createSourceFile("plan.service.ts", plan, ts.ScriptTarget.Latest, true);
+const expectedWriters = ["addPlanItem", "addRoutePlanItem", "addOfferPlanItem", "addPlacePlanItem", "addArticlePlanItem"];
+const actualWriters: string[] = [];
+const property = (object: ts.ObjectLiteralExpression, name: string) =>
+  object.properties.find((p) => p.name?.getText(planAst) === name);
+const valueOf = (p: ts.ObjectLiteralElementLike | undefined): ts.Expression | undefined =>
+  p && ts.isPropertyAssignment(p) ? p.initializer : p && ts.isShorthandPropertyAssignment(p) ? p.name : undefined;
+
+for (const fn of planAst.statements.filter(ts.isFunctionDeclaration)) {
+  if (!fn.body || !fn.name) continue;
+  const body = fn.body;
+  const writer = fn.name.text;
+  // Only an immutable, function-local binding derived from this caller's userId
+  // can stand in for an inline await of the canonical access helper.
+  const canonicalValue = (expr: ts.Expression | undefined, helper: string): boolean => {
+    if (!expr) return false;
+    if (ts.isIdentifier(expr)) {
+      const declaration = body.statements.filter(ts.isVariableStatement)
+        .filter((statement) => Boolean(statement.declarationList.flags & ts.NodeFlags.Const))
+        .flatMap((statement) => [...statement.declarationList.declarations])
+        .find((declaration) => declaration.name.getText(planAst) === expr.text);
+      return declaration?.initializer?.getText(planAst) === `await ${helper}(userId)`;
+    }
+    return expr.getText(planAst) === `await ${helper}(userId)`;
+  };
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node) && /^(prisma|tx)\.planItem\.(create|findFirst)$/.test(node.expression.getText(planAst))) {
+      const args = node.arguments[0];
+      assert.ok(args && ts.isObjectLiteralExpression(args), `${writer}: explicit query required`);
+      if (node.expression.getText(planAst).endsWith(".create")) {
+        actualWriters.push(writer);
+        const data = valueOf(property(args, "data"));
+        assert.ok(data && ts.isObjectLiteralExpression(data), `${writer}: explicit create data required`);
+        assert.equal(valueOf(property(data, "userId"))?.getText(planAst), "userId", `${writer}: creator must be the caller`);
+        assert.ok(canonicalValue(valueOf(property(data, "familyId")), "familyIdForWrite"), `${writer}: familyId must come from familyIdForWrite(userId)`);
+      } else {
+        const where = valueOf(property(args, "where"));
+        assert.ok(where && ts.isObjectLiteralExpression(where), `${writer}: explicit dedup scope required`);
+        assert.ok(where.properties.some((p) => ts.isSpreadAssignment(p) &&
+          canonicalValue(ts.isParenthesizedExpression(p.expression) ? p.expression.expression : p.expression, "activePlanScopeFor")),
+        `${writer}: dedup must use the caller's active family/visibility scope`);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(body);
+}
+assert.deepEqual(actualWriters.sort(), [...expectedWriters].sort(), "all five named create paths must retain family ownership checks");
 assert.match(plan, /\.\.\.\(await planScopeFor\(userId\)\)/);
 
 // Reads default to legacy. delete-account is family-aware since B3 but is
@@ -60,10 +109,7 @@ for (const f of activeStateFiles) {
 const planSvc = read("src/server/services/plan.service.ts");
 const removeBody = planSvc.slice(planSvc.indexOf("export async function removePlanItem"));
 assert.match(removeBody.slice(0, removeBody.indexOf("\n}\n")), /planScopeFor\(userId\)/);
-// Every dedup findFirst in plan.service goes through the active scope.
-for (const m of planSvc.matchAll(/planItem\.findFirst\(\{\s*where: \{([^}]*)\}/g)) {
-  assert.match(m[1], /activePlanScopeFor/, "dedup findFirst must use activePlanScopeFor");
-}
+// Dedup scopes (inline and function-local aliases) are verified above.
 // The scenario duplicate check also ignores cancelled rows.
 assert.match(read("src/app/api/plan/scenario/route.ts"), /\.\.\.activeScope, activityId: activity\.id, id: \{ not: replacement\.planItemId \}/);
 

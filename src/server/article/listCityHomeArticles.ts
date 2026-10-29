@@ -1,3 +1,4 @@
+import { resolveTerritoryScope } from "@/server/territory/territoryScope";
 import { unstable_cache } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { type JournalGeographyGroup } from "@/lib/article/articleJournalGeography";
@@ -256,7 +257,8 @@ export async function queryJournalArticles(
   const base: Prisma.ArticleWhereInput = options.additionalWhere
     ? { AND: [publicJournalWhere(), options.additionalWhere] }
     : publicJournalWhere();
-  return queryBucketedJournal(base, buildJournalFeedBuckets(city, options), options);
+  const territoryScope = city ? await resolveTerritoryScope(city.slug) : null;
+  return queryBucketedJournal(base, buildJournalFeedBuckets(city, { ...options, territoryScope }), options);
 }
 
 /** Total for {@link queryJournalArticles} with the same filter. */

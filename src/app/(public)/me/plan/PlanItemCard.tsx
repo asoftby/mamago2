@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CalendarDays, StickyNote } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
@@ -48,6 +49,8 @@ export function PlanItemCard({
   const router = useRouter();
   const [removing, setRemoving] = useState(false);
   const [changingVisibility, setChangingVisibility] = useState(false);
+  const [recurrenceOpen, setRecurrenceOpen] = useState(false);
+  const [recurrencePending, setRecurrencePending] = useState(false);
   const familyUi = showFamilyUi(familyView);
   const currentUserId = familyView?.currentUserId ?? "";
   const isPrivate = familyUi && item.visibility === "PRIVATE";
@@ -99,6 +102,37 @@ export function PlanItemCard({
       toast.error("Не удалось удалить");
     } finally {
       setRemoving(false);
+    }
+  };
+
+  const cancelRecurrence = async (scope: "THIS" | "FUTURE" | "ALL") => {
+    if (recurrencePending) return;
+    if (scope === "THIS") {
+      setRecurrenceOpen(false);
+      await handleRemove();
+      return;
+    }
+    setRecurrencePending(true);
+    try {
+      const response = await fetch(`/api/plan/manual/recurring/occurrence/${encodeURIComponent(item.id)}`, {
+        method: "DELETE", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope, expectedUpdatedAt: item.updatedAt }),
+      });
+      if (response.status === 409) {
+        toast.error("Серия изменилась. Обновите календарь.");
+        router.refresh();
+        return;
+      }
+      if (!response.ok) throw new Error("cancel_failed");
+      setRecurrenceOpen(false);
+      // A series action may change several weeks. Full refresh drops stale
+      // week caches and day markers, unlike deleting one local card.
+      window.location.reload();
+    } catch {
+      toast.error("Не удалось изменить повторения");
+    } finally {
+      setRecurrencePending(false);
     }
   };
 
@@ -212,6 +246,11 @@ export function PlanItemCard({
                 <path d="M8 11V7a4 4 0 0 1 8 0v4" />
               </svg>
               Видите только вы
+            </span>
+          )}
+          {item.recurrenceSeriesId && (
+            <span className="rounded-full bg-white px-2 py-1 text-[11px] text-neutral-600">
+              Повторяется
             </span>
           )}
           {caption && (
@@ -334,7 +373,7 @@ export function PlanItemCard({
         {item.source !== "TELEGRAM_FORWARD" && item.status !== "PROPOSED" ? (
           <button
             type="button"
-            onClick={handleRemove}
+            onClick={() => item.recurrenceSeriesId ? setRecurrenceOpen(true) : void handleRemove()}
             disabled={removing}
             className="text-[11px] opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
             style={{
@@ -346,6 +385,35 @@ export function PlanItemCard({
           </button>
         ) : null}
       </div>
+      <Dialog open={recurrenceOpen} onOpenChange={setRecurrenceOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Отменить повторение</DialogTitle>
+            <DialogDescription>Выберите, какие дела убрать из плана.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <button type="button" disabled={recurrencePending || removing}
+              onClick={() => void cancelRecurrence("THIS")}
+              className="min-h-11 rounded-xl border px-4 text-left text-sm font-medium">
+              Только это дело
+            </button>
+            {(!familyView || isOwn) && (
+              <>
+                <button type="button" disabled={recurrencePending}
+                  onClick={() => void cancelRecurrence("FUTURE")}
+                  className="min-h-11 rounded-xl border px-4 text-left text-sm font-medium">
+                  Это и следующие
+                </button>
+                <button type="button" disabled={recurrencePending}
+                  onClick={() => void cancelRecurrence("ALL")}
+                  className="min-h-11 rounded-xl border px-4 text-left text-sm font-medium text-red-700">
+                  Всю серию
+                </button>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </article>
   );
 }

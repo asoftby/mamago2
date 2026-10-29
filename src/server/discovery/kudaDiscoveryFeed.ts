@@ -4,7 +4,7 @@ import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getPublicListingActivityWhere } from "@/server/public/publicContentVisibility";
 import { activityInAnyOfCitiesWhere, activityInExactCitiesWhere } from "@/server/discovery/activityInCityWhere";
-import { resolveKudaDiscoveryCityIds } from "@/server/discovery/discoveryHubExpand";
+import { activityInTerritoryScopeWhere, activityInExactTerritoryScopeWhere, resolveTerritoryScope } from "@/server/territory/territoryScope";
 import { resolveTerritoryBySlug } from "@/server/territory/resolveTerritory";
 import { resolveTerritoryCityIds } from "@/server/territory/resolveTerritoryCityIds";
 import { getCrossRegionPopularActivityIds } from "@/server/discovery/crossRegionFamilySignal";
@@ -42,9 +42,11 @@ export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, 
   const now = new Date();
   const explicitTerritory = options.explicitTerritorySlug ? await resolveTerritoryBySlug(options.explicitTerritorySlug) : null;
   if (options.explicitTerritorySlug && !explicitTerritory) throw new Error("Unknown explicit territory");
-  const { primaryCityId, expandedCityIds } = explicitTerritory
-    ? { primaryCityId: cityId, expandedCityIds: await resolveTerritoryCityIds(explicitTerritory) }
-    : await resolveKudaDiscoveryCityIds(citySlug, cityId);
+  const scope = await resolveTerritoryScope(options.explicitTerritorySlug ?? citySlug);
+  const primaryCityId = cityId;
+  const expandedCityIds = explicitTerritory
+    ? await resolveTerritoryCityIds(explicitTerritory)
+    : scope ? await resolveTerritoryCityIds({ id: scope.territoryId, type: scope.type }) : [cityId];
   const strictGeo = Boolean(explicitTerritory);
   const [crossRegionPopularIds, targetRegionId] = await Promise.all([
     options.nearby || strictGeo ? Promise.resolve([] as string[]) : getCrossRegionPopularActivityIds(primaryCityId, expandedCityIds),
@@ -77,7 +79,9 @@ export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, 
   }];
   const pubParts = (pub.AND ?? []) as Prisma.ActivityWhereInput[];
   const where: Prisma.ActivityWhereInput = { AND: [{ type: ActivityType.EVENT }, ...(options.format ? [{ format: options.format }] : options.nearby ? [{ format: { in: [ActivityFormat.OFFLINE, ActivityFormat.HYBRID] } }] : []), { OR: [
-    strictGeo ? activityInExactCitiesWhere(expandedCityIds) : activityInAnyOfCitiesWhere(expandedCityIds),
+    scope
+      ? strictGeo ? activityInExactTerritoryScopeWhere(scope.territoryIds) : activityInTerritoryScopeWhere(scope.territoryIds)
+      : strictGeo ? activityInExactCitiesWhere(expandedCityIds) : activityInAnyOfCitiesWhere(expandedCityIds),
     ...(crossRegionPopularIds.length > 0 ? [{ id: { in: crossRegionPopularIds } }] : []),
     ...(targetRegionId ? [{ boosts: { some: {
       isFreeDaily: false, purchaseRequestKey: { not: null },

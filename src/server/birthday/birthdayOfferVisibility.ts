@@ -2,11 +2,20 @@ import type { Prisma } from "@prisma/client";
 import { getPublicPublishedOfferWhere } from "@/server/public/publicContentVisibility";
 
 /** Birthday cards and the builder share the same published, approved offer pool. */
-export function getPublicBirthdayOfferWhere(cityId: string): Prisma.OfferWhereInput {
+/** `territoryIds` (a territory scope) takes precedence over the legacy `cityId` filter. */
+export function getPublicBirthdayOfferWhere(
+  cityId: string,
+  territoryIds?: readonly string[] | null,
+): Prisma.OfferWhereInput {
   return {
     AND: [
       getPublicPublishedOfferWhere(),
-      { place: { cityId, ownerBusiness: { isNot: null } } },
+      {
+        place: {
+          ...(territoryIds ? { territoryId: { in: [...territoryIds] } } : { cityId }),
+          ownerBusiness: { isNot: null },
+        },
+      },
       {
         OR: [
           { productType: "PARTY_PACKAGE" },

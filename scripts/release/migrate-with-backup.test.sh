@@ -5,14 +5,16 @@ root=$(cd "$(dirname "$0")" && pwd)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/bin"
-# Mock ssh: `docker ps` lists the container; `docker exec ... pg_dump` emits $MOCK_DUMP.
+# Mock ssh: mirror the independent Docker preflight checks; pg_dump emits $MOCK_DUMP.
 cat > "$tmp/bin/ssh" <<'MOCK'
 #!/usr/bin/env bash
 case "$*" in
-  *"docker ps"*) echo "dev-db-1" ;;
+  *"docker info"*) exit 0 ;;
+  *"docker container inspect"*) echo "true" ;;
   *pg_dump*)
     [ "${MOCK_DUMP_FAIL:-0}" = 1 ] && exit 3
     printf '%b' "${MOCK_DUMP:-}" ;;
+  *) echo "Unexpected mock SSH command: $*" >&2; exit 64 ;;
 esac
 MOCK
 chmod +x "$tmp/bin/ssh"

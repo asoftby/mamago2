@@ -1,8 +1,10 @@
+import type { TerritoryScope } from "@/server/territory/territoryScope";
 import type { Prisma } from "@prisma/client";
 import type { JournalTypeFilter } from "@/lib/journal/journalCardMeta";
 import { notExpiredJournalPublicationWhere } from "@/lib/journal/publicationType";
 import {
   buildJournalGeographyBuckets,
+  buildJournalGeographyBucketsByTerritory,
   type JournalCity,
   type JournalGeographyGroup,
 } from "@/lib/article/articleJournalGeography";
@@ -16,10 +18,10 @@ export type JournalBucket = { group: JournalGeographyGroup | null; where: Prisma
  */
 export function buildJournalFeedBuckets(
   city: JournalCity | null,
-  options: { pinnedFirst?: boolean } = {},
+  options: { pinnedFirst?: boolean; territoryScope?: TerritoryScope | null } = {},
 ): JournalBucket[] {
   const geoBuckets: JournalBucket[] = city
-    ? buildJournalGeographyBuckets(city)
+    ? options.territoryScope ? buildJournalGeographyBucketsByTerritory(options.territoryScope) : buildJournalGeographyBuckets(city)
     : [{ group: null, where: {} }];
   if (!options.pinnedFirst) return geoBuckets;
   return [

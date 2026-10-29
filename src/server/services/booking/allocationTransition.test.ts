@@ -37,3 +37,25 @@ test("rejection releases both held and confirmed allocations", () => {
 test("completion leaves confirmed allocation intact", () => {
   assert.equal(allocationTransition(B.COMPLETED, [{ status: A.CONFIRMED, expiresAt: null }], now), null);
 });
+
+
+test("one expired unit blocks atomic confirmation of a multi-resource booking", () => {
+  const allocations = [
+    { status: A.HELD, expiresAt: new Date(now.getTime() + 60_000) },
+    { status: A.HELD, expiresAt: now },
+  ];
+  assert.throws(() => allocationTransition(B.CONFIRMED, allocations, now), /Резерв истёк/);
+});
+
+test("cancellation releases allocations for every resource in a booking", () => {
+  const allocations = [
+    { status: A.HELD, expiresAt: new Date(now.getTime() + 60_000) },
+    { status: A.CONFIRMED, expiresAt: null },
+  ];
+  assert.equal(allocationTransition(B.CANCELLED, allocations, now), A.RELEASED);
+});
+
+test("no allocation is invented for an unallocated booking", () => {
+  assert.equal(allocationTransition(B.CONFIRMED, [], now), A.CONFIRMED);
+  // The caller's updateMany only touches existing HELD rows.
+});

@@ -52,6 +52,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: DEV deployment safeguards and runtime parity regressions
+        run: |
+          bash -n scripts/release/ci-dev-host-deploy.sh
+          bash -n scripts/release/ci-dev-backup.sh
+          bash -n scripts/release/migrate-with-backup.sh
+          node --test scripts/release/ci-dev-deploy.contract.test.mjs
+
       - name: Admin Russian-language check
         run: |
           node --test scripts/check-admin-ru.test.mjs
@@ -112,6 +119,7 @@ jobs:
         run: |
           pnpm exec tsx src/server/services/booking/pendingCampContacts.test.ts
           pnpm exec tsx src/lib/offers/offerClassSchedule.test.ts
+          pnpm exec tsx src/server/services/booking/allocationTransition.test.ts
           pnpm exec tsx src/server/offers/slotAvailability.test.ts
           pnpm exec tsx src/server/offers/getSlots.businessIsolation.test.ts
 
@@ -168,7 +176,6 @@ jobs:
       - name: Cache and discovery performance regressions
         run: |
           pnpm exec tsx src/server/article/publicArticleListCacheWiring.test.ts
-          pnpm exec tsx src/server/discovery/discoveryHubExpandCacheWiring.test.ts
           pnpm exec tsx src/lib/city/scopedEventBrowsing.test.ts
           pnpm exec tsx src/server/discovery/crossRegionFamilySignal.contract.test.ts
           pnpm exec tsx src/server/discovery/discoveryPerf.test.ts
