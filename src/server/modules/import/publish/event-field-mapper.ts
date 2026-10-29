@@ -8,6 +8,7 @@
  */
 
 import type { NormalizedEventImport } from "../types";
+import { mayOverwriteNonEmpty, type ImportSourceKind } from "./source-field-priority";
 import { detectAgeBuckets, getAgeRangeFromBuckets } from "@/lib/age/ageMapping";
 import { DEFAULT_ACTIVITY_FORMAT, normalizeActivityFormat } from "@/domain/activities/activity-format";
 import type { ActivityFormat, PublicationPriceMode } from "@prisma/client";
@@ -402,6 +403,7 @@ export function isPlaceholderZeroPriceFrom(existing: Record<string, unknown>): b
 export function filterActivityNonDestructiveUpdates(
   mapped: MappedActivityFields,
   existing: Record<string, unknown>,
+  options: { incomingSourceKind?: ImportSourceKind } = {},
 ): { updates: Partial<MappedActivityFields>; skipped: string[] } {
   const result: Partial<MappedActivityFields> = {};
   const skipped: string[] = [];
@@ -436,8 +438,12 @@ export function filterActivityNonDestructiveUpdates(
   // description — обновляем если новое длиннее
   if (mapped.description) {
     const existingDesc = existing["description"];
-    if (!existingDesc || String(existingDesc).length < mapped.description.length) {
+    const existingDescIsEmpty = !existingDesc || String(existingDesc).trim() === "";
+    const sourceMayOverwrite = !options.incomingSourceKind || mayOverwriteNonEmpty("content", options.incomingSourceKind);
+    if (existingDescIsEmpty || (sourceMayOverwrite && String(existingDesc).length < mapped.description.length)) {
       result.description = mapped.description;
+    } else if (!sourceMayOverwrite) {
+      skipped.push("description (aggregator never overwrites)");
     } else {
       skipped.push("description (existing longer)");
     }

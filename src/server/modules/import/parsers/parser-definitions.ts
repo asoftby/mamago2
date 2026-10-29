@@ -52,6 +52,14 @@ export const PARSER_DEFINITIONS: ParserDefinition[] = [
       "Фаза 1: только одноплощадочные мероприятия публикуются; многоплощадочные сохраняются как " +
       "pendingMultiVenue (см. docs/imports/abws-phase1-spec.md).",
   },
+  {
+    key: "telegram-channel-event",
+    label: "Telegram-канал — Афиша (t.me/s)",
+    entityType: "EVENT",
+    description:
+      "Публичный Telegram-канал через веб-версию https://t.me/s/<канал>. Укажите адрес канала в поле URL. " +
+      "Только чтение постов: текст, ссылки, хэштеги, фото. Решение «анонс или нет» — в нормализаторе.",
+  },
   // ── Real parsers (добавлять сюда) ────────────────────────────────────────
   // {
   //   key: "afisha-by-place",

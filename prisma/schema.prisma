@@ -5419,6 +5419,7 @@ enum ImportSourceType {
   CSV_FILE
   SITEMAP
   MANUAL
+  TELEGRAM_CHANNEL
 }
 
 enum ImportSourceStatus {
@@ -5441,6 +5442,7 @@ enum ImportFetchStrategy {
   CSV
   SITEMAP_CRAWL
   MANUAL_UPLOAD
+  TELEGRAM_WEB_PREVIEW
 }
 
 enum ImportRunStatus {
@@ -5544,6 +5546,13 @@ model ImportSource {
   crawlMaxPages           Int?
   crawlMaxDetailLinks     Int?
   crawlMaxRecords         Int?
+  /// Интервал плановых запусков при isAutoUpdate = true (минуты)
+  runIntervalMinutes      Int                 @default(60)
+  /// Источник — сам организатор (приоритет по описанию, возрасту, регистрации).
+  /// false для агрегаторов афиш (например, minsk_kids).
+  isOrganizerSource       Boolean             @default(false)
+  /// Бюджет вызовов модели на один запуск источника
+  aiCallBudgetPerRun      Int                 @default(60)
   /// ABWS-specific category filter: parser-native numeric type ids
   /// (e.g. performance.types[].id) allowed through. Empty array = no
   /// filter, import everything, matching current behavior.
@@ -5578,6 +5587,10 @@ model ImportRun {
   totalRejected Int               @default(0)
   totalErrors   Int               @default(0)
   triggerType   ImportTriggerType @default(MANUAL)
+  /// Расход модели за запуск (импорт каналов)
+  aiCalls       Int               @default(0)
+  aiTokensIn    Int               @default(0)
+  aiTokensOut   Int               @default(0)
   triggerUserId String?
   errorMessage  String?
   createdAt     DateTime          @default(now())
@@ -5630,6 +5643,8 @@ model ImportedRecord {
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   applyResult         Json?
+  /// Родитель для записей, выделенных из поста-подборки (DIGEST)
+  parentRecordId      String?
 
   reviewTask        ImportReviewTask?
   publishedActivity Activity?         @relation("ImportedRecordActivity", fields: [publishedActivityId], references: [id])
@@ -5647,6 +5662,7 @@ model ImportedRecord {
   @@index([parseStatus])
   @@index([normalizeStatus])
   @@index([matchStatus])
+  @@index([parentRecordId])
 }
 
 /// Задача ревью для конкретной импортированной записи
