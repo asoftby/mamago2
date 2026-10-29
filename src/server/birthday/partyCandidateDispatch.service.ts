@@ -63,7 +63,11 @@ export async function dispatchPartyCandidateWave(input: {
         !order.eventDate || !order.timeFrom || !order.timeTo ||
         order.childrenCount === null || order.adultsCount === null)
       throw new PartyApiError(409, "Услуга не готова к приглашениям");
-    // EXPIRED is eligible only for a wave that was previously dispatched.\n    // This prevents reviving unrelated expired single-offer add-ons.\n    if (current.status === "EXPIRED" && current.requests.length === 0)\n      throw new PartyApiError(409, "Нет истории приглашений для пополнения");\n    const due = partyResponseDeadline(now, partyStartAt(order.eventDate, order.timeFrom));
+    // EXPIRED is eligible only for a wave that was previously dispatched.
+    // This prevents reviving unrelated expired single-offer add-ons.
+    if (current.status === "EXPIRED" && current.requests.length === 0)
+      throw new PartyApiError(409, "Нет истории приглашений для пополнения");
+    const due = partyResponseDeadline(now, partyStartAt(order.eventDate, order.timeFrom));
     if (due <= now) throw new PartyApiError(410, "Срок ответа исполнителя прошёл");
     const invitedBusinessIds = current.requests.map(r => r.businessId);
     const activeBusinessIds = current.requests
