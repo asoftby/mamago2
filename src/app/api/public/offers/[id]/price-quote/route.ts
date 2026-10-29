@@ -115,7 +115,7 @@ export async function GET(_request: NextRequest, { params }: {
       bookingMode: { in: ["USE_PUBLICATION_DATES", "USE_PUBLICATION_SLOTS"] } },
     select: { currency: true, place: { select: { ownerBusinessId: true } },
       classGroups: { where: { active: true }, select: { id: true } },
-      offerBooking: { select: { options: { where: { active: true },
+      offerBooking: { select: { scheduleKind: true, options: { where: { active: true },
         orderBy: { position: "asc" }, select: {
           id: true, title: true, mode: true, priceByn: true, bookingUnitId: true,
         } } } },
@@ -129,7 +129,7 @@ export async function GET(_request: NextRequest, { params }: {
   const options = offer.currency === "BYN"
     ? offer.offerBooking.options.filter(option =>
       option.mode !== "STANDALONE" &&
-      !(option.bookingUnitId && offer.classGroups.length > 0)).map(option => ({
+      !(option.bookingUnitId && (offer.classGroups.length > 0 ||\n        offer.offerBooking?.scheduleKind !== "ON_REQUEST_WINDOWS"))).map(option => ({
         id: option.id, title: option.title, mode: option.mode,
         priceByn: option.priceByn.toFixed(2),
       }))
