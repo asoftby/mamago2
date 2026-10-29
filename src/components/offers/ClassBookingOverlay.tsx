@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ResponsiveOverlay } from "@/components/ui/responsive-overlay";
@@ -58,6 +58,9 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
   const [children, setChildren] = useState<PrefillResponse["children"]>([]);
   const [selectedChildId, setSelectedChildId] = useState("");
   const [refresh, setRefresh] = useState(0);
+  // Reuse the same token for network retries of an identical intent. Any
+  // change in attendee details, date, tariff or extras produces a fresh token.
+  const pendingIntentRef = useRef<{ signature: string; key: string } | null>(null);
   const [bookingOptions, setBookingOptions] = useState<PublicBookingOption[]>([]);
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(false);
@@ -183,18 +186,22 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(`/api/public/offers/${encodeURIComponent(offerId)}/reserve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          startsAt: chosen.startsAt, endsAt: chosen.endsAt,
-          ...(selectedGroupId ? { classGroupId: selectedGroupId } : {}),
+      const intent = {
+          startsAt: chosen.startsAt, endsAt: chosen.endsAt,          ...(selectedGroupId ? { classGroupId: selectedGroupId } : {}),
           ...(selectedTariffId ? { classTariffId: selectedTariffId } : {}),
           selectedOptionIds,
           seats, customerName: name.trim(), customerPhone: phone.trim(),
           ...(email.trim() ? { customerEmail: email.trim() } : {}),
           ...(seats === 1 && selectedChildId ? { childId: selectedChildId } : {}),
-        }),
+      };
+      const signature = JSON.stringify(intent);
+      if (!pendingIntentRef.current || pendingIntentRef.current.signature !== signature) {
+        pendingIntentRef.current = { signature, key: crypto.randomUUID() };
+      }
+      const response = await fetch(`/api/public/offers/${encodeURIComponent(offerId)}/reserve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...intent, idempotencyKey: pendingIntentRef.current.key }),
       });
       const result = await response.json() as BookingResponse;
       if (!response.ok) {
@@ -202,6 +209,7 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
         throw new Error(result.error || "Не получилось отправить заявку");
       }
       if (!result.bookingId) throw new Error("Не удалось получить номер заявки");
+      pendingIntentRef.current = null;
       setBookingId(result.bookingId);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось отправить заявку");
@@ -214,7 +222,7 @@ export function ClassBookingOverlay({ open, onOpenChange, offerId, offerTitle, t
     <ResponsiveOverlay
       open={open}
       onOpenChange={(next) => {
-        if (!next) { setBookingId(null); setSelected(null); setError(null); }
+        if (!next) { setBookingId(null); setSelected(null); setError(null); pendingIntentRef.current = null; }
         else setLoading(true);
         onOpenChange(next);
       }}
