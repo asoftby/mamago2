@@ -17,6 +17,7 @@ type SeriesSnapshot = {
   expectedUpdatedAt: string;
   expectedSeriesVersion: number;
   cutoff: string;
+  people: Array<{ id: string; name: string }>;
   title: string;
   startTime: string | null;
   childId: string | null;
@@ -58,6 +59,7 @@ export function ManualPlanEntryDialog({
 }) {
   const [title, setTitle] = useState("");
   const [childId, setChildId] = useState("");
+  const [personChoice, setPersonChoice] = useState("");
   const [entryDate, setEntryDate] = useState(date);
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
@@ -112,6 +114,7 @@ export function ManualPlanEntryDialog({
         setTitle(s.title);
         setStartsAt(s.startTime ?? "");
         setChildId(s.childId ?? "");
+        setPersonChoice(s.childId ? `child:${s.childId}` : s.assigneeUserId ? `adult:${s.assigneeUserId}` : "");
         setReminderEnabled(s.reminderEnabled);
         setFrequency(s.recurrence.frequency);
         setWeekdays(s.recurrence.weekdays);
@@ -151,8 +154,8 @@ export function ManualPlanEntryDialog({
               startTime: startsAt || null,
               reminderEnabled: reminderEnabled && Boolean(startsAt),
               reminderLeadMinutes: reminderEnabled && startsAt ? series.reminderLeadMinutes : null,
-              childId: childId || null,
-              assigneeUserId: childId ? null : series.assigneeUserId,
+              childId: personChoice.startsWith("child:") ? personChoice.slice(6) : null,
+              assigneeUserId: personChoice.startsWith("adult:") ? personChoice.slice(6) : null,
               recurrence: {
                 frequency,
                 interval: series.recurrence.interval,
@@ -250,13 +253,26 @@ export function ManualPlanEntryDialog({
             Что?
             <input autoFocus required maxLength={160} value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} aria-describedby={error ? "manual-entry-error" : undefined} />
           </label>
-          <label className={labelClass}>
-            Для кого?
-            <select value={childId} onChange={(e) => setChildId(e.target.value)} className={inputClass}>
-              <option value="">Я / Семья</option>
-              {familyChildren.map((child) => <option key={child.id} value={child.id}>{child.name}</option>)}
-            </select>
-          </label>
+          {editFollowing ? (
+            <label className={labelClass}>
+              Для кого?
+              <select value={personChoice} onChange={(e) => setPersonChoice(e.target.value)} className={inputClass}>
+                <option value="">Семья</option>
+                {(series?.people ?? []).map(person =>
+                  <option key={person.id} value={`adult:${person.id}`}>{person.name}</option>)}
+                {familyChildren.map(child =>
+                  <option key={child.id} value={`child:${child.id}`}>{child.name}</option>)}
+              </select>
+            </label>
+          ) : (
+            <label className={labelClass}>
+              Для кого?
+              <select value={childId} onChange={(e) => setChildId(e.target.value)} className={inputClass}>
+                <option value="">Я / Семья</option>
+                {familyChildren.map(child => <option key={child.id} value={child.id}>{child.name}</option>)}
+              </select>
+            </label>
+          )}
           {!editFollowing && <label className={labelClass}>
             Дата
             <input required type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} className={inputClass} />
