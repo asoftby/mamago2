@@ -279,10 +279,18 @@ export async function replyToPartyRequest(params: {
         const queuedAlternatives = declined ? await tx.partyProviderInvite.count({
           where: { partyOrderItemId: item.id, status: "QUEUED" },
         }) : 0;
+        const otherActiveRequests = declined ? await tx.bookingRequest.count({
+          where: {
+            partyOrderItemId: item.id, id: { not: requestId }, kind: BookingKind.PARTY,
+            status: BookingStatus.NEW,
+            partyStage: { in: ["SENT", "QUOTED", "AWAITING_RECONFIRM"] },
+          },
+        }) : 0;
         await tx.partyOrderItem.update({
           where: { id: item.id },
           data: { status: declined
-            ? queuedAlternatives > 0 ? PartyItemStatus.REQUESTED : PartyItemStatus.DECLINED
+            ? queuedAlternatives > 0 || otherActiveRequests > 0
+              ? PartyItemStatus.REQUESTED : PartyItemStatus.DECLINED
             : PartyItemStatus.NEEDS_DECISION },
         });
       }
