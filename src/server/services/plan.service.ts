@@ -1,4 +1,4 @@
-import { PlanItemSource, type PlanVisibility } from "@prisma/client";
+import { Prisma, PlanItemSource, type PlanVisibility } from "@prisma/client";
 import { planCountUnit } from "@/server/family/familyAnalyticsPure";
 import { prisma } from "@/lib/prisma";
 import { trackUserEvent } from "@/server/services/analytics/AnalyticsEventService";
@@ -362,7 +362,7 @@ async function resolvePlaceForUserSave(
 /**
  * Добавить место в план на дату (дедупликация по userId + placeId).
  */
-/** Persist an offer as a dated, family-visible catalog plan item. */
+/** Persist an offer as a dated catalog item, with idempotency across concurrent saves. */
 export async function addOfferPlanItem(
   userId: string,
   offerId: string,
@@ -374,29 +374,45 @@ export async function addOfferPlanItem(
     select: { id: true, title: true, coverImage: true },
   });
   if (!offer) throw new Error("Offer not found");
-  const existing = await prisma.planItem.findFirst({
-    where: { ...(await activePlanScopeFor(userId)), offerId },
-    select: { id: true },
-  });
-  if (existing) {
-    return prisma.planItem.update({
-      where: { id: existing.id },
-      data: { date, title: offer.title, coverImageUrl: offer.coverImage },
-      select: { id: true },
-    });
+  const familyId = await familyIdForWrite(userId);
+  const scope = await activePlanScopeFor(userId);
+
+  // Serializable transactions make the read-before-create safe even when two
+  // requests arrive simultaneously. A conflicting transaction retries and
+  // observes the item inserted by the winner, rather than inserting a duplicate.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const existing = await tx.planItem.findFirst({
+          where: { ...scope, offerId },
+          select: { id: true },
+        });
+        if (existing) {
+          return tx.planItem.update({
+            where: { id: existing.id },
+            data: { date, title: offer.title, coverImageUrl: offer.coverImage },
+            select: { id: true },
+          });
+        }
+        return tx.planItem.create({
+          data: {
+            userId,
+            familyId,
+            ...(options?.visibility ? { visibility: options.visibility } : {}),
+            offerId,
+            date,
+            title: offer.title,
+            coverImageUrl: offer.coverImage,
+          },
+          select: { id: true },
+        });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) ||
+          error.code !== "P2034" || attempt === 2) throw error;
+    }
   }
-  return prisma.planItem.create({
-    data: {
-      userId,
-      familyId: await familyIdForWrite(userId),
-      ...(options?.visibility ? { visibility: options.visibility } : {}),
-      offerId,
-      date,
-      title: offer.title,
-      coverImageUrl: offer.coverImage,
-    },
-    select: { id: true },
-  });
+  throw new Error("offer_plan_conflict");
 }
 
 export async function addPlacePlanItem(
