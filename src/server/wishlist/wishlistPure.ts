@@ -155,10 +155,13 @@ export const reorderItemsSchema = z.object({
   itemIds: z.array(z.string().min(1)).min(1).max(500),
 });
 
-export type CreateWishlistInput = z.infer<typeof createWishlistSchema>;
-export type UpdateWishlistInput = z.infer<typeof updateWishlistSchema>;
-export type CreateItemInput = z.infer<typeof createItemSchema>;
-export type UpdateItemInput = z.infer<typeof updateItemSchema>;
+/** zod transforms yield required-but-possibly-undefined keys; callers may omit them. */
+type Loose<T> = { [K in keyof T]?: T[K] };
+
+export type CreateWishlistInput = Loose<z.infer<typeof createWishlistSchema>> & { title: string };
+export type UpdateWishlistInput = Loose<z.infer<typeof updateWishlistSchema>>;
+export type CreateItemInput = Loose<z.infer<typeof createItemSchema>> & { title: string };
+export type UpdateItemInput = Loose<z.infer<typeof updateItemSchema>>;
 
 /** YYYY-MM-DD → UTC midnight Date for a @db.Date column. */
 export function dateKeyToDate(key: string | null | undefined): Date | null | undefined {
