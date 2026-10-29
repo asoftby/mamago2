@@ -1,6 +1,7 @@
 import { Prisma, PlanEntryType, PlanItemSource } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { localWallClockToUtc, getLocalDateKey } from "@/lib/date/localDateKey";
+import { expandRecurrence, type RecurrenceRule } from "@/lib/plan/recurrence";
 import { activePlanScopeFor, activeFamilyUserIds, childScopeFor } from "@/server/family/familyAccess";
 import type { PlanOwner } from "@/server/services/planOwner";
 import { RecurrenceMutationError, validateRecurringTask } from "./recurringTask.service";
@@ -64,6 +65,30 @@ async function recurrenceTarget(owner: PlanOwner, itemId: string) {
   return { row, series };
 }
 
+/** Remaining occurrence budget after the historical part of a bounded series.
+ * Expand in safe 300-day windows so the public expansion limit is respected.
+ */
+function remainingOccurrenceCount(series: {
+  frequency: "DAILY" | "WEEKLY" | "MONTHLY";
+  interval: number; weekdays: number[]; startDate: string;
+  untilDate: string | null; maxOccurrences: number | null;
+}, cutoff: string): number | null {
+  if (series.maxOccurrences === null) return null;
+  const startMs = Date.parse(series.startDate + "T00:00:00.000Z");
+  const endMs = Date.parse(cutoff + "T00:00:00.000Z") - 86400000;
+  const rule: RecurrenceRule = {
+    frequency: series.frequency, interval: series.interval, weekdays: series.weekdays,
+    startDate: series.startDate, untilDate: series.untilDate, maxOccurrences: series.maxOccurrences,
+  };
+  let consumed = 0;
+  for (let ms = startMs; ms <= endMs; ms += 300 * 86400000) {
+    const from = new Date(ms).toISOString().slice(0, 10);
+    const to = new Date(Math.min(endMs, ms + 299 * 86400000)).toISOString().slice(0, 10);
+    consumed += expandRecurrence(rule, from, to).length;
+  }
+  return Math.max(1, series.maxOccurrences - consumed);
+}
+
 /** Owners only; needed to pre-fill the edit form and enforce version checks. */
 export async function getRecurringTaskSeriesForEdit(owner: PlanOwner, itemId: string) {
   const { row, series } = await recurrenceTarget(owner, itemId);
@@ -91,7 +116,7 @@ export async function getRecurringTaskSeriesForEdit(owner: PlanOwner, itemId: st
       interval: series.interval,
       weekdays: series.weekdays,
       untilDate: series.untilDate,
-      maxOccurrences: series.maxOccurrences,
+      maxOccurrences: remainingOccurrenceCount(series, row.recurrenceDate!),
     },
   };
 }
