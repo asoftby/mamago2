@@ -8,6 +8,7 @@ import type { PlanBookingState } from "@/server/family/planBookingPure";
 import { Container } from "@/components/ui/Container";
 import { PlanCalendar, invalidatePlanDayMarkers } from "@/features/plan-calendar";
 import { PlanPersonFilter, planPersonFilterOptions } from "@/features/my-plan/components/PlanPersonFilter";
+import { useSharedPlanAudienceFilters } from "@/features/my-plan/hooks/useSharedPlanAudienceFilters";
 import { filterVisiblePlanEntries, type PlanPersonSelection } from "@/features/my-plan/lib/filterPlanEntriesByPerson";
 import { PlanDayList } from "./PlanDayList";
 import { PlanOverviewDialog } from "./PlanOverviewDialog";
@@ -329,9 +330,10 @@ export function PlanPageClient({
   });
   const [scenarioStatuses, setScenarioStatuses] = useState(scenarioStatusByDate);
   const [loadingWeek, setLoadingWeek] = useState<string | null>(null);
-  const [includedPeople, setIncludedPeople] = useState<string[]>([]);
-  const [excludedPeople, setExcludedPeople] = useState<string[]>([]);
-  const [visibilityFilter, setVisibilityFilter] = useState<"ALL" | "PRIVATE" | "FAMILY">("ALL");
+  const { filters: audienceFilters, update: updateAudienceFilters } = useSharedPlanAudienceFilters(currentUserId);
+  const includedPeople = audienceFilters.include;
+  const excludedPeople = audienceFilters.exclude;
+  const visibilityFilter = audienceFilters.visibility;
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
   const [editingManualItem, setEditingManualItem] = useState<SerializedPlanItem | null>(null);
@@ -426,7 +428,6 @@ export function PlanPageClient({
 
   const toSelection = (value: string): PlanPersonSelection | null =>
     value.startsWith("adult:") ? { kind: "adult", id: value.slice("adult:".length) } :
-    value === "family" ? { kind: "adult", id: currentUserId } :
     value.startsWith("child:") ? { kind: "child", id: value.slice("child:".length) } : null;
   const selection = {
     include: includedPeople.map(toSelection).filter((p): p is PlanPersonSelection => p !== null),
@@ -560,11 +561,11 @@ export function PlanPageClient({
             ...familyChildren.map((child) => ({ value: `child:${child.id}`, label: child.name })),
           ])}
           selectedValues={includedPeople}
-          onSelectionChange={setIncludedPeople}
+          onSelectionChange={(include) => updateAudienceFilters({ ...audienceFilters, include })}
           excludedValues={excludedPeople}
-          onExclusionsChange={setExcludedPeople}
+          onExclusionsChange={(exclude) => updateAudienceFilters({ ...audienceFilters, exclude })}
           visibility={visibilityFilter}
-          onVisibilityChange={setVisibilityFilter}
+          onVisibilityChange={(visibility) => updateAudienceFilters({ ...audienceFilters, visibility })}
         />
       </Container>
 
