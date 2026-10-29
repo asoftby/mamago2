@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { SaveHeart } from "@/features/save/SaveHeart";
@@ -100,7 +99,6 @@ function EventCardCategoryLabel({
 export function EventCard({
   id,
   title,
-  isPromoted = false,
   href,
   imageUrl,
   imagePriority = false,
@@ -130,7 +128,6 @@ export function EventCard({
           data-masonry-media
           data-poster-crop={poster ? (poster.cropped ? poster.objectPosition : "none") : undefined}
         >
-          {isPromoted && <Badge variant="outline" title="Платное продвижение Boost" className="absolute left-3 top-3 z-10 bg-background">Реклама</Badge>}
           {imageUrl && canOptimizeWithNextImage(imageUrl) ? (
             <Image
               src={imageUrl}
