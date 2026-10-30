@@ -359,6 +359,7 @@ export async function createManualPlanEntry(owner: PlanOwner, input: ManualPlanE
       category: normalizePlanItemCategory(input.category, title),
       reminderEnabled: input.reminderEnabled === true,
       reminderLeadMinutes,
+      reminderAt: startsAt && input.reminderEnabled === true && reminderLeadMinutes != null ? new Date(startsAt.getTime() - reminderLeadMinutes * 60_000) : null,
     },
     select: calendarItemSelect,
   });
@@ -446,6 +447,7 @@ async function updateEditablePlanEntry(
       ...(patch.tags === undefined ? {} : { tags: normalizePlanNoteTags(patch.tags) }),
       ...(patch.category === undefined ? {} : { category: normalizePlanItemCategory(patch.category, patch.title ?? current.title) }),
       ...(patch.reminderEnabled === undefined ? {} : { reminderEnabled: patch.reminderEnabled === true }),
+      reminderAt: startsAt && reminderEnabled && reminderLeadMinutes != null ? new Date(startsAt.getTime() - reminderLeadMinutes * 60_000) : null,
     },
   });
   if (result.count === 0) throw new ManualPlanEntryError("CONFLICT", "conflict");
