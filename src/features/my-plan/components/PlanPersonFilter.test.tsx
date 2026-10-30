@@ -7,11 +7,11 @@ const options = planPersonFilterOptions([
   { value: "family", label: "Я" },
   { value: "child:1", label: "Степан" },
 ]);
-assert.deepEqual(options.map((option) => option.label), ["Я", "Степан", "Для всех"]);
+assert.deepEqual(options.map((option) => option.label), ["Для всех", "Я", "Степан"]);
 const markup = renderToStaticMarkup(
   <PlanPersonFilter options={options} value="all" onChange={() => {}} />,
 );
-assert.ok(markup.includes("Для кого:"));
+assert.ok(!markup.includes("Для кого:"));
 assert.ok(markup.includes('aria-pressed="true"'));
 assert.ok(markup.includes('aria-label="Для кого"'));
 assert.equal((markup.match(/aria-pressed=/g) ?? []).length, 3);

@@ -63,17 +63,9 @@ export function PlanPersonFilter({
       exclude.filter((item) => item !== id),
     );
   };
-  const hide = (id: string) => {
-    if ((!onExclusionsChange && !onAudienceChange) || !multi || id === "all") return;
-    applyAudience(
-      include.filter((item) => item !== id),
-      exclude.includes(id) ? exclude.filter((item) => item !== id) : [...exclude, id],
-    );
-  };
   return (
-    <div className={`w-full min-w-0 rounded-2xl border border-[rgba(20,18,16,.10)] bg-[#FAF7F1] px-3 py-3 sm:px-4 ${className}`}>
+    <div className={`w-full min-w-0 px-0 py-2 ${className}`}>
       <div role="group" aria-label="Для кого" className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none]">
-        <span className="shrink-0 text-[13px] font-semibold text-[#6B6258]">Для кого:</span>
         {options.map((option) => {
           const selected = multi ? (option.value === "all" ? include.length === 0 && exclude.length === 0 : include.includes(option.value)) : value === option.value;
           return (
@@ -100,23 +92,11 @@ export function PlanPersonFilter({
           );
         })}
       </div>
-      {multi && (onExclusionsChange || onAudienceChange) && options.some((option) => option.value !== "all") && (
-        <div role="group" aria-label="Исключить из плана" className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-[#6B6258]">Исключить:</span>
-          {options.filter((option) => option.value !== "all").map((option) => (
-            <button key={option.value} type="button" aria-pressed={exclude.includes(option.value)}
-              onClick={() => hide(option.value)}
-              className={`rounded-full border px-3 py-1.5 text-xs ${exclude.includes(option.value) ? "border-[#141210] bg-[#141210] text-white" : "border-black/15"}`}>
-              {option.label}
-            </button>
-          ))}
-        </div>
-      )}
       {onVisibilityChange && (
-        <div role="group" aria-label="Доступность дел" className="mt-3 flex flex-wrap items-center gap-2">
+        <div role="group" aria-label="Доступность дел" className="mt-3 grid w-full grid-cols-3 items-end border-b border-black/10">
           {([{ id: "ALL", text: "Все доступные" }, { id: "PRIVATE", text: "Мои личные" }, { id: "FAMILY", text: "Общие" }] as const).map((option) => (
             <button key={option.id} type="button" aria-pressed={visibility === option.id}
-              className={`rounded-full px-3 py-2 text-xs font-medium ${visibility === option.id ? "bg-[#141210] text-white" : "bg-white text-[#141210]"}`}
+              className={`min-w-0 border-b-2 px-1 py-3 text-center text-xs sm:text-sm transition-colors ${visibility === option.id ? "border-[#141210] font-semibold text-[#141210]" : "border-transparent font-normal text-[#6B6258]"}`}
               onClick={() => onVisibilityChange(option.id)}>{option.text}</button>
           ))}
         </div>
@@ -128,5 +108,5 @@ export function PlanPersonFilter({
 export function planPersonFilterOptions(
   people: readonly PlanPersonFilterOption[],
 ): PlanPersonFilterOption[] {
-  return [...people, { value: "all", label: "Для всех" }];
+  return [{ value: "all", label: "Для всех" }, ...people.filter((person) => person.value !== "all")];
 }
