@@ -85,6 +85,7 @@ model User {
   familyInvitesCreated              FamilyInvite[]                   @relation("FamilyInviteCreator")
   familyInvitesAccepted             FamilyInvite[]                   @relation("FamilyInviteAcceptor")
   consentRecords                    ConsentRecord[]
+  publicSaveAvatarConsent           PublicSaveAvatarConsent?
   contentEdits                      ContentEditLog[]                 @relation("ContentEditor")
   ideas                             Idea[]
   collections                       Collection[]
@@ -7512,4 +7513,17 @@ model SupportMessage {
   author     User                @relation("SupportMessageAuthor", fields: [authorId], references: [id], onDelete: Restrict)
 
   @@index([threadId, createdAt, id])
+}
+
+/// Explicit, revocable permission to show the user's avatar next to saved publications.
+/// Does not grant access to their family plans, notes or full save history.
+model PublicSaveAvatarConsent {
+  userId      String   @id
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  textVersion String
+  acceptedAt  DateTime
+  revokedAt   DateTime?
+  updatedAt   DateTime @updatedAt
+
+  @@index([revokedAt])
 }

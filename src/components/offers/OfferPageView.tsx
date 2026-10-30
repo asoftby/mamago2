@@ -309,7 +309,7 @@ export function OfferPageView({
       const id = planItemId ?? result.planItemId;
       if (!id) return;
       void fetch(`/api/save/plan?planItemId=${encodeURIComponent(id)}`, { method: "DELETE", credentials: "include" })
-        .then((res) => { if (!res.ok) throw new Error("offer_plan_remove_failed"); setLocalSave(null); setPlanItemId(null); toast("Убрано из плана"); })
+        .then((res) => { if (!res.ok) throw new Error("offer_plan_remove_failed"); setLocalSave(null); setPlanItemId(null); window.dispatchEvent(new CustomEvent("publication-save-changed", { detail: { kind: "offer", id: data.id } })); toast("Убрано из плана"); })
         .catch(() => toast.error("Не удалось удалить из плана"));
       return;
     }
@@ -322,6 +322,7 @@ export function OfferPageView({
         .then(async (res) => {
           if (!res.ok) throw new Error("offer_idea_remove_failed");
           setIsIdeaSaved(false);
+          window.dispatchEvent(new CustomEvent("publication-save-changed", { detail: { kind: "offer", id: data.id } }));
           toast("Убрано из идей", { duration: 2500 });
         })
         .catch(() => {
@@ -344,6 +345,7 @@ export function OfferPageView({
           }
           if (!res.ok) throw new Error("offer_idea_save_failed");
           setIsIdeaSaved(true);
+          window.dispatchEvent(new CustomEvent("publication-save-changed", { detail: { kind: "offer", id: data.id } }));
           await persistIdeaCollectionSelection(result, { offerId: data.id });
         })
         .catch(() => {
@@ -365,6 +367,7 @@ export function OfferPageView({
     }).then(async (response) => {
       if (!response.ok) throw new Error("offer_plan_save_failed");
       setLocalSave({ kind: "plan", dateISO: result.dateISO });
+      window.dispatchEvent(new CustomEvent("publication-save-changed", { detail: { kind: "offer", id: data.id } }));
       void loadIdeaStatus();
       toast.success("Добавлено в «Мой план»");
     }).catch(() => toast.error("Не удалось добавить предложение в «Мой план»"));
