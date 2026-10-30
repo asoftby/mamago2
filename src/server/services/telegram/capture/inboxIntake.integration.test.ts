@@ -585,3 +585,33 @@ test("processor exception replaces the status with an error instead of silence",
   const item = await db.inboxItem.findUniqueOrThrow({ where: { id: result.outcome.inboxItemId } });
   assert.equal(item.status, "FAILED");
 });
+
+
+test("cross-account global quota is atomic under parallel receipts", async () => {
+  const a = await makeUser("global-cap-a");
+  const b = await makeUser("global-cap-b");
+  const globalUsed = await db.inboxItem.count({
+    where: { environment: "DEV", createdAt: { gte: new Date(Date.now() - CAPTURE_LIMITS.rateWindowMs) } },
+  });
+  const h = makeIntake({ globalItemsPer24hLimit: globalUsed + 2 });
+  const outcomes = await Promise.all([
+    h.intake.receive(a, "DEV", capture()),
+    h.intake.receive(b, "DEV", capture()),
+    h.intake.receive(a, "DEV", capture()),
+  ]);
+  assert.equal(outcomes.filter((r) => r.outcome.status === "stored").length, 2);
+  assert.equal(outcomes.filter((r) => r.outcome.status === "rejected" && r.outcome.reason === "GLOBAL_RATE_LIMITED").length, 1);
+  assert.deepEqual(h.replies, [CAPTURE_REPLIES.globalRateLimited]);
+});
+
+test("daily photo cap rejects screenshots but allows text", async () => {
+  const owner = await makeUser("photo-day-cap");
+  const h = makeIntake();
+  for (let i = 0; i < CAPTURE_LIMITS.maxPhotosPer24h; i += 1) {
+    assert.equal((await h.intake.receive(owner, "DEV", photo(`day-photo-${i}`))).outcome.status, "stored");
+  }
+  const denied = await h.intake.receive(owner, "DEV", photo("day-photo-over-limit"));
+  assert.deepEqual(denied.outcome, { status: "rejected", reason: "PHOTO_RATE_LIMITED" });
+  assert.equal((await h.intake.receive(owner, "DEV", capture())).outcome.status, "stored");
+  assert.deepEqual(h.replies, [CAPTURE_REPLIES.photoRateLimited]);
+});

@@ -32,9 +32,11 @@ export type InboxIntakeDeps = {
   sleep?: (ms: number) => Promise<void>;
   /** Random extra delay before claiming, in ms. */
   jitter?: () => number;
+  /** Optional test-only override; production always uses CAPTURE_LIMITS. */
+  globalItemsPer24hLimit?: number;
 };
 
-export type RejectReason = "RATE_LIMITED" | "TEXT_TOO_LONG" | "PHOTO_TOO_LARGE" | "UNSUPPORTED";
+export type RejectReason = "RATE_LIMITED" | "GLOBAL_RATE_LIMITED" | "PHOTO_RATE_LIMITED" | "TEXT_TOO_LONG" | "PHOTO_TOO_LARGE" | "UNSUPPORTED";
 
 export type IntakeOutcome =
   | { status: "stored"; inboxItemId: string; debounceUntil: Date; isAlbumPart: boolean }
@@ -52,6 +54,8 @@ type StoreResult = IntakeOutcome;
 
 const REJECT_REPLY: Record<RejectReason, string> = {
   RATE_LIMITED: CAPTURE_REPLIES.rateLimited,
+  GLOBAL_RATE_LIMITED: CAPTURE_REPLIES.globalRateLimited,
+  PHOTO_RATE_LIMITED: CAPTURE_REPLIES.photoRateLimited,
   TEXT_TOO_LONG: CAPTURE_REPLIES.textTooLong,
   PHOTO_TOO_LARGE: CAPTURE_REPLIES.photoTooLarge,
   UNSUPPORTED: CAPTURE_REPLIES.unsupported,
@@ -84,9 +88,18 @@ async function lockUserIntake(
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${owner.userId}:${environment}`}))`;
 }
 
+/** Lock order for all writes: user -> global environment -> album. */
+async function lockGlobalIntake(tx: Prisma.TransactionClient, environment: TelegramEnvironment): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`telegram:capture:global:${environment}`}))`;
+}
+
 export function createInboxIntake(deps: InboxIntakeDeps) {
   const { db, notifier, processor } = deps;
   const now = deps.now ?? (() => new Date());
+  const globalItemsPer24hLimit = deps.globalItemsPer24hLimit ?? CAPTURE_LIMITS.maxItemsAcrossUsersPer24h;
+  if (!Number.isSafeInteger(globalItemsPer24hLimit) || globalItemsPer24hLimit < 1) {
+    throw new Error("invalid_global_capture_limit");
+  }
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const jitter = deps.jitter ?? (() => Math.floor(Math.random() * CAPTURE_LIMITS.claimJitterMaxMs));
 
@@ -101,6 +114,18 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
     const since = new Date(now().getTime() - CAPTURE_LIMITS.rateWindowMs);
     const count = await client.inboxItem.count({ where: { userId, createdAt: { gte: since } } });
     return count >= CAPTURE_LIMITS.maxItemsPer24h;
+  }
+
+  async function isGlobalRateLimited(client: Pick<PrismaClient, "inboxItem">, environment: TelegramEnvironment): Promise<boolean> {
+    const since = new Date(now().getTime() - CAPTURE_LIMITS.rateWindowMs);
+    return (await client.inboxItem.count({ where: { environment, createdAt: { gte: since } } })) >= globalItemsPer24hLimit;
+  }
+
+  async function isPhotoRateLimited(client: Pick<PrismaClient, "inboxItemPart">, userId: string, environment: TelegramEnvironment): Promise<boolean> {
+    const since = new Date(now().getTime() - CAPTURE_LIMITS.rateWindowMs);
+    return (await client.inboxItemPart.count({
+      where: { environment, kind: "PHOTO", inboxItem: { userId, createdAt: { gte: since } } },
+    })) >= CAPTURE_LIMITS.maxPhotosPer24h;
   }
 
   function partData(capture: ParsedCapture, environment: TelegramEnvironment, position: number) {
@@ -156,6 +181,7 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
     try {
       return await db.$transaction(async (tx) => {
         await lockUserIntake(tx, owner, environment);
+        await lockGlobalIntake(tx, environment);
 
         // Re-check under the lock (a concurrent delivery may have committed);
         // the unique index stays the final guard.
@@ -163,6 +189,10 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
           return { status: "duplicate" } as const;
         }
         if (await isRateLimited(tx, owner.userId)) return { status: "rejected", reason: "RATE_LIMITED" } as const;
+        if (await isGlobalRateLimited(tx, environment)) return { status: "rejected", reason: "GLOBAL_RATE_LIMITED" } as const;
+        if (capture.partKind === "PHOTO" && await isPhotoRateLimited(tx, owner.userId, environment)) {
+          return { status: "rejected", reason: "PHOTO_RATE_LIMITED" } as const;
+        }
 
         const debounceUntil = now();
         // Nested create in the same transaction: a duplicate update id rolls
@@ -191,6 +221,7 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
     try {
       return await db.$transaction(async (tx) => {
         await lockUserIntake(tx, owner, environment);
+        await lockGlobalIntake(tx, environment);
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${owner.userId}:${environment}:${mediaGroupId}`}))`;
 
         const already = await tx.inboxItemPart.findUnique({
@@ -223,6 +254,10 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
             }
           }
 
+          if (capture.partKind === "PHOTO" && await isPhotoRateLimited(tx, owner.userId, environment)) {
+            return { status: "rejected", reason: "PHOTO_RATE_LIMITED" } as const;
+          }
+
           // Conditional extend: if a claim won the race in between, the
           // item is no longer RECEIVED and this part starts a new item.
           const extended = await tx.inboxItem.updateMany({
@@ -239,6 +274,10 @@ export function createInboxIntake(deps: InboxIntakeDeps) {
         }
 
         if (await isRateLimited(tx, owner.userId)) return { status: "rejected", reason: "RATE_LIMITED" } as const;
+        if (await isGlobalRateLimited(tx, environment)) return { status: "rejected", reason: "GLOBAL_RATE_LIMITED" } as const;
+        if (capture.partKind === "PHOTO" && await isPhotoRateLimited(tx, owner.userId, environment)) {
+          return { status: "rejected", reason: "PHOTO_RATE_LIMITED" } as const;
+        }
 
         const earlier = await tx.inboxItem.findFirst({
           where: { userId: owner.userId, environment, mediaGroupId },
