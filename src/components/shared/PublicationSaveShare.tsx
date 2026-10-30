@@ -109,7 +109,7 @@ export function PublicationSaveShare({
           <span>Поделиться</span>
         </button>
       </div>
-      {total !== null && total > 0 && (
+      {total !== null && total >= 3 && (
         <div className="mt-3 flex min-h-9 items-center gap-3">
           {avatars.length > 0 && (
             <div className="flex shrink-0 items-center pl-1" aria-hidden="true">
