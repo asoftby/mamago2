@@ -16,8 +16,9 @@ import type { AbwsQualityFlags } from "@/server/modules/import/normalizers/abws-
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { TableContainer } from "@/components/ui/table";
-import { Trash2, X } from "lucide-react";
+import { CheckCheck, Trash2, X, XCircle } from "lucide-react";
 import { ReviewQueueActions } from "./ReviewQueueActions";
+import { bulkPublishImportedEventRecords, bulkRejectImportedRecords } from "../../actions";
 import { telegramReviewBadges } from "../../_lib/telegram-review";
 import {
   activeQualityFlagBadges,
@@ -119,6 +120,32 @@ export function ReviewQueueTableClient({ records }: Props) {
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Не удалось выполнить массовое удаление");
       }
+    });
+  }
+
+  function runBulkReview(kind: "publish" | "reject") {
+    if (selectedIds.length === 0) return;
+    const confirmed = window.confirm(
+      kind === "publish"
+        ? `Опубликовать выбранное (${selectedIds.length})?\n\nБудут опубликованы только события с рекомендацией «создать новое», заполненными обязательными полями и без конфликтов, дублей и изменений источника. Остальные будут пропущены с указанием причины. События создаются на модерации.`
+        : `Отклонить выбранное (${selectedIds.length})?\n\nБудут отклонены только записи, которые ещё ждут решения и не связаны с каталогом.`,
+    );
+    if (!confirmed) return;
+
+    startBulkTransition(async () => {
+      const result =
+        kind === "publish"
+          ? await bulkPublishImportedEventRecords(selectedIds)
+          : await bulkRejectImportedRecords(selectedIds);
+      if (!result.success) {
+        toast.error(result.error ?? "Не удалось выполнить действие");
+        return;
+      }
+      const failed = (result.results ?? []).some((r) => r.outcome === "failed");
+      if (failed) toast.error(result.summary ?? "Есть ошибки");
+      else toast.success(result.summary ?? "Готово");
+      setSelectedIds([]);
+      router.refresh();
     });
   }
 
@@ -297,12 +324,20 @@ export function ReviewQueueTableClient({ records }: Props) {
         <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex w-[min(92vw,760px)] -translate-x-1/2 flex-col gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-xl sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <div className="text-sm font-medium text-gray-900">Выбрано объектов: {selectedIds.length}</div>
-            <div className="text-xs text-gray-500">Массовое удаление работает только для сырого импорта, который ещё не связан с Place/Event.</div>
+            <div className="text-xs text-gray-500">Удаление работает только для сырого импорта, который ещё не связан с Place/Event. «Опубликовать» берёт только безопасные «создать новое».</div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setSelectedIds([])} disabled={bulkPending}>
               <X className="mr-1.5 h-4 w-4" />
               Снять выбор
+            </Button>
+            <Button className="flex-1 sm:flex-none" onClick={() => runBulkReview("publish")} disabled={bulkPending}>
+              <CheckCheck className="mr-1.5 h-4 w-4" />
+              Опубликовать
+            </Button>
+            <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => runBulkReview("reject")} disabled={bulkPending}>
+              <XCircle className="mr-1.5 h-4 w-4" />
+              Отклонить
             </Button>
             <Button variant="destructive" className="flex-1 sm:flex-none" onClick={handleBulkDelete} disabled={bulkPending}>
               <Trash2 className="mr-1.5 h-4 w-4" />

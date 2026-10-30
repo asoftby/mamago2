@@ -135,6 +135,7 @@ const DEDUP_WINDOWS: Record<NotificationType, number | null> = {
   // Support notices use the persisted SupportMessage id for exact dedup.
   SUPPORT_BUSINESS_REPLY: null,
   SUPPORT_STAFF_MESSAGE: null,
+  IMPORT_CHANNELS_DIGEST: null,
 };
 
 export function isOneTimeNotificationType(type: NotificationType): boolean {
