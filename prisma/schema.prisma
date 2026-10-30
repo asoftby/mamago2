@@ -7512,3 +7512,15 @@ model SupportMessage {
 
   @@index([threadId, createdAt, id])
 }
+
+/// Explicit, revocable permission to show the user's avatar next to saved publications.
+/// Does not grant access to their family plans, notes or full save history.
+model PublicSaveAvatarConsent {
+  userId      String   @id
+  textVersion String
+  acceptedAt  DateTime
+  revokedAt   DateTime?
+  updatedAt   DateTime @updatedAt
+
+  @@index([revokedAt])
+}
