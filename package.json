@@ -185,7 +185,7 @@
     "test:idea-collections-api-integration": "NODE_OPTIONS=--conditions=react-server tsx src/server/services/ideaCollections.integration.test.ts",
     "test:idea-collections-routes-integration": "NODE_OPTIONS=--conditions=react-server tsx src/app/api/collections/collections.routes.integration.test.ts",
     "test:plan-owner": "tsx src/server/services/planOwner.test.ts",
-    "test:wishlist": "tsx src/server/wishlist/wishlistPure.test.ts && tsx src/features/wishlist/lib/wishlistView.test.ts && tsx src/server/wishlist/wishlist.contract.test.ts",
+    "test:wishlist": "tsx src/lib/analytics/privatePaths.test.ts && tsx src/server/wishlist/wishlistPure.test.ts && tsx src/features/wishlist/lib/wishlistView.test.ts && tsx src/server/wishlist/wishlist.contract.test.ts && tsx src/server/wishlist/wishlistPublic.contract.test.ts",
     "test:my-plan-default-participants": "tsx src/features/my-plan/lib/resolveDefaultParticipants.test.ts",
     "test:my-plan-age-range-selection": "tsx src/features/my-plan/lib/ageRangeSelection.test.ts",
     "test:plan-add-task-fab": "tsx src/features/my-plan/components/PlanStickyCounter.test.tsx",

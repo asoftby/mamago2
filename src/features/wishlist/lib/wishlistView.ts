@@ -9,6 +9,9 @@ const ERRORS: Record<string, string> = {
   archived: "Список в архиве. Верните его из архива, чтобы редактировать.",
   item_reserved: "Подарок уже забронирован.",
   disabled: "Раздел пока недоступен.",
+  sold_out: "Этот подарок только что забронировали. Выберите другой.",
+  forbidden: "Это не ваша бронь.",
+  rate_limited: "Слишком много попыток. Попробуйте позже.",
 };
 
 export function wishlistErrorMessage(code: string | undefined | null): string {
