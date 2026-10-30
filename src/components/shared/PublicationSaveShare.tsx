@@ -26,9 +26,8 @@ export interface PublicationSaveShareProps {
   isSaving?: boolean;
   /** Unique saved-user count, not number of Idea/PlanItem records. */
   saveCount?: number | null;
-  /** Explicit opt-in public profiles only; never family-private records. */
+  /** Most recent consented public savers, newest first; never family-private records. */
   visibleSavers?: readonly PublicSaver[];
-  onOpenSavers?: () => void;
   className?: string;
   footer?: ReactNode;
 }
@@ -42,7 +41,6 @@ export function PublicationSaveShare({
   isSaving = false,
   saveCount,
   visibleSavers = [],
-  onOpenSavers,
   className,
   footer,
 }: PublicationSaveShareProps) {
@@ -77,7 +75,6 @@ export function PublicationSaveShare({
     ? Math.max(0, Math.floor(supplied))
     : null;
   const avatars = visibleSavers.filter((saver) => Boolean(saver.avatarUrl)).slice(0, 5);
-  const canOpen = Boolean(onOpenSavers) && avatars.length > 0;
 
   return (
     <div className={cn("w-full", className)}>
@@ -132,19 +129,9 @@ export function PublicationSaveShare({
               ))}
             </div>
           )}
-          {canOpen ? (
-            <button
-              type="button"
-              onClick={onOpenSavers}
-              className="text-left text-sm text-[#141210]/65 underline-offset-4 hover:underline focus-visible:underline"
-            >
-              Сохранили <span className="font-semibold text-[#E86A3A]">{total}</span>
-            </button>
-          ) : (
-            <span className="text-sm text-[#141210]/65">
-              Сохранили <span className="font-semibold text-[#E86A3A]">{total}</span>
-            </span>
-          )}
+          <span className="text-sm text-[#141210]/65">
+            Сохранили <span className="font-semibold text-[#E86A3A]">{total}</span>
+          </span>
         </div>
       )}
       {footer}
