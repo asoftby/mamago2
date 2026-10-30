@@ -12,6 +12,7 @@ import { TelegramChannel } from "@/server/services/telegram/TelegramChannel";
 import {
   buildAuthorReservedMessage,
   buildGuestReleaseMessage,
+  buildThanksMessage,
   parseTelegramLinkPayload,
   telegramLinkPayload,
   type ReleaseReason,
@@ -80,9 +81,63 @@ export async function notifyAuthorReserved(
   }
 }
 
+type GuestRow = {
+  userId: string | null;
+  user: { email: string | null } | null;
+  telegramChatId: string | null;
+  contactEmail: string | null;
+  item: { title: string; wishlist: { title: string; shareToken: string } };
+};
+
+const guestSelect = {
+  id: true,
+  userId: true,
+  user: { select: { email: true } },
+  contactEmail: true,
+  telegramChatId: true,
+  item: { select: { title: true, wishlist: { select: { title: true, shareToken: true } } } },
+} as const;
+
+/** Account holders get an in-app notice; anyone with a contact on the reservation also gets Telegram and/or email. */
+async function deliverToGuest(
+  row: GuestRow,
+  message: { subject: string; text: string; body?: string },
+  kind: "WISHLIST_RELEASED" | "WISHLIST_THANKS",
+): Promise<void> {
+  if (row.userId) {
+    try {
+      await createNotification({
+        userId: row.userId,
+        type: NOTICE_TYPE,
+        title: message.subject,
+        body: message.body ?? message.text.split("\n")[0],
+        ctaLabel: "Открыть список",
+        actionUrl: `/w/${row.item.wishlist.shareToken}`,
+        metadata: { kind },
+      });
+    } catch (error) {
+      safeLog("account notice failed", error);
+    }
+  }
+  // Contacts left on the reservation itself are honoured for account holders too.
+  if (row.telegramChatId) {
+    try {
+      await new TelegramChannel().sendMessage({ chatId: row.telegramChatId, text: message.text });
+    } catch (error) {
+      safeLog("telegram failed", error);
+    }
+  }
+  if (row.contactEmail && row.contactEmail.toLowerCase() !== (row.user?.email ?? "").toLowerCase()) {
+    try {
+      await sendEmail({ to: row.contactEmail, subject: message.subject, text: message.text });
+    } catch (error) {
+      safeLog("email failed", error);
+    }
+  }
+}
+
 /**
- * Guests whose reservation the author just released. Registered guests get an
- * in-app notice; others get Telegram and/or email if they left a contact.
+ * Guests whose reservation the author just released.
  * Guests without a contact see a banner on their next visit (public view).
  */
 export async function notifyReleasedGuests(db: PrismaClient, released: ReleasedReservation[]): Promise<void> {
@@ -91,14 +146,7 @@ export async function notifyReleasedGuests(db: PrismaClient, released: ReleasedR
   try {
     rows = await db.wishlistReservation.findMany({
       where: { id: { in: released.map((r) => r.reservationId) } },
-      select: {
-        id: true,
-        userId: true,
-        user: { select: { email: true } },
-        contactEmail: true,
-        telegramChatId: true,
-        item: { select: { title: true, wishlist: { select: { title: true, shareToken: true } } } },
-      },
+      select: guestSelect,
     });
   } catch (error) {
     safeLog("load released failed", error);
@@ -107,48 +155,49 @@ export async function notifyReleasedGuests(db: PrismaClient, released: ReleasedR
   const reasonById = new Map(released.map((r) => [r.reservationId, r.reason]));
   const titleById = new Map(released.map((r) => [r.reservationId, r.itemTitle]));
   const base = getBaseUrl();
-
   await Promise.all(
-    rows.map(async (row) => {
-      const listUrl = `${base}/w/${row.item.wishlist.shareToken}`;
-      const message = buildGuestReleaseMessage({
-        itemTitle: titleById.get(row.id) ?? row.item.title,
-        listTitle: row.item.wishlist.title,
-        reason: reasonById.get(row.id) ?? "released",
-        listUrl,
-      });
-      if (row.userId) {
-        try {
-          await createNotification({
-            userId: row.userId,
-            type: NOTICE_TYPE,
-            title: message.subject,
-            body: message.text.split("\n")[0],
-            ctaLabel: "Открыть список",
-            actionUrl: `/w/${row.item.wishlist.shareToken}`,
-            metadata: { kind: "WISHLIST_RELEASED" },
-          });
-        } catch (error) {
-          safeLog("account notice failed", error);
-        }
-      }
-      // Contacts left on the reservation itself are honoured for account holders too.
-      if (row.telegramChatId) {
-        try {
-          await new TelegramChannel().sendMessage({ chatId: row.telegramChatId, text: message.text });
-        } catch (error) {
-          safeLog("telegram failed", error);
-        }
-      }
-      if (row.contactEmail && row.contactEmail.toLowerCase() !== (row.user?.email ?? "").toLowerCase()) {
-        try {
-          await sendEmail({ to: row.contactEmail, subject: message.subject, text: message.text });
-        } catch (error) {
-          safeLog("email failed", error);
-        }
-      }
-    }),
+    rows.map((row) =>
+      deliverToGuest(
+        row,
+        buildGuestReleaseMessage({
+          itemTitle: titleById.get(row.id) ?? row.item.title,
+          listTitle: row.item.wishlist.title,
+          reason: reasonById.get(row.id) ?? "released",
+          listUrl: `${base}/w/${row.item.wishlist.shareToken}`,
+        }),
+        "WISHLIST_RELEASED",
+      ),
+    ),
   );
+}
+
+/** The author thanks everyone who holds a gift. Returns how many reservations were addressed. */
+export async function notifyThanksGuests(
+  db: PrismaClient,
+  reservationIds: string[],
+  message: string | null,
+): Promise<number> {
+  if (reservationIds.length === 0) return 0;
+  const rows = await db.wishlistReservation.findMany({
+    where: { id: { in: reservationIds }, status: { in: ["RESERVED", "PURCHASED"] } },
+    select: guestSelect,
+  });
+  const base = getBaseUrl();
+  await Promise.all(
+    rows.map((row) =>
+      deliverToGuest(
+        row,
+        buildThanksMessage({
+          itemTitle: row.item.title,
+          listTitle: row.item.wishlist.title,
+          message,
+          listUrl: `${base}/w/${row.item.wishlist.shareToken}`,
+        }),
+        "WISHLIST_THANKS",
+      ),
+    ),
+  );
+  return rows.length;
 }
 
 /** Deep link that binds the guest's Telegram chat to their reservation; null if the bot is not configured. */

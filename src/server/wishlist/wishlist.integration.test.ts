@@ -9,6 +9,9 @@ import { PrismaClient } from "@prisma/client";
 
 import {
   addWishlistItem,
+  archiveExpiredWishlists,
+  copyWishlist,
+  sendWishlistThanks,
   createWishlist,
   getOwnerItemImageUrl,
   getWishlist,
@@ -21,6 +24,7 @@ import {
   setWishlistArchived,
   updateWishlist,
   updateWishlistItem,
+  assertWishlistAccess,
 } from "./wishlist.service";
 import { WishlistError, createItemSchema, createWishlistSchema } from "./wishlistPure";
 
@@ -510,4 +514,80 @@ test("catalog offer becomes a gift idea; unpublished or unknown offers are refus
     );
   }
   assert.equal((await getWishlist(owner, w.id, deps)).items.length, 2, "refused offers add nothing");
+});
+
+test("auto-archive: only active lists whose event passed more than 7 days ago", async () => {
+  const owner = await makeUser("arch");
+  const now = new Date("2026-11-10T12:00:00Z");
+  const mk = async (title: string, eventDate?: string) =>
+    createWishlist(owner, createWishlistSchema.parse({ title, ...(eventDate ? { eventDate } : {}) }), deps);
+  const old = await mk("old", "2026-11-02");
+  const edge = await mk("edge", "2026-11-03");
+  const fresh = await mk("fresh", "2026-11-08");
+  const undated = await mk("undated");
+  const r = await archiveExpiredWishlists({ db, env, now: () => now });
+  assert.equal(r.skipped, false);
+  const status = async (id: string) => (await db.wishlist.findUniqueOrThrow({ where: { id } })).status;
+  assert.equal(await status(old.id), "ARCHIVED");
+  assert.equal(await status(edge.id), "ACTIVE", "exactly 7 days ago is not yet archived");
+  assert.equal(await status(fresh.id), "ACTIVE");
+  assert.equal(await status(undated.id), "ACTIVE");
+  assert.ok((await db.wishlist.findUniqueOrThrow({ where: { id: old.id } })).archivedAt);
+  // idempotent: a second run archives nothing more for our lists
+  await archiveExpiredWishlists({ db, env, now: () => now });
+  assert.equal(await status(edge.id), "ACTIVE");
+  // flag off: nothing happens
+  assert.deepEqual(await archiveExpiredWishlists({ db, env: {}, now: () => now }), { archived: 0, skipped: true });
+});
+
+test("copy for next year: fresh link, date +1 year, items without reservations", async () => {
+  const owner = await makeUser("copy");
+  const outsider = await makeUser("copy-out");
+  const src = await createWishlist(owner, createWishlistSchema.parse({ title: "ДР Маши", eventDate: "2026-11-03", visibility: "LINK" }), deps);
+  const a = (await addWishlistItem(owner, src.id, item("Книга", { url: "https://shop.example.test/a", quantity: 2 }), deps)).items[0].id;
+  await addWishlistItem(owner, src.id, item("Мяч"), deps);
+  const gone = (await addWishlistItem(owner, src.id, item("Лишнее"), deps)).items.find((i) => i.title === "Лишнее")!.id;
+  await removeWishlistItem(owner, src.id, gone, {}, deps);
+  await reserve(a);
+
+  const copy = await copyWishlist(owner, src.id, deps);
+  assert.notEqual(copy.id, src.id);
+  assert.notEqual(copy.shareToken, src.shareToken);
+  assert.equal(copy.eventDate, "2027-11-03");
+  assert.equal(copy.title, "ДР Маши");
+  assert.deepEqual(copy.items.map((i) => i.title), ["Книга", "Мяч"]);
+  assert.equal(copy.items[0].quantity, 2);
+  assert.ok(copy.items.every((i) => i.state === "FREE"));
+  const copiedReservations = await db.wishlistReservation.count({ where: { item: { wishlistId: copy.id } } });
+  assert.equal(copiedReservations, 0);
+  assert.equal((await getWishlist(owner, src.id, deps)).items[0].state, "PARTIAL", "source untouched");
+
+  await assert.rejects(copyWishlist(outsider, src.id, deps), (e) => e instanceof WishlistError && e.code === "not_found");
+});
+
+test("thanks: only active reservations are addressed; surprise mode hides the count", async () => {
+  const owner = await makeUser("thx");
+  const w = await createWishlist(owner, wl(), deps);
+  const ids = (await addWishlistItem(owner, w.id, item("Книга", { quantity: 3 }), deps)).items.map((i) => i.id);
+  const kept = await reserve(ids[0]);
+  const bought = await reserve(ids[0], { status: "PURCHASED" });
+  const cancelled = await reserve(ids[0]);
+  await db.wishlistReservation.update({ where: { id: cancelled.id }, data: { status: "CANCELLED" } });
+  let seen: { ids: string[]; message: string | null } | null = null;
+  const rec = { ...deps, notifyThanks: async (_d: unknown, rids: string[], message: string | null) => {
+    seen = { ids: rids, message };
+    return rids.length;
+  } };
+  const r = await sendWishlistThanks(owner, w.id, "Спасибо за праздник!", rec as never);
+  assert.deepEqual(r, { notified: 2 });
+  assert.deepEqual([...seen!.ids].sort(), [kept.id, bought.id].sort());
+  assert.equal(seen!.message, "Спасибо за праздник!");
+
+  await updateWishlist(owner, w.id, { hideReservationsFromOwner: true }, deps);
+  assert.deepEqual(await sendWishlistThanks(owner, w.id, null, rec as never), { notified: null });
+
+  const stranger = await makeUser("thx-out");
+  await assert.rejects(sendWishlistThanks(stranger, w.id, null, rec as never), (e) => e instanceof WishlistError && e.code === "not_found");
+  await assert.rejects(assertWishlistAccess(stranger, w.id, deps), (e) => e instanceof WishlistError && e.code === "not_found");
+  await assertWishlistAccess(owner, w.id, deps);
 });
