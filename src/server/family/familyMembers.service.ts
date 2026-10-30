@@ -23,7 +23,7 @@ async function lockFamily(tx: Prisma.TransactionClient, familyId: string) {
 export type FamilyOverview = {
   familyId: string;
   myRole: "OWNER" | "ADULT";
-  adults: Array<{ userId: string; displayName: string | null; role: "OWNER" | "ADULT"; joinedAt: Date; isMe: boolean }>;
+  adults: Array<{ userId: string; displayName: string | null; avatarUrl: string | null; role: "OWNER" | "ADULT"; joinedAt: Date; isMe: boolean }>;
   children: Array<{ id: string; name: string | null; birthDate: Date | null }>;
   invites: Array<{ id: string; createdAt: Date }>;
 };
@@ -45,7 +45,7 @@ export async function listFamilyForUser(
     prisma.familyMembership.findMany({
       where: { familyId: mine.familyId, leftAt: null },
       orderBy: { joinedAt: "asc" },
-      select: { userId: true, role: true, joinedAt: true, user: { select: { displayName: true } } },
+      select: { userId: true, role: true, joinedAt: true, user: { select: { displayName: true, avatarUrl: true } } },
     }),
     prisma.child.findMany({
       where: { familyId: mine.familyId },
@@ -64,6 +64,7 @@ export async function listFamilyForUser(
     adults: members.map((m) => ({
       userId: m.userId,
       displayName: m.user.displayName,
+      avatarUrl: m.user.avatarUrl,
       role: m.role,
       joinedAt: m.joinedAt,
       isMe: m.userId === userId,
