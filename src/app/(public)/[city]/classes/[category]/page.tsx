@@ -26,6 +26,7 @@ async function resolveCategory(citySlug: string, slug: string) {
 
 export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
   const { city: citySlug, category: slug } = await params;
+  if (slug === "all") permanentRedirect(`/${citySlug}/classes`);
   const query = await searchParams;
   const { city, category } = await resolveCategory(citySlug, slug);
   const total = await countPublicClassesCategory(city.id, city.slug, category.slug);
