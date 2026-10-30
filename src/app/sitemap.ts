@@ -221,20 +221,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }),
       listDiscoveryClassChips(),
     ]);
-    for (const city of cities) {
-      for (const chip of chips) {
-        if (chip.slug === "all" || !chip.isActive) continue;
+    const candidates = cities.flatMap((city) =>
+      chips.filter((chip) => chip.isActive && chip.slug !== "all").map((chip) => ({ city, chip })),
+    );
+    // Bound the number of concurrent database queries during sitemap generation.
+    for (let offset = 0; offset < candidates.length; offset += 5) {
+      const batch = candidates.slice(offset, offset + 5);
+      const populated = await Promise.all(batch.map(async ({ city, chip }) => {
         try {
-          if ((await countPublicClassesCategory(city.id, city.slug, chip.slug)) === 0) continue;
-          entries.push({
-            url: `${baseUrl}/${city.slug}/classes/${encodeURIComponent(chip.slug)}`,
-            lastModified: city.updatedAt,
-            changeFrequency: "weekly",
-            priority: 0.65,
-          });
+          return (await countPublicClassesCategory(city.id, city.slug, chip.slug)) > 0
+            ? { city, chip }
+            : null;
         } catch (error) {
           console.warn("[sitemap] class category count failed:", city.slug, chip.slug, error);
+          return null;
         }
+      }));
+      for (const item of populated) {
+        if (!item) continue;
+        entries.push({
+          url: `${baseUrl}/${item.city.slug}/classes/${encodeURIComponent(item.chip.slug)}`,
+          lastModified: item.city.updatedAt,
+          changeFrequency: "weekly",
+          priority: 0.65,
+        });
       }
     }
   } catch (error) {
