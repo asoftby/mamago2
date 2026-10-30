@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { NOTIFICATION_REGISTRY } from "@/lib/notifications/notificationRegistry";
+
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
 
 // Guest service: every operation is flag-gated, quantity is guarded by a row lock, tokens are hashed.
@@ -70,8 +72,30 @@ assert.match(read("src/lib/upload/uploadFromUrl.ts"), /options\.validateUrl \?\?
 
 // Integrations (PR 5): offers go through the shared visibility rule; gated by the flag.
 assert.match(read("src/server/wishlist/wishlist.service.ts"), /isOfferPubliclyVisible/, "only publicly visible offers become gifts");
-assert.match(read("src/features/me/components/BirthdayPartyDetailView.tsx"), /wishlistEnabled\(\)/, "party block is flag-gated");
+assert.match(read("src/app/(public)/me/birthdays/[id]/page.tsx"), /giftsHref: wishlistEnabled\(\)/, "party gifts entry is flag-gated and lives on the screen that is actually routed");
+assert.match(read("src/features/me/components/PartyOrderStatusScreen.tsx"), /party\.giftsHref/, "the routed party screen renders the gifts block");
 assert.match(read("src/app/(public)/[city]/offers/[slug]/page.tsx"), /wishlistEnabled=\{wishlistEnabled\(\)\}/, "offer button is flag-gated");
 assert.doesNotMatch(read("src/features/wishlist/components/AddOfferToWishlist.tsx"), /intent=/, "no intent param before its dedicated task");
+
+// Stored photos have no MediaAsset: they are served by wishlist routes with their own ACL.
+{
+  const pubRoute = read("src/app/api/w/[token]/items/[itemId]/image/route.ts");
+  assert.match(pubRoute, /getPublicItemImageUrl/);
+  const ownerRoute = read("src/app/api/wishlists/[id]/items/[itemId]/image/route.ts");
+  assert.match(ownerRoute, /getCurrentUser/);
+  assert.match(ownerRoute, /getOwnerItemImageUrl/);
+  const img = read("src/server/wishlist/wishlistImage.ts");
+  assert.doesNotMatch(img, /"image\/svg/, "svg is never served");
+  assert.doesNotMatch(read("src/features/wishlist/components/PublicWishlist.tsx"), /item\.imageUrl/, "guests never use the raw stored path");
+}
+
+// Notifications: a registered type (SYSTEM_INFO is silent by default), contacts honoured for account holders.
+{
+  assert.equal(NOTIFICATION_REGISTRY.SYSTEM?.defaultChannels.inApp, true, "SYSTEM is delivered in-app by default");
+  assert.equal(NOTIFICATION_REGISTRY.SYSTEM_INFO, undefined, "SYSTEM_INFO has no registry entry (silent)");
+  const notify = read("src/server/wishlist/wishlistNotify.ts");
+  assert.doesNotMatch(notify, /type:\s*"SYSTEM_INFO"/, "no wishlist notice uses the unregistered type");
+  assert.doesNotMatch(notify, /account notice failed", error\);\s*\}\s*return;/, "account holders still get reservation contacts");
+}
 
 console.log("wishlistPublic contract ok");

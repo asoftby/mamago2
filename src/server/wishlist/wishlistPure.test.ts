@@ -4,6 +4,8 @@ import {
   archiveCutoff,
   sameDayNextYear,
   thanksSchema,
+  isStoredMediaUrl,
+  wishlistImageSrc,
   SHARE_TOKEN_PATTERN,
   MAX_CLAIMS_PER_COOKIE,
   breakingItemChange,
@@ -129,6 +131,17 @@ assert.equal(breakingItemChange({ url: null, quantity: 3 }, { quantity: 2 }, 2),
   assert.equal(thanksSchema.parse({ message: "  Спасибо!  " }).message, "Спасибо!");
   assert.equal(thanksSchema.parse({ message: "" }).message, null);
   assert.throws(() => thanksSchema.parse({ message: "x".repeat(301) }));
+}
+
+// stored images (review fix)
+{
+  assert.equal(isStoredMediaUrl("/api/media/file/x/y.webp"), true);
+  assert.equal(isStoredMediaUrl("https://shop.example/a.jpg"), false);
+  assert.equal(isStoredMediaUrl(null), false);
+  assert.equal(wishlistImageSrc(null, "/p"), null);
+  assert.equal(wishlistImageSrc("https://shop.example/a.jpg", "/p"), "https://shop.example/a.jpg");
+  assert.equal(wishlistImageSrc("/api/media/file/x/y.webp", "/p"), "/p?v=y");
+  assert.notEqual(wishlistImageSrc("/api/media/file/x/y1.webp", "/p"), wishlistImageSrc("/api/media/file/x/y2.webp", "/p"), "cache busts on change");
 }
 
 console.log("wishlistPure ok");

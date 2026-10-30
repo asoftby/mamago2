@@ -433,31 +433,7 @@ function SortableItem(props: {
 }) {
   const { item, disabled, editing } = props;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, disabled });
-  const [title, setTitle] = useState(item.title);
-  const [url, setUrl] = useState(item.url ?? "");
-  const [image, setImage] = useState(item.imageUrl ?? "");
-  const [comment, setComment] = useState(item.comment ?? "");
-  const [price, setPrice] = useState(item.priceApprox === null ? "" : String(item.priceApprox));
-  const [qty, setQty] = useState(String(item.quantity));
-
   const state = itemStateLabel(item.state, item.takenQuantity, item.quantity);
-
-  function save() {
-    const parsedPrice = price.trim() ? Number(price.replace(",", ".")) : null;
-    const nextUrl = url.trim() || null;
-    const typedImage = image.trim() || null;
-    const imageChanged = typedImage !== (item.imageUrl ?? null);
-    const urlChanged = nextUrl !== (item.url ?? null);
-    props.onSave({
-      title: title.trim() || item.title,
-      url: nextUrl,
-      // A new link means a different product: drop the old photo unless the author set a new one.
-      ...(imageChanged ? { imageUrl: typedImage } : urlChanged ? { imageUrl: null } : {}),
-      comment: comment.trim() || null,
-      priceApprox: parsedPrice !== null && Number.isFinite(parsedPrice) ? parsedPrice : null,
-      quantity: Math.min(99, Math.max(1, Number.parseInt(qty, 10) || 1)),
-    });
-  }
 
   return (
     <li
@@ -476,9 +452,9 @@ function SortableItem(props: {
         >
           ⋮⋮
         </button>
-        {item.imageUrl ? (
+        {item.imageSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+          <img src={item.imageSrc} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
         ) : null}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -539,7 +515,53 @@ function SortableItem(props: {
         ) : null}
       </div>
 
-      {editing ? (
+      {editing ? <ItemEditForm item={item} onSave={props.onSave} /> : null}
+    </li>
+  );
+}
+
+/**
+ * Mounted only while editing: drafts start from the item as it was when the form opened.
+ * Save sends just the fields the author actually touched, so a link preview (title/photo)
+ * that arrives while the form is open is never rolled back by an unrelated edit.
+ */
+function ItemEditForm(props: { item: WishlistItemView; onSave: (patch: Record<string, unknown>) => void }) {
+  const { item } = props;
+  const [base] = useState(() => ({
+    title: item.title,
+    url: item.url ?? "",
+    image: item.imageUrl ?? "",
+    comment: item.comment ?? "",
+    price: item.priceApprox === null ? "" : String(item.priceApprox),
+    qty: String(item.quantity),
+  }));
+  const [title, setTitle] = useState(base.title);
+  const [url, setUrl] = useState(base.url);
+  const [image, setImage] = useState(base.image);
+  const [comment, setComment] = useState(base.comment);
+  const [price, setPrice] = useState(base.price);
+  const [qty, setQty] = useState(base.qty);
+
+  function save() {
+    const patch: Record<string, unknown> = {};
+    const urlChanged = url !== base.url;
+    const imageChanged = image !== base.image;
+    if (title !== base.title) patch.title = title.trim() || item.title;
+    if (urlChanged) patch.url = url.trim() || null;
+    // A new link means a different product: drop the old photo unless the author set a new one.
+    if (imageChanged) patch.imageUrl = image.trim() || null;
+    else if (urlChanged) patch.imageUrl = null;
+    if (comment !== base.comment) patch.comment = comment.trim() || null;
+    if (price !== base.price) {
+      const parsed = price.trim() ? Number(price.replace(",", ".")) : null;
+      patch.priceApprox = parsed !== null && Number.isFinite(parsed) ? parsed : null;
+    }
+    if (qty !== base.qty) patch.quantity = Math.min(99, Math.max(1, Number.parseInt(qty, 10) || 1));
+    if (Object.keys(patch).length === 0) return;
+    props.onSave(patch);
+  }
+
+  return (
         <div className="mt-3 grid gap-2 border-t border-neutral-100 pt-3 sm:grid-cols-2">
           <input className={field} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Название" maxLength={200} aria-label="Название" />
           <input className={field} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Ссылка" maxLength={2048} aria-label="Ссылка" />
@@ -555,7 +577,5 @@ function SortableItem(props: {
             </button>
           </div>
         </div>
-      ) : null}
-    </li>
   );
 }

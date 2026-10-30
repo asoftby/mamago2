@@ -15,6 +15,8 @@ export type PartyOrderScreenData = {
   cancelBlocker: string | null;
   date: string | null;
   time: string | null;
+  /** Set only when the wishlist feature is on (resolved on the server). */
+  giftsHref?: string | null;
   items: Array<{
     id: string;
     title: string;
@@ -191,6 +193,20 @@ export function PartyOrderStatusScreen({ party }: { party: PartyOrderScreenData 
             );
           })}
         </div>
+        {!cancelled && party.giftsHref ? (
+          <section className="space-y-2 border-t border-border pt-5">
+            <h2 className="text-lg font-semibold text-foreground">Подарки</h2>
+            <p className="text-sm text-muted-foreground">
+              Составьте список желаний и отправьте ссылку гостям: каждый отметит, что принесёт, без регистрации.
+            </p>
+            <Link
+              href={party.giftsHref}
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-border px-5 text-sm font-semibold text-foreground hover:bg-muted/50"
+            >
+              Список желаний
+            </Link>
+          </section>
+        ) : null}
         {!cancelled ? (
           <section className="space-y-2 border-t border-border pt-5">
             {party.cancelBlocker ? (
