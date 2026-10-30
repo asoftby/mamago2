@@ -103,7 +103,7 @@ test("accept refused: expired, revoked, joiner with data, joiner in family with 
   assert.ok((await db.familyInvite.findUniqueOrThrow({ where: { id: exp.inviteId } })).expiresAt);
   await db.familyInvite.update({ where: { id: exp.inviteId }, data: { expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000) } });
   const j1 = await mkUser("j3a");
-  assert.equal(await code(acceptFamilyInvite(db, { userId: j1, token: exp.token, consentTextVersion: "v1" }, deps)), "invalid_invite");
+  assert.equal(await code(acceptFamilyInvite(db, { userId: j1, token: exp.token, consentTextVersion: "v1" }, deps)), "expired_invite");
 
   const rev = await createFamilyInvite(db, { userId: owner }, deps);
   await revokeFamilyInvite(db, { userId: owner, inviteId: rev.inviteId }, deps);
