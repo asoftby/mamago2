@@ -29,10 +29,12 @@ export function ClassesChipBar({
         active: chip.slug === activeChipSlug,
         onClick: () => {
           const params = new URLSearchParams(searchParams.toString());
-          if (chip.slug === "all") params.delete("chip");
-          else params.set("chip", chip.slug);
+          params.delete("chip");
+          params.delete("page");
+          const basePath = pathname.replace(/\/classes(?:\/[^/]+)?$/, "/classes");
+          const destination = chip.slug === "all" ? basePath : `${basePath}/${encodeURIComponent(chip.slug)}`;
           const next = params.toString();
-          router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
+          router.push(next ? `${destination}?${next}` : destination, { scroll: false });
         },
         className:
           chip.slug === activeChipSlug

@@ -88,6 +88,41 @@ export function PrivacySettingsClient() {
     }
   });
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [publicSavesEnabled, setPublicSavesEnabled] = useState(false);
+  const [publicSavesLoading, setPublicSavesLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/me/public-save-avatar-consent", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("consent_unavailable");
+        const state: { enabled: boolean } = await res.json();
+        if (active) setPublicSavesEnabled(state.enabled);
+      })
+      .catch(() => {
+        if (active) toast.error("Не удалось загрузить настройку публичных сохранений");
+      })
+      .finally(() => { if (active) setPublicSavesLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const changePublicSaves = async (enabled: boolean) => {
+    setPublicSavesLoading(true);
+    try {
+      const res = await fetch("/api/me/public-save-avatar-consent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      if (!res.ok) throw new Error("consent_save_failed");
+      setPublicSavesEnabled(enabled);
+      toast.success(enabled ? "Показ аватарки разрешён" : "Показ аватарки отключён");
+    } catch {
+      toast.error("Не получилось изменить настройку");
+    } finally {
+      setPublicSavesLoading(false);
+    }
+  };
 
   useEffect(() => {
     window.localStorage.setItem(PRIVACY_PREFS_STORAGE_KEY, JSON.stringify(prefs));
@@ -135,6 +170,27 @@ export function PrivacySettingsClient() {
             checked={prefs.analytics}
             onCheckedChange={(checked) => setPrefs((prev) => ({ ...prev, analytics: checked }))}
           />
+        </div>
+      </PrivacyCard>
+
+      <PrivacyCard title="Публичные сохранения" description="Только для событий, предложений и мест">
+        <div className="space-y-2 rounded-xl border border-neutral-100 px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-neutral-800">Показывать мою аватарку</p>
+              <p className="mt-1 text-xs text-neutral-500">
+                Ваша аватарка может появиться среди пяти последних сохранивших публикацию,
+                когда у неё минимум три сохранения. Имя и профиль не показываются,
+                переходов нет. Согласие можно отозвать в любое время.
+              </p>
+            </div>
+            <Switch
+              aria-label="Согласие на публичный показ аватарки при сохранениях"
+              checked={publicSavesEnabled}
+              disabled={publicSavesLoading}
+              onCheckedChange={(checked) => { void changePublicSaves(checked); }}
+            />
+          </div>
         </div>
       </PrivacyCard>
 
