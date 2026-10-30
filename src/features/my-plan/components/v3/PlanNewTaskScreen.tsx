@@ -379,9 +379,9 @@ export function PlanNewTaskScreen({
                   setTime(maskTime(event.target.value));
                   enableTime();
                 }}
-                aria-invalid={timed && time.length > 0 && !timeValid}
-                 aria-describedby={timed && time.length > 0 && !timeValid ? "plan-time-error" : undefined}
-                 className={cn("w-[72px] border-0 bg-transparent p-0 text-base font-extrabold tabular-nums tracking-[.02em] text-[var(--mp-tx)] outline-none placeholder:font-semibold placeholder:text-[var(--text-muted)]", timed && time.length > 0 && !timeValid && "text-danger ring-1 ring-danger rounded-sm")}
+                aria-invalid={timed && !timeValid}
+                 aria-describedby={timed && !timeValid ? "plan-time-error" : undefined}
+                 className={cn("w-[72px] border-0 bg-transparent p-0 text-base font-extrabold tabular-nums tracking-[.02em] text-[var(--mp-tx)] outline-none placeholder:font-semibold placeholder:text-[var(--text-muted)]", timed && !timeValid && "text-danger ring-1 ring-danger rounded-sm")}
               />
             </label>
           </div>
