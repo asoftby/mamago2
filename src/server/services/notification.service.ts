@@ -83,7 +83,7 @@ export function getAccessibleSurfacesForUser(user: {
     surfaces.push("BUSINESS");
   }
 
-  if (user.role === "ADMIN") {
+  if (user.role === "ADMIN" || user.role === "MODERATOR") {
     surfaces.push("ADMIN");
   }
   
