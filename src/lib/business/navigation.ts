@@ -66,6 +66,7 @@ export const BUSINESS_ACTS_HREF = businessRoute("/documents/acts");
 export const BUSINESS_OFFERS_HREF = businessRoute("/offers");
 
 export const businessNavigation: BusinessNavItem[] = [
+  { type: "item", label: "Сообщения", href: businessRoute("/direct"), icon: MessageSquareText },
   { type: "item", label: "Поддержка mamaGo", href: businessRoute("/support"), icon: CircleHelp },
   {
     type: "item",
