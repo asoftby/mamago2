@@ -18,5 +18,13 @@ export async function countPublicClassesCategory(cityId: string, citySlug: strin
     publicWhereParts, cityId, placeWhere, targetRegionId,
     chipSlug, now: new Date(), free: false, priceMax: null,
   });
-  return prisma.offer.count({ where });
+  try {
+    return await prisma.offer.count({ where });
+  } catch (error) {
+    // Without the classChipSlugs migration the feed may fall back to unfiltered
+    // results. Do not claim an individual category is populated in that case.
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("classChipSlugs") || message.includes("P2022")) return 0;
+    throw error;
+  }
 }
