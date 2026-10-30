@@ -92,6 +92,18 @@ async function resolveCityRedirect(slug: string): Promise<string | null> {
     : null;
 }
 
+async function redirectHistoricalNationalArticleSlug(slug: string): Promise<void> {
+  const resolved = await findArticleBySlug(slug, null);
+  if (!resolved?.isRedirect) return;
+  const current = await prisma.article.findFirst({
+    where: { id: resolved.articleId, ...getPublicPublishedArticleWhere() },
+    select: { slug: true },
+  });
+  if (current?.slug && current.slug !== slug) {
+    permanentRedirect(buildNationalArticlePath(current.slug));
+  }
+}
+
 async function getArticle(slug: string): Promise<ArticleVm | null> {
   // REGION/COUNTRY scope: cityId IS NULL
   const resolved = await findArticleBySlug(slug, null);
@@ -176,6 +188,7 @@ export async function generateMetadata({
   const { slug } = await params;
 
   // If this is a CITY article, redirect immediately (metadata will follow)
+  await redirectHistoricalNationalArticleSlug(slug);
   const cityRedirect = await resolveCityRedirect(slug);
   if (cityRedirect) {
     permanentRedirect(cityRedirect);
@@ -316,6 +329,7 @@ export default async function ArticlePage({
   const { slug } = await params;
 
   // Redirect CITY articles to city-scoped URL
+  await redirectHistoricalNationalArticleSlug(slug);
   const cityRedirect = await resolveCityRedirect(slug);
   if (cityRedirect) {
     permanentRedirect(cityRedirect);
