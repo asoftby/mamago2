@@ -439,6 +439,19 @@ test("author release notifies the affected guests with the right reason", async 
   assert.deepEqual(calls, []);
 });
 
+test("release notice carries the title the guest reserved, even when the same edit renames the gift", async () => {
+  const owner = await makeUser("notif-title");
+  const w = await createWishlist(owner, wl(), deps);
+  const a = (await addWishlistItem(owner, w.id, item("Старое название", { url: "https://shop.example.test/old" }), deps)).items[0].id;
+  const r = await reserve(a);
+  const seen: Array<{ id: string; itemTitle?: string }> = [];
+  const rec = { ...deps, notifyReleased: async (_db: unknown, released: Array<{ reservationId: string; itemTitle?: string }>) => {
+    seen.push(...released.map((x) => ({ id: x.reservationId, itemTitle: x.itemTitle })));
+  } };
+  await updateWishlistItem(owner, w.id, a, { title: "Новое название", url: "https://shop.example.test/new", confirmReserved: true }, rec as never);
+  assert.deepEqual(seen, [{ id: r.id, itemTitle: "Старое название" }]);
+});
+
 test("a failing notifier never fails the author's edit", async () => {
   const owner = await makeUser("notif2");
   const w = await createWishlist(owner, wl(), deps);

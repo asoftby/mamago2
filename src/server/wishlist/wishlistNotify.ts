@@ -22,7 +22,15 @@ import {
  * message must never fail the reservation or the author's edit.
  */
 
-export type ReleasedReservation = { reservationId: string; reason: ReleaseReason };
+/** `itemTitle` is the title the guest reserved (captured before the author's edit); falls back to the current one. */
+export type ReleasedReservation = { reservationId: string; reason: ReleaseReason; itemTitle?: string };
+
+/**
+ * SYSTEM is a registered notification type (in-app + Telegram on by default). SYSTEM_INFO is not in
+ * the registry, so with default settings it reaches nobody. Adding dedicated wishlist types needs an
+ * enum migration and is tracked in the backlog.
+ */
+const NOTICE_TYPE = "SYSTEM" as const;
 
 const AUTHOR_THROTTLE_MS = 10 * 60_000;
 
@@ -60,7 +68,7 @@ export async function notifyAuthorReserved(
     if (recent) return;
     await createNotification({
       userId: wishlist.ownerUserId,
-      type: "SYSTEM_INFO",
+      type: NOTICE_TYPE,
       title: message.title,
       body: message.body,
       ctaLabel: "Открыть список",
@@ -86,6 +94,7 @@ export async function notifyReleasedGuests(db: PrismaClient, released: ReleasedR
       select: {
         id: true,
         userId: true,
+        user: { select: { email: true } },
         contactEmail: true,
         telegramChatId: true,
         item: { select: { title: true, wishlist: { select: { title: true, shareToken: true } } } },
@@ -96,13 +105,14 @@ export async function notifyReleasedGuests(db: PrismaClient, released: ReleasedR
     return;
   }
   const reasonById = new Map(released.map((r) => [r.reservationId, r.reason]));
+  const titleById = new Map(released.map((r) => [r.reservationId, r.itemTitle]));
   const base = getBaseUrl();
 
   await Promise.all(
     rows.map(async (row) => {
       const listUrl = `${base}/w/${row.item.wishlist.shareToken}`;
       const message = buildGuestReleaseMessage({
-        itemTitle: row.item.title,
+        itemTitle: titleById.get(row.id) ?? row.item.title,
         listTitle: row.item.wishlist.title,
         reason: reasonById.get(row.id) ?? "released",
         listUrl,
@@ -111,7 +121,7 @@ export async function notifyReleasedGuests(db: PrismaClient, released: ReleasedR
         try {
           await createNotification({
             userId: row.userId,
-            type: "SYSTEM_INFO",
+            type: NOTICE_TYPE,
             title: message.subject,
             body: message.text.split("\n")[0],
             ctaLabel: "Открыть список",
@@ -121,8 +131,8 @@ export async function notifyReleasedGuests(db: PrismaClient, released: ReleasedR
         } catch (error) {
           safeLog("account notice failed", error);
         }
-        return;
       }
+      // Contacts left on the reservation itself are honoured for account holders too.
       if (row.telegramChatId) {
         try {
           await new TelegramChannel().sendMessage({ chatId: row.telegramChatId, text: message.text });
@@ -130,7 +140,7 @@ export async function notifyReleasedGuests(db: PrismaClient, released: ReleasedR
           safeLog("telegram failed", error);
         }
       }
-      if (row.contactEmail) {
+      if (row.contactEmail && row.contactEmail.toLowerCase() !== (row.user?.email ?? "").toLowerCase()) {
         try {
           await sendEmail({ to: row.contactEmail, subject: message.subject, text: message.text });
         } catch (error) {

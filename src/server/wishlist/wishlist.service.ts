@@ -378,11 +378,11 @@ export async function addWishlistItem(
   return getWishlist(userId, wishlist.id, { db: c.db, env: c.env });
 }
 
-type LockedItem = { id: string; url: string | null; quantity: number };
+type LockedItem = { id: string; url: string | null; quantity: number; title: string };
 
 async function lockItem(tx: Prisma.TransactionClient, wishlistId: string, itemId: string): Promise<LockedItem> {
   const rows = await tx.$queryRaw<LockedItem[]>`
-    SELECT "id", "url", "quantity" FROM "WishlistItem"
+    SELECT "id", "url", "quantity", "title" FROM "WishlistItem"
     WHERE "id" = ${itemId} AND "wishlistId" = ${wishlistId} AND "deletedAt" IS NULL
     FOR UPDATE`;
   const item = rows[0];
@@ -438,7 +438,7 @@ export async function updateWishlistItem(
         where: { id: { in: active.map((r) => r.id) } },
         data: { status: "ITEM_REMOVED" },
       });
-      released.push(...active.map((r) => ({ reservationId: r.id, reason: "replaced" as const })));
+      released.push(...active.map((r) => ({ reservationId: r.id, reason: "replaced" as const, itemTitle: item.title })));
     } else if (breaking === "quantity_below_taken" && input.quantity !== undefined) {
       // Keep the earliest reservations; the newest ones lose the item.
       let kept = 0;
@@ -449,7 +449,7 @@ export async function updateWishlistItem(
       }
       if (dropped.length > 0) {
         await tx.wishlistReservation.updateMany({ where: { id: { in: dropped } }, data: { status: "ITEM_REMOVED" } });
-        released.push(...dropped.map((id) => ({ reservationId: id, reason: "quantity" as const })));
+        released.push(...dropped.map((id) => ({ reservationId: id, reason: "quantity" as const, itemTitle: item.title })));
       }
     }
     const data: Prisma.WishlistItemUpdateInput = {};
@@ -495,7 +495,7 @@ export async function removeWishlistItem(
         where: { id: { in: active.map((r) => r.id) } },
         data: { status: "ITEM_REMOVED" },
       });
-      released.push(...active.map((r) => ({ reservationId: r.id, reason: "removed" as const })));
+      released.push(...active.map((r) => ({ reservationId: r.id, reason: "removed" as const, itemTitle: item.title })));
     }
     await tx.wishlistItem.update({ where: { id: item.id }, data: { deletedAt: new Date() } });
   });

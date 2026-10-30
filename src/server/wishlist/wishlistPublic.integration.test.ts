@@ -259,6 +259,7 @@ test("public view reports only the contact kind", async () => {
   assert.deepEqual(kinds, ["email", "telegram"]);
   assert.ok(!JSON.stringify(view).includes("a@example.test"));
   assert.ok(!JSON.stringify(view).includes("42\""));
+});
 
 test("guest photo route: stored image only through a valid public token", async () => {
   const s = await setup();
