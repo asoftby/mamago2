@@ -11,6 +11,7 @@ import {
   dateToDateKey,
   generateShareToken,
   isActiveReservation,
+  wishlistImageSrc,
   summarizeItemForOwner,
   wishlistEnabled,
   wishlistScopeWhere,
@@ -95,6 +96,8 @@ export type WishlistItemView = {
   quantity: number;
   priority: "LOW" | "NORMAL" | "HIGH";
   imageUrl: string | null;
+  /** What to render in <img>: stored photos go through the image route. */
+  imageSrc: string | null;
   state: OwnerItemState;
   takenQuantity: number;
   reservations: OwnerReservationView[];
@@ -182,6 +185,7 @@ function toView(row: WishlistWithItems, userId: string): WishlistView {
         quantity: item.quantity,
         priority: item.priority,
         imageUrl: item.imageUrl,
+        imageSrc: wishlistImageSrc(item.imageUrl, `/api/wishlists/${row.id}/items/${item.id}/image`),
         state: summary.state,
         takenQuantity: summary.takenQuantity,
         reservations: summary.reservations,
@@ -308,6 +312,23 @@ export async function setWishlistArchived(
     data: archived ? { status: "ARCHIVED", archivedAt: new Date() } : { status: "ACTIVE", archivedAt: null },
   });
   return getWishlist(userId, wishlist.id, { db: c.db, env: c.env });
+}
+
+/** Stored photo of an item for the owner image route (ACL by account/family). */
+export async function getOwnerItemImageUrl(
+  userId: string,
+  wishlistId: string,
+  itemId: string,
+  deps?: WishlistDeps,
+): Promise<string | null> {
+  const c = ctx(deps);
+  const wishlist = await loadAccessible(c, userId, wishlistId);
+  const item = await c.db.wishlistItem.findFirst({
+    where: { id: itemId, wishlistId: wishlist.id, deletedAt: null },
+    select: { imageUrl: true },
+  });
+  if (!item) throw new WishlistError("not_found");
+  return item.imageUrl;
 }
 
 // ─── Items ───────────────────────────────────────────────────────────────────
@@ -528,7 +549,7 @@ export async function refreshItemPreview(
   assertEditable(wishlist);
   const item = await c.db.wishlistItem.findFirst({
     where: { id: itemId, wishlistId: wishlist.id, deletedAt: null },
-    select: { id: true, url: true, title: true },
+    select: { id: true, url: true, title: true, updatedAt: true },
   });
   if (!item) throw new WishlistError("not_found");
   const view = async (preview: PreviewStatus) => ({
@@ -544,9 +565,10 @@ export async function refreshItemPreview(
   const data: Prisma.WishlistItemUpdateManyMutationInput = {};
   if (found.imageUrl) data.imageUrl = found.imageUrl;
   if (found.title && isProvisionalTitle(item.title, item.url)) data.title = found.title.slice(0, 200);
-  // Guard on the link we fetched for: if the author changed it meanwhile, write nothing.
+  // Optimistic guard: any edit since we read the item (link, title, photo, ...) bumps updatedAt,
+  // so a slow preview can never overwrite what the author just typed.
   const written = await c.db.wishlistItem.updateMany({
-    where: { id: item.id, url: item.url, deletedAt: null },
+    where: { id: item.id, url: item.url, updatedAt: item.updatedAt, deletedAt: null },
     data,
   });
   return view(written.count > 0 ? "ok" : "unavailable");
