@@ -1,409 +1,70 @@
-# mamaGo — заметки для агентов
+# mamaGo 2.0 — инструкции для агентов
 
-> **CRITICAL: Before using or merging any agent/worktree output, verify its base SHA against the current repository HEAD. Never copy stale worktree files over newer repository files.**
+Семейная платформа досуга (mamago.by): публичный сайт, «Мой план», бизнес-кабинет, админка.
+Стек: Next.js 16 (App Router), React 19, TypeScript, Tailwind v4, PostgreSQL + Prisma 6, Node 22, pnpm 10.
 
-## Task Start / Environment Consistency — mandatory for EVERY new task
+Этот файл — канонический. Он короткий намеренно: читай его целиком, остальные документы — только когда задача их касается.
 
-A **new task** is any distinct user request that may change repository files, including a new request inside the same chat/session. This protocol is mandatory before implementation starts.
+## 1. Как работать быстро
 
-### Preferred automation entrypoint
+- **Сначала аудит, потом код.** Перед реализацией поищи (`rg`), нет ли уже такой функции, компонента, сервиса или эндпоинта. Есть — переиспользуй или расширь, параллельный дубль не создавай. Коротко отчитайся, что нашёл, до первого коммита.
+- **Источник истины — код, а не отчёты.** `docs/archive/`, `docs/reports/`, `docs/ai-reports/` и файлы вида `*_COMPLETE.md`, `*_FIX.md`, `*_SUMMARY.md` — это история. Они могут описывать устаревшую архитектуру. Не сверяйся с ними, если задача прямо не ссылается на них.
+- **Держи задачу узкой.** Делай ровно то, что попросили. Найденное по пути не чини — запиши в отчёт (см. §6).
+- **Проверяй точечно.** Во время работы запускай только тесты затронутой области и `pnpm exec tsc --noEmit`. Полный `pnpm build` и весь набор регрессий локально не гоняй: их запускает CI на каждом PR.
+- **Не опрашивай GitHub Actions в цикле.** Открыл PR — отчитайся и заверши задачу. Если CI упадёт, это будет отдельный шаг.
 
-When repository shell access is available, Claude Code MUST execute the task workflow itself instead of asking the user to manually create/sync worktrees or repeat routine Git commands:
+## 2. Git: одна задача = одна ветка = один PR
 
-```bash
-# canonical dev checkout
-sh scripts/git/task-start.sh <slug> [prefix]
+- `dev` — только для мержа. Коммиты напрямую в `dev` и `main` запрещены. Каждая задача — отдельная ветка от свежего `origin/dev` и отдельный PR в `dev`.
+- Префиксы веток: `feat/`, `fix/`, `refactor/`, `chore/`, `docs/`, `test/`. Новая просьба пользователя — новая ветка, даже в той же сессии.
+- Commit-сообщения в формате Conventional Commits (проверяет commitlint).
+- Перед push сделай `git fetch origin dev`. Если `dev` ушёл вперёд и задевает твои файлы — аккуратно смержи и перепроверь.
+- Никогда: `reset --hard`, force-push, `--no-verify`, `git add -A` в грязном дереве, перенос файлов из другого worktree через `cp`/`rsync` поверх более свежего кода. Изменения агента — это diff, а не замена файлов.
+- Чужие незакоммиченные изменения не трогай. Если что-то непонятно с состоянием репо — остановись и сообщи.
 
-# task worktree
-sh scripts/git/task-sync.sh
-sh scripts/git/task-check.sh
-sh scripts/git/task-finish.sh
-```
+**Облачная сессия (Claude Code в вебе, свежий клон):** создай ветку от `origin/dev` и работай в этом клоне. Worktree-скрипты не нужны.
 
-### Safe fast-forward of stale canonical dev (Codex / Claude / GitHub parallel work)
+**Локальная машина Алексея (несколько параллельных задач):** используй `sh scripts/git/task-start.sh <slug> [prefix]` → работа → `sh scripts/git/task-finish.sh`. Скрипты сами делают свежий base, отдельный worktree, `pnpm install` и `prisma generate`. Подробности — `docs/engineering/one-command-task-workflow.md`, читать только при сбое скрипта. Не делай symlink `node_modules` между worktree.
 
-GitHub `origin/dev` is the single source of truth. Other agents can merge PRs directly through GitHub while Codex/Claude has an older local checkout. A clean local `dev` that is **only behind** `origin/dev` is normal, not a task failure requiring manual permission.
+Код попадает на DEV/PROD только из Git. Руками на серверах ничего не правится. После деплоя сверяй `gitSha` окружения.
 
-- **Preferred:** from the canonical `dev` checkout run `sh scripts/git/task-start.sh <slug> [prefix]`. This script already fetches via `session-start-gate.sh`, and if its exit code is **4 (behind-only)**, performs `git merge --ff-only origin/dev`, reruns the gate and creates a new isolated task worktree. Do **not** reimplement sync in every task.
-- If running the gate directly and it returns **4**, the agent may perform the *same* fast-forward without asking the user **only when** the branch is `dev`, the fetch succeeded, `ahead=0`, `behind>0`, and tracked/staged files are clean. Then rerun the gate and require PASS before starting a task.
-- Any other STOP result, including local commits, divergence, failed fetch, tracked/staged WIP, wrong branch, or fast-forward failure: **STOP and report**, without automatic reset/rebase/pull/force or changes to existing worktrees. Untracked files are never deleted; inspect and preserve them.
-- Never fast-forward an active task branch/worktree using this shortcut. Use `task-sync.sh` with overlap checks and task-specific verification; never silently overwrite concurrent GitHub changes.
-- A successful local sync does **not** deploy code. All task changes still require a separate PR into `dev`, CI/review and a verified DEV deployment SHA.
+## 3. Prisma — критично
 
-`task-start.sh` wraps the freshness gate, captures exact `BASE_HEAD`, creates the isolated dated branch/worktree, and verifies its base. `task-sync.sh` automatically merges non-overlapping fresh `origin/dev` changes but stops when the same files changed on both sides. `task-check.sh` runs the shared push gate; task-specific tests are still required. `task-finish.sh` performs the final freshness/diff checks and normal push/PR handoff. Each worktree owns its `node_modules` and Prisma Client (`task-start.sh` runs `pnpm install --frozen-lockfile` + `prisma generate`; `task-sync.sh` regenerates when the schema changes). **Never symlink `node_modules` to another checkout** — the shared generated client makes `tsc` results random; the push gate fails on it (`scripts/git/worktree-deps.sh`). Never bypass a safety stop. Human shortcuts `mgtask`, `mgcheck`, and `mgfinish` are documented in `docs/engineering/one-command-task-workflow.md`.
+- `prisma migrate dev` и `prisma db push` **запрещены**: partial unique-индексы (миграция `20260608114243_city_scoped_slugs`) Prisma видит как дрифт и предлагает reset базы. **На reset никогда не соглашаться.**
+- Миграции пишутся вручную: `prisma/migrations/YYYYMMDDHHMMSS_name/migration.sql`. Применение — `npx prisma migrate deploy`.
+- Применённые миграции не редактируются никогда. Нужна правка — новая миграция.
+- `prisma.config.ts` не читает `.env` сам: `set -a; source .env; set +a; npx prisma …`.
 
-1. In the canonical `dev` checkout run:
+## 4. Архитектурные правила
 
-```bash
-sh scripts/git/session-start-gate.sh
-```
+- **Рекомендации — один движок на все поверхности.** Telegram-подборки, «Мой план», Home и Discovery используют общий фундамент рекомендаций. Отдельный движок, отдельные веса или своя «правда» фидбэка на поверхность запрещены. `UserEvent` — сырые действия, `RecommendationRun`/`RecommendationExposure` — что выдал пайплайн. Перед изменениями в рекомендациях или персонализации прочитай `docs/architecture/recommendation-data-foundation.md`.
+- **Auth redirect.** Возврат после логина — только через `getSafeRedirectPath()` (`src/lib/auth/redirectTo.ts`), параметр `redirectTo` (алиас `next`). Только внутренние относительные пути. Параметр `intent` без отдельной задачи не добавлять.
+- **UI.** Используй токены и контролы дизайн-системы (skill `mamago-design-system`, `docs/design-system.md`, `src/app/globals.css`, каталог `/ui-lab`). Новую UI-библиотеку не подключать.
+- **Меню аккаунта** — только `AccountDropdown`/`AccountDropdownContent` (`src/components/account/`) и билдеры `buildPublicSiteAccountModel`/`buildAdminAccountModel`.
+- **Slug рядом с названием** — только через `useAutoSlug` + `transliterateToSlug`. Режим `create` генерирует slug из названия, режим `edit` не пересчитывает его.
+- Тексты админки — на русском (проверяется в CI).
 
-2. Continue only after `PASS`: local `HEAD` must exactly match freshly fetched `origin/dev`. If the gate reports stale, ahead, diverged, tracked/staged WIP, or cannot fetch the remote, STOP. Do not repair the state with `reset --hard`, force-push, broad checkout/restore, or automatic pull/rebase.
-3. Capture the exact clean base SHA:
+## 5. Карта кода
 
-```bash
-BASE_HEAD=$(git rev-parse HEAD)
-```
+- `src/app` — роуты: `(public)`, `account`, `business`, `admin`, `api`, `(ui)/ui-lab`.
+- `src/features/<feature>` — фичи (birthday, wishlist, my-plan, discovery, stories…).
+- `src/server/<domain>` — серверная логика и сервисы. `src/domain` — чистые доменные модули. `src/lib` — утилиты.
+- `src/worker` — фоновые задачи. `prisma/` — схема и миграции. `scripts/` — git-, release- и ops-скрипты.
+- Тесты лежат рядом с кодом (`*.test.ts`, `*.contract.test.ts`). Запуск одного файла: `pnpm exec tsx path/to/file.test.ts`. Именованные наборы — `pnpm test:<name>` в `package.json`.
 
-4. Every repository-changing task must run in its **own isolated task worktree/branch created from that exact `BASE_HEAD`**. Do not implement a new task directly in a shared worktree, and do not reuse an old task worktree for a different task without re-validating it against fresh `origin/dev`.
-5. Before pushing task output or integrating it through a PR, fetch `origin/dev` again and compare it with `BASE_HEAD`. If `origin/dev` advanced, treat the task output as potentially stale: reconcile deliberately on top of the fresh base, inspect overlapping files, and rerun relevant verification before integration.
-6. Git/GitHub commit SHA is the source of truth. `local`, DEV, and PROD are environments, not independent code histories. Never make manual code edits directly on DEV or PROD.
-7. After deployment, verify that the environment reports the expected `gitSha`/build identity before claiming the change is deployed. PROD must come from a known, verified Git commit/artifact; never treat server filesystem state as authoritative source code.
+Локальный запуск: `pnpm dev`, хосты `mamago.local`, `business.mamago.local`, `admin.mamago.local` (порт 3000).
 
-**Core task-start rule:** fresh `origin/dev` → exact `BASE_HEAD` → isolated task worktree/branch → verified PR integration → deployment identity check. If freshness cannot be proven, repository-changing work does not start.
+## 6. Большие документы: что и когда читать
 
-## Branch / PR Integration Model — mandatory
+Эти файлы огромные. **Не читай их целиком.** Ищи по ним `rg` и правь только нужное место.
 
-This section is the canonical workflow for all repository-changing tasks, for Claude Code and every other coding agent.
+| Файл | Когда открывать |
+| --- | --- |
+| `docs/release/dev-to-prod-checklist.md` | Только задачи по релизу DEV → PROD. Релизный скоуп не расширять. |
+| `docs/migration/prelaunch-checklist.md` | Только задачи по миграции с WordPress. Продуктовые решения оттуда принимает Алексей. |
+| `docs/engineering/backlog.md` | Если в задаче сознательно отложено что-то нужное: найди дубль через `rg`, затем допиши запись в конец по формату файла. |
+| `NORTH_STAR.md` | Задачи по SEO и органике. |
 
-### 1. `dev` is merge-only
+## 7. Финал задачи
 
-`dev` is the integration branch. It is **not** an implementation workspace.
-
-Forbidden:
-- implementing a feature/fix/refactor/chore/docs task directly on `dev`;
-- creating normal task commits directly on `dev`;
-- pushing task commits directly to `dev`;
-- using the canonical `dev` checkout as the worktree for feature implementation.
-
-A normal task reaches `dev` only through a verified PR merge from its dedicated task branch.
-
-### 2. One task = one branch = one isolated worktree = one PR
-
-Every distinct repository-changing task gets:
-- one fresh task branch;
-- one isolated task worktree;
-- task-only commits;
-- one PR targeting `dev`.
-
-A new distinct user request is a new task even if it arrives in the same chat/session immediately after another task. Do not continue task B in task A's branch, worktree, or PR.
-
-One branch may contain multiple commits only when every commit belongs to the same logical task and is intended to be reviewed and merged together.
-
-Recommended prefixes:
-- `feat/` — feature;
-- `fix/` — bug fix;
-- `refactor/` — internal restructuring;
-- `chore/` — maintenance/tooling;
-- `docs/` — documentation-only change;
-- `test/` — test-only change.
-
-### 3. Every task branch starts from the exact fresh `origin/dev`
-
-After `session-start-gate.sh` passes, capture `BASE_HEAD` and create the task branch/worktree explicitly from that exact SHA. Never branch from a stale local branch, another task branch, an old worktree, DEV server filesystem, or PROD server filesystem.
-
-The intended shape is:
-
-```text
-origin/dev @ BASE_HEAD
-├── feat/task-a  -> PR -> dev
-├── fix/task-b   -> PR -> dev
-└── chore/task-c -> PR -> dev
-```
-
-Parallel tasks may share the same `BASE_HEAD` only if they were independently created from that verified base. They must never share a working tree.
-
-### 4. No unrelated "while here" changes
-
-If unrelated work is discovered during a task:
-- do not silently fix it in the current branch;
-- do not stage or commit it with the current task;
-- report/record it separately;
-- handle it as a new task on a new branch from a fresh `origin/dev`.
-
-If two changes can be independently reviewed, tested, reverted, or released, treat them as separate tasks/branches unless the user explicitly defines them as one atomic task.
-
-### 5. Re-check `origin/dev` before PR integration
-
-Immediately before final PR integration:
-
-1. fetch fresh `origin/dev`;
-2. compare it with the task's `BASE_HEAD`;
-3. if `origin/dev` advanced, deliberately reconcile the task branch with the new base;
-4. inspect overlapping files and possible semantic conflicts;
-5. rerun relevant verification on the reconciled result;
-6. verify the PR diff still contains only the intended task.
-
-Never make stale output "fit" by copying whole files over newer code.
-
-### 6. Merge gate
-
-A PR may be merged into `dev` only when:
-- the branch is based/reconciled against current `origin/dev`;
-- the diff is task-only and contains no foreign/stale work;
-- relevant targeted checks pass;
-- required repository/project gates pass for the task's risk level;
-- merge conflicts and overlapping edits have been deliberately reviewed.
-
-The merge operation is the integration event. Do not recreate the same task as a manual direct commit on `dev` after the PR.
-
-### 7. After merge, the branch/worktree is finished
-
-Once a task PR is merged:
-- treat that branch/worktree as closed for new development;
-- remove/archive it when convenient;
-- start the next task again from fresh `origin/dev` and capture a new `BASE_HEAD`.
-
-Never use "the previous branch is already close enough" as a reason to skip the fresh-start gate.
-
-### 8. Deployment does not change the branch model
-
-DEV/PROD deployment mechanics are separate from task integration. The code source of truth remains Git/GitHub. Follow the release/deployment documentation for promotion, but never bypass the task branch → PR → `dev` model by editing environment files directly.
-
-**Core integration rule:** **one task = one task branch = one isolated worktree = one task-only PR; `dev` is merge-only.**
-
-## Git / Worktree Safety — mandatory
-
-Правила обязательны для любых параллельных задач, subagents, background agents и временных worktree.
-
-### 1. Всегда проверять base SHA
-
-Перед созданием worktree или запуском agent-задачи зафиксировать текущую базу:
-
-```bash
-BASE_HEAD=$(git rev-parse HEAD)
-git rev-parse --abbrev-ref HEAD
-git status --short
-```
-
-После создания worktree:
-
-```bash
-git rev-parse HEAD
-```
-
-SHA внутри worktree ОБЯЗАН совпадать с `BASE_HEAD`.
-Если SHA не совпадает — STOP.
-Не начинать работу в worktree с неправильной или устаревшей базы.
-
-### 2. Никогда не предполагать, что worktree создан от текущего HEAD
-
-Запрещено полагаться на implicit/default branch state.
-Worktree создавать явно от зафиксированного SHA:
-
-```bash
-git worktree add --detach <path> "$BASE_HEAD"
-```
-
-### 3. Запрещено переносить результат worktree через `cp`, `rsync` или полную замену файлов
-
-Нельзя делать:
-
-```bash
-cp ...
-rsync ...
-```
-
-из agent/worktree обратно в основной working tree, если файл мог измениться после создания worktree.
-Это может тихо откатить уже существующую работу.
-Результат переносить только через:
-
-- patch;
-- cherry-pick;
-- точечное повторное применение diff;
-- rebase/merge после проверки актуальной базы.
-
-### 4. Перед интеграцией проверить, ушёл ли основной HEAD вперёд
-
-Перед переносом результатов:
-
-```bash
-CURRENT_HEAD=$(git rev-parse HEAD)
-```
-
-Сравнить с `BASE_HEAD`.
-Если `CURRENT_HEAD != BASE_HEAD`, считать результат агента потенциально устаревшим.
-Проверить:
-
-```bash
-git diff --name-only "$BASE_HEAD".."$CURRENT_HEAD"
-```
-
-и пересечение этого списка с файлами, изменёнными агентом.
-Если один и тот же файл менялся и в agent worktree, и после `BASE_HEAD` в основном репозитории — запрещено заменять его целиком.
-Изменения агента нужно переприменить поверх актуального HEAD вручную либо через корректный patch/rebase.
-
-### 5. Foreign work-in-progress не трогать
-
-Перед задачей определить существующий foreign diff:
-
-```bash
-git status --short
-```
-
-Не восстанавливать, форматировать, исправлять, stage, commit или удалять чужие незакоммиченные изменения, если они не входят прямо в scope текущей задачи.
-
-### 6. Никогда не использовать широкий staging в грязном рабочем дереве
-
-Если присутствует foreign diff, запрещено:
-
-```bash
-git add .
-git add -A
-git commit -am ...
-```
-
-Использовать только explicit staging:
-
-```bash
-git add path/to/file1 path/to/file2
-```
-
-Если один файл содержит и свои, и чужие изменения — использовать selective/hunk staging.
-Перед commit обязательно:
-
-```bash
-git diff --cached --name-status
-git diff --cached --stat
-git diff --cached --check
-```
-
-### 7. Изолированная проверка при параллельном foreign diff
-
-Если общий `build`, `typecheck`, тесты или `check:push` падают из-за чужой незавершённой работы, нельзя автоматически считать текущую задачу сломанной. Нужно:
-
-1. создать чистый worktree от актуального `BASE_HEAD`;
-2. применить только patch текущей задачи;
-3. запустить полный project gate;
-4. зафиксировать результат.
-
-Если `BASE_HEAD + task patch = green`, а основной working tree остаётся red из-за foreign diff — task может быть независимо признана технически валидной.
-
-### 8. Проверять base после долгих background-задач
-
-После завершения любого background/subagent процесса, особенно если он работал долго, повторно проверить:
-
-```bash
-git rev-parse HEAD
-```
-
-и сравнить: base агента; текущий HEAD основного репозитория; список затронутых файлов.
-Нельзя считать результат безопасным только потому, что agent завершился успешно.
-
-### 9. При crash / usage limit / interrupted agent
-
-Если subagent или background agent завершился аварийно:
-- не копировать его рабочее дерево целиком;
-- сначала определить, какие изменения реально были сделаны;
-- проверить его base SHA;
-- сравнить его base с текущим HEAD;
-- переносить только проверенный diff.
-
-Частично выполненная задача не является основанием для полной замены файлов.
-
-### 10. Защита от silent rollback
-
-Перед интеграцией большого agent diff выполнить проверку пересечения:
-
-```
-files changed by agent
-∩
-files changed in BASE_HEAD..CURRENT_HEAD
-```
-
-Если пересечение непустое — каждый такой файл требует отдельной проверки. Особенно опасны:
-
-- большие уменьшения количества строк;
-- исчезновение новых компонентов;
-- возврат старых API/props;
-- восстановление ранее удалённого кода;
-- внезапные diff на сотни строк при простой локальной задаче.
-
-### 11. Не исправлять unrelated ошибки ради зелёного gate
-
-Если проверка обнаружила ошибку вне scope:
-
-- доказать, что она pre-existing/foreign;
-- зафиксировать её отдельно;
-- не исправлять её молча;
-- не расширять scope задачи без явного решения.
-
-### 12. Финальный Git Gate перед commit
-
-Для любой задачи с несколькими файлами обязательно:
-
-```bash
-git status --short
-git diff --stat
-git diff --check
-git diff --cached --name-status
-git diff --cached --stat
-git diff --cached --check
-```
-
-Для крупных или параллельных изменений дополнительно проверить task-only diff в чистом worktree.
-
-**Core rule:** Agent output is a diff, not a source of truth. Актуальный `HEAD` основного репозитория всегда имеет приоритет над содержимым старого worktree. Никогда не заменять актуальный файл старой версией только потому, что она содержит нужное изменение агента. Нужное изменение должно быть переприменено поверх актуального кода.
-
-## DEV → PROD Readiness
-
-For any DEV → PROD readiness work, read `docs/release/dev-to-prod-checklist.md`
-first and treat it as the release coordination source of truth. Use AUDIT
-FIRST, implement only confirmed gaps, use risk-based verification, make
-atomic commits after completed verified phases, route non-blocking P2/P3
-engineering work to `docs/engineering/backlog.md`, and update checklist
-status/proof after completion. Do not expand the frozen release scope with
-non-blocking work.
-
-## Engineering Backlog
-
-Any consciously deferred engineering task must be recorded in
-`docs/engineering/backlog.md` before the current task is considered complete.
-This is separate from `docs/migration/prelaunch-checklist.md` (release-blocking
-migration work) — the backlog is for deferred work / technical debt / cleanup
-/ follow-up decisions. See that file's own rules for format and status
-conventions.
-
-## Миграция WordPress (Project Phoenix)
-
-- Прогресс и порядок работ: **`docs/migration/prelaunch-checklist.md`** —
-  единственный источник истины. Любая работа по миграции начинается с чтения
-  этого файла (включая раздел «Правила работы», пункт 7 — ускоренный
-  PR/Docker workflow) и заканчивается обновлением его статусов + записью в
-  журнал сессий (handoff log) внизу файла — **пакетно, по завершении
-  сущности/фазы, не после каждого мелкого PR**.
-- Продуктовые решения из чек-листа агент не принимает сам — спрашивает Алексея.
-- **PR/Docker workflow для серии мелких fix-PR:** targeted tests + targeted
-  lint + `tsc --noEmit` для каждого PR; полный `pnpm build` не повторять
-  вручную, если тот же build уже прошёл через pre-push hook; один Docker
-  Build & Push на merge SHA, дальше не ждать в сессии; отдельный docs-коммит
-  после каждого PR — не делать, обновлять чек-лист пакетно; не polling
-  GitHub Actions в цикле. Полный sweep/build/Docker обязателен только на
-  фазовых воротах (первый реальный write, full batch, RC, production
-  cutover) — см. чек-лист, пункт 7, для полного списка.
-
-## Prisma-миграции (ВАЖНО)
-
-- `prisma migrate dev` в этом репо **не используется и не работает**: миграция
-  `20260608114243_city_scoped_slugs` создала partial unique-индексы
-  (`WHERE … IS NOT NULL`), которые невыразимы в schema.prisma → Prisma всегда
-  видит «дрифт» и предлагает **reset базы. Никогда не соглашаться на reset.**
-- Миграции пишутся **вручную**: каталог `prisma/migrations/YYYYMMDDHHMMSS_meaningful_name/`
-  с `migration.sql` (SQL в стиле prisma-generated), применение — `npx prisma migrate deploy`.
-- Применённые миграции **никогда не редактируются** (checksum в `_prisma_migrations`
-  ломается). Нужны правки — новая миграция.
-- `prisma db push` запрещён.
-- env для CLI: `prisma.config.ts` не подхватывает .env автоматически —
-  запускать как `set -a; source .env; set +a; npx prisma …`.
-
-## Auth callbackUrl / redirectTo
-
-Current behavior:
-- Auth (login/register) supports a safe return-to-origin redirect via the
-  `redirectTo` query param (legacy alias: `next`). All capture and resolution
-  goes through `getSafeRedirectPath()` in `src/lib/auth/redirectTo.ts` — the
-  single source of truth, no duplicated validation in components.
-- After successful login/registration, the user returns to the page where
-  auth was initiated (`nextHref` for modal flows, `redirectTo` query param for
-  page flows). Falls back to `/me` if no valid target exists.
-
-Security (`getSafeRedirectPath`):
-- Only internal relative paths are allowed.
-- External URLs, protocol-relative URLs (`//evil.com`), and auth-flow pages
-  themselves (`/auth`, `/login`, `/register`, `/profile-entry`) are rejected
-  as redirect targets to avoid open redirects and redirect loops.
-
-Planned extension:
-- Add an optional `intent` param to resume the original action (not just the
-  page) after auth, e.g. `/login?redirectTo=/minsk/events/slug&intent=add-to-plan`.
-- Not implemented yet — do not add `intent` without a dedicated task.
+Push ветки → PR в `dev` с кратким описанием: что сделано, как проверено, что отложено.

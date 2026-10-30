@@ -81,8 +81,9 @@ ts-errors.txt
 # Root-level scratch/audit output (prod audits, temp analysis dumps)
 /tmp/
 
-# Local AI assistant files
-.claude/
+# Local AI assistant files (shared project skills are committed)
+.claude/*
+!.claude/skills/
 # Graphify local knowledge graph output
 graphify-out/
 .graphify/

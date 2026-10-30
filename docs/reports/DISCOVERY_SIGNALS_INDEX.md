@@ -15,8 +15,8 @@
 - **Implementation**: [Code](../../src/features/discovery/signals/) — TypeScript implementation
 
 ### For Project Context
-- **Summary**: [Foundation Complete](../../DISCOVERY_SIGNAL_FOUNDATION_COMPLETE.md) — What was built
-- **Text summary**: [Summary](../../DISCOVERY_SIGNAL_FOUNDATION_SUMMARY.txt) — Plain text overview
+- **Summary**: [Foundation Complete](../archive/root-md/DISCOVERY_SIGNAL_FOUNDATION_COMPLETE.md) — What was built
+- **Text summary**: [Summary](../archive/root-md/DISCOVERY_SIGNAL_FOUNDATION_SUMMARY.txt) — Plain text overview
 
 ## What Was Built
 
@@ -239,7 +239,7 @@ A: No. This is architecture readiness only. Zero runtime impact.
 1. Read [Architecture](./discovery-signal-architecture.md)
 2. Review [Visual Guide](./DISCOVERY_SIGNALS_VISUAL_GUIDE.md)
 3. Study the code in `src/features/discovery/signals/`
-4. Read [Foundation Complete](../../DISCOVERY_SIGNAL_FOUNDATION_COMPLETE.md)
+4. Read [Foundation Complete](../archive/root-md/DISCOVERY_SIGNAL_FOUNDATION_COMPLETE.md)
 
 ## Related Documentation
 
