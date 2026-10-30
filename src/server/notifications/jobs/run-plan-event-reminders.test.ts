@@ -88,6 +88,7 @@ void (async () => {
     // Срок напоминания у самой записи важнее общего расписания пользователя (120 мин).
     const now = new Date("2026-08-27T12:00:00.000Z");
     const sends: string[] = [];
+    const dueTimes: string[] = [];
     const result = await runPlanEventRemindersCore(
       { now },
       {
@@ -102,11 +103,13 @@ void (async () => {
           ]),
         sendNotificationFn: async (input) => {
           sends.push(input.userId);
+          dueTimes.push(input.context.reminderDueAt?.toISOString() ?? "missing");
           return sentResult;
         },
       },
     );
     assert.deepEqual(sends, ["own15"]);
+    assert.deepEqual(dueTimes, ["2026-08-27T12:00:00.000Z"]);
     assert.equal(result.results[0]?.offsetMinutes, 15);
   }
 
