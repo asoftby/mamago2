@@ -14,6 +14,7 @@ const good = (over: Partial<BulkCandidate> = {}): BulkCandidate => ({
   publishedActivityId: null,
   publishedPlaceId: null,
   reviewStatus: "PENDING",
+  matchStatus: "NO_MATCH",
   normalizedData: { title: "Мастер-класс", startAt: "2026-11-08T14:00:00+03:00", venueName: "Арт-студия" },
   qualityFlags: null,
   task: { id: "t1", status: "PENDING", suggestedAction: "CREATE_NEW" },
@@ -39,6 +40,12 @@ assert.equal(reason(good({ task: { id: "t1", status: "COMPLETED", suggestedActio
 assert.equal(reason(good({ task: { id: "t1", status: "CANCELLED", suggestedAction: "CREATE_NEW" } })), "no_open_task");
 for (const action of ["UPDATE_EXISTING", "MERGE", "REJECT", null]) {
   assert.equal(reason(good({ task: { id: "t1", status: "PENDING", suggestedAction: action } })), "not_create_new", String(action));
+}
+
+// Duplicate detection must have finished with "no match": a failed or pending match also
+// carries the CREATE_NEW fallback recommendation and must never be published in bulk.
+for (const matchStatus of ["SKIPPED", "PENDING", "AMBIGUOUS", "MATCHED", null]) {
+  assert.equal(reason(good({ matchStatus })), "not_matched", String(matchStatus));
 }
 
 // Required fields: title, a date, and a venue or an address.

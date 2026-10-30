@@ -27,6 +27,7 @@ export type BulkSkipReason =
   | "already_decided"
   | "no_open_task"
   | "not_create_new"
+  | "not_matched"
   | "incomplete"
   | "has_conflict"
   | "has_duplicates"
@@ -39,6 +40,7 @@ export const BULK_SKIP_LABEL: Record<BulkSkipReason, string> = {
   already_decided: "решение уже принято",
   no_open_task: "нет открытой задачи ревью",
   not_create_new: "не «создать новое»: нужен взгляд редактора",
+  not_matched: "проверка дублей не завершена",
   incomplete: "нет названия, даты или места",
   has_conflict: "текст и афиша расходятся",
   has_duplicates: "есть возможный дубль",
@@ -59,6 +61,8 @@ export interface BulkCandidate {
   publishedActivityId: string | null;
   publishedPlaceId: string | null;
   reviewStatus: string;
+  /** Итог матчинга: только `NO_MATCH` значит «дублей среди каталога не найдено». */
+  matchStatus: string | null;
   normalizedData: unknown;
   qualityFlags: unknown;
   task: { id: string; status: ImportReviewTaskStatus; suggestedAction: string | null } | null;
@@ -84,6 +88,9 @@ export function checkBulkPublishEligibility(
   }
   if (!record.task || !OPEN_TASK.includes(record.task.status)) return { ok: false, reason: "no_open_task" };
   if (record.task.suggestedAction !== "CREATE_NEW") return { ok: false, reason: "not_create_new" };
+  // Запасная рекомендация после сбоя матчинга тоже CREATE_NEW (matchStatus SKIPPED/PENDING):
+  // дубли не проверялись, такую запись публикует только редактор вручную.
+  if (record.matchStatus !== "NO_MATCH") return { ok: false, reason: "not_matched" };
 
   const nd = record.normalizedData as NormalizedEventImport | null;
   if (!hasRequiredEventFields(nd)) return { ok: false, reason: "incomplete" };
@@ -135,6 +142,7 @@ async function loadCandidates(ids: string[]) {
       publishedActivityId: true,
       publishedPlaceId: true,
       reviewStatus: true,
+      matchStatus: true,
       normalizedData: true,
       qualityFlags: true,
       reviewTask: { select: { id: true, status: true, suggestedAction: true } },

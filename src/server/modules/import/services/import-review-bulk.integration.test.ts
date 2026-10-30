@@ -26,11 +26,11 @@ const nd = (title: string, over: Record<string, unknown> = {}) => ({
 let seq = 0;
 async function record(
   title: string,
-  opts: { action?: string | null; flags?: object; data?: object | null; taskStatus?: "PENDING" | "COMPLETED"; reviewStatus?: "PENDING" | "APPROVED" } = {},
+  opts: { action?: string | null; flags?: object; data?: object | null; taskStatus?: "PENDING" | "COMPLETED"; reviewStatus?: "PENDING" | "APPROVED"; matchStatus?: "NO_MATCH" | "SKIPPED" | "PENDING" } = {},
 ) {
   const r = await prisma.importedRecord.create({
     data: {
-      sourceId, externalId: `bulk-${tag}-${++seq}`, entityTypeHint: "EVENT", parseStatus: "SUCCESS", normalizeStatus: "SUCCESS",
+      sourceId, externalId: `bulk-${tag}-${++seq}`, entityTypeHint: "EVENT", parseStatus: "SUCCESS", normalizeStatus: "SUCCESS", matchStatus: opts.matchStatus ?? "NO_MATCH",
       normalizedData: (opts.data === undefined ? nd(title) : opts.data) as object,
       ...(opts.flags ? { qualityFlags: opts.flags } : {}),
       reviewStatus: opts.reviewStatus ?? "PENDING",
@@ -76,9 +76,11 @@ test("bulk publish takes only safe CREATE_NEW records and says why it skipped th
   const dup = await record("Дубль", { flags: { ...skippedFlags("poll", "EVENT"), skipReason: null, pendingDuplicates: [{ recordId: "r", sourceId: "s", title: "t", score: 0.8, reason: "" }] } });
   const noDate = await record("Без даты", { data: nd("Без даты", { startAt: undefined }) });
   const closed = await record("Уже закрыта", { taskStatus: "COMPLETED" });
+  // Matching failed: the fallback recommendation is CREATE_NEW, but duplicates were never checked.
+  const matchFailed = await record("Матчинг упал", { matchStatus: "SKIPPED" });
   const published: string[] = [];
 
-  const results = await bulkPublishCreateNew([ok.id, update.id, conflict.id, dup.id, noDate.id, closed.id, "missing-id"], adminId, publishOk(published));
+  const results = await bulkPublishCreateNew([ok.id, update.id, conflict.id, dup.id, noDate.id, closed.id, matchFailed.id, "missing-id"], adminId, publishOk(published));
   const by = Object.fromEntries(results.map((r) => [r.importedRecordId, r]));
 
   assert.equal(by[ok.id].outcome, "published");
@@ -89,6 +91,7 @@ test("bulk publish takes only safe CREATE_NEW records and says why it skipped th
   assert.equal(by[dup.id].reason, "has_duplicates");
   assert.equal(by[noDate.id].reason, "incomplete");
   assert.equal(by[closed.id].reason, "no_open_task");
+  assert.equal(by[matchFailed.id].reason, "not_matched");
   assert.equal(by["missing-id"].reason, "not_found");
 
   // The decision is saved for the published one only; skipped records are untouched.
@@ -96,7 +99,7 @@ test("bulk publish takes only safe CREATE_NEW records and says why it skipped th
   assert.equal(approved.reviewStatus, "APPROVED");
   assert.equal(approved.reviewTask?.status, "COMPLETED");
   assert.equal(approved.reviewTask?.decision, "APPROVED_CREATE");
-  for (const untouched of [update, conflict, dup, noDate]) {
+  for (const untouched of [update, conflict, dup, noDate, matchFailed]) {
     const after = await reload(untouched.id);
     assert.equal(after.reviewStatus, "PENDING", untouched.externalId ?? "");
     assert.equal(after.reviewTask?.status, "PENDING");
