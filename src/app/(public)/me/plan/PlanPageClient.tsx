@@ -351,7 +351,8 @@ export function PlanPageClient({
     setItemsByWeek({ [initialRange.from]: initialItems });
   }, [initialItems, initialRange.from]);
 
-  const visibleItems = useMemo(() => Object.values(itemsByWeek).flat(), [itemsByWeek]);
+  const items = useMemo(() => Object.values(itemsByWeek).flat(), [itemsByWeek]);
+  const visibleItems = items;
 
   const loadWeek = useCallback(async (date: string, options: { force?: boolean } = {}) => {
     const from = startOfWeek(date);
