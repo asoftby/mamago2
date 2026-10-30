@@ -28,6 +28,7 @@ import {
 import { classifyImportSource } from "../publish/source-field-priority";
 import { TELEGRAM_CHANNEL_PARSER_KEY } from "../parsers/telegram-channel-constants";
 import { ABWS_PARSER_KEY } from "../normalizers/abws-event.normalizer";
+import { rematchRelatedPendingRecords } from "./import-related-rematch.service";
 import { loadFieldOverrides, loadActivityFieldOverrides, applyOverrideFilter, isFieldAllowed } from "../publish/field-override-checker";
 import { lookupCityId } from "../publish/city-lookup";
 import { lookupVenuePlace } from "../publish/venue-place-lookup";
@@ -178,6 +179,13 @@ export async function publishApprovedEventRecord(
     default: result = { success: false, recordId: importedRecordId, reason: "Unhandled decision type" };
   }
   t.end();
+  // «Это одно событие»: записи других источников, ждущие ревью по тому же событию,
+  // получают опубликованное как кандидата. Сбой здесь публикацию не отменяет.
+  if (result.success) {
+    await rematchRelatedPendingRecords(importedRecordId).catch((error) => {
+      console.error(`[import-publish] related rematch failed recordId=${importedRecordId}`, error instanceof Error ? error.name : "error");
+    });
+  }
   return result;
 }
 

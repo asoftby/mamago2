@@ -42,8 +42,11 @@ import {
   type TelegramPostExtraction,
 } from "../normalizers/telegram-post.schema";
 import {
+  asTelegramFlags,
   diffKeyFields,
+  keyFieldSnapshot,
   mapTelegramExtraction,
+  sameKeyFields,
   skippedFlags,
   type MappedTelegramEvent,
   type TelegramPostContext,
@@ -208,8 +211,8 @@ export function createTelegramPostNormalizer(overrides: Partial<TelegramNormaliz
         errorMessage: null,
         qualityFlags: {
           ...((record.qualityFlags as object | null) ?? {}),
-          sourceChanged: { fields, detectedAt: deps.now().toISOString() },
-        } as Prisma.InputJsonValue,
+          sourceChanged: { fields, detectedAt: deps.now().toISOString(), ...(normalized ? { snapshot: keyFieldSnapshot(normalized) } : {}) },
+        } as unknown as Prisma.InputJsonValue,
       },
     });
     await reopenReviewTask(record.id);
@@ -434,7 +437,11 @@ export function createTelegramPostNormalizer(overrides: Partial<TelegramNormaliz
 
     const changedFields = record.publishedActivityId ? diffKeyFields(previous, event.normalized) : [];
     if (changedFields.length > 0) {
-      event.qualityFlags.sourceChanged = { fields: changedFields, detectedAt: deps.now().toISOString() };
+      event.qualityFlags.sourceChanged = {
+        fields: changedFields,
+        detectedAt: deps.now().toISOString(),
+        snapshot: keyFieldSnapshot(event.normalized),
+      };
     }
     await prisma.importedRecord.update({
       where: { id: record.id },
@@ -538,16 +545,22 @@ export function createTelegramPostNormalizer(overrides: Partial<TelegramNormaliz
 
     const decided = existing.publishedActivityId !== null || ["APPROVED", "REJECTED"].includes(existing.reviewStatus);
     if (decided) {
-      // Решение редактора не затираем: только помечаем изменение источника.
-      const fields = diffKeyFields(existing.normalizedData as NormalizedEventImport | null, event.normalized);
-      if (fields.length > 0) {
+      // Решение редактора не затираем: только помечаем изменение источника. Базой сравнения служит
+      // версия, которую редактор уже просмотрел (если была), иначе исходные данные записи: иначе
+      // правка соседнего пункта подборки снова подняла бы уже разобранное изменение.
+      const existingFlags = asTelegramFlags(existing.qualityFlags);
+      const baseline = existingFlags?.sourceReviewed ?? (existing.normalizedData as NormalizedEventImport | null);
+      const fields = diffKeyFields(baseline, event.normalized);
+      const snapshot = keyFieldSnapshot(event.normalized);
+      const alreadyFlagged = sameKeyFields(existingFlags?.sourceChanged?.snapshot, snapshot);
+      if (fields.length > 0 && !alreadyFlagged) {
         await prisma.importedRecord.update({
           where: { id: existing.id },
           data: {
             qualityFlags: {
               ...(existing.qualityFlags as object | null),
-              sourceChanged: { fields, detectedAt: deps.now().toISOString() },
-            } as Prisma.InputJsonValue,
+              sourceChanged: { fields, detectedAt: deps.now().toISOString(), snapshot },
+            } as unknown as Prisma.InputJsonValue,
           },
         });
         await reopenReviewTask(existing.id);

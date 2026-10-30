@@ -1,10 +1,19 @@
 import assert from "node:assert/strict";
 import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { renderToStaticMarkup as renderStatic } from "react-dom/server";
+import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { NormalizedEventImport } from "@/server/modules/import/types";
 import { skippedFlags, type TelegramQualityFlags } from "@/server/modules/import/normalizers/telegram-post.mapper";
 import { telegramAttentionItems, telegramReviewBadges } from "../../_lib/telegram-review";
 import { TelegramPostBlock } from "./TelegramPostBlock";
+
+// The block embeds a client button that uses the app router; give it a stub router for static rendering.
+const stubRouter = {
+  back() {}, forward() {}, prefetch() {}, push() {}, replace() {}, refresh() {},
+} as unknown as NonNullable<React.ContextType<typeof AppRouterContext>>;
+function renderToStaticMarkup(element: React.ReactElement): string {
+  return renderStatic(createElement(AppRouterContext.Provider, { value: stubRouter }, element));
+}
 
 function flags(over: Partial<TelegramQualityFlags> = {}): TelegramQualityFlags {
   return {
@@ -104,6 +113,37 @@ assert.deepEqual(telegramAttentionItems(null), []);
   assert.match(html, /афиша/, "image role is labelled");
   assert.match(html, /href="https:\/\/t\.me\/minsk_kids\/3743"/);
   assert.match(html, /только админка/);
+}
+
+// Source change on a published event: open the event and mark the change as reviewed.
+{
+  const changed = flags({ sourceChanged: { fields: ["dates"], detectedAt: "2026-10-30T10:00:00Z" } });
+  const withEvent = renderToStaticMarkup(
+    createElement(TelegramPostBlock, { flags: changed, nd, postUrl: null, importedRecordId: "rec-1", publishedActivityId: "act-9" }),
+  );
+  assert.match(withEvent, /Событие на сайте само не меняется/);
+  assert.match(withEvent, /href="\/editor\/event\/act-9\/edit\?returnTo=%2Fadmin%2Fimport%2Freview&amp;importedRecordId=rec-1"/, "link to the event editor");
+  assert.match(withEvent, /Отметить просмотренным/);
+
+  // Not published yet (or no ids): the alert stays, the actions do not.
+  const notPublished = renderToStaticMarkup(createElement(TelegramPostBlock, { flags: changed, nd, postUrl: null, importedRecordId: "rec-1", publishedActivityId: null }));
+  assert.match(notPublished, /Пост изменился/);
+  assert.doesNotMatch(notPublished, /Открыть событие в редакторе/);
+  assert.doesNotMatch(notPublished, /Отметить просмотренным/);
+  const noIds = renderToStaticMarkup(createElement(TelegramPostBlock, { flags: changed, nd, postUrl: null }));
+  assert.doesNotMatch(noIds, /Отметить просмотренным/);
+}
+
+// A possible duplicate explains what to do next (publish one, the other gets it as a candidate).
+{
+  const dup = renderToStaticMarkup(
+    createElement(TelegramPostBlock, {
+      flags: flags({ pendingDuplicates: [{ recordId: "rec-2", sourceId: "s2", title: "Аниме-фест", score: 0.8, reason: "x" }] }),
+      nd,
+      postUrl: null,
+    }),
+  );
+  assert.match(dup, /Опубликуйте одну из записей, и вторая получит/);
 }
 
 // A quiet record shows no alert, no conflict table and no duplicates.

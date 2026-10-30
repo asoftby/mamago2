@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { parseTelegramPostExtraction, type TelegramPostExtraction } from "./telegram-post.schema";
 import {
   diffKeyFields,
+  keyFieldSnapshot,
   mapTelegramExtraction,
   sameCity,
+  sameKeyFields,
   skippedFlags,
   type TelegramPostContext,
 } from "./telegram-post.mapper";
@@ -254,6 +256,24 @@ assert.deepEqual(mapTelegramExtraction(post("NOT_EVENT", []), ctx()).events, [])
   assert.deepEqual(diffKeyFields(base, moved), ["dates", "price"]);
   const reworded = mapTelegramExtraction(post("EVENT", [event({ summary: "Совсем другой текст." })]), ctx()).events[0].normalized;
   assert.deepEqual(diffKeyFields(base, reworded), [], "a reworded summary is not a source change");
+}
+
+// ── Reviewed baseline: a snapshot compares like the data it came from ────────
+{
+  const base = mapTelegramExtraction(post("EVENT", [event()]), ctx()).events[0].normalized;
+  const moved = mapTelegramExtraction(
+    post("EVENT", [event({ occurrences: [{ startAt: field("2026-11-08T15:00:00+03:00"), title: null }] })]),
+    ctx(),
+  ).events[0].normalized;
+  const snapshot = keyFieldSnapshot(moved);
+  assert.deepEqual(Object.keys(snapshot).sort(), ["address", "dates", "price", "title", "venue"]);
+  assert.deepEqual(diffKeyFields(snapshot, moved), [], "the reviewed version no longer counts as a change");
+  assert.deepEqual(diffKeyFields(snapshot, base), ["dates"], "going back to the old date is a change again");
+  assert.deepEqual(diffKeyFields(keyFieldSnapshot(base), moved), diffKeyFields(base, moved), "snapshot and data give the same diff");
+  assert.equal(sameKeyFields(snapshot, keyFieldSnapshot(moved)), true);
+  assert.equal(sameKeyFields(snapshot, keyFieldSnapshot(base)), false);
+  assert.equal(sameKeyFields(undefined, snapshot), false);
+  assert.equal(sameKeyFields(undefined, undefined), false);
 }
 
 // ── Real fixtures: the same post text always yields the same prompt text ─────
