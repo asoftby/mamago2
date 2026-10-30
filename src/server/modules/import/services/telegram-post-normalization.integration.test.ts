@@ -9,6 +9,7 @@ import prisma from "@/lib/prisma";
 import type { OpenRouterCallInput, OpenRouterCallResult } from "@/lib/ai/openrouterClient";
 import { createTelegramPostNormalizer, setTelegramPostNormalizerForTests } from "./telegram-post-normalization.service";
 import { normalizeRunRecords } from "./import-normalization.service";
+import { acknowledgeSourceChange } from "./import-source-change.service";
 import { describePostponed, summarizeNormalization } from "./normalization-notes";
 import { ensureImportReviewTaskExists } from "./import-review-task.service";
 
@@ -421,5 +422,62 @@ test("without a model the run keeps the posts and says why; the next run with a 
     }
   } finally {
     setTelegramPostNormalizerForTests(null);
+  }
+});
+
+test("an acknowledged source change is not raised again by an unrelated edit of the same digest", async () => {
+  const admin = await prisma.user.create({ data: { email: `tg-ack-${tag}@example.invalid`, role: "ADMIN" }, select: { id: true } });
+  try {
+    const parent = await newRecord({ externalId: `chan_${tag}/digest-ack` });
+    const item = (title: string, date: string) => ev({ title: f(title), occurrences: [{ startAt: f(date), title: null }] });
+    const run = (events: unknown[]) => normalizer(() => ok(postJson("DIGEST", events))).n.normalize(parent.id);
+    const child = () => prisma.importedRecord.findUniqueOrThrow({
+      where: { sourceId_externalId: { sourceId, externalId: `chan_${tag}/digest-ack#1` } },
+      include: { reviewTask: true },
+    });
+    const flagsOf = (c: Awaited<ReturnType<typeof child>>) => c.qualityFlags as { sourceChanged?: { fields: string[]; snapshot?: unknown }; sourceReviewed?: unknown };
+
+    // 1. A digest of two items; the first one is reviewed and approved by the editor.
+    await run([item("Показ А", "2030-11-07T15:00:00+03:00"), item("Показ Б", "2030-11-09T15:00:00+03:00")]);
+    const first = await child();
+    await prisma.importedRecord.update({ where: { id: first.id }, data: { reviewStatus: "APPROVED" } });
+    await prisma.importReviewTask.update({ where: { importedRecordId: first.id }, data: { status: "COMPLETED" } });
+
+    // 2. The post moves item A to another date: flagged, with the version it points at.
+    await run([item("Показ А", "2030-11-08T15:00:00+03:00"), item("Показ Б", "2030-11-09T15:00:00+03:00")]);
+    let c = await child();
+    assert.deepEqual(flagsOf(c).sourceChanged?.fields, ["dates"]);
+    assert.ok(flagsOf(c).sourceChanged?.snapshot, "the flagged version is remembered");
+    assert.equal(c.reviewTask?.status, "PENDING");
+
+    // 3. The editor reviews it.
+    assert.deepEqual(await acknowledgeSourceChange(first.id, admin.id), { ok: true });
+    c = await child();
+    assert.equal(flagsOf(c).sourceChanged, undefined);
+    assert.ok(flagsOf(c).sourceReviewed, "the reviewed version becomes the baseline");
+    assert.equal(c.reviewTask?.status, "COMPLETED");
+
+    // 4. An unrelated edit (item B's title): item A's reviewed date change must NOT come back.
+    await run([item("Показ А", "2030-11-08T15:00:00+03:00"), item("Показ Б (новое название)", "2030-11-09T15:00:00+03:00")]);
+    c = await child();
+    assert.equal(flagsOf(c).sourceChanged, undefined, "no repeated alert for an already reviewed change");
+    assert.equal(c.reviewTask?.status, "COMPLETED", "the closed task stays closed");
+
+    // 5. A real new change of item A is still caught, against the reviewed version.
+    await run([item("Показ А", "2030-11-10T15:00:00+03:00"), item("Показ Б (новое название)", "2030-11-09T15:00:00+03:00")]);
+    c = await child();
+    assert.deepEqual(flagsOf(c).sourceChanged?.fields, ["dates"]);
+    assert.equal(c.reviewTask?.status, "PENDING");
+
+    // 6. Seeing the same unreviewed change again (another unrelated edit) does not reopen or rewrite it.
+    const detectedAt = (flagsOf(c).sourceChanged as unknown as { detectedAt: string }).detectedAt;
+    await prisma.importReviewTask.update({ where: { importedRecordId: first.id }, data: { status: "IN_PROGRESS" } });
+    await run([item("Показ А", "2030-11-10T15:00:00+03:00"), item("Показ Б (ещё правка)", "2030-11-09T15:00:00+03:00")]);
+    c = await child();
+    assert.equal((flagsOf(c).sourceChanged as unknown as { detectedAt: string }).detectedAt, detectedAt, "the flag is not rewritten");
+    assert.equal(c.reviewTask?.status, "IN_PROGRESS", "the editor's work in progress is not reset");
+  } finally {
+    await prisma.importReviewTask.updateMany({ where: { importedRecord: { sourceId } }, data: { reviewerUserId: null } });
+    await prisma.user.delete({ where: { id: admin.id } }).catch(() => undefined);
   }
 });

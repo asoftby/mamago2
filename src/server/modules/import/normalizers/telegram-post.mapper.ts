@@ -36,10 +36,21 @@ export interface PendingDuplicateRef {
   reason: string;
 }
 
+/** Ключевые поля события в виде строк: по ним определяется, что в источнике изменилось. */
+export interface KeyFieldSnapshot {
+  dates: string;
+  venue: string;
+  address: string;
+  price: string;
+  title: string;
+}
+
 export interface TelegramSourceChange {
   /** Какие ключевые поля изменились относительно прежней нормализации. */
   fields: string[];
   detectedAt: string;
+  /** Ключевые поля версии источника, на которую указывает пометка (для базы сравнения после «просмотрено»). */
+  snapshot?: KeyFieldSnapshot;
 }
 
 /** Ключи qualityFlags для записей Telegram: заполняются всегда и все. */
@@ -58,6 +69,11 @@ export interface TelegramQualityFlags {
   fieldStates: Record<string, "stated" | "inferred" | "missing">;
   /** Заполняется матчингом: дубли среди ожидающих записей других источников. */
   pendingDuplicates?: PendingDuplicateRef[];
+  /**
+   * Версия источника, изменение которой редактор уже просмотрел. С ней сравнивается следующая
+   * нормализация, чтобы уже разобранное изменение не поднималось снова при правке соседнего пункта подборки.
+   */
+  sourceReviewed?: KeyFieldSnapshot;
 }
 
 export interface TelegramPostContext {
@@ -273,22 +289,36 @@ export function skippedFlags(
   };
 }
 
-/** Какие ключевые поля изменились между двумя нормализациями (для sourceChanged). */
+export function keyFieldSnapshot(n: NormalizedEventImport): KeyFieldSnapshot {
+  return {
+    dates: (n.occurrences ?? []).map((o) => o.startAt).join("|") || n.startAt || "",
+    venue: n.venueName ?? "",
+    address: n.addressText ?? "",
+    price: n.priceText ?? "",
+    title: n.title ?? "",
+  };
+}
+
+export function sameKeyFields(a: KeyFieldSnapshot | undefined, b: KeyFieldSnapshot | undefined): boolean {
+  return Boolean(a && b) && JSON.stringify(a) === JSON.stringify(b);
+}
+
+function toSnapshot(value: NormalizedEventImport | KeyFieldSnapshot): KeyFieldSnapshot {
+  return "entityType" in value ? keyFieldSnapshot(value) : value;
+}
+
+/**
+ * Какие ключевые поля изменились между версиями источника (для sourceChanged).
+ * База сравнения: нормализованные данные или снимок уже просмотренной версии.
+ */
 export function diffKeyFields(
-  before: NormalizedEventImport | null | undefined,
+  before: NormalizedEventImport | KeyFieldSnapshot | null | undefined,
   after: NormalizedEventImport,
 ): string[] {
   if (!before) return [];
-  const starts = (n: NormalizedEventImport) =>
-    (n.occurrences ?? []).map((o) => o.startAt).join("|") || n.startAt || "";
-  const checks: [string, string, string][] = [
-    ["dates", starts(before), starts(after)],
-    ["venue", before.venueName ?? "", after.venueName ?? ""],
-    ["address", before.addressText ?? "", after.addressText ?? ""],
-    ["price", before.priceText ?? "", after.priceText ?? ""],
-    ["title", before.title ?? "", after.title ?? ""],
-  ];
-  return checks.filter(([, a, b]) => a !== b).map(([name]) => name);
+  const a = toSnapshot(before);
+  const b = keyFieldSnapshot(after);
+  return (["dates", "venue", "address", "price", "title"] as const).filter((name) => a[name] !== b[name]);
 }
 
 /** Флаги записи Telegram-канала (по ключу `source`), иначе null. */

@@ -880,7 +880,13 @@ export default async function ReviewDetailPage({
       )}
 
       {telegramFlags && nd && nd.entityType === "EVENT" && (
-        <TelegramPostBlock flags={telegramFlags} nd={nd as NormalizedEventImport} postUrl={rec.sourceUrl} />
+        <TelegramPostBlock
+          flags={telegramFlags}
+          nd={nd as NormalizedEventImport}
+          postUrl={rec.sourceUrl}
+          importedRecordId={rec.id}
+          publishedActivityId={rec.publishedActivityId}
+        />
       )}
 
       <NeedsAttentionBlock
