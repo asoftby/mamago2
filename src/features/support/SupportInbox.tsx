@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Thread = { id: string; businessId: string; subject: string; status: "NEW" | "IN_PROGRESS" | "CLOSED"; lastMessageAt: string };
 type Message = { id: string; body: string; actor: "BUSINESS" | "STAFF"; createdAt: string };
@@ -15,6 +15,7 @@ export function SupportInbox({ businessId, staff = false, initialThreadId }: { b
   const [reply, setReply] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const pendingKeys = useRef(new Map<string, string>());
 
   const loadThreads = useCallback(async () => {
     const qs = businessId ? "?businessId=" + encodeURIComponent(businessId) : "";
@@ -66,9 +67,13 @@ export function SupportInbox({ businessId, staff = false, initialThreadId }: { b
   async function post(url: string, payload: object, after: () => void) {
     setBusy(true); setError("");
     try {
-      const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const signature = url + JSON.stringify(payload);
+      const requestKey = pendingKeys.current.get(signature) ?? crypto.randomUUID();
+      pendingKeys.current.set(signature, requestKey);
+      const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, requestKey }) });
       if (!response.ok) throw new Error("Не удалось отправить сообщение");
       const value: { id?: string } = await response.json();
+      pendingKeys.current.delete(signature);
       after();
       await loadThreads();
       if (value.id && url === "/api/support/threads") setSelected(value.id);
