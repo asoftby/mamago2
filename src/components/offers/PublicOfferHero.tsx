@@ -1,8 +1,12 @@
+"use client";
+
 import { publicOfferShowsPaidPrices } from "./publicOfferPriceLabel";
 import { BookingCountdown, pluralReviews } from "./OfferHero";
 import type { ReactNode, RefObject } from "react";
 import Link from "next/link";
-import { Heart } from "lucide-react";
+import { useState } from "react";
+import { PublicationSaveShare } from "@/components/shared/PublicationSaveShare";
+import { ShareModal } from "@/components/shared/ShareModal";
 import type { OfferPageData } from "@/lib/offer/offerPageTypes";
 import { PublicationHeroLayout } from "@/components/publication-page/PublicationHeroLayout";
 import {
@@ -14,7 +18,6 @@ import { PublicationMediaColumn } from "@/components/media/PublicationMediaColum
 import { mapOfferPageMedia } from "@/lib/media/mapOfferPageMedia";
 import {
   SidebarCard,
-  SidebarCardShare,
   SidebarCardTopSection,
 } from "@/components/shared/SidebarCard";
 import { PlaceInfoRow } from "@/components/shared/PlaceInfoRow";
@@ -58,6 +61,7 @@ export function PublicOfferHero({
   onPrimary,
   onSave,
 }: PublicOfferHeroProps) {
+  const [shareOpen, setShareOpen] = useState(false);
   const media = mapOfferPageMedia(data.media, data.title);
   const label =
     PRODUCT_LABELS[data.productType ?? ""] ??
@@ -175,21 +179,10 @@ export function PublicOfferHero({
                     {isPrimaryLoading ? "Загрузка..." : data.cta.primaryLabel}
                   </Button>
                 )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onSave}
-                  aria-label={isSaved ? "Сохранено" : "Сохранить"}
-                  aria-pressed={isSaved}
-                  className={cn(
-                    "h-14 w-14 shrink-0 rounded-full bg-transparent",
-                    isSaved && "border-brand text-brand",
-                  )}
-                >
-                  <Heart className={cn("h-5 w-5", isSaved && "fill-current")} />
-                </Button>
               </div>
-              {directSlot && <div className="mt-3">{directSlot}</div>}
+              <PublicationSaveShare className="mt-3" isSaved={isSaved} onSave={onSave} onShare={() => setShareOpen(true)} />
+              <ShareModal open={shareOpen} onOpenChange={setShareOpen} url={typeof window !== "undefined" ? window.location.href : ""} title={data.title} entityNoun="предложением" />
+              {directSlot && <div className="mt-3">{directSlot}</div>
               {ownerEditSlot && (
                 <SidebarCardTopSection>{ownerEditSlot}</SidebarCardTopSection>
               )}
@@ -205,10 +198,7 @@ export function PublicOfferHero({
                   ) : (
                     <span />
                   )}
-                  <SidebarCardShare
-                    title={data.title}
-                    entityNoun="предложением"
-                  />
+
                 </div>
               </SidebarCardTopSection>
             </SidebarCard>
