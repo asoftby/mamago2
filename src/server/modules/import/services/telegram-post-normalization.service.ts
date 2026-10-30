@@ -592,4 +592,9 @@ export function getTelegramPostNormalizer(): TelegramPostNormalizer {
   return defaultNormalizer;
 }
 
+/** Только для тестов: подменить нормализатор, который использует общая нормализация запуска (null сбрасывает). */
+export function setTelegramPostNormalizerForTests(normalizer: TelegramPostNormalizer | null): void {
+  defaultNormalizer = normalizer;
+}
+
 export { TELEGRAM_CHANNEL_PARSER_KEY };
