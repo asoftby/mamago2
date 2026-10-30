@@ -16,8 +16,9 @@ export async function GET(request: NextRequest) {
     select: { id: true },
   });
   if (!cityRow) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const now = new Date();
   const row = await prisma.article.findFirst({
-    where: { ...getPublicPublishedArticleWhere(), id, cityId: cityRow.id, subtitle: BREAKING_NEWS_SUBTITLE },
+    where: { ...getPublicPublishedArticleWhere(), id, cityId: cityRow.id, subtitle: BREAKING_NEWS_SUBTITLE, expiresAt: { gt: now }, publishedAt: { lte: now } },
     select: { slug: true },
   });
   if (!row?.slug) return NextResponse.json({ error: "Not found" }, { status: 404 });
