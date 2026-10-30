@@ -3,8 +3,8 @@ import { DEFAULT_NOTIFICATION_TIME_ZONE } from "@/lib/notifications/userNotifica
 import type { PlanReminderCandidate } from "@/server/services/plan.service";
 import type { UserReminderSchedule } from "@/server/services/userNotificationSchedule.service";
 
-// Custom per-item reminder offsets can be up to 24 hours.
-const DEFAULT_MAX_OFFSET_MINUTES = 24 * 60;
+// Scan up to four weeks ahead to support custom reminders in days and weeks.
+const DEFAULT_MAX_OFFSET_MINUTES = 28 * 24 * 60;
 const DEFAULT_DUE_GRACE_MINUTES = 10;
 
 export type RunPlanEventRemindersArgs = {
