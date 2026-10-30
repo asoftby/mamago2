@@ -260,6 +260,7 @@ export function ChildrenCard({
                 className={cn(
                   CARD_W,
                   GLASS_MEMBER_CARD,
+                  "hover:border-white/60 hover:bg-white/35 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_10px_36px_-10px_rgba(15,23,42,0.1)]",
                   highlightChildId === child.id &&
                     "animate-in fade-in zoom-in-95 duration-300",
                 )}
@@ -268,8 +269,8 @@ export function ChildrenCard({
                 <span
                   className={cn(
                     "absolute right-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-xl",
-                    "text-neutral-500 hover:text-neutral-800 bg-white/40 backdrop-blur-sm hover:bg-white/60",
-                    "opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-150",
+                    "text-neutral-500 bg-white/40 backdrop-blur-sm",
+                    "opacity-100",
                   )}
                   aria-hidden
                 >
