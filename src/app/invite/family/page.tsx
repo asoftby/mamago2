@@ -10,7 +10,7 @@ import {
   FAMILY_CONSENT_TEXT_VERSION,
   familyConsentConfigured,
 } from "@/server/family/familyConsent";
-import { getFamilyInviteInfo } from "@/server/family/familyJoin.service";
+import { getFamilyInviteLanding } from "@/server/family/familyJoin.service";
 import { inviterTitle } from "@/features/family/lib/familyJoinView";
 import { FamilyJoinClient } from "@/features/family/components/FamilyJoinClient";
 
@@ -37,8 +37,27 @@ export default async function FamilyInvitePage({
     </Shell>
   );
   if (!token) return invalid;
-  const info = await getFamilyInviteInfo(prisma, token);
-  if (!info) return invalid;
+  const user = await getCurrentUser();
+  const info = await getFamilyInviteLanding(prisma, token, user?.id ?? null);
+  if (info.status === "already_member") {
+    return (
+      <Shell>
+        <h1 className="text-2xl font-semibold text-neutral-950">Вы уже состоите в этой семье</h1>
+        <p className="mt-2 text-neutral-600">Повторное присоединение не требуется.</p>
+        <Link href="/me/profile" className="mt-6 inline-flex min-h-11 items-center text-sm underline">Открыть мою семью</Link>
+      </Shell>
+    );
+  }
+  if (info.status === "expired") {
+    return (
+      <Shell>
+        <h1 className="text-2xl font-semibold text-neutral-950">Срок приглашения истёк</h1>
+        <p className="mt-2 text-neutral-600">Ссылка действовала 7 дней. Попросите владельца семьи отправить новую.</p>
+        <Link href="/" className="mt-6 inline-flex min-h-11 items-center text-sm underline">На главную</Link>
+      </Shell>
+    );
+  }
+  if (info.status !== "valid") return invalid;
 
   if (!familyConsentConfigured()) {
     return (
@@ -49,7 +68,6 @@ export default async function FamilyInvitePage({
     );
   }
 
-  const user = await getCurrentUser();
   const returnTo = `/invite/family?token=${encodeURIComponent(token)}`;
   if (!user) {
     return (
