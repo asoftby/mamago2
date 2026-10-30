@@ -75,6 +75,7 @@ export async function createRecurringTaskSeries(owner: PlanOwner, input: NewRecu
           childId, assigneeUserId,
           startsAt: time ? localWallClockToUtc(rule.startDate, time) : null,
           reminderEnabled, reminderLeadMinutes: lead,
+          reminderAt: time && reminderEnabled && lead != null ? new Date(localWallClockToUtc(rule.startDate, time).getTime() - lead * 60_000) : null,
           recurrenceSeriesId: series.id, recurrenceDate: rule.startDate,
         },
       });
