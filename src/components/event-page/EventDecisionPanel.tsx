@@ -359,6 +359,8 @@ export function EventDecisionPanel({
         <PublicationSaveShare
           className="mt-4"
           isSaved={isPlanned}
+          publicationKind="event"
+          publicationId={data.id}
           onSave={onPlan}
           onShare={() => setShareOpen(true)}
         />
