@@ -6,7 +6,6 @@ import { getConfirmationProgressUi } from "@/features/me/lib/userBirthdayPartyUi
 import { BirthdayPartyDayPlan } from "@/features/me/components/BirthdayPartyDayPlan";
 import { cn } from "@/lib/utils";
 import { getBirthdayBuilderHref } from "@/lib/birthday/getBirthdayBuilderHref";
-import { wishlistEnabled } from "@/server/wishlist/wishlistPure";
 
 type BirthdayPartyDetailViewProps = {
   party: UserBirthdayPartyDetail;
@@ -23,10 +22,6 @@ export function BirthdayPartyDetailView({
   const isDraft = party.status === "draft";
   const progress = !isDraft ? getConfirmationProgressUi(party) : null;
   const birthdayBuilderHref = getBirthdayBuilderHref();
-  const giftsParams = new URLSearchParams({ title: `Подарки на день рождения: ${party.childName}` });
-  const giftsDate = party.dateIso?.slice(0, 10);
-  if (giftsDate && /^\d{4}-\d{2}-\d{2}$/.test(giftsDate)) giftsParams.set("date", giftsDate);
-  const giftsHref = `/me/wishlists?${giftsParams.toString()}`;
 
   return (
     <div className="space-y-6">
@@ -90,20 +85,6 @@ export function BirthdayPartyDetailView({
           partyId={party.id}
         />
       )}
-
-      {wishlistEnabled() ? (
-        <section className="space-y-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Подарки</h2>
-          <Surface variant="elevated" className="p-4 sm:p-5">
-            <p className="text-sm text-muted-foreground">
-              Составьте список желаний и отправьте ссылку гостям: каждый отметит, что принесёт, без регистрации.
-            </p>
-            <Button variant="outline" className="mt-3 h-11 w-full sm:w-auto" asChild>
-              <Link href={giftsHref}>Список желаний</Link>
-            </Button>
-          </Surface>
-        </section>
-      ) : null}
 
       <section className="space-y-2 pt-1">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

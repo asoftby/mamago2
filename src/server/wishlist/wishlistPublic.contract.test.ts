@@ -72,7 +72,8 @@ assert.match(read("src/lib/upload/uploadFromUrl.ts"), /options\.validateUrl \?\?
 
 // Integrations (PR 5): offers go through the shared visibility rule; gated by the flag.
 assert.match(read("src/server/wishlist/wishlist.service.ts"), /isOfferPubliclyVisible/, "only publicly visible offers become gifts");
-assert.match(read("src/features/me/components/BirthdayPartyDetailView.tsx"), /wishlistEnabled\(\)/, "party block is flag-gated");
+assert.match(read("src/app/(public)/me/birthdays/[id]/page.tsx"), /giftsHref: wishlistEnabled\(\)/, "party gifts entry is flag-gated and lives on the screen that is actually routed");
+assert.match(read("src/features/me/components/PartyOrderStatusScreen.tsx"), /party\.giftsHref/, "the routed party screen renders the gifts block");
 assert.match(read("src/app/(public)/[city]/offers/[slug]/page.tsx"), /wishlistEnabled=\{wishlistEnabled\(\)\}/, "offer button is flag-gated");
 assert.doesNotMatch(read("src/features/wishlist/components/AddOfferToWishlist.tsx"), /intent=/, "no intent param before its dedicated task");
 
