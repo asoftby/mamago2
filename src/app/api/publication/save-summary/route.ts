@@ -53,7 +53,7 @@ function summaryQuery(kind: PublicationKind, id: string): Prisma.Sql {
     )
     SELECT (SELECT COUNT(*)::int FROM unique_savers) AS "count",
       COALESCE((SELECT json_agg(json_build_object(
-        'id', recent.id, 'avatarUrl', recent."avatarUrl"
+        'avatarUrl', recent."avatarUrl"
       ) ORDER BY recent.saved_at DESC, recent.id ASC) FROM recent), '[]'::json) AS avatars
   `;
 }
@@ -66,9 +66,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const rows = await prisma.$queryRaw<Array<{ count: number; avatars: Array<{ id: string; avatarUrl: string }> }>>(summaryQuery(kind, id));
+    const rows = await prisma.$queryRaw<Array<{ count: number; avatars: Array<{ avatarUrl: string }> }>>(summaryQuery(kind, id));
     return NextResponse.json(
-      { count: Math.max(0, Number(rows[0]?.count ?? 0)), visibleSavers: (rows[0]?.avatars ?? []).map((a) => ({ id: a.id, avatarUrl: a.avatarUrl })) },
+      { count: Math.max(0, Number(rows[0]?.count ?? 0)), visibleSavers: (rows[0]?.avatars ?? []).map((a) => ({ avatarUrl: a.avatarUrl })) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
