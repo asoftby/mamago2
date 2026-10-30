@@ -29,6 +29,7 @@ type RunPlanEventRemindersDeps = {
       activityId: string | null;
       eventTitle: string;
       startsAt: Date;
+      reminderDueAt?: Date;
       placeName?: string | null;
       cityName?: string | null;
       timeZone?: string;
@@ -140,6 +141,7 @@ export async function runPlanEventRemindersCore(
           activityId: candidate.activityId,
           eventTitle: candidate.activity?.title ?? candidate.title ?? "Событие",
           startsAt,
+          reminderDueAt: dueAt,
           placeName: resolvePlaceName(candidate),
           cityName: resolveCityName(candidate),
           timeZone: settings.timeZone,
