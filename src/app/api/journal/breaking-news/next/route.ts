@@ -18,8 +18,9 @@ export async function GET(request: NextRequest) {
   const cityRow = await prisma.city.findFirst({ where: { slug: city, isActive: true }, select: { id: true } });
   if (!cityRow) return NextResponse.json({ items: [], nextCursor: null });
 
+  const now = new Date();
   const anchor = await prisma.article.findFirst({
-    where: { ...getPublicPublishedArticleWhere(), subtitle: "__breaking_news__", cityId: cityRow.id, id: cursor },
+    where: { ...getPublicPublishedArticleWhere(), subtitle: "__breaking_news__", cityId: cityRow.id, id: cursor, expiresAt: { gt: now }, publishedAt: { lte: now } },
     select: { id: true, publishedAt: true },
   });
   if (!anchor?.publishedAt) {
@@ -31,6 +32,8 @@ export async function GET(request: NextRequest) {
       ...getPublicPublishedArticleWhere(),
       subtitle: "__breaking_news__",
       cityId: cityRow.id,
+      expiresAt: { gt: now },
+      AND: [{ publishedAt: { lte: now } }],
       OR: [
         { publishedAt: { lt: anchor.publishedAt } },
         { publishedAt: anchor.publishedAt, id: { lt: anchor.id } },
