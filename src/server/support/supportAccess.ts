@@ -3,7 +3,7 @@ import { canAccessBusiness } from "@/server/permissions/business-permissions";
 import { prisma } from "@/lib/prisma";
 
 export class SupportAccessError extends Error {
-  constructor(public readonly status: 401 | 403 | 404, message: string) {
+  constructor(public readonly status: 401 | 403 | 404 | 409, message: string) {
     super(message);
     this.name = "SupportAccessError";
   }
