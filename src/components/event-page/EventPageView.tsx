@@ -39,7 +39,12 @@ import { EventGoodFit } from "./EventGoodFit";
 import { PublicationMediaColumn } from "@/components/media/PublicationMediaColumn";
 import { PublicationStatsPanel } from "@/components/publication-stats";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
-import { cn } from "@/lib/utils";
+import { Container } from "@/components/ui/Container";
+import { PublicationPageLayout } from "@/components/publication-page/PublicationPageLayout";
+import { PublicationHeroLayout } from "@/components/publication-page/PublicationHeroLayout";
+import { PublicationFactsStrip } from "@/components/publication-page/PublicationFactsStrip";
+import { PublicationAboutSection } from "@/components/publication-page/PublicationAboutSection";
+import { PublicationSection } from "@/components/publication-page/PublicationSection";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
 import { toastAddedToPlan } from "@/lib/my-plan/toastAddedToPlan";
 import { useUpcomingSessions } from "./useUpcomingSessions";
@@ -92,46 +97,6 @@ function EventMarquee({ items }: { items: string[] }) {
   );
 }
 
-/* ── Meta strip ───────────────────────────────────────────── */
-function EventMetaStrip({ facts }: { facts: EventPageData["importantFacts"] }) {
-  if (!facts.length) return null;
-  return (
-    <section className="border-y border-[rgba(20,18,16,0.10)]">
-      <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
-        <div
-          className="grid grid-cols-2 md:grid-cols-4"
-        >
-
-          {facts.map((f, i) => (
-            <div
-              key={f.id}
-              className={cn(
-                "flex flex-col gap-1.5 py-5",
-                i % 2 !== 0 ? "border-l border-[rgba(20,18,16,0.10)] px-4" : "pr-4",
-                i < 2 && "border-b border-[rgba(20,18,16,0.10)] md:border-b-0",
-                i > 0 && "md:border-l md:border-[rgba(20,18,16,0.10)] md:px-5",
-                i === 0 && "md:pr-5",
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-                  {f.label}
-                </span>
-                <span className="font-mono text-[11px] text-[rgba(20,18,16,0.55)]">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-              </div>
-              <div className="text-[17px] font-medium leading-snug tracking-[-0.01em] text-[#141210]">
-                {f.value}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 /* ── About section ────────────────────────────────────────── */
 function EventAboutEditorial({
   about,
@@ -141,52 +106,32 @@ function EventAboutEditorial({
   descriptionHtml?: string;
 }) {
   return (
-    <section className="py-16 md:py-20">
-      <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
-        <div className="mb-4 flex items-center gap-3.5">
-          <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-            О событии
-          </span>
-          <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
-        </div>
-        <div className="grid grid-cols-1 gap-10 md:grid-cols-[320px_1fr] md:gap-14">
-          <div>
-            <h2
-              style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
+    <PublicationAboutSection kicker="О событии" title="Описание события">
+      {descriptionHtml ? (
+        <EventRichDescription
+          htmlContent={descriptionHtml}
+          collapsedHeight={960}
+          className="border-t-0 pt-0"
+        />
+      ) : about.summary ? (
+        <p className="text-[20px] leading-[1.5] tracking-[-0.005em] text-[#141210]">
+          {about.summary}
+        </p>
+      ) : null}
+
+      {about.highlights && about.highlights.length > 0 && (
+        <div className="mt-8 flex flex-wrap gap-2.5">
+          {about.highlights.map((h, i) => (
+            <span
+              key={i}
+              className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] bg-[#FAF7F1] px-3 text-[13px] text-[#141210]"
             >
-              Описание события
-            </h2>
-          </div>
-
-          <div>
-            {descriptionHtml ? (
-              <EventRichDescription
-                htmlContent={descriptionHtml}
-                collapsedHeight={960}
-                className="border-t-0 pt-0"
-              />
-            ) : about.summary ? (
-              <p className="text-[20px] leading-[1.5] tracking-[-0.005em] text-[#141210]">
-                {about.summary}
-              </p>
-            ) : null}
-
-            {about.highlights && about.highlights.length > 0 && (
-              <div className="mt-8 flex flex-wrap gap-2.5">
-                {about.highlights.map((h, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex h-7 items-center rounded-full border border-[rgba(20,18,16,0.18)] bg-[#FAF7F1] px-3 text-[13px] text-[#141210]"
-                  >
-                    {h}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+              {h}
+            </span>
+          ))}
         </div>
-      </div>
-    </section>
+      )}
+    </PublicationAboutSection>
   );
 }
 
@@ -213,7 +158,7 @@ function EventLocationEditorial({ venue }: { venue: NonNullable<EventPageData["v
 function EventOrganizerLegal({ organizer }: { organizer: NonNullable<EventPageData["organizer"]> }) {
   return (
     <section className="py-8 md:py-10">
-      <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+      <Container>
         <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
           <span
             className="shrink-0 text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]"
@@ -227,7 +172,7 @@ function EventOrganizerLegal({ organizer }: { organizer: NonNullable<EventPageDa
             {organizer.unp ? <span>УНП {organizer.unp}</span> : null}
           </div>
         </div>
-      </div>
+      </Container>
     </section>
   );
 }
@@ -270,7 +215,7 @@ function EventFinalCta({
 
   return (
     <section className="py-24 md:py-32">
-      <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+      <Container>
         <div className="mx-auto max-w-[900px] text-center">
           {daysLeft !== null && (
             <span className="mb-4 block text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
@@ -312,7 +257,7 @@ function EventFinalCta({
             Билет приходит на e-mail · вход за&nbsp;30&nbsp;минут до&nbsp;начала
           </p>
         </div>
-      </div>
+      </Container>
     </section>
   );
 }
@@ -637,9 +582,7 @@ export function EventPageView({
   }, [sessionLineHero, data.venue, data.priceLabel]);
 
   return (
-    <div
-      className="ep-surface min-h-screen pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0"
-    >
+    <PublicationPageLayout>
       {data.previewBannerLabel && (
         <div
           role="status"
@@ -649,35 +592,32 @@ export function EventPageView({
         </div>
       )}
 
-      <section className="pt-4 pb-14 lg:pt-12">
-        <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 gap-10 lg:grid-cols-[440px_1fr] lg:gap-14 lg:items-start">
-            <div>
-              <PublicationMediaColumn
-                media={data.media}
-                galleryItems={data.galleryItems}
-              />
-            </div>
-
-            <div ref={ctaRef}>
-              <EventDecisionPanel
-                data={data}
-                sessionLine={sessionLineHero}
-                sessionTargetDate={selectedSession?.startsAt}
-                venueShort={venueShort}
-                onPlan={handlePlan}
-                onBuy={handleBuy}
-                onSave={handleSave}
-                isPlanned={saveStatus.inPlan}
-                planDate={saveStatus.planDate}
-              />
-            </div>
+      <PublicationHeroLayout
+        media={
+          <PublicationMediaColumn
+            media={data.media}
+            galleryItems={data.galleryItems}
+          />
+        }
+        decision={
+          <div ref={ctaRef}>
+            <EventDecisionPanel
+              data={data}
+              sessionLine={sessionLineHero}
+              sessionTargetDate={selectedSession?.startsAt}
+              venueShort={venueShort}
+              onPlan={handlePlan}
+              onBuy={handleBuy}
+              onSave={handleSave}
+              isPlanned={saveStatus.inPlan}
+              planDate={saveStatus.planDate}
+            />
           </div>
-        </div>
-      </section>
+        }
+      />
 
       {data.importantFacts.length > 0 && (
-        <EventMetaStrip facts={data.importantFacts} />
+        <PublicationFactsStrip facts={data.importantFacts} />
       )}
 
       <EventAboutEditorial
@@ -686,67 +626,63 @@ export function EventPageView({
       />
 
       {(Boolean(data.priceDetails?.trim()) || (data.priceItems?.length ?? 0) > 0 || Boolean(data.priceNote?.trim())) && (
-        <section className="py-14 md:py-16">
-          <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
-            <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <div className="mb-3 flex items-center gap-3.5">
-                  <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-                    Стоимость
-                  </span>
-                  <span className="h-px w-[120px] bg-[rgba(20,18,16,0.10)]" />
-                </div>
-                <h2
-                  style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
-                >
-                  Сколько это стоит
-                </h2>
+        <PublicationSection className="py-14 md:py-16">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <div className="mb-3 flex items-center gap-3.5">
+                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
+                  Стоимость
+                </span>
+                <span className="h-px w-[120px] bg-[rgba(20,18,16,0.10)]" />
               </div>
+              <h2
+                style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
+              >
+                Сколько это стоит
+              </h2>
             </div>
-            <PriceListBlock
-              items={data.priceItems ?? []}
-              detailsHtml={data.priceDetails}
-              note={data.priceNote}
-              showHeader={false}
-            />
           </div>
-        </section>
+          <PriceListBlock
+            items={data.priceItems ?? []}
+            detailsHtml={data.priceDetails}
+            note={data.priceNote}
+            showHeader={false}
+          />
+        </PublicationSection>
       )}
 
       <FaqSection items={data.faqItems} className="!border-t-0" />
 
       {sessions.length > 0 && (
-        <section className="py-14 md:py-16">
-          <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
-            <div className="mb-6">
-              <div className="mb-3 flex items-center gap-3.5">
-                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
-                  Расписание и сеансы
-                </span>
-                <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
-                <span className="inline-flex h-7 shrink-0 items-center rounded-full border border-[rgba(20,18,16,0.18)] px-3 text-[13px] text-[#141210]" style={{ fontFamily: "Menlo, monospace" }}>
-                  {formatSessionCount(sessions.length)}
-                </span>
-              </div>
-              <h2
-                style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
-              >
-                Выбери удобное время
-              </h2>
+        <PublicationSection className="py-14 md:py-16">
+          <div className="mb-6">
+            <div className="mb-3 flex items-center gap-3.5">
+              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]" style={{ fontFamily: "Menlo, monospace" }}>
+                Расписание и сеансы
+              </span>
+              <span className="h-px flex-1 bg-[rgba(20,18,16,0.10)]" />
+              <span className="inline-flex h-7 shrink-0 items-center rounded-full border border-[rgba(20,18,16,0.18)] px-3 text-[13px] text-[#141210]" style={{ fontFamily: "Menlo, monospace" }}>
+                {formatSessionCount(sessions.length)}
+              </span>
             </div>
-            <EventSessionSelector
-              sessions={sessions}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onPlan={handlePlan}
-              onBook={hasSimpleBooking ? handleBook : undefined}
-              isPlanned={saveStatus.inPlan}
-              priceLabel={data.priceLabel}
-              purchaseUrl={data.cta.purchaseUrl}
-              buyLabel={data.cta.buyLabel}
-            />
+            <h2
+              style={{ fontSize: 30, fontWeight: 400, lineHeight: 1.3, letterSpacing: "-0.02em", color: "#141210" }}
+            >
+              Выбери удобное время
+            </h2>
           </div>
-        </section>
+          <EventSessionSelector
+            sessions={sessions}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onPlan={handlePlan}
+            onBook={hasSimpleBooking ? handleBook : undefined}
+            isPlanned={saveStatus.inPlan}
+            priceLabel={data.priceLabel}
+            purchaseUrl={data.cta.purchaseUrl}
+            buyLabel={data.cta.buyLabel}
+          />
+        </PublicationSection>
       )}
 
       {data.venue && <EventLocationEditorial venue={data.venue} />}
@@ -754,19 +690,17 @@ export function EventPageView({
       {data.organizer && <EventOrganizerLegal organizer={data.organizer} />}
 
       {hasSimilar && (
-        <section className="py-14 md:py-16">
-          <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
-            <SimilarEventsSection
-              items={visibleSimilar}
-              onPlan={handlePlanSimilar}
-              allHref={
-                data.categorySlug
-                  ? `/${data.citySlug}/events/category/${data.categorySlug}`
-                  : `/${data.citySlug}/events`
-              }
-            />
-          </div>
-        </section>
+        <PublicationSection className="py-14 md:py-16">
+          <SimilarEventsSection
+            items={visibleSimilar}
+            onPlan={handlePlanSimilar}
+            allHref={
+              data.categorySlug
+                ? `/${data.citySlug}/events/category/${data.categorySlug}`
+                : `/${data.citySlug}/events`
+            }
+          />
+        </PublicationSection>
       )}
 
       {!data.hidePublicationStats && (
@@ -839,6 +773,6 @@ export function EventPageView({
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </PublicationPageLayout>
   );
 }

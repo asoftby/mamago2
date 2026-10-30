@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ExternalLink, Layers } from "lucide-react";
+import { Layers } from "lucide-react";
 import { DemoSection } from "../_components/DemoSection";
 import { OfferPageView } from "@/components/offers";
 import { mockSummerCamp, mockRegularOffer } from "@/lib/offer/offerPageMock";
@@ -12,7 +12,6 @@ const VARIANTS = [
     label: "Летний лагерь (CAMP)",
     badge: "CAMP",
     data: mockSummerCamp,
-    mockUrl: "/minsk/offers/camps/summer-camp?mock=1",
     desc: "Полная структура: смены, таймер, скидки, размещение, отзывы, похожие",
   },
   {
@@ -20,7 +19,6 @@ const VARIANTS = [
     label: "Регулярные занятия (REGULAR)",
     badge: "REGULAR",
     data: mockRegularOffer,
-    mockUrl: "/minsk/offers/courses/robotics-for-kids?mock=1",
     desc: "Расписание занятий, тарифы, таблица групп",
   },
 ] as const;
@@ -68,15 +66,7 @@ export function OfferPageSection() {
             ))}
           </div>
 
-          <a
-            href={variant.mockUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-background px-3 py-1.5 text-[12px] font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            Открыть на отдельной вкладке
-          </a>
+          <span className="text-xs text-muted-foreground">Демонстрационные данные — только UI Lab</span>
         </div>
       </div>
 
@@ -87,10 +77,10 @@ export function OfferPageSection() {
           <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
           <span className="h-2.5 w-2.5 rounded-full bg-green-400" />
           <span className="ml-2 font-mono text-[11px] text-muted-foreground">
-            localhost:3000 · {variant.mockUrl}
+            UI Lab · {variant.label}
           </span>
         </div>
-        <OfferPageView data={variant.data} canEditOffer={false} />
+        <OfferPageView presentation="public" data={variant.data} canEditOffer={false} />
       </div>
     </DemoSection>
   );

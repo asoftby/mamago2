@@ -153,6 +153,11 @@ export function WishlistEditor({ initial }: { initial: WishlistView }) {
     }
   }
 
+  async function releaseReservation(reservationId: string) {
+    if (!window.confirm("Снять бронь? Подарок снова станет свободным.")) return;
+    await run(() => call(`/api/wishlists/${wishlist.id}/reservations/${reservationId}`, "DELETE"));
+  }
+
   async function confirmConflict() {
     if (!conflict) return;
     const current = conflict;
@@ -321,6 +326,7 @@ export function WishlistEditor({ initial }: { initial: WishlistView }) {
                     onEdit={() => setEditingId(editingId === item.id ? null : item.id)}
                     onSave={(patch) => void patchItem(item.id, patch)}
                     onRemove={() => void removeItem(item.id)}
+                    onReleaseReservation={(reservationId) => void releaseReservation(reservationId)}
                   />
                 ))}
               </ul>
@@ -365,6 +371,7 @@ function SortableItem(props: {
   onEdit: () => void;
   onSave: (patch: Record<string, unknown>) => void;
   onRemove: () => void;
+  onReleaseReservation: (reservationId: string) => void;
 }) {
   const { item, disabled, editing } = props;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, disabled });
@@ -429,11 +436,26 @@ function SortableItem(props: {
           ) : null}
           {item.comment ? <p className="mt-0.5 text-sm text-neutral-600">{item.comment}</p> : null}
           {!props.hideReservations && item.reservations.length > 0 ? (
-            <p className="mt-1 text-sm text-neutral-700">
-              {item.reservations
-                .map((r) => `${r.displayName}${r.quantity > 1 ? ` (${r.quantity})` : ""}${r.status === "PURCHASED" ? " — купил(а)" : ""}`)
-                .join(", ")}
-            </p>
+            <ul className="mt-1 space-y-0.5 text-sm text-neutral-700">
+              {item.reservations.map((r) => (
+                <li key={r.id} className="flex flex-wrap items-center gap-2">
+                  <span>
+                    {r.displayName}
+                    {r.quantity > 1 ? ` (${r.quantity})` : ""}
+                    {r.status === "PURCHASED" ? " — купил(а)" : ""}
+                  </span>
+                  {!disabled ? (
+                    <button
+                      type="button"
+                      className="min-h-11 text-xs text-neutral-500 underline hover:text-red-700"
+                      onClick={() => props.onReleaseReservation(r.id)}
+                    >
+                      Снять бронь
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
           ) : null}
         </div>
         {!disabled ? (
