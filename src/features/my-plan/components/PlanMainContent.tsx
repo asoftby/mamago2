@@ -455,12 +455,12 @@ export function PlanMainContent({
   const includedPeople = audienceFilters.include;
   const excludedPeople = audienceFilters.exclude;
   const planVisibilityFilter = audienceFilters.visibility;
-  const [familyAdults, setFamilyAdults] = useState<Array<{ userId: string; displayName: string | null; isMe: boolean }>>([]);
+  const [familyAdults, setFamilyAdults] = useState<Array<{ userId: string; displayName: string | null; avatarUrl?: string | null; isMe: boolean }>>([]);
   useEffect(() => {
     if (!family?.primaryAdultPersonaId) { setFamilyAdults([]); return; }
     const controller = new AbortController();
     fetch("/api/family", { credentials: "include", cache: "no-store", signal: controller.signal })
-      .then(res => res.ok ? res.json() as Promise<{ family?: { adults?: Array<{ userId: string; displayName: string | null; isMe: boolean }> } }> : null)
+      .then(res => res.ok ? res.json() as Promise<{ family?: { adults?: Array<{ userId: string; displayName: string | null; avatarUrl?: string | null; isMe: boolean }> } }> : null)
       .then(data => { if (!controller.signal.aborted) setFamilyAdults(data?.family?.adults ?? []); })
       .catch(() => { if (!controller.signal.aborted) setFamilyAdults([]); });
     return () => controller.abort();
@@ -1160,6 +1160,7 @@ export function PlanMainContent({
     ...familyAdults.map(adult => ({
       value: `adult:${adult.userId}`,
       label: adult.isMe ? "Я" : adult.displayName?.trim() || "Взрослый",
+      avatarUrl: adult.avatarUrl,
     })),
     ...personas.filter(persona => persona.kind === "child").map(persona => ({
       value: `child:${persona.id}`,
