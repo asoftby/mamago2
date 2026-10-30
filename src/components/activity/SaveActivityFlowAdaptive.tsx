@@ -281,7 +281,7 @@ export function SaveActivityFlowAdaptive({
           collectionTarget={collectionTarget}
           onCommit={handleCommit}
           onClose={() => onOpenChange(false)}
-          showVisibilityToggle={showVisibilityToggle}
+          showVisibilityToggle={false}
         />
       )}
       {phase === "auth" && pending && (
