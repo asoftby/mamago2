@@ -46,6 +46,10 @@ export function StepReview({
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [availability, setAvailability] = useState<"AVAILABLE" | "UNAVAILABLE" | "UNKNOWN" | "LOADING" | null>(null);
+  const [suggestedSlots, setSuggestedSlots] = useState<Array<{ start: string; end: string }>>([]);
+  const [slotMode, setSlotMode] = useState<"SCHEDULED" | "REQUEST_ONLY" | null>(null);
+  const [slotsKey, setSlotsKey] = useState("");
+
   const anchorOfferId = offers[0]?.id;
   const checkVenue = venueMode === "VENUE" || venueMode === "PACKAGE";
   const partySize = Number(children) + Number(adults);
@@ -84,6 +88,38 @@ export function StepReview({
     }, 350);
     return () => { controller.abort(); clearTimeout(timeout); };
   }, [anchorOfferId, checkVenue, date, timeFrom, timeTo, children, adults, partySize]);
+
+  useEffect(() => {
+    const guests = Number(children) + Number(adults);
+    const durationMinutes = /^([01]\\d|2[0-3]):[0-5]\\d$/.test(timeFrom) && /^([01]\\d|2[0-3]):[0-5]\\d$/.test(timeTo)
+      ? (Number(timeTo.slice(0, 2)) * 60 + Number(timeTo.slice(3))) -
+        (Number(timeFrom.slice(0, 2)) * 60 + Number(timeFrom.slice(3))) : 0;
+    if (!checkVenue || !anchorOfferId || !date || !children || !adults ||
+        !Number.isInteger(guests) || guests < 1 || guests > 1000 ||
+        durationMinutes < 30 || durationMinutes > 720) {
+      setSuggestedSlots([]); setSlotMode(null); setSlotsKey("");
+      return;
+    }
+    const currentKey = [citySlug, anchorOfferId, date, durationMinutes, guests].join("|");
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      try {
+        const qs = new URLSearchParams({ citySlug, offerId: anchorOfferId, day: date,
+          durationMinutes: String(durationMinutes), guestCount: String(guests) });
+        const response = await fetch("/api/public/birthday/availability?" + qs, { signal: controller.signal, cache: "no-store" });
+        if (!response.ok) throw new Error("Slot preview unavailable");
+        const result: { mode?: string; slots?: Array<{ start: string; end: string }> } = await response.json();
+        if (!controller.signal.aborted) {
+          setSuggestedSlots(Array.isArray(result.slots) ? result.slots.slice(0, 20) : []);
+          setSlotMode(result.mode === "SCHEDULED" ? "SCHEDULED" : "REQUEST_ONLY");
+          setSlotsKey(currentKey);
+        }
+      } catch {
+        if (!controller.signal.aborted) { setSuggestedSlots([]); setSlotMode("REQUEST_ONLY"); setSlotsKey(currentKey); }
+      }
+    }, 350);
+    return () => { clearTimeout(timeout); controller.abort(); };
+  }, [citySlug, anchorOfferId, checkVenue, date, timeFrom, timeTo, children, adults]);
 
   const previewKey = [anchorOfferId, checkVenue, date, timeFrom, timeTo, children, adults].join("|");
   const [lastPreviewKey, setLastPreviewKey] = useState("");
@@ -182,6 +218,26 @@ export function StepReview({
           <label className="text-sm">Ваше имя<input required maxLength={120} value={name} onChange={e => setName(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
           <label className="text-sm sm:col-span-2">Телефон<input required type="tel" maxLength={40} value={phone} onChange={e => setPhone(e.target.value)} className="block w-full rounded-lg border p-3" /></label>
         </fieldset>
+        {checkVenue && slotsKey === [citySlug, anchorOfferId, date,
+          (Number(timeTo.slice(0, 2)) * 60 + Number(timeTo.slice(3))) -
+          (Number(timeFrom.slice(0, 2)) * 60 + Number(timeFrom.slice(3))),
+          Number(children) + Number(adults)].join("|") && suggestedSlots.length > 0 && (
+          <div className="rounded-xl border border-stone-200 p-4">
+            <p className="mb-2 text-sm font-semibold">Возможное время праздника</p>
+            <div className="flex flex-wrap gap-2">
+              {suggestedSlots.map(slot => <button key={slot.start} type="button"
+                onClick={() => { setTimeFrom(slot.start); setTimeTo(slot.end); }}
+                className="rounded-full border border-stone-300 px-3 py-2 text-sm hover:border-primary"
+                aria-label={`Выбрать время ${slot.start}–${slot.end}`}>
+                {slot.start}–{slot.end}
+              </button>)}
+            </div>
+            <p className="mt-2 text-xs text-stone-500">Это предварительная доступность, не бронь. Исполнитель подтвердит время.</p>
+          </div>
+        )}
+        {checkVenue && slotMode === "REQUEST_ONLY" && slotsKey && (
+          <p className="text-xs text-stone-500">Можно отправить запрос на выбранное время — исполнитель уточнит доступность.</p>
+        )}
         {checkVenue && visibleAvailability && (
           <p role="status" className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm text-stone-700">
             {visibleAvailability === "LOADING" ? "Проверяем доступность выбранного времени…" :
