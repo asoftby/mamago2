@@ -71,10 +71,10 @@ export function IdeasCollectionsBar({ collections, ideas, memberships, onCreate,
         <button
           type="button"
           onClick={onCreate}
-          className="group min-w-0 self-start rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="group block w-full min-w-0 self-start rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
-          <span data-masonry-media className="flex aspect-[3/2] items-center justify-center rounded-2xl border-2 border-dashed border-border bg-surface-muted transition-colors group-hover:bg-surface-hover">
-            <Plus className="size-9 text-muted-foreground" />
+          <span data-masonry-media className="flex aspect-[3/2] w-full items-center justify-center rounded-2xl bg-stone-100 transition-shadow group-hover:shadow-md">
+            <Plus className="size-9 text-stone-400" />
           </span>
           <span className="mt-3 block text-base font-semibold">Новая коллекция</span>
         </button>
