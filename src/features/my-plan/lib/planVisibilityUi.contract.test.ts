@@ -12,8 +12,14 @@ assert.match(page, /familyView=\{familyView\}/);
 
 const client = read(dir + "PlanPageClient.tsx");
 assert.match(client, /showFamilyUi\(familyView\)/);
-assert.match(client, /\{familyUi && \(/, "chips render only for a shared family");
-assert.match(client, /try \{[\s\S]*localStorage/, "storage access is wrapped in try/catch");
+// Family view reaches the day and week lists only for a shared family (otherwise null, so no chips render).
+assert.match(client, /familyView=\{familyUi \? familyView : null\}/, "chips render only for a shared family");
+assert.doesNotMatch(client, /familyView=\{familyView\}/, "the raw family view is never passed straight to the lists");
+// The page keeps one audience filter state and no longer reads storage itself; if storage access
+// comes back, it must stay wrapped in try/catch (it can throw in private windows and previews).
+if (/localStorage/.test(client)) {
+  assert.match(client, /try \{[\s\S]*localStorage/, "storage access is wrapped in try/catch");
+}
 
 const card = read(dir + "PlanItemCard.tsx");
 assert.match(card, /Видите только вы/);
