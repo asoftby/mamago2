@@ -25,6 +25,7 @@ import { runOperationsRetentionWithLock } from "@/server/ops/retention/retention
 import { buildSnapshot } from "@/server/ops/snapshot/buildSnapshot";
 import { expireOfferHolds } from "@/server/offers/expireOfferHolds";
 import { notifyExpiredFamilyInvites } from "@/server/family/familyInviteExpiry.service";
+import { familyInvitesEnabled } from "@/server/family/familyScope";
 import type { Detector, DetectorContext, DetectorResult } from "@/server/ops/types";
 import { createWorkerContext, disposeWorkerContext, type WorkerContext } from "./context";
 import { Scheduler } from "./scheduler";
@@ -101,6 +102,7 @@ function wireScheduler(
     name: "family.invite_expiry_notice",
     intervalMs: FAMILY_INVITE_EXPIRY_INTERVAL_MS,
     run: async () => {
+      if (!familyInvitesEnabled()) return;
       const notified = await notifyExpiredFamilyInvites(ctx.prisma);
       if (notified > 0) console.log(`[worker] family invite expiry notices created=${notified}`);
     },
