@@ -15,6 +15,9 @@ import {
   runStatusLabels,
 } from "../_lib/import-admin-ui";
 import { TableContainer } from "@/components/ui/table";
+import { getCurrentUser } from "@/lib/auth/server";
+import { canSeeAiConfig, getAiConfigStatus } from "@/lib/ai/aiConfigStatus";
+import { AiConfigBlock } from "../_components/AiConfigBlock";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -164,6 +167,8 @@ export default async function ImportRunsPage({
   searchParams: Promise<Record<string, string>>;
 }) {
   const sp = await searchParams;
+  // Конфигурация AI: только администратору, и только признаки «задано / не задано».
+  const aiConfig = canSeeAiConfig(await getCurrentUser()) ? getAiConfigStatus() : null;
   const archiveFilter = parseArchiveFilter(sp.archive);
   const filters = {
     status: parseStatus(sp.status),
@@ -185,6 +190,8 @@ export default async function ImportRunsPage({
           Прогон показывает технический результат одного запуска импорта. Это отдельный слой между источником и импортированными объектами.
         </p>
       </div>
+
+      {aiConfig && <AiConfigBlock status={aiConfig} />}
 
       {!importRuntimeReady && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
