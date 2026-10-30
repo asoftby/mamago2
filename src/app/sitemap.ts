@@ -19,6 +19,8 @@ import { resolveEventCanonicalUrl } from "@/lib/seo/resolveEventCanonicalUrl";
 import { resolveCanonicalCitySlugForEvent } from "@/lib/business/eventPublicLink";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 import { eventCategoryHubPath } from "@/lib/seo/eventCategoryHub";
+import { listDiscoveryClassChips } from "@/server/discovery/classChips";
+import { countPublicClassesCategory } from "@/server/discovery/classesCategoryCount";
 
 export const dynamic = "force-dynamic";
 
@@ -207,6 +209,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   } catch (error) {
     console.warn("[sitemap] city/tag/category query failed, skipping city discovery hubs:", error);
+  }
+
+  // Only publish class category hubs with at least one visible offer.
+  try {
+    const [cities, chips] = await Promise.all([
+      prisma.city.findMany({
+        where: { isActive: true, isLegacyNonCity: false },
+        select: { id: true, slug: true, updatedAt: true },
+        take: 50,
+      }),
+      listDiscoveryClassChips(),
+    ]);
+    for (const city of cities) {
+      for (const chip of chips) {
+        if (chip.slug === "all" || !chip.isActive) continue;
+        try {
+          if ((await countPublicClassesCategory(city.id, city.slug, chip.slug)) === 0) continue;
+          entries.push({
+            url: `${baseUrl}/${city.slug}/classes/${encodeURIComponent(chip.slug)}`,
+            lastModified: city.updatedAt,
+            changeFrequency: "weekly",
+            priority: 0.65,
+          });
+        } catch (error) {
+          console.warn("[sitemap] class category count failed:", city.slug, chip.slug, error);
+        }
+      }
+    }
+  } catch (error) {
+    console.warn("[sitemap] classes category sitemap failed:", error);
   }
 
   try {
