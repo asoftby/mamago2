@@ -685,6 +685,9 @@ export async function listPlanItemsDueForReminder(args: {
   windowStart: Date;
   windowEnd: Date;
 }): Promise<PlanReminderCandidate[]> {
+  // Legacy/catalog schedule allows at most a 3h user offset; bound its scan
+  // independently of the four-week explicit reminder horizon.
+  const fallbackWindowEnd = new Date(Math.min(args.windowEnd.getTime(), args.windowStart.getTime() + 4 * 60 * 60_000));
   const rows = (await prisma.planItem.findMany({
     where: {
       AND: [
@@ -697,7 +700,7 @@ export async function listPlanItemsDueForReminder(args: {
       ...DATED,
       OR: [
         { reminderAt: { gte: args.windowStart, lte: args.windowEnd } },
-        { reminderAt: null, startsAt: { gte: args.windowStart, lte: args.windowEnd } },
+        { reminderAt: null, startsAt: { gte: args.windowStart, lte: fallbackWindowEnd } },
       ],
     },
     include: {
