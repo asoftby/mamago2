@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     const rows = await prisma.$queryRaw<Array<{ count: number }>>(countQuery(kind, id));
     return NextResponse.json(
       { count: Math.max(0, Number(rows[0]?.count ?? 0)), visibleSavers: [] },
-      { headers: { "Cache-Control": "public, max-age=30, stale-while-revalidate=30" } },
+      { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
     console.error("Failed to load public save count:", error);
