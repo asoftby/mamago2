@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Share2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { ShareModal, type ShareAnalyticsChannel } from "@/components/shared/ShareModal";
 import { ArticleSaveHeart } from "@/features/save/ArticleSaveHeart";
 import { postProductTelemetryEvent } from "@/lib/analytics/client";
@@ -45,16 +47,24 @@ export function ArticleDetailActions({
   };
 
   return (
-    <div className={className}>
+    <div className={cn("flex items-center gap-2", className)}>
       <ArticleSaveHeart
         articleId={articleId}
         articleTitle={title}
         coverImageUrl={coverImageUrl}
-        variant="detail-bar"
-        onShare={() => setShareOpen(true)}
+        variant="labeled"
         source="detail"
         registerInHeader
       />
+      <button
+        type="button"
+        onClick={() => setShareOpen(true)}
+        aria-label="Поделиться статьёй"
+        className="inline-flex h-10 items-center gap-2 rounded-full border border-[rgba(20,18,16,0.14)] bg-white px-4 text-sm font-medium text-foreground transition-colors hover:border-[rgba(20,18,16,0.28)]"
+      >
+        <Share2 className="h-4 w-4" />
+        <span>Поделиться</span>
+      </button>
       <ShareModal
         open={shareOpen}
         onOpenChange={setShareOpen}
