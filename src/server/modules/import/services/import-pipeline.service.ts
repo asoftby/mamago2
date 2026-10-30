@@ -17,6 +17,7 @@ import { GlobalLock } from "@/server/ops/lock/GlobalLock";
 import { computeContentHash } from "../utils/content-hash";
 import { buildParserRunContext } from "./parser-run-context";
 import { refreshUnchangedRecordPayload } from "./import-record-refresh";
+import { describePostponed, summarizeNormalization } from "./normalization-notes";
 import { getParser } from "../parsers/registry";
 import { normalizeRunRecords } from "./import-normalization.service";
 import { matchRunRecords } from "./import-matching.service";
@@ -56,9 +57,12 @@ export interface RunImportResult {
   totalCreated: number;
   totalSkipped: number;
   totalErrors: number;
-  normalizeResults: { success: number; failed: number };
+  /** `postponed`: сохранено, но нормализация ждёт (нет модели или лимит запуска); это не ошибка. */
+  normalizeResults: { success: number; failed: number; postponed?: number };
   matchResults: { matched: number; noMatch: number; ambiguous: number; failed: number; reviewTasksCreated: number };
   error?: string;
+  /** Не ошибки, но то, что администратор должен увидеть сразу. */
+  warnings?: string[];
 }
 
 /**
@@ -267,8 +271,11 @@ export async function runImportForSource(
 
     // 5. Нормализация
     const normalizeResults = await normalizeRunRecords(run.id);
-    const normalizeSuccess = normalizeResults.filter((r) => r.success).length;
-    const normalizeFailed = normalizeResults.filter((r) => !r.success).length;
+    const normalization = summarizeNormalization(normalizeResults);
+    const normalizeSuccess = normalization.success;
+    const normalizeFailed = normalization.failed;
+    const postponedNote = describePostponed(normalization, source.aiCallBudgetPerRun);
+    if (postponedNote) console.warn(`[import-pipeline] sourceId=${sourceId} runId=${run.id} ${postponedNote}`);
 
     // 6. Matching + гарантия ImportReviewTask на каждой нормализованной PLACE/EVENT записи
     const { results: matchResults, orphanTasksCreated } = await matchRunRecords(run.id);
@@ -319,9 +326,10 @@ export async function runImportForSource(
       totalCreated,
       totalSkipped,
       totalErrors,
-      normalizeResults: { success: normalizeSuccess, failed: normalizeFailed },
+      normalizeResults: { success: normalizeSuccess, failed: normalizeFailed, postponed: normalization.postponed },
       matchResults: matchStats,
       error: runError,
+      ...(postponedNote ? { warnings: [postponedNote] } : {}),
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

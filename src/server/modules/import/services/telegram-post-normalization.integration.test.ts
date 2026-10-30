@@ -7,7 +7,9 @@ import { randomUUID } from "node:crypto";
 import test, { after, before } from "node:test";
 import prisma from "@/lib/prisma";
 import type { OpenRouterCallInput, OpenRouterCallResult } from "@/lib/ai/openrouterClient";
-import { createTelegramPostNormalizer } from "./telegram-post-normalization.service";
+import { createTelegramPostNormalizer, setTelegramPostNormalizerForTests } from "./telegram-post-normalization.service";
+import { normalizeRunRecords } from "./import-normalization.service";
+import { describePostponed, summarizeNormalization } from "./normalization-notes";
 import { ensureImportReviewTaskExists } from "./import-review-task.service";
 
 const tag = randomUUID().slice(0, 8);
@@ -382,5 +384,42 @@ test("an edit that moves a published event into auto-skip still alerts the edito
     await prisma.importedRecord.updateMany({ where: { publishedActivityId: activity.id }, data: { publishedActivityId: null } });
     await prisma.activity.delete({ where: { id: activity.id } });
     await prisma.user.delete({ where: { id: owner.id } });
+  }
+});
+
+test("without a model the run keeps the posts and says why; the next run with a model picks them up", async () => {
+  const run1 = await newRun();
+  const a = await newRecord({ runId: run1.id, externalId: `chan_${tag}/backlog-a` });
+  const b = await newRecord({ runId: run1.id, externalId: `chan_${tag}/backlog-b` });
+  const isOurs = (r: { recordId: string }) => [a.id, b.id].includes(r.recordId);
+
+  // Run 1: the model is not configured on the server.
+  setTelegramPostNormalizerForTests(normalizer(() => assert.fail("no model call"), { fast: null }).n);
+  const first = (await normalizeRunRecords(run1.id)).filter(isOurs);
+  const summary = summarizeNormalization(first);
+  assert.deepEqual([summary.success, summary.failed, summary.postponed], [0, 0, 2], "postponed is not an error");
+  assert.deepEqual(summary.postponedReasons, ["model_not_configured"]);
+  assert.match(describePostponed(summary, 5)!, /2 поста ждут нормализации\. Модель не настроена/);
+  for (const r of [a, b]) {
+    const after = await reload(r.id);
+    assert.equal(after.normalizeStatus, "PENDING", "the post is kept, nothing is lost");
+    assert.equal(after.normalizedData, null);
+    assert.equal(after.runId, run1.id);
+  }
+
+  // Run 2: the model is configured now; there are no new posts, only the backlog.
+  const run2 = await newRun();
+  setTelegramPostNormalizerForTests(normalizer(() => ok(postJson("EVENT", [ev()]))).n);
+  try {
+    const second = (await normalizeRunRecords(run2.id)).filter(isOurs);
+    assert.deepEqual([second.filter((r) => r.success).length, second.length], [2, 2]);
+    for (const r of [a, b]) {
+      const after = await reload(r.id);
+      assert.equal(after.normalizeStatus, "SUCCESS");
+      assert.equal((after.normalizedData as { title: string }).title, "Мастер-класс по лепке");
+      assert.equal(after.runId, run2.id, "moved to the current run so matching sees it");
+    }
+  } finally {
+    setTelegramPostNormalizerForTests(null);
   }
 });

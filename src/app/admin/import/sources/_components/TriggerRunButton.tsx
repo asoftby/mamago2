@@ -13,6 +13,7 @@ export function TriggerRunButton({ sourceId }: Props) {
     success: boolean;
     runId?: string;
     error?: string;
+    warnings?: string[];
     stats?: {
       totalFetched: number;
       totalParsed: number;
@@ -21,6 +22,7 @@ export function TriggerRunButton({ sourceId }: Props) {
       totalErrors: number;
       normalizeSuccess: number;
       normalizeFailed: number;
+      normalizePostponed: number;
       matchMatched: number;
       matchNoMatch: number;
       matchAmbiguous: number;
@@ -61,7 +63,10 @@ export function TriggerRunButton({ sourceId }: Props) {
                 <div className="mt-0.5 space-y-0.5">
                   <div>fetched: {result.stats.totalFetched} / parsed: {result.stats.totalParsed}</div>
                   <div>created: {result.stats.totalCreated} / skipped: {result.stats.totalSkipped}</div>
-                  <div>normalized: {result.stats.normalizeSuccess} / errors: {result.stats.totalErrors}</div>
+                  <div>
+                    normalized: {result.stats.normalizeSuccess} / errors: {result.stats.totalErrors}
+                    {result.stats.normalizePostponed > 0 ? ` / отложено: ${result.stats.normalizePostponed}` : ""}
+                  </div>
                   <div className="border-t border-green-200 pt-0.5 mt-0.5">
                     matched: {result.stats.matchMatched} / no match: {result.stats.matchNoMatch} / ambiguous: {result.stats.matchAmbiguous}
                   </div>
@@ -72,6 +77,15 @@ export function TriggerRunButton({ sourceId }: Props) {
                   )}
                 </div>
               )}
+              {result.warnings?.map((warning) => (
+                <div
+                  key={warning}
+                  role="alert"
+                  className="mt-1.5 rounded border border-amber-300 bg-amber-50 p-1.5 font-medium text-amber-900"
+                >
+                  ⚠ {warning}
+                </div>
+              ))}
             </>
           ) : (
             <div>Ошибка: {result.error}</div>

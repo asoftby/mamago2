@@ -14,8 +14,10 @@ import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import type {
   ImportEntityType,
+  ImportNormalizeStatus,
   ImportReviewStatus,
   ImportReviewTaskStatus,
+  ImportSourceType,
   Prisma,
 } from "@prisma/client";
 import { prismaBase } from "@/lib/prisma";
@@ -107,6 +109,16 @@ export function parsePage(raw: string | undefined): number {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
 }
 
+/**
+ * Посты Telegram-каналов, которые сохранены, но ещё не нормализованы (нет
+ * настроенной модели или исчерпан лимит вызовов запуска): проверять в них пока
+ * нечего, в очередь «Нужно проверить» они не попадают. Остаются в «Все объекты».
+ */
+export const WAITING_FOR_NORMALIZATION = {
+  normalizeStatus: "PENDING" as ImportNormalizeStatus,
+  source: { type: "TELEGRAM_CHANNEL" as ImportSourceType },
+};
+
 function buildStageWhere(stage?: QueueStageFilter) {
   if (stage === "PENDING") {
     return { reviewStatus: "PENDING" as ImportReviewStatus };
@@ -166,13 +178,15 @@ export function buildReviewHref(next: {
   return query ? `/admin/import/review?${query}` : "/admin/import/review";
 }
 
-function buildImportedObjectsWhere(filters: {
+export function buildImportedObjectsWhere(filters: {
   stage?: QueueStageFilter;
   sourceId?: string;
   entityType?: ImportEntityType;
 }) {
+  const openStage = filters.stage === "PENDING" || filters.stage === "IN_PROGRESS";
   return {
     ...(buildStageWhere(filters.stage) ?? {}),
+    ...(openStage ? { NOT: WAITING_FOR_NORMALIZATION } : {}),
     ...(filters.sourceId ? { sourceId: filters.sourceId } : {}),
     ...(filters.entityType ? { entityTypeHint: filters.entityType } : {}),
   };
@@ -220,13 +234,14 @@ async function getQueueStats() {
 
   const [total, pending, inProgress, completed, linked] = await Promise.all([
     db.importedRecord.count({ where: {} }),
-    db.importedRecord.count({ where: { reviewStatus: "PENDING" } }),
+    db.importedRecord.count({ where: { reviewStatus: "PENDING", NOT: WAITING_FOR_NORMALIZATION } }),
     db.importedRecord.count({
       where: {
         OR: [
           { reviewStatus: "IN_REVIEW" },
           { reviewTask: { is: { status: "IN_PROGRESS" } } },
         ],
+        NOT: WAITING_FOR_NORMALIZATION,
       },
     }),
     db.importedRecord.count({
@@ -252,6 +267,13 @@ async function getQueueStats() {
   ]);
 
   return { total, pending, inProgress, completed, linked };
+}
+
+/** Сколько постов каналов сохранено, но ещё не нормализовано. */
+async function getWaitingForNormalizationCount() {
+  const db = getImportAdminDb();
+  if (!db.importedRecord) return 0;
+  return db.importedRecord.count({ where: WAITING_FOR_NORMALIZATION });
 }
 
 async function getSources() {
@@ -286,7 +308,7 @@ export default async function ImportReviewPage({
   const effectiveStage =
     requestedStage ?? (sp.status === "ALL" ? undefined : hasAnyImportedObjects ? "PENDING" : undefined);
 
-  const [{ records, totalCount }, sources] = await Promise.all([
+  const [{ records, totalCount }, sources, waitingForNormalization] = await Promise.all([
     getImportedObjects({
       stage: effectiveStage,
       sourceId: requestedSourceId,
@@ -294,6 +316,7 @@ export default async function ImportReviewPage({
       page: requestedPage,
     }),
     getSources(),
+    getWaitingForNormalizationCount(),
   ]);
   const totalPages = Math.max(1, Math.ceil(totalCount / QUEUE_PAGE_SIZE));
   const currentPage = Math.min(requestedPage, totalPages);
@@ -535,6 +558,17 @@ export default async function ImportReviewPage({
                     : "Для текущего среза объектов нет — попробуйте сменить фильтр или открыть весь список."}
                 </p>
               </div>
+              {waitingForNormalization > 0 && (
+                <div
+                  role="status"
+                  data-testid="waiting-for-normalization"
+                  className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+                >
+                  <strong>{waitingForNormalization}</strong> постов каналов сохранены, но ещё не обработаны моделью, поэтому в очереди их нет.
+                  Если модель не настроена, задайте <code>OPENROUTER_API_KEY</code> и <code>OPENROUTER_CAPTURE_MODEL</code> на сервере и
+                  запустите импорт ещё раз: сохранённые посты обработаются, скачивать заново ничего не нужно. Список виден в «Все объекты».
+                </div>
+              )}
               <ImportReviewFilters
                 sources={sources}
                 currentStage={
