@@ -18,6 +18,7 @@ import {
   updateWishlist,
 } from "./wishlist.service";
 import {
+  getPublicItemImageUrl,
   getPublicWishlist,
   linkGuestReservations,
   reserveItem,
@@ -258,4 +259,16 @@ test("public view reports only the contact kind", async () => {
   assert.deepEqual(kinds, ["email", "telegram"]);
   assert.ok(!JSON.stringify(view).includes("a@example.test"));
   assert.ok(!JSON.stringify(view).includes("42\""));
+
+test("guest photo route: stored image only through a valid public token", async () => {
+  const s = await setup();
+  await db.wishlistItem.update({ where: { id: s.itemId }, data: { imageUrl: "/api/media/file/wl/pic42.webp" } });
+  const view = await getPublicWishlist(s.token, {}, deps);
+  assert.equal(view.items[0].imageSrc, `/api/w/${s.token}/items/${s.itemId}/image?v=pic42`);
+  assert.equal(await getPublicItemImageUrl(s.token, s.itemId, deps), "/api/media/file/wl/pic42.webp");
+  await assert.rejects(getPublicItemImageUrl("x".repeat(32), s.itemId, deps), (e: unknown) => e instanceof WishlistError && e.code === "not_found");
+  const other = await setup();
+  await assert.rejects(getPublicItemImageUrl(other.token, s.itemId, deps), (e: unknown) => e instanceof WishlistError && e.code === "not_found", "item of another list");
+  const priv = await setup({ visibility: "PRIVATE" });
+  await assert.rejects(getPublicItemImageUrl(priv.token, priv.itemId, deps), (e: unknown) => e instanceof WishlistError && e.code === "not_found");
 });

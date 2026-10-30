@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 
 import {
+  isStoredMediaUrl,
+  wishlistImageSrc,
   SHARE_TOKEN_PATTERN,
   MAX_CLAIMS_PER_COOKIE,
   breakingItemChange,
@@ -115,6 +117,17 @@ assert.equal(breakingItemChange({ url: null, quantity: 3 }, { quantity: 2 }, 2),
   assert.equal(wishlistErrorStatus("sold_out"), 409);
   assert.equal(wishlistErrorStatus("forbidden"), 403);
   assert.equal(wishlistErrorStatus("rate_limited"), 429);
+}
+
+// stored images (review fix)
+{
+  assert.equal(isStoredMediaUrl("/api/media/file/x/y.webp"), true);
+  assert.equal(isStoredMediaUrl("https://shop.example/a.jpg"), false);
+  assert.equal(isStoredMediaUrl(null), false);
+  assert.equal(wishlistImageSrc(null, "/p"), null);
+  assert.equal(wishlistImageSrc("https://shop.example/a.jpg", "/p"), "https://shop.example/a.jpg");
+  assert.equal(wishlistImageSrc("/api/media/file/x/y.webp", "/p"), "/p?v=y");
+  assert.notEqual(wishlistImageSrc("/api/media/file/x/y1.webp", "/p"), wishlistImageSrc("/api/media/file/x/y2.webp", "/p"), "cache busts on change");
 }
 
 console.log("wishlistPure ok");

@@ -68,4 +68,16 @@ assert.match(previewRoute, /withWishlistUser/);
 assert.match(previewRoute, /checkRateLimit/);
 assert.match(read("src/lib/upload/uploadFromUrl.ts"), /options\.validateUrl \?\?/, "default Instagram policy is kept");
 
+// Stored photos have no MediaAsset: they are served by wishlist routes with their own ACL.
+{
+  const pubRoute = read("src/app/api/w/[token]/items/[itemId]/image/route.ts");
+  assert.match(pubRoute, /getPublicItemImageUrl/);
+  const ownerRoute = read("src/app/api/wishlists/[id]/items/[itemId]/image/route.ts");
+  assert.match(ownerRoute, /getCurrentUser/);
+  assert.match(ownerRoute, /getOwnerItemImageUrl/);
+  const img = read("src/server/wishlist/wishlistImage.ts");
+  assert.doesNotMatch(img, /"image\/svg/, "svg is never served");
+  assert.doesNotMatch(read("src/features/wishlist/components/PublicWishlist.tsx"), /item\.imageUrl/, "guests never use the raw stored path");
+}
+
 console.log("wishlistPublic contract ok");

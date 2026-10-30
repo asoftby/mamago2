@@ -147,9 +147,9 @@ function ItemCard(props: {
   return (
     <li className="rounded-xl border border-neutral-200 bg-white p-4">
       <div className="flex gap-3">
-        {item.imageUrl ? (
+        {item.imageSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-20 w-20 shrink-0 rounded-lg object-cover" />
+          <img src={item.imageSrc} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-20 w-20 shrink-0 rounded-lg object-cover" />
         ) : null}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
