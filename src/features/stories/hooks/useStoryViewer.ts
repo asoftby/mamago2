@@ -95,7 +95,7 @@ export function useStoryViewer(stories: StoryCollection[]) {
     if (activeStoryIndex === null) return;
     const nextIndex = activeStoryIndex + 1;
     setNewsComplete(false);
-    if (nextIndex >= stories.length) { close(); return; }
+    if (nextIndex >= stories.length) { return; }
     const story = stories[nextIndex];
     setActiveItems(orderBySeen(story.items, seenIds));
     setSeenGroupStart(resolveSeenGroupStart(story.items, seenIds));
@@ -114,7 +114,7 @@ export function useStoryViewer(stories: StoryCollection[]) {
       setActiveItemIndex((i) => i + 1);
       return;
     }
-    if (activeStory.intent === "breaking_news") {
+    if (activeStoryIndex === stories.length - 1 || activeStoryIndex < stories.length - 1) {
       setNewsComplete(true);
       return;
     }
