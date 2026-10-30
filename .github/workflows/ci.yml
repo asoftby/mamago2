@@ -172,6 +172,9 @@ jobs:
           pnpm exec tsx src/server/notifications/notification-action-resolver.test.ts
           pnpm exec tsx src/features/notifications/store/notification-actions.test.ts
 
+      - name: Plan reminder delivery and dedupe regressions
+        run: pnpm test:notifications-mvp
+
       - name: Breaking News stories regressions
         run: |
           pnpm exec tsx src/components/journal/JournalNewsCard.test.tsx
