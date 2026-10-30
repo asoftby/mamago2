@@ -66,7 +66,7 @@ export function BreakingNewsStrip({
               href={item.href}
               className={cn(
                 "group relative shrink-0 snap-start overflow-hidden rounded-xl",
-                "w-[min(43vw,156px)] aspect-[3/4] sm:w-[144px] sm:aspect-[3/4]",
+                "w-[min(34.4vw,125px)] aspect-[3/4] sm:w-[115px] sm:aspect-[3/4]",
                 "shadow-sm ring-1 ring-black/5 transition-transform hover:scale-[1.01]",
               )}
             >
@@ -75,7 +75,7 @@ export function BreakingNewsStrip({
                 alt={item.title}
                 fill
                 className="object-cover transition-transform duration-300 group-hover:scale-105"
-                sizes="(max-width: 640px) 43vw, 144px"
+                sizes="(max-width: 640px) 34vw, 115px"
               />
               <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-2.5 pb-3 pt-10">
                 <span className="mb-[5px] block text-left text-[10px] font-medium text-white drop-shadow-md">

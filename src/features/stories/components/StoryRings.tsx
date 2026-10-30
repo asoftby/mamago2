@@ -1,6 +1,7 @@
 "use client";
 
 import { Zap } from "lucide-react";
+import { useEffect } from "react";
 import { StoryRingItem } from "./StoryRingItem";
 import { StoryModal } from "./StoryModal";
 import { useStoryViewer } from "../hooks/useStoryViewer";
@@ -15,6 +16,8 @@ interface StoryRingsProps {
 export function StoryRings({ stories }: StoryRingsProps) {
   const {
     isOpen,
+    orderedStories,
+    sessionStories,
     newsComplete,
     continueAfterNews,
     activeStory,
@@ -33,9 +36,18 @@ export function StoryRings({ stories }: StoryRingsProps) {
     markSeen,
   } = useStoryViewer(stories);
 
+  const isFinalStory = activeStoryIndex === sessionStories.length - 1;
+  const nextStory = activeStoryIndex !== null ? sessionStories[activeStoryIndex + 1] : null;
+
+  useEffect(() => {
+    if (!newsComplete || !nextStory) return;
+    const timeout = window.setTimeout(continueAfterNews, 1400);
+    return () => window.clearTimeout(timeout);
+  }, [newsComplete, nextStory, continueAfterNews]);
+
   return (
     <>
-      {stories.map((story, index) => {
+      {orderedStories.map((story, index) => {
         const newCount = unseenCount(story.items, seenIds);
         return <StoryRingItem
           key={story.id}
@@ -58,13 +70,19 @@ export function StoryRings({ stories }: StoryRingsProps) {
         />
       })}
 
-      {isOpen && newsComplete && activeStory?.intent === "breaking_news" && (
-        <div role="dialog" aria-modal="true" aria-label="Новости просмотрены" className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 px-4">
-          <div className="w-full max-w-sm space-y-5 rounded-3xl bg-white p-8 text-center text-foreground">
-            <h2 className="font-heading text-2xl">Вы посмотрели все новости</h2>
-            <button type="button" onClick={continueAfterNews} className="min-h-11 w-full rounded-full bg-primary px-5 font-semibold text-primary-foreground">Смотреть дальше</button>
-            <button type="button" onClick={close} className="min-h-11 w-full rounded-full border border-border px-5 font-semibold">Закрыть</button>
-          </div>
+      {isOpen && newsComplete && activeStory && (
+        <div role="dialog" aria-modal="true" aria-label={isFinalStory ? "Все новости просмотрены" : "Следующая тема"} className="fixed inset-0 z-[110] flex flex-col items-center justify-center bg-black/85 px-6 text-center text-white">
+          {isFinalStory ? (
+            <>
+              <h2 className="font-heading text-2xl">Вы просмотрели все новости</h2>
+              <button type="button" onClick={close} className="absolute bottom-[max(32px,env(safe-area-inset-bottom))] left-6 right-6 mx-auto min-h-12 max-w-sm rounded-full bg-white px-5 font-semibold text-black">Закрыть</button>
+            </>
+          ) : (
+            <div className="space-y-3" aria-live="polite">
+              <p className="text-sm text-white/60">Вы просмотрели {activeStory.title}</p>
+              <h2 className="font-heading text-2xl">Далее — {nextStory?.title}</h2>
+            </div>
+          )}
         </div>
       )}
       {isOpen && !newsComplete && activeStory && activeStoryIndex !== null && (
@@ -72,7 +90,7 @@ export function StoryRings({ stories }: StoryRingsProps) {
           activeStory={activeStory}
           activeStoryIndex={activeStoryIndex}
           activeItemIndex={activeItemIndex}
-          totalStories={stories.length}
+          totalStories={sessionStories.length}
           progressKey={progressKey}
           paused={paused}
           seenOfferIds={seenIds}

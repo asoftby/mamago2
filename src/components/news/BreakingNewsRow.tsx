@@ -120,7 +120,7 @@ export function BreakingNewsRow({ items, onAllClickHref = "#", className }: Brea
             <Link
               key={item.id}
               href="#"
-              className="relative flex-shrink-0 snap-start w-[154px] md:w-[168px] h-[224px] md:h-[238px] rounded-xl overflow-hidden group cursor-pointer shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-300"
+              className="relative flex-shrink-0 snap-start w-[123px] md:w-[134px] h-[179px] md:h-[190px] rounded-xl overflow-hidden group cursor-pointer shadow-sm hover:shadow-md hover:scale-[1.01] transition-all duration-300"
             >
               {/* Background Image */}
               <div 
