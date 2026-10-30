@@ -16,6 +16,7 @@ export function PlanPersonFilter({
   onChange,
   selectedValues,
   onSelectionChange,
+  onAudienceChange,
   excludedValues = [],
   onExclusionsChange,
   visibility = "ALL",
@@ -27,32 +28,46 @@ export function PlanPersonFilter({
   onChange?: (value: string) => void;
   selectedValues?: readonly string[];
   onSelectionChange?: (values: string[]) => void;
+  /** Atomically replace include and exclude so a reset never restores stale values. */
+  onAudienceChange?: (next: { include: string[]; exclude: string[] }) => void;
   excludedValues?: readonly string[];
   onExclusionsChange?: (values: string[]) => void;
   visibility?: "ALL" | "PRIVATE" | "FAMILY";
   onVisibilityChange?: (visibility: "ALL" | "PRIVATE" | "FAMILY") => void;
   className?: string;
 }) {
-  const multi = selectedValues !== undefined && onSelectionChange !== undefined;
+  const multi = selectedValues !== undefined && (onSelectionChange !== undefined || onAudienceChange !== undefined);
   const include = selectedValues ?? [];
   const exclude = excludedValues;
+  const applyAudience = (nextInclude: string[], nextExclude: string[]) => {
+    if (onAudienceChange) {
+      onAudienceChange({ include: nextInclude, exclude: nextExclude });
+    } else {
+      // Preserve older single-callback consumers during the rollout.
+      onSelectionChange?.(nextInclude);
+      onExclusionsChange?.(nextExclude);
+    }
+  };
   const toggle = (id: string) => {
     if (!multi) {
       onChange?.(id);
       return;
     }
     if (id === "all") {
-      onSelectionChange([]);
-      onExclusionsChange?.([]);
+      applyAudience([], []);
       return;
     }
-    onSelectionChange(include.includes(id) ? include.filter((item) => item !== id) : [...include, id]);
-    if (exclude.includes(id)) onExclusionsChange?.(exclude.filter((item) => item !== id));
+    applyAudience(
+      include.includes(id) ? include.filter((item) => item !== id) : [...include, id],
+      exclude.filter((item) => item !== id),
+    );
   };
   const hide = (id: string) => {
-    if (!onExclusionsChange || !multi || id === "all") return;
-    onExclusionsChange(exclude.includes(id) ? exclude.filter((item) => item !== id) : [...exclude, id]);
-    if (include.includes(id)) onSelectionChange(include.filter((item) => item !== id));
+    if ((!onExclusionsChange && !onAudienceChange) || !multi || id === "all") return;
+    applyAudience(
+      include.filter((item) => item !== id),
+      exclude.includes(id) ? exclude.filter((item) => item !== id) : [...exclude, id],
+    );
   };
   return (
     <div className={`w-full min-w-0 rounded-2xl border border-[rgba(20,18,16,.10)] bg-[#FAF7F1] px-3 py-3 sm:px-4 ${className}`}>
@@ -78,7 +93,7 @@ export function PlanPersonFilter({
           );
         })}
       </div>
-      {multi && onExclusionsChange && options.some((option) => option.value !== "all") && (
+      {multi && (onExclusionsChange || onAudienceChange) && options.some((option) => option.value !== "all") && (
         <div role="group" aria-label="Исключить из плана" className="mt-2 flex flex-wrap items-center gap-2">
           <span className="text-xs text-[#6B6258]">Исключить:</span>
           {options.filter((option) => option.value !== "all").map((option) => (
