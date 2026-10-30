@@ -32,3 +32,8 @@ ALTER TABLE "SupportMessage" ADD CONSTRAINT "SupportMessage_authorId_fkey" FOREI
 -- Dedicated support notices: customer Direct notifications remain separate.
 ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'SUPPORT_BUSINESS_REPLY';
 ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'SUPPORT_STAFF_MESSAGE';
+
+ALTER TABLE "SupportThread" ADD COLUMN "requestKey" TEXT;
+ALTER TABLE "SupportMessage" ADD COLUMN "requestKey" TEXT;
+CREATE UNIQUE INDEX "SupportThread_requestKey_key" ON "SupportThread"("requestKey");
+CREATE UNIQUE INDEX "SupportMessage_requestKey_key" ON "SupportMessage"("requestKey");
