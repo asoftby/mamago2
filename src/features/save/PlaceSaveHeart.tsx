@@ -148,7 +148,7 @@ export function PlaceSaveHeart({
   return (
     <>
       {variant === "detail-bar" && onShare ? (
-        <PublicationSaveShare isSaved={isSaved} isSaving={isLoading} onSave={() => setFlowOpen(true)} onShare={onShare} className={className} />
+        <PublicationSaveShare publicationKind="place" publicationId={placeId} isSaved={isSaved} isSaving={isLoading} onSave={() => setFlowOpen(true)} onShare={onShare} className={className} />
       ) : variant === "text" ? (
         <button
           type="button"
