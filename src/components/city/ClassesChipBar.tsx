@@ -31,7 +31,7 @@ export function ClassesChipBar({
           const params = new URLSearchParams(searchParams.toString());
           params.delete("chip");
           params.delete("page");
-          const basePath = pathname.replace(/\\/classes(?:\\/[^/]+)?$/, "/classes");
+          const basePath = pathname.replace(/\/classes(?:\/[^/]+)?$/, "/classes");
           const destination = chip.slug === "all" ? basePath : `${basePath}/${encodeURIComponent(chip.slug)}`;
           const next = params.toString();
           router.push(next ? `${destination}?${next}` : destination, { scroll: false });
