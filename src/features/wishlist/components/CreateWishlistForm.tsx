@@ -16,15 +16,19 @@ export type RecipientChild = { id: string; name: string | null };
 export function CreateWishlistForm({
   childrenList,
   defaultChildId,
+  defaultTitle = "",
+  defaultDate = "",
 }: {
   childrenList: RecipientChild[];
   defaultChildId?: string | null;
+  defaultTitle?: string;
+  defaultDate?: string;
 }) {
   const router = useRouter();
   const [childId, setChildId] = useState(defaultChildId ?? childrenList[0]?.id ?? "");
   const [adultName, setAdultName] = useState("");
-  const [title, setTitle] = useState("");
-  const [eventDate, setEventDate] = useState("");
+  const [title, setTitle] = useState(defaultTitle);
+  const [eventDate, setEventDate] = useState(defaultDate);
   const [busy, setBusy] = useState(false);
 
   const forChild = childId !== "";
