@@ -1,0 +1,392 @@
+{
+ "_comment": "DRAFT ground truth for the 45 minsk_kids fixture posts, labelled by the agent from the post text; owner review needed. kind = acceptable post kinds (ambiguous posts list several). start = Europe/Minsk local time (YYYY-MM-DDTHH:mm) or date only (YYYY-MM-DD). placeContains = any substring of venue or address. price: free|paid. Unlabeled fields are not scored.",
+ "labels": [
+  {
+   "messageId": 3797,
+   "kind": [
+    "EVENT",
+    "FESTIVAL"
+   ],
+   "start": "2026-10-29T16:00",
+   "placeContains": [
+    "Национальн"
+   ]
+  },
+  {
+   "messageId": 3798,
+   "kind": [
+    "EVENT"
+   ],
+   "start": "2026-10-30T19:00",
+   "placeContains": [
+    "Червенск"
+   ]
+  },
+  {
+   "messageId": 3800,
+   "kind": [
+    "DIGEST"
+   ]
+  },
+  {
+   "messageId": 3802,
+   "kind": [
+    "FESTIVAL"
+   ],
+   "start": "2026-10-31",
+   "placeContains": [
+    "Дом Москвы"
+   ]
+  },
+  {
+   "messageId": 3806,
+   "kind": [
+    "DIGEST",
+    "FESTIVAL"
+   ],
+   "start": "2026-11-06T12:00",
+   "placeContains": [
+    "Макаенка"
+   ],
+   "price": "free",
+   "note": "two sessions of one project"
+  },
+  {
+   "messageId": 3810,
+   "kind": [
+    "EVENT"
+   ],
+   "start": "2026-11-01T14:00",
+   "placeContains": [
+    "Сирень"
+   ]
+  },
+  {
+   "messageId": 3813,
+   "kind": [
+    "EVENT"
+   ],
+   "start": "2026-10-31T17:00",
+   "placeContains": [
+    "Киселева"
+   ]
+  },
+  {
+   "messageId": 3817,
+   "kind": [
+    "EVENT",
+    "FESTIVAL"
+   ]
+  },
+  {
+   "messageId": 3818,
+   "kind": [
+    "EVENT"
+   ],
+   "start": "2026-11-01T13:00",
+   "placeContains": [
+    "Gourmet"
+   ]
+  },
+  {
+   "messageId": 3820,
+   "kind": [
+    "DIGEST"
+   ]
+  },
+  {
+   "messageId": 3764,
+   "kind": [
+    "EVENT",
+    "NOT_EVENT"
+   ],
+   "note": "advice article about an exhibition"
+  },
+  {
+   "messageId": 3768,
+   "kind": [
+    "EVENT"
+   ],
+   "start": "2026-10-31T17:00",
+   "placeContains": [
+    "Пекин"
+   ]
+  },
+  {
+   "messageId": 3774,
+   "kind": [
+    "EVENT",
+    "FESTIVAL"
+   ],
+   "start": "2026-10-28T18:30",
+   "placeContains": [
+    "Cinemarium",
+    "PALAZZO",
+    "Тимирязева"
+   ],
+   "price": "free"
+  },
+  {
+   "messageId": 3776,
+   "kind": [
+    "EVENT"
+   ],
+   "start": "2026-10-31T11:00",
+   "placeContains": [
+    "Машиностроителей"
+   ]
+  },
+  {
+   "messageId": 3777,
+   "kind": [
+    "EVENT",
+    "FESTIVAL"
+   ]
+  },
+  {
+   "messageId": 3779,
+   "kind": [
+    "FESTIVAL",
+    "DIGEST"
+   ],
+   "price": "free"
+  },
+  {
+   "messageId": 3782,
+   "kind": [
+    "EVENT"
+   ]
+  },
+  {
+   "messageId": 3783,
+   "kind": [
+    "DIGEST"
+   ]
+  },
+  {
+   "messageId": 3784,
+   "kind": [
+    "NOT_EVENT",
+    "EVENT"
+   ],
+   "note": "promotion in a cafe"
+  },
+  {
+   "messageId": 3786,
+   "kind": [
+    "DIGEST"
+   ]
+  },
+  {
+   "messageId": 3796,
+   "kind": [
+    "EVENT"
+   ],
+   "start": "2026-10-31T16:00",
+   "placeContains": [
+    "Невидимый мир"
+   ]
+  },
+  {
+   "messageId": 3735,
+   "kind": [
+    "EVENT",
+    "NOT_EVENT"
+   ],
+   "note": "permanent attraction, no date"
+  },
+  {
+   "messageId": 3742,
+   "kind": [
+    "EVENT"
+   ],
+   "start": "2026-10-30T19:00",
+   "placeContains": [
+    "Литературный"
+   ]
+  },
+  {
+   "messageId": 3743,
+   "kind": [
+    "FESTIVAL"
+   ],
+   "placeContains": [
+    "Конкорс"
+   ]
+  },
+  {
+   "messageId": 3757,
+   "kind": [
+    "EVENT",
+    "FESTIVAL"
+   ],
+   "start": "2026-10-30",
+   "placeContains": [
+    "Червенск"
+   ]
+  },
+  {
+   "messageId": 3708,
+   "kind": [
+    "EVENT",
+    "FESTIVAL"
+   ],
+   "start": "2026-10-24",
+   "placeContains": [
+    "Наивного"
+   ]
+  },
+  {
+   "messageId": 3713,
+   "kind": [
+    "EVENT"
+   ],
+   "start": "2026-10-24T11:00",
+   "placeContains": [
+    "Сирень"
+   ]
+  },
+  {
+   "messageId": 3714,
+   "kind": [
+    "EVENT",
+    "NOT_EVENT"
+   ],
+   "note": "permanent attraction"
+  },
+  {
+   "messageId": 3720,
+   "kind": [
+    "EVENT",
+    "NOT_EVENT"
+   ]
+  },
+  {
+   "messageId": 3723,
+   "kind": [
+    "EVENT",
+    "FESTIVAL"
+   ]
+  },
+  {
+   "messageId": 3727,
+   "kind": [
+    "NOT_EVENT",
+    "EVENT"
+   ],
+   "note": "promotion"
+  },
+  {
+   "messageId": 3729,
+   "kind": [
+    "DIGEST"
+   ]
+  },
+  {
+   "messageId": 3734,
+   "kind": [
+    "EVENT",
+    "NOT_EVENT"
+   ],
+   "start": "2026-10-28",
+   "placeContains": [
+    "Титан"
+   ],
+   "note": "promotion"
+  },
+  {
+   "messageId": 3683,
+   "kind": [
+    "EVENT"
+   ],
+   "start": "2026-10-25T12:00",
+   "placeContains": [
+    "Конкорс"
+   ]
+  },
+  {
+   "messageId": 3684,
+   "kind": [
+    "EVENT"
+   ],
+   "start": "2026-10-24T14:00",
+   "placeContains": [
+    "народного творчества"
+   ]
+  },
+  {
+   "messageId": 3686,
+   "kind": [
+    "EVENT"
+   ]
+  },
+  {
+   "messageId": 3687,
+   "kind": [
+    "EVENT"
+   ]
+  },
+  {
+   "messageId": 3689,
+   "kind": [
+    "EVENT"
+   ],
+   "start": "2026-10-24T18:00",
+   "placeContains": [
+    "Тивали"
+   ]
+  },
+  {
+   "messageId": 3690,
+   "kind": [
+    "NOT_EVENT"
+   ],
+   "note": "contest winner announcement"
+  },
+  {
+   "messageId": 3692,
+   "kind": [
+    "DIGEST"
+   ]
+  },
+  {
+   "messageId": 3699,
+   "kind": [
+    "EVENT"
+   ],
+   "start": "2026-10-24T14:00",
+   "placeContains": [
+    "Сирень"
+   ]
+  },
+  {
+   "messageId": 3701,
+   "kind": [
+    "EVENT",
+    "FESTIVAL"
+   ],
+   "start": "2026-10-24T14:00",
+   "placeContains": [
+    "Конкорс"
+   ]
+  },
+  {
+   "messageId": 3703,
+   "kind": [
+    "EVENT"
+   ]
+  },
+  {
+   "messageId": 3704,
+   "kind": [
+    "EVENT"
+   ]
+  },
+  {
+   "messageId": 3706,
+   "kind": [
+    "DIGEST"
+   ]
+  }
+ ]
+}

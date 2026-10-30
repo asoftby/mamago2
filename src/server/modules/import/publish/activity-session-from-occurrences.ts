@@ -34,6 +34,9 @@ export function shouldApplyImportedScheduleSessions(
   return lockMode !== "PREFER_MANUAL" && lockMode !== "LOCKED";
 }
 
+/** ActivitySession.title — VarChar(120). */
+const SESSION_TITLE_MAX = 120;
+
 function parseOptionalDate(value: string | null | undefined): Date | null {
   if (!value) return null;
   const parsed = new Date(value);
@@ -57,6 +60,7 @@ function parseOptionalDate(value: string | null | undefined): Date | null {
 export function buildActivitySessionUpsertArgs(
   activityId: string,
   occurrence: EventImportOccurrence,
+  source: string = ABWS_PARSER_KEY,
 ): Prisma.ActivitySessionUpsertArgs | null {
   const sourceOccurrence = occurrence as SourceOccurrence;
   const startsAt = sourceOccurrence.startAt ? new Date(sourceOccurrence.startAt) : null;
@@ -71,15 +75,20 @@ export function buildActivitySessionUpsertArgs(
     priceMaxCents: sourceOccurrence.priceMaxCents ?? null,
     isSaleOpen: sourceOccurrence.isSaleOpen ?? null,
     withdrawnAt: parseOptionalDate(sourceOccurrence.withdrawnAt),
+    // Название подсеанса пишем, только если источник его передал; иначе
+    // ручное или прежнее название не затираем.
+    ...(sourceOccurrence.title !== undefined
+      ? { title: sourceOccurrence.title.trim().slice(0, SESSION_TITLE_MAX) || null }
+      : {}),
   };
 
   return {
     where: {
-      source_externalId: { source: ABWS_PARSER_KEY, externalId: sourceOccurrence.externalId },
+      source_externalId: { source, externalId: sourceOccurrence.externalId },
     },
     create: {
       activity: { connect: { id: activityId } },
-      source: ABWS_PARSER_KEY,
+      source,
       externalId: sourceOccurrence.externalId,
       ...shared,
     },
@@ -119,12 +128,22 @@ function getNextActiveOccurrenceAt(
 export async function upsertActivitySessionsFromOccurrences(
   activityId: string,
   occurrences: EventImportOccurrence[],
+  options: {
+    source?: string;
+    /**
+     * Только для источников, у которых один пост описывает лишь часть сеансов
+     * события (Telegram): пропавшими считаются сеансы с этим префиксом
+     * `externalId`, чужие сеансы того же source не затрагиваются.
+     */
+    externalIdPrefix?: string;
+  } = {},
 ): Promise<{
   upserted: number;
   skipped: number;
   withdrawnMissing: number;
   blockedByManualOverride: boolean;
 }> {
+  const source = options.source ?? ABWS_PARSER_KEY;
   return prisma.$transaction(async (tx) => {
     await acquireActivityScheduleLock(tx, activityId);
 
@@ -159,7 +178,7 @@ export async function upsertActivitySessionsFromOccurrences(
 
     for (const occurrence of occurrences) {
       if (occurrence.externalId) currentExternalIds.push(occurrence.externalId);
-      const args = buildActivitySessionUpsertArgs(activityId, occurrence);
+      const args = buildActivitySessionUpsertArgs(activityId, occurrence, source);
       if (!args) {
         skipped++;
         continue;
@@ -168,19 +187,51 @@ export async function upsertActivitySessionsFromOccurrences(
       upserted++;
     }
 
-    const missingResult = await tx.activitySession.updateMany({
-      where: {
-        activityId,
-        source: ABWS_PARSER_KEY,
-        withdrawnAt: null,
-        ...(currentExternalIds.length > 0
-          ? { externalId: { notIn: currentExternalIds } }
-          : {}),
-      },
-      data: { withdrawnAt: new Date() },
-    });
+    // ABWS-блок оставлен как был (на его форму опираются тесты); другие
+    // источники сеансов (Telegram) отзывают пропавшие сеансы только своего source.
+    const missingResult =
+      source === ABWS_PARSER_KEY
+        ? await tx.activitySession.updateMany({
+            where: {
+              activityId,
+              source: ABWS_PARSER_KEY,
+              withdrawnAt: null,
+              ...(currentExternalIds.length > 0
+                ? { externalId: { notIn: currentExternalIds } }
+                : {}),
+            },
+            data: { withdrawnAt: new Date() },
+          })
+        : await tx.activitySession.updateMany({
+            where: {
+              activityId,
+              source,
+              withdrawnAt: null,
+              ...(currentExternalIds.length > 0 || options.externalIdPrefix
+                ? {
+                    externalId: {
+                      ...(options.externalIdPrefix ? { startsWith: options.externalIdPrefix } : {}),
+                      ...(currentExternalIds.length > 0 ? { notIn: currentExternalIds } : {}),
+                    },
+                  }
+                : {}),
+            },
+            data: { withdrawnAt: new Date() },
+          });
 
-    const nextOccurrenceAt = getNextActiveOccurrenceAt(occurrences, new Date());
+    // ABWS присылает полный снимок, поэтому считаем по нему. Для остальных
+    // источников один пост не весь график: берём ближайший активный сеанс
+    // события из базы (уже с учётом сделанных выше записей и отзывов).
+    const nextOccurrenceAt =
+      source === ABWS_PARSER_KEY
+        ? getNextActiveOccurrenceAt(occurrences, new Date())
+        : (
+            await tx.activitySession.findFirst({
+              where: { activityId, withdrawnAt: null, startsAt: { gte: new Date() } },
+              orderBy: { startsAt: "asc" },
+              select: { startsAt: true },
+            })
+          )?.startsAt ?? null;
     await tx.activity.update({
       where: { id: activityId },
       data: { nextOccurrenceAt },

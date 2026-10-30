@@ -26,6 +26,8 @@ import {
   isPlaceholderZeroPriceFrom,
 } from "../publish/event-field-mapper";
 import { classifyImportSource } from "../publish/source-field-priority";
+import { TELEGRAM_CHANNEL_PARSER_KEY } from "../parsers/telegram-channel-constants";
+import { ABWS_PARSER_KEY } from "../normalizers/abws-event.normalizer";
 import { loadFieldOverrides, loadActivityFieldOverrides, applyOverrideFilter, isFieldAllowed } from "../publish/field-override-checker";
 import { lookupCityId } from "../publish/city-lookup";
 import { lookupVenuePlace } from "../publish/venue-place-lookup";
@@ -357,6 +359,32 @@ async function mergeImportedRecordIntoPlace(
   return { success: true, recordId: record.id, decision: "APPROVED_MERGE", placeId: targetPlaceId, appliedFields: Object.keys(allowed), skippedFields: allSkipped, emptyFields };
 }
 
+// ── EVENT sessions: which source owns them ────────────────────────────────────
+
+/** ActivitySession.source для сеансов, пришедших из Telegram-канала. */
+export const TELEGRAM_SESSION_SOURCE = "telegram";
+
+/**
+ * Владелец сеансов записи: Telegram-канал пишет их как "telegram", всё
+ * остальное как раньше (ABWS). Без этого сеансы канала записывались бы как ABWS.
+ *
+ * Для канала возвращается и префикс `externalId` сеансов этой записи: пост
+ * описывает только свою часть графика, поэтому отзыв «пропавших» сеансов не
+ * должен задевать сеансы других постов того же события.
+ */
+async function resolveSessionSource(
+  recordId: string,
+): Promise<{ source: string; externalIdPrefix?: string }> {
+  const row = await prisma.importedRecord.findUnique({
+    where: { id: recordId },
+    select: { externalId: true, source: { select: { parserKey: true } } },
+  });
+  if (row?.source.parserKey !== TELEGRAM_CHANNEL_PARSER_KEY) return { source: ABWS_PARSER_KEY };
+  const externalId = row.externalId ?? recordId;
+  // Сеансы подборки: `<канал>/<id>#<n>.<j>`, одиночного поста: `<канал>/<id>#<j>`.
+  return { source: TELEGRAM_SESSION_SOURCE, externalIdPrefix: externalId.includes("#") ? `${externalId}.` : `${externalId}#` };
+}
+
 // ── EVENT CREATE ──────────────────────────────────────────────────────────────
 
 async function createActivityFromImport(
@@ -477,6 +505,7 @@ async function createActivityFromImport(
     const { upserted, skipped } = await upsertActivitySessionsFromOccurrences(
       activity.id,
       nd.occurrences,
+      await resolveSessionSource(record.id),
     );
     if (upserted > 0) appliedFields.push("sessions");
     if (skipped > 0) warnings.push(`${skipped} occurrence(s) skipped: missing externalId or startAt`);
@@ -596,8 +625,25 @@ async function updateExistingActivityFromImport(
   // stay safe when possibleOccurrenceRisk flagged this as maybe-a-different-
   // occurrence rather than confirmed-same-event.
   if (nd.occurrences && nd.occurrences.length > 0) {
-    const { skipped } = await upsertActivitySessionsFromOccurrences(targetActivityId, nd.occurrences);
-    if (skipped > 0) warnings.push(`${skipped} occurrence(s) skipped: missing externalId or startAt`);
+    const sessionOwner = await resolveSessionSource(record.id);
+    const sessionSource = sessionOwner.source;
+    // Канал-агрегатор не меняет сеансы, у которых есть другой источник (ABWS):
+    // билетная система главнее, расхождение решает редактор.
+    const foreignSessions =
+      sessionSource === TELEGRAM_SESSION_SOURCE
+        ? await prisma.activitySession.count({
+            where: {
+              activityId: targetActivityId,
+              OR: [{ source: null }, { source: { not: TELEGRAM_SESSION_SOURCE } }],
+            },
+          })
+        : 0;
+    if (foreignSessions > 0) {
+      warnings.push(`sessions not changed: ${foreignSessions} session(s) belong to another source, aggregator never overwrites them`);
+    } else {
+      const { skipped } = await upsertActivitySessionsFromOccurrences(targetActivityId, nd.occurrences, sessionOwner);
+      if (skipped > 0) warnings.push(`${skipped} occurrence(s) skipped: missing externalId or startAt`);
+    }
   }
 
   const updatedActivity = await prisma.activity.findUnique({

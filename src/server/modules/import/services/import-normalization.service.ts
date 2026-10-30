@@ -18,6 +18,8 @@ import {
 import type { AbwsPerformanceRawPayload } from "../parsers/abws-performances-event.parser";
 import { upsertActivitySessionsFromOccurrences } from "../publish/activity-session-from-occurrences";
 import { scorePlaceImport, scoreEventImport } from "./import-quality.service";
+import { TELEGRAM_CHANNEL_PARSER_KEY } from "../parsers/telegram-channel-constants";
+import { getTelegramPostNormalizer } from "./telegram-post-normalization.service";
 
 export interface NormalizeRecordResult {
   recordId: string;
@@ -32,7 +34,10 @@ export interface NormalizeRecordResult {
  * Нормализовать одну ImportedRecord.
  * Маршрутизирует по entityTypeHint: PLACE → place normalizer, EVENT → event normalizer.
  */
-export async function normalizeRecord(recordId: string): Promise<NormalizeRecordResult> {
+export async function normalizeRecord(
+  recordId: string,
+  options: { runId?: string } = {},
+): Promise<NormalizeRecordResult> {
   const record = await prisma.importedRecord.findUnique({ where: { id: recordId } });
 
   if (!record) return { recordId, success: false, error: "Record not found" };
@@ -48,13 +53,49 @@ export async function normalizeRecord(recordId: string): Promise<NormalizeRecord
   const entityType = record.entityTypeHint;
 
   if (entityType === "PLACE") return normalizePlaceRecord(record);
-  if (entityType === "EVENT") return normalizeEventRecord(record);
+  if (entityType === "EVENT") {
+    // Посты Telegram-каналов разбирает модель: отдельная асинхронная ветка с
+    // бюджетом запуска, дочерними записями подборок и автоотсевом.
+    const source = await prisma.importSource.findUnique({
+      where: { id: record.sourceId },
+      select: { parserKey: true },
+    });
+    if (source?.parserKey === TELEGRAM_CHANNEL_PARSER_KEY) return normalizeTelegramRecord(recordId, options.runId);
+    return normalizeEventRecord(record);
+  }
 
   await prisma.importedRecord.update({
     where: { id: recordId },
     data: { normalizeStatus: "SKIPPED", errorMessage: `Unsupported entityType: ${entityType}` },
   });
   return { recordId, success: false, error: `Unsupported entityType: ${entityType}` };
+}
+
+// ── Telegram channel post ─────────────────────────────────────────────────────
+
+async function normalizeTelegramRecord(recordId: string, runId?: string): Promise<NormalizeRecordResult> {
+  try {
+    const outcome = await getTelegramPostNormalizer().normalize(recordId, { runId });
+    switch (outcome.status) {
+      case "normalized":
+        return { recordId, success: true, entityType: "EVENT" };
+      case "skipped":
+        return { recordId, success: true, entityType: "EVENT", warnings: [`skipped: ${outcome.reason}`] };
+      case "postponed":
+        // Остаётся PENDING и добирается следующим запуском.
+        return { recordId, success: false, entityType: "EVENT", error: `postponed: ${outcome.reason}` };
+      case "failed":
+        return { recordId, success: false, entityType: "EVENT", error: outcome.code };
+    }
+  } catch (err) {
+    const code = "TELEGRAM_NORMALIZER_ERROR";
+    console.error(`[telegram-post-normalizer] recordId=${recordId} code=${code}`, err instanceof Error ? err.name : "error");
+    await prisma.importedRecord.update({
+      where: { id: recordId },
+      data: { normalizeStatus: "FAILED", errorMessage: code },
+    });
+    return { recordId, success: false, error: code };
+  }
 }
 
 // ── PLACE ─────────────────────────────────────────────────────────────────────
@@ -219,18 +260,29 @@ async function normalizeEventRecord(
  * Нормализовать все PLACE и EVENT записи одного run.
  */
 export async function normalizeRunRecords(runId: string): Promise<NormalizeRecordResult[]> {
+  // Для Telegram-каналов к записям запуска добавляются записи прошлых запусков,
+  // отложенные из-за бюджета вызовов модели: сначала свежие, потом старые.
+  const run = await prisma.importRun.findUnique({
+    where: { id: runId },
+    select: { sourceId: true, source: { select: { parserKey: true } } },
+  });
+  const withBacklog = run?.source.parserKey === TELEGRAM_CHANNEL_PARSER_KEY;
+
   const records = await prisma.importedRecord.findMany({
     where: {
-      runId,
       normalizeStatus: "PENDING",
       entityTypeHint: { in: ["PLACE", "EVENT"] },
+      ...(withBacklog ? { OR: [{ runId }, { sourceId: run!.sourceId }] } : { runId }),
     },
-    select: { id: true },
+    select: { id: true, runId: true },
+    orderBy: { createdAt: "desc" },
   });
+  // Текущий запуск первым, остаток от старых запусков следом.
+  records.sort((a, b) => Number(b.runId === runId) - Number(a.runId === runId));
 
   const results: NormalizeRecordResult[] = [];
   for (const { id } of records) {
-    results.push(await normalizeRecord(id));
+    results.push(await normalizeRecord(id, { runId }));
   }
   return results;
 }
