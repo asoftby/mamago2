@@ -46,6 +46,8 @@ export async function triggerImportRun(sourceId: string): Promise<{
   success: boolean;
   runId?: string;
   error?: string;
+  /** Не ошибки, но важно увидеть сразу (например, нормализация отложена: модель не настроена). */
+  warnings?: string[];
   stats?: {
     totalFetched: number;
     totalParsed: number;
@@ -54,6 +56,7 @@ export async function triggerImportRun(sourceId: string): Promise<{
     totalErrors: number;
     normalizeSuccess: number;
     normalizeFailed: number;
+    normalizePostponed: number;
     matchMatched: number;
     matchNoMatch: number;
     matchAmbiguous: number;
@@ -74,6 +77,7 @@ export async function triggerImportRun(sourceId: string): Promise<{
       success: result.status === "COMPLETED",
       runId: result.runId,
       error: result.error,
+      warnings: result.warnings,
       stats: {
         totalFetched: result.totalFetched,
         totalParsed: result.totalParsed,
@@ -82,6 +86,7 @@ export async function triggerImportRun(sourceId: string): Promise<{
         totalErrors: result.totalErrors,
         normalizeSuccess: result.normalizeResults.success,
         normalizeFailed: result.normalizeResults.failed,
+        normalizePostponed: result.normalizeResults.postponed ?? 0,
         matchMatched: result.matchResults.matched,
         matchNoMatch: result.matchResults.noMatch,
         matchAmbiguous: result.matchResults.ambiguous,
