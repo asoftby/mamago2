@@ -123,7 +123,7 @@ export async function runPlanEventRemindersCore(
 
     // Свой срок у записи («за 15 минут», «за час») важнее общего расписания уведомлений.
     const offsetMinutes = candidate.reminderLeadMinutes ?? settings.offsetMinutes;
-    const dueAt = addMinutes(startsAt, -offsetMinutes);
+    const dueAt = candidate.reminderAt ?? addMinutes(startsAt, -offsetMinutes);
     const oldestAllowedDueAt = addMinutes(now, -dueGraceMinutes);
     if (dueAt.getTime() > now.getTime() || dueAt.getTime() < oldestAllowedDueAt.getTime()) {
       skippedSchedule += 1;
