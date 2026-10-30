@@ -121,7 +121,8 @@ void (async () => {
       { now },
       {
         listPlanItemsDueForReminderFn: async ({ windowEnd }) => {
-          assert.equal(windowEnd.toISOString(), "2026-08-28T12:10:00.000Z");
+          // Current reminder scheduler scans four weeks ahead for long custom offsets.
+          assert.equal(windowEnd.toISOString(), "2026-09-24T12:10:00.000Z");
           return [
             { ...candidate("five", new Date("2026-08-27T12:05:00.000Z")), reminderLeadMinutes: 5 },
             { ...candidate("ninety", new Date("2026-08-27T13:30:00.000Z")), reminderLeadMinutes: 90 },
