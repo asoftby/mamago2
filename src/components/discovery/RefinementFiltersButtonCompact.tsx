@@ -80,17 +80,14 @@ export function RefinementFiltersButtonCompact({
             )}
             aria-hidden={activeCount === 0}
           >
-            <span className="text-gray-400 mx-1">·</span>
-            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gray-900 px-2 text-xs font-bold text-white">
-              {activeCount > 0 ? activeCount : "\u00a0"}
-            </span>
+            <span className="h-2.5 w-2.5 rounded-full bg-primary" />
           </span>
         </button>
       </DialogTrigger>
 
       <DialogContent
         showCloseButton={false}
-        className="max-h-[min(90vh,800px)] max-w-[calc(100%-2rem)] gap-0 overflow-hidden p-0 sm:max-w-lg"
+        className="flex max-h-[min(90vh,800px)] max-w-[calc(100%-2rem)] min-w-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-lg"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader className="flex !flex-row shrink-0 items-center justify-between gap-3 border-b border-neutral-200/90 px-4 py-3 text-left sm:px-5">
@@ -104,7 +101,7 @@ export function RefinementFiltersButtonCompact({
             <ModalCloseButton aria-label="Закрыть фильтры" />
           </DialogClose>
         </DialogHeader>
-        <div className="max-h-[min(70vh,640px)] overflow-y-auto px-4 py-4 sm:px-5">
+        <div className={cn("min-h-0 min-w-0 w-full flex-1 overflow-x-hidden overflow-y-auto px-4 pt-4 sm:px-5", safeIntent === "kuda" ? "pb-0" : "pb-4")}>
           {safeIntent === "kuda" ? (
             <EventAdvancedFilters citySlug={citySlug} onApply={() => setOpen(false)} />
           ) : (
