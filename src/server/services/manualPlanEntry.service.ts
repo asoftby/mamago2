@@ -22,7 +22,7 @@ const TAG_MAX = 32;
 const TAG_COUNT_MAX = 12;
 /** Допустимые значения «за сколько напомнить» (укладываются в окно джоба напоминаний, 180 мин). */
 export const REMINDER_LEAD_MINUTES_OPTIONS = [15, 60, 120] as const;
-export const MAX_CUSTOM_REMINDER_LEAD_MINUTES = 24 * 60;
+export const MAX_CUSTOM_REMINDER_LEAD_MINUTES = 28 * 24 * 60;
 export const FAMILY_CALENDAR_MAX_RANGE_DAYS = 42;
 
 export class ManualPlanEntryError extends Error {
