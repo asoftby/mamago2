@@ -61,13 +61,15 @@ export function buildThanksMessage(input: {
   listTitle: string;
   message: string | null;
   listUrl: string;
-}): { subject: string; text: string } {
+}): { subject: string; text: string; body: string } {
+  // body is the in-app notice text: the same words without the link (the CTA carries it).
+  const body =
+    `Спасибо за подарок «${input.itemTitle}» (список «${input.listTitle}»)!` +
+    (input.message ? `\n\n${input.message}` : "");
   return {
     subject: `Спасибо за подарок: ${input.itemTitle}`,
-    text:
-      `Спасибо за подарок «${input.itemTitle}» (список «${input.listTitle}»)!` +
-      (input.message ? `\n\n${input.message}` : "") +
-      `\n${input.listUrl}`,
+    text: `${body}\n${input.listUrl}`,
+    body,
   };
 }
 

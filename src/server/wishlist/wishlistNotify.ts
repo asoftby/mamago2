@@ -101,7 +101,7 @@ const guestSelect = {
 /** Account holders get an in-app notice; anyone with a contact on the reservation also gets Telegram and/or email. */
 async function deliverToGuest(
   row: GuestRow,
-  message: { subject: string; text: string },
+  message: { subject: string; text: string; body?: string },
   kind: "WISHLIST_RELEASED" | "WISHLIST_THANKS",
 ): Promise<void> {
   if (row.userId) {
@@ -110,7 +110,7 @@ async function deliverToGuest(
         userId: row.userId,
         type: NOTICE_TYPE,
         title: message.subject,
-        body: message.text.split("\n")[0],
+        body: message.body ?? message.text.split("\n")[0],
         ctaLabel: "Открыть список",
         actionUrl: `/w/${row.item.wishlist.shareToken}`,
         metadata: { kind },

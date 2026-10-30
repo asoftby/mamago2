@@ -36,5 +36,9 @@ console.log("wishlistNotifyPure ok");
   const t = buildThanksMessage({ itemTitle: "LEGO", listTitle: "ДР", message: "Было супер", listUrl: "https://x.test/w/t" });
   assert.match(t.subject, /LEGO/);
   assert.match(t.text, /Было супер/);
+  assert.match(t.body, /Было супер/, "in-app notice keeps the author's whole text");
+  assert.doesNotMatch(t.body, /x\.test/, "in-app notice has no link line (CTA carries it)");
+  const multi = buildThanksMessage({ itemTitle: "A", listTitle: "B", message: "Раз\nДва\nТри", listUrl: "u" });
+  assert.match(multi.body, /Три$/);
   assert.doesNotMatch(buildThanksMessage({ itemTitle: "A", listTitle: "B", message: null, listUrl: "u" }).text, /null/);
 }

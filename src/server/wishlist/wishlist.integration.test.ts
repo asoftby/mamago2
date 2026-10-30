@@ -24,6 +24,7 @@ import {
   setWishlistArchived,
   updateWishlist,
   updateWishlistItem,
+  assertWishlistAccess,
 } from "./wishlist.service";
 import { WishlistError, createItemSchema, createWishlistSchema } from "./wishlistPure";
 
@@ -587,4 +588,6 @@ test("thanks: only active reservations are addressed; surprise mode hides the co
 
   const stranger = await makeUser("thx-out");
   await assert.rejects(sendWishlistThanks(stranger, w.id, null, rec as never), (e) => e instanceof WishlistError && e.code === "not_found");
+  await assert.rejects(assertWishlistAccess(stranger, w.id, deps), (e) => e instanceof WishlistError && e.code === "not_found");
+  await assertWishlistAccess(owner, w.id, deps);
 });

@@ -402,6 +402,12 @@ export async function copyWishlist(userId: string, wishlistId: string, deps?: Wi
  * The author thanks everyone holding a gift. In surprise mode the count is hidden
  * so the reply does not reveal how many gifts are taken.
  */
+/** Access check only (404 for strangers). Lets callers spend a rate-limit slot after, not before, it. */
+export async function assertWishlistAccess(userId: string, wishlistId: string, deps?: WishlistDeps): Promise<void> {
+  const c = ctx(deps);
+  await loadAccessible(c, userId, wishlistId);
+}
+
 export async function sendWishlistThanks(
   userId: string,
   wishlistId: string,
