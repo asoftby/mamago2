@@ -22,8 +22,8 @@ export function partyDeliverySamples(
 ): MetricSampleDraft[] {
   return [
     { metric: "party.outbox_failed_exhausted", value: outboxExhausted },
-    { metric: "party.telegram_delivery_failed", value: Number(row?.failed_telegram ?? 0n) },
-    { metric: "party.telegram_pending_stale", value: Number(row?.stale_pending_telegram ?? 0n) },
+    { metric: "party.telegram_delivery_failed", value: Number(row?.failed_telegram ?? BigInt(0)) },
+    { metric: "party.telegram_pending_stale", value: Number(row?.stale_pending_telegram ?? BigInt(0)) },
   ];
 }
 
