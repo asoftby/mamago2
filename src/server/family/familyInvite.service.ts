@@ -7,10 +7,11 @@ import type { MergeDecision } from "./familyMergePure";
 import {
   FamilyInviteError,
   MAX_ACTIVE_INVITES_PER_FAMILY,
+  FAMILY_INVITE_TTL_MS,
+  familyInviteValidity,
   generateInviteToken,
   hashInviteToken,
   activeInviteWhere,
-  isInviteUsable,
 } from "./familyInvitePure";
 
 export { FamilyInviteError } from "./familyInvitePure";
@@ -27,7 +28,8 @@ async function lockFamily(tx: Prisma.TransactionClient, familyId: string) {
 
 /**
  * Creates an invite for the user's family (lazy family). Returns the raw token
- * once; only its hash is stored. Invites do not expire (until accepted or revoked); at most 3 active per family.
+ * once; only its hash is stored. Links expire after seven days and are single-use;
+ * at most 3 usable active invitations per family.
  */
 export async function createFamilyInvite(
   prisma: PrismaClient,
@@ -50,7 +52,7 @@ export async function createFamilyInvite(
     if (active >= MAX_ACTIVE_INVITES_PER_FAMILY) throw new FamilyInviteError("limit_reached");
     const token = generateInviteToken();
     const invite = await tx.familyInvite.create({
-      data: { familyId, createdById: input.userId, tokenHash: hashInviteToken(token), expiresAt: null },
+      data: { familyId, createdById: input.userId, tokenHash: hashInviteToken(token), expiresAt: new Date(now.getTime() + FAMILY_INVITE_TTL_MS) },
       select: { id: true },
     });
     return { inviteId: invite.id, token };
@@ -128,9 +130,15 @@ export async function acceptFamilyInvite(
 
       const invite = await tx.familyInvite.findUnique({
         where: { tokenHash },
-        select: { id: true, familyId: true, createdById: true, status: true, expiresAt: true },
+        select: { id: true, familyId: true, createdById: true, status: true, expiresAt: true, createdAt: true },
       });
-      if (!invite || !isInviteUsable(invite, now)) throw new FamilyInviteError("invalid_invite");
+      if (!invite) throw new FamilyInviteError("invalid_invite");
+      // This account already belongs to the family: no new membership, consent
+      // or duplicated inviter notification even after expiry/consumption.
+      if (preMine?.familyId === invite.familyId) throw new FamilyInviteError("already_member");
+      const validity = familyInviteValidity(invite, now);
+      if (validity === "expired") throw new FamilyInviteError("expired_invite");
+      if (validity !== "valid") throw new FamilyInviteError("invalid_invite");
       const [family, creator] = await Promise.all([
         tx.family.findUnique({ where: { id: invite.familyId }, select: { archivedAt: true } }),
         tx.familyMembership.findFirst({
