@@ -3,7 +3,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { CityShell } from "@/components/city/CityShell";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { listDiscoveryClassChips } from "@/server/discovery/classChips";
-import { getClassesListingPage } from "@/server/discovery/classesListingPage";
+import { countPublicClassesCategory } from "@/server/discovery/classesCategoryCount";
 import { getCityDisplayName } from "@/lib/city/cityDisplayNames";
 import { publicSiteBase } from "@/lib/seo/cityKudaListingMetadata";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
@@ -27,14 +27,8 @@ async function resolveCategory(citySlug: string, slug: string) {
 export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
   const { city: citySlug, category: slug } = await params;
   const query = await searchParams;
-  const { city, category, chips } = await resolveCategory(citySlug, slug);
-  const listing = await getClassesListingPage(city.id, city.slug, {
-    page: 1,
-    chipSlug: category.slug,
-    chipTitleBySlug: new Map(chips.map((chip) => [chip.slug, chip.title])),
-    free: false,
-    priceMax: null,
-  });
+  const { city, category } = await resolveCategory(citySlug, slug);
+  const total = await countPublicClassesCategory(city.id, city.slug, category.slug);
   const cityName = getCityDisplayName(citySlug);
   const path = `/${citySlug}/classes/${category.slug}`;
   const hasFilters = Object.keys(query).some((key) => !["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"].includes(key));
@@ -42,7 +36,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
     title: `${category.title} для детей в ${cityName} — mamaGo`,
     description: category.description?.trim() || `${category.title} для детей в ${cityName}: занятия, расписание, цены и предложения организаторов на mamaGo.`,
     alternates: { canonical: `${publicSiteBase()}${path}` },
-    robots: listing.total === 0 || hasFilters ? { index: false, follow: true } : { index: true, follow: true },
+    robots: total === 0 || hasFilters ? { index: false, follow: true } : { index: true, follow: true },
   };
   return applyGlobalRobotsOverride(metadata);
 }
