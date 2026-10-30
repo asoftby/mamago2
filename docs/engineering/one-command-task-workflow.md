@@ -43,7 +43,7 @@ mgtask stories-display-rules fix
 mgfinish
 ```
 
-`mgcheck` is an optional preflight when you want the full common gate before finishing. It is not required immediately before `mgfinish`, because the repository pre-push hook already runs `pnpm check:push` during `mgfinish`.
+`mgcheck` is an optional preflight when you want the full common gate (`pnpm check:push`: typecheck, regressions, production build) locally before finishing. It is not required: the repository pre-push hook runs the fast gate (typecheck) during `mgfinish`, and the full regression suite plus the production build run in CI on every PR (`push-gate-regressions` and `typecheck` jobs). Set `MG_FULL_GATE=1` to make the pre-push hook run the full gate.
 
 For an agent session, the agent should execute the equivalent repository scripts itself without asking the user to copy these commands.
 
@@ -143,7 +143,7 @@ mgfinish
 2. requires the task worktree to be fully clean, including no untracked task files;
 3. verifies the task-only diff;
 4. pushes the task branch normally;
-5. lets the existing pre-push hook run `pnpm check:push` — no `--no-verify` bypass;
+5. lets the existing pre-push hook run the fast gate (`pnpm check:push:fast`, or the full `pnpm check:push` with `MG_FULL_GATE=1`) — no `--no-verify` bypass;
 6. opens a PR to `dev` automatically when GitHub CLI (`gh`) is available;
 7. otherwise prints that PR creation is the only remaining step.
 

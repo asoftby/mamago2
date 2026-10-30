@@ -56,7 +56,7 @@ pnpm lint
 pnpm check:push
 ```
 
-`check:push` runs the project verification gate (typecheck, regression tests and production build). It can be resource-intensive.
+`check:push` runs the full project verification gate (typecheck, regression tests and production build). It is resource-intensive, so the pre-push hook runs only the fast gate (`check:push:fast`, typecheck) and CI runs the full suite on every PR. Use `MG_FULL_GATE=1 git push` to run the full gate on push.
 
 Some regression checks read PostgreSQL. Use a dedicated local test database with
 synthetic data; never use DEV/PROD credentials or dumps for local verification.

@@ -11,6 +11,56 @@ on:
       - dev
 
 jobs:
+  # The regression suite that used to run on every local `git push` (pre-push hook).
+  # The pre-push hook is now typecheck-only; this job keeps the same coverage on every PR.
+  push-gate-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      gate-postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: gate
+          POSTGRES_PASSWORD: synthetic_only
+          POSTGRES_DB: gate
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U gate -d gate"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.28.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply migrations to the synthetic gate database
+        run: pnpm exec prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://gate:synthetic_only@127.0.0.1:5433/gate
+
+      - name: Push-gate regression suite (pnpm check:push:tests)
+        run: sh scripts/git/gate-env.sh pnpm check:push:tests
+        env:
+          GATE_DATABASE_URL: postgresql://gate:synthetic_only@127.0.0.1:5433/gate
+
   typecheck:
     runs-on: ubuntu-latest
     timeout-minutes: 45

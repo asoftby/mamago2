@@ -68,7 +68,7 @@ fi
 echo "[task-finish] Final task-only diff against origin/dev:"
 git diff --name-only origin/dev...HEAD | sed 's/^/  - /'
 
-echo "[task-finish] Pushing $branch. The repository pre-push hook will run pnpm check:push."
+echo "[task-finish] Pushing $branch. The repository pre-push hook runs the fast gate (typecheck); full regressions + build run in CI."
 git push -u origin "$branch"
 
 if command -v gh >/dev/null 2>&1; then

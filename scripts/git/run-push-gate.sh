@@ -1,5 +1,14 @@
 #!/bin/sh
-# Pre-push gate wrapper: runs `pnpm check:push` with the production build isolated in its own
+# Pre-push gate wrapper.
+#
+# Default (fast): typecheck only (`pnpm check:push:fast`). The full regression suite and the
+# production build run in CI on every PR (.github/workflows/ci.yml, job `push-gate-regressions`
+# plus the build step), so repeating them on every push only slowed agents down.
+#
+#   MG_FULL_GATE=1              run the full local gate (`pnpm check:push`: typecheck,
+#                               regressions on a throwaway Postgres, production build)
+#
+# Full mode runs `pnpm check:push` with the production build isolated in its own
 # directory, so it never touches (or inherits the bloat of) the `.next` cache of a running `next dev`.
 #
 # Why: `next build` shares `.next` with `next dev`; a multi-GB dev cache plus a concurrent dev
@@ -19,6 +28,15 @@ cd "$root" || exit 1
 # this worktree's schema, otherwise typecheck/build results are meaningless.
 if [ -f scripts/git/worktree-deps.sh ]; then
   sh scripts/git/worktree-deps.sh check || exit 1
+fi
+
+if [ "${MG_FULL_GATE:-}" != "1" ]; then
+  case "${NODE_OPTIONS:-}" in
+    *max-old-space-size*) ;;
+    *) NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--max-old-space-size=8192"; export NODE_OPTIONS ;;
+  esac
+  echo "[pre-push] fast gate: typecheck. Full regressions + build run in CI (MG_FULL_GATE=1 to run them locally)."
+  exec pnpm check:push:fast
 fi
 
 gate_dir="${NEXT_DIST_DIR:-node_modules/.cache/next-gate}"
