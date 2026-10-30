@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { permanentRedirect } from "next/navigation";
+import { listDiscoveryClassChips } from "@/server/discovery/classChips";
 import { CityShell } from "@/components/city/CityShell";
 import { buildCityClassesListingMetadata } from "@/lib/seo/cityKudaListingMetadata";
 import { applyGlobalRobotsOverride } from "@/lib/seo/globalNoindex";
@@ -22,6 +24,19 @@ export default async function ClassesPage({ params, searchParams }: PageProps) {
   const { city: citySlug } = await params;
   const resolvedSearchParams = await searchParams;
 
+  const requestedChip = Array.isArray(resolvedSearchParams.chip) ? resolvedSearchParams.chip[0] : resolvedSearchParams.chip;
+  if (requestedChip && requestedChip !== "all") {
+    const chips = await listDiscoveryClassChips();
+    if (chips.some((chip) => chip.isActive && chip.slug === requestedChip)) {
+      const rest = new URLSearchParams();
+      for (const [key, value] of Object.entries(resolvedSearchParams)) {
+        if (key === "chip" || value === undefined) continue;
+        for (const part of Array.isArray(value) ? value : [value]) rest.append(key, part);
+      }
+      const suffix = rest.toString();
+      permanentRedirect(`/${citySlug}/classes/${encodeURIComponent(requestedChip)}${suffix ? `?${suffix}` : ""}`);
+    }
+  }
   return (
     <CityShell
       citySlug={citySlug}
