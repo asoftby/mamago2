@@ -13,3 +13,15 @@ export function activeBreakingNewsContinuationWhere(now: Date): Prisma.ArticleWh
     publishedAt: { lte: now },
   };
 }
+
+/**
+ * Unavailable items (e.g. a story that expired after the metadata response)
+ * must be skipped rather than retried forever ahead of newer valid items.
+ */
+export function nextContinuationItem<T extends { id: string }>(
+  items: readonly T[],
+  loadedIds: ReadonlySet<string>,
+  unavailableIds: ReadonlySet<string>,
+): T | null {
+  return items.find(item => !loadedIds.has(item.id) && !unavailableIds.has(item.id)) ?? null;
+}
