@@ -42,8 +42,7 @@ export function MobileFilterButton({ intent, className }: MobileFilterButtonProp
       <SlidersHorizontal className="h-5 w-5 text-gray-600" />
 
       {activeCount > 0 && (
-        <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-          {activeCount}
+        <div className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-white" aria-hidden="true">
         </div>
       )}
     </button>
