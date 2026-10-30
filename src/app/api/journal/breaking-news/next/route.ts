@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
+import { activeBreakingNewsContinuationWhere } from "@/lib/journal/breakingNewsContinuation";
 
 const PAGE_SIZE = 3;
 
@@ -18,8 +19,9 @@ export async function GET(request: NextRequest) {
   const cityRow = await prisma.city.findFirst({ where: { slug: city, isActive: true }, select: { id: true } });
   if (!cityRow) return NextResponse.json({ items: [], nextCursor: null });
 
+  const now = new Date();
   const anchor = await prisma.article.findFirst({
-    where: { ...getPublicPublishedArticleWhere(), subtitle: "__breaking_news__", cityId: cityRow.id, id: cursor },
+    where: { ...getPublicPublishedArticleWhere(), ...activeBreakingNewsContinuationWhere(now), cityId: cityRow.id, id: cursor },
     select: { id: true, publishedAt: true },
   });
   if (!anchor?.publishedAt) {
@@ -29,7 +31,7 @@ export async function GET(request: NextRequest) {
   const rows = await prisma.article.findMany({
     where: {
       ...getPublicPublishedArticleWhere(),
-      subtitle: "__breaking_news__",
+      ...activeBreakingNewsContinuationWhere(now),
       cityId: cityRow.id,
       OR: [
         { publishedAt: { lt: anchor.publishedAt } },

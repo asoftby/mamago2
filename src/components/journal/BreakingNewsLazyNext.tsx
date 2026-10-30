@@ -2,6 +2,7 @@
 
 import { BreakingNewsView, type BreakingNewsViewProps } from "@/components/article/mvp/BreakingNewsView";
 import { useEffect, useRef, useState } from "react";
+import { nextContinuationItem } from "@/lib/journal/breakingNewsContinuation";
 
 type NextItem = { id: string; slug: string | null; title: string; excerpt: string | null };
 type Page = { items: NextItem[]; nextCursor: string | null };
@@ -13,6 +14,7 @@ export function BreakingNewsLazyNext() {
   const abortRef = useRef<AbortController | null>(null);
   const [items, setItems] = useState<NextItem[]>([]);
   const [articles, setArticles] = useState<Array<BreakingNewsViewProps>>([]);
+  const [unavailableIds, setUnavailableIds] = useState<string[]>([]);
   const fullRequestRef = useRef(false);
   const fullAbortRef = useRef<AbortController | null>(null);
   const fullSentinelRef = useRef<HTMLDivElement>(null);
@@ -57,7 +59,7 @@ export function BreakingNewsLazyNext() {
 
   useEffect(() => {
     const node = fullSentinelRef.current;
-    const next = items.find((item) => !articles.some((article) => article.articleId === item.id));
+    const next = nextContinuationItem(items, new Set(articles.map(article => article.articleId)), new Set(unavailableIds));
     if (!node || !next || fullRequestRef.current) return;
     const observer = new IntersectionObserver(([entry]) => {
       if (!entry.isIntersecting || fullRequestRef.current) return;
@@ -66,13 +68,19 @@ export function BreakingNewsLazyNext() {
       const controller = new AbortController();
       fullAbortRef.current = controller;
       const timeout = window.setTimeout(() => controller.abort(), 8000);
+      let permanentlyUnavailable = false;
       fetch(`/api/journal/breaking-news/article?id=${encodeURIComponent(next.id)}&city=${encodeURIComponent(cityRef.current)}`, { signal: controller.signal })
         .then(async (response) => {
+          if (response.status === 404) {
+            permanentlyUnavailable = true;
+            return null;
+          }
           if (!response.ok) throw new Error("Article unavailable");
           return response.json() as Promise<{ article: NewsPayload }>;
         })
-        .then(({ article }) => {
-          if (controller.signal.aborted) return;
+        .then((payload) => {
+          if (!payload || controller.signal.aborted) return;
+          const { article } = payload;
           setArticles((previous) => [...previous, { ...article, articleId: article.id, publishedAt: article.publishedAt ? new Date(article.publishedAt) : null, related: [], citySlug: cityRef.current, articleHref: `${initialPathRef.current}/${article.slug}` }]);
         })
         .catch(() => { if (!controller.signal.aborted) setError(true); })
@@ -80,11 +88,14 @@ export function BreakingNewsLazyNext() {
           window.clearTimeout(timeout);
           if (fullAbortRef.current === controller) fullAbortRef.current = null;
           fullRequestRef.current = false;
+          if (permanentlyUnavailable && !controller.signal.aborted) {
+            setUnavailableIds(previous => previous.includes(next.id) ? previous : [...previous, next.id]);
+          }
         });
     }, { root: document.querySelector(".journal-news-panel"), rootMargin: "0px 0px 240px 0px" });
     observer.observe(node);
     return () => observer.disconnect();
-  }, [items, articles]);
+  }, [items, articles, unavailableIds]);
 
   useEffect(() => {
     const node = sentinelRef.current;
@@ -123,16 +134,19 @@ export function BreakingNewsLazyNext() {
 
   return (
     <section aria-label="Следующие Breaking News" className="mx-auto max-w-3xl px-5 pb-12 pt-8">
-      <h2 className="mb-5 text-xl font-semibold">Далее в Breaking News</h2>
+      {(hasMore || items.length > 0 || loading || error) && <h2 className="mb-5 text-xl font-semibold">Далее в Breaking News</h2>}
       {articles.map((article) => (
         <section key={article.articleId} data-news-continuation={article.articleId}>
           <BreakingNewsView {...article} />
         </section>
       ))}
-      {!error && items.some((item) => !articles.some((article) => article.articleId === item.id)) && <div ref={fullSentinelRef} className="h-px" aria-hidden />}
+      {!error && nextContinuationItem(items, new Set(articles.map(article => article.articleId)), new Set(unavailableIds)) && <div ref={fullSentinelRef} className="h-px" aria-hidden />}
       {loading && <p role="status" className="py-5 text-sm text-neutral-500">Загружаем следующие публикации…</p>}
       {error && <button type="button" onClick={() => { setError(false); requestedRef.current = false; fullRequestRef.current = false; }} className="py-5 text-sm underline">Повторить загрузку</button>}
       {hasMore && <div ref={sentinelRef} aria-hidden className="h-px" />}
+      {!hasMore && !loading && !error && !nextContinuationItem(items, new Set(articles.map(article => article.articleId)), new Set(unavailableIds)) && (
+        <p role="status" className="py-6 text-center text-sm text-neutral-500">Вы посмотрели все актуальные новости</p>
+      )}
     </section>
   );
 }
