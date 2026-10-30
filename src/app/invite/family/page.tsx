@@ -55,23 +55,32 @@ export default async function FamilyInvitePage({
     return (
       <Shell>
         <h1 className="text-2xl font-semibold text-neutral-950">{inviterTitle(info.inviterName)}</h1>
-        <p className="mt-2 text-neutral-600">
-          Вместе вы будете видеть детей и общие планы на mamaGo. Личные записи остаются личными. Войдите или зарегистрируйтесь, чтобы продолжить.
-        </p>
-        <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-          <Link
-            href={buildAuthUrl({ mode: "login", redirectTo: returnTo })}
-            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-neutral-900 px-5 text-sm font-medium text-white"
-          >
-            Войти
-          </Link>
-          <Link
-            href={buildAuthUrl({ mode: "register", redirectTo: returnTo })}
-            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-neutral-300 px-5 text-sm font-medium text-neutral-900"
-          >
-            Зарегистрироваться
-          </Link>
+        <div className="mt-6 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Приглашение в семью</p>
+          <h2 className="mt-2 font-serif text-xl font-semibold text-neutral-950">Вместе планировать проще</h2>
+          <p className="mt-2 text-sm leading-relaxed text-neutral-600">
+            Вы сможете видеть детей и общие планы семьи, а также участвовать в совместном планировании.
+            Ваши личные записи останутся личными.
+          </p>
+          <p className="mt-4 text-sm text-neutral-600">
+            Войдите или создайте аккаунт, чтобы изучить условия и принять приглашение.
+          </p>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+            <Link
+              href={buildAuthUrl({ mode: "login", redirectTo: returnTo })}
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-neutral-900 px-5 text-sm font-medium text-white"
+            >
+              Войти
+            </Link>
+            <Link
+              href={buildAuthUrl({ mode: "register", redirectTo: returnTo })}
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-neutral-300 px-5 text-sm font-medium text-neutral-900"
+            >
+              Создать аккаунт
+            </Link>
+          </div>
         </div>
+
       </Shell>
     );
   }
