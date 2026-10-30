@@ -112,7 +112,7 @@ type Props = {
   initialSelectedDate: string;
   initialRange: { from: string; to: string };
   familyChildren: Array<{ id: string; name: string }>;
-  familyAdults: Array<{ id: string; name: string }>;
+  familyAdults: Array<{ id: string; name: string; avatarUrl?: string | null }>;
   accountDisplayName?: string | null;
   ideaActivityIds: string[];
   childrenAges: number[];
@@ -540,7 +540,7 @@ export function PlanPageClient({
         <PlanPersonFilter
           className="mt-3"
           options={planPersonFilterOptions([
-            ...familyAdults.map((adult) => ({ value: `adult:${adult.id}`, label: adult.name })),
+            ...familyAdults.map((adult) => ({ value: `adult:${adult.id}`, label: adult.name, avatarUrl: adult.avatarUrl })),
             ...familyChildren.map((child) => ({ value: `child:${child.id}`, label: child.name })),
           ])}
           selectedValues={includedPeople}
