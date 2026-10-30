@@ -180,7 +180,7 @@ export function PublicOfferHero({
                   </Button>
                 )}
               </div>
-              <PublicationSaveShare className="mt-3" isSaved={isSaved} onSave={onSave} onShare={() => setShareOpen(true)} />
+              <PublicationSaveShare className="mt-3" publicationKind="offer" publicationId={data.id} isSaved={isSaved} onSave={onSave} onShare={() => setShareOpen(true)} />
               <ShareModal open={shareOpen} onOpenChange={setShareOpen} url={typeof window !== "undefined" ? window.location.href : ""} title={data.title} entityNoun="предложением" />
               {directSlot && <div className="mt-3">{directSlot}</div>}
               {ownerEditSlot && (
