@@ -9,6 +9,7 @@ import type {
 import { getEffectiveNotificationChannelsForType } from "@/server/services/notificationSettings.service";
 import { sendEmailNotification, skipEmailNotification } from "./email-delivery";
 import { buildNotificationDedupeKey, hasSuccessfulNotificationDelivery } from "./notification-dedupe";
+import { buildPlanReminderEventId } from "./notification-dedupe-core";
 import { sendInAppNotification, skipInAppNotification } from "./in-app-delivery";
 import { renderNotificationContent } from "./notification-renderer";
 import { sendTelegramNotification, skipTelegramNotification } from "./telegram-delivery";
@@ -83,7 +84,7 @@ function resolveNotificationEventId(
   switch (input.scenario) {
     case "PLAN_EVENT_2H_BEFORE": {
       const context = input.context as PlanEventReminderContext;
-      return context.activityId ?? context.planItemId;
+      return buildPlanReminderEventId(context);
     }
     case "PLAN_TOMORROW_DIGEST": {
       const context = input.context as PlanTomorrowDigestContext;

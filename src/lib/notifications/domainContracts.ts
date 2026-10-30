@@ -43,6 +43,8 @@ export type PlanEventReminderContext = {
   activityId?: string | null;
   eventTitle: string;
   startsAt: Date;
+  /** Exact instant the reminder is due; changes when start time or lead time changes. */
+  reminderDueAt?: Date;
   placeName?: string | null;
   cityName?: string | null;
   timeZone?: string;
