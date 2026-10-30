@@ -311,3 +311,24 @@ export function guestItemState(quantity: number, taken: number): GuestItemState 
   if (taken >= quantity) return "TAKEN";
   return taken > 0 ? "PARTIAL" : "FREE";
 }
+
+// ─── Stored images ───────────────────────────────────────────────────────────
+
+const STORED_MEDIA_PREFIX = "/api/media/file/";
+
+/** Photos we saved ourselves (link previews). They have no MediaAsset, so /api/media/file would 404. */
+export function isStoredMediaUrl(url: string | null | undefined): boolean {
+  return !!url && url.startsWith(STORED_MEDIA_PREFIX);
+}
+
+/**
+ * What an <img> should load. Our own files go through the wishlist image routes
+ * (ACL by owner or share token); external links the author typed are used as is.
+ * `proxyPath` is the route without query. The `v` stamp busts the cache when the photo changes.
+ */
+export function wishlistImageSrc(imageUrl: string | null, proxyPath: string): string | null {
+  if (!imageUrl) return null;
+  if (!isStoredMediaUrl(imageUrl)) return imageUrl;
+  const stem = (imageUrl.split("/").pop() ?? "").split(".")[0].slice(0, 48);
+  return `${proxyPath}?v=${encodeURIComponent(stem)}`;
+}

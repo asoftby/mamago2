@@ -12,6 +12,7 @@ import {
   dateToDateKey,
   guestItemState,
   wishlistEnabled,
+  wishlistImageSrc,
   type GuestItemState,
   type GuestReserveInput,
 } from "./wishlistPure";
@@ -56,7 +57,8 @@ export type PublicItemView = {
   currency: string;
   quantity: number;
   priority: "LOW" | "NORMAL" | "HIGH";
-  imageUrl: string | null;
+  /** Ready for <img>: stored photos go through the share-token image route. */
+  imageSrc: string | null;
   state: GuestItemState;
   availableQuantity: number;
   /** Only when the author enabled showReserverNamesToGuests. */
@@ -193,7 +195,7 @@ export async function getPublicWishlist(
         currency: item.currency,
         quantity: item.quantity,
         priority: item.priority,
-        imageUrl: item.imageUrl,
+        imageSrc: wishlistImageSrc(item.imageUrl, `/api/w/${shareToken}/items/${item.id}/image`),
         state: guestItemState(item.quantity, taken),
         availableQuantity: Math.max(0, item.quantity - taken),
         reserverNames: row.showReserverNamesToGuests ? item.reservations.map((r) => r.displayName) : null,
@@ -207,6 +209,18 @@ export async function getPublicWishlist(
       };
     }),
   };
+}
+
+/** Stored photo of an item for the share-token image route. PRIVATE/unknown tokens answer not_found. */
+export async function getPublicItemImageUrl(shareToken: string, itemId: string, deps?: PublicDeps): Promise<string | null> {
+  const c = ctx(deps);
+  const head = await loadPublic(c.db, shareToken);
+  const item = await c.db.wishlistItem.findFirst({
+    where: { id: itemId, wishlistId: head.id, deletedAt: null },
+    select: { imageUrl: true },
+  });
+  if (!item) throw new WishlistError("not_found");
+  return item.imageUrl;
 }
 
 export async function reserveItem(
