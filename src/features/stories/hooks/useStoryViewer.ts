@@ -114,19 +114,8 @@ export function useStoryViewer(stories: StoryCollection[]) {
       setActiveItemIndex((i) => i + 1);
       return;
     }
-    if (activeStoryIndex === stories.length - 1 || activeStoryIndex < stories.length - 1) {
-      setNewsComplete(true);
-      return;
-    }
-    const nextStoryIndex = activeStoryIndex + 1;
-    if (nextStoryIndex < stories.length) {
-      setActiveItems(orderBySeen(stories[nextStoryIndex].items, seenIds));
-      setSeenGroupStart(resolveSeenGroupStart(stories[nextStoryIndex].items, seenIds));
-      setActiveStoryIndex(nextStoryIndex);
-      setActiveItemIndex(0);
-    } else {
-      close();
-    }
+    // End of a topic: show a short interstitial, or the final completion screen.
+    setNewsComplete(true);
   }, [activeStoryIndex, activeStory, activeItemIndex, stories, seenIds, close]);
 
   const prev = useCallback(() => {
