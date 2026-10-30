@@ -12,6 +12,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { emailService } from "@/features/email/server/email-service";
 import { getTelegramConfig } from "@/server/config/telegram.config";
 import { getTelegramDiagnostics } from "@/server/services/telegram/telegramDiagnostics.service";
+import { collectPartyDeliveryMetrics } from "@/server/ops/metrics/collectors/partyDelivery";
 import {
   reconcileStalePendingDeliveries,
   STALE_PENDING_THRESHOLD_MINUTES,
@@ -136,6 +137,16 @@ export default async function AdminSystemNotificationsPage({
     console.error("[admin:notifications] telegram diagnostics failed", error);
   }
 
+  // Read-only booking-delivery diagnostics. A failed metric query must not
+  // hide existing admin notifications or silently render failures as zero.
+  let partyHealth: Awaited<ReturnType<typeof collectPartyDeliveryMetrics>> | null = null;
+  try {
+    partyHealth = await collectPartyDeliveryMetrics({ prisma, now: new Date() });
+  } catch {
+    console.error("[admin:notifications] party delivery health unavailable");
+  }
+  const partyCount = (metric: string) => partyHealth?.find((sample) => sample.metric === metric)?.value;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -181,6 +192,15 @@ export default async function AdminSystemNotificationsPage({
             `pending_update_count: ${telegramLive?.webhook?.pendingUpdateCount ?? "n/a"}`,
             `last error: ${telegramLive?.webhook?.lastErrorMessage ?? "none"}`,
           ]}
+        />
+        <HealthCard
+          title="Праздники — доставка"
+          lines={partyHealth ? [
+            `Outbox FAILED (5+ попыток): ${partyCount("party.outbox_failed_exhausted") ?? "n/a"}`,
+            `Telegram FAILED: ${partyCount("party.telegram_delivery_failed") ?? "n/a"}`,
+            `Telegram PENDING более 10 мин: ${partyCount("party.telegram_pending_stale") ?? "n/a"}`,
+            "SENT в outbox означает обработано, не доставлено. Проверяйте доставки вручную.",
+          ] : ["Диагностика недоступна — проверьте логи, не считать это нулём."]}
         />
         <HealthCard
           title="Summary"

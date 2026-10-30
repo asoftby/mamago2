@@ -34,6 +34,7 @@ import { audienceWeeklyMonthlyCollector } from "./audienceWeeklyMonthly";
 import { b2bHealthCollector } from "./b2bHealth";
 import { b2bQueueMetricsCollector } from "./b2bQueue";
 import { commsMetricsCollector } from "./comms";
+import { partyDeliveryMetricsCollector } from "./partyDelivery";
 import { engagementFunnelCollector } from "./engagementFunnel";
 import { funnelMetricsCollector } from "./funnel";
 import { googleSearchConsoleCollector } from "./googleSearchConsole";
@@ -58,6 +59,7 @@ export function registerCoreMetricCollectors(): void {
   registerMetricCollector(importMetricsCollector);
   registerMetricCollector(b2bQueueMetricsCollector);
   registerMetricCollector(commsMetricsCollector);
+  registerMetricCollector(partyDeliveryMetricsCollector);
   registerMetricCollector(weeklyPlanningFamiliesCollector);
   registerMetricCollector(retentionCollector);
   registerMetricCollector(habitCollector);
