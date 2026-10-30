@@ -567,6 +567,21 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     category: "ADMIN",
   },
 
+  IMPORT_CHANNELS_DIGEST: {
+    type: "IMPORT_CHANNELS_DIGEST",
+    audience: "ADMIN",
+    surface: "ADMIN",
+    groupId: "admin_moderation",
+    label: "Сводка по Telegram-каналам",
+    description: "Раз в сутки: новые посты, возможные дубли, изменения опубликованного и что ждёт решения",
+    defaultChannels: { inApp: true, email: false, telegram: true },
+    ctaLabel: "Открыть очередь",
+    resolveHref: () => "/admin/import/review",
+    telegram: { enabledByDefault: true },
+    importance: "NORMAL",
+    category: "ADMIN",
+  },
+
   // ── Booking ──
   BOOKING_CREATED: {
     type: "BOOKING_CREATED",

@@ -19,6 +19,12 @@ import {
   repairOrphanImportReviewTasks,
 } from "@/server/modules/import/services/import-review-task.service";
 import { applyDecision } from "@/server/modules/import/services/import-review.service";
+import {
+  bulkPublishCreateNew,
+  bulkRejectRecords,
+  summarizeBulkResults,
+  type BulkItemResult,
+} from "@/server/modules/import/services/import-review-bulk.service";
 import { publishApprovedRecord, publishApprovedEventRecord } from "@/server/modules/import/services/import-publish.service";
 import { getParser } from "@/server/modules/import/parsers/registry";
 import { normalizePlacePayload } from "@/server/modules/import/normalizers/place.normalizer";
@@ -566,6 +572,47 @@ export async function bulkDeleteImportedRecords(
 
     revalidatePath("/admin/import/review");
     return { success: true, count: deleteResult.count };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
+
+export type BulkReviewActionResult = {
+  success: boolean;
+  summary?: string;
+  results?: BulkItemResult[];
+  error?: string;
+};
+
+/**
+ * Пакетно опубликовать события из очереди ревью: только «создать новое» с
+ * заполненными обязательными полями и без конфликтов, дублей и изменений
+ * источника. Остальное пропускается с причиной. Только для админа.
+ */
+export async function bulkPublishImportedEventRecords(importedRecordIds: string[]): Promise<BulkReviewActionResult> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return { success: false, error: "Unauthorized" };
+    requireAdmin(user.role);
+
+    const results = await bulkPublishCreateNew(importedRecordIds, user.id);
+    revalidatePath("/admin/import/review");
+    return { success: true, results, summary: summarizeBulkResults(results) };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
+
+/** Пакетно отклонить записи очереди ревью (только неопубликованные с открытой задачей). */
+export async function bulkRejectImportedRecords(importedRecordIds: string[]): Promise<BulkReviewActionResult> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return { success: false, error: "Unauthorized" };
+    requireAdmin(user.role);
+
+    const results = await bulkRejectRecords(importedRecordIds, user.id);
+    revalidatePath("/admin/import/review");
+    return { success: true, results, summary: summarizeBulkResults(results) };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }

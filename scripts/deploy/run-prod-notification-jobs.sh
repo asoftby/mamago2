@@ -44,6 +44,12 @@ if ! run_job "/api/cron/plan-tomorrow-digests" "plan-tomorrow-digests"; then
   overall_status=1
 fi
 
+# Daily Telegram-channel import digest for admins: the route sends once a day after 09:00 Minsk.
+if ! run_job "/api/cron/import-channels-digest" "import-channels-digest"; then
+  echo "[mamago-notifications] import-channels-digest failed" >&2
+  overall_status=1
+fi
+
 # Forward-to-plan inbox maintenance runs last so a slow recovery can never delay reminders/digests.
 if ! run_job "/api/cron/inbox-recover" "inbox-recover"; then
   echo "[mamago-notifications] inbox-recover failed" >&2

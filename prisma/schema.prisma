@@ -4617,6 +4617,7 @@ enum NotificationType {
   DIRECT_NEW_MESSAGE
   SUPPORT_BUSINESS_REPLY
   SUPPORT_STAFF_MESSAGE
+  IMPORT_CHANNELS_DIGEST
 }
 
 enum NotificationAudience {
