@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { NormalizedEventImport } from "@/server/modules/import/types";
 import type { TelegramQualityFlags } from "@/server/modules/import/normalizers/telegram-post.mapper";
+import { editorEventEditHref } from "@/lib/content-editor/types";
 import { lowConfidenceFields, postKindLabel, SOURCE_CHANGE_FIELD_LABEL } from "../../_lib/telegram-review";
+import { AcknowledgeSourceChange } from "./AcknowledgeSourceChange";
 
 const STATE_LABEL: Record<string, { label: string; className: string }> = {
   stated: { label: "указано", className: "bg-emerald-100 text-emerald-900" },
@@ -49,10 +51,15 @@ export function TelegramPostBlock({
   flags,
   nd,
   postUrl,
+  importedRecordId,
+  publishedActivityId,
 }: {
   flags: TelegramQualityFlags;
   nd: NormalizedEventImport;
   postUrl: string | null;
+  importedRecordId?: string;
+  /** Событие, уже опубликованное из этой записи: у него можно просмотреть изменение источника. */
+  publishedActivityId?: string | null;
 }) {
   const low = lowConfidenceFields(flags);
   const sessions = nd.occurrences ?? [];
@@ -76,7 +83,18 @@ export function TelegramPostBlock({
         {changed && (
           <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm text-violet-950">
             <strong>Пост изменился.</strong> Изменено: {changed.fields.map((f) => SOURCE_CHANGE_FIELD_LABEL[f] ?? f).join(", ")}.
-            Событие на сайте прежнее: решите, обновлять ли его.
+            Событие на сайте само не меняется: откройте его, при необходимости внесите правки вручную и отметьте изменение просмотренным.
+            {publishedActivityId && importedRecordId && (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <a
+                  href={`${editorEventEditHref(publishedActivityId)}?returnTo=${encodeURIComponent("/admin/import/review")}&importedRecordId=${encodeURIComponent(importedRecordId)}`}
+                  className="text-sm font-medium text-blue-700 hover:underline"
+                >
+                  Открыть событие в редакторе
+                </a>
+                <AcknowledgeSourceChange importedRecordId={importedRecordId} />
+              </div>
+            )}
           </div>
         )}
 
@@ -176,7 +194,10 @@ export function TelegramPostBlock({
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-gray-500">Это только подсказка: ничего не сливается автоматически.</p>
+            <p className="mt-2 text-xs text-gray-500">
+              Это только подсказка: ничего не сливается автоматически. Опубликуйте одну из записей, и вторая получит
+              опубликованное событие как кандидата: останется выбрать «Обновить» или «Объединить».
+            </p>
           </div>
         )}
       </div>

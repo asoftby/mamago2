@@ -19,6 +19,7 @@ import {
   repairOrphanImportReviewTasks,
 } from "@/server/modules/import/services/import-review-task.service";
 import { applyDecision } from "@/server/modules/import/services/import-review.service";
+import { acknowledgeSourceChange } from "@/server/modules/import/services/import-source-change.service";
 import {
   bulkPublishCreateNew,
   bulkRejectRecords,
@@ -577,6 +578,30 @@ export async function bulkDeleteImportedRecords(
 
     revalidatePath("/admin/import/review");
     return { success: true, count: deleteResult.count };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
+
+/**
+ * Отметить изменение поста просмотренным: флаг `sourceChanged` снимается,
+ * задача ревью закрывается. Событие на сайте это действие не меняет.
+ */
+export async function acknowledgeSourceChangeAction(
+  importedRecordId: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return { success: false, error: "Unauthorized" };
+    requireAdmin(user.role);
+
+    const result = await acknowledgeSourceChange(importedRecordId, user.id);
+    if (!result.ok) {
+      return { success: false, error: result.reason === "no_change" ? "Изменений источника уже нет" : "Запись не найдена" };
+    }
+    revalidatePath("/admin/import/review");
+    revalidatePath(`/admin/import/review/${importedRecordId}`);
+    return { success: true };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
