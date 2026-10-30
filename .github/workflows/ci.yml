@@ -231,6 +231,9 @@ jobs:
       - name: Event map regressions
         run: pnpm exec tsx src/components/business/wizard/event/steps/location/eventLocationLeafletMap.test.ts
 
+      - name: Public publication presentation regressions
+        run: pnpm test:publication-media
+
       - name: Public shell regressions
         run: |
           pnpm exec tsx src/components/shell/PublicFooter.contract.test.ts

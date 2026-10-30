@@ -10,6 +10,7 @@ import { renderPriceWithIcon } from "@/components/icons/BelarusianRubleIcon";
 import { normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 
 interface OfferScheduleProps {
+  showHeading?: boolean;
   type: "classes" | "shifts";
   items: OfferScheduleItem[];
   /** Для shifts — передаёт полный контекст смены */
@@ -23,6 +24,7 @@ interface OfferScheduleProps {
 export function OfferSchedule({
   type,
   items,
+  showHeading = true,
   onShiftCta,
   onSaveShift,
   onItemCta,
@@ -48,7 +50,7 @@ export function OfferSchedule({
   return (
     <section id="schedule" className="space-y-7 scroll-mt-24">
       {/* Editorial section header */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      {showHeading && <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3.5 mb-3">
             <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-gray-400">
@@ -60,7 +62,7 @@ export function OfferSchedule({
             {type === "shifts" ? "Выбери своё лето" : "Выберите подходящую группу"}
           </h2>
         </div>
-      </div>
+      </div>}
 
       {items.length === 0 ? (
         <EmptySchedule onCta={() => onItemCta?.("empty")} />

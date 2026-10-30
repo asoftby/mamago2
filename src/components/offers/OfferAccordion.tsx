@@ -1,5 +1,8 @@
 "use client";
 
+import { isRichTextMeaningful } from "@/lib/richtext/utils";
+import { PublicationSection } from "@/components/publication-page/PublicationSection";
+import { PublicationSectionHeading } from "@/components/publication-page/PublicationSectionHeading";
 import { useState } from "react";
 import type { OfferPageData } from "@/lib/offer/offerPageTypes";
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
@@ -342,5 +345,29 @@ export function OfferAccordion({ data }: OfferAccordionProps) {
 
       <div style={{ borderTop: "1px solid rgba(20,18,16,0.10)" }} />
     </div>
+  );
+}
+
+/** Public detail pages never substitute demonstration schedules or housing. */
+export function OfferUniqueSections({ data }: OfferAccordionProps) {
+  const daySchedule = (data.daySchedule ?? []).filter((item) => isRichTextMeaningful(item.title ?? ""));
+  const housing = Object.entries(data.accommodation ?? {})
+    .filter(([, value]) => typeof value === "string" && !isEmptyValue(value) && isRichTextMeaningful(value))
+    .map(([key, value]): [string, string] => [HOUSING_LABEL_MAP[key.toLowerCase()] ?? key, String(value).trim()]);
+  return (
+    <>
+      {daySchedule.length > 0 && (
+        <PublicationSection className="py-14 md:py-16">
+          <PublicationSectionHeading kicker="Программа" title="Расписание дня" />
+          <DayScheduleContent items={daySchedule} />
+        </PublicationSection>
+      )}
+      {housing.length > 0 && (
+        <PublicationSection className="py-14 md:py-16">
+          <PublicationSectionHeading kicker="Условия" title="Проживание и условия" />
+          <HousingContent entries={housing} />
+        </PublicationSection>
+      )}
+    </>
   );
 }

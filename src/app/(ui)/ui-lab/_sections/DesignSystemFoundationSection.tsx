@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ModalCloseButton } from "@/components/ui/modal-close-button";
+import { PublicationPresentationPreview } from "./PublicationPresentationPreview";
 import { CloseIcon } from "@/components/ui/close-icon";
 
 export function DesignSystemFoundationSection() {
@@ -155,6 +156,9 @@ export function DesignSystemFoundationSection() {
           </p>
         </RenderSafe>
       </InventoryGrid>
+      <RenderSafe title="Event publication presentation — extracted, design unchanged" file="src/components/publication-page/PublicationHeroLayout.tsx">
+        <PublicationPresentationPreview />
+      </RenderSafe>
     </DemoSection>
   );
 }

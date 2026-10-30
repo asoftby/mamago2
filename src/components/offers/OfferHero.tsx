@@ -246,7 +246,7 @@ function computeCountdown(until: string): CountdownTime | null {
   };
 }
 
-function BookingCountdown({ until }: { until: string }) {
+export function BookingCountdown({ until }: { until: string }) {
   const compute = useCallback(() => computeCountdown(until), [until]);
   const [time, setTime] = useState<CountdownTime | null>(() => compute());
 
@@ -288,7 +288,7 @@ function BookingCountdown({ until }: { until: string }) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function pluralReviews(n: number): string {
+export function pluralReviews(n: number): string {
   const mod10 = n % 10;
   const mod100 = n % 100;
   if (mod100 >= 11 && mod100 <= 19) return `${n} отзывов`;

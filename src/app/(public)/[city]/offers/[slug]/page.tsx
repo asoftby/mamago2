@@ -17,7 +17,6 @@ import { getOfferPageData } from "@/lib/offer/offerPageData";
 import { OfferPageView } from "@/components/offers";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canShowOfferOwnerEditOnPublicPage } from "@/lib/permissions/offerEditPermissions";
-import { mockSummerCamp, mockLesnayaSkazka } from "@/lib/offer/offerPageMock";
 import { resolveOfferStructuredDataType } from "@/lib/seo/schema/buildOfferJsonLd";
 import { isOfferPubliclyVisible } from "@/lib/offers/offerVisibility";
 import { tryResolvePublicationForCta } from "@/server/services/direct/directThread.service";
@@ -122,18 +121,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function CanonicalOfferPage({ params, searchParams }: PageProps) {
+export default async function CanonicalOfferPage({ params }: PageProps) {
   const { city: citySlug, slug } = await params;
-  const { mock } = await searchParams;
-
-  // Mock mode: ?mock=1 or ?mock=lesnaya-skazka
-  if (mock === "lesnaya-skazka") {
-    return <OfferPageView data={mockLesnayaSkazka} canEditOffer={false} />;
-  }
-  if (mock === "1") {
-    return <OfferPageView data={mockSummerCamp} canEditOffer={false} />;
-  }
-
   const city = await findCityBySlug(citySlug, { select: { id: true, slug: true } });
   if (!city) notFound();
 
@@ -336,7 +325,7 @@ export default async function CanonicalOfferPage({ params, searchParams }: PageP
           >[]
         }
       />
-      <OfferPageView data={data} canEditOffer={canEditOffer} direct={directCta} otherOffers={otherOffers} />
+      <OfferPageView presentation="public" data={data} canEditOffer={canEditOffer} direct={directCta} otherOffers={otherOffers} />
     </>
   );
 }
