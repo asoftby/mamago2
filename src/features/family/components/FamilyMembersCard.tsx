@@ -131,7 +131,7 @@ export function FamilyMembersCard(props: FamilyMembersCardProps) {
         <div className="mt-5 border-t border-neutral-100 pt-5">
           <h3 className="text-base font-semibold text-neutral-900">Пригласить взрослого</h3>
           <BodyMuted className="mt-1">
-            Ссылка одноразовая и без срока действия. Email нужен только чтобы отправить письмо — мы его не сохраняем.
+            Ссылка одноразовая и действует 7 дней. Email нужен только чтобы отправить письмо — мы его не сохраняем.
           </BodyMuted>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <input
