@@ -26,7 +26,7 @@ async function main() {
   try {
     const [a, b, outsider] = await Promise.all(
       ["a", "b", "outside"].map(label =>
-        prisma.user.create({ data: { email: `family-acl-${tag}-${label}@example.invalid`, displayName: `Family ${label}` } }),
+        prisma.user.create({ data: { email: `family-acl-${tag}-${label}@example.invalid`, displayName: `Family ${label}`, avatarUrl: `https://example.invalid/${label}.png` } }),
       ),
     );
     userIds.push(a.id, b.id, outsider.id);
@@ -41,8 +41,8 @@ async function main() {
     // Identity is determined by active membership, not inferred from the plan's creator.
     const familyView = await listFamilyForUser(prisma, a.id);
     assert.deepEqual(
-      familyView?.adults.map(member => [member.userId, member.displayName, member.isMe]),
-      [[a.id, "Family a", true], [b.id, "Family b", false]],
+      familyView?.adults.map(member => [member.userId, member.displayName, member.avatarUrl, member.isMe]),
+      [[a.id, "Family a", "https://example.invalid/a.png", true], [b.id, "Family b", "https://example.invalid/b.png", false]],
       "both adults must resolve to separate named users",
     );
     const create = (userId: string, familyId: string, visibility: "PRIVATE" | "FAMILY", createdAt: Date) =>
