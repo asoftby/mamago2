@@ -12,6 +12,7 @@ const createInput = z.object({
   businessId: z.string().min(1),
   subject: z.string().trim().min(3).max(160),
   body: z.string().trim().min(1).max(3000),
+  requestKey: z.string().uuid().optional(),
 });
 function failure(e: unknown) {
   if (e instanceof SupportAccessError) return NextResponse.json({ error: e.message }, { status: e.status });
@@ -49,10 +50,22 @@ export async function POST(request: NextRequest) {
     // Transactional membership guard prevents a deleted membership from being silently accepted.
     const membership = await getBusinessMembership(user.id, input.businessId);
     if (!membership) throw new SupportAccessError(404, "Business not found");
-    const thread = await prisma.supportThread.create({ data: {
-      id: randomUUID(), businessId: input.businessId, createdById: user.id, subject: input.subject,
-      messages: { create: { id: randomUUID(), authorId: user.id, actor: "BUSINESS", body: input.body } },
-    }, select: { id: true, businessId: true, status: true, messages: { select: { id: true }, take: 1 } } });
+    const requestKey = input.requestKey ?? randomUUID();
+    const select = {
+      id: true, businessId: true, createdById: true, subject: true, status: true,
+      messages: { select: { id: true }, take: 1 },
+    } as const;
+    const create = {
+      id: randomUUID(), requestKey,
+      businessId: input.businessId, createdById: user.id, subject: input.subject,
+      messages: { create: { id: randomUUID(), authorId: user.id, actor: "BUSINESS" as const, body: input.body } },
+    };
+    const thread = await prisma.supportThread.upsert({
+      where: { requestKey }, create, update: {}, select,
+    });
+    if (thread.businessId !== input.businessId || thread.createdById !== user.id || thread.subject !== input.subject) {
+      throw new SupportAccessError(409, "Request key already used");
+    }
     const messageId = thread.messages[0]?.id;
     if (messageId) await notifySupportMessage({
       threadId: thread.id, businessId: thread.businessId, messageId,
