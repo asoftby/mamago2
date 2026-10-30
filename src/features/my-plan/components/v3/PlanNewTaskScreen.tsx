@@ -111,6 +111,7 @@ export function PlanNewTaskScreen({
   const [repeat, setRepeat] = useState<RepeatFrequency>("NONE");
   const [repeatEnd, setRepeatEnd] = useState<RepeatEnd>("NEVER");
   const [repeatUntil, setRepeatUntil] = useState(initialDate);
+  const [repeatUntilTime, setRepeatUntilTime] = useState("");
   const [repeatCount, setRepeatCount] = useState("10");
   const [repeatDays, setRepeatDays] = useState<number[]>([weekdayOf(initialDate)]);
   // Keep a stable key if the network fails and the user retries.
@@ -143,9 +144,12 @@ export function PlanNewTaskScreen({
     /^[1-9]\\d*$/.test(customLeadValue) && Number.isSafeInteger(customLeadTotal) &&
     customLeadTotal >= 1 && customLeadTotal <= 28 * 1440
   );
+  const effectiveUntilDate = repeatEnd === "UNTIL" && repeatUntilTime && timed && timeValid && repeatUntilTime < time
+    ? new Date(Date.parse(repeatUntil + "T00:00:00Z") - 86400000).toISOString().slice(0, 10)
+    : repeatUntil;
   const repeatValid = repeat === "NONE" || Boolean(day &&
     (repeat !== "WEEKLY" || repeatDays.includes(weekdayOf(day))) &&
-    (repeatEnd !== "UNTIL" || repeatUntil >= day) &&
+    (repeatEnd !== "UNTIL" || (effectiveUntilDate >= day && (!repeatUntilTime || /^([01]\d|2[0-3]):[0-5]\d$/.test(repeatUntilTime)))) &&
     (repeatEnd !== "COUNT" || (/^[0-9]+$/.test(repeatCount) && Number(repeatCount) >= 1 && Number(repeatCount) <= 10000)));
   const can = Boolean(text.trim() && day && (!timed || timeValid) && customLeadValid && repeatValid);
   const whenWord = when === "today" ? "сегодня" : when === "tomorrow" ? "завтра" : day ? longDay(day) : "";
@@ -202,7 +206,7 @@ export function PlanNewTaskScreen({
         interval: 1,
         startDate: day,
         weekdays: repeat === "WEEKLY" ? [...repeatDays].sort((a, b) => a - b) : [],
-        untilDate: repeatEnd === "UNTIL" ? repeatUntil : null,
+        untilDate: repeatEnd === "UNTIL" ? effectiveUntilDate : null,
         maxOccurrences: repeatEnd === "COUNT" ? Number(repeatCount) : null,
       } : null;
       if (!editItem && recurrence && !recurrenceRequestKey.current) {
@@ -457,7 +461,15 @@ export function PlanNewTaskScreen({
                     }}
                     className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3" />
                 </label>
-                <p className="text-[12px] text-[var(--mp-tx2)]">Если дата не указана, задача будет повторяться без ограничения. Время повторений берётся из времени задачи.</p>
+                {repeatEnd === "UNTIL" && timed && (
+                  <label className="grid gap-1.5 text-sm font-semibold">
+                    Время окончания (необязательно)
+                    <input type="time" value={repeatUntilTime} onChange={e => setRepeatUntilTime(e.target.value)}
+                      className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3" />
+                  </label>
+                )}
+                <p className="text-[12px] text-[var(--mp-tx2)]">Если дата не указана, задача будет повторяться без ограничения. Время окончания ограничивает последний день повторения.</p>
+                {!repeatValid && repeatEnd === "UNTIL" && <p role="alert" className="text-sm text-danger">Конец повтора должен быть не раньше начала.</p>}
               </div>
             )}
           </div>
