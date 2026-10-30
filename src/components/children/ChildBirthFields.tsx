@@ -84,7 +84,7 @@ export function ChildBirthFields({
                   {Array.from({ length: 19 }, (_, index) => new Date().getFullYear() - index).map((year) => <option key={year} value={year}>{year}</option>)}
                 </select>
               </div>
-              <Calendar key={`${calendarMonth.getFullYear()}-${calendarMonth.getMonth()}`} size="compact" disablePast={false} defaultMonth={calendarMonth} value={selected} onChange={(date) => {
+              <Calendar key={`${calendarMonth.getFullYear()}-${calendarMonth.getMonth()}`} size="compact" disablePast={false} defaultMonth={calendarMonth} value={selected} onMonthChange={setCalendarMonth} onChange={(date) => {
                 if (!date || date > new Date()) return;
                 onChange({ precision: "DAY", date: formatDate(date) });
                 setCalendarOpen(false);
@@ -114,11 +114,7 @@ export function ChildBirthFields({
         type="button"
         className="text-sm font-medium text-[#EF8759] hover:underline"
         onClick={() =>
-          onChange(
-            value.precision === "DAY"
-              ? { precision: "MONTH", year: "", month: "" }
-              : { precision: "DAY", date: "" },
-          )
+          onChange({ precision: "DAY", date: "" })
         }
       >
         Указать полную дату
