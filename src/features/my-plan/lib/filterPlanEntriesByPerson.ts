@@ -23,3 +23,31 @@ export function filterPlanEntriesByPerson<T extends {
       return entries.filter((entry) => !entry.childId && entry.assigneeUserId === selection.id);
   }
 }
+
+
+/**
+ * Presentation-only filtering of entries ALREADY authorized by the server.
+ * Never use this function to decide which PRIVATE/FAMILY records a user may read.
+ * The current legacy single-person filter remains intact until both UI surfaces
+ * and the server read model are migrated together.
+ */
+export type PlanAudienceSelection = {
+  include: readonly PlanPersonSelection[];
+  exclude?: readonly PlanPersonSelection[];
+  visibility?: "ALL" | "PRIVATE" | "FAMILY";
+};
+
+export function filterVisiblePlanEntries<T extends {
+  childId?: string | null;
+  assigneeUserId?: string | null;
+  visibility?: "PRIVATE" | "FAMILY" | null;
+}>(entries: readonly T[], selection: PlanAudienceSelection): T[] {
+  const matches = (entry: T, person: PlanPersonSelection): boolean =>
+    person.kind === "all" ||
+    (person.kind === "child" ? entry.childId === person.id : !entry.childId && entry.assigneeUserId === person.id);
+  return entries.filter(entry =>
+    (selection.visibility === undefined || selection.visibility === "ALL" || entry.visibility === selection.visibility) &&
+    (selection.include.length === 0 || selection.include.some(person => matches(entry, person))) &&
+    !(selection.exclude ?? []).some(person => matches(entry, person))
+  );
+}

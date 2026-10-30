@@ -61,3 +61,7 @@ jobs:
         env:
           NODE_OPTIONS: "--conditions=react-server"
         run: pnpm exec tsx src/server/wishlist/wishlist.integration.test.ts
+      - name: Run public wishlist guest-reservation integration
+        env:
+          NODE_OPTIONS: "--conditions=react-server"
+        run: pnpm exec tsx src/server/wishlist/wishlistPublic.integration.test.ts

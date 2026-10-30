@@ -121,7 +121,7 @@ export default async function ProgramPage({ params }: ProgramPageProps) {
         vertical="EDUCATION"
         cityId={null}
       />
-      <OfferPageView data={data} />
+      <OfferPageView presentation="public" data={data} />
     </>
   );
 }

@@ -5,14 +5,14 @@
  */
 
 import type { ImportSource } from "@prisma/client";
-import type { ParsedRawRecord, ParserResult } from "../types";
+import type { ParsedRawRecord, ParserResult, ParserRunContext } from "../types";
 
 /**
  * Базовый интерфейс парсера.
  */
 export interface ImportParser {
   readonly parserKey: string;
-  parse(source: ImportSource): Promise<ParserResult>;
+  parse(source: ImportSource, context?: ParserRunContext): Promise<ParserResult>;
 }
 
 /**

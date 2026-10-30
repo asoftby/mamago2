@@ -17,6 +17,7 @@ function formatDayLabel(dateStr: string): { weekday: string; day: number; month:
 type Props = {
   date: string;
   items: SerializedPlanItem[];
+  participantNameById: ReadonlyMap<string, string>;
   onRemove: (id: string) => void;
   familyView?: FamilyView | null;
   onVisibilityChange?: VisibilityChange;
@@ -62,7 +63,7 @@ function ScenarioCta({
   );
 }
 
-export function PlanDayList({ date, items, onRemove, familyView, onVisibilityChange, onEditManual, conflictIds, scenarioStatus }: Props) {
+export function PlanDayList({ date, items, participantNameById, onRemove, familyView, onVisibilityChange, onEditManual, conflictIds, scenarioStatus }: Props) {
   const { weekday, day, month } = formatDayLabel(date);
 
   return (
@@ -111,6 +112,7 @@ export function PlanDayList({ date, items, onRemove, familyView, onVisibilityCha
             <PlanItemCard
               key={item.id}
               item={item}
+              participantName={item.childId ? participantNameById.get(`child:${item.childId}`) : item.assigneeUserId ? participantNameById.get(`adult:${item.assigneeUserId}`) : undefined}
               onRemove={onRemove}
               onEdit={onEditManual}
               hasConflict={conflictIds.has(item.id)}

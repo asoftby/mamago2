@@ -1,7 +1,12 @@
 "use client";
 
 import "@/styles/event-page.css";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { OwnerOfferEditDropdown } from "./OwnerOfferEditDropdown";
+import { publicOfferPriceLabel } from "./publicOfferPriceLabel";
+import { PublicOfferContent } from "./PublicOfferContent";
+import { PUBLICATION_PAGE_CLASS } from "@/components/publication-page/PublicationPageLayout";
+import { Container } from "@/components/ui/Container";
 import { OfferHero } from "./OfferHero";
 import Link from "next/link";
 import { OfferEditorialInsights } from "./OfferEditorialInsights";
@@ -38,7 +43,9 @@ export interface OfferDirectCtaInfo {
   brandName: string;
 }
 
-interface OfferPageViewProps {
+export interface OfferPageViewProps {
+  /** Public routes opt in; owner preview keeps its existing layout and fallbacks. */
+  presentation?: "preview" | "public";
   otherOffers?: Array<{ id: string; title: string; href: string; image: string | null; price: string | null }>;
   data: OfferPageData;
   isPrimaryLoading?: boolean;
@@ -105,6 +112,7 @@ function sortShiftContextsByNearest(shifts: ShiftCtaContext[]): ShiftCtaContext[
 
 export function OfferPageView({
   data,
+  presentation = "preview",
   isPrimaryLoading,
   isSecondaryLoading,
   canEditOffer = false,
@@ -367,65 +375,101 @@ export function OfferPageView({
   const isPlanSaved = localSave?.kind === "plan";
   const planDate = localSave?.kind === "plan" ? localSave.dateISO ?? null : null;
 
+  const directSlot = direct && data.offerType !== "REGULAR" && !data.classSlotBookingEnabled &&
+    data.hasPrimaryAction !== false && data.resolvedCta?.actionKind !== "EXTERNAL" ? (
+      <DirectRequestCta
+        publicationRef={{ publicationType: "OFFER", offerId: direct.offerId }}
+        publicationTitle={direct.publicationTitle}
+        brandName={direct.brandName}
+        className="flex h-14 w-full items-center justify-center gap-2 rounded-full border border-[rgba(20,18,16,0.18)] bg-transparent text-[15px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
+      >
+        Отправить заявку
+      </DirectRequestCta>
+    ) : null;
+  const isPublicPage = presentation === "public";
+  const PageContainer = isPublicPage ? Fragment : "div";
+  const hasSupportingContent = Boolean(
+    data.reviews?.length || data.place || otherOffers.length ||
+    (data.hasPrimaryAction !== false && data.promoCta),
+  );
+  const placeBlock = data.place ? (
+    <>
+      <OfferSectionNote text={sectionNotes?.place} />
+      <OfferPlace place={data.place} citySlug={data.citySlug} />
+    </>
+  ) : null;
+
   return (
-    <main className="ep-surface min-h-screen">
-      <div className="mx-auto max-w-[1200px] space-y-16 px-4 py-8 sm:px-6 lg:space-y-24 lg:px-8 lg:py-12">
-        <OfferHero
-          data={data}
-          canEditOffer={canEditOffer}
-          isPrimaryLoading={isPrimaryLoading}
-          isSecondaryLoading={isSecondaryLoading}
-          isInPlan={isPlanSaved}
-          isSaved={isSaved}
-          onPrimary={handlePrimary}
-          onSave={handleSave}
-          ctaRef={ctaRef}
-          directSlot={
-            direct && data.offerType !== "REGULAR" && !data.classSlotBookingEnabled && data.hasPrimaryAction !== false && data.resolvedCta?.actionKind !== "EXTERNAL" && (
-              <DirectRequestCta
-                publicationRef={{ publicationType: "OFFER", offerId: direct.offerId }}
-                publicationTitle={direct.publicationTitle}
-                brandName={direct.brandName}
-                className="flex h-14 w-full items-center justify-center gap-2 rounded-full border border-[rgba(20,18,16,0.18)] bg-transparent text-[15px] font-semibold text-[#141210] transition-colors hover:border-[#141210]"
-              >
-                Отправить заявку
-              </DirectRequestCta>
-            )
-          }
-        />
-
-        <OfferEditorialInsights data={data} />
-
-        {data.openingHours && (
-          <section aria-label="Режим работы предложения" className="border-y border-gray-200 py-5">
-            <h2 className="mb-3 text-lg font-semibold">Режим работы</h2>
-            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-700">
-              {data.openingHours.lines.map((line) => <span key={line}>{line}</span>)}
-            </div>
-            {data.openingHours.closedDates.length > 0 && (
-              <p className="mt-3 text-sm text-gray-500">
-                Выходные даты: {data.openingHours.closedDates.map((date) =>
-                  date.split("-").reverse().join(".")).join(", ")}
-              </p>
-            )}
-          </section>
-        )}
-
-        <OfferAccordion data={data} />
-
-        <FaqSection items={data.faqItems} />
-
-        {data.schedule && data.schedule.items.length > 0 && (
-          <OfferSchedule
-            type={data.schedule.type}
-            items={data.schedule.items}
+    <main className={isPublicPage ? PUBLICATION_PAGE_CLASS : "ep-surface min-h-screen"}>
+      <PageContainer {...(presentation === "preview" ? { className: "mx-auto max-w-[1200px] space-y-16 px-4 py-8 sm:px-6 lg:space-y-24 lg:px-8 lg:py-12" } : {})}>
+        {presentation === "public" ? (
+          <PublicOfferContent
+            data={data}
+            canEditOffer={canEditOffer}
+            isPrimaryLoading={isPrimaryLoading}
+            isSaved={isSaved}
+            priceLabel={stickyPriceLabel}
+            sessionLine={stickySessionLine}
+            onPrimary={handlePrimary}
+            onSave={handleSave}
             onShiftCta={handleShiftCta}
             onSaveShift={openSaveForShift}
             onItemCta={handleItemCta}
+            ctaRef={ctaRef}
+            directSlot={directSlot}
+            ownerEditSlot={canEditOffer ? <OwnerOfferEditDropdown offerId={data.id} offerType={data.offerType} productType={data.productType} /> : undefined}
           />
+        ) : (
+          <>
+            <OfferHero
+              data={data}
+              canEditOffer={canEditOffer}
+              isPrimaryLoading={isPrimaryLoading}
+              isSecondaryLoading={isSecondaryLoading}
+              isInPlan={isPlanSaved}
+              isSaved={isSaved}
+              onPrimary={handlePrimary}
+              onSave={handleSave}
+              ctaRef={ctaRef}
+              directSlot={directSlot}
+            />
+
+            <OfferEditorialInsights data={data} />
+
+            {data.openingHours && (
+              <section aria-label="Режим работы предложения" className="border-y border-gray-200 py-5">
+                <h2 className="mb-3 text-lg font-semibold">Режим работы</h2>
+                <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-700">
+                  {data.openingHours.lines.map((line) => <span key={line}>{line}</span>)}
+                </div>
+                {data.openingHours.closedDates.length > 0 && (
+                  <p className="mt-3 text-sm text-gray-500">
+                    Выходные даты: {data.openingHours.closedDates.map((date) =>
+                      date.split("-").reverse().join(".")).join(", ")}
+                  </p>
+                )}
+              </section>
+            )}
+
+            <OfferAccordion data={data} />
+
+            <FaqSection items={data.faqItems} />
+
+            {data.schedule && data.schedule.items.length > 0 && (
+              <OfferSchedule
+                type={data.schedule.type}
+                items={data.schedule.items}
+                onShiftCta={handleShiftCta}
+                onSaveShift={openSaveForShift}
+                onItemCta={handleItemCta}
+              />
+            )}
+
+          </>
         )}
 
-        {data.reviews && (
+        {(!isPublicPage || hasSupportingContent) && <OfferSupportingContentContainer publicPage={presentation === "public"}>
+        {data.reviews && (presentation === "preview" || data.reviews.length > 0) && (
           <>
             <OfferSectionNote text={sectionNotes?.reviews} />
             <OfferReviews
@@ -436,12 +480,7 @@ export function OfferPageView({
           </>
         )}
 
-        {data.place ? (
-          <>
-            <OfferSectionNote text={sectionNotes?.place} />
-            <OfferPlace place={data.place} citySlug={data.citySlug} />
-          </>
-        ) : null}
+        {placeBlock}
 
         {otherOffers.length > 0 && (
           <section aria-labelledby="other-business-offers-title" className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6">
@@ -468,12 +507,13 @@ export function OfferPageView({
         )}
 
         {data.hasPrimaryAction !== false && data.promoCta && <OfferPromoCta {...data.promoCta} onPrimary={handlePrimary} />}
-      </div>
+        </OfferSupportingContentContainer>}
+      </PageContainer>
 
       <EventStickyActionBar
         ctaRef={ctaRef}
         sessionLine={stickySessionLine}
-        priceLabel={stickyPriceLabel}
+        priceLabel={presentation === "public" ? publicOfferPriceLabel(data.pricing, stickyPriceLabel) : stickyPriceLabel}
         primaryLabel={data.cta.primaryLabel}
         primaryHref={data.resolvedCta?.actionKind === "EXTERNAL"
           ? data.resolvedCta.externalTarget?.href : undefined}
@@ -537,4 +577,8 @@ function OfferSectionNote({ text }: { text?: string }) {
       {text}
     </div>
   );
+}
+
+function OfferSupportingContentContainer({ publicPage, children }: { publicPage: boolean; children: React.ReactNode }) {
+  return publicPage ? <Container className="space-y-14 py-14 md:space-y-16 md:py-16">{children}</Container> : <>{children}</>;
 }

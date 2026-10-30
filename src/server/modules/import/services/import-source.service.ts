@@ -4,6 +4,7 @@
 
 import type { ImportSource, ImportSourceStatus, ImportSourceType, ImportFetchStrategy, ImportEntityType } from "@prisma/client";
 import * as repo from "../repositories/import-source.repository";
+import { TELEGRAM_CHANNEL_PARSER_KEY } from "../parsers/telegram-channel-constants";
 import prisma from "@/lib/prisma";
 
 export type CreateImportSourceDto = {
@@ -70,14 +71,18 @@ export async function createImportSource(dto: CreateImportSourceDto): Promise<Im
   const existing = await repo.findImportSourceBySlug(dto.slug);
   if (existing) throw new Error(`ImportSource with slug "${dto.slug}" already exists`);
 
+  // Telegram-канал добавляется одной записью источника: тип и стратегия
+  // выводятся из ключа парсера, форма создания остаётся прежней.
+  const isTelegramChannel = dto.parserKey === TELEGRAM_CHANNEL_PARSER_KEY;
+
   return repo.createImportSource({
     name: dto.name,
     slug: dto.slug,
-    type: dto.type,
-    fetchStrategy: dto.fetchStrategy ?? "HTML_SCRAPE",
+    type: isTelegramChannel ? "TELEGRAM_CHANNEL" : dto.type,
+    fetchStrategy: isTelegramChannel ? "TELEGRAM_WEB_PREVIEW" : (dto.fetchStrategy ?? "HTML_SCRAPE"),
     baseUrl: dto.baseUrl,
     parserKey: dto.parserKey,
-    defaultEntity: dto.defaultEntity ?? "PLACE",
+    defaultEntity: isTelegramChannel ? "EVENT" : (dto.defaultEntity ?? "PLACE"),
     notes: dto.notes,
     isTrusted: dto.isTrusted ?? false,
     isAutoUpdate: dto.isAutoUpdate ?? false,

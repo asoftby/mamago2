@@ -18,7 +18,10 @@ export type WishlistErrorCode =
   | "invalid_input"
   | "invalid_recipient"
   | "item_reserved"
-  | "archived";
+  | "archived"
+  | "sold_out"
+  | "forbidden"
+  | "rate_limited";
 
 export class WishlistError extends Error {
   constructor(
@@ -38,7 +41,12 @@ export function wishlistErrorStatus(code: WishlistErrorCode): number {
       return 404;
     case "item_reserved":
     case "archived":
+    case "sold_out":
       return 409;
+    case "forbidden":
+      return 403;
+    case "rate_limited":
+      return 429;
     default:
       return 400;
   }
@@ -257,4 +265,47 @@ export function breakingItemChange(
   if (patch.url !== undefined && (patch.url ?? null) !== (current.url ?? null)) return "url_changed";
   if (patch.quantity !== undefined && patch.quantity < takenQuantity) return "quantity_below_taken";
   return null;
+}
+
+// ─── Guest side (PR 2) ───────────────────────────────────────────────────────
+
+export const CONSENT_TEXT_VERSION = "wl-v1";
+export const MAX_CLAIMS_PER_COOKIE = 30;
+
+export const guestReserveSchema = z.object({
+  displayName: z.string().trim().min(1, "Укажите имя").max(60),
+  quantity: z.number().int().min(1).max(99).default(1),
+  contactEmail: z
+    .union([z.string().trim().toLowerCase().email("Некорректный email").max(254), z.literal(""), z.null()])
+    .optional()
+    .transform((v) => (v ? v : null)),
+  /** Required when a contact is left: the guest agrees to be notified about changes. */
+  consent: z.boolean().optional(),
+});
+export type GuestReserveInput = { displayName: string; quantity?: number; contactEmail?: string | null; consent?: boolean };
+
+export const guestActionSchema = z.object({ action: z.enum(["cancel", "purchased"]) });
+
+/** One cookie per list; value = comma-separated raw claim tokens (64 hex each). */
+export function claimCookieName(shareToken: string): string {
+  return `wl_c_${shareToken}`;
+}
+
+const RAW_CLAIM_PATTERN = /^[a-f0-9]{64}$/;
+
+export function parseClaimCookie(value: string | undefined | null): string[] {
+  if (!value) return [];
+  return [...new Set(value.split(",").filter((t) => RAW_CLAIM_PATTERN.test(t)))].slice(-MAX_CLAIMS_PER_COOKIE);
+}
+
+export function serializeClaimCookie(tokens: string[]): string {
+  return [...new Set(tokens)].slice(-MAX_CLAIMS_PER_COOKIE).join(",");
+}
+
+/** Guest-facing state of an item. Names are never part of it unless the author allowed. */
+export type GuestItemState = "FREE" | "PARTIAL" | "TAKEN";
+
+export function guestItemState(quantity: number, taken: number): GuestItemState {
+  if (taken >= quantity) return "TAKEN";
+  return taken > 0 ? "PARTIAL" : "FREE";
 }

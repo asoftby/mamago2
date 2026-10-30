@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bell, CalendarClock, Trash2, Users } from "lucide-react";
+import { Bell, CalendarClock, Trash2 } from "lucide-react";
 import { useOptionalCity } from "@/contexts/CityContext";
 import { DEFAULT_CITY_SLUG } from "@/lib/city/resolveCityContext";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
@@ -41,17 +41,6 @@ const twoLineTitleStyle = {
   WebkitBoxOrient: "vertical" as const,
   overflow: "hidden",
 } as const;
-
-function Avatar({ name }: { name: string | null }) {
-  return (
-    <span
-      aria-hidden
-      className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-[var(--mp-ac-soft)] text-[10px] font-bold leading-none text-[var(--mp-ac-dark)]"
-    >
-      {name ? name.trim().charAt(0).toUpperCase() : <Users className="h-2.5 w-2.5" />}
-    </span>
-  );
-}
 
 export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel }: PlanItemRowProps) {
   const cityCtx = useOptionalCity();
@@ -147,7 +136,6 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel }
           )}
 
           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[13px] leading-4 text-[var(--mp-tx2)]">
-            <Avatar name={participantLabel ?? null} />
             <span className="min-w-0 truncate">{participantLabel || "Вся семья"}</span>
             {showReminder ? (
               <span className="inline-flex shrink-0 items-center gap-1">

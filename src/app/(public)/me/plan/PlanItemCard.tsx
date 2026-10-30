@@ -38,6 +38,7 @@ export function PlanItemCard({
   onVisibilityChange,
   onEdit,
   hasConflict = false,
+  participantName,
 }: {
   item: SerializedPlanItem;
   onRemove: (id: string) => void;
@@ -45,6 +46,7 @@ export function PlanItemCard({
   onVisibilityChange?: VisibilityChange;
   onEdit?: (item: SerializedPlanItem) => void;
   hasConflict?: boolean;
+  participantName?: string;
 }) {
   const router = useRouter();
   const [removing, setRemoving] = useState(false);
@@ -328,6 +330,7 @@ export function PlanItemCard({
             {metaLine}
           </span>
         )}
+        <span className="mt-0.5 text-[12px] font-medium text-[#6B6258]">{participantName || "Вся семья"}</span>
         {hasConflict ? (
           <span className="text-xs font-medium text-amber-700">Пересекается по времени</span>
         ) : null}
