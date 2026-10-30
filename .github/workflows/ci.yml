@@ -396,6 +396,18 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec tsx src/server/family/familyPlanAcl.integration.test.ts
 
+      - name: Family invite expiry, duplicate join and notification PostgreSQL regressions
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+          FAMILY_INVITES: '1'
+          FAMILY_CORE_READS: '1'
+          NODE_OPTIONS: --conditions=react-server
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/server/family/familyInvite.test.ts
+          pnpm exec tsx src/server/family/familyInvites.contract.test.ts
+          pnpm exec tsx src/server/family/familyInvite.integration.test.ts
+
       - name: Telegram capture quota PostgreSQL regressions
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test

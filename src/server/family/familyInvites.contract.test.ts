@@ -47,11 +47,11 @@ const invite = read("src/server/family/familyInvite.service.ts");
 assert.match(invite, /!input\.merge\) throw new FamilyInviteError\("needs_merge"\)/);
 console.log("familyInvites.contract (M3b): ok");
 
-// Invites are open-ended: expiresAt is nullable, new invites are created without a date.
+// Legacy invites have nullable expiresAt but are treated as expiring 7 days after creation.
 {
   const sql2 = read("prisma/migrations/20261007090000_family_invite_no_expiry/migration.sql");
   assert.match(sql2, /ALTER TABLE "FamilyInvite" ALTER COLUMN "expiresAt" DROP NOT NULL;/);
   assert.match(read("prisma/schema.prisma"), /expiresAt\s+DateTime\?\n\s+createdAt\s+DateTime\s+@default\(now\(\)\)\n\s+acceptedById/);
-  assert.match(read("src/server/family/familyInvite.service.ts"), /expiresAt: null/);
-  console.log("familyInvites.contract (no-expiry): ok");
+  assert.match(read("src/server/family/familyInvite.service.ts"), /expiresAt: new Date\(now\.getTime\(\) \+ FAMILY_INVITE_TTL_MS\)/);
+  console.log("familyInvites.contract (legacy-null expiry): ok");
 }

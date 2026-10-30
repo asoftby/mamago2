@@ -8,7 +8,7 @@ import {
   type MergeChild,
   type MergeDecision,
 } from "./familyMergePure";
-import { hashInviteToken, isInviteUsable } from "./familyInvitePure";
+import { familyInviteValidity, hashInviteToken } from "./familyInvitePure";
 import { recordFamilySharedDataConsent } from "./familyConsentRecord";
 
 type Tx = Prisma.TransactionClient;
@@ -43,13 +43,15 @@ export async function previewFamilyInviteMerge(
       familyId: true,
       status: true,
       expiresAt: true,
+      createdAt: true,
       createdById: true,
       family: { select: { archivedAt: true } },
     },
   });
-  if (!invite || !isInviteUsable(invite, now) || invite.family.archivedAt) {
-    throw new FamilyInviteError("invalid_invite");
-  }
+  if (!invite) throw new FamilyInviteError("invalid_invite");
+  const validity = familyInviteValidity(invite, now);
+  if (validity === "expired") throw new FamilyInviteError("expired_invite");
+  if (validity !== "valid" || invite.family.archivedAt) throw new FamilyInviteError("invalid_invite");
   // Same validity as accept: a link whose creator left the family is dead and must not leak children.
   const creator = await prisma.familyMembership.findFirst({
     where: { familyId: invite.familyId, userId: invite.createdById, leftAt: null },

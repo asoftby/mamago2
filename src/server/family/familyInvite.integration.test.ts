@@ -8,6 +8,9 @@ import test, { after } from "node:test";
 import { PrismaClient } from "@prisma/client";
 import { ensureFamilyForUser } from "./ensureFamily";
 import { previewFamilyInviteMerge } from "./familyMerge.service";
+import { getFamilyInviteLanding } from "./familyJoin.service";
+import { notifyExpiredFamilyInvites } from "./familyInviteExpiry.service";
+import { FAMILY_INVITE_TTL_MS } from "./familyInvitePure";
 import {
   FamilyInviteError,
   acceptFamilyInvite,
@@ -68,6 +71,7 @@ test("create stores only the hash; max 3 active", async () => {
   const first = await createFamilyInvite(db, { userId: u }, deps);
   const row = await db.familyInvite.findUniqueOrThrow({ where: { id: first.inviteId } });
   assert.notEqual(row.tokenHash, first.token);
+  assert.ok(row.expiresAt && row.expiresAt.getTime() > Date.now() + 6 * 24 * 60 * 60 * 1000);
   await createFamilyInvite(db, { userId: u }, deps);
   await createFamilyInvite(db, { userId: u }, deps);
   assert.equal(await code(createFamilyInvite(db, { userId: u }, deps)), "limit_reached");
@@ -88,16 +92,18 @@ test("accept: consent required, joins as ADULT FROM_JOIN, empty solo family arch
   const consent = await db.consentRecord.findFirstOrThrow({ where: { userId: joiner } });
   assert.equal(consent.textVersion, "v1");
   assert.equal(await code(acceptFamilyInvite(db, { userId: await mkUser("late2"), token, consentTextVersion: "v1" }, deps)), "invalid_invite");
+  assert.equal(await code(acceptFamilyInvite(db, { userId: joiner, token, consentTextVersion: "v1" }, deps)), "already_member");
+  assert.equal((await getFamilyInviteLanding(db, token, joiner)).status, "already_member");
 });
 
 test("accept refused: expired, revoked, joiner with data, joiner in family with other adults", async () => {
   const owner = await mkUser("owner3");
-  // New invites never expire; a legacy dated invite (pre-M5) must still expire.
+  // New invitations have explicit expiry. Existing dated invitations still expire.
   const exp = await createFamilyInvite(db, { userId: owner }, deps);
-  assert.equal((await db.familyInvite.findUniqueOrThrow({ where: { id: exp.inviteId } })).expiresAt, null);
+  assert.ok((await db.familyInvite.findUniqueOrThrow({ where: { id: exp.inviteId } })).expiresAt);
   await db.familyInvite.update({ where: { id: exp.inviteId }, data: { expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000) } });
   const j1 = await mkUser("j3a");
-  assert.equal(await code(acceptFamilyInvite(db, { userId: j1, token: exp.token, consentTextVersion: "v1" }, deps)), "invalid_invite");
+  assert.equal(await code(acceptFamilyInvite(db, { userId: j1, token: exp.token, consentTextVersion: "v1" }, deps)), "expired_invite");
 
   const rev = await createFamilyInvite(db, { userId: owner }, deps);
   await revokeFamilyInvite(db, { userId: owner, inviteId: rev.inviteId }, deps);
@@ -238,4 +244,38 @@ test("FROM_JOIN: past shared events hidden; future, undated and post-join items 
 
   assert.deepEqual(await ids(joiner), [futureEvent.id, undated.id, loggedLater.id].sort(), "past hidden, the rest visible");
   assert.deepEqual(await ids(owner), [...all].sort(), "owner (ALL) sees full history");
+});
+
+test("expiry notices: creator receives one alert, joiner sees reason, old NULL links also expire", async () => {
+  const owner = await mkUser("expiry-owner");
+  const joiner = await mkUser("expiry-joiner");
+  const start = new Date("2026-01-01T10:00:00Z");
+  const at = new Date(start.getTime() + FAMILY_INVITE_TTL_MS);
+  const a = await createFamilyInvite(db, { userId: owner }, { env, now: () => start });
+  const stored = await db.familyInvite.findUniqueOrThrow({ where: { id: a.inviteId } });
+  assert.equal(stored.expiresAt?.getTime(), at.getTime());
+  assert.equal((await getFamilyInviteLanding(db, a.token, joiner, new Date(at.getTime() - 1))).status, "valid");
+  assert.equal((await getFamilyInviteLanding(db, a.token, joiner, at)).status, "expired");
+  assert.equal(await code(acceptFamilyInvite(db, { userId: joiner, token: a.token, consentTextVersion: "v1" }, { env, now: () => at })), "expired_invite");
+
+  const before = await db.notification.count({ where: { id: "family-invite-expired:" + a.inviteId } });
+  assert.equal(before, 0);
+  await notifyExpiredFamilyInvites(db, at);
+  assert.equal((await db.notification.findUniqueOrThrow({ where: { id: "family-invite-expired:" + a.inviteId } })).userId, owner);
+  await notifyExpiredFamilyInvites(db, at);
+  assert.equal(await db.notification.count({ where: { id: "family-invite-expired:" + a.inviteId } }), 1);
+
+  const legacy = await createFamilyInvite(db, { userId: owner }, deps);
+  const old = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+  await db.familyInvite.update({ where: { id: legacy.inviteId }, data: { expiresAt: null, createdAt: old } });
+  assert.equal((await getFamilyInviteLanding(db, legacy.token, joiner)).status, "expired");
+  await notifyExpiredFamilyInvites(db);
+  assert.equal(await db.notification.count({ where: { id: "family-invite-expired:" + legacy.inviteId } }), 1);
+
+  const valid = await createFamilyInvite(db, { userId: owner }, deps);
+  const other = await mkUser("expiry-used");
+  await acceptFamilyInvite(db, { userId: other, token: valid.token, consentTextVersion: "v1" }, deps);
+  await notifyExpiredFamilyInvites(db, new Date(Date.now() + FAMILY_INVITE_TTL_MS + 60_000));
+  assert.equal(await db.notification.count({ where: { id: "family-invite-expired:" + valid.inviteId } }), 0);
+  assert.equal((await getFamilyInviteLanding(db, valid.token, other)).status, "already_member");
 });

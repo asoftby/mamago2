@@ -24,6 +24,8 @@ import { observeReleaseEvent } from "@/server/ops/releaseEvent";
 import { runOperationsRetentionWithLock } from "@/server/ops/retention/retentionRun";
 import { buildSnapshot } from "@/server/ops/snapshot/buildSnapshot";
 import { expireOfferHolds } from "@/server/offers/expireOfferHolds";
+import { notifyExpiredFamilyInvites } from "@/server/family/familyInviteExpiry.service";
+import { familyInvitesEnabled } from "@/server/family/familyScope";
 import type { Detector, DetectorContext, DetectorResult } from "@/server/ops/types";
 import { createWorkerContext, disposeWorkerContext, type WorkerContext } from "./context";
 import { Scheduler } from "./scheduler";
@@ -31,6 +33,7 @@ import { Scheduler } from "./scheduler";
 const SNAPSHOT_INTERVAL_MS = 60_000;
 const RETENTION_INTERVAL_MS = 86_400_000;
 const OFFER_HOLD_EXPIRY_INTERVAL_MS = 5 * 60_000;
+const FAMILY_INVITE_EXPIRY_INTERVAL_MS = 15 * 60_000;
 /**
  * Deterministic per-collector startup stagger, so nine collectors don't
  * all open their first DB round-trip in the same tick as the seven
@@ -92,6 +95,16 @@ function wireScheduler(
       if (expired.requests || expired.allocations) {
         console.log(`[worker] expired offer holds requests=${expired.requests} allocations=${expired.allocations}`);
       }
+    },
+  });
+
+  scheduler.scheduleRepeating({
+    name: "family.invite_expiry_notice",
+    intervalMs: FAMILY_INVITE_EXPIRY_INTERVAL_MS,
+    run: async () => {
+      if (!familyInvitesEnabled()) return;
+      const notified = await notifyExpiredFamilyInvites(ctx.prisma);
+      if (notified > 0) console.log(`[worker] family invite expiry notices created=${notified}`);
     },
   });
 

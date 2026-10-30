@@ -1,22 +1,28 @@
 import type { PrismaClient } from "@prisma/client";
 import { createNotification } from "@/server/services/notification.service";
-import { hashInviteToken, isInviteUsable } from "./familyInvitePure";
+import { familyInviteValidity, hashInviteToken } from "./familyInvitePure";
 
 export type InviteInfo = { inviterName: string | null };
+export type FamilyInviteLanding =
+  | { status: "valid"; inviterName: string | null }
+  | { status: "already_member" | "expired" | "invalid" };
 
 /**
- * What an invite link may reveal BEFORE the consent: only who invites.
- * No children, no plan, no other adults. Null = unusable link.
+ * Public link state, with no family details exposed to outsiders before
+ * consent. Current family members may safely be told they're already members
+ * even if the old token was accepted, revoked or expired.
  */
-export async function getFamilyInviteInfo(
+export async function getFamilyInviteLanding(
   prisma: PrismaClient,
   token: string,
+  userId: string | null = null,
   now: Date = new Date(),
-): Promise<InviteInfo | null> {
+): Promise<FamilyInviteLanding> {
   const invite = await prisma.familyInvite.findUnique({
     where: { tokenHash: hashInviteToken(token) },
     select: {
       status: true,
+      createdAt: true,
       expiresAt: true,
       familyId: true,
       createdById: true,
@@ -24,13 +30,34 @@ export async function getFamilyInviteInfo(
       createdBy: { select: { displayName: true } },
     },
   });
-  if (!invite || !isInviteUsable(invite, now) || invite.family.archivedAt) return null;
+  if (!invite) return { status: "invalid" };
+
+  if (userId) {
+    const member = await prisma.familyMembership.findFirst({
+      where: { familyId: invite.familyId, userId, leftAt: null },
+      select: { id: true },
+    });
+    if (member && !invite.family.archivedAt) return { status: "already_member" };
+  }
+  const validity = familyInviteValidity(invite, now);
+  if (validity === "expired") return { status: "expired" };
+  if (validity !== "valid" || invite.family.archivedAt) return { status: "invalid" };
   const creator = await prisma.familyMembership.findFirst({
     where: { familyId: invite.familyId, userId: invite.createdById, leftAt: null },
     select: { id: true },
   });
-  if (!creator) return null;
-  return { inviterName: invite.createdBy.displayName?.trim() || null };
+  if (!creator) return { status: "invalid" };
+  return { status: "valid", inviterName: invite.createdBy.displayName?.trim() || null };
+}
+
+/** Compatibility for other readers: only a valid invite discloses inviter name. */
+export async function getFamilyInviteInfo(
+  prisma: PrismaClient,
+  token: string,
+  now: Date = new Date(),
+): Promise<InviteInfo | null> {
+  const result = await getFamilyInviteLanding(prisma, token, null, now);
+  return result.status === "valid" ? { inviterName: result.inviterName } : null;
 }
 
 /** Tells the inviter (in-app) that someone joined. Best effort, never throws. */

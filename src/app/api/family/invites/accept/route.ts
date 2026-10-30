@@ -33,6 +33,7 @@ const bodySchema = z
 const STATUS: Record<string, number> = {
   disabled: 404,
   invalid_invite: 404,
+  expired_invite: 410,
   consent_required: 400,
   merge_invalid: 400,
   already_member: 409,
