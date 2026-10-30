@@ -230,8 +230,17 @@ Run `migrate deploy` through the wrapper, never bare. It calls
 every check passes; any failure aborts before the migration starts:
 
 ```bash
-scripts/release/migrate-with-backup.sh mamago-dev dev-db-1 -- \
-  ssh mamago-dev 'docker compose -p dev run --rm migrate'
+# Owner-run PROD preflight on the target host, BEFORE editing APP_VERSION:
+ssh mamago-prod 'cd /opt/mamago/prod && bash -s -- prod prod-<N>' \
+  < scripts/release/compose-db-preflight.sh
+
+# A verified off-host backup MUST succeed before migrations:
+scripts/release/migrate-with-backup.sh mamago-prod prod-db-1 -- \
+  ssh mamago-prod 'cd /opt/mamago/prod && docker compose -p prod run --rm --no-deps migrate'
+
+# Never use bare "docker compose run migrate" or "docker compose up app worker":
+# their dependency reconciliation may recreate prod-db-1. Record DB ID and
+# StartedAt before/after; both must be identical.
 ```
 
 ## 5. Deploy order
@@ -245,7 +254,7 @@ scripts/release/migrate-with-backup.sh mamago-dev dev-db-1 -- \
 5. Pull + start the new image for **both `app` and `worker` together**
    (`dev-<N>` re-tagged `prod-<N>`, §1) via the existing `prod` compose
    project (owner-triggered via Telegram) — e.g.
-   `docker compose pull app worker && docker compose up -d app worker`.
+   `docker compose -p prod pull app worker migrate && docker compose -p prod up -d --no-deps app worker`.
    **Never update only `app`.** `app` and `worker` are the same image with
    a different command (see the root `docker-compose.yml` comment on the
    `worker` service) and must move together on every deploy — a prior
