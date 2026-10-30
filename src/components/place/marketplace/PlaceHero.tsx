@@ -1,6 +1,6 @@
 "use client";
 
-import { Instagram, Link2, Phone, Share2, Star } from "lucide-react";
+import { Instagram, Link2, Phone, Star } from "lucide-react";
 import { useState } from "react";
 import { ShareModal } from "@/components/shared/ShareModal";
 import { PlaceSaveHeart } from "@/features/save/PlaceSaveHeart";
@@ -331,28 +331,18 @@ export function PlaceHero({
               </SidebarCardTopSection>
             )}
 
-            {/* Save/share live alongside primary CTA actions. */}
+            {/* Public detail actions; the existing save chooser remains authoritative. */}
             <SidebarCardTopSection mt={20} pt={20}>
-            {/* Desktop actions in CTA card; mobile actions remain in publication header. */}
-            <div className="hidden items-center justify-between gap-5 lg:flex">
               <PlaceSaveHeart
-                variant="text"
+                variant="detail-bar"
                 registerInHeader
                 placeId={placeId}
                 placeSlug={placeSlug}
                 placeTitle={title}
                 coverImageUrl={logoUrl}
                 source="place-detail"
+                onShare={() => setShareOpen(true)}
               />
-              <button
-                type="button"
-                onClick={() => setShareOpen(true)}
-                className="inline-flex items-center gap-2 text-[14px] font-medium text-[rgba(20,18,16,0.55)] transition-colors hover:text-[#141210]"
-              >
-                <Share2 size={18} strokeWidth={1.75} aria-hidden />
-                Поделиться
-              </button>
-            </div>
             </SidebarCardTopSection>
 
             {/* Source-separated reputation link, no blended star average. */}
