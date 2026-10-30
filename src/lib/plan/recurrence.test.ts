@@ -7,3 +7,7 @@ assert.deepEqual(expandRecurrence({frequency:"MONTHLY", interval:1, startDate:"2
 assert.deepEqual(expandRecurrence({frequency:"DAILY", interval:1, startDate:"2026-10-29", maxOccurrences:3}, "2026-10-31","2026-11-10"), ["2026-10-31"]);
 assert.throws(()=>expandRecurrence({frequency:"DAILY", interval:0, startDate:"2026-10-29"}, "2026-10-29","2026-10-30"));
 assert.throws(()=>expandRecurrence({frequency:"DAILY", interval:1, startDate:"2026-02-30"}, "2026-02-28","2026-03-01"));
+
+// The optional series cutoff is inclusive, and no cutoff permits subsequent dates.
+assert.deepEqual(expandRecurrence({frequency:"DAILY", interval:1, startDate:"2026-10-29", untilDate:"2026-10-31"}, "2026-10-29", "2026-11-03"), ["2026-10-29","2026-10-30","2026-10-31"]);
+assert.deepEqual(expandRecurrence({frequency:"DAILY", interval:1, startDate:"2026-10-29"}, "2026-11-01", "2026-11-02"), ["2026-11-01","2026-11-02"]);

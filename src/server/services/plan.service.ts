@@ -111,6 +111,8 @@ export type PlanItemWithActivity = {
   reminderEnabled?: boolean | null;
   /** За сколько минут напомнить; null = по общему расписанию уведомлений. */
   reminderLeadMinutes?: number | null;
+  /** Exact persisted reminder instant; null falls back to offset calculation. */
+  reminderAt?: Date | null;
   /** Взрослый член семьи, на кого ручное дело; null = не задано. */
   assigneeUserId?: string | null;
   /** Family Core: audience + version for edit-conflict checks (persisted rows). */
@@ -685,21 +687,23 @@ export async function listPlanItemsDueForReminder(args: {
   windowStart: Date;
   windowEnd: Date;
 }): Promise<PlanReminderCandidate[]> {
+  // Legacy/catalog schedule allows at most a 3h user offset; bound its scan
+  // independently of the four-week explicit reminder horizon.
+  const fallbackWindowEnd = new Date(Math.min(args.windowEnd.getTime(), args.windowStart.getTime() + 4 * 60 * 60_000));
   const rows = (await prisma.planItem.findMany({
     where: {
-      OR: [
-        { activityId: { not: null } },
-        {
-          source: { in: [PlanItemSource.MANUAL, PlanItemSource.TELEGRAM_FORWARD] },
-          reminderEnabled: true,
-        },
+      AND: [
+        { OR: [
+          { activityId: { not: null } },
+          { source: { in: [PlanItemSource.MANUAL, PlanItemSource.TELEGRAM_FORWARD] }, reminderEnabled: true },
+        ] },
       ],
       ...NOT_CANCELLED,
       ...DATED,
-      startsAt: {
-        gte: args.windowStart,
-        lte: args.windowEnd,
-      },
+      OR: [
+        { reminderAt: { gte: args.windowStart, lte: args.windowEnd } },
+        { reminderAt: null, startsAt: { gte: args.windowStart, lte: fallbackWindowEnd } },
+      ],
     },
     include: {
       activity: { select: planActivitySelect },

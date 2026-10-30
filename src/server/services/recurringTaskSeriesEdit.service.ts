@@ -207,6 +207,8 @@ export async function editRecurringTaskFollowing(owner: PlanOwner, itemId: strin
             title, date: newStart, childId, assigneeUserId,
             startsAt: time ? localWallClockToUtc(newStart, time) : null,
             reminderEnabled, reminderLeadMinutes: lead,
+            reminderAt: time && reminderEnabled && lead != null
+              ? new Date(localWallClockToUtc(newStart, time).getTime() - lead * 60_000) : null,
             recurrenceSeriesId: replacement.id, recurrenceDate: newStart,
           },
         });

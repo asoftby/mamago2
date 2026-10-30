@@ -53,6 +53,8 @@ export function planRecurrenceInsertRows(series: Series[], from: string, to: str
         startsAt: template.time ? localWallClockToUtc(date, template.time) : null,
         reminderEnabled: template.reminderEnabled,
         reminderLeadMinutes: template.lead as number | null,
+        reminderAt: template.time && template.reminderEnabled && typeof template.lead === "number"
+          ? new Date(localWallClockToUtc(date, template.time).getTime() - template.lead * 60_000) : null,
       });
     }
   }

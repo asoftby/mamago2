@@ -22,7 +22,7 @@ const TAG_MAX = 32;
 const TAG_COUNT_MAX = 12;
 /** Допустимые значения «за сколько напомнить» (укладываются в окно джоба напоминаний, 180 мин). */
 export const REMINDER_LEAD_MINUTES_OPTIONS = [15, 60, 120] as const;
-export const MAX_CUSTOM_REMINDER_LEAD_MINUTES = 24 * 60;
+export const MAX_CUSTOM_REMINDER_LEAD_MINUTES = 28 * 24 * 60;
 export const FAMILY_CALENDAR_MAX_RANGE_DAYS = 42;
 
 export class ManualPlanEntryError extends Error {
@@ -359,6 +359,7 @@ export async function createManualPlanEntry(owner: PlanOwner, input: ManualPlanE
       category: normalizePlanItemCategory(input.category, title),
       reminderEnabled: input.reminderEnabled === true,
       reminderLeadMinutes,
+      reminderAt: startsAt && input.reminderEnabled === true && reminderLeadMinutes != null ? new Date(startsAt.getTime() - reminderLeadMinutes * 60_000) : null,
     },
     select: calendarItemSelect,
   });
@@ -446,6 +447,7 @@ async function updateEditablePlanEntry(
       ...(patch.tags === undefined ? {} : { tags: normalizePlanNoteTags(patch.tags) }),
       ...(patch.category === undefined ? {} : { category: normalizePlanItemCategory(patch.category, patch.title ?? current.title) }),
       ...(patch.reminderEnabled === undefined ? {} : { reminderEnabled: patch.reminderEnabled === true }),
+      reminderAt: startsAt && reminderEnabled && reminderLeadMinutes != null ? new Date(startsAt.getTime() - reminderLeadMinutes * 60_000) : null,
     },
   });
   if (result.count === 0) throw new ManualPlanEntryError("CONFLICT", "conflict");

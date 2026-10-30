@@ -30,6 +30,7 @@ const REMIND_OPTIONS: Array<{ minutes: number | null; label: string }> = [
   { minutes: 15, label: "За 15 минут" },
   { minutes: 60, label: "За час" },
   { minutes: 120, label: "За 2 часа" },
+  { minutes: 1440, label: "За день" },
 ];
 
 const WD = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
@@ -101,13 +102,16 @@ export function PlanNewTaskScreen({
     !REMIND_OPTIONS.some((option) => option.minutes === editItem.reminderLeadMinutes)
       ? editItem.reminderLeadMinutes : null;
   const [customLeadOpen, setCustomLeadOpen] = useState(initialCustomLead != null);
-  const [customLeadHours, setCustomLeadHours] = useState(initialCustomLead == null ? "" : String(Math.floor(initialCustomLead / 60)));
-  const [customLeadMinutes, setCustomLeadMinutes] = useState(initialCustomLead == null ? "" : String(initialCustomLead % 60));
+  const initialLeadUnit = initialCustomLead != null && initialCustomLead % 10080 === 0 ? "weeks" : initialCustomLead != null && initialCustomLead % 1440 === 0 ? "days" : initialCustomLead != null && initialCustomLead % 60 === 0 ? "hours" : "minutes";
+  const leadFactors = { minutes: 1, hours: 60, days: 1440, weeks: 10080 } as const;
+  const [customLeadUnit, setCustomLeadUnit] = useState<keyof typeof leadFactors>(initialLeadUnit);
+  const [customLeadValue, setCustomLeadValue] = useState(initialCustomLead == null ? "" : String(initialCustomLead / leadFactors[initialLeadUnit]));
   const [leadTouched, setLeadTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [repeat, setRepeat] = useState<RepeatFrequency>("NONE");
   const [repeatEnd, setRepeatEnd] = useState<RepeatEnd>("NEVER");
   const [repeatUntil, setRepeatUntil] = useState(initialDate);
+  const [repeatUntilTime, setRepeatUntilTime] = useState("");
   const [repeatCount, setRepeatCount] = useState("10");
   const [repeatDays, setRepeatDays] = useState<number[]>([weekdayOf(initialDate)]);
   // Keep a stable key if the network fails and the user retries.
@@ -135,18 +139,17 @@ export function PlanNewTaskScreen({
   const day = when === "today" ? todayIso : when === "tomorrow" ? tomorrowIso : pickedDate;
   const timeValid = /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
   const pastToday = timed && timeValid && day === todayIso && time < new Date().toTimeString().slice(0, 5);
-  const customLeadTotal = Number(customLeadHours || 0) * 60 + Number(customLeadMinutes || 0);
+  const customLeadTotal = Number(customLeadValue) * leadFactors[customLeadUnit];
   const customLeadValid = !timed || !customLeadOpen || (
-    /^\d{0,2}$/.test(customLeadHours) &&
-    /^\d{0,2}$/.test(customLeadMinutes) &&
-    Number(customLeadHours || 0) <= 24 &&
-    Number(customLeadMinutes || 0) < 60 &&
-    customLeadTotal >= 1 &&
-    customLeadTotal <= 1440
+    /^[1-9]\\d*$/.test(customLeadValue) && Number.isSafeInteger(customLeadTotal) &&
+    customLeadTotal >= 1 && customLeadTotal <= 28 * 1440
   );
+  const effectiveUntilDate = repeatEnd === "UNTIL" && repeatUntilTime && timed && timeValid && repeatUntilTime < time
+    ? new Date(Date.parse(repeatUntil + "T00:00:00Z") - 86400000).toISOString().slice(0, 10)
+    : repeatUntil;
   const repeatValid = repeat === "NONE" || Boolean(day &&
     (repeat !== "WEEKLY" || repeatDays.includes(weekdayOf(day))) &&
-    (repeatEnd !== "UNTIL" || repeatUntil >= day) &&
+    (repeatEnd !== "UNTIL" || (effectiveUntilDate >= day && (!repeatUntilTime || /^([01]\d|2[0-3]):[0-5]\d$/.test(repeatUntilTime)))) &&
     (repeatEnd !== "COUNT" || (/^[0-9]+$/.test(repeatCount) && Number(repeatCount) >= 1 && Number(repeatCount) <= 10000)));
   const can = Boolean(text.trim() && day && (!timed || timeValid) && customLeadValid && repeatValid);
   const whenWord = when === "today" ? "сегодня" : when === "tomorrow" ? "завтра" : day ? longDay(day) : "";
@@ -203,7 +206,7 @@ export function PlanNewTaskScreen({
         interval: 1,
         startDate: day,
         weekdays: repeat === "WEEKLY" ? [...repeatDays].sort((a, b) => a - b) : [],
-        untilDate: repeatEnd === "UNTIL" ? repeatUntil : null,
+        untilDate: repeatEnd === "UNTIL" ? effectiveUntilDate : null,
         maxOccurrences: repeatEnd === "COUNT" ? Number(repeatCount) : null,
       } : null;
       if (!editItem && recurrence && !recurrenceRequestKey.current) {
@@ -378,7 +381,9 @@ export function PlanNewTaskScreen({
                   setTime(maskTime(event.target.value));
                   enableTime();
                 }}
-                className="w-[72px] border-0 bg-transparent p-0 text-base font-extrabold tabular-nums tracking-[.02em] text-[var(--mp-tx)] outline-none placeholder:font-semibold placeholder:text-[var(--text-muted)]"
+                aria-invalid={timed && !timeValid}
+                 aria-describedby={timed && !timeValid ? "plan-time-error" : undefined}
+                 className={cn("w-[72px] border-0 bg-transparent p-0 text-base font-extrabold tabular-nums tracking-[.02em] text-[var(--mp-tx)] outline-none placeholder:font-semibold placeholder:text-[var(--text-muted)]", timed && !timeValid && "text-danger ring-1 ring-danger rounded-sm")}
               />
             </label>
           </div>
@@ -446,32 +451,25 @@ export function PlanNewTaskScreen({
               </>
             )}
             {repeat !== "NONE" && (
-              <div className="mt-3 grid gap-3">
+              <div className="mt-3 grid gap-2">
                 <label className="grid gap-1.5 text-sm font-semibold">
-                  Окончание повторений
-                  <select value={repeatEnd} onChange={e => setRepeatEnd(e.target.value as RepeatEnd)}
-                    className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3">
-                    <option value="NEVER">Без даты окончания</option>
-                    <option value="UNTIL">До даты</option>
-                    <option value="COUNT">После количества повторений</option>
-                  </select>
+                  Конец повтора (необязательно)
+                  <input type="date" min={day ?? todayIso} value={repeatEnd === "UNTIL" ? repeatUntil : ""}
+                    onChange={e => {
+                      setRepeatUntil(e.target.value);
+                      setRepeatEnd(e.target.value ? "UNTIL" : "NEVER");
+                    }}
+                    className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3" />
                 </label>
-                {repeatEnd === "UNTIL" && (
+                {repeatEnd === "UNTIL" && timed && (
                   <label className="grid gap-1.5 text-sm font-semibold">
-                    Последний день
-                    <input type="date" min={day ?? todayIso} value={repeatUntil}
-                      onChange={e => setRepeatUntil(e.target.value)}
+                    Время окончания (необязательно)
+                    <input type="time" value={repeatUntilTime} onChange={e => setRepeatUntilTime(e.target.value)}
                       className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3" />
                   </label>
                 )}
-                {repeatEnd === "COUNT" && (
-                  <label className="grid gap-1.5 text-sm font-semibold">
-                    Количество повторений
-                    <input type="number" min={1} max={10000} value={repeatCount}
-                      onChange={e => setRepeatCount(e.target.value)}
-                      className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3" />
-                  </label>
-                )}
+                <p className="text-[12px] text-[var(--mp-tx2)]">Если дата не указана, задача будет повторяться без ограничения. Время окончания ограничивает последний день повторения.</p>
+                {!repeatValid && repeatEnd === "UNTIL" && <p role="alert" className="text-sm text-danger">Конец повтора должен быть не раньше начала.</p>}
               </div>
             )}
           </div>
@@ -512,60 +510,51 @@ export function PlanNewTaskScreen({
                 return;
               }
               const initial = lead !== null && !REMIND_OPTIONS.some((option) => option.minutes === lead) ? lead : 0;
-              setCustomLeadHours(initial ? String(Math.floor(initial / 60)) : "");
-              setCustomLeadMinutes(initial ? String(initial % 60) : "");
+              const unit = initial && initial % 10080 === 0 ? "weeks" : initial && initial % 1440 === 0 ? "days" : initial && initial % 60 === 0 ? "hours" : "minutes";
+              setCustomLeadUnit(unit);
+              setCustomLeadValue(initial ? String(initial / leadFactors[unit]) : "");
               setCustomLeadOpen(true);
             }}
             className={cn(PLAN_CHIP, customLeadOpen ? PLAN_CHIP_ON : PLAN_CHIP_OFF, PLAN_CHIP_DISABLED)}
           >
             <Bell className="h-4 w-4" aria-hidden />
-            Своё время
+            Другое
           </button>
           </div>
           {customLeadOpen && timed ? (
             <div className="mt-3 rounded-2xl border border-[var(--mp-line)] p-3">
-              <p className="mb-2 text-[13px] text-[var(--mp-tx2)]">За сколько до начала напомнить (до 24 часов)</p>
+              <p className="mb-2 text-[13px] text-[var(--mp-tx2)]">За сколько до начала напомнить?</p>
               <div className="flex items-center gap-3">
                 <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
-                  Часы
-                  <input
-                    type="number"
-                    min={0}
-                    max={24}
-                    inputMode="numeric"
-                    value={customLeadHours}
-                    onChange={(event) => {
-                      const next = event.target.value;
-                      setCustomLeadHours(next);
-                      const total = Number(next || 0) * 60 + Number(customLeadMinutes || 0);
-                      setLead(total > 0 && total <= 1440 ? total : null);
+                  Количество
+                  <input type="number" min={1} step={1} inputMode="numeric" value={customLeadValue}
+                    onChange={event => {
+                      const value = event.target.value;
+                      setCustomLeadValue(value);
+                      const total = Number(value) * leadFactors[customLeadUnit];
+                      setLead(/^[1-9]\\d*$/.test(value) && Number.isSafeInteger(total) && total <= 28 * 1440 ? total : null);
                       setLeadTouched(true);
                     }}
                     className="h-11 w-full rounded-xl border border-[var(--mp-line)] bg-white px-3 text-base"
-                    aria-label="Часов до напоминания"
-                  />
+                    aria-label="Количество до напоминания" />
                 </label>
                 <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
-                  Минуты
-                  <input
-                    type="number"
-                    min={0}
-                    max={59}
-                    inputMode="numeric"
-                    value={customLeadMinutes}
-                    onChange={(event) => {
-                      const next = event.target.value;
-                      setCustomLeadMinutes(next);
-                      const total = Number(customLeadHours || 0) * 60 + Number(next || 0);
-                      setLead(total > 0 && total <= 1440 ? total : null);
-                      setLeadTouched(true);
-                    }}
-                    className="h-11 w-full rounded-xl border border-[var(--mp-line)] bg-white px-3 text-base"
-                    aria-label="Минут до напоминания"
-                  />
+                  Единица
+                  <select value={customLeadUnit} onChange={event => {
+                    const unit = event.target.value as keyof typeof leadFactors;
+                    setCustomLeadUnit(unit);
+                    const total = Number(customLeadValue) * leadFactors[unit];
+                    setLead(/^[1-9]\\d*$/.test(customLeadValue) && Number.isSafeInteger(total) && total <= 28 * 1440 ? total : null);
+                    setLeadTouched(true);
+                  }} className="h-11 w-full rounded-xl border border-[var(--mp-line)] bg-white px-3 text-base">
+                    <option value="minutes">Минуты</option>
+                    <option value="hours">Часы</option>
+                    <option value="days">Дни</option>
+                    <option value="weeks">Недели</option>
+                  </select>
                 </label>
               </div>
-              {!customLeadValid ? <p role="alert" className="mt-2 text-[13px] text-danger">Укажите от 1 минуты до 24 часов</p> : null}
+              {!customLeadValid ? <p role="alert" className="mt-2 text-[13px] text-danger">Укажите положительное целое число (не более 4 недель)</p> : null}
               <p className="mt-2 text-[12px] text-[var(--mp-tx2)]">В Telegram напоминание придёт, если бот подключён и уведомления включены.</p>
             </div>
           ) : null}

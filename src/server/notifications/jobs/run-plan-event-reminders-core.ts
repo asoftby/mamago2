@@ -3,8 +3,8 @@ import { DEFAULT_NOTIFICATION_TIME_ZONE } from "@/lib/notifications/userNotifica
 import type { PlanReminderCandidate } from "@/server/services/plan.service";
 import type { UserReminderSchedule } from "@/server/services/userNotificationSchedule.service";
 
-// Custom per-item reminder offsets can be up to 24 hours.
-const DEFAULT_MAX_OFFSET_MINUTES = 24 * 60;
+// Scan up to four weeks ahead to support custom reminders in days and weeks.
+const DEFAULT_MAX_OFFSET_MINUTES = 28 * 24 * 60;
 const DEFAULT_DUE_GRACE_MINUTES = 10;
 
 export type RunPlanEventRemindersArgs = {
@@ -123,7 +123,7 @@ export async function runPlanEventRemindersCore(
 
     // Свой срок у записи («за 15 минут», «за час») важнее общего расписания уведомлений.
     const offsetMinutes = candidate.reminderLeadMinutes ?? settings.offsetMinutes;
-    const dueAt = addMinutes(startsAt, -offsetMinutes);
+    const dueAt = candidate.reminderAt ?? addMinutes(startsAt, -offsetMinutes);
     const oldestAllowedDueAt = addMinutes(now, -dueGraceMinutes);
     if (dueAt.getTime() > now.getTime() || dueAt.getTime() < oldestAllowedDueAt.getTime()) {
       skippedSchedule += 1;
