@@ -402,6 +402,13 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec tsx src/server/services/telegram/capture/inboxIntake.integration.test.ts
 
+      - name: Party delivery health PostgreSQL integration
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/server/ops/metrics/collectors/partyDelivery.integration.test.ts
+
       - name: Business support PostgreSQL isolation
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
