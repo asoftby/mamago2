@@ -87,7 +87,7 @@ export function buildPublicSiteAccountModel(input: {
       {
         key: "account",
         type: "button",
-        label: "Мои данные",
+        label: "Моя семья",
         icon: UserCircle,
         activeHref: "/me",
         activeExact: true,
