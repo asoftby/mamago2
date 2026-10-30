@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { buildNotificationDedupeKeyCore } from "./notification-dedupe-core";
+import { buildNotificationDedupeKeyCore, buildPlanReminderEventId } from "./notification-dedupe-core";
 
 {
   const key = buildNotificationDedupeKeyCore({
@@ -23,3 +23,14 @@ import { buildNotificationDedupeKeyCore } from "./notification-dedupe-core";
 }
 
 console.log("notification-dedupe tests: OK");
+
+{
+  const startsAt = new Date("2026-11-01T14:00:00.000Z");
+  const early = new Date("2026-11-01T12:00:00.000Z");
+  const moved = new Date("2026-11-01T13:00:00.000Z");
+  const first = buildPlanReminderEventId({ planItemId: "plan_a", startsAt, reminderDueAt: early });
+  assert.equal(first, "plan_a:2026-11-01T12:00:00.000Z");
+  assert.equal(buildPlanReminderEventId({ planItemId: "plan_a", startsAt, reminderDueAt: early }), first);
+  assert.notEqual(buildPlanReminderEventId({ planItemId: "plan_a", startsAt, reminderDueAt: moved }), first);
+  assert.notEqual(buildPlanReminderEventId({ planItemId: "plan_b", startsAt, reminderDueAt: early }), first);
+}
