@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { loadArticleMvpBySlugPublic } from "@/lib/article/articleMvpRenderData";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
+import { activeBreakingNewsContinuationWhere } from "@/lib/journal/breakingNewsContinuation";
 
 /** One full article on demand; never preloads the whole news archive. */
 export async function GET(request: NextRequest) {
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
   if (!cityRow) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const now = new Date();
   const row = await prisma.article.findFirst({
-    where: { ...getPublicPublishedArticleWhere(), id, cityId: cityRow.id, subtitle: BREAKING_NEWS_SUBTITLE, expiresAt: { gt: now }, publishedAt: { lte: now } },
+    where: { ...getPublicPublishedArticleWhere(), id, cityId: cityRow.id, ...activeBreakingNewsContinuationWhere(now) },
     select: { slug: true },
   });
   if (!row?.slug) return NextResponse.json({ error: "Not found" }, { status: 404 });
