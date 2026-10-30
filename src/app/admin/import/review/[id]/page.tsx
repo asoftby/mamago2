@@ -15,6 +15,9 @@ import { ReviewDetailWorkflow } from "./_components/ReviewDetailWorkflow";
 import { reconcileImportedRecordLinks } from "@/server/modules/import/services/import-link-reconciliation.service";
 import { activeQualityFlagBadges } from "../../_lib/import-admin-ui";
 import type { AbwsQualityFlags } from "@/server/modules/import/normalizers/abws-event.normalizer";
+import { TelegramPostBlock } from "../_components/TelegramPostBlock";
+import { asTelegramFlags } from "@/server/modules/import/normalizers/telegram-post.mapper";
+import { telegramAttentionItems } from "../../_lib/telegram-review";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -822,6 +825,7 @@ export default async function ReviewDetailPage({
   const activityMap = Object.fromEntries(activityDetails.map((a) => [a.id, a]));
 
   const nd = rec.normalizedData as (NormalizedPlaceImport | NormalizedEventImport) | null;
+  const telegramFlags = asTelegramFlags(rec.qualityFlags);
   const isAlreadyApplied = !!rec.publishedPlaceId || !!rec.publishedActivityId;
   const resolvedApplyResult = await resolveApplyResultWithSlug({
     entityType,
@@ -875,8 +879,13 @@ export default async function ReviewDetailPage({
         <EventCatalogBlock nd={nd as NormalizedEventImport} />
       )}
 
+      {telegramFlags && nd && nd.entityType === "EVENT" && (
+        <TelegramPostBlock flags={telegramFlags} nd={nd as NormalizedEventImport} postUrl={rec.sourceUrl} />
+      )}
+
       <NeedsAttentionBlock
         items={[
+          ...telegramAttentionItems(telegramFlags),
           ...activeQualityFlagBadges(rec.qualityFlags as AbwsQualityFlags | null).map(
             (badge) => `⚑ ${badge.label} — пометка не блокирует публикацию, решение за ревьюером`,
           ),

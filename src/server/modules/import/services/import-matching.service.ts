@@ -18,6 +18,7 @@ import { scorePlaceCandidate } from "../matching/place-match-scorer";
 import { determineSuggestedAction } from "../matching/suggested-action";
 import { findEventCandidates } from "../matching/event-candidate-search";
 import { findPendingRecordDuplicates } from "../matching/pending-record-candidates";
+import { asTelegramFlags, mergePendingDuplicates } from "../normalizers/telegram-post.mapper";
 import { scoreEventCandidate } from "../matching/event-match-scorer";
 import { determineEventSuggestedAction } from "../matching/event-suggested-action";
 import {
@@ -136,7 +137,7 @@ async function matchPlaceRecord(
 // ── EVENT matching ────────────────────────────────────────────────────────────
 
 async function matchEventRecord(
-  record: { id: string; sourceId: string; normalizedData: unknown; qualityScore: number | null },
+  record: { id: string; sourceId: string; normalizedData: unknown; qualityScore: number | null; qualityFlags?: unknown },
 ): Promise<MatchRecordResult> {
   try {
     const normalized = record.normalizedData as unknown as NormalizedEventImport;
@@ -175,6 +176,12 @@ async function matchEventRecord(
         matchCandidates: scored as unknown as object[],
         confidenceScore: actionResult.confidenceScore,
         matchStatus: actionResult.matchStatus === "FAILED" ? "SKIPPED" : actionResult.matchStatus,
+        // Дубли среди ожидающих записей других источников показываем в ревью.
+        // Только для записей Telegram: у них флаги заполнены всегда, а у ABWS и
+        // family.by `qualityFlags` не получает новых ключей (статистика по нему).
+        ...(asTelegramFlags(record.qualityFlags)
+          ? { qualityFlags: mergePendingDuplicates(asTelegramFlags(record.qualityFlags)!, pendingDuplicates) as object }
+          : {}),
       },
     });
 

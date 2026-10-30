@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { TableContainer } from "@/components/ui/table";
 import { Trash2, X } from "lucide-react";
 import { ReviewQueueActions } from "./ReviewQueueActions";
+import { telegramReviewBadges } from "../../_lib/telegram-review";
 import {
   activeQualityFlagBadges,
   formatImportEntity,
@@ -162,6 +163,7 @@ export function ReviewQueueTableClient({ records }: Props) {
               });
               const canDelete = !linkedEntityId;
               const qualityFlagBadges = activeQualityFlagBadges(rec.qualityFlags);
+              const telegramBadges = telegramReviewBadges(rec.qualityFlags);
 
               return (
                 <tr key={rec.id} className={task?.status === "IN_PROGRESS" ? "bg-blue-50/40" : "hover:bg-gray-50"}>
@@ -201,6 +203,15 @@ export function ReviewQueueTableClient({ records }: Props) {
                             Нет задачи ревью (ошибка)
                           </span>
                         )}
+                        {telegramBadges.map((badge) => (
+                          <span
+                            key={badge.key}
+                            title={badge.title}
+                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${badge.className}`}
+                          >
+                            {badge.label}
+                          </span>
+                        ))}
                         {qualityFlagBadges.map((badge) => (
                           <span
                             key={badge.key}
