@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils";
  * visibleSavers MUST contain only profiles with explicit public-save consent.
  */
 export type PublicSaver = {
-  id: string;
   avatarUrl: string | null;
 };
 
@@ -115,11 +114,11 @@ export function PublicationSaveShare({
         <div className="mt-3 flex min-h-9 items-center gap-3">
           {avatars.length > 0 && (
             <div className="flex shrink-0 items-center pl-1" aria-hidden="true">
-              {avatars.map((saver) => (
+              {avatars.map((saver, index) => (
                 // Images here are optional, consent-gated inputs supplied by the server.
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  key={saver.id}
+                  key={`${saver.avatarUrl}-${index}`}
                   src={saver.avatarUrl!}
                   alt=""
                   width={36}
