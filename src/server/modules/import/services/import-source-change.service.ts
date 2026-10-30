@@ -28,13 +28,15 @@ export async function acknowledgeSourceChange(
   const flags = asTelegramFlags(record.qualityFlags);
   if (!flags?.sourceChanged) return { ok: false, reason: "no_change" };
 
-  const { sourceChanged: _acknowledged, ...rest } = flags;
-  void _acknowledged;
+  // Запоминаем просмотренную версию источника как базу сравнения: правка соседнего пункта
+  // подборки не должна снова поднимать это же изменение.
+  const { sourceChanged: acknowledged, ...rest } = flags;
+  const next = acknowledged.snapshot ? { ...rest, sourceReviewed: acknowledged.snapshot } : rest;
 
   await prisma.$transaction([
     prisma.importedRecord.update({
       where: { id: importedRecordId },
-      data: { qualityFlags: rest as object },
+      data: { qualityFlags: next as object },
     }),
     ...(record.reviewTask && ["PENDING", "IN_PROGRESS"].includes(record.reviewTask.status)
       ? [
