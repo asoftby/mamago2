@@ -124,7 +124,7 @@ function Inner({ mode, collection, ideaTitle, collections, initialSelection, onA
           )}
         </div>
       ) : (
-        <div className="px-5 sm:px-6">
+        <div className="px-5 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-10">
           <form onSubmit={(event) => { event.preventDefault(); void (mode === "manage" ? submitRename() : submitCreate()); }}>
             <label htmlFor="idea-collection-title" className="mb-2 block text-xs font-medium" style={{ color: C.ink2 }}>Название</label>
             <input id="idea-collection-title" className={inputClass} autoFocus maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, Летние идеи" />
