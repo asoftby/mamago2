@@ -35,7 +35,7 @@ export default async function PlanPage({
   });
   const adultIds = familyReadsEnabled() ? await activeFamilyUserIds(user.id) : [user.id];
   const familyView = adultIds.length > 1 ? { currentUserId: user.id, adultsCount: adultIds.length } : null;
-  const familyAdultUsers = await prisma.user.findMany({ where: { id: { in: adultIds } }, select: { id: true, displayName: true } });
+  const familyAdultUsers = await prisma.user.findMany({ where: { id: { in: adultIds } }, select: { id: true, displayName: true, avatarUrl: true } });
   const [experienceCandidates, recentExperiences, pastEntries] = await Promise.all([
     listPendingExperienceCandidates({ userId: user.id, lookbackDays: 14, take: 3 }),
     listRecentExperienceSummaries({ userId: user.id, take: 3 }),
@@ -99,7 +99,7 @@ export default async function PlanPage({
       familyChildren={children.map((child) => ({ id: child.id, name: child.name?.trim() || "Ребёнок" }))}
       accountDisplayName={user.displayName?.trim() || null}
       familyView={familyView}
-      familyAdults={familyAdultUsers.map((adult) => ({ id: adult.id, name: adult.id === user.id ? "Я" : adult.displayName?.trim() || "Взрослый" }))}
+      familyAdults={familyAdultUsers.map((adult) => ({ id: adult.id, name: adult.id === user.id ? "Я" : adult.displayName?.trim() || "Взрослый", avatarUrl: adult.avatarUrl }))}
       ideaActivityIds={ideaActivityIds}
       initialIdeas={serializedIdeas}
       childrenAges={childrenAges}
