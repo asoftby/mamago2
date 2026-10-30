@@ -8,6 +8,8 @@ export function SupportInbox({ businessId, staff = false, initialThreadId }: { b
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selected, setSelected] = useState<string | null>(initialThreadId ?? null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [nextThreadsCursor, setNextThreadsCursor] = useState<string | null>(null);
+  const [nextMessagesCursor, setNextMessagesCursor] = useState<string | null>(null);
   const [subject, setSubject] = useState("");
   const [draft, setDraft] = useState("");
   const [reply, setReply] = useState("");
@@ -18,15 +20,17 @@ export function SupportInbox({ businessId, staff = false, initialThreadId }: { b
     const qs = businessId ? "?businessId=" + encodeURIComponent(businessId) : "";
     const response = await fetch("/api/support/threads" + qs, { cache: "no-store" });
     if (!response.ok) throw new Error("Не удалось загрузить обращения");
-    const data: { threads: Thread[] } = await response.json();
-    setThreads(data.threads);
-  }, [businessId]);
+    const data: { threads: Thread[]; nextCursor: string | null } = await response.json();
+    setThreads(previous => [...data.threads, ...previous.filter(t => t.id === selected && !data.threads.some(next => next.id === t.id))]);
+    setNextThreadsCursor(data.nextCursor);
+  }, [businessId, selected]);
 
   const loadMessages = useCallback(async (id: string) => {
     const response = await fetch("/api/support/threads/" + encodeURIComponent(id), { cache: "no-store" });
     if (!response.ok) throw new Error("Не удалось загрузить переписку");
-    const data: { messages: Message[] } = await response.json();
+    const data: { messages: Message[]; nextCursor: string | null } = await response.json();
     setMessages(data.messages);
+    setNextMessagesCursor(data.nextCursor);
   }, []);
 
   useEffect(() => { void loadThreads().catch(e => setError(String(e))); }, [loadThreads]);
@@ -34,6 +38,30 @@ export function SupportInbox({ businessId, staff = false, initialThreadId }: { b
     if (!selected) return;
     void loadMessages(selected).catch(e => setError(String(e)));
   }, [selected, loadMessages]);
+
+  const loadMoreThreads = async () => {
+    if (!nextThreadsCursor) return;
+    try {
+      const qs = new URLSearchParams({ cursor: nextThreadsCursor });
+      if (businessId) qs.set("businessId", businessId);
+      const response = await fetch("/api/support/threads?" + qs, { cache: "no-store" });
+      if (!response.ok) throw new Error("Не удалось загрузить обращения");
+      const data: { threads: Thread[]; nextCursor: string | null } = await response.json();
+      setThreads(existing => [...existing, ...data.threads.filter(t => !existing.some(prev => prev.id === t.id))]);
+      setNextThreadsCursor(data.nextCursor);
+    } catch (e) { setError(String(e)); }
+  };
+
+  const loadEarlierMessages = async () => {
+    if (!selected || !nextMessagesCursor) return;
+    try {
+      const response = await fetch("/api/support/threads/" + encodeURIComponent(selected) + "?cursor=" + encodeURIComponent(nextMessagesCursor), { cache: "no-store" });
+      if (!response.ok) throw new Error("Не удалось загрузить историю");
+      const data: { messages: Message[]; nextCursor: string | null } = await response.json();
+      setMessages(existing => [...data.messages.filter(m => !existing.some(prev => prev.id === m.id)), ...existing]);
+      setNextMessagesCursor(data.nextCursor);
+    } catch (e) { setError(String(e)); }
+  };
 
   async function post(url: string, payload: object, after: () => void) {
     setBusy(true); setError("");
@@ -79,6 +107,7 @@ export function SupportInbox({ businessId, staff = false, initialThreadId }: { b
           <span className="text-stone-500">{t.status}{staff ? " · " + t.businessId : ""}</span>
         </button>)}
         {!threads.length && <p className="text-sm text-stone-500">Пока нет обращений</p>}
+        {nextThreadsCursor && <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => void loadMoreThreads()}>Показать ещё обращения</button>}
       </div>
       <div className="space-y-3 rounded-xl border p-4">
         {active ? <>
@@ -93,6 +122,7 @@ export function SupportInbox({ businessId, staff = false, initialThreadId }: { b
               <span className="text-sm text-stone-500">{active.status}</span>}
           </div>
           <div className="max-h-[420px] space-y-3 overflow-y-auto" aria-live="polite">
+            {nextMessagesCursor && <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => void loadEarlierMessages()}>Ранее в переписке</button>}
             {messages.map(m => <div key={m.id} className="rounded-lg bg-stone-50 p-3 text-sm">
               <p className="mb-1 font-medium">{m.actor === "STAFF" ? "Команда mamaGo" : "Представитель бизнеса"}</p>
               <p className="whitespace-pre-wrap">{m.body}</p>
