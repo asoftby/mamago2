@@ -1,4 +1,9 @@
-import type { NotificationScenario } from "@/lib/notifications/domainContracts";
+import type { NotificationScenario, PlanEventReminderContext } from "@/lib/notifications/domainContracts";
+
+/** Plan-row identity plus due instant: separate saved rows and re-schedules get separate reminders. */
+export function buildPlanReminderEventId(context: Pick<PlanEventReminderContext, "planItemId" | "startsAt" | "reminderDueAt">): string {
+  return `${context.planItemId}:${(context.reminderDueAt ?? context.startsAt).toISOString()}`;
+}
 
 export function buildNotificationDedupeKeyCore(args: {
   scenario: NotificationScenario;
