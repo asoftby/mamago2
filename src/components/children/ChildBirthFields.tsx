@@ -1,6 +1,8 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { FilterSelect, type FilterSelectOption } from "@/components/ui/filter-select";
 
@@ -59,16 +61,37 @@ export function ChildBirthFields({
   onChange: (value: ChildBirthDraft) => void;
   idPrefix: string;
 }) {
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const formatDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const selected = value.precision === "DAY" && value.date ? new Date(`${value.date}T12:00:00`) : null;
   return (
     <div className="space-y-3">
       <Label htmlFor={`${idPrefix}-exact`}>Дата рождения ребёнка</Label>
       {value.precision === "DAY" ? (
-        <Input
-          id={`${idPrefix}-exact`}
-          type="date"
-          value={value.date}
-          onChange={(event) => onChange({ precision: "DAY", date: event.target.value })}
-        />
+        <div className="space-y-2">
+          <Button type="button" variant="outline" id={`${idPrefix}-exact`} className="w-full justify-start" onClick={() => {
+            setCalendarMonth(selected ?? new Date());
+            setCalendarOpen((open) => !open);
+          }} aria-expanded={calendarOpen}>
+            {selected && !Number.isNaN(selected.getTime()) ? selected.toLocaleDateString("ru-RU") : "Выбрать дату рождения"}
+          </Button>
+          {calendarOpen && (
+            <div className="rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm">
+              <div className="mb-3 flex items-center gap-2">
+                <label htmlFor={`${idPrefix}-year`} className="text-sm text-neutral-600">Год</label>
+                <select id={`${idPrefix}-year`} className="h-10 flex-1 rounded-lg border border-neutral-200 px-3" value={calendarMonth.getFullYear()} onChange={(event) => setCalendarMonth(new Date(Number(event.target.value), calendarMonth.getMonth(), 1))}>
+                  {Array.from({ length: 19 }, (_, index) => new Date().getFullYear() - index).map((year) => <option key={year} value={year}>{year}</option>)}
+                </select>
+              </div>
+              <Calendar key={`${calendarMonth.getFullYear()}-${calendarMonth.getMonth()}`} size="compact" disablePast={false} defaultMonth={calendarMonth} value={selected} onMonthChange={setCalendarMonth} onChange={(date) => {
+                if (!date || date > new Date()) return;
+                onChange({ precision: "DAY", date: formatDate(date) });
+                setCalendarOpen(false);
+              }} />
+            </div>
+          )}
+        </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
           <FilterSelect
@@ -87,19 +110,15 @@ export function ChildBirthFields({
           />
         </div>
       )}
-      <button
+      {value.precision === "MONTH" && <button
         type="button"
         className="text-sm font-medium text-[#EF8759] hover:underline"
         onClick={() =>
-          onChange(
-            value.precision === "DAY"
-              ? { precision: "MONTH", year: "", month: "" }
-              : { precision: "DAY", date: "" },
-          )
+          onChange({ precision: "DAY", date: "" })
         }
       >
-        {value.precision === "DAY" ? "Указать только месяц и год" : "Указать полную дату"}
-      </button>
+        Указать полную дату
+      </button>}
     </div>
   );
 }

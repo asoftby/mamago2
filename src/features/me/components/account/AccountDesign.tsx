@@ -187,7 +187,7 @@ export function AccountDesign(props: AccountDesignProps) {
                 <span className="caps" style={{ color: "var(--accent-deep)" }}>● Мой аккаунт</span>
                 <span className="caps">{localGreeting}</span>
               </div>
-              <h1 className="serif" style={{ margin: 0, fontSize: "100px", lineHeight: 0.92, letterSpacing: "-.03em" }}>
+              <h1 className="serif mg-acc__hero-name" style={{ margin: 0, lineHeight: 0.92, letterSpacing: "-.03em" }}>
                 {userName}
                 <span style={{ fontStyle: "italic", color: "var(--accent-deep)" }}>.</span>
               </h1>
@@ -521,7 +521,7 @@ const CSS = `
   background:var(--paper);border:1px solid var(--line);border-radius:16px;
   cursor:pointer;transition:all .18s;min-width:160px;
 }
-.mg-acc .member-card:hover{border-color:var(--ink);transform:translateY(-2px)}
+.mg-acc .member-card:hover{border-color:var(--line);transform:none}
 .mg-acc .member-add{
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:8px;padding:14px;min-width:120px;
@@ -564,10 +564,12 @@ const CSS = `
 .mg-acc :focus{outline:none}
 .mg-acc :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
 
+.mg-acc .mg-acc__hero-name{font-size:100px}
 @media(max-width:760px){
-  .mg-acc .hero-grid{grid-template-columns:1fr;gap:28px;align-items:stretch}
+ .mg-acc .hero-grid{grid-template-columns:1fr;gap:28px;align-items:stretch}
 }
 @media(max-width:640px){
+  .mg-acc .mg-acc__hero-name{font-size:40px}
   .mg-acc .wrap{padding:0 16px}
   .mg-acc .member-row{overflow-x:auto}
 }
