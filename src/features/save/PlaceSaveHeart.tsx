@@ -133,6 +133,8 @@ export function PlaceSaveHeart({
         } else if (result.action === "remove-plan") {
           toast.success("Убрано из плана");
         }
+        window.dispatchEvent(new CustomEvent("publication-save-changed", { detail: { kind: "place", id: placeId } }));
+        await checkSaveStatus();
       } catch {
         toast.error("Не получилось выполнить действие", {
           description: "Попробуйте ещё раз",
@@ -142,7 +144,7 @@ export function PlaceSaveHeart({
         setIsLoading(false);
       }
     },
-    [coverImageUrl, placeId, placeSlug, placeTitle],
+    [coverImageUrl, placeId, placeSlug, placeTitle, checkSaveStatus],
   );
 
   return (
