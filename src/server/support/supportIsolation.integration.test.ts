@@ -30,6 +30,31 @@ async function main() {
       messages: { create: { authorId: ownerA.id, actor: "BUSINESS", body: "Test" } },
     } });
     threadIds.push(thread.id);
+    const ticketKey = randomUUID();
+    const firstTicket = await prisma.supportThread.upsert({
+      where: { requestKey: ticketKey },
+      create: { businessId: a.id, createdById: ownerA.id, subject: "Retry ticket", requestKey: ticketKey },
+      update: {},
+    });
+    threadIds.push(firstTicket.id);
+    const repeatedTicket = await prisma.supportThread.upsert({
+      where: { requestKey: ticketKey },
+      create: { businessId: a.id, createdById: ownerA.id, subject: "Retry ticket", requestKey: ticketKey },
+      update: {},
+    });
+    assert.equal(repeatedTicket.id, firstTicket.id, "ticket request-key retry is idempotent");
+    const replyKey = randomUUID();
+    const firstReply = await prisma.supportMessage.upsert({
+      where: { requestKey: replyKey },
+      create: { threadId: thread.id, authorId: ownerA.id, actor: "BUSINESS", body: "Retry reply", requestKey: replyKey },
+      update: {},
+    });
+    const repeatedReply = await prisma.supportMessage.upsert({
+      where: { requestKey: replyKey },
+      create: { threadId: thread.id, authorId: ownerA.id, actor: "BUSINESS", body: "Retry reply", requestKey: replyKey },
+      update: {},
+    });
+    assert.equal(repeatedReply.id, firstReply.id, "message request-key retry is idempotent");
     assert.equal(await canAccessBusiness(ownerA.id, a.id), true);
     assert.equal((await requireSupportThreadAccess({ id: ownerA.id, role: "USER" }, thread.id)).id, thread.id);
     assert.equal(await canAccessBusiness(ownerB.id, a.id), false);
