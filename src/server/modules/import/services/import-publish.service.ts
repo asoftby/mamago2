@@ -367,13 +367,22 @@ export const TELEGRAM_SESSION_SOURCE = "telegram";
 /**
  * Владелец сеансов записи: Telegram-канал пишет их как "telegram", всё
  * остальное как раньше (ABWS). Без этого сеансы канала записывались бы как ABWS.
+ *
+ * Для канала возвращается и префикс `externalId` сеансов этой записи: пост
+ * описывает только свою часть графика, поэтому отзыв «пропавших» сеансов не
+ * должен задевать сеансы других постов того же события.
  */
-async function resolveSessionSource(recordId: string): Promise<string> {
+async function resolveSessionSource(
+  recordId: string,
+): Promise<{ source: string; externalIdPrefix?: string }> {
   const row = await prisma.importedRecord.findUnique({
     where: { id: recordId },
-    select: { source: { select: { parserKey: true } } },
+    select: { externalId: true, source: { select: { parserKey: true } } },
   });
-  return row?.source.parserKey === TELEGRAM_CHANNEL_PARSER_KEY ? TELEGRAM_SESSION_SOURCE : ABWS_PARSER_KEY;
+  if (row?.source.parserKey !== TELEGRAM_CHANNEL_PARSER_KEY) return { source: ABWS_PARSER_KEY };
+  const externalId = row.externalId ?? recordId;
+  // Сеансы подборки: `<канал>/<id>#<n>.<j>`, одиночного поста: `<канал>/<id>#<j>`.
+  return { source: TELEGRAM_SESSION_SOURCE, externalIdPrefix: externalId.includes("#") ? `${externalId}.` : `${externalId}#` };
 }
 
 // ── EVENT CREATE ──────────────────────────────────────────────────────────────
@@ -496,7 +505,7 @@ async function createActivityFromImport(
     const { upserted, skipped } = await upsertActivitySessionsFromOccurrences(
       activity.id,
       nd.occurrences,
-      { source: await resolveSessionSource(record.id) },
+      await resolveSessionSource(record.id),
     );
     if (upserted > 0) appliedFields.push("sessions");
     if (skipped > 0) warnings.push(`${skipped} occurrence(s) skipped: missing externalId or startAt`);
@@ -616,7 +625,8 @@ async function updateExistingActivityFromImport(
   // stay safe when possibleOccurrenceRisk flagged this as maybe-a-different-
   // occurrence rather than confirmed-same-event.
   if (nd.occurrences && nd.occurrences.length > 0) {
-    const sessionSource = await resolveSessionSource(record.id);
+    const sessionOwner = await resolveSessionSource(record.id);
+    const sessionSource = sessionOwner.source;
     // Канал-агрегатор не меняет сеансы, у которых есть другой источник (ABWS):
     // билетная система главнее, расхождение решает редактор.
     const foreignSessions =
@@ -631,9 +641,7 @@ async function updateExistingActivityFromImport(
     if (foreignSessions > 0) {
       warnings.push(`sessions not changed: ${foreignSessions} session(s) belong to another source, aggregator never overwrites them`);
     } else {
-      const { skipped } = await upsertActivitySessionsFromOccurrences(targetActivityId, nd.occurrences, {
-        source: sessionSource,
-      });
+      const { skipped } = await upsertActivitySessionsFromOccurrences(targetActivityId, nd.occurrences, sessionOwner);
       if (skipped > 0) warnings.push(`${skipped} occurrence(s) skipped: missing externalId or startAt`);
     }
   }

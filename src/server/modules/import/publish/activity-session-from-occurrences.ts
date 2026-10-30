@@ -128,7 +128,15 @@ function getNextActiveOccurrenceAt(
 export async function upsertActivitySessionsFromOccurrences(
   activityId: string,
   occurrences: EventImportOccurrence[],
-  options: { source?: string } = {},
+  options: {
+    source?: string;
+    /**
+     * Только для источников, у которых один пост описывает лишь часть сеансов
+     * события (Telegram): пропавшими считаются сеансы с этим префиксом
+     * `externalId`, чужие сеансы того же source не затрагиваются.
+     */
+    externalIdPrefix?: string;
+  } = {},
 ): Promise<{
   upserted: number;
   skipped: number;
@@ -199,14 +207,31 @@ export async function upsertActivitySessionsFromOccurrences(
               activityId,
               source,
               withdrawnAt: null,
-              ...(currentExternalIds.length > 0
-                ? { externalId: { notIn: currentExternalIds } }
+              ...(currentExternalIds.length > 0 || options.externalIdPrefix
+                ? {
+                    externalId: {
+                      ...(options.externalIdPrefix ? { startsWith: options.externalIdPrefix } : {}),
+                      ...(currentExternalIds.length > 0 ? { notIn: currentExternalIds } : {}),
+                    },
+                  }
                 : {}),
             },
             data: { withdrawnAt: new Date() },
           });
 
-    const nextOccurrenceAt = getNextActiveOccurrenceAt(occurrences, new Date());
+    // ABWS присылает полный снимок, поэтому считаем по нему. Для остальных
+    // источников один пост не весь график: берём ближайший активный сеанс
+    // события из базы (уже с учётом сделанных выше записей и отзывов).
+    const nextOccurrenceAt =
+      source === ABWS_PARSER_KEY
+        ? getNextActiveOccurrenceAt(occurrences, new Date())
+        : (
+            await tx.activitySession.findFirst({
+              where: { activityId, withdrawnAt: null, startsAt: { gte: new Date() } },
+              orderBy: { startsAt: "asc" },
+              select: { startsAt: true },
+            })
+          )?.startsAt ?? null;
     await tx.activity.update({
       where: { id: activityId },
       data: { nextOccurrenceAt },

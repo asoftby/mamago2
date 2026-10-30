@@ -260,3 +260,127 @@ test("a poster-only post (no text) goes to the model with its images", async () 
   assert.deepEqual(await n.normalize(record.id), { status: "normalized", events: 1 });
   assert.equal(calls[0].userParts.filter((p) => p.type === "image_url").length, 1);
 });
+
+// ── Review-found cases ──────────────────────────────────────────────────────
+
+test("an auto-skipped post returns to the review queue when an edit makes it valid", async () => {
+  const record = await newRecord();
+  const noDate = ev({ occurrences: [] });
+  const { n } = normalizer(() => ok(postJson("EVENT", [noDate])));
+  assert.deepEqual(await n.normalize(record.id), { status: "skipped", reason: "incomplete" });
+  const skipped = await reload(record.id);
+  assert.equal(skipped.reviewTask?.status, "CANCELLED");
+  assert.equal(skipped.reviewStatus, "SKIPPED");
+
+  // The post is edited and now carries a date.
+  const { n: n2 } = normalizer(() => ok(postJson("EVENT", [ev()])));
+  assert.deepEqual(await n2.normalize(record.id), { status: "normalized", events: 1 });
+  const back = await reload(record.id);
+  assert.equal(back.normalizeStatus, "SUCCESS");
+  assert.equal(back.reviewTask?.status, "PENDING");
+  assert.equal(back.reviewStatus, "PENDING");
+});
+
+test("an editor's decision is not reopened by renormalization", async () => {
+  const record = await newRecord();
+  const { n } = normalizer(() => ok(postJson("EVENT", [ev()])));
+  await n.normalize(record.id);
+  // The editor rejected it: the task is closed by a person, not by the automation.
+  await prisma.importReviewTask.update({ where: { importedRecordId: record.id }, data: { status: "COMPLETED", notes: "not suitable" } });
+  await prisma.importedRecord.update({ where: { id: record.id }, data: { reviewStatus: "REJECTED" } });
+
+  await n.normalize(record.id);
+  const after = await reload(record.id);
+  assert.equal(after.reviewTask?.status, "COMPLETED");
+  assert.equal(after.reviewStatus, "REJECTED");
+});
+
+test("a digest child that was auto-closed comes back when the post is fixed", async () => {
+  const parent = await newRecord({ externalId: `chan_${tag}/digest-fix` });
+  const two = [ev({ title: f("Первое") }), ev({ title: f("Второе") })];
+  await normalizer(() => ok(postJson("DIGEST", two))).n.normalize(parent.id);
+
+  // Second item loses its date: its child record is closed.
+  const broken = [ev({ title: f("Первое") }), ev({ title: f("Второе"), occurrences: [] })];
+  await normalizer(() => ok(postJson("DIGEST", broken))).n.normalize(parent.id);
+  const closed = await prisma.importedRecord.findUniqueOrThrow({
+    where: { sourceId_externalId: { sourceId, externalId: `chan_${tag}/digest-fix#2` } },
+    include: { reviewTask: true },
+  });
+  assert.equal(closed.reviewTask?.status, "CANCELLED");
+
+  // The date is added back: the child returns to the queue.
+  await normalizer(() => ok(postJson("DIGEST", two))).n.normalize(parent.id);
+  const reopened = await prisma.importedRecord.findUniqueOrThrow({ where: { id: closed.id }, include: { reviewTask: true } });
+  assert.equal(reopened.normalizeStatus, "SUCCESS");
+  assert.equal(reopened.reviewTask?.status, "PENDING");
+  assert.equal(reopened.reviewStatus, "PENDING");
+});
+
+test("the budget is checked before every model call, retries and escalation included", async () => {
+  const run = await newRun();
+  await prisma.importRun.update({ where: { id: run.id }, data: { aiCalls: 3 } }); // budget 5: two calls left
+  const record = await newRecord({ runId: run.id });
+  const { n, calls } = normalizer(() => ok("not json"));
+
+  assert.deepEqual(await n.normalize(record.id, { runId: run.id }), { status: "postponed", reason: "budget" });
+  assert.deepEqual(calls.map((c) => c.model), ["fast", "fast"], "the strong-model call is blocked, not made");
+  const usage = await prisma.importRun.findUniqueOrThrow({ where: { id: run.id } });
+  assert.equal(usage.aiCalls, 5, "the budget is never exceeded");
+  assert.equal((await reload(record.id)).normalizeStatus, "PENDING", "picked up by the next run");
+});
+
+test("category detection also needs budget and is skipped without it", async () => {
+  const run = await newRun();
+  await prisma.importRun.update({ where: { id: run.id }, data: { aiCalls: 4 } }); // one call left
+  const record = await newRecord({ runId: run.id });
+  let categoryCalls = 0;
+  const n = createTelegramPostNormalizer({
+    openrouter: { chat: async () => ok(postJson("EVENT", [ev()])) },
+    models: () => ({ fast: "fast", strong: null, responseFormat: "json_object" }),
+    loadImage: async () => ({ ok: false, code: "IMAGE_FETCH_FAILED" }),
+    detectCategory: async () => { categoryCalls++; return null; },
+    now: () => NOW,
+  });
+
+  assert.deepEqual(await n.normalize(record.id, { runId: run.id }), { status: "normalized", events: 1 });
+  assert.equal(categoryCalls, 0, "the last call went to extraction; category is optional and skipped");
+  assert.equal((await prisma.importRun.findUniqueOrThrow({ where: { id: run.id } })).aiCalls, 5);
+});
+
+test("an edit that moves a published event into auto-skip still alerts the editor", async () => {
+  const owner = await prisma.user.create({ data: { email: `tg-norm-${tag}@example.invalid` }, select: { id: true } });
+  const activity = await prisma.activity.create({
+    data: {
+      ownerUserId: owner.id, title: `Published ${tag}`, shortDesc: "fixture", type: "EVENT", status: "PUBLISHED",
+      scheduleMode: "ONE_TIME", schedulingKind: "SLOT", scheduleJson: { durationMinutes: 60 },
+    },
+    select: { id: true },
+  });
+  try {
+    const record = await newRecord();
+    const previous = { entityType: "EVENT", title: "Мастер-класс по лепке", startAt: "2026-11-08T14:00:00+03:00", occurrences: [{ startAt: "2026-11-08T14:00:00+03:00" }], sourceSlug: "x", sourceUrl: "u", categoryCandidates: [], imageUrls: [] };
+    await prisma.importedRecord.update({
+      where: { id: record.id },
+      data: { publishedActivityId: activity.id, reviewStatus: "APPROVED", normalizeStatus: "PENDING", normalizedData: previous },
+    });
+    await prisma.importReviewTask.update({ where: { importedRecordId: record.id }, data: { status: "COMPLETED" } });
+
+    // The post was edited: the date is now in the past.
+    const past = ev({ occurrences: [{ startAt: f("2026-10-01T10:00:00+03:00"), title: null }] });
+    const { n } = normalizer(() => ok(postJson("EVENT", [past])));
+    assert.deepEqual(await n.normalize(record.id), { status: "skipped", reason: "past_event" });
+
+    const after = await reload(record.id);
+    assert.deepEqual((after.normalizedData as { title: string }).title, "Мастер-класс по лепке", "published data is kept");
+    assert.equal(after.normalizeStatus, "SUCCESS");
+    const changed = (after.qualityFlags as { sourceChanged: { fields: string[] } }).sourceChanged.fields;
+    assert.ok(changed.includes("skip:past_event") && changed.includes("dates"), `changed: ${changed.join(",")}`);
+    assert.equal(after.reviewTask?.status, "PENDING", "the editor is alerted");
+    assert.equal(after.publishedActivityId, activity.id);
+  } finally {
+    await prisma.importedRecord.updateMany({ where: { publishedActivityId: activity.id }, data: { publishedActivityId: null } });
+    await prisma.activity.delete({ where: { id: activity.id } });
+    await prisma.user.delete({ where: { id: owner.id } });
+  }
+});

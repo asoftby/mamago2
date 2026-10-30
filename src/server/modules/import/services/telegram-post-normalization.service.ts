@@ -109,6 +109,40 @@ function readRawPost(payload: unknown): RawPost {
   };
 }
 
+/** Бюджет исчерпан посреди записи: запись откладывается целиком. */
+class BudgetExhausted extends Error {
+  constructor() {
+    super("AI call budget exhausted");
+    this.name = "BudgetExhausted";
+  }
+}
+
+/**
+ * Бюджет вызовов модели на запуск. Проверяется перед КАЖДЫМ вызовом
+ * (извлечение, повтор, сильная модель, категория), а не только перед записью.
+ * `limit === null`: запуска нет, ограничения нет.
+ */
+function createCallBudget(limit: number | null, alreadyUsed: number) {
+  let spent = 0;
+  let reported = 0;
+  return {
+    canSpend: () => limit === null || alreadyUsed + spent < limit,
+    take() {
+      if (limit !== null && alreadyUsed + spent >= limit) throw new BudgetExhausted();
+      spent++;
+    },
+    /** Сколько вызовов ещё не записано в счётчики запуска. */
+    unreported() {
+      const delta = spent - reported;
+      reported = spent;
+      return delta;
+    },
+  };
+}
+type CallBudget = ReturnType<typeof createCallBudget>;
+
+const NO_USAGE: ExtractionUsage = { tokensIn: null, tokensOut: null, model: null };
+
 export function createTelegramPostNormalizer(overrides: Partial<TelegramNormalizerDeps> = {}) {
   const deps = { ...defaultDeps(), ...overrides } as TelegramNormalizerDeps;
 
@@ -131,6 +165,65 @@ export function createTelegramPostNormalizer(overrides: Partial<TelegramNormaliz
       where: { importedRecordId: recordId, status: { in: ["COMPLETED", "CANCELLED"] } },
       data: { status: "PENDING", reviewedAt: null },
     });
+  }
+
+  /**
+   * Автоотсеянная запись снова стала валидной после правки поста: возвращаем её
+   * в очередь. Только если задачу закрыла автоматика (`auto:`), а не редактор.
+   */
+  async function reopenIfAutoClosed(recordId: string) {
+    const task = await prisma.importReviewTask.findUnique({
+      where: { importedRecordId: recordId },
+      select: { status: true, notes: true },
+    });
+    if (!task || task.status !== "CANCELLED" || !task.notes?.startsWith("auto:")) return;
+    await prisma.importReviewTask.update({
+      where: { importedRecordId: recordId },
+      data: { status: "PENDING", notes: null, reviewedAt: null },
+    });
+    await prisma.importedRecord.updateMany({
+      where: { id: recordId, reviewStatus: "SKIPPED" },
+      data: { reviewStatus: "PENDING" },
+    });
+  }
+
+  /**
+   * Пост, по которому событие уже опубликовано, правкой ушёл в автоотсев
+   * (прошла дата, другой город, больше не событие). Событие на сайте остаётся
+   * прежним, поэтому редактора нужно предупредить: данные не затираем, ставим
+   * `sourceChanged` и переоткрываем задачу.
+   */
+  async function flagPublishedChange(
+    record: ImportedRecord,
+    reason: TelegramSkipReason,
+    previous: NormalizedEventImport | null,
+    normalized?: NormalizedEventImport,
+  ) {
+    const fields = [...(normalized ? diffKeyFields(previous, normalized) : []), `skip:${reason}`];
+    await prisma.importedRecord.update({
+      where: { id: record.id },
+      data: {
+        normalizeStatus: "SUCCESS",
+        matchStatus: "SKIPPED",
+        errorMessage: null,
+        qualityFlags: {
+          ...((record.qualityFlags as object | null) ?? {}),
+          sourceChanged: { fields, detectedAt: deps.now().toISOString() },
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await reopenReviewTask(record.id);
+  }
+
+  async function skipRecord(
+    record: ImportedRecord,
+    reason: TelegramSkipReason,
+    flags: TelegramQualityFlags,
+    previous: NormalizedEventImport | null,
+    normalized?: NormalizedEventImport,
+  ) {
+    if (record.publishedActivityId) return flagPublishedChange(record, reason, previous, normalized);
+    return markSkipped(record, reason, flags, normalized);
   }
 
   async function markSkipped(
@@ -207,10 +300,9 @@ export function createTelegramPostNormalizer(overrides: Partial<TelegramNormaliz
     const models = deps.models();
     if (!models.fast) return { status: "postponed", reason: "model_not_configured" };
     let run: Pick<ImportRun, "aiCalls"> | null = null;
-    if (runId) {
-      run = await prisma.importRun.findUnique({ where: { id: runId }, select: { aiCalls: true } });
-      if (run && run.aiCalls >= source.aiCallBudgetPerRun) return { status: "postponed", reason: "budget" };
-    }
+    if (runId) run = await prisma.importRun.findUnique({ where: { id: runId }, select: { aiCalls: true } });
+    const budget = createCallBudget(run ? source.aiCallBudgetPerRun : null, run?.aiCalls ?? 0);
+    if (!budget.canSpend()) return { status: "postponed", reason: "budget" };
 
     // 3. Картинки (память, на диск не пишем).
     const imageDataUrls: string[] = [];
@@ -232,10 +324,9 @@ export function createTelegramPostNormalizer(overrides: Partial<TelegramNormaliz
 
     // 4. Модель. Каждый HTTP-вызов считаем в бюджет.
     const usage: ExtractionUsage = { tokensIn: null, tokensOut: null, model: null };
-    let calls = 0;
     const countingClient: Pick<OpenRouterClient, "chat"> = {
       chat: (input) => {
-        calls++;
+        budget.take(); // перед каждым вызовом, включая повтор и сильную модель
         return deps.openrouter.chat(input);
       },
     };
@@ -266,10 +357,21 @@ export function createTelegramPostNormalizer(overrides: Partial<TelegramNormaliz
       },
       usage,
     });
-    const outcome = await call.runWithRetry({ fast: models.fast, strong: models.strong });
-    await addRunUsage(runId, calls, usage);
+    let outcome: Awaited<ReturnType<typeof call.runWithRetry>>;
+    try {
+      outcome = await call.runWithRetry({ fast: models.fast, strong: models.strong });
+    } catch (error) {
+      if (!(error instanceof BudgetExhausted)) throw error;
+      // Бюджет кончился на повторе или эскалации: уже сделанные вызовы учтены,
+      // запись остаётся PENDING и разбирается заново следующим запуском.
+      await addRunUsage(runId, budget.unreported(), usage);
+      console.log(`[telegram-post-normalizer] recordId=${record.id} postponed=budget`);
+      return { status: "postponed", reason: "budget" };
+    }
+    const modelCalls = budget.unreported();
+    await addRunUsage(runId, modelCalls, usage);
     console.log(
-      `[telegram-post-normalizer] recordId=${record.id} calls=${calls} model=${usage.model ?? "-"} ` +
+      `[telegram-post-normalizer] recordId=${record.id} calls=${modelCalls} model=${usage.model ?? "-"} ` +
         `tokensIn=${usage.tokensIn ?? "-"} tokensOut=${usage.tokensOut ?? "-"} ok=${outcome.ok}`,
     );
 
@@ -301,7 +403,7 @@ export function createTelegramPostNormalizer(overrides: Partial<TelegramNormaliz
 
     if (mapped.postKind === "NOT_EVENT") {
       await cancelStaleChildren(record.id, []);
-      await markSkipped(record, "not_event", skippedFlags("not_event", "NOT_EVENT"));
+      await skipRecord(record, "not_event", skippedFlags("not_event", "NOT_EVENT"), previous);
       return { status: "skipped", reason: "not_event" };
     }
 
@@ -311,11 +413,12 @@ export function createTelegramPostNormalizer(overrides: Partial<TelegramNormaliz
       for (const event of mapped.events) {
         if (event.skipReason) continue;
         kept.push(event.externalId);
-        await upsertDigestChild(record, source, runId, raw, event);
+        await upsertDigestChild(record, source, runId, raw, event, budget);
         created++;
       }
       await cancelStaleChildren(record.id, kept);
       await markSkipped(record, "digest_split", skippedFlags("digest_split", "DIGEST"));
+      await addRunUsage(runId, budget.unreported(), NO_USAGE);
       return { status: "normalized", events: created };
     }
 
@@ -323,10 +426,10 @@ export function createTelegramPostNormalizer(overrides: Partial<TelegramNormaliz
     await cancelStaleChildren(record.id, []);
     const event = mapped.events[0];
     if (event.skipReason) {
-      await markSkipped(record, event.skipReason, event.qualityFlags, event.normalized);
+      await skipRecord(record, event.skipReason, event.qualityFlags, previous, event.normalized);
       return { status: "skipped", reason: event.skipReason };
     }
-    await enrichCategory(event, runId);
+    await enrichCategory(event, budget);
     const { score } = scoreEventImport(event.normalized);
 
     const changedFields = record.publishedActivityId ? diffKeyFields(previous, event.normalized) : [];
@@ -341,17 +444,24 @@ export function createTelegramPostNormalizer(overrides: Partial<TelegramNormaliz
         qualityScore: score,
         qualityFlags: event.qualityFlags as unknown as Prisma.InputJsonValue,
         errorMessage: null,
+        matchStatus: "PENDING",
         // Запись, добранная из прошлого запуска, переезжает в текущий, чтобы её увидел матчинг.
         ...(runId ? { runId } : {}),
       },
     });
     if (changedFields.length > 0) await reopenReviewTask(record.id);
+    // Пост был автоотсеян, правка сделала его валидным: возвращаем в очередь.
+    await reopenIfAutoClosed(record.id);
+    await addRunUsage(runId, budget.unreported(), NO_USAGE);
     return { status: "normalized", events: 1 };
   }
 
-  async function enrichCategory(event: MappedTelegramEvent, runId: string | null) {
+  async function enrichCategory(event: MappedTelegramEvent, budget: CallBudget) {
     const n = event.normalized;
     if (!n.title) return;
+    // Категория необязательна: без бюджета вызов пропускаем, редактор выберет сам.
+    if (!budget.canSpend()) return;
+    budget.take();
     try {
       const category = await deps.detectCategory({
         title: n.title,
@@ -365,7 +475,6 @@ export function createTelegramPostNormalizer(overrides: Partial<TelegramNormaliz
         scheduleText: n.scheduleText,
         organizerName: n.organizerName,
       });
-      await addRunUsage(runId, 1, { tokensIn: null, tokensOut: null, model: null });
       if (!category) return;
       n.aiDetectedCategoryId = category.categoryId;
       n.aiDetectedCategorySlug = category.categorySlug;
@@ -385,9 +494,10 @@ export function createTelegramPostNormalizer(overrides: Partial<TelegramNormaliz
     runId: string | null,
     raw: RawPost,
     event: MappedTelegramEvent,
+    budget: CallBudget,
   ) {
     const childRunId = runId;
-    await enrichCategory(event, runId);
+    await enrichCategory(event, budget);
     const { score } = scoreEventImport(event.normalized);
     const existing = await prisma.importedRecord.findUnique({
       where: { sourceId_externalId: { sourceId: source.id, externalId: event.externalId } },
@@ -458,6 +568,8 @@ export function createTelegramPostNormalizer(overrides: Partial<TelegramNormaliz
       },
     });
     await ensureImportReviewTaskExists(existing.id);
+    // Ребёнок был автоотсеян (например, без даты), правка поста сделала его валидным.
+    await reopenIfAutoClosed(existing.id);
   }
 
   return {
