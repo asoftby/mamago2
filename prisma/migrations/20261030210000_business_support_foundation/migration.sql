@@ -28,3 +28,7 @@ ALTER TABLE "SupportThread" ADD CONSTRAINT "SupportThread_businessId_fkey" FOREI
 ALTER TABLE "SupportThread" ADD CONSTRAINT "SupportThread_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "SupportMessage" ADD CONSTRAINT "SupportMessage_threadId_fkey" FOREIGN KEY ("threadId") REFERENCES "SupportThread"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "SupportMessage" ADD CONSTRAINT "SupportMessage_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- Dedicated support notices: customer Direct notifications remain separate.
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'SUPPORT_BUSINESS_REPLY';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'SUPPORT_STAFF_MESSAGE';
