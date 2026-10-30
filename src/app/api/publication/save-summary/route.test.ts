@@ -18,5 +18,6 @@ assert.match(route, /COUNT\(\*\)::int/);
 assert.match(route, /visibleSavers:\s*\[\]/, "Do not expose avatar identities without opt-in");
 assert.doesNotMatch(route, /avatarUrl|displayName|\.user\.findMany/, "Public summary must not identify private savers");
 assert.match(bar, /publication-save-changed/, "Counts must refresh after a successful mutation");
+assert.match(bar, /total >= 3/, "Social proof visible only from three saves");
 
 console.log("publication save summary static privacy contract: OK");
