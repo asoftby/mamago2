@@ -447,32 +447,17 @@ export function PlanNewTaskScreen({
               </>
             )}
             {repeat !== "NONE" && (
-              <div className="mt-3 grid gap-3">
+              <div className="mt-3 grid gap-2">
                 <label className="grid gap-1.5 text-sm font-semibold">
-                  Окончание повторений
-                  <select value={repeatEnd} onChange={e => setRepeatEnd(e.target.value as RepeatEnd)}
-                    className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3">
-                    <option value="NEVER">Без даты окончания</option>
-                    <option value="UNTIL">До даты</option>
-                    <option value="COUNT">После количества повторений</option>
-                  </select>
+                  Конец повтора (необязательно)
+                  <input type="date" min={day ?? todayIso} value={repeatEnd === "UNTIL" ? repeatUntil : ""}
+                    onChange={e => {
+                      setRepeatUntil(e.target.value);
+                      setRepeatEnd(e.target.value ? "UNTIL" : "NEVER");
+                    }}
+                    className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3" />
                 </label>
-                {repeatEnd === "UNTIL" && (
-                  <label className="grid gap-1.5 text-sm font-semibold">
-                    Последний день
-                    <input type="date" min={day ?? todayIso} value={repeatUntil}
-                      onChange={e => setRepeatUntil(e.target.value)}
-                      className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3" />
-                  </label>
-                )}
-                {repeatEnd === "COUNT" && (
-                  <label className="grid gap-1.5 text-sm font-semibold">
-                    Количество повторений
-                    <input type="number" min={1} max={10000} value={repeatCount}
-                      onChange={e => setRepeatCount(e.target.value)}
-                      className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3" />
-                  </label>
-                )}
+                <p className="text-[12px] text-[var(--mp-tx2)]">Если дата не указана, задача будет повторяться без ограничения. Время повторений берётся из времени задачи.</p>
               </div>
             )}
           </div>
