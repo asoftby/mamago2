@@ -8,6 +8,10 @@ import { PrismaClient } from "@prisma/client";
 import { collectPartyDeliveryMetrics } from "./partyDelivery";
 
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL must be an isolated migrated PostgreSQL database");
+const dbHost = new URL(process.env.DATABASE_URL).hostname;
+if (!["localhost", "127.0.0.1"].includes(dbHost)) {
+  throw new Error("Party delivery PostgreSQL test refuses non-local databases");
+}
 const prisma = new PrismaClient();
 const marker = randomUUID();
 const ids: { delivery: string[]; notifications: string[]; outbox: string[]; booking?: string; business?: string; user?: string } = {
