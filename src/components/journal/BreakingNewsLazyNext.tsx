@@ -123,7 +123,7 @@ export function BreakingNewsLazyNext() {
 
   return (
     <section aria-label="Следующие Breaking News" className="mx-auto max-w-3xl px-5 pb-12 pt-8">
-      <h2 className="mb-5 text-xl font-semibold">Далее в Breaking News</h2>
+      {(hasMore || items.length > 0 || loading || error) && <h2 className="mb-5 text-xl font-semibold">Далее в Breaking News</h2>}
       {articles.map((article) => (
         <section key={article.articleId} data-news-continuation={article.articleId}>
           <BreakingNewsView {...article} />
@@ -133,6 +133,9 @@ export function BreakingNewsLazyNext() {
       {loading && <p role="status" className="py-5 text-sm text-neutral-500">Загружаем следующие публикации…</p>}
       {error && <button type="button" onClick={() => { setError(false); requestedRef.current = false; fullRequestRef.current = false; }} className="py-5 text-sm underline">Повторить загрузку</button>}
       {hasMore && <div ref={sentinelRef} aria-hidden className="h-px" />}
+      {!hasMore && !loading && !error && items.every((item) => articles.some((article) => article.articleId === item.id)) && (
+        <p role="status" className="py-6 text-center text-sm text-neutral-500">Вы посмотрели все актуальные новости</p>
+      )}
     </section>
   );
 }
