@@ -27,6 +27,15 @@ export interface TelegramConflict {
   image: { index: number; value: string | null } | null;
 }
 
+/** Возможный дубль среди ещё не разобранных записей другого источника. */
+export interface PendingDuplicateRef {
+  recordId: string;
+  sourceId: string;
+  title: string;
+  score: number;
+  reason: string;
+}
+
 export interface TelegramSourceChange {
   /** Какие ключевые поля изменились относительно прежней нормализации. */
   fields: string[];
@@ -47,6 +56,8 @@ export interface TelegramQualityFlags {
   addressNote: string | null;
   imageRoles: { index: number; role: "POSTER" | "PHOTO" | "OTHER" }[];
   fieldStates: Record<string, "stated" | "inferred" | "missing">;
+  /** Заполняется матчингом: дубли среди ожидающих записей других источников. */
+  pendingDuplicates?: PendingDuplicateRef[];
 }
 
 export interface TelegramPostContext {
@@ -278,4 +289,32 @@ export function diffKeyFields(
     ["title", before.title ?? "", after.title ?? ""],
   ];
   return checks.filter(([, a, b]) => a !== b).map(([name]) => name);
+}
+
+/** Флаги записи Telegram-канала (по ключу `source`), иначе null. */
+export function asTelegramFlags(value: unknown): TelegramQualityFlags | null {
+  return value && typeof value === "object" && (value as { source?: unknown }).source === "telegram"
+    ? (value as TelegramQualityFlags)
+    : null;
+}
+
+/** Дубли, найденные матчингом, кладём в флаги записи; пустой список снимает прежние. */
+export function mergePendingDuplicates(
+  flags: TelegramQualityFlags,
+  duplicates: { entityId: string; sourceId: string; entityTitle: string; score: number; reason: string }[],
+): TelegramQualityFlags {
+  const { pendingDuplicates: _previous, ...rest } = flags;
+  void _previous;
+  return duplicates.length === 0
+    ? rest
+    : {
+        ...rest,
+        pendingDuplicates: duplicates.map((d) => ({
+          recordId: d.entityId,
+          sourceId: d.sourceId,
+          title: d.entityTitle,
+          score: d.score,
+          reason: d.reason,
+        })),
+      };
 }
