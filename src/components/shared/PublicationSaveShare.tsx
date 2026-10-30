@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Heart, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,8 @@ export type PublicSaver = {
 
 export interface PublicationSaveShareProps {
   isSaved: boolean;
+  publicationKind?: "event" | "offer" | "place";
+  publicationId?: string;
   onSave: () => void;
   onShare: () => void;
   isSaving?: boolean;
@@ -33,6 +35,8 @@ export interface PublicationSaveShareProps {
 
 export function PublicationSaveShare({
   isSaved,
+  publicationKind,
+  publicationId,
   onSave,
   onShare,
   isSaving = false,
@@ -42,8 +46,35 @@ export function PublicationSaveShare({
   className,
   footer,
 }: PublicationSaveShareProps) {
-  const total = typeof saveCount === "number" && Number.isFinite(saveCount)
-    ? Math.max(0, Math.floor(saveCount))
+  const [remoteCount, setRemoteCount] = useState<number | null>(null);
+  const refresh = useCallback(async () => {
+    if (!publicationKind || !publicationId) return;
+    try {
+      const params = new URLSearchParams({ kind: publicationKind, id: publicationId });
+      const res = await fetch("/api/publication/save-summary?" + params.toString(), { cache: "no-store" });
+      if (!res.ok) return;
+      const summary: { count?: number } = await res.json();
+      if (typeof summary.count === "number" && Number.isFinite(summary.count)) {
+        setRemoteCount(Math.max(0, Math.floor(summary.count)));
+      }
+    } catch {
+      // The actions remain available if the public counter cannot load.
+    }
+  }, [publicationKind, publicationId]);
+
+  useEffect(() => {
+    void refresh();
+    const onUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ kind?: string; id?: string }>).detail;
+      if (detail?.kind === publicationKind && detail.id === publicationId) void refresh();
+    };
+    window.addEventListener("publication-save-changed", onUpdated);
+    return () => window.removeEventListener("publication-save-changed", onUpdated);
+  }, [publicationKind, publicationId, refresh]);
+
+  const supplied = typeof saveCount === "number" && Number.isFinite(saveCount) ? saveCount : remoteCount;
+  const total = typeof supplied === "number" && Number.isFinite(supplied)
+    ? Math.max(0, Math.floor(supplied))
     : null;
   const avatars = visibleSavers.filter((saver) => Boolean(saver.avatarUrl)).slice(0, 5);
   const canOpen = Boolean(onOpenSavers) && avatars.length > 0;
