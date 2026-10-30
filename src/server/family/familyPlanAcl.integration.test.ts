@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { planScopeFor } from "./familyAccess";
+import { listFamilyForUser } from "./familyMembers.service";
+import { listFamilyCalendarItems } from "@/server/services/manualPlanEntry.service";
 
 if (!process.env.DATABASE_URL) throw new Error("Isolated PostgreSQL DATABASE_URL required");
 if (process.env.FAMILY_CORE_READS !== "1") throw new Error("FAMILY_CORE_READS=1 required");
@@ -24,7 +26,7 @@ async function main() {
   try {
     const [a, b, outsider] = await Promise.all(
       ["a", "b", "outside"].map(label =>
-        prisma.user.create({ data: { email: `family-acl-${tag}-${label}@example.invalid` } }),
+        prisma.user.create({ data: { email: `family-acl-${tag}-${label}@example.invalid`, displayName: `Family ${label}` } }),
       ),
     );
     userIds.push(a.id, b.id, outsider.id);
@@ -36,6 +38,13 @@ async function main() {
       { userId: b.id, familyId: family.id, role: "ADULT", historyAccess: "FROM_JOIN", joinedAt: joined },
       { userId: outsider.id, familyId: otherFamily.id, role: "OWNER", historyAccess: "ALL", joinedAt: before },
     ] });
+    // Identity is determined by active membership, not inferred from the plan's creator.
+    const familyView = await listFamilyForUser(prisma, a.id);
+    assert.deepEqual(
+      familyView?.adults.map(member => [member.userId, member.displayName, member.isMe]),
+      [[a.id, "Family a", true], [b.id, "Family b", false]],
+      "both adults must resolve to separate named users",
+    );
     const create = (userId: string, familyId: string, visibility: "PRIVATE" | "FAMILY", createdAt: Date) =>
       prisma.planItem.create({ data: {
         userId, familyId, visibility, date, createdAt, updatedAt: createdAt,
@@ -49,6 +58,12 @@ async function main() {
       create(outsider.id, otherFamily.id, "FAMILY", joined),
       create(a.id, family.id, "FAMILY", before),
     ]);
+    const calendarA = await listFamilyCalendarItems({ owner: { userId: a.id }, from: date, to: date });
+    const calendarB = await listFamilyCalendarItems({ owner: { userId: b.id }, from: date, to: date });
+    assert.ok(!calendarB.some(item => item.id === aPrivate.id), "private creator's entry must stay hidden");
+    assert.equal(calendarA.find(item => item.id === bShared.id)?.authorName, "Family b");
+    assert.equal(calendarB.find(item => item.id === aShared.id)?.authorName, "Family a");
+
     // The future date makes legacy shared records visible under FROM_JOIN;
     // test historical restrictions separately using an old event date.
     assert.deepEqual(await visible(a.id), ids([aPrivate, aShared, bShared, legacyShared]));
