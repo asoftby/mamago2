@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Heart } from "lucide-react";
+import { PublicationSaveShare } from "@/components/shared/PublicationSaveShare";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
@@ -20,7 +21,8 @@ type PlaceSaveHeartProps = {
   className?: string;
   iconClassName?: string;
   /** `text` — «♡ Сохранить» (иконка + подпись) вместо круглой кнопки. */
-  variant?: "icon" | "text";
+  variant?: "icon" | "text" | "detail-bar";
+  onShare?: () => void;
   /** Зарегистрировать «сохранить» в мобильном хедере публикации (единый источник — этот компонент). */
   registerInHeader?: boolean;
 };
@@ -42,6 +44,7 @@ export function PlaceSaveHeart({
   className,
   iconClassName,
   variant = "icon",
+  onShare,
   registerInHeader = false,
 }: PlaceSaveHeartProps) {
   const { isAuthenticated } = useAuthMe();
@@ -144,7 +147,9 @@ export function PlaceSaveHeart({
 
   return (
     <>
-      {variant === "text" ? (
+      {variant === "detail-bar" && onShare ? (
+        <PublicationSaveShare isSaved={isSaved} isSaving={isLoading} onSave={() => setFlowOpen(true)} onShare={onShare} className={className} />
+      ) : variant === "text" ? (
         <button
           type="button"
           onClick={() => setFlowOpen(true)}
