@@ -16,6 +16,8 @@ interface StoryRingsProps {
 export function StoryRings({ stories }: StoryRingsProps) {
   const {
     isOpen,
+    orderedStories,
+    sessionStories,
     newsComplete,
     continueAfterNews,
     activeStory,
@@ -34,8 +36,8 @@ export function StoryRings({ stories }: StoryRingsProps) {
     markSeen,
   } = useStoryViewer(stories);
 
-  const isFinalStory = activeStoryIndex === stories.length - 1;
-  const nextStory = activeStoryIndex !== null ? stories[activeStoryIndex + 1] : null;
+  const isFinalStory = activeStoryIndex === sessionStories.length - 1;
+  const nextStory = activeStoryIndex !== null ? sessionStories[activeStoryIndex + 1] : null;
 
   useEffect(() => {
     if (!newsComplete || !nextStory) return;
@@ -43,12 +45,9 @@ export function StoryRings({ stories }: StoryRingsProps) {
     return () => window.clearTimeout(timeout);
   }, [newsComplete, nextStory, continueAfterNews]);
 
-  const orderedRings = stories.map((story, index) => ({ story, index }))
-    .sort((a, b) => Number(unseenCount(b.story.items, seenIds) > 0) - Number(unseenCount(a.story.items, seenIds) > 0));
-
   return (
     <>
-      {orderedRings.map(({ story, index }, visualIndex) => {
+      {orderedStories.map((story, index) => {
         const newCount = unseenCount(story.items, seenIds);
         return <StoryRingItem
           key={story.id}
@@ -56,7 +55,7 @@ export function StoryRings({ stories }: StoryRingsProps) {
           seen={newCount === 0}
           unseenCount={newCount}
           coverImageUrl={resolveStoryRingCoverUrl(story, seenIds)}
-          imagePriority={visualIndex === 0}
+          imagePriority={index === 0}
           fallbackContent={
             story.intent === "breaking_news" ? (
               <div
@@ -91,7 +90,7 @@ export function StoryRings({ stories }: StoryRingsProps) {
           activeStory={activeStory}
           activeStoryIndex={activeStoryIndex}
           activeItemIndex={activeItemIndex}
-          totalStories={stories.length}
+          totalStories={sessionStories.length}
           progressKey={progressKey}
           paused={paused}
           seenOfferIds={seenIds}
