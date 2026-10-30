@@ -13,10 +13,10 @@ const FORMATS: { key: PlaceType; icon: string; title: string; sub: string }[] = 
 ];
 
 const BUDGETS: { key: BirthdayBudgetGroup; icon: string; title: ReactNode }[] = [
-  { key: "up300", icon: "💚", title: <>До 300 <BelarusianRubleIcon /></> },
-  { key: "300-600", icon: "💛", title: <>300–600 <BelarusianRubleIcon /></> },
-  { key: "600-1000", icon: "🧡", title: <>600–1000 <BelarusianRubleIcon /></> },
-  { key: "1000plus", icon: "💎", title: <>1000+ <BelarusianRubleIcon /></> },
+  { key: "up300", icon: "💚", title: <>До 300 <BelarusianRubleIcon size="text" /></> },
+  { key: "300-600", icon: "💛", title: <>300–600 <BelarusianRubleIcon size="text" /></> },
+  { key: "600-1000", icon: "🧡", title: <>600–1000 <BelarusianRubleIcon size="text" /></> },
+  { key: "1000plus", icon: "💎", title: <>1000+ <BelarusianRubleIcon size="text" /></> },
 ];
 
 function CheckIcon({ c = "#fff" }: { c?: string }) {

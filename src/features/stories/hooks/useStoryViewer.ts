@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import type { StoryCollection } from "../types/story";
 import {
   markSeen as addSeenOfferId,
   orderBySeen,
+  unseenCount,
   readSeen,
   seenGroupStart as resolveSeenGroupStart,
   writeSeen,
@@ -23,6 +24,7 @@ function browserStorage(): Storage | null {
 
 export function useStoryViewer(stories: StoryCollection[]) {
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
+  const [sessionStories, setSessionStories] = useState<StoryCollection[]>([]);
   const [activeItemIndex, setActiveItemIndex] = useState(0);
   const [activeItems, setActiveItems] = useState<StoryCollection["items"]>([]);
   const [seenGroupStart, setSeenGroupStart] = useState<number | null>(null);
@@ -49,8 +51,12 @@ export function useStoryViewer(stories: StoryCollection[]) {
     };
   }, []);
 
+  const orderedStories = useMemo(() => [...stories].sort((a, b) =>
+    Number(unseenCount(b.items, seenIds) > 0) - Number(unseenCount(a.items, seenIds) > 0)
+  ), [stories, seenIds]);
+  // Freeze the visible topic order for an open viewing session.
   const isOpen = activeStoryIndex !== null;
-  const activeSourceStory = activeStoryIndex !== null ? stories[activeStoryIndex] : null;
+  const activeSourceStory = activeStoryIndex !== null ? sessionStories[activeStoryIndex] : null;
   const activeStory = activeSourceStory
     ? { ...activeSourceStory, items: activeItems }
     : null;
@@ -69,23 +75,25 @@ export function useStoryViewer(stories: StoryCollection[]) {
 
   const open = useCallback(
     (storyIndex: number) => {
-      const story = stories[storyIndex];
+      const story = orderedStories[storyIndex];
       if (!story) return;
       setPaused(false);
       setNewsComplete(false);
+      setSessionStories(orderedStories);
       setActiveItems(orderBySeen(story.items, seenIds));
       setSeenGroupStart(resolveSeenGroupStart(story.items, seenIds));
       setActiveStoryIndex(storyIndex);
       setActiveItemIndex(0);
       setProgressKey((k) => k + 1);
     },
-    [seenIds, stories],
+    [seenIds, orderedStories],
   );
 
   const close = useCallback(() => {
     setPaused(false);
     setNewsComplete(false);
     setActiveStoryIndex(null);
+    setSessionStories([]);
     setActiveItemIndex(0);
     setActiveItems([]);
     setSeenGroupStart(null);
@@ -95,14 +103,14 @@ export function useStoryViewer(stories: StoryCollection[]) {
     if (activeStoryIndex === null) return;
     const nextIndex = activeStoryIndex + 1;
     setNewsComplete(false);
-    if (nextIndex >= stories.length) { close(); return; }
-    const story = stories[nextIndex];
+    if (nextIndex >= sessionStories.length) { return; }
+    const story = sessionStories[nextIndex];
     setActiveItems(orderBySeen(story.items, seenIds));
     setSeenGroupStart(resolveSeenGroupStart(story.items, seenIds));
     setActiveStoryIndex(nextIndex);
     setActiveItemIndex(0);
     setProgressKey((k) => k + 1);
-  }, [activeStoryIndex, stories, seenIds, close]);
+  }, [activeStoryIndex, sessionStories, seenIds]);
 
   const next = useCallback(() => {
     if (activeStoryIndex === null || !activeStory) return;
@@ -114,20 +122,9 @@ export function useStoryViewer(stories: StoryCollection[]) {
       setActiveItemIndex((i) => i + 1);
       return;
     }
-    if (activeStory.intent === "breaking_news") {
-      setNewsComplete(true);
-      return;
-    }
-    const nextStoryIndex = activeStoryIndex + 1;
-    if (nextStoryIndex < stories.length) {
-      setActiveItems(orderBySeen(stories[nextStoryIndex].items, seenIds));
-      setSeenGroupStart(resolveSeenGroupStart(stories[nextStoryIndex].items, seenIds));
-      setActiveStoryIndex(nextStoryIndex);
-      setActiveItemIndex(0);
-    } else {
-      close();
-    }
-  }, [activeStoryIndex, activeStory, activeItemIndex, stories, seenIds, close]);
+    // End of a topic: show a short interstitial, or the final completion screen.
+    setNewsComplete(true);
+  }, [activeStoryIndex, activeStory, activeItemIndex]);
 
   const prev = useCallback(() => {
     if (activeStoryIndex === null || !activeStory) return;
@@ -140,14 +137,14 @@ export function useStoryViewer(stories: StoryCollection[]) {
     }
     const prevStoryIndex = activeStoryIndex - 1;
     if (prevStoryIndex >= 0) {
-      const prevStory = stories[prevStoryIndex];
+      const prevStory = sessionStories[prevStoryIndex];
       const orderedItems = orderBySeen(prevStory.items, seenIds);
       setActiveItems(orderedItems);
       setSeenGroupStart(resolveSeenGroupStart(prevStory.items, seenIds));
       setActiveStoryIndex(prevStoryIndex);
       setActiveItemIndex(orderedItems.length - 1);
     }
-  }, [activeStoryIndex, activeStory, activeItemIndex, stories, seenIds]);
+  }, [activeStoryIndex, activeStory, activeItemIndex, sessionStories, seenIds]);
 
   const pause = useCallback(() => setPaused(true), []);
   const resume = useCallback(() => setPaused(false), []);
@@ -167,6 +164,8 @@ export function useStoryViewer(stories: StoryCollection[]) {
 
   return {
     isOpen,
+    orderedStories,
+    sessionStories,
     newsComplete,
     continueAfterNews,
     activeStory,
