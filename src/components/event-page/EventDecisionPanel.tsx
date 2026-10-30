@@ -2,7 +2,7 @@
 
 import "@/styles/event-page.css";
 import { useEffect, useRef, useState } from "react";
-import { Heart, Phone, Share2 } from "lucide-react";
+import { Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BYN_SYMBOL, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { BelarusianRubleIcon } from "@/components/icons/BelarusianRubleIcon";
@@ -14,6 +14,7 @@ import { PUBLICATION_PRIMARY_ACTION_CLASS, PUBLICATION_BADGE_CLASS } from "@/com
 import { PublicationTitle } from "@/components/publication-page/PublicationTitle";
 import { SidebarCard, SidebarCardTopSection } from "@/components/shared/SidebarCard";
 import { ShareModal } from "@/components/shared/ShareModal";
+import { PublicationSaveShare } from "@/components/shared/PublicationSaveShare";
 import { EventSimpleBookingModal } from "./EventSimpleBookingModal";
 import { CallActionButton } from "@/components/shared/CallActionButton";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
@@ -354,26 +355,15 @@ export function EventDecisionPanel({
           />
         )}
 
-        {/* Secondary actions follow the primary CTA, visually matching the countdown panel. */}
-        <div className="mt-4 grid grid-cols-2 gap-1.5 rounded-xl border border-dashed border-[rgba(20,18,16,0.18)] bg-[#F6F2EA] px-3 py-3">
-          <button
-            type="button"
-            onClick={onPlan}
-            aria-pressed={isPlanned}
-            className="flex min-h-11 items-center justify-center gap-2 rounded-lg text-[14px] font-medium text-[rgba(20,18,16,0.70)] transition-colors hover:bg-white/60 hover:text-[#141210] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E86A3A]"
-          >
-            <Heart size={18} strokeWidth={1.75} className={isPlanned ? "fill-[#E86A3A] text-[#E86A3A]" : ""} aria-hidden />
-            {isPlanned ? "Сохранено" : "Сохранить"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShareOpen(true)}
-            className="flex min-h-11 items-center justify-center gap-2 rounded-lg text-[14px] font-medium text-[rgba(20,18,16,0.70)] transition-colors hover:bg-white/60 hover:text-[#141210] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E86A3A]"
-          >
-            <Share2 size={18} strokeWidth={1.75} aria-hidden />
-            Поделиться
-          </button>
-        </div>
+        {/* Unified save/share UI; the existing plan and share handlers remain authoritative. */}
+        <PublicationSaveShare
+          className="mt-4"
+          isSaved={isPlanned}
+          publicationKind="event"
+          publicationId={data.id}
+          onSave={onPlan}
+          onShare={() => setShareOpen(true)}
+        />
 
         {/* Owner edit */}
         {data.ownerEditHref && (

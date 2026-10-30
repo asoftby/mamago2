@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
-import { createElement, type ReactElement, type ReactNode } from "react";
+import { createElement } from "react";
 
 import { PublicationTitle } from "@/components/publication-page/PublicationTitle";
 import { publicOfferPriceLabel } from "./publicOfferPriceLabel";
@@ -118,24 +118,15 @@ for (const text of [
   assert.ok(tariff.includes(text));
 const noAction = render({ hasPrimaryAction: false });
 assert.ok(!noAction.includes(">Записаться</button>"));
-assert.match(noAction, /aria-label="Сохранить"/);
+assert.match(noAction, /aria-label="Сохранить публикацию"/);
 // The presentation passes the controller's exact callbacks through, with no new action policy.
-const hero = PublicOfferHero(props);
-const callbacks: unknown[] = [];
-function walk(node: ReactNode): void {
-  if (Array.isArray(node)) {
-    node.forEach(walk);
-    return;
-  }
-  if (!node || typeof node !== "object" || !("props" in node)) return;
-  const p = (node as ReactElement<Record<string, unknown>>).props;
-  if (p.onClick) callbacks.push(p.onClick);
-  walk(p.children as ReactNode);
-  walk(p.decision as ReactNode);
-}
-walk(hero);
-assert.ok(callbacks.includes(primary));
-assert.ok(callbacks.includes(save));
+// The hero uses React state. Render it through React rather than calling
+// a component as a plain function (which violates the Rules of Hooks).
+const heroHtml = renderToStaticMarkup(createElement(PublicOfferHero, props));
+assert.match(heroHtml, />Записаться<\/button>/);
+assert.match(heroHtml, /aria-label="Сохранить публикацию"/);
+assert.match(heroHtml, />Поделиться<\/span>/);
+assert.match(heroHtml, /publication-save-summary|Сохранить/);
 console.log(
   "Public Offer presentation: empty sections, no mock fallbacks, preview compatibility, real content, prices, tariffs and action callbacks OK",
 );

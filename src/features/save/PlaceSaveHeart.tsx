@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Heart } from "lucide-react";
+import { PublicationSaveShare } from "@/components/shared/PublicationSaveShare";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
@@ -20,7 +21,8 @@ type PlaceSaveHeartProps = {
   className?: string;
   iconClassName?: string;
   /** `text` — «♡ Сохранить» (иконка + подпись) вместо круглой кнопки. */
-  variant?: "icon" | "text";
+  variant?: "icon" | "text" | "detail-bar";
+  onShare?: () => void;
   /** Зарегистрировать «сохранить» в мобильном хедере публикации (единый источник — этот компонент). */
   registerInHeader?: boolean;
 };
@@ -42,6 +44,7 @@ export function PlaceSaveHeart({
   className,
   iconClassName,
   variant = "icon",
+  onShare,
   registerInHeader = false,
 }: PlaceSaveHeartProps) {
   const { isAuthenticated } = useAuthMe();
@@ -130,6 +133,8 @@ export function PlaceSaveHeart({
         } else if (result.action === "remove-plan") {
           toast.success("Убрано из плана");
         }
+        window.dispatchEvent(new CustomEvent("publication-save-changed", { detail: { kind: "place", id: placeId } }));
+        await checkSaveStatus();
       } catch {
         toast.error("Не получилось выполнить действие", {
           description: "Попробуйте ещё раз",
@@ -139,12 +144,14 @@ export function PlaceSaveHeart({
         setIsLoading(false);
       }
     },
-    [coverImageUrl, placeId, placeSlug, placeTitle],
+    [coverImageUrl, placeId, placeSlug, placeTitle, checkSaveStatus],
   );
 
   return (
     <>
-      {variant === "text" ? (
+      {variant === "detail-bar" && onShare ? (
+        <PublicationSaveShare publicationKind="place" publicationId={placeId} isSaved={isSaved} isSaving={isLoading} onSave={() => setFlowOpen(true)} onShare={onShare} className={className} />
+      ) : variant === "text" ? (
         <button
           type="button"
           onClick={() => setFlowOpen(true)}

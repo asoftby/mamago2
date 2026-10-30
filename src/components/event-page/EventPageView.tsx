@@ -461,6 +461,8 @@ export function EventPageView({
           if (!res.ok) throw new Error("plan_remove_failed");
           toast.success("Убрано из плана");
         }
+        window.dispatchEvent(new CustomEvent("publication-save-changed", { detail: { kind: "event", id: data.id } }));
+        await loadSaveStatus();
       } catch (error) {
         toast.error("Не получилось выполнить действие", { description: "Попробуйте еще раз" });
         throw error;
@@ -468,7 +470,7 @@ export function EventPageView({
         setIsPrimaryLoading(false);
       }
     },
-    [data.id, data.media.posterUrl, data.title, formatPlanDateRu],
+    [data.id, data.media.posterUrl, data.title, formatPlanDateRu, loadSaveStatus],
   );
 
   const addToPlanByDate = useCallback(
@@ -609,7 +611,7 @@ export function EventPageView({
               onPlan={handlePlan}
               onBuy={handleBuy}
               onSave={handleSave}
-              isPlanned={saveStatus.inPlan}
+              isPlanned={saveStatus.isIdea || saveStatus.inPlan}
               planDate={saveStatus.planDate}
             />
           </div>
