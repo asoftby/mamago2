@@ -20,6 +20,13 @@ export interface UploadFromUrlOptions {
    * file (per-owner). `undefined` disables dedup.
    */
   dedupOwnerId?: string;
+  /**
+   * URL policy for the initial request and every redirect hop. Defaults to the
+   * Instagram-only allowlist; callers fetching arbitrary public images (e.g.
+   * wishlist link previews) pass the generic public-http(s) policy. DNS/IP
+   * safety is always enforced by the pinned transport regardless of this hook.
+   */
+  validateUrl?: (url: URL) => void;
 }
 
 export interface UploadedImageResult {
@@ -52,9 +59,11 @@ export async function uploadImageFromUrl(
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
       },
-      validateUrl: (candidate) => {
-        assertSafeRemoteUrl(candidate.toString());
-      },
+      validateUrl:
+        options.validateUrl ??
+        ((candidate) => {
+          assertSafeRemoteUrl(candidate.toString());
+        }),
     });
     buffer = remote.buffer;
     contentType = remote.headers["content-type"] || "";

@@ -91,6 +91,17 @@ export function WishlistEditor({ initial }: { initial: WishlistView }) {
     }
   }
 
+  /** Pulls photo/title from the item's link; a blocked shop just leaves the manual fields. */
+  async function loadPreview(itemId: string) {
+    const res = await call(`/api/wishlists/${wishlist.id}/items/${itemId}/preview`, "POST");
+    if (res.ok && res.data.wishlist) {
+      setWishlist(res.data.wishlist as WishlistView);
+      if (res.data.preview === "unavailable") {
+        toast.message("Не удалось получить фото по ссылке. Название и фото можно указать вручную.");
+      }
+    }
+  }
+
   async function addItem(e: React.FormEvent) {
     e.preventDefault();
     const { title, url } = parseQuickLine(quickLine);
@@ -100,6 +111,7 @@ export function WishlistEditor({ initial }: { initial: WishlistView }) {
       toast.error("Проверьте цену.");
       return;
     }
+    const knownIds = new Set(wishlist.items.map((i) => i.id));
     await run(
       () =>
         call(`/api/wishlists/${wishlist.id}/items`, "POST", {
@@ -108,10 +120,14 @@ export function WishlistEditor({ initial }: { initial: WishlistView }) {
           priceApprox: price,
           quantity: Math.min(99, Math.max(1, Number.parseInt(quickQty, 10) || 1)),
         }),
-      () => {
+      (data) => {
         setQuickLine("");
         setQuickPrice("");
         setQuickQty("1");
+        if (url) {
+          const created = (data.wishlist as WishlistView).items.find((i) => !knownIds.has(i.id));
+          if (created) void loadPreview(created.id);
+        }
       },
     );
   }
@@ -135,6 +151,8 @@ export function WishlistEditor({ initial }: { initial: WishlistView }) {
       });
     } else if (res.ok) {
       setEditingId(null);
+      const before = wishlist.items.find((i) => i.id === itemId)?.url ?? null;
+      if (typeof patch.url === "string" && patch.url && patch.url !== before) void loadPreview(itemId);
     }
   }
 
@@ -375,24 +393,7 @@ function SortableItem(props: {
 }) {
   const { item, disabled, editing } = props;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id, disabled });
-  const [title, setTitle] = useState(item.title);
-  const [url, setUrl] = useState(item.url ?? "");
-  const [comment, setComment] = useState(item.comment ?? "");
-  const [price, setPrice] = useState(item.priceApprox === null ? "" : String(item.priceApprox));
-  const [qty, setQty] = useState(String(item.quantity));
-
   const state = itemStateLabel(item.state, item.takenQuantity, item.quantity);
-
-  function save() {
-    const parsedPrice = price.trim() ? Number(price.replace(",", ".")) : null;
-    props.onSave({
-      title: title.trim() || item.title,
-      url: url.trim() || null,
-      comment: comment.trim() || null,
-      priceApprox: parsedPrice !== null && Number.isFinite(parsedPrice) ? parsedPrice : null,
-      quantity: Math.min(99, Math.max(1, Number.parseInt(qty, 10) || 1)),
-    });
-  }
 
   return (
     <li
@@ -411,6 +412,10 @@ function SortableItem(props: {
         >
           ⋮⋮
         </button>
+        {item.imageSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.imageSrc} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+        ) : null}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-neutral-950">{item.title}</span>
@@ -470,10 +475,57 @@ function SortableItem(props: {
         ) : null}
       </div>
 
-      {editing ? (
+      {editing ? <ItemEditForm item={item} onSave={props.onSave} /> : null}
+    </li>
+  );
+}
+
+/**
+ * Mounted only while editing: drafts start from the item as it was when the form opened.
+ * Save sends just the fields the author actually touched, so a link preview (title/photo)
+ * that arrives while the form is open is never rolled back by an unrelated edit.
+ */
+function ItemEditForm(props: { item: WishlistItemView; onSave: (patch: Record<string, unknown>) => void }) {
+  const { item } = props;
+  const [base] = useState(() => ({
+    title: item.title,
+    url: item.url ?? "",
+    image: item.imageUrl ?? "",
+    comment: item.comment ?? "",
+    price: item.priceApprox === null ? "" : String(item.priceApprox),
+    qty: String(item.quantity),
+  }));
+  const [title, setTitle] = useState(base.title);
+  const [url, setUrl] = useState(base.url);
+  const [image, setImage] = useState(base.image);
+  const [comment, setComment] = useState(base.comment);
+  const [price, setPrice] = useState(base.price);
+  const [qty, setQty] = useState(base.qty);
+
+  function save() {
+    const patch: Record<string, unknown> = {};
+    const urlChanged = url !== base.url;
+    const imageChanged = image !== base.image;
+    if (title !== base.title) patch.title = title.trim() || item.title;
+    if (urlChanged) patch.url = url.trim() || null;
+    // A new link means a different product: drop the old photo unless the author set a new one.
+    if (imageChanged) patch.imageUrl = image.trim() || null;
+    else if (urlChanged) patch.imageUrl = null;
+    if (comment !== base.comment) patch.comment = comment.trim() || null;
+    if (price !== base.price) {
+      const parsed = price.trim() ? Number(price.replace(",", ".")) : null;
+      patch.priceApprox = parsed !== null && Number.isFinite(parsed) ? parsed : null;
+    }
+    if (qty !== base.qty) patch.quantity = Math.min(99, Math.max(1, Number.parseInt(qty, 10) || 1));
+    if (Object.keys(patch).length === 0) return;
+    props.onSave(patch);
+  }
+
+  return (
         <div className="mt-3 grid gap-2 border-t border-neutral-100 pt-3 sm:grid-cols-2">
           <input className={field} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Название" maxLength={200} aria-label="Название" />
           <input className={field} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Ссылка" maxLength={2048} aria-label="Ссылка" />
+          <input className={field} value={image} onChange={(e) => setImage(e.target.value)} placeholder="Ссылка на фото (если превью не подтянулось)" maxLength={2048} aria-label="Ссылка на фото" />
           <input className={field} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Комментарий (размер, цвет…)" maxLength={1000} aria-label="Комментарий" />
           <div className="grid grid-cols-2 gap-2">
             <input className={field} value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Цена" inputMode="decimal" aria-label="Цена" />
@@ -485,7 +537,5 @@ function SortableItem(props: {
             </button>
           </div>
         </div>
-      ) : null}
-    </li>
   );
 }

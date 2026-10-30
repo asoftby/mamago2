@@ -10,8 +10,10 @@ import { PrismaClient } from "@prisma/client";
 import {
   addWishlistItem,
   createWishlist,
+  getOwnerItemImageUrl,
   getWishlist,
   listWishlists,
+  refreshItemPreview,
   removeWishlistItem,
   reorderWishlistItems,
   rotateShareToken,
@@ -313,4 +315,86 @@ test("db constraints: quantity range enforced", async () => {
   const created = await createWishlist(owner, wl(), deps);
   await assert.rejects(() => db.wishlistItem.create({ data: { wishlistId: created.id, title: "bad", quantity: 0 } }));
   await assert.rejects(() => db.wishlistItem.create({ data: { wishlistId: created.id, title: "bad", quantity: 100 } }));
+});
+
+test("link preview: fills photo and placeholder title, never touches link or reservations", async () => {
+  const owner = await makeUser("prev");
+  const w = await createWishlist(owner, wl(), deps);
+  const added = await addWishlistItem(owner, w.id, item("shop.example.test", { url: "https://shop.example.test/p/1" }), deps);
+  const itemId = added.items[0].id;
+  const reservation = await reserve(itemId);
+  const fetchPreview = async () => ({ title: "LEGO City 42", imageUrl: "/api/media/file/lego.webp" });
+
+  const res = await refreshItemPreview(owner, w.id, itemId, { ...deps, fetchPreview });
+  assert.equal(res.preview, "ok");
+  const row = await db.wishlistItem.findUniqueOrThrow({ where: { id: itemId } });
+  assert.equal(row.title, "LEGO City 42");
+  assert.equal(row.imageUrl, "/api/media/file/lego.webp");
+  assert.equal(row.url, "https://shop.example.test/p/1");
+  assert.equal((await db.wishlistReservation.findUniqueOrThrow({ where: { id: reservation.id } })).status, "RESERVED");
+
+  // a title the author typed himself is never overwritten
+  await updateWishlistItem(owner, w.id, itemId, { title: "Мой выбор" }, deps);
+  await refreshItemPreview(owner, w.id, itemId, { ...deps, fetchPreview });
+  assert.equal((await db.wishlistItem.findUniqueOrThrow({ where: { id: itemId } })).title, "Мой выбор");
+});
+
+test("link preview: an edit made while the preview was loading is never overwritten", async () => {
+  const owner = await makeUser("prev-race");
+  const w = await createWishlist(owner, wl(), deps);
+  const added = await addWishlistItem(owner, w.id, item("shop.example.test", { url: "https://shop.example.test/p/9" }), deps);
+  const itemId = added.items[0].id;
+  // the author fixes the title and photo while the (slow) fetch is still running
+  const slow = async () => {
+    await updateWishlistItem(owner, w.id, itemId, { title: "Свой заголовок", imageUrl: "https://img.example.test/mine.jpg" }, deps);
+    return { title: "Магазин: товар", imageUrl: "/api/media/file/shop.webp" };
+  };
+  const res = await refreshItemPreview(owner, w.id, itemId, { ...deps, fetchPreview: slow });
+  assert.equal(res.preview, "unavailable");
+  const row = await db.wishlistItem.findUniqueOrThrow({ where: { id: itemId } });
+  assert.equal(row.title, "Свой заголовок");
+  assert.equal(row.imageUrl, "https://img.example.test/mine.jpg");
+});
+
+test("stored photos are served through the wishlist route (ACL), external links stay as typed", async () => {
+  const owner = await makeUser("img");
+  const stranger = await makeUser("img-out");
+  const w = await createWishlist(owner, wl(), deps);
+  const added = await addWishlistItem(owner, w.id, item("Книга"), deps);
+  // only the preview job can store such a path; the input schema rejects it
+  await db.wishlistItem.update({ where: { id: added.items[0].id }, data: { imageUrl: "/api/media/file/wl/abc123.webp" } });
+  assert.throws(() => item("Хак", { imageUrl: "/api/media/file/secret.webp" }), "internal paths are not accepted from the client");
+  const view = (await getWishlist(owner, w.id, deps)).items[0];
+  assert.equal(view.imageUrl, "/api/media/file/wl/abc123.webp", "raw value kept for editing");
+  assert.equal(view.imageSrc, `/api/wishlists/${w.id}/items/${view.id}/image?v=abc123`);
+  const ext = (await addWishlistItem(owner, w.id, item("Мяч", { imageUrl: "https://img.example.test/b.jpg" }), deps)).items.find((i) => i.title === "Мяч")!;
+  assert.equal(ext.imageSrc, "https://img.example.test/b.jpg");
+  assert.equal(await getOwnerItemImageUrl(owner, w.id, view.id, deps), "/api/media/file/wl/abc123.webp");
+  await assert.rejects(getOwnerItemImageUrl(stranger, w.id, view.id, deps), (e) => e instanceof WishlistError && e.code === "not_found");
+});
+
+test("link preview: blocked shop, missing link, stale link and foreign user", async () => {
+  const owner = await makeUser("prev2");
+  const w = await createWishlist(owner, wl(), deps);
+  const withUrl = (await addWishlistItem(owner, w.id, item("Книга", { url: "https://shop.example.test/b" }), deps)).items[0].id;
+  const noUrl = (await addWishlistItem(owner, w.id, item("Без ссылки"), deps)).items[1].id;
+
+  assert.equal((await refreshItemPreview(owner, w.id, withUrl, { ...deps, fetchPreview: async () => null })).preview, "unavailable");
+  assert.equal((await refreshItemPreview(owner, w.id, noUrl, { ...deps, fetchPreview: async () => ({ title: "x", imageUrl: "/a" }) })).preview, "no_url");
+
+  // the link changes while the page is being fetched: nothing is written
+  const racing = async () => {
+    await db.wishlistItem.update({ where: { id: withUrl }, data: { url: "https://shop.example.test/other" } });
+    return { title: "Old product", imageUrl: "/old.webp" };
+  };
+  assert.equal((await refreshItemPreview(owner, w.id, withUrl, { ...deps, fetchPreview: racing })).preview, "unavailable");
+  const row = await db.wishlistItem.findUniqueOrThrow({ where: { id: withUrl } });
+  assert.equal(row.imageUrl, null);
+  assert.equal(row.title, "Книга");
+
+  const stranger = await makeUser("prev3");
+  await assert.rejects(
+    refreshItemPreview(stranger, w.id, withUrl, { ...deps, fetchPreview: async () => null }),
+    (e: unknown) => e instanceof WishlistError && e.code === "not_found",
+  );
 });
