@@ -8,6 +8,7 @@ import type {
   OpenRouterClient,
   OpenRouterResponseFormat,
 } from "@/lib/ai/openrouterClient";
+import { createExtractionCall } from "@/server/ai/extraction";
 import type { PlanOwner } from "@/server/services/planOwner";
 import {
   CaptureDraftSchema,
@@ -45,16 +46,6 @@ type Usage = {
   tokensIn: number | null;
   tokensOut: number | null;
 };
-
-type Attempt =
-  | { kind: "parsed"; draft: CaptureDraft }
-  | { kind: "invalid" }
-  | {
-      kind: "infra";
-      code: string;
-      retryable: boolean;
-      notConfigured: boolean;
-    };
 
 type EditSnapshot = {
   id: string;
@@ -95,19 +86,6 @@ const PRESERVED_INTAKE_RULES = new Set([
   "ALBUM_TRUNCATED",
   "ALBUM_LATE_PART",
 ]);
-
-function addUsage(
-  usage: Usage,
-  input: { model: string; tokensIn: number | null; tokensOut: number | null },
-): void {
-  usage.model = input.model;
-  if (input.tokensIn !== null) {
-    usage.tokensIn = (usage.tokensIn ?? 0) + input.tokensIn;
-  }
-  if (input.tokensOut !== null) {
-    usage.tokensOut = (usage.tokensOut ?? 0) + input.tokensOut;
-  }
-}
 
 function sumUsage(previous: number | null, added: number | null): number | null {
   if (previous === null && added === null) return null;
@@ -313,74 +291,44 @@ export function createCaptureEditService(deps: CaptureEditDeps) {
       tokensOut: null,
     };
 
-    const attempt = async (model: string): Promise<Attempt> => {
-      const response = await deps.openrouter.chat({
-        model,
-        systemPrompt: replacingText ? CAPTURE_SYSTEM_PROMPT : CAPTURE_EDIT_SYSTEM_PROMPT,
-        userParts,
-        responseFormat,
-      });
-      if (!response.ok) {
-        return {
-          kind: "infra",
-          code: response.code,
-          retryable: response.retryable,
-          notConfigured: response.code === "OPENROUTER_NOT_CONFIGURED",
-        };
-      }
-      addUsage(usage, response);
-      const parsed = parseCaptureDraft(response.content);
-      return parsed.ok
-        ? { kind: "parsed", draft: parsed.draft }
-        : { kind: "invalid" };
-    };
-
-    let result = await attempt(models.fast);
-    if (
-      result.kind === "invalid" ||
-      (result.kind === "infra" && result.retryable)
-    ) {
-      result = await attempt(models.fast);
+    // Fast model, one retry, then the strong model once: the shared policy (same as the capture processor).
+    const call = createExtractionCall<CaptureDraft>({
+      openrouter: deps.openrouter,
+      systemPrompt: replacingText ? CAPTURE_SYSTEM_PROMPT : CAPTURE_EDIT_SYSTEM_PROMPT,
+      userParts,
+      responseFormat,
+      parse: (content) => {
+        const parsed = parseCaptureDraft(content);
+        return parsed.ok ? { ok: true, value: parsed.draft } : { ok: false };
+      },
+      usage,
+    });
+    const outcome = await call.runWithRetry({ fast: models.fast, strong: models.strong });
+    if (!outcome.ok) {
+      return {
+        ok: false,
+        code:
+          outcome.reason === "NOT_CONFIGURED"
+            ? "CAPTURE_MODEL_NOT_CONFIGURED"
+            : outcome.reason === "INFRA"
+              ? "OPENROUTER_FAILED"
+              : "INVALID_MODEL_OUTPUT",
+      };
     }
+    const escalated = outcome.escalation !== null;
+    const escalationCodes: string[] =
+      outcome.escalation === "BAD_RESPONSE"
+        ? [RULE_CODES.escalateBadResponse]
+        : outcome.escalation === "INVALID_JSON"
+          ? [RULE_CODES.escalateInvalidJson]
+          : [];
+    const editedDraft = outcome.value;
 
-    let escalated = false;
-    const escalationCodes: string[] = [];
-    if (result.kind === "infra") {
-      if (result.notConfigured) {
-        return { ok: false, code: "CAPTURE_MODEL_NOT_CONFIGURED" };
-      }
-      if (result.code !== "OPENROUTER_BAD_RESPONSE" || !models.strong) {
-        return { ok: false, code: "OPENROUTER_FAILED" };
-      }
-      escalated = true;
-      escalationCodes.push(RULE_CODES.escalateBadResponse);
-      result = await attempt(models.strong);
-      if (result.kind === "infra") {
-        return { ok: false, code: "OPENROUTER_FAILED" };
-      }
-      if (result.kind === "invalid") {
-        return { ok: false, code: "INVALID_MODEL_OUTPUT" };
-      }
-    } else if (result.kind === "invalid") {
-      if (!models.strong) {
-        return { ok: false, code: "INVALID_MODEL_OUTPUT" };
-      }
-      escalated = true;
-      escalationCodes.push(RULE_CODES.escalateInvalidJson);
-      result = await attempt(models.strong);
-      if (result.kind === "infra") {
-        return { ok: false, code: "OPENROUTER_FAILED" };
-      }
-      if (result.kind === "invalid") {
-        return { ok: false, code: "INVALID_MODEL_OUTPUT" };
-      }
-    }
-
-    if (!replacingText && result.draft.intent !== current.data.intent) {
+    if (!replacingText && editedDraft.intent !== current.data.intent) {
       return { ok: false, code: "EDIT_INTENT_CHANGED" };
     }
 
-    const rules = applyPostLlmRules(result.draft, context);
+    const rules = applyPostLlmRules(editedDraft, context);
     const ruleCodes = [...escalationCodes, ...rules.ruleCodes];
     let duplicates: DuplicateMatch[] = [];
     if (rules.draft.intent === "CREATE") {
