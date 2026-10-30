@@ -537,6 +537,36 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     category: "ADMIN",
   },
 
+  // ── Business support channel (separate from customer Direct) ──
+  SUPPORT_BUSINESS_REPLY: {
+    type: "SUPPORT_BUSINESS_REPLY",
+    audience: "BUSINESS",
+    surface: "BUSINESS",
+    groupId: "business",
+    label: "Ответ поддержки mamaGo",
+    description: "Команда mamaGo ответила на обращение бизнеса",
+    defaultChannels: { inApp: true, email: false, telegram: true },
+    ctaLabel: "Открыть обращение",
+    resolveHref: () => "/business/support",
+    telegram: { enabledByDefault: true, title: "Ответ поддержки mamaGo" },
+    importance: "HIGH",
+    category: "BUSINESS",
+  },
+  SUPPORT_STAFF_MESSAGE: {
+    type: "SUPPORT_STAFF_MESSAGE",
+    audience: "ADMIN",
+    surface: "ADMIN",
+    groupId: "admin_moderation",
+    label: "Сообщение от бизнеса в поддержку",
+    description: "Бизнес создал обращение или ответил в переписке",
+    defaultChannels: { inApp: true, email: false, telegram: false },
+    ctaLabel: "Открыть обращение",
+    resolveHref: () => "/admin/support",
+    telegram: { enabledByDefault: false },
+    importance: "HIGH",
+    category: "ADMIN",
+  },
+
   // ── Booking ──
   BOOKING_CREATED: {
     type: "BOOKING_CREATED",

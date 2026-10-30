@@ -1,0 +1,90 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { prisma } from "@/lib/prisma";
+import { canAccessBusiness } from "@/server/permissions/business-permissions";
+import { requireSupportThreadAccess, SupportAccessError } from "./supportAccess";
+
+if (!process.env.DATABASE_URL) throw new Error("Isolated PostgreSQL database required");
+const tag = randomUUID();
+const userIds: string[] = [];
+const businessIds: string[] = [];
+const threadIds: string[] = [];
+
+async function main() {
+  try {
+    const [ownerA, ownerB, outsider] = await Promise.all(
+      ["a", "b", "outsider"].map(name =>
+        prisma.user.create({ data: { email: `support-acl-${tag}-${name}@example.invalid` } }),
+      ),
+    );
+    userIds.push(ownerA.id, ownerB.id, outsider.id);
+    const a = await prisma.business.create({ data: { name: "Support A", ownerUserId: ownerA.id } });
+    const b = await prisma.business.create({ data: { name: "Support B", ownerUserId: ownerB.id } });
+    businessIds.push(a.id, b.id);
+    await prisma.businessMember.createMany({ data: [
+      { businessId: a.id, userId: ownerA.id, role: "OWNER", isActive: true },
+      { businessId: b.id, userId: ownerB.id, role: "OWNER", isActive: true },
+    ] });
+    const thread = await prisma.supportThread.create({ data: {
+      businessId: a.id, createdById: ownerA.id, subject: "ACL test",
+      messages: { create: { authorId: ownerA.id, actor: "BUSINESS", body: "Test" } },
+    } });
+    threadIds.push(thread.id);
+    const ticketKey = randomUUID();
+    const firstTicket = await prisma.supportThread.upsert({
+      where: { requestKey: ticketKey },
+      create: { businessId: a.id, createdById: ownerA.id, subject: "Retry ticket", requestKey: ticketKey },
+      update: {},
+    });
+    threadIds.push(firstTicket.id);
+    const repeatedTicket = await prisma.supportThread.upsert({
+      where: { requestKey: ticketKey },
+      create: { businessId: a.id, createdById: ownerA.id, subject: "Retry ticket", requestKey: ticketKey },
+      update: {},
+    });
+    assert.equal(repeatedTicket.id, firstTicket.id, "ticket request-key retry is idempotent");
+    const replyKey = randomUUID();
+    const firstReply = await prisma.supportMessage.upsert({
+      where: { requestKey: replyKey },
+      create: { threadId: thread.id, authorId: ownerA.id, actor: "BUSINESS", body: "Retry reply", requestKey: replyKey },
+      update: {},
+    });
+    const repeatedReply = await prisma.supportMessage.upsert({
+      where: { requestKey: replyKey },
+      create: { threadId: thread.id, authorId: ownerA.id, actor: "BUSINESS", body: "Retry reply", requestKey: replyKey },
+      update: {},
+    });
+    assert.equal(repeatedReply.id, firstReply.id, "message request-key retry is idempotent");
+    assert.equal(await canAccessBusiness(ownerA.id, a.id), true);
+    assert.equal((await requireSupportThreadAccess({ id: ownerA.id, role: "USER" }, thread.id)).id, thread.id);
+    assert.equal(await canAccessBusiness(ownerB.id, a.id), false);
+    assert.equal(await canAccessBusiness(outsider.id, a.id), false);
+    await assert.rejects(requireSupportThreadAccess({ id: ownerB.id, role: "USER" }, thread.id), (e: unknown) => e instanceof SupportAccessError && e.status === 404);
+    await assert.rejects(requireSupportThreadAccess({ id: outsider.id, role: "USER" }, thread.id), (e: unknown) => e instanceof SupportAccessError && e.status === 404);
+    const rowsForB = await prisma.supportThread.findMany({
+      where: { businessId: { in: [b.id] } }, select: { id: true },
+    });
+    assert.ok(!rowsForB.some(row => row.id === thread.id), "B must not read A's thread");
+    const message = await prisma.supportMessage.findFirst({
+      where: { threadId: thread.id }, select: { actor: true, authorId: true },
+    });
+    assert.equal(message?.actor, "BUSINESS");
+    assert.equal(message?.authorId, ownerA.id);
+    await prisma.businessMember.update({
+      where: { businessId_userId: { businessId: a.id, userId: ownerA.id } },
+      data: { isActive: false },
+    });
+    assert.equal(await canAccessBusiness(ownerA.id, a.id), false, "revoked member loses access");
+    await assert.rejects(requireSupportThreadAccess({ id: ownerA.id, role: "USER" }, thread.id), (e: unknown) => e instanceof SupportAccessError && e.status === 404);
+    console.log("Support cross-business PostgreSQL isolation: passed");
+  } finally {
+    if (threadIds.length) await prisma.supportThread.deleteMany({ where: { id: { in: threadIds } } });
+    if (businessIds.length) {
+      await prisma.businessMember.deleteMany({ where: { businessId: { in: businessIds } } });
+      await prisma.business.deleteMany({ where: { id: { in: businessIds } } });
+    }
+    if (userIds.length) await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+    await prisma.$disconnect();
+  }
+}
+main().catch(e => { console.error(e); process.exitCode = 1; });
