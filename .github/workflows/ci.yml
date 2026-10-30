@@ -58,6 +58,7 @@ jobs:
           bash -n scripts/release/ci-dev-backup.sh
           bash -n scripts/release/migrate-with-backup.sh
           node --test scripts/release/ci-dev-deploy.contract.test.mjs
+          node --test scripts/release/compose-db-preflight.contract.test.mjs
 
       - name: Admin Russian-language check
         run: |
