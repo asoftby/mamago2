@@ -20,6 +20,7 @@ import {
   PLAN_SEG_ON,
 } from "./planChipStyles";
 import { PlanScreenTitleHead } from "./PlanScreenTitleHead";
+import { planParticipantPalette } from "../PlanParticipantChip";
 
 export type PlanNewTaskPerson = { id: string; name: string; kind: "adult" | "child" };
 
@@ -389,9 +390,10 @@ export function PlanNewTaskScreen({
           <div className="flex flex-wrap gap-5">
             {[{ id: "", name: "Вся семья", kind: "adult" as const }, ...people].map((p) => {
               const on = whoId === p.id;
+              const colors = planParticipantPalette(p.id ? `${p.kind}:${p.id}` : null);
               return (
                 <button key={p.id || "family"} type="button" aria-pressed={on} onClick={() => setWhoId(p.id)} className={cn("flex min-w-11 flex-col items-center gap-[7px] rounded-2xl", PLAN_FOCUS)}>
-                  <span className={cn("relative flex h-[62px] w-[62px] items-center justify-center rounded-full border-2 text-[21px] font-extrabold transition-colors", "text-[var(--mp-ac)]", on ? "border-[var(--mp-ac)] bg-[var(--mp-soft)]" : "border-transparent bg-[var(--mp-soft)] hover:border-[var(--mp-line-strong)]")}>
+                  <span className={cn("relative flex h-[62px] w-[62px] items-center justify-center rounded-full border-2 text-[21px] font-extrabold transition-colors", on ? "border-current" : "border-transparent hover:border-current/30")} style={{ background: colors.bg, color: colors.fg }}>
                     {p.id === "" ? <Users className="h-6 w-6" aria-hidden /> : displayName(p).trim().charAt(0).toUpperCase()}
                     {on ? (
                       <span className="absolute -bottom-[3px] -right-[3px] flex h-[23px] w-[23px] items-center justify-center rounded-full border-2 border-[var(--mp-bg)] bg-[var(--mp-ac)] text-white">

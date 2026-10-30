@@ -8,7 +8,8 @@ import type { PlanBookingState } from "@/server/family/planBookingPure";
 import { Container } from "@/components/ui/Container";
 import { PlanCalendar, invalidatePlanDayMarkers } from "@/features/plan-calendar";
 import { PlanPersonFilter, planPersonFilterOptions } from "@/features/my-plan/components/PlanPersonFilter";
-import { filterPlanEntriesByPerson } from "@/features/my-plan/lib/filterPlanEntriesByPerson";
+import { useSharedPlanAudienceFilters } from "@/features/my-plan/hooks/useSharedPlanAudienceFilters";
+import { filterVisiblePlanEntries, type PlanPersonSelection } from "@/features/my-plan/lib/filterPlanEntriesByPerson";
 import { PlanDayList } from "./PlanDayList";
 import { PlanOverviewDialog } from "./PlanOverviewDialog";
 import { PlanProfileCompletionGate } from "./PlanProfileCompletionGate";
@@ -34,7 +35,6 @@ import {
 import {
   filterFamilyCalendarItems,
   findFamilyCalendarConflictIds,
-  type FamilyCalendarFilter,
 } from "@/features/my-plan/lib/familyCalendar";
 import { toast } from "@/lib/toast";
 
@@ -112,6 +112,7 @@ type Props = {
   initialSelectedDate: string;
   initialRange: { from: string; to: string };
   familyChildren: Array<{ id: string; name: string }>;
+  familyAdults: Array<{ id: string; name: string }>;
   accountDisplayName?: string | null;
   ideaActivityIds: string[];
   childrenAges: number[];
@@ -304,6 +305,7 @@ export function PlanPageClient({
   initialSelectedDate,
   initialRange,
   familyChildren,
+  familyAdults,
   accountDisplayName,
   initialIdeas = [],
   scenarioStatusByDate = {},
@@ -328,7 +330,10 @@ export function PlanPageClient({
   });
   const [scenarioStatuses, setScenarioStatuses] = useState(scenarioStatusByDate);
   const [loadingWeek, setLoadingWeek] = useState<string | null>(null);
-  const [calendarFilter, setCalendarFilter] = useState<FamilyCalendarFilter>("all");
+  const { filters: audienceFilters, update: updateAudienceFilters } = useSharedPlanAudienceFilters(currentUserId);
+  const includedPeople = audienceFilters.include;
+  const excludedPeople = audienceFilters.exclude;
+  const visibilityFilter = audienceFilters.visibility;
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
   const [editingManualItem, setEditingManualItem] = useState<SerializedPlanItem | null>(null);
@@ -421,14 +426,21 @@ export function PlanPageClient({
     }, {});
   }, [visibleItems]);
 
-  const dayItems = filterPlanEntriesByPerson(
-    itemsByDate[selectedDate] ?? [],
-    calendarFilter === "all"
-      ? { kind: "all" }
-      : calendarFilter === "family"
-        ? { kind: "adult", id: currentUserId }
-        : { kind: "child", id: calendarFilter.slice("child:".length) },
-  );
+  const toSelection = (value: string): PlanPersonSelection | null =>
+    value.startsWith("adult:") ? { kind: "adult", id: value.slice("adult:".length) } :
+    value.startsWith("child:") ? { kind: "child", id: value.slice("child:".length) } : null;
+  const selection = {
+    include: includedPeople.map(toSelection).filter((p): p is PlanPersonSelection => p !== null),
+    exclude: excludedPeople.map(toSelection).filter((p): p is PlanPersonSelection => p !== null),
+    visibility: visibilityFilter,
+  };
+  // The server returns only records accessible to the current account.
+  // The local participant/scope selection can only narrow that set.
+  const dayItems = filterVisiblePlanEntries(itemsByDate[selectedDate] ?? [], selection);
+  const participantNameById = new Map<string, string>([
+    ...familyAdults.map((adult) => [`adult:${adult.id}`, adult.name] as const),
+    ...familyChildren.map((child) => [`child:${child.id}`, child.name] as const),
+  ]);
   const conflictIds = useMemo(() => findFamilyCalendarConflictIds(dayItems), [dayItems]);
   const todayISO = todayKey();
   const selectedWeekStart = startOfWeek(selectedDate);
@@ -549,11 +561,15 @@ export function PlanPageClient({
         <PlanPersonFilter
           className="mt-3"
           options={planPersonFilterOptions([
-            { value: "family", label: "Я" },
+            ...familyAdults.map((adult) => ({ value: `adult:${adult.id}`, label: adult.name })),
             ...familyChildren.map((child) => ({ value: `child:${child.id}`, label: child.name })),
           ])}
-          value={calendarFilter}
-          onChange={(value) => setCalendarFilter(value as FamilyCalendarFilter)}
+          selectedValues={includedPeople}
+          onSelectionChange={(include) => updateAudienceFilters({ ...audienceFilters, include })}
+          excludedValues={excludedPeople}
+          onExclusionsChange={(exclude) => updateAudienceFilters({ ...audienceFilters, exclude })}
+          visibility={visibilityFilter}
+          onVisibilityChange={(visibility) => updateAudienceFilters({ ...audienceFilters, visibility })}
         />
       </Container>
 
@@ -601,6 +617,7 @@ export function PlanPageClient({
           <PlanDayList
             date={selectedDate}
             items={dayItems}
+            participantNameById={participantNameById}
             onRemove={handleRemoveItem}
             familyView={familyUi ? familyView : null}
             onVisibilityChange={handleVisibilityChange}
