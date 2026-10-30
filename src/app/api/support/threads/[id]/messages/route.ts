@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
+import { notifySupportMessage } from "@/server/support/supportNotifications";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/security/rateLimit";
 import { requireSupportThreadAccess, isSupportStaff, SupportAccessError } from "@/server/support/supportAccess";
@@ -30,6 +31,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }, select: { id: true, actor: true, body: true, createdAt: true } });
     });
     if (!message) return NextResponse.json({ error: "Conversation closed" }, { status: 409 });
+    await notifySupportMessage({
+      threadId: id, businessId: thread.businessId, messageId: message.id,
+      senderId: user.id, actor: message.actor,
+    });
     return NextResponse.json(message, { status: 201 });
   } catch (e) {
     if (e instanceof SupportAccessError) return NextResponse.json({ error: e.message }, { status: e.status });
