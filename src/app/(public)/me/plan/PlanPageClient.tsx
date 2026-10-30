@@ -565,9 +565,8 @@ export function PlanPageClient({
             ...familyChildren.map((child) => ({ value: `child:${child.id}`, label: child.name })),
           ])}
           selectedValues={includedPeople}
-          onSelectionChange={(include) => updateAudienceFilters({ ...audienceFilters, include })}
+          onAudienceChange={({ include, exclude }) => updateAudienceFilters({ ...audienceFilters, include, exclude })}
           excludedValues={excludedPeople}
-          onExclusionsChange={(exclude) => updateAudienceFilters({ ...audienceFilters, exclude })}
           visibility={visibilityFilter}
           onVisibilityChange={(visibility) => updateAudienceFilters({ ...audienceFilters, visibility })}
         />
