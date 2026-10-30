@@ -13,7 +13,6 @@ import { cn } from "@/lib/utils";
  */
 export type PublicSaver = {
   id: string;
-  displayName: string;
   avatarUrl: string | null;
 };
 
@@ -45,13 +44,15 @@ export function PublicationSaveShare({
   footer,
 }: PublicationSaveShareProps) {
   const [remoteCount, setRemoteCount] = useState<number | null>(null);
+  const [remoteSavers, setRemoteSavers] = useState<PublicSaver[]>([]);
   const refresh = useCallback(async () => {
     if (!publicationKind || !publicationId) return;
     try {
       const params = new URLSearchParams({ kind: publicationKind, id: publicationId });
       const res = await fetch("/api/publication/save-summary?" + params.toString(), { cache: "no-store" });
       if (!res.ok) return;
-      const summary: { count?: number } = await res.json();
+      const summary: { count?: number; visibleSavers?: PublicSaver[] } = await res.json();
+      setRemoteSavers(Array.isArray(summary.visibleSavers) ? summary.visibleSavers : []);
       if (typeof summary.count === "number" && Number.isFinite(summary.count)) {
         setRemoteCount(Math.max(0, Math.floor(summary.count)));
       }
@@ -74,7 +75,8 @@ export function PublicationSaveShare({
   const total = typeof supplied === "number" && Number.isFinite(supplied)
     ? Math.max(0, Math.floor(supplied))
     : null;
-  const avatars = visibleSavers.filter((saver) => Boolean(saver.avatarUrl)).slice(0, 5);
+  const avatars = (publicationKind && publicationId ? remoteSavers : visibleSavers)
+    .filter((saver) => Boolean(saver.avatarUrl)).slice(0, 5);
 
   return (
     <div className={cn("w-full", className)}>
