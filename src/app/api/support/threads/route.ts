@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { getCurrentUser } from "@/lib/auth/server";
+import { notifySupportMessage } from "@/server/support/supportNotifications";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/security/rateLimit";
 import { getBusinessMembership } from "@/server/permissions/business-permissions";
@@ -51,7 +52,12 @@ export async function POST(request: NextRequest) {
     const thread = await prisma.supportThread.create({ data: {
       id: randomUUID(), businessId: input.businessId, createdById: user.id, subject: input.subject,
       messages: { create: { id: randomUUID(), authorId: user.id, actor: "BUSINESS", body: input.body } },
-    }, select: { id: true, businessId: true, status: true } });
-    return NextResponse.json(thread, { status: 201 });
+    }, select: { id: true, businessId: true, status: true, messages: { select: { id: true }, take: 1 } } });
+    const messageId = thread.messages[0]?.id;
+    if (messageId) await notifySupportMessage({
+      threadId: thread.id, businessId: thread.businessId, messageId,
+      senderId: user.id, actor: "BUSINESS",
+    });
+    return NextResponse.json({ id: thread.id, businessId: thread.businessId, status: thread.status }, { status: 201 });
   } catch (e) { return failure(e); }
 }
