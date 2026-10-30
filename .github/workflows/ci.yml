@@ -78,6 +78,12 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mamago_ci
 
+      - name: Business support notification routing contract
+        run: pnpm exec tsx src/server/support/supportNoticeContract.test.ts
+
+      - name: Business support authorization regressions
+        run: pnpm exec tsx src/server/support/supportAccess.test.ts
+
       - name: Business authorization architecture regressions
         run: |
           pnpm exec tsx src/lib/auth/businessEventAuthorizationWiring.test.ts
@@ -378,6 +384,13 @@ jobs:
         run: |
           pnpm exec prisma migrate deploy
           pnpm exec tsx src/server/family/familyPlanAcl.integration.test.ts
+
+      - name: Business support PostgreSQL isolation
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/server/support/supportIsolation.integration.test.ts
 
       - name: Cross-region eligibility PostgreSQL behavior
         env:
