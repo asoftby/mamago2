@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type MouseEvent } from "react";
 import { Heart } from "lucide-react";
+import { PublicationSaveShare } from "@/components/shared/PublicationSaveShare";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
@@ -27,7 +28,9 @@ type ArticleSaveHeartProps = {
   className?: string;
   iconClassName?: string;
   /** "icon" — карточка (только сердце); "labeled" — detail (сердце + текст) */
-  variant?: "icon" | "labeled";
+  variant?: "icon" | "labeled" | "detail-bar";
+  /** Share handler for the unified detail bar; existing modal remains in parent. */
+  onShare?: () => void;
   /**
    * Статус из батч-запроса родителя (карточные гриды). Может прийти позже
    * монтирования — компонент синхронизируется, когда проп обновится.
@@ -61,6 +64,7 @@ export function ArticleSaveHeart({
   className,
   iconClassName,
   variant = "icon",
+  onShare,
   initialStatus,
   skipOwnFetch = false,
   registerInHeader = false,
@@ -180,6 +184,15 @@ export function ArticleSaveHeart({
 
   return (
     <>
+      {variant === "detail-bar" && onShare ? (
+        <PublicationSaveShare
+          isSaved={isSaved}
+          isSaving={isLoading}
+          onSave={() => setFlowOpen(true)}
+          onShare={onShare}
+          className={className}
+        />
+      ) : (
       <button
         type="button"
         onClick={handleHeartClick}
@@ -198,6 +211,7 @@ export function ArticleSaveHeart({
         <Heart className={cn("h-4 w-4", isSaved && "fill-current", iconClassName)} />
         {variant === "labeled" ? <span>Сохранить</span> : null}
       </button>
+      )}
 
       <SaveActivityFlowAdaptive
         open={flowOpen}
