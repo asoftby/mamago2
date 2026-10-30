@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 type Thread = { id: string; businessId: string; subject: string; status: "NEW" | "IN_PROGRESS" | "CLOSED"; lastMessageAt: string };
 type Message = { id: string; body: string; actor: "BUSINESS" | "STAFF"; createdAt: string };
 
-export function SupportInbox({ businessId, staff = false }: { businessId?: string; staff?: boolean }) {
+export function SupportInbox({ businessId, staff = false, initialThreadId }: { businessId?: string; staff?: boolean; initialThreadId?: string }) {
   const [threads, setThreads] = useState<Thread[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(initialThreadId ?? null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [subject, setSubject] = useState("");
   const [draft, setDraft] = useState("");
@@ -49,6 +49,17 @@ export function SupportInbox({ businessId, staff = false }: { businessId?: strin
     finally { setBusy(false); }
   }
 
+  // The other side may reply while this screen is open. Poll only the support API,
+  // not customer Direct. Keep manual refresh available as a fallback.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void loadThreads().catch(() => {});
+      if (selected) void loadMessages(selected).catch(() => {});
+    }, 20000);
+    return () => clearInterval(timer);
+  }, [selected, loadThreads, loadMessages]);
+
   const active = threads.find(t => t.id === selected);
   return <section className="mx-auto max-w-5xl space-y-5 px-4 py-8">
     <header><h1 className="text-2xl font-semibold">Поддержка mamaGo</h1>
@@ -60,6 +71,7 @@ export function SupportInbox({ businessId, staff = false }: { businessId?: strin
       <textarea required maxLength={3000} className="w-full rounded-lg border p-3" placeholder="Опишите вопрос" value={draft} onChange={e => setDraft(e.target.value)}/>
       <button disabled={busy} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">Отправить обращение</button>
     </form>}
+    <button type="button" onClick={() => { void loadThreads().catch(e => setError(String(e))); if (selected) void loadMessages(selected).catch(e => setError(String(e))); }} className="rounded-lg border px-3 py-2 text-sm">Обновить переписку</button>
     <div className="grid gap-4 md:grid-cols-[minmax(210px,1fr)_2fr]">
       <div className="space-y-2"><h2 className="font-semibold">Обращения</h2>
         {threads.map(t => <button key={t.id} onClick={() => setSelected(t.id)} className={"block w-full rounded-lg border p-3 text-left text-sm " + (selected === t.id ? "border-primary" : "")}>
