@@ -683,6 +683,7 @@ model PlanItem {
   @@index([userId, planPlaceSlug])
   @@index([articleId])
   @@index([startsAt])
+  @@index([reminderAt])
   @@index([userId, source, startsAt])
   @@index([childId])
   @@index([assigneeUserId])
