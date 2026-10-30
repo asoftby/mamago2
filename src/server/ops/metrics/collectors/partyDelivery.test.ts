@@ -3,8 +3,8 @@ import type { MetricCollectorContext } from "../types";
 import { collectPartyDeliveryMetrics, partyDeliverySamples, partyDeliveryMetricsCollector } from "./partyDelivery";
 
 assert.deepEqual(partyDeliverySamples(2, {
-  failed_telegram: 3n,
-  stale_pending_telegram: 1n,
+  failed_telegram: BigInt(3),
+  stale_pending_telegram: BigInt(1),
 }), [
   { metric: "party.outbox_failed_exhausted", value: 2 },
   { metric: "party.telegram_delivery_failed", value: 3 },
@@ -24,7 +24,7 @@ void (async () => {
     partyOutbox: {
       count: async (args: { where: unknown }) => { observedWhere = args.where; return 4; },
     },
-    $queryRaw: async () => { queries += 1; return [{ failed_telegram: 2n, stale_pending_telegram: 3n }]; },
+    $queryRaw: async () => { queries += 1; return [{ failed_telegram: BigInt(2), stale_pending_telegram: BigInt(3) }]; },
   };
   const actual = await collectPartyDeliveryMetrics({ prisma, now } as unknown as MetricCollectorContext);
   assert.deepEqual(observedWhere, { status: "FAILED", attempts: { gte: 5 } });
