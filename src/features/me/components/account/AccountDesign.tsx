@@ -564,11 +564,12 @@ const CSS = `
 .mg-acc :focus{outline:none}
 .mg-acc :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
 
+.mg-acc .mg-acc__hero-name{font-size:100px}
 @media(max-width:760px){
-  .mg-acc .mg-acc__hero-name{font-size:100px}
  .mg-acc .hero-grid{grid-template-columns:1fr;gap:28px;align-items:stretch}
 }
 @media(max-width:640px){
+  .mg-acc .mg-acc__hero-name{font-size:40px}
   .mg-acc .wrap{padding:0 16px}
   .mg-acc .member-row{overflow-x:auto}
 }
