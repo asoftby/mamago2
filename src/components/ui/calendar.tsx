@@ -12,6 +12,8 @@ export interface CalendarProps {
   disabled?: boolean;
   disablePast?: boolean;
   defaultMonth?: Date;
+  /** Notifies controlled calendar consumers when arrow navigation changes the displayed month. */
+  onMonthChange?: (month: Date) => void;
   rangeStart?: Date | null; // For range selection
   rangeEnd?: Date | null; // For range selection
   minDate?: Date | null; // Minimum selectable date (for range end selection)
@@ -36,6 +38,7 @@ export function Calendar({
   disabled = false,
   disablePast = true,
   defaultMonth,
+  onMonthChange,
   rangeStart,
   rangeEnd,
   minDate,
@@ -127,6 +130,7 @@ export function Calendar({
   };
 
   const handlePrevMonth = () => {
+    onMonthChange?.(new Date(year, month - 1, 1));
     if (month === 0) {
       setMonth(11);
       setYear(year - 1);
@@ -136,6 +140,7 @@ export function Calendar({
   };
 
   const handleNextMonth = () => {
+    onMonthChange?.(new Date(year, month + 1, 1));
     if (month === 11) {
       setMonth(0);
       setYear(year + 1);
