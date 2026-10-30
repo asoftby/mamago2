@@ -8,10 +8,10 @@ import { BuilderProgress } from "../BuilderProgress";
 type BuilderHook = BirthdayBuilderWithGate;
 
 const BUDGET_OPTIONS = [
-  { value: "up300" as const, emoji: "💚", label: <>До 300 <BelarusianRubleIcon /></> },
-  { value: "300-600" as const, emoji: "💛", label: <>300–600 <BelarusianRubleIcon /></> },
-  { value: "600-1000" as const, emoji: "🧡", label: <>600–1000 <BelarusianRubleIcon /></> },
-  { value: "1000plus" as const, emoji: "💎", label: <>1000+ <BelarusianRubleIcon /></> },
+  { value: "up300" as const, emoji: "💚", label: <>До 300 <BelarusianRubleIcon size="text" /></> },
+  { value: "300-600" as const, emoji: "💛", label: <>300–600 <BelarusianRubleIcon size="text" /></> },
+  { value: "600-1000" as const, emoji: "🧡", label: <>600–1000 <BelarusianRubleIcon size="text" /></> },
+  { value: "1000plus" as const, emoji: "💎", label: <>1000+ <BelarusianRubleIcon size="text" /></> },
 ];
 
 export function StepBudget({ builder }: { builder: BuilderHook }) {

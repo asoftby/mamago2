@@ -100,6 +100,7 @@ jobs:
           pnpm exec tsx src/server/services/recurringTask.service.test.ts
           pnpm exec tsx src/server/services/recurrenceMaterialization.test.ts
           pnpm exec tsx src/app/api/plan/manual/recurring/route.contract.test.ts
+          pnpm exec tsx src/features/birthday/builder/components/steps/budgetCurrencySize.contract.test.tsx
           pnpm exec tsx src/server/birthday/partyDraft.contract.test.ts
           pnpm exec tsx src/server/birthday/partyBusiness.contract.test.ts
           pnpm exec tsx src/server/birthday/partyOutbox.contract.test.ts
