@@ -450,8 +450,7 @@ export function PlanMainContent({
     }
     return null;
   }, [openedEventId, planItemsByDate]);
-  /** Фильтр дня по человеку: «Все» либо id персоны (ребёнок — childId, взрослый — assigneeUserId). */
-  const [personFilter, setPersonFilter] = useState<string>("all");
+  /** Selection lives in useSharedPlanAudienceFilters, not in a second stale state. */
   const { filters: audienceFilters, update: updateAudienceFilters } = useSharedPlanAudienceFilters(family?.primaryAdultPersonaId);
   const includedPeople = audienceFilters.include;
   const excludedPeople = audienceFilters.exclude;
@@ -1132,7 +1131,19 @@ export function PlanMainContent({
   ) : null;
   const isPastDay = selectedDate < todayKey;
   const isTodaySelected = selectedDate === todayKey;
-  const filterPerson = personFilter === "all" ? null : personas.find((persona) => persona.id === personFilter) ?? null;
+  const filteredAudience = includedPeople.length > 0 || excludedPeople.length > 0 || planVisibilityFilter !== "ALL";
+  const filterPerson = includedPeople.length === 1 && excludedPeople.length === 0
+    ? (() => {
+        const token = includedPeople[0]!;
+        const userId = token.slice(6);
+        if (token.startsWith("adult:")) {
+          const adult = familyAdults.find((member) => member.userId === userId);
+          return { kind: "adult" as const, displayName: adult?.isMe ? "Я" : adult?.displayName?.trim() || "Участник семьи" };
+        }
+        if (token.startsWith("child:")) return personas.find((persona) => persona.kind === "child" && persona.id === userId) ?? null;
+        return null;
+      })()
+    : null;
   const personShortName = (persona: { kind: string; displayName?: string | null }) =>
     persona.displayName?.trim() || (persona.kind === "adult" ? "Я" : "");
   const dayContextLabel = (() => {
@@ -1140,7 +1151,9 @@ export function PlanMainContent({
     const needsWeekday = ["Сегодня", "Завтра", "Вчера"].includes(base);
     const weekday = new Date(`${selectedDate}T12:00:00`).toLocaleDateString("ru-RU", { weekday: "long" });
     const label = needsWeekday ? `${base}, ${weekday}` : base;
-    return filterPerson ? `${label} · ${filterPerson.kind === "adult" ? "мои дела" : personShortName(filterPerson)}` : label;
+    return filterPerson ? `${label} · ${filterPerson.kind === "adult"
+      ? (personShortName(filterPerson) === "Я" ? "мои дела" : `дела: ${personShortName(filterPerson)}`)
+      : personShortName(filterPerson)}` : label;
   })();
 
   const personFilterOptions = planPersonFilterOptions([
@@ -1263,13 +1276,17 @@ export function PlanMainContent({
     if (dayPartSections.length > 0) return renderDayPlanSection(compact);
     return (
       <div role="status" className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-[15.5px] leading-[1.5] text-[var(--mp-tx2)]">
-        {filterPerson ? (
+        {filteredAudience ? (
           <>
             <b className="font-bold text-[var(--mp-tx)]">
-              У {filterPerson.kind === "adult" ? "вас" : toGenitiveName(personShortName(filterPerson))} в этот день свободно.
+              {filterPerson?.kind === "adult" && personShortName(filterPerson) === "Я"
+                ? "У вас в этот день свободно."
+                : filterPerson?.kind === "child"
+                  ? `У ${toGenitiveName(personShortName(filterPerson))} в этот день свободно.`
+                  : "Нет дел по выбранным фильтрам."}
             </b>{" "}
-            <button type="button" onClick={() => setPersonFilter("all")} className="font-bold text-[var(--mp-ac-dark)] underline underline-offset-[3px]">
-              Показать всех
+            <button type="button" onClick={() => updateAudienceFilters({ include: [], exclude: [], visibility: "ALL" })} className="font-bold text-[var(--mp-ac-dark)] underline underline-offset-[3px]">
+              Сбросить фильтры
             </button>
           </>
         ) : (
@@ -1295,7 +1312,7 @@ export function PlanMainContent({
 
   /** Пустой день: 1–2 сохранённые идеи с кнопкой «Запланировать на {дата}» (тот же механизм, что «+» у идей). */
   const renderOwnIdeas = () => {
-    if (isPendingDateHydration || isPastDay || dayPartSections.length > 0 || filterPerson) return null;
+    if (isPendingDateHydration || isPastDay || dayPartSections.length > 0 || filteredAudience) return null;
     const dayActivityIds = new Set((planItemsByDate?.[selectedDate] ?? []).map((item) => item.activityId));
     const candidates = ideas
       .filter((idea) => !idea.inPlanOnDate && !dayActivityIds.has(idea.activityId))
