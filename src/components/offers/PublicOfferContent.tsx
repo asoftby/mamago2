@@ -5,6 +5,7 @@ import { PublicationAboutSection } from "@/components/publication-page/Publicati
 import { PublicationSection } from "@/components/publication-page/PublicationSection";
 import { PublicationSectionHeading } from "@/components/publication-page/PublicationSectionHeading";
 import { EventRichDescription } from "@/components/event-page/EventRichDescription";
+import { RichContentRenderer } from "@/components/content/RichContentRenderer";
 import { PriceListBlock } from "@/components/shared/PriceListBlock";
 import { FaqSection } from "@/components/public/FaqSection";
 import { OfferUniqueSections } from "./OfferAccordion";
@@ -96,10 +97,10 @@ export function PublicOfferContent(props: Props) {
           />
           <PriceListBlock
             items={priceItems}
-            detailsHtml={priceDetails}
             note={priceData.note}
             showHeader={false}
           />
+          {isRichTextMeaningful(priceDetails) && <RichContentRenderer html={priceDetails} />}
           {showTariffs &&
             data.pricing.discounts?.map((discount, index) => (
               <p key={index} className="my-3 text-sm text-text-main">

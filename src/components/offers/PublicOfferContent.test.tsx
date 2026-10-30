@@ -188,3 +188,10 @@ for (const mode of ["FREE", "NONE", "ON_REQUEST"] as const) {
   assert.ok(!html.includes("Старая скидка"));
   assert.ok(!html.includes("Сколько это стоит"));
 }
+
+const linkedPricing = render({ pricing: {
+  priceCaption: '<p>Читайте <a href="https://example.com/participation">условия участия</a></p>',
+  promotionDetails: '<p><a href="https://example.com/promotion">Инструкция по акции</a></p>',
+} });
+assert.match(linkedPricing, /href="https:\/\/example\.com\/participation"/);
+assert.match(linkedPricing, /href="https:\/\/example\.com\/promotion"/);
