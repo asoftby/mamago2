@@ -54,9 +54,6 @@ export function JournalCard({ href, title, imageUrl, categoryLabel, geographyLab
                   </p>
                 )}
               </div>
-              {geographyLabel && (
-                <p className="mb-1 text-xs text-muted-foreground">{geographyLabel}</p>
-              )}
               <p className={cn(
                   "font-semibold text-neutral-900 transition-colors duration-150 group-hover:text-primary",
                   homeCard
