@@ -23,3 +23,17 @@ assert.deepEqual(filterVisiblePlanEntries(visible, { include: [{kind:"adult",id:
 assert.deepEqual(filterVisiblePlanEntries(visible, { include: [{kind:"all"}], exclude: [{kind:"adult",id:"adult-2"}], visibility:"FAMILY" }).map(x=>x.id), ["three","shared"]);
 assert.deepEqual(filterVisiblePlanEntries(visible, { include: [], visibility:"PRIVATE" }).map(x=>x.id), ["one"]);
 assert.equal(filterVisiblePlanEntries(visible, { include: [{kind:"adult",id:"adult-1"},{kind:"adult",id:"adult-1"}] }).length, 2);
+
+assert.deepEqual(
+  filterVisiblePlanEntries(visible, { include: [{ kind: "adult", id: "departed-adult" }] }),
+  [],
+  "stale participant selection must not broaden to the whole family",
+);
+assert.deepEqual(
+  filterVisiblePlanEntries(visible, {
+    include: [{ kind: "adult", id: "adult-1" }],
+    exclude: [{ kind: "adult", id: "adult-1" }],
+  }),
+  [],
+  "explicit exclusion wins over inclusion",
+);

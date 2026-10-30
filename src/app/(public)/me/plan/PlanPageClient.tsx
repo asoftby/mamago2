@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { PLAN_SCOPE_STORAGE_KEY, filterByScope, parsePlanScopeFilter, showFamilyUi, type FamilyView, type PlanScopeFilter } from "@/features/my-plan/lib/planVisibilityView";
+import { showFamilyUi, type FamilyView } from "@/features/my-plan/lib/planVisibilityView";
 import type { PlanBookingState } from "@/server/family/planBookingPure";
 import { Container } from "@/components/ui/Container";
 import { PlanCalendar, invalidatePlanDayMarkers } from "@/features/plan-calendar";
@@ -112,7 +112,7 @@ type Props = {
   initialSelectedDate: string;
   initialRange: { from: string; to: string };
   familyChildren: Array<{ id: string; name: string }>;
-  familyAdults: Array<{ id: string; name: string }>;
+  familyAdults: Array<{ id: string; name: string; avatarUrl?: string | null }>;
   accountDisplayName?: string | null;
   ideaActivityIds: string[];
   childrenAges: number[];
@@ -344,35 +344,15 @@ export function PlanPageClient({
     if (searchParams.has("historyPage")) setArchiveOpen(true);
   }, [searchParams]);
   const familyUi = showFamilyUi(familyView);
-  const [scope, setScope] = useState<PlanScopeFilter>("all");
-
-  // The chosen chip is remembered per browser; read after mount to keep SSR markup stable.
-  useEffect(() => {
-    try {
-      setScope(parsePlanScopeFilter(window.localStorage.getItem(PLAN_SCOPE_STORAGE_KEY)));
-    } catch {
-      /* storage unavailable: keep "all" */
-    }
-  }, []);
+  // Single audience source of truth: obsolete legacy scope must not silently
+  // narrow entries when the visible participant chips say "Все доступные".
   // Server data is the source of truth after a refresh (e.g. after a conflict).
   useEffect(() => {
     setItemsByWeek({ [initialRange.from]: initialItems });
   }, [initialItems, initialRange.from]);
 
-  const changeScope = (next: PlanScopeFilter) => {
-    setScope(next);
-    try {
-      window.localStorage.setItem(PLAN_SCOPE_STORAGE_KEY, next);
-    } catch {
-      /* ignore */
-    }
-  };
-
   const items = useMemo(() => Object.values(itemsByWeek).flat(), [itemsByWeek]);
-  const visibleItems = useMemo(
-    () => (familyUi ? filterByScope(items, scope, familyView?.currentUserId ?? "") : items),
-    [items, scope, familyUi, familyView],
-  );
+  const visibleItems = items;
 
   const loadWeek = useCallback(async (date: string, options: { force?: boolean } = {}) => {
     const from = startOfWeek(date);
@@ -445,7 +425,7 @@ export function PlanPageClient({
   const todayISO = todayKey();
   const selectedWeekStart = startOfWeek(selectedDate);
   const selectedWeekEnd = addDays(selectedWeekStart, 6);
-  const weekItems = visibleItems
+  const weekItems = filterVisiblePlanEntries(visibleItems, selection)
     .filter((item) => item.date >= selectedWeekStart && item.date <= selectedWeekEnd)
     .sort((a, b) => {
       const byDate = a.date.localeCompare(b.date);
@@ -556,52 +536,21 @@ export function PlanPageClient({
 
       {/* Week Calendar */}
       <Container className="pb-4">
-        <PlanCalendar value={selectedDate} onChange={selectDate} variant="page" markerScope={familyUi ? scope : "all"} />
+        <PlanCalendar value={selectedDate} onChange={selectDate} variant="page" markerScope={visibilityFilter === "FAMILY" ? "family" : "all"} />
         {loadingWeek != null ? <span role="status" className="mt-2 block text-xs text-neutral-500">Загрузка…</span> : null}
         <PlanPersonFilter
           className="mt-3"
           options={planPersonFilterOptions([
-            ...familyAdults.map((adult) => ({ value: `adult:${adult.id}`, label: adult.name })),
+            ...familyAdults.map((adult) => ({ value: `adult:${adult.id}`, label: adult.name, avatarUrl: adult.avatarUrl })),
             ...familyChildren.map((child) => ({ value: `child:${child.id}`, label: child.name })),
           ])}
           selectedValues={includedPeople}
-          onSelectionChange={(include) => updateAudienceFilters({ ...audienceFilters, include })}
+          onAudienceChange={({ include, exclude }) => updateAudienceFilters({ ...audienceFilters, include, exclude })}
           excludedValues={excludedPeople}
-          onExclusionsChange={(exclude) => updateAudienceFilters({ ...audienceFilters, exclude })}
           visibility={visibilityFilter}
           onVisibilityChange={(visibility) => updateAudienceFilters({ ...audienceFilters, visibility })}
         />
       </Container>
-
-      {familyUi && (
-        <Container>
-          <div role="tablist" aria-label="Что показывать в плане" className="flex gap-2 pb-6">
-            {(
-              [
-                ["all", "Всё"],
-                ["family", "Семья"],
-                ["mine", "Моё"],
-              ] as const
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={scope === value}
-                onClick={() => changeScope(value)}
-                className="rounded-full border px-4 py-1.5 text-[13px] font-semibold"
-                style={{
-                  borderColor: scope === value ? "#141210" : "rgba(20,18,16,.18)",
-                  background: scope === value ? "#141210" : "transparent",
-                  color: scope === value ? "#fff" : "#3A332B",
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </Container>
-      )}
 
       {/* Main: day list + ideas sidebar */}
       <Container className="pb-20">

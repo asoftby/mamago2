@@ -450,18 +450,17 @@ export function PlanMainContent({
     }
     return null;
   }, [openedEventId, planItemsByDate]);
-  /** Фильтр дня по человеку: «Все» либо id персоны (ребёнок — childId, взрослый — assigneeUserId). */
-  const [personFilter, setPersonFilter] = useState<string>("all");
+  /** Selection lives in useSharedPlanAudienceFilters, not in a second stale state. */
   const { filters: audienceFilters, update: updateAudienceFilters } = useSharedPlanAudienceFilters(family?.primaryAdultPersonaId);
   const includedPeople = audienceFilters.include;
   const excludedPeople = audienceFilters.exclude;
   const planVisibilityFilter = audienceFilters.visibility;
-  const [familyAdults, setFamilyAdults] = useState<Array<{ userId: string; displayName: string | null; isMe: boolean }>>([]);
+  const [familyAdults, setFamilyAdults] = useState<Array<{ userId: string; displayName: string | null; avatarUrl?: string | null; isMe: boolean }>>([]);
   useEffect(() => {
     if (!family?.primaryAdultPersonaId) { setFamilyAdults([]); return; }
     const controller = new AbortController();
     fetch("/api/family", { credentials: "include", cache: "no-store", signal: controller.signal })
-      .then(res => res.ok ? res.json() as Promise<{ family?: { adults?: Array<{ userId: string; displayName: string | null; isMe: boolean }> } }> : null)
+      .then(res => res.ok ? res.json() as Promise<{ family?: { adults?: Array<{ userId: string; displayName: string | null; avatarUrl?: string | null; isMe: boolean }> } }> : null)
       .then(data => { if (!controller.signal.aborted) setFamilyAdults(data?.family?.adults ?? []); })
       .catch(() => { if (!controller.signal.aborted) setFamilyAdults([]); });
     return () => controller.abort();
@@ -1002,13 +1001,13 @@ export function PlanMainContent({
 
   const audienceSelection = useMemo(() => {
     const person = (id: string): PlanPersonSelection | null => {
-      if (id.startsWith("adult:")) {
-        const userId = id.slice(6);
-        return familyAdults.some(adult => adult.userId === userId) || userId === family?.primaryAdultPersonaId ? { kind: "adult", id: userId } : null;
+      // Unknown saved selections must stay restrictive: do not turn a removed
+      // family member's filter into "all". The server already enforces ACL.
+      if (id.startsWith("adult:") && id.length > 6) {
+        return { kind: "adult", id: id.slice(6) };
       }
-      if (id.startsWith("child:")) {
-        const childId = id.slice(6);
-        return personas.some(p => p.kind === "child" && p.id === childId) ? { kind: "child", id: childId } : null;
+      if (id.startsWith("child:") && id.length > 6) {
+        return { kind: "child", id: id.slice(6) };
       }
       return null;
     };
@@ -1017,7 +1016,7 @@ export function PlanMainContent({
       exclude: excludedPeople.map(person).filter((p): p is PlanPersonSelection => Boolean(p)),
       visibility: planVisibilityFilter,
     };
-  }, [includedPeople, excludedPeople, planVisibilityFilter, personas, familyAdults, family?.primaryAdultPersonaId]);
+  }, [includedPeople, excludedPeople, planVisibilityFilter]);
 
   const visibleDayItems = useMemo(
     () => filterVisiblePlanEntries(dayItemsSorted, audienceSelection),
@@ -1132,7 +1131,19 @@ export function PlanMainContent({
   ) : null;
   const isPastDay = selectedDate < todayKey;
   const isTodaySelected = selectedDate === todayKey;
-  const filterPerson = personFilter === "all" ? null : personas.find((persona) => persona.id === personFilter) ?? null;
+  const filteredAudience = includedPeople.length > 0 || excludedPeople.length > 0 || planVisibilityFilter !== "ALL";
+  const filterPerson = includedPeople.length === 1 && excludedPeople.length === 0
+    ? (() => {
+        const token = includedPeople[0]!;
+        const userId = token.slice(6);
+        if (token.startsWith("adult:")) {
+          const adult = familyAdults.find((member) => member.userId === userId);
+          return { kind: "adult" as const, displayName: adult?.isMe ? "Я" : adult?.displayName?.trim() || "Участник семьи" };
+        }
+        if (token.startsWith("child:")) return personas.find((persona) => persona.kind === "child" && persona.id === userId) ?? null;
+        return null;
+      })()
+    : null;
   const personShortName = (persona: { kind: string; displayName?: string | null }) =>
     persona.displayName?.trim() || (persona.kind === "adult" ? "Я" : "");
   const dayContextLabel = (() => {
@@ -1140,13 +1151,16 @@ export function PlanMainContent({
     const needsWeekday = ["Сегодня", "Завтра", "Вчера"].includes(base);
     const weekday = new Date(`${selectedDate}T12:00:00`).toLocaleDateString("ru-RU", { weekday: "long" });
     const label = needsWeekday ? `${base}, ${weekday}` : base;
-    return filterPerson ? `${label} · ${filterPerson.kind === "adult" ? "мои дела" : personShortName(filterPerson)}` : label;
+    return filterPerson ? `${label} · ${filterPerson.kind === "adult"
+      ? (personShortName(filterPerson) === "Я" ? "мои дела" : `дела: ${personShortName(filterPerson)}`)
+      : personShortName(filterPerson)}` : label;
   })();
 
   const personFilterOptions = planPersonFilterOptions([
     ...familyAdults.map(adult => ({
       value: `adult:${adult.userId}`,
       label: adult.isMe ? "Я" : adult.displayName?.trim() || "Взрослый",
+      avatarUrl: adult.avatarUrl,
     })),
     ...personas.filter(persona => persona.kind === "child").map(persona => ({
       value: `child:${persona.id}`,
@@ -1161,9 +1175,8 @@ export function PlanMainContent({
       <PlanPersonFilter
         options={personFilterOptions}
         selectedValues={includedPeople}
-        onSelectionChange={(include) => updateAudienceFilters({ ...audienceFilters, include })}
+        onAudienceChange={({ include, exclude }) => updateAudienceFilters({ ...audienceFilters, include, exclude })}
         excludedValues={excludedPeople}
-        onExclusionsChange={(exclude) => updateAudienceFilters({ ...audienceFilters, exclude })}
         visibility={planVisibilityFilter}
         onVisibilityChange={(visibility) => updateAudienceFilters({ ...audienceFilters, visibility })}
       />
@@ -1189,6 +1202,9 @@ export function PlanMainContent({
               ? (familyAdults.find((adult) => adult.userId === item.assigneeUserId)?.displayName?.trim() || personas.find((persona) => persona.id === item.assigneeUserId)?.displayName?.trim() || "Взрослый")
               : null
         }
+        authorLabel={familyAdults.length > 1 && item.userId !== family?.primaryAdultPersonaId
+          ? familyAdults.find((adult) => adult.userId === item.userId)?.displayName?.trim() || "другой взрослый"
+          : null}
         onRemove={() => handleRemoveFromPlan(item.id)}
         onMove={canMovePlanItem(item) && !isPastDay ? () => setMovingItem(item) : undefined}
         onOpen={() => {
@@ -1261,13 +1277,17 @@ export function PlanMainContent({
     if (dayPartSections.length > 0) return renderDayPlanSection(compact);
     return (
       <div role="status" className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-[15.5px] leading-[1.5] text-[var(--mp-tx2)]">
-        {filterPerson ? (
+        {filteredAudience ? (
           <>
             <b className="font-bold text-[var(--mp-tx)]">
-              У {filterPerson.kind === "adult" ? "вас" : toGenitiveName(personShortName(filterPerson))} в этот день свободно.
+              {filterPerson?.kind === "adult" && personShortName(filterPerson) === "Я"
+                ? "У вас в этот день свободно."
+                : filterPerson?.kind === "child"
+                  ? `У ${toGenitiveName(personShortName(filterPerson))} в этот день свободно.`
+                  : "Нет дел по выбранным фильтрам."}
             </b>{" "}
-            <button type="button" onClick={() => setPersonFilter("all")} className="font-bold text-[var(--mp-ac-dark)] underline underline-offset-[3px]">
-              Показать всех
+            <button type="button" onClick={() => updateAudienceFilters({ include: [], exclude: [], visibility: "ALL" })} className="font-bold text-[var(--mp-ac-dark)] underline underline-offset-[3px]">
+              Сбросить фильтры
             </button>
           </>
         ) : (
@@ -1293,7 +1313,7 @@ export function PlanMainContent({
 
   /** Пустой день: 1–2 сохранённые идеи с кнопкой «Запланировать на {дата}» (тот же механизм, что «+» у идей). */
   const renderOwnIdeas = () => {
-    if (isPendingDateHydration || isPastDay || dayPartSections.length > 0 || filterPerson) return null;
+    if (isPendingDateHydration || isPastDay || dayPartSections.length > 0 || filteredAudience) return null;
     const dayActivityIds = new Set((planItemsByDate?.[selectedDate] ?? []).map((item) => item.activityId));
     const candidates = ideas
       .filter((idea) => !idea.inPlanOnDate && !dayActivityIds.has(idea.activityId))
