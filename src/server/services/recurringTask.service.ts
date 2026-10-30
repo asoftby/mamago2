@@ -22,7 +22,7 @@ export function validateRecurringTask(value: NewRecurringTask) {
   if (typeof value.title !== "string" || !value.title.trim() || value.title.length > 160 || /[<>]/.test(value.title)) throw new Error("invalid_title");
   if (value.startTime != null && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value.startTime)) throw new Error("invalid_start_time");
   const lead = value.reminderLeadMinutes;
-  if (lead != null && (!Number.isInteger(lead) || lead < 1 || lead > 1440 || !value.startTime || value.reminderEnabled !== true)) throw new Error("invalid_reminder");
+  if (lead != null && (!Number.isInteger(lead) || lead < 1 || lead > 28 * 24 * 60 || !value.startTime || value.reminderEnabled !== true)) throw new Error("invalid_reminder");
   const childId = value.childId ?? null;
   const assigneeUserId = value.assigneeUserId ?? null;
   if (childId !== null && (typeof childId !== "string" || !childId || childId.length > 128)) throw new Error("invalid_child");
