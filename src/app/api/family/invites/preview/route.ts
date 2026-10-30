@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ preview });
   } catch (error) {
     if (error instanceof FamilyInviteError) {
-      return NextResponse.json({ error: error.code }, { status: error.code === "invalid_invite" ? 404 : 409 });
+      return NextResponse.json({ error: error.code }, { status: error.code === "invalid_invite" ? 404 : error.code === "expired_invite" ? 410 : 409 });
     }
     console.error("[family] join preview failed", error);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
