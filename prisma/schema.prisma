@@ -7484,6 +7484,7 @@ enum SupportMessageActor {
 
 model SupportThread {
   id            String              @id @default(cuid())
+  requestKey    String?             @unique
   businessId    String
   createdById   String
   subject       String
@@ -7500,6 +7501,7 @@ model SupportThread {
 
 model SupportMessage {
   id         String              @id @default(cuid())
+  requestKey String?             @unique
   threadId   String
   authorId   String
   actor      SupportMessageActor
