@@ -23,6 +23,8 @@ interface PlanItemRowProps {
   onOpen?: () => void;
   /** Имя ребёнка, для кого пункт. Нет → «Вся семья». */
   participantLabel?: string | null;
+  /** Creator of a shared entry, distinct from its assigned participant. */
+  authorLabel?: string | null;
 }
 
 export type PlanItemVisualKind = "event" | "note";
@@ -42,7 +44,7 @@ const twoLineTitleStyle = {
   overflow: "hidden",
 } as const;
 
-export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel }: PlanItemRowProps) {
+export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, authorLabel }: PlanItemRowProps) {
   const cityCtx = useOptionalCity();
   const city = cityCtx?.citySlug ?? DEFAULT_CITY_SLUG;
   const activityDetailHref = item.activity?.id
@@ -137,6 +139,9 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel }
 
           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[13px] leading-4 text-[var(--mp-tx2)]">
             <span className="min-w-0 truncate">{participantLabel || "Вся семья"}</span>
+            {authorLabel ? (
+              <span className="min-w-0 truncate">· Добавил(а) {authorLabel}</span>
+            ) : null}
             {showReminder ? (
               <span className="inline-flex shrink-0 items-center gap-1">
                 <span aria-hidden>·</span>
