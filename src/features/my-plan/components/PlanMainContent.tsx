@@ -1002,13 +1002,13 @@ export function PlanMainContent({
 
   const audienceSelection = useMemo(() => {
     const person = (id: string): PlanPersonSelection | null => {
-      if (id.startsWith("adult:")) {
-        const userId = id.slice(6);
-        return familyAdults.some(adult => adult.userId === userId) || userId === family?.primaryAdultPersonaId ? { kind: "adult", id: userId } : null;
+      // Unknown saved selections must stay restrictive: do not turn a removed
+      // family member's filter into "all". The server already enforces ACL.
+      if (id.startsWith("adult:") && id.length > 6) {
+        return { kind: "adult", id: id.slice(6) };
       }
-      if (id.startsWith("child:")) {
-        const childId = id.slice(6);
-        return personas.some(p => p.kind === "child" && p.id === childId) ? { kind: "child", id: childId } : null;
+      if (id.startsWith("child:") && id.length > 6) {
+        return { kind: "child", id: id.slice(6) };
       }
       return null;
     };
@@ -1017,7 +1017,7 @@ export function PlanMainContent({
       exclude: excludedPeople.map(person).filter((p): p is PlanPersonSelection => Boolean(p)),
       visibility: planVisibilityFilter,
     };
-  }, [includedPeople, excludedPeople, planVisibilityFilter, personas, familyAdults, family?.primaryAdultPersonaId]);
+  }, [includedPeople, excludedPeople, planVisibilityFilter]);
 
   const visibleDayItems = useMemo(
     () => filterVisiblePlanEntries(dayItemsSorted, audienceSelection),
@@ -1161,9 +1161,8 @@ export function PlanMainContent({
       <PlanPersonFilter
         options={personFilterOptions}
         selectedValues={includedPeople}
-        onSelectionChange={(include) => updateAudienceFilters({ ...audienceFilters, include })}
+        onAudienceChange={({ include, exclude }) => updateAudienceFilters({ ...audienceFilters, include, exclude })}
         excludedValues={excludedPeople}
-        onExclusionsChange={(exclude) => updateAudienceFilters({ ...audienceFilters, exclude })}
         visibility={planVisibilityFilter}
         onVisibilityChange={(visibility) => updateAudienceFilters({ ...audienceFilters, visibility })}
       />
@@ -1189,6 +1188,9 @@ export function PlanMainContent({
               ? (familyAdults.find((adult) => adult.userId === item.assigneeUserId)?.displayName?.trim() || personas.find((persona) => persona.id === item.assigneeUserId)?.displayName?.trim() || "Взрослый")
               : null
         }
+        authorLabel={familyAdults.length > 1 && item.userId !== family?.primaryAdultPersonaId
+          ? familyAdults.find((adult) => adult.userId === item.userId)?.displayName?.trim() || "другой взрослый"
+          : null}
         onRemove={() => handleRemoveFromPlan(item.id)}
         onMove={canMovePlanItem(item) && !isPastDay ? () => setMovingItem(item) : undefined}
         onOpen={() => {
