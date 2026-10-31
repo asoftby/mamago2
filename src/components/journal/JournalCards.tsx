@@ -33,7 +33,7 @@ export function journalCardMeta(article: CityHomeJournalArticle, now?: Date): st
   if (article.publicationType === "BREAKING_NEWS") {
     return article.publishedAt ? formatJournalRelativeTime(article.publishedAt, now) : "";
   }
-  return `${article.readTime} мин чтения`;
+  return "";
 }
 
 function SaveOverlay({ article, saveStatus, source }: { article: CityHomeJournalArticle; saveStatus?: ArticleSaveStatus; source: string }) {
