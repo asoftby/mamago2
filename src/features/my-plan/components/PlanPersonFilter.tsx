@@ -74,18 +74,19 @@ export function PlanPersonFilter({
               type="button"
               aria-pressed={selected}
               onClick={() => toggle(option.value)}
-              className="inline-flex min-h-11 max-w-[180px] shrink-0 items-center justify-center gap-1.5 truncate rounded-full border px-4 text-[14px] font-semibold transition-colors"
+              className="inline-flex h-[46px] max-w-[180px] shrink-0 items-center justify-center gap-2 truncate rounded-full border px-[18px] text-[14px] font-semibold transition-colors hover:border-[#6f675e]"
               style={{
-                color: selected ? "#fff" : "#141210",
-                background: selected ? "#141210" : "#fff",
-                borderColor: selected ? "#141210" : "rgba(20,18,16,.18)",
+                color: "#141210",
+                background: selected ? "var(--mp-chip-on-bg, #f7c3ad)" : "#fff",
+                borderColor: selected ? "var(--mp-chip-on-line, #f3a684)" : "rgba(20,18,16,.18)",
               }}
             >
               {option.value !== "all" ? (option.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={option.avatarUrl} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                <img src={option.avatarUrl} alt="" className="h-[26px] w-[26px] shrink-0 rounded-full object-cover" />
               ) : (
-                <span aria-hidden className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-black/10 text-[10px] font-bold">{option.label.trim().charAt(0).toUpperCase() || "•"}</span>
+                <span aria-hidden className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
+                style={{ background: "rgba(0,0,0,.1)" }}>{option.label.trim().charAt(0).toUpperCase() || "•"}</span>
               )) : null}
               {option.label}
             </button>

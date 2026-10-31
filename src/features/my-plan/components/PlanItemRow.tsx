@@ -85,32 +85,25 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
     }
   };
 
-  const titleClassName = "text-[15.5px] font-semibold leading-[1.35] text-[var(--mp-tx)] [overflow-wrap:anywhere]";
+  const titleClassName = "text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)] [overflow-wrap:anywhere]";
 
   return (
-    <article className="group relative rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-3 transition-colors hover:border-[var(--mp-line-strong)] focus-within:border-[var(--mp-line-strong)]">
-      <div className="flex items-start gap-3">
-        <div className="w-10 shrink-0 pt-0.5 text-center text-text-main">
-          {time ? (
-            <span className="text-[14px] font-bold leading-5 tabular-nums">{time}</span>
-          ) : (
-            <span className="block text-[11px] leading-[1.2] text-[var(--mp-tx2)]">Весь день</span>
-          )}
-        </div>
+    <article className="group relative rounded-[22px] border border-[#d6e4f3] bg-[#eaf2fb] py-3 pl-3.5 pr-2 transition-colors hover:border-[#b9cfe8] focus-within:border-[#b9cfe8]">
+      <div className="flex items-start gap-3.5">
 
         {showPoster ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={poster!}
             alt=""
-            className="h-10 w-10 shrink-0 rounded-lg object-cover"
+            className="h-[50px] w-[50px] shrink-0 rounded-full border border-[#cbdcef] object-cover"
           />
         ) : isCatalogEvent ? (
-          <PlanItemCategoryTile category={category} />
+          <PlanItemCategoryTile category={category} round />
         ) : !isManual ? (
-          <PlanItemCategoryTile category={category} />
+          <PlanItemCategoryTile category={category} round />
         ) : (
-          <PlanItemCategoryPicker value={category} onChange={(next) => void changeCategory(next)} className="relative z-10" />
+          <PlanItemCategoryPicker round value={category} onChange={(next) => void changeCategory(next)} className="relative z-10" />
         )}
 
         <div className="min-w-0 flex-1">
@@ -137,7 +130,9 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
             </span>
           )}
 
-          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[13px] leading-4 text-[var(--mp-tx2)]">
+          <div className="mp-font-meta mt-[3px] flex min-w-0 items-center gap-1.5 text-[11px] leading-4 tracking-[.02em] text-[var(--mp-tx2)]">
+            <span className="shrink-0 tabular-nums">{time || "Весь день"}</span>
+            <span aria-hidden>·</span>
             <span className="min-w-0 truncate">{participantLabel || "Вся семья"}</span>
             {authorLabel ? (
               <span className="min-w-0 truncate">· Добавил(а) {authorLabel}</span>
@@ -152,7 +147,7 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
           </div>
         </div>
 
-        <div className="relative z-10 -mr-1 flex shrink-0 items-center">
+        <div className="relative z-10 flex shrink-0 items-center self-center">
           {onMove ? (
             <button
               type="button"

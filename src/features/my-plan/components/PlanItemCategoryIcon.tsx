@@ -41,15 +41,21 @@ const CATEGORY_ICONS: Record<PlanItemCategoryKey, ComponentType<LucideProps>> = 
 export function PlanItemCategoryTile({
   category,
   className,
+  round = false,
 }: {
   category: PlanItemCategoryKey;
   className?: string;
+  /** «Мой план» v3: белый круг 50px с обводкой вместо плитки 40px. */
+  round?: boolean;
 }) {
   const Icon = CATEGORY_ICONS[category];
   return (
     <span
       className={cn(
-        "flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-border text-text-muted",
+        "flex shrink-0 items-center justify-center",
+        round
+          ? "h-[50px] w-[50px] rounded-full border border-[#cbdcef] bg-white text-[var(--mp-tx)]"
+          : "h-10 w-10 rounded-[10px] bg-border text-text-muted",
         className,
       )}
       aria-hidden
@@ -65,7 +71,9 @@ export function PlanItemCategoryPicker({
   onChange,
   className,
   stopPropagation = false,
+  round = false,
 }: {
+  round?: boolean;
   value: PlanItemCategoryKey;
   onChange: (next: PlanItemCategoryKey) => void;
   className?: string;
@@ -80,11 +88,12 @@ export function PlanItemCategoryPicker({
           aria-label={`Значок: ${PLAN_ITEM_CATEGORY_LABELS[value]}. Изменить`}
           onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
           className={cn(
-            "shrink-0 rounded-[10px] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+            "shrink-0 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+            round ? "rounded-full" : "rounded-[10px]",
             className,
           )}
         >
-          <PlanItemCategoryTile category={value} />
+          <PlanItemCategoryTile category={value} round={round} />
         </button>
       </PopoverTrigger>
       <PopoverContent

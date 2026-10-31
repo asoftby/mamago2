@@ -88,8 +88,11 @@ export function MyPlanCapsuleView({
             <CalendarDays className="h-[19px] w-[19px]" strokeWidth={1.8} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
-            <span className="block text-[12px] leading-tight text-white/90">
-              Мой <em className="font-display italic text-white">план</em>
+            <span
+              style={{ fontFamily: "Menlo, ui-monospace, SFMono-Regular, Monaco, Consolas, monospace" }}
+              className="block text-[12px] leading-tight text-white/90"
+            >
+              Мой план
             </span>
             <span className="block text-[13px] font-medium leading-[1.2] text-white lg:line-clamp-2">
               {loading ? "Загружаем…" : "Добавим что-нибудь?"}

@@ -16,7 +16,7 @@ assert.doesNotMatch(inWidget, /style=/); // no token overrides: the sheet define
 const onPage = renderToStaticMarkup(createElement(PlanStickyCounter, { onAdd: noop, floating: true }));
 assert.match(onPage, /fixed/);
 assert.match(onPage, /--mp-ac:var\(--primary\)/);
-assert.match(onPage, /Что нужно сделать\?/);
+assert.match(onPage, /Добавим что-нибудь\?/);
 assert.match(onPage, /max-w-\[560px\]/);
 
 // Without a handler nothing renders.
