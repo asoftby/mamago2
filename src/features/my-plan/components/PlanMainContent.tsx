@@ -454,7 +454,8 @@ export function PlanMainContent({
   const { filters: audienceFilters, update: updateAudienceFilters } = useSharedPlanAudienceFilters(family?.primaryAdultPersonaId);
   const includedPeople = audienceFilters.include;
   const excludedPeople = audienceFilters.exclude;
-  const planVisibilityFilter = audienceFilters.visibility;
+  // Вкладки «Все доступные / Мои личные / Общие» в виджете пока скрыты: сохранённый фильтр не должен прятать дела.
+  const planVisibilityFilter: typeof audienceFilters.visibility = "ALL";
   const [familyAdults, setFamilyAdults] = useState<Array<{ userId: string; displayName: string | null; avatarUrl?: string | null; isMe: boolean }>>([]);
   useEffect(() => {
     if (!family?.primaryAdultPersonaId) { setFamilyAdults([]); return; }
@@ -1175,8 +1176,6 @@ export function PlanMainContent({
         selectedValues={includedPeople}
         onAudienceChange={({ include, exclude }) => updateAudienceFilters({ ...audienceFilters, include, exclude })}
         excludedValues={excludedPeople}
-        visibility={planVisibilityFilter}
-        onVisibilityChange={(visibility) => updateAudienceFilters({ ...audienceFilters, visibility })}
       />
     );
 
