@@ -198,6 +198,20 @@ export class TelegramWebhookService {
     return result.afterResponse ? { afterResponse: result.afterResponse } : {};
   }
 
+  private async handleWishlistLink(chatId: string, payload: string): Promise<void> {
+    let reply: string | null = null;
+    try {
+      const { bindWishlistTelegram } = await import("@/server/wishlist/wishlistNotify");
+      reply = await bindWishlistTelegram(payload, chatId);
+    } catch (e) {
+      console.error("[telegram:webhook] wishlist link failed", e instanceof Error ? e.name : typeof e);
+    }
+    await this.sendShortReply(
+      chatId,
+      reply ?? "Ссылка устарела или бронь уже снята. Откройте список заново и выберите подарок.",
+    );
+  }
+
   private async handleMessage(message: TelegramMessage): Promise<void> {
     const chatId = String(message.chat.id);
     await touchTelegramConnectionByChatIdForCurrentEnvironment(chatId);
@@ -230,6 +244,12 @@ export class TelegramWebhookService {
     // Dev logging: extracted payload
     if (process.env.NODE_ENV !== "production") {
       console.log("[telegram:webhook] /start command detected - hasPayload=%s", payload !== null);
+    }
+
+    // Wishlist guest deep link: binds this chat to one gift reservation (signed payload).
+    if (payload?.startsWith("wl_")) {
+      await this.handleWishlistLink(chatId, payload);
+      return;
     }
 
     // Plain /start without link token: welcome a connected user, otherwise explain
