@@ -169,7 +169,7 @@ export function JournalPageView({
           <h2 id="journal-feed-title" className="m-0 font-heading text-[24px] leading-tight tracking-[-0.02em] sm:text-[28px]">
             {typeFilter ? "Все материалы" : "Свежие материалы"}
           </h2>
-          <div className="pt-5 md:hidden">
+          <div className="flex flex-col gap-12 pt-5 md:hidden">
             {feed.map((article, index) => (
               <AnalyticsCardViewTracker
                 key={article.id}
