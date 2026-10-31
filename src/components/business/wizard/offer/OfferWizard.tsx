@@ -868,7 +868,7 @@ export function OfferWizard({
           return (
             <div className="space-y-6">
               <Step5Pricing {...commonProps} hideCta={variant === "v2"} />
-              {formData.productType !== "CAMP" && (
+              {variant === "v2" && formData.productType !== "CAMP" && (
                 <BookingServicesEditor offerId={offerId} />
               )}
             </div>
