@@ -1,4 +1,6 @@
 import { EventCategoryPublicationType, Prisma } from "@prisma/client";
+import { buildArticlePublicPath } from "@/lib/routing/cityPaths";
+import { buildPublicPath } from "@/lib/routing/surface";
 import prisma from "@/lib/prisma";
 import { getPublicPublishedArticleWhere } from "@/server/public/publicContentVisibility";
 import { queryCityHomeArticles, type JournalPage } from "@/server/article/listCityHomeArticles";
@@ -9,6 +11,7 @@ export type CityBlogCategory = {
   name: string;
   thumbnailUrl: string | null;
   hasNewArticle: boolean;
+  recentArticles?: Array<{ id: string; href: string }>;
 };
 
 type CityRef = {
@@ -64,6 +67,18 @@ export async function listPopulatedCityBlogCategories(city: CityRef): Promise<Ci
         coverImage: { select: { publicUrl: true } },
       },
     });
+    const recentArticles = await prisma.article.findMany({
+      where: {
+        AND: [
+          articleWhere,
+          categoryScopeWhere([category.id]),
+          { publishedAt: { gte: freshnessCutoff } },
+        ],
+      },
+      select: { id: true, slug: true, geoScope: true, city: { select: { slug: true } } },
+      orderBy: { publishedAt: "desc" },
+      take: 200,
+    });
     const recentCover = latest?.coverImage?.publicUrl ?? latest?.heroImage ?? null;
     const illustrated = recentCover ? null : await prisma.article.findFirst({
       where: {
@@ -81,7 +96,11 @@ export async function listPopulatedCityBlogCategories(city: CityRef): Promise<Ci
       slug: category.slug,
       name: category.nameRu,
       thumbnailUrl: recentCover ?? illustrated?.coverImage?.publicUrl ?? illustrated?.heroImage ?? null,
-      hasNewArticle: Boolean(latest?.publishedAt && latest.publishedAt >= freshnessCutoff),
+      hasNewArticle: recentArticles.length > 0,
+      recentArticles: recentArticles.filter((item) => item.slug).map((item) => ({
+        id: item.id,
+        href: buildPublicPath(buildArticlePublicPath({ slug: item.slug!, geoScope: item.geoScope, citySlug: item.city?.slug })),
+      })),
     };
   }));
 }
