@@ -63,7 +63,7 @@ function longDay(dateIso: string): string {
   return new Date(y!, m! - 1, d!).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 }
 
-const SECTION_LABEL = "mp-font-ui mx-0.5 mb-2.5 text-[17px] font-semibold tracking-[-.01em] text-[var(--mp-tx)]";
+const SECTION_LABEL = "mp-font-ui mx-0.5 mb-2.5 text-[15px] font-semibold tracking-[-.01em] text-[var(--mp-tx)]";
 
 /**
  * «Новое дело» в той же шторке: текст → когда → время → для кого → напомнить.
@@ -270,7 +270,7 @@ export function PlanNewTaskScreen({
   const barDay = day
     ? `${when === "today" ? "Сегодня" : when === "tomorrow" ? "Завтра" : weekdayLong(day)}, ${longDay(day)}`
     : "Выберите день";
-  const chipBase = "mp-font-ui inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full border px-[18px] text-[15px] font-semibold whitespace-nowrap transition-colors";
+  const chipBase = "mp-font-ui inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full border px-[18px] text-[14px] font-semibold whitespace-nowrap transition-colors";
   const chipOn = "border-[var(--mp-chip-on-bg)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]";
   const chipOff = "border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)] enabled:hover:border-[var(--mp-tx2)]";
   const pickedChipLabel = pickedDate ? `${weekdayShort(pickedDate)}, ${longDay(pickedDate)}` : null;
@@ -286,7 +286,7 @@ export function PlanNewTaskScreen({
         >
           <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
         </button>
-        <h2 className="mp-font-meta m-0 flex items-center gap-2 text-[12.5px] font-medium uppercase leading-none tracking-[.16em] text-[var(--mp-ac-dark)]">
+        <h2 className="mp-font-meta m-0 flex items-center gap-2 text-[10px] font-medium uppercase leading-none tracking-[.14em] text-[var(--mp-ac-dark)]">
           <i aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--mp-ac-dark)]" />
           {isMove ? "Перенести дело" : "Новое дело"}
         </h2>
@@ -305,7 +305,7 @@ export function PlanNewTaskScreen({
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder="Что нужно сделать?"
-            className="mp-font-ui m-0 mb-[18px] mt-1 block min-h-[72px] w-full resize-none border-0 bg-transparent p-0 text-[33px] font-extrabold leading-[1.08] tracking-[-.03em] text-[var(--mp-tx)] caret-[var(--mp-ac)] outline-none placeholder:font-extrabold placeholder:text-[#b9b0a5]"
+            className="mp-font-ui m-0 mb-[18px] mt-1 block min-h-[72px] w-full resize-none border-0 bg-transparent p-0 text-[34px] font-semibold leading-none tracking-[-.02em] text-[var(--mp-tx)] caret-[var(--mp-ac)] outline-none placeholder:font-semibold placeholder:text-[#b9b0a5]"
           />
         </label>
 
@@ -372,8 +372,8 @@ export function PlanNewTaskScreen({
             <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white">
               {calOpen ? <X className="h-4 w-4" strokeWidth={2} aria-hidden /> : <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />}
             </span>
-            <span className="flex-1 text-[16.5px] font-medium text-[var(--mp-tx)]">{calOpen ? "Свернуть календарь" : "Другой день"}</span>
-            <span className="mp-font-meta text-[12.5px] text-[var(--mp-tx2)]">весь календарь →</span>
+            <span className="flex-1 text-[15px] font-semibold text-[var(--mp-tx)]">{calOpen ? "Свернуть календарь" : "Другой день"}</span>
+            <span className="mp-font-meta text-[11px] text-[var(--mp-tx2)]">весь календарь →</span>
           </button>
           {calOpen ? (
             <div className="mt-2.5 rounded-[20px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-2.5">
@@ -381,14 +381,14 @@ export function PlanNewTaskScreen({
                 <button type="button" aria-label="Предыдущий месяц" disabled={monthOffset <= 0} onClick={() => setMonthOffset((v) => v - 1)} className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)] disabled:opacity-30">
                   <ChevronLeft className="h-4 w-4" strokeWidth={2} />
                 </button>
-                <span className="text-[16px] font-semibold capitalize text-[var(--mp-tx)]">{monthLabel}</span>
+                <span className="text-[18px] font-normal capitalize tracking-[-.01em] text-[var(--mp-tx)]">{monthLabel}</span>
                 <button type="button" aria-label="Следующий месяц" onClick={() => setMonthOffset((v) => v + 1)} className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)]">
                   <ChevronRight className="h-4 w-4" strokeWidth={2} />
                 </button>
               </div>
               <div className="grid grid-cols-7 gap-0.5">
                 {WD.map((w) => (
-                  <span key={w} className="mp-font-meta py-1.5 text-center text-[11px] uppercase text-[var(--mp-tx2)]">{w}</span>
+                  <span key={w} className="mp-font-meta py-1.5 text-center text-[10px] uppercase text-[var(--mp-tx2)]">{w}</span>
                 ))}
                 {cells.map((d, i) => {
                   if (d === null) return <span key={`b${i}`} />;
@@ -445,7 +445,7 @@ export function PlanNewTaskScreen({
                 aria-label="Своё время"
                 aria-invalid={timed && !timeValid}
                 aria-describedby={timed && !timeValid ? "plan-time-error" : undefined}
-                className={cn("mp-font-meta w-full min-w-0 border-0 bg-transparent p-0 pr-3 text-[17px] font-semibold text-[var(--mp-tx)] outline-none placeholder:font-normal placeholder:text-[#b9b0a5]", timed && !timeValid && "text-danger")}
+                className={cn("mp-font-meta w-full min-w-0 border-0 bg-transparent p-0 pr-3 text-[16px] font-semibold text-[var(--mp-tx)] outline-none placeholder:font-normal placeholder:text-[#b9b0a5]", timed && !timeValid && "text-danger")}
               />
             </label>
           </div>
@@ -603,7 +603,7 @@ export function PlanNewTaskScreen({
       <div className="shrink-0 bg-[var(--mp-bg)] px-3.5 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-1">
         <div className="flex min-h-20 items-center gap-3 rounded-[22px] bg-[var(--mp-tx)] py-4 pl-5 pr-4 text-white">
           <div className="min-w-0 flex-1">
-            <b className="block text-[17px] font-semibold leading-[1.25] tracking-[-.01em]">
+            <b className="block text-[15px] font-semibold leading-[1.25] tracking-[-.01em]">
               {barDay}
               {timed && timeValid ? ` · ${time}` : ""}
             </b>
@@ -613,7 +613,7 @@ export function PlanNewTaskScreen({
             type="button"
             disabled={!can || saving}
             onClick={() => void submit()}
-            className={cn("mp-font-ui h-[54px] shrink-0 rounded-full bg-[var(--mp-ac)] px-5 text-[16px] font-semibold text-white transition-colors hover:bg-[var(--mp-ac-dark)] disabled:bg-[#4a433c] disabled:text-white/60", PLAN_FOCUS)}
+            className={cn("mp-font-ui h-[54px] shrink-0 rounded-full bg-[var(--mp-ac)] px-5 text-[15px] font-semibold text-white transition-colors hover:bg-[var(--mp-ac-dark)] disabled:bg-[#4a433c] disabled:text-white/60", PLAN_FOCUS)}
           >
             {saving ? "Сохраняем…" : isMove ? "Перенести" : "Добавить"}
           </button>
