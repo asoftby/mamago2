@@ -213,11 +213,11 @@ export function JournalMobileCard({
       <div className="relative">
         <Link href={article.href} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
           <Cover article={article} tone={index} className="aspect-[1.22] rounded-xl" />
-          <div className="mt-5">
+          <div className="mt-[17px]">
             <span className="block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
               {article.category?.name ?? (article.publicationType === "COLLECTION" ? "Подборка" : "Журнал")}
             </span>
-            <h3 className="mt-1 line-clamp-2 text-[19px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors duration-150 group-hover:text-[#C24E22]">
+            <h3 className="mt-[9px] line-clamp-2 text-[26px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors duration-150 group-hover:text-[#C24E22]">
               {article.title}
             </h3>
           </div>
