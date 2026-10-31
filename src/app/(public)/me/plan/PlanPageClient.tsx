@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import { ArrowRight, Heart } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { showFamilyUi, type FamilyView } from "@/features/my-plan/lib/planVisibilityView";
 import type { PlanBookingState } from "@/server/family/planBookingPure";
@@ -13,7 +14,6 @@ import { filterVisiblePlanEntries, type PlanPersonSelection } from "@/features/m
 import { PlanDayList } from "./PlanDayList";
 import { PlanOverviewDialog } from "./PlanOverviewDialog";
 import { PlanProfileCompletionGate } from "./PlanProfileCompletionGate";
-import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import type { PlanActivityPublicAvailability } from "@/lib/plan/publicVisibility";
 import {
   ExperienceCheckIn,
@@ -154,147 +154,35 @@ function formatNearestWeekItem(date: string, todayISO: string): string {
   return parsed.toLocaleDateString("ru-RU", { weekday: "long" });
 }
 
-function formatAddedDate(iso: string) {
-  const d = new Date(iso);
-  const months = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
-  return `${d.getDate()} ${months[d.getMonth()]}`;
-}
-
-// Placeholder tones for cards without an image
-const TONES = [
-  "linear-gradient(160deg, #CDE3D6, #9CC1AC)",
-  "linear-gradient(160deg, #E6DBC8, #C9BCA0)",
-  "linear-gradient(160deg, #F6D567, #E8B935)",
-  "linear-gradient(160deg, #F2C8A7, #E89460)",
-  "linear-gradient(160deg, #2A2622, #141210)",
-];
-
-function IdeasSidebar({ ideas }: { ideas: SerializedIdea[] }) {
+function IdeasRow({ count }: { count: number }) {
   return (
-    <aside style={{ position: "sticky", top: 24, display: "flex", flexDirection: "column", gap: 10 }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-        <span
-          className="font-mono uppercase"
-          style={{ fontSize: 11, letterSpacing: ".14em", color: "rgba(20,18,16,.55)", whiteSpace: "nowrap" }}
-        >
-          Без даты · Идеи
-        </span>
-        <div style={{ flex: 1, height: 1, background: "rgba(20,18,16,.10)" }} />
-        <Link
-          href="/me/ideas"
-          style={{ fontSize: 12, color: "#C24E22", fontWeight: 600, whiteSpace: "nowrap" }}
-        >
-          Все →
-        </Link>
+    <>
+      <div className="mt-8 mb-3.5 flex items-center gap-3.5" aria-hidden>
+        <i className="h-px flex-1 bg-[#DCD4C9]" />
+        <span className="font-serif text-[21px] italic text-[#6F675E]">или без даты</span>
+        <i className="h-px flex-1 bg-[#DCD4C9]" />
       </div>
-
-      {ideas.length === 0 ? (
-        <div style={{
-          padding: "20px 16px",
-          background: "#FAF7F1",
-          border: "1px dashed rgba(20,18,16,.18)",
-          borderRadius: 14,
-          textAlign: "center",
-        }}>
-          <p style={{ margin: 0, fontSize: 13, color: "rgba(20,18,16,.55)", lineHeight: 1.5 }}>
-            Сохраняйте активности в&nbsp;идеи — они появятся здесь
-          </p>
-        </div>
-      ) : (
-        ideas.map((idea, i) => {
-          const title = idea.activity?.title ?? "Активность";
-          const image = idea.activity?.coverImageUrl;
-          const slug = idea.activity?.slug;
-          const href = idea.activityId
-            ? publicActivityPath(idea.activityId, "minsk", slug)
-            : "/me/ideas";
-
-          return (
-            <Link
-              key={idea.id}
-              href={href}
-              style={{
-                display: "flex",
-                gap: 12,
-                padding: 14,
-                background: "#FAF7F1",
-                border: "1px solid rgba(20,18,16,.10)",
-                borderRadius: 14,
-                transition: "all .18s",
-                textDecoration: "none",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.borderColor = "#141210";
-                (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(-2px)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(20,18,16,.10)";
-                (e.currentTarget as HTMLAnchorElement).style.transform = "none";
-              }}
-            >
-              <div style={{
-                width: 54,
-                height: 54,
-                borderRadius: 10,
-                flexShrink: 0,
-                background: image ? "transparent" : TONES[i % TONES.length],
-                overflow: "hidden",
-              }}>
-                {image && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={image} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                )}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, flex: 1 }}>
-                <h4 style={{
-                  margin: 0,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  lineHeight: 1.25,
-                  color: "#141210",
-                  letterSpacing: "-.005em",
-                  overflow: "hidden",
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                }}>
-                  {title}
-                </h4>
-                {idea.activity?.ageLabel && (
-                  <span style={{ fontSize: 12, color: "rgba(20,18,16,.55)" }}>{idea.activity.ageLabel}</span>
-                )}
-                <span
-                  className="font-mono uppercase"
-                  style={{ fontSize: 10, letterSpacing: ".06em", color: "rgba(20,18,16,.55)", marginTop: 2 }}
-                >
-                  ● добавлено {formatAddedDate(idea.createdAt)}
-                </span>
-              </div>
-            </Link>
-          );
-        })
-      )}
-
-      {/* Promo */}
-      <div style={{
-        padding: "16px 18px",
-        borderRadius: 14,
-        background: "linear-gradient(135deg, #FFE8DC, #FFF1E5)",
-        border: "1px solid rgba(232,106,58,.2)",
-        display: "flex",
-        flexDirection: "column",
-        gap: 6,
-      }}>
-        <span
-          className="font-display"
-          style={{ fontSize: 18, lineHeight: 1.15, letterSpacing: "-.01em", color: "#141210" }}
-        >
-          Перенесите <span style={{ fontStyle: "italic", color: "#C24E22" }}>идею</span> в&nbsp;план
+      <Link
+        href="/me/ideas"
+        className="group flex min-h-20 w-full items-center gap-3.5 rounded-[22px] border border-[#ECE6DD] bg-[#F8F5EF] py-3 pr-[18px] pl-3.5 no-underline transition-colors hover:border-[#141210] hover:bg-white"
+      >
+        <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full border border-[#DCD4C9] bg-white text-[#141210]">
+          <Heart className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden />
         </span>
-        <span style={{ fontSize: 12, color: "#3A332B" }}>Один клик — и&nbsp;мы&nbsp;напомним накануне</span>
-      </div>
-    </aside>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210]">
+            Мои идеи{count > 0 ? ` · ${count}` : ""}
+          </span>
+          <span className="mt-0.5 block text-sm text-[#6F675E]">
+            {count > 0 ? "Поставьте на свободный день" : "Сохраняйте активности в идеи — они появятся здесь"}
+          </span>
+        </span>
+        <ArrowRight
+          className="h-[18px] w-[18px] shrink-0 text-[#6F675E] transition-[transform,color] group-hover:translate-x-[3px] group-hover:text-[#C24E22]"
+          aria-hidden
+        />
+      </Link>
+    </>
   );
 }
 
@@ -477,65 +365,25 @@ export function PlanPageClient({
     setItemsByWeek((current) => Object.fromEntries(Object.entries(current).map(([week, weekItems]) => [week, weekItems.map((i) => i.id === itemId ? { ...i, ...next } : i)])));
   };
 
-  const hasIdeas = initialIdeas.length > 0;
-
   return (
-    <div style={{ minHeight: "100vh", background: "#FFFFFF" }}>
+    <div className="min-h-screen bg-white">
       <PlanProfileCompletionGate />
 
-      {/* Breadcrumbs */}
-      <Container>
-        <div className="flex items-center gap-2 pt-6 pb-2" style={{ color: "rgba(20,18,16,.55)", fontSize: 13 }}>
-          <Link href="/me" className="inline-flex items-center gap-1.5" style={{ color: "inherit" }}>
-            ← Профиль
-          </Link>
-          <span style={{ opacity: 0.5 }}>→</span>
-          <span style={{ color: "#141210" }}>Мой план</span>
-        </div>
-      </Container>
-
-      {/* Hero */}
-      <Container className="pt-6 pb-9">
-        <div
-          className="plan-hero-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr)",
-            gap: 0,
-            alignItems: "flex-end",
-          }}
-        >
-          <div>
-            <div className="flex items-center gap-3" style={{ marginBottom: 18, lineHeight: 1 }}>
-              <span
-                className="font-mono uppercase inline-flex items-center gap-1.5"
-                style={{ fontSize: 11, letterSpacing: ".14em", color: "var(--primary)" }}
-              >
-                <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "var(--primary)", flexShrink: 0 }} />
-                МОЙ ПЛАН
-              </span>
-              <span
-                className="font-mono uppercase"
-                style={{ fontSize: 11, letterSpacing: ".14em", color: "rgba(20,18,16,.55)" }}
-              >
-                {monthName(selectedDate).toUpperCase()}
-              </span>
-            </div>
-            <h1
-              className="text-[38px] leading-[1.02] tracking-[-0.03em] sm:text-[58px]"
-              style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 400, color: "#141210" }}
-            >
-              Мой план
-            </h1>
-
+      <Container className="pt-10 pb-2">
+        <header>
+          <div className="flex items-center gap-2 font-mono text-[12.5px] font-medium uppercase tracking-[.16em] text-[#C24E22]">
+            <i aria-hidden className="h-1.5 w-1.5 rounded-full bg-[#C24E22]" />
+            Мой план
+            <span className="text-[#6F675E]">{monthName(selectedDate)}</span>
           </div>
-
-
-        </div>
+          <h1 className="mt-2.5 text-[clamp(36px,4vw,54px)] font-extrabold leading-[1.05] tracking-[-0.035em] text-[#141210]">
+            {weekItems.length > 0 ? "Что у нас на неделе?" : "Неделя пока свободна"}
+          </h1>
+        </header>
       </Container>
 
       {/* Week Calendar */}
-      <Container className="pb-4">
+      <Container className="pt-6 pb-2">
         <PlanCalendar value={selectedDate} onChange={selectDate} variant="page" markerScope={visibilityFilter === "FAMILY" ? "family" : "all"} />
         {loadingWeek != null ? <span role="status" className="mt-2 block text-xs text-neutral-500">Загрузка…</span> : null}
         <PlanPersonFilter
@@ -552,53 +400,46 @@ export function PlanPageClient({
         />
       </Container>
 
-      {/* Main: day list + ideas sidebar */}
-      <Container className="pb-20">
-        <div
-          className="plan-main-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr)",
-            gap: 24,
-            alignItems: "flex-start",
-          }}
-        >
-          <PlanDayList
-            date={selectedDate}
-            items={dayItems}
-            participantNameById={participantNameById}
-            onRemove={handleRemoveItem}
-            familyView={familyUi ? familyView : null}
-            onVisibilityChange={handleVisibilityChange}
-            onEditManual={openEdit}
-            conflictIds={conflictIds}
-            scenarioStatus={scenarioStatuses[selectedDate]}
-          />
-          {hasIdeas && <div className="w-full max-w-[320px]"><IdeasSidebar ideas={initialIdeas} /></div>}
-        </div>
-      </Container>
+      {/* Main: day list + ideas row | check-in, week overview, archive */}
+      <Container className="pt-6 pb-8">
+        <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="min-w-0">
+            <PlanDayList
+              date={selectedDate}
+              items={dayItems}
+              participantNameById={participantNameById}
+              onRemove={handleRemoveItem}
+              familyView={familyUi ? familyView : null}
+              onVisibilityChange={handleVisibilityChange}
+              onEditManual={openEdit}
+              conflictIds={conflictIds}
+              scenarioStatus={scenarioStatuses[selectedDate]}
+            />
+            <IdeasRow count={initialIdeas.length} />
+          </div>
 
-      {/* Secondary views follow the selected day's schedule. */}
-      <Container className="pb-6">
-          <div className="flex flex-col items-start">
-            <div
-              className="w-full max-w-[320px] overflow-hidden rounded-[14px] border border-[rgba(20,18,16,.10)] bg-[#FAF7F1]"
-            >
+          <aside className="flex min-w-0 flex-col gap-3.5 lg:sticky lg:top-6">
+            {/* Explicit post-event check-in; never opened as an automatic modal. */}
+            <ExperienceCheckIn
+              candidates={experienceCandidates}
+              recentExperiences={recentExperiences}
+            />
+            <div className="overflow-hidden rounded-[22px] border border-[#ECE6DD] bg-[#F8F5EF]">
               <button
                 type="button"
                 onClick={() => weekItems.length > 0 && setOverviewOpen(true)}
                 disabled={weekItems.length === 0}
                 aria-label={weekItems.length > 0 ? "Открыть обзор недели" : "На этой неделе план пока пуст"}
-                className="flex w-full flex-col gap-2 px-[18px] py-4 text-left transition-colors enabled:hover:bg-white/60 disabled:cursor-default"
+                className="flex w-full flex-col gap-2 px-[22px] py-5 text-left transition-colors enabled:hover:bg-white/60 disabled:cursor-default"
               >
-                <span className="font-mono text-[11px] uppercase tracking-[.12em] text-[#6B6258]">
+                <span className="font-mono text-[11.5px] uppercase tracking-[.14em] text-[#6F675E]">
                   На этой неделе
                 </span>
                 <span className="font-sans text-[27px] font-normal leading-tight text-[#141210]">
                   {weekItems.length === 0 ? "Нет событий" : `${weekItems.length} ${pluralizeEvents(weekItems.length)}`}
                 </span>
                 {weekItems.length > 0 && (
-                  <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-primary">
+                  <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-[#C24E22]">
                     Посмотреть все <span aria-hidden="true">→</span>
                   </span>
                 )}
@@ -618,21 +459,17 @@ export function PlanPageClient({
                     });
                   });
                 }}
-                className="flex min-h-11 w-full items-center justify-between border-t border-[rgba(20,18,16,.10)] px-[18px] py-2 text-left text-sm font-medium text-[#807C77] transition-colors hover:bg-white/60 hover:text-[#514D48]"
+                className="flex min-h-11 w-full items-center justify-between border-t border-[#ECE6DD] px-[22px] py-2 text-left text-sm font-medium text-[#6F675E] transition-colors hover:bg-white/60 hover:text-[#141210]"
               >
                 Архив событий <span aria-hidden="true">→</span>
               </button>
             </div>
-          </div>
+          </aside>
+        </div>
       </Container>
 
-      {/* Explicit post-event check-in; never opened as an automatic modal. */}
-      <Container>
-        <ExperienceCheckIn
-          candidates={experienceCandidates}
-          recentExperiences={recentExperiences}
-        />
-        {archiveOpen && (
+      {archiveOpen && (
+        <Container>
           <PastPlanArchive
             entries={pastEntries}
             hasNext={pastEntriesHasNext}
@@ -640,23 +477,8 @@ export function PlanPageClient({
             selectedDate={selectedDate}
             onClose={() => setArchiveOpen(false)}
           />
-        )}
-      </Container>
-
-      {/* Intro copy stays available without pushing the calendar below the fold. */}
-      <Container className="pb-10">
-            <p style={{
-              maxWidth: 520,
-              marginTop: 22,
-              marginBottom: 0,
-              fontSize: 18,
-              lineHeight: 1.5,
-              color: "#3A332B",
-            }}>
-              Планируйте день и&nbsp;сохраняйте активности на&nbsp;нужные даты.
-              Напомним накануне — чтобы ничего не&nbsp;потерялось.
-            </p>
-      </Container>
+        </Container>
+      )}
 
       <PlanOverviewDialog
         open={overviewOpen}
@@ -705,17 +527,6 @@ export function PlanPageClient({
         }}
       />
 
-      <style>{`
-        @media (max-width: 900px) {
-          .plan-hero-grid, .plan-main-grid {
-            grid-template-columns: 1fr !important;
-            gap: 24px !important;
-          }
-          .plan-hero-grid > div:last-child {
-            align-items: flex-start !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }

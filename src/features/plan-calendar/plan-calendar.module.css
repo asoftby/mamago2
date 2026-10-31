@@ -223,3 +223,49 @@ button.monthLabel:hover { color: var(--plan-ink); }
 .strip::-webkit-scrollbar { display: none; }
 .stripItem { flex: 0 0 calc(100% / 7); min-width: 0; padding: 0 2px; scroll-snap-align: start; box-sizing: border-box; }
 .stripItem .cell { width: 100%; }
+
+/* ---- page variant («Мой план», десктоп): крупные плитки недели ---- */
+.rootPage .monthLabel {
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  color: var(--plan-ink);
+}
+.rootPage .header { gap: 10px; margin-bottom: 14px; }
+.rootPage .rule { background: #ece6dd; }
+.rootPage .textNav { display: none; }
+.rootPage .todayPill {
+  min-height: 44px;
+  padding: 0 18px;
+  border-color: var(--plan-ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: background-color 0.15s, color 0.15s;
+}
+.rootPage .todayPill:hover:not(:disabled) { background: var(--plan-ink); color: var(--plan-on-ink); }
+.rootPage .todayPill:disabled { border-color: #dcd4c9; opacity: 0.6; }
+.rootPage .todayPillAway { border-color: var(--plan-ink); }
+.rootPage .arrow { width: 44px; height: 44px; background: #fff; border-color: #dcd4c9; }
+.rootPage .arrow:hover:not(:disabled) { border-color: var(--plan-ink); }
+.rootPage .days { gap: 10px; }
+.rootPage .cell:not(.cellMobile) {
+  height: 112px;
+  gap: 4px;
+  justify-content: center;
+  border-radius: 22px;
+  border-color: #ece6dd;
+  background: #f8f5ef;
+}
+.rootPage .cell:not(.cellMobile):hover { border-color: #dcd4c9; }
+.rootPage .cell:not(.cellMobile) .dow { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; }
+.rootPage .cell:not(.cellMobile) .num { font-size: 42px; line-height: 1.05; }
+.rootPage .cell:not(.cellMobile).today:not(.selected) { border: 1.5px solid var(--plan-ink); }
+.rootPage .cell:not(.cellMobile).today:not(.selected) .num { color: var(--plan-ink); }
+.rootPage .cell:not(.cellMobile).today:not(.selected) .dow { color: var(--plan-muted); }
+.rootPage .cell:not(.cellMobile).selected { background: var(--plan-ink); border-color: var(--plan-ink); }
+.rootPage .cell:not(.cellMobile).selected .dow { opacity: 0.66; }
+.rootPage .cell:not(.cellMobile) .dot { width: 6px; height: 6px; }

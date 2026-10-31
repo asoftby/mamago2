@@ -82,7 +82,7 @@ export function PlanCalendar({ value, onChange, variant, dayMarkers, markerScope
   }, [value, narrow]);
 
   return (
-    <div ref={rootRef} className={`${styles.root} ${className ?? ""}`} data-plan-calendar data-mode={narrow ? "strip" : "week"}>
+    <div ref={rootRef} className={`${styles.root} ${variant === "page" ? styles.rootPage : ""} ${className ?? ""}`} data-plan-calendar data-mode={narrow ? "strip" : "week"}>
       {narrow ? (
         <MobileStrip
           value={value}

@@ -194,21 +194,22 @@ export function PlanItemCard({
   );
 
   const showCatalogMedia = presentation.isCatalog;
+  const restBorder = showCatalogMedia || isPrivate ? "#ECE6DD" : "#D6E4F3";
 
   return (
     <article
       className={showCatalogMedia
-        ? "group grid grid-cols-[176px_minmax(0,1fr)_auto] items-center gap-5 rounded-[18px] border p-[14px] transition-[border-color,transform] duration-200 max-sm:grid-cols-[72px_minmax(0,1fr)_auto] max-sm:gap-3 max-sm:p-3"
-        : "group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-[18px] border p-4 transition-[border-color] duration-200"}
+        ? "group grid grid-cols-[176px_minmax(0,1fr)_auto] items-center gap-5 rounded-[22px] border p-[14px] transition-[border-color,transform] duration-200 max-sm:grid-cols-[72px_minmax(0,1fr)_auto] max-sm:gap-3 max-sm:p-3"
+        : "group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-[22px] border p-4 transition-[border-color] duration-200"}
       style={{
-        background: isPrivate ? "#F3EFE7" : "#FAF7F1",
-        borderColor: "rgba(20,18,16,.10)",
+        background: isPrivate ? "#F3EFE7" : showCatalogMedia ? "#F8F5EF" : "#EAF2FB",
+        borderColor: restBorder,
       }}
       onMouseEnter={(event) => {
-        event.currentTarget.style.borderColor = "rgba(20,18,16,.28)";
+        event.currentTarget.style.borderColor = showCatalogMedia ? "#141210" : "#B9CFE8";
       }}
       onMouseLeave={(event) => {
-        event.currentTarget.style.borderColor = "rgba(20,18,16,.10)";
+        event.currentTarget.style.borderColor = restBorder;
       }}
     >
       {showCatalogMedia && href ? (

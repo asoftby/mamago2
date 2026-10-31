@@ -79,23 +79,14 @@ export function PlanDayList({ date, items, participantNameById, onRemove, family
             gap: 14,
           }}
         >
-          <h2
-            className="text-[32px] leading-[1.1] tracking-[-0.025em] lg:text-[40px]"
-            style={{
-              margin: 0,
-              fontFamily: "var(--font-heading)",
-              fontWeight: 400,
-              color: "#141210",
-            }}
-          >
-            {weekday},{" "}
-            {day} {month}
+          <h2 className="m-0 text-[30px] font-bold leading-[1.15] tracking-[-0.025em] text-[#141210]">
+            <span className="capitalize">{weekday}</span>, {day} {month}
           </h2>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {items.length > 0 && (
               <span
                 className="font-mono uppercase"
-                style={{ fontSize: 11, letterSpacing: ".12em", color: "rgba(20,18,16,.55)" }}
+                style={{ fontSize: 11.5, letterSpacing: ".14em", color: "#6F675E" }}
               >
                 {items.length} {items.length % 10 === 1 && items.length % 100 !== 11 ? "запись" : [2, 3, 4].includes(items.length % 10) && (items.length % 100 < 12 || items.length % 100 > 14) ? "записи" : "записей"}
               </span>
@@ -124,10 +115,10 @@ export function PlanDayList({ date, items, participantNameById, onRemove, family
       ) : (
         <div
           style={{
-            padding: "40px 32px",
-            background: "#FAF7F1",
-            border: "1px dashed rgba(20,18,16,.18)",
-            borderRadius: 18,
+            padding: "36px 28px",
+            background: "#F8F5EF",
+            border: "1.5px dashed #DCD4C9",
+            borderRadius: 24,
             textAlign: "center",
           }}
         >
@@ -139,9 +130,9 @@ export function PlanDayList({ date, items, participantNameById, onRemove, family
               href="/minsk"
               style={{
                 display: "inline-flex", alignItems: "center", gap: 8,
-                height: 50, padding: "0 22px", borderRadius: 999,
+                height: 52, padding: "0 22px", borderRadius: 999,
                 fontWeight: 600, fontSize: 14,
-                background: "var(--primary)", color: "#fff",
+                background: "#141210", color: "#fff",
                 border: "1px solid transparent",
                 transition: "background .18s",
                 textDecoration: "none",
