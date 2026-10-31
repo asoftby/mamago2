@@ -38,7 +38,7 @@ import { PlanWeekScreen } from "./v3/PlanWeekScreen";
 import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
 import { PlanMoveSheet, canMovePlanItem } from "./v3/PlanMoveSheet";
 import { fetchPlanExperienceFeed, type PlanExperienceFeed } from "./v3/planExperienceApi";
-import { ArrowRight, Heart, History, Lightbulb, Plus } from "lucide-react";
+import { ArrowRight, Heart, History, Lightbulb, Plus, Search } from "lucide-react";
 import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { MediaCover } from "@/components/ui/media-cover";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
@@ -1367,8 +1367,19 @@ export function PlanMainContent({
       "flex min-h-12 w-full items-center justify-center gap-[7px] rounded-xl bg-primary px-4 text-[15px] font-bold text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60";
     if (!hasRequestedSuggestions) {
       return (
-        <button type="button" className={linkClass} onClick={handleDecideClick}>
-          Подобрать, куда сходить
+        <button
+          type="button"
+          onClick={handleDecideClick}
+          className="group flex min-h-[76px] w-full items-center gap-3.5 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-3 pl-3.5 pr-4 text-left transition-colors hover:border-[var(--mp-tx)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full bg-[var(--mp-tx)] text-white">
+            <Search className="h-5 w-5" strokeWidth={1.8} aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[16.5px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Подобрать, куда сходить</span>
+            <span className="mt-[3px] block text-[13.5px] text-[var(--mp-tx2)]">Афиша на {isTodaySelected ? "сегодня" : "этот день"}</span>
+          </span>
+          <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--mp-ac-dark)]" strokeWidth={1.8} aria-hidden />
         </button>
       );
     }

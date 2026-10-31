@@ -22,7 +22,8 @@ export function PlanStickyCounter({ onAdd, floating = false }: PlanStickyCounter
       // Вне виджета (страница плана) токены --mp-* не заданы предками — ставим их на самой кнопке.
       style={floating ? MY_PLAN_V3_TOKENS : undefined}
       className={
-        "pointer-events-none inset-x-0 bottom-0 bg-gradient-to-t from-[var(--mp-bg)] from-60% to-transparent pt-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] " +
+        "pointer-events-none inset-x-0 bottom-0 pt-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] " +
+        (floating ? "" : "bg-gradient-to-t from-[var(--mp-bg)] from-60% to-transparent ") +
         (floating ? "fixed z-40 px-4 " : "absolute z-10 px-3.5")
       }
     >
