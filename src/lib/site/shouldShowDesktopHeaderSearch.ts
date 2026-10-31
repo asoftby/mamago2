@@ -75,6 +75,8 @@ export function shouldShowDesktopHeaderSearch(pathname: string): boolean {
 
   if (segments.length === 2) return true;
 
+  if (section === "blog" && segments.length === 4 && segments[2] === "category" && segments[3]) return true;
+
   if (segments.length > 3) return false;
 
   const nestedSlug = segments[2]?.toLowerCase();
