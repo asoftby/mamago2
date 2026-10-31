@@ -172,3 +172,14 @@ test("env readers: trimmed values, defaults, and opt-in json_schema", () => {
     { fast: "a/b", strong: "c/d", responseFormat: "json_schema" },
   );
 });
+
+test("rejects truncated model output even when nonempty, without logging payload", async () => {
+  const { api } = client(() => new Response(JSON.stringify({
+    choices: [{ finish_reason: "length", message: { content: "SENSITIVE {\\\"partial\\\":" } }],
+    usage: { prompt_tokens: 10, completion_tokens: 2000 },
+  }), { status: 200 }));
+  const { result, logs } = await withLogs(() => api.chat(input));
+  assert.deepEqual(result, { ok: false, code: "OPENROUTER_BAD_RESPONSE", retryable: true });
+  assert.match(logs, /OUTPUT_TRUNCATED/);
+  assert.doesNotMatch(logs, /SENSITIVE|SECRET|USER_MESSAGE_TEXT/);
+});
