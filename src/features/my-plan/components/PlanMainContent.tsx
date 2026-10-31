@@ -1395,7 +1395,7 @@ export function PlanMainContent({
       <button
         type="button"
         onClick={openPicks}
-        className="group flex min-h-[76px] w-full items-center gap-3.5 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-3 pl-3.5 pr-4 text-left transition-colors hover:border-[var(--mp-tx)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="group flex min-h-[76px] w-full items-center gap-3.5 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-3 pl-3.5 pr-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full bg-[var(--mp-ac)] text-white">
           <Search className="h-5 w-5" strokeWidth={1.8} aria-hidden />
@@ -1404,7 +1404,7 @@ export function PlanMainContent({
           <span className="block text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Подобрать, куда сходить</span>
           <span className="mt-[3px] block text-[13px] text-[var(--mp-tx2)]">Активности на {posterDayWord(selectedDate, todayKey)}</span>
         </span>
-        <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--mp-ac-dark)]" strokeWidth={1.8} aria-hidden />
+        <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--primary-hover)]" strokeWidth={1.8} aria-hidden />
       </button>
     );
   };

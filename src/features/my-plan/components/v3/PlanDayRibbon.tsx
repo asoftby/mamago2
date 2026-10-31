@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   addDays,
   dayOfMonth,
@@ -170,8 +170,7 @@ export function PlanDayRibbon({
         type="button"
         onClick={onOpenMonth}
         className={cn(
-          "mt-3 flex min-h-[62px] w-full items-center gap-3 rounded-[20px] border-[1.5px] border-dashed border-[var(--mp-line-strong)] py-0 pl-3.5 pr-[18px] text-left transition-colors",
-          "hover:border-[var(--mp-tx2)] hover:bg-[var(--mp-card)]",
+          "group mt-3 flex min-h-[62px] w-full items-center gap-3 rounded-[20px] border-[1.5px] border-dashed border-[var(--mp-line-strong)] py-0 pl-3.5 pr-4 text-left",
           PLAN_FOCUS,
         )}
       >
@@ -180,8 +179,9 @@ export function PlanDayRibbon({
         </span>
         <span className="flex-1 text-[15px] font-semibold text-[var(--mp-tx)]">Весь месяц</span>
         <span className="mp-font-meta text-[11px] text-[var(--mp-tx2)]">
-          до {dayOfMonth(monthEnd)} {monthGenitive(monthEnd)} →
+          до {dayOfMonth(monthEnd)} {monthGenitive(monthEnd)}
         </span>
+        <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--primary-hover)]" strokeWidth={1.8} aria-hidden />
       </button>
     </div>
   );
