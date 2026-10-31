@@ -118,32 +118,3 @@ export async function listJournalCollections(input: {
     take: Math.max(1, Math.min(24, input.limit ?? JOURNAL_COLLECTIONS_LIMIT)),
   });
 }
-
-/** Globally paginate current news before archived news; no page-local reordering. */
-async function queryPaginatedBreakingNews(
-  feedWhere: Prisma.ArticleWhereInput,
-  skip: number,
-  take: number,
-): Promise<CityHomeJournalArticle[]> {
-  const now = new Date();
-  const currentWhere: Prisma.ArticleWhereInput = {
-    AND: [feedWhere, notExpiredJournalPublicationWhere(now)],
-  };
-  const currentCount = await countJournalArticles(currentWhere);
-  const currentSkip = Math.min(skip, currentCount);
-  const currentTake = Math.min(take, Math.max(0, currentCount - currentSkip));
-  const current = currentTake > 0
-    ? await queryJournalArticles(null, { additionalWhere: currentWhere, skip: currentSkip, take: currentTake })
-    : [];
-  const archiveTake = take - current.length;
-  if (archiveTake <= 0) return current;
-  const archiveWhere: Prisma.ArticleWhereInput = {
-    AND: [feedWhere, { OR: [{ expiresAt: null }, { expiresAt: { lte: now } }] }],
-  };
-  const archive = await queryJournalArticles(null, {
-    additionalWhere: archiveWhere,
-    skip: Math.max(0, skip - currentCount),
-    take: archiveTake,
-  });
-  return [...current, ...archive];
-}
