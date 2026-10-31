@@ -3,7 +3,7 @@
 import { useRef, RefObject, useEffect, useMemo, useState } from "react";
 import { MapPin, Calendar, Users, X } from "lucide-react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { DiscoveryFilters } from "@/features/filters/discovery/filters.store";
 import { useDiscoveryFilters } from "@/features/filters/discovery/filters.store";
@@ -92,6 +92,7 @@ function CityHubDesktopSearchControl({
   embeddedInHeader = false,
 }: CityHubDesktopSearchControlProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const locationRef = useRef<HTMLButtonElement>(null);
   const { applied, actions } = useDiscoveryFilters();
   const headerGeoFilters = useOptionalHeaderDiscoveryFilters();
@@ -275,7 +276,12 @@ function CityHubDesktopSearchControl({
                 if (slug === citySlug) return;
                 actions.setDraft({ nearby: false, metro: null, district: null });
                 const target =
-                  currentIntent === "journal" ? `/${slug}/blog` : `/${slug}`;
+                  currentIntent === "journal"
+                    ? (() => {
+                        const match = pathname.match(/^\/[a-z0-9-]+\/blog\/category\/([^/]+)\/?$/i);
+                        return match ? `/${slug}/blog/category/${match[1]}` : `/${slug}/blog`;
+                      })()
+                    : `/${slug}`;
                 router.push(target, { scroll: false });
                 onPanelClose();
                 actions.close();
