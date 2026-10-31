@@ -15,7 +15,7 @@ import {
 import { JournalFeedGridCard, JournalFeedRow, JournalMainCard, JournalNewsCard } from "./JournalCards";
 import { JournalCollectionsCarousel } from "./JournalCollectionsCarousel";
 
-const NEWS_CARD_SHELL = "shrink-0 snap-start w-[42vw] min-w-[140px] max-w-[200px] lg:w-[calc((100%-6rem)/5)] lg:max-w-none";
+const NEWS_CARD_SHELL = "shrink-0 snap-start w-[33.6vw] min-w-[112px] max-w-[160px] lg:w-[16%] lg:max-w-none";
 
 /**
  * Страница журнала: H1 + подзаголовок → «Главное» → «Breaking News» → «Подборки mamaGo»
