@@ -221,7 +221,6 @@ export function PlanPageClient({
   const { filters: audienceFilters, update: updateAudienceFilters } = useSharedPlanAudienceFilters(currentUserId);
   const includedPeople = audienceFilters.include;
   const excludedPeople = audienceFilters.exclude;
-  const visibilityFilter = audienceFilters.visibility;
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
   const [editingManualItem, setEditingManualItem] = useState<SerializedPlanItem | null>(null);
