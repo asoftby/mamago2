@@ -82,6 +82,7 @@ import { Step3Media } from "./steps/Step3Media";
 import { Step4Conditions } from "./steps/Step4Conditions";
 import { Step5Pricing } from "./steps/Step5Pricing";
 import { BookingServicesEditor } from "./components/BookingServicesEditor";
+import { PartyResourceSchedule } from "./components/PartyResourceSchedule";
 import { Step6Contacts } from "./steps/Step6Contacts";
 import { FaqStep } from "../shared/FaqStep";
 
@@ -922,6 +923,10 @@ export function OfferWizard({
           {blocks.map((key) => (
             <div key={key}>{renderBlock(key)}</div>
           ))}
+          {currentStepKey === "schedule" &&
+            (formData.productType === "PARTY_SERVICE" || formData.productType === "PARTY_PACKAGE") && (
+              <PartyResourceSchedule offerId={offerId} />
+            )}
         </div>
       );
     }
