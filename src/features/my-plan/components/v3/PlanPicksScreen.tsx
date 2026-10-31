@@ -67,6 +67,8 @@ export function PlanPicksScreen({
   onClose?: () => void;
 }) {
   const [saved, setSaved] = useState<string[]>([]);
+  /** «Для всех» = возраст «Любой»: ни людей, ни возраста не выбрано. */
+  const anyAge = selectedPeopleIds.length === 0 && selectedAges.length === 0;
   const [savingId, setSavingId] = useState<string | null>(null);
 
   const saveIdea = async (activity: PlanSuggestionItem) => {
@@ -120,7 +122,7 @@ export function PlanPicksScreen({
               </button>
             </span>
           ) : null}
-          <button type="button" aria-pressed={selectedPeopleIds.length === 0 && selectedAges.length === 0} onClick={() => onTogglePerson(null)} className={chip(selectedPeopleIds.length === 0 && selectedAges.length === 0)}>
+          <button type="button" aria-pressed={anyAge} onClick={() => onTogglePerson(null)} className={chip(anyAge)}>
             Для всех
           </button>
           {people.map((person) => (
@@ -136,6 +138,14 @@ export function PlanPicksScreen({
           ))}
         </div>
         <div role="group" aria-label="Возраст" className="-mx-5 mt-2 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none] md:-mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
+          <button
+            type="button"
+            aria-pressed={anyAge}
+            onClick={() => onTogglePerson(null)}
+            className={chip(anyAge)}
+          >
+            Любой
+          </button>
           {ageOptions.map((age) => (
             <button
               key={age.value}
