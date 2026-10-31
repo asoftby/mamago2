@@ -247,7 +247,6 @@ function NewsHero({
             <span style={{ ...capsStyle, color: C.ink2 }}>Минск</span>
             <span style={capsStyle}>·</span>
             <PublishedAtChip publishedAt={publishedAt} />
-            <span style={capsStyle}>· 5 мин чтения</span>
             {editHref ? (
               <>
                 <span style={capsStyle}>·</span>
@@ -880,9 +879,7 @@ function RelatedSection({ items }: { items: RelatedArticle[] }) {
                 {it.title}
               </div>
 
-              <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: C.ink3, marginTop: "auto", letterSpacing: ".08em", textTransform: "uppercase" }}>
-                5 мин чтения →
-              </div>
+              
             </Link>
           ))}
         </div>
