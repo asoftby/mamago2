@@ -1296,16 +1296,9 @@ export function PlanMainContent({
       return (
         <section aria-label="В вашем плане">
           {emptyHeading}
-          <button
-            type="button"
-            onClick={openPicks}
-            className="flex min-h-[50px] w-full items-center gap-2 rounded-2xl border-[1.5px] border-dashed border-[var(--mp-line-strong)] pl-3.5 pr-2 text-left text-[13px] text-[var(--mp-tx2)] transition-colors hover:border-[var(--mp-tx2)] hover:text-[var(--mp-tx)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            <span className="flex-1">Свободно · есть несколько предложений</span>
-            <span className="flex h-8 w-8 items-center justify-center">
-              <ArrowRight className="h-4 w-4" strokeWidth={1.8} aria-hidden />
-            </span>
-          </button>
+          <p role="status" className="m-0 px-0.5 text-[14px] font-normal leading-[1.5] text-[var(--mp-tx2)]">
+            На {posterDayWord(selectedDate, todayKey)} планов нет.
+          </p>
         </section>
       );
     }
