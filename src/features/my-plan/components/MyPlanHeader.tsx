@@ -5,18 +5,23 @@ import { X } from "lucide-react";
 type MyPlanHeaderProps = {
   onClose?: () => void;
   compact?: boolean;
+  /** Без минимальной высоты и нижнего отступа: заголовок экрана садится вплотную к подписи. */
+  tight?: boolean;
 };
 
-export function MyPlanHeader({ onClose, compact = false }: MyPlanHeaderProps) {
+export function MyPlanHeader({ onClose, compact = false, tight = false }: MyPlanHeaderProps) {
   return (
     <div
       className="flex items-center justify-between gap-3 bg-[var(--mp-bg)]"
-      style={{ padding: compact ? "26px 18px 6px 20px" : "26px 24px 6px 32px", minHeight: 80 }}
+      style={
+        tight
+          ? { padding: compact ? "26px 18px 2px 20px" : "26px 24px 0 32px" }
+          : { padding: compact ? "26px 18px 6px 20px" : "26px 24px 6px 32px", minHeight: 80 }
+      }
     >
       <p
         style={{ fontFamily: "Menlo, ui-monospace, SFMono-Regular, Monaco, Consolas, monospace" }}
-        className="m-0 flex items-center gap-2 text-[10px] font-medium uppercase leading-none tracking-[.14em] text-[var(--mp-ac-dark)]">
-        <i aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--mp-ac-dark)]" />
+        className="m-0 text-[10px] font-medium uppercase leading-none tracking-[.14em] text-[var(--mp-ac-dark)]">
         Мой план
       </p>
 
