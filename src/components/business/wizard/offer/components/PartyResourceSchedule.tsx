@@ -25,6 +25,8 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
   const [duration, setDuration] = useState(60);
   const [capacity, setCapacity] = useState(1);
   const [pending, setPending] = useState(false);
+  const [preview, setPreview] = useState<{configured:boolean;message:string;slots:{startsAt:string;endsAt:string;remainingSeats:number|null}[]} | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -94,6 +96,28 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
             <p className="font-medium">Привязанные ресурсы</p>
             {units.map(unit => <div key={unit.id} className="space-y-2"><div className="flex items-center gap-2"><span>{unit.name} — {unit.status}</span><Button type="button" variant="outline" size="sm" onClick={() => setEditingId(current => current === unit.id ? null : unit.id)}>Изменить</Button></div>{editingId === unit.id && <PartyResourceEditor unitId={unit.id} offerId={offerId!} onSaved={() => void refresh()} />}</div>)}
           </div>}
+          <div className="space-y-2 rounded-xl border p-3">
+            <Button type="button" variant="outline" disabled={previewLoading} onClick={async () => {
+              setPreviewLoading(true); setError("");
+              try {
+                const res = await fetch(`/api/business/offers/${encodeURIComponent(offerId)}/slot-preview`, {cache:"no-store"});
+                const value = await res.json();
+                if (!res.ok) throw new Error(value.error || "Не удалось получить доступность");
+                setPreview(value);
+              } catch (e) { setError(e instanceof Error ? e.message : "Ошибка предпросмотра"); }
+              finally {setPreviewLoading(false);}
+            }}>{previewLoading ? "Загрузка…" : "Проверить свободные слоты на 7 дней"}</Button>
+            {preview && <div className="space-y-2 text-sm">
+              <p>{preview.message}</p>
+              {preview.configured && (preview.slots.length ? <ul className="space-y-1">
+                {preview.slots.slice(0, 20).map(slot => <li key={slot.startsAt}>
+                  {new Date(slot.startsAt).toLocaleString("ru-RU", {timeZone:"Europe/Minsk",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}
+                  {" — "} {new Date(slot.endsAt).toLocaleTimeString("ru-RU", {timeZone:"Europe/Minsk",hour:"2-digit",minute:"2-digit"})}
+                  {slot.remainingSeats !== null ? ` · мест: ${slot.remainingSeats}` : ""}
+                </li>)}
+              </ul> : <p>Свободных слотов в выбранном периоде не найдено.</p>)}
+            </div>}
+          </div>
           <div className="space-y-2">
             <Label htmlFor="party-resource-name">Название ресурса</Label>
             <Input id="party-resource-name" value={name} maxLength={120}
