@@ -1608,7 +1608,6 @@ export function PlanMainContent({
             {renderDayList(true)}
             {renderOwnIdeas()}
             {renderIdeas()}
-            {renderBottomActions()}
             {renderWeekTeaser()}
           </>
         )}
