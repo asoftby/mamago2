@@ -37,11 +37,11 @@ import { PlanVisitsScreen } from "./v3/PlanVisitsScreen";
 import { PlanDayRibbon } from "./v3/PlanDayRibbon";
 import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
 import { PlanMonthScreen } from "./v3/PlanMonthScreen";
+import { PlanPicksScreen } from "./v3/PlanPicksScreen";
 import { PlanMoveSheet, canMovePlanItem } from "./v3/PlanMoveSheet";
 import { fetchPlanExperienceFeed, type PlanExperienceFeed } from "./v3/planExperienceApi";
-import { ArrowRight, Bookmark, Heart, Lightbulb, Plus, Search } from "lucide-react";
+import { ArrowRight, Bookmark, Heart, Lightbulb, Search } from "lucide-react";
 import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
-import { MediaCover } from "@/components/ui/media-cover";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
@@ -61,10 +61,7 @@ import {
   recommendationDraftKey,
   reconcileAddedActivityIds,
 } from "../lib/planRecommendationDraftStorage";
-import {
-  focusPlanRecommendationResults,
-  PLAN_RECOMMENDATION_RESULTS_A11Y,
-} from "../lib/planRecommendationUi";
+import { focusPlanRecommendationResults } from "../lib/planRecommendationUi";
 
 interface PlanChildChip {
   id: string;
@@ -428,12 +425,12 @@ export function PlanMainContent({
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   /** Два экрана остаются в одной модалке: сдвигаем их по горизонтали, не теряя план. */
-  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "month" | "event" | "scenario">("plan");
+  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "month" | "picks" | "event" | "scenario">("plan");
   /** Сохраняем исходящий экран в DOM до конца обратной анимации. */
-  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "month" | "event" | "scenario" | null>(null);
+  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "month" | "picks" | "event" | "scenario" | null>(null);
   /** Каждое открытие формы — новый экземпляр; отменённая анимация не оставляет старый черновик. */
   const [nestedScreenVersion, setNestedScreenVersion] = useState(0);
-  const openNestedScreen = useCallback((next: "new" | "visits" | "month" | "event" | "scenario") => {
+  const openNestedScreen = useCallback((next: "new" | "visits" | "month" | "picks" | "event" | "scenario") => {
     setNestedScreenVersion((version) => version + 1);
     setMountedNestedScreen(next);
     setScreen(next);
@@ -492,6 +489,7 @@ export function PlanMainContent({
   const [planAudienceOverride, setPlanAudienceOverride] = useState<string[] | null>(null);
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState(false);
+  const [picksPeople, setPicksPeople] = useState<string[]>([]);
   const [addedSuggestionActivityIds, setAddedSuggestionActivityIds] = useState<string[]>([]);
   const lastRequestSnapshotRef = useRef<PlanSuggestionAudienceSnapshot>({
     ageRangeValues: [],
@@ -1363,100 +1361,41 @@ export function PlanMainContent({
     );
   };
 
-  /** «Идеи на сегодня · от mamaGo»: пунктирный блок отдельно от плана; «+» добавляет в план. */
+  /** Кнопка «Подобрать, куда сходить»: открывает экран подборки и, если её ещё нет, запрашивает её. */
   const renderIdeas = () => {
     if (isPendingDateHydration) return null;
-    if (awaitingAgeAnswer) {
-      return <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} compact />;
-    }
-    const linkClass =
-      "flex min-h-12 w-full items-center justify-center gap-[7px] rounded-xl bg-primary px-4 text-[15px] font-bold text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60";
-    if (!hasRequestedSuggestions) {
-      return (
-        <button
-          type="button"
-          onClick={handleDecideClick}
-          className="group flex min-h-[76px] w-full items-center gap-3.5 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-3 pl-3.5 pr-4 text-left transition-colors hover:border-[var(--mp-tx)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full bg-[var(--mp-tx)] text-white">
-            <Search className="h-5 w-5" strokeWidth={1.8} aria-hidden />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[16.5px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Подобрать, куда сходить</span>
-            <span className="mt-[3px] block text-[13.5px] text-[var(--mp-tx2)]">Афиша на {posterDayWord(selectedDate, todayKey)}</span>
-          </span>
-          <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--mp-ac-dark)]" strokeWidth={1.8} aria-hidden />
-        </button>
-      );
-    }
-    const exhausted = suggestionsGeneration >= MAX_SUGGESTION_BATCHES;
     return (
-      <section
-        id="plan-recommendation-results"
-        className="rounded-[20px] border-[1.5px] border-dashed border-[var(--mp-line-strong)] px-3.5 pb-1 pt-3.5 outline-none"
-        {...PLAN_RECOMMENDATION_RESULTS_A11Y}
+      <button
+        type="button"
+        onClick={() => {
+          openNestedScreen("picks");
+          if (!hasRequestedSuggestions) handleDecideClick();
+        }}
+        className="group flex min-h-[76px] w-full items-center gap-3.5 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-3 pl-3.5 pr-4 text-left transition-colors hover:border-[var(--mp-tx)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
-        <div className="mb-1.5 flex items-baseline justify-between">
-          <b className="text-base font-bold text-[var(--mp-tx)]">Идеи на {isTodaySelected ? "сегодня" : "этот день"}</b>
-          <span className="text-[12.5px] font-semibold text-[var(--mp-tx2)]">от mamaGo</span>
-        </div>
-        {isFetchingSuggestions ? (
-          <div className="space-y-2 pb-3 pt-1" aria-busy>
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-[52px] animate-pulse rounded-xl bg-[var(--surface-hover)]" />
-            ))}
-          </div>
-        ) : suggestionsError ? (
-          <div className="pb-2 pt-1 text-[15px] leading-6 text-[var(--mp-tx2)]">
-            Не получилось загрузить идеи.{" "}
-            <button
-              type="button"
-              onClick={() => void handleFetchSuggestions(lastRequestSnapshotRef.current)}
-              className="font-bold text-[var(--mp-ac-dark)] underline underline-offset-[3px]"
-            >
-              Попробовать снова
-            </button>
-          </div>
-        ) : suggestions.length === 0 ? (
-          <p className="pb-2 pt-1 text-[15px] leading-6 text-[var(--mp-tx2)]">
-            На эту дату подходящих событий пока нет.
-          </p>
-        ) : (
-          suggestions.map((activity, index) => (
-            <div
-              key={activity.id}
-              className={"grid grid-cols-[52px_1fr_44px] items-center gap-3 py-[9px] " + (index === 0 ? "" : "border-t border-[var(--mp-line)]")}
-            >
-              <div className="w-[52px]">
-                <MediaCover imageUrl={activity.coverImageUrl || undefined} alt={activity.title} ratio="1/1" className="rounded-xl shadow-none" />
-              </div>
-              <div className="min-w-0">
-                <div className="line-clamp-2 text-[14.5px] font-bold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">{activity.title}</div>
-                {ideaMeta(activity) ? <div className="mt-0.5 text-[13px] leading-[1.4] text-[var(--mp-tx2)]">{ideaMeta(activity)}</div> : null}
-              </div>
-              <button
-                type="button"
-                aria-label="Добавить в план"
-                disabled={addingActivityId === activity.id}
-                onClick={() => void handleAddSuggestionToPlan(activity)}
-                className="flex h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-[var(--mp-line-strong)] text-[var(--mp-tx)] transition-colors hover:border-[var(--mp-ac)] hover:bg-[var(--mp-ac-soft)] hover:text-[var(--mp-ac-dark)] disabled:opacity-60"
-              >
-                <Plus className="h-[19px] w-[19px]" strokeWidth={2} aria-hidden />
-              </button>
-            </div>
-          ))
-        )}
-        {!isFetchingSuggestions ? (
-          <button
-            type="button"
-            className={linkClass}
-            onClick={exhausted ? handleOpenCatalog : handleRegenerate}
-          >
-            {exhausted ? "Открыть каталог" : "Подобрать ещё"}
-          </button>
-        ) : null}
-      </section>
+        <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full bg-[var(--mp-tx)] text-white">
+          <Search className="h-5 w-5" strokeWidth={1.8} aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[16.5px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Подобрать, куда сходить</span>
+          <span className="mt-[3px] block text-[13.5px] text-[var(--mp-tx2)]">Афиша на {posterDayWord(selectedDate, todayKey)}</span>
+        </span>
+        <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--mp-ac-dark)]" strokeWidth={1.8} aria-hidden />
+      </button>
     );
+  };
+
+  /** Смена участников на экране подборки: тот же расчёт возраста, что у «Подобрать». */
+  const handlePicksPeople = (id: string | null) => {
+    const next = id === null ? [] : picksPeople.includes(id) ? picksPeople.filter((x) => x !== id) : [...picksPeople, id];
+    setPicksPeople(next);
+    if (next.length === 0) {
+      handleDecideClick();
+      return;
+    }
+    const childIds = personas.filter((persona) => persona.kind === "child" && next.includes(persona.id)).map((persona) => persona.id);
+    const ages = childIds.length === 0 ? ["18+"] : deriveAgeRangesFromChildren(childrenList, childIds).map((item) => item.range);
+    void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(ages, next));
   };
 
   const renderBottomActions = () => (
@@ -1780,6 +1719,44 @@ export function PlanMainContent({
             />
           ) : mountedNestedScreen === "visits" ? (
             <PlanVisitsScreen key={nestedScreenVersion} onBack={closeNestedScreen} />
+          ) : mountedNestedScreen === "picks" ? (
+            <PlanPicksScreen
+              key={nestedScreenVersion}
+              title={`Куда сходить ${(() => {
+                const word = posterDayWord(selectedDate, todayKey);
+                if (word === "сегодня" || word === "завтра") return word;
+                return `${word.startsWith("вторник") ? "во" : "в"} ${word}`;
+              })()}`}
+              people={personas.map((persona) => ({
+                id: persona.id,
+                label: persona.kind === "adult" ? "Я" : persona.displayName?.trim() || "Ребёнок",
+              }))}
+              selectedPeopleIds={picksPeople}
+              onTogglePerson={handlePicksPeople}
+              suggestions={suggestions}
+              loading={isFetchingSuggestions}
+              failed={suggestionsError}
+              addingActivityId={addingActivityId}
+              metaFor={ideaMeta}
+              ageQuestion={
+                awaitingAgeAnswer ? (
+                  <PlanNeedsAgeQuestion
+                    onConfirm={handleAgeAnswerConfirm}
+                    onCancel={() => {
+                      handleAgeAnswerCancel();
+                      closeNestedScreen();
+                    }}
+                  />
+                ) : null
+              }
+              exhausted={suggestionsGeneration >= MAX_SUGGESTION_BATCHES}
+              onAdd={(activity) => void handleAddSuggestionToPlan(activity)}
+              onRetry={() => void handleFetchSuggestions(lastRequestSnapshotRef.current)}
+              onMore={handleRegenerate}
+              onOpenCatalog={handleOpenCatalog}
+              onBack={closeNestedScreen}
+              onClose={onRequestClose}
+            />
           ) : mountedNestedScreen === "month" ? (
             <PlanMonthScreen
               key={nestedScreenVersion}
