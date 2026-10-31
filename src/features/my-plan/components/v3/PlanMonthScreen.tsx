@@ -161,7 +161,7 @@ export function PlanMonthScreen({
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
       <PlanScreenHeader
         kicker="Весь месяц"
-        title={`${monthName(monthStart).charAt(0)}${monthName(monthStart).slice(1).toLowerCase()} · ${dela(total)}`}
+        title={`${monthName(monthStart).charAt(0)}${monthName(monthStart).slice(1).toLowerCase()}${items === undefined ? "" : ` · ${total ? dela(total) : "дел пока нет"}`}`}
         onBack={onBack}
         onClose={onClose}
       />
