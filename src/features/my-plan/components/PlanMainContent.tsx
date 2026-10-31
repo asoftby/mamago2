@@ -49,6 +49,8 @@ import { resolveScenarioCtaState, resolveScenarioCtaLabel } from "../lib/canOpen
 import { sortPlanItemsForDay } from "../lib/sortPlanItemsForDay";
 import { useResolveDefaultParticipants } from "../lib/useResolveDefaultParticipants";
 import { writeLastPlanAgeRanges } from "../lib/lastPlanAgeRangesStorage";
+import { toggleAgeRangeSelection } from "../lib/ageRangeSelection";
+import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import {
   fetchPlanSuggestions,
   createPlanSuggestionAudienceSnapshot,
@@ -490,6 +492,7 @@ export function PlanMainContent({
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState(false);
   const [picksPeople, setPicksPeople] = useState<string[]>([]);
+  const [picksAges, setPicksAges] = useState<string[]>([]);
   const [addedSuggestionActivityIds, setAddedSuggestionActivityIds] = useState<string[]>([]);
   const lastRequestSnapshotRef = useRef<PlanSuggestionAudienceSnapshot>({
     ageRangeValues: [],
@@ -1406,17 +1409,37 @@ export function PlanMainContent({
     );
   };
 
-  /** Смена участников на экране подборки: тот же расчёт возраста, что у «Подобрать». */
-  const handlePicksPeople = (id: string | null) => {
-    const next = id === null ? [] : picksPeople.includes(id) ? picksPeople.filter((x) => x !== id) : [...picksPeople, id];
-    setPicksPeople(next);
-    if (next.length === 0) {
+  /** Запрос подборки с экрана подборки: свой возраст важнее состава, «Для всех» = возраст «Любой». */
+  const refetchPicks = (ids: string[], ages: string[]) => {
+    if (ages.length > 0) {
+      void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(ages, ids));
+      return;
+    }
+    if (ids.length === 0) {
       handleDecideClick();
       return;
     }
-    const childIds = personas.filter((persona) => persona.kind === "child" && next.includes(persona.id)).map((persona) => persona.id);
-    const ages = childIds.length === 0 ? ["18+"] : deriveAgeRangesFromChildren(childrenList, childIds).map((item) => item.range);
-    void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(ages, next));
+    const childIds = personas.filter((persona) => persona.kind === "child" && ids.includes(persona.id)).map((persona) => persona.id);
+    const derived = childIds.length === 0 ? ["18+"] : deriveAgeRangesFromChildren(childrenList, childIds).map((item) => item.range);
+    void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(derived, ids));
+  };
+
+  const handlePicksPeople = (id: string | null) => {
+    const next = id === null ? [] : picksPeople.includes(id) ? picksPeople.filter((x) => x !== id) : [...picksPeople, id];
+    setPicksPeople(next);
+    if (id === null) setPicksAges([]);
+    refetchPicks(next, id === null ? [] : picksAges);
+  };
+
+  const handlePicksAge = (value: string) => {
+    const next = toggleAgeRangeSelection(picksAges, value);
+    setPicksAges(next);
+    refetchPicks(picksPeople, next);
+  };
+
+  const handlePicksResetAges = () => {
+    setPicksAges([]);
+    refetchPicks(picksPeople, []);
   };
 
   const renderBottomActions = () => (
@@ -1754,6 +1777,10 @@ export function PlanMainContent({
               }))}
               selectedPeopleIds={picksPeople}
               onTogglePerson={handlePicksPeople}
+              ageOptions={AGE_GROUPS.filter((group) => group.value !== "18+").map((group) => ({ value: group.value, label: group.label }))}
+              selectedAges={picksAges}
+              onToggleAge={handlePicksAge}
+              onResetAges={handlePicksResetAges}
               suggestions={suggestions}
               loading={isFetchingSuggestions}
               failed={suggestionsError}

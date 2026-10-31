@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Heart } from "lucide-react";
+import { Heart, RefreshCw, X } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { PLAN_FOCUS } from "./planChipStyles";
@@ -9,6 +9,7 @@ import { PlanScreenHeader } from "./PlanScreenHeader";
 import type { PlanSuggestionItem } from "../../lib/fetchPlanSuggestions";
 
 export type PlanPicksPerson = { id: string; label: string };
+export type PlanPicksAge = { value: string; label: string };
 
 /**
  * «Подборка для вас»: экран по кнопке «Подобрать, куда сходить». Карточки из /api/plan/suggestions,
@@ -19,6 +20,10 @@ export function PlanPicksScreen({
   people,
   selectedPeopleIds,
   onTogglePerson,
+  ageOptions,
+  selectedAges,
+  onToggleAge,
+  onResetAges,
   suggestions,
   loading,
   failed,
@@ -38,6 +43,11 @@ export function PlanPicksScreen({
   people: PlanPicksPerson[];
   selectedPeopleIds: string[];
   onTogglePerson: (id: string | null) => void;
+  /** Возрастные диапазоны для своего поиска; «Для всех» = возраст «Любой». */
+  ageOptions: PlanPicksAge[];
+  selectedAges: string[];
+  onToggleAge: (value: string) => void;
+  onResetAges: () => void;
   suggestions: PlanSuggestionItem[];
   loading: boolean;
   failed: boolean;
@@ -90,28 +100,50 @@ export function PlanPicksScreen({
       <PlanScreenHeader kicker="Подборка для вас" title={title} onBack={onBack} onClose={onClose} />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-28 pt-0 md:px-8">
-        <p className="m-0 mx-0.5 mb-1 mt-1 text-[14.5px] leading-[1.5] text-[var(--mp-tx2)]">
-          Учли возраст детей и выбранный день.
-        </p>
-
-        {people.length > 1 ? (
-          <div role="group" aria-label="Для кого" className="-mx-5 mt-3 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none] md:-mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
-            <button type="button" aria-pressed={selectedPeopleIds.length === 0} onClick={() => onTogglePerson(null)} className={chip(selectedPeopleIds.length === 0)}>
-              Для всех
-            </button>
-            {people.map((person) => (
+        <div role="group" aria-label="Для кого" className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none] md:-mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
+          {selectedAges.length > 0 ? (
+            <span className={cn(chip(true), "gap-1.5 pr-2")}>
+              <span className="max-w-[180px] truncate">
+                {selectedAges.map((value) => ageOptions.find((age) => age.value === value)?.label ?? value).join(", ")}
+              </span>
               <button
-                key={person.id}
                 type="button"
-                aria-pressed={selectedPeopleIds.includes(person.id)}
-                onClick={() => onTogglePerson(person.id)}
-                className={chip(selectedPeopleIds.includes(person.id))}
+                aria-label="Сбросить возраст"
+                onClick={onResetAges}
+                className={cn("flex h-7 w-7 items-center justify-center rounded-full bg-white/16 hover:bg-white/25", PLAN_FOCUS)}
               >
-                {person.label}
+                <X className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden />
               </button>
-            ))}
-          </div>
-        ) : null}
+            </span>
+          ) : null}
+          <button type="button" aria-pressed={selectedPeopleIds.length === 0 && selectedAges.length === 0} onClick={() => onTogglePerson(null)} className={chip(selectedPeopleIds.length === 0 && selectedAges.length === 0)}>
+            Для всех
+          </button>
+          {people.map((person) => (
+            <button
+              key={person.id}
+              type="button"
+              aria-pressed={selectedPeopleIds.includes(person.id)}
+              onClick={() => onTogglePerson(person.id)}
+              className={chip(selectedPeopleIds.includes(person.id))}
+            >
+              {person.label}
+            </button>
+          ))}
+        </div>
+        <div role="group" aria-label="Возраст" className="-mx-5 mt-2 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none] md:-mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
+          {ageOptions.map((age) => (
+            <button
+              key={age.value}
+              type="button"
+              aria-pressed={selectedAges.includes(age.value)}
+              onClick={() => onToggleAge(age.value)}
+              className={chip(selectedAges.includes(age.value))}
+            >
+              {age.label}
+            </button>
+          ))}
+        </div>
 
         <div className="mt-4">
           {ageQuestion ? (
@@ -130,7 +162,7 @@ export function PlanPicksScreen({
               </button>
             </div>
           ) : suggestions.length === 0 ? (
-            <p className="m-0 px-0.5 text-[15px] leading-6 text-[var(--mp-tx2)]">На эту дату подходящих событий пока нет.</p>
+            <p role="status" className="m-0 flex min-h-[76px] items-center justify-center rounded-[22px] border border-[#d6e4f3] bg-[#eaf2fb] px-4 py-3 text-center text-[14px] leading-[1.5] text-[var(--mp-tx2)]">На эту дату подходящих событий пока нет.</p>
           ) : (
             <div className="flex flex-col gap-2.5">
               {suggestions.map((activity) => {
@@ -182,13 +214,18 @@ export function PlanPicksScreen({
           )}
         </div>
 
-        {!ageQuestion && !loading && !failed ? (
+        {!ageQuestion && !loading && !failed && suggestions.length > 0 ? (
           <button
             type="button"
             onClick={exhausted ? onOpenCatalog : onMore}
-            className="mx-auto mt-[22px] block min-h-11 px-3 text-center text-[14px] font-medium text-[var(--mp-tx2)] hover:text-[var(--mp-tx)]"
+            className={cn("mx-auto mt-[22px] flex min-h-11 items-center gap-2 px-3 text-center text-[14px] font-medium text-[var(--mp-tx2)] hover:text-[var(--mp-tx)]", PLAN_FOCUS)}
           >
-            {exhausted ? "Открыть каталог →" : "Подобрать ещё →"}
+            {exhausted ? "Открыть каталог →" : (
+              <>
+                <RefreshCw className="h-4 w-4" strokeWidth={1.8} aria-hidden />
+                Показать ещё
+              </>
+            )}
           </button>
         ) : null}
       </div>
