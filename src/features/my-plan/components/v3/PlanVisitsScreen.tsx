@@ -169,7 +169,7 @@ export function PlanVisitsScreen({ onBack, onClose }: { onBack: () => void; onCl
             aria-pressed={onlySuper}
             onClick={() => setOnlySuper((v) => !v)}
             className={cn(
-              "inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full border px-[18px] text-[15px] font-semibold transition-colors",
+              "inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full border px-[18px] text-[14px] font-semibold transition-colors",
               onlySuper
                 ? "border-[var(--mp-chip-on-bg)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]"
                 : "border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)] hover:border-[var(--mp-tx2)]",
@@ -200,7 +200,7 @@ export function PlanVisitsScreen({ onBack, onClose }: { onBack: () => void; onCl
           groups.map((group) => (
             <div key={group.month}>
               <div className="mb-2.5 mt-[22px] flex items-center gap-3 px-0.5">
-                <span className="text-[19px] font-medium tracking-[-.02em] text-[var(--mp-tx)]">{group.month}</span>
+                <span className="text-[18px] font-normal tracking-[-.01em] text-[var(--mp-tx)]">{group.month}</span>
                 <i aria-hidden className="h-px flex-1 bg-[var(--mp-line)]" />
               </div>
               <div className="flex flex-col gap-2.5">
@@ -208,8 +208,8 @@ export function PlanVisitsScreen({ onBack, onClose }: { onBack: () => void; onCl
                 <div key={visit.id} className="rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-3 pl-4 pr-3.5">
                   <div className="flex items-start gap-2">
                     <div className="min-w-0 flex-1">
-                      <div className="text-[16.5px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">{visit.title}</div>
-                      <div className="mp-font-meta mt-[3px] text-[12px] tracking-[.02em] text-[var(--mp-tx2)]">{dayLabel(visit.plannedDate)}</div>
+                      <div className="text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">{visit.title}</div>
+                      <div className="mp-font-meta mt-[3px] text-[11px] tracking-[.02em] text-[var(--mp-tx2)]">{dayLabel(visit.plannedDate)}</div>
                     </div>
                     {visit.feedbackSentiment ? (
                       <span

@@ -57,7 +57,7 @@ export function PlanIdeasScreen({
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="line-clamp-2 block text-[16.5px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)] [overflow-wrap:anywhere]">
+                  <span className="line-clamp-2 block text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)] [overflow-wrap:anywhere]">
                     {idea.activity.title}
                   </span>
                 </span>
@@ -65,7 +65,7 @@ export function PlanIdeasScreen({
                   type="button"
                   disabled={planned || addingActivityId === idea.activityId}
                   onClick={() => onAdd(idea)}
-                  className="h-10 shrink-0 rounded-full bg-[var(--mp-tx)] px-3.5 text-[13.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-45"
+                  className="h-10 shrink-0 rounded-full bg-[var(--mp-tx)] px-3.5 text-[14px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-45"
                 >
                   {planned ? "В плане" : "В план"}
                 </button>
