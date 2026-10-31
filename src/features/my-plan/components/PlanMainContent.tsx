@@ -321,6 +321,14 @@ function buildParticipantSummaryLabels(
   );
 }
 
+/** «сегодня» / «завтра» / «среду, 4 ноября» — для подписи «Афиша на …». */
+function posterDayWord(selectedDate: string, todayKey: string): string {
+  if (selectedDate === todayKey) return "сегодня";
+  if (selectedDate === addDaysIso(todayKey, 1)) return "завтра";
+  const date = new Date(`${selectedDate}T12:00:00`);
+  return `${weekdayForNa(date)}, ${date.toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}`;
+}
+
 function weekdayForNa(date: Date): string {
   const weekday = date.toLocaleDateString("ru-RU", { weekday: "long" }).toLowerCase();
   const accusativeByNa: Record<string, string> = {
@@ -1375,7 +1383,7 @@ export function PlanMainContent({
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-[16.5px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Подобрать, куда сходить</span>
-            <span className="mt-[3px] block text-[13.5px] text-[var(--mp-tx2)]">Афиша на {isTodaySelected ? "сегодня" : "этот день"}</span>
+            <span className="mt-[3px] block text-[13.5px] text-[var(--mp-tx2)]">Афиша на {posterDayWord(selectedDate, todayKey)}</span>
           </span>
           <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--mp-ac-dark)]" strokeWidth={1.8} aria-hidden />
         </button>
