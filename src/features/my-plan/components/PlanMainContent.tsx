@@ -20,6 +20,7 @@ import { LiquidNotification } from "@/components/ui/liquid-notification";
 import { PlanCalendar } from "@/features/plan-calendar";
 import { PlanPersonFilter, planPersonFilterOptions } from "./PlanPersonFilter";
 import { useSharedPlanAudienceFilters } from "../hooks/useSharedPlanAudienceFilters";
+import { PlanEmptyDayMessage } from "./PlanEmptyDayMessage";
 import { filterVisiblePlanEntries, type PlanPersonSelection } from "../lib/filterPlanEntriesByPerson";
 import { pluralRu, relativeLabel } from "@/lib/date/dateKey";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
@@ -1273,9 +1274,26 @@ export function PlanMainContent({
     }
     if (dayPartSections.length > 0) return renderDayPlanSection(compact);
     return (
-      <p role="status" className="m-0 px-0.5 text-[15.5px] font-normal leading-[1.5] text-[var(--mp-tx2)]">
-        {isTodaySelected ? "На сегодня дел нет." : "На этот день дел нет."}
-      </p>
+      <div role="status" className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-[15.5px] leading-[1.5] text-[var(--mp-tx2)]">
+        {filteredAudience ? (
+          <>
+            <b className="font-bold text-[var(--mp-tx)]">
+              {filterPerson?.kind === "adult" && personShortName(filterPerson) === "Я"
+                ? "У вас в этот день свободно."
+                : filterPerson?.kind === "child"
+                  ? `У ${toGenitiveName(personShortName(filterPerson))} в этот день свободно.`
+                  : "Нет дел по выбранным фильтрам."}
+            </b>{" "}
+            <button type="button" onClick={() => updateAudienceFilters({ include: [], exclude: [], visibility: "ALL" })} className="font-bold text-[var(--mp-ac-dark)] underline underline-offset-[3px]">
+              Сбросить фильтры
+            </button>
+          </>
+        ) : (
+          <>
+            <PlanEmptyDayMessage />
+          </>
+        )}
+      </div>
     );
   };
 
