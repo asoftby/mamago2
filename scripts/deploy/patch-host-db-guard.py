@@ -118,6 +118,8 @@ def harden_legacy(source: str) -> str:
         raise ValueError("Unexpected deploy.sh version: missing/duplicated anchor")
     updated = source.replace(ANCHOR, GUARD + "\n" + ANCHOR, 1)
     for original, replacement in REPLACEMENTS:
+        if original == "docker compose up -d db" and updated.splitlines().count(original) != 1:
+            raise ValueError("Unexpected DB start command: expected exactly one standalone line")
         if updated.count(original) != 1:
             raise ValueError("Unexpected deploy.sh version: " + original[:100])
         updated = updated.replace(original, replacement, 1)
