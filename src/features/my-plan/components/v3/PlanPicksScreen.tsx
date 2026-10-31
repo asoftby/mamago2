@@ -1,14 +1,12 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ChevronLeft, Heart, X } from "lucide-react";
+import { Heart } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { PLAN_FOCUS } from "./planChipStyles";
+import { PlanScreenHeader } from "./PlanScreenHeader";
 import type { PlanSuggestionItem } from "../../lib/fetchPlanSuggestions";
-
-const ROUND =
-  "flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line)] bg-white text-[var(--mp-tx)] shadow-[0_4px_12px_-4px_rgba(20,18,16,.18)] transition-colors hover:bg-[var(--mp-bg)]";
 
 export type PlanPicksPerson = { id: string; label: string };
 
@@ -89,25 +87,9 @@ export function PlanPicksScreen({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
-      <div className="flex shrink-0 items-start gap-3 px-5 pb-1.5 pt-[26px] md:px-8">
-        <button type="button" onClick={onBack} aria-label="Назад в план" className={cn(ROUND, "mt-1", PLAN_FOCUS)}>
-          <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
-        </button>
-        <div className="min-w-0 flex-1">
-          <p className="mp-font-meta m-0 flex items-center gap-2 text-[10px] font-medium uppercase leading-none tracking-[.14em] text-[var(--mp-ac-dark)]">
-            <i aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--mp-ac-dark)]" />
-            Подборка для вас
-          </p>
-          <h2 className="m-0 mt-1.5 text-[30px] font-semibold leading-none tracking-[-.02em] text-[var(--mp-tx)] [text-wrap:pretty]">{title}</h2>
-        </div>
-        {onClose ? (
-          <button type="button" onClick={onClose} aria-label="Закрыть мой план" className={cn(ROUND, "mt-1", PLAN_FOCUS)}>
-            <X className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
-          </button>
-        ) : null}
-      </div>
+      <PlanScreenHeader kicker="Подборка для вас" title={title} onBack={onBack} onClose={onClose} />
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-28 pt-1 md:px-8">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-28 pt-0 md:px-8">
         <p className="m-0 mx-0.5 mb-1 mt-1 text-[14.5px] leading-[1.5] text-[var(--mp-tx2)]">
           Учли возраст детей и выбранный день.
         </p>
