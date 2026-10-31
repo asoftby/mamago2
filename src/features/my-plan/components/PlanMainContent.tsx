@@ -1296,7 +1296,7 @@ export function PlanMainContent({
       return (
         <section aria-label="В вашем плане">
           {emptyHeading}
-          <p role="status" className="m-0 px-0.5 text-[14px] font-normal leading-[1.5] text-[var(--mp-tx2)]">
+          <p role="status" className="m-0 px-0.5 pb-2 text-center text-[14px] font-normal leading-[1.5] text-[var(--mp-tx2)]">
             На {posterDayWord(selectedDate, todayKey)} планов нет.
           </p>
         </section>
