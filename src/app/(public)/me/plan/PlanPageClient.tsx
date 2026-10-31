@@ -300,7 +300,8 @@ export function PlanPageClient({
   const selection = {
     include: includedPeople.map(toSelection).filter((p): p is PlanPersonSelection => p !== null),
     exclude: excludedPeople.map(toSelection).filter((p): p is PlanPersonSelection => p !== null),
-    visibility: visibilityFilter,
+    // The «Все доступные / Мои личные / Общие» tabs are hidden for now: do not narrow by a stored value.
+    visibility: "ALL" as const,
   };
   // The server returns only records accessible to the current account.
   // The local participant/scope selection can only narrow that set.
@@ -384,7 +385,7 @@ export function PlanPageClient({
 
       {/* Week Calendar */}
       <Container className="pt-6 pb-2">
-        <PlanCalendar value={selectedDate} onChange={selectDate} variant="page" markerScope={visibilityFilter === "FAMILY" ? "family" : "all"} />
+        <PlanCalendar value={selectedDate} onChange={selectDate} variant="page" markerScope="all" />
         {loadingWeek != null ? <span role="status" className="mt-2 block text-xs text-neutral-500">Загрузка…</span> : null}
         <PlanPersonFilter
           className="mt-3"
@@ -395,8 +396,6 @@ export function PlanPageClient({
           selectedValues={includedPeople}
           onAudienceChange={({ include, exclude }) => updateAudienceFilters({ ...audienceFilters, include, exclude })}
           excludedValues={excludedPeople}
-          visibility={visibilityFilter}
-          onVisibilityChange={(visibility) => updateAudienceFilters({ ...audienceFilters, visibility })}
         />
       </Container>
 
