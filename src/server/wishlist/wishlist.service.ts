@@ -23,6 +23,7 @@ import {
   type UpdateWishlistInput,
 } from "./wishlistPure";
 import { isProvisionalTitle } from "./linkPreviewPure";
+import type { ReleasedReservation } from "./wishlistNotify";
 
 /**
  * Wishlist author side (PR 1): create/edit lists and items. Public page and
@@ -34,6 +35,8 @@ export type WishlistDeps = {
   db?: PrismaClient;
   env?: Record<string, string | undefined>;
   /** Test seam for link previews; defaults to the real SSRF-safe fetcher. */
+  /** Test seam: guest notices after the author releases reservations. */
+  notifyReleased?: (db: PrismaClient, released: ReleasedReservation[]) => Promise<void>;
   fetchPreview?: (url: string, ownerUserId: string) => Promise<{ title: string | null; imageUrl: string | null } | null>;
 };
 
@@ -77,6 +80,17 @@ async function loadAccessible(c: Ctx, userId: string, wishlistId: string) {
   });
   if (!wishlist) throw new WishlistError("not_found");
   return wishlist;
+}
+
+/** Best-effort: never fails the author's edit. */
+async function notifyReleased(c: Ctx, deps: WishlistDeps | undefined, released: ReleasedReservation[]) {
+  if (released.length === 0) return;
+  try {
+    const send = deps?.notifyReleased ?? (await import("./wishlistNotify")).notifyReleasedGuests;
+    await send(c.db, released);
+  } catch (error) {
+    console.error("[wishlist] release notice failed", error instanceof Error ? error.name : typeof error);
+  }
 }
 
 function assertEditable(wishlist: { status: string }) {
@@ -364,11 +378,11 @@ export async function addWishlistItem(
   return getWishlist(userId, wishlist.id, { db: c.db, env: c.env });
 }
 
-type LockedItem = { id: string; url: string | null; quantity: number };
+type LockedItem = { id: string; url: string | null; quantity: number; title: string };
 
 async function lockItem(tx: Prisma.TransactionClient, wishlistId: string, itemId: string): Promise<LockedItem> {
   const rows = await tx.$queryRaw<LockedItem[]>`
-    SELECT "id", "url", "quantity" FROM "WishlistItem"
+    SELECT "id", "url", "quantity", "title" FROM "WishlistItem"
     WHERE "id" = ${itemId} AND "wishlistId" = ${wishlistId} AND "deletedAt" IS NULL
     FOR UPDATE`;
   const item = rows[0];
@@ -401,6 +415,7 @@ export async function updateWishlistItem(
   const c = ctx(deps);
   const wishlist = await loadAccessible(c, userId, wishlistId);
   assertEditable(wishlist);
+  const released: ReleasedReservation[] = [];
   await c.db.$transaction(async (tx) => {
     const item = await lockItem(tx, wishlist.id, itemId);
     const active = (
@@ -423,6 +438,7 @@ export async function updateWishlistItem(
         where: { id: { in: active.map((r) => r.id) } },
         data: { status: "ITEM_REMOVED" },
       });
+      released.push(...active.map((r) => ({ reservationId: r.id, reason: "replaced" as const, itemTitle: item.title })));
     } else if (breaking === "quantity_below_taken" && input.quantity !== undefined) {
       // Keep the earliest reservations; the newest ones lose the item.
       let kept = 0;
@@ -433,6 +449,7 @@ export async function updateWishlistItem(
       }
       if (dropped.length > 0) {
         await tx.wishlistReservation.updateMany({ where: { id: { in: dropped } }, data: { status: "ITEM_REMOVED" } });
+        released.push(...dropped.map((id) => ({ reservationId: id, reason: "quantity" as const, itemTitle: item.title })));
       }
     }
     const data: Prisma.WishlistItemUpdateInput = {};
@@ -446,6 +463,7 @@ export async function updateWishlistItem(
     await tx.wishlistItem.update({ where: { id: item.id }, data });
   });
   await touch(c, wishlist.id);
+  await notifyReleased(c, deps, released);
   return getWishlist(userId, wishlist.id, { db: c.db, env: c.env });
 }
 
@@ -460,6 +478,7 @@ export async function removeWishlistItem(
   const c = ctx(deps);
   const wishlist = await loadAccessible(c, userId, wishlistId);
   assertEditable(wishlist);
+  const released: ReleasedReservation[] = [];
   await c.db.$transaction(async (tx) => {
     const item = await lockItem(tx, wishlist.id, itemId);
     const active = (
@@ -476,10 +495,12 @@ export async function removeWishlistItem(
         where: { id: { in: active.map((r) => r.id) } },
         data: { status: "ITEM_REMOVED" },
       });
+      released.push(...active.map((r) => ({ reservationId: r.id, reason: "removed" as const, itemTitle: item.title })));
     }
     await tx.wishlistItem.update({ where: { id: item.id }, data: { deletedAt: new Date() } });
   });
   await touch(c, wishlist.id);
+  await notifyReleased(c, deps, released);
   return getWishlist(userId, wishlist.id, { db: c.db, env: c.env });
 }
 
@@ -522,12 +543,14 @@ export async function cancelReservationAsOwner(
   const c = ctx(deps);
   const wishlist = await loadAccessible(c, userId, wishlistId);
   assertEditable(wishlist);
+  // ITEM_REMOVED (not CANCELLED) marks an author-side release, so the guest sees a notice.
   const res = await c.db.wishlistReservation.updateMany({
     where: { id: reservationId, item: { wishlistId: wishlist.id }, status: { in: ["RESERVED", "PURCHASED"] } },
-    data: { status: "CANCELLED" },
+    data: { status: "ITEM_REMOVED" },
   });
   if (res.count === 0) throw new WishlistError("not_found");
   await touch(c, wishlist.id);
+  await notifyReleased(c, deps, [{ reservationId, reason: "released" }]);
   return getWishlist(userId, wishlist.id, { db: c.db, env: c.env });
 }
 
