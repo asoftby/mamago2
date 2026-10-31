@@ -1,11 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { buildPublicPath } from "@/lib/routing/surface";
 import { buildCityPublicPath } from "@/lib/routing/cityPaths";
 import type { CityBlogCategory } from "@/server/article/cityBlogCategories";
+
+const JOURNAL_SEEN_KEY = "mamago.journal.article-seen.v1";
+
+function readSeenArticles(): Set<string> {
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem(JOURNAL_SEEN_KEY) || "[]");
+    return new Set(Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
 
 /** Kept in the shared journal layout so it survives section transitions. */
 export function BlogPersistentNav({ citySlug, categories }: {
@@ -14,6 +25,7 @@ export function BlogPersistentNav({ citySlug, categories }: {
 }) {
   const pathname = usePathname();
   const [articleSection, setArticleSection] = useState<string | null>(null);
+  const [seenArticles, setSeenArticles] = useState<Set<string>>(new Set());
   const activeRef = useRef<HTMLAnchorElement>(null);
   const scrollRef = useRef<HTMLElement>(null);
   const [scrollEdges, setScrollEdges] = useState({ left: false, right: false });
@@ -24,6 +36,34 @@ export function BlogPersistentNav({ citySlug, categories }: {
   const activeSlug = pathname.startsWith(sectionPrefix)
     ? pathname.slice(sectionPrefix.length).split("/")[0]
     : isArticle ? articleSection : null;
+
+  useEffect(() => {
+    const sync = () => setSeenArticles(readSeenArticles());
+    sync();
+    window.addEventListener("storage", sync);
+    window.addEventListener("focus", sync);
+    window.addEventListener("pageshow", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("focus", sync);
+      window.removeEventListener("pageshow", sync);
+    };
+  }, []);
+
+  // Opening the actual publication marks that publication alone as seen.
+  // Merely visiting its category leaves all unread indicators intact.
+  useEffect(() => {
+    const currentPath = pathname.replace(/\/$/, "");
+    const matches = categories.flatMap((category) => category.recentArticles ?? [])
+      .filter((article) => article.href.split("?")[0].replace(/\/$/, "") === currentPath)
+      .map((article) => article.id);
+    if (!matches.length) return;
+    const next = readSeenArticles();
+    if (matches.every((id) => next.has(id))) return;
+    matches.forEach((id) => next.add(id));
+    try { window.localStorage.setItem(JOURNAL_SEEN_KEY, JSON.stringify([...next])); } catch { /* Storage unavailable */ }
+    setSeenArticles(next);
+  }, [pathname, categories]);
 
   useLayoutEffect(() => {
     const onArticleSection = (event: Event) => {
@@ -73,9 +113,13 @@ export function BlogPersistentNav({ citySlug, categories }: {
   };
 
   const collageCovers = categories.map((category) => category.thumbnailUrl).filter((url): url is string => Boolean(url)).slice(0, 4);
+  const hasUnseen = (category: CityBlogCategory) =>
+    category.recentArticles
+      ? category.recentArticles.some((article) => !seenArticles.has(article.id))
+      : category.hasNewArticle;
   const pills = [
-    { id: "all", slug: null, name: "Все", thumbnailUrl: null, hasNewArticle: false },
-    ...categories.map((category) => ({ id: category.id, slug: category.slug, name: category.name, thumbnailUrl: category.thumbnailUrl, hasNewArticle: category.hasNewArticle })),
+    { id: "all", slug: null, name: "Все", thumbnailUrl: null, hasNewArticle: categories.some(hasUnseen) },
+    ...categories.map((category) => ({ id: category.id, slug: category.slug, name: category.name, thumbnailUrl: category.thumbnailUrl, hasNewArticle: hasUnseen(category) })),
   ];
 
   return (
@@ -109,7 +153,7 @@ export function BlogPersistentNav({ citySlug, categories }: {
                       <span className="flex h-full w-full items-center justify-center text-base">{pill.slug ? pill.name.slice(0, 1) : "Все".slice(0, 1)}</span>
                     )}
                   </span>
-                  {pill.slug && pill.hasNewArticle && <span className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-primary" />}
+                  {pill.hasNewArticle && <span className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-background bg-primary" />}
                 </span>
               {pill.name}
             </Link>
