@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   addDays,
   dayOfMonth,
@@ -176,7 +176,7 @@ export function PlanDayRibbon({
         )}
       >
         <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white">
-          <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+          <CalendarDays className="h-4 w-4" strokeWidth={1.8} aria-hidden />
         </span>
         <span className="flex-1 text-[15px] font-semibold text-[var(--mp-tx)]">Весь месяц</span>
         <span className="mp-font-meta text-[11px] text-[var(--mp-tx2)]">
