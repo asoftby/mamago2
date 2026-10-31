@@ -59,6 +59,7 @@ jobs:
           bash -n scripts/release/migrate-with-backup.sh
           node --test scripts/release/ci-dev-deploy.contract.test.mjs
           node --test scripts/release/compose-db-preflight.contract.test.mjs
+          python3 scripts/deploy/patch-host-db-guard.test.py
 
       - name: Admin Russian-language check
         run: |
