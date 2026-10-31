@@ -13,7 +13,7 @@ import {
   journalTypeFilterHref,
   type JournalTypeFilter,
 } from "@/lib/journal/journalCardMeta";
-import { JournalFeedGridCard, JournalFeedRow, JournalMainCard, JournalNewsCard } from "./JournalCards";
+import { JournalFeedGridCard, JournalFeedRow, JournalMainCard, JournalMobileCard, JournalNewsCard } from "./JournalCards";
 import { JournalCollectionsCarousel } from "./JournalCollectionsCarousel";
 
 const NEWS_CARD_SHELL = "shrink-0 snap-start w-[33.6vw] min-w-[112px] max-w-[160px] lg:w-[16%] lg:max-w-none";
@@ -169,7 +169,21 @@ export function JournalPageView({
           <h2 id="journal-feed-title" className="m-0 font-heading text-[24px] leading-tight tracking-[-0.02em] sm:text-[28px]">
             {typeFilter ? "Все материалы" : "Свежие материалы"}
           </h2>
-          <div className="border-b border-border lg:hidden">
+          <div className="flex flex-col gap-12 pt-5 md:hidden">
+            {feed.map((article, index) => (
+              <AnalyticsCardViewTracker
+                key={article.id}
+                entityType="ARTICLE"
+                entityId={article.id}
+                vertical="CITY"
+                citySlug={citySlug}
+                meta={{ section: "journal", block: "feed-mobile", position: index + 1 }}
+              >
+                <JournalMobileCard article={article} index={index + 1} saveStatus={saveStatuses[article.id]} />
+              </AnalyticsCardViewTracker>
+            ))}
+          </div>
+          <div className="hidden border-b border-border md:block lg:hidden">
             {feed.map((article, index) => (
               <AnalyticsCardViewTracker
                 key={article.id}
