@@ -135,10 +135,10 @@ function FeedbackCard({
   return (
     <>
       <section className="flex h-full min-h-[178px] flex-col gap-1.5 rounded-[24px] bg-[var(--mp-tx)] px-[18px] pb-4 pt-[18px] text-white shadow-[0_14px_30px_-16px_rgba(20,18,16,.55)]" aria-label="Как прошло?">
-        <p className="mp-font-meta text-[11.5px] font-medium uppercase tracking-[.14em] text-white/65">
+        <p className="mp-font-meta text-[10px] font-medium uppercase tracking-[.12em] text-white/65">
           Вы были · {formatPlannedDay(current.plannedDate, todayIso)}
         </p>
-        <h4 className="mb-2 text-[19px] font-bold leading-[1.25] tracking-[-.01em] text-white">
+        <h4 className="mb-2 text-[17px] font-semibold leading-[1.25] tracking-[-.01em] text-white">
           Как вам {current.title}?
         </h4>
         <div className="grid grid-cols-3 gap-2" role="group" aria-label="Оценка">
@@ -284,8 +284,8 @@ export function PlanFeedbackCard({
           <span className="flex h-[50px] w-[50px] items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)]">
             <History className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden />
           </span>
-          <b className="text-[16px] font-semibold text-[var(--mp-tx)]">Все визиты</b>
-          <span className="mp-font-meta text-[12px] text-[var(--mp-tx2)]">история →</span>
+          <b className="text-[15px] font-semibold text-[var(--mp-tx)]">Все визиты</b>
+          <span className="mp-font-meta text-[11px] text-[var(--mp-tx2)]">история →</span>
         </button>
       </div>
       {cards.length > 1 ? (

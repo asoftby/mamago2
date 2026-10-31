@@ -87,7 +87,7 @@ export function PlanDayRibbon({
   return (
     <div id="plan-week-calendar" className="min-w-0" data-plan-ribbon>
       <div className="mx-0.5 mb-3 mt-[18px] flex items-center justify-between">
-        <span className="text-[25px] font-medium tracking-[-.02em] text-[var(--mp-tx)]" aria-live="polite">
+        <span className="text-[18px] font-normal tracking-[-.01em] text-[var(--mp-tx)]" aria-live="polite">
           {month} <span className="mp-font-display font-normal text-[var(--mp-tx2)]">{yearOf(value)}</span>
         </span>
         <button
@@ -95,7 +95,7 @@ export function PlanDayRibbon({
           disabled={value === today}
           onClick={() => onChange(today)}
           className={cn(
-            "mp-font-meta h-9 rounded-full border border-[var(--mp-tx)] px-3.5 text-[11.5px] font-semibold uppercase tracking-[.14em] text-[var(--mp-tx)] transition-colors",
+            "mp-font-meta h-9 rounded-full border border-[var(--mp-tx)] px-3.5 text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--mp-tx)] transition-colors",
             "enabled:hover:bg-[var(--mp-tx)] enabled:hover:text-white disabled:border-[var(--mp-line-strong)] disabled:text-[var(--mp-tx2)] disabled:opacity-60",
             PLAN_FOCUS,
           )}
@@ -131,7 +131,7 @@ export function PlanDayRibbon({
                 data-day={day}
                 onClick={() => onChange(day)}
                 className={cn(
-                  "flex h-[104px] w-[78px] shrink-0 snap-start flex-col items-center justify-center gap-[3px] rounded-[20px] border transition-colors",
+                  "flex h-[92px] w-[76px] shrink-0 snap-start flex-col items-center justify-center gap-[3px] rounded-[20px] border transition-colors",
                   selected
                     ? "border-[var(--mp-tx)] bg-[var(--mp-tx)] text-white"
                     : isToday
@@ -140,10 +140,10 @@ export function PlanDayRibbon({
                   PLAN_FOCUS,
                 )}
               >
-                <span className={cn("mp-font-meta text-[11.5px] uppercase tracking-[.14em]", selected ? "text-white/65" : "text-[var(--mp-tx2)]")}>
+                <span className={cn("mp-font-meta text-[10px] uppercase tracking-[.1em]", selected ? "text-white/65" : "text-[var(--mp-tx2)]")}>
                   {weekdayShort(day)}
                 </span>
-                <span className="mp-font-display text-[38px] leading-[1.05] [font-variant-numeric:lining-nums]">{dayOfMonth(day)}</span>
+                <span className="mp-font-display text-[28px] font-normal leading-none tracking-[-.02em] [font-variant-numeric:lining-nums]">{dayOfMonth(day)}</span>
                 {owners.length ? (
                   <span className="flex h-3.5 items-center gap-1" aria-hidden>
                     {owners.slice(0, MAX_DOTS).map((owner) => (
@@ -151,7 +151,7 @@ export function PlanDayRibbon({
                     ))}
                   </span>
                 ) : (
-                  <span className={cn("mp-font-meta h-3.5 text-[10.5px] uppercase tracking-[.12em]", selected ? "text-white/65" : "text-[var(--mp-tx2)]")}>
+                  <span className={cn("mp-font-meta h-3.5 text-[9px] uppercase tracking-[.08em]", selected ? "text-white/65" : "text-[var(--mp-tx2)]")}>
                     {isToday ? "сегодня" : monthShort(day)}
                   </span>
                 )}
@@ -178,8 +178,8 @@ export function PlanDayRibbon({
         <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white">
           <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
         </span>
-        <span className="flex-1 text-[16.5px] font-medium text-[var(--mp-tx)]">Весь месяц</span>
-        <span className="mp-font-meta text-[12.5px] text-[var(--mp-tx2)]">
+        <span className="flex-1 text-[15px] font-semibold text-[var(--mp-tx)]">Весь месяц</span>
+        <span className="mp-font-meta text-[11px] text-[var(--mp-tx2)]">
           до {dayOfMonth(monthEnd)} {monthGenitive(monthEnd)} →
         </span>
       </button>

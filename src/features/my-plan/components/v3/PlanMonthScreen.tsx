@@ -27,7 +27,7 @@ const MAX_MONTHS_AHEAD = 12;
 const ROUND =
   "flex shrink-0 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)] disabled:opacity-30";
 
-const CAPS = "mp-font-meta text-[11.5px] font-medium uppercase tracking-[.14em] text-[var(--mp-tx2)]";
+const CAPS = "mp-font-meta text-[10px] font-medium uppercase tracking-[.1em] text-[var(--mp-tx2)]";
 
 function dela(n: number): string {
   return `${n} ${pluralRu(n, ["дело", "дела", "дел"])}`;
@@ -165,11 +165,11 @@ export function PlanMonthScreen({
           <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="mp-font-meta m-0 flex items-center gap-2 text-[12.5px] font-medium uppercase leading-none tracking-[.16em] text-[var(--mp-ac-dark)]">
+          <p className="mp-font-meta m-0 flex items-center gap-2 text-[10px] font-medium uppercase leading-none tracking-[.14em] text-[var(--mp-ac-dark)]">
             <i aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--mp-ac-dark)]" />
             Весь месяц
           </p>
-          <h2 className="m-0 mt-1 text-[27px] font-extrabold leading-[1.1] tracking-[-.025em] text-[var(--mp-tx)]">
+          <h2 className="m-0 mt-1 text-[30px] font-semibold leading-none tracking-[-.02em] text-[var(--mp-tx)]">
             {monthName(monthStart)[0]}
             {monthName(monthStart).slice(1).toLowerCase()} · {dela(total)}
           </h2>

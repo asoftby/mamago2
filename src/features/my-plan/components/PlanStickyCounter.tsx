@@ -31,7 +31,7 @@ export function PlanStickyCounter({ onAdd, floating = false }: PlanStickyCounter
       <button
         type="button"
         onClick={onAdd}
-        className="group pointer-events-auto relative flex min-h-[72px] w-full items-center gap-3 overflow-hidden rounded-[26px] border border-[#f7d2c0] bg-[var(--mp-ac-soft)] py-[9px] pl-[22px] pr-[9px] text-left text-[18px] font-bold tracking-[-.01em] text-[var(--mp-tx)] transition-colors hover:bg-[#ffdfcf] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="group pointer-events-auto relative flex min-h-[72px] w-full items-center gap-3 overflow-hidden rounded-[26px] border border-[#f7d2c0] bg-[var(--mp-ac-soft)] py-[9px] pl-[22px] pr-[9px] text-left text-[16px] font-semibold tracking-[-.01em] text-[var(--mp-tx)] transition-colors hover:bg-[#ffdfcf] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <span className="flex-1">Добавим что-нибудь?</span>
         <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[var(--mp-ac)] text-white transition-transform group-hover:scale-105">

@@ -80,7 +80,7 @@ export function PlanPicksScreen({
 
   const chip = (selected: boolean) =>
     cn(
-      "inline-flex h-[46px] shrink-0 items-center rounded-full border px-[18px] text-[15px] font-semibold transition-colors",
+      "inline-flex h-[46px] shrink-0 items-center rounded-full border px-[18px] text-[14px] font-semibold transition-colors",
       selected
         ? "border-[var(--mp-chip-on-bg)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]"
         : "border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)] hover:border-[var(--mp-tx2)]",
@@ -94,11 +94,11 @@ export function PlanPicksScreen({
           <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
         </button>
         <div className="min-w-0 flex-1">
-          <p className="mp-font-meta m-0 flex items-center gap-2 text-[12.5px] font-medium uppercase leading-none tracking-[.16em] text-[var(--mp-ac-dark)]">
+          <p className="mp-font-meta m-0 flex items-center gap-2 text-[10px] font-medium uppercase leading-none tracking-[.14em] text-[var(--mp-ac-dark)]">
             <i aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--mp-ac-dark)]" />
             Подборка для вас
           </p>
-          <h2 className="m-0 mt-1.5 text-[27px] font-extrabold leading-[1.1] tracking-[-.025em] text-[var(--mp-tx)] [text-wrap:pretty]">{title}</h2>
+          <h2 className="m-0 mt-1.5 text-[30px] font-semibold leading-none tracking-[-.02em] text-[var(--mp-tx)] [text-wrap:pretty]">{title}</h2>
         </div>
         {onClose ? (
           <button type="button" onClick={onClose} aria-label="Закрыть мой план" className={cn(ROUND, "mt-1", PLAN_FOCUS)}>
@@ -164,17 +164,17 @@ export function PlanPicksScreen({
                       ) : null}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <h3 className="m-0 line-clamp-2 text-[17px] font-bold leading-[1.25] tracking-[-.01em] text-[var(--mp-tx)] [overflow-wrap:anywhere]">
+                      <h3 className="m-0 line-clamp-2 text-[15px] font-semibold leading-[1.25] tracking-[-.01em] text-[var(--mp-tx)] [overflow-wrap:anywhere]">
                         {activity.title}
                       </h3>
-                      {category ? <p className="m-0 mt-1 truncate text-[13.5px] text-[var(--mp-tx2)]">{category}</p> : null}
-                      {meta ? <p className="mp-font-meta m-0 mt-0.5 truncate text-[12px] tracking-[.02em] text-[var(--mp-tx2)]">{meta}</p> : null}
+                      {category ? <p className="m-0 mt-1 truncate text-[13px] text-[var(--mp-tx2)]">{category}</p> : null}
+                      {meta ? <p className="mp-font-meta m-0 mt-0.5 truncate text-[11px] tracking-[.02em] text-[var(--mp-tx2)]">{meta}</p> : null}
                       <div className="mt-2.5 flex items-center gap-2">
                         <button
                           type="button"
                           disabled={addingActivityId === activity.id}
                           onClick={() => onAdd(activity)}
-                          className="h-11 rounded-full bg-[var(--mp-tx)] px-[18px] text-[14.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                          className="h-11 rounded-full bg-[var(--mp-tx)] px-[18px] text-[14px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                         >
                           В план
                         </button>

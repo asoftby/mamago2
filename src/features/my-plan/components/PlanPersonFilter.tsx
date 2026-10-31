@@ -74,7 +74,7 @@ export function PlanPersonFilter({
               type="button"
               aria-pressed={selected}
               onClick={() => toggle(option.value)}
-              className="inline-flex h-[46px] max-w-[180px] shrink-0 items-center justify-center gap-2 truncate rounded-full border px-[18px] text-[15px] font-semibold transition-colors hover:border-[#6f675e]"
+              className="inline-flex h-[46px] max-w-[180px] shrink-0 items-center justify-center gap-2 truncate rounded-full border px-[18px] text-[14px] font-semibold transition-colors hover:border-[#6f675e]"
               style={{
                 color: selected ? "#fff" : "#141210",
                 background: selected ? "#141210" : "#fff",

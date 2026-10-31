@@ -85,7 +85,7 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
     }
   };
 
-  const titleClassName = "text-[16.5px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)] [overflow-wrap:anywhere]";
+  const titleClassName = "text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)] [overflow-wrap:anywhere]";
 
   return (
     <article className="group relative rounded-[22px] border border-[#d6e4f3] bg-[#eaf2fb] py-3 pl-3.5 pr-2 transition-colors hover:border-[#b9cfe8] focus-within:border-[#b9cfe8]">
@@ -130,7 +130,7 @@ export function PlanItemRow({ item, onRemove, onMove, onOpen, participantLabel, 
             </span>
           )}
 
-          <div className="mp-font-meta mt-[3px] flex min-w-0 items-center gap-1.5 text-[12px] leading-4 tracking-[.02em] text-[var(--mp-tx2)]">
+          <div className="mp-font-meta mt-[3px] flex min-w-0 items-center gap-1.5 text-[11px] leading-4 tracking-[.02em] text-[var(--mp-tx2)]">
             <span className="shrink-0 tabular-nums">{time || "Весь день"}</span>
             <span aria-hidden>·</span>
             <span className="min-w-0 truncate">{participantLabel || "Вся семья"}</span>

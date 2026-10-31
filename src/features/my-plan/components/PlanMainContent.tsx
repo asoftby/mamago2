@@ -1223,14 +1223,14 @@ export function PlanMainContent({
     );
     const nowLine = (
       <div key="now-line" role="separator" aria-label={`Сейчас ${nowLabel}`} className="relative mx-1 my-0.5 flex items-center gap-2.5">
-        <span className="mp-font-meta inline-flex h-[26px] items-center rounded-full bg-[var(--mp-ac)] px-2.5 text-[12.5px] font-semibold tabular-nums text-white">{nowLabel}</span>
+        <span className="mp-font-meta inline-flex h-[24px] items-center rounded-full bg-[var(--mp-ac)] px-2.5 text-[11px] font-semibold tabular-nums text-white">{nowLabel}</span>
         <i className="relative h-0.5 flex-1 rounded-sm bg-[var(--mp-ac)] before:absolute before:-left-1 before:-top-[3px] before:h-2 before:w-2 before:rounded-full before:bg-[var(--mp-ac)]" />
-        <span className="mp-font-meta text-[11.5px] font-medium uppercase tracking-[.14em] text-[var(--mp-ac-dark)]">сейчас</span>
+        <span className="mp-font-meta text-[10px] font-medium uppercase tracking-[.14em] text-[var(--mp-ac-dark)]">сейчас</span>
       </div>
     );
     return (
       <section aria-label="В вашем плане">
-        <h3 className={(compact ? "mb-3" : "mb-2.5") + " mx-0.5 mt-1 text-[20px] font-bold tracking-[-.015em] text-[var(--mp-tx)]"}>{dayContextLabel}</h3>
+        <h3 className={(compact ? "mb-3" : "mb-2.5") + " mx-0.5 mt-1 text-[18px] font-semibold tracking-[-.01em] text-[var(--mp-tx)]"}>{dayContextLabel}</h3>
         <div className="space-y-2">
           {timedRows.map((item, index) => (
             <div key={item.id} className="space-y-2">
@@ -1242,7 +1242,7 @@ export function PlanMainContent({
         </div>
         {untimedRows.length > 0 ? (
           <>
-            <p className="mp-font-meta mx-1 mb-2.5 mt-[18px] text-[11.5px] font-medium uppercase tracking-[.14em] text-[var(--mp-tx2)]">В любое время</p>
+            <p className="mp-font-meta mx-1 mb-2.5 mt-[18px] text-[10px] font-medium uppercase tracking-[.1em] text-[var(--mp-tx2)]">В любое время</p>
             <div className="space-y-2">{untimedRows.map(renderRow)}</div>
           </>
         ) : null}
@@ -1377,8 +1377,8 @@ export function PlanMainContent({
           <Search className="h-5 w-5" strokeWidth={1.8} aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[16.5px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Подобрать, куда сходить</span>
-          <span className="mt-[3px] block text-[13.5px] text-[var(--mp-tx2)]">Афиша на {posterDayWord(selectedDate, todayKey)}</span>
+          <span className="block text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Подобрать, куда сходить</span>
+          <span className="mt-[3px] block text-[13px] text-[var(--mp-tx2)]">Афиша на {posterDayWord(selectedDate, todayKey)}</span>
         </span>
         <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--mp-ac-dark)]" strokeWidth={1.8} aria-hidden />
       </button>
@@ -1413,7 +1413,7 @@ export function PlanMainContent({
       ) : null}
       <div className="flex items-center gap-3.5 pt-2" aria-hidden>
         <i className="h-px flex-1 bg-[var(--mp-line-strong)]" />
-        <span className="mp-font-display text-[21px] italic text-[var(--mp-tx2)]">или без даты</span>
+        <span className="mp-font-display text-[18px] italic text-[var(--mp-tx2)]">или без даты</span>
         <i className="h-px flex-1 bg-[var(--mp-line-strong)]" />
       </div>
       <nav aria-label="Разделы моего плана">
@@ -1427,8 +1427,8 @@ export function PlanMainContent({
               <Heart className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[16.5px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Мои идеи · {ideasCount}</span>
-              <span className="mt-[3px] block text-[13.5px] text-[var(--mp-tx2)]">Поставьте на свободный день</span>
+              <span className="block text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Мои идеи · {ideasCount}</span>
+              <span className="mt-[3px] block text-[13px] text-[var(--mp-tx2)]">Поставьте на свободный день</span>
             </span>
             <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--mp-ac-dark)]" strokeWidth={1.8} aria-hidden />
           </button>
@@ -1438,15 +1438,15 @@ export function PlanMainContent({
               <Bookmark className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[16.5px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Идей пока нет</span>
-              <span className="mt-[3px] block text-[13.5px] text-[var(--mp-tx2)]">Сохраняйте места из афиши без даты</span>
+              <span className="block text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Идей пока нет</span>
+              <span className="mt-[3px] block text-[13px] text-[var(--mp-tx2)]">Сохраняйте места из афиши без даты</span>
             </span>
           </div>
         )}
         <button
           type="button"
           onClick={() => openNestedScreen("visits")}
-          className="mx-auto mt-[22px] block min-h-11 px-3 text-center text-[13.5px] font-medium text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="mx-auto mt-[22px] block min-h-11 px-3 text-center text-[13px] font-medium text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           История визитов →
         </button>
@@ -1457,7 +1457,7 @@ export function PlanMainContent({
   /** Заголовок недели и карточка оценки визита — верх экрана по макету v3. */
   const renderHead = () => (
     <>
-      <h1 className="m-0 mb-[18px] mt-1 text-[33px] font-extrabold leading-[1.08] tracking-[-.03em] text-[var(--mp-tx)] [text-wrap:pretty]">
+      <h1 className="m-0 mb-[18px] mt-1 text-[34px] font-semibold leading-none tracking-[-.02em] text-[var(--mp-tx)] [text-wrap:pretty]">
         {currentWeekCount > 0 ? "Что у нас на неделе?" : "Неделя пока свободна"}
       </h1>
       <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} onOpenVisits={() => openNestedScreen("visits")} />
