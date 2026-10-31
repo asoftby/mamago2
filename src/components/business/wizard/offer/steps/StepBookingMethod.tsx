@@ -33,6 +33,7 @@ export function StepBookingMethod({ data, onChange, isEditable, externalUrlLocke
   const number = data.productType === "CAMP" ? 1 : 3;
   const urlError = schedule.bookingMethod === "EXTERNAL" ? validateExternalUrl(schedule.externalUrl) : null;
   const isCamp = data.productType === "CAMP" || data.offerWizardType === "CAMP";
+  const isParty = data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE";
 
   const kindChips: ChipItem[] = (
     [
@@ -59,6 +60,12 @@ export function StepBookingMethod({ data, onChange, isEditable, externalUrlLocke
             : "Брони, заявки и закрытие отдельных часов — в Календаре кабинета."}
         </p>
       </div>
+
+      {isParty && (
+        <p role="note" className="rounded-xl border border-border/70 bg-muted/40 px-3 py-2.5 text-sm">
+          Часы работы выше показывают, когда услуга может предоставляться, но не создают доступные для бронирования слоты.\n          Реальная доступность зависит от настроек ресурсов, занятости и блокировок в календаре кабинета.\n          Режим «По заявке» не подтверждает свободное время автоматически.
+        </p>
+      )}
 
       {!isCamp && schedule.legacyBookingMode && !schedule.bookingMethod && (
         <p className="rounded-xl border border-border/70 bg-muted/40 px-3 py-2.5 text-sm">

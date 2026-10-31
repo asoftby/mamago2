@@ -77,6 +77,9 @@ export function shouldShowDesktopHeaderSearch(pathname: string): boolean {
 
   if (section === "blog" && segments.length === 4 && segments[2] === "category" && segments[3]) return true;
 
+  // Journal article details retain the same global city search as the Journal listing.
+  if (section === "blog" && segments.length === 3 && segments[2]) return true;
+
   if (segments.length > 3) return false;
 
   const nestedSlug = segments[2]?.toLowerCase();
