@@ -29,7 +29,7 @@ export function ArticleAuthorActionsBar({
   const authorInitial = authorName.charAt(0).toUpperCase();
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-4 border-t border-border/60 pt-4", className)}>
+    <div className={cn("flex flex-nowrap items-center gap-2 border-t border-border/60 pt-4 sm:flex-wrap sm:gap-4", className)}>
       <div className="flex min-w-0 items-center gap-2.5">
         {author?.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -49,7 +49,7 @@ export function ArticleAuthorActionsBar({
           coverImageUrl={coverImageUrl}
           source={source}
           citySlug={citySlug}
-          className="ml-auto flex-wrap"
+          className="ml-auto shrink-0 flex-nowrap"
         />
       ) : null}
     </div>
