@@ -39,7 +39,7 @@ import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
 import { PlanMonthScreen } from "./v3/PlanMonthScreen";
 import { PlanMoveSheet, canMovePlanItem } from "./v3/PlanMoveSheet";
 import { fetchPlanExperienceFeed, type PlanExperienceFeed } from "./v3/planExperienceApi";
-import { ArrowRight, Heart, History, Lightbulb, Plus, Search } from "lucide-react";
+import { ArrowRight, Bookmark, Heart, Lightbulb, Plus, Search } from "lucide-react";
 import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { MediaCover } from "@/components/ui/media-cover";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
@@ -1470,27 +1470,40 @@ export function PlanMainContent({
         <span className="mp-font-display text-[21px] italic text-[var(--mp-tx2)]">или без даты</span>
         <i className="h-px flex-1 bg-[var(--mp-line-strong)]" />
       </div>
-      <nav aria-label="Разделы моего плана" className="space-y-2.5">
-        {[
-          { label: ideasCount ? `Мои идеи · ${ideasCount}` : "Мои идеи", hint: "Поставьте на свободный день", icon: Heart, onClick: handleOpenMyIdeas },
-          { label: "Где мы были", hint: "История визитов", icon: History, onClick: () => openNestedScreen("visits") },
-        ].map(({ label, hint, icon: Icon, onClick }) => (
+      <nav aria-label="Разделы моего плана">
+        {ideasCount ? (
           <button
-            key={label}
             type="button"
-            onClick={onClick}
+            onClick={handleOpenMyIdeas}
             className="group flex min-h-[76px] w-full items-center gap-3.5 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-3 pl-3.5 pr-4 text-left transition-colors hover:border-[var(--mp-tx)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)]">
-              <Icon className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden />
+              <Heart className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[16.5px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">{label}</span>
-              <span className="mt-[3px] block text-[13.5px] text-[var(--mp-tx2)]">{hint}</span>
+              <span className="block text-[16.5px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Мои идеи · {ideasCount}</span>
+              <span className="mt-[3px] block text-[13.5px] text-[var(--mp-tx2)]">Поставьте на свободный день</span>
             </span>
             <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--mp-ac-dark)]" strokeWidth={1.8} aria-hidden />
           </button>
-        ))}
+        ) : (
+          <div className="flex min-h-[76px] w-full items-center gap-3.5 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-3 pl-3.5 pr-4">
+            <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)]">
+              <Bookmark className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[16.5px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Идей пока нет</span>
+              <span className="mt-[3px] block text-[13.5px] text-[var(--mp-tx2)]">Сохраняйте места из афиши без даты</span>
+            </span>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => openNestedScreen("visits")}
+          className="mx-auto mt-[22px] block min-h-11 px-3 text-center text-[13.5px] font-medium text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          История визитов →
+        </button>
       </nav>
     </div>
   );
