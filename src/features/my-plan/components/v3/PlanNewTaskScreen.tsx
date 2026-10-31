@@ -698,11 +698,11 @@ export function PlanNewTaskScreen({
 
       </div>
       <div className="shrink-0 bg-[var(--mp-bg)] px-3.5 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-1">
-        <div className="flex min-h-20 items-center gap-3 rounded-[22px] bg-[var(--mp-tx)] py-4 pl-5 pr-4 text-white">
+        <div className="flex min-h-[62px] items-center gap-3 rounded-[20px] border border-[#f7d2c0] bg-[var(--mp-ac-soft)] py-2 pl-[18px] pr-2 text-[var(--mp-tx)]">
           <div className="min-w-0 flex-1">
-            <b className="block text-[15px] font-semibold leading-[1.25] tracking-[-.01em]">
+            <b className="block text-[15px] font-semibold leading-[1.25] tracking-[-.01em] text-[var(--mp-tx)]">
               {barDay}
-              {timed && timeValid ? ` · ${time}` : ""}
+              {timed && timeValid ? ` в ${time}` : ""}
             </b>
             <span className="sr-only" role="status">{label}</span>
           </div>
@@ -710,7 +710,7 @@ export function PlanNewTaskScreen({
             type="button"
             disabled={!can || saving}
             onClick={() => void submit()}
-            className={cn("mp-font-ui h-[54px] shrink-0 rounded-full bg-[var(--mp-ac)] px-5 text-[15px] font-semibold text-white transition-colors hover:bg-[var(--mp-ac-dark)] disabled:bg-[#4a433c] disabled:text-white/60", PLAN_FOCUS)}
+            className={cn("mp-font-ui h-11 shrink-0 rounded-[14px] bg-[var(--mp-ac)] px-5 text-[15px] font-semibold text-white transition-colors hover:bg-[var(--mp-ac-dark)] disabled:bg-[#f2c4ac] disabled:text-white", PLAN_FOCUS)}
           >
             {saving ? "Сохраняем…" : isMove ? "Перенести" : "Добавить"}
           </button>
