@@ -42,8 +42,7 @@ export function JournalPageView({
   collections: CityHomeJournalArticle[];
   feed: CityHomeJournalArticle[];
   typeFilter: JournalTypeFilter | null;
-  newsArchive?: boolean;
-  /** Путь страницы (с query рубрики/темы, без type/page): «Все →» и «Смотреть все →» добавляют `?type=`. */
+  newsArchive?: boolean;  /** Путь страницы (с query рубрики/темы, без type/page): «Все →» и «Смотреть все →» добавляют `?type=`. */
   basePath: string;
   citySlug?: string;
   /** Доп. контент под заголовком (подрубрики/темы на странице рубрики). */
@@ -72,19 +71,87 @@ export function JournalPageView({
       <header className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className={`m-0 font-heading text-[34px] leading-[.98] tracking-[-0.03em] sm:text-[40px] ${newsArchive ? "text-muted-foreground" : ""}`}>
-            {typeFilter === "BREAKING_NEWS" ? (
-        <section aria-label={newsArchive ? "Архив Breaking News" : "Актуальные Breaking News"}>
-          {displayedNews.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              {displayedNews.map((article, index) => (
+            {typeFilter === "BREAKING_NEWS" ? (newsArchive ? "Архив Breaking News" : "Breaking News") : typeFilter ? JOURNAL_TYPE_FILTER_TITLE[typeFilter] : title}
+          </h1>
+          {typeFilter === "BREAKING_NEWS" && (
+            <Link href={newsArchive ? typeHref("BREAKING_NEWS") : `${typeHref("BREAKING_NEWS")}&archive=1`} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+              <Archive aria-hidden="true" className="h-4 w-4" />
+              {newsArchive ? "Актуальные" : "Архив"}
+            </Link>
+          )}
+        </div>
+        {typeFilter !== "BREAKING_NEWS" && (
+          <p className="max-w-3xl text-[16px] leading-relaxed text-muted-foreground sm:text-[17px]">
+            {typeFilter ? (
+              <Link href={resetHref} className="inline-flex min-h-11 items-center font-semibold text-brand-ink hover:underline">
+                ← Все материалы
+              </Link>
+            ) : subtitle}
+          </p>
+        )}
+        {intro}
+      </header>
+
+      {main ? (
+        <section aria-label="Главное">
+          <AnalyticsCardViewTracker
+            entityType="ARTICLE"
+            entityId={main.id}
+            vertical="CITY"
+            citySlug={citySlug}
+            meta={{ section: "journal", block: "main", position: 0 }}
+          >
+            <JournalMainCard article={main} saveStatus={saveStatuses[main.id]} />
+          </AnalyticsCardViewTracker>
+        </section>
+      ) : null}
+
+      {news.length > 0 ? (
+        <section aria-labelledby="journal-news-title" className="space-y-4">
+          <HorizontalCardRow
+            headerTitle={
+              <h2 id="journal-news-title" className="m-0 font-heading text-[24px] leading-tight tracking-[-0.02em] sm:text-[28px]">
+                Breaking News
+              </h2>
+            }
+            navLeading={
+              <Link
+                href={typeHref("BREAKING_NEWS")}
+                className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap text-sm font-semibold text-brand-ink hover:underline"
+              >
+                Все →
+              </Link>
+            }
+          >
+            {orderBreakingNewsBySeen(news, seenNewsIds).map((article, index) => (
+              <div key={article.id} className={NEWS_CARD_SHELL}>
                 <AnalyticsCardViewTracker
-                  key={article.id}
                   entityType="ARTICLE"
                   entityId={article.id}
                   vertical="CITY"
                   citySlug={citySlug}
-                  meta={{ section: "journal", block: newsArchive ? "news-archive" : "news-current", position: index }}
+                  meta={{ section: "journal", block: "news", position: index }}
                 >
+                  <JournalNewsCard article={article} />
+                </AnalyticsCardViewTracker>
+              </div>
+            ))}
+          </HorizontalCardRow>
+        </section>
+      ) : null}
+
+      <JournalCollectionsCarousel
+        collections={collections}
+        allHref={typeHref("COLLECTION")}
+        citySlug={citySlug}
+      />
+
+      {typeFilter === "BREAKING_NEWS" ? (
+        <section aria-label={newsArchive ? "Архив Breaking News" : "Актуальные Breaking News"}>
+          {displayedNews.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              {displayedNews.map((article, index) => (
+                <AnalyticsCardViewTracker key={article.id} entityType="ARTICLE" entityId={article.id} vertical="CITY" citySlug={citySlug} meta={{ section: "journal", block: newsArchive ? "news-archive" : "news-current", position: index }}>
                   <JournalNewsCard article={article} />
                 </AnalyticsCardViewTracker>
               ))}
