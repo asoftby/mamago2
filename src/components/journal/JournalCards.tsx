@@ -66,7 +66,7 @@ export function JournalMainCard({ article, saveStatus }: { article: CityHomeJour
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             {article.category ? (
-              <span className="font-mono text-[11px] font-semibold uppercase tracking-[.12em] text-brand-ink">
+              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
                 {article.category.name}
               </span>
             ) : null}
@@ -159,7 +159,7 @@ export function JournalFeedRow({
         {article.category || typeBadge ? (
           <div className="flex flex-wrap items-center gap-x-2">
             {article.category ? (
-              <span className="font-mono text-[11px] font-semibold uppercase tracking-[.12em] text-brand-ink">
+              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
                 {article.category.name}
               </span>
             ) : null}
@@ -177,7 +177,7 @@ export function JournalFeedRow({
           </div>
         ) : null}
         <Link href={article.href} className="min-h-11">
-          <h3 className="m-0 line-clamp-3 font-heading text-[20px] leading-[1.2] tracking-[-0.015em] text-foreground transition-colors group-hover:text-primary">
+          <h3 className="m-0 line-clamp-2 text-[19px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors duration-150 group-hover:text-[#C24E22]">
             {article.title}
           </h3>
         </Link>
@@ -214,10 +214,10 @@ export function JournalMobileCard({
         <Link href={article.href} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
           <Cover article={article} tone={index} className="aspect-[1.22] rounded-xl" />
           <div className="mt-5">
-            <span className="block text-[12px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            <span className="block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
               {article.category?.name ?? (article.publicationType === "COLLECTION" ? "Подборка" : "Журнал")}
             </span>
-            <h3 className="mt-3 font-heading text-[28px] font-bold leading-[1.12] tracking-[-0.025em] text-foreground transition-colors group-hover:text-primary">
+            <h3 className="mt-1 line-clamp-2 text-[19px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors duration-150 group-hover:text-[#C24E22]">
               {article.title}
             </h3>
           </div>
@@ -256,7 +256,7 @@ export function JournalFeedGridCard({
         {article.category || typeBadge ? (
           <div className="flex flex-wrap items-center gap-x-2">
             {article.category ? (
-              <span className="font-mono text-[11px] font-semibold uppercase tracking-[.12em] text-brand-ink">
+              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
                 {article.category.name}
               </span>
             ) : null}
@@ -274,7 +274,7 @@ export function JournalFeedGridCard({
           </div>
         ) : null}
         <Link href={article.href} className="min-h-11">
-          <h3 className="m-0 line-clamp-4 font-heading text-[20px] font-semibold leading-[1.2] tracking-[-0.025em] text-foreground transition-colors group-hover:text-primary">
+          <h3 className="m-0 line-clamp-2 text-[19px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210] transition-colors duration-150 group-hover:text-[#C24E22]">
             {article.title}
           </h3>
         </Link>
