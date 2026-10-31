@@ -307,7 +307,7 @@ export function PlanNewTaskScreen({
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder="Что нужно сделать?"
-            className="mp-font-ui m-0 mb-[18px] block min-h-[56px] w-full resize-none border-0 bg-transparent p-0 text-[22px] font-bold leading-[1.15] tracking-[-.01em] text-[var(--mp-tx)] caret-[var(--mp-ac)] outline-none placeholder:font-bold placeholder:text-[#b9b0a5]"
+            className="mp-font-ui m-0 mb-[30px] block min-h-[76px] w-full resize-none border-0 bg-transparent p-0 text-[32px] font-bold leading-[1.15] tracking-[-.01em] text-[var(--mp-tx)] caret-[var(--mp-ac)] outline-none placeholder:font-bold placeholder:text-[#b9b0a5]"
           />
         </label>
 
