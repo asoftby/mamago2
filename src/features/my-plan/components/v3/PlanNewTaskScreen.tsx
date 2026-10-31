@@ -361,7 +361,7 @@ export function PlanNewTaskScreen({
     ? `${when === "today" ? "Сегодня" : when === "tomorrow" ? "Завтра" : weekdayLong(day)}, ${longDay(day)}`
     : "Выберите день";
   const chipBase = "mp-font-ui inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full border px-[18px] text-[14px] font-semibold whitespace-nowrap transition-colors";
-  const chipOn = "border-[var(--mp-chip-on-bg)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]";
+  const chipOn = "border-[var(--mp-chip-on-line)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]";
   const chipOff = "border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)] enabled:hover:border-[var(--mp-tx2)]";
   const pickedChipLabel = pickedDate ? `${weekdayShort(pickedDate)}, ${longDay(pickedDate)}` : null;
 
@@ -419,7 +419,7 @@ export function PlanNewTaskScreen({
                     <span
                       aria-hidden
                       className="flex h-[26px] w-[26px] items-center justify-center rounded-full text-[11px] font-bold"
-                      style={on ? { background: "rgba(255,255,255,.16)", color: "#fff" } : { background: colors.bg, color: colors.fg }}
+                      style={on ? { background: "rgba(0,0,0,.08)", color: "var(--mp-tx)" } : { background: colors.bg, color: colors.fg }}
                     >
                       {displayName(p).trim().charAt(0).toUpperCase()}
                     </span>
@@ -495,7 +495,7 @@ export function PlanNewTaskScreen({
                       onClick={() => { setPickedDate(value); setWhen("other"); setCalOpen(false); }}
                       className={cn(
                         "mp-font-display h-11 rounded-xl text-[17px] tabular-nums transition-colors disabled:text-[#c2b9ae]",
-                        on ? "bg-[var(--mp-tx)] text-white" : "hover:enabled:bg-white",
+                        on ? "bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)] shadow-[inset_0_0_0_1.5px_var(--mp-chip-on-line)]" : "hover:enabled:bg-white",
                         value === todayIso && !on && "shadow-[inset_0_0_0_1.5px_var(--mp-tx)]",
                       )}
                     >
@@ -516,8 +516,8 @@ export function PlanNewTaskScreen({
             </button>
             <label
               className={cn(
-                "flex h-[46px] min-w-0 flex-1 cursor-text items-center gap-2.5 rounded-full border bg-white pl-3.5 pr-1.5 transition-colors focus-within:border-[var(--mp-tx)]",
-                timed ? "border-[var(--mp-tx)] shadow-[inset_0_0_0_1px_var(--mp-tx)]" : "border-[var(--mp-line-strong)]",
+                "flex h-[46px] min-w-0 flex-1 cursor-text items-center gap-2.5 rounded-full border pl-3.5 pr-1.5 transition-colors focus-within:border-[var(--mp-chip-on-line)]",
+                timed ? "border-[var(--mp-chip-on-line)] bg-[var(--mp-chip-on-bg)]" : "border-[var(--mp-line-strong)] bg-white",
               )}
               onClick={() => {
                 enableTime();
