@@ -92,7 +92,7 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
         <>
           {units.length > 0 && <div className="space-y-1 text-sm">
             <p className="font-medium">Привязанные ресурсы</p>
-            {units.map(unit => <div key={unit.id} className="space-y-2"><div className="flex items-center gap-2"><span>{unit.name} — {unit.status}</span><Button type="button" variant="outline" size="sm" onClick={() => setEditingId(current => current === unit.id ? null : unit.id)}>Изменить</Button></div>{editingId === unit.id && <PartyResourceEditor unitId={unit.id} offerId={offerId} onSaved={() => void refresh()} />}</div>)}
+            {units.map(unit => <div key={unit.id} className="space-y-2"><div className="flex items-center gap-2"><span>{unit.name} — {unit.status}</span><Button type="button" variant="outline" size="sm" onClick={() => setEditingId(current => current === unit.id ? null : unit.id)}>Изменить</Button></div>{editingId === unit.id && <PartyResourceEditor unitId={unit.id} offerId={offerId!} onSaved={() => void refresh()} />}</div>)}
           </div>}
           <div className="space-y-2">
             <Label htmlFor="party-resource-name">Название ресурса</Label>
