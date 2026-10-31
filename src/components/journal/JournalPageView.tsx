@@ -74,7 +74,7 @@ export function JournalPageView({
           <h1 className={`m-0 font-heading text-[34px] leading-[.98] tracking-[-0.03em] sm:text-[40px] ${newsArchive ? "text-muted-foreground" : ""}`}>
             {typeFilter === "BREAKING_NEWS" ? (
         <section aria-label={newsArchive ? "Архив Breaking News" : "Актуальные Breaking News"}>
-          {displayedNews.length ? (
+          {displayedNews.length > 0 ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {displayedNews.map((article, index) => (
                 <AnalyticsCardViewTracker
@@ -90,7 +90,9 @@ export function JournalPageView({
               ))}
             </div>
           ) : (
-            <p className="py-8 text-sm text-muted-foreground">{newsArchive ? "В архиве пока нет материалов." : "Сейчас нет актуальных Breaking News."}</p>
+            <p className="py-8 text-sm text-muted-foreground">
+              {newsArchive ? "В архиве пока нет материалов." : "Сейчас нет актуальных Breaking News."}
+            </p>
           )}
         </section>
       ) : null}
