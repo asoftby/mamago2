@@ -71,3 +71,17 @@ test("party v2 schedule uses existing tenant-scoped booking unit API, not openin
   assert.ok(api.includes("place: { ownerBusinessId: businessId }"));
   assert.ok(api.includes('type: "EXCLUSIVE"'));
 });
+
+test("party resource editing preserves server optimistic lock and existing exceptions", () => {
+  const component = source("src/components/business/wizard/offer/components/PartyResourceEditor.tsx");
+  assert.ok(component.includes("expectedUpdatedAt:unit.updatedAt"));
+  assert.ok(component.includes("offerIds:unit.offers.map"));
+  assert.ok(component.includes("rules,exceptions"));
+  assert.ok(component.includes("/api/business/booking-units/"));
+  const api = source("src/app/api/business/booking-units/[id]/route.ts");
+  assert.ok(api.includes("bookingUnitUpdateSchema.safeParse"));
+  assert.ok(api.includes("FOR UPDATE"));
+  assert.ok(api.includes("expectedUpdatedAt"));
+  assert.ok(api.includes("bookingAllocation.count"));
+  assert.ok(api.includes("ownerBusinessId: businessId"));
+});
