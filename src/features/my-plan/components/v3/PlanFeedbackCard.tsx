@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Send } from "lucide-react";
 import { PhoneVerificationModal } from "@/components/place/PhoneVerificationModal";
 import { MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH } from "@/lib/experience/feedback";
 import { toast } from "@/lib/toast";
@@ -177,7 +177,7 @@ export function PlanFeedbackCard({
             {feedbackV1 && saved ? (
               <p role="status" className="mt-3 text-[13px] font-semibold text-[var(--mp-tx)]">Оценка сохранена. Комментарий необязателен.</p>
             ) : null}
-            <div className="mt-3 flex gap-2">
+            <div className="relative mt-3 w-full">
               <input
                 value={comment}
                 onChange={(event) => {
@@ -185,17 +185,21 @@ export function PlanFeedbackCard({
                   if (hideTimer.current) clearTimeout(hideTimer.current);
                 }}
                 onFocus={() => { if (hideTimer.current) clearTimeout(hideTimer.current); }}
+                onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); void save(); } }}
                 maxLength={MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH}
                 placeholder="Пару слов? Можно пропустить"
-                className="h-12 min-w-0 flex-1 rounded-[14px] border border-[var(--mp-line)] bg-[var(--mp-bg)] px-3.5 text-[15px] text-[var(--mp-tx)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--mp-line-strong)] focus:bg-white"
+                aria-label="Комментарий о посещении"
+                className="h-12 w-full min-w-0 rounded-[14px] border border-[var(--mp-line)] bg-[var(--mp-bg)] py-2 pl-3.5 pr-14 text-[15px] text-[var(--mp-tx)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--mp-line-strong)] focus:bg-white"
               />
               <button
                 type="button"
+                aria-label="Отправить отзыв"
+                title="Отправить отзыв"
                 disabled={busy || !picked || (feedbackV1 && !comment.trim())}
                 onClick={() => void save()}
-                className="h-12 rounded-[14px] bg-[var(--mp-tx)] px-[18px] text-[15px] font-bold text-white disabled:opacity-50"
+                className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded-[11px] bg-[var(--mp-tx)] text-white transition-opacity disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                {feedbackV1 ? "Отправить" : "Готово"}
+                <Send className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
           </>
