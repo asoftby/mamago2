@@ -162,7 +162,7 @@ export function PlanVisitsScreen({ onBack, onClose }: { onBack: () => void; onCl
         onBack={onBack}
         onClose={onClose}
       />
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-1 md:px-8">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-0 md:px-8">
         <div className="mt-3 flex gap-2 overflow-x-auto [scrollbar-width:none]">
           <button
             type="button"

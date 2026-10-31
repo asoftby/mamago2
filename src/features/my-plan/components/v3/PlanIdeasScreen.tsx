@@ -38,7 +38,7 @@ export function PlanIdeasScreen({
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
       <PlanScreenHeader title={ideas.length ? ideasLabel(ideas.length) : "Идей нет"} kicker="Мои идеи" onBack={onBack} onClose={onClose} />
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-1 md:px-8">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-0 md:px-8">
         <p className="m-0 mx-0.5 mb-1 mt-0.5 text-[14.5px] leading-[1.5] text-[var(--mp-tx2)]">
           Сохранено без даты. Нажмите «В план» — идея станет делом на {dayLabel}.
         </p>
