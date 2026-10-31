@@ -140,11 +140,11 @@ export function PlanFeedbackCard({
 
   return (
     <>
-      <section className="mb-4 rounded-[20px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-4" aria-label="Как прошло?">
-        <p className="text-[13px] font-semibold text-[var(--mp-tx2)]">
-          {formatPlannedDay(current.plannedDate, todayIso)}
+      <section className="mb-5 flex flex-col gap-1.5 rounded-[24px] bg-[var(--mp-tx)] px-[18px] pb-4 pt-[18px] text-white shadow-[0_14px_30px_-16px_rgba(20,18,16,.55)]" aria-label="Как прошло?">
+        <p className="mp-font-meta text-[11.5px] font-medium uppercase tracking-[.14em] text-white/65">
+          Вы были · {formatPlannedDay(current.plannedDate, todayIso)}
         </p>
-        <h4 className="mb-3.5 mt-1 text-[17px] font-bold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">
+        <h4 className="mb-2 text-[19px] font-bold leading-[1.25] tracking-[-.01em] text-white">
           Как вам {current.title}?
         </h4>
         <div className="grid grid-cols-3 gap-2" role="group" aria-label="Оценка">
@@ -156,13 +156,13 @@ export function PlanFeedbackCard({
               aria-pressed={picked === face.sentiment}
               onClick={() => void pick(face.sentiment)}
               className={cn(
-                "flex h-[76px] flex-col items-center justify-center gap-1.5 rounded-2xl border-[1.5px] text-[13.5px] font-bold transition-colors disabled:opacity-60",
+                "flex h-[60px] flex-col items-center justify-center gap-[3px] rounded-2xl border-[1.5px] text-[13px] font-semibold lowercase transition-colors disabled:opacity-60",
                 picked === face.sentiment
-                  ? "border-[var(--mp-tx)] bg-white text-[var(--mp-tx)]"
-                  : "border-transparent bg-[var(--mp-bg)] text-[var(--mp-tx2)] hover:bg-[var(--mp-soft)]",
+                  ? "border-[var(--mp-ac)] bg-white text-[var(--mp-tx)]"
+                  : "border-transparent bg-white/80 text-[var(--mp-tx)] hover:bg-white/95",
               )}
             >
-              <span className="text-[var(--mp-tx)]"><PlanFace mouth={face.mouth} size={30} /></span>
+              <span className="text-[var(--mp-tx)]"><PlanFace mouth={face.mouth} size={24} /></span>
               {face.label}
             </button>
           ))}
@@ -170,12 +170,12 @@ export function PlanFeedbackCard({
 
         {counted ? (
           <>
-            <span className="mt-3 inline-flex h-[34px] items-center gap-1.5 rounded-full bg-[var(--success-soft)] px-3 text-[13.5px] font-bold text-[var(--success-hover)]">
+            <span className="mt-2 inline-flex h-[34px] items-center gap-1.5 self-start rounded-full bg-[var(--success-soft)] px-3 text-[13.5px] font-bold text-[var(--success-hover)]">
               <Check className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
               Визит засчитан
             </span>
             {feedbackV1 && saved ? (
-              <p role="status" className="mt-3 text-[13px] font-semibold text-[var(--mp-tx)]">Оценка сохранена. Комментарий необязателен.</p>
+              <p role="status" className="mt-3 text-[13px] font-semibold text-white">Оценка сохранена. Комментарий необязателен.</p>
             ) : null}
             <div className="relative mt-3 w-full">
               <input
@@ -189,7 +189,7 @@ export function PlanFeedbackCard({
                 maxLength={MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH}
                 placeholder="Пару слов? Можно пропустить"
                 aria-label="Комментарий о посещении"
-                className="h-12 w-full min-w-0 rounded-[14px] border border-[var(--mp-line)] bg-[var(--mp-bg)] py-2 pl-3.5 pr-14 text-[15px] text-[var(--mp-tx)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--mp-line-strong)] focus:bg-white"
+                className="h-12 w-full min-w-0 rounded-[14px] border border-transparent bg-white py-2 pl-3.5 pr-14 text-[15px] text-[var(--mp-tx)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--mp-line-strong)] focus:bg-white"
               />
               <button
                 type="button"
@@ -204,12 +204,12 @@ export function PlanFeedbackCard({
             </div>
           </>
         ) : (
-          <div className="mt-1 text-center">
+          <div className="text-center">
             <button
               type="button"
               disabled={busy}
               onClick={() => void skip()}
-              className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-[15px] font-bold text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)]"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-[13.5px] font-medium text-white/75 underline decoration-white/35 underline-offset-[3px] transition-colors hover:text-white"
             >
               Мы не ходили
             </button>

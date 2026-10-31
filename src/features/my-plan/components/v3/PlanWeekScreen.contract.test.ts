@@ -12,7 +12,6 @@ assert.match(summary, /currentWeekEnd = addDaysIso\(from, \(7 - weekday\) % 7\)/
 assert.match(summary, /currentWeekItems:|currentWeekItems,/);
 assert.match(store, /normalizePlanItemsFromApi\(data.currentWeekItems\)/);
 assert.match(modal, /На этой неделе/);
-assert.match(modal, /Посмотреть все/);
 assert.match(modal, /openNestedScreen\("week"\)/);
 assert.match(modal, /<PlanWeekScreen/);
 assert.match(modal, /onSelectDate=\{\(date\) => \{/);

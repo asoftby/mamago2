@@ -36,10 +36,9 @@ import { PlanNewTaskScreen } from "./v3/PlanNewTaskScreen";
 import { PlanVisitsScreen } from "./v3/PlanVisitsScreen";
 import { PlanWeekScreen } from "./v3/PlanWeekScreen";
 import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
-import { PlanDayBar } from "./v3/PlanDayBar";
 import { PlanMoveSheet, canMovePlanItem } from "./v3/PlanMoveSheet";
 import { fetchPlanExperienceFeed, type PlanExperienceFeed } from "./v3/planExperienceApi";
-import { ChevronRight, History, Lightbulb, Plus } from "lucide-react";
+import { ArrowRight, Heart, History, Lightbulb, Plus } from "lucide-react";
 import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { MediaCover } from "@/components/ui/media-cover";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
@@ -1124,7 +1123,7 @@ export function PlanMainContent({
       id="plan-week-calendar"
       className={isDesktop
         ? "min-w-0 bg-transparent px-0 py-3"
-        : "min-w-0 rounded-[18px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-3.5"}
+        : "min-w-0 bg-transparent py-1"}
     >
       <PlanCalendar value={selectedDate} onChange={onChangeDate} variant="widget" />
     </div>
@@ -1219,15 +1218,15 @@ export function PlanMainContent({
       />
     );
     const nowLine = (
-      <div key="now-line" className="my-0.5 ml-2.5 flex items-center gap-2 text-xs font-bold tabular-nums text-[var(--mp-ac-dark)]">
-        <span>{nowLabel}</span>
-        <i className="h-px flex-1 bg-[var(--mp-ac)] opacity-45" />
-        <span>сейчас</span>
+      <div key="now-line" role="separator" aria-label={`Сейчас ${nowLabel}`} className="relative mx-1 my-0.5 flex items-center gap-2.5">
+        <span className="mp-font-meta inline-flex h-[26px] items-center rounded-full bg-[var(--mp-ac)] px-2.5 text-[12.5px] font-semibold tabular-nums text-white">{nowLabel}</span>
+        <i className="relative h-0.5 flex-1 rounded-sm bg-[var(--mp-ac)] before:absolute before:-left-1 before:-top-[3px] before:h-2 before:w-2 before:rounded-full before:bg-[var(--mp-ac)]" />
+        <span className="mp-font-meta text-[11.5px] font-medium uppercase tracking-[.14em] text-[var(--mp-ac-dark)]">сейчас</span>
       </div>
     );
     return (
       <section aria-label="В вашем плане">
-        <p className={(compact ? "mb-3" : "mb-2.5") + " text-[13px] font-bold text-[var(--mp-tx2)]"}>{dayContextLabel}</p>
+        <h3 className={(compact ? "mb-3" : "mb-2.5") + " mx-0.5 mt-1 text-[20px] font-bold tracking-[-.015em] text-[var(--mp-tx)]"}>{dayContextLabel}</h3>
         <div className="space-y-2">
           {timedRows.map((item, index) => (
             <div key={item.id} className="space-y-2">
@@ -1239,7 +1238,7 @@ export function PlanMainContent({
         </div>
         {untimedRows.length > 0 ? (
           <>
-            <p className="mb-2.5 mt-[18px] text-[13px] font-bold text-[var(--mp-tx2)]">В любое время</p>
+            <p className="mp-font-meta mx-1 mb-2.5 mt-[18px] text-[11.5px] font-medium uppercase tracking-[.14em] text-[var(--mp-tx2)]">В любое время</p>
             <div className="space-y-2">{untimedRows.map(renderRow)}</div>
           </>
         ) : null}
@@ -1444,21 +1443,20 @@ export function PlanMainContent({
   };
 
   const renderWeekTeaser = () => (
-    <section aria-label="На этой неделе" className="rounded-[18px] border border-[var(--mp-line)] bg-[var(--mp-card)] px-4 py-3.5">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[15px] font-bold text-[var(--mp-tx)]">На этой неделе</h2>
-        <button
-          type="button"
-          onClick={() => openNestedScreen("week")}
-          className="inline-flex min-h-10 items-center gap-1 text-[13px] font-semibold text-[var(--mp-ac-dark)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          Посмотреть все <ChevronRight className="h-4 w-4" aria-hidden />
-        </button>
-      </div>
-      <p className="mt-0.5 text-[13px] text-[var(--mp-tx2)]">
-        {currentWeekCount === 0 ? "Нет событий" : `${currentWeekCount} ${pluralRu(currentWeekCount, ["событие", "события", "событий"])}`}
-      </p>
-    </section>
+    <button
+      type="button"
+      aria-label="На этой неделе"
+      onClick={() => openNestedScreen("week")}
+      className="flex min-h-[62px] w-full items-center gap-3 rounded-[20px] border-[1.5px] border-dashed border-[var(--mp-line-strong)] py-0 pl-3.5 pr-[18px] text-left transition-colors hover:border-[var(--mp-tx2)] hover:bg-[var(--mp-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white">
+        <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+      </span>
+      <span className="flex-1 text-[16.5px] font-medium text-[var(--mp-tx)]">На этой неделе</span>
+      <span className="mp-font-meta text-[12.5px] text-[var(--mp-tx2)]">
+        {currentWeekCount === 0 ? "нет событий" : `${currentWeekCount} ${pluralRu(currentWeekCount, ["событие", "события", "событий"])}`} →
+      </span>
+    </button>
   );
 
   const renderBottomActions = () => (
@@ -1474,15 +1472,44 @@ export function PlanMainContent({
           }
         />
       ) : null}
-      <nav aria-label="Разделы моего плана" className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 border-t border-[var(--mp-line)] pt-4">
-        <button type="button" onClick={handleOpenMyIdeas} className="min-h-11 text-[14px] font-semibold text-[var(--mp-tx2)] hover:text-[var(--mp-ac-dark)]">
-          {ideasCount ? `Мои идеи · ${ideasCount}` : "Мои идеи"}
-        </button>
-        <button type="button" onClick={() => openNestedScreen("visits")} className="min-h-11 text-[14px] font-semibold text-[var(--mp-tx2)] hover:text-[var(--mp-ac-dark)]">
-          Где мы были
-        </button>
+      <div className="flex items-center gap-3.5 pt-2" aria-hidden>
+        <i className="h-px flex-1 bg-[var(--mp-line-strong)]" />
+        <span className="mp-font-display text-[21px] italic text-[var(--mp-tx2)]">или без даты</span>
+        <i className="h-px flex-1 bg-[var(--mp-line-strong)]" />
+      </div>
+      <nav aria-label="Разделы моего плана" className="space-y-2.5">
+        {[
+          { label: ideasCount ? `Мои идеи · ${ideasCount}` : "Мои идеи", hint: "Поставьте на свободный день", icon: Heart, onClick: handleOpenMyIdeas },
+          { label: "Где мы были", hint: "История визитов", icon: History, onClick: () => openNestedScreen("visits") },
+        ].map(({ label, hint, icon: Icon, onClick }) => (
+          <button
+            key={label}
+            type="button"
+            onClick={onClick}
+            className="group flex min-h-[76px] w-full items-center gap-3.5 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-3 pl-3.5 pr-4 text-left transition-colors hover:border-[var(--mp-tx)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)]">
+              <Icon className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[16.5px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">{label}</span>
+              <span className="mt-[3px] block text-[13.5px] text-[var(--mp-tx2)]">{hint}</span>
+            </span>
+            <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--mp-ac-dark)]" strokeWidth={1.8} aria-hidden />
+          </button>
+        ))}
       </nav>
     </div>
+  );
+
+  /** Заголовок недели и карточка оценки визита — верх экрана по макету v3. */
+  const renderHead = () => (
+    <>
+      <h1 className="m-0 mb-[18px] mt-1 text-[33px] font-extrabold leading-[1.08] tracking-[-.03em] text-[var(--mp-tx)] [text-wrap:pretty]">
+        {currentWeekCount > 0 ? "Что у нас на неделе?" : "Неделя пока свободна"}
+      </h1>
+      <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
+    </>
   );
 
   // Свои дела и записи Telegram используют одну форму даты/времени; каталог — расписание.
@@ -1529,11 +1556,11 @@ export function PlanMainContent({
           id="my-plan-recommendations"
           className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[var(--mp-bg)] px-8 pb-28 pt-1"
         >
+          {renderHead()}
+
           {planCalendar}
 
           {renderPersonFilter(false)}
-
-          {selectedDate === todayKey ? <PlanDayBar items={dayItemsSorted} /> : null}
 
           {isPastDay ? (
             renderPastDay(false)
@@ -1545,7 +1572,6 @@ export function PlanMainContent({
               {renderWeekTeaser()}
             </>
           )}
-          <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
           {!isPastDay ? renderBottomActions() : null}
         </div>
 
@@ -1595,11 +1621,11 @@ export function PlanMainContent({
         id="my-plan-recommendations"
         className="flex-1 space-y-5 overflow-y-auto bg-[var(--mp-bg)] px-5 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4"
       >
+        {renderHead()}
+
         {planCalendar}
 
         {renderPersonFilter(true)}
-
-        {selectedDate === todayKey ? <PlanDayBar items={dayItemsSorted} /> : null}
 
         {isPastDay ? (
           renderPastDay(true)
@@ -1611,7 +1637,6 @@ export function PlanMainContent({
             {renderWeekTeaser()}
           </>
         )}
-        <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
           {!isPastDay ? renderBottomActions() : null}
       </div>
 
