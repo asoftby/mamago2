@@ -59,15 +59,15 @@ test("resource extras follow the canonical ON_REQUEST_WINDOWS booking schedule",
 
 test("party v2 schedule uses existing tenant-scoped booking unit API, not opening hours as slots", () => {
   const wizard = source("src/components/business/wizard/offer/OfferWizard.tsx");
-  assert.match(wizard, /currentStepKey === "schedule"/);
-  assert.match(wizard, /<PartyResourceSchedule offerId=\\{offerId\\}/);
+  assert.ok(wizard.includes('currentStepKey === "schedule"'));
+  assert.ok(wizard.includes("<PartyResourceSchedule offerId={offerId}"));
   const editor = source("src/components/business/wizard/offer/components/PartyResourceSchedule.tsx");
-  assert.match(editor, /\/api\/business\/booking-units/);
-  assert.match(editor, /offerIds: \\[offerId\\]/);
-  assert.match(editor, /minDurationMinutes: duration/);
-  assert.match(editor, /rules: selected\\.map/);
+  assert.ok(editor.includes("/api/business/booking-units"));
+  assert.ok(editor.includes("offerIds: [offerId]"));
+  assert.ok(editor.includes("minDurationMinutes: duration"));
+  assert.ok(editor.includes("rules: selected.map"));
   const api = source("src/app/api/business/booking-units/route.ts");
-  assert.match(api, /bookingUnitCreateSchema\\.safeParse/);
-  assert.match(api, /place: \\{ ownerBusinessId: businessId \\}/);
-  assert.match(api, /type: "EXCLUSIVE"/);
+  assert.ok(api.includes("bookingUnitCreateSchema.safeParse"));
+  assert.ok(api.includes("place: { ownerBusinessId: businessId }"));
+  assert.ok(api.includes('type: "EXCLUSIVE"'));
 });
