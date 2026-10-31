@@ -34,8 +34,9 @@ import { PlanEventScreen } from "./v3/PlanEventScreen";
 import { PlanScenarioScreen } from "./v3/PlanScenarioScreen";
 import { PlanNewTaskScreen } from "./v3/PlanNewTaskScreen";
 import { PlanVisitsScreen } from "./v3/PlanVisitsScreen";
-import { PlanWeekScreen } from "./v3/PlanWeekScreen";
+import { PlanDayRibbon } from "./v3/PlanDayRibbon";
 import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
+import { PlanMonthScreen } from "./v3/PlanMonthScreen";
 import { PlanMoveSheet, canMovePlanItem } from "./v3/PlanMoveSheet";
 import { fetchPlanExperienceFeed, type PlanExperienceFeed } from "./v3/planExperienceApi";
 import { ArrowRight, Heart, History, Lightbulb, Plus, Search } from "lucide-react";
@@ -419,12 +420,12 @@ export function PlanMainContent({
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   /** Два экрана остаются в одной модалке: сдвигаем их по горизонтали, не теряя план. */
-  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "week" | "event" | "scenario">("plan");
+  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "month" | "event" | "scenario">("plan");
   /** Сохраняем исходящий экран в DOM до конца обратной анимации. */
-  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "week" | "event" | "scenario" | null>(null);
+  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "month" | "event" | "scenario" | null>(null);
   /** Каждое открытие формы — новый экземпляр; отменённая анимация не оставляет старый черновик. */
   const [nestedScreenVersion, setNestedScreenVersion] = useState(0);
-  const openNestedScreen = useCallback((next: "new" | "visits" | "week" | "event" | "scenario") => {
+  const openNestedScreen = useCallback((next: "new" | "visits" | "month" | "event" | "scenario") => {
     setNestedScreenVersion((version) => version + 1);
     setMountedNestedScreen(next);
     setScreen(next);
@@ -1119,14 +1120,12 @@ export function PlanMainContent({
   const hasRequestedSuggestions = suggestionsGeneration > 0 || isFetchingSuggestions;
   // One calendar for both layouts: strip vs week row is chosen by container width.
   const planCalendar = onChangeDate ? (
-    <div
-      id="plan-week-calendar"
-      className={isDesktop
-        ? "min-w-0 bg-transparent px-0 py-3"
-        : "min-w-0 bg-transparent py-1"}
-    >
-      <PlanCalendar value={selectedDate} onChange={onChangeDate} variant="widget" />
-    </div>
+    <PlanDayRibbon
+      value={selectedDate}
+      onChange={onChangeDate}
+      onOpenMonth={() => openNestedScreen("month")}
+      monthEnd={addDaysIso(`${selectedDate.slice(0, 7)}-01`, new Date(Number(selectedDate.slice(0, 4)), Number(selectedDate.slice(5, 7)), 0).getDate() - 1)}
+    />
   ) : null;
   const isPastDay = selectedDate < todayKey;
   const isTodaySelected = selectedDate === todayKey;
@@ -1453,23 +1452,6 @@ export function PlanMainContent({
     );
   };
 
-  const renderWeekTeaser = () => (
-    <button
-      type="button"
-      aria-label="На этой неделе"
-      onClick={() => openNestedScreen("week")}
-      className="flex min-h-[62px] w-full items-center gap-3 rounded-[20px] border-[1.5px] border-dashed border-[var(--mp-line-strong)] py-0 pl-3.5 pr-[18px] text-left transition-colors hover:border-[var(--mp-tx2)] hover:bg-[var(--mp-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-    >
-      <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white">
-        <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
-      </span>
-      <span className="flex-1 text-[16.5px] font-medium text-[var(--mp-tx)]">На этой неделе</span>
-      <span className="mp-font-meta text-[12.5px] text-[var(--mp-tx2)]">
-        {currentWeekCount === 0 ? "нет событий" : `${currentWeekCount} ${pluralRu(currentWeekCount, ["событие", "события", "событий"])}`} →
-      </span>
-    </button>
-  );
-
   const renderBottomActions = () => (
     <div className="space-y-3">
       {scenarioCtaLabel ? (
@@ -1519,7 +1501,7 @@ export function PlanMainContent({
       <h1 className="m-0 mb-[18px] mt-1 text-[33px] font-extrabold leading-[1.08] tracking-[-.03em] text-[var(--mp-tx)] [text-wrap:pretty]">
         {currentWeekCount > 0 ? "Что у нас на неделе?" : "Неделя пока свободна"}
       </h1>
-      <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
+      <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} onOpenVisits={() => openNestedScreen("visits")} />
     </>
   );
 
@@ -1580,7 +1562,6 @@ export function PlanMainContent({
               {renderDayList(false)}
               {renderOwnIdeas()}
               {renderIdeas()}
-              {renderWeekTeaser()}
             </>
           )}
           {!isPastDay ? renderBottomActions() : null}
@@ -1645,7 +1626,6 @@ export function PlanMainContent({
             {renderDayList(true)}
             {renderOwnIdeas()}
             {renderIdeas()}
-            {renderWeekTeaser()}
           </>
         )}
           {!isPastDay ? renderBottomActions() : null}
@@ -1780,14 +1760,21 @@ export function PlanMainContent({
             />
           ) : mountedNestedScreen === "visits" ? (
             <PlanVisitsScreen key={nestedScreenVersion} onBack={closeNestedScreen} />
-          ) : mountedNestedScreen === "week" ? (
-            <PlanWeekScreen
+          ) : mountedNestedScreen === "month" ? (
+            <PlanMonthScreen
               key={nestedScreenVersion}
-              items={visibleCurrentWeekItems}
+              today={todayKey}
+              selected={selectedDate}
               onBack={closeNestedScreen}
-              onSelectDate={(date) => {
+              onClose={onRequestClose}
+              onOpenDay={(date) => {
                 onChangeDate?.(date);
                 closeNestedScreen();
+              }}
+              onAddOnDay={(date) => {
+                onChangeDate?.(date);
+                setEditingNote(null);
+                openNestedScreen("new");
               }}
             />
           ) : null}
