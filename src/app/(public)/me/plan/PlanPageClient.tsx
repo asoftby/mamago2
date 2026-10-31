@@ -37,6 +37,7 @@ import {
   findFamilyCalendarConflictIds,
 } from "@/features/my-plan/lib/familyCalendar";
 import { toast } from "@/lib/toast";
+import { PLAN_SELF_LABEL, planAudienceLabel } from "@/features/my-plan/lib/planAudienceLabel";
 
 export type SerializedPlanItem = {
   id: string;
@@ -154,34 +155,43 @@ function formatNearestWeekItem(date: string, todayISO: string): string {
   return parsed.toLocaleDateString("ru-RU", { weekday: "long" });
 }
 
-function IdeasRow({ count }: { count: number }) {
+function IdeasRow({ count, onOpenHistory, historyOpen }: { count: number; onOpenHistory: () => void; historyOpen: boolean }) {
   return (
     <>
       <div className="mt-8 mb-3.5 flex items-center gap-3.5" aria-hidden>
-        <i className="h-px flex-1 bg-[#DCD4C9]" />
-        <span className="font-serif text-[21px] italic text-[#6F675E]">или без даты</span>
-        <i className="h-px flex-1 bg-[#DCD4C9]" />
+        <i className="h-px flex-1 bg-[var(--border-strong)]" />
+        <span className="font-serif text-[21px] italic text-[var(--text-muted)]">или без даты</span>
+        <i className="h-px flex-1 bg-[var(--border-strong)]" />
       </div>
       <Link
         href="/me/ideas"
-        className="group flex min-h-20 w-full items-center gap-3.5 rounded-[22px] border border-[#ECE6DD] bg-[#F8F5EF] py-3 pr-[18px] pl-3.5 no-underline transition-colors hover:border-[#141210] hover:bg-white"
+        className="group flex min-h-20 w-full items-center gap-3.5 rounded-[22px] border border-[var(--border)] bg-[var(--surface-subtle)] py-3 pr-[18px] pl-3.5 no-underline transition-colors hover:border-[var(--text-main)] hover:bg-white"
       >
-        <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full border border-[#DCD4C9] bg-white text-[#141210]">
+        <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full border border-[var(--border-strong)] bg-white text-[var(--text-main)]">
           <Heart className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-[#141210]">
+          <span className="block text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-[var(--text-main)]">
             Мои идеи{count > 0 ? ` · ${count}` : ""}
           </span>
-          <span className="mt-0.5 block text-sm text-[#6F675E]">
+          <span className="mt-0.5 block text-sm text-[var(--text-muted)]">
             {count > 0 ? "Поставьте на свободный день" : "Сохраняйте активности в идеи — они появятся здесь"}
           </span>
         </span>
         <ArrowRight
-          className="h-[18px] w-[18px] shrink-0 text-[#6F675E] transition-[transform,color] group-hover:translate-x-[3px] group-hover:text-[#C24E22]"
+          className="h-[18px] w-[18px] shrink-0 text-[var(--text-muted)] transition-[transform,color] group-hover:translate-x-[3px] group-hover:text-[var(--brand-active)]"
           aria-hidden
         />
       </Link>
+      <button
+        type="button"
+        aria-controls="past-plan-history"
+        aria-expanded={historyOpen}
+        onClick={onOpenHistory}
+        className="mx-auto mt-[22px] block min-h-11 px-3 text-center text-[13px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-main)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        История визитов →
+      </button>
     </>
   );
 }
@@ -305,6 +315,16 @@ export function PlanPageClient({
   // The server returns only records accessible to the current account.
   // The local participant/scope selection can only narrow that set.
   const dayItems = filterVisiblePlanEntries(itemsByDate[selectedDate] ?? [], selection);
+  const audienceLabel = planAudienceLabel(
+    includedPeople.map((token) => {
+      if (token.startsWith("adult:")) {
+        const id = token.slice("adult:".length);
+        return id === currentUserId ? PLAN_SELF_LABEL : familyAdults.find((adult) => adult.id === id)?.name ?? "";
+      }
+      return familyChildren.find((child) => child.id === token.slice("child:".length))?.name ?? "";
+    }).filter(Boolean),
+    excludedPeople.length > 0,
+  );
   const participantNameById = new Map<string, string>([
     ...familyAdults.map((adult) => [`adult:${adult.id}`, adult.name] as const),
     ...familyChildren.map((child) => [`child:${child.id}`, child.name] as const),
@@ -348,6 +368,15 @@ export function PlanPageClient({
     ));
   };
 
+  const openHistory = () => {
+    setArchiveOpen(true);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        document.getElementById("past-plan-history")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+  };
+
   const openCreate = () => {
     setNewTaskOpen(true);
   };
@@ -374,9 +403,9 @@ export function PlanPageClient({
           <div className="flex items-center gap-2 font-mono text-[12.5px] font-medium uppercase tracking-[.16em] text-[#C24E22]">
             <i aria-hidden className="h-1.5 w-1.5 rounded-full bg-[#C24E22]" />
             Мой план
-            <span className="text-[#6F675E]">{monthName(selectedDate)}</span>
+            <span className="text-[var(--text-muted)]">{monthName(selectedDate)}</span>
           </div>
-          <h1 className="mt-2.5 text-[clamp(36px,4vw,54px)] font-extrabold leading-[1.05] tracking-[-0.035em] text-[#141210]">
+          <h1 className="mt-2.5 text-[clamp(36px,4vw,54px)] font-extrabold leading-[1.05] tracking-[-0.035em] text-[var(--text-main)]">
             {weekItems.length > 0 ? "Что у нас на неделе?" : "Неделя пока свободна"}
           </h1>
         </header>
@@ -411,9 +440,10 @@ export function PlanPageClient({
               onVisibilityChange={handleVisibilityChange}
               onEditManual={openEdit}
               conflictIds={conflictIds}
+              audienceLabel={audienceLabel}
               scenarioStatus={scenarioStatuses[selectedDate]}
             />
-            <IdeasRow count={initialIdeas.length} />
+            <IdeasRow count={initialIdeas.length} historyOpen={archiveOpen} onOpenHistory={openHistory} />
           </div>
 
           <aside className="flex min-w-0 flex-col gap-3.5 lg:sticky lg:top-6">
@@ -422,7 +452,7 @@ export function PlanPageClient({
               candidates={experienceCandidates}
               recentExperiences={recentExperiences}
             />
-            <div className="overflow-hidden rounded-[22px] border border-[#ECE6DD] bg-[#F8F5EF]">
+            <div className="overflow-hidden rounded-[22px] border border-[var(--border)] bg-[var(--surface-subtle)]">
               <button
                 type="button"
                 onClick={() => weekItems.length > 0 && setOverviewOpen(true)}
@@ -430,10 +460,10 @@ export function PlanPageClient({
                 aria-label={weekItems.length > 0 ? "Открыть обзор недели" : "На этой неделе план пока пуст"}
                 className="flex w-full flex-col gap-2 px-[22px] py-5 text-left transition-colors enabled:hover:bg-white/60 disabled:cursor-default"
               >
-                <span className="font-mono text-[11.5px] uppercase tracking-[.14em] text-[#6F675E]">
+                <span className="font-mono text-[11.5px] uppercase tracking-[.14em] text-[var(--text-muted)]">
                   На этой неделе
                 </span>
-                <span className="font-sans text-[27px] font-normal leading-tight text-[#141210]">
+                <span className="font-sans text-[27px] font-normal leading-tight text-[var(--text-main)]">
                   {weekItems.length === 0 ? "Нет событий" : `${weekItems.length} ${pluralizeEvents(weekItems.length)}`}
                 </span>
                 {weekItems.length > 0 && (
@@ -441,25 +471,6 @@ export function PlanPageClient({
                     Посмотреть все <span aria-hidden="true">→</span>
                   </span>
                 )}
-              </button>
-              <button
-                type="button"
-                aria-controls="past-plan-history"
-                aria-expanded={archiveOpen}
-                onClick={() => {
-                  setArchiveOpen(true);
-                  window.requestAnimationFrame(() => {
-                    window.requestAnimationFrame(() => {
-                      document.getElementById("past-plan-history")?.scrollIntoView({
-                        behavior: "smooth",
-                        block: "start",
-                      });
-                    });
-                  });
-                }}
-                className="flex min-h-11 w-full items-center justify-between border-t border-[#ECE6DD] px-[22px] py-2 text-left text-sm font-medium text-[#6F675E] transition-colors hover:bg-white/60 hover:text-[#141210]"
-              >
-                Архив событий <span aria-hidden="true">→</span>
               </button>
             </div>
           </aside>

@@ -194,7 +194,7 @@ export function PlanItemCard({
   );
 
   const showCatalogMedia = presentation.isCatalog;
-  const restBorder = showCatalogMedia || isPrivate ? "#ECE6DD" : "#D6E4F3";
+  const restBorder = showCatalogMedia || isPrivate ? "var(--border)" : "#D6E4F3";
 
   return (
     <article
@@ -202,11 +202,11 @@ export function PlanItemCard({
         ? "group grid grid-cols-[176px_minmax(0,1fr)_auto] items-center gap-5 rounded-[22px] border p-[14px] transition-[border-color,transform] duration-200 max-sm:grid-cols-[72px_minmax(0,1fr)_auto] max-sm:gap-3 max-sm:p-3"
         : "group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-[22px] border p-4 transition-[border-color] duration-200"}
       style={{
-        background: isPrivate ? "#F3EFE7" : showCatalogMedia ? "#F8F5EF" : "#EAF2FB",
+        background: isPrivate ? "#F3EFE7" : showCatalogMedia ? "var(--surface-subtle)" : "#EAF2FB",
         borderColor: restBorder,
       }}
       onMouseEnter={(event) => {
-        event.currentTarget.style.borderColor = showCatalogMedia ? "#141210" : "#B9CFE8";
+        event.currentTarget.style.borderColor = showCatalogMedia ? "var(--text-main)" : "#B9CFE8";
       }}
       onMouseLeave={(event) => {
         event.currentTarget.style.borderColor = restBorder;

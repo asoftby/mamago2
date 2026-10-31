@@ -168,7 +168,7 @@ export function ExperienceCheckIn({
     <>
       <section
         aria-labelledby="experience-check-in-title"
-        className={`rounded-[24px] border border-[#ECE6DD] bg-[#F8F5EF] p-5 transition-all duration-300 ${exitState === "leaving" ? "translate-y-2 opacity-0" : "opacity-100"}`}
+        className={`rounded-[24px] border border-[var(--border)] bg-[var(--surface-subtle)] p-5 transition-all duration-300 ${exitState === "leaving" ? "translate-y-2 opacity-0" : "opacity-100"}`}
       >
         <p className="font-mono text-[11px] uppercase tracking-[.14em] text-[var(--primary)]">
           Как прошло?

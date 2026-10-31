@@ -234,7 +234,7 @@ button.monthLabel:hover { color: var(--plan-ink); }
   color: var(--plan-ink);
 }
 .rootPage .header { gap: 10px; margin-bottom: 14px; }
-.rootPage .rule { background: #ece6dd; }
+.rootPage .rule { background: var(--border); }
 .rootPage .textNav { display: none; }
 .rootPage .todayPill {
   min-height: 44px;
@@ -247,9 +247,9 @@ button.monthLabel:hover { color: var(--plan-ink); }
   transition: background-color 0.15s, color 0.15s;
 }
 .rootPage .todayPill:hover:not(:disabled) { background: var(--plan-ink); color: var(--plan-on-ink); }
-.rootPage .todayPill:disabled { border-color: #dcd4c9; opacity: 0.6; }
+.rootPage .todayPill:disabled { border-color: var(--border-strong); opacity: 0.6; }
 .rootPage .todayPillAway { border-color: var(--plan-ink); }
-.rootPage .arrow { width: 44px; height: 44px; background: #fff; border-color: #dcd4c9; }
+.rootPage .arrow { width: 44px; height: 44px; background: #fff; border-color: var(--border-strong); }
 .rootPage .arrow:hover:not(:disabled) { border-color: var(--plan-ink); }
 .rootPage .days { gap: 10px; }
 .rootPage .cell:not(.cellMobile) {
@@ -257,10 +257,10 @@ button.monthLabel:hover { color: var(--plan-ink); }
   gap: 4px;
   justify-content: center;
   border-radius: 22px;
-  border-color: #ece6dd;
-  background: #f8f5ef;
+  border-color: var(--border);
+  background: var(--surface-subtle);
 }
-.rootPage .cell:not(.cellMobile):hover { border-color: #dcd4c9; }
+.rootPage .cell:not(.cellMobile):hover { border-color: var(--border-strong); }
 .rootPage .cell:not(.cellMobile) .dow { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; }
 .rootPage .cell:not(.cellMobile) .num { font-size: 42px; line-height: 1.05; }
 .rootPage .cell:not(.cellMobile).today:not(.selected) { border: 1.5px solid var(--plan-ink); }
