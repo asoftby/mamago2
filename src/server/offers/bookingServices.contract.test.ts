@@ -55,3 +55,19 @@ test("resource extras follow the canonical ON_REQUEST_WINDOWS booking schedule",
   const schedule = source("src/server/offers/offerSchedule.service.ts");
   assert.match(schedule, /Перед изменением расписания отключите допуслуги/);
 });
+
+
+test("party v2 schedule uses existing tenant-scoped booking unit API, not opening hours as slots", () => {
+  const wizard = source("src/components/business/wizard/offer/OfferWizard.tsx");
+  assert.match(wizard, /currentStepKey === "schedule"/);
+  assert.match(wizard, /<PartyResourceSchedule offerId=\\{offerId\\}/);
+  const editor = source("src/components/business/wizard/offer/components/PartyResourceSchedule.tsx");
+  assert.match(editor, /\/api\/business\/booking-units/);
+  assert.match(editor, /offerIds: \\[offerId\\]/);
+  assert.match(editor, /minDurationMinutes: duration/);
+  assert.match(editor, /rules: selected\\.map/);
+  const api = source("src/app/api/business/booking-units/route.ts");
+  assert.match(api, /bookingUnitCreateSchema\\.safeParse/);
+  assert.match(api, /place: \\{ ownerBusinessId: businessId \\}/);
+  assert.match(api, /type: "EXCLUSIVE"/);
+});
