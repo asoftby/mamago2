@@ -1767,10 +1767,16 @@ export function PlanMainContent({
             <PlanPicksScreen
               key={nestedScreenVersion}
               title={`Куда сходить ${(() => {
-                const word = posterDayWord(selectedDate, todayKey);
-                if (word === "сегодня" || word === "завтра") return word;
-                return `${word.startsWith("вторник") ? "во" : "в"} ${word}`;
+                if (selectedDate === todayKey) return "сегодня";
+                if (selectedDate === addDaysIso(todayKey, 1)) return "завтра";
+                const weekday = weekdayForNa(new Date(`${selectedDate}T12:00:00`));
+                return `${weekday.startsWith("вторник") ? "во" : "в"} ${weekday}`;
               })()}`}
+              meta={(() => {
+                const date = new Date(`${selectedDate}T12:00:00`);
+                const weekday = date.toLocaleDateString("ru-RU", { weekday: "long" });
+                return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${date.toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}`;
+              })()}
               people={personas.map((persona) => ({
                 id: persona.id,
                 label: persona.kind === "adult" ? "Я" : persona.displayName?.trim() || "Ребёнок",

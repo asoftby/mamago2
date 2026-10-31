@@ -17,6 +17,7 @@ export type PlanPicksAge = { value: string; label: string };
  */
 export function PlanPicksScreen({
   title,
+  meta,
   people,
   selectedPeopleIds,
   onTogglePerson,
@@ -40,6 +41,8 @@ export function PlanPicksScreen({
 }: {
   /** «Куда сходить в среду, 4 ноября». */
   title: string;
+  /** «Воскресенье, 1 ноября»: день недели и дата выбранного дня. */
+  meta?: string;
   people: PlanPicksPerson[];
   selectedPeopleIds: string[];
   onTogglePerson: (id: string | null) => void;
@@ -97,7 +100,7 @@ export function PlanPicksScreen({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
-      <PlanScreenHeader kicker="Подборка для вас" title={title} onBack={onBack} onClose={onClose} />
+      <PlanScreenHeader kicker="Подборка для вас" title={title} meta={meta} onBack={onBack} onClose={onClose} />
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-28 pt-0 md:px-8">
         <div role="group" aria-label="Для кого" className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none] md:-mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
