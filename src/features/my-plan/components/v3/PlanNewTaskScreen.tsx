@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Bell, ChevronLeft, ChevronRight, Clock3, Plus, Users, X } from "lucide-react";
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
 import { toast } from "@/lib/toast";
@@ -27,6 +27,92 @@ const REMIND_OPTIONS: Array<{ minutes: number | null; label: string }> = [
   { minutes: 120, label: "За 2 часа" },
   { minutes: 1440, label: "За день" },
 ];
+
+/** Единицы своего напоминания: максимум 4 недели (как на сервере). */
+const LEAD_UNITS = [
+  { key: "minutes", max: 59, forms: ["минуту", "минуты", "минут"] },
+  { key: "hours", max: 23, forms: ["час", "часа", "часов"] },
+  { key: "days", max: 28, forms: ["день", "дня", "дней"] },
+  { key: "weeks", max: 4, forms: ["неделю", "недели", "недель"] },
+] as const;
+
+function leadPlural(n: number, forms: readonly [string, string, string]): string {
+  const m = n % 10;
+  const h = n % 100;
+  return m === 1 && h !== 11 ? forms[0] : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? forms[1] : forms[2];
+}
+
+const WHEEL_ROW = 40;
+
+/** Колесо выбора: прокрутка с примагничиванием, значение под подсветкой посередине. */
+function Wheel({
+  items,
+  value,
+  onChange,
+  label,
+  className,
+}: {
+  items: string[];
+  value: number;
+  onChange: (index: number) => void;
+  label: string;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const timer = useRef<number | undefined>(undefined);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && Math.round(el.scrollTop / WHEEL_ROW) !== value) el.scrollTop = value * WHEEL_ROW;
+  }, [value, items.length]);
+  const onScroll = () => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      const el = ref.current;
+      if (!el) return;
+      const index = Math.max(0, Math.min(items.length - 1, Math.round(el.scrollTop / WHEEL_ROW)));
+      if (index !== value) onChange(index);
+    }, 90);
+  };
+  return (
+    <div
+      ref={ref}
+      role="listbox"
+      aria-label={label}
+      tabIndex={0}
+      onScroll={onScroll}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          onChange(Math.min(items.length - 1, value + 1));
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          onChange(Math.max(0, value - 1));
+        }
+      }}
+      className="relative h-[200px] snap-y snap-mandatory overflow-y-auto outline-none [mask-image:linear-gradient(transparent,#000_35%,#000_65%,transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <div className="py-[80px]">
+        {items.map((text, index) => (
+          <button
+            key={index}
+            type="button"
+            role="option"
+            aria-selected={index === value}
+            onClick={() => onChange(index)}
+            className={cn(
+              "block h-10 w-full snap-center text-[18px] tabular-nums",
+              index === value ? "font-bold text-[var(--mp-tx)]" : "font-medium text-[var(--mp-tx2)]",
+              className,
+            )}
+          >
+            {text}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const WD = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
 type RepeatFrequency = "NONE" | "DAILY" | "WEEKLY" | "MONTHLY";
@@ -145,8 +231,12 @@ export function PlanNewTaskScreen({
   const timeValid = /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
   const pastToday = timed && timeValid && day === todayIso && time < new Date().toTimeString().slice(0, 5);
   const customLeadTotal = Number(customLeadValue) * leadFactors[customLeadUnit];
+  const leadUnit = LEAD_UNITS.find((u) => u.key === customLeadUnit) ?? LEAD_UNITS[0];
+  const leadValue = Math.max(1, Math.min(leadUnit.max, Math.round(Number(customLeadValue)) || 1));
+  /** Свой срок выбран: lead не совпадает ни с одним быстрым вариантом. */
+  const customActive = timed && lead !== null && !REMIND_OPTIONS.some((option) => option.minutes === lead);
   const customLeadValid = !timed || !customLeadOpen || (
-    /^[1-9]\\d*$/.test(customLeadValue) && Number.isSafeInteger(customLeadTotal) &&
+    Number.isInteger(Number(customLeadValue)) && Number.isSafeInteger(customLeadTotal) &&
     customLeadTotal >= 1 && customLeadTotal <= 28 * 1440
   );
   const effectiveUntilDate = repeatEnd === "UNTIL" && repeatUntilTime && timed && timeValid && repeatUntilTime < time
@@ -480,60 +570,65 @@ export function PlanNewTaskScreen({
               );
             })}
             <button
-            type="button"
-            disabled={!timed}
-            aria-expanded={customLeadOpen}
-            onClick={() => {
-              if (customLeadOpen) {
-                setCustomLeadOpen(false);
-                return;
-              }
-              const initial = lead !== null && !REMIND_OPTIONS.some((option) => option.minutes === lead) ? lead : 0;
-              const unit = initial && initial % 10080 === 0 ? "weeks" : initial && initial % 1440 === 0 ? "days" : initial && initial % 60 === 0 ? "hours" : "minutes";
-              setCustomLeadUnit(unit);
-              setCustomLeadValue(initial ? String(initial / leadFactors[unit]) : "");
-              setCustomLeadOpen(true);
-            }}
-            className={cn(PLAN_CHIP, customLeadOpen ? PLAN_CHIP_ON : PLAN_CHIP_OFF, PLAN_CHIP_DISABLED)}
-          >
-            <Bell className="h-4 w-4" aria-hidden />
-            Другое
-          </button>
+              type="button"
+              disabled={!timed}
+              aria-expanded={customLeadOpen}
+              aria-pressed={customActive}
+              onClick={() => {
+                if (customLeadOpen) {
+                  setCustomLeadOpen(false);
+                  return;
+                }
+                if (!customActive) {
+                  // По умолчанию «за 30 минут», как в дизайне; дальше человек крутит колесо.
+                  setCustomLeadUnit("minutes");
+                  setCustomLeadValue("30");
+                  setLead(30);
+                  setLeadTouched(true);
+                } else {
+                  const unit = lead % 10080 === 0 ? "weeks" : lead % 1440 === 0 ? "days" : lead % 60 === 0 ? "hours" : "minutes";
+                  setCustomLeadUnit(unit);
+                  setCustomLeadValue(String(Math.min(LEAD_UNITS.find((u) => u.key === unit)!.max, lead / leadFactors[unit])));
+                }
+                setCustomLeadOpen(true);
+              }}
+              className={cn(PLAN_CHIP, customActive ? PLAN_CHIP_ON : PLAN_CHIP_OFF, PLAN_CHIP_DISABLED)}
+            >
+              <Bell className="h-4 w-4" aria-hidden />
+              {customActive ? `За ${leadValue} ${leadPlural(leadValue, leadUnit.forms)}` : "Другое"}
+            </button>
           </div>
           {customLeadOpen && timed ? (
-            <div className="mt-3 rounded-2xl border border-[var(--mp-line)] p-3">
-              <p className="mb-2 text-[13px] text-[var(--mp-tx2)]">За сколько до начала напомнить?</p>
-              <div className="flex items-center gap-3">
-                <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
-                  Количество
-                  <input type="number" min={1} step={1} inputMode="numeric" value={customLeadValue}
-                    onChange={event => {
-                      const value = event.target.value;
-                      setCustomLeadValue(value);
-                      const total = Number(value) * leadFactors[customLeadUnit];
-                      setLead(/^[1-9]\\d*$/.test(value) && Number.isSafeInteger(total) && total <= 28 * 1440 ? total : null);
-                      setLeadTouched(true);
-                    }}
-                    className="h-11 w-full rounded-xl border border-[var(--mp-line)] bg-white px-3 text-base"
-                    aria-label="Количество до напоминания" />
-                </label>
-                <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
-                  Единица
-                  <select value={customLeadUnit} onChange={event => {
-                    const unit = event.target.value as keyof typeof leadFactors;
-                    setCustomLeadUnit(unit);
-                    const total = Number(customLeadValue) * leadFactors[unit];
-                    setLead(/^[1-9]\\d*$/.test(customLeadValue) && Number.isSafeInteger(total) && total <= 28 * 1440 ? total : null);
+            <div className="mt-2.5">
+              <div className="relative grid grid-cols-[72px_minmax(0,1fr)_auto] items-center gap-1 rounded-[20px] border border-[var(--mp-line)] bg-[var(--mp-card)] px-4">
+                <span aria-hidden className="pointer-events-none absolute inset-x-2 top-1/2 -mt-5 h-10 rounded-xl bg-white shadow-[0_1px_3px_rgba(20,18,16,.08)]" />
+                <Wheel
+                  label="Сколько до начала"
+                  items={Array.from({ length: leadUnit.max }, (_, i) => String(i + 1))}
+                  value={leadValue - 1}
+                  onChange={(index) => {
+                    setCustomLeadValue(String(index + 1));
+                    setLead((index + 1) * leadFactors[leadUnit.key]);
                     setLeadTouched(true);
-                  }} className="h-11 w-full rounded-xl border border-[var(--mp-line)] bg-white px-3 text-base">
-                    <option value="minutes">Минуты</option>
-                    <option value="hours">Часы</option>
-                    <option value="days">Дни</option>
-                    <option value="weeks">Недели</option>
-                  </select>
-                </label>
+                  }}
+                  className="mp-font-meta pr-2.5 text-right"
+                />
+                <Wheel
+                  label="Единица времени"
+                  items={LEAD_UNITS.map((u) => leadPlural(leadValue, u.forms))}
+                  value={LEAD_UNITS.findIndex((u) => u.key === leadUnit.key)}
+                  onChange={(index) => {
+                    const unit = LEAD_UNITS[index]!;
+                    const next = Math.min(leadValue, unit.max);
+                    setCustomLeadUnit(unit.key);
+                    setCustomLeadValue(String(next));
+                    setLead(next * leadFactors[unit.key]);
+                    setLeadTouched(true);
+                  }}
+                  className="pl-1.5 text-left"
+                />
+                <span className="mp-font-meta relative text-[12.5px] text-[var(--mp-tx2)]">до начала</span>
               </div>
-              {!customLeadValid ? <p role="alert" className="mt-2 text-[13px] text-danger">Укажите положительное целое число (не более 4 недель)</p> : null}
               <p className="mt-2 text-[12px] text-[var(--mp-tx2)]">В Telegram напоминание придёт, если бот подключён и уведомления включены.</p>
             </div>
           ) : null}
