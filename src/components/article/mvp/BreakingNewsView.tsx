@@ -978,6 +978,7 @@ export function BreakingNewsView({
     return () => observer.disconnect();
   }, [articleId, draftWatermark]);
   const cityHomeHref = getCityHomeHref(citySlug);
+  const journalHref = citySlug?.trim() ? `/${citySlug.trim()}/blog` : "/blog";
 
   const galleryBlock = blocks.find((b): b is Extract<ArticleMvpResolvedBlock, { type: "gallery" }> => b.type === "gallery");
 
