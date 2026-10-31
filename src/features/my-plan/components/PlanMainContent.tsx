@@ -1365,7 +1365,7 @@ export function PlanMainContent({
       return <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} compact />;
     }
     const linkClass =
-      "flex min-h-11 w-full items-center justify-center gap-[7px] rounded-xl text-[15px] font-bold text-[var(--mp-ac-dark)] transition-colors hover:text-[var(--mp-ac)] disabled:opacity-60";
+      "flex min-h-12 w-full items-center justify-center gap-[7px] rounded-xl bg-primary px-4 text-[15px] font-bold text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60";
     if (!hasRequestedSuggestions) {
       return (
         <button type="button" className={linkClass} onClick={handleDecideClick}>
@@ -1474,24 +1474,14 @@ export function PlanMainContent({
           }
         />
       ) : null}
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={handleOpenMyIdeas}
-          className="flex min-h-11 min-w-0 items-center justify-center gap-[7px] rounded-xl border border-[var(--mp-line)] bg-[var(--mp-card)] px-3 text-[15px] font-bold text-[var(--mp-tx)] transition-colors hover:border-[var(--mp-line-strong)]"
-        >
-          <Lightbulb className="h-[17px] w-[17px] shrink-0 text-[var(--mp-ac-dark)]" aria-hidden />
-          <span className="truncate">{ideasCount ? `Мои идеи · ${ideasCount}` : "Мои идеи"}</span>
+      <nav aria-label="Разделы моего плана" className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 border-t border-[var(--mp-line)] pt-4">
+        <button type="button" onClick={handleOpenMyIdeas} className="min-h-11 text-[14px] font-semibold text-[var(--mp-tx2)] hover:text-[var(--mp-ac-dark)]">
+          {ideasCount ? `Мои идеи · ${ideasCount}` : "Мои идеи"}
         </button>
-        <button
-          type="button"
-          onClick={() => openNestedScreen("visits")}
-          className="flex min-h-11 min-w-0 items-center justify-center gap-[7px] rounded-xl border border-[var(--mp-line)] bg-[var(--mp-card)] px-3 text-[15px] font-bold text-[var(--mp-tx)] transition-colors hover:border-[var(--mp-line-strong)]"
-        >
-          <History className="h-[17px] w-[17px] shrink-0 text-[var(--mp-tx2)]" aria-hidden />
-          <span className="truncate">Где мы были</span>
+        <button type="button" onClick={() => openNestedScreen("visits")} className="min-h-11 text-[14px] font-semibold text-[var(--mp-tx2)] hover:text-[var(--mp-ac-dark)]">
+          Где мы были
         </button>
-      </div>
+      </nav>
     </div>
   );
 
@@ -1552,11 +1542,11 @@ export function PlanMainContent({
               {renderDayList(false)}
               {renderOwnIdeas()}
               {renderIdeas()}
-              {renderBottomActions()}
               {renderWeekTeaser()}
             </>
           )}
           <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
+          {!isPastDay ? renderBottomActions() : null}
         </div>
 
         <PlanStickyCounter
@@ -1618,11 +1608,11 @@ export function PlanMainContent({
             {renderDayList(true)}
             {renderOwnIdeas()}
             {renderIdeas()}
-            {renderBottomActions()}
             {renderWeekTeaser()}
           </>
         )}
         <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
+          {!isPastDay ? renderBottomActions() : null}
       </div>
 
       <PlanStickyCounter
