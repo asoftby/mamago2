@@ -27,7 +27,7 @@ type ArticleSaveHeartProps = {
   className?: string;
   iconClassName?: string;
   /** "icon" — карточка (только сердце); "labeled" — detail (сердце + текст) */
-  variant?: "icon" | "labeled";
+  variant?: "icon" | "labeled" | "responsive";
   /**
    * Статус из батч-запроса родителя (карточные гриды). Может прийти позже
    * монтирования — компонент синхронизируется, когда проп обновится.
@@ -189,14 +189,16 @@ export function ArticleSaveHeart({
         className={cn(
           variant === "labeled"
             ? "inline-flex h-10 items-center gap-2 rounded-full border border-[rgba(20,18,16,0.14)] bg-white px-4 text-sm font-medium text-foreground transition-colors hover:border-[rgba(20,18,16,0.28)]"
-            : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm transition-all hover:scale-105 active:scale-95",
+            : variant === "responsive"
+              ? "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-white shadow-none transition-colors hover:border-foreground/30 sm:h-10 sm:w-auto sm:gap-2 sm:px-4 sm:text-sm sm:font-medium"
+              : "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm transition-all hover:scale-105 active:scale-95",
           isSaved ? "text-primary" : "text-muted-foreground hover:text-primary",
           isLoading && "cursor-not-allowed opacity-50",
           className,
         )}
       >
         <Heart className={cn("h-4 w-4", isSaved && "fill-current", iconClassName)} />
-        {variant === "labeled" ? <span>Сохранить</span> : null}
+        {variant === "labeled" ? <span>Сохранить</span> : variant === "responsive" ? <span className="hidden sm:inline">Сохранить</span> : null}
       </button>
 
       <SaveActivityFlowAdaptive
