@@ -271,3 +271,4 @@ button.monthLabel:hover { color: var(--plan-ink); }
 .widget .dots { height: 14px; }
 .widget .dot { width: 6px; height: 6px; }
 .widget .arrow { background: #fff; border-color: var(--plan-line); box-shadow: 0 4px 12px -4px rgba(20, 18, 16, 0.2); }
+.widget .cellMobile { height: 92px; }

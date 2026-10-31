@@ -85,7 +85,8 @@ export function PlanPersonFilter({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={option.avatarUrl} alt="" className="h-[26px] w-[26px] shrink-0 rounded-full object-cover" />
               ) : (
-                <span aria-hidden className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-black/10 text-[11px] font-bold">{option.label.trim().charAt(0).toUpperCase() || "•"}</span>
+                <span aria-hidden className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
+                style={{ background: selected ? "rgba(255,255,255,.16)" : "rgba(0,0,0,.1)" }}>{option.label.trim().charAt(0).toUpperCase() || "•"}</span>
               )) : null}
               {option.label}
             </button>
