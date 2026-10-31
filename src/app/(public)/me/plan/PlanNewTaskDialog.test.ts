@@ -25,7 +25,7 @@ const newTask = readFileSync(
 assert.match(planMain, /relative flex min-h-0 flex-1 flex-col w-full overflow-hidden/, "slides fill overlay without intrinsic growth");
 assert.match(planMain, /flex min-h-0 flex-1 w-\[200%\] transform-gpu transition-transform/, "horizontal slide occupies bounded height");
 assert.match(newTask, /data-plan-new-task-scroll[\s\S]*?overflow-y-auto overscroll-y-contain touch-pan-y/, "task content scrolls inside fixed overlay");
-assert.match(newTask, /shrink-0 border-t/, "save button remains anchored below scroll area");
+assert.match(newTask, /shrink-0 bg-\[var\(--mp-bg\)\] px-3\.5/, "save bar remains anchored below scroll area");
 assert.match(page, /const openCreate = \(\) => \{\s*setNewTaskOpen\(true\)/);
 assert.match(page, /<PlanNewTaskDialog[\s\S]*?onSaved=\{\(date\) => \{[\s\S]*?selectDate\(date\)/);
 assert.match(page, /const openEdit = \(item: SerializedPlanItem\) => \{[\s\S]*?setManualDialogOpen\(true\)/);

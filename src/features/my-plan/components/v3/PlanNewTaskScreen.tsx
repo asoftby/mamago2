@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, ChevronLeft, ChevronRight, Check, Clock3, Mic, Users } from "lucide-react";
+import { Bell, ChevronLeft, ChevronRight, Clock3, Plus, Users, X } from "lucide-react";
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -14,12 +14,7 @@ import {
   PLAN_CHIP_OFF,
   PLAN_CHIP_ON,
   PLAN_FOCUS,
-  PLAN_SEG,
-  PLAN_SEG_BTN,
-  PLAN_SEG_OFF,
-  PLAN_SEG_ON,
 } from "./planChipStyles";
-import { PlanScreenTitleHead } from "./PlanScreenTitleHead";
 import { planParticipantPalette } from "../PlanParticipantChip";
 
 export type PlanNewTaskPerson = { id: string; name: string; kind: "adult" | "child" };
@@ -50,6 +45,15 @@ function addDays(dateIso: string, n: number): string {
   const dt = new Date(y!, m! - 1, d! + n);
   return iso(dt.getFullYear(), dt.getMonth(), dt.getDate());
 }
+function weekdayLong(dateIso: string): string {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  const name = new Date(y!, m! - 1, d!).toLocaleDateString("ru-RU", { weekday: "long" });
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+function weekdayShort(dateIso: string): string {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  return new Date(y!, m! - 1, d!).toLocaleDateString("ru-RU", { weekday: "short" });
+}
 function maskTime(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 4);
   return digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits;
@@ -59,7 +63,7 @@ function longDay(dateIso: string): string {
   return new Date(y!, m! - 1, d!).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 }
 
-const SECTION_LABEL = "mp-font-ui mb-[9px] text-[15px] font-bold text-[var(--mp-tx)]";
+const SECTION_LABEL = "mp-font-ui mx-0.5 mb-2.5 text-[17px] font-semibold tracking-[-.01em] text-[var(--mp-tx)]";
 
 /**
  * «Новое дело» в той же шторке: текст → когда → время → для кого → напомнить.
@@ -127,6 +131,7 @@ export function PlanNewTaskScreen({
 
   const [ty, tm] = todayIso.split("-").map(Number);
   const [monthOffset, setMonthOffset] = useState(0);
+  const [calOpen, setCalOpen] = useState(false);
   const monthDate = new Date(ty!, tm! - 1 + monthOffset, 1);
   const monthLabel = monthDate.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
   const leadBlanks = (monthDate.getDay() + 6) % 7;
@@ -262,15 +267,35 @@ export function PlanNewTaskScreen({
     }
   }
 
+  const barDay = day
+    ? `${when === "today" ? "Сегодня" : when === "tomorrow" ? "Завтра" : weekdayLong(day)}, ${longDay(day)}`
+    : "Выберите день";
+  const chipBase = "mp-font-ui inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full border px-[18px] text-[15px] font-semibold whitespace-nowrap transition-colors";
+  const chipOn = "border-[var(--mp-chip-on-bg)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]";
+  const chipOff = "border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)] enabled:hover:border-[var(--mp-tx2)]";
+  const pickedChipLabel = pickedDate ? `${weekdayShort(pickedDate)}, ${longDay(pickedDate)}` : null;
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
-      <PlanScreenTitleHead title={isMove ? <>Перенести <em>дело</em></> : <>Новое <em>дело</em></>} onBack={onBack} />
+      <div className="flex min-h-20 shrink-0 items-center gap-3 px-5 pb-1.5 pt-[26px] md:px-8">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Назад в план"
+          className={cn("flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line)] bg-white text-[var(--mp-tx)] shadow-[0_4px_12px_-4px_rgba(20,18,16,.18)] transition-colors hover:bg-[var(--mp-bg)]", PLAN_FOCUS)}
+        >
+          <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
+        </button>
+        <h2 className="mp-font-meta m-0 flex items-center gap-2 text-[12.5px] font-medium uppercase leading-none tracking-[.16em] text-[var(--mp-ac-dark)]">
+          <i aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--mp-ac-dark)]" />
+          {isMove ? "Перенести дело" : "Новое дело"}
+        </h2>
+      </div>
       <div
         data-plan-new-task-scroll
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y px-5 pb-6 md:px-8"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y px-5 pb-6 pt-1 md:px-8"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
-        <div className="mb-[22px] mt-1">
         <label className="block">
           <span className="sr-only">Что нужно сделать</span>
           <textarea
@@ -280,67 +305,105 @@ export function PlanNewTaskScreen({
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder="Что нужно сделать?"
-            className={cn(
-              "mp-font-ui block w-full resize-none rounded-2xl border border-[var(--mp-chip-line)] bg-white px-4 py-3",
-              "text-[20px] font-normal leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)] caret-[var(--mp-ac)]",
-              "outline-none transition-shadow placeholder:font-normal placeholder:text-[var(--text-muted)]",
-              "focus:border-[var(--mp-tx)] focus:shadow-[0_0_0_3px_rgba(26,20,16,.08)]",
-            )}
+            className="mp-font-ui m-0 mb-[18px] mt-1 block min-h-[72px] w-full resize-none border-0 bg-transparent p-0 text-[33px] font-extrabold leading-[1.08] tracking-[-.03em] text-[var(--mp-tx)] caret-[var(--mp-ac)] outline-none placeholder:font-extrabold placeholder:text-[#b9b0a5]"
           />
         </label>
-        <div className="mt-2 flex items-center gap-[7px] border-b border-[var(--mp-line)] pb-4 text-[13px] text-[var(--mp-tx2)] md:hidden">
-          <Mic className="h-[15px] w-[15px]" aria-hidden />
-          Удобнее голосом — нажмите микрофон на&nbsp;клавиатуре
-        </div>
+
+        <div className="mb-6">
+          <div className={SECTION_LABEL}>Для кого</div>
+          <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] md:-mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
+            {[{ id: "", name: "Вся семья", kind: "adult" as const }, ...people].map((p) => {
+              const on = whoId === p.id;
+              const colors = planParticipantPalette(p.id ? `${p.kind}:${p.id}` : null);
+              return (
+                <button
+                  key={p.id || "family"}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setWhoId(p.id)}
+                  className={cn(chipBase, p.id ? "pl-2" : "", on ? chipOn : chipOff, PLAN_FOCUS)}
+                >
+                  {p.id ? (
+                    <span
+                      aria-hidden
+                      className="flex h-[26px] w-[26px] items-center justify-center rounded-full text-[11px] font-bold"
+                      style={on ? { background: "rgba(255,255,255,.16)", color: "#fff" } : { background: colors.bg, color: colors.fg }}
+                    >
+                      {displayName(p).trim().charAt(0).toUpperCase()}
+                    </span>
+                  ) : (
+                    <Users className="h-[18px] w-[18px]" aria-hidden />
+                  )}
+                  {displayName(p)}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="mb-[22px]">
+        <div className="mb-6">
           <div className={SECTION_LABEL}>Когда</div>
-          <div className={PLAN_SEG}>
-            {([["today", "Сегодня"], ["tomorrow", "Завтра"], ["other", "Другой день"]] as const).map(([key, name]) => (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={when === key}
-                onClick={() => setWhen(key)}
-                className={cn(PLAN_SEG_BTN, when === key ? PLAN_SEG_ON : PLAN_SEG_OFF)}
-              >
-                {name}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" aria-pressed={when === "today"} onClick={() => { setWhen("today"); setCalOpen(false); }} className={cn(chipBase, when === "today" ? chipOn : chipOff, PLAN_FOCUS)}>
+              Сегодня
+            </button>
+            <button type="button" aria-pressed={when === "tomorrow"} onClick={() => { setWhen("tomorrow"); setCalOpen(false); }} className={cn(chipBase, when === "tomorrow" ? chipOn : chipOff, PLAN_FOCUS)}>
+              Завтра
+            </button>
+            {when === "other" && pickedChipLabel ? (
+              <button type="button" aria-pressed onClick={() => setCalOpen(true)} className={cn(chipBase, chipOn, PLAN_FOCUS)}>
+                {pickedChipLabel}
               </button>
-            ))}
+            ) : null}
           </div>
-          {when === "other" ? (
-            <div className="mt-2.5 rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] px-2.5 py-3">
-              <div className="mx-1 mb-1.5 flex items-center justify-between">
-                <span className="text-[15px] font-bold capitalize text-[var(--mp-tx)]">{monthLabel}</span>
-                <span className="flex">
-                  <button type="button" aria-label="Предыдущий месяц" disabled={monthOffset <= 0} onClick={() => setMonthOffset((v) => v - 1)} className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--mp-tx2)] disabled:opacity-30">
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                  <button type="button" aria-label="Следующий месяц" onClick={() => setMonthOffset((v) => v + 1)} className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--mp-tx2)]">
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
-                </span>
+          <button
+            type="button"
+            aria-expanded={calOpen}
+            onClick={() => {
+              if (!calOpen && when !== "other") setWhen("other");
+              setCalOpen((v) => !v);
+            }}
+            className={cn(
+              "mt-3 flex min-h-[62px] w-full items-center gap-3 rounded-[20px] border-[1.5px] border-dashed py-0 pl-3.5 pr-[18px] text-left transition-colors hover:border-[var(--mp-tx2)] hover:bg-[var(--mp-card)]",
+              calOpen ? "border-[var(--mp-tx2)] bg-[var(--mp-card)]" : "border-[var(--mp-line-strong)]",
+              PLAN_FOCUS,
+            )}
+          >
+            <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white">
+              {calOpen ? <X className="h-4 w-4" strokeWidth={2} aria-hidden /> : <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />}
+            </span>
+            <span className="flex-1 text-[16.5px] font-medium text-[var(--mp-tx)]">{calOpen ? "Свернуть календарь" : "Другой день"}</span>
+            <span className="mp-font-meta text-[12.5px] text-[var(--mp-tx2)]">весь календарь →</span>
+          </button>
+          {calOpen ? (
+            <div className="mt-2.5 rounded-[20px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-2.5">
+              <div className="mb-1 flex items-center justify-between">
+                <button type="button" aria-label="Предыдущий месяц" disabled={monthOffset <= 0} onClick={() => setMonthOffset((v) => v - 1)} className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)] disabled:opacity-30">
+                  <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+                </button>
+                <span className="text-[16px] font-semibold capitalize text-[var(--mp-tx)]">{monthLabel}</span>
+                <button type="button" aria-label="Следующий месяц" onClick={() => setMonthOffset((v) => v + 1)} className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)]">
+                  <ChevronRight className="h-4 w-4" strokeWidth={2} />
+                </button>
               </div>
               <div className="grid grid-cols-7 gap-0.5">
                 {WD.map((w) => (
-                  <span key={w} className="py-1 text-center text-xs font-semibold text-[var(--mp-tx2)]">{w}</span>
+                  <span key={w} className="mp-font-meta py-1.5 text-center text-[11px] uppercase text-[var(--mp-tx2)]">{w}</span>
                 ))}
                 {cells.map((d, i) => {
                   if (d === null) return <span key={`b${i}`} />;
                   const value = iso(monthDate.getFullYear(), monthDate.getMonth(), d);
                   const disabled = value < todayIso;
-                  const on = value === pickedDate;
+                  const on = value === pickedDate && when === "other";
                   return (
                     <button
                       key={value}
                       type="button"
                       disabled={disabled}
-                      onClick={() => setPickedDate(value)}
+                      onClick={() => { setPickedDate(value); setWhen("other"); setCalOpen(false); }}
                       className={cn(
-                        "h-11 rounded-xl text-[15px] font-bold tabular-nums transition-colors disabled:text-[var(--text-subtle)]",
-                        on ? "bg-[var(--mp-tx)] text-white" : "hover:enabled:bg-[var(--mp-soft)]",
-                        !on && !disabled && i % 7 > 4 && "text-[var(--mp-ac-dark)]",
+                        "mp-font-display h-11 rounded-xl text-[17px] tabular-nums transition-colors disabled:text-[#c2b9ae]",
+                        on ? "bg-[var(--mp-tx)] text-white" : "hover:enabled:bg-white",
                         value === todayIso && !on && "shadow-[inset_0_0_0_1.5px_var(--mp-tx)]",
                       )}
                     >
@@ -353,25 +416,23 @@ export function PlanNewTaskScreen({
           ) : null}
         </div>
 
-        <div className="mb-[22px]">
+        <div className="mb-6">
           <div className={SECTION_LABEL}>Время</div>
-          <div className={PLAN_SEG}>
-            <button
-              type="button"
-              aria-pressed={!timed}
-              onClick={() => setTimed(false)}
-              className={cn(PLAN_SEG_BTN, !timed ? PLAN_SEG_ON : PLAN_SEG_OFF)}
-            >
+          <div className="flex gap-2">
+            <button type="button" aria-pressed={!timed} onClick={() => setTimed(false)} className={cn(chipBase, "tabular-nums", !timed ? chipOn : chipOff, PLAN_FOCUS)}>
               Без времени
             </button>
             <label
-              className={cn(PLAN_SEG_BTN, "flex cursor-text items-center justify-center gap-[7px] px-3 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--mp-ac)]", timed ? PLAN_SEG_ON : PLAN_SEG_OFF)}
+              className={cn(
+                "flex h-[46px] min-w-0 flex-1 cursor-text items-center gap-2.5 rounded-full border bg-white pl-3.5 pr-1.5 transition-colors focus-within:border-[var(--mp-tx)]",
+                timed ? "border-[var(--mp-tx)] shadow-[inset_0_0_0_1px_var(--mp-tx)]" : "border-[var(--mp-line-strong)]",
+              )}
               onClick={() => {
                 enableTime();
                 window.setTimeout(() => timeRef.current?.focus(), 0);
               }}
             >
-              <Clock3 className={cn("h-4 w-4", timed ? "text-[var(--mp-ac)]" : "text-[var(--mp-tx2)]")} aria-hidden />
+              <Clock3 className={cn("h-[18px] w-[18px] shrink-0", timed ? "text-[var(--mp-tx)]" : "text-[var(--mp-tx2)]")} aria-hidden />
               <input
                 ref={timeRef}
                 inputMode="numeric"
@@ -381,102 +442,18 @@ export function PlanNewTaskScreen({
                   setTime(maskTime(event.target.value));
                   enableTime();
                 }}
+                aria-label="Своё время"
                 aria-invalid={timed && !timeValid}
-                 aria-describedby={timed && !timeValid ? "plan-time-error" : undefined}
-                 className={cn("w-[72px] border-0 bg-transparent p-0 text-base font-extrabold tabular-nums tracking-[.02em] text-[var(--mp-tx)] outline-none placeholder:font-semibold placeholder:text-[var(--text-muted)]", timed && !timeValid && "text-danger ring-1 ring-danger rounded-sm")}
+                aria-describedby={timed && !timeValid ? "plan-time-error" : undefined}
+                className={cn("mp-font-meta w-full min-w-0 border-0 bg-transparent p-0 pr-3 text-[17px] font-semibold text-[var(--mp-tx)] outline-none placeholder:font-normal placeholder:text-[#b9b0a5]", timed && !timeValid && "text-danger")}
               />
             </label>
           </div>
-          {pastToday ? <p className="mx-0.5 mt-2 text-[13px] text-[var(--mp-tx2)]">Это время сегодня уже прошло — можно поставить на завтра</p> : null}
+          {pastToday ? <p className="mx-0.5 mt-2.5 text-[13.5px] leading-[1.45] text-[var(--mp-tx2)]">Это время сегодня уже прошло — можно поставить на завтра</p> : null}
         </div>
 
         <div className="mb-[22px]">
-          <div className={SECTION_LABEL}>Для кого</div>
-          <div className="flex flex-wrap gap-5">
-            {[{ id: "", name: "Вся семья", kind: "adult" as const }, ...people].map((p) => {
-              const on = whoId === p.id;
-              const colors = planParticipantPalette(p.id ? `${p.kind}:${p.id}` : null);
-              return (
-                <button key={p.id || "family"} type="button" aria-pressed={on} onClick={() => setWhoId(p.id)} className={cn("flex min-w-11 flex-col items-center gap-[7px] rounded-2xl", PLAN_FOCUS)}>
-                  <span className={cn("relative flex h-[62px] w-[62px] items-center justify-center rounded-full border-2 text-[21px] font-extrabold transition-colors", on ? "border-current" : "border-transparent hover:border-current/30")} style={{ background: colors.bg, color: colors.fg }}>
-                    {p.id === "" ? <Users className="h-6 w-6" aria-hidden /> : displayName(p).trim().charAt(0).toUpperCase()}
-                    {on ? (
-                      <span className="absolute -bottom-[3px] -right-[3px] flex h-[23px] w-[23px] items-center justify-center rounded-full border-2 border-[var(--mp-bg)] bg-[var(--mp-ac)] text-white">
-                        <Check className="h-3 w-3" strokeWidth={2.8} aria-hidden />
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="mp-font-ui max-w-[72px] truncate text-sm font-semibold text-[var(--mp-tx)]">{displayName(p)}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {!isMove && (
-          <div className="mb-[22px]">
-            <div className={SECTION_LABEL}>Повторять</div>
-            <div className="flex flex-wrap gap-2">
-              {([
-                ["NONE", "Никогда"],
-                ["DAILY", "Каждый день"],
-                ["WEEKLY", "Каждую неделю"],
-                ["MONTHLY", "Каждый месяц"],
-              ] as const).map(([value, name]) => (
-                <button key={value} type="button" aria-pressed={repeat === value}
-                  onClick={() => {
-                    if (value === "WEEKLY" && day && !repeatDays.includes(weekdayOf(day))) setRepeatDays([weekdayOf(day)]);
-                    setRepeat(value);
-                  }}
-                  className={cn(PLAN_CHIP, repeat === value ? PLAN_CHIP_ON : PLAN_CHIP_OFF)}>
-                  {name}
-                </button>
-              ))}
-            </div>
-            {repeat === "WEEKLY" && (
-              <>
-                <div className="mt-3 flex flex-wrap gap-2" aria-label="Дни недели">
-                  {WD.map((name, index) => {
-                    const value = index + 1;
-                    const selected = repeatDays.includes(value);
-                    return (
-                      <button key={value} type="button" aria-pressed={selected}
-                        onClick={() => setRepeatDays(days => selected ? days.filter(d => d !== value) : [...days, value])}
-                        className={cn("h-11 min-w-11 rounded-full px-2 text-sm font-semibold", PLAN_FOCUS,
-                          selected ? PLAN_CHIP_ON : PLAN_CHIP_OFF)}>{name}</button>
-                    );
-                  })}
-                </div>
-                {!repeatValid && <p role="alert" className="mt-2 text-sm text-danger">Выберите день начала и дни повторений.</p>}
-              </>
-            )}
-            {repeat !== "NONE" && (
-              <div className="mt-3 grid gap-2">
-                <label className="grid gap-1.5 text-sm font-semibold">
-                  Конец повтора (необязательно)
-                  <input type="date" min={day ?? todayIso} value={repeatEnd === "UNTIL" ? repeatUntil : ""}
-                    onChange={e => {
-                      setRepeatUntil(e.target.value);
-                      setRepeatEnd(e.target.value ? "UNTIL" : "NEVER");
-                    }}
-                    className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3" />
-                </label>
-                {repeatEnd === "UNTIL" && timed && (
-                  <label className="grid gap-1.5 text-sm font-semibold">
-                    Время окончания (необязательно)
-                    <input type="time" value={repeatUntilTime} onChange={e => setRepeatUntilTime(e.target.value)}
-                      className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3" />
-                  </label>
-                )}
-                <p className="text-[12px] text-[var(--mp-tx2)]">Если дата не указана, задача будет повторяться без ограничения. Время окончания ограничивает последний день повторения.</p>
-                {!repeatValid && repeatEnd === "UNTIL" && <p role="alert" className="text-sm text-danger">Конец повтора должен быть не раньше начала.</p>}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="mb-[22px]">
-          <div className={SECTION_LABEL}>Когда напомнить?</div>
+          <div className={SECTION_LABEL}>Напомнить</div>
           <div className="flex flex-wrap gap-2">
             {REMIND_OPTIONS.map((o) => {
               const on = timed ? lead === o.minutes : o.minutes === null;
@@ -560,16 +537,87 @@ export function PlanNewTaskScreen({
           ) : null}
           {!timed ? <p className="mx-0.5 mt-2 text-[13px] text-[var(--mp-tx2)]">Укажите время, чтобы включить напоминание</p> : null}
         </div>
+        {!isMove && (
+          <div className="mb-[22px]">
+            <div className={SECTION_LABEL}>Повторять</div>
+            <div className="flex flex-wrap gap-2">
+              {([
+                ["NONE", "Никогда"],
+                ["DAILY", "Каждый день"],
+                ["WEEKLY", "Каждую неделю"],
+                ["MONTHLY", "Каждый месяц"],
+              ] as const).map(([value, name]) => (
+                <button key={value} type="button" aria-pressed={repeat === value}
+                  onClick={() => {
+                    if (value === "WEEKLY" && day && !repeatDays.includes(weekdayOf(day))) setRepeatDays([weekdayOf(day)]);
+                    setRepeat(value);
+                  }}
+                  className={cn(PLAN_CHIP, repeat === value ? PLAN_CHIP_ON : PLAN_CHIP_OFF)}>
+                  {name}
+                </button>
+              ))}
+            </div>
+            {repeat === "WEEKLY" && (
+              <>
+                <div className="mt-3 flex flex-wrap gap-2" aria-label="Дни недели">
+                  {WD.map((name, index) => {
+                    const value = index + 1;
+                    const selected = repeatDays.includes(value);
+                    return (
+                      <button key={value} type="button" aria-pressed={selected}
+                        onClick={() => setRepeatDays(days => selected ? days.filter(d => d !== value) : [...days, value])}
+                        className={cn("h-11 min-w-11 rounded-full px-2 text-sm font-semibold", PLAN_FOCUS,
+                          selected ? PLAN_CHIP_ON : PLAN_CHIP_OFF)}>{name}</button>
+                    );
+                  })}
+                </div>
+                {!repeatValid && <p role="alert" className="mt-2 text-sm text-danger">Выберите день начала и дни повторений.</p>}
+              </>
+            )}
+            {repeat !== "NONE" && (
+              <div className="mt-3 grid gap-2">
+                <label className="grid gap-1.5 text-sm font-semibold">
+                  Конец повтора (необязательно)
+                  <input type="date" min={day ?? todayIso} value={repeatEnd === "UNTIL" ? repeatUntil : ""}
+                    onChange={e => {
+                      setRepeatUntil(e.target.value);
+                      setRepeatEnd(e.target.value ? "UNTIL" : "NEVER");
+                    }}
+                    className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3" />
+                </label>
+                {repeatEnd === "UNTIL" && timed && (
+                  <label className="grid gap-1.5 text-sm font-semibold">
+                    Время окончания (необязательно)
+                    <input type="time" value={repeatUntilTime} onChange={e => setRepeatUntilTime(e.target.value)}
+                      className="min-h-11 rounded-xl border border-[var(--mp-line)] bg-white px-3" />
+                  </label>
+                )}
+                <p className="text-[12px] text-[var(--mp-tx2)]">Если дата не указана, задача будет повторяться без ограничения. Время окончания ограничивает последний день повторения.</p>
+                {!repeatValid && repeatEnd === "UNTIL" && <p role="alert" className="text-sm text-danger">Конец повтора должен быть не раньше начала.</p>}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
-      <div className="shrink-0 border-t border-[var(--mp-line)] bg-[var(--mp-bg)] px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 md:px-8">
-        <button
-          type="button"
-          disabled={!can || saving}
-          onClick={() => void submit()}
-          className={cn("mp-font-ui flex h-[54px] w-full items-center justify-center rounded-2xl bg-[var(--mp-ac)] text-base font-bold text-white transition-colors hover:bg-[var(--mp-ac-dark)] disabled:bg-[var(--border)] disabled:text-[var(--text-muted)]", PLAN_FOCUS)}
-        >
-          {saving ? "Сохраняем…" : label}
-        </button>
+      <div className="shrink-0 bg-[var(--mp-bg)] px-3.5 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-1">
+        <div className="flex min-h-20 items-center gap-3 rounded-[22px] bg-[var(--mp-tx)] py-4 pl-5 pr-4 text-white">
+          <div className="min-w-0 flex-1">
+            <b className="block text-[17px] font-semibold leading-[1.25] tracking-[-.01em]">
+              {barDay}
+              {timed && timeValid ? ` · ${time}` : ""}
+            </b>
+            <span className="sr-only" role="status">{label}</span>
+          </div>
+          <button
+            type="button"
+            disabled={!can || saving}
+            onClick={() => void submit()}
+            className={cn("mp-font-ui h-[54px] shrink-0 rounded-full bg-[var(--mp-ac)] px-5 text-[16px] font-semibold text-white transition-colors hover:bg-[var(--mp-ac-dark)] disabled:bg-[#4a433c] disabled:text-white/60", PLAN_FOCUS)}
+          >
+            {saving ? "Сохраняем…" : isMove ? "Перенести" : "Добавить"}
+          </button>
+        </div>
       </div>
     </div>
   );
