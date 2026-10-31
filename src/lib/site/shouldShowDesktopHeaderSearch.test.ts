@@ -9,7 +9,7 @@ assert.equal(shouldShowDesktopHeaderSearch("/minsk/blog"), true);
 assert.equal(shouldShowDesktopHeaderSearch("/minsk/blog/category/events"), true);
 assert.equal(shouldShowDesktopHeaderSearch("/minsk/blog/category/routes"), true);
 assert.equal(shouldShowDesktopHeaderSearch("/minsk/blog/category/events/topic"), false);
-assert.equal(shouldShowDesktopHeaderSearch("/minsk/blog/some-article"), false);
+assert.equal(shouldShowDesktopHeaderSearch("/minsk/blog/some-article"), true);
 assert.equal(shouldShowDesktopHeaderSearch("/minsk/events/today"), true);
 assert.equal(shouldShowDesktopHeaderSearch("/minsk/events/some-event-slug"), false);
 assert.equal(shouldShowDesktopHeaderSearch("/minsk/places"), true);
