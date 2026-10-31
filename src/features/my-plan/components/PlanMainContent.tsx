@@ -20,9 +20,8 @@ import { LiquidNotification } from "@/components/ui/liquid-notification";
 import { PlanCalendar } from "@/features/plan-calendar";
 import { PlanPersonFilter, planPersonFilterOptions } from "./PlanPersonFilter";
 import { useSharedPlanAudienceFilters } from "../hooks/useSharedPlanAudienceFilters";
-import { PlanEmptyDayMessage } from "./PlanEmptyDayMessage";
 import { filterVisiblePlanEntries, type PlanPersonSelection } from "../lib/filterPlanEntriesByPerson";
-import { pluralRu, relativeLabel } from "@/lib/date/dateKey";
+import { pluralRu } from "@/lib/date/dateKey";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
 import { QuickAddChildModal } from "@/components/children/QuickAddChildModal";
 import { AddPersonaTypeModal } from "./AddPersonaTypeModal";
@@ -34,14 +33,14 @@ import { PlanEventScreen } from "./v3/PlanEventScreen";
 import { PlanScenarioScreen } from "./v3/PlanScenarioScreen";
 import { PlanNewTaskScreen } from "./v3/PlanNewTaskScreen";
 import { PlanVisitsScreen } from "./v3/PlanVisitsScreen";
-import { PlanWeekScreen } from "./v3/PlanWeekScreen";
+import { PlanDayRibbon } from "./v3/PlanDayRibbon";
 import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
-import { PlanDayBar } from "./v3/PlanDayBar";
+import { PlanMonthScreen } from "./v3/PlanMonthScreen";
+import { PlanPicksScreen } from "./v3/PlanPicksScreen";
 import { PlanMoveSheet, canMovePlanItem } from "./v3/PlanMoveSheet";
 import { fetchPlanExperienceFeed, type PlanExperienceFeed } from "./v3/planExperienceApi";
-import { ChevronRight, History, Lightbulb, Plus } from "lucide-react";
+import { ArrowRight, Bookmark, Heart, Lightbulb, Search } from "lucide-react";
 import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
-import { MediaCover } from "@/components/ui/media-cover";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
 import { PlanNeedsAgeQuestion } from "./PlanNeedsAgeQuestion";
 import { BuildScenarioButton } from "./BuildScenarioButton";
@@ -49,6 +48,8 @@ import { resolveScenarioCtaState, resolveScenarioCtaLabel } from "../lib/canOpen
 import { sortPlanItemsForDay } from "../lib/sortPlanItemsForDay";
 import { useResolveDefaultParticipants } from "../lib/useResolveDefaultParticipants";
 import { writeLastPlanAgeRanges } from "../lib/lastPlanAgeRangesStorage";
+import { toggleAgeRangeSelection } from "../lib/ageRangeSelection";
+import { AGE_GROUPS } from "@/features/filters/age/ageGroups";
 import {
   fetchPlanSuggestions,
   createPlanSuggestionAudienceSnapshot,
@@ -61,10 +62,7 @@ import {
   recommendationDraftKey,
   reconcileAddedActivityIds,
 } from "../lib/planRecommendationDraftStorage";
-import {
-  focusPlanRecommendationResults,
-  PLAN_RECOMMENDATION_RESULTS_A11Y,
-} from "../lib/planRecommendationUi";
+import { focusPlanRecommendationResults } from "../lib/planRecommendationUi";
 
 interface PlanChildChip {
   id: string;
@@ -321,6 +319,14 @@ function buildParticipantSummaryLabels(
   );
 }
 
+/** «сегодня» / «завтра» / «среду, 4 ноября» — для подписи «Активности на …». */
+function posterDayWord(selectedDate: string, todayKey: string): string {
+  if (selectedDate === todayKey) return "сегодня";
+  if (selectedDate === addDaysIso(todayKey, 1)) return "завтра";
+  const date = new Date(`${selectedDate}T12:00:00`);
+  return `${weekdayForNa(date)}, ${date.toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}`;
+}
+
 function weekdayForNa(date: Date): string {
   const weekday = date.toLocaleDateString("ru-RU", { weekday: "long" }).toLowerCase();
   const accusativeByNa: Record<string, string> = {
@@ -420,12 +426,12 @@ export function PlanMainContent({
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   /** Два экрана остаются в одной модалке: сдвигаем их по горизонтали, не теряя план. */
-  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "week" | "event" | "scenario">("plan");
+  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "month" | "picks" | "event" | "scenario">("plan");
   /** Сохраняем исходящий экран в DOM до конца обратной анимации. */
-  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "week" | "event" | "scenario" | null>(null);
+  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "month" | "picks" | "event" | "scenario" | null>(null);
   /** Каждое открытие формы — новый экземпляр; отменённая анимация не оставляет старый черновик. */
   const [nestedScreenVersion, setNestedScreenVersion] = useState(0);
-  const openNestedScreen = useCallback((next: "new" | "visits" | "week" | "event" | "scenario") => {
+  const openNestedScreen = useCallback((next: "new" | "visits" | "month" | "picks" | "event" | "scenario") => {
     setNestedScreenVersion((version) => version + 1);
     setMountedNestedScreen(next);
     setScreen(next);
@@ -454,7 +460,8 @@ export function PlanMainContent({
   const { filters: audienceFilters, update: updateAudienceFilters } = useSharedPlanAudienceFilters(family?.primaryAdultPersonaId);
   const includedPeople = audienceFilters.include;
   const excludedPeople = audienceFilters.exclude;
-  const planVisibilityFilter = audienceFilters.visibility;
+  // Вкладки «Все доступные / Мои личные / Общие» в виджете пока скрыты: сохранённый фильтр не должен прятать дела.
+  const planVisibilityFilter: typeof audienceFilters.visibility = "ALL";
   const [familyAdults, setFamilyAdults] = useState<Array<{ userId: string; displayName: string | null; avatarUrl?: string | null; isMe: boolean }>>([]);
   useEffect(() => {
     if (!family?.primaryAdultPersonaId) { setFamilyAdults([]); return; }
@@ -483,6 +490,8 @@ export function PlanMainContent({
   const [planAudienceOverride, setPlanAudienceOverride] = useState<string[] | null>(null);
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState(false);
+  const [picksPeople, setPicksPeople] = useState<string[]>([]);
+  const [picksAges, setPicksAges] = useState<string[]>([]);
   const [addedSuggestionActivityIds, setAddedSuggestionActivityIds] = useState<string[]>([]);
   const lastRequestSnapshotRef = useRef<PlanSuggestionAudienceSnapshot>({
     ageRangeValues: [],
@@ -1120,14 +1129,12 @@ export function PlanMainContent({
   const hasRequestedSuggestions = suggestionsGeneration > 0 || isFetchingSuggestions;
   // One calendar for both layouts: strip vs week row is chosen by container width.
   const planCalendar = onChangeDate ? (
-    <div
-      id="plan-week-calendar"
-      className={isDesktop
-        ? "min-w-0 bg-transparent px-0 py-3"
-        : "min-w-0 rounded-[18px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-3.5"}
-    >
-      <PlanCalendar value={selectedDate} onChange={onChangeDate} variant="widget" />
-    </div>
+    <PlanDayRibbon
+      value={selectedDate}
+      onChange={onChangeDate}
+      onOpenMonth={() => openNestedScreen("month")}
+      monthEnd={addDaysIso(`${selectedDate.slice(0, 7)}-01`, new Date(Number(selectedDate.slice(0, 4)), Number(selectedDate.slice(5, 7)), 0).getDate() - 1)}
+    />
   ) : null;
   const isPastDay = selectedDate < todayKey;
   const isTodaySelected = selectedDate === todayKey;
@@ -1147,14 +1154,40 @@ export function PlanMainContent({
   const personShortName = (persona: { kind: string; displayName?: string | null }) =>
     persona.displayName?.trim() || (persona.kind === "adult" ? "Я" : "");
   const dayContextLabel = (() => {
-    const base = relativeLabel(selectedDate, todayKey);
-    const needsWeekday = ["Сегодня", "Завтра", "Вчера"].includes(base);
-    const weekday = new Date(`${selectedDate}T12:00:00`).toLocaleDateString("ru-RU", { weekday: "long" });
-    const label = needsWeekday ? `${base}, ${weekday}` : base;
-    return filterPerson ? `${label} · ${filterPerson.kind === "adult"
-      ? (personShortName(filterPerson) === "Я" ? "мои дела" : `дела: ${personShortName(filterPerson)}`)
-      : personShortName(filterPerson)}` : label;
+    // «Сегодня, 31 октября» / «Завтра, 1 ноября» / «Среда, 4 ноября».
+    const dayDate = new Date(`${selectedDate}T12:00:00`);
+    const datePart = dayDate.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+    const weekdayName = dayDate.toLocaleDateString("ru-RU", { weekday: "long" });
+    const label = selectedDate === todayKey
+      ? `Сегодня, ${datePart}`
+      : selectedDate === addDaysIso(todayKey, 1)
+        ? `Завтра, ${datePart}`
+        : `${weekdayName.charAt(0).toUpperCase()}${weekdayName.slice(1)}, ${datePart}`;
+    return label;
   })();
+  /** «Для всех» / «Для меня» / «Для Степана» — справа от заголовка дня. */
+  const renderDayHeading = (compact: boolean) => {
+    const included = includedPeople
+      .map((token) => personFilterOptions.find((option) => option.value === token)?.label)
+      .filter((label): label is string => Boolean(label))
+      .map((label) => (label === "Я" ? "меня" : toGenitiveName(label)));
+    const audienceLabel = !filteredAudience
+      ? "Для всех"
+      : excludedPeople.length === 0 && planVisibilityFilter === "ALL" && included.length === 1
+        ? `Для ${included[0]}`
+        : "Для выбранных";
+    return (
+      <div className={(compact ? "mb-3" : "mb-2.5") + " mx-0.5 mt-1 flex items-baseline justify-between gap-3"}>
+        <h3 className="m-0 text-[18px] font-semibold tracking-[-.01em] text-[var(--mp-tx)]">{dayContextLabel}</h3>
+        <span
+          style={{ fontFamily: "Menlo, ui-monospace, SFMono-Regular, Monaco, Consolas, monospace" }}
+          className="min-w-0 truncate text-right text-[12px] text-[var(--mp-tx2)]"
+        >
+          {audienceLabel}
+        </span>
+      </div>
+    );
+  };
 
   const personFilterOptions = planPersonFilterOptions([
     ...familyAdults.map(adult => ({
@@ -1177,8 +1210,6 @@ export function PlanMainContent({
         selectedValues={includedPeople}
         onAudienceChange={({ include, exclude }) => updateAudienceFilters({ ...audienceFilters, include, exclude })}
         excludedValues={excludedPeople}
-        visibility={planVisibilityFilter}
-        onVisibilityChange={(visibility) => updateAudienceFilters({ ...audienceFilters, visibility })}
       />
     );
 
@@ -1219,15 +1250,15 @@ export function PlanMainContent({
       />
     );
     const nowLine = (
-      <div key="now-line" className="my-0.5 ml-2.5 flex items-center gap-2 text-xs font-bold tabular-nums text-[var(--mp-ac-dark)]">
-        <span>{nowLabel}</span>
-        <i className="h-px flex-1 bg-[var(--mp-ac)] opacity-45" />
-        <span>сейчас</span>
+      <div key="now-line" role="separator" aria-label={`Сейчас ${nowLabel}`} className="relative mx-1 my-0.5 flex items-center gap-2.5">
+        <span className="mp-font-meta inline-flex h-[24px] items-center rounded-full bg-[var(--mp-ac)] px-2.5 text-[11px] font-semibold tabular-nums text-white">{nowLabel}</span>
+        <i className="relative h-0.5 flex-1 rounded-sm bg-[var(--mp-ac)] before:absolute before:-left-1 before:-top-[3px] before:h-2 before:w-2 before:rounded-full before:bg-[var(--mp-ac)]" />
+        <span className="mp-font-meta text-[10px] font-medium uppercase tracking-[.14em] text-[var(--mp-ac-dark)]">сейчас</span>
       </div>
     );
     return (
       <section aria-label="В вашем плане">
-        <p className={(compact ? "mb-3" : "mb-2.5") + " text-[13px] font-bold text-[var(--mp-tx2)]"}>{dayContextLabel}</p>
+        {renderDayHeading(compact)}
         <div className="space-y-2">
           {timedRows.map((item, index) => (
             <div key={item.id} className="space-y-2">
@@ -1239,7 +1270,7 @@ export function PlanMainContent({
         </div>
         {untimedRows.length > 0 ? (
           <>
-            <p className="mb-2.5 mt-[18px] text-[13px] font-bold text-[var(--mp-tx2)]">В любое время</p>
+            <p className="mp-font-meta mx-1 mb-2.5 mt-[18px] text-[10px] font-medium uppercase tracking-[.1em] text-[var(--mp-tx2)]">В любое время</p>
             <div className="space-y-2">{untimedRows.map(renderRow)}</div>
           </>
         ) : null}
@@ -1264,6 +1295,12 @@ export function PlanMainContent({
       </div>
     );
 
+  /** Экран подборки; саму подборку запрашиваем, только если её ещё не было. */
+  const openPicks = () => {
+    openNestedScreen("picks");
+    if (!hasRequestedSuggestions) handleDecideClick();
+  };
+
   /** Список дня: записи по времени либо спокойный пустой день. */
   const renderDayList = (compact: boolean) => {
     if (isPendingDateHydration) {
@@ -1276,26 +1313,12 @@ export function PlanMainContent({
     }
     if (dayPartSections.length > 0) return renderDayPlanSection(compact);
     return (
-      <div role="status" className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-[15.5px] leading-[1.5] text-[var(--mp-tx2)]">
-        {filteredAudience ? (
-          <>
-            <b className="font-bold text-[var(--mp-tx)]">
-              {filterPerson?.kind === "adult" && personShortName(filterPerson) === "Я"
-                ? "У вас в этот день свободно."
-                : filterPerson?.kind === "child"
-                  ? `У ${toGenitiveName(personShortName(filterPerson))} в этот день свободно.`
-                  : "Нет дел по выбранным фильтрам."}
-            </b>{" "}
-            <button type="button" onClick={() => updateAudienceFilters({ include: [], exclude: [], visibility: "ALL" })} className="font-bold text-[var(--mp-ac-dark)] underline underline-offset-[3px]">
-              Сбросить фильтры
-            </button>
-          </>
-        ) : (
-          <>
-            <PlanEmptyDayMessage />
-          </>
-        )}
-      </div>
+      <section aria-label="В вашем плане" className="pb-2">
+        {renderDayHeading(compact)}
+        <p role="status" className="m-0 flex min-h-[76px] items-center justify-center rounded-[22px] border border-[#d6e4f3] bg-[#eaf2fb] px-4 py-3 text-center text-[14px] font-normal leading-[1.5] text-[var(--mp-tx2)]">
+          На {isTodaySelected ? "сегодня" : selectedDate === addDaysIso(todayKey, 1) ? "завтра" : "этот день"} планов нет.
+        </p>
+      </section>
     );
   };
 
@@ -1358,108 +1381,59 @@ export function PlanMainContent({
     );
   };
 
-  /** «Идеи на сегодня · от mamaGo»: пунктирный блок отдельно от плана; «+» добавляет в план. */
+  /** Кнопка «Подобрать, куда сходить»: открывает экран подборки и, если её ещё нет, запрашивает её. */
   const renderIdeas = () => {
     if (isPendingDateHydration) return null;
-    if (awaitingAgeAnswer) {
-      return <PlanNeedsAgeQuestion onConfirm={handleAgeAnswerConfirm} onCancel={handleAgeAnswerCancel} compact />;
-    }
-    const linkClass =
-      "flex min-h-12 w-full items-center justify-center gap-[7px] rounded-xl bg-primary px-4 text-[15px] font-bold text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-60";
-    if (!hasRequestedSuggestions) {
-      return (
-        <button type="button" className={linkClass} onClick={handleDecideClick}>
-          Подобрать, куда сходить
-        </button>
-      );
-    }
-    const exhausted = suggestionsGeneration >= MAX_SUGGESTION_BATCHES;
     return (
-      <section
-        id="plan-recommendation-results"
-        className="rounded-[20px] border-[1.5px] border-dashed border-[var(--mp-line-strong)] px-3.5 pb-1 pt-3.5 outline-none"
-        {...PLAN_RECOMMENDATION_RESULTS_A11Y}
+      <button
+        type="button"
+        onClick={openPicks}
+        className="group flex min-h-[76px] w-full items-center gap-3.5 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-3 pl-3.5 pr-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
-        <div className="mb-1.5 flex items-baseline justify-between">
-          <b className="text-base font-bold text-[var(--mp-tx)]">Идеи на {isTodaySelected ? "сегодня" : "этот день"}</b>
-          <span className="text-[12.5px] font-semibold text-[var(--mp-tx2)]">от mamaGo</span>
-        </div>
-        {isFetchingSuggestions ? (
-          <div className="space-y-2 pb-3 pt-1" aria-busy>
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-[52px] animate-pulse rounded-xl bg-[var(--surface-hover)]" />
-            ))}
-          </div>
-        ) : suggestionsError ? (
-          <div className="pb-2 pt-1 text-[15px] leading-6 text-[var(--mp-tx2)]">
-            Не получилось загрузить идеи.{" "}
-            <button
-              type="button"
-              onClick={() => void handleFetchSuggestions(lastRequestSnapshotRef.current)}
-              className="font-bold text-[var(--mp-ac-dark)] underline underline-offset-[3px]"
-            >
-              Попробовать снова
-            </button>
-          </div>
-        ) : suggestions.length === 0 ? (
-          <p className="pb-2 pt-1 text-[15px] leading-6 text-[var(--mp-tx2)]">
-            На эту дату подходящих событий пока нет.
-          </p>
-        ) : (
-          suggestions.map((activity, index) => (
-            <div
-              key={activity.id}
-              className={"grid grid-cols-[52px_1fr_44px] items-center gap-3 py-[9px] " + (index === 0 ? "" : "border-t border-[var(--mp-line)]")}
-            >
-              <div className="w-[52px]">
-                <MediaCover imageUrl={activity.coverImageUrl || undefined} alt={activity.title} ratio="1/1" className="rounded-xl shadow-none" />
-              </div>
-              <div className="min-w-0">
-                <div className="line-clamp-2 text-[14.5px] font-bold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">{activity.title}</div>
-                {ideaMeta(activity) ? <div className="mt-0.5 text-[13px] leading-[1.4] text-[var(--mp-tx2)]">{ideaMeta(activity)}</div> : null}
-              </div>
-              <button
-                type="button"
-                aria-label="Добавить в план"
-                disabled={addingActivityId === activity.id}
-                onClick={() => void handleAddSuggestionToPlan(activity)}
-                className="flex h-11 w-11 items-center justify-center rounded-full border-[1.5px] border-[var(--mp-line-strong)] text-[var(--mp-tx)] transition-colors hover:border-[var(--mp-ac)] hover:bg-[var(--mp-ac-soft)] hover:text-[var(--mp-ac-dark)] disabled:opacity-60"
-              >
-                <Plus className="h-[19px] w-[19px]" strokeWidth={2} aria-hidden />
-              </button>
-            </div>
-          ))
-        )}
-        {!isFetchingSuggestions ? (
-          <button
-            type="button"
-            className={linkClass}
-            onClick={exhausted ? handleOpenCatalog : handleRegenerate}
-          >
-            {exhausted ? "Открыть каталог" : "Подобрать ещё"}
-          </button>
-        ) : null}
-      </section>
+        <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full bg-[var(--mp-ac)] text-white">
+          <Search className="h-5 w-5" strokeWidth={1.8} aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Подобрать, куда сходить</span>
+          <span className="mt-[3px] block text-[13px] text-[var(--mp-tx2)]">Активности на {posterDayWord(selectedDate, todayKey)}</span>
+        </span>
+        <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--primary-hover)]" strokeWidth={1.8} aria-hidden />
+      </button>
     );
   };
 
-  const renderWeekTeaser = () => (
-    <section aria-label="На этой неделе" className="rounded-[18px] border border-[var(--mp-line)] bg-[var(--mp-card)] px-4 py-3.5">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[15px] font-bold text-[var(--mp-tx)]">На этой неделе</h2>
-        <button
-          type="button"
-          onClick={() => openNestedScreen("week")}
-          className="inline-flex min-h-10 items-center gap-1 text-[13px] font-semibold text-[var(--mp-ac-dark)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          Посмотреть все <ChevronRight className="h-4 w-4" aria-hidden />
-        </button>
-      </div>
-      <p className="mt-0.5 text-[13px] text-[var(--mp-tx2)]">
-        {currentWeekCount === 0 ? "Нет событий" : `${currentWeekCount} ${pluralRu(currentWeekCount, ["событие", "события", "событий"])}`}
-      </p>
-    </section>
-  );
+  /** Запрос подборки с экрана подборки: свой возраст важнее состава, «Для всех» = возраст «Любой». */
+  const refetchPicks = (ids: string[], ages: string[]) => {
+    if (ages.length > 0) {
+      void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(ages, ids));
+      return;
+    }
+    if (ids.length === 0) {
+      handleDecideClick();
+      return;
+    }
+    const childIds = personas.filter((persona) => persona.kind === "child" && ids.includes(persona.id)).map((persona) => persona.id);
+    const derived = childIds.length === 0 ? ["18+"] : deriveAgeRangesFromChildren(childrenList, childIds).map((item) => item.range);
+    void handleFetchSuggestions(createPlanSuggestionAudienceSnapshot(derived, ids));
+  };
+
+  const handlePicksPeople = (id: string | null) => {
+    const next = id === null ? [] : picksPeople.includes(id) ? picksPeople.filter((x) => x !== id) : [...picksPeople, id];
+    setPicksPeople(next);
+    if (id === null) setPicksAges([]);
+    refetchPicks(next, id === null ? [] : picksAges);
+  };
+
+  const handlePicksAge = (value: string) => {
+    const next = toggleAgeRangeSelection(picksAges, value);
+    setPicksAges(next);
+    refetchPicks(picksPeople, next);
+  };
+
+  const handlePicksResetAges = () => {
+    setPicksAges([]);
+    refetchPicks(picksPeople, []);
+  };
 
   const renderBottomActions = () => (
     <div className="space-y-3">
@@ -1474,15 +1448,57 @@ export function PlanMainContent({
           }
         />
       ) : null}
-      <nav aria-label="Разделы моего плана" className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 border-t border-[var(--mp-line)] pt-4">
-        <button type="button" onClick={handleOpenMyIdeas} className="min-h-11 text-[14px] font-semibold text-[var(--mp-tx2)] hover:text-[var(--mp-ac-dark)]">
-          {ideasCount ? `Мои идеи · ${ideasCount}` : "Мои идеи"}
-        </button>
-        <button type="button" onClick={() => openNestedScreen("visits")} className="min-h-11 text-[14px] font-semibold text-[var(--mp-tx2)] hover:text-[var(--mp-ac-dark)]">
-          Где мы были
+      <div className="flex items-center gap-3.5 pt-2" aria-hidden>
+        <i className="h-px flex-1 bg-[var(--mp-line-strong)]" />
+        <span className="mp-font-display text-[18px] italic text-[var(--mp-tx2)]">или без даты</span>
+        <i className="h-px flex-1 bg-[var(--mp-line-strong)]" />
+      </div>
+      <nav aria-label="Разделы моего плана">
+        {ideasCount ? (
+          <button
+            type="button"
+            onClick={handleOpenMyIdeas}
+            className="group flex min-h-[76px] w-full items-center gap-3.5 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-3 pl-3.5 pr-4 text-left transition-colors hover:border-[var(--mp-tx)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)]">
+              <Heart className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Мои идеи · {ideasCount}</span>
+              <span className="mt-[3px] block text-[13px] text-[var(--mp-tx2)]">Поставьте на свободный день</span>
+            </span>
+            <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--mp-ac-dark)]" strokeWidth={1.8} aria-hidden />
+          </button>
+        ) : (
+          <div className="flex min-h-[76px] w-full items-center gap-3.5 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-3 pl-3.5 pr-4">
+            <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)]">
+              <Bookmark className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Идей пока нет</span>
+              <span className="mt-[3px] block text-[13px] text-[var(--mp-tx2)]">Сохраняйте места из афиши без даты</span>
+            </span>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => openNestedScreen("visits")}
+          className="mx-auto mt-[22px] block min-h-11 px-3 text-center text-[13px] font-medium text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          История визитов →
         </button>
       </nav>
     </div>
+  );
+
+  /** Заголовок недели и карточка оценки визита — верх экрана по макету v3. */
+  const renderHead = () => (
+    <>
+      <p className="m-0 mb-[18px] text-[22px] font-bold leading-[1.15] tracking-[-.01em] text-[var(--mp-tx)] [text-wrap:pretty]">
+        {currentWeekCount > 0 ? "Что у нас на неделе?" : "Неделя пока свободна"}
+      </p>
+      <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} onOpenVisits={() => openNestedScreen("visits")} />
+    </>
   );
 
   // Свои дела и записи Telegram используют одну форму даты/времени; каталог — расписание.
@@ -1522,18 +1538,18 @@ export function PlanMainContent({
   const planContent = isDesktop ? (
       <div className="relative flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
         <div className="sticky top-0 z-20 flex-shrink-0">
-          <MyPlanHeader onClose={onRequestClose} />
+          <MyPlanHeader onClose={onRequestClose} tight />
         </div>
 
         <div
           id="my-plan-recommendations"
-          className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[var(--mp-bg)] px-8 pb-28 pt-1"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[var(--mp-bg)] px-8 pb-28 pt-0"
         >
+          {renderHead()}
+
           {planCalendar}
 
           {renderPersonFilter(false)}
-
-          {selectedDate === todayKey ? <PlanDayBar items={dayItemsSorted} /> : null}
 
           {isPastDay ? (
             renderPastDay(false)
@@ -1542,10 +1558,8 @@ export function PlanMainContent({
               {renderDayList(false)}
               {renderOwnIdeas()}
               {renderIdeas()}
-              {renderWeekTeaser()}
             </>
           )}
-          <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
           {!isPastDay ? renderBottomActions() : null}
         </div>
 
@@ -1588,18 +1602,18 @@ export function PlanMainContent({
   ) : (
     <div className="relative flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
       <div className="flex-shrink-0">
-        <MyPlanHeader onClose={onRequestClose} compact />
+        <MyPlanHeader onClose={onRequestClose} compact tight />
       </div>
 
       <div
         id="my-plan-recommendations"
-        className="flex-1 space-y-5 overflow-y-auto bg-[var(--mp-bg)] px-5 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4"
+        className="flex-1 space-y-5 overflow-y-auto bg-[var(--mp-bg)] px-5 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-0"
       >
+        {renderHead()}
+
         {planCalendar}
 
         {renderPersonFilter(true)}
-
-        {selectedDate === todayKey ? <PlanDayBar items={dayItemsSorted} /> : null}
 
         {isPastDay ? (
           renderPastDay(true)
@@ -1608,10 +1622,8 @@ export function PlanMainContent({
             {renderDayList(true)}
             {renderOwnIdeas()}
             {renderIdeas()}
-            {renderWeekTeaser()}
           </>
         )}
-        <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} />
           {!isPastDay ? renderBottomActions() : null}
       </div>
 
@@ -1744,14 +1756,69 @@ export function PlanMainContent({
             />
           ) : mountedNestedScreen === "visits" ? (
             <PlanVisitsScreen key={nestedScreenVersion} onBack={closeNestedScreen} />
-          ) : mountedNestedScreen === "week" ? (
-            <PlanWeekScreen
+          ) : mountedNestedScreen === "picks" ? (
+            <PlanPicksScreen
               key={nestedScreenVersion}
-              items={visibleCurrentWeekItems}
+              title={`Куда сходить ${(() => {
+                if (selectedDate === todayKey) return "сегодня";
+                if (selectedDate === addDaysIso(todayKey, 1)) return "завтра";
+                const weekday = weekdayForNa(new Date(`${selectedDate}T12:00:00`));
+                return `${weekday.startsWith("вторник") ? "во" : "в"} ${weekday}`;
+              })()}`}
+              meta={(() => {
+                const date = new Date(`${selectedDate}T12:00:00`);
+                const weekday = date.toLocaleDateString("ru-RU", { weekday: "long" });
+                return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${date.toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}`;
+              })()}
+              people={personas.map((persona) => ({
+                id: persona.id,
+                label: persona.kind === "adult" ? "Я" : persona.displayName?.trim() || "Ребёнок",
+              }))}
+              selectedPeopleIds={picksPeople}
+              onTogglePerson={handlePicksPeople}
+              ageOptions={AGE_GROUPS.filter((group) => group.value !== "18+").map((group) => ({ value: group.value, label: group.label }))}
+              selectedAges={picksAges}
+              onToggleAge={handlePicksAge}
+              onResetAges={handlePicksResetAges}
+              suggestions={suggestions}
+              loading={isFetchingSuggestions}
+              failed={suggestionsError}
+              addingActivityId={addingActivityId}
+              metaFor={ideaMeta}
+              ageQuestion={
+                awaitingAgeAnswer ? (
+                  <PlanNeedsAgeQuestion
+                    onConfirm={handleAgeAnswerConfirm}
+                    onCancel={() => {
+                      handleAgeAnswerCancel();
+                      closeNestedScreen();
+                    }}
+                  />
+                ) : null
+              }
+              exhausted={suggestionsGeneration >= MAX_SUGGESTION_BATCHES}
+              onAdd={(activity) => void handleAddSuggestionToPlan(activity)}
+              onRetry={() => void handleFetchSuggestions(lastRequestSnapshotRef.current)}
+              onMore={handleRegenerate}
+              onOpenCatalog={handleOpenCatalog}
               onBack={closeNestedScreen}
-              onSelectDate={(date) => {
+              onClose={onRequestClose}
+            />
+          ) : mountedNestedScreen === "month" ? (
+            <PlanMonthScreen
+              key={nestedScreenVersion}
+              today={todayKey}
+              selected={selectedDate}
+              onBack={closeNestedScreen}
+              onClose={onRequestClose}
+              onOpenDay={(date) => {
                 onChangeDate?.(date);
                 closeNestedScreen();
+              }}
+              onAddOnDay={(date) => {
+                onChangeDate?.(date);
+                setEditingNote(null);
+                openNestedScreen("new");
               }}
             />
           ) : null}

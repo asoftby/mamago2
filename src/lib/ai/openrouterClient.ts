@@ -77,7 +77,7 @@ export function readCaptureModelConfig(env: Record<string, string | undefined> =
 
 type RawResponse = {
   model?: unknown;
-  choices?: Array<{ message?: { content?: unknown } }>;
+  choices?: Array<{ finish_reason?: unknown; message?: { content?: unknown } }>;
   usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
 };
 
@@ -135,8 +135,16 @@ export function createOpenRouterClient(deps: OpenRouterClientDeps = {}) {
       }
 
       const payload = (await response.json().catch(() => null)) as RawResponse | null;
-      const content = payload?.choices?.[0]?.message?.content;
+      const choice = payload?.choices?.[0];
+      const content = choice?.message?.content;
+      // A length-limited response is frequently incomplete JSON. Reject it
+      // before domain parsing, without logging any provider/user content.
+      if (choice?.finish_reason === "length") {
+        console.error("[openrouter] reason=OUTPUT_TRUNCATED");
+        return { ok: false, code: "OPENROUTER_BAD_RESPONSE", retryable: true };
+      }
       if (typeof content !== "string" || content.trim().length === 0) {
+        console.error("[openrouter] reason=EMPTY_OR_MALFORMED_CONTENT");
         return { ok: false, code: "OPENROUTER_BAD_RESPONSE", retryable: true };
       }
       return {

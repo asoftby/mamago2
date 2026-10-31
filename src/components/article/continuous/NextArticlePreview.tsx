@@ -60,11 +60,6 @@ export function NextArticlePreview({
               {excerpt.trim()}
             </p>
           ) : null}
-          {typeof readTimeMinutes === "number" ? (
-            <p className="mt-2 text-xs text-muted-foreground">
-              {readTimeMinutes} мин чтения
-            </p>
-          ) : null}
         </div>
       </div>
     </Link>

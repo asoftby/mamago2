@@ -30,6 +30,9 @@ const C = {
   bg: "#FFFFFF",
   paper: "#FAF7F1",
   ink: "#141210",
+  /** Выбранное состояние как в «Моём плане»: персиковый фон, оранжевая обводка, тёмный текст. */
+  peach: "#F7C3AD",
+  peachLine: "#F3A684",
   ink2: "#3A332B",
   ink3: "rgba(20,18,16,.55)",
   line: "rgba(20,18,16,.10)",
@@ -482,9 +485,9 @@ function DateSlider({ options, selISO, onSelect, sessionCountsByDate }: DateSlid
                 flexShrink: 0, scrollSnapAlign: "center",
                 width: 76, padding: "10px 8px 10px",
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-                background: isSel ? C.ink : C.paper,
-                color: isSel ? "#FAF7F1" : C.ink,
-                border: `1px solid ${isSel ? C.ink : C.line}`,
+                background: isSel ? C.peach : C.paper,
+                color: C.ink,
+                border: `1px solid ${isSel ? C.peachLine : C.line}`,
                 borderRadius: 14, cursor: "pointer",
                 transition: "all .15s", position: "relative",
                 fontFamily: "var(--font-sans)",
@@ -492,9 +495,9 @@ function DateSlider({ options, selISO, onSelect, sessionCountsByDate }: DateSlid
               onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.ink; }}
               onMouseLeave={(e) => { if (!isSel) e.currentTarget.style.borderColor = C.line; }}
             >
-              <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: isSel ? "rgba(250,247,241,.6)" : C.ink3 }}>{chip.dow}</span>
+              <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: C.ink3 }}>{chip.dow}</span>
               <span style={{ fontFamily: "var(--font-pt-serif), Georgia, serif", fontSize: 28, fontWeight: 400, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
-              <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 9, letterSpacing: ".08em", color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
+              <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 9, letterSpacing: ".08em", color: C.ink3 }}>{chip.month}</span>
               {dotsCount > 0 ? (
                 <span
                   aria-label={dotsLabel ?? undefined}
@@ -612,17 +615,17 @@ function ConfirmBar({ iso, time, onConfirm, label = "Сохранить" }: { is
   return (
     <div style={{
       marginTop: 14, padding: "14px 16px",
-      background: C.ink, color: "#FAF7F1", borderRadius: 14,
+      background: C.peach, color: C.ink, borderRadius: 14,
       display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14,
     }}>
       <div>
-        <div style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".1em", color: "rgba(250,247,241,.55)", marginBottom: 3 }}>● выбрано</div>
+        <div style={{ fontFamily: "var(--font-mono, ui-monospace)", textTransform: "uppercase" as const, fontSize: 10, letterSpacing: ".1em", color: C.ink3, marginBottom: 3 }}>● выбрано</div>
         <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.01em" }}>
           {DOW_FULL[chip.dow] ?? chip.dow},{" "}
           <span>{chip.day}</span>{" "}
           {RU_MONTHS_FULL[chip.monthIdx]}
           {time && (
-            <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 13, fontWeight: 500, color: "rgba(250,247,241,.75)", marginLeft: 6 }}>
+            <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 13, fontWeight: 500, color: C.ink2, marginLeft: 6 }}>
               · {time}
             </span>
           )}
@@ -696,7 +699,7 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 16, flexShrink: 0, transition: "all .15s",
           }}
-          onMouseEnter={(e) => { const b = e.currentTarget as HTMLElement; b.style.background = C.ink; b.style.color = "#FAF7F1"; b.style.borderColor = C.ink; }}
+          onMouseEnter={(e) => { const b = e.currentTarget as HTMLElement; b.style.background = C.peach; b.style.color = C.ink; b.style.borderColor = C.peachLine; }}
           onMouseLeave={(e) => { const b = e.currentTarget as HTMLElement; b.style.background = "transparent"; b.style.color = C.ink2; b.style.borderColor = C.line2; }}
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
@@ -729,18 +732,16 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
                 const isWeekend = chip.dow === "сб" || chip.dow === "вс";
                 const dowColor = isWeekend
                   ? "var(--primary)"
-                  : isSel
-                    ? "rgba(250,247,241,.55)"
-                    : C.ink3;
+                  : C.ink3;
                 return (
                   <button
                     key={iso}
                     onClick={() => onSelect(iso)}
                     style={{
                       padding: "10px 12px", borderRadius: 14,
-                      background: isSel ? C.ink : C.paper,
-                      color: isSel ? "#FAF7F1" : C.ink,
-                      border: `1px solid ${isSel ? C.ink : C.line}`,
+                      background: isSel ? C.peach : C.paper,
+                      color: C.ink,
+                      border: `1px solid ${isSel ? C.peachLine : C.line}`,
                       display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2,
                       minWidth: 64, cursor: "pointer", transition: "all .15s",
                       fontFamily: "var(--font-sans)",
@@ -750,7 +751,7 @@ function AllDatesDrawer({ options, selISO, onSelect, onBack }: AllDatesDrawerPro
                   >
                     <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase" as const, color: dowColor }}>{chip.dow}</span>
                     <span style={{ fontFamily: "var(--font-pt-serif), Georgia, serif", fontSize: 24, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
-                    <span style={{ fontSize: 11, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
+                    <span style={{ fontSize: 11, color: C.ink3 }}>{chip.month}</span>
                   </button>
                 );
               })}
@@ -1044,10 +1045,10 @@ function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onRe
         <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
           <span style={{
             display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "6px 12px", borderRadius: 99, background: C.ink, color: "#FAF7F1",
+            padding: "6px 12px", borderRadius: 99, background: C.peach, color: C.ink,
             fontSize: 12, fontWeight: 500,
           }}>
-            <CalIcon size={13} color="#FAF7F1" /> В плане · {planDateFmt}
+            <CalIcon size={13} color={C.ink} /> В плане · {planDateFmt}
           </span>
         </div>
       )}
@@ -1071,7 +1072,7 @@ function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onRe
           padding: "14px 14px 14px 16px",
           background: C.paper, border: `1px solid ${C.line}`, borderRadius: 14,
         }}>
-          <IcoCircle bg={C.ink} color="#FAF7F1"><CalIcon size={16} color="#FAF7F1" /></IcoCircle>
+          <IcoCircle bg={C.peach} color={C.ink}><CalIcon size={16} color={C.ink} /></IcoCircle>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-.005em", color: C.ink, display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" as const }}>
               {planDateFmt ?? "Дата не указана"}
@@ -1117,12 +1118,12 @@ function InPlanView({ planDate, planStartsAt, planItemId, onSwitchCalendar, onRe
       {/* Footer */}
       <div style={{ paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
         <button onClick={() => { window.location.href = "/me/plan"; }} style={{
-          width: "100%", height: 46, borderRadius: 999, background: C.ink, color: "#FAF7F1",
+          width: "100%", height: 46, borderRadius: 999, background: C.peach, color: C.ink,
           border: 0, fontSize: 13, fontWeight: 600,
           display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
           cursor: "pointer", fontFamily: "var(--font-sans)",
         }}>
-          Перейти в план <ExternalLinkIcon size={13} color="#FAF7F1" />
+          Перейти в план <ExternalLinkIcon size={13} color={C.ink} />
         </button>
         <div style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
           <button
@@ -1264,12 +1265,12 @@ function InIdeasView({ onRemoveIdea, onSchedule, onCollections, dateOptions }: {
       {/* Footer */}
       <div style={{ display: "flex", gap: 10, paddingTop: 14, borderTop: `1px solid ${C.line}` }}>
         <button onClick={() => { window.location.href = "/me/ideas"; }} style={{
-          flex: 1, height: 46, borderRadius: 999, background: C.ink, color: "#FAF7F1",
+          flex: 1, height: 46, borderRadius: 999, background: C.peach, color: C.ink,
           border: 0, fontSize: 13, fontWeight: 600,
           display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
           cursor: "pointer", fontFamily: "var(--font-sans)",
         }}>
-          Все мои идеи <ExternalLinkIcon size={13} color="#FAF7F1" />
+          Все мои идеи <ExternalLinkIcon size={13} color={C.ink} />
         </button>
       </div>
 
@@ -1293,7 +1294,7 @@ function InIdeasView({ onRemoveIdea, onSchedule, onCollections, dateOptions }: {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 16, flexShrink: 0, transition: "all .15s",
               }}
-              onMouseEnter={(e) => { const b = e.currentTarget as HTMLElement; b.style.background = C.ink; b.style.color = "#FAF7F1"; b.style.borderColor = C.ink; }}
+              onMouseEnter={(e) => { const b = e.currentTarget as HTMLElement; b.style.background = C.peach; b.style.color = C.ink; b.style.borderColor = C.peachLine; }}
               onMouseLeave={(e) => { const b = e.currentTarget as HTMLElement; b.style.background = "transparent"; b.style.color = C.ink2; b.style.borderColor = C.line2; }}
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
@@ -1325,16 +1326,16 @@ function InIdeasView({ onRemoveIdea, onSchedule, onCollections, dateOptions }: {
                       onClick={() => setSelISO(iso)}
                       style={{
                         padding: "10px 12px", borderRadius: 14,
-                        background: isSel ? C.ink : C.paper,
-                        color: isSel ? "#FAF7F1" : C.ink,
-                        border: `1px solid ${isSel ? C.ink : C.line}`,
+                        background: isSel ? C.peach : C.paper,
+                        color: C.ink,
+                        border: `1px solid ${isSel ? C.peachLine : C.line}`,
                         display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2,
                         minWidth: 64, cursor: "pointer", transition: "all .15s", fontFamily: "var(--font-sans)",
                       }}
                     >
-                      <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase" as const, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.dow}</span>
+                      <span style={{ fontFamily: "var(--font-mono, ui-monospace)", fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase" as const, color: C.ink3 }}>{chip.dow}</span>
                       <span style={{ fontFamily: "var(--font-pt-serif), Georgia, serif", fontSize: 24, lineHeight: 1, letterSpacing: "-.02em" }}>{chip.day}</span>
-                      <span style={{ fontSize: 11, color: isSel ? "rgba(250,247,241,.55)" : C.ink3 }}>{chip.month}</span>
+                      <span style={{ fontSize: 11, color: C.ink3 }}>{chip.month}</span>
                     </button>
                   );
                 })}
@@ -1427,7 +1428,7 @@ function EditorialView({
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {isSingleDate ? (
           <>
-            <OptRow num="01" iconEl={<IcoCircle bg={C.ink} color="#FAF7F1"><CalIcon size={17} color="#FAF7F1" /></IcoCircle>}
+            <OptRow num="01" iconEl={<IcoCircle bg={C.peach} color={C.ink}><CalIcon size={17} color={C.ink} /></IcoCircle>}
               title="На дату проведения" sub={fmtDateLong(eventPlanDateISO ?? "")}
               onClick={() => onPlan(eventPlanDateISO ?? "")} />
             <OptRow num="02" iconEl={<IcoCircle bg={C.bg} color={C.ink2} border={`1px solid ${C.line2}`}><CalIcon size={17} /></IcoCircle>}
@@ -1435,14 +1436,14 @@ function EditorialView({
               onClick={onSwitchCalendar} />
           </>
         ) : isLongRunning ? (
-          <OptRow num="01" iconEl={<IcoCircle bg={C.ink} color="#FAF7F1"><CalIcon size={17} color="#FAF7F1" /></IcoCircle>}
+          <OptRow num="01" iconEl={<IcoCircle bg={C.peach} color={C.ink}><CalIcon size={17} color={C.ink} /></IcoCircle>}
             title="Выбрать дату" sub={rangeLabel ?? "Выбрать дату посещения"}
             onClick={onSwitchCalendar} />
         ) : upcomingOptions.length > 0 ? (
           <>
             {upcomingOptions.slice(0, 2).map((iso, i) => (
               <OptRow key={iso} num={`0${i + 1}`}
-                iconEl={<IcoCircle bg={i === 0 ? C.ink : C.bg} color={i === 0 ? "#FAF7F1" : C.ink2} border={i === 0 ? undefined : `1px solid ${C.line2}`}><CalIcon size={17} color={i === 0 ? "#FAF7F1" : undefined} /></IcoCircle>}
+                iconEl={<IcoCircle bg={i === 0 ? C.peach : C.bg} color={i === 0 ? C.ink : C.ink2} border={i === 0 ? undefined : `1px solid ${C.line2}`}><CalIcon size={17} color={i === 0 ? C.ink : undefined} /></IcoCircle>}
                 title={i === 0 ? "Ближайшая дата" : "Следующая дата"} sub={fmtDateLong(iso)}
                 onClick={() => onPlan(iso)} />
             ))}
@@ -1455,7 +1456,7 @@ function EditorialView({
           </>
         ) : (
           <>
-            <OptRow num="01" iconEl={<IcoCircle bg={C.ink} color="#FAF7F1"><CalIcon size={17} color="#FAF7F1" /></IcoCircle>}
+            <OptRow num="01" iconEl={<IcoCircle bg={C.peach} color={C.ink}><CalIcon size={17} color={C.ink} /></IcoCircle>}
               title="Сегодня" sub={`В план на ${formatLocalPlanDate(todayISO, "ru-RU")}`}
               onClick={() => onPlan(todayISO)} />
             <OptRow num="02" iconEl={<IcoCircle bg={C.bg} color={C.ink2} border={`1px solid ${C.line2}`}><CalIcon size={17} /></IcoCircle>}
@@ -1512,13 +1513,13 @@ function ConfirmView({ scenario, isIdea, inPlan, planDate, onCommit }: {
             return (
               <button key={slot.id} onClick={() => setSelectedSlotId(slot.id)} style={{
                 display: "flex", alignItems: "center", gap: 12, padding: "14px 16px",
-                borderRadius: 16, border: `2px solid ${isSel ? C.ink : C.line}`,
-                background: isSel ? C.ink : C.paper, color: isSel ? "#FAF7F1" : C.ink,
+                borderRadius: 16, border: `2px solid ${isSel ? C.peachLine : C.line}`,
+                background: isSel ? C.peach : C.paper, color: C.ink,
                 fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 500,
                 cursor: "pointer", transition: "all .15s", textAlign: "left",
               }}>
-                <span style={{ width: 16, height: 16, borderRadius: 99, border: `2px solid ${isSel ? "#FAF7F1" : C.line2}`, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  {isSel && <span style={{ width: 8, height: 8, borderRadius: 99, background: "#FAF7F1" }} />}
+                <span style={{ width: 16, height: 16, borderRadius: 99, border: `2px solid ${isSel ? C.ink : C.line2}`, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {isSel && <span style={{ width: 8, height: 8, borderRadius: 99, background: C.ink }} />}
                 </span>
                 {slot.label}
               </button>
@@ -1537,13 +1538,13 @@ function ConfirmView({ scenario, isIdea, inPlan, planDate, onCommit }: {
         </button>
         <button onClick={handlePlan} disabled={!!inPlan} style={{
           flex: 1.2, height: 46, borderRadius: 999,
-          background: inPlan ? C.line : C.ink, color: inPlan ? C.ink3 : "#FAF7F1",
+          background: inPlan ? C.line : C.peach, color: inPlan ? C.ink3 : C.ink,
           border: 0, fontSize: 13, fontWeight: 600,
           display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
           cursor: inPlan ? "not-allowed" : "pointer", fontFamily: "var(--font-sans)",
         }}>
           {inPlan && planDate ? `На ${formatLocalPlanDate(planDate, "ru-RU")}` : "Добавить в план"}
-          {!inPlan && <ArrowIcon size={14} color="#FAF7F1" />}
+          {!inPlan && <ArrowIcon size={14} color={C.ink} />}
         </button>
       </div>
     </div>
