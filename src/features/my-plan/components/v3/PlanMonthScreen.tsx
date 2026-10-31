@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, ChevronDown, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, Plus } from "lucide-react";
 import {
   addDays,
   addMonths,
@@ -148,6 +148,7 @@ export function PlanMonthScreen({
     return { blocks: list, total: count };
   }, [items, from, monthEnd]);
 
+  const prevMonth = addMonths(monthStart, -1);
   const nextMonth = addMonths(monthStart, 1);
   const nextCount = cache[nextMonth.slice(0, 7)]?.length;
   const goMonth = (next: number) => {
@@ -274,27 +275,48 @@ export function PlanMonthScreen({
           })
         )}
 
-        {offset < MAX_MONTHS_AHEAD ? (
-          <button
-            type="button"
-            onClick={() => goMonth(offset + 1)}
-            className={cn("mt-[18px] flex min-h-[72px] w-full items-center gap-3 rounded-[22px] bg-[var(--mp-tx)] py-3 pl-5 pr-[18px] text-left text-white", PLAN_FOCUS)}
-          >
-            <span className="flex-1">
-              <span className={cn(CAPS, "block text-white/60")}>дальше</span>
-              <b className="mt-0.5 block text-[19px] font-semibold">
-                {monthName(nextMonth)[0]}
-                {monthName(nextMonth).slice(1).toLowerCase()} <span className="mp-font-display font-normal text-white/60">{yearOf(nextMonth)}</span>
-              </b>
-            </span>
-            <span className="mp-font-meta text-[12px] text-white/70">{nextCount === undefined ? "" : nextCount ? dela(nextCount) : "пока пусто"}</span>
-            <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
-          </button>
-        ) : (
-          <p className="mx-1 mt-5 text-center text-[14px] leading-[1.5] text-[var(--mp-tx2)]">
-            План можно составить на год вперёд. Прошедшие дела — в «Где мы были».
-          </p>
-        )}
+        <div className="mt-[18px] flex flex-col gap-2.5">
+          {offset > 0 ? (
+            <button
+              type="button"
+              onClick={() => goMonth(offset - 1)}
+              className={cn(
+                "flex min-h-[72px] w-full items-center gap-3 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-3 pl-[18px] pr-5 text-left text-[var(--mp-tx)] transition-colors hover:border-[var(--mp-tx)]",
+                PLAN_FOCUS,
+              )}
+            >
+              <ArrowLeft className="h-[18px] w-[18px] shrink-0" strokeWidth={2} aria-hidden />
+              <span className="flex-1">
+                <span className={cn(CAPS, "block")}>назад</span>
+                <b className="mt-0.5 block text-[19px] font-semibold">
+                  {monthName(prevMonth)[0]}
+                  {monthName(prevMonth).slice(1).toLowerCase()} <span className="mp-font-display font-normal text-[var(--mp-tx2)]">{yearOf(prevMonth)}</span>
+                </b>
+              </span>
+            </button>
+          ) : null}
+          {offset < MAX_MONTHS_AHEAD ? (
+            <button
+              type="button"
+              onClick={() => goMonth(offset + 1)}
+              className={cn("flex min-h-[72px] w-full items-center gap-3 rounded-[22px] bg-[var(--mp-tx)] py-3 pl-5 pr-[18px] text-left text-white", PLAN_FOCUS)}
+            >
+              <span className="flex-1">
+                <span className={cn(CAPS, "block text-white/60")}>дальше</span>
+                <b className="mt-0.5 block text-[19px] font-semibold">
+                  {monthName(nextMonth)[0]}
+                  {monthName(nextMonth).slice(1).toLowerCase()} <span className="mp-font-display font-normal text-white/60">{yearOf(nextMonth)}</span>
+                </b>
+              </span>
+              <span className="mp-font-meta text-[12px] text-white/70">{nextCount === undefined ? "" : nextCount ? dela(nextCount) : "пока пусто"}</span>
+              <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+            </button>
+          ) : (
+            <p className="mx-1 mt-2 text-center text-[14px] leading-[1.5] text-[var(--mp-tx2)]">
+              План можно составить на год вперёд. Прошедшие дела — в «Где мы были».
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
