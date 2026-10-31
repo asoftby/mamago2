@@ -171,7 +171,7 @@ export function PlanVisitsScreen({ onBack, onClose }: { onBack: () => void; onCl
             className={cn(
               "inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full border px-[18px] text-[14px] font-semibold transition-colors",
               onlySuper
-                ? "border-[var(--mp-chip-on-bg)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]"
+                ? "border-[var(--mp-chip-on-line)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]"
                 : "border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)] hover:border-[var(--mp-tx2)]",
             )}
           >
