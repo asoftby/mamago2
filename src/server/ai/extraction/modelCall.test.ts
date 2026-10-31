@@ -19,12 +19,14 @@ const fail = (code: Extract<OpenRouterCallResult, { ok: false }>["code"], retrya
 
 function setup(steps: Step[]) {
   const models: string[] = [];
+  const tokenLimits: Array<number | undefined> = [];
   const queue = [...steps];
   const usage: ExtractionUsage = { tokensIn: null, tokensOut: null, model: null };
   const call = createExtractionCall<string>({
     openrouter: {
       async chat(input) {
         models.push(input.model);
+        tokenLimits.push(input.maxTokens);
         const next = queue.shift();
         assert.ok(next, "unexpected extra model call");
         const result = typeof next === "function" ? next(input) : next;
@@ -37,7 +39,7 @@ function setup(steps: Step[]) {
     parse: (content) => (content.startsWith("good") ? { ok: true, value: content } : { ok: false }),
     usage,
   });
-  return { call, models, usage };
+  return { call, models, tokenLimits, usage };
 }
 
 async function main() {
@@ -56,6 +58,7 @@ async function main() {
     const out = await t.call.runWithRetry({ fast: "fast", strong: "strong" });
     assert.equal(out.ok, true);
     assert.deepEqual(t.models, ["fast", "fast"]);
+    assert.deepEqual(t.tokenLimits, [undefined, undefined]);
   }
 
   // Not configured is final and never retried.
@@ -80,6 +83,7 @@ async function main() {
     const out = await t.call.runWithRetry({ fast: "fast", strong: "strong" });
     assert.deepEqual(out, { ok: true, value: "good-3", escalation: "INVALID_JSON" });
     assert.deepEqual(t.models, ["fast", "fast", "strong"]);
+    assert.deepEqual(t.tokenLimits, [undefined, 4000, 4000]);
     assert.equal(t.usage.model, "strong");
     assert.equal(t.usage.tokensIn, 30);
   }
@@ -104,6 +108,7 @@ async function main() {
     const out = await t.call.runWithRetry({ fast: "fast", strong: "strong" });
     assert.deepEqual(out, { ok: false, reason: "INFRA", escalated: true, escalation: "BAD_RESPONSE" });
     assert.deepEqual(t.models, ["fast", "fast", "strong"]);
+    assert.deepEqual(t.tokenLimits, [undefined, 4000, 4000]);
   }
 
   // Bad provider response without a strong model is a plain INFRA failure.
