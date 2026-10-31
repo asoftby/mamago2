@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Send } from "lucide-react";
+import { Check, History, Send } from "lucide-react";
 import { PhoneVerificationModal } from "@/components/place/PhoneVerificationModal";
 import { MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH } from "@/lib/experience/feedback";
 import { toast } from "@/lib/toast";
@@ -31,22 +31,17 @@ type Current =
  * «Как вам прошедшее?» — один тап по лицу засчитывает визит (attendance = ATTENDED),
  * комментарий необязателен. Использует существующие /api/plan/experiences*.
  */
-export function PlanFeedbackCard({
-  feed,
+function FeedbackCard({
+  base,
+  feedbackV1,
   todayIso,
   onChanged,
 }: {
-  feed: PlanExperienceFeed | null;
+  base: Current;
+  feedbackV1: boolean;
   todayIso: string;
   onChanged: () => void;
 }) {
-  const pending = feed?.awaitingFeedback[0] ?? null;
-  const candidate = pending ? null : (feed?.pending[0] ?? null);
-  const base: Current | null = pending
-    ? { kind: "rate", experienceId: pending.id, title: pending.title, plannedDate: pending.plannedDate }
-    : candidate
-      ? { kind: "ask", planItemId: candidate.planItemId, title: candidate.title, plannedDate: candidate.plannedDate }
-      : null;
   // После тапа по лицу визит засчитан: карточка переходит в режим «оценка» без ожидания перезагрузки ленты.
   const [override, setOverride] = useState<Current | null>(null);
   const current = override ?? base;
@@ -58,7 +53,6 @@ export function PlanFeedbackCard({
   const [hidden, setHidden] = useState(false);
   const [saved, setSaved] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const feedbackV1 = feed?.feedbackV1Enabled === true;
 
   useEffect(() => () => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -140,11 +134,11 @@ export function PlanFeedbackCard({
 
   return (
     <>
-      <section className="mb-4 rounded-[20px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-4" aria-label="Как прошло?">
-        <p className="text-[13px] font-semibold text-[var(--mp-tx2)]">
-          {formatPlannedDay(current.plannedDate, todayIso)}
+      <section className="flex h-full min-h-[178px] flex-col gap-1.5 rounded-[24px] bg-[var(--mp-tx)] px-[18px] pb-4 pt-[18px] text-white shadow-[0_14px_30px_-16px_rgba(20,18,16,.55)]" aria-label="Как прошло?">
+        <p className="mp-font-meta text-[10px] font-medium uppercase tracking-[.12em] text-white/65">
+          Вы были · {formatPlannedDay(current.plannedDate, todayIso)}
         </p>
-        <h4 className="mb-3.5 mt-1 text-[17px] font-bold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">
+        <h4 className="mb-2 text-[17px] font-semibold leading-[1.25] tracking-[-.01em] text-white">
           Как вам {current.title}?
         </h4>
         <div className="grid grid-cols-3 gap-2" role="group" aria-label="Оценка">
@@ -156,13 +150,13 @@ export function PlanFeedbackCard({
               aria-pressed={picked === face.sentiment}
               onClick={() => void pick(face.sentiment)}
               className={cn(
-                "flex h-[76px] flex-col items-center justify-center gap-1.5 rounded-2xl border-[1.5px] text-[13.5px] font-bold transition-colors disabled:opacity-60",
+                "flex h-[60px] flex-col items-center justify-center gap-[3px] rounded-2xl border-[1.5px] text-[13px] font-semibold lowercase transition-colors disabled:opacity-60",
                 picked === face.sentiment
-                  ? "border-[var(--mp-tx)] bg-white text-[var(--mp-tx)]"
-                  : "border-transparent bg-[var(--mp-bg)] text-[var(--mp-tx2)] hover:bg-[var(--mp-soft)]",
+                  ? "border-[var(--mp-ac)] bg-white text-[var(--mp-tx)]"
+                  : "border-transparent bg-white/80 text-[var(--mp-tx)] hover:bg-white/95",
               )}
             >
-              <span className="text-[var(--mp-tx)]"><PlanFace mouth={face.mouth} size={30} /></span>
+              <span className="text-[var(--mp-tx)]"><PlanFace mouth={face.mouth} size={24} /></span>
               {face.label}
             </button>
           ))}
@@ -170,12 +164,12 @@ export function PlanFeedbackCard({
 
         {counted ? (
           <>
-            <span className="mt-3 inline-flex h-[34px] items-center gap-1.5 rounded-full bg-[var(--success-soft)] px-3 text-[13.5px] font-bold text-[var(--success-hover)]">
+            <span className="mt-2 inline-flex h-[34px] items-center gap-1.5 self-start rounded-full bg-[var(--success-soft)] px-3 text-[13.5px] font-bold text-[var(--success-hover)]">
               <Check className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />
               Визит засчитан
             </span>
             {feedbackV1 && saved ? (
-              <p role="status" className="mt-3 text-[13px] font-semibold text-[var(--mp-tx)]">Оценка сохранена. Комментарий необязателен.</p>
+              <p role="status" className="mt-3 text-[13px] font-semibold text-white">Оценка сохранена. Комментарий необязателен.</p>
             ) : null}
             <div className="relative mt-3 w-full">
               <input
@@ -189,7 +183,7 @@ export function PlanFeedbackCard({
                 maxLength={MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH}
                 placeholder="Пару слов? Можно пропустить"
                 aria-label="Комментарий о посещении"
-                className="h-12 w-full min-w-0 rounded-[14px] border border-[var(--mp-line)] bg-[var(--mp-bg)] py-2 pl-3.5 pr-14 text-[15px] text-[var(--mp-tx)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--mp-line-strong)] focus:bg-white"
+                className="h-12 w-full min-w-0 rounded-[14px] border border-transparent bg-white py-2 pl-3.5 pr-14 text-[15px] text-[var(--mp-tx)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--mp-line-strong)] focus:bg-white"
               />
               <button
                 type="button"
@@ -204,12 +198,12 @@ export function PlanFeedbackCard({
             </div>
           </>
         ) : (
-          <div className="mt-1 text-center">
+          <div className="text-center">
             <button
               type="button"
               disabled={busy}
               onClick={() => void skip()}
-              className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-[15px] font-bold text-[var(--mp-tx2)] transition-colors hover:text-[var(--mp-tx)]"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-[13.5px] font-medium text-white/75 underline decoration-white/35 underline-offset-[3px] transition-colors hover:text-white"
             >
               Мы не ходили
             </button>
@@ -226,5 +220,81 @@ export function PlanFeedbackCard({
         }}
       />
     </>
+  );
+}
+
+const MAX_CARDS = 5;
+
+/**
+ * Лента карточек «Как вам …?» (по одной на визит, ждущий оценки) + карточка «Все визиты».
+ * Точки под лентой показывают текущую карточку.
+ */
+export function PlanFeedbackCard({
+  feed,
+  todayIso,
+  onChanged,
+  onOpenVisits,
+}: {
+  feed: PlanExperienceFeed | null;
+  todayIso: string;
+  onChanged: () => void;
+  onOpenVisits: () => void;
+}) {
+  const [hidden, setHidden] = useState<string[]>([]);
+  const [index, setIndex] = useState(0);
+  const cards: Array<{ id: string; base: Current }> = [
+    ...(feed?.awaitingFeedback ?? []).map((row) => ({
+      id: `r:${row.id}`,
+      base: { kind: "rate", experienceId: row.id, title: row.title, plannedDate: row.plannedDate } as Current,
+    })),
+    ...(feed?.pending ?? []).map((row) => ({
+      id: `a:${row.planItemId}`,
+      base: { kind: "ask", planItemId: row.planItemId, title: row.title, plannedDate: row.plannedDate } as Current,
+    })),
+  ]
+    .filter((card) => !hidden.includes(card.id))
+    .slice(0, MAX_CARDS);
+  if (cards.length === 0) return null;
+  const feedbackV1 = feed?.feedbackV1Enabled === true;
+
+  return (
+    <div className="mb-3">
+      <div
+        onScroll={(event) => setIndex(Math.round(event.currentTarget.scrollLeft / 310))}
+        className="-mx-5 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-5 [scrollbar-width:none] md:-mx-0 md:px-0 [&::-webkit-scrollbar]:hidden"
+      >
+        {cards.map((card) => (
+          <div key={card.id} className="w-[300px] shrink-0 snap-start scroll-ml-5">
+            <FeedbackCard
+              base={card.base}
+              feedbackV1={feedbackV1}
+              todayIso={todayIso}
+              onChanged={() => {
+                setHidden((list) => [...list, card.id]);
+                onChanged();
+              }}
+            />
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={onOpenVisits}
+          className="flex w-[150px] shrink-0 snap-start flex-col items-start justify-center gap-2 rounded-[24px] border border-[var(--mp-line)] bg-[var(--mp-card)] px-[18px] py-4 text-left transition-colors hover:border-[var(--mp-tx)]"
+        >
+          <span className="flex h-[50px] w-[50px] items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)]">
+            <History className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden />
+          </span>
+          <b className="text-[15px] font-semibold text-[var(--mp-tx)]">Все визиты</b>
+          <span className="mp-font-meta text-[11px] text-[var(--mp-tx2)]">история →</span>
+        </button>
+      </div>
+      {cards.length > 1 ? (
+        <div className="mt-3 flex justify-center gap-[5px]" aria-hidden>
+          {cards.map((card, i) => (
+            <i key={card.id} className={cn("h-1.5 rounded-full transition-all", i === index ? "w-[22px] bg-[var(--mp-tx)]" : "w-1.5 bg-[var(--mp-line-strong)]")} />
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }

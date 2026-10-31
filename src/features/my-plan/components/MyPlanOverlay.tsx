@@ -6,6 +6,7 @@ import { MyPlanPanelContent } from "./MyPlanPanelContent";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { MY_PLAN_V3_TOKENS } from "./v3/myPlanV3Tokens";
+import { MY_PLAN_V3_SHEET_TOKENS } from "./v3/myPlanV3Tokens";
 
 
 
@@ -75,7 +76,7 @@ export function MyPlanOverlay({ open, onOpenChange }: MyPlanOverlayProps) {
       bodyClassName="min-h-0 overflow-hidden"
     >
       <div
-        style={MY_PLAN_V3_TOKENS}
+        style={{ ...MY_PLAN_V3_TOKENS, ...MY_PLAN_V3_SHEET_TOKENS }}
         className={cn(
           "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--mp-bg)] text-[var(--mp-tx)]",
           "animate-in fade-in-0 duration-150",

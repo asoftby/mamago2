@@ -37,3 +37,11 @@ export const MY_PLAN_V3_TOKENS = {
   "--plan-accent-ink": "var(--brand-active)",
   "--plan-on-ink": "var(--surface)",
 } as CSSProperties;
+
+/** Белый лист модалки: карточки — «бумажные» (--surface-subtle), как в макете v3. Только внутри оверлея. */
+export const MY_PLAN_V3_SHEET_TOKENS = {
+  "--mp-bg": "var(--surface)",
+  "--mp-card": "var(--surface-subtle)",
+  "--plan-cell": "var(--surface-subtle)",
+  "--plan-surface": "var(--surface-subtle)",
+} as CSSProperties;

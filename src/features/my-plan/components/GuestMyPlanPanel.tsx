@@ -513,7 +513,7 @@ export function GuestMyPlanPanel({
     cn(
       "inline-flex h-11 items-center gap-1.5 rounded-full border px-4 text-[15px] font-semibold transition-colors",
       on
-        ? "border-[var(--mp-tx)] bg-[var(--mp-tx)] text-white"
+        ? "border-[var(--mp-chip-on-line)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]"
         : "border-[var(--mp-line)] bg-[var(--mp-card)] text-[var(--mp-tx)] hover:border-[var(--mp-line-strong)]",
     );
   const primaryBtn =
@@ -599,7 +599,7 @@ export function GuestMyPlanPanel({
                   onClick={() => setWhenChoice(o.key)}
                   className={cn(
                     "flex min-h-[66px] flex-col items-start justify-center rounded-2xl border px-3 py-2.5 text-left transition-colors",
-                    on ? "border-[var(--mp-tx)] bg-[var(--mp-tx)] text-white" : "border-[var(--mp-line)] bg-[var(--mp-card)] hover:border-[var(--mp-line-strong)]",
+                    on ? "border-[var(--mp-chip-on-line)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]" : "border-[var(--mp-line)] bg-[var(--mp-card)] hover:border-[var(--mp-line-strong)]",
                   )}
                 >
                   <b className="text-[15px] font-bold">{o.label}</b>

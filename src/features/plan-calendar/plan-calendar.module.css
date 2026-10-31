@@ -223,3 +223,52 @@ button.monthLabel:hover { color: var(--plan-ink); }
 .strip::-webkit-scrollbar { display: none; }
 .stripItem { flex: 0 0 calc(100% / 7); min-width: 0; padding: 0 2px; scroll-snap-align: start; box-sizing: border-box; }
 .stripItem .cell { width: 100%; }
+
+/* ---- widget («Мой план» v3): month heading + paper tiles on a white sheet ---- */
+.widget .header { margin: 18px 2px 12px; gap: 12px; }
+.widget .monthLabel {
+  display: inline-block;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 25px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  text-transform: lowercase;
+  color: var(--plan-ink);
+}
+.widget .monthLabel::first-letter { text-transform: uppercase; }
+.widget .rule { background: transparent; }
+.widget .todayPill {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-color: var(--plan-ink);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: background-color 0.15s, color 0.15s;
+}
+.widget .todayPill:hover:not(:disabled) { background: var(--plan-ink); color: var(--plan-on-ink); }
+.widget .todayPill:disabled { border-color: var(--plan-line); opacity: 0.6; }
+.widget .cell,
+.widget .cellMobile {
+  height: 104px;
+  padding: 0;
+  gap: 3px;
+  justify-content: center;
+  border-radius: 20px;
+  border: 1px solid var(--plan-line);
+  background: var(--plan-cell);
+}
+.widget .cell:hover { border-color: var(--plan-line); }
+.widget .cell.selected { background: var(--plan-ink); border-color: var(--plan-ink); }
+.widget .cell.today:not(.selected) { border: 1.5px solid var(--plan-ink); box-shadow: none; }
+.widget .cell.today:not(.selected) .num,
+.widget .cell.today:not(.selected) .dow { color: var(--plan-ink); }
+.widget .dow { font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; }
+.widget .num { font-size: 38px; line-height: 1.05; }
+.widget .dots { height: 14px; }
+.widget .dot { width: 6px; height: 6px; }
+.widget .arrow { background: #fff; border-color: var(--plan-line); box-shadow: 0 4px 12px -4px rgba(20, 18, 16, 0.2); }
+.widget .cellMobile { height: 92px; }
