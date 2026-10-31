@@ -1166,19 +1166,23 @@ export function PlanMainContent({
     return label;
   })();
   /** «Для всех» / «Для меня» / «Для Степана» — справа от заголовка дня. */
-  const audienceLabel = !filteredAudience
-    ? "Для всех"
-    : filterPerson
-      ? filterPerson.kind === "adult" && personShortName(filterPerson) === "Я"
-        ? "Для меня"
-        : `Для ${toGenitiveName(personShortName(filterPerson))}`
-      : "Для выбранных";
-  const renderDayHeading = (compact: boolean) => (
-    <div className={(compact ? "mb-3" : "mb-2.5") + " mx-0.5 mt-1 flex items-baseline justify-between gap-3"}>
-      <h3 className="m-0 text-[18px] font-semibold tracking-[-.01em] text-[var(--mp-tx)]">{dayContextLabel}</h3>
-      <span className="shrink-0 text-[13px] text-[var(--mp-tx2)]">{audienceLabel}</span>
-    </div>
-  );
+  const renderDayHeading = (compact: boolean) => {
+    const included = includedPeople
+      .map((token) => personFilterOptions.find((option) => option.value === token)?.label)
+      .filter((label): label is string => Boolean(label))
+      .map((label) => (label === "Я" ? "меня" : toGenitiveName(label)));
+    const audienceLabel = !filteredAudience
+      ? "Для всех"
+      : excludedPeople.length === 0 && planVisibilityFilter === "ALL" && included.length > 0 && included.length <= 3
+        ? `Для ${joinNamesRu(included)}`
+        : "Для выбранных";
+    return (
+      <div className={(compact ? "mb-3" : "mb-2.5") + " mx-0.5 mt-1 flex items-baseline justify-between gap-3"}>
+        <h3 className="m-0 text-[18px] font-semibold tracking-[-.01em] text-[var(--mp-tx)]">{dayContextLabel}</h3>
+        <span className="min-w-0 truncate text-right text-[13px] text-[var(--mp-tx2)]">{audienceLabel}</span>
+      </div>
+    );
+  };
 
   const personFilterOptions = planPersonFilterOptions([
     ...familyAdults.map(adult => ({
