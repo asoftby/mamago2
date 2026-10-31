@@ -65,7 +65,7 @@ console.log("offerWizardV2Steps contract tests passed");
   assert.match(method, /не создают доступные для бронирования слоты/);
   assert.match(method, /По заявке.*не подтверждает свободное время автоматически/);
   const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.tsx", "utf8");
-  assert.match(wizard, /<BookingServicesEditor offerId=\\{offerId\\}/);
+  assert.ok(wizard.includes("<BookingServicesEditor offerId={offerId}"));
   const classSchedule = readFileSync("src/components/business/wizard/offer/steps/StepClassSchedule.tsx", "utf8");
-  assert.match(classSchedule, /classSchedule\\.groups\\.map/);
+  assert.ok(classSchedule.includes("classSchedule.groups.map"));
 }
