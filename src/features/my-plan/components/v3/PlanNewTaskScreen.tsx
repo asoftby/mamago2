@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, ChevronLeft, ChevronRight, Check, Clock3, Mic, Users } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Bell, ChevronLeft, ChevronRight, Clock3, Plus, Users, X } from "lucide-react";
 import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -14,12 +14,7 @@ import {
   PLAN_CHIP_OFF,
   PLAN_CHIP_ON,
   PLAN_FOCUS,
-  PLAN_SEG,
-  PLAN_SEG_BTN,
-  PLAN_SEG_OFF,
-  PLAN_SEG_ON,
 } from "./planChipStyles";
-import { PlanScreenTitleHead } from "./PlanScreenTitleHead";
 import { planParticipantPalette } from "../PlanParticipantChip";
 
 export type PlanNewTaskPerson = { id: string; name: string; kind: "adult" | "child" };
@@ -32,6 +27,92 @@ const REMIND_OPTIONS: Array<{ minutes: number | null; label: string }> = [
   { minutes: 120, label: "За 2 часа" },
   { minutes: 1440, label: "За день" },
 ];
+
+/** Единицы своего напоминания: максимум 4 недели (как на сервере). */
+const LEAD_UNITS = [
+  { key: "minutes", max: 59, forms: ["минуту", "минуты", "минут"] },
+  { key: "hours", max: 23, forms: ["час", "часа", "часов"] },
+  { key: "days", max: 28, forms: ["день", "дня", "дней"] },
+  { key: "weeks", max: 4, forms: ["неделю", "недели", "недель"] },
+] as const;
+
+function leadPlural(n: number, forms: readonly [string, string, string]): string {
+  const m = n % 10;
+  const h = n % 100;
+  return m === 1 && h !== 11 ? forms[0] : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? forms[1] : forms[2];
+}
+
+const WHEEL_ROW = 40;
+
+/** Колесо выбора: прокрутка с примагничиванием, значение под подсветкой посередине. */
+function Wheel({
+  items,
+  value,
+  onChange,
+  label,
+  className,
+}: {
+  items: string[];
+  value: number;
+  onChange: (index: number) => void;
+  label: string;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const timer = useRef<number | undefined>(undefined);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && Math.round(el.scrollTop / WHEEL_ROW) !== value) el.scrollTop = value * WHEEL_ROW;
+  }, [value, items.length]);
+  const onScroll = () => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      const el = ref.current;
+      if (!el) return;
+      const index = Math.max(0, Math.min(items.length - 1, Math.round(el.scrollTop / WHEEL_ROW)));
+      if (index !== value) onChange(index);
+    }, 90);
+  };
+  return (
+    <div
+      ref={ref}
+      role="listbox"
+      aria-label={label}
+      tabIndex={0}
+      onScroll={onScroll}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          onChange(Math.min(items.length - 1, value + 1));
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          onChange(Math.max(0, value - 1));
+        }
+      }}
+      className="relative h-[200px] snap-y snap-mandatory overflow-y-auto outline-none [mask-image:linear-gradient(transparent,#000_35%,#000_65%,transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <div className="py-[80px]">
+        {items.map((text, index) => (
+          <button
+            key={index}
+            type="button"
+            role="option"
+            aria-selected={index === value}
+            onClick={() => onChange(index)}
+            className={cn(
+              "block h-10 w-full snap-center text-[18px] tabular-nums",
+              index === value ? "font-bold text-[var(--mp-tx)]" : "font-medium text-[var(--mp-tx2)]",
+              className,
+            )}
+          >
+            {text}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const WD = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
 type RepeatFrequency = "NONE" | "DAILY" | "WEEKLY" | "MONTHLY";
@@ -50,6 +131,15 @@ function addDays(dateIso: string, n: number): string {
   const dt = new Date(y!, m! - 1, d! + n);
   return iso(dt.getFullYear(), dt.getMonth(), dt.getDate());
 }
+function weekdayLong(dateIso: string): string {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  const name = new Date(y!, m! - 1, d!).toLocaleDateString("ru-RU", { weekday: "long" });
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+function weekdayShort(dateIso: string): string {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  return new Date(y!, m! - 1, d!).toLocaleDateString("ru-RU", { weekday: "short" });
+}
 function maskTime(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 4);
   return digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits;
@@ -59,7 +149,7 @@ function longDay(dateIso: string): string {
   return new Date(y!, m! - 1, d!).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 }
 
-const SECTION_LABEL = "mp-font-ui mb-[9px] text-[15px] font-bold text-[var(--mp-tx)]";
+const SECTION_LABEL = "mp-font-ui mx-0.5 mb-2.5 text-[15px] font-semibold tracking-[-.01em] text-[var(--mp-tx)]";
 
 /**
  * «Новое дело» в той же шторке: текст → когда → время → для кого → напомнить.
@@ -127,6 +217,7 @@ export function PlanNewTaskScreen({
 
   const [ty, tm] = todayIso.split("-").map(Number);
   const [monthOffset, setMonthOffset] = useState(0);
+  const [calOpen, setCalOpen] = useState(false);
   const monthDate = new Date(ty!, tm! - 1 + monthOffset, 1);
   const monthLabel = monthDate.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
   const leadBlanks = (monthDate.getDay() + 6) % 7;
@@ -140,8 +231,12 @@ export function PlanNewTaskScreen({
   const timeValid = /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
   const pastToday = timed && timeValid && day === todayIso && time < new Date().toTimeString().slice(0, 5);
   const customLeadTotal = Number(customLeadValue) * leadFactors[customLeadUnit];
+  const leadUnit = LEAD_UNITS.find((u) => u.key === customLeadUnit) ?? LEAD_UNITS[0];
+  const leadValue = Math.max(1, Math.min(leadUnit.max, Math.round(Number(customLeadValue)) || 1));
+  /** Свой срок выбран: lead не совпадает ни с одним быстрым вариантом. */
+  const customActive = timed && lead !== null && (customLeadOpen || !REMIND_OPTIONS.some((option) => option.minutes === lead));
   const customLeadValid = !timed || !customLeadOpen || (
-    /^[1-9]\\d*$/.test(customLeadValue) && Number.isSafeInteger(customLeadTotal) &&
+    Number.isInteger(Number(customLeadValue)) && Number.isSafeInteger(customLeadTotal) &&
     customLeadTotal >= 1 && customLeadTotal <= 28 * 1440
   );
   const effectiveUntilDate = repeatEnd === "UNTIL" && repeatUntilTime && timed && timeValid && repeatUntilTime < time
@@ -262,15 +357,37 @@ export function PlanNewTaskScreen({
     }
   }
 
+  const barDay = day
+    ? `${when === "today" ? "Сегодня" : when === "tomorrow" ? "Завтра" : weekdayLong(day)}, ${longDay(day)}`
+    : "Выберите день";
+  const chipBase = "mp-font-ui inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full border px-[18px] text-[14px] font-semibold whitespace-nowrap transition-colors";
+  const chipOn = "border-[var(--mp-chip-on-line)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]";
+  const chipOff = "border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)] enabled:hover:border-[var(--mp-tx2)]";
+  const pickedChipLabel = pickedDate ? `${weekdayShort(pickedDate)}, ${longDay(pickedDate)}` : null;
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
-      <PlanScreenTitleHead title={isMove ? <>Перенести <em>дело</em></> : <>Новое <em>дело</em></>} onBack={onBack} />
+      <div className="flex shrink-0 items-center gap-3 px-5 pb-1 pt-[26px] md:px-8">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Назад в план"
+          className={cn("flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line)] bg-white text-[var(--mp-tx)] shadow-[0_4px_12px_-4px_rgba(20,18,16,.18)] transition-colors hover:bg-[var(--mp-bg)]", PLAN_FOCUS)}
+        >
+          <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
+        </button>
+        <p
+          style={{ fontFamily: "Menlo, ui-monospace, SFMono-Regular, Monaco, Consolas, monospace" }}
+          className="m-0 text-[10px] font-medium uppercase leading-none tracking-[.14em] text-[var(--mp-ac-dark)]"
+        >
+          {isMove ? "Перенести дело" : "Новое дело"}
+        </p>
+      </div>
       <div
         data-plan-new-task-scroll
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y px-5 pb-6 md:px-8"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y px-5 pb-6 pt-0 md:px-8"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
-        <div className="mb-[22px] mt-1">
         <label className="block">
           <span className="sr-only">Что нужно сделать</span>
           <textarea
@@ -280,67 +397,105 @@ export function PlanNewTaskScreen({
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder="Что нужно сделать?"
-            className={cn(
-              "mp-font-ui block w-full resize-none rounded-2xl border border-[var(--mp-chip-line)] bg-white px-4 py-3",
-              "text-[20px] font-normal leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)] caret-[var(--mp-ac)]",
-              "outline-none transition-shadow placeholder:font-normal placeholder:text-[var(--text-muted)]",
-              "focus:border-[var(--mp-tx)] focus:shadow-[0_0_0_3px_rgba(26,20,16,.08)]",
-            )}
+            className="mp-font-ui m-0 mb-[18px] mt-3 block min-h-[76px] w-full resize-none border-0 bg-transparent p-0 !text-[26px] font-bold leading-[1.15] tracking-[-.01em] text-[var(--mp-tx)] caret-[var(--mp-ac)] outline-none placeholder:font-bold placeholder:text-[#b9b0a5]"
           />
         </label>
-        <div className="mt-2 flex items-center gap-[7px] border-b border-[var(--mp-line)] pb-4 text-[13px] text-[var(--mp-tx2)] md:hidden">
-          <Mic className="h-[15px] w-[15px]" aria-hidden />
-          Удобнее голосом — нажмите микрофон на&nbsp;клавиатуре
-        </div>
+
+        <div className="mb-6">
+          <div className={SECTION_LABEL}>Для кого</div>
+          <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] md:-mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
+            {[{ id: "", name: "Вся семья", kind: "adult" as const }, ...people].map((p) => {
+              const on = whoId === p.id;
+              const colors = planParticipantPalette(p.id ? `${p.kind}:${p.id}` : null);
+              return (
+                <button
+                  key={p.id || "family"}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setWhoId(p.id)}
+                  className={cn(chipBase, p.id ? "pl-2" : "", on ? chipOn : chipOff, PLAN_FOCUS)}
+                >
+                  {p.id ? (
+                    <span
+                      aria-hidden
+                      className="flex h-[26px] w-[26px] items-center justify-center rounded-full text-[11px] font-bold"
+                      style={on ? { background: "rgba(0,0,0,.08)", color: "var(--mp-tx)" } : { background: colors.bg, color: colors.fg }}
+                    >
+                      {displayName(p).trim().charAt(0).toUpperCase()}
+                    </span>
+                  ) : (
+                    <Users className="h-[18px] w-[18px]" aria-hidden />
+                  )}
+                  {displayName(p)}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="mb-[22px]">
+        <div className="mb-6">
           <div className={SECTION_LABEL}>Когда</div>
-          <div className={PLAN_SEG}>
-            {([["today", "Сегодня"], ["tomorrow", "Завтра"], ["other", "Другой день"]] as const).map(([key, name]) => (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={when === key}
-                onClick={() => setWhen(key)}
-                className={cn(PLAN_SEG_BTN, when === key ? PLAN_SEG_ON : PLAN_SEG_OFF)}
-              >
-                {name}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" aria-pressed={when === "today"} onClick={() => { setWhen("today"); setCalOpen(false); }} className={cn(chipBase, when === "today" ? chipOn : chipOff, PLAN_FOCUS)}>
+              Сегодня
+            </button>
+            <button type="button" aria-pressed={when === "tomorrow"} onClick={() => { setWhen("tomorrow"); setCalOpen(false); }} className={cn(chipBase, when === "tomorrow" ? chipOn : chipOff, PLAN_FOCUS)}>
+              Завтра
+            </button>
+            {when === "other" && pickedChipLabel ? (
+              <button type="button" aria-pressed onClick={() => setCalOpen(true)} className={cn(chipBase, chipOn, PLAN_FOCUS)}>
+                {pickedChipLabel}
               </button>
-            ))}
+            ) : null}
           </div>
-          {when === "other" ? (
-            <div className="mt-2.5 rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] px-2.5 py-3">
-              <div className="mx-1 mb-1.5 flex items-center justify-between">
-                <span className="text-[15px] font-bold capitalize text-[var(--mp-tx)]">{monthLabel}</span>
-                <span className="flex">
-                  <button type="button" aria-label="Предыдущий месяц" disabled={monthOffset <= 0} onClick={() => setMonthOffset((v) => v - 1)} className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--mp-tx2)] disabled:opacity-30">
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                  <button type="button" aria-label="Следующий месяц" onClick={() => setMonthOffset((v) => v + 1)} className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--mp-tx2)]">
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
-                </span>
+          <button
+            type="button"
+            aria-expanded={calOpen}
+            onClick={() => {
+              if (!calOpen && when !== "other") setWhen("other");
+              setCalOpen((v) => !v);
+            }}
+            className={cn(
+              "mt-3 flex min-h-[62px] w-full items-center gap-3 rounded-[20px] border-[1.5px] border-dashed py-0 pl-3.5 pr-[18px] text-left transition-colors hover:border-[var(--mp-tx2)] hover:bg-[var(--mp-card)]",
+              calOpen ? "border-[var(--mp-tx2)] bg-[var(--mp-card)]" : "border-[var(--mp-line-strong)]",
+              PLAN_FOCUS,
+            )}
+          >
+            <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white">
+              {calOpen ? <X className="h-4 w-4" strokeWidth={2} aria-hidden /> : <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />}
+            </span>
+            <span className="flex-1 text-[15px] font-semibold text-[var(--mp-tx)]">{calOpen ? "Свернуть календарь" : "Другой день"}</span>
+            <span className="mp-font-meta text-[11px] text-[var(--mp-tx2)]">весь календарь →</span>
+          </button>
+          {calOpen ? (
+            <div className="mt-2.5 rounded-[20px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-2.5">
+              <div className="mb-1 flex items-center justify-between">
+                <button type="button" aria-label="Предыдущий месяц" disabled={monthOffset <= 0} onClick={() => setMonthOffset((v) => v - 1)} className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)] disabled:opacity-30">
+                  <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+                </button>
+                <span className="text-[18px] font-normal capitalize tracking-[-.01em] text-[var(--mp-tx)]">{monthLabel}</span>
+                <button type="button" aria-label="Следующий месяц" onClick={() => setMonthOffset((v) => v + 1)} className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)]">
+                  <ChevronRight className="h-4 w-4" strokeWidth={2} />
+                </button>
               </div>
               <div className="grid grid-cols-7 gap-0.5">
                 {WD.map((w) => (
-                  <span key={w} className="py-1 text-center text-xs font-semibold text-[var(--mp-tx2)]">{w}</span>
+                  <span key={w} className="mp-font-meta py-1.5 text-center text-[10px] uppercase text-[var(--mp-tx2)]">{w}</span>
                 ))}
                 {cells.map((d, i) => {
                   if (d === null) return <span key={`b${i}`} />;
                   const value = iso(monthDate.getFullYear(), monthDate.getMonth(), d);
                   const disabled = value < todayIso;
-                  const on = value === pickedDate;
+                  const on = value === pickedDate && when === "other";
                   return (
                     <button
                       key={value}
                       type="button"
                       disabled={disabled}
-                      onClick={() => setPickedDate(value)}
+                      onClick={() => { setPickedDate(value); setWhen("other"); setCalOpen(false); }}
                       className={cn(
-                        "h-11 rounded-xl text-[15px] font-bold tabular-nums transition-colors disabled:text-[var(--text-subtle)]",
-                        on ? "bg-[var(--mp-tx)] text-white" : "hover:enabled:bg-[var(--mp-soft)]",
-                        !on && !disabled && i % 7 > 4 && "text-[var(--mp-ac-dark)]",
+                        "mp-font-display h-11 rounded-xl text-[17px] tabular-nums transition-colors disabled:text-[#c2b9ae]",
+                        on ? "bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)] shadow-[inset_0_0_0_1.5px_var(--mp-chip-on-line)]" : "hover:enabled:bg-white",
                         value === todayIso && !on && "shadow-[inset_0_0_0_1.5px_var(--mp-tx)]",
                       )}
                     >
@@ -353,25 +508,23 @@ export function PlanNewTaskScreen({
           ) : null}
         </div>
 
-        <div className="mb-[22px]">
+        <div className="mb-6">
           <div className={SECTION_LABEL}>Время</div>
-          <div className={PLAN_SEG}>
-            <button
-              type="button"
-              aria-pressed={!timed}
-              onClick={() => setTimed(false)}
-              className={cn(PLAN_SEG_BTN, !timed ? PLAN_SEG_ON : PLAN_SEG_OFF)}
-            >
+          <div className="flex gap-2">
+            <button type="button" aria-pressed={!timed} onClick={() => setTimed(false)} className={cn(chipBase, "tabular-nums", !timed ? chipOn : chipOff, PLAN_FOCUS)}>
               Без времени
             </button>
             <label
-              className={cn(PLAN_SEG_BTN, "flex cursor-text items-center justify-center gap-[7px] px-3 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--mp-ac)]", timed ? PLAN_SEG_ON : PLAN_SEG_OFF)}
+              className={cn(
+                "flex h-[46px] min-w-0 flex-1 cursor-text items-center gap-2.5 rounded-full border pl-3.5 pr-1.5 transition-colors focus-within:border-[var(--mp-chip-on-line)]",
+                timed ? "border-[var(--mp-chip-on-line)] bg-[var(--mp-chip-on-bg)]" : "border-[var(--mp-line-strong)] bg-white",
+              )}
               onClick={() => {
                 enableTime();
                 window.setTimeout(() => timeRef.current?.focus(), 0);
               }}
             >
-              <Clock3 className={cn("h-4 w-4", timed ? "text-[var(--mp-ac)]" : "text-[var(--mp-tx2)]")} aria-hidden />
+              <Clock3 className={cn("h-[18px] w-[18px] shrink-0", timed ? "text-[var(--mp-tx)]" : "text-[var(--mp-tx2)]")} aria-hidden />
               <input
                 ref={timeRef}
                 inputMode="numeric"
@@ -381,38 +534,106 @@ export function PlanNewTaskScreen({
                   setTime(maskTime(event.target.value));
                   enableTime();
                 }}
+                aria-label="Своё время"
                 aria-invalid={timed && !timeValid}
-                 aria-describedby={timed && !timeValid ? "plan-time-error" : undefined}
-                 className={cn("w-[72px] border-0 bg-transparent p-0 text-base font-extrabold tabular-nums tracking-[.02em] text-[var(--mp-tx)] outline-none placeholder:font-semibold placeholder:text-[var(--text-muted)]", timed && !timeValid && "text-danger ring-1 ring-danger rounded-sm")}
+                aria-describedby={timed && !timeValid ? "plan-time-error" : undefined}
+                className={cn("mp-font-meta w-full min-w-0 border-0 bg-transparent p-0 pr-3 text-[16px] font-semibold text-[var(--mp-tx)] outline-none placeholder:font-normal placeholder:text-[#b9b0a5]", timed && !timeValid && "text-danger")}
               />
             </label>
           </div>
-          {pastToday ? <p className="mx-0.5 mt-2 text-[13px] text-[var(--mp-tx2)]">Это время сегодня уже прошло — можно поставить на завтра</p> : null}
+          {pastToday ? <p className="mx-0.5 mt-2.5 text-[13.5px] leading-[1.45] text-[var(--mp-tx2)]">Это время сегодня уже прошло — можно поставить на завтра</p> : null}
         </div>
 
         <div className="mb-[22px]">
-          <div className={SECTION_LABEL}>Для кого</div>
-          <div className="flex flex-wrap gap-5">
-            {[{ id: "", name: "Вся семья", kind: "adult" as const }, ...people].map((p) => {
-              const on = whoId === p.id;
-              const colors = planParticipantPalette(p.id ? `${p.kind}:${p.id}` : null);
+          <div className={SECTION_LABEL}>Напомнить</div>
+          <div className="flex flex-wrap gap-2">
+            {REMIND_OPTIONS.map((o) => {
+              const on = timed ? lead === o.minutes && !customActive : o.minutes === null;
+              // Без времени доступно только «Не напоминать»; остальные явно выключены.
+              const disabled = !timed && o.minutes !== null;
               return (
-                <button key={p.id || "family"} type="button" aria-pressed={on} onClick={() => setWhoId(p.id)} className={cn("flex min-w-11 flex-col items-center gap-[7px] rounded-2xl", PLAN_FOCUS)}>
-                  <span className={cn("relative flex h-[62px] w-[62px] items-center justify-center rounded-full border-2 text-[21px] font-extrabold transition-colors", on ? "border-current" : "border-transparent hover:border-current/30")} style={{ background: colors.bg, color: colors.fg }}>
-                    {p.id === "" ? <Users className="h-6 w-6" aria-hidden /> : displayName(p).trim().charAt(0).toUpperCase()}
-                    {on ? (
-                      <span className="absolute -bottom-[3px] -right-[3px] flex h-[23px] w-[23px] items-center justify-center rounded-full border-2 border-[var(--mp-bg)] bg-[var(--mp-ac)] text-white">
-                        <Check className="h-3 w-3" strokeWidth={2.8} aria-hidden />
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="mp-font-ui max-w-[72px] truncate text-sm font-semibold text-[var(--mp-tx)]">{displayName(p)}</span>
+                <button
+                  key={o.label}
+                  type="button"
+                  aria-pressed={on}
+                  disabled={disabled}
+                  onClick={() => {
+                    setCustomLeadOpen(false);
+                    setLead(o.minutes);
+                    setLeadTouched(true);
+                  }}
+                  className={cn(PLAN_CHIP, on ? PLAN_CHIP_ON : PLAN_CHIP_OFF, PLAN_CHIP_DISABLED)}
+                >
+                  {o.minutes !== null ? <Bell className="h-4 w-4" aria-hidden /> : null}
+                  {o.label}
                 </button>
               );
             })}
+            <button
+              type="button"
+              disabled={!timed}
+              aria-expanded={customLeadOpen}
+              aria-pressed={customActive}
+              onClick={() => {
+                if (customLeadOpen) {
+                  setCustomLeadOpen(false);
+                  return;
+                }
+                if (!customActive) {
+                  // По умолчанию «за 30 минут», как в дизайне; дальше человек крутит колесо.
+                  setCustomLeadUnit("minutes");
+                  setCustomLeadValue("30");
+                  setLead(30);
+                  setLeadTouched(true);
+                } else {
+                  const unit = lead % 10080 === 0 ? "weeks" : lead % 1440 === 0 ? "days" : lead % 60 === 0 ? "hours" : "minutes";
+                  setCustomLeadUnit(unit);
+                  setCustomLeadValue(String(Math.min(LEAD_UNITS.find((u) => u.key === unit)!.max, lead / leadFactors[unit])));
+                }
+                setCustomLeadOpen(true);
+              }}
+              className={cn(PLAN_CHIP, customActive ? PLAN_CHIP_ON : PLAN_CHIP_OFF, PLAN_CHIP_DISABLED)}
+            >
+              <Bell className="h-4 w-4" aria-hidden />
+              {customActive ? `За ${leadValue} ${leadPlural(leadValue, leadUnit.forms)}` : "Другое"}
+            </button>
           </div>
+          {customLeadOpen && timed ? (
+            <div className="mt-2.5">
+              <div className="relative grid grid-cols-[72px_minmax(0,1fr)_auto] items-center gap-1 rounded-[20px] border border-[var(--mp-line)] bg-[var(--mp-card)] px-4">
+                <span aria-hidden className="pointer-events-none absolute inset-x-2 top-1/2 -mt-5 h-10 rounded-xl bg-white shadow-[0_1px_3px_rgba(20,18,16,.08)]" />
+                <Wheel
+                  label="Сколько до начала"
+                  items={Array.from({ length: leadUnit.max }, (_, i) => String(i + 1))}
+                  value={leadValue - 1}
+                  onChange={(index) => {
+                    setCustomLeadValue(String(index + 1));
+                    setLead((index + 1) * leadFactors[leadUnit.key]);
+                    setLeadTouched(true);
+                  }}
+                  className="mp-font-meta pr-2.5 text-right"
+                />
+                <Wheel
+                  label="Единица времени"
+                  items={LEAD_UNITS.map((u) => leadPlural(leadValue, u.forms))}
+                  value={LEAD_UNITS.findIndex((u) => u.key === leadUnit.key)}
+                  onChange={(index) => {
+                    const unit = LEAD_UNITS[index]!;
+                    const next = Math.min(leadValue, unit.max);
+                    setCustomLeadUnit(unit.key);
+                    setCustomLeadValue(String(next));
+                    setLead(next * leadFactors[unit.key]);
+                    setLeadTouched(true);
+                  }}
+                  className="pl-1.5 text-left"
+                />
+                <span className="mp-font-meta relative text-[12.5px] text-[var(--mp-tx2)]">до начала</span>
+              </div>
+              <p className="mt-2 text-[12px] text-[var(--mp-tx2)]">В Telegram напоминание придёт, если бот подключён и уведомления включены.</p>
+            </div>
+          ) : null}
+          {!timed ? <p className="mx-0.5 mt-2 text-[13px] text-[var(--mp-tx2)]">Укажите время, чтобы включить напоминание</p> : null}
         </div>
-
         {!isMove && (
           <div className="mb-[22px]">
             <div className={SECTION_LABEL}>Повторять</div>
@@ -475,101 +696,25 @@ export function PlanNewTaskScreen({
           </div>
         )}
 
-        <div className="mb-[22px]">
-          <div className={SECTION_LABEL}>Когда напомнить?</div>
-          <div className="flex flex-wrap gap-2">
-            {REMIND_OPTIONS.map((o) => {
-              const on = timed ? lead === o.minutes : o.minutes === null;
-              // Без времени доступно только «Не напоминать»; остальные явно выключены.
-              const disabled = !timed && o.minutes !== null;
-              return (
-                <button
-                  key={o.label}
-                  type="button"
-                  aria-pressed={on}
-                  disabled={disabled}
-                  onClick={() => {
-                    setCustomLeadOpen(false);
-                    setLead(o.minutes);
-                    setLeadTouched(true);
-                  }}
-                  className={cn(PLAN_CHIP, on ? PLAN_CHIP_ON : PLAN_CHIP_OFF, PLAN_CHIP_DISABLED)}
-                >
-                  {o.minutes !== null ? <Bell className="h-4 w-4" aria-hidden /> : null}
-                  {o.label}
-                </button>
-              );
-            })}
-            <button
-            type="button"
-            disabled={!timed}
-            aria-expanded={customLeadOpen}
-            onClick={() => {
-              if (customLeadOpen) {
-                setCustomLeadOpen(false);
-                return;
-              }
-              const initial = lead !== null && !REMIND_OPTIONS.some((option) => option.minutes === lead) ? lead : 0;
-              const unit = initial && initial % 10080 === 0 ? "weeks" : initial && initial % 1440 === 0 ? "days" : initial && initial % 60 === 0 ? "hours" : "minutes";
-              setCustomLeadUnit(unit);
-              setCustomLeadValue(initial ? String(initial / leadFactors[unit]) : "");
-              setCustomLeadOpen(true);
-            }}
-            className={cn(PLAN_CHIP, customLeadOpen ? PLAN_CHIP_ON : PLAN_CHIP_OFF, PLAN_CHIP_DISABLED)}
-          >
-            <Bell className="h-4 w-4" aria-hidden />
-            Другое
-          </button>
-          </div>
-          {customLeadOpen && timed ? (
-            <div className="mt-3 rounded-2xl border border-[var(--mp-line)] p-3">
-              <p className="mb-2 text-[13px] text-[var(--mp-tx2)]">За сколько до начала напомнить?</p>
-              <div className="flex items-center gap-3">
-                <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
-                  Количество
-                  <input type="number" min={1} step={1} inputMode="numeric" value={customLeadValue}
-                    onChange={event => {
-                      const value = event.target.value;
-                      setCustomLeadValue(value);
-                      const total = Number(value) * leadFactors[customLeadUnit];
-                      setLead(/^[1-9]\\d*$/.test(value) && Number.isSafeInteger(total) && total <= 28 * 1440 ? total : null);
-                      setLeadTouched(true);
-                    }}
-                    className="h-11 w-full rounded-xl border border-[var(--mp-line)] bg-white px-3 text-base"
-                    aria-label="Количество до напоминания" />
-                </label>
-                <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
-                  Единица
-                  <select value={customLeadUnit} onChange={event => {
-                    const unit = event.target.value as keyof typeof leadFactors;
-                    setCustomLeadUnit(unit);
-                    const total = Number(customLeadValue) * leadFactors[unit];
-                    setLead(/^[1-9]\\d*$/.test(customLeadValue) && Number.isSafeInteger(total) && total <= 28 * 1440 ? total : null);
-                    setLeadTouched(true);
-                  }} className="h-11 w-full rounded-xl border border-[var(--mp-line)] bg-white px-3 text-base">
-                    <option value="minutes">Минуты</option>
-                    <option value="hours">Часы</option>
-                    <option value="days">Дни</option>
-                    <option value="weeks">Недели</option>
-                  </select>
-                </label>
-              </div>
-              {!customLeadValid ? <p role="alert" className="mt-2 text-[13px] text-danger">Укажите положительное целое число (не более 4 недель)</p> : null}
-              <p className="mt-2 text-[12px] text-[var(--mp-tx2)]">В Telegram напоминание придёт, если бот подключён и уведомления включены.</p>
-            </div>
-          ) : null}
-          {!timed ? <p className="mx-0.5 mt-2 text-[13px] text-[var(--mp-tx2)]">Укажите время, чтобы включить напоминание</p> : null}
-        </div>
       </div>
-      <div className="shrink-0 border-t border-[var(--mp-line)] bg-[var(--mp-bg)] px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 md:px-8">
-        <button
-          type="button"
-          disabled={!can || saving}
-          onClick={() => void submit()}
-          className={cn("mp-font-ui flex h-[54px] w-full items-center justify-center rounded-2xl bg-[var(--mp-ac)] text-base font-bold text-white transition-colors hover:bg-[var(--mp-ac-dark)] disabled:bg-[var(--border)] disabled:text-[var(--text-muted)]", PLAN_FOCUS)}
-        >
-          {saving ? "Сохраняем…" : label}
-        </button>
+      <div className="shrink-0 bg-[var(--mp-bg)] px-3.5 pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-1">
+        <div className="flex min-h-[62px] items-center gap-3 rounded-[20px] border border-[#f7d2c0] bg-[var(--mp-ac-soft)] py-2 pl-[18px] pr-2 text-[var(--mp-tx)]">
+          <div className="min-w-0 flex-1">
+            <b className="block text-[15px] font-semibold leading-[1.25] tracking-[-.01em] text-[var(--mp-tx)]">
+              {barDay}
+              {timed && timeValid ? ` в ${time}` : ""}
+            </b>
+            <span className="sr-only" role="status">{label}</span>
+          </div>
+          <button
+            type="button"
+            disabled={!can || saving}
+            onClick={() => void submit()}
+            className={cn("mp-font-ui h-11 shrink-0 rounded-[14px] bg-[var(--mp-ac)] px-5 text-[15px] font-semibold text-white transition-colors hover:bg-[var(--mp-ac-dark)] disabled:bg-[#f2c4ac] disabled:text-white", PLAN_FOCUS)}
+          >
+            {saving ? "Сохраняем…" : isMove ? "Перенести" : "Добавить"}
+          </button>
+        </div>
       </div>
     </div>
   );
