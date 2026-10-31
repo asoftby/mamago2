@@ -1476,9 +1476,9 @@ export function PlanMainContent({
   );
 
   /** Заголовок недели и карточка оценки визита — верх экрана по макету v3. */
-  const renderHead = (compact: boolean) => (
+  const renderHead = () => (
     <>
-      <p className={(compact ? "" : "-mt-0.5 ") + "m-0 mb-[18px] text-[22px] font-bold leading-[1.15] tracking-[-.01em] text-[var(--mp-tx)] [text-wrap:pretty]"}>
+      <p className="m-0 mb-[18px] text-[22px] font-bold leading-[1.15] tracking-[-.01em] text-[var(--mp-tx)] [text-wrap:pretty]">
         {currentWeekCount > 0 ? "Что у нас на неделе?" : "Неделя пока свободна"}
       </p>
       <PlanFeedbackCard key={`${experienceFeed?.awaitingFeedback[0]?.id ?? ""}-${experienceFeed?.pending[0]?.planItemId ?? ""}`} feed={experienceFeed} todayIso={todayKey} onChanged={() => void reloadExperienceFeed()} onOpenVisits={() => openNestedScreen("visits")} />
@@ -1529,7 +1529,7 @@ export function PlanMainContent({
           id="my-plan-recommendations"
           className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[var(--mp-bg)] px-8 pb-28 pt-0"
         >
-          {renderHead(false)}
+          {renderHead()}
 
           {planCalendar}
 
@@ -1593,7 +1593,7 @@ export function PlanMainContent({
         id="my-plan-recommendations"
         className="flex-1 space-y-5 overflow-y-auto bg-[var(--mp-bg)] px-5 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-0"
       >
-        {renderHead(true)}
+        {renderHead()}
 
         {planCalendar}
 

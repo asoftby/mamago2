@@ -15,7 +15,7 @@ export function MyPlanHeader({ onClose, compact = false, tight = false }: MyPlan
       className="flex items-center justify-between gap-3 bg-[var(--mp-bg)]"
       style={
         tight
-          ? { padding: compact ? "26px 18px 2px 20px" : "26px 24px 0 32px" }
+          ? { padding: compact ? "26px 18px 4px 20px" : "26px 24px 0 32px" }
           : { padding: compact ? "26px 18px 6px 20px" : "26px 24px 6px 32px", minHeight: 80 }
       }
     >
