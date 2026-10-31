@@ -1397,7 +1397,7 @@ export function PlanMainContent({
         onClick={openPicks}
         className="group flex min-h-[76px] w-full items-center gap-3.5 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-3 pl-3.5 pr-4 text-left transition-colors hover:border-[var(--mp-tx)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
-        <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full bg-[var(--mp-tx)] text-white">
+        <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full bg-[var(--mp-ac)] text-white">
           <Search className="h-5 w-5" strokeWidth={1.8} aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
