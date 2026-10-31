@@ -53,12 +53,13 @@ export function addExtractionUsage(
 }
 
 export function createExtractionCall<T>(deps: ExtractionCallDeps<T>) {
-  async function attempt(model: string): Promise<ExtractionAttempt<T>> {
+  async function attempt(model: string, maxTokens?: number): Promise<ExtractionAttempt<T>> {
     const response = await deps.openrouter.chat({
       model,
       systemPrompt: deps.systemPrompt,
       userParts: deps.userParts,
       responseFormat: deps.responseFormat,
+      ...(maxTokens ? { maxTokens } : {}),
     });
     if (!response.ok) {
       // A non-retryable failure (not configured, auth/4xx) is final; retryable ones are retried once.
@@ -80,10 +81,15 @@ export function createExtractionCall<T>(deps: ExtractionCallDeps<T>) {
     if (first.kind === "infra" && first.notConfigured) {
       return { ok: false, reason: "NOT_CONFIGURED", escalated: false, escalation: null };
     }
-    if (first.kind === "invalid" || (first.kind === "infra" && first.retryable)) first = await attempt(models.fast);
+    // Retry malformed/truncated output with more room for structured JSON.
+    // Transient network/HTTP failures retain the regular token budget.
+    if (first.kind === "invalid" || (first.kind === "infra" && first.retryable)) {
+      const extendOutput = first.kind === "invalid" || first.code === "OPENROUTER_BAD_RESPONSE";
+      first = await attempt(models.fast, extendOutput ? 4_000 : undefined);
+    }
 
     const viaStrong = async (escalation: ExtractionEscalation): Promise<ExtractionOutcome<T>> => {
-      const strong = await attempt(models.strong as string);
+      const strong = await attempt(models.strong as string, 4_000);
       if (strong.kind === "infra") return { ok: false, reason: "INFRA", escalated: true, escalation };
       if (strong.kind === "invalid") return { ok: false, reason: "INVALID", escalated: true, escalation };
       return { ok: true, value: strong.value, escalation };
