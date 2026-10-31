@@ -85,3 +85,17 @@ test("party resource editing preserves server optimistic lock and existing excep
   assert.ok(api.includes("bookingAllocation.count"));
   assert.ok(api.includes("ownerBusinessId: businessId"));
 });
+
+test("party preview is tenant scoped and uses transactional booking engine's read-only slot calculator", () => {
+  const api = source("src/app/api/business/offers/[id]/slot-preview/route.ts");
+  assert.ok(api.includes("getCurrentUser"));
+  assert.ok(api.includes("getMyBusiness"));
+  assert.ok(api.includes("ownerBusinessId: business.id"));
+  assert.ok(api.includes('["PARTY_SERVICE", "PARTY_PACKAGE"]'));
+  assert.ok(api.includes("getSlots({ offerId: id"));
+  assert.ok(api.includes("configured: false, slots: []"));
+  assert.ok(api.includes("private, no-store"));
+  const view = source("src/components/business/wizard/offer/components/PartyResourceSchedule.tsx");
+  assert.ok(view.includes("/slot-preview"));
+  assert.ok(view.includes("preview.configured"));
+});
