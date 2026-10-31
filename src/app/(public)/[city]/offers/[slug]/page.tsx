@@ -8,6 +8,7 @@ import { buildOfferStructuredData } from "@/lib/seo/schema/buildOfferStructuredD
 import { buildBreadcrumbJsonLd } from "@/lib/seo/schema/buildBreadcrumbJsonLd";
 import { buildFaqJsonLd } from "@/lib/seo/schema/buildFaqJsonLd";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { wishlistEnabled } from "@/server/wishlist/wishlistPure";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { getOfferPublicPath } from "@/lib/offers/offerPublicUrl";
@@ -325,7 +326,14 @@ export default async function CanonicalOfferPage({ params }: PageProps) {
           >[]
         }
       />
-      <OfferPageView presentation="public" data={data} canEditOffer={canEditOffer} direct={directCta} otherOffers={otherOffers} />
+      <OfferPageView
+        presentation="public"
+        data={data}
+        canEditOffer={canEditOffer}
+        direct={directCta}
+        otherOffers={otherOffers}
+        wishlistEnabled={wishlistEnabled()}
+      />
     </>
   );
 }
