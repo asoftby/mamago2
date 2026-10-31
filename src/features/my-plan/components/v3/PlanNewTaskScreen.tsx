@@ -234,7 +234,7 @@ export function PlanNewTaskScreen({
   const leadUnit = LEAD_UNITS.find((u) => u.key === customLeadUnit) ?? LEAD_UNITS[0];
   const leadValue = Math.max(1, Math.min(leadUnit.max, Math.round(Number(customLeadValue)) || 1));
   /** Свой срок выбран: lead не совпадает ни с одним быстрым вариантом. */
-  const customActive = timed && lead !== null && !REMIND_OPTIONS.some((option) => option.minutes === lead);
+  const customActive = timed && lead !== null && (customLeadOpen || !REMIND_OPTIONS.some((option) => option.minutes === lead));
   const customLeadValid = !timed || !customLeadOpen || (
     Number.isInteger(Number(customLeadValue)) && Number.isSafeInteger(customLeadTotal) &&
     customLeadTotal >= 1 && customLeadTotal <= 28 * 1440
@@ -548,7 +548,7 @@ export function PlanNewTaskScreen({
           <div className={SECTION_LABEL}>Напомнить</div>
           <div className="flex flex-wrap gap-2">
             {REMIND_OPTIONS.map((o) => {
-              const on = timed ? lead === o.minutes : o.minutes === null;
+              const on = timed ? lead === o.minutes && !customActive : o.minutes === null;
               // Без времени доступно только «Не напоминать»; остальные явно выключены.
               const disabled = !timed && o.minutes !== null;
               return (
