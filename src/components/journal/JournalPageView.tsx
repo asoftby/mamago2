@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Archive } from "lucide-react";
+import { Archive, ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { orderBreakingNewsBySeen, readSeenBreakingNews } from "@/features/stories/lib/seen";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
@@ -73,10 +73,10 @@ export function JournalPageView({
           <h1 className={`m-0 font-heading text-[34px] leading-[.98] tracking-[-0.03em] sm:text-[40px] ${newsArchive ? "text-muted-foreground" : ""}`}>
             {typeFilter === "BREAKING_NEWS" ? (newsArchive ? "Архив Breaking News" : "Breaking News") : typeFilter ? JOURNAL_TYPE_FILTER_TITLE[typeFilter] : title}
           </h1>
-          {typeFilter === "BREAKING_NEWS" && (
-            <Link href={newsArchive ? typeHref("BREAKING_NEWS") : `${typeHref("BREAKING_NEWS")}&archive=1`} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
-              <Archive aria-hidden="true" className="h-4 w-4" />
-              {newsArchive ? "Актуальные" : "Архив"}
+          {typeFilter === "BREAKING_NEWS" && newsArchive && (
+            <Link href={typeHref("BREAKING_NEWS")} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+              <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+              Актуальные
             </Link>
           )}
         </div>
@@ -160,6 +160,14 @@ export function JournalPageView({
             <p className="py-8 text-sm text-muted-foreground">
               {newsArchive ? "В архиве пока нет материалов." : "Сейчас нет актуальных Breaking News."}
             </p>
+          )}
+          {!newsArchive && (
+            <div className="mt-8 flex justify-center">
+              <Link href={`${typeHref("BREAKING_NEWS")}&archive=1`} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+                <Archive aria-hidden="true" className="h-4 w-4" />
+                Архив Breaking News
+              </Link>
+            </div>
           )}
         </section>
       ) : null}
