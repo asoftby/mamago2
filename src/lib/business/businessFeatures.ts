@@ -88,7 +88,7 @@ export function parseBusinessFeaturesPatch(
  */
 export function isOfferWizardV2Enabled(
   business: { features?: unknown } | null | undefined,
-  env: Pick<NodeJS.ProcessEnv, "APP_ENV" | "OFFER_WIZARD_V2_DEV_ENABLED"> = process.env,
+  env: { APP_ENV?: string; OFFER_WIZARD_V2_DEV_ENABLED?: string } = process.env,
 ): boolean {
   const appEnv = env.APP_ENV?.trim().toLowerCase();
   if (appEnv === "dev" && env.OFFER_WIZARD_V2_DEV_ENABLED === "true") return true;
