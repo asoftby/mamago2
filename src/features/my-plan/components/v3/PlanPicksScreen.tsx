@@ -106,8 +106,9 @@ export function PlanPicksScreen({
         <div role="group" aria-label="Для кого" className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none] md:-mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
           {selectedAges.length > 0 ? (
             <span className={cn(chip(true), "gap-1.5 pr-2")}>
-              <span className="max-w-[180px] truncate">
-                {selectedAges.map((value) => ageOptions.find((age) => age.value === value)?.label ?? value).join(", ")}
+              <span className="whitespace-nowrap">
+                {ageOptions.find((age) => age.value === selectedAges[0])?.label ?? selectedAges[0]}
+                {selectedAges.length > 1 ? ` +${selectedAges.length - 1}` : ""}
               </span>
               <button
                 type="button"
