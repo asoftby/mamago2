@@ -20,7 +20,6 @@ import { LiquidNotification } from "@/components/ui/liquid-notification";
 import { PlanCalendar } from "@/features/plan-calendar";
 import { PlanPersonFilter, planPersonFilterOptions } from "./PlanPersonFilter";
 import { useSharedPlanAudienceFilters } from "../hooks/useSharedPlanAudienceFilters";
-import { PlanEmptyDayMessage } from "./PlanEmptyDayMessage";
 import { filterVisiblePlanEntries, type PlanPersonSelection } from "../lib/filterPlanEntriesByPerson";
 import { pluralRu } from "@/lib/date/dateKey";
 import { publicActivityPath } from "@/lib/business/eventPublicLink";
@@ -1164,10 +1163,22 @@ export function PlanMainContent({
       : selectedDate === addDaysIso(todayKey, 1)
         ? `Завтра, ${datePart}`
         : `${weekdayName.charAt(0).toUpperCase()}${weekdayName.slice(1)}, ${datePart}`;
-    return filterPerson ? `${label} · ${filterPerson.kind === "adult"
-      ? (personShortName(filterPerson) === "Я" ? "мои дела" : `дела: ${personShortName(filterPerson)}`)
-      : personShortName(filterPerson)}` : label;
+    return label;
   })();
+  /** «Для всех» / «Для меня» / «Для Степана» — справа от заголовка дня. */
+  const audienceLabel = !filteredAudience
+    ? "Для всех"
+    : filterPerson
+      ? filterPerson.kind === "adult" && personShortName(filterPerson) === "Я"
+        ? "Для меня"
+        : `Для ${toGenitiveName(personShortName(filterPerson))}`
+      : "Для выбранных";
+  const renderDayHeading = (compact: boolean) => (
+    <div className={(compact ? "mb-3" : "mb-2.5") + " mx-0.5 mt-1 flex items-baseline justify-between gap-3"}>
+      <h3 className="m-0 text-[18px] font-semibold tracking-[-.01em] text-[var(--mp-tx)]">{dayContextLabel}</h3>
+      <span className="shrink-0 text-[13px] text-[var(--mp-tx2)]">{audienceLabel}</span>
+    </div>
+  );
 
   const personFilterOptions = planPersonFilterOptions([
     ...familyAdults.map(adult => ({
@@ -1238,7 +1249,7 @@ export function PlanMainContent({
     );
     return (
       <section aria-label="В вашем плане">
-        <h3 className={(compact ? "mb-3" : "mb-2.5") + " mx-0.5 mt-1 text-[18px] font-semibold tracking-[-.01em] text-[var(--mp-tx)]"}>{dayContextLabel}</h3>
+        {renderDayHeading(compact)}
         <div className="space-y-2">
           {timedRows.map((item, index) => (
             <div key={item.id} className="space-y-2">
@@ -1292,40 +1303,13 @@ export function PlanMainContent({
       );
     }
     if (dayPartSections.length > 0) return renderDayPlanSection(compact);
-    const emptyHeading = (
-      <h3 className={(compact ? "mb-3" : "mb-2.5") + " mx-0.5 mt-1 text-[18px] font-semibold tracking-[-.01em] text-[var(--mp-tx)]"}>{dayContextLabel}</h3>
-    );
-    if (!filteredAudience && !isPastDay) {
-      return (
-        <section aria-label="В вашем плане" className="pb-2">
-          {emptyHeading}
-          <p role="status" className="m-0 flex min-h-[76px] items-center justify-center rounded-[22px] border border-[#d6e4f3] bg-[#eaf2fb] px-4 py-3 text-center text-[14px] font-normal leading-[1.5] text-[var(--mp-tx2)]">
-            На {isTodaySelected ? "сегодня" : selectedDate === addDaysIso(todayKey, 1) ? "завтра" : "этот день"} планов нет.
-          </p>
-        </section>
-      );
-    }
     return (
-      <div role="status" className="rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-[15.5px] leading-[1.5] text-[var(--mp-tx2)]">
-        {filteredAudience ? (
-          <>
-            <b className="font-bold text-[var(--mp-tx)]">
-              {filterPerson?.kind === "adult" && personShortName(filterPerson) === "Я"
-                ? "У вас в этот день свободно."
-                : filterPerson?.kind === "child"
-                  ? `У ${toGenitiveName(personShortName(filterPerson))} в этот день свободно.`
-                  : "Нет дел по выбранным фильтрам."}
-            </b>{" "}
-            <button type="button" onClick={() => updateAudienceFilters({ include: [], exclude: [], visibility: "ALL" })} className="font-bold text-[var(--mp-ac-dark)] underline underline-offset-[3px]">
-              Сбросить фильтры
-            </button>
-          </>
-        ) : (
-          <>
-            <PlanEmptyDayMessage />
-          </>
-        )}
-      </div>
+      <section aria-label="В вашем плане" className="pb-2">
+        {renderDayHeading(compact)}
+        <p role="status" className="m-0 flex min-h-[76px] items-center justify-center rounded-[22px] border border-[#d6e4f3] bg-[#eaf2fb] px-4 py-3 text-center text-[14px] font-normal leading-[1.5] text-[var(--mp-tx2)]">
+          На {isTodaySelected ? "сегодня" : selectedDate === addDaysIso(todayKey, 1) ? "завтра" : "этот день"} планов нет.
+        </p>
+      </section>
     );
   };
 
