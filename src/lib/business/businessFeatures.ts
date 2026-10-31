@@ -88,7 +88,7 @@ export function parseBusinessFeaturesPatch(
  */
 export function isOfferWizardV2Enabled(
   business: { features?: unknown } | null | undefined,
-  env: { APP_ENV?: string; OFFER_WIZARD_V2_DEV_ENABLED?: string } = process.env,
+  env: { APP_ENV?: string; OFFER_WIZARD_V2_DEV_ENABLED?: string } = {\n    APP_ENV: process.env["APP_ENV"],\n    OFFER_WIZARD_V2_DEV_ENABLED: process.env["OFFER_WIZARD_V2_DEV_ENABLED"],\n  },
 ): boolean {
   const appEnv = env.APP_ENV?.trim().toLowerCase();
   if (appEnv === "dev" && env.OFFER_WIZARD_V2_DEV_ENABLED === "true") return true;
