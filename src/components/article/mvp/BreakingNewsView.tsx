@@ -978,7 +978,6 @@ export function BreakingNewsView({
     return () => observer.disconnect();
   }, [articleId, draftWatermark]);
   const cityHomeHref = getCityHomeHref(citySlug);
-  const journalHref = citySlug?.trim() ? `/${citySlug.trim()}/blog` : "/blog";
 
   const galleryBlock = blocks.find((b): b is Extract<ArticleMvpResolvedBlock, { type: "gallery" }> => b.type === "gallery");
 
@@ -999,16 +998,6 @@ export function BreakingNewsView({
         backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .35 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")`,
         opacity: .055, mixBlendMode: "multiply",
       }} aria-hidden />
-
-      {/* Close to Journal. Direct links retain a reliable destination. */}
-      <Link
-        href={journalHref}
-        aria-label="Закрыть публикацию и вернуться в Журнал"
-        className="bn-standalone-close fixed right-4 top-[max(4.5rem,calc(env(safe-area-inset-top) + 4.5rem))] z-[110] flex h-11 w-11 items-center justify-center rounded-full bg-white/95 text-neutral-900 shadow-lg backdrop-blur-sm transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-
-      >
-        <X size={22} aria-hidden />
-      </Link>
 
       {/* Reading progress bar */}
       <ReadingProgress />
