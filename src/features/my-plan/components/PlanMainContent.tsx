@@ -1173,13 +1173,18 @@ export function PlanMainContent({
       .map((label) => (label === "Я" ? "меня" : toGenitiveName(label)));
     const audienceLabel = !filteredAudience
       ? "Для всех"
-      : excludedPeople.length === 0 && planVisibilityFilter === "ALL" && included.length > 0 && included.length <= 3
-        ? `Для ${joinNamesRu(included)}`
+      : excludedPeople.length === 0 && planVisibilityFilter === "ALL" && included.length === 1
+        ? `Для ${included[0]}`
         : "Для выбранных";
     return (
       <div className={(compact ? "mb-3" : "mb-2.5") + " mx-0.5 mt-1 flex items-baseline justify-between gap-3"}>
         <h3 className="m-0 text-[18px] font-semibold tracking-[-.01em] text-[var(--mp-tx)]">{dayContextLabel}</h3>
-        <span className="min-w-0 truncate text-right text-[13px] text-[var(--mp-tx2)]">{audienceLabel}</span>
+        <span
+          style={{ fontFamily: "Menlo, ui-monospace, SFMono-Regular, Monaco, Consolas, monospace" }}
+          className="min-w-0 truncate text-right text-[12px] text-[var(--mp-tx2)]"
+        >
+          {audienceLabel}
+        </span>
       </div>
     );
   };
