@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ city: string }>;
-  searchParams: Promise<{ page?: string | string[]; type?: string | string[] }>;
+  searchParams: Promise<{ page?: string | string[]; type?: string | string[]; archive?: string | string[] }>;
 }
 
 async function resolveCity(citySlug: string) {
@@ -67,12 +67,14 @@ export default async function CityBlogPage({ params, searchParams }: PageProps) 
 
   const requestedPage = parsePage(query.page);
   const typeFilter = parseJournalTypeFilter(query.type);
+  const newsArchive = typeFilter === "BREAKING_NEWS" && (Array.isArray(query.archive) ? query.archive[0] : query.archive) === "1";
   // Территория — только из глобальной шапки (город страницы): материалы города выше.
   const journal = await loadJournalPage({
     city,
     scopeWhere: null,
     scopeKey: "all",
     typeFilter,
+    newsArchive,
     page: requestedPage,
   });
   if (requestedPage > journal.totalPages && journal.total > 0) notFound();
@@ -89,11 +91,12 @@ export default async function CityBlogPage({ params, searchParams }: PageProps) 
         collections={journal.collections}
         feed={journal.feed}
         typeFilter={typeFilter}
+        newsArchive={newsArchive}
         basePath={basePath}
         citySlug={city.slug}
       />
       <BlogPagination
-        basePath={typeFilter ? journalTypeFilterHref(basePath, typeFilter) : basePath}
+        basePath={typeFilter ? `${journalTypeFilterHref(basePath, typeFilter)}${newsArchive ? "&archive=1" : ""}` : basePath}
         page={journal.page}
         totalPages={journal.totalPages}
       />
