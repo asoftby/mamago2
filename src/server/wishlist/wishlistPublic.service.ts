@@ -3,6 +3,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { generateRawToken, hashToken } from "@/lib/auth/tokenHash";
 import { prisma as defaultPrisma } from "@/lib/prisma";
 
+import { RELEASE_NOTICE_DAYS } from "./wishlistNotifyPure";
 import {
   ACTIVE_RESERVATION_STATUSES,
   CONSENT_TEXT_VERSION,
@@ -23,7 +24,12 @@ import {
  * lock on the item, so concurrent guests can never over-book.
  */
 
-export type PublicDeps = { db?: PrismaClient; env?: Record<string, string | undefined> };
+export type PublicDeps = {
+  db?: PrismaClient;
+  env?: Record<string, string | undefined>;
+  /** Test seam: notice to the author after a reservation. */
+  notifyReserved?: (db: PrismaClient, input: { wishlistId: string; displayName: string; itemId: string }) => Promise<void>;
+};
 type Ctx = { db: PrismaClient };
 
 function ctx(deps: PublicDeps = {}): Ctx {
@@ -36,7 +42,11 @@ export type GuestReservationView = {
   quantity: number;
   status: "RESERVED" | "PURCHASED";
   displayName: string;
+  /** How the guest will hear about changes; null → only the banner on the next visit. */
+  contact: "telegram" | "email" | null;
 };
+
+export type PublicNotice = { reservationId: string; itemTitle: string };
 
 export type PublicItemView = {
   id: string;
@@ -64,6 +74,8 @@ export type PublicWishlistView = {
   eventDate: string | null;
   recipientLabel: string | null;
   archived: boolean;
+  /** Reservations of this visitor that the author has released in the last days. */
+  notices: PublicNotice[];
   items: PublicItemView[];
 };
 
@@ -125,7 +137,16 @@ export async function getPublicWishlist(
         include: {
           reservations: {
             where: { status: { in: ACTIVE } },
-            select: { id: true, quantity: true, status: true, displayName: true, userId: true, claimTokenHash: true },
+            select: {
+              id: true,
+              quantity: true,
+              status: true,
+              displayName: true,
+              userId: true,
+              claimTokenHash: true,
+              contactEmail: true,
+              telegramChatId: true,
+            },
           },
         },
       },
@@ -133,7 +154,24 @@ export async function getPublicWishlist(
   });
 
   const claimHashes = new Set(rawClaims.map(hashToken));
+  const owners: Prisma.WishlistReservationWhereInput[] = [];
+  if (claimHashes.size > 0) owners.push({ claimTokenHash: { in: [...claimHashes] } });
+  if (viewer.userId) owners.push({ userId: viewer.userId });
+  const released =
+    owners.length === 0
+      ? []
+      : await c.db.wishlistReservation.findMany({
+          where: {
+            status: "ITEM_REMOVED",
+            updatedAt: { gte: new Date(Date.now() - RELEASE_NOTICE_DAYS * 86_400_000) },
+            item: { wishlistId: head.id },
+            OR: owners,
+          },
+          orderBy: { updatedAt: "desc" },
+          select: { id: true, item: { select: { title: true } } },
+        });
   return {
+    notices: released.map((r) => ({ reservationId: r.id, itemTitle: r.item.title })),
     title: row.title,
     note: row.note,
     occasion: row.occasion,
@@ -166,6 +204,7 @@ export async function getPublicWishlist(
           quantity: r.quantity,
           status: r.status as "RESERVED" | "PURCHASED",
           displayName: r.displayName,
+          contact: r.telegramChatId ? ("telegram" as const) : r.contactEmail ? ("email" as const) : null,
         })),
       };
     }),
@@ -200,8 +239,10 @@ export async function reserveItem(
   const rawClaimToken = generateRawToken();
   const now = new Date();
 
+  let wishlistId = "";
   const reservation = await c.db.$transaction(async (tx) => {
     const wishlist = await loadPublic(tx, shareToken);
+    wishlistId = wishlist.id;
     if (wishlist.status === "ARCHIVED") throw new WishlistError("archived", "Вишлист в архиве");
     const locked = await tx.$queryRaw<Array<{ id: string; quantity: number }>>`
       SELECT "id", "quantity" FROM "WishlistItem"
@@ -233,6 +274,12 @@ export async function reserveItem(
       select: { id: true },
     });
   });
+  try {
+    const notify = deps?.notifyReserved ?? (await import("./wishlistNotify")).notifyAuthorReserved;
+    await notify(c.db, { wishlistId, displayName: input.displayName.trim(), itemId });
+  } catch (error) {
+    console.error("[wishlist] author notice failed", error instanceof Error ? error.name : typeof error);
+  }
   return { reservationId: reservation.id, rawClaimToken };
 }
 

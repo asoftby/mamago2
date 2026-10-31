@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { NOTIFICATION_REGISTRY } from "@/lib/notifications/notificationRegistry";
+
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
 
 // Guest service: every operation is flag-gated, quantity is guarded by a row lock, tokens are hashed.
@@ -12,7 +14,15 @@ assert.match(svc, /FOR UPDATE/, "reserve locks the item row");
 assert.match(svc, /hashToken\(rawClaimToken\)/, "only the hash of the claim token is stored");
 assert.doesNotMatch(svc, /claimToken:/, "no raw claim token column");
 assert.match(svc, /visibility === "PRIVATE"[\s\S]{0,80}not_found/, "private lists look missing");
-assert.doesNotMatch(svc, /contactEmail: true|telegramChatId: true/, "public view never selects guest contacts");
+assert.match(svc, /contact: r\.telegramChatId \? \("telegram" as const\) : r\.contactEmail \? \("email" as const\) : null/, "public view exposes only the contact kind");
+assert.doesNotMatch(svc, /contactEmail: r\.contactEmail|telegramChatId: r\.telegramChatId/, "raw guest contacts never reach the public view");
+
+// Notifications (PR 4)
+const notify = read("src/server/wishlist/wishlistNotify.ts");
+assert.match(notify, /hideReservationsFromOwner\) return/, "surprise mode: author is never told about reservations");
+assert.match(notify, /parseTelegramLinkPayload/, "telegram binding requires the signed payload");
+assert.doesNotMatch(notify, /console\.(log|error)\([^)]*(contactEmail|telegramChatId|displayName)/, "no contacts in logs");
+assert.match(read("src/server/services/telegram/TelegramWebhookService.ts"), /startsWith\("wl_"\)/, "webhook routes wl_ payloads");
 
 // Routes: rate limited, cookie httpOnly, no auth required.
 const helper = read("src/server/wishlist/wishlistPublicRoute.ts");
@@ -70,6 +80,15 @@ assert.match(read("src/lib/upload/uploadFromUrl.ts"), /options\.validateUrl \?\?
   const img = read("src/server/wishlist/wishlistImage.ts");
   assert.doesNotMatch(img, /"image\/svg/, "svg is never served");
   assert.doesNotMatch(read("src/features/wishlist/components/PublicWishlist.tsx"), /item\.imageUrl/, "guests never use the raw stored path");
+}
+
+// Notifications: a registered type (SYSTEM_INFO is silent by default), contacts honoured for account holders.
+{
+  assert.equal(NOTIFICATION_REGISTRY.SYSTEM?.defaultChannels.inApp, true, "SYSTEM is delivered in-app by default");
+  assert.equal(NOTIFICATION_REGISTRY.SYSTEM_INFO, undefined, "SYSTEM_INFO has no registry entry (silent)");
+  const notify = read("src/server/wishlist/wishlistNotify.ts");
+  assert.doesNotMatch(notify, /type:\s*"SYSTEM_INFO"/, "no wishlist notice uses the unregistered type");
+  assert.doesNotMatch(notify, /account notice failed", error\);\s*\}\s*return;/, "account holders still get reservation contacts");
 }
 
 console.log("wishlistPublic contract ok");

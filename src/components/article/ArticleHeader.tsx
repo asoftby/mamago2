@@ -55,7 +55,7 @@ export function ArticleHeader({
   const showDek = Boolean(subtitleHtml?.trim() || subtitle?.trim());
   const categoryLabel = category?.trim().toLocaleLowerCase("ru-RU") || null;
   const showMeta =
-    Boolean(journalHref || categoryLabel || formattedDate || readTime || editHref);
+    Boolean(journalHref || categoryLabel || formattedDate || editHref);
 
   const journalClassName =
     "inline-flex items-center text-primary font-medium uppercase tracking-wide text-xs leading-none transition-colors hover:text-primary/80";
@@ -94,9 +94,6 @@ export function ArticleHeader({
           ) : null}
           {formattedDate ? (
             <span className={metaPlainClassName}>{formattedDate}</span>
-          ) : null}
-          {readTime ? (
-            <span className={metaPlainClassName}>{readTime} мин чтения</span>
           ) : null}
           {editHref ? (
             <Link
