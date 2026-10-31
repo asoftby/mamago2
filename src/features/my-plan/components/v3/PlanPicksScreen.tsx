@@ -95,7 +95,7 @@ export function PlanPicksScreen({
     cn(
       "inline-flex h-[46px] shrink-0 items-center rounded-full border px-[18px] text-[14px] font-semibold transition-colors",
       selected
-        ? "border-[var(--mp-chip-on-bg)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]"
+        ? "border-[var(--mp-chip-on-line)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]"
         : "border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)] hover:border-[var(--mp-tx2)]",
       PLAN_FOCUS,
     );
@@ -116,7 +116,7 @@ export function PlanPicksScreen({
                 type="button"
                 aria-label="Сбросить возраст"
                 onClick={onResetAges}
-                className={cn("flex h-7 w-7 items-center justify-center rounded-full bg-white/16 hover:bg-white/25", PLAN_FOCUS)}
+                className={cn("flex h-7 w-7 items-center justify-center rounded-full bg-black/10 hover:bg-black/15", PLAN_FOCUS)}
               >
                 <X className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden />
               </button>

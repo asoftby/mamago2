@@ -218,7 +218,7 @@ export function PlanMonthScreen({
                 key={block.key}
                 className={cn(
                   "mb-2 overflow-hidden rounded-[20px] border",
-                  isOpen ? "border-[var(--mp-tx)] bg-white" : "border-[var(--mp-line)] bg-[var(--mp-card)]",
+                  isOpen ? "border-[var(--mp-chip-on-line)] bg-white" : "border-[var(--mp-line)] bg-[var(--mp-card)]",
                 )}
               >
                 <button
@@ -227,17 +227,17 @@ export function PlanMonthScreen({
                   onClick={() => setOpen(isOpen ? null : block.day)}
                   className={cn(
                     "flex min-h-[68px] w-full items-center gap-3.5 py-2.5 pl-4 pr-3.5 text-left",
-                    isOpen && "bg-[var(--mp-tx)] text-white",
+                    isOpen && "bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]",
                     PLAN_FOCUS,
                   )}
                 >
                   <span className="flex w-[34px] shrink-0 flex-col items-center">
-                    <span className={cn(CAPS, isOpen && "text-white/65")}>{weekdayShort(block.day)}</span>
+                    <span className={CAPS}>{weekdayShort(block.day)}</span>
                     <span className="mp-font-display text-[28px] leading-none">{dayOfMonth(block.day)}</span>
                   </span>
                   <span className="min-w-0 flex-1">
                     <b className="block text-[16px] font-semibold">{dayLabel(block.day, today)}</b>
-                    <span className={cn(CAPS, isOpen && "text-white/65")}>{dela(block.items.length)}</span>
+                    <span className={CAPS}>{dela(block.items.length)}</span>
                   </span>
                   <ChevronDown className={cn("h-[18px] w-[18px] shrink-0 transition-transform", isOpen && "rotate-180")} strokeWidth={2} aria-hidden />
                 </button>

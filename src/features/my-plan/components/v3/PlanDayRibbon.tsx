@@ -96,7 +96,7 @@ export function PlanDayRibbon({
           onClick={() => onChange(today)}
           className={cn(
             "mp-font-meta h-9 rounded-full border border-[var(--mp-tx)] px-3.5 text-[10px] font-semibold uppercase tracking-[.14em] text-[var(--mp-tx)] transition-colors",
-            "enabled:hover:bg-[var(--mp-tx)] enabled:hover:text-white disabled:border-[var(--mp-line-strong)] disabled:text-[var(--mp-tx2)] disabled:opacity-60",
+            "enabled:hover:border-[var(--mp-chip-on-line)] enabled:hover:bg-[var(--mp-chip-on-bg)] enabled:hover:text-[var(--mp-chip-on-tx)] disabled:border-[var(--mp-line-strong)] disabled:text-[var(--mp-tx2)] disabled:opacity-60",
             PLAN_FOCUS,
           )}
         >
@@ -133,25 +133,25 @@ export function PlanDayRibbon({
                 className={cn(
                   "flex h-[92px] w-[76px] shrink-0 snap-start flex-col items-center justify-center gap-[3px] rounded-[20px] border transition-colors",
                   selected
-                    ? "border-[var(--mp-tx)] bg-[var(--mp-tx)] text-white"
+                    ? "border-[var(--mp-chip-on-line)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]"
                     : isToday
                       ? "border-[1.5px] border-[var(--mp-tx)] bg-[var(--mp-card)] text-[var(--mp-tx)]"
                       : "border-[var(--mp-line)] bg-[var(--mp-card)] text-[var(--mp-tx)] hover:border-[var(--mp-line-strong)]",
                   PLAN_FOCUS,
                 )}
               >
-                <span className={cn("mp-font-meta text-[10px] uppercase tracking-[.1em]", selected ? "text-white/65" : "text-[var(--mp-tx2)]")}>
+                <span className="mp-font-meta text-[10px] uppercase tracking-[.1em] text-[var(--mp-tx2)]">
                   {weekdayShort(day)}
                 </span>
                 <span className="mp-font-display text-[28px] font-normal leading-none tracking-[-.02em] [font-variant-numeric:lining-nums]">{dayOfMonth(day)}</span>
                 {owners.length ? (
                   <span className="flex h-3.5 items-center gap-1" aria-hidden>
                     {owners.slice(0, MAX_DOTS).map((owner) => (
-                      <i key={owner} className="h-1.5 w-1.5 rounded-full" style={{ background: selected ? "#fff" : ownerColor(owner) }} />
+                      <i key={owner} className="h-1.5 w-1.5 rounded-full" style={{ background: ownerColor(owner) }} />
                     ))}
                   </span>
                 ) : (
-                  <span className={cn("mp-font-meta h-3.5 text-[9px] uppercase tracking-[.08em]", selected ? "text-white/65" : "text-[var(--mp-tx2)]")}>
+                  <span className="mp-font-meta h-3.5 text-[9px] uppercase tracking-[.08em] text-[var(--mp-tx2)]">
                     {isToday ? "сегодня" : monthShort(day)}
                   </span>
                 )}

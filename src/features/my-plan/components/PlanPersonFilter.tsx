@@ -76,9 +76,9 @@ export function PlanPersonFilter({
               onClick={() => toggle(option.value)}
               className="inline-flex h-[46px] max-w-[180px] shrink-0 items-center justify-center gap-2 truncate rounded-full border px-[18px] text-[14px] font-semibold transition-colors hover:border-[#6f675e]"
               style={{
-                color: selected ? "#fff" : "#141210",
-                background: selected ? "#141210" : "#fff",
-                borderColor: selected ? "#141210" : "rgba(20,18,16,.18)",
+                color: "#141210",
+                background: selected ? "var(--mp-chip-on-bg, #f7c3ad)" : "#fff",
+                borderColor: selected ? "var(--mp-chip-on-line, #f3a684)" : "rgba(20,18,16,.18)",
               }}
             >
               {option.value !== "all" ? (option.avatarUrl ? (
@@ -86,7 +86,7 @@ export function PlanPersonFilter({
                 <img src={option.avatarUrl} alt="" className="h-[26px] w-[26px] shrink-0 rounded-full object-cover" />
               ) : (
                 <span aria-hidden className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
-                style={{ background: selected ? "rgba(255,255,255,.16)" : "rgba(0,0,0,.1)" }}>{option.label.trim().charAt(0).toUpperCase() || "•"}</span>
+                style={{ background: "rgba(0,0,0,.1)" }}>{option.label.trim().charAt(0).toUpperCase() || "•"}</span>
               )) : null}
               {option.label}
             </button>

@@ -13,7 +13,7 @@ export const PLAN_SEG_ON = "bg-white text-[var(--mp-tx)] shadow-[0_1px_3px_rgba(
 export const PLAN_SEG_OFF = "text-[var(--mp-tx2)]";
 
 export const PLAN_CHIP = `mp-font-ui inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border px-4 text-[15px] font-semibold transition-colors ${PLAN_FOCUS}`;
-export const PLAN_CHIP_ON = "border-[var(--mp-chip-on-bg)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]";
+export const PLAN_CHIP_ON = "border-[var(--mp-chip-on-line)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]";
 export const PLAN_CHIP_OFF =
   "border-[var(--mp-chip-line)] bg-[var(--mp-card)] text-[var(--mp-tx)] enabled:hover:border-[var(--mp-tx2)]";
 /** Недоступный чип: явно «выключен» — приглушён и с курсором not-allowed. */
