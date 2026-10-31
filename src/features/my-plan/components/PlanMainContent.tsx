@@ -318,7 +318,7 @@ function buildParticipantSummaryLabels(
   );
 }
 
-/** «сегодня» / «завтра» / «среду, 4 ноября» — для подписи «Афиша на …». */
+/** «сегодня» / «завтра» / «среду, 4 ноября» — для подписи «Активности на …». */
 function posterDayWord(selectedDate: string, todayKey: string): string {
   if (selectedDate === todayKey) return "сегодня";
   if (selectedDate === addDaysIso(todayKey, 1)) return "завтра";
@@ -1294,10 +1294,10 @@ export function PlanMainContent({
     );
     if (!filteredAudience && !isPastDay) {
       return (
-        <section aria-label="В вашем плане">
+        <section aria-label="В вашем плане" className="pb-2">
           {emptyHeading}
-          <p role="status" className="m-0 px-0.5 pb-2 text-center text-[14px] font-normal leading-[1.5] text-[var(--mp-tx2)]">
-            На {posterDayWord(selectedDate, todayKey)} планов нет.
+          <p role="status" className="m-0 flex min-h-[76px] items-center justify-center rounded-[22px] border border-[#d6e4f3] bg-[#eaf2fb] px-4 py-3 text-center text-[14px] font-normal leading-[1.5] text-[var(--mp-tx2)]">
+            На {isTodaySelected ? "сегодня" : selectedDate === addDaysIso(todayKey, 1) ? "завтра" : "этот день"} планов нет.
           </p>
         </section>
       );
@@ -1399,7 +1399,7 @@ export function PlanMainContent({
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Подобрать, куда сходить</span>
-          <span className="mt-[3px] block text-[13px] text-[var(--mp-tx2)]">Афиша на {posterDayWord(selectedDate, todayKey)}</span>
+          <span className="mt-[3px] block text-[13px] text-[var(--mp-tx2)]">Активности на {posterDayWord(selectedDate, todayKey)}</span>
         </span>
         <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--mp-ac-dark)]" strokeWidth={1.8} aria-hidden />
       </button>
