@@ -33,6 +33,7 @@ import { PlanArticleScreen } from "./v3/PlanArticleScreen";
 import { PlanEventScreen } from "./v3/PlanEventScreen";
 import { PlanScenarioScreen } from "./v3/PlanScenarioScreen";
 import { PlanNewTaskScreen } from "./v3/PlanNewTaskScreen";
+import { PlanIdeasScreen } from "./v3/PlanIdeasScreen";
 import { PlanVisitsScreen } from "./v3/PlanVisitsScreen";
 import { PlanWeekScreen } from "./v3/PlanWeekScreen";
 import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
@@ -420,12 +421,12 @@ export function PlanMainContent({
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   /** Два экрана остаются в одной модалке: сдвигаем их по горизонтали, не теряя план. */
-  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "week" | "event" | "scenario">("plan");
+  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "ideas" | "week" | "event" | "scenario">("plan");
   /** Сохраняем исходящий экран в DOM до конца обратной анимации. */
-  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "week" | "event" | "scenario" | null>(null);
+  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "ideas" | "week" | "event" | "scenario" | null>(null);
   /** Каждое открытие формы — новый экземпляр; отменённая анимация не оставляет старый черновик. */
   const [nestedScreenVersion, setNestedScreenVersion] = useState(0);
-  const openNestedScreen = useCallback((next: "new" | "visits" | "week" | "event" | "scenario") => {
+  const openNestedScreen = useCallback((next: "new" | "visits" | "ideas" | "week" | "event" | "scenario") => {
     setNestedScreenVersion((version) => version + 1);
     setMountedNestedScreen(next);
     setScreen(next);
@@ -1475,7 +1476,7 @@ export function PlanMainContent({
         />
       ) : null}
       <nav aria-label="Разделы моего плана" className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 border-t border-[var(--mp-line)] pt-4">
-        <button type="button" onClick={handleOpenMyIdeas} className="min-h-11 text-[14px] font-semibold text-[var(--mp-tx2)] hover:text-[var(--mp-ac-dark)]">
+        <button type="button" onClick={() => openNestedScreen("ideas")} className="min-h-11 text-[14px] font-semibold text-[var(--mp-tx2)] hover:text-[var(--mp-ac-dark)]">
           {ideasCount ? `Мои идеи · ${ideasCount}` : "Мои идеи"}
         </button>
         <button type="button" onClick={() => openNestedScreen("visits")} className="min-h-11 text-[14px] font-semibold text-[var(--mp-tx2)] hover:text-[var(--mp-ac-dark)]">
@@ -1743,7 +1744,19 @@ export function PlanMainContent({
               onOpen={handleOpenScenarioPage}
             />
           ) : mountedNestedScreen === "visits" ? (
-            <PlanVisitsScreen key={nestedScreenVersion} onBack={closeNestedScreen} />
+            <PlanVisitsScreen key={nestedScreenVersion} onBack={closeNestedScreen} onClose={onRequestClose} />
+          ) : mountedNestedScreen === "ideas" ? (
+            <PlanIdeasScreen
+              key={nestedScreenVersion}
+              ideas={ideas}
+              dayLabel={new Date(`${selectedDate}T12:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+              plannedActivityIds={new Set((planItemsByDate?.[selectedDate] ?? []).map((item) => item.activityId).filter((id): id is string => Boolean(id)))}
+              addingActivityId={addingActivityId}
+              onAdd={(idea) => void handleAddIdeaToPlan(idea)}
+              onOpenAll={handleOpenMyIdeas}
+              onBack={closeNestedScreen}
+              onClose={onRequestClose}
+            />
           ) : mountedNestedScreen === "week" ? (
             <PlanWeekScreen
               key={nestedScreenVersion}
