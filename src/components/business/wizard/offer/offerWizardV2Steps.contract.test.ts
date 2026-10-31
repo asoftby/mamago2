@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { getDefaultFormData } from "./defaults";
 import { V2_STEPS, V2_STEP_KEYS, getV2StepMembers, isV2CompositeStepKey } from "./offerWizardV2Steps";
 
@@ -43,3 +44,28 @@ const V2_KEYS = ["type", "about", "services", "schedule", "terms", "review"];
 }
 
 console.log("offerWizardV2Steps contract tests passed");
+
+{
+  // Booking policies across all four routes: assert exact composition and
+  // distinguish party opening hours from actual availability.
+  const base = getDefaultFormData(null);
+  const routes = [
+    { data: { ...base, productType: "PLACE_VISIT" as const }, steps: ["conditions", "openingHours", "bookingMethod"] },
+    { data: { ...base, productType: "REGULAR_ACTIVITY" as const }, steps: ["conditions", "classSchedule", "bookingMethod"] },
+    { data: { ...base, productType: "PARTY_PACKAGE" as const }, steps: ["openingHours", "bookingMethod"] },
+    { data: { ...base, offerWizardType: "CAMP" as const, productType: "CAMP" as const }, steps: ["campSchedule", "accommodation", "bookingMethod"] },
+  ];
+  for (const route of routes) {
+    assert.deepEqual(getV2StepMembers("schedule", route.data), route.steps);
+    assert.deepEqual(getV2StepMembers("services", route.data), ["price"]);
+  }
+
+  const method = readFileSync("src/components/business/wizard/offer/steps/StepBookingMethod.tsx", "utf8");
+  assert.match(method, /isParty &&/);
+  assert.match(method, /не создают доступные для бронирования слоты/);
+  assert.match(method, /По заявке.*не подтверждает свободное время автоматически/);
+  const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.tsx", "utf8");
+  assert.match(wizard, /<BookingServicesEditor offerId=\\{offerId\\}/);
+  const classSchedule = readFileSync("src/components/business/wizard/offer/steps/StepClassSchedule.tsx", "utf8");
+  assert.match(classSchedule, /classSchedule\\.groups\\.map/);
+}
