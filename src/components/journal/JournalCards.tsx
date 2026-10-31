@@ -209,7 +209,7 @@ export function JournalMobileCard({
   saveStatus?: ArticleSaveStatus;
 }) {
   return (
-    <article className="group relative min-w-0 pb-12 last:pb-0">
+    <article className="group relative min-w-0">
       <div className="relative">
         <Link href={article.href} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
           <Cover article={article} tone={index} className="aspect-[1.22] rounded-xl" />
