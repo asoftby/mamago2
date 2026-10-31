@@ -277,7 +277,7 @@ export function PlanNewTaskScreen({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
-      <div className="flex min-h-20 shrink-0 items-center gap-3 px-5 pb-1.5 pt-[26px] md:px-8">
+      <div className="flex shrink-0 items-center gap-3 px-5 pb-1 pt-[26px] md:px-8">
         <button
           type="button"
           onClick={onBack}
@@ -286,14 +286,16 @@ export function PlanNewTaskScreen({
         >
           <ChevronLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
         </button>
-        <h2 className="mp-font-meta m-0 flex items-center gap-2 text-[10px] font-medium uppercase leading-none tracking-[.14em] text-[var(--mp-ac-dark)]">
-          <i aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--mp-ac-dark)]" />
+        <p
+          style={{ fontFamily: "Menlo, ui-monospace, SFMono-Regular, Monaco, Consolas, monospace" }}
+          className="m-0 text-[10px] font-medium uppercase leading-none tracking-[.14em] text-[var(--mp-ac-dark)]"
+        >
           {isMove ? "Перенести дело" : "Новое дело"}
-        </h2>
+        </p>
       </div>
       <div
         data-plan-new-task-scroll
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y px-5 pb-6 pt-1 md:px-8"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y px-5 pb-6 pt-0 md:px-8"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
         <label className="block">
@@ -305,7 +307,7 @@ export function PlanNewTaskScreen({
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder="Что нужно сделать?"
-            className="mp-font-ui m-0 mb-[18px] mt-1 block min-h-[72px] w-full resize-none border-0 bg-transparent p-0 text-[34px] font-semibold leading-none tracking-[-.02em] text-[var(--mp-tx)] caret-[var(--mp-ac)] outline-none placeholder:font-semibold placeholder:text-[#b9b0a5]"
+            className="mp-font-ui m-0 mb-[18px] block min-h-[56px] w-full resize-none border-0 bg-transparent p-0 text-[22px] font-bold leading-[1.15] tracking-[-.01em] text-[var(--mp-tx)] caret-[var(--mp-ac)] outline-none placeholder:font-bold placeholder:text-[#b9b0a5]"
           />
         </label>
 
