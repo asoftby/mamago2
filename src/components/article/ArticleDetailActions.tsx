@@ -52,8 +52,7 @@ export function ArticleDetailActions({
         articleId={articleId}
         articleTitle={title}
         coverImageUrl={coverImageUrl}
-        variant="icon"
-        className="h-11 w-11 border border-border bg-white shadow-none sm:h-10 sm:w-auto sm:px-4"
+        variant="responsive"
         iconClassName="h-5 w-5"
         source="detail"
         registerInHeader
