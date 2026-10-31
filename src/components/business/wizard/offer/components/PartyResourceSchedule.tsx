@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PartyResourceEditor } from "./PartyResourceEditor";
 
 type Unit = { id: string; name: string; status: string; offers: { offerId: string }[] };
 const days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -24,6 +25,7 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
   const [duration, setDuration] = useState(60);
   const [capacity, setCapacity] = useState(1);
   const [pending, setPending] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -90,7 +92,7 @@ export function PartyResourceSchedule({ offerId }: { offerId: string | null }) {
         <>
           {units.length > 0 && <div className="space-y-1 text-sm">
             <p className="font-medium">Привязанные ресурсы</p>
-            {units.map(unit => <p key={unit.id}>{unit.name} — {unit.status}</p>)}
+            {units.map(unit => <div key={unit.id} className="space-y-2"><div className="flex items-center gap-2"><span>{unit.name} — {unit.status}</span><Button type="button" variant="outline" size="sm" onClick={() => setEditingId(current => current === unit.id ? null : unit.id)}>Изменить</Button></div>{editingId === unit.id && <PartyResourceEditor unitId={unit.id} offerId={offerId} onSaved={() => void refresh()} />}</div>)}
           </div>}
           <div className="space-y-2">
             <Label htmlFor="party-resource-name">Название ресурса</Label>
