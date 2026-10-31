@@ -81,3 +81,19 @@ export function parseBusinessFeaturesPatch(
   }
   return Object.keys(patch).length > 0 ? patch : null;
 }
+
+/** DEV-only, explicitly opt-in rollout for full offer-wizard QA.
+ * Never infer the environment from NODE_ENV: next start uses "production" on DEV.
+ * An actual production APP_ENV always obeys the business feature flag.
+ */
+export function isOfferWizardV2Enabled(
+  business: { features?: unknown } | null | undefined,
+  env: { APP_ENV?: string; OFFER_WIZARD_V2_DEV_ENABLED?: string } = {
+    APP_ENV: process.env["APP_ENV"],
+    OFFER_WIZARD_V2_DEV_ENABLED: process.env["OFFER_WIZARD_V2_DEV_ENABLED"],
+  },
+): boolean {
+  const appEnv = env.APP_ENV?.trim().toLowerCase();
+  if (appEnv === "dev" && env.OFFER_WIZARD_V2_DEV_ENABLED === "true") return true;
+  return isBusinessFeatureEnabled(business, "newOfferWizard");
+}

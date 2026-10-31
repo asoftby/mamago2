@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { OfferWizard } from "@/components/business/wizard/offer/OfferWizard";
 import { isOfferCtaStepFeatureEnabled } from "@/components/business/wizard/offer/ctaStepFeatureFlag";
-import { isBusinessFeatureEnabled } from "@/lib/business/businessFeatures";
+import { isOfferWizardV2Enabled } from "@/lib/business/businessFeatures";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
   defaultEditorNav,
@@ -139,7 +139,7 @@ export default async function EditorEditOfferPage({
         pendingRevisionFields={pendingRevision?.fields}
         operationalVersion={offerOperationalVersion(offer as unknown as Record<string, unknown>)}
         ctaStepEnabled={ctaStepEnabled}
-        newWizard={isBusinessFeatureEnabled(offerBusiness, "newOfferWizard")}
+        newWizard={isOfferWizardV2Enabled(offerBusiness)}
       />
     </ContentEditorChrome>
   );
