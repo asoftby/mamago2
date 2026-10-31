@@ -112,8 +112,8 @@ assert.match(
 
 assert.match(
   myPlanHeader,
-  /flex h-11 w-11 shrink-0 items-center justify-center rounded-full/,
-  "My Plan close button must be a 44px touch target (h-11 w-11)",
+  /flex h-\[46px\] w-\[46px\] shrink-0 items-center justify-center rounded-full/,
+  "My Plan close button must be at least a 44px touch target (46px)",
 );
 
 assert.match(
