@@ -3,7 +3,6 @@
 import Link from "next/link";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
 import { ArticleSaveHeart, type ArticleSaveStatus } from "@/features/save/ArticleSaveHeart";
-import { formatJournalPublishedDate } from "@/lib/article/formatJournalPublishedDate";
 import { formatCollectionMeta, formatJournalRelativeTime } from "@/lib/journal/journalCardMeta";
 import { cn } from "@/lib/utils";
 import { JournalBadge, journalTypeBadgeVariant } from "./JournalBadge";
@@ -151,7 +150,6 @@ export function JournalFeedRow({
   typeHref?: string | null;
 }) {
   const typeBadge = journalTypeBadgeVariant(article.publicationType);
-  const date = article.publishedAt ? formatJournalPublishedDate(article.publishedAt) : null;
   return (
     <div className="group relative grid grid-cols-[96px_1fr] items-center gap-4 border-t border-border py-4 sm:grid-cols-[180px_1fr] sm:gap-8 sm:py-6">
       <Link href={article.href} tabIndex={-1} aria-hidden className="block">
@@ -179,13 +177,10 @@ export function JournalFeedRow({
           </div>
         ) : null}
         <Link href={article.href} className="min-h-11">
-          <h3 className="m-0 line-clamp-3 font-heading text-[19px] leading-[1.15] tracking-[-0.015em] text-foreground transition-colors group-hover:text-primary sm:text-[26px]">
+          <h3 className="m-0 line-clamp-3 font-heading text-[20px] leading-[1.2] tracking-[-0.015em] text-foreground transition-colors group-hover:text-primary">
             {article.title}
           </h3>
         </Link>
-        <p className="text-[12px] text-muted-foreground sm:text-[13px]">
-          {[article.geographyLabel, date, journalCardMeta(article)].filter(Boolean).join(" · ")}
-        </p>
       </div>
       <div className="absolute right-0 top-1/2 -translate-y-1/2">
         <ArticleSaveHeart
@@ -219,7 +214,6 @@ export function JournalFeedGridCard({
   typeHref?: string | null;
 }) {
   const typeBadge = journalTypeBadgeVariant(article.publicationType);
-  const date = article.publishedAt ? formatJournalPublishedDate(article.publishedAt) : null;
   return (
     <article className="group min-w-0">
       <div className="relative">
@@ -250,13 +244,10 @@ export function JournalFeedGridCard({
           </div>
         ) : null}
         <Link href={article.href} className="min-h-11">
-          <h3 className="m-0 line-clamp-4 font-heading text-[24px] font-semibold leading-[1.18] tracking-[-0.025em] text-foreground transition-colors group-hover:text-primary">
+          <h3 className="m-0 line-clamp-4 font-heading text-[20px] font-semibold leading-[1.2] tracking-[-0.025em] text-foreground transition-colors group-hover:text-primary">
             {article.title}
           </h3>
         </Link>
-        <p className="text-[13px] text-muted-foreground">
-          {[article.geographyLabel, date, journalCardMeta(article)].filter(Boolean).join(" · ")}
-        </p>
       </div>
     </article>
   );
