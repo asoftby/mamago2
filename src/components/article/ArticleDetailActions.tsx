@@ -52,7 +52,8 @@ export function ArticleDetailActions({
         articleId={articleId}
         articleTitle={title}
         coverImageUrl={coverImageUrl}
-        variant="labeled"
+        variant="responsive"
+        iconClassName="h-5 w-5"
         source="detail"
         registerInHeader
       />
@@ -60,10 +61,10 @@ export function ArticleDetailActions({
         type="button"
         onClick={() => setShareOpen(true)}
         aria-label="Поделиться статьёй"
-        className="inline-flex h-10 items-center gap-2 rounded-full border border-[rgba(20,18,16,0.14)] bg-white px-4 text-sm font-medium text-foreground transition-colors hover:border-[rgba(20,18,16,0.28)]"
+        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-white text-foreground transition-colors hover:border-[rgba(20,18,16,0.28)] sm:h-10 sm:w-auto sm:gap-2 sm:px-4 sm:text-sm sm:font-medium"
       >
-        <Share2 className="h-4 w-4" />
-        <span>Поделиться</span>
+        <Share2 className="h-5 w-5 sm:h-4 sm:w-4" />
+        <span className="hidden sm:inline">Поделиться</span>
       </button>
       <ShareModal
         open={shareOpen}
