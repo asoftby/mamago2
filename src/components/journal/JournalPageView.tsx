@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Archive } from "lucide-react";
 import { useEffect, useState } from "react";
 import { orderBreakingNewsBySeen, readSeenBreakingNews } from "@/features/stories/lib/seen";
 import type { CityHomeJournalArticle } from "@/server/article/listCityHomeArticles";
@@ -29,6 +30,7 @@ export function JournalPageView({
   collections,
   feed,
   typeFilter,
+  newsArchive = false,
   basePath,
   citySlug,
   intro,
@@ -40,7 +42,7 @@ export function JournalPageView({
   collections: CityHomeJournalArticle[];
   feed: CityHomeJournalArticle[];
   typeFilter: JournalTypeFilter | null;
-  /** Путь страницы (с query рубрики/темы, без type/page): «Все →» и «Смотреть все →» добавляют `?type=`. */
+  newsArchive?: boolean;  /** Путь страницы (с query рубрики/темы, без type/page): «Все →» и «Смотреть все →» добавляют `?type=`. */
   basePath: string;
   citySlug?: string;
   /** Доп. контент под заголовком (подрубрики/темы на странице рубрики). */
@@ -61,24 +63,32 @@ export function JournalPageView({
     window.addEventListener("storage", refresh);
     return () => { window.removeEventListener("focus", refresh); window.removeEventListener("pageshow", refresh); window.removeEventListener("storage", refresh); };
   }, []);
-  const currentNews = typeFilter === "BREAKING_NEWS" ? feed.filter((article) => article.expiresAt && new Date(article.expiresAt).getTime() > Date.now()) : [];
-  const rankedCurrentNews = orderBreakingNewsBySeen(currentNews, seenNewsIds);
-  const archivedNews = typeFilter === "BREAKING_NEWS" ? feed.filter((article) => !article.expiresAt || new Date(article.expiresAt).getTime() <= Date.now()) : [];
+  const displayedNews = typeFilter === "BREAKING_NEWS" && !newsArchive ? orderBreakingNewsBySeen(feed, seenNewsIds) : feed;
   const empty = !main && news.length === 0 && collections.length === 0 && feed.length === 0;
 
   return (
     <div className="site-wrap space-y-10 px-4 pb-16 pt-6 sm:space-y-14 sm:px-7 sm:pt-10">
       <header className="space-y-3">
-        <h1 className="m-0 font-heading text-[34px] leading-[.98] tracking-[-0.03em] sm:text-[40px]">
-          {typeFilter ? JOURNAL_TYPE_FILTER_TITLE[typeFilter] : title}
-        </h1>
-        <p className="max-w-3xl text-[16px] leading-relaxed text-muted-foreground sm:text-[17px]">
-          {typeFilter ? (
-            <Link href={resetHref} className="inline-flex min-h-11 items-center font-semibold text-brand-ink hover:underline">
-              ← Все материалы
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className={`m-0 font-heading text-[34px] leading-[.98] tracking-[-0.03em] sm:text-[40px] ${newsArchive ? "text-muted-foreground" : ""}`}>
+            {typeFilter === "BREAKING_NEWS" ? (newsArchive ? "Архив Breaking News" : "Breaking News") : typeFilter ? JOURNAL_TYPE_FILTER_TITLE[typeFilter] : title}
+          </h1>
+          {typeFilter === "BREAKING_NEWS" && (
+            <Link href={newsArchive ? typeHref("BREAKING_NEWS") : `${typeHref("BREAKING_NEWS")}&archive=1`} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+              <Archive aria-hidden="true" className="h-4 w-4" />
+              {newsArchive ? "Актуальные" : "Архив"}
             </Link>
-          ) : subtitle}
-        </p>
+          )}
+        </div>
+        {typeFilter !== "BREAKING_NEWS" && (
+          <p className="max-w-3xl text-[16px] leading-relaxed text-muted-foreground sm:text-[17px]">
+            {typeFilter ? (
+              <Link href={resetHref} className="inline-flex min-h-11 items-center font-semibold text-brand-ink hover:underline">
+                ← Все материалы
+              </Link>
+            ) : subtitle}
+          </p>
+        )}
         {intro}
       </header>
 
@@ -137,27 +147,19 @@ export function JournalPageView({
       />
 
       {typeFilter === "BREAKING_NEWS" ? (
-        <section aria-label="Все новости" className="space-y-8">
-          {currentNews.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="font-heading text-2xl">Актуальные новости</h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                {rankedCurrentNews.map((article) => <JournalNewsCard key={article.id} article={article} />)}
-              </div>
+        <section aria-label={newsArchive ? "Архив Breaking News" : "Актуальные Breaking News"}>
+          {displayedNews.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              {displayedNews.map((article, index) => (
+                <AnalyticsCardViewTracker key={article.id} entityType="ARTICLE" entityId={article.id} vertical="CITY" citySlug={citySlug} meta={{ section: "journal", block: newsArchive ? "news-archive" : "news-current", position: index }}>
+                  <JournalNewsCard article={article} />
+                </AnalyticsCardViewTracker>
+              ))}
             </div>
-          )}
-          {archivedNews.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="font-heading text-2xl">Архив новостей</h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                {archivedNews.map((article) => (
-                  <div key={article.id} className="space-y-2">
-                    <JournalNewsCard article={article} />
-                    <p className="text-xs text-muted-foreground"><span className="font-semibold">Архив</span> · {article.publishedAt ? new Date(article.publishedAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Minsk" }) : ""}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+          ) : (
+            <p className="py-8 text-sm text-muted-foreground">
+              {newsArchive ? "В архиве пока нет материалов." : "Сейчас нет актуальных Breaking News."}
+            </p>
           )}
         </section>
       ) : null}
@@ -226,7 +228,7 @@ export function JournalPageView({
         </section>
       ) : null}
 
-      {empty ? (
+      {empty && typeFilter !== "BREAKING_NEWS" ? (
         <div className="py-12">
           <p className="text-sm text-muted-foreground">Здесь пока нет материалов.</p>
           {typeFilter ? (

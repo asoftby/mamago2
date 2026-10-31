@@ -44,6 +44,7 @@ export async function loadJournalPage(input: {
   typeFilter: JournalTypeFilter | null;
   page: number;
   pageSize?: number;
+  newsArchive?: boolean;
 }): Promise<JournalPageData> {
   const pageSize = Math.max(1, Math.min(60, input.pageSize ?? 24));
   const page = Math.max(1, Math.trunc(input.page));
@@ -64,12 +65,17 @@ export async function loadJournalPage(input: {
       typeFilter: input.typeFilter,
       mainId: input.typeFilter ? null : await resolveMainId(main, input.scopeWhere, top),
     });
-    const total = await countJournalArticles(feedWhere);
+    const newsFeedWhere: Prisma.ArticleWhereInput = input.typeFilter === "BREAKING_NEWS"
+      ? { AND: [feedWhere, input.newsArchive
+        ? { OR: [{ expiresAt: null }, { expiresAt: { lte: new Date() } }] }
+        : notExpiredJournalPublicationWhere(new Date())] }
+      : feedWhere;
+    const total = await countJournalArticles(newsFeedWhere);
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     // Страница типа (?type=news|collection) — все материалы типа, включая истёкшие
     // новости, строго по дате публикации. Основная лента — закреплённые, затем город.
     const feed = page > totalPages ? [] : input.typeFilter === "BREAKING_NEWS"
-      ? await queryPaginatedBreakingNews(feedWhere, (page - 1) * pageSize, pageSize)
+      ? await queryJournalArticles(null, { additionalWhere: newsFeedWhere, skip: (page - 1) * pageSize, take: pageSize })
       : await queryJournalArticles(input.typeFilter ? null : input.city, {
       additionalWhere: feedWhere,
       pinnedFirst: !input.typeFilter,
@@ -80,7 +86,7 @@ export async function loadJournalPage(input: {
   };
   return unstable_cache(
     load,
-    ["journal-page", input.city?.id ?? "national", input.city?.regionId ?? "", input.scopeKey, input.typeFilter ?? "all", String(page), String(pageSize)],
+    ["journal-page", input.city?.id ?? "national", input.city?.regionId ?? "", input.scopeKey, input.typeFilter ?? "all", input.newsArchive ? "archive" : "current", String(page), String(pageSize)],
     { tags: [PUBLIC_ARTICLE_LIST_CACHE_TAG, PUBLIC_ARTICLE_CATEGORY_DEPENDENCY_TAG], revalidate: 300 },
   )();
 }
@@ -111,33 +117,4 @@ export async function listJournalCollections(input: {
     additionalWhere: collections,
     take: Math.max(1, Math.min(24, input.limit ?? JOURNAL_COLLECTIONS_LIMIT)),
   });
-}
-
-/** Globally paginate current news before archived news; no page-local reordering. */
-async function queryPaginatedBreakingNews(
-  feedWhere: Prisma.ArticleWhereInput,
-  skip: number,
-  take: number,
-): Promise<CityHomeJournalArticle[]> {
-  const now = new Date();
-  const currentWhere: Prisma.ArticleWhereInput = {
-    AND: [feedWhere, notExpiredJournalPublicationWhere(now)],
-  };
-  const currentCount = await countJournalArticles(currentWhere);
-  const currentSkip = Math.min(skip, currentCount);
-  const currentTake = Math.min(take, Math.max(0, currentCount - currentSkip));
-  const current = currentTake > 0
-    ? await queryJournalArticles(null, { additionalWhere: currentWhere, skip: currentSkip, take: currentTake })
-    : [];
-  const archiveTake = take - current.length;
-  if (archiveTake <= 0) return current;
-  const archiveWhere: Prisma.ArticleWhereInput = {
-    AND: [feedWhere, { OR: [{ expiresAt: null }, { expiresAt: { lte: now } }] }],
-  };
-  const archive = await queryJournalArticles(null, {
-    additionalWhere: archiveWhere,
-    skip: Math.max(0, skip - currentCount),
-    take: archiveTake,
-  });
-  return [...current, ...archive];
 }
