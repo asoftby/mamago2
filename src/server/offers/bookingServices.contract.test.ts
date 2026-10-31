@@ -55,3 +55,47 @@ test("resource extras follow the canonical ON_REQUEST_WINDOWS booking schedule",
   const schedule = source("src/server/offers/offerSchedule.service.ts");
   assert.match(schedule, /Перед изменением расписания отключите допуслуги/);
 });
+
+
+test("party v2 schedule uses existing tenant-scoped booking unit API, not opening hours as slots", () => {
+  const wizard = source("src/components/business/wizard/offer/OfferWizard.tsx");
+  assert.ok(wizard.includes('currentStepKey === "schedule"'));
+  assert.ok(wizard.includes("<PartyResourceSchedule offerId={offerId}"));
+  const editor = source("src/components/business/wizard/offer/components/PartyResourceSchedule.tsx");
+  assert.ok(editor.includes("/api/business/booking-units"));
+  assert.ok(editor.includes("offerIds: [offerId]"));
+  assert.ok(editor.includes("minDurationMinutes: duration"));
+  assert.ok(editor.includes("rules: selected.map"));
+  const api = source("src/app/api/business/booking-units/route.ts");
+  assert.ok(api.includes("bookingUnitCreateSchema.safeParse"));
+  assert.ok(api.includes("place: { ownerBusinessId: businessId }"));
+  assert.ok(api.includes('type: "EXCLUSIVE"'));
+});
+
+test("party resource editing preserves server optimistic lock and existing exceptions", () => {
+  const component = source("src/components/business/wizard/offer/components/PartyResourceEditor.tsx");
+  assert.ok(component.includes("expectedUpdatedAt:unit.updatedAt"));
+  assert.ok(component.includes("offerIds:unit.offers.map"));
+  assert.ok(component.includes("rules,exceptions"));
+  assert.ok(component.includes("/api/business/booking-units/"));
+  const api = source("src/app/api/business/booking-units/[id]/route.ts");
+  assert.ok(api.includes("bookingUnitUpdateSchema.safeParse"));
+  assert.ok(api.includes("FOR UPDATE"));
+  assert.ok(api.includes("expectedUpdatedAt"));
+  assert.ok(api.includes("bookingAllocation.count"));
+  assert.ok(api.includes("ownerBusinessId: businessId"));
+});
+
+test("party preview is tenant scoped and uses transactional booking engine's read-only slot calculator", () => {
+  const api = source("src/app/api/business/offers/[id]/slot-preview/route.ts");
+  assert.ok(api.includes("getCurrentUser"));
+  assert.ok(api.includes("getMyBusiness"));
+  assert.ok(api.includes("ownerBusinessId: business.id"));
+  assert.ok(api.includes('["PARTY_SERVICE", "PARTY_PACKAGE"]'));
+  assert.ok(api.includes("getSlots({ offerId: id"));
+  assert.ok(api.includes("configured: false, slots: []"));
+  assert.ok(api.includes("private, no-store"));
+  const view = source("src/components/business/wizard/offer/components/PartyResourceSchedule.tsx");
+  assert.ok(view.includes("/slot-preview"));
+  assert.ok(view.includes("preview.configured"));
+});
