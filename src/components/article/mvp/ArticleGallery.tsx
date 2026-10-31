@@ -48,6 +48,23 @@ export function mergeGalleryWarmIndexes(
   }
   return sorted;
 }
+/** Five-dot moving viewport, independent of the total number of gallery images. */
+function MobileGalleryDots({ index, total }: { index: number; total: number }) {
+  if (total <= 1) return null;
+  const visible = Math.min(5, total);
+  const start = Math.max(0, Math.min(index - 2, total - visible));
+  return (
+    <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/35 px-3 py-2" aria-label={`Фото ${index + 1} из ${total}`} role="status">
+      {Array.from({ length: visible }, (_, offset) => {
+        const photoIndex = start + offset;
+        const distance = Math.abs(photoIndex - index);
+        const edge = total > visible && (offset === 0 && start > 0 || offset === visible - 1 && start + visible < total);
+        return <span key={photoIndex} aria-hidden="true" className={cn("rounded-full transition-all duration-200", photoIndex === index ? "h-2 w-2 bg-white" : edge ? "h-1 w-1 bg-white/40" : distance > 1 ? "h-1.5 w-1.5 bg-white/50" : "h-[7px] w-[7px] bg-white/60")} />;
+      })}
+    </div>
+  );
+}
+
 /** Article body width used elsewhere in this renderer to calibrate `sizes`. */
 const ARTICLE_WIDTH_PX = 720;
 
@@ -759,11 +776,7 @@ export function ArticleGallery({
               </button>
             ) : null}
 
-            {total > 1 ? (
-              <div className="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/45 px-2.5 py-1 text-xs text-white">
-                {(mobileTransition?.to ?? mobileIndex) + 1} / {total}
-              </div>
-            ) : null}
+            <MobileGalleryDots index={mobileTransition?.to ?? mobileIndex} total={total} />
           </div>
         </div>
       ) : null}
