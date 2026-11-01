@@ -77,8 +77,6 @@ export function MyPlanOverlay({ open, onOpenChange }: MyPlanOverlayProps) {
     >
       <div
         style={{ ...MY_PLAN_V3_TOKENS, ...MY_PLAN_V3_SHEET_TOKENS }}
-        // ResponsiveOverlay already animates the sheet/dialog. An extra
-        // fade on its entire content causes a visible double-paint on iOS.
         className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--mp-bg)] text-[var(--mp-tx)]"
       >
         <MyPlanPanelContent
