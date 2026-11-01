@@ -43,7 +43,7 @@ test("shared header contains the title, all link and separate navigation in norm
 test("mobile journal article heading stays 4px smaller than Fresh Materials", () => {
   const pageSource = readFileSync(new URL("./JournalPageView.tsx", import.meta.url), "utf8");
   const cardSource = readFileSync(new URL("./JournalCards.tsx", import.meta.url), "utf8");
-  const section = pageSource.match(/<h2 id="journal-feed-title" className="[^"]*text-\[(\d+)px\]/);
+  const section = pageSource.match(/<h2 id="journal-feed-title" className="[^"]*?text-\[(\d+)px\]/);
   const card = cardSource.match(/<h3 className="[^"]*mt-\[9px\][^"]*text-\[(\d+)px\][^"]*leading-\[([0-9.]+)\]/);
   assert.ok(section, "section heading typography must remain explicit");
   assert.ok(card, "mobile article card typography must remain explicit");
