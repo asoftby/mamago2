@@ -497,6 +497,29 @@ export async function correctUnratedExperienceAttendance(input: {
   if (updated.count === 0 && current.attendance !== "NOT_ATTENDED") {
     throw new ExperienceDomainError("attendance_conflict", "Attendance changed concurrently");
   }
+  if (updated.count > 0) {
+    // Immutable event history: do not erase the original ATTENDED event.
+    // Recommendation affinity ignores corrected outcomes and also re-checks
+    // the authoritative Experience state in case telemetry is unavailable.
+    await trackUserEvent({
+      idempotencyKey: `experience:${existing.id}:attendance_corrected`,
+      userId: input.userId,
+      eventType: "ATTENDANCE_CORRECTED",
+      entityType: "EVENT",
+      entityId: existing.entityId,
+      vertical: "CITY",
+      cityId: await getActivityCityIdForAnalytics(existing.entityId),
+      meta: {
+        source: "plan",
+        experienceId: existing.id,
+        planItemId: existing.sourcePlanItemId,
+        previousAttendance: "ATTENDED",
+        attendance: "NOT_ATTENDED",
+        subjects: safeSubjects(existing.subjects),
+        decisionContextVersion: 1,
+      },
+    });
+  }
   return current;
 }
 
