@@ -200,7 +200,7 @@ function NewsHero({
   coverImageUrl?: string | null;
 }) {
   return (
-    <section style={{ padding: "4px 0 24px" }}>
+    <section style={{ padding: "4px 0 0" }}>
       <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
           {/* Meta row */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
@@ -267,6 +267,7 @@ function NewsHero({
             coverImageUrl={coverImageUrl}
             source="breaking-news-detail"
             citySlug={citySlug}
+            className="!border-t-0 !pt-0"
           />
       </div>
     </section>
@@ -409,7 +410,7 @@ function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
   if (contentBlocks.length === 0) return null;
 
   return (
-    <section style={{ padding: "28px 0 12px" }}>
+    <section style={{ padding: "16px 0 12px" }}>
       <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
           {groups.map((group, i) => {
             if (group.kind === "info") {
