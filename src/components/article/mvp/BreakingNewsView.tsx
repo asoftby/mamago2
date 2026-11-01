@@ -246,7 +246,7 @@ function NewsHero({
           </div>
 
           {/* H1 */}
-          <h1 className="mb-4 font-sans text-3xl font-bold leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl">
+          <h1 className={`${excerpt ? "mb-4" : "mb-0"} font-sans text-3xl font-bold leading-tight tracking-tight text-foreground md:text-4xl lg:text-5xl`}>
             {title}
           </h1>
 
@@ -254,7 +254,7 @@ function NewsHero({
           {excerpt && (
             <p style={{
               maxWidth: 620, color: C.ink2, fontSize: 19, lineHeight: 1.5,
-              marginBottom: 28, marginTop: 0,
+              marginBottom: 0, marginTop: 0,
             }}>
               {excerpt}
             </p>
@@ -268,7 +268,7 @@ function NewsHero({
             coverImageUrl={coverImageUrl}
             source="breaking-news-detail"
             citySlug={citySlug}
-            className="!border-t-0 !pt-0"
+            className="!border-t-0 !pt-[30px] !pb-[30px] md:!pt-[45px] md:!pb-[45px]"
           />
       </div>
     </section>
@@ -411,7 +411,7 @@ function ArticleBody({ blocks }: { blocks: ArticleMvpResolvedBlock[] }) {
   if (contentBlocks.length === 0) return null;
 
   return (
-    <section style={{ padding: "16px 0 12px" }}>
+    <section style={{ padding: "0 0 12px" }}>
       <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
           {groups.map((group, i) => {
             if (group.kind === "info") {
@@ -1002,11 +1002,13 @@ export function BreakingNewsView({
         citySlug={citySlug}
         coverImageUrl={coverImageUrl}
       />
-      <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
-        <div className="pb-6">
-          <PublicationTagChips tags={tags} citySlug={citySlug} />
+      {tags.length > 0 ? (
+        <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
+          <div className="pb-6">
+            <PublicationTagChips tags={tags} citySlug={citySlug} />
+          </div>
         </div>
-      </div>
+      ) : null}
       {galleryBlock ? (
         <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
           <ArticleGallery images={galleryBlock.images} presentation={galleryBlock.presentation} caption={galleryBlock.caption} />
