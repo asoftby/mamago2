@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Experience } from "@prisma/client";
-import { experienceSentimentToValue } from "@/lib/feedback/model";
+import { buildOccurrenceKey, experienceSentimentToValue } from "@/lib/feedback/model";
 
 /**
  * Shadow-writes the personal Experience rating into the new Feedback model.
@@ -8,6 +8,9 @@ import { experienceSentimentToValue } from "@/lib/feedback/model";
  * Never marks a reaction public, and never infers a historical venue from the
  * current Activity, PlanItem, or Offer location. Attendance here is self-
  * reported; a separate verified booking writer must set venuePlaceIdAtVisit.
+ *
+ * The emoji Experience is a legacy SENTIMENT3 reaction (−1/0/+1): it is stored
+ * with scale SENTIMENT3 and never counted in star aggregates.
  */
 export async function syncPlanExperienceReaction(input: {
   userId: string;
@@ -28,13 +31,15 @@ export async function syncPlanExperienceReaction(input: {
   }
 
   const actorKey = `user:${userId}`;
+  const occurrenceKey = buildOccurrenceKey("plan", plan.id);
   const reaction = await prisma.feedbackReaction.upsert({
     where: {
-      actorKey_targetType_targetId_occurrenceKey: {
+      actorKey_targetType_targetId_occurrenceKey_scale: {
         actorKey,
         targetType: "EVENT",
         targetId: experience.entityId,
-        occurrenceKey: plan.id,
+        occurrenceKey,
+        scale: "SENTIMENT3",
       },
     },
     create: {
@@ -43,7 +48,8 @@ export async function syncPlanExperienceReaction(input: {
       familyId: plan.familyId,
       targetType: "EVENT",
       targetId: experience.entityId,
-      occurrenceKey: plan.id,
+      occurrenceKey,
+      scale: "SENTIMENT3",
       value: experienceSentimentToValue(experience.feedbackSentiment),
       visitStatus: "SELF_REPORTED",
       source: "PLAN",

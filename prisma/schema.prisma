@@ -1562,6 +1562,7 @@ model ActivitySession {
   activity        Activity         @relation(fields: [activityId], references: [id], onDelete: Cascade)
   bookingRequests BookingRequest[]
 
+  feedbackReactions FeedbackReaction[]
   @@unique([source, externalId])
   @@index([activityId])
   @@index([startsAt])
@@ -2848,6 +2849,7 @@ model OfferSession {
   /// Числовая цена (для бюджет-фильтра)
   price    Decimal? @db.Decimal(10, 2)
 
+  feedbackReactions FeedbackReaction[]
   @@index([offerId])
   @@unique([offerId, startAt])
   @@index([startAt, endAt])
@@ -6297,6 +6299,7 @@ model BookingRequest {
   allocations BookingAllocation[]
   confirmedForPartyItem PartyOrderItem? @relation("ConfirmedPartyBooking")
 
+  feedbackReactions FeedbackReaction[]
   @@index([kind, businessId, partyStage])
   @@index([partyOrderItemId])
   @@index([businessId])
@@ -7190,6 +7193,32 @@ enum FeedbackTargetType {
   ARTICLE
   NEWS
   ROUTE
+  /// Aggregate-only (performer rollup); reactions never target BUSINESS (SQL CHECK).
+  BUSINESS
+}
+
+/// SENTIMENT3 = legacy −1/0/+1 reactions (kept, never converted); STARS5 = 1–5.
+enum FeedbackScale {
+  SENTIMENT3
+  STARS5
+}
+
+enum FeedbackExperienceLevel {
+  TRIAL
+  REGULAR
+}
+
+enum FeedbackRevisionReason {
+  USER_EDIT
+  MODERATION
+  MIGRATION
+}
+
+enum FeedbackProjection {
+  DIRECT
+  LINKED_EVENT
+  LINKED_OFFER
+  BUSINESS_ROLLUP
 }
 
 enum FeedbackSource {
@@ -7231,7 +7260,16 @@ model FeedbackReaction {
   familyId          String?
   targetType        FeedbackTargetType
   targetId          String
+  /// Prefixed: plan:<id> | session:<id> | offer-session:<id> | booking:<id> | visit:<YYYY-MM-DD> | legacy:<id>.
   occurrenceKey     String              @default("")
+  /// SQL CHECK: SENTIMENT3 → value in (−1,0,1); STARS5 → value 1–5.
+  scale             FeedbackScale       @default(STARS5)
+  activitySessionId String?
+  offerSessionId    String?
+  bookingRequestId  String?
+  experienceLevel   FeedbackExperienceLevel?
+  /// Soft withdrawal by the author: excluded from aggregates, history kept.
+  withdrawnAt       DateTime?
   /// Immutable venue at the completed visit/service. Never infer from current Activity/Offer.placeId.
   venuePlaceIdAtVisit String?
   value             Int
@@ -7245,10 +7283,18 @@ model FeedbackReaction {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   user              User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activitySession   ActivitySession?    @relation(fields: [activitySessionId], references: [id], onDelete: SetNull)
+  offerSession      OfferSession?       @relation(fields: [offerSessionId], references: [id], onDelete: SetNull)
+  bookingRequest    BookingRequest?     @relation(fields: [bookingRequestId], references: [id], onDelete: SetNull)
   review            FeedbackReview?
+  revisions         FeedbackRevision[]
 
-  @@unique([actorKey, targetType, targetId, occurrenceKey])
+  @@unique([actorKey, targetType, targetId, occurrenceKey, scale])
   @@index([targetType, targetId, isPublicEligible])
+  @@index([targetType, targetId, scale, isPublicEligible])
+  @@index([activitySessionId])
+  @@index([offerSessionId])
+  @@index([bookingRequestId])
   @@index([targetType, occurrenceKey, isPublicEligible])
   @@index([targetType, venuePlaceIdAtVisit, isPublicEligible])
   @@index([userId, createdAt])
@@ -7266,6 +7312,9 @@ model FeedbackReview {
   moderatedAt       DateTime?
   businessReply     String?              @db.Text
   businessReplyStatus FeedbackReviewStatus?
+  /// Last approved text; stays visible while an edited version is PENDING.
+  publishedText     String?              @db.Text
+  publishedAt       DateTime?
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
   reaction          FeedbackReaction     @relation(fields: [reactionId], references: [id], onDelete: Cascade)
@@ -7273,13 +7322,33 @@ model FeedbackReview {
   @@index([status, createdAt])
 }
 
+/// History of every reaction/review change, written in the same transaction.
+model FeedbackRevision {
+  id           String                 @id @default(cuid())
+  reactionId   String
+  value        Int
+  scale        FeedbackScale
+  tagIds       String[]               @default([])
+  reviewText   String?                @db.Text
+  reviewStatus FeedbackReviewStatus?
+  reason       FeedbackRevisionReason
+  actorKey     String
+  createdAt    DateTime               @default(now())
+  reaction     FeedbackReaction       @relation(fields: [reactionId], references: [id], onDelete: Cascade)
+
+  @@index([reactionId, createdAt])
+}
+
 model FeedbackTag {
   id          String               @id @default(cuid())
   key         String               @unique
   label       String
   scope       FeedbackTagScope
+  /// Star values (1–5) for which the chip is offered; SQL CHECK.
   showFor     Int[]                @default([])
   targetTypes FeedbackTargetType[] @default([])
+  /// Chip set for party services; empty = not party-specific.
+  partyCategories PartyCategory[]  @default([])
   isActive    Boolean              @default(true)
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
@@ -7287,22 +7356,28 @@ model FeedbackTag {
   @@index([scope, isActive])
 }
 
-/// Direct scores only; linked venue/organizer signals are projected separately.
-/// No Google review content is included in this table.
+/// Star aggregates per target and source projection (STARS5, public, not withdrawn).
+/// No Google content. SQL CHECK keeps count/sum consistent with c1…c5.
 model FeedbackReputationAggregate {
   targetType    FeedbackTargetType
   targetId      String
-  count         Int                @default(0)
-  countPos      Int                @default(0)
-  countNeu      Int                @default(0)
-  countNeg      Int                @default(0)
-  sharePositive Float?
+  projection    FeedbackProjection
+  ratingCount   Int                @default(0)
+  ratingSum     Int                @default(0)
+  ratingAverage Float?
+  c1            Int                @default(0)
+  c2            Int                @default(0)
+  c3            Int                @default(0)
+  c4            Int                @default(0)
+  c5            Int                @default(0)
+  verifiedCount Int                @default(0)
   rankScore     Float?
-  topTags       Json?
-  linkedTags    Json?
+  /// { [tagKey]: { selected: number, eligible: number } }
+  tagStats      Json               @default("{}")
   updatedAt     DateTime           @updatedAt
 
-  @@id([targetType, targetId])
+  @@id([targetType, targetId, projection])
+  @@index([projection, targetType, rankScore])
 }
 
 // Independent business Telegram bot connections. Existing TelegramConnection is family-only.
