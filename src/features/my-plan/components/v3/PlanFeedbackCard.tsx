@@ -302,8 +302,8 @@ export function PlanFeedbackCard({
   ]
     .filter((card) => !hidden.includes(card.id))
     .slice(0, MAX_CARDS);
-  // History remains reachable after the last feedback card has been completed.
-  if (cards.length === 0 && !(feed?.visits.length)) return null;
+  // With no active feedback cards, render nothing. Visit history stays accessible via the plan's history link.
+  if (cards.length === 0) return null;
   const feedbackV1 = feed?.feedbackV1Enabled === true;
 
   return (

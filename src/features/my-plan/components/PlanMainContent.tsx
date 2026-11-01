@@ -38,7 +38,7 @@ import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
 import { PlanMonthScreen } from "./v3/PlanMonthScreen";
 import { PlanPicksScreen } from "./v3/PlanPicksScreen";
 import { PlanMoveSheet, canMovePlanItem } from "./v3/PlanMoveSheet";
-import { fetchPlanExperienceFeed, type PlanExperienceFeed } from "./v3/planExperienceApi";
+import { fetchPlanExperienceFeed, hasPendingPlanFeedback, type PlanExperienceFeed } from "./v3/planExperienceApi";
 import { ArrowRight, Bookmark, Heart, Lightbulb, Search } from "lucide-react";
 import { formatPriceFrom, normalizeUiCurrencyText } from "@/lib/formatters/format-price";
 import { MAX_SUGGESTION_BATCHES } from "../lib/suggestionsConfig";
@@ -474,7 +474,14 @@ export function PlanMainContent({
   }, [family?.primaryAdultPersonaId]);
   const [experienceFeed, setExperienceFeed] = useState<PlanExperienceFeed | null>(null);
   const reloadExperienceFeed = useCallback(async () => {
-    setExperienceFeed(await fetchPlanExperienceFeed());
+    const next = await fetchPlanExperienceFeed();
+    // Do not repaint the entire overlay when only visit history is returned.
+    // The visits screen fetches its own history when opened.
+    if (!next) return;
+    setExperienceFeed((current) => {
+      if (hasPendingPlanFeedback(next)) return next;
+      return current === null ? current : null;
+    });
   }, []);
   useEffect(() => {
     void reloadExperienceFeed();

@@ -26,6 +26,11 @@ export type PlanExperienceFeed = {
   feedbackV1Enabled?: boolean;
 };
 
+/** History by itself does not create a feedback carousel in My Plan. */
+export function hasPendingPlanFeedback(feed: PlanExperienceFeed | null): boolean {
+  return feed !== null && (feed.pending.length > 0 || feed.awaitingFeedback.length > 0);
+}
+
 export async function fetchPlanExperienceFeed(): Promise<PlanExperienceFeed | null> {
   try {
     const res = await fetch("/api/plan/experiences", { credentials: "include", cache: "no-store" });
