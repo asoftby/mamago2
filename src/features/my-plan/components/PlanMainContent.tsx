@@ -1454,7 +1454,7 @@ export function PlanMainContent({
           }
         />
       ) : null}
-      <div className="flex items-center gap-3.5 pt-2" aria-hidden>
+      <div className="flex min-h-[64px] items-center gap-3.5" aria-hidden>
         <i className="h-px flex-1 bg-[var(--mp-line-strong)]" />
         <span className="mp-font-display text-[18px] italic text-[var(--mp-tx2)]">или без даты</span>
         <i className="h-px flex-1 bg-[var(--mp-line-strong)]" />

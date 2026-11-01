@@ -80,7 +80,7 @@ export function RefinementFiltersButtonCompact({
             )}
             aria-hidden={activeCount === 0}
           >
-            <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+            <span className="h-[5px] w-[5px] rounded-full bg-red-500" />
           </span>
         </button>
       </DialogTrigger>

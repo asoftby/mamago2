@@ -198,6 +198,7 @@ jobs:
         run: |
           pnpm exec tsx src/lib/discovery/kudaFilters.review.contract.test.ts
           pnpm exec tsx src/components/discovery/quickFilters.clearable.contract.test.ts
+          pnpm exec tsx src/components/discovery/afishaHeaderSpacing.contract.test.ts
           pnpm exec tsx src/components/mobile/mobileOverlayActions.contract.test.ts
 
       - name: Cache and discovery performance regressions
