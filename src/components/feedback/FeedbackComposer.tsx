@@ -9,7 +9,7 @@ import {
   type FeedbackValue,
 } from "@/lib/feedback/model";
 import {
-  availableFeedbackTagsForSentiment,
+  availableFeedbackTags,
   STARTER_FEEDBACK_TAGS,
   type StarterFeedbackTag,
 } from "@/lib/feedback/tagCatalog";
@@ -61,7 +61,7 @@ export function FeedbackComposer({
   const [textSaved, setTextSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const allowedTags = value === null ? [] : availableFeedbackTagsForSentiment(targetType, value, tags);
+  const allowedTags = value === null ? [] : availableFeedbackTags(targetType, value, tags);
   const options: Array<{ value: FeedbackValue; icon: string; label: string }> = isContent
     ? [
         { value: -1, icon: "👎", label: "Нет" },
@@ -86,7 +86,7 @@ export function FeedbackComposer({
     if (busy || value === next) return;
     const prev = value;
     const prevTags = selectedTags;
-    const validKeys = new Set(availableFeedbackTagsForSentiment(targetType, next, tags).map((tag) => tag.key));
+    const validKeys = new Set(availableFeedbackTags(targetType, next, tags).map((tag) => tag.key));
     const nextTags = prevTags.filter((key) => validKeys.has(key));
     setValue(next);
     setSelectedTags(nextTags);

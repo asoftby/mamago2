@@ -26,10 +26,6 @@ type RawReaction = {
  *
  * Linked offers require a COMPLETED, user-owned BookingRequest referencing the
  * actual place of service. Offer.placeId alone cannot prove where it occurred.
- *
- * Reads only SENTIMENT3 (−1/0/+1) reactions with prefixed occurrence keys
- * (plan:<PlanItem.id>, booking:<BookingRequest.id>). The star projection
- * replaces this loader in a later Feedback 5★ PR; behaviour is unchanged here.
  */
 export async function loadPlaceReputationOverview(input: {
   placeId: string;
@@ -37,17 +33,15 @@ export async function loadPlaceReputationOverview(input: {
 }): Promise<PlaceReputationOverview> {
   const [direct, events, offers, legacy, tags] = await Promise.all([
     prisma.feedbackReaction.findMany({
-      where: { targetType: "PLACE", targetId: input.placeId, isPublicEligible: true, scale: "SENTIMENT3", withdrawnAt: null },
+      where: { targetType: "PLACE", targetId: input.placeId, isPublicEligible: true },
       select: { id: true, actorKey: true, value: true, tagIds: true, migrationKey: true },
     }),
     prisma.$queryRaw<RawReaction[]>`
       SELECT r."id", r."actorKey", r."value", r."tagIds", r."migrationKey"
       FROM "FeedbackReaction" r
-      JOIN "PlanItem" p ON r."occurrenceKey" = 'plan:' || p."id"
+      JOIN "PlanItem" p ON p."id" = r."occurrenceKey"
       JOIN "Experience" e ON e."sourcePlanItemId" = p."id"
       WHERE r."targetType" = 'EVENT'::"FeedbackTargetType"
-        AND r."scale" = 'SENTIMENT3'::"FeedbackScale"
-        AND r."withdrawnAt" IS NULL
         AND r."isPublicEligible" = TRUE
         AND r."userId" IS NOT NULL
         AND p."activityId" = r."targetId"
@@ -61,10 +55,8 @@ export async function loadPlaceReputationOverview(input: {
     prisma.$queryRaw<RawReaction[]>`
       SELECT r."id", r."actorKey", r."value", r."tagIds", r."migrationKey"
       FROM "FeedbackReaction" r
-      JOIN "BookingRequest" b ON r."occurrenceKey" = 'booking:' || b."id"
+      JOIN "BookingRequest" b ON b."id" = r."occurrenceKey"
       WHERE r."targetType" = 'OFFER'::"FeedbackTargetType"
-        AND r."scale" = 'SENTIMENT3'::"FeedbackScale"
-        AND r."withdrawnAt" IS NULL
         AND r."isPublicEligible" = TRUE
         AND r."userId" IS NOT NULL
         AND b."publicationType" = 'OFFER'::"PublicationType"
