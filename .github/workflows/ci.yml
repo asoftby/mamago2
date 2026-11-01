@@ -184,6 +184,7 @@ jobs:
         run: |
           pnpm exec tsx src/components/journal/JournalNewsCard.test.tsx
           pnpm exec tsx src/lib/journal/breakingNewsContinuation.test.ts
+          pnpm exec tsx src/components/article/mvp/BreakingNewsView.authorSpacing.test.ts
 
       - name: Article performance analytics regressions
         run: |
