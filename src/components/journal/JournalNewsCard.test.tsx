@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import Link from "next/link";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -36,4 +37,17 @@ test("shared header contains the title, all link and separate navigation in norm
   assert.match(header, /Следующие публикации/);
   assert.match(header, /hidden sm:block/);
   assert.doesNotMatch(header, /lg:absolute|lg:-top|absolute right-0 -top/);
+});
+
+// Mobile editorial hierarchy: section heading is 24px, article title 4px smaller.
+test("mobile journal article heading stays 4px smaller than Fresh Materials", () => {
+  const pageSource = readFileSync(new URL("./JournalPageView.tsx", import.meta.url), "utf8");
+  const cardSource = readFileSync(new URL("./JournalCards.tsx", import.meta.url), "utf8");
+  const section = pageSource.match(/<h2 id="journal-feed-title" className="[^"]*text-\\[(\\d+)px\\]/);
+  const card = cardSource.match(/<h3 className="[^"]*mt-\\[9px\\][^"]*text-\\[(\\d+)px\\][^"]*leading-\\[([0-9.]+)\\]/);
+  assert.ok(section, "section heading typography must remain explicit");
+  assert.ok(card, "mobile article card typography must remain explicit");
+  assert.equal(Number(section[1]) - Number(card[1]), 4);
+  assert.equal(Number(card[1]), 20);
+  assert.equal(Number(card[2]), 1.2);
 });
