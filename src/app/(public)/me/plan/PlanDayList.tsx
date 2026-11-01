@@ -4,9 +4,8 @@ import React from "react";
 import Link from "next/link";
 import type { SerializedPlanItem } from "./PlanPageClient";
 import { PlanItemCard, type VisibilityChange } from "./PlanItemCard";
-import { PlanEmptyDayMessage } from "@/features/my-plan/components/PlanEmptyDayMessage";
 import type { FamilyView } from "@/features/my-plan/lib/planVisibilityView";
-import { dayOfMonth, monthGenitive, weekdayFull } from "@/lib/date/dateKey";
+import { addDays, dayOfMonth, monthGenitive, todayKey, weekdayFull } from "@/lib/date/dateKey";
 import { resolveScenarioCtaState, resolveScenarioCtaLabel } from "@/features/my-plan/lib/canOpenDayScenario";
 
 function formatDayLabel(dateStr: string): { weekday: string; day: number; month: string } {
@@ -23,6 +22,8 @@ type Props = {
   onVisibilityChange?: VisibilityChange;
   onEditManual: (item: SerializedPlanItem) => void;
   conflictIds: ReadonlySet<string>;
+  /** «Для всех» / «Для меня» / «Для Степана» / «Для выбранных». */
+  audienceLabel: string;
   /** undefined = no Scenario yet for this date. */
   scenarioStatus?: "ready" | "changed";
 };
@@ -63,8 +64,9 @@ function ScenarioCta({
   );
 }
 
-export function PlanDayList({ date, items, participantNameById, onRemove, familyView, onVisibilityChange, onEditManual, conflictIds, scenarioStatus }: Props) {
+export function PlanDayList({ date, items, participantNameById, onRemove, familyView, onVisibilityChange, onEditManual, conflictIds, audienceLabel, scenarioStatus }: Props) {
   const { weekday, day, month } = formatDayLabel(date);
+  const today = todayKey();
 
   return (
     <div>
@@ -79,28 +81,15 @@ export function PlanDayList({ date, items, participantNameById, onRemove, family
             gap: 14,
           }}
         >
-          <h2
-            className="text-[32px] leading-[1.1] tracking-[-0.025em] lg:text-[40px]"
-            style={{
-              margin: 0,
-              fontFamily: "var(--font-heading)",
-              fontWeight: 400,
-              color: "#141210",
-            }}
-          >
-            {weekday},{" "}
-            {day} {month}
+          <h2 className="m-0 text-[30px] font-bold leading-[1.15] tracking-[-0.025em] text-[#141210]">
+            <span className="capitalize">{weekday}</span>, {day} {month}
           </h2>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {items.length > 0 && (
-              <span
-                className="font-mono uppercase"
-                style={{ fontSize: 11, letterSpacing: ".12em", color: "rgba(20,18,16,.55)" }}
-              >
-                {items.length} {items.length % 10 === 1 && items.length % 100 !== 11 ? "запись" : [2, 3, 4].includes(items.length % 10) && (items.length % 100 < 12 || items.length % 100 > 14) ? "записи" : "записей"}
-              </span>
-            )}
-          </div>
+          <span
+            style={{ fontFamily: "Menlo, ui-monospace, SFMono-Regular, Monaco, Consolas, monospace" }}
+            className="min-w-0 truncate text-right text-[12px] text-[var(--text-muted)]"
+          >
+            {audienceLabel}
+          </span>
         </div>
         <ScenarioCta date={date} itemCount={items.length} scenarioStatus={scenarioStatus} />
       </div>
@@ -122,35 +111,12 @@ export function PlanDayList({ date, items, participantNameById, onRemove, family
           ))}
         </div>
       ) : (
-        <div
-          style={{
-            padding: "40px 32px",
-            background: "#FAF7F1",
-            border: "1px dashed rgba(20,18,16,.18)",
-            borderRadius: 18,
-            textAlign: "center",
-          }}
+        <p
+          role="status"
+          className="m-0 flex min-h-[76px] items-center justify-center rounded-[22px] border border-[#d6e4f3] bg-[#eaf2fb] px-4 py-3 text-center text-[15px] font-normal leading-[1.5] text-[var(--text-muted)]"
         >
-          <p className="mb-6 text-[16px] leading-6 text-[#3A332B]">
-            <PlanEmptyDayMessage />
-          </p>
-          <div style={{ display: "inline-flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-            <Link
-              href="/minsk"
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 8,
-                height: 50, padding: "0 22px", borderRadius: 999,
-                fontWeight: 600, fontSize: 14,
-                background: "var(--primary)", color: "#fff",
-                border: "1px solid transparent",
-                transition: "background .18s",
-                textDecoration: "none",
-              }}
-            >
-              Куда пойти →
-            </Link>
-          </div>
-        </div>
+          На {date === today ? "сегодня" : date === addDays(today, 1) ? "завтра" : "этот день"} планов нет.
+        </p>
       )}
     </div>
   );
