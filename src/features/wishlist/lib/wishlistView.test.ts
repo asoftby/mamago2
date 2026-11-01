@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { formatEventDate, itemStateLabel, moveItem, parseQuickLine, wishlistErrorMessage } from "./wishlistView";
+import { formatEventDate, itemStateLabel, moveItem, parseQuickLine, partyGiftsHref, wishlistErrorMessage } from "./wishlistView";
 
 assert.deepEqual(parseQuickLine("Лего Сити пожарная станция https://21vek.by/toys/lego"), {
   title: "Лего Сити пожарная станция",
@@ -24,5 +24,16 @@ assert.equal(formatEventDate(null), null);
 assert.match(formatEventDate("2026-12-05") ?? "", /5 декабря/);
 assert.equal(wishlistErrorMessage("nope"), "Не получилось. Попробуйте ещё раз.");
 assert.equal(wishlistErrorMessage("archived"), "Список в архиве. Верните его из архива, чтобы редактировать.");
+
+// party -> gifts link (review fix: the date must survive, regex was once suspected of double escaping)
+{
+  const href = partyGiftsHref("Степан", "2026-10-30");
+  const q = new URL(href, "https://x.test").searchParams;
+  assert.equal(new URL(href, "https://x.test").pathname, "/me/wishlists");
+  assert.equal(q.get("date"), "2026-10-30");
+  assert.equal(q.get("title"), "Подарки на день рождения: Степан");
+  assert.equal(new URL(partyGiftsHref("Степан", null), "https://x.test").searchParams.get("date"), null);
+  assert.equal(new URL(partyGiftsHref("Степан", "30.10.2026"), "https://x.test").searchParams.get("date"), null);
+}
 
 console.log("wishlistView ok");

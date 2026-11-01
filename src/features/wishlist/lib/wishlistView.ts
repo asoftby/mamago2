@@ -68,3 +68,13 @@ export function moveItem<T>(list: T[], from: number, to: number): T[] {
   next.splice(to, 0, item);
   return next;
 }
+
+/**
+ * Link from a birthday party to a new gift list: prefilled title and, when valid, the party date.
+ * Only a plain YYYY-MM-DD date is passed on; the wishlist page validates it again.
+ */
+export function partyGiftsHref(childName: string, dateKey: string | null | undefined): string {
+  const params = new URLSearchParams({ title: `Подарки на день рождения: ${childName}` });
+  if (dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)) params.set("date", dateKey);
+  return `/me/wishlists?${params.toString()}`;
+}

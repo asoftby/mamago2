@@ -1755,7 +1755,7 @@ export function PlanMainContent({
               onOpen={handleOpenScenarioPage}
             />
           ) : mountedNestedScreen === "visits" ? (
-            <PlanVisitsScreen key={nestedScreenVersion} onBack={closeNestedScreen} />
+            <PlanVisitsScreen key={nestedScreenVersion} onBack={closeNestedScreen} onClose={onRequestClose} />
           ) : mountedNestedScreen === "picks" ? (
             <PlanPicksScreen
               key={nestedScreenVersion}

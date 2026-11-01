@@ -6,7 +6,7 @@ import { MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH } from "@/lib/experience/feedbac
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { PLAN_FACES, PLAN_FACE_LABEL, PlanFace, sentimentMouth, type PlanSentiment } from "./PlanFace";
-import { PlanScreenTitleHead } from "./PlanScreenTitleHead";
+import { PlanScreenHeader } from "./PlanScreenHeader";
 import {
   fetchPlanExperienceFeed,
   postExperienceFeedback,
@@ -17,6 +17,13 @@ function monthKey(dateKey: string): string {
   const [y, m] = dateKey.split("-").map(Number);
   const label = new Date(y!, m! - 1, 1).toLocaleDateString("ru-RU", { month: "long" });
   return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function visitsLabel(n: number): string {
+  const m = n % 10;
+  const h = n % 100;
+  const word = m === 1 && h !== 11 ? "визит" : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? "визита" : "визитов";
+  return `${n} ${word}`;
 }
 
 function dayLabel(dateKey: string): string {
@@ -90,10 +97,11 @@ function RateBox({
 }
 
 /** «Где мы уже были» — подтверждённые визиты по месяцам с оценкой в один тап. */
-export function PlanVisitsScreen({ onBack }: { onBack: () => void }) {
+export function PlanVisitsScreen({ onBack, onClose }: { onBack: () => void; onClose?: () => void }) {
   const [visits, setVisits] = useState<PlanExperienceRow[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [onlySuper, setOnlySuper] = useState(false);
   const [busy, setBusy] = useState(false);
   const [phoneFor, setPhoneFor] = useState<{ id: string; sentiment: PlanSentiment; comment: string } | null>(null);
 
@@ -138,7 +146,8 @@ export function PlanVisitsScreen({ onBack }: { onBack: () => void }) {
   );
 
   const groups: Array<{ month: string; items: PlanExperienceRow[] }> = [];
-  for (const visit of visits ?? []) {
+  const shown = (visits ?? []).filter((visit) => !onlySuper || visit.feedbackSentiment === "LIKE");
+  for (const visit of shown) {
     const month = monthKey(visit.plannedDate);
     const last = groups[groups.length - 1];
     if (last && last.month === month) last.items.push(visit);
@@ -147,58 +156,89 @@ export function PlanVisitsScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
-      <PlanScreenTitleHead title={<>Где мы <em>были</em></>} onBack={onBack} />
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-1 md:px-8">
+      <PlanScreenHeader
+        title="Где мы были"
+        meta={visits ? visitsLabel(shown.length) : undefined}
+        onBack={onBack}
+        onClose={onClose}
+      />
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-0 md:px-8">
+        <div className="mt-3 flex gap-2 overflow-x-auto [scrollbar-width:none]">
+          <button
+            type="button"
+            aria-pressed={onlySuper}
+            onClick={() => setOnlySuper((v) => !v)}
+            className={cn(
+              "inline-flex h-[46px] shrink-0 items-center gap-2 rounded-full border px-[18px] text-[14px] font-semibold transition-colors",
+              onlySuper
+                ? "border-[var(--mp-chip-on-line)] bg-[var(--mp-chip-on-bg)] text-[var(--mp-chip-on-tx)]"
+                : "border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)] hover:border-[var(--mp-tx2)]",
+            )}
+          >
+            <PlanFace mouth="super" size={20} />
+            Только «Супер»
+          </button>
+        </div>
 
         {visits === null && !failed ? (
-          <div className="mt-5 space-y-2" aria-busy>
+          <div className="mt-5 space-y-2.5" aria-busy>
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-[92px] animate-pulse rounded-[18px] border border-[var(--mp-line)] bg-[var(--mp-card)]" />
+              <div key={i} className="h-[92px] animate-pulse rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)]" />
             ))}
           </div>
         ) : failed ? (
-          <div className="mt-5 rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-[15px] leading-6 text-[var(--mp-tx2)]">
+          <div className="mt-5 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-[15px] leading-6 text-[var(--mp-tx2)]">
             Не получилось загрузить визиты.{" "}
             <button type="button" onClick={() => setReloadKey((v) => v + 1)} className="font-bold text-[var(--mp-ac-dark)]">Попробовать снова</button>
           </div>
         ) : groups.length === 0 ? (
-          <div className="mt-5 rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-[15px] leading-6 text-[var(--mp-tx2)]">
-            <b className="font-bold text-[var(--mp-tx)]">Пока пусто.</b> Здесь появятся события, на которых вы побывали.
+          <div className="mt-5 rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] p-[18px] text-[15px] leading-6 text-[var(--mp-tx2)]">
+            <b className="font-bold text-[var(--mp-tx)]">{onlySuper ? "Здесь пока пусто." : "Пока пусто."}</b>{" "}
+            {onlySuper ? "Нет визитов с оценкой «Супер»." : "Здесь появятся события, на которых вы побывали."}
           </div>
         ) : (
           groups.map((group) => (
             <div key={group.month}>
-              <div className="mb-2.5 mt-5 text-[13px] font-bold text-[var(--mp-tx2)]">{group.month}</div>
+              <div className="mb-2.5 mt-[22px] flex items-center gap-3 px-0.5">
+                <span className="text-[18px] font-normal tracking-[-.01em] text-[var(--mp-tx)]">{group.month}</span>
+                <i aria-hidden className="h-px flex-1 bg-[var(--mp-line)]" />
+              </div>
+              <div className="flex flex-col gap-2.5">
               {group.items.map((visit) => (
-                <div key={visit.id} className="mb-2 rounded-[18px] border border-[var(--mp-line)] bg-[var(--mp-card)] px-3 pb-2 pt-3">
-                  <div className="text-[15.5px] font-bold leading-[1.3] tracking-[-.005em] text-[var(--mp-tx)]">{visit.title}</div>
-                  <div className="mt-0.5 text-[13px] text-[var(--mp-tx2)]">{dayLabel(visit.plannedDate)}</div>
+                <div key={visit.id} className="rounded-[22px] border border-[var(--mp-line)] bg-[var(--mp-card)] py-3 pl-4 pr-3.5">
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">{visit.title}</div>
+                      <div className="mp-font-meta mt-[3px] text-[11px] tracking-[.02em] text-[var(--mp-tx2)]">{dayLabel(visit.plannedDate)}</div>
+                    </div>
+                    {visit.feedbackSentiment ? (
+                      <span
+                        title={PLAN_FACE_LABEL[visit.feedbackSentiment]}
+                        aria-label={`Оценка: ${PLAN_FACE_LABEL[visit.feedbackSentiment]}`}
+                        className="-mr-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--mp-line-strong)] bg-white text-[var(--mp-tx)]"
+                      >
+                        <PlanFace mouth={sentimentMouth(visit.feedbackSentiment)} size={22} />
+                      </span>
+                    ) : null}
+                  </div>
                   {openId === visit.id ? (
                     <RateBox
                       initial={visit.feedbackSentiment}
                       initialComment={visit.feedbackComment ?? ""}
                       busy={busy}
                       onCancel={() => setOpenId(null)}
-                      onSave={(s, c) => void rate(visit.id, s, c)}
+                      onSave={(sentiment, comment) => void rate(visit.id, sentiment, comment)}
                     />
                   ) : visit.feedbackSentiment ? (
-                    <div className="mt-1.5">
-                      <div className="flex items-center justify-between gap-2">
-                        {/* Отправленный отзыв не редактируется: API отвечает 409 на изменённую оценку. */}
-                        <span className="inline-flex items-center gap-1.5 text-[13.5px] font-bold text-[var(--mp-tx)]">
-                          <PlanFace mouth={sentimentMouth(visit.feedbackSentiment)} size={20} />
-                          {PLAN_FACE_LABEL[visit.feedbackSentiment]}
-                        </span>
-                      </div>
-                      {visit.feedbackComment ? (
-                        <p className="mb-1 mt-0.5 text-[13.5px] italic leading-[1.45] text-[var(--mp-tx2)]">«{visit.feedbackComment}»</p>
-                      ) : null}
-                    </div>
+                    /* Отправленный отзыв не редактируется: API отвечает 409 на изменённую оценку. */
+                    visit.feedbackComment ? (
+                      <p className="mp-font-display m-0 mt-1.5 text-[14px] italic leading-[1.45] text-[var(--mp-tx)]">«{visit.feedbackComment}»</p>
+                    ) : null
                   ) : (
                     <button
                       type="button"
                       onClick={() => setOpenId(visit.id)}
-                      className="mb-1 mt-2 inline-flex min-h-10 items-center gap-1.5 rounded-full bg-[var(--mp-ac-soft)] px-3.5 text-[13.5px] font-bold text-[var(--mp-ac-dark)] transition-colors hover:bg-brand-soft-hover"
+                      className="mt-2 inline-flex min-h-10 items-center gap-1.5 rounded-full bg-[var(--mp-ac-soft)] px-3.5 text-[13.5px] font-bold text-[var(--mp-ac-dark)] transition-colors hover:bg-brand-soft-hover"
                     >
                       <PlanFace mouth="good" size={17} />
                       Как было? Оценить
@@ -206,6 +246,7 @@ export function PlanVisitsScreen({ onBack }: { onBack: () => void }) {
                   )}
                 </div>
               ))}
+              </div>
             </div>
           ))
         )}
