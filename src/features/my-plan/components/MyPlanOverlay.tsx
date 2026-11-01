@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import { ResponsiveOverlay } from "@/components/ui/responsive-overlay";
 import { MyPlanPanelContent } from "./MyPlanPanelContent";
-import { cn } from "@/lib/utils";
+
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { MY_PLAN_V3_TOKENS } from "./v3/myPlanV3Tokens";
 import { MY_PLAN_V3_SHEET_TOKENS } from "./v3/myPlanV3Tokens";
@@ -77,10 +77,9 @@ export function MyPlanOverlay({ open, onOpenChange }: MyPlanOverlayProps) {
     >
       <div
         style={{ ...MY_PLAN_V3_TOKENS, ...MY_PLAN_V3_SHEET_TOKENS }}
-        className={cn(
-          "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--mp-bg)] text-[var(--mp-tx)]",
-          "animate-in fade-in-0 duration-150",
-        )}
+        // ResponsiveOverlay already animates the sheet/dialog. An extra
+        // fade on its entire content causes a visible double-paint on iOS.
+        className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--mp-bg)] text-[var(--mp-tx)]"
       >
         <MyPlanPanelContent
           open={open}
