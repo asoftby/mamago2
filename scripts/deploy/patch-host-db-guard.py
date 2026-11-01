@@ -122,7 +122,7 @@ def harden_legacy(source: str) -> str:
     updated = source.replace(ANCHOR, GUARD + "\n" + ANCHOR, 1)
     for original, replacement in REPLACEMENTS:
         if original == "docker compose up -d db":
-            pattern = r"(?m)^(?P<indent>[ \\t]*)docker compose up -d db[ \\t]*$"
+            pattern = r"(?m)^(?P<indent>[ \t]*)docker compose up -d db[ \t]*$"
             matches = list(re.finditer(pattern, updated))
             if len(matches) != 1:
                 raise ValueError("Unexpected DB start command: expected exactly one standalone line")
