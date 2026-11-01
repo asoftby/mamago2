@@ -172,6 +172,47 @@ async function main() {
   assert.ok(repaired.changed >= 1);
   assert.equal((await direct("EVENT", activity.id))?.ratingCount, 1);
 
+  // 10. Concurrent writes: simultaneous first ratings of one object must not lose updates
+  //     (per-aggregate advisory lock serialises the recompute; ТЗ 5.6). Repeated rounds raise the
+  //     chance of catching an interleaving where each tx recomputes without seeing the other's row.
+  const today = daysAgo(1);
+  const rounds: number[][] = [[5, 3], [1, 4], [2, 2], [5, 5], [1, 5], [4, 3], [3, 1], [5, 1], [2, 4], [4, 4], [1, 2, 3, 4, 5, 5]];
+  for (const [round, values] of rounds.entries()) {
+    const racePlace = await prisma.place.create({ data: {
+      title: `FB5 race ${round} ${tag}`, shortDesc: "fixture", createdByUserId: owner.id, ownerBusinessId: businessId,
+      status: "PUBLISHED", category: "play", activityTypes: [], ageTags: [], visitFormats: [],
+    } });
+    targetIds.push(racePlace.id);
+    const raters = await Promise.all(values.map((_, i) =>
+      prisma.user.create({ data: { email: `fb5-${tag}-race-${round}-${i}@example.invalid` } })));
+    userIds.push(...raters.map((u) => u.id));
+
+    const results = await Promise.all(values.map((value, i) => submitStarRating({
+      user: { id: raters[i].id, phoneE164: null, phoneVerifiedAt: null },
+      targetType: "PLACE", targetId: racePlace.id, value, occurrence: { kind: "visit", date: today },
+    })));
+    assert.ok(results.every((r) => r.created), `round ${round}: every concurrent write succeeds`);
+
+    const agg = await direct("PLACE", racePlace.id);
+    assert.ok(agg, `round ${round}: aggregate exists`);
+    const dist = [1, 2, 3, 4, 5].map((star) => values.filter((v) => v === star).length);
+    assert.equal(agg.ratingCount, values.length, `round ${round}: no lost update (count)`);
+    assert.equal(agg.ratingSum, values.reduce((a, b) => a + b, 0), `round ${round}: sum`);
+    assert.deepEqual([agg.c1, agg.c2, agg.c3, agg.c4, agg.c5], dist, `round ${round}: distribution`);
+    assert.equal(await prisma.feedbackReaction.count({ where: { targetType: "PLACE", targetId: racePlace.id, withdrawnAt: null } }), values.length);
+    assert.ok(agg.rankScore !== null && agg.rankScore >= 1 && agg.rankScore <= 5, `round ${round}: rankScore in range`);
+
+    // The lock-protected incremental result must equal a from-scratch recompute (no drift, no double count).
+    await reconcileFeedbackAggregates(now);
+    const after = await direct("PLACE", racePlace.id);
+    assert.ok(after);
+    assert.deepEqual(
+      [after.ratingCount, after.ratingSum, after.c1, after.c2, after.c3, after.c4, after.c5, after.rankScore],
+      [agg.ratingCount, agg.ratingSum, agg.c1, agg.c2, agg.c3, agg.c4, agg.c5, agg.rankScore],
+      `round ${round}: concurrent result equals full recompute`,
+    );
+  }
+
   console.log("✅ feedback 5★ write path integration test");
 }
 
