@@ -1209,17 +1209,15 @@ export function PlanMainContent({
     ...(!familyAdults.length && family?.primaryAdultPersonaId ? [{ value: `adult:${family.primaryAdultPersonaId}`, label: "Я" }] : []),
   ]);
 
-  /** The mobile chip row needs the same clearance below as above (20px outer gap + 8px internal padding). */
-  const renderPersonFilter = (compact: boolean) =>
+  /** Same filter UI as /me/plan, only the outer spacing depends on the sheet. */
+  const renderPersonFilter = (_compact: boolean) =>
     personFilterOptions.length < 2 ? null : (
-      <div className={compact ? "pb-5" : undefined}>
-        <PlanPersonFilter
-          options={personFilterOptions}
-          selectedValues={includedPeople}
-          onAudienceChange={({ include, exclude }) => updateAudienceFilters({ ...audienceFilters, include, exclude })}
-          excludedValues={excludedPeople}
-        />
-      </div>
+      <PlanPersonFilter
+        options={personFilterOptions}
+        selectedValues={includedPeople}
+        onAudienceChange={({ include, exclude }) => updateAudienceFilters({ ...audienceFilters, include, exclude })}
+        excludedValues={excludedPeople}
+      />
     );
 
   const renderDayPlanSection = (compact: boolean) => {

@@ -30,7 +30,7 @@ export function EventQuickFilters({ halloweenEnabled = false }: { halloweenEnabl
   }, [halloweenEnabled, applied.occasionSlug, actions]);
 
   return (
-    <div className="!mt-0 flex items-center gap-3 overflow-x-auto scroll-smooth pb-3 pt-0 [scrollbar-width:none]" aria-label="Быстрые фильтры событий">
+    <div className="!mt-0 flex items-center gap-3 overflow-x-auto scroll-smooth pb-0 pt-0 [scrollbar-width:none]" aria-label="Быстрые фильтры событий">
       {halloweenEnabled && (
         <HalloweenChip
           active={applied.occasionSlug === "halloween"}
