@@ -230,7 +230,7 @@ export function CityDiscoveryShell({
   return (
     <main className="min-h-screen bg-white pb-20">
       <Container className="pt-10 space-y-6">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           <H1 className={DISCOVERY_TITLE_CLASS}><CityTitle title={pageTitle} citySlug={city} /></H1>
           {filterButton}
         </div>
