@@ -24,4 +24,10 @@ const notifications = readFileSync(new URL("../../../components/site/header/Noti
 assert.ok(filtersButton.includes("h-[5px] w-[5px] rounded-full bg-red-500"));
 assert.match(notifications, /rounded-full bg-red-500/);
 
+// The mobile participant chips are 20px below the calendar (+8px own top
+// padding); add the matching 20px after them so the sticky add CTA doesn't
+// visually touch the chip row.
+assert.match(content, /<div className=\{compact \? "pb-5" : undefined\}>/);
+assert.match(content, /\{renderPersonFilter\(true\)\}/);
+
 console.log("MyPlanOverlay.flicker.test.ts: OK");
