@@ -21,7 +21,7 @@ assert.match(planHeader, /tight \? "translate-y-7" : ""/);
 // and uses the same red-500 token as the notification-bell count badge.
 const filtersButton = readFileSync(new URL("../../../components/discovery/RefinementFiltersButtonCompact.tsx", import.meta.url), "utf8");
 const notifications = readFileSync(new URL("../../../components/site/header/NotificationsDropdown.tsx", import.meta.url), "utf8");
-assert.match(filtersButton, /h-\\[5px\\] w-\\[5px\\] rounded-full bg-red-500/);
+assert.ok(filtersButton.includes("h-[5px] w-[5px] rounded-full bg-red-500"));
 assert.match(notifications, /rounded-full bg-red-500/);
 
 console.log("MyPlanOverlay.flicker.test.ts: OK");
