@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { SaveToPlanModal } from "@/components/activity/SaveToPlanModal";
 import { persistIdeaCollectionSelection } from "@/features/save/persistIdeaCollectionSelection";
+import { requestPlanRefetchForDate } from "@/lib/my-plan/myPlanOpenIntent";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { IdeaItem } from "@/app/(public)/me/ideas/types";
@@ -149,8 +150,8 @@ export function IdeasCollections({
   useEffect(() => {
     const controller = new AbortController();
     async function load() {
-      try {
-        if (initialIdeas === undefined) {
+      if (initialIdeas === undefined) {
+        try {
           const response = await fetch("/api/me/ideas", { cache: "no-store", signal: controller.signal });
           if (!response.ok) throw new Error("load_failed");
           const data = (await response.json()) as {
@@ -162,19 +163,23 @@ export function IdeasCollections({
           setCollections(data.collections ?? []);
           setMemberships(data.memberships ?? {});
           setLoaded(true);
+        } catch (error) {
+          if ((error as Error).name === "AbortError") return;
+          setLoadFailed(true);
+          setLoaded(true);
+          return;
         }
+      }
+      // Статьи — необязательная догрузка: её сбой не должен прятать уже загруженные идеи.
+      try {
         const articles = await fetch("/api/ideas/articles", { signal: controller.signal });
         if (!articles.ok) return;
         const data = (await articles.json()) as { items?: IdeaItem[] };
         if (Array.isArray(data.items) && data.items.length > 0) {
           setIdeas((current) => mergeIdeas(current, data.items ?? []));
         }
-      } catch (error) {
-        if ((error as Error).name === "AbortError") return;
-        if (initialIdeas === undefined) {
-          setLoadFailed(true);
-          setLoaded(true);
-        }
+      } catch {
+        // оставляем основной список как есть
       }
     }
     void load();
@@ -424,6 +429,10 @@ export function IdeasCollections({
               : { ...item, isPlanned: false, plannedDate: undefined, planItemId: undefined, planStatus: "UNPLANNED" },
         ),
       );
+      // Стор виджета плана живёт на клиенте — просим перезагрузить затронутые даты.
+      for (const date of new Set([idea.plannedDate, result.action === "plan" ? result.dateISO : undefined])) {
+        if (date) requestPlanRefetchForDate(date);
+      }
       router.refresh();
     } catch {
       toast.error("Не удалось изменить план", { description: "Попробуйте ещё раз" });
