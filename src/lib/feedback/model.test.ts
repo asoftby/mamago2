@@ -7,6 +7,7 @@ import {
   feedbackRankScore, starDistribution, starPresentation, formatStarAverage,
   ratingsWord, resolveCategoryPrior, tagShare, buildOccurrenceKey, parseOccurrenceKey,
   isValidFeedbackValue, isReactionTargetType, sentimentToRepresentativeStars,
+  starRatingPublicEligible,
   type FeedbackStars,
 } from "./model";
 
@@ -93,5 +94,9 @@ assert.throws(() => feedbackRankScore({ ratings: [{ value: 5, weight: 0 }], cate
 assert.equal(tagShare({ selected: 4, eligible: 4, distinctAuthors: 4 }), null);
 assert.equal(tagShare({ selected: 2, eligible: 10, distinctAuthors: 2 }), null);
 assert.equal(tagShare({ selected: 35, eligible: 40, distinctAuthors: 35 }), 0.875);
+
+// Stars of an authenticated user are public without a verified phone (решение 01.11).
+assert.equal(starRatingPublicEligible({ authenticated: true }), true);
+assert.equal(starRatingPublicEligible({ authenticated: false }), false);
 
 console.log("✅ feedback model test");

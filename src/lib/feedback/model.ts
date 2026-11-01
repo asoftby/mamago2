@@ -292,3 +292,13 @@ export function tagShare(input: { selected: number; eligible: number; distinctAu
   if (input.eligible < MIN_TAG_ELIGIBLE || input.distinctAuthors < MIN_TAG_MENTIONS || input.selected <= 0) return null;
   return Math.min(1, input.selected / input.eligible);
 }
+
+/**
+ * STARS5 public eligibility (решение 01.11.2026): an authenticated user's star
+ * rating is public and ranked without a verified phone; the phone is required
+ * only for review text. Guests never rate. The legacy SENTIMENT3 rule
+ * (`feedbackPublicEligible`) is unchanged.
+ */
+export function starRatingPublicEligible(input: { authenticated: boolean }): boolean {
+  return input.authenticated;
+}
