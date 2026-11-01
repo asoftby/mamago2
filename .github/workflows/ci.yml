@@ -289,6 +289,7 @@ jobs:
           pnpm exec tsx src/features/my-plan/components/MyPlanOverlay.flicker.test.ts
           pnpm exec tsx src/features/my-plan/lib/filterPlanEntriesByPerson.test.ts
           pnpm exec tsx "src/app/(public)/me/plan/PlanWeekSummary.contract.test.ts"
+          pnpm exec tsx "src/app/(public)/me/plan/ExperienceCheckIn.carousel.test.ts"
           pnpm test:experience-feedback
           pnpm test:plan-experience-contract
           pnpm exec tsx src/server/services/experience/pastPlanArchive.contract.test.ts
