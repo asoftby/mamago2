@@ -185,6 +185,7 @@ export const USER_EVENT_TYPE_LABELS_RU: Record<UserEventType, string> = {
   PLAN_AUDIENCE_SNAPSHOT: "Снимок аудитории плана",
   ATTENDED: "Посещение",
   EXPERIENCE_FEEDBACK: "Отзыв о посещении",
+  ATTENDANCE_CORRECTED: "Исправлено посещение: не были",
   PLAN_ITEM_SHARED: "Пункт плана открыт семье",
   PLAN_ITEM_MADE_PRIVATE: "Пункт плана скрыт",
   PLAN_ITEM_RESCHEDULED: "Пункт плана перенесён",
