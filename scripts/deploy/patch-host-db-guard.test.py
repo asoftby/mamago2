@@ -74,6 +74,25 @@ with tempfile.TemporaryDirectory() as temp:
     broken_sha = hashlib.sha256(target.read_bytes()).hexdigest()
     assert invoke(target, broken_sha, "--verify").returncode != 0
 
+    # A guarded-looking file must not pass if the actual rejection path is missing.
+    target.write_bytes(patched)
+    complete = target.read_text()
+    guard_start = complete.index('if [[ "$DB_CONFIG_BEFORE" != "$DB_CONFIG_AFTER" ]]; then')
+    guard_end = complete.index("\\nfi", guard_start) + len("\\nfi")
+    missing_config_rejection = complete[:guard_start] + complete[guard_end:]
+    target.write_text(missing_config_rejection)
+    missing_sha = hashlib.sha256(target.read_bytes()).hexdigest()
+    assert invoke(target, missing_sha, "--verify").returncode != 0
+
+    # Removing the health abort or the EXIT identity check must also fail.
+    for fragment in (
+        'if [[ "$DB_HEALTH" != healthy ]]; then',
+        'trap \\'rc=$?; trap - EXIT; if ! check_db_identity; then exit 90; fi; exit "$rc"\\' EXIT',
+    ):
+        target.write_text(complete.replace(fragment, "# removed guard", 1))
+        bad_sha = hashlib.sha256(target.read_bytes()).hexdigest()
+        assert invoke(target, bad_sha, "--verify").returncode != 0
+
     target.write_text(LEGACY.replace("docker compose up -d db", "docker compose up -d db worker"))
     changed_sha = hashlib.sha256(target.read_bytes()).hexdigest()
     assert invoke(target, changed_sha, "--apply").returncode != 0
