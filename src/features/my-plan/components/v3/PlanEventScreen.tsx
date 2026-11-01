@@ -56,7 +56,7 @@ export function PlanEventScreen({
   const isClass = activity?.type === "COURSE";
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
+    <div className="flex h-full min-h-0 min-w-0 w-full flex-col bg-[var(--mp-bg)]">
       <PlanScreenHead back="План" onBack={onBack} />
       <span className={`mx-5 mb-3 inline-flex h-[30px] w-fit items-center rounded-full px-3 text-[13px] font-bold md:mx-8 ${isClass ? "bg-[#E4E6F4] text-[#454C86]" : "bg-[var(--mp-ac-soft)] text-[var(--mp-ac-dark)]"}`}>
         {isClass ? "Занятие" : "Из афиши"}
