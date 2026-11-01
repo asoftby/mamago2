@@ -67,10 +67,12 @@ async function main() {
   targetIds.push(place.id, activity.id, partyOffer.id, visitOffer.id, businessId);
   const booking = await prisma.bookingRequest.create({ data: {
     businessId, publicationType: "OFFER", offerId: partyOffer.id, placeId: place.id, userId: rater.id, status: "COMPLETED",
+    customerName: "FB5 rater", customerPhone: "+375290000001",
     startsAt: new Date(now.getTime() - 86_400_000), completedAt: now,
   } });
   const foreignBooking = await prisma.bookingRequest.create({ data: {
     businessId, publicationType: "OFFER", offerId: partyOffer.id, placeId: place.id, userId: strangerRow.id, status: "COMPLETED",
+    customerName: "FB5 stranger", customerPhone: "+375290000002",
   } });
   const animatorTag = await prisma.feedbackTag.create({ data: {
     key: `fb5-punctual-${tag}`, label: "Пунктуальность", scope: "PROGRAM", showFor: [4, 5], targetTypes: ["OFFER"], partyCategories: ["ANIMATOR"],
