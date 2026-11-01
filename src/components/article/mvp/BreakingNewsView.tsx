@@ -73,27 +73,6 @@ function SectionKicker({ label }: { label: string }) {
   );
 }
 
-// ─── Reading progress ─────────────────────────────────────────────────────────
-
-function ReadingProgress() {
-  const [p, setP] = useState(0);
-  useEffect(() => {
-    const onScroll = () => {
-      const h = document.documentElement;
-      const max = (h.scrollHeight - h.clientHeight) || 1;
-      setP(Math.min(1, Math.max(0, h.scrollTop / max)));
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-  return (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 3, zIndex: 90, pointerEvents: "none" }}>
-      <div style={{ height: "100%", width: `${p * 100}%`, background: C.accent, transition: "width .1s linear" }} />
-    </div>
-  );
-}
-
 // ─── Marquee ticker ───────────────────────────────────────────────────────────
 
 const MARQUEE_ITEM_GAP = 20;
@@ -995,9 +974,6 @@ export function BreakingNewsView({
         backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .35 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")`,
         opacity: .055, mixBlendMode: "multiply",
       }} aria-hidden />
-
-      {/* Reading progress bar */}
-      <ReadingProgress />
 
       {/* Breaking ticker */}
       <Marquee items={marqueeItems} />
