@@ -530,10 +530,13 @@ export async function submitExperienceFeedback(input: {
   let experience = existing;
   if (!existing.feedbackSentiment) {
     const updated = await prisma.experience.updateMany({
-      where: { id: existing.id, feedbackSentiment: null },
+      where: { id: existing.id, attendance: "ATTENDED", feedbackSentiment: null },
       data: { feedbackSentiment: input.sentiment, feedbackComment: nextComment, feedbackAt: new Date() },
     });
     experience = await prisma.experience.findUniqueOrThrow({ where: { id: existing.id } });
+    if (updated.count === 0 && experience.attendance !== "ATTENDED") {
+      throw new ExperienceDomainError("feedback_not_allowed", "Attendance was corrected before feedback");
+    }
     if (updated.count === 0 && !isSameExperienceFeedback(experience, { sentiment: input.sentiment, comment: nextComment })) {
       throw new ExperienceDomainError("feedback_conflict", "Feedback has already been submitted");
     }
