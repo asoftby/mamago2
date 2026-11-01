@@ -10,7 +10,7 @@ export function formatPlanAgeLabel(label: string | null | undefined): string | n
   const ranges = [...original.matchAll(/(\d{1,2})\s*[-–—]\s*(\d{1,2})(?:\s*(?:лет|года|год))?/g)]
     .map((match) => ({ from: Number(match[1]), to: Number(match[2]) }))
     .filter(({ from, to }) => from <= to);
-  const hasOpenEndedGroup = /(?:^|[,;\s])18\s*\+(?=$|[,;\s])/.test(original);
+  const hasOpenEndedGroup = /(?:^|[,;\s])18\s*\+(?=$|[,;\s])/.test(original) || /#nokids/i.test(original);
   if (ranges.length === 0) return hasOpenEndedGroup ? "18+" : original;
 
   const min = Math.min(...ranges.map(({ from }) => from), ...(hasOpenEndedGroup ? [18] : []));
