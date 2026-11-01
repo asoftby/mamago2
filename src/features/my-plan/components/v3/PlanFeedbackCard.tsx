@@ -336,6 +336,9 @@ export function PlanFeedbackCard({
                   }
                 }
                 setHidden((list) => [...list, card.id]);
+                // Attendance and/or feedback was persisted: update the visits
+                // history even if the user closes before auto-hide fires.
+                if (activeCardId.startsWith("r:")) onChanged();
               }}
             />
           </div>
