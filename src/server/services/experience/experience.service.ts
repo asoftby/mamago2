@@ -508,7 +508,6 @@ export async function correctUnratedExperienceAttendance(input: {
       entityType: "EVENT",
       entityId: existing.entityId,
       vertical: "CITY",
-      cityId: await getActivityCityIdForAnalytics(existing.entityId),
       meta: {
         source: "plan",
         experienceId: existing.id,
