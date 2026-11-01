@@ -11,6 +11,8 @@ assert.match(ui, /Следующее посещение/);
 assert.match(ui, /\{index \+ 1\} из \{visible\.length\}/);
 assert.match(ui, /visible\.map\(\(card, cardIndex\) =>/);
 assert.match(ui, /hidden=\{cardIndex !== index\}/);
+assert.match(ui, /onFinishedRef\.current\(\)/);
+assert.match(ui, /onFinishedRef\.current = onFinished/);
 assert.match(ui, /key=\{card\.id\}/);
 assert.match(ui, /aria-label="Закрыть карточку посещения"/);
 assert.match(ui, /mamago:experience-snooze:/);
@@ -35,5 +37,13 @@ assert.match(service, /A rated visit cannot be corrected/);
 assert.match(service, /attendance: "ATTENDED", feedbackSentiment: null/);
 assert.match(service, /Attendance was corrected before feedback/);
 assert.match(service, /canCorrectAttendance: row\.userId === input\.userId/);
+
+const affinity = readFileSync(new URL("../../../../server/services/recommendations/experienceAffinity.ts", import.meta.url), "utf8");
+assert.match(service, /eventType: "ATTENDANCE_CORRECTED"/);
+assert.match(service, /attendance_corrected/);
+assert.match(affinity, /eventType === "ATTENDANCE_CORRECTED"/);
+assert.match(affinity, /where: \{ id: \{ in: attendedIds \}, userId: input\.userId \}/);
+assert.match(affinity, /visit\.attendance === "ATTENDED"/);
+assert.match(affinity, /stillAttendedIds\.has\(id\)/);
 
 console.log("ExperienceCheckIn.carousel.test.ts: OK");
