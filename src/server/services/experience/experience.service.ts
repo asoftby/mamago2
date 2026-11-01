@@ -40,6 +40,7 @@ export type PendingExperienceCandidate = {
 
 export type ExperienceSummary = ReturnType<typeof serializeExperience> & {
   title: string;
+  canCorrectAttendance: boolean;
 };
 
 export async function listRecentExperienceSummaries(input: {
