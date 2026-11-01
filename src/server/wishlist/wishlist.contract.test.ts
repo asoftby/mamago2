@@ -24,7 +24,9 @@ assert.match(read("src/lib/prisma.ts"), /PRISMA_CACHE_VERSION = "v\d+"/);
 
 // Service: every public operation goes through the flag gate and ACL.
 const svc = read("src/server/wishlist/wishlist.service.ts");
-const exported = [...svc.matchAll(/export async function (\w+)/g)].map((m) => m[1]);
+// archiveExpiredWishlists is the system cron job: it checks the flag itself and has no user ACL.
+const exported = [...svc.matchAll(/export async function (\w+)/g)].map((m) => m[1]).filter((n) => n !== "archiveExpiredWishlists");
+assert.match(svc, /export async function archiveExpiredWishlists[\s\S]*?wishlistEnabled\(env\)/, "cron job is flag-gated");
 assert.ok(exported.length >= 10, "service surface present");
 assert.equal((svc.match(/const c = ctx\(deps\)/g) ?? []).length, exported.length, "all operations are flag-gated");
 assert.match(svc, /FOR UPDATE/, "item mutations lock the row");
@@ -55,6 +57,19 @@ for (const page of ["src/app/(public)/me/wishlists/page.tsx", "src/app/(public)/
   assert.match(src, /wishlistEnabled\(\)/, `${page} is flag-gated`);
   assert.match(src, /applyGlobalRobotsOverride/, `${page} has robots override`);
   assert.match(src, /redirect\(/, `${page} requires login`);
+}
+
+// Lifecycle (PR 6): cron is authorized and scheduled; author actions are user-scoped.
+{
+  const cron = read("src/app/api/cron/wishlist-archive/route.ts");
+  assert.match(cron, /authorizeCronRequest/, "cron route requires the cron secret");
+  assert.match(read("scripts/deploy/run-prod-notification-jobs.sh"), /run_job "\/api\/cron\/wishlist-archive"/);
+  for (const route of ["src/app/api/wishlists/[id]/copy/route.ts", "src/app/api/wishlists/[id]/thanks/route.ts"]) {
+    assert.match(read(route), /withWishlistUser/, `${route} uses withWishlistUser`);
+  }
+  assert.match(read("src/app/api/wishlists/[id]/thanks/route.ts"), /checkRateLimit/, "thanks is rate limited");
+  assert.match(svc, /copyWishlist[\s\S]*?generateShareToken\(\)/, "copy gets a fresh share token");
+  assert.doesNotMatch(svc.slice(svc.indexOf("export async function copyWishlist"), svc.indexOf("export async function sendWishlistThanks")), /reservations:\s*\{\s*create/, "copy never carries reservations");
 }
 
 console.log("wishlist contract ok");

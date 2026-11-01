@@ -61,4 +61,10 @@ if ! run_job "/api/cron/inbox-purge" "inbox-purge"; then
   overall_status=1
 fi
 
+# Wishlists: archive lists 7 days after their event (no-op while WISHLIST_ENABLED is off).
+if ! run_job "/api/cron/wishlist-archive" "wishlist-archive"; then
+  echo "[mamago-notifications] wishlist-archive failed" >&2
+  overall_status=1
+fi
+
 exit "$overall_status"

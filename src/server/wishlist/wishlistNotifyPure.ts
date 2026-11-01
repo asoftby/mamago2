@@ -56,6 +56,23 @@ export function buildGuestReleaseMessage(input: {
   };
 }
 
+export function buildThanksMessage(input: {
+  itemTitle: string;
+  listTitle: string;
+  message: string | null;
+  listUrl: string;
+}): { subject: string; text: string; body: string } {
+  // body is the in-app notice text: the same words without the link (the CTA carries it).
+  const body =
+    `Спасибо за подарок «${input.itemTitle}» (список «${input.listTitle}»)!` +
+    (input.message ? `\n\n${input.message}` : "");
+  return {
+    subject: `Спасибо за подарок: ${input.itemTitle}`,
+    text: `${body}\n${input.listUrl}`,
+    body,
+  };
+}
+
 export function buildAuthorReservedMessage(input: {
   listTitle: string;
   itemTitle: string;

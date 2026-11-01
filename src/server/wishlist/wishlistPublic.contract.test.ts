@@ -99,3 +99,11 @@ assert.doesNotMatch(read("src/features/wishlist/components/AddOfferToWishlist.ts
 }
 
 console.log("wishlistPublic contract ok");
+
+// Thanks route: ACL runs before the rate limit, so a stranger cannot burn the owner's daily slot.
+{
+  const route = read("src/app/api/wishlists/[id]/thanks/route.ts");
+  const access = route.indexOf("assertWishlistAccess(");
+  const limit = route.indexOf("checkRateLimit(");
+  assert.ok(access > 0 && limit > access, "thanks route: access check must precede checkRateLimit");
+}
