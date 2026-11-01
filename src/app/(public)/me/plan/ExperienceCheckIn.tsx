@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { PhoneVerificationModal } from "@/components/place/PhoneVerificationModal";
 import { EMOJI_RATING_OPTIONS, type EmojiRatingType } from "@/lib/content-rating/emojiRating";
@@ -57,6 +57,8 @@ function ExperienceCheckInCard({
   onDismiss: () => void;
   onFinished: () => void;
 }) {
+  const titleId = useId();
+  const commentId = useId();
   const [submitted, setSubmitted] = useState<ExperienceCheckInState | null>(initialExperience);
   const [selectedSentiment, setSelectedSentiment] = useState<Sentiment | null>(null);
   const [comment, setComment] = useState("");
@@ -184,7 +186,7 @@ function ExperienceCheckInCard({
   return (
     <>
       <section
-        aria-labelledby="experience-check-in-title"
+        aria-labelledby={titleId}
         className={`relative rounded-[24px] border border-[var(--border)] bg-[var(--surface-subtle)] p-5 transition-all duration-300 ${exitState === "leaving" ? "translate-y-2 opacity-0" : "opacity-100"}`}
       >
         <button type="button" aria-label="Закрыть карточку посещения" title="Напомнить завтра" disabled={busy} onClick={postpone}
@@ -194,7 +196,7 @@ function ExperienceCheckInCard({
         <p className="pr-10 font-mono text-[11px] uppercase tracking-[.14em] text-[var(--primary)]">
           Как прошло?
         </p>
-        <h2 id="experience-check-in-title" className="mt-2 text-xl font-semibold text-[#141210]">
+        <h2 id={titleId} className="mt-2 text-xl font-semibold text-[#141210]">
           {shownTitle}
         </h2>
         <p className="mt-1 text-sm text-[#6B6258]">{formatDate(shownDate)}</p>
@@ -256,11 +258,11 @@ function ExperienceCheckInCard({
                 );
               })}
             </div>
-            <label htmlFor="experience-feedback-comment" className="mt-5 block text-sm font-medium text-[#141210]">
+            <label htmlFor={commentId} className="mt-5 block text-sm font-medium text-[#141210]">
               Ваш комментарий <span className="font-normal text-[#6B6258]">(необязательно)</span>
             </label>
             <textarea
-              id="experience-feedback-comment"
+              id={commentId}
               value={comment}
               onChange={(event) => setComment(event.target.value)}
               maxLength={MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH}
