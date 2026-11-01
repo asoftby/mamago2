@@ -22,6 +22,7 @@ import { getCityHomeHref } from "@/lib/header/getCityHomeHref";
 import { ArticleGallery } from "@/components/article/mvp/ArticleGallery";
 import { ArticleBreadcrumbs } from "@/components/article/ArticleBreadcrumbs";
 import { ArticleAuthorActionsBar } from "@/components/article/ArticleAuthorActionsBar";
+import { ContentEmojiRating } from "@/components/content/ContentEmojiRating";
 import { groupArticleInfoBlocks } from "@/lib/article/articleInfoBlockGrouping";
 import {
   ArticlePerformanceArticleTracker,
@@ -1033,6 +1034,19 @@ export function BreakingNewsView({
           entityType={activityBlock.entityType}
           entityId={activityBlock.entityId}
         />
+      )}
+
+      {!draftWatermark && (
+        <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+          <ContentEmojiRating
+            entityType="ARTICLE"
+            entityId={articleId}
+            title="Была полезна статья?"
+            getPath={`/api/articles/ratings/${articleId}`}
+            postPath="/api/articles/rate"
+            postBodyKey="articleId"
+          />
+        </div>
       )}
 
       <RelatedSection items={related} />
