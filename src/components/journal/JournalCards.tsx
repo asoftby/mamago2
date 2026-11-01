@@ -217,7 +217,7 @@ export function JournalMobileCard({
             <span className="block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[rgba(20,18,16,0.55)]">
               {article.category?.name ?? (article.publicationType === "COLLECTION" ? "Подборка" : "Журнал")}
             </span>
-            <h3 className="mt-[9px] line-clamp-2 text-[36px] font-semibold leading-[1.15] tracking-[-0.01em] text-[#141210] transition-colors duration-150 group-hover:text-[#C24E22]">
+            <h3 className="mt-[9px] line-clamp-2 text-[20px] font-semibold leading-[1.2] tracking-[-0.01em] text-[#141210] transition-colors duration-150 group-hover:text-[#C24E22]">
               {article.title}
             </h3>
           </div>
