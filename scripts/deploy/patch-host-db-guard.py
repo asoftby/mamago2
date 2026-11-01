@@ -96,6 +96,9 @@ def check_syntax(source: str) -> None:
 
 
 def verify_safe(source: str) -> None:
+    # Reject removal or alteration of any critical guard condition or failure path.
+    if source.count(GUARD.strip()) != 1:
+        raise ValueError('Complete database guard block missing or modified')
     for item in REQUIRED:
         if source.count(item) != 1:
             raise ValueError("Safety contract missing/duplicated: " + item[:85])
@@ -118,8 +121,13 @@ def harden_legacy(source: str) -> str:
         raise ValueError("Unexpected deploy.sh version: missing/duplicated anchor")
     updated = source.replace(ANCHOR, GUARD + "\n" + ANCHOR, 1)
     for original, replacement in REPLACEMENTS:
-        if original == "docker compose up -d db" and updated.splitlines().count(original) != 1:
-            raise ValueError("Unexpected DB start command: expected exactly one standalone line")
+        if original == "docker compose up -d db":
+            pattern = r"(?m)^(?P<indent>[ \\t]*)docker compose up -d db[ \\t]*$"
+            matches = list(re.finditer(pattern, updated))
+            if len(matches) != 1:
+                raise ValueError("Unexpected DB start command: expected exactly one standalone line")
+            updated = re.sub(pattern, lambda match: match.group("indent") + replacement, updated, count=1)
+            continue
         if updated.count(original) != 1:
             raise ValueError("Unexpected deploy.sh version: " + original[:100])
         updated = updated.replace(original, replacement, 1)
