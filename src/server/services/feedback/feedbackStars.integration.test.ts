@@ -131,7 +131,7 @@ async function main() {
   assert.equal(partyRow.bookingRequestId, booking.id);
   const partyAgg = await direct("OFFER", partyOffer.id);
   assert.equal(partyAgg?.verifiedCount, 1);
-  assert.deepEqual((partyAgg?.tagStats as Record<string, unknown>)[animatorTag.key], { selected: 1, eligible: 1 });
+  assert.deepEqual((partyAgg?.tagStats as Record<string, unknown>)[animatorTag.key], { selected: 1, eligible: 1, authors: 1 });
   assert.equal((await direct("BUSINESS", businessId, "BUSINESS_ROLLUP"))?.ratingCount, 1);
   assert.equal((await direct("PLACE", place.id, "LINKED_OFFER"))?.ratingCount, 1);
 

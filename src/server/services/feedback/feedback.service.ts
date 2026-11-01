@@ -289,9 +289,9 @@ export async function getFeedbackSummary(input: { targetType: string; targetId: 
   const byProjection = new Map(rows.map((row) => [row.projection, row]));
   const main = byProjection.get(targetType === "BUSINESS" ? "BUSINESS_ROLLUP" : "DIRECT");
 
-  const stats = (main?.tagStats ?? {}) as Record<string, { selected: number; eligible: number }>;
+  const stats = (main?.tagStats ?? {}) as Record<string, { selected: number; eligible: number; authors?: number }>;
   const shares = Object.entries(stats)
-    .map(([key, stat]) => ({ key, eligible: stat.eligible, share: tagShare({ selected: stat.selected, eligible: stat.eligible, distinctAuthors: stat.selected }) }))
+    .map(([key, stat]) => ({ key, eligible: stat.eligible, share: tagShare({ selected: stat.selected, eligible: stat.eligible, distinctAuthors: stat.authors ?? stat.selected }) }))
     .filter((chip): chip is { key: string; eligible: number; share: number } => chip.share !== null)
     .sort((a, b) => b.share - a.share || b.eligible - a.eligible)
     .slice(0, MAX_SUMMARY_CHIPS);

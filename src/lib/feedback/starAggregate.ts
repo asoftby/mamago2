@@ -31,7 +31,8 @@ export type AggregateTagDef = {
   partyCategories: readonly string[];
 };
 
-export type TagStat = { selected: number; eligible: number };
+/** `authors` = distinct authors who selected the chip (a business rollup can hold one author on many offers). */
+export type TagStat = { selected: number; eligible: number; authors?: number };
 
 export type StarAggregate = {
   ratingCount: number;
@@ -106,12 +107,16 @@ export function computeStarAggregate(input: {
   for (const tag of input.tags) {
     let eligible = 0;
     let selected = 0;
+    const authors = new Set<string>();
     for (const row of rows) {
       if (!tagOfferedFor(tag, { targetType: input.targetType, value: row.value, partyCategory: input.partyCategory })) continue;
       eligible += 1;
-      if (row.tagIds.includes(tag.id)) selected += 1;
+      if (row.tagIds.includes(tag.id)) {
+        selected += 1;
+        authors.add(row.actorKey);
+      }
     }
-    if (eligible > 0) tagStats[tag.key] = { selected, eligible };
+    if (eligible > 0) tagStats[tag.key] = { selected, eligible, authors: authors.size };
   }
 
   const count = rows.length;

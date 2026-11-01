@@ -214,7 +214,9 @@ export async function resolveOccurrence(
         ...base, occurrenceKey: buildOccurrenceKey("plan", occurrence.id),
         visitStatus: "SELF_REPORTED",
         visitedAt: experience.plannedStartsAt ?? experience.attendanceConfirmedAt,
-        venuePlaceIdAtVisit: target.currentVenuePlaceId,
+        // A plan item carries no historical venue evidence: never infer it from the current
+        // Activity/Offer location (it may have moved since). A place is its own venue.
+        venuePlaceIdAtVisit: target.targetType === "PLACE" ? target.targetId : null,
       };
     }
   }

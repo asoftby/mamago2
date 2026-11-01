@@ -61,9 +61,14 @@ const chipRows = [
   row("user:c4", 1, { tagIds: ["tg2"] }),
 ];
 const chips = computeStarAggregate({ rows: chipRows, targetType: "OFFER", partyCategory: "ANIMATOR", categoryPrior: 4, tags, now });
-assert.deepEqual(chips.tagStats["kids-delighted"], { selected: 2, eligible: 3 });
-assert.deepEqual(chips.tagStats["boring"], { selected: 2, eligible: 2 });
-assert.deepEqual(chips.tagStats["punctual"], { selected: 1, eligible: 2 });
+assert.deepEqual(chips.tagStats["kids-delighted"], { selected: 2, eligible: 3, authors: 2 });
+assert.deepEqual(chips.tagStats["boring"], { selected: 2, eligible: 2, authors: 2 });
+assert.deepEqual(chips.tagStats["punctual"], { selected: 1, eligible: 2, authors: 1 });
+// Business rollup: one author selecting the same chip on several offers is ONE distinct author.
+const rollupRows = ["o1", "o2", "o3", "o4", "o5"].map((offerId) => row("user:same", 5, { targetId: offerId, tagIds: ["tg1"] }));
+const rollup = computeStarAggregate({ rows: rollupRows, targetType: "OFFER", categoryPrior: 4, tags, now });
+assert.deepEqual(rollup.tagStats["kids-delighted"], { selected: 5, eligible: 5, authors: 1 });
+
 const notParty = computeStarAggregate({ rows: chipRows, targetType: "OFFER", partyCategory: "CAKE", categoryPrior: 4, tags, now });
 assert.equal(notParty.tagStats["punctual"], undefined);
 assert.equal(tagOfferedFor(tags[0], { targetType: "PLACE", value: 5 }), false);
