@@ -98,7 +98,7 @@ assert.match(planFeedbackCard, /aria-label="Закрыть вопрос о по�
 assert.match(planFeedbackCard, /mamago:plan-feedback-snooze:/);
 assert.match(planFeedbackCard, /new Set\(\[card\.id, activeCardId\]\)/);
 assert.match(planFeedbackCard, /if \(activeCardId\.startsWith\("r:"\)\) onChanged\(\)/);
-assert.match(planFeedbackCard, /if \(cards\.length === 0 && !\(feed\?\.visits\.length\)\) return null/);
+assert.match(planFeedbackCard, /if \(cards\.length === 0\) return null/);
 assert.doesNotMatch(planFeedbackCard, /feedbackV1 && !comment\.trim\(\)/);
 
 console.log("experience.contract.test.ts: OK");
