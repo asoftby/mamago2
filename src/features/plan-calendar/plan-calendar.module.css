@@ -274,6 +274,7 @@ button.monthLabel:hover { color: var(--plan-ink); }
 .widget .cellMobile { height: 92px; }
 
 /* ---- page variant («Мой план», десктоп): крупные плитки недели ---- */
+@media (min-width: 768px) {
 .rootPage .monthLabel {
   font-family: inherit;
   font-size: 22px;
@@ -318,3 +319,4 @@ button.monthLabel:hover { color: var(--plan-ink); }
 .rootPage .cell:not(.cellMobile).selected { background: var(--plan-ink); border-color: var(--plan-ink); }
 .rootPage .cell:not(.cellMobile).selected .dow { opacity: 0.66; }
 .rootPage .cell:not(.cellMobile) .dot { width: 6px; height: 6px; }
+}
