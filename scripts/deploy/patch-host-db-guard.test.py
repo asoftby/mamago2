@@ -78,7 +78,7 @@ with tempfile.TemporaryDirectory() as temp:
     target.write_bytes(patched)
     complete = target.read_text()
     guard_start = complete.index('if [[ "$DB_CONFIG_BEFORE" != "$DB_CONFIG_AFTER" ]]; then')
-    guard_end = complete.index("\\nfi", guard_start) + len("\\nfi")
+    guard_end = complete.index("\nfi", guard_start) + len("\nfi")
     missing_config_rejection = complete[:guard_start] + complete[guard_end:]
     target.write_text(missing_config_rejection)
     missing_sha = hashlib.sha256(target.read_bytes()).hexdigest()
@@ -87,7 +87,7 @@ with tempfile.TemporaryDirectory() as temp:
     # Removing the health abort or the EXIT identity check must also fail.
     for fragment in (
         'if [[ "$DB_HEALTH" != healthy ]]; then',
-        'trap \\'rc=$?; trap - EXIT; if ! check_db_identity; then exit 90; fi; exit "$rc"\\' EXIT',
+        "trap 'rc=$?; trap - EXIT; if ! check_db_identity; then exit 90; fi; exit \"$rc\"' EXIT",
     ):
         target.write_text(complete.replace(fragment, "# removed guard", 1))
         bad_sha = hashlib.sha256(target.read_bytes()).hexdigest()
