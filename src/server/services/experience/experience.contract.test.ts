@@ -97,6 +97,7 @@ assert.match(planFeedbackCard, /onVerified=\{\(\) => \{/);
 assert.match(planFeedbackCard, /aria-label="Закрыть вопрос о посещении"/);
 assert.match(planFeedbackCard, /mamago:plan-feedback-snooze:/);
 assert.match(planFeedbackCard, /new Set\(\[card\.id, activeCardId\]\)/);
+assert.match(planFeedbackCard, /if \(activeCardId\.startsWith\("r:"\)\) onChanged\(\)/);
 assert.match(planFeedbackCard, /if \(cards\.length === 0 && !\(feed\?\.visits\.length\)\) return null/);
 assert.doesNotMatch(planFeedbackCard, /feedbackV1 && !comment\.trim\(\)/);
 
