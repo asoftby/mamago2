@@ -74,6 +74,7 @@ export async function listRecentExperienceSummaries(input: {
   return rows.map((row) => ({
     ...serializeExperience(row),
     title: titleByPlanItemId.get(row.sourcePlanItemId) ?? "Событие",
+    canCorrectAttendance: row.userId === input.userId,
   }));
 }
 
@@ -452,6 +453,50 @@ export async function confirmPlanExperience(input: {
     await ensureExperienceTelemetry(experience, "ATTENDED", input);
   }
   return experience;
+}
+
+/**
+ * Correct an accidentally confirmed visit before any rating is submitted.
+ * Only the adult who recorded attendance may change it, and the underlying
+ * plan item must still be in their accessible family scope.
+ */
+export async function correctUnratedExperienceAttendance(input: {
+  userId: string;
+  experienceId: string;
+}): Promise<Experience> {
+  const existing = await prisma.experience.findFirst({
+    where: { id: input.experienceId, userId: input.userId },
+  });
+  if (!existing) throw new ExperienceDomainError("not_found", "Experience not found");
+
+  const visible = await prisma.planItem.findFirst({
+    where: { id: existing.sourcePlanItemId, ...(await planScopeFor(input.userId)) },
+    select: { id: true },
+  });
+  if (!visible) throw new ExperienceDomainError("not_found", "Plan item not found");
+
+  if (existing.attendance === "NOT_ATTENDED") return existing;
+  if (existing.feedbackSentiment !== null || existing.feedbackAt !== null) {
+    throw new ExperienceDomainError("attendance_conflict", "A rated visit cannot be corrected");
+  }
+
+  const updated = await prisma.experience.updateMany({
+    where: {
+      id: existing.id,
+      userId: input.userId,
+      attendance: "ATTENDED",
+      feedbackSentiment: null,
+      feedbackAt: null,
+    },
+    data: { attendance: "NOT_ATTENDED" },
+  });
+  const current = await prisma.experience.findUniqueOrThrow({
+    where: { id: existing.id },
+  });
+  if (updated.count === 0 && current.attendance !== "NOT_ATTENDED") {
+    throw new ExperienceDomainError("attendance_conflict", "Attendance changed concurrently");
+  }
+  return current;
 }
 
 export async function submitExperienceFeedback(input: {
