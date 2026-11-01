@@ -1,5 +1,6 @@
 import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
 import assert from "node:assert/strict";
+import { formatPlanAgeLabel } from "./formatPlanAgeLabel";
 import {
   buildPlanCardPresentation,
   formatPlanCardAge,
@@ -69,5 +70,10 @@ assert.deepEqual(
     venueAddress: "пр-т Независимости, 25",
   },
 );
+
+assert.equal(formatPlanAgeLabel("9–12 лет, 12–14 лет, 14–16 лет, 16–18 лет"), "9–18 лет");
+assert.equal(formatPlanAgeLabel("3–5 лет, 5–7 лет, 18+"), "3+");
+assert.equal(formatPlanAgeLabel("18+"), "18+");
+assert.equal(formatPlanAgeLabel("0–1 год, 1–3 года"), "0–3 года");
 
 console.log("planPagePresentation tests: OK");
