@@ -88,8 +88,10 @@ jobs:
 
   # Opt-in only. Keep disabled until host Compose, SSH host keys, encrypted
   # backup recovery and DEV rehearsal pass. Never deploys PROD.
+  # Release-only push: build and publish the image, never deploy it automatically.
+  # Use [build-only] in the merge commit message for an owner-managed DEV rollout.
   deploy-dev:
-    if: ${{ github.ref == 'refs/heads/dev' && vars.MAMAGO_AUTO_DEPLOY_DEV == 'true' }}
+    if: ${{ github.ref == 'refs/heads/dev' && vars.MAMAGO_AUTO_DEPLOY_DEV == 'true' && !contains(github.event.head_commit.message, '[build-only]') }}
     needs: build-and-push
     runs-on: ubuntu-latest
     timeout-minutes: 35
