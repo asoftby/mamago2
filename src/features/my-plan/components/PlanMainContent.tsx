@@ -1676,19 +1676,19 @@ export function PlanMainContent({
     >
       <div
         className={cn(
-          "flex min-h-0 flex-1 w-[200%] transform-gpu transition-transform duration-300 ease-in-out motion-reduce:transition-none",
+          "flex min-h-0 min-w-0 flex-1 w-[200%] transition-transform duration-300 ease-in-out motion-reduce:transition-none",
           screen === "plan" ? "translate-x-0" : "-translate-x-1/2",
         )}
       >
         <div
-          className="h-full min-h-0 w-1/2 shrink-0"
+          className="h-full min-h-0 min-w-0 w-1/2 shrink-0"
           aria-hidden={screen !== "plan"}
           inert={screen !== "plan"}
         >
           {planContent}
         </div>
         <div
-          className="h-full min-h-0 w-1/2 shrink-0"
+          className="h-full min-h-0 min-w-0 w-1/2 shrink-0"
           aria-hidden={screen === "plan"}
           inert={screen === "plan"}
         >
