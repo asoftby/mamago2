@@ -61,6 +61,11 @@ function record(value: Prisma.JsonValue | null): Record<string, unknown> {
     : {};
 }
 
+function experienceIdForEvent(event: OutcomeRow): string | null {
+  const value = record(event.meta).experienceId;
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
 function boundedSemanticKeys(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.filter(
@@ -117,8 +122,20 @@ export function buildSelectedExperienceAffinity(
     });
   }
 
+  // Corrections are immutable events; original ATTENDED events remain in the
+  // ledger but must no longer count as positive preference evidence.
+  const boundedEvents = events.slice(0, EXPERIENCE_AFFINITY_MAX_EVENTS);
+  const correctedIds = new Set(
+    boundedEvents.filter((event) => event.eventType === "ATTENDANCE_CORRECTED")
+      .map(experienceIdForEvent)
+      .filter((id): id is string => id !== null),
+  );
   let outcomeEventCount = 0;
-  for (const event of events.slice(0, EXPERIENCE_AFFINITY_MAX_EVENTS)) {
+  for (const event of boundedEvents) {
+    if (event.eventType === "ATTENDED") {
+      const id = experienceIdForEvent(event);
+      if (id && correctedIds.has(id)) continue;
+    }
     const meta = record(event.meta);
     const delta = experienceOutcomeDelta(event.eventType, meta.sentiment);
     if (delta === 0) continue;
@@ -215,12 +232,32 @@ export async function resolveSelectedExperienceAffinity(input: {
   const events = await prisma.userEvent.findMany({
     where: {
       userId: input.userId,
-      eventType: { in: ["ATTENDED", "EXPERIENCE_FEEDBACK"] },
+      eventType: { in: ["ATTENDED", "EXPERIENCE_FEEDBACK", "ATTENDANCE_CORRECTED"] },
       createdAt: { gte: since },
     },
     orderBy: { createdAt: "desc" },
     take: EXPERIENCE_AFFINITY_MAX_EVENTS,
     select: { eventType: true, meta: true },
   });
-  return buildSelectedExperienceAffinity(selectedSubjects, events);
+  // The visit record is authoritative if an event delivery fails or arrives
+  // out of order: an ATTENDED signal with a corrected Experience is ignored.
+  const attendedIds = [...new Set(events.filter((event) => event.eventType === "ATTENDED")
+    .map(experienceIdForEvent)
+    .filter((id): id is string => id !== null))];
+  if (attendedIds.length === 0) {
+    return buildSelectedExperienceAffinity(selectedSubjects, events);
+  }
+  const currentVisits = await prisma.experience.findMany({
+    where: { id: { in: attendedIds }, userId: input.userId },
+    select: { id: true, attendance: true },
+  });
+  const stillAttendedIds = new Set(currentVisits
+    .filter((visit) => visit.attendance === "ATTENDED")
+    .map((visit) => visit.id));
+  const validEvents = events.filter((event) => {
+    if (event.eventType !== "ATTENDED") return true;
+    const id = experienceIdForEvent(event);
+    return !id || stillAttendedIds.has(id);
+  });
+  return buildSelectedExperienceAffinity(selectedSubjects, validEvents);
 }

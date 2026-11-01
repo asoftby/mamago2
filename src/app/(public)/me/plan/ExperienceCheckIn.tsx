@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { PhoneVerificationModal } from "@/components/place/PhoneVerificationModal";
 import { EMOJI_RATING_OPTIONS, type EmojiRatingType } from "@/lib/content-rating/emojiRating";
 import { MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH } from "@/lib/experience/feedback";
@@ -21,6 +22,7 @@ export type ExperienceCheckInState = {
   attendance: "ATTENDED" | "NOT_ATTENDED";
   feedbackSentiment: "LIKE" | "NEUTRAL" | "DISLIKE" | null;
   feedbackComment?: string | null;
+  canCorrectAttendance?: boolean;
 };
 
 type Sentiment = NonNullable<ExperienceCheckInState["feedbackSentiment"]>;
@@ -44,63 +46,51 @@ function formatDate(dateKey: string) {
   );
 }
 
-export function ExperienceCheckIn({
-  candidates,
-  recentExperiences,
+function ExperienceCheckInCard({
+  candidate,
+  initialExperience,
+  onDismiss,
+  onFinished,
 }: {
-  candidates: ExperienceCheckInCandidate[];
-  recentExperiences: ExperienceCheckInState[];
+  candidate: ExperienceCheckInCandidate | null;
+  initialExperience: ExperienceCheckInState | null;
+  onDismiss: () => void;
+  onFinished: () => void;
 }) {
-  // Finish a confirmed visit's pending feedback before asking about another event.
-  // Already rated visits do not come back on subsequent page loads.
-  const pendingFeedback = recentExperiences.find(
-    (item) => item.attendance === "ATTENDED" && !item.feedbackSentiment,
-  ) ?? null;
-  const candidate = pendingFeedback ? null : candidates[0] ?? null;
-  const [submitted, setSubmitted] = useState<ExperienceCheckInState | null>(pendingFeedback);
+  const titleId = useId();
+  const commentId = useId();
+  const [submitted, setSubmitted] = useState<ExperienceCheckInState | null>(initialExperience);
   const [selectedSentiment, setSelectedSentiment] = useState<Sentiment | null>(null);
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [snoozed, setSnoozed] = useState(false);
   const [message, setMessage] = useState("");
   const [phoneModalOpen, setPhoneModalOpen] = useState(false);
   const [complete, setComplete] = useState(false);
   const [exitState, setExitState] = useState<"visible" | "leaving" | "hidden">("visible");
-
-  const currentPlanItemId = submitted?.planItemId ?? candidate?.planItemId ?? null;
+  const onFinishedRef = useRef(onFinished);
   useEffect(() => {
-    if (!currentPlanItemId) return;
-    try {
-      const until = Number(window.localStorage.getItem("mamago:experience-snooze:" + currentPlanItemId));
-      if (until > Date.now()) setSnoozed(true);
-    } catch {
-      // Storage unavailable.
-    }
-  }, [currentPlanItemId]);
+    onFinishedRef.current = onFinished;
+  }, [onFinished]);
 
   function postpone() {
-    if (currentPlanItemId) {
-      try {
-        window.localStorage.setItem("mamago:experience-snooze:" + currentPlanItemId, String(Date.now() + 86400000));
-      } catch {
-        // Still allow dismiss.
-      }
-    }
-    setSnoozed(true);
+    onDismiss();
   }
 
   useEffect(() => {
     if (!complete) return;
     const beginExit = window.setTimeout(() => setExitState("leaving"), 2700);
-    const hide = window.setTimeout(() => setExitState("hidden"), 3000);
+    const hide = window.setTimeout(() => {
+      setExitState("hidden");
+      onFinishedRef.current();
+    }, 3000);
     return () => {
       window.clearTimeout(beginExit);
       window.clearTimeout(hide);
     };
   }, [complete]);
 
-  if ((!candidate && !submitted) || exitState === "hidden" || snoozed) return null;
+  if ((!candidate && !submitted) || exitState === "hidden") return null;
 
   async function confirm(attendance: "ATTENDED" | "NOT_ATTENDED") {
     if (!candidate || busy) return;
@@ -122,6 +112,35 @@ export function ExperienceCheckIn({
       }
     } catch {
       setMessage("Не получилось сохранить ответ. Попробуйте ещё раз.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function markNotAttended() {
+    if (busy || complete) return;
+    if (!submitted) {
+      await confirm("NOT_ATTENDED");
+      return;
+    }
+    if (submitted.attendance !== "ATTENDED" ||
+        submitted.feedbackSentiment !== null ||
+        submitted.canCorrectAttendance === false) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/plan/experiences/${submitted.id}/attendance`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ attendance: "NOT_ATTENDED" }),
+      });
+      if (!response.ok) throw new Error("attendance_correction_failed");
+      setSubmitted((current) => current ? { ...current, attendance: "NOT_ATTENDED" } : current);
+      setMessage("Отметили, что вы не были");
+      setComplete(true);
+    } catch {
+      setMessage("Не получилось изменить посещение. Попробуйте ещё раз.");
     } finally {
       setBusy(false);
     }
@@ -167,13 +186,17 @@ export function ExperienceCheckIn({
   return (
     <>
       <section
-        aria-labelledby="experience-check-in-title"
-        className={`rounded-[24px] border border-[var(--border)] bg-[var(--surface-subtle)] p-5 transition-all duration-300 ${exitState === "leaving" ? "translate-y-2 opacity-0" : "opacity-100"}`}
+        aria-labelledby={titleId}
+        className={`relative rounded-[24px] border border-[var(--border)] bg-[var(--surface-subtle)] p-5 transition-all duration-300 ${exitState === "leaving" ? "translate-y-2 opacity-0" : "opacity-100"}`}
       >
-        <p className="font-mono text-[11px] uppercase tracking-[.14em] text-[var(--primary)]">
+        <button type="button" aria-label="Закрыть карточку посещения" title="Напомнить завтра" disabled={busy} onClick={postpone}
+          className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full text-[var(--text-muted)] hover:bg-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          <X className="h-5 w-5" aria-hidden />
+        </button>
+        <p className="pr-10 font-mono text-[11px] uppercase tracking-[.14em] text-[var(--primary)]">
           Как прошло?
         </p>
-        <h2 id="experience-check-in-title" className="mt-2 text-xl font-semibold text-[#141210]">
+        <h2 id={titleId} className="mt-2 text-xl font-semibold text-[#141210]">
           {shownTitle}
         </h2>
         <p className="mt-1 text-sm text-[#6B6258]">{formatDate(shownDate)}</p>
@@ -184,7 +207,8 @@ export function ExperienceCheckIn({
               className="min-h-11 rounded-xl bg-[#141210] px-4 py-2 text-sm font-semibold text-white">
               Оценить →
             </button>
-            <button type="button" onClick={postpone} className="min-h-11 px-2 text-xs text-[#6B6258]">Напомнить завтра</button>
+            <button type="button" disabled={busy} onClick={() => void markNotAttended()} className="min-h-11 px-2 text-sm font-medium text-[#6B6258]">Мы не были</button>
+            <button type="button" onClick={postpone} className="min-h-11 px-2 text-xs text-[#6B6258]">Позже</button>
           </div>
         ) : !submitted ? (
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -202,7 +226,7 @@ export function ExperienceCheckIn({
               onClick={() => void confirm("NOT_ATTENDED")}
               className="min-h-11 rounded-xl border border-[rgba(20,18,16,.2)] bg-white px-5 py-3 text-sm font-semibold text-[#141210] disabled:opacity-50"
             >
-              Не получилось
+              Мы не были
             </button>
             <button type="button" disabled={busy} onClick={postpone} className="min-h-11 px-3 text-sm text-[#6B6258] disabled:opacity-50">Позже</button>
           </div>
@@ -234,11 +258,11 @@ export function ExperienceCheckIn({
                 );
               })}
             </div>
-            <label htmlFor="experience-feedback-comment" className="mt-5 block text-sm font-medium text-[#141210]">
+            <label htmlFor={commentId} className="mt-5 block text-sm font-medium text-[#141210]">
               Ваш комментарий <span className="font-normal text-[#6B6258]">(необязательно)</span>
             </label>
             <textarea
-              id="experience-feedback-comment"
+              id={commentId}
               value={comment}
               onChange={(event) => setComment(event.target.value)}
               maxLength={MAX_EXPERIENCE_FEEDBACK_COMMENT_LENGTH}
@@ -256,6 +280,12 @@ export function ExperienceCheckIn({
               >
                 {busy ? "Отправляем…" : "Отправить отзыв"}
               </button>
+              {submitted.canCorrectAttendance !== false ? (
+                <button type="button" disabled={busy || complete} onClick={() => void markNotAttended()}
+                  className="min-h-11 text-sm font-medium text-[#6B6258] disabled:opacity-50">
+                  Мы не были
+                </button>
+              ) : null}
               <button
                 type="button"
                 disabled={busy}
@@ -285,5 +315,87 @@ export function ExperienceCheckIn({
         }}
       />
     </>
+  );
+}
+
+/** Desktop check-in: one-card carousel with explicit navigation. */
+export function ExperienceCheckIn({
+  candidates,
+  recentExperiences,
+}: {
+  candidates: ExperienceCheckInCandidate[];
+  recentExperiences: ExperienceCheckInState[];
+}) {
+  const cards = [
+    ...recentExperiences
+      .filter((item) => item.attendance === "ATTENDED" && !item.feedbackSentiment)
+      .map((item) => ({ id: `r:${item.id}`, planItemId: item.planItemId, candidate: null, experience: item })),
+    ...candidates
+      .filter((item) => !recentExperiences.some((recent) => recent.planItemId === item.planItemId))
+      .map((item) => ({ id: `a:${item.planItemId}`, planItemId: item.planItemId, candidate: item, experience: null })),
+  ];
+  const [dismissed, setDismissed] = useState<string[]>([]);
+  const [requestedIndex, setRequestedIndex] = useState(0);
+
+  useEffect(() => {
+    const snoozed = cards
+      .filter((card) => {
+        try {
+          return Number(window.localStorage.getItem("mamago:experience-snooze:" + card.planItemId)) > Date.now();
+        } catch {
+          return false;
+        }
+      })
+      .map((card) => card.planItemId);
+    if (snoozed.length) {
+      setDismissed((current) => Array.from(new Set([...current, ...snoozed])));
+    }
+  }, [candidates, recentExperiences]);
+
+  const visible = cards.filter((card) => !dismissed.includes(card.planItemId));
+  const index = Math.min(requestedIndex, Math.max(0, visible.length - 1));
+  const active = visible[index] ?? null;
+
+  function hideCard(planItemId: string) {
+    try {
+      window.localStorage.setItem("mamago:experience-snooze:" + planItemId, String(Date.now() + 86400000));
+    } catch {
+      // Closing works even if browser storage is unavailable.
+    }
+    setDismissed((current) => current.includes(planItemId) ? current : [...current, planItemId]);
+  }
+
+  if (!active) return null;
+
+  return (
+    <div role="region" aria-roledescription="карусель" aria-label="Оценки прошедших мероприятий" className="min-w-0">
+      {visible.length > 1 ? (
+        <div className="mb-2 flex items-center justify-end gap-2">
+          <span aria-live="polite" className="mr-1 text-xs tabular-nums text-[var(--text-muted)]">
+            {index + 1} из {visible.length}
+          </span>
+          <button type="button" aria-label="Предыдущее посещение" disabled={index === 0}
+            onClick={() => setRequestedIndex(Math.max(0, index - 1))}
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border)] bg-white disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            <ChevronLeft className="h-5 w-5" aria-hidden />
+          </button>
+          <button type="button" aria-label="Следующее посещение" disabled={index === visible.length - 1}
+            onClick={() => setRequestedIndex(Math.min(visible.length - 1, index + 1))}
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border)] bg-white disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            <ChevronRight className="h-5 w-5" aria-hidden />
+          </button>
+        </div>
+      ) : null}
+      {visible.map((card, cardIndex) => (
+        <div key={card.id} hidden={cardIndex !== index} aria-hidden={cardIndex !== index}>
+          <ExperienceCheckInCard
+            candidate={card.candidate}
+            initialExperience={card.experience}
+            onDismiss={() => hideCard(card.planItemId)}
+            onFinished={() => hideCard(card.planItemId)}
+          />
+        </div>
+      ))}
+    </div>
   );
 }
