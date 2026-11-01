@@ -40,6 +40,19 @@ function event(
   };
 }
 
+assert.equal(experienceOutcomeDelta("ATTENDANCE_CORRECTED"), 0);
+const originalAttendance = event("ATTENDED", [childA], undefined, { experienceId: "visit-corrected" });
+const correctedAttendance = event("ATTENDANCE_CORRECTED", [childA], undefined, { experienceId: "visit-corrected" });
+assert.equal(scoreCandidateExperienceAffinity(
+  buildSelectedExperienceAffinity([childA], [originalAttendance, correctedAttendance]),
+  { categoryId: "category-science" },
+).experienceAffinityBoost, 0);
+assert.equal(scoreCandidateExperienceAffinity(
+  buildSelectedExperienceAffinity([childA], [correctedAttendance, originalAttendance]),
+  { categoryId: "category-science" },
+).experienceAffinityBoost, 0, "correction order does not affect the result");
+assert.equal(buildSelectedExperienceAffinity([childA], [correctedAttendance, originalAttendance])
+  .outcomeEventCount, 0, "a retracted visit never adds affinity outcomes");
 assert.equal(experienceOutcomeDelta("ATTENDED"), 2);
 assert.equal(experienceOutcomeDelta("EXPERIENCE_FEEDBACK", "LIKE"), 5);
 assert.equal(experienceOutcomeDelta("EXPERIENCE_FEEDBACK", "NEUTRAL"), 0);
