@@ -4204,6 +4204,8 @@ enum UserEventType {
   PLAN_AUDIENCE_SNAPSHOT
   ATTENDED
   EXPERIENCE_FEEDBACK
+  /// Server-side correction of an incorrectly recorded visit; not a positive signal.
+  ATTENDANCE_CORRECTED
   /// Family Core M4a (server-only): visibility/decision domain events of a plan item.
   PLAN_ITEM_SHARED
   PLAN_ITEM_MADE_PRIVATE
