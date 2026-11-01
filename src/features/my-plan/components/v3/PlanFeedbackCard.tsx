@@ -148,7 +148,7 @@ function FeedbackCard({
           <X className="h-5 w-5" aria-hidden />
         </button>
         <p className="mp-font-meta pr-10 text-[10px] font-medium uppercase tracking-[.12em] text-white/65">
-          Вы были · {formatPlannedDay(current.plannedDate, todayIso)}
+          {current.kind === "ask" ? "Были ли вы" : "Вы были"} · {formatPlannedDay(current.plannedDate, todayIso)}
         </p>
         <h4 className="mb-2 text-[17px] font-semibold leading-[1.25] tracking-[-.01em] text-white">
           Как вам {current.title}?
@@ -187,7 +187,8 @@ function FeedbackCard({
                 {busy ? "Сохраняем оценку…" : "Выберите оценку или отправьте выбранную. Комментарий необязателен."}
               </p>
             )}
-            {(!saved || feedbackV1) ? <div className="relative mt-3 w-full">
+            {!saved || feedbackV1 ? (
+              <div className="relative mt-3 w-full">
               <input
                 value={comment}
                 onChange={(event) => {
@@ -211,7 +212,8 @@ function FeedbackCard({
               >
                 <Send className="h-5 w-5" aria-hidden="true" />
               </button>
-            </div> : null}
+              </div>
+            ) : null}
           </>
         ) : (
           <div>
@@ -224,14 +226,14 @@ function FeedbackCard({
               className="mt-2 h-10 w-full rounded-xl bg-white px-3 text-[13px] text-[var(--mp-tx)] placeholder:text-[var(--text-muted)]"
             />
             <div className="text-center">
-            <button
+              <button
               type="button"
               disabled={busy}
               onClick={() => void skip()}
               className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-[13.5px] font-medium text-white/75 underline decoration-white/35 underline-offset-[3px] transition-colors hover:text-white"
             >
-              Мы не ходили
-            </button>
+                Мы не ходили
+              </button>
             </div>
           </div>
         )}
@@ -300,7 +302,8 @@ export function PlanFeedbackCard({
   ]
     .filter((card) => !hidden.includes(card.id))
     .slice(0, MAX_CARDS);
-  if (cards.length === 0) return null;
+  // History remains reachable after the last feedback card has been completed.
+  if (cards.length === 0 && !(feed?.visits.length)) return null;
   const feedbackV1 = feed?.feedbackV1Enabled === true;
 
   return (
