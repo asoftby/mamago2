@@ -74,6 +74,18 @@ async function priorFor(db: Db, targetType: "PLACE" | "EVENT" | "OFFER", categor
   });
 }
 
+/**
+ * Serialize recomputes of one aggregate row. Inside a write transaction the
+ * lock is held until commit, so a concurrent writer waits and then reads the
+ * committed reactions — no lost update between two simultaneous ratings.
+ * Lock order is always DIRECT → LINKED → BUSINESS_ROLLUP (no deadlock cycle).
+ * Outside a transaction (reconcile) it is released at once and is harmless.
+ */
+async function lockAggregate(db: Db, key: { targetType: string; targetId: string; projection: Projection }): Promise<void> {
+  const lockKey = `mamago:feedback-aggregate:${key.targetType}:${key.targetId}:${key.projection}`;
+  await db.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+}
+
 async function writeAggregate(
   db: Db,
   key: { targetType: FeedbackTargetType; targetId: string; projection: Projection },
@@ -124,6 +136,7 @@ async function categoryOf(db: Db, targetType: "PLACE" | "EVENT" | "OFFER", targe
 }
 
 export async function recomputeDirect(db: Db, targetType: "PLACE" | "EVENT" | "OFFER", targetId: string, now = new Date()): Promise<void> {
+  await lockAggregate(db, { targetType, targetId, projection: "DIRECT" });
   const [rows, tags, prior, partyCategory] = await Promise.all([
     db.feedbackReaction.findMany({ where: { ...COUNTED, targetType, targetId }, select: ROW_SELECT }),
     loadTags(db),
@@ -138,6 +151,7 @@ export async function recomputeDirect(db: Db, targetType: "PLACE" | "EVENT" | "O
 export async function recomputeLinkedForPlace(db: Db, placeId: string, now = new Date()): Promise<void> {
   const tags = await loadTags(db);
   for (const [projection, rowsType] of [["LINKED_EVENT", "EVENT"], ["LINKED_OFFER", "OFFER"]] as const) {
+    await lockAggregate(db, { targetType: "PLACE", targetId: placeId, projection });
     const [rows, prior] = await Promise.all([
       db.feedbackReaction.findMany({
         where: { ...COUNTED, targetType: rowsType, venuePlaceIdAtVisit: placeId, visitStatus: { in: [...LINKED_VISITS] } },
@@ -153,6 +167,7 @@ export async function recomputeLinkedForPlace(db: Db, placeId: string, now = new
 
 /** Performer rating = direct ratings of the business's own services; venues it worked at are not mixed in. */
 export async function recomputeBusinessRollup(db: Db, businessId: string, now = new Date()): Promise<void> {
+  await lockAggregate(db, { targetType: "BUSINESS", targetId: businessId, projection: "BUSINESS_ROLLUP" });
   const offers = await db.offer.findMany({ where: { place: { ownerBusinessId: businessId } }, select: { id: true } });
   const [rows, prior, tags] = await Promise.all([
     offers.length === 0
