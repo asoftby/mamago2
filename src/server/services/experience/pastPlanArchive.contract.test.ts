@@ -29,5 +29,6 @@ test("check-in is optional and can be postponed without losing history", () => {
   assert.match(checkIn, /Оценить →/);
   assert.match(checkIn, /Напомнить завтра/);
   assert.match(checkIn, /experience-snooze/);
-  assert.match(checkIn, /setTimeout\(\(\) => setExitState\("hidden"\), 3000\)/);
+  assert.match(checkIn, /setExitState\("hidden"\)/);
+  assert.match(checkIn, /onFinished\(\)/);
 });
