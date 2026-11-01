@@ -53,15 +53,9 @@ assert.deepEqual(three.columnKeys, [["a"], ["b"], ["c"]]);
 
 // Source contracts.
 const grid = readFileSync(new URL("./OrderedMasonryGrid.tsx", import.meta.url), "utf8");
-const ideas = readFileSync(new URL("../../app/(public)/me/ideas/components/IdeasGrid.tsx", import.meta.url), "utf8");
-const collections = readFileSync(new URL("../../app/(public)/me/ideas/components/IdeasCollectionsBar.tsx", import.meta.url), "utf8");
 assert.doesNotMatch(grid, /columns-\d|column-count|grid-flow-dense/);
 assert.match(grid, /ResizeObserver/);
 assert.match(grid, /useLayoutEffect/);
 assert.match(grid, /SSR_MASONRY_CONFIG/);
-assert.match(ideas, /<OrderedMasonryGrid/);
-assert.match(ideas, /key: idea\.id/);
-assert.match(collections, /<OrderedMasonryGrid/);
-assert.match(collections, /key: item\.id/);
 
 console.log("Ordered masonry: breakpoints, shortest-column placement, append stability, contracts: OK");

@@ -32,6 +32,7 @@ import { PlanArticleScreen } from "./v3/PlanArticleScreen";
 import { PlanEventScreen } from "./v3/PlanEventScreen";
 import { PlanScenarioScreen } from "./v3/PlanScenarioScreen";
 import { PlanNewTaskScreen } from "./v3/PlanNewTaskScreen";
+import { PlanIdeasScreen } from "./v3/PlanIdeasScreen";
 import { PlanVisitsScreen } from "./v3/PlanVisitsScreen";
 import { PlanDayRibbon } from "./v3/PlanDayRibbon";
 import { PlanFeedbackCard } from "./v3/PlanFeedbackCard";
@@ -426,12 +427,15 @@ export function PlanMainContent({
   const [showAdultParticipantModal, setShowAdultParticipantModal] = useState(false);
   const [showAudienceSheet, setShowAudienceSheet] = useState(false);
   /** Два экрана остаются в одной модалке: сдвигаем их по горизонтали, не теряя план. */
-  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "month" | "picks" | "event" | "scenario">("plan");
+  const [screen, setScreen] = useState<"plan" | "new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas">("plan");
   /** Сохраняем исходящий экран в DOM до конца обратной анимации. */
-  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "month" | "picks" | "event" | "scenario" | null>(null);
+  const [mountedNestedScreen, setMountedNestedScreen] = useState<"new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas" | null>(null);
   /** Каждое открытие формы — новый экземпляр; отменённая анимация не оставляет старый черновик. */
   const [nestedScreenVersion, setNestedScreenVersion] = useState(0);
-  const openNestedScreen = useCallback((next: "new" | "visits" | "month" | "picks" | "event" | "scenario") => {
+  /** Счётчик идей, пересчитанный на экране «Мои идеи» (удаления там не обновляют useMyPlan). */
+  const [ideasCountOverride, setIdeasCountOverride] = useState<number | null>(null);
+  const shownIdeasCount = ideasCountOverride ?? ideasCount;
+  const openNestedScreen = useCallback((next: "new" | "visits" | "month" | "picks" | "event" | "scenario" | "ideas") => {
     setNestedScreenVersion((version) => version + 1);
     setMountedNestedScreen(next);
     setScreen(next);
@@ -898,12 +902,7 @@ export function PlanMainContent({
       router.push(href);
     }, 0);
   };
-  const handleOpenMyIdeas = useCallback(() => {
-    onRequestClose?.();
-    window.setTimeout(() => {
-      router.push("/me/ideas");
-    }, 0);
-  }, [onRequestClose, router]);
+  const handleOpenMyIdeas = useCallback(() => openNestedScreen("ideas"), [openNestedScreen]);
   const handleIdeasPageClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
     onRequestClose?.();
@@ -1461,7 +1460,7 @@ export function PlanMainContent({
         <i className="h-px flex-1 bg-[var(--mp-line-strong)]" />
       </div>
       <nav aria-label="Разделы моего плана">
-        {ideasCount ? (
+        {shownIdeasCount ? (
           <button
             type="button"
             onClick={handleOpenMyIdeas}
@@ -1471,7 +1470,7 @@ export function PlanMainContent({
               <Heart className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Мои идеи · {ideasCount}</span>
+              <span className="block text-[15px] font-semibold leading-[1.3] tracking-[-.01em] text-[var(--mp-tx)]">Мои идеи · {shownIdeasCount}</span>
               <span className="mt-[3px] block text-[13px] text-[var(--mp-tx2)]">Поставьте на свободный день</span>
             </span>
             <ArrowRight className="h-[18px] w-[18px] shrink-0 text-[var(--mp-tx2)] transition-transform group-hover:translate-x-[3px] group-hover:text-[var(--mp-ac-dark)]" strokeWidth={1.8} aria-hidden />
@@ -1761,6 +1760,8 @@ export function PlanMainContent({
               onBack={closeNestedScreen}
               onOpen={handleOpenScenarioPage}
             />
+          ) : mountedNestedScreen === "ideas" ? (
+            <PlanIdeasScreen key={nestedScreenVersion} onBack={closeNestedScreen} onClose={onRequestClose} onCountChange={setIdeasCountOverride} />
           ) : mountedNestedScreen === "visits" ? (
             <PlanVisitsScreen key={nestedScreenVersion} onBack={closeNestedScreen} onClose={onRequestClose} />
           ) : mountedNestedScreen === "picks" ? (
