@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { PhoneVerificationModal } from "@/components/place/PhoneVerificationModal";
 import { EMOJI_RATING_OPTIONS, type EmojiRatingType } from "@/lib/content-rating/emojiRating";
@@ -66,6 +66,8 @@ function ExperienceCheckInCard({
   const [phoneModalOpen, setPhoneModalOpen] = useState(false);
   const [complete, setComplete] = useState(false);
   const [exitState, setExitState] = useState<"visible" | "leaving" | "hidden">("visible");
+  const onFinishedRef = useRef(onFinished);
+  onFinishedRef.current = onFinished;
 
   function postpone() {
     onDismiss();
@@ -76,13 +78,13 @@ function ExperienceCheckInCard({
     const beginExit = window.setTimeout(() => setExitState("leaving"), 2700);
     const hide = window.setTimeout(() => {
       setExitState("hidden");
-      onFinished();
+      onFinishedRef.current();
     }, 3000);
     return () => {
       window.clearTimeout(beginExit);
       window.clearTimeout(hide);
     };
-  }, [complete, onFinished]);
+  }, [complete]);
 
   if ((!candidate && !submitted) || exitState === "hidden") return null;
 
@@ -380,13 +382,16 @@ export function ExperienceCheckIn({
           </button>
         </div>
       ) : null}
-      <ExperienceCheckInCard
-        key={active.id}
-        candidate={active.candidate}
-        initialExperience={active.experience}
-        onDismiss={() => hideCard(active.planItemId)}
-        onFinished={() => hideCard(active.planItemId)}
-      />
+      {visible.map((card, cardIndex) => (
+        <div key={card.id} hidden={cardIndex !== index} aria-hidden={cardIndex !== index}>
+          <ExperienceCheckInCard
+            candidate={card.candidate}
+            initialExperience={card.experience}
+            onDismiss={() => hideCard(card.planItemId)}
+            onFinished={() => hideCard(card.planItemId)}
+          />
+        </div>
+      ))}
     </div>
   );
 }
