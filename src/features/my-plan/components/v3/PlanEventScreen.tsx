@@ -9,6 +9,7 @@ import { resolveActivityParticipationCta } from "@/lib/plan/resolveActivityParti
 import { planEntryDisplay } from "../../lib/planEntryDisplay";
 import { formatPlanCardPrice } from "../../lib/planPagePresentation";
 import { resolveActivityAddress } from "../../lib/formatActivityAddress";
+import { formatPlanAgeLabel } from "../../lib/formatPlanAgeLabel";
 import type { PlanItemWithActivity } from "../../types/event";
 import { PlanScreenHead } from "./PlanScreenHead";
 
@@ -51,10 +52,11 @@ export function PlanEventScreen({
   const cta = activity ? resolveActivityParticipationCta(activity, city) : null;
   const ctaHref = cta?.href ?? detailHref;
   const price = activity ? formatPlanCardPrice(activity) : null;
+  const ageLabel = formatPlanAgeLabel(activity?.ageLabel);
   const isClass = activity?.type === "COURSE";
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--mp-bg)]">
+    <div className="flex h-full min-h-0 min-w-0 w-full flex-col bg-[var(--mp-bg)]">
       <PlanScreenHead back="План" onBack={onBack} />
       <span className={`mx-5 mb-3 inline-flex h-[30px] w-fit items-center rounded-full px-3 text-[13px] font-bold md:mx-8 ${isClass ? "bg-[#E4E6F4] text-[#454C86]" : "bg-[var(--mp-ac-soft)] text-[var(--mp-ac-dark)]"}`}>
         {isClass ? "Занятие" : "Из афиши"}
@@ -68,12 +70,12 @@ export function PlanEventScreen({
         </div>
 
         <div className="mt-[18px] flex items-start gap-3">
-          <h2 className="mp-font-display m-0 flex-1 text-[26px] font-normal leading-[1.18] tracking-[-0.015em] text-[var(--mp-tx)] [text-wrap:pretty]">
+          <h2 className="mp-font-display m-0 min-w-0 flex-1 text-[26px] font-normal leading-[1.18] tracking-[-0.015em] text-[var(--mp-tx)] [text-wrap:pretty]">
             {title}
           </h2>
-          {activity?.ageLabel ? (
-            <span className="mt-[3px] inline-flex h-[30px] shrink-0 items-center rounded-[9px] border-[1.5px] border-[var(--mp-tx)] px-[11px] text-sm font-extrabold text-[var(--mp-tx)]">
-              {activity.ageLabel}
+          {ageLabel ? (
+            <span className="mt-[3px] inline-flex h-[30px] max-w-[40%] shrink-0 items-center whitespace-nowrap rounded-[9px] border-[1.5px] border-[var(--mp-tx)] px-[11px] text-sm font-extrabold text-[var(--mp-tx)]">
+              {ageLabel}
             </span>
           ) : null}
         </div>
