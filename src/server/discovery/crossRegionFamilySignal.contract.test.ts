@@ -29,4 +29,11 @@ assert.match(purchase, /validateBoostTargetRegions/);
 assert.match(purchase, /targetRegionIds,/);
 assert.match(action, /targetRegionIds: z\.array/);
 assert.match(form, /Вся Беларусь/);
+
+const editor = readFileSync("src/app/(content-editor)/editor/event/[id]/edit/page.tsx", "utf8");
+const overrideApi = readFileSync("src/app/api/admin/discovery/cross-region-overrides/route.ts", "utf8");
+assert.doesNotMatch(editor, /EventCrossRegionOverrides/, "editorial geo controls must not render in the event wizard");
+assert.match(overrideApi, /requireAdminOrModeratorApiUser/, "protected editorial override API remains available");
+assert.match(signal, /crossRegionEditorialOverride\.findMany/, "cross-region overrides remain active in discovery");
+
 console.log("cross-region Boost and 50-family signal contract tests: OK");
