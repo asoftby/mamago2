@@ -67,7 +67,9 @@ function ExperienceCheckInCard({
   const [complete, setComplete] = useState(false);
   const [exitState, setExitState] = useState<"visible" | "leaving" | "hidden">("visible");
   const onFinishedRef = useRef(onFinished);
-  onFinishedRef.current = onFinished;
+  useEffect(() => {
+    onFinishedRef.current = onFinished;
+  }, [onFinished]);
 
   function postpone() {
     onDismiss();
