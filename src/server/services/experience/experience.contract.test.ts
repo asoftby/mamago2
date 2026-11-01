@@ -27,6 +27,12 @@ const ui = readFileSync(
   new URL("../../../app/(public)/me/plan/ExperienceCheckIn.tsx", import.meta.url),
   "utf8",
 );
+// Overlay card should submit the rating on face selection, allow dismissing a
+// pending prompt, and keep the visit history available after all prompts close.
+const planFeedbackCard = readFileSync(
+  new URL("../../../features/my-plan/components/v3/PlanFeedbackCard.tsx", import.meta.url),
+  "utf8",
+);
 const attendanceRoute = readFileSync(
   new URL("../../../app/api/plan/experiences/route.ts", import.meta.url),
   "utf8",
@@ -83,5 +89,14 @@ assert.match(service, /const nextComment = input\.allowEditing && !comment \? ex
 assert.match(service, /allowEditing\?: boolean/);
 assert.match(schema, /feedbackComment\s+String\?/);
 assert.doesNotMatch(engagementWeights, /ATTENDED|EXPERIENCE_FEEDBACK/);
+
+assert.match(planFeedbackCard, /await persistRating\(experience\.id, sentiment, comment\.trim\(\)\)/);
+assert.match(planFeedbackCard, /await persistRating\(current\.experienceId, sentiment, comment\.trim\(\)\)/);
+assert.match(planFeedbackCard, /result === "phone"/);
+assert.match(planFeedbackCard, /onVerified=\{\(\) => \{/);
+assert.match(planFeedbackCard, /aria-label="Закрыть вопрос о посещении"/);
+assert.match(planFeedbackCard, /mamago:plan-feedback-snooze:/);
+assert.match(planFeedbackCard, /if \(cards\.length === 0 && !\(feed\?\.visits\.length\)\) return null/);
+assert.doesNotMatch(planFeedbackCard, /feedbackV1 && !comment\.trim\(\)/);
 
 console.log("experience.contract.test.ts: OK");
