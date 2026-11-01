@@ -42,7 +42,7 @@ function FeedbackCard({
   feedbackV1: boolean;
   todayIso: string;
   onChanged: () => void;
-  onDismiss: (snooze: boolean) => void;
+  onDismiss: (snooze: boolean, activeCardId: string) => void;
 }) {
   // После тапа по лицу визит засчитан: карточка переходит в режим «оценка» без ожидания перезагрузки ленты.
   const [override, setOverride] = useState<Current | null>(null);
@@ -142,7 +142,7 @@ function FeedbackCard({
           aria-label="Закрыть вопрос о посещении"
           title={saved ? "Закрыть" : "Напомнить завтра"}
           disabled={busy}
-          onClick={() => onDismiss(!saved)}
+          onClick={() => onDismiss(!saved, current.kind === "rate" ? `r:${current.experienceId}` : `a:${current.planItemId}`)}
           className="absolute right-2.5 top-2.5 flex h-11 w-11 items-center justify-center rounded-full text-white/75 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
         >
           <X className="h-5 w-5" aria-hidden />
@@ -322,10 +322,15 @@ export function PlanFeedbackCard({
                 setHidden((list) => [...list, card.id]);
                 onChanged();
               }}
-              onDismiss={(snooze) => {
+              onDismiss={(snooze, activeCardId) => {
                 if (snooze) {
                   try {
-                    window.localStorage.setItem("mamago:plan-feedback-snooze:" + card.id, String(Date.now() + 86400000));
+                    const until = String(Date.now() + 86400000);
+                    // An "ask" card may become a "rate" card after confirming
+                    // attendance. Snooze both identities to survive a reload.
+                    for (const id of new Set([card.id, activeCardId])) {
+                      window.localStorage.setItem("mamago:plan-feedback-snooze:" + id, until);
+                    }
                   } catch {
                     // Closing must still work if storage is unavailable.
                   }
