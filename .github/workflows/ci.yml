@@ -161,8 +161,11 @@ jobs:
       - name: WordPress excluded-user backfill safety regressions
         run: pnpm test:migration-user-exclusion-backfill
 
+      - name: Five-user historical WordPress preview safety regressions
+        run: pnpm exec tsx --test scripts/migration-wordpress-five-preview.test.ts
+
       - name: Safe SSH preview and historical coverage audit syntax
-        run: python3 -m py_compile scripts/migration-user-exclusion-preview-ssh.py scripts/migration-wordpress-user-coverage-audit.py scripts/migration-wordpress-user-archive-reconcile.py scripts/migration-all-users-dev-prod-audit.py scripts/migration-dev-only-ownership-overlap-audit.py
+        run: python3 -m py_compile scripts/migration-user-exclusion-preview-ssh.py scripts/migration-wordpress-user-coverage-audit.py scripts/migration-wordpress-user-archive-reconcile.py scripts/migration-all-users-dev-prod-audit.py scripts/migration-dev-only-ownership-overlap-audit.py scripts/migration-wordpress-five-preview-ssh.py
 
       - name: Feedback model and multi-source reputation regressions
         run: pnpm test:feedback-foundation
