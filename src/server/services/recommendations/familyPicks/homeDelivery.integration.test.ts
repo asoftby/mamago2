@@ -7,6 +7,7 @@ import { minskDateKey } from "./window";
 import { loadHomeContext, saveHomeSelection } from "./homeContext";
 import { deliverHomeFamilyPicks, type HomeFamilyDelivery } from "./delivery";
 import { resolveHomeRequest } from "./homeRequest";
+import { HomeSelectionSync, persistHomeSelection } from "@/features/city-home/lib/homeSelectionSync";
 import { FamilyHomeCache } from "@/features/city-home/lib/familyHomeCache";
 
 const url = new URL(process.env.DATABASE_URL ?? "http://missing");
@@ -53,6 +54,35 @@ async function main() {
     assert.equal(await saveHomeSelection(user.id, first.id, fromAnotherDevice.context.preferenceVersion), false, "late update must not overwrite");
     assert.equal((await loadHomeContext(stranger.id)).context.selectedChildId, null);
     await assert.rejects(saveHomeSelection(stranger.id, first.id, null), /selection_unavailable/);
+    // Two open devices consume the real account preference, independent of profile hash.
+    const tabA = new HomeSelectionSync((await loadHomeContext(user.id)).context);
+    const tabB = new HomeSelectionSync((await loadHomeContext(user.id)).context);
+    const persistence = {
+      context: async () => (await loadHomeContext(user.id)).context,
+      save: async (choice: string | null, version: string | null) => {
+        const result = await resolveHomeRequest({ action: "selection", city: city.slug, selectedChildId: choice, version }, user.id, null, undefined, true);
+        if (result.status !== 200) throw new Error(`home_${result.status}`);
+      },
+    };
+    assert.equal(await persistHomeSelection(tabA, tabA.begin(first.id), persistence), "saved");
+    const beforeOtherDevice = await persistence.context();
+    assert.equal(await persistHomeSelection(tabB, tabB.begin(second.id), persistence), "saved");
+    const onFocus = await persistence.context();
+    assert.equal(onFocus.signature, beforeOtherDevice.signature);
+    assert.notEqual(onFocus.preferenceVersion, beforeOtherDevice.preferenceVersion);
+    assert.equal(tabA.reconcile(onFocus), second.id, "A → X, B → Y, A focus → Y");
+    // A competing write after A's read must cause real API CAS 409 and sync to B.
+    const conflict = await persistHomeSelection(tabA, tabA.begin(first.id), {
+      ...persistence,
+      save: async (choice, version) => {
+        assert.ok(await saveHomeSelection(user.id, null, version));
+        await persistence.save(choice, version);
+      },
+    });
+    assert.equal(conflict, "conflict");
+    assert.equal(tabA.reconcile(await persistence.context()), null);
+    const restore = await persistence.context();
+    assert.ok(await saveHomeSelection(user.id, second.id, restore.preferenceVersion));
     // Large full pool, no pre-age truncation: 100 UNKNOWN and 700 confirmed.
     for (let i = 0; i < 800; i++) activityIds.push(`home_${marker.replaceAll("-", "")}_${i}`);
     await db.activity.createMany({ data: activityIds.map((id, index) => ({ id, ownerUserId: user.id, cityId: city.id, title: `Synthetic ${index}`, shortDesc: "Disposable benchmark", type: "EVENT", status: "PUBLISHED", agePolicy: index < 100 ? "UNKNOWN" : "SPECIFIC", ageMinMonths: index < 100 ? null : 0, ageMaxMonths: index < 100 ? null : 216, ageTags: [], scheduleMode: "MULTI_DATE", nextOccurrenceAt: day(1), priceMode: "FREE" })) });

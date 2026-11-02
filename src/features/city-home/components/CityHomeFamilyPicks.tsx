@@ -13,6 +13,7 @@ import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
 import { FAMILY_PERSONAS_CHANGED_EVENT } from "@/lib/family/familyPersonaEvents";
 import { AUTH_STATE_CHANGED_EVENT } from "@/lib/auth/client";
+import { HomeSelectionSync, persistHomeSelection } from "../lib/homeSelectionSync";
 import { FamilyHomeCache, readHomeDismissals, writeHomeDismissals, HOME_DISMISS_TTL_MS, type HomeDismissal } from "../lib/familyHomeCache";
 import { homeCatalogHref, homeSelection, homeSelectionLabel, homeAgeLabel, homePeriodLabel, minskPlanDate, type HomeFamilyContext } from "../lib/familyHome";
 import type { HomeFamilyDelivery } from "@/server/services/recommendations/familyPicks/delivery";
@@ -39,7 +40,6 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   const [context, setContext] = useState(initialContext);
   const contextRef = useRef(initialContext);
   const [selected, setSelected] = useState<string | null>(initialContext.selectedChildId);
-  const selectedRef = useRef(selected);
   const [data, setData] = useState<HomeFamilyDelivery | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [announcement, setAnnouncement] = useState("");
@@ -47,9 +47,9 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   const controller = useRef<AbortController | null>(null);
   const dismissals = useRef<HomeDismissal[]>([]);
   const [impressed, setImpressed] = useState(new Set<string>());
-  const initialRef = useRef(initialContext);
-  const selectionTouched = useRef(false);
+  const selectionSync = useRef(new HomeSelectionSync(initialContext));
   const preferenceQueue = useRef(Promise.resolve());
+  const mounted = useRef(false);
   const allowedActor = useRef(true);
   useEffect(() => { allowedActor.current = auth.user?.id === actor && !auth.isLoading; }, [actor, auth.user?.id, auth.isLoading]);
 
@@ -64,13 +64,14 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
     }
   }, [actor]);
 
-  const load = useCallback(async (requested: string | null) => {
+  const load = useCallback(async () => {
+    if (!mounted.current || !allowedActor.current) return;
     controller.current?.abort();
     const abort = new AbortController();
     controller.current = abort;
     const generation = cache.current.begin();
     setState("loading");
-    const valid = () => !abort.signal.aborted && allowedActor.current && cache.current.current(generation);
+    const valid = () => mounted.current && !abort.signal.aborted && allowedActor.current && cache.current.current(generation);
     try {
       const stored = readHomeDismissals(actor);
       const merged = new Map(dismissals.current.filter(entry => Date.now() - entry.at < HOME_DISMISS_TTL_MS).map(entry => [entry.id, entry]));
@@ -85,8 +86,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
       const fresh = (await post({ action: "context", city: citySlug }, abort.signal)).context as HomeFamilyContext;
       if (!valid()) return;
       if (fresh.actorId !== actor || fresh.audience !== "personalized") { cache.current.cancel(); router.refresh(); return; }
-      const choice = homeSelection(fresh, selectionTouched.current ? requested : fresh.selectedChildId);
-      selectedRef.current = choice;
+      const choice = selectionSync.current.reconcile(fresh);
       setSelected(choice);
       if (contextRef.current.signature !== fresh.signature) cache.current.clear();
       contextRef.current = fresh;
@@ -108,60 +108,70 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   }, [actor, citySlug, flushDismissals, router]);
 
   useEffect(() => {
+    mounted.current = true;
     dismissals.current = readHomeDismissals(actor);
     for (const entry of dismissals.current) cache.current.dismiss(entry.id, entry.at + HOME_DISMISS_TTL_MS);
-    let choice = initialRef.current.selectedChildId;
-    if (initialRef.current.selectionPersistence === "device") {
-      try { choice = homeSelection(initialRef.current, localStorage.getItem(`mg_family_home_selected:${actor}`)); } catch { /* use server default */ }
-    }
-    selectedRef.current = choice;
-    void load(choice);
+    void load();
     const memory = cache.current;
-    return () => { controller.current?.abort(); memory.cancel(); };
+    const choices = selectionSync.current;
+    return () => { mounted.current = false; choices.cancel(); controller.current?.abort(); memory.cancel(); };
   }, [actor, load]);
 
   useEffect(() => {
-    const refresh = () => { cache.current.clear(); void load(selectedRef.current); };
-    const logout = () => { allowedActor.current = false; controller.current?.abort(); cache.current.cancel(); setData(null); setState("loading"); };
-    const focus = () => { void load(selectedRef.current); };
+    const refresh = () => { cache.current.clear(); void load(); };
+    const logout = () => { selectionSync.current.cancel(); allowedActor.current = false; controller.current?.abort(); cache.current.cancel(); setData(null); setState("loading"); };
+    const focus = () => { void load(); };
+    const visible = () => { if (document.visibilityState === "visible") void load(); };
     window.addEventListener(FAMILY_PERSONAS_CHANGED_EVENT, refresh);
     window.addEventListener(AUTH_STATE_CHANGED_EVENT, logout);
-    const storage = (event: StorageEvent) => { if (event.key === `mg_family_home_dismissed:${actor}`) void load(selectedRef.current); };
+    const storage = (event: StorageEvent) => { if (event.key === `mg_family_home_dismissed:${actor}`) void load(); };
     window.addEventListener("storage", storage);
     window.addEventListener("focus", focus);
-    return () => { window.removeEventListener(FAMILY_PERSONAS_CHANGED_EVENT, refresh); window.removeEventListener(AUTH_STATE_CHANGED_EVENT, logout); window.removeEventListener("focus", focus); window.removeEventListener("storage", storage); };
+    document.addEventListener("visibilitychange", visible);
+    return () => { window.removeEventListener(FAMILY_PERSONAS_CHANGED_EVENT, refresh); window.removeEventListener(AUTH_STATE_CHANGED_EVENT, logout); window.removeEventListener("focus", focus); window.removeEventListener("storage", storage); document.removeEventListener("visibilitychange", visible); };
   }, [load, actor]);
 
   useEffect(() => {
-    if (initialContext.signature !== contextRef.current.signature) { cache.current.clear(); void load(selectedRef.current); }
-  }, [initialContext.signature, load]);
+    if (initialContext.signature !== contextRef.current.signature
+      || initialContext.preferenceVersion !== contextRef.current.preferenceVersion
+      || initialContext.selectedChildId !== contextRef.current.selectedChildId) void load();
+  }, [initialContext.signature, initialContext.preferenceVersion, initialContext.selectedChildId, load]);
 
   function select(id: string | null) {
-    selectionTouched.current = true;
-    selectedRef.current = id;
-    setSelected(id);
-    if (context.selectionPersistence === "device") {
-      try { if (id) localStorage.setItem(`mg_family_home_selected:${actor}`, id); else localStorage.removeItem(`mg_family_home_selected:${actor}`); } catch { /* visit-only */ }
-    }
-    if (context.selectionPersistence === "account") {
-      preferenceQueue.current = preferenceQueue.current.catch(() => {}).then(async () => {
-        if (!allowedActor.current || selectedRef.current !== id) return;
-        try {
+    const choice = homeSelection(context, id);
+    const token = selectionSync.current.begin(choice);
+    setSelected(choice);
+    setAnnouncement("Сохраняем выбор на аккаунте…");
+    preferenceQueue.current = preferenceQueue.current.catch(() => {}).then(async () => {
+      if (!mounted.current || !allowedActor.current || !selectionSync.current.isPending(token)) return;
+      const result = await persistHomeSelection(selectionSync.current, token, {
+        context: async () => {
+          if (!mounted.current || !allowedActor.current) throw new Error("selection_actor_changed");
           const fresh = (await post({ action: "context", city: citySlug })).context as HomeFamilyContext;
-          if (!allowedActor.current || fresh.actorId !== actor || selectedRef.current !== id) return;
-          await post({ action: "selection", city: citySlug, selectedChildId: id, version: fresh.preferenceVersion });
-        } catch { if (allowedActor.current) setAnnouncement("Не удалось сохранить выбор на аккаунте. Выберите ребёнка повторно."); }
+          if (!mounted.current || !allowedActor.current || fresh.actorId !== actor) throw new Error("selection_actor_changed");
+          return fresh;
+        },
+        save: async (selectedChildId, version) => {
+          if (!mounted.current || !allowedActor.current) throw new Error("selection_actor_changed");
+          await post({ action: "selection", city: citySlug, selectedChildId, version });
+        },
       });
-    }
-    void load(id);
+      if (!mounted.current || !allowedActor.current || result === "obsolete") return;
+      setAnnouncement(result === "saved" ? "Выбор обновлён на аккаунте." : result === "conflict"
+        ? "Выбор изменён на другом устройстве. Показываем актуальный выбор аккаунта."
+        : "Не удалось подтвердить сохранение. Обновляем выбор из аккаунта.");
+      void load();
+    });
+    void load();
   }
+
   function dismiss(item: HomeFamilyDelivery["items"][number]) {
     cache.current.dismiss(item.id);
     dismissals.current = [...dismissals.current.filter(entry => entry.id !== item.id), { id: item.id, token: crypto.randomUUID(), at: Date.now(), exposureId: item.exposureId, city: citySlug, saved: false }].slice(-200);
     writeHomeDismissals(actor, dismissals.current);
     setData(value => value ? cache.current.filter(value) : value);
     setAnnouncement(`«${item.title}» скрыто из всех подборок`);
-    void load(selectedRef.current);
+    void load();
   }
   const choiceChild = context.children.find(child => child.id === selected);
   const href = homeCatalogHref(citySlug, context, selected);
@@ -182,9 +192,9 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
       {context.selectionPersistence === "device" && <p className="mb-3 text-xs text-muted-foreground">Выбор запоминается на этом устройстве.</p>}
       {choiceChild && !choiceChild.hasBirthDate && <p className="mb-4 text-sm">Укажите дату рождения ребёнка — тогда мы сможем подобрать события по возрасту. <Link href="/me/profile" className="underline">Заполнить профиль</Link></p>}
       {(!actorMatches || state === "loading") ? <div role="status"><span className="sr-only">Подбираем события…</span><HorizontalCardRow>{[0, 1, 2, 3].map(id => <div key={id} className={EVENT_CARD_SHELL}><div className="aspect-[2/3] animate-pulse rounded-2xl bg-muted" /><div className="mt-3 h-16 rounded bg-muted/50" /></div>)}</HorizontalCardRow></div> :
-        state === "error" ? <div role="alert" className="py-8"><p>Не удалось загрузить события. Ваш выбор сохранён.</p><button type="button" className="min-h-11 underline" onClick={() => void load(selectedRef.current)}>Повторить</button><p><Link href={href} className="underline">Открыть каталог</Link></p></div> : <FamilyHomeResults data={data!} context={context} citySlug={citySlug} selected={selected} impressed={impressed}
+        state === "error" ? <div role="alert" className="py-8"><p>Не удалось загрузить события. Повторите попытку.</p><button type="button" className="min-h-11 underline" onClick={() => void load()}>Повторить</button><p><Link href={href} className="underline">Открыть каталог</Link></p></div> : <FamilyHomeResults data={data!} context={context} citySlug={citySlug} selected={selected} impressed={impressed}
           onImpression={identity => setImpressed(previous => new Set([...previous, identity]))}
-          onDismiss={dismiss} onSave={() => { cache.current.clear(); void load(selectedRef.current); }} />}
+          onDismiss={dismiss} onSave={() => { cache.current.clear(); void load(); }} />}
       <p role="status" aria-live="polite" className="sr-only">{announcement}</p>
     </div>
   </CityHomeSection>;

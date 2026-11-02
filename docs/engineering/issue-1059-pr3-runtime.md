@@ -116,3 +116,25 @@ success and are left for separate tasks.
   flow without an invented PLAN_ADD; complete attribution remains PR 4.
 
 No merge, deployment, DEV/PROD migration or PR 4 work is authorized by this PR.
+
+## Independent review 5742293741: preference synchronization
+
+`HomeSelectionSync` replaces the permanent local-touch override. Only a pending
+local intent outranks the fresh account preference. Successful writes release
+that override; CAS 409 and failed writes reconcile to fresh server truth and
+announce conflict/failure rather than claiming a saved local choice. Monotonic
+preference revisions reject late pre-save contexts. New local intents cannot be
+settled by an earlier in-flight save. ACL removal cancels pending child choices;
+logout/unmount cancels pending state and suppresses late work.
+
+Focus, visibility return and SSR context changes revalidate account preference.
+The SSR effect watches preferenceVersion and selectedChildId as well as profile
+signature. Preference revisions deliberately remain outside the recommendation
+cache fingerprint: they choose a per-child cache entry rather than invalidating
+valid entries/creating new delivery traces on every account-choice write.
+
+Seven synchronization unit scenarios cover two devices A→X/B→Y/A focus→Y, pending
+write priority, concurrent CAS, superseded writes/stale contexts, ACL loss,
+logout/account change and failed persistence. The disposable PostgreSQL harness
+also exercises real preference revisions and API CAS conflicts with the same
+client synchronizer. Browser/CLS acceptance remains in the checklist above.
