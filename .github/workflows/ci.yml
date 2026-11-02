@@ -80,6 +80,9 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mamago_ci
 
+      - name: Family picks profile ACL and backwards-compatible API contract
+        run: pnpm test:family-picks
+
       - name: Business support notification routing contract
         run: pnpm exec tsx src/server/support/supportNoticeContract.test.ts
 
