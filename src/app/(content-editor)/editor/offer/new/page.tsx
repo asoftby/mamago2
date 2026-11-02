@@ -25,7 +25,7 @@ function surfaceFromHostAndPath(host: string | undefined, pathname: string): Con
 export default async function EditorNewOfferPage({
   searchParams,
 }: {
-  searchParams: Promise<{ returnTo?: string; placeId?: string }>;
+  searchParams: Promise<{ returnTo?: string; placeId?: string; creationIntent?: string }>;
 }) {
   const routing = await getCurrentRequestRoutingContext();
   const user = await getCurrentUser();
@@ -51,7 +51,7 @@ export default async function EditorNewOfferPage({
     );
   }
 
-  const { returnTo, placeId: placeIdParam } = await searchParams;
+  const { returnTo, placeId: placeIdParam, creationIntent } = await searchParams;
 
   let defaultPlaceId: string | null = placeIdParam ?? null;
   if (!defaultPlaceId && business) {
@@ -91,6 +91,7 @@ export default async function EditorNewOfferPage({
         contentEditorNav={nav}
         returnTo={returnTo}
         defaultPlaceId={defaultPlaceId}
+        creationIntent={creationIntent === "classes" || creationIntent === "parties" || creationIntent === "camps" ? creationIntent : undefined}
         ctaStepEnabled={ctaStepEnabled}
         newWizard={isOfferWizardV2Enabled(business)}
       />
