@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
 import {
-  FIVE_RECOVERY_KEYS, FIVE_RECOVERY_NAMESPACE,
+  FIVE_RECOVERY_KEYS, FIVE_RECOVERY_NAMESPACE, FIVE_RECOVERY_ARCHIVE_SHA256,
   assertFiveRecoveryPlanApproved,
   parseFiveRecoveryArgs, parseFiveRecoveryManifest,
   verifyFiveRecoveryManifestBytes,
@@ -15,7 +15,7 @@ const approval = () => ({
   issue: 1064,
   approvedBy: "FOUNDER",
   approvedAt: new Date(Date.now() - 60_000).toISOString(),
-  archiveSha256: SHA("a"),
+  archiveSha256: FIVE_RECOVERY_ARCHIVE_SHA256,
   sourceNamespace: FIVE_RECOVERY_NAMESPACE,
   entries: FIVE_RECOVERY_KEYS.map((sourceRecordKey, index) => ({
     sourceRecordKey,
@@ -82,6 +82,7 @@ test("manifest must not include admin, unknown, fewer, duplicates or unordered I
       i === 4 ? { ...x, sourceRecordKey: "wordpress-db:user:538" } : x) },
     { ...base, entries: base.entries.map((x, i) =>
       i === 2 ? { ...x, email: "private@example.org" } : x) },
+    { ...base, archiveSha256: SHA("a") },
     { ...base, sourceNamespace: "dev-user-recovery-1064" },
     { ...base, approvedBy: "ADMIN" },
     { ...base, approvedAt: "2999-01-01T00:00:00Z" },
