@@ -37,7 +37,6 @@ import { describeContentColumns } from "@/lib/offers/offerPublishedEditGate";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
 import { getOfferTypeSelection } from "./offerTypeChoices";
 import { OfferSubtypeClarifier } from "./components/OfferSubtypeClarifier";
-import { getOfferTypeSelection } from "./offerTypeChoices";
 import { validateForSubmit, type ValidationResult } from "./validation";
 import {
   getStepsForOfferType,
