@@ -62,9 +62,10 @@ test("commit flags require explicit operator approval and backup", () => {
 });
 
 test("manifest SHA must be hash of exact reviewed bytes, not JSON normalized", () => {
-  const bytes = Buffer.from(JSON.stringify(approval()), "utf8");
+  const approved = approval();
+  const bytes = Buffer.from(JSON.stringify(approved), "utf8");
   const sha = createHash("sha256").update(bytes).digest("hex");
-  assert.deepEqual(verifyFiveRecoveryManifestBytes(bytes, sha), parseFiveRecoveryManifest(approval()));
+  assert.deepEqual(verifyFiveRecoveryManifestBytes(bytes, sha), parseFiveRecoveryManifest(approved));
   assert.throws(() => verifyFiveRecoveryManifestBytes(bytes, SHA("d")),
     /FIVE_RECOVERY_MANIFEST_SHA256_MISMATCH/);
 });
