@@ -397,6 +397,13 @@ jobs:
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
 
+      - name: Personal family picks policy PostgreSQL integration
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm test:family-picks-policy-integration
+
       - name: Family plan PostgreSQL access isolation
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
