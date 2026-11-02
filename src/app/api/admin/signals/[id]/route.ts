@@ -3,6 +3,7 @@ import { Prisma, SignalDomain, SignalEntityType, SignalStatus, SignalUsageType }
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canManageSignalDefinitions } from "@/lib/auth/signalDefinitionsAdmin";
+import { revalidateEventStep1Signals } from "@/server/admin/activities/revalidateEventStep1Signals";
 import { ensureEventCategorySlug } from "@/lib/taxonomy/eventCategorySlug";
 import {
   assertSignalCanBecomeChild,
@@ -251,6 +252,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
         _count: { select: { children: true, options: true } },
       },
     });
+    revalidateEventStep1Signals(resolved.slug, updated.slug);
     return NextResponse.json(updated);
   } catch (e) {
     const schema = jsonFromPrismaError(e);
@@ -286,6 +288,7 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
 
   try {
     await prisma.signalDefinition.delete({ where: { id: resolved.id } });
+    revalidateEventStep1Signals(resolved.slug);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
