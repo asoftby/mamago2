@@ -6,7 +6,7 @@ export const eventStep1GenresTag = (categoryId: string) => `event-step1-genres:$
 
 /** Only these signal definitions feed the event editor's cached option lists. */
 export function eventStep1SignalCacheTags(...slugs: Array<string | null | undefined>): string[] {
-  const tags = slugs.map((slug) => {
+  const tags: Array<string | null> = slugs.map((slug) => {
     if (slug === "age") return EVENT_STEP1_AGES_TAG;
     if (slug === "interests") return EVENT_STEP1_INTERESTS_TAG;
     return null;
