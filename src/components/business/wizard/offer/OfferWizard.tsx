@@ -36,6 +36,7 @@ import type { OfferFormData, OfferWizardMode, OfferWizardStepKey, OfferWizardVar
 import { describeContentColumns } from "@/lib/offers/offerPublishedEditGate";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
 import { getOfferTypeSelection } from "./offerTypeChoices";
+import { OfferSubtypeClarifier } from "./components/OfferSubtypeClarifier";
 import { getOfferTypeSelection } from "./offerTypeChoices";
 import { validateForSubmit, type ValidationResult } from "./validation";
 import {
@@ -926,6 +927,10 @@ export function OfferWizard({
       }
       return (
         <div className="space-y-10">
+          {currentStepKey === "about" && mode === "create" &&
+            (creationIntent === "classes" || creationIntent === "parties") && (
+              <OfferSubtypeClarifier group={creationIntent} data={formData} onChange={handleChange} />
+            )}
           {blocks.map((key) => (
             <div key={key}>{renderBlock(key)}</div>
           ))}
