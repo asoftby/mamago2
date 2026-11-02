@@ -11,6 +11,7 @@ import {
 } from "../src/lib/migration/commit/user/UserMigrationVerticalSlice";
 import {
   FIVE_RECOVERY_KEYS, FIVE_RECOVERY_NAMESPACE,
+  type FiveRecoveryApproval,
   assertFiveRecoveryPlanApproved, parseFiveRecoveryArgs,
   verifyFiveRecoveryManifestBytes,
 } from "../src/lib/migration/commit/user/wordpressFiveArchiveBackfillPolicy";
@@ -23,7 +24,7 @@ import {
   checkDevUser43, readInputFromStdin, sourceCandidate,
 } from "./migration-wordpress-five-preview";
 
-interface Planned {
+export interface Planned {
   sourceRecordKey: string;
   email: string;
   canonicalHash: string;
@@ -32,82 +33,13 @@ interface Planned {
   draft: UserCreateDraft;
 }
 
-async function main(): Promise<void> {
-  // Do not consume private archive data or connect to PROD before the full gate.
-  const args = parseFiveRecoveryArgs(process.argv.slice(2));
-  const approval = verifyFiveRecoveryManifestBytes(
-    readFileSync(args.approvedManifest), args.approvedManifestSha256,
-  );
-  if (SOURCE_NAMESPACE !== FIVE_RECOVERY_NAMESPACE ||
-      JSON.stringify(FIVE_WORDPRESS_SOURCE_KEYS) !== JSON.stringify(FIVE_RECOVERY_KEYS)) {
-    throw new Error("FIVE_RECOVERY_PREVIEW_AND_WRITE_SCOPE_DRIFT");
-  }
-  const input = await readInputFromStdin();
-  if (approval.archiveSha256 !== input.archiveSha256) {
-    throw new Error("FIVE_RECOVERY_SOURCE_ARCHIVE_CHANGED");
-  }
-  const exclusions = readFounderExclusionKeys();
-  const historic = JSON.parse(readFileSync(
-    "docs/migration/users-production-activation-manifest.json", "utf8",
-  )) as { entries: Array<{ sourceRecordKey: string; emailMask: string }> };
-  const masks = new Map(historic.entries.map(e => [e.sourceRecordKey, e.emailMask]));
-  const planned: Planned[] = [];
-  for (let i = 0; i < FIVE_RECOVERY_KEYS.length; i++) {
-    const raw = input.sourceRecords[i];
-    if (raw.sourceRecordKey !== FIVE_RECOVERY_KEYS[i] ||
-        !exclusions.has(raw.sourceRecordKey)) {
-      throw new Error("FIVE_RECOVERY_FOUNDER_EXCLUSION_DRIFT");
-    }
-    const source = sourceCandidate(input, raw);
-    const candidate = normalizeUserCandidate(source);
-    const draft = buildUserDraft(candidate);
-    const canonicalHash = buildUserCanonicalHash(candidate, draft);
-    const email = candidate.normalizedEmail;
-    if (!email || !draft ||
-        masks.get(source.sourceRecordKey)?.toLowerCase() !==
-          maskEmail(email)?.toLowerCase()) {
-      throw new Error("FIVE_RECOVERY_HISTORICAL_IDENTITY_MISMATCH");
-    }
-    assertFiveRecoveryPlanApproved(approval.entries[i], {
-      sourceRecordKey: source.sourceRecordKey,
-      action: "CREATE",
-      canonicalHash, candidate, draft,
-    }, source.sourceHash);
-    planned.push({
-      sourceRecordKey: source.sourceRecordKey, email, canonicalHash,
-      sourceHash: source.sourceHash, candidate, draft,
-    });
-  }
-  if (new Set(planned.map(p => p.email)).size !== FIVE_RECOVERY_KEYS.length) {
-    throw new Error("FIVE_RECOVERY_DUPLICATE_SOURCE_EMAIL");
-  }
-
-  const sourceUrl = process.env.SOURCE_DEV_DATABASE_URL;
-  const prodUrl = process.env.DATABASE_URL;
-  if (!sourceUrl || !prodUrl ||
-      parseMigrationDatabaseUrl(sourceUrl).database !== DEV_DATABASE_NAME) {
-    throw new Error("FIVE_RECOVERY_TWO_DISTINCT_DATABASE_TARGETS_REQUIRED");
-  }
-  const dev = new PrismaClient({ datasources: { db: { url: sourceUrl } } });
-  const prod = new PrismaClient();
-  try {
-    const [devIdentity, prodIdentity] = await Promise.all([
-      dev.$queryRawUnsafe<Array<{ current_database: string }>>("SELECT current_database()"),
-      prod.$queryRawUnsafe<Array<{ current_database: string }>>("SELECT current_database()"),
-    ]);
-    if (devIdentity[0]?.current_database !== DEV_DATABASE_NAME) {
-      throw new Error("FIVE_RECOVERY_DEV_DATABASE_FINGERPRINT_MISMATCH");
-    }
-    assertMigrationDatabaseTarget({
-      databaseUrl: prodUrl,
-      currentDatabase: prodIdentity[0]?.current_database,
-      confirmProduction: true, confirmWrites: true,
-      acknowledgeProdUserImport: true,
-      requireProdUserAcknowledgement: true,
-    });
-    // The fifth source identity must still match the verified DEV WP lineage.
-    await checkDevUser43(dev, planned[4].email);
-
+export async function commitApprovedFiveAtomic(
+  prod: PrismaClient,
+  planned: Planned[],
+  approval: FiveRecoveryApproval,
+  archiveSha256: string,
+  manifestSha256: string,
+) {
     const result = await prod.$transaction(async tx => {
       const locks = await tx.$queryRawUnsafe<Array<{ acquired: boolean }>>(
         "SELECT pg_try_advisory_xact_lock(1064, 5) AS acquired",
@@ -207,7 +139,7 @@ async function main(): Promise<void> {
         data: {
           sourceId: source.id, mode: "COMMIT", status: "RUNNING",
           adapterVersion: "users-archive-five-v1",
-          snapshotHash: input.archiveSha256, startedAt: new Date(),
+          snapshotHash: archiveSha256, startedAt: new Date(),
         },
       });
       for (const plan of toCreate) {
@@ -223,7 +155,7 @@ async function main(): Promise<void> {
               sourceRecordKey: plan.sourceRecordKey,
               legacyUserId: plan.candidate.legacyUserId,
               emailMask: maskEmail(plan.email),
-              archiveSha256: input.archiveSha256,
+              archiveSha256: archiveSha256,
               role: "USER", status: "PENDING_ACTIVATION",
               passwordImported: false,
               businessImported: false, eventsImported: false,
@@ -235,7 +167,7 @@ async function main(): Promise<void> {
               sourceHash: plan.sourceHash, issue: 1064,
             },
             validationSummary: {
-              manifestSha256: args.approvedManifestSha256,
+              manifestSha256: manifestSha256,
               archivedIdentityMatched: true,
             },
           },
@@ -290,6 +222,88 @@ async function main(): Promise<void> {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
       maxWait: 15000, timeout: 30000,
     });
+    return result;
+}
+
+async function main(): Promise<void> {
+  // Do not consume private archive data or connect to PROD before the full gate.
+  const args = parseFiveRecoveryArgs(process.argv.slice(2));
+  const approval = verifyFiveRecoveryManifestBytes(
+    readFileSync(args.approvedManifest), args.approvedManifestSha256,
+  );
+  if (SOURCE_NAMESPACE !== FIVE_RECOVERY_NAMESPACE ||
+      JSON.stringify(FIVE_WORDPRESS_SOURCE_KEYS) !== JSON.stringify(FIVE_RECOVERY_KEYS)) {
+    throw new Error("FIVE_RECOVERY_PREVIEW_AND_WRITE_SCOPE_DRIFT");
+  }
+  const input = await readInputFromStdin();
+  if (approval.archiveSha256 !== input.archiveSha256) {
+    throw new Error("FIVE_RECOVERY_SOURCE_ARCHIVE_CHANGED");
+  }
+  const exclusions = readFounderExclusionKeys();
+  const historic = JSON.parse(readFileSync(
+    "docs/migration/users-production-activation-manifest.json", "utf8",
+  )) as { entries: Array<{ sourceRecordKey: string; emailMask: string }> };
+  const masks = new Map(historic.entries.map(e => [e.sourceRecordKey, e.emailMask]));
+  const planned: Planned[] = [];
+  for (let i = 0; i < FIVE_RECOVERY_KEYS.length; i++) {
+    const raw = input.sourceRecords[i];
+    if (raw.sourceRecordKey !== FIVE_RECOVERY_KEYS[i] ||
+        !exclusions.has(raw.sourceRecordKey)) {
+      throw new Error("FIVE_RECOVERY_FOUNDER_EXCLUSION_DRIFT");
+    }
+    const source = sourceCandidate(input, raw);
+    const candidate = normalizeUserCandidate(source);
+    const draft = buildUserDraft(candidate);
+    const canonicalHash = buildUserCanonicalHash(candidate, draft);
+    const email = candidate.normalizedEmail;
+    if (!email || !draft ||
+        masks.get(source.sourceRecordKey)?.toLowerCase() !==
+          maskEmail(email)?.toLowerCase()) {
+      throw new Error("FIVE_RECOVERY_HISTORICAL_IDENTITY_MISMATCH");
+    }
+    assertFiveRecoveryPlanApproved(approval.entries[i], {
+      sourceRecordKey: source.sourceRecordKey,
+      action: "CREATE",
+      canonicalHash, candidate, draft,
+    }, source.sourceHash);
+    planned.push({
+      sourceRecordKey: source.sourceRecordKey, email, canonicalHash,
+      sourceHash: source.sourceHash, candidate, draft,
+    });
+  }
+  if (new Set(planned.map(p => p.email)).size !== FIVE_RECOVERY_KEYS.length) {
+    throw new Error("FIVE_RECOVERY_DUPLICATE_SOURCE_EMAIL");
+  }
+
+  const sourceUrl = process.env.SOURCE_DEV_DATABASE_URL;
+  const prodUrl = process.env.DATABASE_URL;
+  if (!sourceUrl || !prodUrl ||
+      parseMigrationDatabaseUrl(sourceUrl).database !== DEV_DATABASE_NAME) {
+    throw new Error("FIVE_RECOVERY_TWO_DISTINCT_DATABASE_TARGETS_REQUIRED");
+  }
+  const dev = new PrismaClient({ datasources: { db: { url: sourceUrl } } });
+  const prod = new PrismaClient();
+  try {
+    const [devIdentity, prodIdentity] = await Promise.all([
+      dev.$queryRawUnsafe<Array<{ current_database: string }>>("SELECT current_database()"),
+      prod.$queryRawUnsafe<Array<{ current_database: string }>>("SELECT current_database()"),
+    ]);
+    if (devIdentity[0]?.current_database !== DEV_DATABASE_NAME) {
+      throw new Error("FIVE_RECOVERY_DEV_DATABASE_FINGERPRINT_MISMATCH");
+    }
+    assertMigrationDatabaseTarget({
+      databaseUrl: prodUrl,
+      currentDatabase: prodIdentity[0]?.current_database,
+      confirmProduction: true, confirmWrites: true,
+      acknowledgeProdUserImport: true,
+      requireProdUserAcknowledgement: true,
+    });
+    // The fifth source identity must still match the verified DEV WP lineage.
+    await checkDevUser43(dev, planned[4].email);
+
+    const result = await commitApprovedFiveAtomic(
+      prod, planned, approval, input.archiveSha256, args.approvedManifestSha256,
+    );
 
     console.log(JSON.stringify({
       result: "FIVE_USER_RECOVERY_COMMIT_SUCCEEDED",
