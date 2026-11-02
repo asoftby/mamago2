@@ -33,7 +33,9 @@ test("production write refuses missing approval, reviewed hash and tested backup
   ]) {
     assert.throws(() => parseUserExclusionBackfillArgs(
       complete.filter(x => x !== missing),
-    ), /PROD_BACKFILL_APPROVAL_AND_BACKUP_REQUIRED/);
+    ), missing === "--confirm-production"
+      ? /PROD_TARGET_CONFIRMATION_REQUIRED/
+      : /PROD_BACKFILL_APPROVAL_AND_BACKUP_REQUIRED/);
   }
   assert.throws(() => parseUserExclusionBackfillArgs(
     complete.map(x => x === "a".repeat(64) ? "bad" : x),
