@@ -37,3 +37,14 @@ test("business intent preselects offer type without creating another entity", ()
   assert.ok(wizard.includes('creationIntent === "camps" ? "CAMP"'));
   assert.ok(wizard.includes('creationIntent ? "about" : "type"'));
 });
+
+test("subtype choices preserve shared content and remain on the About step", () => {
+  const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.tsx", "utf8");
+  assert.ok(wizard.includes("<OfferSubtypeClarifier group={creationIntent}"));
+  const clarifier = readFileSync("src/components/business/wizard/offer/components/OfferSubtypeClarifier.tsx", "utf8");
+  for (const type of ["ONE_TIME_ACTIVITY", "REGULAR_ACTIVITY", "PARTY_SERVICE", "PARTY_PACKAGE"]) {
+    assert.ok(clarifier.includes(type));
+  }
+  assert.ok(clarifier.includes("...getOfferTypeSelection(item.type)"));
+  assert.ok(!clarifier.includes("categoryIds: []"));
+});
