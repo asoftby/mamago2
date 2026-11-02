@@ -24,3 +24,16 @@ test("business intent routing reuses current editors, without writes or duplicat
   assert.ok(source.includes('href: "/editor/offer/new"'));
   assert.ok(source.includes("currentSurfaceReturnTo"));
 });
+
+test("business intent preselects offer type without creating another entity", () => {
+  for (const intent of ["classes", "parties", "camps"]) {
+    assert.ok(source.includes(`/editor/offer/new?creationIntent=${intent}`));
+  }
+  const page = readFileSync("src/app/(content-editor)/editor/offer/new/page.tsx", "utf8");
+  assert.ok(page.includes("creationIntent={creationIntent"));
+  const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.tsx", "utf8");
+  assert.ok(wizard.includes('creationIntent === "classes" ? "REGULAR_ACTIVITY"'));
+  assert.ok(wizard.includes('creationIntent === "parties" ? "PARTY_SERVICE"'));
+  assert.ok(wizard.includes('creationIntent === "camps" ? "CAMP"'));
+  assert.ok(wizard.includes('creationIntent ? "about" : "type"'));
+});
