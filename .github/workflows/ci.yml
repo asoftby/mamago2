@@ -162,7 +162,7 @@ jobs:
         run: pnpm test:migration-user-exclusion-backfill
 
       - name: Safe SSH preview and historical coverage audit syntax
-        run: python3 -m py_compile scripts/migration-user-exclusion-preview-ssh.py scripts/migration-wordpress-user-coverage-audit.py scripts/migration-wordpress-user-archive-reconcile.py scripts/migration-all-users-dev-prod-audit.py
+        run: python3 -m py_compile scripts/migration-user-exclusion-preview-ssh.py scripts/migration-wordpress-user-coverage-audit.py scripts/migration-wordpress-user-archive-reconcile.py scripts/migration-all-users-dev-prod-audit.py scripts/migration-dev-only-ownership-overlap-audit.py
 
       - name: Feedback model and multi-source reputation regressions
         run: pnpm test:feedback-foundation
