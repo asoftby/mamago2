@@ -18,8 +18,12 @@ export interface ApprovedUserBackfillManifest {
   entries: ApprovedUserBackfillEntry[];
 }
 
-// Only the confirmed real DEV-only account is in scope for recovery.
-// The other four exclusions are already present in PROD and must never be duplicated.
+// This pre-existing *single-user* writer is intentionally restricted to
+// user:43. New read-only evidence identified four more historical candidates
+// (7, 17, 22, 42), all absent from PROD by 2026-07-03 archived email.
+// They are NOT yet approved or supported by this write path. Extending
+// its allowlist requires separate source-specific design, collision checks,
+// approval manifest, transactional safety tests, and an explicit PROD gate.
 const ALLOWED = new Set<string>(["wordpress-db:user:43"]);
 const HASH = /^[a-f0-9]{64}$/;
 
