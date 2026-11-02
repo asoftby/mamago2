@@ -138,12 +138,14 @@ Historical subjects match only by `kind + refId`; manual subjects never become
 persistent preference identity. Non-matching and disliked candidates remain
 rankable. Future ranking changes must intentionally bump `algorithmVersion`.
 
-### Prepared Home policy: `family-picks-confirmed-v2` (PR 2, inactive)
+### Home policy: `family-picks-confirmed-v2` (PR 2 policy, PR 3 delivery)
 
 `loadPersonalFamilyPicks` / `selectPersonalFamilyPicks` in the existing `familyPicks`
-modules are an internal, read-only surface composition path. Public Home and its
-legacy GET still use `loadFamilyPicks` / `family-picks-v1`; per-child public calls
-remain disabled as established in PR 1. No feature flag enables v2 in this PR.
+modules remain the read-only surface composition path. PR 3 wraps it in final
+HOME delivery through an authenticated private/no-store POST contract.
+`HOME_FAMILY_PICKS_V2=1` enables the personal Home branch; default OFF renders
+one common events section. Legacy GET retains its v1 contract. See
+[PR 3 runtime checklist](../engineering/issue-1059-pr3-runtime.md).
 
 The prepared path resolves a fresh server profile through the existing family ACL,
 validates ALL_FAMILY/CHILD selection before candidate loading, and consumes the

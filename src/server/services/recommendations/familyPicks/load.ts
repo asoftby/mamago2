@@ -34,7 +34,7 @@ import {
   type FamilyPickCandidate,
   type FamilyPicksResult,
 } from "./select";
-import { loadFamilyPicksProfile, familyPicksProfileContext, type FamilyPicksProfileChild } from "./profile";
+import { loadFamilyPicksProfile, familyPicksProfileContext, type FamilyPicksProfileChild, type FamilyPicksProfile } from "./profile";
 import {
   personalWindowRange,
   collectConfirmedOccurrences,
@@ -369,6 +369,10 @@ type PersonalExtras = {
   ageMinMonths: number | null;
   ageMaxMonths: number | null;
   businessId: string | null;
+  priceMode?: import("@prisma/client").PublicationPriceMode;
+  priceFrom?: number | null;
+  priceTo?: number | null;
+  currency?: string | null;
   nextOccurrenceAt: Date | null;
   sessions: { startsAt: Date; withdrawnAt: Date | null; soldOut?: boolean }[];
   _count: { sessions: number };
@@ -401,6 +405,7 @@ const personalDependencies: PersonalLoadDependencies = {
     where: { AND: [{ id: { in: ids }, type: "EVENT", status: { in: ["PUBLISHED", "PENDING_UPDATE"] } }, getPublicListingActivityWhere(now)] },
     select: {
       id: true, businessId: true, agePolicy: true, ageMinMonths: true, ageMaxMonths: true, nextOccurrenceAt: true,
+      priceMode: true, priceFrom: true, priceTo: true, currency: true,
       _count: { select: { sessions: true } },
       // Keep withdrawn rows to prevent fallback resurrecting a cancelled session.
       sessions: { where: { startsAt: { gte: range.start, lt: range.end } }, select: { startsAt: true, withdrawnAt: true } },
@@ -416,27 +421,42 @@ export async function loadPersonalFamilyPicks(input: {
   userId: string | null;
   citySlug: string;
   selection: PersonalFamilySelection;
+  /** Trusted same-request server snapshot only; never deserialize from an HTTP body. */
+  serverProfile?: FamilyPicksProfile;
+  excludeActivityIds?: string[];
   now?: Date;
 }, deps: PersonalLoadDependencies = personalDependencies) {
   const now = input.now ?? new Date();
-  const profile = await deps.loadProfile(input.userId);
+  const profile = input.serverProfile ?? await deps.loadProfile(input.userId);
+  if (profile.userId !== input.userId) throw new FamilyPicksSelectionUnavailableError();
   const selection = input.selection;
   if (selection.mode !== "ALL_FAMILY" && (selection.mode !== "CHILD"
     || !parseSafeOpaqueId(selection.selectedChildId)
     || !profile.children.some(child => child.id === selection.selectedChildId))) {
     throw new FamilyPicksSelectionUnavailableError();
   }
+  let candidateCount = 0;
+  let cardExtras = new Map<string, PersonalExtras>();
   const response = (window: PersonalShowWindow, items: PersonalFamilyPick[], suggestions: RankedPlanSuggestion[], sharedAlgorithmVersion: string | null) => {
     const byId = new Map(suggestions.map(suggestion => [suggestion.activity.id, suggestion]));
     return {
       policyVersion: PERSONAL_FAMILY_PICKS_POLICY.version,
       sharedAlgorithmVersion,
+      candidateCount,
       window,
       selection,
       status: profile.audience !== "personalized" ? "UNAVAILABLE" as const : items.length ? "READY" as const : "EMPTY" as const,
       runId: null,
       items: items.map(pick => ({
         id: pick.candidate.id, title: byId.get(pick.candidate.id)!.activity.title,
+        href: `/${input.citySlug}/events/${byId.get(pick.candidate.id)!.activity.slug ?? pick.candidate.id}`,
+        imageUrl: byId.get(pick.candidate.id)!.activity.coverImageUrl ?? null,
+        categoryName: byId.get(pick.candidate.id)!.activity.eventCategory?.nameRu ?? null,
+        agePolicy: pick.candidate.agePolicy, ageMinMonths: pick.candidate.ageMinMonths, ageMaxMonths: pick.candidate.ageMaxMonths,
+        priceMode: cardExtras.get(pick.candidate.id)?.priceMode ?? "UNKNOWN",
+        priceFrom: cardExtras.get(pick.candidate.id)?.priceFrom ?? null,
+        priceTo: cardExtras.get(pick.candidate.id)?.priceTo ?? null,
+        currency: cardExtras.get(pick.candidate.id)?.currency ?? null,
         startsAt: pick.startsAt.toISOString(), matchedChildIds: pick.matchedChildIds,
         allChildrenMatch: pick.allChildrenMatch, position: pick.position,
         score: pick.candidate.sharedScore, exposureId: null,
@@ -449,9 +469,10 @@ export async function loadPersonalFamilyPicks(input: {
   const selectedChildren = selection.mode === "CHILD"
     ? profile.children.filter(child => child.id === selection.selectedChildId) : profile.children;
   const subjects: Subject[] = selectedChildren.map(child => ({ kind: "child", refId: child.id, source: "profile" }));
-  const [excluded, experienceAffinity] = await Promise.all([
+  const [storedExcluded, experienceAffinity] = await Promise.all([
     deps.loadExcluded(profile.userId, now), deps.loadAffinity({ userId: profile.userId, subjects, now }),
   ]);
+  const excluded = [...new Set([...storedExcluded, ...(input.excludeActivityIds ?? [])])];
   let lastAlgorithmVersion: string | null = null;
   for (const horizon of PERSONAL_FAMILY_PICKS_POLICY.horizons) {
     const window = resolvePersonalShowWindow(now, horizon);
@@ -463,8 +484,10 @@ export async function loadPersonalFamilyPicks(input: {
       experienceAffinity,
     });
     lastAlgorithmVersion = batch.algorithmVersion;
+    candidateCount = batch.candidateCount;
     const extras = batch.suggestions.length ? await deps.loadExtras(batch.suggestions.map(s => s.activity.id), now, range) : [];
     const byId = new Map(extras.map(extra => [extra.id, extra]));
+    cardExtras = byId;
     const candidates: PersonalFamilyCandidate[] = batch.suggestions.flatMap(suggestion => {
       const extra = byId.get(suggestion.activity.id);
       if (!extra || excluded.includes(extra.id)) return [];

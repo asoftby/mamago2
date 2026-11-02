@@ -137,8 +137,8 @@ test("unavailable selected ID fails before ranking or trace; profile errors prop
   await assert.rejects(loadPersonalFamilyPicks({ userId: "account_a", citySlug: "minsk", selection: all, now }, { ...f.deps, loadProfile: async () => { throw new Error("DB unavailable"); } }), /DB unavailable/);
 });
 
-test("public API/Home remain disconnected from prepared v2", () => {
-  for (const path of ["src/server/services/recommendations/familyPicks/request.ts", "src/app/api/recommendations/family-picks/route.ts", "src/features/city-home/pages/CityHomePage.tsx"]) {
+test("legacy GET resolver remains disconnected from v2 composition", () => {
+  for (const path of ["src/server/services/recommendations/familyPicks/request.ts", "src/app/api/recommendations/family-picks/route.ts"]) {
     assert.doesNotMatch(readFileSync(path, "utf8"), /loadPersonalFamilyPicks|selectPersonalFamilyPicks/);
   }
 });

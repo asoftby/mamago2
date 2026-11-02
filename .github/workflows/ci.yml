@@ -404,6 +404,7 @@ jobs:
         run: |
           pnpm exec prisma migrate deploy
           pnpm test:family-picks-policy-integration
+          pnpm test:family-home-integration
 
       - name: Family plan PostgreSQL access isolation
         env:
