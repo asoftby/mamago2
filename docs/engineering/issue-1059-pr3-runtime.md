@@ -76,10 +76,11 @@ browser viewport/layout and real network timing checks remain runtime acceptance
 items below; SSR and pure cache tests do not establish visual CLS or all browser
 race behavior. All test stages of the repository push gate passed locally. Production build
 then hit the managed 8 GiB cgroup limit: exit 137, oom_kill increased 3 → 4.
-The full gate therefore did not pass. Publishing a Draft with build deferred to
-mandatory GitHub CI requires a separate explicit PR 3 exception; PR 1/2 exceptions
-do not apply. No push/PR has been performed at this point. CI outcome must be
-reported after the exception and publication.
+The full gate therefore did not pass. After notification of this failure and
+the required PR 3 exception, the user instructed to continue. The branch was
+published with the local hook skipped for Draft review; production build remains
+mandatory in GitHub CI. Draft: https://github.com/asoftby/mamago2/pull/1069.
+CI outcome is reported in the PR/chat separately; no successful build is claimed.
 
 Targeted ESLint passes. The broader `eslint src --quiet` additionally reports 17
 existing errors in 10 files outside this diff; all 10 were compared byte-for-byte
