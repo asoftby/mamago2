@@ -69,7 +69,7 @@ test("requires explicit FOUNDER approval and exact manifest schema", () => {
   }), /BACKFILL_MANIFEST_ENTRY_INVALID/);
   assert.throws(() => parseApprovedUserBackfillManifest({
     ...approval(), entries: [entry, entry],
-  }), /BACKFILL_MANIFEST_ENTRY_INVALID/);
+  }), /BACKFILL_MANIFEST_INVALID/);
   assert.throws(() => parseApprovedUserBackfillManifest({
     ...approval(), entries: [],
   }), /BACKFILL_MANIFEST_INVALID/);
