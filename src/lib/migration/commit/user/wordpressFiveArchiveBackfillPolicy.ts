@@ -14,6 +14,7 @@ export const FIVE_RECOVERY_KEYS = [
   "wordpress-db:user:43",
 ] as const;
 export const FIVE_RECOVERY_NAMESPACE = "wordpress-audit-20260703-recovery-1064";
+export const FIVE_RECOVERY_ARCHIVE_SHA256 = "ea2ed02a2260ab137d77ce2d42df9332710861074771fbc8fffd29128d184a5e";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 
@@ -61,8 +62,7 @@ export function parseFiveRecoveryManifest(input: unknown): FiveRecoveryApproval 
       !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(input.approvedAt) ||
       !Number.isFinite(Date.parse(input.approvedAt)) ||
       Date.parse(input.approvedAt) > Date.now() ||
-      typeof input.archiveSha256 !== "string" ||
-      !SHA256.test(input.archiveSha256) ||
+      input.archiveSha256 !== FIVE_RECOVERY_ARCHIVE_SHA256 ||
       input.sourceNamespace !== FIVE_RECOVERY_NAMESPACE ||
       !Array.isArray(input.entries) ||
       input.entries.length !== FIVE_RECOVERY_KEYS.length) {
