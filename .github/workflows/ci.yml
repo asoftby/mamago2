@@ -164,6 +164,7 @@ jobs:
       - name: Five-user historical WordPress preview safety regressions
         run: |
           pnpm exec tsx --test scripts/migration-wordpress-five-preview.test.ts
+          pnpm exec tsx --test src/lib/migration/commit/user/wordpressFiveArchiveBackfillPolicy.test.ts
           python3 scripts/test_migration_wordpress_five_preview_ssh.py
 
       - name: Safe SSH preview and historical coverage audit syntax
