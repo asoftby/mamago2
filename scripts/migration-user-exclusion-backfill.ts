@@ -102,10 +102,13 @@ export function parseUserExclusionBackfillArgs(argv: readonly string[]): Args {
 async function readMigratedDevSource(dev: PrismaClient): Promise<UserSourceCandidate> {
   // Exactly one original USER lineage is required; no synthetic DEV account,
   // deleted user, privileged account or alternate source can be used.
+  // PROD vs DEV evidence (2026-11-02) confirms the actual namespace is
+  // phoenix-release-bundle; users-immutable-snapshot was an incorrect assumption.
   const lineages = await dev.migrationLineage.findMany({
     where: { sourceRecordKey: SOURCE_KEY, targetType: "USER", isActive: true },
     select: {
-      targetId: true, lastSourceHash: true,
+      targetId: true, lastSourceHash: true, sourceEntityType: true,
+      sourceExternalId: true,
       source: { select: { adapterKey: true, sourceNamespace: true } },
     },
   });
@@ -113,7 +116,9 @@ async function readMigratedDevSource(dev: PrismaClient): Promise<UserSourceCandi
       !lineages[0].targetId ||
       !lineages[0].lastSourceHash ||
       lineages[0].source.adapterKey !== "wordpress-db" ||
-      lineages[0].source.sourceNamespace !== "users-immutable-snapshot") {
+      lineages[0].source.sourceNamespace !== "phoenix-release-bundle" ||
+      lineages[0].sourceEntityType !== "wordpress-db:user" ||
+      lineages[0].sourceExternalId !== "43") {
     throw new Error("DEV_SOURCE_LINEAGE_NOT_VERIFIED:" + SOURCE_KEY);
   }
   const user = await dev.user.findUnique({
