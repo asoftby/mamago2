@@ -5,7 +5,7 @@ import { parseUserExclusionBackfillArgs } from "./migration-user-exclusion-backf
 
 test("preview requires an explicit, non-write mode", () => {
   const args = parseUserExclusionBackfillArgs([
-    "--preview", "--confirm-production", "--allow-remote-readonly",
+    "--preview", "--confirm-production",
   ]);
   assert.equal(args.mode, "PREVIEW");
   assert.equal(args.manifestPath, null);
@@ -20,7 +20,7 @@ test("production write refuses missing approval, reviewed hash and tested backup
   );
   const complete = [
     "--confirm-writes", "--confirm-production",
-    "--allow-remote-readonly", "--acknowledge-prod-user-import",
+    "--acknowledge-prod-user-import",
     "--acknowledge-exclusion-backfill", "--confirm-backup-restored",
     "--backup-reference", "verified-test-restore",
     "--manifest", "/secure/approved.json",
@@ -44,4 +44,6 @@ test("unknown flags, absent values and attempts at arbitrary selection are refus
   assert.throws(() => parseUserExclusionBackfillArgs(["--preview", "--all-users"]), /Unknown argument/);
   assert.throws(() => parseUserExclusionBackfillArgs(["--preview", "--manifest"]), /Missing value/);
   assert.throws(() => parseUserExclusionBackfillArgs(["--preview", "--only", "43"]), /Unknown argument/);
+  assert.throws(() => parseUserExclusionBackfillArgs(["--preview", "--allow-remote-readonly"]), /Unknown argument/);
+  assert.throws(() => parseUserExclusionBackfillArgs(["--preview"]), /PROD_TARGET_CONFIRMATION_REQUIRED/);
 });
