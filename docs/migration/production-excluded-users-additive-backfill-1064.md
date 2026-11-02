@@ -16,7 +16,7 @@
 1. CI и независимое ревью draft PR #1065; без автоматического merge или деплоя.
 2. Известна точная DEV и PROD PostgreSQL база (каждая на своём отдельном соединении). Код проверяет фактические `current_database()` = `devmamago` и `prodmamago` и соответствующие имена в строках подключения; не допускается запуск с перепутанными URL.
 3. На машине запуска доступны **в двух отдельных локальных SSH-туннелях** обе базы, с закрытыми от вывода логами/командами credentials. Файл `.env` сам по себе не подгружается `prisma.config.ts`: переменные `DATABASE_URL` и `SOURCE_DEV_DATABASE_URL` должны быть реально экспортированы в процесс CLI. Нельзя пересылать значения URL, паролей и ключей в чат.
-4. Подтверждена подлинность записи `user:43` в DEV, неактивный (PENDING_ACTIVATION) статус и исходный lineage `wordpress-db/users-immutable-snapshot`. Проверены точные email/displayName; старый WordPress источник недоступен, поэтому DEV lineage выступает *историческим* доказательством, а не нынешним внешним источником.
+4. Подтверждена подлинность записи `user:43` в DEV, неактивный (PENDING_ACTIVATION) статус и исходный lineage `wordpress-db/phoenix-release-bundle` (и `sourceEntityType=wordpress-db:user`, `sourceExternalId=43`). Проверены точные email/displayName; старый WordPress источник недоступен, поэтому DEV lineage выступает *историческим* доказательством, а не нынешним внешним источником.
 5. Для записи в PROD: свежий полный резервный бэкап PROD, **тестовое восстановление в отдельную БД**, акт подтверждения, отдельно утверждённый манифест (все хеши совпадают), явное разрешение оператора на запись.
 
 ## Шаг 1 — read-only проверка с сервера (не требует env)
@@ -34,6 +34,8 @@ for db in dev-db-1 prod-db-1; do
       -d "${POSTGRES_DB:-postgres}" -P pager=off
   ' <<'SQL'
 SELECT l."sourceRecordKey", l."targetType"::text,
+       s."adapterKey", s."sourceNamespace",
+       l."sourceEntityType", l."sourceExternalId",
        l."isActive", l."lastSourceHash" IS NOT NULL AS has_source_hash,
        CASE WHEN u.id IS NULL THEN 'MISSING' ELSE u.role::text END AS role,
        u.status::text, u."deletedAt" IS NOT NULL AS deleted,
@@ -41,6 +43,7 @@ SELECT l."sourceRecordKey", l."targetType"::text,
             ELSE LEFT(split_part(u.email,'@',1),1) || '***@' ||
                  split_part(u.email,'@',2) END AS masked_email
 FROM "MigrationLineage" l
+JOIN "MigrationSource" s ON s.id = l."sourceId"
 LEFT JOIN "User" u ON u.id = l."targetId"
 WHERE l."sourceRecordKey" = 'wordpress-db:user:43'
   AND l."targetType" = 'USER';
