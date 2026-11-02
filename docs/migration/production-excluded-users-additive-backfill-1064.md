@@ -1,38 +1,72 @@
-# P0 — адресная дозагрузка исключённых WordPress Users в PROD (#1064)
+# P0 — адресное восстановление WordPress User 43 из DEV в PROD (#1064)
 
-**Режим:** строго аддитивный, пользовательский. Не является миграцией Business, BusinessMember, бизнес-ролей или бизнес-верификации. Никаких автоматических писем.
+**Обновлено 2026-11-02:** исходная база WordPress выведена из эксплуатации и недоступна. Запуск старой команды с `WP_SSH_*` / `WP_DB_*` невозможен. Этот сценарий использует только **сохранённого ранее мигрированного пользователя из DEV** и его исходную MigrationLineage как проверяемое подтверждение происхождения.
 
-## Почему этот путь отдельный
+## Scope / ограничения
 
-Документ `docs/migration/manifests/phoenix-users-founder-exclusions-2026-07-31.json` временно исключает WordPress ID 7, 17, 22, 42, 43 по причине `HISTORICAL_NAME_INPUT_UNRECOVERABLE`. Стандартный `migration:user:live` намеренно их пропускает. Старые DEV-учётные записи (особенно `user:43`) **нельзя копировать напрямую** в PROD.
+- Восстанавливаем **ровно одного** подтверждённого недостающего пользователя: `wordpress-db:user:43`. Остальные 4 исторических исключения имеют исходный USER lineage в PROD.
+- В PROD создаётся **новый User**, `role=USER`, `status=PENDING_ACTIVATION`, `passwordHash=null`, без старых паролей. Копируются только проверенные email и displayName из DEV.
+- Никакого переноса `Business`, `BusinessMember`, `BUSINESS_OWNER`, сессий, телефонов, подтверждений email, привилегий или иных личных данных.
+- Никакого `DELETE`, `UPDATE` существующих User/Business, автоматических писем, обхода защиты администраторов или глобального снятия исторических исключений.
+- Исходный WordPress ID сохраняется в новом `MigrationLineage` под отдельным `wordpress-db/dev-user-recovery-1064` namespace. Это явно **восстановление из DEV**, а не повторная миграция из WordPress.
+- При наличии любого существующего email без учёта регистра, чужого активного lineage или изменения snapshot операция блокируется. `SKIP_UNCHANGED` без writes применяется только к нашему же прежнему успешно созданному аккаунту.
 
-Создан отдельный `scripts/migration-user-exclusion-backfill.ts`, который работает с **актуальным WordPress источником** и использует существующий проверенный путь `planUserMigration/writeUserMigration`. Только `CREATE` по индивидуально одобренному списку; при повторе `SKIP_UNCHANGED` без каких-либо записей.
+## Предварительные требования
 
-## Обязательные условия перед началом
+1. CI и независимое ревью draft PR #1065; без автоматического merge или деплоя.
+2. Известна точная DEV и PROD PostgreSQL база (каждая на своём отдельном соединении). Код проверяет фактические `current_database()` = `devmamago` и `prodmamago` и соответствующие имена в строках подключения; не допускается запуск с перепутанными URL.
+3. На машине запуска доступны **в двух отдельных локальных SSH-туннелях** обе базы, с закрытыми от вывода логами/командами credentials. Файл `.env` сам по себе не подгружается `prisma.config.ts`: переменные `DATABASE_URL` и `SOURCE_DEV_DATABASE_URL` должны быть реально экспортированы в процесс CLI. Нельзя пересылать значения URL, паролей и ключей в чат.
+4. Подтверждена подлинность записи `user:43` в DEV, неактивный (PENDING_ACTIVATION) статус и исходный lineage `wordpress-db/users-immutable-snapshot`. Проверены точные email/displayName; старый WordPress источник недоступен, поэтому DEV lineage выступает *историческим* доказательством, а не нынешним внешним источником.
+5. Для записи в PROD: свежий полный резервный бэкап PROD, **тестовое восстановление в отдельную БД**, акт подтверждения, отдельно утверждённый манифест (все хеши совпадают), явное разрешение оператора на запись.
 
-1. Источник WordPress доступен по SSH **с компьютера оператора**. Не переносить запуск на PROD-хост.
-2. Проверены PROD `DATABASE_URL` и `SELECT current_database()` = `prodmamago`; используйте обычный SSH-туннель на Mac. Не публиковать URL, пароли, SSH-ключи.
-3. Создан полный бэкап PROD и проведено **пробное восстановление в отдельную базу**. Записать идентификатор бэкапа и результат проверки восстановления.
-4. Утверждены конкретные исходные WordPress ID и источники идентичности, совпадение email, назначение аккаунта и причина исторического исключения. Не выдумывать исторические имя/фамилию; текущий `display_name` WordPress допустим только при явной проверке пользователем-владельцем миграции.
-5. Все существующие PROD пользователи, включая 72 адреса, отсутствующих в DEV, остаются неизменными. `user:1` — администратор, никогда не кандидат на создание. DEV `example.invalid` и `mamago.local` — тестовые данные, не переносить.
-6. Успешны CI + независимое ревью PR и review конкретного manifest. **Ни один из этих пунктов не предполагается выполненным автоматически.**
+## Шаг 1 — read-only проверка с сервера (не требует env)
 
-## Шаг 1. Read-only preview
-
-Из корня репозитория на Mac, с настроенными переменными подключения к WordPress и PROD:
+С рабочей станции:
 
 ```bash
-pnpm exec tsx scripts/migration-user-exclusion-backfill.ts \
-  --preview --confirm-production --allow-remote-readonly
+ssh mamago-prod 'bash -s' <<'SH'
+set -euo pipefail
+for db in dev-db-1 prod-db-1; do
+  echo "=== $db / WordPress user:43 ==="
+  docker exec -i "$db" sh -c '
+    export PGPASSWORD="${POSTGRES_PASSWORD:-}"
+    exec psql -X -v ON_ERROR_STOP=1 -U "${POSTGRES_USER:-postgres}" \
+      -d "${POSTGRES_DB:-postgres}" -P pager=off
+  ' <<'SQL'
+SELECT l."sourceRecordKey", l."targetType"::text,
+       l."isActive", l."lastSourceHash" IS NOT NULL AS has_source_hash,
+       CASE WHEN u.id IS NULL THEN 'MISSING' ELSE u.role::text END AS role,
+       u.status::text, u."deletedAt" IS NOT NULL AS deleted,
+       CASE WHEN u.email IS NULL THEN NULL
+            ELSE LEFT(split_part(u.email,'@',1),1) || '***@' ||
+                 split_part(u.email,'@',2) END AS masked_email
+FROM "MigrationLineage" l
+LEFT JOIN "User" u ON u.id = l."targetId"
+WHERE l."sourceRecordKey" = 'wordpress-db:user:43'
+  AND l."targetType" = 'USER';
+SQL
+done
+SH
 ```
 
-Вывод включает для пяти исключённых WordPress ID: `sourceRecordKey`, `action` (`CREATE`, `BLOCKED`, `SKIP_UNCHANGED`), маску адреса, `emailSha256`, `sourceHash`, `canonicalHash`. **Ни писем, ни изменений БД.** Режим проверки может выявить, что часть ID уже существует в PROD или имеет конфликт — такой аккаунт нельзя создавать повторно.
+Это только SELECT, пароли не печатаются. Сверить с исходным расследованием #1064.
 
-После preview сверить эти данные и статус восстановления с живой базой, документированными исключениями и первоначальным источником. В случае `BLOCKED` — расследование, не обход защиты.
+## Шаг 2 — предпросмотр в новой ветке PR
 
-## Шаг 2. Утверждённый manifest
+На Mac уже есть worktree `~/dev/mamago2-worktrees/user-backfill-1064`. После обновления ветки и установки зависимостей требуются **две разные строки подключения** из безопасных операторских переменных:
 
-Файл создаётся **только после проверки**; его нельзя генерировать как автоматическое разрешение на запись. Пример формата (значения хешей — заполняются из проверенного preview, ниже *фиктивные*, не применять):
+- `SOURCE_DEV_DATABASE_URL` → строго `devmamago`
+- `DATABASE_URL` → строго `prodmamago`
+
+```bash
+pnpm migration:user:exclusion-backfill --preview --confirm-production
+```
+
+Не запускать, пока обе строки подключения не настроены, иначе CLI остановится. Режим предпросмотра **не пишет ни в одну базу и не отправляет письма**. В выводе: маска email, `emailSha256`, `canonicalHash`, `sourceHash`, `action=CREATE/BLOCKED/SKIP_UNCHANGED`. Вывод не должен содержать полную почту.
+
+## Шаг 3 — утверждение точного манифеста
+
+После проверки и согласования `action=CREATE` сформировать отдельный непубличный JSON (хеши ниже *заглушки*):
 
 ```json
 {
@@ -40,63 +74,44 @@ pnpm exec tsx scripts/migration-user-exclusion-backfill.ts \
   "issue": 1064,
   "approvedBy": "FOUNDER",
   "approvedAt": "2026-11-02T18:00:00.000Z",
-  "entries": [
-    {
-      "sourceRecordKey": "wordpress-db:user:43",
-      "emailSha256": "<64 lowercase hex>",
-      "canonicalHash": "<64 lowercase hex>",
-      "sourceHash": "<64 lowercase hex>",
-      "action": "CREATE"
-    }
-  ]
+  "entries": [{
+    "sourceRecordKey": "wordpress-db:user:43",
+    "emailSha256": "<64 lowercase hex>",
+    "canonicalHash": "<64 lowercase hex>",
+    "sourceHash": "<64 lowercase hex>",
+    "action": "CREATE"
+  }]
 }
 ```
 
-`entries` должны быть в лексикографическом порядке по `sourceRecordKey`. Допускаются **только** ID 7, 17, 22, 42, 43; никаких других. Без полных адресов email, паролей или токенов. Избегайте включения реальных персональных хешей в публичные PR и комментарии: храните файл вне репозитория с ограниченным доступом. Дата и факт согласования должны быть действительными.
-
-Повторная проверка manifest без записей:
-
-```bash
-pnpm exec tsx scripts/migration-user-exclusion-backfill.ts \
-  --preview --confirm-production --allow-remote-readonly \
-  --manifest /secure/path/user-backfill-approved.json
-```
-
-**Если изменился email, `sourceHash` или `canonicalHash`, операция остановится.** Также стоп при иной роли, ином статусе нового пользователя, конфликте email (без учёта регистра), несовпадении/дублировании lineage или уже занятом WordPress ID.
-
-## Шаг 3. Запись только по отдельному подтверждению
-
-Сначала зафиксировать хеш **ровно тех байт** manifest, которые независимо проверены:
+Точный бинарный SHA-256 проверенного manifest:
 
 ```bash
 shasum -a 256 /secure/path/user-backfill-approved.json
 ```
 
-После письменного подтверждения точного состава и успешного test-restore:
+## Шаг 4 — PROD write (только после самостоятельного разрешения)
 
 ```bash
-pnpm exec tsx scripts/migration-user-exclusion-backfill.ts \
+pnpm migration:user:exclusion-backfill \
   --confirm-writes --confirm-production \
-  --allow-remote-readonly \
   --acknowledge-prod-user-import \
   --acknowledge-exclusion-backfill \
   --confirm-backup-restored \
-  --backup-reference "RESTORE-TEST-ID" \
+  --backup-reference "VERIFIED-RESTORE-ID" \
   --manifest /secure/path/user-backfill-approved.json \
   --reviewed-manifest-sha256 "<reviewed-manifest-sha256>"
 ```
 
-`--confirm-backup-restored` и `--backup-reference` — **операторские подтверждения**, а не автоматическая техническая проверка восстановления. Не передавать флаги до выполнения проверки.
+Поля `--confirm-backup-restored` / `--backup-reference` — подтверждение человека, а **не автоматическая проверка**; не указывать их без test restore. Перед CREATE код повторно считывает DEV snapshot и PROD, проверяет точное совпадение с манифестом, затем вызывает существующий `writeUserMigration` в SERIALIZABLE транзакции. При конфликте транзакция откатывается; уже существующих пользователей не изменяем.
 
-Скрипт повторно сверяет source и target непосредственно перед каждым `CREATE`, использует SERIALIZABLE транзакцию существующего `writeUserMigration`, не создаёт Business/BusinessMember, не повышает роль и не отправляет писем. Он не меняет существующих пользователей. Миграционный ledger создаётся только для новых User. При неожиданном конфликте запуск останавливается; уже завершённые записи не удаляются (при возобновлении `SKIP_UNCHANGED` без writes).
+После создания: сверить число новых User (+1), новых User lineage, число Business и BusinessMember (без изменений), отсутствие коллизий email и корректность USER/PENDING_ACTIVATION. После проверки — отдельная самосервисная активация через сайт, **не массовая рассылка**.
 
-После запуска сверить ожидаемую прибавку User, отсутствие изменения Business/BusinessMember, целевые User/lineage, отсутствие дублей. Затем отдельно проверить **индивидуальную** активацию (`PENDING_ACTIVATION`) и доставку писем в рамках #1060. Массовую рассылку не включать.
-
-## Проверки к PR
+## CI
 
 ```bash
-pnpm exec tsx --test src/lib/migration/commit/user/productionExclusionBackfillPolicy.test.ts
+pnpm test:migration-user-exclusion-backfill
 pnpm exec tsc --noEmit
 ```
 
-**Никаких автоматических деплоев или PROD-импортов в рамках PR.**
+**PR сам по себе ничего в PROD не деплоит и не импортирует.**
