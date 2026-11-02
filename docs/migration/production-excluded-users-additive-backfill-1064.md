@@ -229,6 +229,47 @@ SELECT. Проверяет совпадения email с обеими БД, на
 нет оснований автоматически создавать аккаунты, если недостаточна
 достоверность исходных имён и адресов.
 
+## Следующий этап: строгий PREVIEW всех пяти архивных WordPress User
+
+Уже реализован ограниченный **только read-only** pipeline:
+`scripts/migration-wordpress-five-preview-ssh.py` читает неизменённый
+локальный `mamago-wp-audit-20260703-034032.tar.gz`, извлекает
+**ровно** `user:7/17/22/42/43` (579 исходных строк) и передаёт записи
+напрямую в stdin `scripts/migration-wordpress-five-preview.ts`.
+Электронные адреса, имена, пароли не выводятся, не сохраняются на диск,
+не отправляются в GitHub. Через изолированные SSH-туннели проверяются
+`devmamago` и `prodmamago`.
+
+```bash
+cd ~/dev/mamago2-worktrees/user-backfill-1064
+git fetch origin fix/prod-wordpress-user-additive-backfill-1064
+git switch --detach origin/fix/prod-wordpress-user-additive-backfill-1064
+python3 scripts/migration-wordpress-five-preview-ssh.py \
+  "$HOME/Desktop/mamago2-old-20260717/mamago-wp-audit-20260703-034032.tar.gz"
+```
+
+В TS проверяются точный список ID и структура входных данных,
+уникальность нормализованных email, совпадение с историческим
+activation-manifest, наличие исходного DEV lineage для user:43,
+отсутствие в PROD любых lineage с этими sourceRecordKey (в том числе
+неактивных) и email-коллизий **включая soft-deleted User**. Для каждого
+формируется тот же canonicalHash, который использует существующий
+`planUserMigration`, и sourceHash архивного кандидата.
+
+Вывод должен содержать пять `action=CREATE`; любой конфликт
+останавливает preview. В отчёте только маски email и проверочные хеши.
+**PREVIEW не разрешает импорт и не содержит COMMIT mode.**
+
+Дальнейшая работа: отдельный, ограниченный теми же пятью ID write path
+с проверенным манифестом точных source/email/canonical hashes,
+одобрением владельца, backup/test-restore, сериализуемыми/идемпотентными
+транзакциями, проверкой счётчиков до/после и отсутствием привилегий.
+Не включать пяти-пользовательский write в существующую команду для
+одного user:43 без независимого security-review и тестов.
+Для всех пяти требуется `USER / PENDING_ACTIVATION / passwordHash=null`
+без Business, BusinessMember, Activity, Session и отправки писем.
+Отдельно проверяем PROD-верификацию бизнеса по УНП и права на объекты.
+
 ## Шаг 2 — рекомендованный read-only preview через SSH (без .env)
 
 В этой версии PR предусмотрен отдельный Python 3 CLI-хелпер
