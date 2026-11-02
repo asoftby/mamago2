@@ -36,6 +36,7 @@ import type { OfferFormData, OfferWizardMode, OfferWizardStepKey, OfferWizardVar
 import { describeContentColumns } from "@/lib/offers/offerPublishedEditGate";
 import { getDefaultFormData, hasMeaningfulContent } from "./defaults";
 import { getOfferTypeSelection } from "./offerTypeChoices";
+import { OfferSubtypeClarifier } from "./components/OfferSubtypeClarifier";
 import { validateForSubmit, type ValidationResult } from "./validation";
 import {
   getStepsForOfferType,
@@ -109,6 +110,7 @@ interface OfferWizardProps {
   };
   onComplete?: (offerId: string) => void;
   defaultPlaceId?: string | null;
+  creationIntent?: "classes" | "parties" | "camps";
   editorSurface?: ContentEditorSurface;
   contentEditorNav?: Partial<ContentEditorNav>;
   returnTo?: string;
@@ -279,6 +281,7 @@ export function OfferWizard({
   userRole,
   onComplete,
   defaultPlaceId,
+  creationIntent,
   editorSurface,
   contentEditorNav,
   returnTo,
@@ -305,7 +308,10 @@ export function OfferWizard({
     if (mode === "edit" && offer) {
       return mapOfferToFormData(offer);
     }
-    return getDefaultFormData(defaultPlaceId ?? null);
+    const defaults = getDefaultFormData(defaultPlaceId ?? null);
+    const selectedType = creationIntent === "classes" ? "REGULAR_ACTIVITY" : creationIntent === "parties" ? "PARTY_SERVICE" : creationIntent === "camps" ? "CAMP" : null;
+    if (!selectedType) return defaults;
+    return { ...defaults, ...getOfferTypeSelection(selectedType), ...(selectedType === "CAMP" ? { schedule: { ...defaults.schedule, bookingMethod: "REQUEST_ONLY" as const, legacyBookingMode: null, externalUrl: "" } } : {}) };
   });
   
   // Staff may browse the default step sequence before selecting a format.
@@ -317,7 +323,7 @@ export function OfferWizard({
   // Current step key (not number)
   const [currentStepKey, setCurrentStepKey] = useState<OfferWizardStepKey>(() => {
     if (mode !== "edit" || !offer || initialStepNumber == null || initialStepNumber < 1) {
-      return "type";
+      return mode === "create" && creationIntent ? "about" : "type";
     }
     const fd = mapOfferToFormData(offer);
     const initialSteps = getStepsForOfferType(fd.offerWizardType ?? (freeStepNavigation ? "SINGLE" : null), fd.productType, variant);
@@ -920,6 +926,10 @@ export function OfferWizard({
       }
       return (
         <div className="space-y-10">
+          {currentStepKey === "about" && mode === "create" &&
+            (creationIntent === "classes" || creationIntent === "parties") && (
+              <OfferSubtypeClarifier group={creationIntent} data={formData} onChange={handleChange} />
+            )}
           {blocks.map((key) => (
             <div key={key}>{renderBlock(key)}</div>
           ))}
