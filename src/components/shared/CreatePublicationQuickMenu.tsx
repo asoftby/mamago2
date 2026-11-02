@@ -301,7 +301,7 @@ export function CreatePublicationQuickMenu({
           onOpenChange={setOpen}
           title={publicationMode === "business" ? "Что хотите добавить?" : "Что создаём?"}
           showCloseButton={true}
-          height="auto"
+          height="min(85dvh, 720px)"
         >
           {renderItems()}
         </BottomSheet>
