@@ -34,7 +34,20 @@ SELECT
     JOIN "MigrationSource" s ON s.id = l."sourceId"
     WHERE l."targetId" = u.id AND l."targetType" = 'USER'
       AND l."isActive" = true
-  ), '')
+  ), ''),
+  CASE WHEN u."emailVerifiedAt" IS NULL THEN 'EMAIL_NOT_VERIFIED'
+       ELSE 'EMAIL_VERIFIED' END,
+  CASE WHEN u."lastLoginAt" IS NULL THEN 'NEVER_LOGGED_IN'
+       ELSE 'LOGIN_PRESENT' END,
+  CASE WHEN nullif(btrim(u."displayName"), '') IS NULL THEN 'NO_DISPLAY_NAME'
+       ELSE 'HAS_DISPLAY_NAME' END,
+  (SELECT COUNT(*) FROM "Business" b WHERE b."ownerUserId" = u.id),
+  (SELECT COUNT(*) FROM "BusinessMember" bm
+    WHERE bm."userId" = u.id AND bm."isActive" = true),
+  (SELECT COUNT(*) FROM "Activity" a WHERE a."ownerUserId" = u.id),
+  (SELECT COUNT(*) FROM "FamilyMembership" fm
+    WHERE fm."userId" = u.id AND fm."leftAt" IS NULL),
+  (SELECT COUNT(*) FROM "Session" sess WHERE sess."userId" = u.id)
 FROM "User" u
 WHERE u.email IS NOT NULL;
 SQL
@@ -78,9 +91,11 @@ def read_users():
             values = line.split("|")
             if len(values) == 2 and values[0] == "DB":
                 names[current] = values[1]
-            elif len(values) == 8 and values[0] == "U":
+            elif len(values) == 16 and values[0] == "U":
                 if not re.fullmatch(r"[a-f0-9]{32}", values[1]):
                     raise RuntimeError("Bad fingerprint in query")
+                if any(not re.fullmatch(r"[0-9]+", item) for item in values[11:16]):
+                    raise RuntimeError("Invalid account relationship counts")
                 rows[current].append({
                     "fingerprint": values[1],
                     "role": values[2],
@@ -89,6 +104,14 @@ def read_users():
                     "credential": values[5],
                     "created": values[6],
                     "lineage": tuple(sorted(set(filter(None, values[7].split(";"))))),
+                    "email_verified": values[8],
+                    "login": values[9],
+                    "display_name": values[10],
+                    "business_owned": int(values[11]),
+                    "business_memberships": int(values[12]),
+                    "activities_owned": int(values[13]),
+                    "family_memberships": int(values[14]),
+                    "sessions": int(values[15]),
                 })
             else:
                 raise RuntimeError("Unexpected SQL columns")
@@ -145,7 +168,14 @@ def main():
         print(
             f"  {index}. source={source}; role={user['role']}; "
             f"status={user['status']}; credential={user['credential']}; "
-            f"created={user['created']}; source_match={source_state}"
+            f"created={user['created']}; source_match={source_state}; "
+            f"email={user['email_verified']}; {user['login']}; "
+            f"{user['display_name']}; "
+            f"businessesOwned={user['business_owned']}; "
+            f"businessMemberships={user['business_memberships']}; "
+            f"activitiesOwned={user['activities_owned']}; "
+            f"familyMemberships={user['family_memberships']}; "
+            f"sessions={user['sessions']}"
         )
     prod_deleted_matches = [
         user for user in dev if user["lifecycle"] == "LIVE"
