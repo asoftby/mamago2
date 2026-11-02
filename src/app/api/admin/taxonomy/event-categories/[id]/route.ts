@@ -77,6 +77,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
         data: { sortOrder: a.sortOrder },
       }),
     ]);
+    revalidateTag(EVENT_STEP1_CATEGORIES_TAG, { expire: 0 });
     return NextResponse.json({ ok: true });
   }
 
@@ -250,7 +251,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
         _count: { select: { activities: true, children: true } },
       },
     });
-    revalidateTag(EVENT_STEP1_CATEGORIES_TAG, "max");
+    revalidateTag(EVENT_STEP1_CATEGORIES_TAG, { expire: 0 });
     return NextResponse.json(mapCategoryWithParent(updated));
   } catch {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -274,7 +275,7 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
 
   try {
     await prisma.eventCategory.delete({ where: { id } });
-    revalidateTag(EVENT_STEP1_CATEGORIES_TAG, "max");
+    revalidateTag(EVENT_STEP1_CATEGORIES_TAG, { expire: 0 });
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
