@@ -229,6 +229,68 @@ SELECT. Проверяет совпадения email с обеими БД, на
 нет оснований автоматически создавать аккаунты, если недостаточна
 достоверность исходных имён и адресов.
 
+## Read-only PREVIEW 5/5 подтверждён оператором
+
+Оператор выполнил точный archive + SSH Prisma preview после зелёного
+GitHub CI. Результат: **CREATE 5/5, reason=null 5/5**, WordPress ID
+`7,17,22,42,43`, `devmamago` / `prodmamago`, без отправки
+писем, бизнесов, событий или изменения существующих User.
+
+Подтверждённый SHA-256 исходного архивного `.tar.gz`:
+`ea2ed02a2260ab137d77ce2d42df9332710861074771fbc8fffd29128d184a5e`.
+Исходные точные email/имена остаются только в локальном архиве оператора.
+Результат read-only **не является одобрением записи**.
+
+## Отдельный атомарный импорт пяти User — подготовлен, но НЕ разрешён
+
+Новый независимый операторский CLI:
+`scripts/migration-wordpress-five-commit.ts`.
+
+**Не запускать** до независимого review, успешного CI и отдельного явного
+разрешения владельца на запись в PROD. Для исполнения нужны:
+
+- Непубличный пятистрочный JSON манифест: `schemaVersion=1`, `issue=1064`,
+  `approvedBy=FOUNDER`, дата утверждения `approvedAt` в UTC,
+  `archiveSha256` выше и точный `sourceNamespace` =
+  `wordpress-audit-20260703-recovery-1064`.
+- `entries` с точно упорядоченными `sourceRecordKey`:
+  `wordpress-db:user:7`, `17`, `22`, `42`, `43`.
+  Для каждой записи: `emailSha256`, `canonicalHash`, `sourceHash`,
+  `action=CREATE` — исключительно из проверенного preview. Манифест
+  **не содержит email/имени**. Любое изменение хешей блокирует импорт.
+- SHA-256 точного содержимого проверенного манифеста,
+  контроль свежей резервной копии PROD и отдельной тестовой реставрации
+  на PostgreSQL 16 перед записью.
+- Два отдельных SSH-туннеля в `devmamago` и `prodmamago`;
+  исходные email/имена передаются в STDIN в памяти и не сохраняются
+  в файлах репозитория или логе. Не передавать пароли, DATABASE_URL,
+  сами email или полные raw SQL результаты в чат.
+- Отдельно подтверждённые флаги `--confirm-writes`,
+  `--confirm-production`, `--acknowledge-prod-user-import`,
+  `--acknowledge-exclusion-backfill`,
+  `--confirm-five-user-archive-recovery`,
+  `--confirm-backup-restored`, `--backup-reference`,
+  `--manifest`, `--reviewed-manifest-sha256`.
+
+**Safety properties:** ровно 5 известных ID; контроль email маски
+исторического activation manifest; immutable archive SHA; DEV lineage
+и email user:43; повторные SELECT на PROD внутри одной `SERIALIZABLE`
+транзакции; глобальный advisory lock на этот сценарий; отсутствие
+case-insensitive email совпадений, включая deleted User; отсутствие
+чужих активных или неактивных USER lineage. Создание User и
+MigrationSource/Run/Record/Lineage — атомарно для всех пяти.
+При любом конфликте rollback **всех** новых пользователей; частично
+ранее запущенный импорт требует разбирательства. Повторный запуск
+после полного успешного импорта — пять `SKIP_UNCHANGED`, без
+перезаписи User/пароля/статуса. Итоговые счётчики `Business`,
+`BusinessMember`, `Activity` не должны меняться.
+
+**Ограничение:** перечисленные свойства проверены в исходном коде и
+должны пройти независимые unit + PostgreSQL integration проверки
+до разрешения запуска; операторский successful preview сам по себе
+не тестирует этот write path. Бизнесы в PROD подтверждаются
+независимо по УНП; ownership не переносится.
+
 ## Следующий этап: строгий PREVIEW всех пяти архивных WordPress User
 
 Уже реализован ограниченный **только read-only** pipeline:
