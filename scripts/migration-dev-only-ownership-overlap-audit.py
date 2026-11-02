@@ -97,6 +97,45 @@ def matches(item, target, field):
         return sum(bool(item["source"] & other["source"]) for other in target)
     return sum(bool(item[field]) and item[field]==other[field] for other in target)
 
+def prod_owners(records, dev_fp, prod_users):
+    """Safe metadata for existing PROD owners, without any PII."""
+    if not records:
+        return "NONE"
+    fragments=[]
+    for row in records[:3]:
+        owner_fp=row["owner"]
+        user=prod_users.get(owner_fp)
+        if user is None:
+            fragments.append("OWNER_NOT_IN_ACTIVE_USER_SET")
+            continue
+        owner_lineages=sorted(user["source"])
+        source_ids=[
+            key.rsplit(":",1)[-1]
+            for key in owner_lineages
+            if key.startswith("wordpress-db/wordpress-db:user:")
+        ]
+        fragments.append(
+            "role="+user["role"]
+            +",status="+user["status"]
+            +",sameDevUserEmail="+("YES" if owner_fp==dev_fp else "NO")
+            +",wordpressOwnerSourceIds="+(",".join(source_ids[:3]) if source_ids else "NONE")
+        )
+    if len(records)>3:
+        fragments.append("ADDITIONAL_MATCHES="+str(len(records)-3))
+    return " / ".join(fragments)
+
+def is_business_match(left,right):
+    return (
+        bool(left["source"] & right["source"])
+        or bool(left["unp"]) and left["unp"]==right["unp"]
+    )
+
+def is_activity_match(left,right):
+    return (
+        bool(left["source"] & right["source"])
+        or bool(left["slug"]) and left["slug"]==right["slug"]
+    )
+
 def main():
     if len(sys.argv)!=1:
         raise RuntimeError("Read-only audit accepts no arguments")
@@ -120,11 +159,17 @@ def main():
                   f"PROD sameSource={matches(b,prod['business'],'source')}, "
                   f"sameUNP={matches(b,prod['business'],'unp')}, "
                   f"sameName={matches(b,prod['business'],'name')}")
+            strong=[x for x in prod["business"] if is_business_match(b,x)]
+            print("      Matching PROD business owners: "+
+                  prod_owners(strong,fp,prod["users"]))
         for n,a in enumerate(activity,1):
             print(f"    Activity {n}: status={a['status']}; "
                   f"PROD sameSource={matches(a,prod['activity'],'source')}, "
                   f"sameSlug={matches(a,prod['activity'],'slug')}, "
                   f"sameTitle={matches(a,prod['activity'],'title')}")
+            strong=[x for x in prod["activity"] if is_activity_match(a,x)]
+            print("      Matching PROD activity owners: "+
+                  prod_owners(strong,fp,prod["users"]))
     print("All comparisons are read-only. Name/title matches alone are not authoritative.")
 
 if __name__=="__main__":
