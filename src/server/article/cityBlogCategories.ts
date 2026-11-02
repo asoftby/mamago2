@@ -11,7 +11,7 @@ export type CityBlogCategory = {
   name: string;
   thumbnailUrl: string | null;
   hasNewArticle: boolean;
-  recentArticles?: Array<{ id: string; href: string }>;
+  recentArticles?: Array<{ id: string; href: string; publishedAt: string }>;
 };
 
 type CityRef = {
@@ -75,7 +75,7 @@ export async function listPopulatedCityBlogCategories(city: CityRef): Promise<Ci
           { publishedAt: { gte: freshnessCutoff } },
         ],
       },
-      select: { id: true, slug: true, geoScope: true, city: { select: { slug: true } } },
+      select: { id: true, slug: true, publishedAt: true, geoScope: true, city: { select: { slug: true } } },
       orderBy: { publishedAt: "desc" },
       take: 200,
     });
@@ -99,6 +99,7 @@ export async function listPopulatedCityBlogCategories(city: CityRef): Promise<Ci
       hasNewArticle: recentArticles.length > 0,
       recentArticles: recentArticles.filter((item) => item.slug).map((item) => ({
         id: item.id,
+        publishedAt: item.publishedAt!.toISOString(),
         href: buildPublicPath(buildArticlePublicPath({ slug: item.slug!, geoScope: item.geoScope, citySlug: item.city?.slug })),
       })),
     };
