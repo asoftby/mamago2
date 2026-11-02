@@ -406,6 +406,14 @@ jobs:
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
 
+      - name: Five-user WordPress recovery atomicity and rerun on PostgreSQL
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+          FIVE_WP_RECOVERY_PG_TEST: '1'
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx --test scripts/migration-wordpress-five-commit.integration.test.ts
+
       - name: Family plan PostgreSQL access isolation
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
