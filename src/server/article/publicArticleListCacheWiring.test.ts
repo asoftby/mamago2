@@ -41,8 +41,8 @@ assert.match(
 );
 assert.match(
   categoryRoute,
-  /revalidateTag\(EVENT_STEP1_CATEGORIES_TAG, "max"\)/,
-  "category mutation route must keep invalidating the shared category dependency tag",
+  /revalidateTag\(EVENT_STEP1_CATEGORIES_TAG, \{ expire: 0 \}\)/,
+  "category mutation route must expire the shared category dependency tag immediately",
 );
 
 assert.match(
