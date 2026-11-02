@@ -53,10 +53,29 @@ WHERE l."targetType" = 'USER'
   AND s."adapterKey" = 'wordpress-db'
   AND l."sourceRecordKey" LIKE 'wordpress-db:user:%';
 SELECT
-  'U', md5(lower(btrim(email))), role::text
+  'U', id, md5(lower(btrim(email))), role::text,
+  CASE WHEN email IS NULL THEN '' ELSE
+    left(split_part(email, '@', 1), 1) || '***@' || split_part(email, '@', 2)
+  END
 FROM "User"
 WHERE "deletedAt" IS NULL
   AND email IS NOT NULL;
+SELECT
+  'R', r."sourceRecordKey", r.status::text,
+  CASE WHEN r."rawPayload" IS NOT NULL THEN 'RAW_PRESENT' ELSE 'RAW_ABSENT' END,
+  CASE WHEN r."normalizedPayload" IS NOT NULL THEN 'NORMALIZED_PRESENT' ELSE 'NORMALIZED_ABSENT' END,
+  CASE WHEN r."rawPayloadRef" IS NOT NULL THEN 'RAW_REF_PRESENT' ELSE 'RAW_REF_ABSENT' END,
+  CASE WHEN r."normalizedPayloadRef" IS NOT NULL THEN 'NORMALIZED_REF_PRESENT' ELSE 'NORMALIZED_REF_ABSENT' END
+FROM "MigrationRecord" r
+JOIN "MigrationSource" s ON s.id = r."sourceId"
+WHERE s."adapterKey" = 'wordpress-db'
+AND r."sourceRecordKey" IN (
+  'wordpress-db:user:7',
+  'wordpress-db:user:17',
+  'wordpress-db:user:22',
+  'wordpress-db:user:42',
+  'wordpress-db:user:43'
+);
 SQL
   printf 'END:%s\n' "$label"
 done
@@ -100,8 +119,8 @@ def read_databases() -> tuple[dict, dict]:
             "check containers and connectivity privately"
         )
     databases = {
-        "dev": {"name": None, "lineages": defaultdict(list), "email_hashes": {}},
-        "prod": {"name": None, "lineages": defaultdict(list), "email_hashes": {}},
+        "dev": {"name": None, "lineages": defaultdict(list), "email_hashes": {}, "users_by_id": {}, "records": defaultdict(list)},
+        "prod": {"name": None, "lineages": defaultdict(list), "email_hashes": {}, "users_by_id": {}, "records": defaultdict(list)},
     }
     current = None
     for line in result.stdout.splitlines():
@@ -128,10 +147,16 @@ def read_databases() -> tuple[dict, dict]:
             databases[current]["lineages"][key].append(
                 (fingerprint, role, status, record_state, namespace)
             )
-        elif fields[0] == "U" and len(fields) == 3:
-            _, fingerprint, role = fields
+        elif fields[0] == "U" and len(fields) == 5:
+            _, user_id, fingerprint, role, masked_email = fields
             if re.fullmatch(r"[0-9a-f]{32}", fingerprint):
                 databases[current]["email_hashes"].setdefault(fingerprint, set()).add(role)
+                databases[current]["users_by_id"][user_id] = (fingerprint, role, masked_email)
+        elif fields[0] == "R" and len(fields) == 7:
+            _, key, status, raw, normalized, raw_ref, normalized_ref = fields
+            if not KEY.fullmatch(key):
+                raise RuntimeError("Invalid MigrationRecord source key")
+            databases[current]["records"][key].append((status, raw, normalized, raw_ref, normalized_ref))
         else:
             raise RuntimeError("Unexpected read-only query output")
     if current is not None:
@@ -145,6 +170,19 @@ def main() -> None:
     if len(sys.argv) != 1:
         raise RuntimeError("Read-only coverage audit accepts no arguments")
     expected = read_reference_keys()
+    activation = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    approved_five = {"wordpress-db:user:7", "wordpress-db:user:17",
+                     "wordpress-db:user:22", "wordpress-db:user:42",
+                     "wordpress-db:user:43"}
+    history = {
+        e["sourceRecordKey"]: (e["userId"], e["emailMask"])
+        for e in activation["entries"]
+        if e.get("sourceRecordKey") in approved_five
+        and isinstance(e.get("userId"), str)
+        and isinstance(e.get("emailMask"), str)
+    }
+    if len(history) != 5:
+        raise RuntimeError("Historical manifest lacks one or more excluded users")
     dev, prod = read_databases()
     dk, pk = set(dev["lineages"]), set(prod["lineages"])
     reference_missing_both = sorted(expected - dk - pk)
@@ -185,6 +223,33 @@ def main() -> None:
     show("DEV-only keys whose normalized email has no PROD match", dev_only_email_missing)
     show("DEV-only keys requiring manual review", unresolved)
     show("Duplicate active WordPress USER lineage keys", duplicate_lineages)
+    print("HISTORICAL FIVE: original activation User IDs vs current Users")
+    print("(user IDs and emails are not printed; FOUND is identity evidence, not import approval)")
+    for key in sorted(history, key=lambda k: int(k.split(":")[-1])):
+        user_id, historic_mask = history[key]
+        fields = []
+        for label, database in (("DEV", dev), ("PROD", prod)):
+            user = database["users_by_id"].get(user_id)
+            if user is None:
+                identity = "ID_ABSENT"
+            elif user[2].casefold() == historic_mask.casefold():
+                identity = "HISTORIC_ID_AND_MASK_MATCH"
+            else:
+                identity = "HISTORIC_ID_PRESENT_MASK_MISMATCH"
+            record_rows = database["records"].get(key, [])
+            payload_rows = sum(
+                1 for r in record_rows
+                if r[1] == "RAW_PRESENT" or r[2] == "NORMALIZED_PRESENT"
+            )
+            payload_ref_rows = sum(
+                1 for r in record_rows
+                if r[3] == "RAW_REF_PRESENT" or r[4] == "NORMALIZED_REF_PRESENT"
+            )
+            fields.append(
+                f"{label}={identity}; MigrationRecord={len(record_rows)};"
+                f"payloadRows={payload_rows};payloadRefRows={payload_ref_rows}"
+            )
+        print(f"  {key}: " + " | ".join(fields))
     print("No destructive operation, import, approval, or activation was performed.")
     print("Reference manifest is historical and may not represent the entire WordPress DB.")
     print("A missing lineage or matching email requires case-by-case validation.")
