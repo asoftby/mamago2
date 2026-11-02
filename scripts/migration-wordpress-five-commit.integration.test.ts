@@ -15,7 +15,7 @@ import {
 } from "../src/lib/migration/commit/user/UserMigrationVerticalSlice";
 import { hashBackfillEmail } from "../src/lib/migration/commit/user/productionExclusionBackfillPolicy";
 import {
-  FIVE_RECOVERY_KEYS, FIVE_RECOVERY_NAMESPACE,
+  FIVE_RECOVERY_KEYS, FIVE_RECOVERY_NAMESPACE, FIVE_RECOVERY_ARCHIVE_SHA256,
   type FiveRecoveryApproval,
 } from "../src/lib/migration/commit/user/wordpressFiveArchiveBackfillPolicy";
 import {
@@ -25,7 +25,7 @@ import {
   commitApprovedFiveAtomic, type Planned,
 } from "./migration-wordpress-five-commit";
 
-const archiveSha256 = "a".repeat(64);
+const archiveSha256 = FIVE_RECOVERY_ARCHIVE_SHA256;
 const manifestSha256 = "b".repeat(64);
 const emails = [7, 17, 22, 42, 43].map(i =>
   "wp-1064-ci-identity-" + i + "@example.invalid",
