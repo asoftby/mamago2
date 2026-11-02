@@ -33,7 +33,7 @@ export const FIVE_WORDPRESS_SOURCE_KEYS = [
   "wordpress-db:user:42",
   "wordpress-db:user:43",
 ] as const;
-const SOURCE_NAMESPACE = "wordpress-audit-20260703-recovery-1064";
+export const SOURCE_NAMESPACE = "wordpress-audit-20260703-recovery-1064";
 const HEX_64 = /^[0-9a-f]{64}$/;
 
 type RawUser = {
@@ -112,7 +112,7 @@ async function readInputFromStdin(): Promise<SourceInput> {
   }
 }
 
-function sourceCandidate(source: SourceInput, row: RawUser): UserSourceCandidate {
+export function sourceCandidate(source: SourceInput, row: RawUser): UserSourceCandidate {
   const id = Number(row.sourceRecordKey.slice("wordpress-db:user:".length));
   const normalizedEmail = normalizeUserEmail(row.email);
   if (!normalizedEmail) throw new Error("INVALID_ARCHIVE_USER_EMAIL");
@@ -144,7 +144,7 @@ function sourceCandidate(source: SourceInput, row: RawUser): UserSourceCandidate
   };
 }
 
-async function checkDevUser43(dev: PrismaClient, email: string): Promise<void> {
+export async function checkDevUser43(dev: PrismaClient, email: string): Promise<void> {
   const lineages = await dev.migrationLineage.findMany({
     where: { sourceRecordKey: "wordpress-db:user:43", targetType: "USER", isActive: true },
     select: {
