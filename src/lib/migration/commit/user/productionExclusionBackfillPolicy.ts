@@ -1,7 +1,5 @@
 import { createHash } from "node:crypto";
 
-import { USERS_UNRESOLVED_SOURCE_RECORD_KEYS } from "@/lib/migration/release/knownBlockers";
-
 export const WORDPRESS_USER_BACKFILL_ISSUE = 1064;
 
 export interface ApprovedUserBackfillEntry {
@@ -20,7 +18,9 @@ export interface ApprovedUserBackfillManifest {
   entries: ApprovedUserBackfillEntry[];
 }
 
-const ALLOWED = new Set<string>(USERS_UNRESOLVED_SOURCE_RECORD_KEYS);
+// Only the confirmed real DEV-only account is in scope for recovery.
+// The other four exclusions are already present in PROD and must never be duplicated.
+const ALLOWED = new Set<string>(["wordpress-db:user:43"]);
 const HASH = /^[a-f0-9]{64}$/;
 
 export function hashBackfillEmail(email: string): string {
