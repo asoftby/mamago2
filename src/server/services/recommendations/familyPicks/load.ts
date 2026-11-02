@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import type { Subject } from "@/lib/decision/decisionContext";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
 import { DEFAULT_TZ } from "@/server/geo/geoConstants";
-import { activeFamilyUserIds, activePlanScopeFor, childScopeFor } from "@/server/family/familyAccess";
+import { activeFamilyUserIds, activePlanScopeFor } from "@/server/family/familyAccess";
 import {
   eventSystemInterestSlugs,
   rankPlanSuggestionsForCity,
@@ -21,6 +21,7 @@ import {
   type FamilyPickCandidate,
   type FamilyPicksResult,
 } from "./select";
+import { loadFamilyPicksProfile, familyPicksProfileContext, type FamilyPicksProfileChild } from "./profile";
 import { collectUpcomingOccurrences, resolveShowWindow, type ShowWindow } from "./window";
 
 /** Постоянные расписания (как в общем движке): видимы независимо от дня. */
@@ -53,6 +54,8 @@ export type FamilyPicksResponse = {
   window: ShowWindow;
   /** guest — без аккаунта; user — авторизован (даже если детей в профиле ещё нет). */
   audience: "guest" | "user";
+  /** Profile audience is independent of the legacy ranking level/audience. */
+  profileContext: ReturnType<typeof familyPicksProfileContext>;
   /** Ключи возрастных групп детей для ссылки «Другие идеи» (`age=`). Пусто, если возраст неизвестен. */
   ageFilter: string[];
   runId: string | null;
@@ -91,16 +94,7 @@ async function loadDismissedKeys(input: {
   return rows.flatMap((row) => (row.entityId ? [`EVENT:${row.entityId}`] : []));
 }
 
-async function loadFamily(userId: string, anonymousId: string | null, now: Date, config: FamilyPicksConfig) {
-  const childRows = await prisma.child.findMany({
-    where: await childScopeFor(userId),
-    select: {
-      id: true,
-      name: true,
-      birthDate: true,
-      systemInterests: { select: { interestSlug: true } },
-    },
-  });
+async function loadFamily(userId: string, childRows: FamilyPicksProfileChild[], anonymousId: string | null, now: Date, config: FamilyPicksConfig) {
   const children: FamilyChild[] = childRows.map((row) => ({
     id: row.id,
     name: row.name,
@@ -155,11 +149,14 @@ export async function loadFamilyPicks(input: LoadFamilyPicksInput): Promise<Fami
   const now = input.now ?? new Date();
   const config = normalizeFamilyPicksConfig(input.config);
   const window = resolveShowWindow(now, config.weekHorizonDays);
+  const profile = await loadFamilyPicksProfile(input.userId ?? null);
+  const profileContext = familyPicksProfileContext(profile);
   const empty: FamilyPicksResponse = {
     level: "NONE",
     title: null,
     window,
     audience: input.userId ? "user" : "guest",
+    profileContext,
     ageFilter: [],
     runId: null,
     algorithmVersion: FAMILY_PICKS_ALGORITHM_VERSION,
@@ -170,7 +167,7 @@ export async function loadFamilyPicks(input: LoadFamilyPicksInput): Promise<Fami
   if (!city) return empty;
 
   const family = input.userId
-    ? await loadFamily(input.userId, input.anonymousId ?? null, now, config)
+    ? await loadFamily(input.userId, profile.children, input.anonymousId ?? null, now, config)
     : {
         children: [] as FamilyChild[],
         subjects: [] as Subject[],
@@ -333,6 +330,7 @@ export async function loadFamilyPicks(input: LoadFamilyPicksInput): Promise<Fami
     title: result.title,
     window,
     audience: input.userId ? "user" : "guest",
+    profileContext,
     ageFilter: ageFilterKeysForChildren(family.children),
     runId: trace?.runId ?? null,
     algorithmVersion: FAMILY_PICKS_ALGORITHM_VERSION,
