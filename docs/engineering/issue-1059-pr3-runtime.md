@@ -76,6 +76,12 @@ browser viewport/layout and real network timing checks remain runtime acceptance
 items below; SSR and pure cache tests do not establish visual CLS or all browser
 race behavior. Local build status and CI outcome are reported in the PR.
 
+Targeted ESLint passes. The broader `eslint src --quiet` additionally reports 17
+existing errors in 10 files outside this diff; all 10 were compared byte-for-byte
+with origin/dev and are unchanged (search/blog/plan UI, existing discovery/admin
+components, stories and territory test). They are not counted as PR 3 validation
+success and are left for separate tasks.
+
 ## Runtime acceptance after a future authorized DEV release
 
 - [ ] Confirm expected git SHA, schema migration and flag OFF → exactly one common
