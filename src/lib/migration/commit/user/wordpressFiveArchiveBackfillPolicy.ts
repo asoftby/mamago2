@@ -164,8 +164,8 @@ export interface FiveRecoveryPlanSnapshot {
   draft: {
     role: string;
     status: string;
-    passwordHash: null;
-    emailVerifiedAt: null;
+    passwordHash: string | null;
+    emailVerifiedAt: Date | null;
     phoneE164: string | null;
   } | null;
 }
