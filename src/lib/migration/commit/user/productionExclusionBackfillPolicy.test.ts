@@ -50,7 +50,7 @@ test("idempotent skip must match the same reviewed identity and source", () => {
 });
 
 test("never permits admin/source key 1, unknown key, or arbitrary WP user", () => {
-  for (const key of ["wordpress-db:user:1", "wordpress-db:user:38", "wordpress-db:user:999"]) {
+  for (const key of ["wordpress-db:user:1", "wordpress-db:user:7", "wordpress-db:user:17", "wordpress-db:user:22", "wordpress-db:user:42", "wordpress-db:user:38", "wordpress-db:user:999"]) {
     assert.throws(() => parseApprovedUserBackfillManifest({
       ...approval(), entries: [{ ...entry, sourceRecordKey: key }],
     }), /BACKFILL_MANIFEST_ENTRY_INVALID/);
