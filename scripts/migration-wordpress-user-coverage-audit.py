@@ -62,8 +62,8 @@ WHERE "deletedAt" IS NULL
   AND email IS NOT NULL;
 SELECT
   'R', r."sourceRecordKey", r.status::text,
-  CASE WHEN r."rawPayload" IS NOT NULL THEN 'RAW_PRESENT' ELSE 'RAW_ABSENT' END,
-  CASE WHEN r."normalizedPayload" IS NOT NULL THEN 'NORMALIZED_PRESENT' ELSE 'NORMALIZED_ABSENT' END,
+  CASE WHEN r."rawPayload" IS NOT NULL AND r."rawPayload" <> 'null'::jsonb THEN 'RAW_PRESENT' ELSE 'RAW_ABSENT' END,
+  CASE WHEN r."normalizedPayload" IS NOT NULL AND r."normalizedPayload" <> 'null'::jsonb THEN 'NORMALIZED_PRESENT' ELSE 'NORMALIZED_ABSENT' END,
   CASE WHEN r."rawPayloadRef" IS NOT NULL THEN 'RAW_REF_PRESENT' ELSE 'RAW_REF_ABSENT' END,
   CASE WHEN r."normalizedPayloadRef" IS NOT NULL THEN 'NORMALIZED_REF_PRESENT' ELSE 'NORMALIZED_REF_ABSENT' END
 FROM "MigrationRecord" r
