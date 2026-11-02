@@ -114,6 +114,36 @@ source key уже есть в PROD, помечает возможное совп
 Это правило **не добавляет PROD writes** в PR #1065 и не расширяет
 single-user writer; бизнесы не мигрируются данным PR.
 
+## Подтверждение владельцев существующих PROD объектов (2026-11-02)
+
+Оператор выполнил усиленный `migration-dev-only-ownership-overlap-audit.py`.
+Только SELECT; для совпавших бизнесов и событий проверены PROD owner
+role/status и WordPress lineage (без вывода PII).
+
+- DEV-only #1/#2: `APPROVED`, но `isVerified=false`, Business без УНП;
+  в PROD совпадающего бизнеса нет, `Matching PROD business owners: NONE`.
+  Наличие DEV approval не имеет силы в PROD.
+- DEV-only #3/#4: бизнесов и событий нет, перенос аккаунта не одобрен.
+- DEV-only #5: в PROD ровно один Business с тем же УНП и именем.
+  **PROD owner: `role=USER,status=ACTIVE`, WordPress source user ID 538**;
+  email владельца *не равен* DEV-only #5. Никакого duplicate Business,
+  owner transfer или смены BusinessMember без подтверждения полномочий
+  через штатный request-access flow.
+- DEV WordPress `user:43`: его два `PUBLISHED` Activity существуют
+  в PROD с совпадениями source, slug и title. **PROD owner у обеих —
+  `ADMIN,status=ACTIVE`, без WP user source lineage**. Даже после
+  восстановления User 43 *не переназначать* их автоматически; если
+  нужна передача права управления, требуется отдельное подтверждение
+  законного владельца и проверка связанных прав.
+- DEV Business пользователя 43: `DRAFT`, без УНП и PROD совпадения;
+  **не копировать** автоматически.
+- Архивные WP users 7/17/22/42/43 остаются кандидатами на
+  **отдельное** восстановление User с безопасными правами. Готовый
+  CLI в данном PR разрешает только user:43. Список допусков и
+  транзакционный write path для остальных ещё не расширены.
+
+**Ни один PROD User, Business, BusinessMember, Activity не менялся.**
+
 ## Итог overlap-аудита 2026-11-02 (read-only)
 
 Вторичный операторский аудит `scripts/migration-dev-only-ownership-overlap-audit.py` подтвердил:
