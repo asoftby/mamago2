@@ -115,9 +115,13 @@ def postgres_url(user: str, password: str, port: int, db: str) -> str:
     )
 
 
-def main() -> int:
-    if len(sys.argv) != 1:
-        raise RuntimeError("This helper accepts no flags; only safe preview is supported")
+def main(cli_args: list[str] | None = None, input_text: str | None = None) -> int:
+    if cli_args is None:
+        if len(sys.argv) != 1:
+            raise RuntimeError("This helper accepts no flags; only safe preview is supported")
+        cli_args = ["pnpm", "migration:user:exclusion-backfill", "--preview", "--confirm-production"]
+    if "--confirm-writes" in cli_args or "--preview" not in cli_args:
+        raise RuntimeError("This SSH helper only supports read-only preview commands")
     if shutil.which("pnpm") is None:
         raise RuntimeError("pnpm is unavailable")
     if not (ROOT / "scripts/migration-user-exclusion-backfill.ts").exists():
@@ -168,10 +172,9 @@ def main() -> int:
         )
         print("DEV and PROD SSH forwards established; read-only preview only.", flush=True)
         result = subprocess.run(
-            [
-                "pnpm", "migration:user:exclusion-backfill",
-                "--preview", "--confirm-production",
-            ],
+            cli_args,
+            input=input_text,
+            text=input_text is not None,
             cwd=ROOT, env=env, check=False,
         )
         return result.returncode
