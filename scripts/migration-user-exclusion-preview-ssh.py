@@ -27,20 +27,47 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def remote(command: str) -> bytes:
-    completed = subprocess.run(
-        ["ssh", "-o", "BatchMode=yes", SSH_ALIAS, command],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        timeout=30,
-        check=False,
-    )
-    if completed.returncode:
-        # Never print remote stdout: it could contain a database password.
+    """Use a reused SSH connection; retry bounded transport problems once.
+
+    Captured stdout may contain credentials, so NEVER print stdout, stderr,
+    or the command argument (including on subprocess.TimeoutExpired).
+    """
+    for attempt in range(2):
+        try:
+            completed = subprocess.run(
+                [
+                    "ssh", "-o", "BatchMode=yes",
+                    "-o", "ConnectTimeout=15",
+                    "-o", "ControlMaster=auto",
+                    "-o", "ControlPath=/tmp/mamago-preview-%C",
+                    "-o", "ControlPersist=90",
+                    "-o", "ServerAliveInterval=10",
+                    "-o", "ServerAliveCountMax=3",
+                    "-T", SSH_ALIAS, command,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=75,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            if attempt == 0:
+                time.sleep(2)
+                continue
+            raise RuntimeError(
+                "SSH read-only metadata request timed out twice; "
+                "verify SSH/Docker connectivity before retrying"
+            ) from None
+        if completed.returncode == 0:
+            return completed.stdout
+        if completed.returncode == 255 and attempt == 0:
+            time.sleep(2)
+            continue
         raise RuntimeError(
-            f"SSH remote setup failed (exit {completed.returncode}); "
-            "verify SSH alias and Docker containers locally"
+            f"SSH metadata request failed (exit {completed.returncode}); "
+            "check the SSH alias, remote Docker and container state"
         )
-    return completed.stdout
+    raise RuntimeError("SSH read-only metadata request failed")
 
 
 def container_config(container: str, expected_database: str) -> tuple[str, str, str, str]:
@@ -105,6 +132,7 @@ def main() -> int:
 
     ssh_args = [
         "ssh", "-o", "BatchMode=yes",
+        "-o", "ConnectTimeout=15",
         "-o", "ExitOnForwardFailure=yes",
         "-o", "ServerAliveInterval=15",
         "-o", "ServerAliveCountMax=3",
@@ -119,7 +147,7 @@ def main() -> int:
         stderr=subprocess.DEVNULL,
     )
     try:
-        for _ in range(40):
+        for _ in range(120):
             if ssh.poll() is not None:
                 raise RuntimeError("SSH tunnel terminated; check SSH alias and forwarding permissions")
             try:
