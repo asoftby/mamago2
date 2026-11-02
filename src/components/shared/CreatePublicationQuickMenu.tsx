@@ -132,7 +132,7 @@ const BUSINESS_INTENTS: Item[] = [
   {
     id: "classes",
     kind: "link",
-    href: "/editor/offer/new",
+    href: "/editor/offer/new?creationIntent=classes",
     label: "Занятия и кружки",
     description: "Регулярные занятия, секции, курсы и обучение",
     Icon: GraduationCap,
@@ -140,7 +140,7 @@ const BUSINESS_INTENTS: Item[] = [
   {
     id: "party-service",
     kind: "link",
-    href: "/editor/offer/new",
+    href: "/editor/offer/new?creationIntent=parties",
     label: "Дни рождения и услуги",
     description: "Аниматоры, шоу и праздничные программы на заказ",
     Icon: PartyPopper,
@@ -148,7 +148,7 @@ const BUSINESS_INTENTS: Item[] = [
   {
     id: "camps",
     kind: "link",
-    href: "/editor/offer/new",
+    href: "/editor/offer/new?creationIntent=camps",
     label: "Лагеря и каникулы",
     description: "Смены, программы и отдых на каникулах",
     Icon: Sun,
@@ -224,7 +224,8 @@ export function CreatePublicationQuickMenu({
 
             const params = new URLSearchParams();
             params.set("returnTo", currentSurfaceReturnTo);
-            return `${item.href}?${params.toString()}`;
+            const separator = item.href.includes("?") ? "&" : "?";
+            return `${item.href}${separator}${params.toString()}`;
           })();
 
           return (
