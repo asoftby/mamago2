@@ -13,7 +13,6 @@ import { readFileSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
 
 import {
-  buildUserCanonicalHash,
   maskEmail,
   normalizeUserCandidate,
   normalizeUserEmail,
