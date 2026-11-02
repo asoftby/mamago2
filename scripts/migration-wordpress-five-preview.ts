@@ -36,13 +36,13 @@ export const FIVE_WORDPRESS_SOURCE_KEYS = [
 export const SOURCE_NAMESPACE = "wordpress-audit-20260703-recovery-1064";
 const HEX_64 = /^[0-9a-f]{64}$/;
 
-type RawUser = {
+export type RawUser = {
   sourceRecordKey: string;
   email: string;
   displayName: string;
 };
 
-type SourceInput = {
+export type SourceInput = {
   archiveSha256: string;
   sourceRecords: RawUser[];
 };
@@ -95,7 +95,7 @@ export function parseFiveUserSource(input: unknown): SourceInput {
   return { archiveSha256: source.archiveSha256, sourceRecords: normalized };
 }
 
-async function readInputFromStdin(): Promise<SourceInput> {
+export async function readInputFromStdin(): Promise<SourceInput> {
   const buffers: Buffer[] = [];
   let size = 0;
   for await (const chunk of process.stdin) {
