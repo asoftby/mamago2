@@ -158,6 +158,9 @@ jobs:
         # GitHub ubuntu runners abort TypeScript at Node's default heap ceiling.
         run: NODE_OPTIONS=--max-old-space-size=6144 pnpm tsc --noEmit
 
+      - name: WordPress excluded-user backfill safety regressions
+        run: pnpm test:migration-user-exclusion-backfill
+
       - name: Feedback model and multi-source reputation regressions
         run: pnpm test:feedback-foundation
 
