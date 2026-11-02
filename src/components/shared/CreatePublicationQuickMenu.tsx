@@ -210,7 +210,7 @@ export function CreatePublicationQuickMenu({
   };
 
   const renderItems = () => (
-    <div className="grid gap-2 pt-2 px-4 pb-4">
+    <div className="grid max-h-[min(70dvh,32rem)] gap-2 overflow-y-auto overscroll-contain px-4 pb-4 pt-2">
       {visibleItems.map((item) => {
         const { Icon } = item;
         const rowClass =
