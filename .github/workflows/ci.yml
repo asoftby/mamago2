@@ -161,6 +161,9 @@ jobs:
       - name: WordPress excluded-user backfill safety regressions
         run: pnpm test:migration-user-exclusion-backfill
 
+      - name: Safe SSH preview helper syntax
+        run: python3 -m py_compile scripts/migration-user-exclusion-preview-ssh.py
+
       - name: Feedback model and multi-source reputation regressions
         run: pnpm test:feedback-foundation
 
