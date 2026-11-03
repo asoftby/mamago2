@@ -178,6 +178,9 @@ jobs:
       - name: Feedback model and multi-source reputation regressions
         run: pnpm test:feedback-foundation
 
+      - name: Business phone duplicate error regression
+        run: pnpm exec tsx src/lib/phone-verification/businessContactVerification.shared.test.ts
+
       - name: Business onboarding progress regressions
         run: pnpm exec tsx src/lib/business/onboardingProgress.test.ts
         env:
