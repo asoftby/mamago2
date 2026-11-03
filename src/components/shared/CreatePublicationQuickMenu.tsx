@@ -118,7 +118,7 @@ const BUSINESS_INTENTS: Item[] = [
     kind: "link",
     href: "/editor/event/new",
     label: "Мероприятие",
-    description: "Спектакль, экскурсия или мастер-класс на конкретную дату",
+    description: "Спектакли, экскурсии и мастер-классы с конкретной датой и временем",
     Icon: Calendar,
   },
   {
@@ -126,7 +126,7 @@ const BUSINESS_INTENTS: Item[] = [
     kind: "link",
     href: "/editor/place/new",
     label: "Страница места",
-    description: "Добавить музей, кафе, игровую комнату или другую площадку",
+    description: "Музей, кафе, игровая комната или другая площадка с собственной страницей",
     Icon: MapPin,
   },
   {
@@ -134,7 +134,7 @@ const BUSINESS_INTENTS: Item[] = [
     kind: "link",
     href: "/editor/offer/new?creationIntent=place",
     label: "Предложение о посещении",
-    description: "Билеты, стоимость, часы посещения и запись в место",
+    description: "Билеты, цены, расписание и запись на посещение вашего места",
     Icon: Tag,
   },
   {
@@ -142,7 +142,7 @@ const BUSINESS_INTENTS: Item[] = [
     kind: "link",
     href: "/editor/offer/new?creationIntent=classes",
     label: "Занятия и кружки",
-    description: "Регулярные занятия, секции, курсы и обучение",
+    description: "Кружки, секции, курсы, разовые и регулярные занятия для детей",
     Icon: GraduationCap,
   },
   {
@@ -150,7 +150,7 @@ const BUSINESS_INTENTS: Item[] = [
     kind: "link",
     href: "/editor/offer/new?creationIntent=parties",
     label: "Дни рождения и услуги",
-    description: "Аниматоры, шоу и праздничные программы на заказ",
+    description: "Аниматоры, шоу, отдельные услуги и готовые праздничные программы",
     Icon: PartyPopper,
   },
   {
@@ -158,7 +158,7 @@ const BUSINESS_INTENTS: Item[] = [
     kind: "link",
     href: "/editor/offer/new?creationIntent=camps",
     label: "Лагеря и каникулы",
-    description: "Смены, программы и отдых на каникулах",
+    description: "Детские лагеря, смены, программы и отдых во время каникул",
     Icon: Sun,
   },
 ];
@@ -223,6 +223,7 @@ export function CreatePublicationQuickMenu({
         const { Icon } = item;
         const rowClass =
           "flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-4 text-left transition-colors hover:bg-gray-50 hover:border-gray-300";
+        const itemRowClass = cn(rowClass, publicationMode === "business" && "min-h-[104px] items-center");
 
         if (item.kind === "link") {
           const href = (() => {
@@ -241,7 +242,7 @@ export function CreatePublicationQuickMenu({
               key={item.id}
               href={href}
               onClick={() => setOpen(false)}
-              className={rowClass}
+              className={itemRowClass}
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <Icon className="h-5 w-5" />
@@ -251,7 +252,7 @@ export function CreatePublicationQuickMenu({
                   {item.label}
                 </span>
                 {item.description ? (
-                  <span className="block text-[12px] text-muted-foreground">
+                  <span className={cn("block text-[12px] text-muted-foreground", publicationMode === "business" && "line-clamp-2 min-h-10 max-w-[260px] leading-5")}>
                     {item.description}
                   </span>
                 ) : null}
@@ -265,7 +266,7 @@ export function CreatePublicationQuickMenu({
             key={item.id}
             type="button"
             onClick={() => goAdminPublication(item.publicationType)}
-            className={cn(rowClass, "w-full")}
+            className={cn(itemRowClass, "w-full")}
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Icon className="h-5 w-5" />
@@ -275,7 +276,7 @@ export function CreatePublicationQuickMenu({
                 {item.label}
               </span>
               {item.description ? (
-                <span className="block text-[12px] text-muted-foreground">
+                <span className={cn("block text-[12px] text-muted-foreground", publicationMode === "business" && "line-clamp-2 min-h-10 max-w-[260px] leading-5")}>
                   {item.description}
                 </span>
               ) : null}
