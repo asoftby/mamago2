@@ -324,7 +324,7 @@ export function OfferWizard({
   const [currentStepKey, setCurrentStepKey] = useState<OfferWizardStepKey>(() => {
     if (mode !== "edit" || !offer || initialStepNumber == null || initialStepNumber < 1) {
       return mode === "create" && creationIntent
-        ? (variant === "v2" ? "about" : "details")
+        ? (variant === "v2" ? "about" : creationIntent === "parties" ? "placements" : "details")
         : "type";
     }
     const fd = mapOfferToFormData(offer);
@@ -862,13 +862,20 @@ export function OfferWizard({
         case "type":
           return <Step1Type {...commonProps} showCategories={variant === "v2"} />;
         case "placements":
-          return <Step2Placements {...commonProps} showAdditionalPlacements={variant !== "v2"} />;
+          return (
+            <div className="space-y-6">
+              {variant === "v1" && mode === "create" && creationIntent === "parties" && (
+                <OfferSubtypeClarifier group="parties" data={formData} onChange={handleChange} />
+              )}
+              <Step2Placements {...commonProps} showAdditionalPlacements={variant !== "v2"} />
+            </div>
+          );
         case "details":
           return (
             <div className="space-y-6">
               {variant === "v1" && mode === "create" &&
-                (creationIntent === "classes" || creationIntent === "parties") && (
-                  <OfferSubtypeClarifier group={creationIntent} data={formData} onChange={handleChange} />
+                creationIntent === "classes" && (
+                  <OfferSubtypeClarifier group="classes" data={formData} onChange={handleChange} />
                 )}
               <Step2Information {...commonProps} v2={variant === "v2"} />
             </div>
