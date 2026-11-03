@@ -63,10 +63,20 @@ function upcomingSaturdayIso(fromIso: string): string {
   return `${yy}-${mm}-${dd}`;
 }
 
-function slotStartsAt(dateIso: string, slot: GuestSlot): Date {
-  const hour = slot === "morning" ? 10 : slot === "afternoon" ? 14 : 18;
-  const [y, m, d] = dateIso.split("-").map(Number);
-  return new Date(y, (m ?? 1) - 1, d ?? 1, hour, 0, 0);
+/** Never turn a UI list slot into a fabricated event time. */
+function confirmedGuestStartsAt(activity: NonNullable<MyPlanIdea["activity"]>): Date | null {
+  const value = (activity as typeof activity & { suggestedStartsAt?: string | null }).suggestedStartsAt;
+  if (!value) return null;
+  const at = new Date(value);
+  return Number.isNaN(at.getTime()) ? null : at;
+}
+
+function minskGuestDay(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Minsk", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(date);
+  const part = (type: string) => parts.find((p) => p.type === type)!.value;
+  return part("year") + "-" + part("month") + "-" + part("day");
 }
 
 function activityToPlanItem(
@@ -74,13 +84,14 @@ function activityToPlanItem(
   slot: GuestSlot,
   activity: NonNullable<MyPlanIdea["activity"]>,
 ): PlanItemWithActivity {
+  const actualStart = confirmedGuestStartsAt(activity);
   return {
-    /** Стабильный id по слоту и дате — чтобы карточка после «В план» не считалась новым элементом */
+    /** Stable draft ID; slot is a list position, not an event start time. */
     id: `guest-${activity.id}-${slot}-${dateIso}`,
     userId: "guest",
     activityId: activity.id,
-    date: dateIso,
-    startsAt: slotStartsAt(dateIso, slot),
+    date: actualStart ? minskGuestDay(actualStart) : dateIso,
+    startsAt: actualStart,
     title: activity.title,
     coverImageUrl: activity.coverImageUrl ?? null,
     createdAt: new Date(),
@@ -128,8 +139,9 @@ export function GuestMyPlanPanel({
   const [refetchForWeekend, setRefetchForWeekend] = useState(false);
 
   const [freeSearch, setFreeSearch] = useState(false);
-  const [goAdult, setGoAdult] = useState(true);
+  const [goAdult, setGoAdult] = useState(false);
   const [kidRanges, setKidRanges] = useState<string[]>([]);
+  const whoKey: "kids" | "me" | "any" = freeSearch ? "any" : goAdult ? "me" : "kids";
 
   const [whenChoice, setWhenChoice] = useState<"today" | "tomorrow" | "weekend">(
     "today",
@@ -138,6 +150,7 @@ export function GuestMyPlanPanel({
     "any",
   );
   const [interests, setInterests] = useState<string[]>([]);
+  const [showInterests, setShowInterests] = useState(false);
 
   const [scenarioSlots, setScenarioSlots] = useState<
     Array<{ slot: GuestSlot; activity: NonNullable<MyPlanIdea["activity"]> }>
@@ -150,6 +163,8 @@ export function GuestMyPlanPanel({
   const [engagementActionCount, setEngagementActionCount] = useState(0);
   /** Не даём отправить второй POST до завершения первого (иначе быстро расходуется rate limit). */
   const scenarioGenerationInFlightRef = useRef(false);
+  /** Restored empty drafts retry once; a real failed/empty response never loops. */
+  const scenarioRequestAttemptedRef = useRef(false);
 
   /** Остаток подборок с сервера (null — ещё не было успешного ответа) */
   const [guestRemainingGenerations, setGuestRemainingGenerations] = useState<
@@ -182,7 +197,7 @@ export function GuestMyPlanPanel({
       setAuthGateVisible(false);
       setEngagementActionCount(0);
       setFreeSearch(false);
-      setGoAdult(true);
+      setGoAdult(false);
       setKidRanges([]);
       setWhenChoice("today");
       setFormatChoice("any");
@@ -195,7 +210,7 @@ export function GuestMyPlanPanel({
       restoreDoneRef.current = true;
       return;
     }
-    setPhase(draft.phase);
+    setPhase(draft.phase === "engaged" ? "generated" : draft.phase);
     setAuthGateVisible(draft.authGateVisible);
     setEngagementActionCount(draft.engagementActionCount);
     setFreeSearch(draft.freeSearch);
@@ -204,15 +219,82 @@ export function GuestMyPlanPanel({
     setWhenChoice(draft.whenChoice);
     setFormatChoice(draft.formatChoice);
     setInterests(Array.isArray(draft.interests) ? draft.interests : []);
-    setScenarioSlots(draft.scenarioSlots);
-    setCommittedBySlot(reviveCommittedFromDraft(draft));
     setGuestRemainingGenerations(draft.guestRemainingGenerations);
     setGuestQuotaBlocked(draft.guestQuotaBlocked);
     if (draft.selectedPlanDateIso) {
       setSelectedPlanDate(draft.selectedPlanDateIso);
     }
-    restoreDoneRef.current = true;
-  }, [citySlug, setSelectedPlanDate]);
+
+    // Stored v1 drafts predate real session timestamps. Verify ALL restored
+    // cards against live published occurrences, including chosen cards, without
+    // spending another limited generation or creating recommendation exposures.
+    const chosen = reviveCommittedFromDraft(draft);
+    const ids = [...new Set([
+      ...draft.scenarioSlots.map((row) => row.activity.id),
+      ...Object.values(chosen).flatMap((item) => item?.activityId ? [item.activityId] : []),
+    ])].slice(0, 12);
+    if (!ids.length) {
+      setScenarioSlots([]);
+      setCommittedBySlot({});
+      restoreDoneRef.current = true;
+      return;
+    }
+
+    let active = true;
+    scenarioRequestAttemptedRef.current = true;
+    setLoadingScenario(true);
+    setScenarioSlots([]);
+    setCommittedBySlot({});
+    const selectedDay = draft.selectedPlanDateIso ?? todayIso;
+    void (async () => {
+      try {
+        const response = await fetch("/api/plan/guest-draft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ids,
+            date: selectedDay,
+            ...(draft.whenChoice === "weekend" ? { dateTo: addDaysIso(selectedDay, 1) } : {}),
+          }),
+        });
+        if (!response.ok) throw new Error("draft_revalidation_unavailable");
+        const result = (await response.json()) as { occurrences?: Record<string, string> };
+        if (!active) return;
+        const times = result.occurrences ?? {};
+        const validated = draft.scenarioSlots.flatMap((row) => {
+          const startsAt = times[row.activity.id];
+          return startsAt ? [{ ...row, activity: { ...row.activity, suggestedStartsAt: startsAt } }] : [];
+        });
+        const validatedChosen: Partial<Record<GuestSlot, PlanItemWithActivity>> = {};
+        for (const slot of ["morning", "afternoon", "evening"] as const) {
+          const item = chosen[slot];
+          const startsAt = item?.activityId ? times[item.activityId] : null;
+          if (!item || !startsAt) continue;
+          const actual = new Date(startsAt);
+          validatedChosen[slot] = {
+            ...item,
+            startsAt: actual,
+            date: minskGuestDay(actual),
+            activity: item.activity ? ({ ...item.activity, suggestedStartsAt: startsAt } as NonNullable<MyPlanIdea["activity"]>) : item.activity,
+          };
+        }
+        setScenarioSlots(validated);
+        setCommittedBySlot(validatedChosen);
+        if (draft.phase === "engaged" && Object.keys(validatedChosen).length > 0) setPhase("engaged");
+      } catch {
+        if (active) {
+          setPhase(draft.phase === "engaged" ? "generated" : draft.phase);
+          toast.error("Не удалось проверить старые события. Обновите подборку.");
+        }
+      } finally {
+        if (active) {
+          restoreDoneRef.current = true;
+          setLoadingScenario(false);
+        }
+      }
+    })();
+    return () => { active = false; };
+  }, [citySlug, setSelectedPlanDate, todayIso]);
 
   useEffect(() => {
     if (!restoreDoneRef.current) return;
@@ -286,6 +368,7 @@ export function GuestMyPlanPanel({
         return;
       }
       scenarioGenerationInFlightRef.current = true;
+      scenarioRequestAttemptedRef.current = true;
       if (opts?.showGeneratedShellFirst) {
         setPhase((p) => (p === "engaged" ? "engaged" : "generated"));
       }
@@ -307,8 +390,9 @@ export function GuestMyPlanPanel({
             anonymousId: anonymousId || undefined,
             city: citySlug,
             date: resolvedTargetDate,
+            ...(whenChoice === "weekend" ? { dateTo: addDaysIso(resolvedTargetDate, 1) } : {}),
             exclude,
-            ageRanges: kidRanges.slice().sort(),
+            ageRanges: whoKey === "me" ? ["18+"] : whoKey === "kids" ? kidRanges.slice().sort() : [],
             ...(interests.length > 0 ? { interests } : {}),
           }),
         });
@@ -350,8 +434,7 @@ export function GuestMyPlanPanel({
         }
 
         const raw = Array.isArray(data.suggestions) ? data.suggestions : [];
-        let merged = normalizePlanSuggestions(raw, 6);
-        if (formatChoice === "active") merged = [...merged].reverse();
+        const merged = normalizePlanSuggestions(raw, 6);
         const distributed = distributeActivitiesToSlots(merged.slice(0, 6));
 
         setScenarioSlots(distributed);
@@ -370,10 +453,11 @@ export function GuestMyPlanPanel({
     },
     [
       citySlug,
-      formatChoice,
       guestCanGenerateMore,
       interests,
       kidRanges,
+      whoKey,
+      whenChoice,
       resolvedTargetDate,
       setSelectedPlanDate,
     ],
@@ -391,6 +475,10 @@ export function GuestMyPlanPanel({
       const target = committedRef.current[slot]
         ? (order.find((sk) => !committedRef.current[sk]) ?? slot)
         : slot;
+      if (!confirmedGuestStartsAt(activity)) {
+        toast.error("Время события не подтверждено. Подберите другие варианты.");
+        return;
+      }
       const item = activityToPlanItem(resolvedTargetDate, target, activity);
       setCommittedBySlot((prev) => ({ ...prev, [target]: item }));
       recordEngagement();
@@ -416,7 +504,7 @@ export function GuestMyPlanPanel({
   useEffect(() => {
     if (!restoreDoneRef.current) return;
     if (phase !== "generated") return;
-    if (scenarioSlots.length > 0) return;
+    if (scenarioSlots.length > 0 || scenarioRequestAttemptedRef.current) return;
     if (loadingScenario) return;
     if (!guestCanGenerateMore) return;
     void fetchScenario();
@@ -470,18 +558,11 @@ export function GuestMyPlanPanel({
     { key: "me", label: "Для себя" },
     { key: "any", label: "Без разницы" },
   ];
-  const whoKey: "kids" | "me" | "any" = freeSearch ? "any" : goAdult ? "me" : "kids";
   const pickWho = (key: "kids" | "me" | "any") => {
     setFreeSearch(key === "any");
     setGoAdult(key === "me");
     if (key !== "kids") setKidRanges([]);
   };
-  const MOOD_OPTIONS: Array<{ key: "calm" | "active" | "any"; label: string }> = [
-    { key: "calm", label: "Спокойно" },
-    { key: "active", label: "Активно" },
-    { key: "any", label: "Без разницы" },
-  ];
-  const MOOD_TEXT = { calm: "спокойно", active: "активно", any: "любое настроение" } as const;
   const summaryText = (() => {
     const who =
       whoKey === "kids"
@@ -491,7 +572,7 @@ export function GuestMyPlanPanel({
           : "С кем угодно";
     const w = WHEN_OPTIONS.find((o) => o.key === whenChoice)!;
     const it = interests.map((k) => getSystemInterestLabel(k).toLowerCase()).join(", ");
-    return `${who} · ${w.label}, ${w.sub} · ${MOOD_TEXT[formatChoice]}${it ? ` · ${it}` : ""}`;
+    return `${who} · ${w.label}, ${w.sub}${it ? ` · ${it}` : ""}`;
   })();
   const quizValid = !(whoKey === "kids" && kidRanges.length === 0);
 
@@ -538,6 +619,7 @@ export function GuestMyPlanPanel({
         key={`${row.slot}-${row.activity.id}`}
         item={item}
         isInPlan={Boolean(committed)}
+        guestDraft
         onAddToPlan={() => void handleAddScenarioToPlan(row.slot, row.activity)}
         onRemoveFromPlan={() => committed && handleRemoveCommitted(committed.sk)}
       />
@@ -553,7 +635,7 @@ export function GuestMyPlanPanel({
     body = (
       <>
         <p className="mb-[22px] text-[15px] leading-[1.5] text-[var(--mp-tx2)]">
-          Подберём, куда сходить. Пара вопросов — и&nbsp;покажем варианты из&nbsp;афиши.
+          Соберём план на день из мероприятий с подтверждённым временем.
         </p>
         <div className="mb-[26px]">
           <div className="mb-[11px] text-[17px] font-bold tracking-[-.01em] text-[var(--mp-tx)]">С кем идёте?</div>
@@ -609,36 +691,26 @@ export function GuestMyPlanPanel({
             })}
           </div>
         </div>
-        <div className="mb-[26px]">
-          <div className="mb-[11px] text-[17px] font-bold tracking-[-.01em] text-[var(--mp-tx)]">Какое настроение?</div>
-          <div className="flex flex-wrap gap-2">
-            {MOOD_OPTIONS.map((o) => (
-              <button key={o.key} type="button" aria-pressed={formatChoice === o.key} onClick={() => setFormatChoice(o.key)} className={chipClass(formatChoice === o.key)}>
-                {o.label}
-              </button>
-            ))}
-          </div>
-        </div>
         <div>
-          <div className="mb-[11px] text-[17px] font-bold tracking-[-.01em] text-[var(--mp-tx)]">
-            Интересы <span className="ml-1.5 text-[13px] font-medium tracking-normal text-[var(--mp-tx2)]">необязательно</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {QUIZ_INTEREST_SLUGS.map((slug) => {
-              const on = interests.includes(slug);
-              return (
-                <button
-                  key={slug}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => setInterests((prev) => (on ? prev.filter((x) => x !== slug) : [...prev, slug]))}
-                  className={chipClass(on)}
-                >
-                  {getSystemInterestLabel(slug)}
-                </button>
-              );
-            })}
-          </div>
+          <button type="button" aria-expanded={showInterests}
+            onClick={() => setShowInterests((prev) => !prev)}
+            className="min-h-11 text-left text-sm font-semibold text-[var(--mp-ac-dark)]">
+            {showInterests ? "Скрыть интересы" : interests.length > 0 ? `Интересы выбраны: ${interests.length} · Изменить` : "Уточнить по интересам (необязательно)"}
+          </button>
+          {showInterests ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {QUIZ_INTEREST_SLUGS.map((slug) => {
+                const on = interests.includes(slug);
+                return (
+                  <button key={slug} type="button" aria-pressed={on}
+                    onClick={() => setInterests((prev) => (on ? prev.filter((x) => x !== slug) : [...prev, slug]))}
+                    className={chipClass(on)}>
+                    {getSystemInterestLabel(slug)}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       </>
     );
@@ -688,7 +760,7 @@ export function GuestMyPlanPanel({
     if (committedCount > 0) {
       footer = (
         <button type="button" className={primaryBtn} onClick={() => setPhase("engaged")}>
-          В плане: {committedCount}
+          Выбрано: {committedCount}
           <span className="opacity-55">·</span>
           Дальше
           <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
@@ -696,7 +768,7 @@ export function GuestMyPlanPanel({
       );
     }
   } else if (screen === "empty") {
-    const kind = formatChoice === "active" ? "Активных занятий" : formatChoice === "calm" ? "Спокойных занятий" : "Подходящих событий";
+    const kind = "Подходящих событий";
     const whenText = whenChoice === "today" ? "сегодня" : whenChoice === "tomorrow" ? "завтра" : "на выходные";
     const ages = KID_AGE_GROUPS.filter((g) => kidRanges.includes(g.value)).map((g) => g.label);
     head = <PlanScreenHead back="Ответы" onBack={() => setPhase("onboarding")} />;
@@ -747,7 +819,7 @@ export function GuestMyPlanPanel({
     head = <PlanScreenHead back="Варианты" onBack={() => setPhase("generated")} />;
     body = (
       <>
-        <h3 className="mb-3.5 text-[22px] font-bold leading-[1.2] tracking-[-.02em] text-[var(--mp-tx)]">Ваш план</h3>
+        <h3 className="mb-3.5 text-[22px] font-bold leading-[1.2] tracking-[-.02em] text-[var(--mp-tx)]">Черновик плана</h3>
         <div className="mb-4 flex items-start gap-2.5 rounded-[14px] bg-[var(--mp-soft)] px-3.5 py-3 text-[13.5px] leading-[1.45] text-[var(--mp-tx2)]">
           <Info className="mt-px h-[18px] w-[18px] shrink-0" aria-hidden />
           <span>Пока сохранён только в&nbsp;этом браузере. Войдите, чтобы он&nbsp;не&nbsp;потерялся.</span>
@@ -836,11 +908,8 @@ export function GuestMyPlanPanel({
             onClick={(event) => event.stopPropagation()}
           >
             <span className="mx-auto mb-4 block h-[5px] w-[38px] rounded-full bg-[var(--border-strong)]" />
-            <h3 className="mb-1.5 text-[23px] font-bold leading-[1.2] tracking-[-.02em] text-[var(--mp-tx)]">Сохраним ваш план</h3>
-            <p className="mb-2.5 text-[15px] leading-[1.5] text-[var(--mp-tx2)]">Войдите — и&nbsp;план будет с&nbsp;вами везде.</p>
-            {benefit(<Monitor className="h-5 w-5" aria-hidden />, <>Откроется на&nbsp;любом устройстве</>)}
-            {benefit(<Bell className="h-5 w-5" aria-hidden />, <>Напомним о&nbsp;событиях вовремя</>)}
-            {benefit(<Repeat2 className="h-5 w-5" aria-hidden />, <>Всё выбранное перенесём сами</>)}
+            <h3 className="mb-1.5 text-[23px] font-bold leading-[1.2] tracking-[-.02em] text-[var(--mp-tx)]">Сохранить план</h3>
+            <p className="mb-2.5 text-[15px] leading-[1.5] text-[var(--mp-tx2)]">Черновик уже на этом устройстве. Войдите, чтобы перенести выбранные события в семейный план и открывать его везде.</p>
             <Link href={loginHref} className={cn(primaryBtn, "mt-4 no-underline")}>
               Войти или создать аккаунт
             </Link>
@@ -859,6 +928,9 @@ function summaryDateLine(item: PlanItemWithActivity): string {
   if (!src) return "";
   const d = src instanceof Date ? src : new Date(src);
   if (Number.isNaN(d.getTime())) return "";
-  const day = d.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" }).replace(/\./g, "");
-  return item.activity?.ageLabel ? `${day} · ${item.activity.ageLabel}` : day;
+  const day = d.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Minsk" }).replace(/\./g, "");
+  const time = item.startsAt
+    ? item.startsAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Minsk" })
+    : "время уточняется";
+  return [day, time, item.activity?.ageLabel].filter(Boolean).join(" · ");
 }
