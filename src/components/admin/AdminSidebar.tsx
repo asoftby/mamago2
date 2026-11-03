@@ -17,6 +17,7 @@ import { ADMIN_PATH_PREFIX } from "@/lib/routing/surface";
 import type { BuildInfo } from "@/lib/system/buildInfo";
 
 interface AdminSidebarProps {
+  userRole?: "ADMIN" | "MODERATOR";
   onNavigate?: () => void;
   moderationCounts: ModerationNavCounts;
   b2bPendingVerificationCount?: number;
@@ -107,6 +108,7 @@ function hasPendingInChildren(
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function AdminSidebar({
+  userRole = "MODERATOR",
   onNavigate,
   moderationCounts,
   b2bPendingVerificationCount = 0,
@@ -213,6 +215,7 @@ export function AdminSidebar({
         <SidebarPublicSiteEntry onNavigate={onNavigate} />
 
         {ADMIN_SIDEBAR_CONFIG.map((entry) => {
+          if (entry.id === "crm" && userRole !== "ADMIN") return null;
           if (isGroupEntry(entry)) {
             // AdminSidebarGroup — collapsible with no own href
             const groupHasActive = getTopLevelChildren(entry).some((child) =>

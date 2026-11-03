@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import type { BuildInfo } from "@/lib/system/buildInfo";
 
 interface AdminHeaderProps {
+  userRole?: "ADMIN" | "MODERATOR";
   userEmail?: string;
   /** Как в личном кабинете: из профиля пользователя, иначе показываем префикс email */
   userDisplayName?: string | null;
@@ -33,6 +34,7 @@ interface AdminHeaderProps {
 }
 
 export function AdminHeader({
+  userRole = "MODERATOR",
   userEmail,
   userDisplayName,
   hasApprovedBusinessProfile = false,
@@ -171,6 +173,7 @@ export function AdminHeader({
         showCloseButton={true}
       >
         <AdminSidebar
+          userRole={userRole}
           moderationCounts={moderationCounts}
           b2bPendingVerificationCount={b2bPendingVerificationCount}
           importPendingReviewCount={importPendingReviewCount}
