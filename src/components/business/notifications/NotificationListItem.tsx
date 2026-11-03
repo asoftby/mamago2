@@ -48,6 +48,7 @@ function resolveNavigableCtaLabel(type: string): string {
     case "PLACE_REJECTED":
     case "PLACE_UPDATE_APPROVED":
     case "PLACE_UPDATE_NEEDS_REVISION":
+    case "PLACE_IMPROVEMENT_REQUESTED":
     case "PLACE_UPDATE_REJECTED":
     case "OFFER_APPROVED":
     case "OFFER_NEEDS_CHANGES":
