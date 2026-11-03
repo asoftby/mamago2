@@ -21,7 +21,8 @@ import {
   findMostRecentSubjectsSnapshot,
   recordPlanAudienceSnapshot,
 } from "@/lib/decision/subjects";
-import { readOptionalSafeOpaqueId } from "@/lib/decision/identifiers";
+import { saveHomeEventPlan } from "@/server/services/recommendations/familyPicks/homePlanAdd";
+import { parseSafeOpaqueId, readOptionalSafeOpaqueId } from "@/lib/decision/identifiers";
 import { planScopeFor } from "@/server/family/familyAccess";
 import { familyReadsEnabled } from "@/server/family/familyScope";
 import type { PlanVisibility } from "@prisma/client";
@@ -100,8 +101,10 @@ export async function POST(request: NextRequest) {
         ? visibilityRaw
         : undefined;
 
-    const anonymousIdParsed = readOptionalSafeOpaqueId(anonymousId);
-    const exposureIdParsed = readOptionalSafeOpaqueId(recommendationExposureId);
+    const isHomePlanSource = planAddSource === "home-family-picks";
+    // Invalid Home attribution must never block saving the plan or fall back to another surface.
+    const anonymousIdParsed = isHomePlanSource ? { ok: true as const, value: null } : readOptionalSafeOpaqueId(anonymousId);
+    const exposureIdParsed = isHomePlanSource ? { ok: true as const, value: parseSafeOpaqueId(recommendationExposureId) } : readOptionalSafeOpaqueId(recommendationExposureId);
     if (!anonymousIdParsed.ok || !exposureIdParsed.ok) {
       return NextResponse.json({ error: "invalid_identifier" }, { status: 400 });
     }
@@ -131,7 +134,7 @@ export async function POST(request: NextRequest) {
 
     // Offers must never create rows with an invalid calendar date.
     // Leave the existing activity/place/route validation contracts unchanged.
-    if (offerId) {
+    if (offerId || isHomePlanSource) {
       try {
         validateFamilyCalendarRange(date, date);
       } catch {
@@ -152,6 +155,7 @@ export async function POST(request: NextRequest) {
         ? { subjects, decisionContextVersion: 1 as const, selectedPersonaIds: personaIds }
         : {};
     let planItem;
+    let homeAttributionStatus: "recorded" | "unattributed" | "unavailable" | "existing" | undefined;
 
     if (offerId) {
       planItem = await addOfferPlanItem(user.id, offerId, date, { visibility });
@@ -235,59 +239,67 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      planItem = await addPlanItem(
-        user.id,
-        activityId,
-        date,
-        resolvedStartsAt,
-        title ?? undefined,
-        coverImageUrl ?? undefined,
-        visibility,
-      );
+      if (isHomePlanSource) {
+        const saved = await saveHomeEventPlan({ userId: user.id, activityId, date,
+          startsAt: resolvedStartsAt, title: title ?? undefined,
+          coverImageUrl: coverImageUrl ?? undefined, visibility,
+          exposureId: validRecommendationExposureId,
+          sessionId: await getSessionRowIdFromCookies(),
+          cityId: await getActivityCityIdForAnalytics(activityId),
+          dateMeta: planDateMeta, subjectsMeta });
+        planItem = saved.planItem;
+        homeAttributionStatus = saved.attributionStatus;
+      } else {
+        planItem = await addPlanItem(user.id, activityId, date, resolvedStartsAt,
+          title ?? undefined, coverImageUrl ?? undefined, visibility);
+      }
 
       if (planItem.created) {
-        const cityId = await getActivityCityIdForAnalytics(activityId);
-        const sessionRowId = await getSessionRowIdFromCookies();
-        const sourceTag =
-          planAddSource === "recommendation"
-            ? ("recommendation" as const)
-            : planAddSource === "idea"
-              ? ("plan" as const)
-              : ("detail" as const);
-        void trackUserEvent({
-          userId: user.id,
-          sessionId: sessionRowId,
-          anonymousId: validAnonymousId,
-          eventType: "PLAN_ADD",
-        planVisibility: visibility,
-          entityType: "EVENT",
-          entityId: activityId,
-          vertical: "CITY",
-          cityId,
-          meta: {
-            source: sourceTag,
-            section: "afisha",
-            targetAction: "plan",
-            planItemId: planItem.id,
-            ...planDateMeta,
-            ...(planAddSource === "recommendation" || planAddSource === "idea"
-              ? { planAddSource }
-              : {}),
-            ...(sourceTag === "recommendation" && validRecommendationExposureId
-              ? { recommendationExposureId: validRecommendationExposureId }
-              : {}),
-            ...subjectsMeta,
-          },
-        });
-        if (sourceTag === "recommendation") {
-          void trackFirstOccurrenceEvent({
+        if (!isHomePlanSource) {
+          const cityId = await getActivityCityIdForAnalytics(activityId);
+          const sessionRowId = await getSessionRowIdFromCookies();
+          const sourceTag =
+            planAddSource === "recommendation"
+              ? ("recommendation" as const)
+              : planAddSource === "idea"
+                ? ("plan" as const)
+                : ("detail" as const);
+          void trackUserEvent({
             userId: user.id,
             sessionId: sessionRowId,
-            eventType: "FIRST_PERSONALIZED_PLAN_ADD",
-            meta: { recommendationSurface: "my_plan" },
+            anonymousId: validAnonymousId,
+            eventType: "PLAN_ADD",
+            planVisibility: visibility,
+            entityType: "EVENT",
+            entityId: activityId,
+            vertical: "CITY",
+            cityId,
+            meta: {
+              source: sourceTag,
+              section: "afisha",
+              targetAction: "plan",
+              planItemId: planItem.id,
+              ...planDateMeta,
+              ...(planAddSource === "recommendation" || planAddSource === "idea"
+                ? { planAddSource }
+                : {}),
+              ...(sourceTag === "recommendation" && validRecommendationExposureId
+                ? { recommendationExposureId: validRecommendationExposureId }
+                : {}),
+              ...subjectsMeta,
+            },
           });
+          if (sourceTag === "recommendation") {
+            void trackFirstOccurrenceEvent({
+              userId: user.id,
+              sessionId: sessionRowId,
+              eventType: "FIRST_PERSONALIZED_PLAN_ADD",
+              meta: { recommendationSurface: "my_plan" },
+            });
+          }
         }
       } else {
+        if (isHomePlanSource) homeAttributionStatus = "existing";
         // Existing PlanItem re-saved (same date with a new audience, or moved
         // to another date): no new plan-add happened, but the CURRENT audience
         // must still be recorded so a later remove can never fall back to a
@@ -306,7 +318,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, planItem });
+    return NextResponse.json({ success: true, planItem, ...(homeAttributionStatus ? { homeAttributionStatus } : {}) });
   } catch (error) {
     console.error("Add plan item error:", error);
     return NextResponse.json(

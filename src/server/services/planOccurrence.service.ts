@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { activePlanScopeFor } from "@/server/family/familyAccess";
 
@@ -9,12 +10,12 @@ export async function resolvePlanActivityOccurrence(input: {
   userId: string;
   activityId: string;
   date: string;
-}): Promise<
+}, db: Pick<Prisma.TransactionClient, "planItem" | "experience"> = prisma): Promise<
   | { kind: "update"; planItemId: string }
   | { kind: "completed_same_date"; planItemId: string }
   | { kind: "create" }
 > {
-  const existing = await prisma.planItem.findMany({
+  const existing = await db.planItem.findMany({
     where: { ...(await activePlanScopeFor(input.userId)), activityId: input.activityId },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: 25,
@@ -24,7 +25,7 @@ export async function resolvePlanActivityOccurrence(input: {
 
   const consumed = new Set(
     (
-      await prisma.experience.findMany({
+      await db.experience.findMany({
         where: { sourcePlanItemId: { in: existing.map((item) => item.id) } },
         select: { sourcePlanItemId: true },
       })

@@ -1,3 +1,4 @@
+import type { HomePlanAttribution } from "@/features/save/planAttribution";
 /**
  * Единая модель post-auth: точка входа, отложенное действие, возврат.
  */
@@ -26,6 +27,7 @@ export type PendingSaveIdeaAction = {
 };
 
 export type PendingSavePlanAction = {
+  planAttribution?: HomePlanAttribution;
   kind: "save_plan";
   entityType: PendingEntityType;
   entityId: string;

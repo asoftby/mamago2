@@ -7,6 +7,7 @@ import { toast } from "@/lib/toast";
 import { SaveActivityFlowAdaptive } from "@/components/activity/SaveActivityFlowAdaptive";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 import type { ActivityTicketSource } from "@/components/activity/ActivityTicketCard";
+import type { HomePlanAttribution } from "./planAttribution";
 import { persistActivitySave } from "@/features/save/persistActivitySave";
 import { useAuthMe } from "@/features/birthday/builder/hooks/useAuthMe";
 import { getLocalDateKey } from "@/lib/date/localDateKey";
@@ -26,6 +27,7 @@ type SaveHeartProps = {
   /** Если активность длительная, используем конец диапазона для state-aware модалки. */
   eventPlanDateEndISO?: string | null;
   source?: string;
+  planAttribution?: HomePlanAttribution;
   className?: string;
   iconClassName?: string;
   onSaveChange?: (isSaved: boolean) => void;
@@ -53,6 +55,7 @@ export function SaveHeart({
   eventPlanDateISO,
   eventPlanDateEndISO,
   source,
+  planAttribution,
   className,
   iconClassName,
   onSaveChange,
@@ -150,6 +153,7 @@ export function SaveHeart({
         await persistActivitySave(result, {
           activityId,
           offerId,
+          planAttribution,
           title: activityTitle,
           coverImageUrl,
         });
@@ -181,7 +185,7 @@ export function SaveHeart({
         setIsLoading(false);
       }
     },
-    [activityId, offerId, activityTitle, coverImageUrl, onSaveChange],
+    [activityId, offerId, activityTitle, coverImageUrl, onSaveChange, planAttribution],
   );
 
   const triggerAnimation = () => {
@@ -262,6 +266,7 @@ export function SaveHeart({
           eventPlanDateOptions: eventPlanDateOptions,
         }}
         source={source}
+        planAttribution={planAttribution}
         onPersist={handlePersist}
         showVisibilityToggle
         isIdea={saveStatus.isIdea}

@@ -1,7 +1,9 @@
+import { homePlanAttributionFields, type HomePlanAttribution } from "./planAttribution";
 import type { SaveToPlanResult } from "@/components/activity/SaveToPlanModal";
 
 export type PersistActivityMeta = {
   activityId: string;
+  planAttribution?: HomePlanAttribution;
   offerId?: string;
   title: string;
   coverImageUrl?: string | null;
@@ -24,6 +26,7 @@ export async function persistActivitySave(
       body: JSON.stringify({
         activityId: meta.activityId,
         date: result.dateISO,
+        ...homePlanAttributionFields(meta.planAttribution),
         ...(result.visibility ? { visibility: result.visibility } : {}),
         title: meta.title,
         coverImageUrl: meta.coverImageUrl,
