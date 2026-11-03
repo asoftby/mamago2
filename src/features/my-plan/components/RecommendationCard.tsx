@@ -20,6 +20,8 @@ interface RecommendationCardProps {
   item: PlanItemWithActivity;
   isInPlan?: boolean;
   isRecommendation?: boolean;
+  /** This is an anonymous local draft, not a saved account PlanItem. */
+  guestDraft?: boolean;
   onAddToPlan?: () => void;
   onRemoveFromPlan?: () => void;
   onShowMore?: () => void;
@@ -41,6 +43,7 @@ type RecommendationActivityTrace = {
 export function RecommendationCard({
   item,
   isInPlan = false,
+  guestDraft = false,
   onAddToPlan,
   onRemoveFromPlan,
   onShowMore,
@@ -78,9 +81,9 @@ export function RecommendationCard({
     ? new Date(item.startsAt).toLocaleTimeString("ru-RU", {
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: "Europe/Minsk",
       })
     : null;
-  void timeStr;
 
   const agePart = item.activity?.ageLabel ?? null;
   const categoryLabel = item.activity?.eventCategory?.nameRu?.trim() || null;
@@ -90,7 +93,7 @@ export function RecommendationCard({
     if (!src) return null;
     const d = src instanceof Date ? src : new Date(src);
     if (Number.isNaN(d.getTime())) return null;
-    return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+    return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long", timeZone: guestDraft ? "Europe/Minsk" : undefined });
   })();
 
   const priceLabel = (() => {
@@ -105,7 +108,7 @@ export function RecommendationCard({
     return null;
   })();
 
-  const metaLine = [agePart, datePart, priceLabel].filter(Boolean).join(" • ");
+  const metaLine = [agePart, datePart, guestDraft ? timeStr : null, priceLabel].filter(Boolean).join(" • ");
   const totalVariants = variantTotal ?? alternativesCount ?? 0;
   const currentVariant = variantPosition ?? 1;
   const showVariantControls = !isInPlan && totalVariants > 1;
@@ -173,7 +176,7 @@ export function RecommendationCard({
         <div className="inline-flex w-fit max-w-full shrink-0 items-center rounded-full bg-[var(--mp-ac-soft)] px-3 py-1.5">
           <Sparkles className="mr-1.5 h-3.5 w-3.5 shrink-0 text-[var(--mp-ac)]" />
           <p className="text-[11px] font-semibold leading-none tracking-wide text-[var(--mp-ac-dark)]">
-            Рекомендовано <span className="font-bold text-[var(--mp-tx)]">mamaGo</span>
+            {guestDraft && timeStr ? `Сеанс в ${timeStr}` : <>Рекомендовано <span className="font-bold text-[var(--mp-tx)]">mamaGo</span></>}
           </p>
         </div>
       ) : (
@@ -181,7 +184,7 @@ export function RecommendationCard({
           <div className="inline-flex shrink-0 items-center rounded-full bg-[var(--success-soft)] px-3 py-1.5">
             <Check className="mr-1.5 h-3.5 w-3.5 text-[var(--success-hover)]" />
             <p className="text-[11px] font-medium leading-none tracking-wide text-[var(--success-hover)]">
-              Добавлено
+              {guestDraft ? "Выбрано" : "Добавлено"}
             </p>
           </div>
           <Button
