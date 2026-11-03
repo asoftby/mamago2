@@ -155,11 +155,25 @@ jobs:
         run: pnpm test:gsc
 
       - name: Event wizard occasion hydration regressions
-        run: pnpm test:event-wizard-update-loop
+        run: |
+          pnpm test:event-wizard-update-loop
+          pnpm exec tsx src/components/business/wizard/event/steps/Step1Basics.interests.contract.test.ts
 
       - name: Type check
         # GitHub ubuntu runners abort TypeScript at Node's default heap ceiling.
         run: NODE_OPTIONS=--max-old-space-size=6144 pnpm tsc --noEmit
+
+      - name: WordPress excluded-user backfill safety regressions
+        run: pnpm test:migration-user-exclusion-backfill
+
+      - name: Five-user historical WordPress preview safety regressions
+        run: |
+          pnpm exec tsx --test scripts/migration-wordpress-five-preview.test.ts
+          pnpm exec tsx --test src/lib/migration/commit/user/wordpressFiveArchiveBackfillPolicy.test.ts
+          python3 scripts/test_migration_wordpress_five_preview_ssh.py
+
+      - name: Safe SSH preview and historical coverage audit syntax
+        run: python3 -m py_compile scripts/migration-user-exclusion-preview-ssh.py scripts/migration-wordpress-user-coverage-audit.py scripts/migration-wordpress-user-archive-reconcile.py scripts/migration-all-users-dev-prod-audit.py scripts/migration-dev-only-ownership-overlap-audit.py scripts/migration-wordpress-five-preview-ssh.py
 
       - name: Feedback model and multi-source reputation regressions
         run: pnpm test:feedback-foundation
@@ -405,6 +419,14 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm test:family-picks-policy-integration
           pnpm test:family-home-integration
+
+      - name: Five-user WordPress recovery atomicity and rerun on PostgreSQL
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+          FIVE_WP_RECOVERY_PG_TEST: '1'
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx --test scripts/migration-wordpress-five-commit.integration.test.ts
 
       - name: Family plan PostgreSQL access isolation
         env:
