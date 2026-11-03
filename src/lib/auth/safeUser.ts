@@ -8,6 +8,8 @@ export const SESSION_USER_SELECT = {
   displayName: true,
   phoneE164: true,
   phoneVerifiedAt: true,
+  businessContactVerifiedPhoneE164: true,
+  businessContactPhoneVerifiedAt: true,
   emailVerifiedAt: true,
   status: true,
   suspendedUntil: true,
@@ -36,6 +38,8 @@ export type CurrentUser = {
   displayName: string | null;
   phoneE164: string | null;
   phoneVerifiedAt: Date | null;
+  businessContactVerifiedPhoneE164: string | null;
+  businessContactPhoneVerifiedAt: Date | null;
   emailVerifiedAt: Date | null;
   status: UserStatus;
   familyRole: string | null;
@@ -60,6 +64,8 @@ export function toCurrentUser(user: SessionUserRecord): CurrentUser {
     displayName: user.displayName,
     phoneE164: user.phoneE164,
     phoneVerifiedAt: user.phoneVerifiedAt,
+    businessContactVerifiedPhoneE164: user.businessContactVerifiedPhoneE164,
+    businessContactPhoneVerifiedAt: user.businessContactPhoneVerifiedAt,
     emailVerifiedAt: user.emailVerifiedAt,
     status: user.status,
     familyRole: user.familyRole,

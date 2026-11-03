@@ -79,7 +79,7 @@ export function GateFlowController() {
     }
 
     // Check phone verification
-    if (!user.phoneVerifiedAt) {
+    if (!(user.canComment ?? Boolean(user.phoneVerifiedAt))) {
       // Need phone verification
       queueMicrotask(() => setPhoneModalOpen(true));
     } else {

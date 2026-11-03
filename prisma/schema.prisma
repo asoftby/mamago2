@@ -28,6 +28,9 @@ model User {
   emailVerificationExpires          DateTime?
   phoneE164                         String?                          @unique
   phoneVerifiedAt                   DateTime?
+  /// Verified business contact, stored separately from the personal account phone.
+  businessContactVerifiedPhoneE164  String?                          @unique
+  businessContactPhoneVerifiedAt    DateTime?
   emailVerifiedAt                   DateTime?
   lastVerificationEmailSentAt       DateTime?
   lastLoginAt                       DateTime?

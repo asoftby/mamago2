@@ -19,6 +19,8 @@ export type AccountMenuUser = {
   avatarUrl?: string | null;
   /** Phone verification timestamp (ISO string) */
   phoneVerifiedAt?: string | null;
+  /** Verified personal OR business contact phone permits posting comments. */
+  canComment?: boolean;
   /** Семейная персона (primary adult) — тот же источник, что блок «Моя семья» */
   familyRole?: string | null;
   ageBandLabel?: string | null;

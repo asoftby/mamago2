@@ -65,7 +65,7 @@ export function useCommentGate() {
       }
 
       // B) User authenticated but phone not verified
-      if (!user.phoneVerifiedAt) {
+      if (!(user.canComment ?? Boolean(user.phoneVerifiedAt))) {
         // Save pending action
         setPendingAction({
           type: actionType,
@@ -104,6 +104,6 @@ export function useCommentGate() {
     isLoading,
     user,
     isAuthenticated: !!user,
-    isPhoneVerified: !!user?.phoneVerifiedAt,
+    isPhoneVerified: user?.canComment ?? Boolean(user?.phoneVerifiedAt),
   };
 }

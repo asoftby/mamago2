@@ -109,7 +109,6 @@ export async function createBusinessAction(
     legalName: String(formData.get("legalName") ?? ""),
     phone: String(formData.get("phone") ?? ""),
   };
-  const clientVerifiedPhone = String(formData.get("phoneVerificationPhone") ?? "");
 
   try {
     // Validate
@@ -138,12 +137,14 @@ export async function createBusinessAction(
       userPhoneE164: user.phoneE164,
       userPhoneVerifiedAt: user.phoneVerifiedAt,
     });
-    const clientConfirmedCurrentPhone = clientVerifiedPhone === phoneE164;
+    const businessContactVerifiedThisPhone = isBusinessContactPhoneVerifiedForUser({
+      phoneE164,
+      userPhoneE164: user.businessContactVerifiedPhoneE164,
+      userPhoneVerifiedAt: user.businessContactPhoneVerifiedAt,
+    });
 
-    if (
-      !existingPhoneStillVerified &&
-      !(clientConfirmedCurrentPhone && userVerifiedThisPhone)
-    ) {
+    // Client-side hidden inputs or localStorage drafts are not trusted evidence.
+    if (!existingPhoneStillVerified && !userVerifiedThisPhone && !businessContactVerifiedThisPhone) {
       return buildPhoneVerificationFieldError();
     }
 
@@ -162,7 +163,9 @@ export async function createBusinessAction(
     const contactPhoneVerifiedAt =
       existingPhoneStillVerified && existing?.contactPhoneVerifiedAt
         ? existing.contactPhoneVerifiedAt
-        : user.phoneVerifiedAt;
+        : businessContactVerifiedThisPhone
+          ? user.businessContactPhoneVerifiedAt
+          : user.phoneVerifiedAt;
 
     if (existing) {
       // UPSERT: Update existing business and resubmit
