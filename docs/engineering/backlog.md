@@ -5937,3 +5937,43 @@ distributor_company_id=550) и хотели бы уточнить несколь
 - Dependencies: согласовать UX и расположение в админке (например, отдельная настройка «Охват и продвижение» на странице события); сделать аудит полномочий и отображения активных исключений.
 - Acceptance criteria: администратор/модератор может просматривать, создавать и отзывать исключения для выбранного события из отдельного интерфейса, не в визарде; обязательны регион, причина, срок, атрибуция автора. Бизнес-пользователи не видят управление; строгие геофильтры и обычный/Boost-охват не меняются; CI и DEV-проверка.
 - Source: решение владельца mamaGo, 2026-11-01; Issue #795.
+
+
+## [BACKLOG-227] Запрет прямого push в dev/main на уровне локального hook и проверка branch protection
+
+- Status: OPEN
+- Priority: P1
+- Area: Git / Security gates
+- Added: 2026-11-04
+- Reason deferred: аудит инструкций ограничен документированием инвариантов; изменение hook и тестов требует отдельного PR.
+- Context: `CLAUDE.md` запрещает прямые коммиты/push в `dev`. Но `.husky/pre-push` для `origin/dev` проверяет только «не отстаёт ли локальный HEAD» и разрешает push, если он актуален; GitHub API не выполняет локальный hook.
+- Current state: документированный запрет существует; локальный механизм не реализует полный запрет. Состояние серверных GitHub branch protections отдельно не подтверждено.
+- Dependencies: аудит branch protections и тесты безопасного PR-only процесса.
+- Acceptance criteria: прямые обычные pushes в `dev`/`main` блокируются для любых имен remote по ref назначения, unit/contract тесты доказывают это, правила GitHub branch protection проверены; PR/merge сохраняет работоспособность.
+- Source: agent-instruction audit, PR #1100.
+
+## [BACKLOG-228] Устранить опасные Prisma reset/development scripts из package.json
+
+- Status: OPEN
+- Priority: P1
+- Area: Database / Safety tooling
+- Added: 2026-11-04
+- Reason deferred: удаление/замена CLI-команд может повлиять на исторические сценарии и требует отдельного тестируемого изменения.
+- Context: `db:migrate`, `db:migrate:dev`, `db:migrate:safe` вызывают запрещённый `prisma migrate dev`, а `db:reset:dev` и `db:reset:safe` — `prisma migrate reset` (включая `--force`). Название `safe` создаёт неверное ощущение безопасности. В инструкции добавлен явный запрет.
+- Current state: scripts присутствуют; доказательств их безопасного использования на реальной базе нет.
+- Dependencies: проверить фактические consumers scripts и предусмотреть недеструктивные alternatives с `prisma migrate deploy` по release runbook.
+- Acceptance criteria: никакой обычный pnpm script не может случайно вызвать destructive reset/migrate-dev; негативные smoke tests и документированные инструкции для миграций проходят; production data не используется в проверках.
+- Source: agent-instruction audit, PR #1100.
+
+## [BACKLOG-229] Единая и идемпотентная orchestration полного gate и очереди сборок
+
+- Status: OPEN
+- Priority: P2
+- Area: Developer workflow / CI
+- Added: 2026-11-04
+- Reason deferred: корректный SHA-bound gate proof, build lock и защита от interruption требуют самостоятельной реализации и регрессионных тестов; в текущем аудите только согласованы инструкции.
+- Context: `task-check.sh` запускает `pnpm check:push` напрямую (без изолирующей обёртки `run-push-gate.sh`), а `task-finish.sh` запускает полный gate заново через pre-push; `run-push-gate.sh` временно восстанавливает конфиги без trap на сигнал/прерывание. Параллельные Next.js builds на одном host конкурируют за память.
+- Current state: кеширование подтверждённого gate отсутствует; стандартный путь без `task-check` не повторяет gate до финальной отправки.
+- Dependencies: определить точный fingerprint (SHA, dirty state, deps/Prisma, environment/toolchain, gate definition), сериализовать builds и добавить тесты инвалидации и interrupted cleanup.
+- Acceptance criteria: один проверенный полный gate для неизменённого candidate, повтор только при валидной инвалидации; запрет bypass; контент и конфиги остаются нетронутыми при crash; CI на текущем PR SHA обязателен; регрессии Git workflow зелёные.
+- Source: agent-instruction audit, PR #1100.
