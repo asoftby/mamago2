@@ -11,6 +11,7 @@ import {
   STABLE_HEADER_BLOCK2_PX,
   useStableHeaderBehavior,
 } from "@/hooks/useStableHeaderBehavior";
+import { useStableHeaderFootprint } from "@/hooks/useStableHeaderFootprint";
 import {
   getIntentFromPath,
   getDiscoveryIntentForPublicationPath,
@@ -70,7 +71,8 @@ export const HEADER_HEIGHT = STABLE_HEADER_BLOCK1_DEFAULT_PX;
 const HEADER_SEARCH_BAR_WRAP_CLASS = "w-full max-w-[760px]";
 
 /**
- * Десктоп-хедер в стиле Airbnb (в потоке документа, не fixed):
+ * Десктоп-хедер в стиле Airbnb (в потоке документа, не fixed). Место в потоке постоянно —
+ * при сворачивании строки поиска его держит {@link useStableHeaderFootprint}, контент не прыгает:
  * - **По умолчанию у верха:** строка 1 — лого | навигация по разделам | поиск и меню; строка 2 — большая овальная строка поиска.
  * - **После скролла:** одна строка — лого | компактная капсула | поиск и меню.
  * - При открытой search surface — визуально усиленная строка поиска.
@@ -82,6 +84,8 @@ export function SiteHeaderShell() {
   const isLandingHeader = headerVariant === "landing";
   const routeIntent = getIntentFromPath(pathname);
   const headerRef = useRef<HTMLElement>(null);
+  const searchRowRef = useRef<HTMLDivElement>(null);
+  const searchRowInnerRef = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
   const hb = useStableHeaderBehavior({
     scrollThreshold: 80,
@@ -139,8 +143,17 @@ export function SiteHeaderShell() {
   const shouldRenderDesktopSearchRow =
     !isLandingHeader && shouldShowDesktopHeaderSearch(pathname ?? "");
 
+  /** Сворачивание строки поиска не двигает контент: место хедера в потоке постоянно. */
+  const onSearchRowAnimationUpdate = useStableHeaderFootprint(
+    headerRef,
+    searchRowRef,
+    searchRowInnerRef,
+    shouldRenderDesktopSearchRow,
+  );
+
   const expandedSearchRowInner = (
     <div
+      ref={searchRowInnerRef}
       className={cn(
         SITE_CONTENT_CONTAINER_CLASS,
         "pb-3 pt-1",
@@ -314,6 +327,7 @@ export function SiteHeaderShell() {
           {/* Вторая строка: сегментированный поиск — не на посадочных */}
           {shouldRenderDesktopSearchRow && (
             <motion.div
+              ref={searchRowRef}
               data-header-block1
               data-search-surface
               initial={false}
@@ -322,6 +336,7 @@ export function SiteHeaderShell() {
                 opacity: showExpandedSearchRow ? 1 : 0,
               }}
               transition={searchRowTransition(reduceMotion)}
+              onUpdate={onSearchRowAnimationUpdate}
               className="w-full shrink-0 overflow-hidden bg-transparent will-change-[max-height,opacity]"
               style={{
                 pointerEvents: showExpandedSearchRow ? "auto" : "none",
