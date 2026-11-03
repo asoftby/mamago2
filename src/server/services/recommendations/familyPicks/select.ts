@@ -1,3 +1,6 @@
+import { ageMonthsIntervalAt, type ChildBirthRecord } from "@/lib/child/birth";
+import { PERSONAL_FAMILY_PICKS_POLICY } from "./config";
+import { minskDateKey } from "./window";
 import { getSystemInterestLabel } from "@/lib/config/interests";
 import { AGE_OPTIONS } from "@/lib/config/ages";
 import { EXPERIENCE_AFFINITY_MAX, MAX_INTEREST_BOOST } from "@/server/services/recommendations/rankingSignals";
@@ -514,4 +517,68 @@ export function selectFamilyPicks(
   });
 
   return { level, title: titleForLevel(level, window), items, eligibleCount, filtered };
+}
+
+// Confirmed-age v2 is composition over the shared ranker's score, not another ranker.
+export type PersonalFamilySelection = { mode: "ALL_FAMILY" } | { mode: "CHILD"; selectedChildId: string };
+export type PersonalFamilyChild = ChildBirthRecord & { id: string };
+export type PersonalFamilyCandidate = Pick<FamilyPickCandidate,
+  "id" | "agePolicy" | "ageMinMonths" | "ageMaxMonths" | "categoryId" | "businessId" | "occurrences"
+> & { sharedScore: number };
+export type PersonalFamilyPick = {
+  candidate: PersonalFamilyCandidate;
+  startsAt: Date;
+  matchedChildIds: string[];
+  allChildrenMatch: boolean;
+  position: number;
+};
+
+export function confirmedAgeMatchAt(child: PersonalFamilyChild, event: PersonalFamilyCandidate, at: Date): AgeMatch {
+  if (event.agePolicy === "ADULT_ONLY") return "MISMATCH";
+  // Even unrestricted events must not invent a MATCH for a child without DOB.
+  const calendarDate = new Date(`${minskDateKey(at)}T00:00:00Z`);
+  const age = ageMonthsIntervalAt(child, calendarDate);
+  if (!age || age.min < 0) return "UNKNOWN";
+  if (event.agePolicy === "UNRESTRICTED") return "MATCH";
+  if (event.agePolicy === "UNKNOWN" || (event.ageMinMonths == null && event.ageMaxMonths == null)) return "UNKNOWN";
+  const min = event.ageMinMonths ?? 0;
+  const max = event.ageMaxMonths ?? Infinity;
+  if (age.max < min || age.min > max) return "MISMATCH";
+  return age.min >= min && age.max <= max ? "MATCH" : "UNKNOWN";
+}
+
+/** Each event is bound to ONE confirmed occurrence. AND/OR badges never mix dates. */
+export function selectPersonalFamilyPicks(
+  candidates: readonly PersonalFamilyCandidate[],
+  children: readonly PersonalFamilyChild[],
+  selection: PersonalFamilySelection,
+): PersonalFamilyPick[] {
+  const target = selection.mode === "CHILD" ? children.find(child => child.id === selection.selectedChildId) : null;
+  if (children.length === 0 || (selection.mode === "CHILD" && !target)) return [];
+  const events = new Map<string, PersonalFamilyPick>();
+  for (const candidate of candidates) {
+    const occurrences = candidate.occurrences.flatMap(startsAt => {
+      const matchedChildIds = children.filter(child => confirmedAgeMatchAt(child, candidate, startsAt) === "MATCH").map(child => child.id).sort();
+      if (target ? !matchedChildIds.includes(target.id) : matchedChildIds.length === 0) return [];
+      return [{ candidate, startsAt, matchedChildIds, allChildrenMatch: matchedChildIds.length === children.length, position: 0 }];
+    });
+    occurrences.sort((a, b) => Number(b.allChildrenMatch) - Number(a.allChildrenMatch)
+      || b.matchedChildIds.length - a.matchedChildIds.length || a.startsAt.getTime() - b.startsAt.getTime());
+    const pick = occurrences[0];
+    if (!pick) continue;
+    const previous = events.get(candidate.id);
+    if (!previous || (pick.allChildrenMatch && !previous.allChildrenMatch)
+      || (pick.allChildrenMatch === previous.allChildrenMatch && comparePersonalPicks(pick, previous) < 0)) events.set(candidate.id, pick);
+  }
+  const ranked = [...events.values()].sort(comparePersonalPicks);
+  const all = ranked.filter(pick => pick.allChildrenMatch);
+  const pool = selection.mode === "CHILD" ? ranked : all.length >= PERSONAL_FAMILY_PICKS_POLICY.orFillThreshold
+    ? all : [...all, ...ranked.filter(pick => !pick.allChildrenMatch)];
+  // No diversity/novelty slot may evict AND or hide a short, valid result.
+  return pool.slice(0, PERSONAL_FAMILY_PICKS_POLICY.resultCount).map((pick, index) => ({ ...pick, position: index + 1 }));
+}
+
+function comparePersonalPicks(a: PersonalFamilyPick, b: PersonalFamilyPick): number {
+  return b.candidate.sharedScore - a.candidate.sharedScore || a.startsAt.getTime() - b.startsAt.getTime()
+    || (a.candidate.id < b.candidate.id ? -1 : a.candidate.id > b.candidate.id ? 1 : 0);
 }

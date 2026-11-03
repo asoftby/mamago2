@@ -123,9 +123,9 @@ export async function PATCH(req: Request, { params }: RouteParams) {
       data,
       include: { category: { select: { id: true, nameRu: true, slug: true } } },
     });
-    revalidateTag(eventStep1GenresTag(updated.categoryId), "max");
+    revalidateTag(eventStep1GenresTag(updated.categoryId), { expire: 0 });
     if (updated.categoryId !== current.categoryId) {
-      revalidateTag(eventStep1GenresTag(current.categoryId), "max");
+      revalidateTag(eventStep1GenresTag(current.categoryId), { expire: 0 });
     }
     return NextResponse.json(updated);
   } catch (e) {
@@ -150,7 +150,7 @@ export async function DELETE(_req: Request, { params }: RouteParams) {
     const current = await prisma.genre.findUnique({ where: { id }, select: { categoryId: true } });
     await prisma.genre.delete({ where: { id } });
     if (current?.categoryId) {
-      revalidateTag(eventStep1GenresTag(current.categoryId), "max");
+      revalidateTag(eventStep1GenresTag(current.categoryId), { expire: 0 });
     }
     return NextResponse.json({ ok: true });
   } catch (e) {

@@ -3,10 +3,18 @@ import prisma from "@/lib/prisma";
 import { AGE_KEYS } from "@/lib/config/ages";
 import type { EventStep1Taxonomies, PublicGenreOption } from "@/components/business/wizard/event/steps/step1Taxonomies";
 import { getGenresByCategory } from "@/lib/taxonomy/getGenresByCategory";
-
-export const EVENT_STEP1_CATEGORIES_TAG = "event-step1-categories";
-export const EVENT_STEP1_AGES_TAG = "event-step1-ages";
-export const eventStep1GenresTag = (categoryId: string) => `event-step1-genres:${categoryId}`;
+import {
+  EVENT_STEP1_CATEGORIES_TAG,
+  EVENT_STEP1_AGES_TAG,
+  EVENT_STEP1_INTERESTS_TAG,
+  eventStep1GenresTag,
+} from "./eventStep1CacheTags";
+export {
+  EVENT_STEP1_CATEGORIES_TAG,
+  EVENT_STEP1_AGES_TAG,
+  EVENT_STEP1_INTERESTS_TAG,
+  eventStep1GenresTag,
+} from "./eventStep1CacheTags";
 
 const getCachedEventCategories = unstable_cache(
   async () => {
@@ -91,7 +99,7 @@ const getCachedInterestOptions = unstable_cache(
     }));
   },
   ["admin-event-interest-options-v1"],
-  { revalidate: 3600 },
+  { revalidate: 3600, tags: [EVENT_STEP1_INTERESTS_TAG] },
 );
 
 async function getCachedGenresForCategory(categoryId: string): Promise<PublicGenreOption[]> {

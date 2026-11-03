@@ -78,3 +78,11 @@ export function normalizeFamilyPicksConfig(value?: unknown): FamilyPicksConfig {
     dismissCooldownDays: int(input.dismissCooldownDays, d.dismissCooldownDays, 1, 365),
   };
 }
+
+/** Prepared surface policy; legacy family-picks-v1 and public callers stay unchanged. */
+export const PERSONAL_FAMILY_PICKS_POLICY = {
+  version: "family-picks-confirmed-v2",
+  resultCount: 7,
+  orFillThreshold: 4,
+  horizons: [7, 30],
+} as const;

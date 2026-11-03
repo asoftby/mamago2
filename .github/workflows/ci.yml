@@ -80,6 +80,9 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mamago_ci
 
+      - name: Family picks profile ACL and backwards-compatible API contract
+        run: pnpm test:family-picks
+
       - name: Business support notification routing contract
         run: pnpm exec tsx src/server/support/supportNoticeContract.test.ts
 
@@ -216,6 +219,7 @@ jobs:
 
       - name: Cache and discovery performance regressions
         run: |
+          pnpm exec tsx src/server/admin/activities/eventStep1CacheTags.test.ts
           pnpm exec tsx src/server/article/publicArticleListCacheWiring.test.ts
           pnpm exec tsx src/lib/city/scopedEventBrowsing.test.ts
           pnpm exec tsx src/server/discovery/crossRegionFamilySignal.contract.test.ts
@@ -405,6 +409,13 @@ jobs:
         run: pnpm test:seo-http
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+
+      - name: Personal family picks policy PostgreSQL integration
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm test:family-picks-policy-integration
 
       - name: Five-user WordPress recovery atomicity and rerun on PostgreSQL
         env:

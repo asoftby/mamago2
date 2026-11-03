@@ -127,7 +127,7 @@ export async function POST(req: Request) {
         _count: { select: { activities: true, children: true } },
       },
     });
-    revalidateTag(EVENT_STEP1_CATEGORIES_TAG, "max");
+    revalidateTag(EVENT_STEP1_CATEGORIES_TAG, { expire: 0 });
     return NextResponse.json(mapCategoryWithParent(created));
   } catch (e) {
     const schema = prismaToHttpResponse(e);
