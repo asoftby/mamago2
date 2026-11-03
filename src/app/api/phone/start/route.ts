@@ -68,9 +68,11 @@ export async function POST(request: NextRequest) {
 
       const errorMessage =
         error instanceof Error ? error.message : "Не удалось отправить SMS";
-      const status = errorMessage.includes("Повторная отправка через")
-        ? 429
-        : 400;
+      const status = errorMessage === "Этот номер уже привязан к другому аккаунту"
+        ? 409
+        : errorMessage.includes("Повторная отправка через")
+          ? 429
+          : 400;
       return NextResponse.json(
         { ok: false, error: errorMessage, otpState },
         { status }
