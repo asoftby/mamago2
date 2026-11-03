@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/server";
+import { BUSINESS_PHONE_ALREADY_LINKED_MESSAGE } from "@/lib/phone-verification/businessContactVerification.shared";
 import prisma from "@/lib/prisma";
 import {
   normalizeBusinessContactPhone,
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     const message =
       error instanceof Error ? error.message : "Не удалось отправить код";
-    const status = message === "Этот номер уже привязан к другому аккаунту"
+    const status = message === BUSINESS_PHONE_ALREADY_LINKED_MESSAGE
       ? 409
       : message.includes("Повторная отправка через")
         ? 429
