@@ -1,17 +1,20 @@
 # Agent Instructions
 
-## Preferred automation — use it instead of making the user operate Git
+## ChatGPT-first development — two first-class modes
 
-For every repository-changing task, agents with repository shell access MUST use the repository workflow scripts themselves instead of asking the user to manually create branches/worktrees or repeat routine Git commands:
+ChatGPT is the default task coordinator. Select **GitHub Direct** for work that can be correctly implemented/reviewed through repository APIs and verified by the applicable GitHub CI; select **Local Assisted** when local execution, browser/UI verification, a database, integration tests, debugging or build diagnosis are needed. Agents choose the mode based on task risk and available tools; do not ask the owner to operate Git, Codex, or Claude Code as a routine prerequisite. Both modes use a fresh `dev` SHA, isolated task branch, task-only PR, architecture checks, and required final-SHA CI/review. GitHub Direct does not run a local hook and must never claim it did; if GitHub CI cannot prove the required behavior, switch to Local Assisted or add an appropriate CI check. A local worktree is mandatory only in Local Assisted; GitHub Direct instead uses a dedicated remote branch.
+
+## Preferred Local Assisted automation — use it instead of making the user operate Git
+
+When Local Assisted mode is selected, agents with repository shell access MUST use the repository workflow scripts themselves instead of asking the user to manually create branches/worktrees or repeat routine Git commands:
 
 ```bash
 # from canonical dev
 sh scripts/git/task-start.sh <slug> [prefix]
 
-# from the task worktree
-sh scripts/git/task-sync.sh
-sh scripts/git/task-check.sh
+# from the task worktree: targeted checks, commit, then finish
 sh scripts/git/task-finish.sh
+# task-sync.sh and task-check.sh are optional; avoid redundant full gate runs
 ```
 
 Human shell shortcuts are available after `sh scripts/git/install-shell-shortcuts.sh`:
@@ -42,9 +45,7 @@ See the canonical **Fast and safe execution** section in `CLAUDE.md` for the ris
 
 A "new task" means any distinct user request that may change repository files, even when it arrives in the same chat/session immediately after another task.
 
-Before reading/modifying implementation files for a new task, the agent MUST establish a fresh, clean base from `origin/dev`:
-
-1. In the canonical `dev` checkout, run `sh scripts/git/session-start-gate.sh` (normally through `task-start.sh`).
+Before modifying implementation files for a new task, the agent MUST establish the exact fresh base SHA from `origin/dev`. In **Local Assisted**, use the canonical `dev` checkout and `sh scripts/git/session-start-gate.sh` (normally through `task-start.sh`). In **GitHub Direct**, read the current remote `dev` SHA through GitHub and create a dedicated branch at that exact SHA; there is no local checkout, so do not invent a local gate result. The detailed Local Assisted steps are:
 2. Repository work may start only when the gate reports PASS and local `HEAD` exactly matches fresh `origin/dev`.
 3. Capture that exact SHA as `BASE_HEAD`.
 4. Perform the task in an isolated task worktree/branch created from that exact `BASE_HEAD`; do not implement a new task directly in a shared/stale worktree.
@@ -52,14 +53,14 @@ Before reading/modifying implementation files for a new task, the agent MUST est
 6. Before integrating/pushing task output, fetch `origin/dev` again and verify whether it advanced since `BASE_HEAD`. If it advanced, reconcile the task deliberately on top of the new base and rerun relevant verification before integration.
 7. If freshness cannot be proven, the tree is dirty with foreign work, or branches diverged: STOP repository modifications and report the state. Never make the gate green with `reset --hard`, force-push, broad checkout/restore, or automatic pull/rebase.
 
-## CRITICAL — one task = one branch = one worktree = one PR; `dev` is merge-only
+## CRITICAL — one task = one branch = one PR (+ isolated worktree in Local Assisted); `dev` is merge-only
 
 This is the mandatory integration model for every repository-changing task:
 
 1. `dev` is an integration branch only. Do not implement features, fixes, refactors, chores, or documentation changes directly on `dev`.
 2. Do not create normal task commits directly on `dev`, and do not push task commits directly to `dev`. `dev` advances through a reviewed/verified PR merge from a task branch.
-3. Every distinct task gets its own task branch and its own isolated worktree, both created from the exact fresh `BASE_HEAD` captured from `origin/dev`.
-4. A new distinct user request is a new task even inside the same chat/session. Do not append task B to task A's branch/worktree/PR.
+3. Every distinct task gets its own branch created from exact fresh `BASE_HEAD` captured from `origin/dev`; **Local Assisted** additionally requires an isolated worktree. **GitHub Direct** makes commits only through its dedicated remote branch.
+4. A genuinely separate user request is a new task even inside the same chat/session. Corrections and review feedback within an open PR that preserve the same acceptance contract stay in that PR; do not append unrelated task B to task A's branch/worktree/PR.
 5. One task branch may contain multiple commits only when all commits belong to that same task and are intended to be reviewed/merged together.
 6. If unrelated work is discovered while implementing a task, do not fix it "while here". Record/report it and handle it as a separate task on a separate fresh branch.
 7. Before opening/updating/merging a PR, fetch `origin/dev` again. If `dev` advanced, deliberately reconcile the task branch with the fresh base, inspect overlaps, and rerun relevant verification.
@@ -69,7 +70,7 @@ This is the mandatory integration model for every repository-changing task:
 
 Recommended branch prefixes: `feat/`, `fix/`, `refactor/`, `chore/`, `docs/`, `test/`.
 
-**Core integration rule:** fresh `origin/dev` → exact `BASE_HEAD` → one isolated task branch/worktree → task-only commits → PR → verified merge into `dev`. No direct task development on `dev`.
+**Core integration rule:** fresh `origin/dev` → exact `BASE_HEAD` → isolated task branch (plus isolated worktree for Local Assisted) → task-only commits → PR → required final-SHA CI/review → verified merge into `dev`. No direct task development on `dev`.
 
 Environment discipline:
 - Git/GitHub commit SHA is the source of truth for code.
