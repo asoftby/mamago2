@@ -45,6 +45,8 @@ type OtpUser = {
 export type PhoneOtpSendDependencies = {
   checkRateLimit: RateLimitCheck;
   findUser: (phoneE164: string) => Promise<OtpUser | null>;
+  /** Business contact phones are reserved for their verified owner, even without a personal phone. */
+  isBusinessContactReserved: (phoneE164: string) => Promise<boolean>;
   createOrGetStub: (phoneE164: string, phoneDigits: string) => Promise<OtpUser>;
   storeOtp: (params: {
     userId: string;
@@ -138,9 +140,18 @@ export async function sendPhoneOtp(
     return "rate_limited";
   }
 
-  const existingUser = await dependencies.findUser(params.phoneE164);
+  const [existingUser, businessContactReserved] = await Promise.all([
+    dependencies.findUser(params.phoneE164),
+    // LOGIN must continue to match the personal account phone only.
+    // REGISTER must not create a stub for somebody else's verified business contact.
+    params.purpose === "REGISTER"
+      ? dependencies.isBusinessContactReserved(params.phoneE164)
+      : Promise.resolve(false),
+  ]);
   const realUser = existingUser !== null && !isStubUser(existingUser);
-  const eligible = params.purpose === "LOGIN" ? realUser : !realUser;
+  const eligible = params.purpose === "LOGIN"
+    ? realUser
+    : !realUser && !businessContactReserved;
 
   if (!eligible) {
     return "accepted";
