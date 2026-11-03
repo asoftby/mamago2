@@ -17,7 +17,7 @@ function parsePage(value: string | string[] | undefined): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
-type BlogSearchParams = { city?: string | string[]; page?: string | string[]; type?: string | string[] };
+type BlogSearchParams = { city?: string | string[]; page?: string | string[]; type?: string | string[]; archive?: string | string[] };
 
 export async function generateMetadata({
   searchParams,
@@ -58,11 +58,13 @@ export default async function BlogPage({
 
   const requestedPage = parsePage(query.page);
   const typeFilter = parseJournalTypeFilter(query.type);
+  const newsArchive = typeFilter === "BREAKING_NEWS" && (Array.isArray(query.archive) ? query.archive[0] : query.archive) === "1";
   const journal = await loadJournalPage({
     city: null,
     scopeWhere: null,
     scopeKey: "all",
     typeFilter,
+    newsArchive,
     page: requestedPage,
   });
   if (requestedPage > journal.totalPages && journal.total > 0) notFound();
@@ -78,9 +80,10 @@ export default async function BlogPage({
         collections={journal.collections}
         feed={journal.feed}
         typeFilter={typeFilter}
+        newsArchive={newsArchive}
         basePath="/blog"
       />
-      <BlogPagination basePath={typeFilter ? journalTypeFilterHref("/blog", typeFilter) : "/blog"} page={journal.page} totalPages={journal.totalPages} />
+      <BlogPagination basePath={typeFilter ? `${journalTypeFilterHref("/blog", typeFilter)}${newsArchive ? "&archive=1" : ""}` : "/blog"} page={journal.page} totalPages={journal.totalPages} />
     </main>
   );
 }

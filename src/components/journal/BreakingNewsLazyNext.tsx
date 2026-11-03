@@ -1,152 +1,209 @@
 "use client";
 
-import { BreakingNewsView, type BreakingNewsViewProps } from "@/components/article/mvp/BreakingNewsView";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { BreakingNewsView, type BreakingNewsViewProps } from "@/components/article/mvp/BreakingNewsView";
 import { nextContinuationItem } from "@/lib/journal/breakingNewsContinuation";
 
-type NextItem = { id: string; slug: string | null; title: string; excerpt: string | null };
+type NextItem = { id: string; slug: string | null; title: string };
 type Page = { items: NextItem[]; nextCursor: string | null };
-type NewsPayload = Omit<BreakingNewsViewProps, "articleId" | "related" | "articleHref" | "citySlug" | "publishedAt"> & { id: string; slug: string; publishedAt: string | null };
+type NewsPayload = Omit<BreakingNewsViewProps, "articleId" | "articleHref" | "citySlug" | "publishedAt"> & {
+  id: string;
+  slug: string;
+  publishedAt: string | null;
+};
 
-export function BreakingNewsLazyNext() {
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const requestedRef = useRef(false);
-  const abortRef = useRef<AbortController | null>(null);
+type Props = {
+  initialArticleId: string;
+  initialArticleHref: string;
+  citySlug?: string | null;
+};
+
+/**
+ * Breaking News uses the same uninterrupted reading model as regular articles.
+ * Only published, unexpired news are appended; the archive appears once the
+ * complete continuation has been read (never between individual articles).
+ */
+export function BreakingNewsLazyNext({ initialArticleId, initialArticleHref, citySlug }: Props) {
   const [items, setItems] = useState<NextItem[]>([]);
-  const [articles, setArticles] = useState<Array<BreakingNewsViewProps>>([]);
+  const [articles, setArticles] = useState<BreakingNewsViewProps[]>([]);
   const [unavailableIds, setUnavailableIds] = useState<string[]>([]);
-  const fullRequestRef = useRef(false);
-  const fullAbortRef = useRef<AbortController | null>(null);
-  const fullSentinelRef = useRef<HTMLDivElement>(null);
-  const [error, setError] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const cursorRef = useRef<string | null>(null);
-  const initialPathRef = useRef<string>("");
-  const cityRef = useRef<string>("");
-  const initialArticleHrefRef = useRef<string>("");
-  const firstArticleIdRef = useRef<string | null>(null);
+  const [loadingList, setLoadingList] = useState(false);
+  const [loadingArticle, setLoadingArticle] = useState(false);
+  const [error, setError] = useState(false);
+
+  const cursorRef = useRef<string>(initialArticleId);
+  const listSentinelRef = useRef<HTMLDivElement>(null);
+  const articleSentinelRef = useRef<HTMLDivElement>(null);
+  const listRequestRef = useRef(false);
+  const articleRequestRef = useRef(false);
+  const listAbortRef = useRef<AbortController | null>(null);
+  const articleAbortRef = useRef<AbortController | null>(null);
+  const initialDocumentTitleRef = useRef<string | null>(null);
+
+  const queryScope = citySlug ? "&city=" + encodeURIComponent(citySlug) : "";
+  const articleBasePath = citySlug ? "/" + citySlug + "/blog/" : "/blog/";
+  const archiveHref = (citySlug ? "/" + citySlug + "/blog" : "/blog") + "?type=news&archive=1";
+  const loadedIds = new Set(articles.map((article) => article.articleId));
+  const next = nextContinuationItem(items, loadedIds, new Set(unavailableIds));
 
   useEffect(() => {
-    cursorRef.current = document.querySelector<HTMLElement>("[data-breaking-news-article-id]")?.dataset.breakingNewsArticleId ?? null;
-    firstArticleIdRef.current = cursorRef.current;
-    initialPathRef.current = window.location.pathname.split("/").slice(0, -1).join("/");
-    cityRef.current = window.location.pathname.split("/")[1] ?? "";
-    initialArticleHrefRef.current = window.location.pathname;
+    initialDocumentTitleRef.current = document.title;
+    return () => {
+      listAbortRef.current?.abort();
+      articleAbortRef.current?.abort();
+    };
   }, []);
 
-  useEffect(() => () => { abortRef.current?.abort(); fullAbortRef.current?.abort(); }, []);
-
   useEffect(() => {
+    if (articles.length === 0) return;
     const root = document.querySelector<HTMLElement>(".journal-news-panel");
-    if (!root || articles.length === 0) return;
-    const nodes = Array.from(root.querySelectorAll<HTMLElement>("[data-breaking-news-article-id]"));
-    const articleUrls = new Map(articles.map((article) => [article.articleId, article.articleHref]));
+    const scrollTarget = root ?? window;
     const updateActiveArticle = () => {
-      const rootTop = root.getBoundingClientRect().top;
-      const active = nodes.filter((node) => node.getBoundingClientRect().top <= rootTop + 120).at(-1) ?? nodes[0];
-      const id = active?.dataset.breakingNewsArticleId;
-      if (!id) return;
-      const target = articleUrls.get(id) ?? (id === firstArticleIdRef.current ? initialArticleHrefRef.current : null);
+      const nodes = Array.from(document.querySelectorAll<HTMLElement>("[data-breaking-news-article-id]"));
+      const threshold = (root?.getBoundingClientRect().top ?? 0) + 120;
+      const active = nodes.filter((node) => node.getBoundingClientRect().top <= threshold).at(-1) ?? nodes[0];
+      const activeId = active?.dataset.breakingNewsArticleId;
+      const article = articles.find((item) => item.articleId === activeId);
+      const target = article?.articleHref ?? (activeId === initialArticleId ? initialArticleHref : null);
       if (target && window.location.pathname !== target) {
         window.history.replaceState(window.history.state, "", target);
       }
+      const title = article ? article.title + " — mamaGo" : initialDocumentTitleRef.current;
+      if (title && document.title !== title) document.title = title;
     };
-    root.addEventListener("scroll", updateActiveArticle, { passive: true });
+    scrollTarget.addEventListener("scroll", updateActiveArticle, { passive: true });
     updateActiveArticle();
-    return () => root.removeEventListener("scroll", updateActiveArticle);
-  }, [articles]);
+    return () => scrollTarget.removeEventListener("scroll", updateActiveArticle);
+  }, [articles, initialArticleHref, initialArticleId]);
 
+  // Fetch the next metadata page only after the current queue was read.
   useEffect(() => {
-    const node = fullSentinelRef.current;
-    const next = nextContinuationItem(items, new Set(articles.map(article => article.articleId)), new Set(unavailableIds));
-    if (!node || !next || fullRequestRef.current) return;
+    const node = listSentinelRef.current;
+    if (!node || !hasMore || error || next || listRequestRef.current) return;
+    const root = document.querySelector<HTMLElement>(".journal-news-panel");
     const observer = new IntersectionObserver(([entry]) => {
-      if (!entry.isIntersecting || fullRequestRef.current) return;
-      fullRequestRef.current = true;
+      if (!entry.isIntersecting || listRequestRef.current) return;
       observer.disconnect();
+      listRequestRef.current = true;
+      setLoadingList(true);
       const controller = new AbortController();
-      fullAbortRef.current = controller;
+      listAbortRef.current = controller;
       const timeout = window.setTimeout(() => controller.abort(), 8000);
-      let permanentlyUnavailable = false;
-      fetch(`/api/journal/breaking-news/article?id=${encodeURIComponent(next.id)}&city=${encodeURIComponent(cityRef.current)}`, { signal: controller.signal })
+      fetch("/api/journal/breaking-news/next?cursor=" + encodeURIComponent(cursorRef.current) + queryScope, {
+        signal: controller.signal,
+      })
+        .then(async (response) => {
+          if (!response.ok) throw new Error("Cannot load the next Breaking News");
+          return response.json() as Promise<Page>;
+        })
+        .then((page) => {
+          if (controller.signal.aborted) return;
+          setItems((previous) => {
+            const seen = new Set(previous.map((item) => item.id));
+            return [...previous, ...page.items.filter((item) => !seen.has(item.id))];
+          });
+          if (page.nextCursor) cursorRef.current = page.nextCursor;
+          setHasMore(Boolean(page.nextCursor));
+        })
+        .catch(() => { if (!controller.signal.aborted) setError(true); })
+        .finally(() => {
+          window.clearTimeout(timeout);
+          if (listAbortRef.current === controller) listAbortRef.current = null;
+          listRequestRef.current = false;
+          setLoadingList(false);
+        });
+    }, { root, rootMargin: "0px 0px 240px 0px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [articles, error, hasMore, items, next, queryScope, unavailableIds]);
+
+  // Fetch each full article only as its boundary approaches the viewport.
+  useEffect(() => {
+    const node = articleSentinelRef.current;
+    if (!node || !next || error || articleRequestRef.current) return;
+    const root = document.querySelector<HTMLElement>(".journal-news-panel");
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting || articleRequestRef.current) return;
+      observer.disconnect();
+      articleRequestRef.current = true;
+      setLoadingArticle(true);
+      const controller = new AbortController();
+      articleAbortRef.current = controller;
+      const timeout = window.setTimeout(() => controller.abort(), 8000);
+      let unavailable = false;
+      fetch("/api/journal/breaking-news/article?id=" + encodeURIComponent(next.id) + queryScope, {
+        signal: controller.signal,
+      })
         .then(async (response) => {
           if (response.status === 404) {
-            permanentlyUnavailable = true;
+            unavailable = true;
             return null;
           }
-          if (!response.ok) throw new Error("Article unavailable");
+          if (!response.ok) throw new Error("Cannot load the Breaking News article");
           return response.json() as Promise<{ article: NewsPayload }>;
         })
         .then((payload) => {
           if (!payload || controller.signal.aborted) return;
           const { article } = payload;
-          setArticles((previous) => [...previous, { ...article, articleId: article.id, publishedAt: article.publishedAt ? new Date(article.publishedAt) : null, related: [], citySlug: cityRef.current, articleHref: `${initialPathRef.current}/${article.slug}` }]);
+          setArticles((previous) => {
+            if (previous.some((item) => item.articleId === article.id)) return previous;
+            return [...previous, {
+              ...article,
+              articleId: article.id,
+              publishedAt: article.publishedAt ? new Date(article.publishedAt) : null,
+              citySlug,
+              articleHref: articleBasePath + article.slug,
+            }];
+          });
         })
         .catch(() => { if (!controller.signal.aborted) setError(true); })
         .finally(() => {
           window.clearTimeout(timeout);
-          if (fullAbortRef.current === controller) fullAbortRef.current = null;
-          fullRequestRef.current = false;
-          if (permanentlyUnavailable && !controller.signal.aborted) {
-            setUnavailableIds(previous => previous.includes(next.id) ? previous : [...previous, next.id]);
+          if (articleAbortRef.current === controller) articleAbortRef.current = null;
+          articleRequestRef.current = false;
+          setLoadingArticle(false);
+          if (unavailable && !controller.signal.aborted) {
+            setUnavailableIds((previous) => previous.includes(next.id) ? previous : [...previous, next.id]);
           }
         });
-    }, { root: document.querySelector(".journal-news-panel"), rootMargin: "0px 0px 240px 0px" });
+    }, { root, rootMargin: "0px 0px 240px 0px" });
     observer.observe(node);
     return () => observer.disconnect();
-  }, [items, articles, unavailableIds]);
+  }, [articleBasePath, articles, citySlug, error, next, queryScope]);
 
-  useEffect(() => {
-    const node = sentinelRef.current;
-    if (!node || !hasMore || error) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      if (!entry.isIntersecting || requestedRef.current || !cursorRef.current) return;
-      requestedRef.current = true;
-      setLoading(true);
-      const controller = new AbortController();
-      abortRef.current = controller;
-      const timeout = window.setTimeout(() => controller.abort(), 8000);
-      fetch(`/api/journal/breaking-news/next?cursor=${encodeURIComponent(cursorRef.current)}&city=${encodeURIComponent(cityRef.current)}`, { signal: controller.signal })
-        .then(async (response) => {
-          if (!response.ok) throw new Error("Failed to load next stories");
-          return response.json() as Promise<Page>;
-        })
-        .then((page) => {
-          setItems((previous) => {
-            const seen = new Set(previous.map((item) => item.id));
-            return [...previous, ...page.items.filter((item) => !seen.has(item.id))].slice(-12);
-          });
-          cursorRef.current = page.nextCursor;
-          setHasMore(Boolean(page.nextCursor));
-        })
-.catch(() => { if (!controller.signal.aborted) setError(true); })
-        .finally(() => {
-          window.clearTimeout(timeout);
-          if (abortRef.current === controller) abortRef.current = null;
-          requestedRef.current = false;
-          setLoading(false);
-        });
-    }, { root: document.querySelector(".journal-news-panel"), rootMargin: "0px 0px 240px 0px" });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [hasMore, error, items.length]);
-
+  const complete = !hasMore && !next && !loadingList && !loadingArticle && !error;
   return (
-    <section aria-label="Следующие Breaking News" className="mx-auto max-w-3xl px-5 pb-12 pt-8">
-      {(hasMore || items.length > 0 || loading || error) && <h2 className="mb-5 text-xl font-semibold">Далее в Breaking News</h2>}
+    <section aria-label="Продолжение Breaking News" className="bg-white pb-14">
       {articles.map((article) => (
-        <section key={article.articleId} data-news-continuation={article.articleId}>
+        <section key={article.articleId} data-news-continuation={article.articleId} className="border-t border-border/60 pt-8">
           <BreakingNewsView {...article} />
         </section>
       ))}
-      {!error && nextContinuationItem(items, new Set(articles.map(article => article.articleId)), new Set(unavailableIds)) && <div ref={fullSentinelRef} className="h-px" aria-hidden />}
-      {loading && <p role="status" className="py-5 text-sm text-neutral-500">Загружаем следующие публикации…</p>}
-      {error && <button type="button" onClick={() => { setError(false); requestedRef.current = false; fullRequestRef.current = false; }} className="py-5 text-sm underline">Повторить загрузку</button>}
-      {hasMore && <div ref={sentinelRef} aria-hidden className="h-px" />}
-      {!hasMore && !loading && !error && !nextContinuationItem(items, new Set(articles.map(article => article.articleId)), new Set(unavailableIds)) && (
-        <p role="status" className="py-6 text-center text-sm text-neutral-500">Вы посмотрели все актуальные новости</p>
-      )}
+      {loadingList || loadingArticle ? (
+        <p role="status" className="mx-auto max-w-3xl px-4 py-6 text-center text-sm text-muted-foreground">
+          Загружаем следующую публикацию…
+        </p>
+      ) : null}
+      {error ? (
+        <div className="mx-auto max-w-3xl px-4 py-6 text-center">
+          <p className="mb-3 text-sm text-muted-foreground">Не удалось загрузить следующую публикацию.</p>
+          <button type="button" className="text-sm text-primary underline underline-offset-2"
+            onClick={() => { setError(false); listRequestRef.current = false; articleRequestRef.current = false; }}>
+            Повторить загрузку
+          </button>
+        </div>
+      ) : null}
+      {next && !error ? <div ref={articleSentinelRef} className="h-px" aria-hidden /> : null}
+      {hasMore && !next && !error ? <div ref={listSentinelRef} className="h-px" aria-hidden /> : null}
+      {complete ? (
+        <footer className="mx-auto max-w-3xl border-t border-border/60 px-4 pb-8 pt-8 text-center sm:px-6">
+          <Link href={archiveHref} className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline">
+            Архив Breaking News
+          </Link>
+        </footer>
+      ) : null}
     </section>
   );
 }
