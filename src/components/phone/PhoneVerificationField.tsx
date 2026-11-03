@@ -20,6 +20,7 @@ import {
   isVerifiedPhoneMatch,
 } from "@/lib/phone-verification/businessContactVerification.shared";
 import { sameOriginUrl } from "@/lib/client/sameOriginUrl";
+import { AUTH_STATE_CHANGED_EVENT } from "@/lib/auth/client";
 
 type VerificationStatus =
   | "idle"
@@ -211,10 +212,6 @@ export function PhoneVerificationField({
     const nextPhone = value ?? "";
     onPhoneChange(nextPhone);
 
-    if (verifiedPhoneE164 && verifiedPhoneE164 !== nextPhone) {
-      onVerifiedPhoneChange(null);
-    }
-
     setError("");
     setCodeDigits(emptyOtpDigits());
     setShowCodeInput(false);
@@ -317,6 +314,8 @@ export function PhoneVerificationField({
         }
 
         onVerifiedPhoneChange(phoneE164);
+        // Comments can now use the verified business contact immediately.
+        window.dispatchEvent(new Event(AUTH_STATE_CHANGED_EVENT));
         setShowCodeInput(false);
         setStatus("verified");
         setCodeDigits(emptyOtpDigits());
@@ -430,17 +429,11 @@ export function PhoneVerificationField({
           placeholder="Номер телефона"
           value={phoneE164 || undefined}
           onChange={handlePhoneInputChange}
-          disabled={isVerified || otpState.supportRequired}
+          disabled={otpState.supportRequired}
         />
       </div>
 
       <input type="hidden" name="phone" value={phoneE164} />
-      <input
-        type="hidden"
-        name="phoneVerificationPhone"
-        value={verifiedPhoneE164 ?? ""}
-      />
-
       {otpState.supportRequired && (
         <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
           Доступ к подтверждению номера временно ограничен. Напишите в службу

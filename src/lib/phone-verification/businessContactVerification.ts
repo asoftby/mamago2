@@ -9,6 +9,7 @@ import {
   BUSINESS_CONTACT_VERIFICATION_CODE_LENGTH,
   BUSINESS_CONTACT_VERIFICATION_PURPOSE,
   isE164Phone,
+  BUSINESS_PHONE_ALREADY_LINKED_MESSAGE,
 } from "./businessContactVerification.shared";
 import {
   BusinessContactOtpEscalationError,
@@ -116,6 +117,21 @@ export async function sendBusinessContactVerificationCode(params: {
 
   assertCanSendBusinessContactOtp(escalationUser, now);
 
+  // A verified contact must not be associated with another user's account.
+  const otherOwner = await prisma.user.findFirst({
+    where: {
+      id: { not: params.userId },
+      OR: [
+        { phoneE164 },
+        { businessContactVerifiedPhoneE164: phoneE164 },
+      ],
+    },
+    select: { id: true },
+  });
+  if (otherOwner) {
+    throw new Error(BUSINESS_PHONE_ALREADY_LINKED_MESSAGE);
+  }
+
   const existing = await prisma.phoneOtp.findUnique({
     where: {
       userId_phoneE164_purpose: {
@@ -212,6 +228,7 @@ export async function verifyBusinessContactVerificationCode(params: {
   userId: string;
   phone: string;
   code: string;
+  target: "business" | "account";
 }): Promise<{
   phoneE164: string;
   verifiedAt: string;
@@ -332,11 +349,30 @@ export async function verifyBusinessContactVerificationCode(params: {
   }
 
   await prisma.$transaction(async (tx) => {
+    // Repeat the ownership check when consuming OTP, not only when sending it.
+    const conflictingOwner = await tx.user.findFirst({
+      where: {
+        id: { not: params.userId },
+        OR: [
+          { phoneE164 },
+          { businessContactVerifiedPhoneE164: phoneE164 },
+        ],
+      },
+      select: { id: true },
+    });
+    if (conflictingOwner) {
+      throw new Error(BUSINESS_PHONE_ALREADY_LINKED_MESSAGE);
+    }
+
     await tx.user.update({
       where: { id: params.userId },
       data: {
-        phoneE164,
-        phoneVerifiedAt: now,
+        ...(params.target === "business"
+          ? {
+              businessContactVerifiedPhoneE164: phoneE164,
+              businessContactPhoneVerifiedAt: now,
+            }
+          : { phoneE164, phoneVerifiedAt: now }),
         businessContactOtpFailedAttempts: 0,
         businessContactOtpLockTier: 0,
         businessContactOtpLockedUntil: null,

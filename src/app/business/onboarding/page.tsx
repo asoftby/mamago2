@@ -116,6 +116,9 @@ export default async function OnboardingPage() {
             currentUserId={user.id}
             initialData={normalizedInitialData}
             accountPhoneE164={user.phoneE164 ?? null}
+            accountPhoneVerifiedAt={user.phoneVerifiedAt?.toISOString() ?? null}
+            businessContactVerifiedPhoneE164={user.businessContactVerifiedPhoneE164 ?? null}
+            businessContactPhoneVerifiedAt={user.businessContactPhoneVerifiedAt?.toISOString() ?? null}
             initialBusinessContactOtpState={initialBusinessContactOtpState}
           />
         </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import {
   normalizeBusinessContactVerificationPurpose,
+  BUSINESS_PHONE_ALREADY_LINKED_MESSAGE,
 } from "@/lib/phone-verification/businessContactVerification.shared";
 import {
   loadBusinessContactOtpClientState,
@@ -68,9 +69,11 @@ export async function POST(request: NextRequest) {
 
       const errorMessage =
         error instanceof Error ? error.message : "Не удалось отправить SMS";
-      const status = errorMessage.includes("Повторная отправка через")
-        ? 429
-        : 400;
+      const status = errorMessage === BUSINESS_PHONE_ALREADY_LINKED_MESSAGE
+        ? 409
+        : errorMessage.includes("Повторная отправка через")
+          ? 429
+          : 400;
       return NextResponse.json(
         { ok: false, error: errorMessage, otpState },
         { status }

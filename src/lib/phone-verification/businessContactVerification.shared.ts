@@ -46,6 +46,9 @@ export const BUSINESS_PHONE_ALREADY_LINKED_MESSAGE =
 
 /** Match only a unique conflict on phoneE164, never arbitrary P2002 errors. */
 export function isBusinessPhoneUniqueViolation(error: unknown): boolean {
+  if (error instanceof Error && error.message === BUSINESS_PHONE_ALREADY_LINKED_MESSAGE) {
+    return true;
+  }
   if (!error || typeof error !== "object" || !("code" in error) || error.code !== "P2002") {
     return false;
   }
@@ -53,6 +56,59 @@ export function isBusinessPhoneUniqueViolation(error: unknown): boolean {
     ? error.meta as Record<string, unknown>
     : null;
   const target = meta?.target;
-  return (Array.isArray(target) && target.includes("phoneE164")) ||
-    (typeof target === "string" && target.includes("phoneE164"));
+  return (Array.isArray(target) && (target.includes("phoneE164") || target.includes("businessContactVerifiedPhoneE164"))) ||
+    (typeof target === "string" && (target.includes("phoneE164") || target.includes("businessContactVerifiedPhoneE164")));
+}
+
+/** Verified phone evidence is keyed by an exact normalized phone match. */
+export type BusinessContactPhoneEvidence = {
+  phoneE164: string | null | undefined;
+  accountPhoneE164?: string | null;
+  accountPhoneVerifiedAt?: string | Date | null;
+  businessContactVerifiedPhoneE164?: string | null;
+  businessContactPhoneVerifiedAt?: string | Date | null;
+  existingBusinessPhoneE164?: string | null;
+  existingBusinessContactPhoneVerifiedAt?: string | Date | null;
+};
+
+export function verifiedBusinessContactPhone(params: BusinessContactPhoneEvidence): string {
+  const phone = params.phoneE164;
+  if (!phone) return "";
+  if (
+    (phone === params.accountPhoneE164 && params.accountPhoneVerifiedAt) ||
+    (phone === params.businessContactVerifiedPhoneE164 && params.businessContactPhoneVerifiedAt) ||
+    (phone === params.existingBusinessPhoneE164 && params.existingBusinessContactPhoneVerifiedAt)
+  ) return phone;
+  return "";
+}
+
+/** A verified business phone enables comments without approving the business itself. */
+export function hasVerifiedPhoneForComments(params: {
+  accountPhoneE164: string | null | undefined;
+  accountPhoneVerifiedAt: string | Date | null | undefined;
+  businessContactVerifiedPhoneE164: string | null | undefined;
+  businessContactPhoneVerifiedAt: string | Date | null | undefined;
+}): boolean {
+  return Boolean(
+    (params.accountPhoneE164 && params.accountPhoneVerifiedAt) ||
+    (params.businessContactVerifiedPhoneE164 && params.businessContactPhoneVerifiedAt)
+  );
+}
+
+/**
+ * Onboarding UI hint only: a freshly OTP-confirmed phone remains verified when
+ * the user briefly switches the input to another phone and comes back.
+ * This in-memory value is NEVER accepted by the server action as verification proof.
+ */
+export function resolveOnboardingVerifiedPhone(
+  params: BusinessContactPhoneEvidence & {
+    recentlyOtpVerifiedPhoneE164?: string | null;
+  }
+): string {
+  const serverVerified = verifiedBusinessContactPhone(params);
+  if (serverVerified) return serverVerified;
+  return isVerifiedPhoneMatch({
+    currentPhoneE164: params.phoneE164,
+    verifiedPhoneE164: params.recentlyOtpVerifiedPhoneE164,
+  }) ? params.phoneE164 ?? "" : "";
 }

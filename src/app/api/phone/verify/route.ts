@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         phone,
         code: code4,
+        target: "business",
       });
 
       return NextResponse.json({
@@ -85,6 +86,7 @@ export async function POST(request: NextRequest) {
       const errorMessage =
         error instanceof Error ? error.message : "Внутренняя ошибка сервера";
       const status =
+        errorMessage.includes("Неверный формат") ||
         errorMessage.includes("Код") ||
         errorMessage.includes("Неверный") ||
         errorMessage.includes("истёк") ||

@@ -40,6 +40,11 @@ export async function POST(request: NextRequest) {
             where: { phoneE164: normalizedPhone },
             select: { id: true, email: true },
           }),
+        isBusinessContactReserved: async (normalizedPhone) =>
+          Boolean(await prisma.user.findFirst({
+            where: { businessContactVerifiedPhoneE164: normalizedPhone },
+            select: { id: true },
+          })),
         createOrGetStub: (normalizedPhone, phoneDigits) =>
           prisma.user.upsert({
             where: { email: `phone_${phoneDigits}@pending.mamago.by` },
