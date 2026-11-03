@@ -17,6 +17,7 @@ import {
 import {
   type BusinessContactOtpClientState,
   isVerifiedPhoneMatch,
+  verifiedBusinessContactPhone,
 } from "@/lib/phone-verification/businessContactVerification.shared";
 import "./onboarding-phone-input.css";
 
@@ -43,23 +44,32 @@ function defaultPhoneFromProps(
   return "";
 }
 
-function defaultVerifiedPhoneFromProps(
-  initialData:
-    | { phone?: string | null; contactPhoneVerifiedAt?: string | Date | null }
-    | undefined
-    | null
+function verifiedPhoneFromProps(
+  phone: string,
+  initialData: { phone?: string | null; contactPhoneVerifiedAt?: string | Date | null } | null | undefined,
+  accountPhoneE164: string | null | undefined,
+  accountPhoneVerifiedAt: string | null | undefined,
+  businessContactVerifiedPhoneE164: string | null | undefined,
+  businessContactPhoneVerifiedAt: string | null | undefined
 ) {
-  if (initialData?.phone && initialData?.contactPhoneVerifiedAt) {
-    return initialData.phone;
-  }
-
-  return "";
+  return verifiedBusinessContactPhone({
+    phoneE164: phone,
+    existingBusinessPhoneE164: initialData?.phone,
+    existingBusinessContactPhoneVerifiedAt: initialData?.contactPhoneVerifiedAt,
+    accountPhoneE164,
+    accountPhoneVerifiedAt,
+    businessContactVerifiedPhoneE164,
+    businessContactPhoneVerifiedAt,
+  });
 }
 
 export function OnboardingForm({
   currentUserId,
   initialData,
   accountPhoneE164 = null,
+  accountPhoneVerifiedAt = null,
+  businessContactVerifiedPhoneE164 = null,
+  businessContactPhoneVerifiedAt = null,
   initialBusinessContactOtpState,
 }: {
   /** ID текущего авторизованного пользователя — используется для скоупинга localStorage draft */
@@ -67,6 +77,9 @@ export function OnboardingForm({
   initialData?: { unp?: string; legalName?: string; phone?: string | null; contactPhoneVerifiedAt?: string | null } | null;
   /** Номер из аккаунта (как правило, подтверждённый при регистрации) — если в заявке ещё нет телефона */
   accountPhoneE164?: string | null;
+  accountPhoneVerifiedAt?: string | null;
+  businessContactVerifiedPhoneE164?: string | null;
+  businessContactPhoneVerifiedAt?: string | null;
   /** Серверное состояние escalation OTP (business contact) */
   initialBusinessContactOtpState?: BusinessContactOtpClientState;
 }) {
@@ -81,7 +94,14 @@ export function OnboardingForm({
     defaultPhoneFromProps(initialData, accountPhoneE164)
   );
   const [verifiedPhoneE164, setVerifiedPhoneE164] = useState(() =>
-    defaultVerifiedPhoneFromProps(initialData)
+    verifiedPhoneFromProps(
+      defaultPhoneFromProps(initialData, accountPhoneE164),
+      initialData,
+      accountPhoneE164,
+      accountPhoneVerifiedAt,
+      businessContactVerifiedPhoneE164,
+      businessContactPhoneVerifiedAt
+    )
   );
   
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -115,15 +135,18 @@ export function OnboardingForm({
         setPhoneE164(accountPhoneE164);
       }
 
-      if (
-        draft.verifiedPhoneE164 &&
-        draft.phoneE164 &&
-        draft.verifiedPhoneE164 === draft.phoneE164
-      ) {
-        setVerifiedPhoneE164(draft.verifiedPhoneE164);
-      }
+      // A local draft is never proof of OTP; recompute from server evidence.
+      const draftPhone = draft.phoneE164 || accountPhoneE164 || "";
+      setVerifiedPhoneE164(verifiedPhoneFromProps(
+        draftPhone,
+        initialData,
+        accountPhoneE164,
+        accountPhoneVerifiedAt,
+        businessContactVerifiedPhoneE164,
+        businessContactPhoneVerifiedAt
+      ));
     });
-  }, [initialData, accountPhoneE164, currentUserId]);
+  }, [initialData, accountPhoneE164, accountPhoneVerifiedAt, businessContactVerifiedPhoneE164, businessContactPhoneVerifiedAt, currentUserId]);
 
   // Debounced save helper
   const debouncedSave = (data: Parameters<typeof saveDraft>[1]) => {
@@ -154,7 +177,14 @@ export function OnboardingForm({
       const nextVerifiedPhone =
         currentVerifiedPhone && currentVerifiedPhone === e164
           ? currentVerifiedPhone
-          : "";
+          : verifiedPhoneFromProps(
+              e164,
+              initialData,
+              accountPhoneE164,
+              accountPhoneVerifiedAt,
+              businessContactVerifiedPhoneE164,
+              businessContactPhoneVerifiedAt
+            );
       debouncedSave({
         phoneE164: e164,
         verifiedPhoneE164: nextVerifiedPhone || undefined,
@@ -259,6 +289,10 @@ export function OnboardingForm({
           Телефон (для связи)
         </label>
 
+        <p className="mb-2 text-xs text-gray-500">
+          Если этот номер уже подтверждён в аккаунте, повторное SMS не требуется.
+          Подтверждение контактного номера также позволяет оставлять комментарии.
+        </p>
         <PhoneVerificationField
           phoneE164={phoneE164}
           verifiedPhoneE164={verifiedPhoneE164}
