@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import {
   BUSINESS_CONTACT_VERIFICATION_PURPOSE,
+  BUSINESS_PHONE_ALREADY_LINKED_MESSAGE,
+  isBusinessPhoneUniqueViolation,
   LEGACY_BUSINESS_PHONE_VERIFY_PURPOSE,
   isE164Phone,
   isVerifiedPhoneMatch,
@@ -46,3 +48,24 @@ assert.equal(
 );
 
 console.log("businessContactVerification.shared.test.ts passed");
+
+assert.equal(
+  isBusinessPhoneUniqueViolation({ code: "P2002", meta: { target: ["phoneE164"] } }),
+  true
+);
+assert.equal(
+  isBusinessPhoneUniqueViolation({ code: "P2002", meta: { target: "User_phoneE164_key" } }),
+  true
+);
+assert.equal(
+  isBusinessPhoneUniqueViolation({ code: "P2002", meta: { target: ["email"] } }),
+  false
+);
+assert.equal(
+  isBusinessPhoneUniqueViolation({ code: "P2025", meta: { target: ["phoneE164"] } }),
+  false
+);
+assert.equal(isBusinessPhoneUniqueViolation(new Error("phoneE164")), false);
+assert.equal(isBusinessPhoneUniqueViolation({ code: "P2002" }), false);
+assert.match(BUSINESS_PHONE_ALREADY_LINKED_MESSAGE, /другому аккаунту/);
+assert.doesNotMatch(BUSINESS_PHONE_ALREADY_LINKED_MESSAGE, /Prisma|P2002|phoneE164/);

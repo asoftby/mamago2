@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
 import {
   normalizeBusinessContactVerificationPurpose,
+  BUSINESS_PHONE_ALREADY_LINKED_MESSAGE,
+  isBusinessPhoneUniqueViolation,
 } from "@/lib/phone-verification/businessContactVerification.shared";
 import {
   loadBusinessContactOtpClientState,
@@ -46,8 +48,19 @@ export async function POST(request: NextRequest) {
         otpState: result.otpState,
       });
     } catch (error) {
-      console.error("[phone/verify] Error:", error);
       const otpState = await loadBusinessContactOtpClientState(user.id);
+
+      if (isBusinessPhoneUniqueViolation(error)) {
+        return NextResponse.json(
+          {
+            ok: false,
+            code: "PHONE_ALREADY_IN_USE",
+            error: BUSINESS_PHONE_ALREADY_LINKED_MESSAGE,
+            otpState,
+          },
+          { status: 409 }
+        );
+      }
 
       if (isBusinessContactOtpEscalationError(error)) {
         const status =
@@ -78,8 +91,17 @@ export async function POST(request: NextRequest) {
         errorMessage.includes("не найден")
           ? 400
           : 500;
+      if (status === 500) {
+        console.error("[phone/verify] Unexpected verification error:", error);
+      }
       return NextResponse.json(
-        { ok: false, error: errorMessage, otpState },
+        {
+          ok: false,
+          error: status === 400
+            ? errorMessage
+            : "Не удалось подтвердить номер. Попробуйте позже.",
+          otpState,
+        },
         { status }
       );
     }
