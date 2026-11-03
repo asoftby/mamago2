@@ -74,11 +74,13 @@ export async function POST(request: NextRequest) {
 
     const message =
       error instanceof Error ? error.message : "Не удалось отправить код";
-    const status = message.includes("Повторная отправка через")
-      ? 429
-      : message.includes("Неверный формат")
-        ? 400
-        : 500;
+    const status = message === "Этот номер уже привязан к другому аккаунту"
+      ? 409
+      : message.includes("Повторная отправка через")
+        ? 429
+        : message.includes("Неверный формат")
+          ? 400
+          : 500;
 
     return NextResponse.json({ ok: false, error: message }, { status });
   }
