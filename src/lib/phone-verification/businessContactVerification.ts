@@ -9,6 +9,7 @@ import {
   BUSINESS_CONTACT_VERIFICATION_CODE_LENGTH,
   BUSINESS_CONTACT_VERIFICATION_PURPOSE,
   isE164Phone,
+  BUSINESS_PHONE_ALREADY_LINKED_MESSAGE,
 } from "./businessContactVerification.shared";
 import {
   BusinessContactOtpEscalationError,
@@ -128,7 +129,7 @@ export async function sendBusinessContactVerificationCode(params: {
     select: { id: true },
   });
   if (otherOwner) {
-    throw new Error("Этот номер уже привязан к другому аккаунту");
+    throw new Error(BUSINESS_PHONE_ALREADY_LINKED_MESSAGE);
   }
 
   const existing = await prisma.phoneOtp.findUnique({
@@ -360,7 +361,7 @@ export async function verifyBusinessContactVerificationCode(params: {
       select: { id: true },
     });
     if (conflictingOwner) {
-      throw new Error("Этот номер уже привязан к другому аккаунту");
+      throw new Error(BUSINESS_PHONE_ALREADY_LINKED_MESSAGE);
     }
 
     await tx.user.update({
