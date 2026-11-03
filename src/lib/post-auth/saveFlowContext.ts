@@ -1,3 +1,4 @@
+import type { HomePlanAttribution } from "@/features/save/planAttribution";
 import type {
   PendingEntityType,
   PendingPostAuthAction,
@@ -10,6 +11,7 @@ export type SaveFlowPostAuthAction =
 
 export function buildSavePostAuthContext(input: {
   result: SaveFlowPostAuthAction;
+  planAttribution?: HomePlanAttribution;
   returnTo: string;
   entityId?: string;
   entityType: PendingEntityType;
@@ -35,6 +37,7 @@ export function buildSavePostAuthContext(input: {
             entityType,
             entityId,
             plannedDate: result.dateISO,
+            ...(input.planAttribution ? { planAttribution: input.planAttribution } : {}),
             timeSlotId: result.timeSlotId,
             title,
             coverImageUrl,

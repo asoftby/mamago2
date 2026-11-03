@@ -209,16 +209,17 @@ export async function addPlanItem(
   coverImageUrl?: string,
   /** Family Core M4c: audience of a NEW item (existing items keep theirs). Default FAMILY. */
   visibility?: PlanVisibility,
+  tx: Pick<Prisma.TransactionClient, "planItem" | "experience"> = prisma,
 ): Promise<{ id: string; created: boolean }> {
   // Only deduplicate when activityId is present
   if (activityId) {
-    const occurrence = await resolvePlanActivityOccurrence({ userId, activityId, date });
+    const occurrence = await resolvePlanActivityOccurrence({ userId, activityId, date }, tx);
     if (occurrence.kind === "update") {
-      const before = await prisma.planItem.findUnique({
+      const before = await tx.planItem.findUnique({
         where: { id: occurrence.planItemId },
         select: { date: true, startsAt: true, familyId: true, visibility: true },
       });
-      const updated = await prisma.planItem.update({
+      const updated = await tx.planItem.update({
         where: { id: occurrence.planItemId },
         data: { date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
         select: { id: true },
@@ -241,7 +242,7 @@ export async function addPlanItem(
     }
   }
 
-  const created = await prisma.planItem.create({
+  const created = await tx.planItem.create({
     data: { userId, familyId: await familyIdForWrite(userId), ...(visibility ? { visibility } : {}), activityId: activityId ?? null, date, startsAt: startsAt ?? null, title: title ?? null, coverImageUrl: coverImageUrl ?? null },
     select: { id: true },
   });

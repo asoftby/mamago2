@@ -204,9 +204,9 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
         </div>
 
         {events.mode === "error" ? <CityHomeSection title="Мероприятия для семьи"><p role="alert">Не удалось проверить профиль. Обновите страницу, чтобы повторить.</p></CityHomeSection> :
-          <HomeEventsBoundary key={`${events.actorId}:${city.slug}:${events.mode}`} actorId={events.actorId}>
+          <HomeEventsBoundary key={`${events.actorId}:${city.slug}:${events.mode}`} actorId={events.actorId} citySlug={city.slug}>
             {events.mode === "personal" ? <CityHomeFamilyPicks citySlug={city.slug} initialContext={events.context} /> :
-              <CityHomeGeneralEvents activities={events.activities} citySlug={city.slug} authenticated={Boolean(user)} />}
+              <CityHomeGeneralEvents activities={events.activities} citySlug={city.slug} />}
           </HomeEventsBoundary>}
 
 

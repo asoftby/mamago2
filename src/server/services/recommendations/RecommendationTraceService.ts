@@ -216,6 +216,9 @@ export type RecommendationAttributionVerifyInput = {
   userId?: string | null;
   sessionId?: string | null;
   anonymousId?: string | null;
+  /** Optional strict scope for surface-specific write paths; legacy callers unchanged. */
+  surface?: RecommendationSurface;
+  maxAgeMinutes?: number;
 };
 
 /**
@@ -227,6 +230,7 @@ export type RecommendationAttributionVerifyInput = {
  */
 export async function verifyRecommendationAttribution(
   input: RecommendationAttributionVerifyInput,
+  db: Pick<Prisma.TransactionClient, "recommendationExposure"> = prisma,
 ): Promise<{ exposureId: string; runId: string } | null> {
   try {
     if (!input.exposureId) return null;
@@ -237,12 +241,13 @@ export async function verifyRecommendationAttribution(
     if (input.anonymousId) ownershipOr.push({ anonymousId: input.anonymousId });
     if (ownershipOr.length === 0) return null;
 
-    const exposure = await prisma.recommendationExposure.findFirst({
+    const exposure = await db.recommendationExposure.findFirst({
       where: {
         id: input.exposureId,
         entityType: input.entityType,
         entityId: input.entityId,
-        run: { OR: ownershipOr },
+        ...(input.maxAgeMinutes != null ? { exposedAt: { gte: new Date(Date.now() - Math.min(1440, Math.max(1, input.maxAgeMinutes)) * 60_000) } } : {}),
+        run: { OR: ownershipOr, ...(input.surface ? { surface: input.surface } : {}) },
       },
       select: { id: true, runId: true },
     });
@@ -261,6 +266,8 @@ export type RecommendationOutcomeLinkInput = {
   eventType: UserEventType;
   /** Квалифицированный показ (meta.impression: ≥50% ≥1 с). Только он ставит deliveredAt. */
   impression?: boolean;
+  surface?: RecommendationSurface;
+  maxAgeMinutes?: number;
   userId?: string | null;
   sessionId?: string | null;
   anonymousId?: string | null;
@@ -274,23 +281,24 @@ export type RecommendationOutcomeLinkInput = {
  */
 export async function linkRecommendationOutcome(
   input: RecommendationOutcomeLinkInput,
+  db: Pick<Prisma.TransactionClient, "recommendationExposure" | "recommendationOutcome"> = prisma,
 ): Promise<boolean> {
   try {
     if (!input.exposureId || !input.userEventId) return false;
 
-    const verified = await verifyRecommendationAttribution(input);
+    const verified = await verifyRecommendationAttribution(input, db);
     if (!verified) return false;
 
     // Квалифицированный показ (CARD_VIEW с meta.impression, ≥50% ≥1 с на клиенте):
     // фиксируем первый момент доставки, повторные показы его не перетирают.
     if (input.eventType === "CARD_VIEW" && input.impression === true) {
-      await prisma.recommendationExposure.updateMany({
+      await db.recommendationExposure.updateMany({
         where: { id: verified.exposureId, deliveredAt: null },
         data: { deliveredAt: new Date() },
       });
     }
 
-    await prisma.recommendationOutcome.upsert({
+    await db.recommendationOutcome.upsert({
       where: { userEventId: input.userEventId },
       create: {
         exposureId: verified.exposureId,

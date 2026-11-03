@@ -2,6 +2,11 @@ import { z } from "zod";
 import { AgeRangesRequestSchema } from "@/lib/decision/decisionContext";
 import { SafeOpaqueIdSchema } from "@/lib/decision/identifiers";
 
+export const calendarDaySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((day) => {
+  const parsed = new Date(day + "T12:00:00Z");
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(day);
+}, "Некорректная дата");
+
 /**
  * Request contract for POST /api/plan/generate. Kept out of the route file
  * (Next.js route modules may only export handlers) so it is directly testable.
@@ -11,9 +16,26 @@ import { SafeOpaqueIdSchema } from "@/lib/decision/identifiers";
 export const guestGenerateBodySchema = z.object({
   anonymousId: SafeOpaqueIdSchema.optional().nullable(),
   city: z.string().min(1).optional().default("minsk"),
-  date: z.string().optional(),
+  date: calendarDaySchema.optional(),
+  /** Saturday–Sunday for the guest weekend picker; maximum two days. */
+  dateTo: calendarDaySchema.optional(),
   exclude: z.array(z.string()).optional(),
   ageRanges: AgeRangesRequestSchema.optional(),
   /** Интересы из квиза гостя; на сервере отфильтровываются по каноническому списку. */
   interests: z.array(z.string().max(40)).max(13).optional(),
-});
+}).refine(({ date, dateTo }) => {
+  if (!dateTo) return true;
+  if (!date || dateTo < date) return false;
+  return (Date.parse(dateTo + "T12:00:00Z") - Date.parse(date + "T12:00:00Z")) <= 86_400_000;
+}, { message: "Дата окончания должна быть в пределах двух дней", path: ["dateTo"] });
+
+
+/** Read-only refresh for legacy guest drafts; no generation quota is consumed. */
+export const guestDraftRefreshSchema = z.object({
+  date: calendarDaySchema,
+  dateTo: calendarDaySchema.optional(),
+  ids: z.array(SafeOpaqueIdSchema).min(1).max(12),
+}).refine(
+  ({ date, dateTo }) => !dateTo || (dateTo >= date && Date.parse(dateTo + "T12:00:00Z") - Date.parse(date + "T12:00:00Z") <= 86_400_000),
+  { path: ["dateTo"], message: "Некорректный диапазон дат" },
+);
