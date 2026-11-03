@@ -39,3 +39,20 @@ export function isVerifiedPhoneMatch(params: {
       params.currentPhoneE164 === params.verifiedPhoneE164
   );
 }
+
+/** Safe public copy: do not expose database internals or account identities. */
+export const BUSINESS_PHONE_ALREADY_LINKED_MESSAGE =
+  "Этот номер уже привязан к другому аккаунту mamaGo. Войдите в него или обратитесь в поддержку.";
+
+/** Match only a unique conflict on phoneE164, never arbitrary P2002 errors. */
+export function isBusinessPhoneUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== "object" || !("code" in error) || error.code !== "P2002") {
+    return false;
+  }
+  const meta = "meta" in error && error.meta && typeof error.meta === "object"
+    ? error.meta as Record<string, unknown>
+    : null;
+  const target = meta?.target;
+  return (Array.isArray(target) && target.includes("phoneE164")) ||
+    (typeof target === "string" && target.includes("phoneE164"));
+}
