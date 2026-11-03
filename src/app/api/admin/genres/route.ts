@@ -93,7 +93,7 @@ export async function POST(req: Request) {
         category: { select: { id: true, nameRu: true, slug: true } },
       },
     });
-    revalidateTag(eventStep1GenresTag(categoryId), "max");
+    revalidateTag(eventStep1GenresTag(categoryId), { expire: 0 });
     return NextResponse.json(created);
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {

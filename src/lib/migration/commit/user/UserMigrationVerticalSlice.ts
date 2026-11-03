@@ -241,7 +241,7 @@ export async function writeUserMigration(
   return prisma.$transaction(async tx => {
     const source = await tx.migrationSource.upsert({
       where: { adapterKey_sourceNamespace: { adapterKey: "wordpress-db", sourceNamespace } },
-      create: { adapterKey: "wordpress-db", sourceNamespace, name: sourceNamespace === "users-immutable-snapshot" ? "Immutable WordPress User snapshot" : "Live WordPress users", scope: { goldenOnly: sourceNamespace === "users-immutable-snapshot" } },
+      create: { adapterKey: "wordpress-db", sourceNamespace, name: sourceNamespace === "users-immutable-snapshot" ? "Immutable WordPress User snapshot" : sourceNamespace === "dev-user-recovery-1064" ? "DEV migrated User recovery (issue #1064)" : "Live WordPress users", scope: { goldenOnly: sourceNamespace === "users-immutable-snapshot" } },
       update: {},
     });
     const run = await tx.migrationRun.create({ data: { sourceId: source.id, mode: "COMMIT", status: "RUNNING", adapterVersion: "users-v1", snapshotHash, startedAt: new Date() } });

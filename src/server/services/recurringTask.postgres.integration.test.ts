@@ -3,7 +3,7 @@
  */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { after, test } from "node:test";
+import { after, beforeEach, test } from "node:test";
 import { PrismaClient } from "@prisma/client";
 import { createRecurringTaskSeries, cancelRecurringTaskSeries } from "./recurringTask.service";
 import { materializeRecurrencesForRange } from "./recurrenceMaterialization.service";
@@ -18,6 +18,14 @@ if (!["postgres:", "postgresql:"].includes(url.protocol) ||
     url.port !== "55444" || url.pathname !== "/mamago_recurrence_it") {
   throw Error("recurrence_it_only_allows_localhost_55444_mamago_recurrence_it");
 }
+
+// The fixture calendar (including weekdays) is intentional. Freeze only Date so
+// future-edit scenarios cannot silently become past-edit scenarios as CI ages.
+// Each test owns/restores its clock; real timers and PostgreSQL remain untouched.
+beforeEach(context => {
+  assert.ok("mock" in context, "fixture clock requires a test context");
+  context.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-28T09:00:00.000Z") });
+});
 
 const db = new PrismaClient();
 after(async () => db.$disconnect());
@@ -313,4 +321,22 @@ test("reassignment to a family child applies to all future materialized instance
   const rows=await db.planItem.findMany({where:{recurrenceSeriesId:updated.seriesId}});
   assert.equal(rows.length,4);
   assert.ok(rows.every(row=>row.childId===child.id));
+});
+
+test("following edit still rejects an occurrence after it becomes past", async context => {
+  const owner = await fixture();
+  const id = await createRecurringTaskSeries(owner, {
+    ...base, requestKey: "repeat_" + randomUUID().replaceAll("-", ""),
+    recurrence: { frequency: "DAILY", interval: 1, startDate: "2026-11-01", maxOccurrences: 5 },
+  });
+  const target = await db.planItem.findFirstOrThrow({ where: { recurrenceSeriesId: id } });
+  const snapshot = await getRecurringTaskSeriesForEdit(owner, target.id);
+  context.mock.timers.setTime(new Date("2026-11-02T09:00:00.000Z").getTime());
+  await assert.rejects(editRecurringTaskFollowing(owner, target.id, {
+    expectedUpdatedAt: snapshot.expectedUpdatedAt, expectedSeriesVersion: snapshot.expectedSeriesVersion,
+    title: "Must remain unchanged", startTime: "18:00", reminderEnabled: false, reminderLeadMinutes: null,
+    childId: null, assigneeUserId: null, recurrence: snapshot.recurrence,
+  }), /past_series_edit_not_allowed/);
+  assert.equal(await db.planRecurrenceSeries.count({ where: { ownerUserId: owner.userId } }), 1);
+  assert.equal((await db.planItem.findUniqueOrThrow({ where: { id: target.id } })).title, base.title);
 });

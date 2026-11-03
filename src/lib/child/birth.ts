@@ -181,3 +181,16 @@ export function childDisplayName(name: string | null | undefined, unnamedIndex?:
   if (normalized) return normalized;
   return unnamedIndex == null ? "Ребёнок" : `Ребёнок ${unnamedIndex}`;
 }
+
+/** Conservative completed-month interval at a calendar date (UTC date-only input).
+ * Null precision is legacy uncertainty: never infer an exact birthday from its day.
+ */
+export function ageMonthsIntervalAt(record: ChildBirthRecord, targetDate: Date): { min: number; max: number } | null {
+  const birth = recordParts(record);
+  if (!birth || Number.isNaN(targetDate.getTime())) return null;
+  const target = utcCalendarParts(targetDate);
+  const lastDay = record.birthPrecision === "DAY" ? birth.day : new Date(Date.UTC(birth.year, birth.month, 0)).getUTCDate();
+  const firstDay = record.birthPrecision === "DAY" ? birth.day : 1;
+  const months = (day: number) => (target.year - birth.year) * 12 + target.month - birth.month - Number(target.day < day);
+  return { min: months(lastDay), max: months(firstDay) };
+}

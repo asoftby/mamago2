@@ -3,6 +3,7 @@ import { Prisma, SignalDomain, SignalEntityType, SignalStatus, SignalUsageType }
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canManageSignalDefinitions } from "@/lib/auth/signalDefinitionsAdmin";
+import { revalidateEventStep1Signals } from "@/server/admin/activities/revalidateEventStep1Signals";
 import { ensureEventCategorySlug } from "@/lib/taxonomy/eventCategorySlug";
 import { assertValidSignalParentIdOrNull } from "@/lib/taxonomy/signalHierarchyServer";
 
@@ -221,6 +222,7 @@ export async function POST(req: Request) {
         _count: { select: { children: true, options: true } },
       },
     });
+    revalidateEventStep1Signals(created.slug);
     return NextResponse.json(created);
   } catch (e) {
     if (e instanceof SyntaxError) {

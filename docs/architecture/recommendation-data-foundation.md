@@ -137,3 +137,48 @@ immutable `ATTENDED` / `EXPERIENCE_FEEDBACK` events in a 365-day horizon.
 Historical subjects match only by `kind + refId`; manual subjects never become
 persistent preference identity. Non-matching and disliked candidates remain
 rankable. Future ranking changes must intentionally bump `algorithmVersion`.
+
+### Home policy: `family-picks-confirmed-v2` (PR 2 policy, PR 3 delivery)
+
+`loadPersonalFamilyPicks` / `selectPersonalFamilyPicks` in the existing `familyPicks`
+modules remain the read-only surface composition path. PR 3 wraps it in final
+HOME delivery through an authenticated private/no-store POST contract.
+`HOME_FAMILY_PICKS_V2=1` enables the personal Home branch; default OFF renders
+one common events section. Legacy GET retains its v1 contract. See
+[PR 3 runtime checklist](../engineering/issue-1059-pr3-runtime.md).
+
+The prepared path resolves a fresh server profile through the existing family ACL,
+validates ALL_FAMILY/CHILD selection before candidate loading, and consumes the
+complete `rankPlanSuggestionsForCity` batch and its score. It does not define new
+behavior weights, change Discovery membership, or require Feedback 5★.
+
+At each confirmed occurrence, age fit is proved over the child's birth interval:
+DAY is exact, MONTH (and legacy null precision) covers every possible day of its
+month. Evaluation uses the occurrence's Europe/Minsk calendar date. Missing DOB
+never becomes MATCH, including unrestricted events. Only proven matches are
+eligible. One chosen occurrence owns the card date and its exact matched-child
+list; matches on different dates cannot be combined into “all children”.
+
+ALL_FAMILY puts AND first; OR is appended only if AND <4. Within a group, use the
+shared score, then the chosen date, then a stable ID tie-break. Return up to 7
+unique events, even when only 1–2 qualify; no hard diversity/novelty reservation
+may remove AND or hide short results. Individual selection admits only that
+child's confirmed matches. The window is 7 local calendar days from today,
+expanded to 30 only when the final eligible 7-day result is empty.
+
+Hydration rechecks published/live visibility and active business. Withdrawn and
+past sessions are excluded; any stored sessions suppress nextOccurrenceAt
+fallback, preventing resurrection of cancelled materialized dates. ALWAYS,
+ON_DEMAND and RECURRING without a future confirmed date are not dated results.
+The current ActivitySession schema has no authoritative sold-out field;
+isSaleOpen=false or absent buyUrl must not be interpreted as sold out. The pure
+occurrence contract can exclude an explicit trusted soldOut signal when one is
+available; this PR invents no such signal from sale metadata.
+
+The v2 loader returns policyVersion and sharedAlgorithmVersion, final window,
+selection, READY/EMPTY/UNAVAILABLE and confirmed occurrence metadata. It writes
+**no** runs/exposures for preview, empty results or intermediate fallback passes.
+PR 3 must explicitly implement delivery, then trace the final returned set once;
+preparing a response alone is not a qualified impression. v2 exclusions use the
+existing active plan ACL and account-scoped 60-day DISMISS history; other adults'
+rejections and browser anonymous IDs do not become this account's preferences.

@@ -1,21 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { revalidateEventStep1Signals } from "@/server/admin/activities/revalidateEventStep1Signals";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canManageSignalDefinitions } from "@/lib/auth/signalDefinitionsAdmin";
 
 export const runtime = "nodejs";
 
-async function resolveDefinitionId(identifier: string): Promise<string | null> {
+async function resolveDefinition(identifier: string): Promise<{ id: string; slug: string } | null> {
   const bySlug = await prisma.signalDefinition.findUnique({
     where: { slug: identifier },
-    select: { id: true },
+    select: { id: true, slug: true },
   });
-  if (bySlug) return bySlug.id;
-  const byId = await prisma.signalDefinition.findUnique({
+  if (bySlug) return bySlug;
+  return prisma.signalDefinition.findUnique({
     where: { id: identifier },
-    select: { id: true },
+    select: { id: true, slug: true },
   });
-  return byId?.id ?? null;
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -25,8 +25,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const { id } = await params;
-  const definitionId = await resolveDefinitionId(id);
-  if (!definitionId) {
+  const definition = await resolveDefinition(id);
+  if (!definition) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   const body = await req.json(); 
@@ -35,7 +35,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!label || !value) return NextResponse.json({ ok:false, error:"label and value required" }, { status: 400 }); 
 
   const created = await prisma.signalOption.create({ 
-    data: { definitionId, label, value, order: body.order ?? 0, isActive: body.isActive ?? true }, 
+    data: { definitionId: definition.id, label, value, order: body.order ?? 0, isActive: body.isActive ?? true }, 
   }); 
+  revalidateEventStep1Signals(definition.slug);
   return NextResponse.json(created); 
 } 
