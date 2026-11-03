@@ -17,7 +17,7 @@ import { FAMILY_PERSONAS_CHANGED_EVENT } from "@/lib/family/familyPersonaEvents"
 import { AUTH_STATE_CHANGED_EVENT } from "@/lib/auth/client";
 import { homeChipSelectEvent, homeCatalogEvent, homeSelectionMode } from "../lib/homeInteractionTelemetry";
 import { HomeSelectionSync, persistHomeSelection } from "../lib/homeSelectionSync";
-import { FamilyHomeCache, readHomeDismissals, writeHomeDismissals, HOME_DISMISS_TTL_MS, type HomeDismissal } from "../lib/familyHomeCache";
+import { FamilyHomeCache, drainPendingHomeDismissals, readHomeDismissals, writeHomeDismissals, HOME_DISMISS_TTL_MS, type HomeDismissal } from "../lib/familyHomeCache";
 import { homeCatalogHref, homeSelection, homeSelectionLabel, homeAgeLabel, homePeriodLabel, minskPlanDate, type HomeFamilyContext } from "../lib/familyHome";
 import type { HomeFamilyDelivery } from "@/server/services/recommendations/familyPicks/delivery";
 
@@ -73,22 +73,16 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
     if (dismissFlushActive.current || !allowedActor.current) return;
     dismissFlushActive.current = true;
     try {
-      // This independent queue starts as soon as the user rejects an event.
-      // Ranker requests may be aborted during navigation; dismissal writes must not be.
-      while (allowedActor.current) {
-        const entry = dismissals.current.find(value => !value.saved);
-        if (!entry) return;
-        try {
-          await post({ action: "dismiss", city: entry.city, eventId: entry.id, exposureId: entry.exposureId, token: entry.token,
-            selectedChildId: entry.selectedChildId ?? null });
-          if (!allowedActor.current) return;
-          entry.saved = true;
-          writeHomeDismissals(actor, dismissals.current);
-        } catch {
-          if (allowedActor.current && mounted.current) setAnnouncement("Событие скрыто на этом устройстве. Повторим сохранение отказа.");
-          return; // keep the unsaved token for a future attempt
-        }
-      }
+      // Independent of ranking/navigation; a removed child or failed write
+      // cannot block valid dismissals later in the queue.
+      await drainPendingHomeDismissals(
+        () => dismissals.current,
+        () => allowedActor.current,
+        async entry => { await post({ action: "dismiss", city: entry.city, eventId: entry.id, exposureId: entry.exposureId,
+          token: entry.token, selectedChildId: entry.selectedChildId ?? null }); },
+        () => writeHomeDismissals(actor, dismissals.current),
+        () => { if (mounted.current) setAnnouncement("Событие скрыто на этом устройстве. Повторим сохранение отказа."); },
+      );
     } finally {
       dismissFlushActive.current = false;
     }

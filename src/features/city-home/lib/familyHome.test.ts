@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { homeCatalogHref, homeSelection, homeAgeLabel, minskPlanDate, familyHomeCacheKey, type HomeFamilyContext } from "./familyHome";
-import { FamilyHomeCache, HOME_DISMISS_TTL_MS, readHomeDismissals, writeHomeDismissals } from "./familyHomeCache";
+import { FamilyHomeCache, HOME_DISMISS_TTL_MS, drainPendingHomeDismissals, readHomeDismissals, writeHomeDismissals, type HomeDismissal } from "./familyHomeCache";
 import { parseAppliedFromUrl } from "@/features/filters/discovery/discoveryFilterParams";
 
 const context: HomeFamilyContext = { actorId: "account_a", signature: "a".repeat(64), day: "2030-11-02", policyVersion: "v2", audience: "personalized",
@@ -102,6 +102,50 @@ test("device dismissal storage is account-scoped, bounded and aligned with serve
   } finally { Reflect.deleteProperty(globalThis, "localStorage"); }
 });
 
+test("failed or deleted-child dismissals cannot block valid entries or cause retry loops", async () => {
+  const entry = (token: string, child: string | null): HomeDismissal =>
+    ({ id: token, token, city: "minsk", exposureId: null, selectedChildId: child, at: Date.now(), saved: false });
+  const records = [entry("orphan", "deleted_child"), entry("valid", "child_0001"), entry("network", null)];
+  const attempts: string[] = [];
+  let failures = 0;
+  let writes = 0;
+  const flush = () => drainPendingHomeDismissals(
+    () => records, () => true,
+    async record => {
+      attempts.push(record.token);
+      if (record.token === "orphan" || (record.token === "network" && failures < 2)) {
+        throw new Error(record.token === "orphan" ? "home_404" : "home_503");
+      }
+    },
+    () => { writes++; },
+    () => { failures++; },
+  );
+  await flush();
+  assert.deepEqual(attempts, ["orphan", "valid", "network"]);
+  assert.deepEqual(records.map(record => record.saved), [false, true, false]);
+  assert.equal(writes, 1);
+  await flush();
+  assert.deepEqual(attempts, ["orphan", "valid", "network", "orphan", "network"]);
+  assert.deepEqual(records.map(record => record.saved), [false, true, true]);
+  assert.equal(writes, 2);
+});
+
+test("newly queued dismissals are sent while an earlier write is pending", async () => {
+  const records: HomeDismissal[] = [{ id: "first", token: "first", city: "minsk", exposureId: null, at: Date.now(), saved: false }];
+  const attempts: string[] = [];
+  await drainPendingHomeDismissals(
+    () => records, () => true,
+    async record => {
+      attempts.push(record.token);
+      if (record.token === "first") records.push({ id: "second", token: "second", city: "minsk", exposureId: null, at: Date.now(), saved: false });
+    },
+    () => {},
+    () => assert.fail("no write should fail"),
+  );
+  assert.deepEqual(attempts, ["first", "second"]);
+  assert.ok(records.every(record => record.saved));
+});
+
 test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty states", () => {
   const ui = readFileSync("src/features/city-home/components/CityHomeFamilyPicks.tsx", "utf8");
   assert.equal((ui.match(/<SaveHeart /g) ?? []).length, 1);
@@ -114,6 +158,7 @@ test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty
   assert.match(ui, /setData\(null\)/);
   assert.match(ui, /keepalive: body.action === "dismiss"/, "dismissal request should survive page navigation");
   assert.match(ui, /if \(dismissFlushActive.current \|\| !allowedActor.current\) return/, "dismissal writes must be serialized");
+  assert.match(ui, /await drainPendingHomeDismissals\(/, "retryable failures must not block other dismissals");
   assert.match(ui, /void flushDismissals\(\);\s*void load\(\{ keepCurrent: true \}\)/,
     "persist user rejection before fetching replacement recommendations");
   assert.doesNotMatch(ui, /AddParticipantModal/);

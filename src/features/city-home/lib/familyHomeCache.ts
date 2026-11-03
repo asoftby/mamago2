@@ -15,6 +15,31 @@ export function readHomeDismissals(actor: string, now = Date.now()): HomeDismiss
 export function writeHomeDismissals(actor: string, entries: HomeDismissal[]) {
   try { localStorage.setItem(`mg_family_home_dismissed:${actor}`, JSON.stringify(entries.slice(-200))); } catch { /* Visit memory still applies. */ }
 }
+/** Each pending token is attempted at most once per pass. A rejected/removed
+ * child must not block later valid dismissals; failures remain retryable. */
+export async function drainPendingHomeDismissals(
+  entries: () => HomeDismissal[],
+  canSend: () => boolean,
+  send: (entry: HomeDismissal) => Promise<void>,
+  onSaved: () => void,
+  onFailed: () => void,
+) {
+  const attempted = new Set<string>();
+  while (canSend()) {
+    const entry = entries().find(value => !value.saved && !attempted.has(value.token));
+    if (!entry) return;
+    attempted.add(entry.token);
+    try {
+      await send(entry);
+      if (!canSend()) return;
+      entry.saved = true;
+      onSaved();
+    } catch {
+      // Preserve the failed entry for a later pass; continue past 404/5xx.
+      if (canSend()) onFailed();
+    }
+  }
+}
 export class FamilyHomeCache<T extends { items: { id: string }[]; window: { horizonDays: 7 | 30 } }> {
   private entries = new Map<string, { data: T; until: number }>();
   private denied = new Map<string, number>();
