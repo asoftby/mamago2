@@ -106,6 +106,12 @@ test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty
   const ui = readFileSync("src/features/city-home/components/CityHomeFamilyPicks.tsx", "utf8");
   assert.equal((ui.match(/<SaveHeart /g) ?? []).length, 1);
   assert.ok(ui.includes("<FamilyActivationEditChildBirthOverlay"), "birth-only editor must preserve existing interests");
+  assert.match(ui, /attempt < 2/);
+  assert.match(ui, /error\.message === "home_409"/);
+  assert.match(ui, /deliveryScopeMatches/);
+  assert.match(ui, /const deadline = setTimeout/);
+  assert.match(ui, /clearTimeout\(deadline\)/);
+  assert.match(ui, /setData\(null\)/);
   assert.doesNotMatch(ui, /AddParticipantModal/);
   assert.doesNotMatch(ui, /saveMeta=|selectedPersonaIds|useDiscoveryFilters|startsAt.slice/);
   for (const expected of ['framing="poster"', 'aria-pressed', 'ArrowRight', 'ArrowLeft', 'context.children.length > 0', 'items.slice(0, 10)', 'role="alert"', 'horizonDays === 30', 'Все события для', '+ Ребёнок']) assert.ok(ui.includes(expected), expected);

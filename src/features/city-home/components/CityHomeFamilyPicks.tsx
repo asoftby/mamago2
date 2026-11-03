@@ -50,6 +50,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   const actor = initialContext.actorId!;
   const [context, setContext] = useState(initialContext);
   const contextRef = useRef(initialContext);
+  const visibleSelection = useRef(initialContext.selectedChildId);
   const [selected, setSelected] = useState<string | null>(initialContext.selectedChildId);
   const [data, setData] = useState<HomeFamilyDelivery | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -86,6 +87,15 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
     const generation = cache.current.begin();
     if (!options?.keepCurrent) setState("loading");
     const valid = () => mounted.current && !abort.signal.aborted && allowedActor.current && cache.current.current(generation);
+    // The single deadline covers both context+ranking and any stale-context
+    // retry. A second fetch must not double the apparent loading time.
+    const deadline = setTimeout(() => {
+      if (valid()) {
+        setState("error");
+        setAnnouncement("Подбор не ответил вовремя. Повторите попытку или откройте каталог.");
+      }
+      abort.abort();
+    }, 15_000);
     try {
       const stored = readHomeDismissals(actor);
       const entryKey = (entry: HomeDismissal) => JSON.stringify([entry.selectedChildId ?? null, entry.id]);
@@ -96,32 +106,62 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
         if (!previous || entry.at > previous.at || (entry.token === previous.token && entry.saved)) merged.set(entryKey(entry), entry);
       }
       dismissals.current = [...merged.values()].slice(-200);
-      // Pending telemetry must not hold the recommendation loader hostage
-      // to a sequence of network retries; local exclusions apply immediately.
-      void flushDismissals();
-      if (!valid()) return;
-      const fresh = (await post({ action: "context", city: citySlug }, abort.signal)).context as HomeFamilyContext;
-      if (!valid()) return;
-      if (fresh.actorId !== actor || fresh.audience !== "personalized") { cache.current.cancel(); router.refresh(); return; }
-      const choice = selectionSync.current.reconcile(fresh);
-      setSelected(choice);
-      if (contextRef.current.signature !== fresh.signature) cache.current.clear();
-      contextRef.current = fresh;
-      setContext(fresh);
-      const cached = cache.current.get(fresh, citySlug, choice);
-      if (cached) { setData(cached); setState("ready"); return; }
-      const result = await post({ action: "recommend", city: citySlug, selectedChildId: choice, signature: fresh.signature,
-        dismissedIds: dismissals.current.filter(entry =>
-          !entry.selectedChildId || entry.selectedChildId === choice).map(entry => entry.id) }, abort.signal) as HomeFamilyDelivery;
-      if (!valid()) return;
-      if (result.context.actorId !== actor || result.context.signature !== fresh.signature) throw new Error("stale_context");
-      cache.current.set(fresh, citySlug, choice, result);
-      setData(cache.current.filter(result, Date.now(), choice));
-      setState("ready");
+      // A persisted DISMISS changes Home's signed context. It is safe for
+      // telemetry to complete in the background: locally excluded IDs already
+      // reach the ranker, and a stale signature can be retried once.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (!valid()) return;
+        const fresh = (await post({ action: "context", city: citySlug }, abort.signal)).context as HomeFamilyContext;
+        if (!valid()) return;
+        if (fresh.actorId !== actor || fresh.audience !== "personalized") {
+          setData(null);
+          setState("loading");
+          cache.current.cancel();
+          router.refresh();
+          return;
+        }
+        const choice = selectionSync.current.reconcile(fresh);
+        const childrenChanged = JSON.stringify(contextRef.current.children) !== JSON.stringify(fresh.children);
+        if (choice !== visibleSelection.current || childrenChanged) {
+          // Never show an old child's interactive cards under another chip.
+          setData(null);
+          setState("loading");
+        }
+        visibleSelection.current = choice;
+        setSelected(choice);
+        if (contextRef.current.signature !== fresh.signature) cache.current.clear();
+        contextRef.current = fresh;
+        setContext(fresh);
+        const cached = cache.current.get(fresh, citySlug, choice);
+        if (cached) {
+          setData(cached);
+          setState("ready");
+          void flushDismissals();
+          return;
+        }
+        let result: HomeFamilyDelivery;
+        try {
+          result = await post({ action: "recommend", city: citySlug, selectedChildId: choice, signature: fresh.signature,
+            dismissedIds: dismissals.current.filter(entry =>
+              !entry.selectedChildId || entry.selectedChildId === choice).map(entry => entry.id) }, abort.signal) as HomeFamilyDelivery;
+        } catch (error) {
+          if (valid() && attempt === 0 && error instanceof Error && error.message === "home_409") continue;
+          throw error;
+        }
+        if (!valid()) return;
+        if (result.context.actorId !== actor || result.context.signature !== fresh.signature) throw new Error("stale_context");
+        cache.current.set(fresh, citySlug, choice, result);
+        setData(cache.current.filter(result, Date.now(), choice));
+        setState("ready");
+        void flushDismissals();
+        return;
+      }
     } catch (error) {
       if (!valid()) return;
       if (error instanceof Error && /home_(401|403|404|409)/.test(error.message)) { cache.current.cancel(); router.refresh(); }
       setState("error");
+    } finally {
+      clearTimeout(deadline);
     }
   }, [actor, citySlug, flushDismissals, router]);
 
@@ -162,6 +202,9 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
     if (!interaction) return;
     void postAnalyticsEvent(interaction);
     const token = selectionSync.current.begin(choice);
+    visibleSelection.current = choice;
+    setData(null);
+    setState("loading");
     setSelected(choice);
     setAnnouncement("Сохраняем выбор на аккаунте…");
     preferenceQueue.current = preferenceQueue.current.catch(() => {}).then(async () => {
@@ -203,6 +246,8 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   const editingChild = context.children.find(child => child.id === editingChildId);
   const href = homeCatalogHref(citySlug, context, selected);
   const actorMatches = auth.user?.id === actor && !auth.isLoading;
+  const deliveryScopeMatches = !data || (data.selection.mode === "CHILD"
+    ? data.selection.selectedChildId === selected : selected === null);
   return <CityHomeSection title="Для вашей семьи" subtitle={data ? homePeriodLabel(data.window) : "Подбираем события для вашей семьи"} reserveCarouselControls>
     <div className="min-h-40" data-placement="HOME_FOR_FAMILY" aria-busy={state === "loading"}>
       {context.children.length > 0 && <div role="group" aria-label="Для кого подобрать события" className="mb-4 flex gap-2 overflow-x-auto py-1"
@@ -224,7 +269,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
       {choiceChild && !choiceChild.hasBirthDate && <p className="mb-4 text-sm">Укажите дату рождения ребёнка для точного подбора.{" "}
         <button type="button" className="min-h-11 underline" onClick={() => setEditingChildId(choiceChild.id)}>Указать возраст</button>
       </p>}
-      {(!actorMatches || state === "loading") ? <div role="status"><span className="sr-only">Подбираем события…</span><HorizontalCardRow>{[0, 1, 2, 3].map(id => <div key={id} className={EVENT_CARD_SHELL}><div className="aspect-[2/3] animate-pulse rounded-2xl bg-muted" /><div className="mt-3 h-16 rounded bg-muted/50" /></div>)}</HorizontalCardRow></div> :
+      {(!actorMatches || state === "loading" || !deliveryScopeMatches) ? <div role="status"><span className="sr-only">Подбираем события…</span><HorizontalCardRow>{[0, 1, 2, 3].map(id => <div key={id} className={EVENT_CARD_SHELL}><div className="aspect-[2/3] animate-pulse rounded-2xl bg-muted" /><div className="mt-3 h-16 rounded bg-muted/50" /></div>)}</HorizontalCardRow></div> :
         state === "error" ? <div role="alert" className="py-8"><p>Не удалось загрузить события. Повторите попытку.</p><button type="button" className="min-h-11 underline" onClick={() => void load()}>Повторить</button><p><Link href={href} onClick={() => void postAnalyticsEvent(homeCatalogEvent(selected, citySlug))} className="underline">Открыть каталог</Link></p></div> : <FamilyHomeResults data={data!} context={context} citySlug={citySlug} selected={selected} impressed={impressed}
           onImpression={identity => setImpressed(previous => new Set([...previous, identity]))}
           onDismiss={dismiss} onSave={() => { cache.current.clear(); void load({ keepCurrent: true }); }} />}
