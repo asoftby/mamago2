@@ -44,15 +44,15 @@ export function PhoneVerificationGateModal({
     setLoading(true);
 
     try {
-      const response = await fetch("/api/phone/start", {
+      const response = await fetch("/api/settings/phone/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneE164: phone }),
+        body: JSON.stringify({ phone }),
       });
 
       const result = await response.json();
 
-      if (result.success) {
+      if (response.ok && result.ok) {
         setStep("otp");
       } else {
         setError(result.error || "Не удалось отправить код");
@@ -69,15 +69,15 @@ export function PhoneVerificationGateModal({
     setLoading(true);
 
     try {
-      const response = await fetch("/api/phone/verify", {
+      const response = await fetch("/api/settings/phone/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneE164: phone, code: otp }),
+        body: JSON.stringify({ phone, code: otp }),
       });
 
       const result = await response.json();
 
-      if (result.success) {
+      if (response.ok && result.ok) {
         // Refresh user data
         await refetch();
 
@@ -221,7 +221,7 @@ export function PhoneVerificationGateModal({
                     placeholder="123456"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                    maxLength={6}
+                    maxLength={4}
                     className="text-center text-2xl tracking-widest"
                   />
                 </div>
@@ -237,7 +237,7 @@ export function PhoneVerificationGateModal({
                   </Button>
                   <Button
                     onClick={handleVerifyOtp}
-                    disabled={otp.length !== 6 || loading}
+                    disabled={otp.length !== 4 || loading}
                     className="flex-1 bg-blue-600 hover:bg-blue-700"
                   >
                     {loading ? "Проверка..." : "Подтвердить"}
