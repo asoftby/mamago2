@@ -1,4 +1,5 @@
 "use client";
+import type { HomePlanAttribution } from "@/features/save/planAttribution";
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -47,6 +48,7 @@ export type SaveActivityFlowAdaptiveProps = {
   /** Entity id for guest pending-action resume; falls back to activityId when omitted */
   pendingEntityId?: string;
   source?: string;
+  planAttribution?: HomePlanAttribution;
   collectionTarget?: IdeaCollectionTarget;
   onPersist: (result: SaveToPlanResult) => Promise<void>;
   nextHref?: string;
@@ -110,6 +112,7 @@ export function SaveActivityFlowAdaptive({
   pendingEntityType = "activity",
   pendingEntityId,
   source,
+  planAttribution,
   collectionTarget,
   onPersist,
   nextHref,
@@ -177,6 +180,7 @@ export function SaveActivityFlowAdaptive({
         savePostAuthContext(
           buildSavePostAuthContext({
             result,
+            planAttribution,
             returnTo: resolvedNext,
             entityId,
             entityType: pendingEntityType,
@@ -196,6 +200,7 @@ export function SaveActivityFlowAdaptive({
       coverImageUrl,
       pendingEntityType,
       pendingEntityId,
+      planAttribution,
       resolvedNext,
     ],
   );

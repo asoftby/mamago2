@@ -71,6 +71,7 @@ export async function trackUserEvent(
     // always re-verified server-side (entity match + actor ownership) before
     // anything is built on top of it, exactly like the fallback lookup already
     // does implicitly via its own scoped query. See decisionId below.
+    const homePlanAdd = input.attributionPolicy === "HOME_PLAN_ADD" && input.eventType === "PLAN_ADD" && input.entityType === "EVENT";
     const isRecommendationAction = metaObject?.source === "recommendation";
     const explicitExposureId =
       typeof metaObject?.recommendationExposureId === "string"
@@ -85,10 +86,11 @@ export async function trackUserEvent(
           entityType: input.entityType,
           entityId: input.entityId,
           userId: input.userId ?? null,
-          sessionId: input.sessionId ?? null,
-          anonymousId: input.anonymousId ?? null,
+          sessionId: homePlanAdd ? null : input.sessionId ?? null,
+          anonymousId: homePlanAdd ? null : input.anonymousId ?? null,
+          ...(homePlanAdd ? { surface: "HOME" as const, maxAgeMinutes: 120 } : {}),
         });
-      } else if (input.userId || input.anonymousId) {
+      } else if (!homePlanAdd && (input.userId || input.anonymousId)) {
         // Also matches a guest-owned run (anonymousId) even once the actor
         // is now authenticated — old guest history keeps its own identity,
         // we just look it up by both keys instead of rewriting it.
@@ -119,6 +121,20 @@ export async function trackUserEvent(
       }
     }
 
+    if (homePlanAdd) {
+      // No recent-exposure fallback, no client-provided HOME claims survive failure.
+      const rest = { ...(metaObject ?? {}) };
+      for (const key of ["recommendationExposureId", "recommendationRunId", "recommendationSurface", "placement", "homePlanAddVerified"]) {
+        delete rest[key];
+      }
+      metaObject = { ...rest, source: attribution ? "recommendation" : "detail",
+        section: attribution ? "home" : "afisha",
+        ...(attribution ? { recommendationExposureId: attribution.exposureId,
+          recommendationRunId: attribution.runId, recommendationSurface: "home",
+          placement: "HOME_FOR_FAMILY", homePlanAddVerified: true } : {}) };
+      meta = metaObject as Prisma.InputJsonValue;
+    }
+
     // decisionId = RecommendationRun.id, set ONLY from a verified attribution
     // above (explicit-and-verified, or the ownership-scoped fallback). Not a
     // hard FK — see UserEvent.decisionId.
@@ -131,8 +147,7 @@ export async function trackUserEvent(
 
     let userEvent;
     try {
-      userEvent = await prisma.userEvent.create({
-        data: {
+      const data = {
           idempotencyKey: input.idempotencyKey ?? undefined,
           userId: input.userId ?? undefined,
           sessionId: input.sessionId ?? undefined,
@@ -147,8 +162,21 @@ export async function trackUserEvent(
           cityId: cityId ?? undefined,
           clientClass: input.clientClass ?? undefined,
           meta: meta === undefined ? undefined : meta,
-        },
-      });
+      };
+      if (homePlanAdd && attribution) {
+        userEvent = await prisma.$transaction(async tx => {
+          const event = await tx.userEvent.create({ data });
+          const linked = await linkRecommendationOutcome({
+            exposureId: attribution!.exposureId, entityType: "EVENT", entityId: input.entityId!,
+            userEventId: event.id, eventType: "PLAN_ADD", userId: input.userId,
+            surface: "HOME", maxAgeMinutes: 120,
+          }, tx);
+          if (!linked) throw new Error("home_plan_outcome_not_linked");
+          return event;
+        });
+      } else {
+        userEvent = await prisma.userEvent.create({ data });
+      }
     } catch (error) {
       if (
         input.idempotencyKey &&
@@ -158,6 +186,15 @@ export async function trackUserEvent(
         // The winning request already owns every downstream side effect. Do
         // not aggregate behavior, register promotion actions, or link another
         // recommendation outcome for this retry.
+        if (homePlanAdd) {
+          const existing = await prisma.userEvent.findUnique({
+            where: { idempotencyKey: input.idempotencyKey }, select: { id: true },
+          });
+          const outcome = existing ? await prisma.recommendationOutcome.findUnique({
+            where: { userEventId: existing.id }, select: { id: true },
+          }) : null;
+          return { ok: true, recommendationOutcomeLinked: Boolean(outcome) };
+        }
         return { ok: true };
       }
       throw error;
@@ -186,7 +223,7 @@ export async function trackUserEvent(
       typeof metaObject?.recommendationExposureId === "string"
         ? metaObject.recommendationExposureId.trim()
         : "";
-    if (recommendationExposureId && input.entityType && input.entityId) {
+    if (!homePlanAdd && recommendationExposureId && input.entityType && input.entityId) {
       void linkRecommendationOutcome({
         exposureId: recommendationExposureId,
         entityType: input.entityType,
@@ -200,7 +237,7 @@ export async function trackUserEvent(
       });
     }
 
-    return { ok: true };
+    return { ok: true, ...(homePlanAdd ? { recommendationOutcomeLinked: Boolean(attribution) } : {}) };
   } catch (error) {
     console.error("[product-telemetry] trackUserEvent failed:", error);
     return {

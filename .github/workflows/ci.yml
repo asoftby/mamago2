@@ -424,6 +424,10 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm test:family-picks-policy-integration
           pnpm test:family-home-integration
+          pnpm test:family-home-analytics-integration
+          pnpm test:decision-attribution-integration
+          pnpm exec tsx src/app/api/analytics/events/route.test.ts
+          pnpm exec tsx src/lib/analytics/impressionGate.test.ts
 
       - name: Five-user WordPress recovery atomicity and rerun on PostgreSQL
         env:

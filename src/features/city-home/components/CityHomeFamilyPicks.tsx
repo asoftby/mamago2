@@ -15,6 +15,7 @@ import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
 import { FAMILY_PERSONAS_CHANGED_EVENT } from "@/lib/family/familyPersonaEvents";
 import { AUTH_STATE_CHANGED_EVENT } from "@/lib/auth/client";
+import { homeChipSelectEvent, homeCatalogEvent, homeSelectionMode } from "../lib/homeInteractionTelemetry";
 import { HomeSelectionSync, persistHomeSelection } from "../lib/homeSelectionSync";
 import { FamilyHomeCache, readHomeDismissals, writeHomeDismissals, HOME_DISMISS_TTL_MS, type HomeDismissal } from "../lib/familyHomeCache";
 import { homeCatalogHref, homeSelection, homeSelectionLabel, homeAgeLabel, homePeriodLabel, minskPlanDate, type HomeFamilyContext } from "../lib/familyHome";
@@ -156,6 +157,10 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
 
   function select(id: string | null) {
     const choice = homeSelection(context, id);
+    const previous = selectionSync.current.reconcile(contextRef.current);
+    const interaction = homeChipSelectEvent(previous, choice, citySlug);
+    if (!interaction) return;
+    void postAnalyticsEvent(interaction);
     const token = selectionSync.current.begin(choice);
     setSelected(choice);
     setAnnouncement("Сохраняем выбор на аккаунте…");
@@ -220,7 +225,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
         <button type="button" className="min-h-11 underline" onClick={() => setEditingChildId(choiceChild.id)}>Указать возраст</button>
       </p>}
       {(!actorMatches || state === "loading") ? <div role="status"><span className="sr-only">Подбираем события…</span><HorizontalCardRow>{[0, 1, 2, 3].map(id => <div key={id} className={EVENT_CARD_SHELL}><div className="aspect-[2/3] animate-pulse rounded-2xl bg-muted" /><div className="mt-3 h-16 rounded bg-muted/50" /></div>)}</HorizontalCardRow></div> :
-        state === "error" ? <div role="alert" className="py-8"><p>Не удалось загрузить события. Повторите попытку.</p><button type="button" className="min-h-11 underline" onClick={() => void load()}>Повторить</button><p><Link href={href} className="underline">Открыть каталог</Link></p></div> : <FamilyHomeResults data={data!} context={context} citySlug={citySlug} selected={selected} impressed={impressed}
+        state === "error" ? <div role="alert" className="py-8"><p>Не удалось загрузить события. Повторите попытку.</p><button type="button" className="min-h-11 underline" onClick={() => void load()}>Повторить</button><p><Link href={href} onClick={() => void postAnalyticsEvent(homeCatalogEvent(selected, citySlug))} className="underline">Открыть каталог</Link></p></div> : <FamilyHomeResults data={data!} context={context} citySlug={citySlug} selected={selected} impressed={impressed}
           onImpression={identity => setImpressed(previous => new Set([...previous, identity]))}
           onDismiss={dismiss} onSave={() => { cache.current.clear(); void load({ keepCurrent: true }); }} />}
       <p role="status" aria-live="polite" className="sr-only">{announcement}</p>
@@ -244,7 +249,7 @@ export function FamilyHomeResults({ data, context, citySlug, selected, impressed
   const href = homeCatalogHref(citySlug, context, selected);
   function meta(item: HomeFamilyDelivery["items"][number]) {
     return { source: item.exposureId ? "recommendation" as const : "listing" as const, section: "home" as const, placement: "HOME_FOR_FAMILY", recommendationSurface: "home" as const,
-      policyVersion: data?.policyVersion, selection: selected ?? "ALL_FAMILY", position: item.position,
+      policyVersion: data?.policyVersion, selectionMode: homeSelectionMode(selected), position: item.position,
       ...(data?.runId ? { recommendationRunId: data.runId } : {}), ...(item.exposureId ? { recommendationExposureId: item.exposureId } : {}) };
   }
   return <>
@@ -260,13 +265,13 @@ export function FamilyHomeResults({ data, context, citySlug, selected, impressed
                     <EventCard id={item.id} title={item.title} href={item.href} imageUrl={item.imageUrl} imageWidth={item.imageWidth} imageHeight={item.imageHeight} framing="poster" imagePriority={index < 2}
                       categoryLabel={item.categoryName ?? undefined} metaLabel={`${homeAgeLabel(item)} · ${formatRuShortDayMonth(item.startsAt)}`} priceLabel={formatPublicCardPrice(item) ?? undefined} />
                     <p className="mt-2 text-xs font-medium">{badge}</p>
-                    <div className="mt-3 flex flex-wrap gap-2"><SaveHeart activityId={item.id} activityTitle={item.title} coverImageUrl={item.imageUrl} eventPlanDateISO={minskPlanDate(item.startsAt)} source="home-family-picks" triggerLabel="В мой план" onSaveChange={onSave} />
+                    <div className="mt-3 flex flex-wrap gap-2"><SaveHeart activityId={item.id} activityTitle={item.title} coverImageUrl={item.imageUrl} eventPlanDateISO={minskPlanDate(item.startsAt)} source="home-family-picks" planAttribution={{ planAddSource: "home-family-picks", recommendationExposureId: item.exposureId }} triggerLabel="В мой план" onSaveChange={onSave} />
                       <button type="button" onClick={() => onDismiss(item)} className="min-h-11 px-2 text-sm underline">Не подходит</button></div>
                   </div>
                 </AnalyticsCardViewTracker>
               </div>;
             })}
-            <div className={EVENT_CARD_SHELL}><Link href={href} className="flex min-h-48 items-center justify-center rounded-2xl border border-dashed p-6 text-center">Все события для {homeSelectionLabel(context, selected)}</Link></div>
+            <div className={EVENT_CARD_SHELL}><Link href={href} onClick={() => void postAnalyticsEvent(homeCatalogEvent(selected, citySlug))} className="flex min-h-48 items-center justify-center rounded-2xl border border-dashed p-6 text-center">Все события для {homeSelectionLabel(context, selected)}</Link></div>
           </HorizontalCardRow>
         </>;
 }
