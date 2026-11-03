@@ -45,3 +45,10 @@ test("subtype questions stay available for classes and parties", () => {
   assert.ok(clarifier.includes("...getOfferTypeSelection(item.type)"));
   assert.ok(!clarifier.includes("categoryIds: []"));
 });
+
+test("business creation cards have equal height and two-line descriptions, without technical captions", () => {
+  assert.ok(menu.includes('min-h-[104px] items-center'));
+  assert.ok(menu.includes('line-clamp-2 min-h-10 max-w-[260px] leading-5'));
+  assert.ok(!menu.includes('Создаёт Place'));
+  assert.ok(!menu.includes('Создаёт Offer'));
+});
