@@ -102,6 +102,8 @@ const DEDUP_WINDOWS: Record<NotificationType, number | null> = {
   PLACE_UPDATE_APPROVED: null,
   PLACE_UPDATE_NEEDS_REVISION: null,
   PLACE_UPDATE_REJECTED: null,
+  // Each new request must notify again, even if a previous request for this place was resolved.
+  PLACE_IMPROVEMENT_REQUESTED: 0,
   OFFER_APPROVED: null,
   OFFER_NEEDS_CHANGES: null,
   OFFER_REJECTED: null,

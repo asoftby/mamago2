@@ -9,6 +9,7 @@ import {
 } from "@/server/services/improvementRequest.service";
 import { ImprovementSeverity } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { notifyPlaceImprovementRequested } from "@/server/services/notification.service";
 
 /**
  * GET /api/admin/places/[id]/improvement-request
@@ -95,7 +96,7 @@ export async function POST(
     // Get place to find owner
     const place = await prisma.place.findUnique({
       where: { id },
-      select: { ownerBusinessId: true, status: true },
+      select: { title: true, status: true, ownerBusiness: { select: { ownerUserId: true } } },
     });
 
     if (!place) {
@@ -109,11 +110,21 @@ export async function POST(
       );
     }
 
+    // ImprovementRequest.assignedToUserId references User.id, never Business.id.
+    // Without a linked business, sending a "successful" request is misleading.
+    const ownerUserId = place.ownerBusiness?.ownerUserId;
+    if (!ownerUserId) {
+      return NextResponse.json(
+        { error: "К месту не привязан бизнес. Нельзя отправить замечание владельцу." },
+        { status: 422 },
+      );
+    }
+
     const request = await createImprovementRequest({
       entityType: "PLACE",
       entityId: id,
       createdByModeratorId: user.id,
-      assignedToUserId: place.ownerBusinessId || user.id,
+      assignedToUserId: ownerUserId,
       severity,
       title,
       description,
@@ -121,7 +132,27 @@ export async function POST(
       dueAt: dueAt ? new Date(dueAt) : undefined,
     });
 
-    return NextResponse.json({ request });
+    // Keep the business action even if notification infrastructure is unavailable,
+    // but tell the moderator rather than silently reporting delivery as successful.
+    let notificationCreated = false;
+    try {
+      await notifyPlaceImprovementRequested({
+        placeId: id,
+        placeName: place.title,
+        requestId: request.id,
+        ownerUserId,
+        requestTitle: request.title,
+        requestDescription: request.description,
+      });
+      notificationCreated = true;
+    } catch (notificationError) {
+      console.error("[API] Improvement request notification creation failed", {
+        requestId: request.id,
+        notificationError,
+      });
+    }
+
+    return NextResponse.json({ request, notificationCreated }, { status: 201 });
   } catch (error: unknown) {
     console.error("[API] Create improvement request error:", error);
     
