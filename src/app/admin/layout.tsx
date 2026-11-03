@@ -98,8 +98,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div className="min-h-screen bg-gray-50 font-sans antialiased">
         {/* Global Header */}
         <AdminHeader
-          userRole={user.role === "ADMIN" ? "ADMIN" : "MODERATOR"}
           userEmail={user.email || undefined}
+          userRole={user.role === "ADMIN" ? "ADMIN" : "MODERATOR"}
           userDisplayName={user.displayName}
           hasApprovedBusinessProfile={hasApprovedBusinessProfile}
           moderationCounts={moderationCounts}

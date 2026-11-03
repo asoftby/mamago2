@@ -173,11 +173,11 @@ export function AdminHeader({
         showCloseButton={true}
       >
         <AdminSidebar
-          userRole={userRole}
           moderationCounts={moderationCounts}
           b2bPendingVerificationCount={b2bPendingVerificationCount}
           importPendingReviewCount={importPendingReviewCount}
           reviewsPendingCount={reviewsPendingCount}
+          userRole={userRole}
           onNavigate={() => setMobileMenuOpen(false)}
           buildInfo={buildInfo}
         />
