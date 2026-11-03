@@ -10,6 +10,8 @@ type Page = { items: NextItem[]; nextCursor: string | null };
 type NewsPayload = Omit<BreakingNewsViewProps, "articleId" | "articleHref" | "citySlug" | "publishedAt"> & {
   id: string;
   slug: string;
+  href: string;
+  citySlug?: string | null;
   publishedAt: string | null;
 };
 
@@ -42,8 +44,6 @@ export function BreakingNewsLazyNext({ initialArticleId, initialArticleHref, cit
   const articleAbortRef = useRef<AbortController | null>(null);
   const initialDocumentTitleRef = useRef<string | null>(null);
 
-  const queryScope = citySlug ? "&city=" + encodeURIComponent(citySlug) : "";
-  const articleBasePath = citySlug ? "/" + citySlug + "/blog/" : "/blog/";
   const archiveHref = (citySlug ? "/" + citySlug + "/blog" : "/blog") + "?type=news&archive=1";
   const loadedIds = new Set(articles.map((article) => article.articleId));
   const next = nextContinuationItem(items, loadedIds, new Set(unavailableIds));
@@ -90,8 +90,11 @@ export function BreakingNewsLazyNext({ initialArticleId, initialArticleHref, cit
       setLoadingList(true);
       const controller = new AbortController();
       listAbortRef.current = controller;
-      const timeout = window.setTimeout(() => controller.abort(), 8000);
-      fetch("/api/journal/breaking-news/next?cursor=" + encodeURIComponent(cursorRef.current) + queryScope, {
+      const timeout = window.setTimeout(() => {
+        if (!controller.signal.aborted) setError(true);
+        controller.abort();
+      }, 8000);
+      fetch("/api/journal/breaking-news/next?cursor=" + encodeURIComponent(cursorRef.current), {
         signal: controller.signal,
       })
         .then(async (response) => {
@@ -117,7 +120,7 @@ export function BreakingNewsLazyNext({ initialArticleId, initialArticleHref, cit
     }, { root, rootMargin: "0px 0px 240px 0px" });
     observer.observe(node);
     return () => observer.disconnect();
-  }, [articles, error, hasMore, items, next, queryScope, unavailableIds]);
+  }, [articles, error, hasMore, items, next, unavailableIds]);
 
   // Fetch each full article only as its boundary approaches the viewport.
   useEffect(() => {
@@ -131,9 +134,12 @@ export function BreakingNewsLazyNext({ initialArticleId, initialArticleHref, cit
       setLoadingArticle(true);
       const controller = new AbortController();
       articleAbortRef.current = controller;
-      const timeout = window.setTimeout(() => controller.abort(), 8000);
+      const timeout = window.setTimeout(() => {
+        if (!controller.signal.aborted) setError(true);
+        controller.abort();
+      }, 8000);
       let unavailable = false;
-      fetch("/api/journal/breaking-news/article?id=" + encodeURIComponent(next.id) + queryScope, {
+      fetch("/api/journal/breaking-news/article?id=" + encodeURIComponent(next.id), {
         signal: controller.signal,
       })
         .then(async (response) => {
@@ -153,8 +159,7 @@ export function BreakingNewsLazyNext({ initialArticleId, initialArticleHref, cit
               ...article,
               articleId: article.id,
               publishedAt: article.publishedAt ? new Date(article.publishedAt) : null,
-              citySlug,
-              articleHref: articleBasePath + article.slug,
+              articleHref: article.href,
             }];
           });
         })
@@ -171,7 +176,7 @@ export function BreakingNewsLazyNext({ initialArticleId, initialArticleHref, cit
     }, { root, rootMargin: "0px 0px 240px 0px" });
     observer.observe(node);
     return () => observer.disconnect();
-  }, [articleBasePath, articles, citySlug, error, next, queryScope]);
+  }, [articles, error, next]);
 
   const complete = !hasMore && !next && !loadingList && !loadingArticle && !error;
   return (

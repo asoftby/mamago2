@@ -26,6 +26,17 @@ test("archive is shown only after the last article, not between articles", () =>
   assert.ok(!reader.includes("Далее в Breaking News"), "there is no intermediate next-news card");
 });
 
+test("continuation preserves canonical URLs for city and national news", () => {
+  const nextEndpoint = source("../../app/api/journal/breaking-news/next/route.ts");
+  const articleEndpoint = source("../../app/api/journal/breaking-news/article/route.ts");
+  const reader = source("./BreakingNewsLazyNext.tsx");
+  assert.ok(!nextEndpoint.includes("scopeWhere"), "the news index mixes geographic scopes");
+  assert.match(articleEndpoint, /buildArticlePublicPath/);
+  assert.match(articleEndpoint, /geoScope: row\.geoScope/);
+  assert.match(articleEndpoint, /citySlug: row\.geoScope === "CITY"/);
+  assert.match(reader, /articleHref: article\.href/);
+});
+
 test("scroll tracking and continuation work with regular pages and dialogs", () => {
   const reader = source("./BreakingNewsLazyNext.tsx");
   const overlay = source("./JournalNewsOverlay.tsx");
