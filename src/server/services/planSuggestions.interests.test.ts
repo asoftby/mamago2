@@ -6,6 +6,7 @@ import {
   INTEREST_MATCH_WEIGHT,
   MAX_INTEREST_MATCHES,
   PLAN_SUGGESTION_ALGORITHM_VERSION,
+  confirmedPlanOccurrencesWhere,
 } from "./planSuggestions.service";
 
 const scienceEvent = { signals: { interests: ["science"] } };
@@ -46,5 +47,21 @@ assert.deepEqual(matching.interestReasonCodes, ["INTEREST_MATCH"]);
 const nonmatching = planSuggestionScore({ engagementScore: 7, profileInterestSlugs: ["sport"], scheduleJson: scienceEvent });
 assert.equal(nonmatching.score, 7, "nonmatching candidates remain rankable");
 assert.deepEqual(nonmatching.interestReasonCodes, []);
+
+// Dated recommendations must filter verified future sessions before the top-N
+// ranking cap; generic ALWAYS availability is not a booked time.
+const start = new Date("2026-11-03T00:00:00Z");
+const end = new Date("2026-11-04T00:00:00Z");
+const now = new Date("2026-11-03T12:00:00Z");
+const confirmed = confirmedPlanOccurrencesWhere({ start, end }, now);
+assert.deepEqual(confirmed, {
+  OR: [
+    { sessions: { some: { startsAt: { gte: now, lt: end }, withdrawnAt: null } } },
+    { AND: [
+      { sessions: { none: {} } },
+      { nextOccurrenceAt: { gte: now, lt: end } },
+    ] },
+  ],
+});
 
 console.log("planSuggestions.interests.test.ts: OK");
