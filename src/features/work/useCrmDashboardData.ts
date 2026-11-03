@@ -12,6 +12,8 @@ interface DashboardData {
   leads: CrmLead[];
   todayItems: WorkItem[];
   upcomingItems: WorkItem[];
+  upcomingLoading: boolean;
+  upcomingError: string | null;
   totalLeads: number | null;
   activeSales: number | null;
   refresh: () => void;
@@ -36,12 +38,19 @@ function query(base: string, values: Record<string, string>): string {
 }
 
 /** CRM is a view of canonical WorkItem / CrmLead APIs from #1077. */
-export function useCrmDashboardData(actorId: string): DashboardData {
+export function useCrmDashboardData(actorId: string, upcomingSearch: string): DashboardData {
   const [refreshToken, setRefreshToken] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [leadsResult, setLeadsResult] = useState<LeadList | null>(null);
-  const [upcomingResult, setUpcomingResult] = useState<WorkList | null>(null);
+  const [upcomingState, setUpcomingState] = useState<{
+    key: string; result: WorkList | null; error: string | null;
+  } | null>(null);
+  const upcomingKey = JSON.stringify([actorId, upcomingSearch, refreshToken]);
+  const latestUpcoming = upcomingState?.key === upcomingKey ? upcomingState : null;
+  const upcomingResult = latestUpcoming?.result ?? null;
+  const upcomingLoading = latestUpcoming === null;
+  const upcomingError = latestUpcoming?.error ?? null;
   const [todayResult, setTodayResult] = useState<WorkList | null>(null);
   const [overdueResult, setOverdueResult] = useState<WorkList | null>(null);
   const [activeSales, setActiveSales] = useState<number | null>(null);
@@ -65,19 +74,16 @@ export function useCrmDashboardData(actorId: string): DashboardData {
       // Exclude completed/canceled tasks on the server, BEFORE pagination.
       readJson<WorkList>(query(itemsBase, { ...own, due: "TODAY", openOnly: "true" }), signal),
       readJson<WorkList>(query(itemsBase, { ...own, due: "OVERDUE" }), signal),
-      // Query the server for future OPEN tasks before applying pagination.
-      readJson<WorkList>(query(itemsBase, { ...own, due: "UPCOMING", take: "4" }), signal),
       salesCount("NEW"), salesCount("IN_PROGRESS"), salesCount("WAITING"),
-    ]).then(([leads, today, overdue, upcoming, salesNew, salesInProgress, salesWaiting]) => {
+    ]).then(([leads, today, overdue, salesNew, salesInProgress, salesWaiting]) => {
       if (signal.aborted) return;
       if (!Array.isArray(leads.leads) || !Array.isArray(today.items) ||
-        !Array.isArray(overdue.items) || !Array.isArray(upcoming.items)) {
+        !Array.isArray(overdue.items)) {
         throw new Error("Сервер вернул неполные данные CRM.");
       }
       setLeadsResult(leads);
       setTodayResult(today);
       setOverdueResult(overdue);
-      setUpcomingResult(upcoming);
       setActiveSales(salesNew.total + salesInProgress.total + salesWaiting.total);
       setLoading(false);
     }).catch((cause: unknown) => {
@@ -87,6 +93,28 @@ export function useCrmDashboardData(actorId: string): DashboardData {
     });
     return () => controller.abort();
   }, [actorId, refreshToken]);
+
+  // Searching updates only the upcoming panel, not all dashboard metrics and leads.
+  // Aborting the previous request prevents stale search responses from replacing new results.
+  useEffect(() => {
+    const controller = new AbortController();
+    const search = upcomingSearch.trim();
+    void readJson<WorkList>(query("/api/admin/work/items", {
+      assigneeId: actorId, due: "UPCOMING", take: "4",
+      ...(search ? { search } : {}),
+    }), controller.signal).then(result => {
+      if (controller.signal.aborted) return;
+      if (!Array.isArray(result.items)) throw new Error("Сервер вернул неполные данные CRM.");
+      setUpcomingState({ key: upcomingKey, result, error: null });
+    }).catch((cause: unknown) => {
+      if (controller.signal.aborted) return;
+      setUpcomingState({
+        key: upcomingKey, result: null,
+        error: cause instanceof Error ? cause.message : "Ошибка загрузки ближайших задач.",
+      });
+    });
+    return () => controller.abort();
+  }, [actorId, upcomingSearch, refreshToken, upcomingKey]);
 
   const todayItems = useMemo(() => sortByDeadline(
     uniqueItems(todayResult?.items ?? [], overdueResult?.items ?? []).filter(isOpen),
@@ -101,7 +129,7 @@ export function useCrmDashboardData(actorId: string): DashboardData {
     loading, error,
     leads: leadsResult?.leads ?? [],
     todayItems,
-    upcomingItems,
+    upcomingItems, upcomingLoading, upcomingError,
     totalLeads: leadsResult?.total ?? null,
     activeSales,
     refresh,

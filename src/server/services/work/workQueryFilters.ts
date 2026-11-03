@@ -21,7 +21,15 @@ export function buildWorkItemWhere(
       AND: [{ status: { notIn: ["DONE", "CANCELED"] as const } }],
     } : {}),
     ...(query.assigneeId ? { assigneeId: query.assigneeId } : {}),
-    ...(query.search ? { title: { contains: query.search, mode: "insensitive" as const } } : {}),
+    // Filter on the server before the LIMIT/OFFSET in listWorkItems.
+    ...(query.search ? {
+      OR: [
+        { title: { contains: query.search, mode: "insensitive" as const } },
+        { nextAction: { contains: query.search, mode: "insensitive" as const } },
+        { business: { is: { name: { contains: query.search, mode: "insensitive" as const } } } },
+        { lead: { is: { name: { contains: query.search, mode: "insensitive" as const } } } },
+      ],
+    } : {}),
     ...(query.due === "TODAY" ? { dueAt: { gte: start, lt: end } } :
       query.due === "OVERDUE" ? {
         dueAt: { lt: now },

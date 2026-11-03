@@ -31,6 +31,11 @@ test("CRM uses staff-only admin navigation and real canonical APIs", () => {
   assert.match(server, /prisma\.supportThread\.count/);
   assert.match(client, /\/api\/admin\/work\/items/);
   assert.match(client, /\/api\/admin\/work\/leads/);
+  assert.match(client, /search \? \{ search \} : \{\}/, "upcoming search must reach the server");
+  assert.match(client, /take: "4"/, "server must paginate matching upcoming tasks to four");
+  const dashboard = read("src/features/work/components/CrmDashboard.tsx");
+  assert.match(dashboard, /useCrmDashboardData\(actorId, debouncedSearch\)/);
+  assert.doesNotMatch(dashboard, /data\.upcomingItems\.filter\(/, "do not search only the four loaded tasks");
   // The dashboard must never reach dev without the backing #1088 handlers.
   for (const path of [
     "src/app/api/admin/work/items/route.ts",

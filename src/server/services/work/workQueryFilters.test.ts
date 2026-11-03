@@ -60,6 +60,22 @@ test("TODAY open-only filtering excludes completed tasks before pagination", () 
   });
 });
 
+test("UPCOMING searches title, next action, business and lead before pagination", () => {
+  const where = buildWorkItemWhere(workListQuerySchema.parse({
+    due: "UPCOMING", search: "  Клиент Ромашка  ", take: "4",
+    assigneeId: "clp0o00000000000000000001",
+  }), new Date("2026-11-03T12:00:00Z"));
+  assert.deepEqual(where.OR, [
+    { title: { contains: "Клиент Ромашка", mode: "insensitive" } },
+    { nextAction: { contains: "Клиент Ромашка", mode: "insensitive" } },
+    { business: { is: { name: { contains: "Клиент Ромашка", mode: "insensitive" } } } },
+    { lead: { is: { name: { contains: "Клиент Ромашка", mode: "insensitive" } } } },
+  ]);
+  assert.deepEqual(where.AND, [{ status: { notIn: ["DONE", "CANCELED"] } }]);
+  assert.deepEqual(where.dueAt, { gte: new Date("2026-11-03T21:00:00Z") });
+  assert.equal(where.assigneeId, "clp0o00000000000000000001");
+});
+
 test("open-only remains additive with UPCOMING and explicit statuses", () => {
   const where = buildWorkItemWhere(workListQuerySchema.parse({
     due: "UPCOMING", openOnly: "true", status: "WAITING",

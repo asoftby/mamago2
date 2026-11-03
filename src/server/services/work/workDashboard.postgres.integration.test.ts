@@ -26,6 +26,9 @@ test("CRM upcoming and lead summaries remain correct beyond 50 tasks and across 
     prismaBase.crmLead.create({ data: { name: `CRM test old backlog ${key}` } }),
     prismaBase.crmLead.create({ data: { name: `CRM test other administrator ${key}` } }),
   ]);
+  const business = await prismaBase.business.create({
+    data: { ownerUserId: admin2.id, name: "CRM searchable business " + key },
+  });
   try {
     const old = new Date("2020-01-01T12:00:00Z");
     await prismaBase.workItem.createMany({
@@ -74,6 +77,37 @@ test("CRM upcoming and lead summaries remain correct beyond 50 tasks and across 
     assert.equal(futureResult.total, 1);
     assert.equal(futureResult.items[0]?.title, "Upcoming private task");
 
+    // The matches intentionally fall AFTER four earlier unrelated tasks.
+    // Search must execute in PostgreSQL before the server applies take=4.
+    await prismaBase.workItem.createMany({
+      data: Array.from({ length: 5 }, (_, i) => ({
+        title: "Unrelated upcoming " + i, kind: "OPERATIONS" as const,
+        status: "NEW" as const, dueAt: new Date("2030-11-30T09:00:00Z"),
+        assigneeId: admin1.id, createdById: admin1.id,
+      })),
+    });
+    await prismaBase.workItem.create({
+      data: { title: "Discuss the next campaign", kind: "OPERATIONS", status: "NEW",
+        dueAt: new Date("2030-12-02T09:00:00Z"), businessId: business.id,
+        assigneeId: admin1.id, createdById: admin1.id },
+    });
+    const firstFour = await listWorkItems(workListQuerySchema.parse({
+      assigneeId: admin1.id, due: "UPCOMING", take: 4,
+    }));
+    assert.equal(firstFour.total, 7);
+    assert.ok(firstFour.items.every(row => row.title.startsWith("Unrelated upcoming")));
+    for (const [search, expectedTitle] of [
+      ["private task", "Upcoming private task"],
+      [lead1.name, "Upcoming private task"],
+      [business.name, "Discuss the next campaign"],
+    ]) {
+      const found = await listWorkItems(workListQuerySchema.parse({
+        assigneeId: admin1.id, due: "UPCOMING", search, take: 4,
+      }));
+      assert.equal(found.total, 1, "server search failed for " + search);
+      assert.equal(found.items[0]?.title, expectedTitle);
+    }
+
     const leads = await listLeads(crmLeadListQuerySchema.parse({ take: 50 }));
     const other = leads.leads.find(row => row.id === lead2.id);
     assert.ok(other, "lead owned by another admin must be returned");
@@ -86,6 +120,7 @@ test("CRM upcoming and lead summaries remain correct beyond 50 tasks and across 
       "completed backlog must not hide the next action");
   } finally {
     await prismaBase.workItem.deleteMany({ where: { createdById: admin1.id } });
+    await prismaBase.business.delete({ where: { id: business.id } });
     await prismaBase.crmLead.deleteMany({ where: { id: { in: [lead1.id, lead2.id] } } });
     await prismaBase.user.deleteMany({ where: { id: { in: [admin1.id, admin2.id] } } });
   }

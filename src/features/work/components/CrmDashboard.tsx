@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle, ArrowRight, CalendarDays, Check, ChevronRight, CircleHelp,
   Clock3, Handshake, Headset, LoaderCircle, Plus, RefreshCw, Search, UsersRound,
@@ -135,8 +135,13 @@ function CrmLeadTable({
 }
 
 export function CrmDashboard({ actorId, openSupportCount }: Props) {
-  const data = useCrmDashboardData(actorId);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => clearTimeout(timeout);
+  }, [search]);
+  const data = useCrmDashboardData(actorId, debouncedSearch);
   const [createState, setCreateState] = useState<CreateState>(null);
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
   const [showAllLeads, setShowAllLeads] = useState(false);
@@ -153,10 +158,10 @@ export function CrmDashboard({ actorId, openSupportCount }: Props) {
       .some(text => text?.toLocaleLowerCase("ru-RU").includes(query)),
   ), [data.leads, query]);
   const visibleLeads = showAllLeads ? filteredLeads : filteredLeads.slice(0, 5);
-  const upcoming = useMemo(() => data.upcomingItems.filter(item =>
-    !query || [item.title, item.business?.name, item.lead?.name]
-      .some(text => text?.toLocaleLowerCase("ru-RU").includes(query)),
-  ), [data.upcomingItems, query]);
+  // Upcoming search runs in PostgreSQL before take=4, across title/business/lead.
+  const upcoming = data.upcomingItems;
+  const upcomingPending = data.upcomingLoading ||
+    query !== debouncedSearch.toLocaleLowerCase("ru-RU");
 
   async function completeItem(item: WorkItem) {
     setCompletingId(item.id);
@@ -295,9 +300,15 @@ export function CrmDashboard({ actorId, openSupportCount }: Props) {
               <h2 id="crm-upcoming-title" className="text-base font-semibold text-gray-950">Ближайшие задачи</h2>
               <CalendarDays className="h-4.5 w-4.5 text-gray-400" />
             </div>
-            {data.loading ? <DataEmpty>Загружаем…</DataEmpty> :
-              data.error ? <DataEmpty>Дела пока недоступны.</DataEmpty> :
-              upcoming.length === 0 ? <DataEmpty>В ближайшие дни задач нет.</DataEmpty> :
+            {data.loading || upcomingPending ? <DataEmpty>Загружаем…</DataEmpty> :
+              data.error || data.upcomingError ? (
+                <div className="px-5 py-5 text-center text-sm text-gray-500">
+                  <p>{data.upcomingError ?? "Дела пока недоступны."}</p>
+                  <button type="button" onClick={data.refresh}
+                    className="mt-2 text-emerald-700 underline underline-offset-2">Повторить</button>
+                </div>
+              ) :
+              upcoming.length === 0 ? <DataEmpty>{query ? "По запросу задач не найдено." : "В ближайшие дни задач нет."}</DataEmpty> :
               <div className="divide-y divide-gray-100 px-5 pb-3 sm:px-6">
                 {upcoming.map(item => (
                   <button key={item.id} type="button" onClick={() => setSelectedItem(item)}
