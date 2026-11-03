@@ -7,6 +7,7 @@ import {
   isE164Phone,
   isVerifiedPhoneMatch,
   verifiedBusinessContactPhone,
+  resolveOnboardingVerifiedPhone,
   hasVerifiedPhoneForComments,
   normalizeBusinessContactVerificationPurpose,
 } from "./businessContactVerification.shared";
@@ -140,3 +141,34 @@ assert.equal(isBusinessPhoneUniqueViolation({
   code: "P2002", meta: { target: ["businessContactVerifiedPhoneE164"] },
 }), true);
 assert.equal(isBusinessPhoneUniqueViolation(new Error(BUSINESS_PHONE_ALREADY_LINKED_MESSAGE)), true);
+
+// A newly OTP-confirmed business phone B stays available in the current form
+// after an interim selection C. C itself is never marked verified.
+const inMemoryVerification = {
+  accountPhoneE164: accountPhone,
+  accountPhoneVerifiedAt: verifiedAt,
+  businessContactVerifiedPhoneE164: null,
+  businessContactPhoneVerifiedAt: null,
+  recentlyOtpVerifiedPhoneE164: businessPhone,
+};
+assert.equal(resolveOnboardingVerifiedPhone({
+  ...inMemoryVerification,
+  phoneE164: businessPhone,
+}), businessPhone);
+assert.equal(resolveOnboardingVerifiedPhone({
+  ...inMemoryVerification,
+  phoneE164: "+375331234567",
+}), "");
+assert.equal(resolveOnboardingVerifiedPhone({
+  ...inMemoryVerification,
+  phoneE164: businessPhone,
+}), businessPhone);
+// A localStorage draft alone is not a verification source after page reload.
+assert.equal(resolveOnboardingVerifiedPhone({
+  phoneE164: businessPhone,
+  recentlyOtpVerifiedPhoneE164: null,
+}), "");
+assert.equal(resolveOnboardingVerifiedPhone({
+  ...inMemoryVerification,
+  phoneE164: accountPhone,
+}), accountPhone);
