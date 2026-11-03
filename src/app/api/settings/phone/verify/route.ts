@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       phone: phoneE164,
       code: parsed.data.code,
+      target: "account",
     });
 
     try {
