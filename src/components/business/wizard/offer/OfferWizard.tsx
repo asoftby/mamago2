@@ -110,7 +110,7 @@ interface OfferWizardProps {
   };
   onComplete?: (offerId: string) => void;
   defaultPlaceId?: string | null;
-  creationIntent?: "classes" | "parties" | "camps";
+  creationIntent?: "place" | "classes" | "parties" | "camps";
   editorSurface?: ContentEditorSurface;
   contentEditorNav?: Partial<ContentEditorNav>;
   returnTo?: string;
@@ -309,7 +309,7 @@ export function OfferWizard({
       return mapOfferToFormData(offer);
     }
     const defaults = getDefaultFormData(defaultPlaceId ?? null);
-    const selectedType = creationIntent === "classes" ? "REGULAR_ACTIVITY" : creationIntent === "parties" ? "PARTY_SERVICE" : creationIntent === "camps" ? "CAMP" : null;
+    const selectedType = creationIntent === "place" ? "PLACE_VISIT" : creationIntent === "classes" ? "REGULAR_ACTIVITY" : creationIntent === "parties" ? "PARTY_SERVICE" : creationIntent === "camps" ? "CAMP" : null;
     if (!selectedType) return defaults;
     return { ...defaults, ...getOfferTypeSelection(selectedType), ...(selectedType === "CAMP" ? { schedule: { ...defaults.schedule, bookingMethod: "REQUEST_ONLY" as const, legacyBookingMode: null, externalUrl: "" } } : {}) };
   });
