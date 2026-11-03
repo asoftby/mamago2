@@ -96,7 +96,7 @@ export function BlogPersistentNav({ citySlug, categories }: {
     else if (left + active.offsetWidth > scroller.scrollLeft + scroller.clientWidth) {
       scroller.scrollLeft = left + active.offsetWidth - scroller.clientWidth;
     }
-  }, [activeSlug]);
+  }, [activeSlug, priorityOrder]);
 
   // The scrollbar is visually hidden; desktop needs visible navigation controls.
   useLayoutEffect(() => {
