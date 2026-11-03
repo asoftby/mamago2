@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import {
+  BUSINESS_PHONE_ALREADY_LINKED_MESSAGE,
+  isBusinessPhoneUniqueViolation,
+} from "@/lib/phone-verification/businessContactVerification.shared";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import {
@@ -49,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     if (existingOwner) {
       return NextResponse.json(
-        { ok: false, error: "Этот номер уже привязан к другому аккаунту" },
+        { ok: false, code: "PHONE_ALREADY_IN_USE", error: BUSINESS_PHONE_ALREADY_LINKED_MESSAGE },
         { status: 409 }
       );
     }
@@ -85,12 +88,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
+    if (isBusinessPhoneUniqueViolation(error)) {
       return NextResponse.json(
-        { ok: false, error: "Этот номер уже привязан к другому аккаунту" },
+        { ok: false, code: "PHONE_ALREADY_IN_USE", error: BUSINESS_PHONE_ALREADY_LINKED_MESSAGE },
         { status: 409 }
       );
     }
@@ -105,6 +105,12 @@ export async function POST(request: NextRequest) {
         ? 400
         : 500;
 
-    return NextResponse.json({ ok: false, error: message }, { status });
+    if (status === 500) {
+      console.error("[settings/phone/verify] Unexpected verification error:", error);
+    }
+    return NextResponse.json({
+      ok: false,
+      error: status === 400 ? message : "Не удалось подтвердить номер. Попробуйте позже.",
+    }, { status });
   }
 }
