@@ -43,7 +43,7 @@ mgtask stories-display-rules fix
 mgfinish
 ```
 
-`mgcheck` is an optional preflight when you want the full common gate before finishing. It is not required immediately before `mgfinish`, because the repository pre-push hook already runs `pnpm check:push` during `mgfinish`.
+`mgcheck` is an optional preflight when you want the full common gate before finishing. It is **not** required immediately before `mgfinish`: `mgcheck` directly executes `pnpm check:push`, and `mgfinish` triggers the pre-push wrapper, which executes it **again**. There is no gate-result cache. The normal fast path is targeted checks followed by `mgfinish` once; never bypass the hook or hide a failed gate.
 
 For an agent session, the agent should execute the equivalent repository scripts itself without asking the user to copy these commands.
 
@@ -108,7 +108,7 @@ mgcheck
 7. runs `git diff --check`;
 8. requires Node 22 and `pnpm`;
 9. `worktree-deps.sh ensure`: installs dependencies if the worktree has no `node_modules`, regenerates the Prisma Client if its schema/config/generated-client fingerprint is missing or changed, and fails if `node_modules` is a symlink pointing outside the worktree;
-10. runs `pnpm check:push`.
+10. runs `pnpm check:push` directly. Unlike the pre-push hook (`scripts/git/run-push-gate.sh`), this does **not** use the isolated Next.js gate build directory; avoid using it unnecessarily while `next dev` runs in the same worktree.
 
 Targeted tests required by the task are still the agent/developer's responsibility. `mgcheck` is the common repository gate, not a replacement for task-specific verification.
 
@@ -158,9 +158,9 @@ Agents or environments that do not use the interactive shortcuts can call the re
 sh scripts/git/task-start.sh <slug> [prefix]
 
 # task worktree
-sh scripts/git/task-sync.sh
-sh scripts/git/task-check.sh      # optional common preflight
-sh scripts/git/task-finish.sh
+sh scripts/git/task-sync.sh       # optional explicit sync; finish also syncs
+sh scripts/git/task-check.sh      # optional full preflight; duplicates finish's full gate
+sh scripts/git/task-finish.sh     # standard final gate via pre-push hook
 ```
 
 Agents with repository shell access should execute these themselves. They should not ask the user to manually create branches/worktrees or repeat routine Git commands unless a safety stop requires human judgment.
