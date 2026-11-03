@@ -5,6 +5,7 @@ import { Star, Check, X, Trash2, ExternalLink, MessageSquare, Edit, Trash } from
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getAbsolutePlacePublicUrl } from "@/lib/placePublicUrl";
+import { getPlaceDetailHref } from "@/lib/admin/placeDetailNavigation";
 import Link from "next/link";
 import {
   Select,
@@ -498,7 +499,7 @@ export default function ReviewsPage() {
                       )}
 
                       <Link
-                        href={`/admin/content/places/${review.placeId}`}
+                        href={getPlaceDetailHref(review.placeId, "/admin/moderation/reviews")}
                         target="_blank"
                       >
                         <Button variant="outline" size="sm">
