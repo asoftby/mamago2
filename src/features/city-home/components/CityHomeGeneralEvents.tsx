@@ -7,11 +7,8 @@ import { getCityLocativePhrase } from "@/lib/city/cityDisplayNames";
 import type { ActivityMock } from "@/types/activity";
 
 /** Common SEO-readable SSR; never consumes header persona or discovery filter state. */
-export function CityHomeGeneralEvents({ activities, citySlug, authenticated }: { activities: ActivityMock[]; citySlug: string; authenticated: boolean }) {
+export function CityHomeGeneralEvents({ activities, citySlug }: { activities: ActivityMock[]; citySlug: string }) {
   return <CityHomeSection title={`Куда пойти с ребёнком ${getCityLocativePhrase(citySlug)}`} reserveCarouselControls>
-    <p className="mb-4 text-sm text-muted-foreground"><Link className="inline-flex min-h-11 items-center underline" href={authenticated ? "/me/profile" : `/register?redirectTo=${encodeURIComponent(`/${citySlug}`)}`}>
-      {authenticated ? "Добавьте ребёнка — подберём события по возрасту" : "Зарегистрируйтесь — подберём события для вашей семьи"}
-    </Link></p>
     {!activities.length && <p role="status" className="py-6">Пока нет опубликованных событий. Загляните позже.</p>}
     <HorizontalCardRow>
       {activities.slice(0, 7).map((activity, index) => <div key={activity.id} className={EVENT_CARD_SHELL}><AnalyticsCardViewTracker entityType="EVENT" entityId={activity.id} vertical="CITY" citySlug={citySlug} threshold={0.5} dwellMs={1000} meta={{ section: "afisha", exposureId: activity.exposureId ?? null }}><EventCard {...activityMockToEventCard(activity, citySlug)} framing="poster" imagePriority={index < 2} /></AnalyticsCardViewTracker></div>)}

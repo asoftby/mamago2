@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { X, Users, Sparkles } from "lucide-react";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { FamilyActivationAddChildOverlay } from "./FamilyActivationAddChildOverlay";
+import { AddParticipantModal } from "@/components/children/AddParticipantModal";
 import { AdultActivationOverlay } from "./AdultActivationOverlay";
 import { requestOpenMyPlan } from "@/lib/my-plan/myPlanOpenIntent";
 
@@ -82,29 +83,7 @@ function BannerShell({
   onDismiss: () => void;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-[20px] border border-[#ffd8c4] px-5 py-5 shadow-[0_2px_16px_rgba(245,140,90,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] sm:px-6 sm:py-6">
-      <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,216,196,0.42),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(255,181,138,0.24),_transparent_34%),linear-gradient(135deg,_#fffaf5_0%,_#fff6ef_45%,_#fff9f6_100%)]"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-0 animate-mg-banner-gradient-flow opacity-90"
-        style={{
-          background:
-            "linear-gradient(120deg, rgba(255,241,232,0.9), rgba(255,216,196,0.55), rgba(255,181,138,0.35), rgba(255,248,244,0.85), rgba(255,224,204,0.5))",
-          backgroundSize: "300% 300%",
-        }}
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute -left-16 top-0 h-32 w-32 animate-mg-banner-orb-drift rounded-full bg-[radial-gradient(circle,_rgba(255,201,167,0.35),_transparent_70%)] blur-2xl"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute -right-10 bottom-0 h-28 w-28 animate-mg-banner-orb-drift-reverse rounded-full bg-[radial-gradient(circle,_rgba(255,166,116,0.3),_transparent_70%)] blur-3xl"
-        aria-hidden
-      />
-
+    <div className="relative rounded-2xl border border-border bg-background px-5 py-4 sm:px-6">
       {/* dismiss */}
       <button
         type="button"
@@ -171,20 +150,22 @@ export function ActivationBannerHost() {
   );
 
   const [childOpen, setChildOpen] = useState(false);
+  const [editBirthOpen, setEditBirthOpen] = useState(false);
   const [adultOpen, setAdultOpen] = useState(false);
 
   const loading = family?.loading ?? true;
   const menuUser = family?.menuUser ?? null;
   const hasChildren = (family?.childPersonasForFilter.length ?? 0) > 0;
+  const childMissingBirth = family?.childPersonasForFilter.find((child) => !child.birthDate) ?? null;
   const isAdultComplete = !!(
     menuUser?.familyRole ||
     (menuUser?.preferenceSignalIds?.length ?? 0) > 0
   );
 
   // which banner to show
-  const showChild = !loading && !!menuUser && !hasChildren && !childDismissed;
+  const showChild = !loading && !!menuUser && (!hasChildren || !!childMissingBirth) && !childDismissed;
   const showAdult =
-    !loading && !!menuUser && hasChildren && !isAdultComplete && adultDismissCount < ADULT_MAX_DISMISS;
+    !loading && !!menuUser && hasChildren && !childMissingBirth && !isAdultComplete && adultDismissCount < ADULT_MAX_DISMISS;
 
   const activeBanner: "child" | "adult" | null = showChild
     ? "child"
@@ -226,23 +207,15 @@ export function ActivationBannerHost() {
   if (!menuUser) {
     if (guestDismissed) return null;
     return (
-      <motion.div
-        key="guest-plan"
-        variants={bannerVariants}
-        initial="hidden"
-        animate="visible"
-        exit="exit"
-      >
-        <BannerShell
-          icon={<Sparkles className="h-5 w-5 text-[#EF8759]" strokeWidth={1.75} />}
-          title="Подберём идеи для вашей семьи"
-          description="Соберём готовый сценарий дня — регистрация нужна только чтобы сохранить план"
-          ctaLabel="Реши за меня"
-          ctaStyle="primary"
-          onCta={() => requestOpenMyPlan()}
-          onDismiss={dismissGuest}
-        />
-      </motion.div>
+      <div className="relative flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 pr-12">
+        <p className="text-sm text-foreground">Хотите готовый план на день?</p>
+        <button type="button" onClick={() => requestOpenMyPlan()} className="min-h-11 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground">
+          Собрать план дня
+        </button>
+        <button type="button" onClick={dismissGuest} aria-label="Скрыть подсказку" className="absolute right-3 top-3 p-2 text-muted-foreground">
+          <X className="h-4 w-4" aria-hidden />
+        </button>
+      </div>
     );
   }
 
@@ -259,11 +232,13 @@ export function ActivationBannerHost() {
           >
             <BannerShell
               icon={<Users className="h-5 w-5 text-[#EF8759]" strokeWidth={1.75} />}
-              title="Подберём идеи для вашей семьи"
-              description="Добавьте ребёнка — и получите персональные рекомендации и готовые планы"
-              ctaLabel="Добавить ребёнка"
+              title={childMissingBirth ? "Уточните возраст ребёнка" : "Подберём события для вашей семьи"}
+              description={childMissingBirth
+                ? "Укажите месяц и год рождения — рекомендации станут точнее."
+                : "Добавьте ребёнка, чтобы видеть подходящие ему мероприятия."}
+              ctaLabel={childMissingBirth ? "Указать возраст" : "Добавить ребёнка"}
               ctaStyle="primary"
-              onCta={() => setChildOpen(true)}
+              onCta={() => childMissingBirth ? setEditBirthOpen(true) : setChildOpen(true)}
               onDismiss={dismissChild}
             />
           </motion.div>
@@ -294,6 +269,13 @@ export function ActivationBannerHost() {
         open={childOpen}
         onOpenChange={setChildOpen}
         onSuccess={handleChildSuccess}
+      />
+      <AddParticipantModal
+        isOpen={editBirthOpen}
+        onClose={() => setEditBirthOpen(false)}
+        childData={childMissingBirth ? { id: childMissingBirth.id, name: childMissingBirth.name, birthDate: null } : undefined}
+        childOnly
+        onSaved={() => { void family?.refresh(); }}
       />
       <AdultActivationOverlay
         open={adultOpen}

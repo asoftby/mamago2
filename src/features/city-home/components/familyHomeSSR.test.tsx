@@ -10,22 +10,31 @@ const fontModule = require.resolve("next/font/local");
 const previousFont = require.cache[fontModule];
 require.cache[fontModule] = { id: fontModule, filename: fontModule, loaded: true, exports: { __esModule: true, default: () => ({ style: { fontFamily: "serif" }, className: "test-font", variable: "test-font" }) } } as NodeModule;
 const { CityHomeGeneralEvents } = require("./CityHomeGeneralEvents") as typeof import("./CityHomeGeneralEvents");
+const { HomeEventsBoundary } = require("./HomeEventsBoundary") as typeof import("./HomeEventsBoundary");
 const { CityHomeFamilyPicks, FamilyHomeResults } = require("./CityHomeFamilyPicks") as typeof import("./CityHomeFamilyPicks");
 if (previousFont) require.cache[fontModule] = previousFont;
 else delete require.cache[fontModule];
 import type { HomeFamilyContext } from "../lib/familyHome";
 const router = { bfcacheId: "test", back() {}, forward() {}, refresh() {}, hmrRefresh() {}, push() {}, replace() {}, prefetch() {} };
 
-test("guest HTML contains the common SEO title, registration and one catalog CTA", () => {
+test("guest HTML contains the common SEO title and one catalog CTA without a registration gate", () => {
   const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={null}>
-    <CityHomeGeneralEvents activities={[]} citySlug="minsk" authenticated={false} />
+    <CityHomeGeneralEvents activities={[]} citySlug="minsk" />
   </AuthProvider></AppRouterContext.Provider>);
   assert.match(html, /Куда пойти с ребёнком в Минске/);
-  assert.match(html, /register\?redirectTo/);
+  assert.doesNotMatch(html, /register\?redirectTo|Зарегистрируйтесь/);
   assert.match(html, /Пока нет опубликованных событий/);
   assert.equal((html.match(/>Все события</g) ?? []).length, 1);
   assert.doesNotMatch(html, /Для вашей семьи|child_000/);
 });
+test("Home boundary never renders another account's events on the server", () => {
+  const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={{ id: "current" } as never}>
+    <HomeEventsBoundary actorId="old" citySlug="minsk"><p>Old account private events</p></HomeEventsBoundary>
+  </AuthProvider></AppRouterContext.Provider>);
+  assert.doesNotMatch(html, /Old account private events/);
+  assert.match(html, /Подбираем мероприятия/);
+});
+
 for (const count of [1, 2, 3, 5, 7]) {
   test(`personal SSR with ${count} children has a stable skeleton, correct chips and no common flash`, () => {
     const context: HomeFamilyContext = { actorId: "account_a", signature: "a".repeat(64), day: "2030-11-02", policyVersion: "v2", audience: "personalized",
