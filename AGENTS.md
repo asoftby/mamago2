@@ -53,6 +53,8 @@ Before modifying implementation files for a new task, the agent MUST establish t
 6. Before integrating/pushing task output, fetch `origin/dev` again and verify whether it advanced since `BASE_HEAD`. If it advanced, reconcile the task deliberately on top of the new base and rerun relevant verification before integration.
 7. If freshness cannot be proven, the tree is dirty with foreign work, or branches diverged: STOP repository modifications and report the state. Never make the gate green with `reset --hard`, force-push, broad checkout/restore, or automatic pull/rebase.
 
+In **GitHub Direct**, perform the equivalent remote-SHA/branch/reconciliation checks through GitHub rather than these local shell commands; `session-start-gate.sh` cannot be run through the GitHub API.
+
 ## CRITICAL — one task = one branch = one PR (+ isolated worktree in Local Assisted); `dev` is merge-only
 
 This is the mandatory integration model for every repository-changing task:
@@ -85,7 +87,7 @@ The canonical repository instructions are in `CLAUDE.md`.
 
 All agents MUST read and follow `CLAUDE.md` before modifying the repository.
 
-All agents MUST also obey the repository freshness gate and branch/PR integration model above. They supplement the `Task Start / Environment Consistency` and `Git / Worktree Safety` sections in `CLAUDE.md`; they do not replace them.
+All agents MUST also obey the repository freshness rules (local gate in Local Assisted; equivalent remote-SHA check in GitHub Direct) and branch/PR integration model above. They supplement the `Task Start / Environment Consistency` and `Git / Worktree Safety` sections in `CLAUDE.md`; they do not replace them.
 
 In particular, the mandatory `Git / Worktree Safety` section applies to:
 - subagents;
