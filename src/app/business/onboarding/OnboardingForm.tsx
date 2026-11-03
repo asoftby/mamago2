@@ -17,7 +17,7 @@ import {
 import {
   type BusinessContactOtpClientState,
   isVerifiedPhoneMatch,
-  verifiedBusinessContactPhone,
+  resolveOnboardingVerifiedPhone,
 } from "@/lib/phone-verification/businessContactVerification.shared";
 import "./onboarding-phone-input.css";
 
@@ -50,9 +50,10 @@ function verifiedPhoneFromProps(
   accountPhoneE164: string | null | undefined,
   accountPhoneVerifiedAt: string | null | undefined,
   businessContactVerifiedPhoneE164: string | null | undefined,
-  businessContactPhoneVerifiedAt: string | null | undefined
+  businessContactPhoneVerifiedAt: string | null | undefined,
+  recentlyOtpVerifiedPhoneE164: string | null = null
 ) {
-  return verifiedBusinessContactPhone({
+  return resolveOnboardingVerifiedPhone({
     phoneE164: phone,
     existingBusinessPhoneE164: initialData?.phone,
     existingBusinessContactPhoneVerifiedAt: initialData?.contactPhoneVerifiedAt,
@@ -60,6 +61,7 @@ function verifiedPhoneFromProps(
     accountPhoneVerifiedAt,
     businessContactVerifiedPhoneE164,
     businessContactPhoneVerifiedAt,
+    recentlyOtpVerifiedPhoneE164,
   });
 }
 
@@ -104,6 +106,8 @@ export function OnboardingForm({
     )
   );
   
+  // Volatile UX hint from a successful OTP in this form; never stored as security evidence.
+  const recentlyOtpVerifiedPhoneRef = useRef<string | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load draft on mount (only if no initialData)
@@ -173,27 +177,27 @@ export function OnboardingForm({
     const e164 = value ?? "";
     setPhoneE164(e164);
 
-    setVerifiedPhoneE164((currentVerifiedPhone) => {
-      const nextVerifiedPhone =
-        currentVerifiedPhone && currentVerifiedPhone === e164
-          ? currentVerifiedPhone
-          : verifiedPhoneFromProps(
-              e164,
-              initialData,
-              accountPhoneE164,
-              accountPhoneVerifiedAt,
-              businessContactVerifiedPhoneE164,
-              businessContactPhoneVerifiedAt
-            );
-      debouncedSave({
-        phoneE164: e164,
-        verifiedPhoneE164: nextVerifiedPhone || undefined,
-      });
-      return nextVerifiedPhone;
+    const nextVerifiedPhone = verifiedPhoneFromProps(
+      e164,
+      initialData,
+      accountPhoneE164,
+      accountPhoneVerifiedAt,
+      businessContactVerifiedPhoneE164,
+      businessContactPhoneVerifiedAt,
+      recentlyOtpVerifiedPhoneRef.current
+    );
+    setVerifiedPhoneE164(nextVerifiedPhone);
+    debouncedSave({
+      phoneE164: e164,
+      verifiedPhoneE164: nextVerifiedPhone || undefined,
     });
   };
 
   const handleVerifiedPhoneChange = (verifiedPhone: string | null) => {
+    if (verifiedPhone) {
+      // OTP just succeeded. Re-selecting the same number must not require another SMS.
+      recentlyOtpVerifiedPhoneRef.current = verifiedPhone;
+    }
     const nextVerifiedPhone = verifiedPhone ?? "";
     setVerifiedPhoneE164(nextVerifiedPhone);
     debouncedSave({
