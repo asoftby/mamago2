@@ -41,6 +41,12 @@ Speed means eliminating duplicated work, not bypassing safety. For every task:
 
 See the canonical **Fast and safe execution** section in `CLAUDE.md` for the risk-based verification table, architecture ownership checks, GitHub-only workflow, secret/data rules, and distinction between follow-up fixes on one open PR and a genuinely new task. **Never use `package.json` Prisma migrate-dev/reset scripts, even when named `safe`.** All existing freshness, branch/worktree, hook, CI, and deployment safety rules remain mandatory.
 
+## CRITICAL — server efficiency and fast responses are acceptance criteria
+
+For **every code-changing task**, protect user-perceived latency **and** server cost, especially Afisha/Discovery, family recommendations, business onboarding and Place/Event/Offer editors. Before adding reads/writes/fetches, identify request frequency, number of database/API round trips, payload size, cache scope and invalidation, and any external/AI charges. Never introduce avoidable N+1 queries, unbounded fetches, duplicate client/server requests, unnecessary polling, heavy work on page load, or broad revalidation on every draft save. Prefer bounded indexed queries, minimal selected fields, reuse of existing domain services, deduped requests, appropriately scoped caching and lazy loading. Private/family/business data must **never** enter a cross-user cache.
+
+For affected **hot paths**, include before/after or representative evidence (queries per action, latency/p95 where measurable, response bytes, cache behavior, external call count); when measurement is unavailable, state the limitation and do not claim a speedup. Do not optimize by breaking freshness, authorization, data integrity or the product contract. Follow **Server cost, latency and resource discipline** in `CLAUDE.md`; the older `docs/audits/performance-architecture-audit.md` is historical context only, not current code truth.
+
 ## CRITICAL — mandatory start for EVERY repository-changing task
 
 A "new task" means any distinct user request that may change repository files, even when it arrives in the same chat/session immediately after another task.
