@@ -52,6 +52,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Full push-gate proof invalidation regressions
+        run: node --test scripts/git/full-gate-proof.test.cjs
+
       - name: DEV deployment safeguards and runtime parity regressions
         run: |
           bash -n scripts/release/ci-dev-host-deploy.sh

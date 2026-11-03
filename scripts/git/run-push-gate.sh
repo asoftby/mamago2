@@ -21,6 +21,24 @@ if [ -f scripts/git/worktree-deps.sh ]; then
   sh scripts/git/worktree-deps.sh check || exit 1
 fi
 
+# Refresh the integration base even for a direct git push outside task-finish.
+# A failed fetch must never certify a stale PASS.
+if ! git fetch --quiet origin dev; then
+  echo "[pre-push] STOP: cannot refresh origin/dev for gate proof." >&2
+  exit 1
+fi
+
+# The installed pnpm graph must match the committed lockfile BEFORE any expensive gate.
+node scripts/git/full-gate-proof.cjs validate || exit 1
+
+# Reuse ONLY a worktree-local proof from an actual completed full gate.
+# If any relevant input changed, the proof is rejected and the full gate runs.
+if node scripts/git/full-gate-proof.cjs check; then
+  echo "[pre-push] Full push gate already passed for this exact candidate."
+  exit 0
+fi
+node scripts/git/full-gate-proof.cjs clear || exit 1
+
 gate_dir="${NEXT_DIST_DIR:-node_modules/.cache/next-gate}"
 max_gb="${NEXT_CACHE_MAX_GB:-6}"
 max_kb=$((max_gb * 1024 * 1024))
@@ -66,12 +84,16 @@ for f in tsconfig.json next-env.d.ts; do
   [ -f "$f" ] && cp "$f" "$backup/$f"
 done
 
-NEXT_DIST_DIR="$gate_dir" pnpm check:push
-status=$?
+status=0
+NEXT_DIST_DIR="$gate_dir" pnpm check:push || status=$?
 
 for f in tsconfig.json next-env.d.ts; do
   [ -f "$backup/$f" ] && cp "$backup/$f" "$f"
 done
 rm -rf "$backup"
 
+if [ "$status" -eq 0 ]; then
+  # A missing/stale/dirty proof is a hard failure: do not push without evidence.
+  node scripts/git/full-gate-proof.cjs record || exit 1
+fi
 exit "$status"
