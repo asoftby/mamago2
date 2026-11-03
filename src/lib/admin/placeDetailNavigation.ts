@@ -20,6 +20,10 @@ export function getPlaceDetailBackLink(
     return { href, label: "Назад к очереди" };
   }
 
+  if (href.startsWith("/admin/moderation/reviews")) {
+    return { href, label: "Назад к отзывам" };
+  }
+
   if (href.startsWith("/admin/content/places")) {
     return { href, label: "Назад к местам" };
   }
