@@ -288,6 +288,25 @@ export const NOTIFICATION_REGISTRY: Record<string, NotificationRegistryEntry> = 
     category: "MODERATION",
   },
 
+  PLACE_IMPROVEMENT_REQUESTED: {
+    type: "PLACE_IMPROVEMENT_REQUESTED",
+    audience: "BUSINESS",
+    surface: "BUSINESS",
+    groupId: "moderation",
+    label: "Замечание редакции к месту",
+    description: "Редакция запросила правки опубликованного места",
+    defaultChannels: { inApp: true, email: false, telegram: true },
+    entityType: "PLACE",
+    ctaLabel: "Посмотреть замечание",
+    resolveHref: (n) => n.ctaAction || (n.entityId ? `/editor/place/${n.entityId}/edit#improvement-requests` : "/business/places"),
+    telegram: {
+      enabledByDefault: true,
+      title: "Замечание редакции",
+    },
+    importance: "HIGH",
+    category: "MODERATION",
+  },
+
   PLACE_UPDATE_REJECTED: {
     type: "PLACE_UPDATE_REJECTED",
     audience: "BUSINESS",
