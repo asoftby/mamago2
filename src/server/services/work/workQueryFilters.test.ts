@@ -48,3 +48,22 @@ test("UPCOMING preserves an explicitly requested status", () => {
   assert.equal(where.status, "WAITING");
   assert.deepEqual(where.AND, [{ status: { notIn: ["DONE", "CANCELED"] } }]);
 });
+
+test("TODAY open-only filtering excludes completed tasks before pagination", () => {
+  const where = buildWorkItemWhere(workListQuerySchema.parse({
+    due: "TODAY", openOnly: "true", assigneeId: "clp0o00000000000000000001",
+  }), new Date("2026-11-03T12:00:00Z"));
+  assert.deepEqual(where.AND, [{ status: { notIn: ["DONE", "CANCELED"] } }]);
+  assert.deepEqual(where.dueAt, {
+    gte: new Date("2026-11-02T21:00:00Z"),
+    lt: new Date("2026-11-03T21:00:00Z"),
+  });
+});
+
+test("open-only remains additive with UPCOMING and explicit statuses", () => {
+  const where = buildWorkItemWhere(workListQuerySchema.parse({
+    due: "UPCOMING", openOnly: "true", status: "WAITING",
+  }), new Date("2026-11-03T12:00:00Z"));
+  assert.deepEqual(where.AND, [{ status: { notIn: ["DONE", "CANCELED"] } }]);
+  assert.equal(where.status, "WAITING");
+});

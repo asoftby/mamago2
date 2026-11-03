@@ -35,6 +35,29 @@ test("CRM upcoming and lead summaries remain correct beyond 50 tasks and across 
         leadId: lead1.id,
       })),
     });
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Minsk", year: "numeric", month: "2-digit", day: "2-digit",
+    }).formatToParts(new Date());
+    const datePart = (name: string) => parts.find(part => part.type === name)?.value ?? "";
+    const todayStart = new Date(`${datePart("year")}-${datePart("month")}-${datePart("day")}T00:00:00+03:00`);
+    await prismaBase.workItem.createMany({
+      data: Array.from({ length: 60 }, (_, i) => ({
+        title: `Today's completed ${i}`, kind: "OPERATIONS" as const,
+        status: "DONE" as const, dueAt: new Date(todayStart.getTime() + 60_000),
+        assigneeId: admin1.id, createdById: admin1.id,
+      })),
+    });
+    await prismaBase.workItem.create({
+      data: { title: "Today's next open item", kind: "OPERATIONS", status: "NEW",
+        dueAt: new Date(todayStart.getTime() + 20 * 60 * 60 * 1000),
+        assigneeId: admin1.id, createdById: admin1.id },
+    });
+    const todayResult = await listWorkItems(workListQuerySchema.parse({
+      assigneeId: admin1.id, due: "TODAY", openOnly: "true", take: 4,
+    }));
+    assert.equal(todayResult.total, 1);
+    assert.equal(todayResult.items[0]?.title, "Today's next open item");
+
     const future = new Date("2030-12-01T09:00:00Z");
     await prismaBase.workItem.createMany({
       data: [

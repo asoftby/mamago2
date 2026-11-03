@@ -62,7 +62,8 @@ export function useCrmDashboardData(actorId: string): DashboardData {
 
     void Promise.all([
       readJson<LeadList>("/api/admin/work/leads?take=50", signal),
-      readJson<WorkList>(query(itemsBase, { ...own, due: "TODAY" }), signal),
+      // Exclude completed/canceled tasks on the server, BEFORE pagination.
+      readJson<WorkList>(query(itemsBase, { ...own, due: "TODAY", openOnly: "true" }), signal),
       readJson<WorkList>(query(itemsBase, { ...own, due: "OVERDUE" }), signal),
       // Query the server for future OPEN tasks before applying pagination.
       readJson<WorkList>(query(itemsBase, { ...own, due: "UPCOMING", take: "4" }), signal),
