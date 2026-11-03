@@ -1,4 +1,6 @@
 import { notFound, redirect } from "next/navigation";
+import type { ReactNode } from "react";
+import { PlaceDetailHeaderActions } from "@/components/admin/PlaceDetailHeaderActions";
 import { getCurrentUser } from "@/lib/auth/server";
 import { PlaceModerationView } from "@/components/admin/PlaceModerationView";
 import { PlaceRevisionModerationView } from "@/components/admin/PlaceRevisionModerationView";
@@ -36,7 +38,7 @@ export default async function PlaceModerationPage({
   }
 
   const { id } = await params;
-  const { mode } = await searchParams;
+  const { mode, returnTo } = await searchParams;
 
   const place = await loadPlaceForBasicModeration(id);
 
@@ -44,8 +46,15 @@ export default async function PlaceModerationPage({
     notFound();
   }
 
+  const withNavigation = (content: ReactNode) => (
+    <>
+      <PlaceDetailHeaderActions place={place} returnTo={returnTo} />
+      {content}
+    </>
+  );
+
   if (place.status === "PENDING") {
-    return (
+    return withNavigation(
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <PlaceModerationView
@@ -77,7 +86,7 @@ export default async function PlaceModerationPage({
 
     if (revision && revision.status === "PENDING") {
       // Show revision moderation view
-      return (
+      return withNavigation(
         <div className="space-y-6 bg-gray-50 pb-8">
           <PlaceRevisionModerationView
             place={fullPlace}
@@ -184,7 +193,7 @@ export default async function PlaceModerationPage({
         color: "bg-gray-100 text-gray-800",
       };
 
-      return (
+      return withNavigation(
         <div className="min-h-screen bg-gray-50">
           {/* Header */}
           <div className="bg-white border-b">
@@ -386,7 +395,7 @@ export default async function PlaceModerationPage({
   };
 
   // Show non-moderation management preview for DRAFT / NEEDS_REVISION / REJECTED without pending revision
-  return (
+  return withNavigation(
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 py-4">
