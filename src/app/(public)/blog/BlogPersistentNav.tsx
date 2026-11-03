@@ -26,6 +26,7 @@ export function BlogPersistentNav({ citySlug, categories }: {
   const pathname = usePathname();
   const [articleSection, setArticleSection] = useState<string | null>(null);
   const [seenArticles, setSeenArticles] = useState<Set<string>>(new Set());
+  const [priorityOrder, setPriorityOrder] = useState<string[] | null>(null);
   const activeRef = useRef<HTMLAnchorElement>(null);
   const scrollRef = useRef<HTMLElement>(null);
   const [scrollEdges, setScrollEdges] = useState({ left: false, right: false });
@@ -39,7 +40,19 @@ export function BlogPersistentNav({ citySlug, categories }: {
 
   useEffect(() => {
     const sync = () => setSeenArticles(readSeenArticles());
-    sync();
+    const initialSeen = readSeenArticles();
+    setSeenArticles(initialSeen);
+    // Snapshot priority once per journal visit: chips never jump while reading.
+    setPriorityOrder([...categories]
+      .map((category, index) => ({
+        id: category.id,
+        index,
+        latestUnread: Math.max(0, ...(category.recentArticles ?? [])
+          .filter((article) => !initialSeen.has(article.id))
+          .map((article) => Date.parse(article.publishedAt) || 0)),
+      }))
+      .sort((a, b) => b.latestUnread - a.latestUnread || a.index - b.index)
+      .map((item) => item.id));
     window.addEventListener("storage", sync);
     window.addEventListener("focus", sync);
     window.addEventListener("pageshow", sync);
@@ -83,7 +96,7 @@ export function BlogPersistentNav({ citySlug, categories }: {
     else if (left + active.offsetWidth > scroller.scrollLeft + scroller.clientWidth) {
       scroller.scrollLeft = left + active.offsetWidth - scroller.clientWidth;
     }
-  }, [activeSlug]);
+  }, [activeSlug, priorityOrder]);
 
   // The scrollbar is visually hidden; desktop needs visible navigation controls.
   useLayoutEffect(() => {
@@ -117,9 +130,12 @@ export function BlogPersistentNav({ citySlug, categories }: {
     category.recentArticles
       ? category.recentArticles.some((article) => !seenArticles.has(article.id))
       : category.hasNewArticle;
+  const sortedCategories = priorityOrder
+    ? [...categories].sort((a, b) => priorityOrder.indexOf(a.id) - priorityOrder.indexOf(b.id))
+    : categories;
   const pills = [
     { id: "all", slug: null, name: "Все", thumbnailUrl: null, hasNewArticle: categories.some(hasUnseen) },
-    ...categories.map((category) => ({ id: category.id, slug: category.slug, name: category.name, thumbnailUrl: category.thumbnailUrl, hasNewArticle: hasUnseen(category) })),
+    ...sortedCategories.map((category) => ({ id: category.id, slug: category.slug, name: category.name, thumbnailUrl: category.thumbnailUrl, hasNewArticle: hasUnseen(category) })),
   ];
 
   return (
