@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "./server";
+import { hasVerifiedPhoneForComments } from "@/lib/phone-verification/businessContactVerification.shared";
 
 /**
  * Verification gate для UGC-действий (отзывы, комментарии, заявки, жалобы).
@@ -8,7 +9,9 @@ import { getCurrentUser } from "./server";
  * 
  * Проверяет:
  * 1. Пользователь авторизован
- * 2. Телефон подтвержден (phoneVerifiedAt не null)
+ * 2. Личный телефон ИЛИ контактный номер бизнеса подтверждён через SMS.
+ *    При подтверждении только бизнес-номера user.phoneE164 может быть null:
+ *    не используйте его как обязательный контактный номер без отдельной проверки.
  * 
  * @returns User если все проверки пройдены, NextResponse с ошибкой если нет
  * 
@@ -39,7 +42,12 @@ export async function requirePhoneVerifiedUser() {
   }
 
   // Проверка подтверждения телефона
-  if (!user.phoneVerifiedAt) {
+  if (!hasVerifiedPhoneForComments({
+    accountPhoneE164: user.phoneE164,
+    accountPhoneVerifiedAt: user.phoneVerifiedAt,
+    businessContactVerifiedPhoneE164: user.businessContactVerifiedPhoneE164,
+    businessContactPhoneVerifiedAt: user.businessContactPhoneVerifiedAt,
+  })) {
     return NextResponse.json(
       { 
         error: "PHONE_NOT_VERIFIED", 
