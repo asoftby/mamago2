@@ -2,44 +2,41 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const source = readFileSync("src/components/shared/CreatePublicationQuickMenu.tsx", "utf8");
+const menu = readFileSync("src/components/shared/CreatePublicationQuickMenu.tsx", "utf8");
+const page = readFileSync("src/app/(content-editor)/editor/offer/new/page.tsx", "utf8");
+const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.tsx", "utf8");
 
-test("business creation shows family-facing intents, not Event/Offer model choices", () => {
+test("business creation distinguishes the place profile from its visit offer", () => {
   for (const label of [
     "Мероприятие",
-    "Место для посещения",
+    "Страница места",
+    "Предложение о посещении",
     "Занятия и кружки",
     "Дни рождения и услуги",
     "Лагеря и каникулы",
   ]) {
-    assert.ok(source.includes(`label: "${label}"`));
+    assert.ok(menu.includes(`label: "${label}"`), label);
   }
-  assert.ok(source.includes('publicationMode === "full"'));
-  assert.ok(source.includes(": BUSINESS_INTENTS"));
+  assert.match(menu, /id: "visit-place",[\s\S]*?href: "\/editor\/place\/new"/);
+  assert.match(menu, /id: "place-offer",[\s\S]*?href: "\/editor\/offer\/new\?creationIntent=place"/);
+  assert.ok(menu.includes('publicationMode === "full"'));
+  assert.ok(menu.includes(": BUSINESS_INTENTS"));
+  assert.ok(menu.includes("currentSurfaceReturnTo"));
 });
 
-test("business intent routing reuses current editors, without writes or duplicates", () => {
-  assert.ok(source.includes('href: "/editor/event/new"'));
-  assert.ok(source.includes('href: "/editor/place/new"'));
-  assert.ok(source.includes('href: "/editor/offer/new"'));
-  assert.ok(source.includes("currentSurfaceReturnTo"));
-});
-
-test("business intent preselects offer type without creating another entity", () => {
-  for (const intent of ["classes", "parties", "camps"]) {
-    assert.ok(source.includes(`/editor/offer/new?creationIntent=${intent}`));
+test("place visit offer uses the existing OFFER model and editor", () => {
+  for (const intent of ["place", "classes", "parties", "camps"]) {
+    assert.ok(menu.includes(`/editor/offer/new?creationIntent=${intent}`), intent);
+    assert.ok(page.includes(`creationIntent === "${intent}"`), intent);
   }
-  const page = readFileSync("src/app/(content-editor)/editor/offer/new/page.tsx", "utf8");
-  assert.ok(page.includes("creationIntent={creationIntent"));
-  const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.tsx", "utf8");
-  assert.ok(wizard.includes('creationIntent === "classes" ? "REGULAR_ACTIVITY"'));
-  assert.ok(wizard.includes('creationIntent === "parties" ? "PARTY_SERVICE"'));
-  assert.ok(wizard.includes('creationIntent === "camps" ? "CAMP"'));
-  assert.ok(wizard.includes('creationIntent ? "about" : "type"'));
+  assert.match(wizard, /creationIntent === "place" \? "PLACE_VISIT"/);
+  assert.ok(wizard.includes("...getOfferTypeSelection(selectedType)"));
+  assert.match(wizard, /variant === "v2" \? "about" : creationIntent === "parties" \? "placements" : "details"/);
 });
 
-test("subtype choices preserve shared content and remain on the About step", () => {
-  const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.tsx", "utf8");
+test("subtype questions stay available for classes and parties", () => {
+  assert.ok(wizard.includes('creationIntent === "classes" && ('));
+  assert.ok(wizard.includes('creationIntent === "parties" && ('));
   assert.ok(wizard.includes("<OfferSubtypeClarifier group={creationIntent}"));
   const clarifier = readFileSync("src/components/business/wizard/offer/components/OfferSubtypeClarifier.tsx", "utf8");
   for (const type of ["ONE_TIME_ACTIVITY", "REGULAR_ACTIVITY", "PARTY_SERVICE", "PARTY_PACKAGE"]) {
