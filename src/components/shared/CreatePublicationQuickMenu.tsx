@@ -134,7 +134,7 @@ const BUSINESS_INTENTS: Item[] = [
     kind: "link",
     href: "/editor/offer/new?creationIntent=place",
     label: "Предложение о посещении",
-    description: "Билеты, цены, расписание и запись на посещение вашего места",
+    description: "Стоимость, часы работы и условия посещения вашего места",
     Icon: Tag,
   },
   {
