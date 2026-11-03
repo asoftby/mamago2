@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { X, Users, Sparkles } from "lucide-react";
 import { useFamilyPersona } from "@/contexts/FamilyPersonaContext";
 import { FamilyActivationAddChildOverlay } from "./FamilyActivationAddChildOverlay";
-import { AddParticipantModal } from "@/components/children/AddParticipantModal";
+import { FamilyActivationEditChildBirthOverlay } from "./FamilyActivationEditChildBirthOverlay";
 import { AdultActivationOverlay } from "./AdultActivationOverlay";
 import { requestOpenMyPlan } from "@/lib/my-plan/myPlanOpenIntent";
 
@@ -270,12 +270,11 @@ export function ActivationBannerHost() {
         onOpenChange={setChildOpen}
         onSuccess={handleChildSuccess}
       />
-      <AddParticipantModal
-        isOpen={editBirthOpen}
-        onClose={() => setEditBirthOpen(false)}
-        childData={childMissingBirth ? { id: childMissingBirth.id, name: childMissingBirth.name, birthDate: null } : undefined}
-        childOnly
-        onSaved={() => { void family?.refresh(); }}
+      <FamilyActivationEditChildBirthOverlay
+        open={editBirthOpen}
+        onOpenChange={setEditBirthOpen}
+        child={childMissingBirth}
+        onSuccess={handleChildSuccess}
       />
       <AdultActivationOverlay
         open={adultOpen}

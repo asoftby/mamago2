@@ -30,13 +30,14 @@ export function HomeEventsBoundary({
   const waiting = isLoading || currentActor !== actorId;
   const pendingKey = [actorId ?? "guest", isLoading ? "auth-loading" : currentActor ?? "guest"].join(":");
   const [expiredKey, setExpiredKey] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const refreshAttemptedRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!waiting) return;
     const timeout = window.setTimeout(() => setExpiredKey(pendingKey), HOME_AUTH_WAIT_MS);
     return () => window.clearTimeout(timeout);
-  }, [waiting, pendingKey]);
+  }, [waiting, pendingKey, retryCount]);
 
   useEffect(() => {
     if (isLoading || currentActor === actorId) {
@@ -64,6 +65,7 @@ export function HomeEventsBoundary({
 
   const retry = () => {
     setExpiredKey(null);
+    setRetryCount((previous) => previous + 1);
     refreshAttemptedRef.current = null;
     void refetch();
     router.refresh();
