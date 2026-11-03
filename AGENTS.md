@@ -36,7 +36,7 @@ Speed means eliminating duplicated work, not bypassing safety. For every task:
 6. Keep targeted security/regression checks proportional to risk (especially authentication, family ACL, personal data, payments, booking, concurrency, and migrations). Required CI/review on the **current PR HEAD** and fresh-base/overlap checks remain blocking for merge.
 7. Avoid busy-polling CI or repeating already answered status checks. Report the actual SHA, verified checks, blockers, and next action, without implying a PR was merged or deployed before proof exists.
 
-See the canonical **Fast and safe execution** section in `CLAUDE.md`. All existing freshness, branch/worktree, hook, CI, and deployment safety rules remain mandatory.
+See the canonical **Fast and safe execution** section in `CLAUDE.md` for the risk-based verification table, architecture ownership checks, GitHub-only workflow, secret/data rules, and distinction between follow-up fixes on one open PR and a genuinely new task. **Never use `package.json` Prisma migrate-dev/reset scripts, even when named `safe`.** All existing freshness, branch/worktree, hook, CI, and deployment safety rules remain mandatory.
 
 ## CRITICAL — mandatory start for EVERY repository-changing task
 
