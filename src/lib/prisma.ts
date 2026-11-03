@@ -7,7 +7,7 @@ import { extendPrismaWithSearchIndexing } from "@/lib/search/prismaSearchExtensi
 // Bump: UserEvent.familyId/planVisibility (Family Core A1, 2026-10-03)
 // GSC query cache (2026-10-22).
 // Wishlist models (2026-10-29).
-const PRISMA_CACHE_VERSION = "v20";
+const PRISMA_CACHE_VERSION = "v21"; // Mini CRM models (2026-11-03)
 
 const globalForPrisma = globalThis as unknown as {
   [key: string]: unknown;
