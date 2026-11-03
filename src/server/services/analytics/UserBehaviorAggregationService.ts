@@ -186,7 +186,10 @@ export async function applyUserBehaviorEvent(
     // Their sentiment is interpreted only by the subject-aware bounded resolver.
     const isExperienceOutcome =
       eventType === "ATTENDED" || eventType === "EXPERIENCE_FEEDBACK";
-    if (vertical && !isExperienceOutcome) preferredVerticals = bump(preferredVerticals, vertical);
+    const isChildScopedHomeDismiss =
+      eventType === "DISMISS" && typeof metaRecord(meta).homeSelectedChildId === "string";
+    if (vertical && !isExperienceOutcome && !isChildScopedHomeDismiss)
+      preferredVerticals = bump(preferredVerticals, vertical);
 
     const affinityDelta = behaviorAffinityDelta(eventType, metaRecord(meta));
     preferredCategories = bumpBy(

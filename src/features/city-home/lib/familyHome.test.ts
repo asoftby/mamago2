@@ -72,6 +72,22 @@ test("dismiss removes every chip and refetch cannot resurrect, independent of PO
   }
 });
 
+test("child-scoped dismissal does not affect other children or the whole-family feed", () => {
+  const cache = new FamilyHomeCache<ReturnType<typeof delivery>>("account_a");
+  for (const choice of [null, "child_0001", "child_0002"]) cache.set(context, "minsk", choice, delivery());
+  cache.dismiss("event_a", Date.now() + HOME_DISMISS_TTL_MS, "child_0001");
+  // A dismissal invalidates stale cache entries; fresh response must still be filtered.
+  for (const choice of [null, "child_0001", "child_0002"]) cache.set(context, "minsk", choice, delivery());
+  assert.deepEqual(cache.get(context, "minsk", "child_0001")?.items, [{ id: "event_b" }]);
+  assert.equal(cache.get(context, "minsk", "child_0002")?.items.length, 2);
+  assert.equal(cache.get(context, "minsk", null)?.items.length, 2);
+  // Same event can be rejected separately for a second child.
+  cache.dismiss("event_a", Date.now() + HOME_DISMISS_TTL_MS, "child_0002");
+  for (const choice of [null, "child_0001", "child_0002"]) cache.set(context, "minsk", choice, delivery());
+  assert.deepEqual(cache.get(context, "minsk", "child_0002")?.items, [{ id: "event_b" }]);
+  assert.equal(cache.get(context, "minsk", null)?.items.length, 2);
+});
+
 test("device dismissal storage is account-scoped, bounded and aligned with server 60-day TTL", () => {
   const storage = new Map<string, string>();
   Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) } });
@@ -90,7 +106,7 @@ test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty
   const ui = readFileSync("src/features/city-home/components/CityHomeFamilyPicks.tsx", "utf8");
   assert.equal((ui.match(/<SaveHeart /g) ?? []).length, 1);
   assert.doesNotMatch(ui, /saveMeta=|selectedPersonaIds|useDiscoveryFilters|startsAt.slice/);
-  for (const expected of ['framing="poster"', 'aria-pressed', 'ArrowRight', 'ArrowLeft', 'context.children.length > 1', 'items.slice(0, 7)', 'role="alert"', 'horizonDays === 30', 'Все события для']) assert.ok(ui.includes(expected), expected);
+  for (const expected of ['framing="poster"', 'aria-pressed', 'ArrowRight', 'ArrowLeft', 'context.children.length > 0', 'items.slice(0, 10)', 'role="alert"', 'horizonDays === 30', 'Все события для', '+ Ребёнок']) assert.ok(ui.includes(expected), expected);
   const page = readFileSync("src/features/city-home/pages/CityHomePage.tsx", "utf8");
   assert.doesNotMatch(page, /CityHomeKudaSection|getKudaDiscoveryFeed|hasHomeContent|kudaPreviewPromise/);
   assert.match(page, /events.mode === "personal"/);

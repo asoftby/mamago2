@@ -138,7 +138,18 @@ Historical subjects match only by `kind + refId`; manual subjects never become
 persistent preference identity. Non-matching and disliked candidates remain
 rankable. Future ranking changes must intentionally bump `algorithmVersion`.
 
-### Home policy: `family-picks-confirmed-v2` (PR 2 policy, PR 3 delivery)
+### Home policy: family-picks-confirmed-v3 (per-child selection and scoped feedback)
+
+v3 extends the existing personal Home delivery to up to 10 events. A HOME DISMISS
+for an explicitly selected and ACL-verified child is stored with
+UserEvent.meta.homeSelectedChildId, and is excluded only for that child
+on subsequent requests. Dismissals without this subject (including legacy
+records and the "Вся семья" action) remain account-wide. Per-child
+dismissals are excluded from account-wide behavior affinity, to prevent
+polluting recommendations for siblings. No separate ranking engine is created.
+The same shared ranker, UserEvent and RecommendationOutcome pipeline applies.
+
+### Previous Home policy: family-picks-confirmed-v2 (PR 2 policy, PR 3 delivery)
 
 `loadPersonalFamilyPicks` / `selectPersonalFamilyPicks` in the existing `familyPicks`
 modules remain the read-only surface composition path. PR 3 wraps it in final

@@ -16,7 +16,8 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("selection"), city, selectedChildId: choice, version: z.string().datetime().nullable() }),
   z.object({ action: z.literal("recommend"), city, selectedChildId: choice, signature: z.string().length(64),
     dismissedIds: z.array(SafeOpaqueIdSchema).max(200).default([]) }),
-  z.object({ action: z.literal("dismiss"), city, eventId: SafeOpaqueIdSchema, exposureId: SafeOpaqueIdSchema.nullable(), token: SafeOpaqueIdSchema }),
+  z.object({ action: z.literal("dismiss"), city, eventId: SafeOpaqueIdSchema, exposureId: SafeOpaqueIdSchema.nullable(), token: SafeOpaqueIdSchema,
+    selectedChildId: choice }),
 ]);
 const defaults = { saveSelection: saveHomeSelection, context: loadHomeContext, deliver: deliverHomeFamilyPicks, verify: verifyRecommendationAttribution, track: trackUserEvent,
   publicEvent: async (id: string): Promise<{ id: string } | null> => prisma.activity.findFirst({ where: { AND: [{ id }, getPublicActivityDetailWhere()] }, select: { id: true } }) };
@@ -28,11 +29,17 @@ export async function resolveHomeRequest(raw: unknown, userId: string | null, se
   if (!parsed.success) return { status: 400, body: { error: "invalid_request" } };
   const data = parsed.data;
   if (data.action === "dismiss") {
+    if (data.selectedChildId) {
+      const owned = await deps.context(userId);
+      if (!owned.profile.children.some(child => child.id === data.selectedChildId))
+        return { status: 404, body: { error: "selection_unavailable" } };
+    }
     const attribution = data.exposureId ? await deps.verify({ exposureId: data.exposureId, entityType: "EVENT", entityId: data.eventId, userId }) : null;
     if (data.exposureId ? !attribution : !await deps.publicEvent(data.eventId)) return { status: 404, body: { error: "event_unavailable" } };
     const result = await deps.track({ userId, sessionId, eventType: "DISMISS", entityType: "EVENT", entityId: data.eventId, citySlug: data.city, vertical: "CITY",
       idempotencyKey: `home-dismiss:${userId}:${data.token}`,
       meta: { source: attribution ? "recommendation" : "listing", section: "home", placement: "HOME_FOR_FAMILY",
+        ...(data.selectedChildId ? { homeSelectedChildId: data.selectedChildId } : {}),
         ...(attribution ? { recommendationExposureId: attribution.exposureId, recommendationRunId: attribution.runId, recommendationSurface: "home" } : {}) } });
     return result.ok ? { status: 200, body: { ok: true } } : { status: 503, body: { error: "dismiss_not_saved" } };
   }
