@@ -155,7 +155,9 @@ jobs:
         run: pnpm test:gsc
 
       - name: Event wizard occasion hydration regressions
-        run: pnpm test:event-wizard-update-loop
+        run: |
+          pnpm test:event-wizard-update-loop
+          pnpm exec tsx src/components/business/wizard/event/steps/Step1Basics.interests.contract.test.ts
 
       - name: Type check
         # GitHub ubuntu runners abort TypeScript at Node's default heap ceiling.
