@@ -141,7 +141,7 @@ export function Step1Basics({
             if (!r.ok) throw new Error("age");
             return r.json() as Promise<{ options?: PublicAgeOption[] }>;
           }),
-          fetch("/api/public/signals/interests").then(async (r) => {
+          fetch("/api/public/signals/interests", { cache: "no-store" }).then(async (r) => {
             if (!r.ok) throw new Error("interests");
             return r.json() as Promise<{ options?: PublicInterestOption[] }>;
           }),
@@ -187,6 +187,34 @@ export function Step1Basics({
     }
 
     void load();
+    return () => {
+      alive = false;
+    };
+  }, [initialTaxonomies]);
+
+  // Server-provided options can lag behind the live catalog. Refresh interests
+  // after hydration so recently added options appear even with stale SSR data.
+  useEffect(() => {
+    if (!initialTaxonomies) return;
+
+    let alive = true;
+    async function refreshInterests() {
+      try {
+        const response = await fetch("/api/public/signals/interests", { cache: "no-store" });
+        if (!response.ok) return;
+        const result = (await response.json()) as { options?: PublicInterestOption[] };
+        if (!alive || !Array.isArray(result.options)) return;
+
+        const freshOptions = result.options
+          .filter((option) => option.active)
+          .sort((a, b) => a.order - b.order || a.value.localeCompare(b.value));
+        setInterestOptions(freshOptions.length > 0 ? freshOptions : buildFallbackInterestOptions());
+      } catch {
+        // Preserve the server-provided options on a transient public API error.
+      }
+    }
+
+    void refreshInterests();
     return () => {
       alive = false;
     };
