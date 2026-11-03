@@ -37,7 +37,8 @@ async function post(body: Record<string, unknown>, signal?: AbortSignal) {
   const timer = setTimeout(onAbort, 15_000);
   try {
     const response = await fetch("/api/recommendations/family-picks", { method: "POST", credentials: "include", cache: "no-store",
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: timeout.signal });
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: timeout.signal,
+      keepalive: body.action === "dismiss" });
     if (!response.ok) throw new Error(`home_${response.status}`);
     return await response.json();
   } finally { clearTimeout(timer); signal?.removeEventListener("abort", onAbort); }
@@ -60,6 +61,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   const cache = useRef(new FamilyHomeCache<HomeFamilyDelivery>(actor));
   const controller = useRef<AbortController | null>(null);
   const dismissals = useRef<HomeDismissal[]>([]);
+  const dismissFlushActive = useRef(false);
   const [impressed, setImpressed] = useState(new Set<string>());
   const selectionSync = useRef(new HomeSelectionSync(initialContext));
   const preferenceQueue = useRef(Promise.resolve());
@@ -68,14 +70,27 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   useEffect(() => { allowedActor.current = auth.user?.id === actor && !auth.isLoading; }, [actor, auth.user?.id, auth.isLoading]);
 
   const flushDismissals = useCallback(async () => {
-    for (const entry of dismissals.current.filter(value => !value.saved)) {
-      if (!allowedActor.current) return;
-      try {
-        await post({ action: "dismiss", city: entry.city, eventId: entry.id, exposureId: entry.exposureId, token: entry.token,
-          selectedChildId: entry.selectedChildId ?? null });
-        entry.saved = true;
-        writeHomeDismissals(actor, dismissals.current);
-      } catch { if (allowedActor.current) setAnnouncement("Событие скрыто на этом устройстве. Повторим сохранение отказа."); }
+    if (dismissFlushActive.current || !allowedActor.current) return;
+    dismissFlushActive.current = true;
+    try {
+      // This independent queue starts as soon as the user rejects an event.
+      // Ranker requests may be aborted during navigation; dismissal writes must not be.
+      while (allowedActor.current) {
+        const entry = dismissals.current.find(value => !value.saved);
+        if (!entry) return;
+        try {
+          await post({ action: "dismiss", city: entry.city, eventId: entry.id, exposureId: entry.exposureId, token: entry.token,
+            selectedChildId: entry.selectedChildId ?? null });
+          if (!allowedActor.current) return;
+          entry.saved = true;
+          writeHomeDismissals(actor, dismissals.current);
+        } catch {
+          if (allowedActor.current && mounted.current) setAnnouncement("Событие скрыто на этом устройстве. Повторим сохранение отказа.");
+          return; // keep the unsaved token for a future attempt
+        }
+      }
+    } finally {
+      dismissFlushActive.current = false;
     }
   }, [actor]);
 
@@ -106,6 +121,8 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
         if (!previous || entry.at > previous.at || (entry.token === previous.token && entry.saved)) merged.set(entryKey(entry), entry);
       }
       dismissals.current = [...merged.values()].slice(-200);
+      // Retry unsaved dismissals immediately, even if ranking subsequently fails.
+      void flushDismissals();
       // A persisted DISMISS changes Home's signed context. It is safe for
       // telemetry to complete in the background: locally excluded IDs already
       // reach the ranker, and a stale signature can be retried once.
@@ -240,6 +257,8 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
     writeHomeDismissals(actor, dismissals.current);
     setData(value => value ? cache.current.filter(value, Date.now(), childScope) : value);
     setAnnouncement("«" + item.title + "» скрыто " + (childScope ? "для выбранного ребёнка" : "для всей семьи"));
+    // Persist before fetching replacement recommendations and independently of their lifecycle.
+    void flushDismissals();
     void load({ keepCurrent: true });
   }
   const choiceChild = context.children.find(child => child.id === selected);

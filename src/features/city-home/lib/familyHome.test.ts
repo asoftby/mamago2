@@ -112,6 +112,10 @@ test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty
   assert.match(ui, /const deadline = setTimeout/);
   assert.match(ui, /clearTimeout\(deadline\)/);
   assert.match(ui, /setData\(null\)/);
+  assert.match(ui, /keepalive: body.action === "dismiss"/, "dismissal request should survive page navigation");
+  assert.match(ui, /if \(dismissFlushActive.current \|\| !allowedActor.current\) return/, "dismissal writes must be serialized");
+  assert.match(ui, /void flushDismissals\(\);\s*void load\(\{ keepCurrent: true \}\)/,
+    "persist user rejection before fetching replacement recommendations");
   assert.doesNotMatch(ui, /AddParticipantModal/);
   assert.doesNotMatch(ui, /saveMeta=|selectedPersonaIds|useDiscoveryFilters|startsAt.slice/);
   for (const expected of ['framing="poster"', 'aria-pressed', 'ArrowRight', 'ArrowLeft', 'context.children.length > 0', 'items.slice(0, 10)', 'role="alert"', 'horizonDays === 30', 'Все события для', '+ Ребёнок']) assert.ok(ui.includes(expected), expected);
