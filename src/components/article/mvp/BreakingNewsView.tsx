@@ -778,97 +778,6 @@ function LinkedEntityCard({
   );
 }
 
-// ─── Related articles ─────────────────────────────────────────────────────────
-
-const RELATED_TONES = [
-  "linear-gradient(160deg, #E6DBC8, #C9BCA0)",
-  "linear-gradient(160deg, #F2C8A7, #E89460)",
-  "linear-gradient(160deg, #CDE3D6, #9CC1AC)",
-];
-
-type RelatedArticle = {
-  id: string;
-  title: string;
-  slug: string | null;
-  excerpt: string | null;
-  publishedAt: Date | null;
-  heroUrl: string | null;
-};
-
-function RelatedSection({ items }: { items: RelatedArticle[] }) {
-  if (items.length === 0) return null;
-  return (
-    <section style={{ padding: "52px 0 28px", borderTop: `1px solid ${C.line}`, marginTop: 44 }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 28px" }}>
-        <div style={{ display: "flex", alignItems: "end", justifyContent: "space-between", marginBottom: 22, gap: 16, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 220 }}>
-            <span style={capsStyle}>Дальше читать</span>
-            <span style={{ flex: 1, height: 1, background: C.line }} />
-          </div>
-          <Link href="/blog" style={{ fontSize: 14, color: C.ink2, textDecoration: "underline", textUnderlineOffset: 4 }}>
-            Все материалы →
-          </Link>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-          {items.map((it, i) => (
-            <Link
-              key={it.id}
-              href={it.slug ? `/blog/${it.slug}` : "/blog"}
-              style={{
-                display: "flex", flexDirection: "column", gap: 14, cursor: "pointer",
-                padding: "18px 18px 20px",
-                border: `1px solid ${C.line}`,
-                borderRadius: 18,
-                background: C.paper,
-                textDecoration: "none", color: "inherit",
-                transition: "transform .2s, box-shadow .2s",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-                (e.currentTarget as HTMLElement).style.boxShadow = "0 16px 40px -20px rgba(20,18,16,.18)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.transform = "";
-                (e.currentTarget as HTMLElement).style.boxShadow = "";
-              }}
-            >
-              {/* Cover */}
-              <div style={{ aspectRatio: "3/2", borderRadius: 12, overflow: "hidden", flexShrink: 0 }}>
-                {it.heroUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={it.heroUrl} alt={it.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <div style={{ width: "100%", height: "100%", background: RELATED_TONES[i % RELATED_TONES.length] }} />
-                )}
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ ...capsStyle, color: C.accentDeep }}>● Новость</span>
-                {it.publishedAt && (
-                  <span style={capsStyle}>
-                    {new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" }).format(it.publishedAt)}
-                  </span>
-                )}
-              </div>
-
-              <div style={{
-                fontFamily: FONT_DISPLAY, fontWeight: 400,
-                fontSize: 22, lineHeight: 1.12, letterSpacing: "-.015em",
-                color: C.ink,
-              }}>
-                {it.title}
-              </div>
-
-              
-            </Link>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 // ─── Keyframes injector ───────────────────────────────────────────────────────
 
 function GlobalStyles() {
@@ -920,7 +829,6 @@ export interface BreakingNewsViewProps {
   blocks: ArticleMvpResolvedBlock[];
   author: { displayName: string | null; avatarUrl: string | null } | null;
   tags?: Array<{ slug: string; title: string }>;
-  related: RelatedArticle[];
   editHref?: string;
   draftWatermark?: boolean;
   citySlug?: string | null;
@@ -936,7 +844,6 @@ export function BreakingNewsView({
   blocks,
   author,
   tags = [],
-  related,
   editHref,
   draftWatermark,
   citySlug,
@@ -967,12 +874,12 @@ export function BreakingNewsView({
   const marqueeItems = ["BREAKING NEWS"];
 
   return (
-    <div data-breaking-news-article-id={articleId} style={{ background: "#fff", color: C.ink, minHeight: "100vh", position: "relative" }}>
+    <div data-breaking-news-article-id={articleId} style={{ background: "#fff", color: C.ink, position: "relative" }}>
       <GlobalStyles />
 
       {/* Grain texture overlay */}
       <div style={{
-        position: "fixed", inset: 0, pointerEvents: "none", zIndex: 1000,
+        position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,
         backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .35 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")`,
         opacity: .055, mixBlendMode: "multiply",
       }} aria-hidden />
@@ -1052,7 +959,6 @@ export function BreakingNewsView({
         </div>
       )}
 
-      <RelatedSection items={related} />
     </div>
   );
 }
