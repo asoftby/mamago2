@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url);
 const fontModule = require.resolve("next/font/local");
 const previousFont = require.cache[fontModule];
 require.cache[fontModule] = { id: fontModule, filename: fontModule, loaded: true, exports: { __esModule: true, default: () => ({ style: { fontFamily: "serif" }, className: "test-font", variable: "test-font" }) } } as NodeModule;
-const { CityHomeGeneralEvents } = require("./CityHomeGeneralEvents") as typeof import("./CityHomeGeneralEvents");
+const { CityHomeGeneralEvents, extractGuestAgeEvents } = require("./CityHomeGeneralEvents") as typeof import("./CityHomeGeneralEvents");
 const { HomeEventsBoundary } = require("./HomeEventsBoundary") as typeof import("./HomeEventsBoundary");
 const { CityHomeFamilyPicks, FamilyHomeResults } = require("./CityHomeFamilyPicks") as typeof import("./CityHomeFamilyPicks");
 if (previousFont) require.cache[fontModule] = previousFont;
@@ -22,11 +22,27 @@ test("guest HTML contains the common SEO title and one catalog CTA without a reg
     <CityHomeGeneralEvents activities={[]} citySlug="minsk" />
   </AuthProvider></AppRouterContext.Provider>);
   assert.match(html, /Куда пойти с ребёнком в Минске/);
+  assert.match(html, /Выберите возраст/);
+  assert.match(html, /Возраст ребёнка/);
+  assert.match(html, /3–5 лет/);
   assert.doesNotMatch(html, /register\?redirectTo|Зарегистрируйтесь/);
   assert.match(html, /Пока нет опубликованных событий/);
   assert.equal((html.match(/>Все события</g) ?? []).length, 1);
   assert.doesNotMatch(html, /Для вашей семьи|child_000/);
 });
+test("guest age preview uses primary catalog matches, never secondary mismatches", () => {
+  const make = (id: string, bucket: "primary" | "secondary") => ({
+    id, feedBucket: bucket,
+  });
+  const items = Array.from({ length: 12 }, (_, i) => make("age_" + i, "primary"));
+  items.push(make("wrong_age", "secondary"));
+  const picked = extractGuestAgeEvents({ items: items as never });
+  assert.equal(picked.length, 10);
+  assert.equal(picked[0].id, "age_0");
+  assert.equal(picked[9].id, "age_9");
+  assert.ok(picked.every((item) => item.id !== "wrong_age"));
+});
+
 test("Home boundary never renders another account's events on the server", () => {
   const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={{ id: "current" } as never}>
     <HomeEventsBoundary actorId="old" citySlug="minsk"><p>Old account private events</p></HomeEventsBoundary>
