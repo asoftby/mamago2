@@ -30,6 +30,10 @@ export function behaviorAffinityDelta(
   eventType: UserEventType,
   meta?: Record<string, unknown> | null,
 ): number {
+  // A rejection of a Home pick for one specific child must not poison
+  // the account-wide taste profile used by other children or surfaces.
+  // The scoped event remains raw UserEvent truth and HOME selection exclusion.
+  if (eventType === "DISMISS" && typeof meta?.homeSelectedChildId === "string") return 0;
   if (eventType !== "FEEDBACK_LEFT") {
     return BEHAVIOR_AFFINITY_WEIGHTS[eventType] ?? 0;
   }

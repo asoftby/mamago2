@@ -73,6 +73,14 @@ async function main() {
     await db.familyMembership.create({ data: { userId: other.id, familyId: family.id, role: "ADULT" } });
     await db.userEvent.create({ data: { userId: other.id, familyId: family.id, eventType: "DISMISS", entityType: "EVENT", entityId: closed.id, createdAt: now } });
     assert.ok((await load()).items.some(item => item.id === closed.id), "another adult's dismissal must not exclude my recommendation");
+    const scoped = await db.userEvent.create({ data: { userId: owner.id, familyId: family.id, eventType: "DISMISS",
+      entityType: "EVENT", entityId: closed.id, createdAt: now, meta: { homeSelectedChildId: first.id } } });
+    const forFirst = () => loadPersonalFamilyPicks({ userId: owner.id, citySlug: city.slug, selection: { mode: "CHILD", selectedChildId: first.id }, now });
+    const forSecond = () => loadPersonalFamilyPicks({ userId: owner.id, citySlug: city.slug, selection: { mode: "CHILD", selectedChildId: second.id }, now });
+    assert.ok((await load()).items.some(item => item.id === closed.id), "child rejection must not hide family-wide events");
+    assert.ok(!(await forFirst()).items.some(item => item.id === closed.id), "rejected child must exclude the event");
+    assert.ok((await forSecond()).items.some(item => item.id === closed.id), "sibling must still see the event");
+    await db.userEvent.delete({ where: { id: scoped.id } });
     const ownDismissal = await db.userEvent.create({ data: { userId: owner.id, familyId: family.id, eventType: "DISMISS", entityType: "EVENT", entityId: closed.id, createdAt: now } });
     assert.deepEqual((await load()).items.map(item => item.id), [multi.id]);
     await db.userEvent.delete({ where: { id: ownDismissal.id } });
