@@ -93,7 +93,7 @@ export function CrmCreateDialog({
       <div className="absolute inset-0" onClick={() => !saving && onClose()} aria-hidden="true" />
       <section
         role="dialog" aria-modal="true" aria-labelledby="crm-create-title"
-        className="relative z-10 w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl sm:p-7"
+        className="relative z-10 max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl sm:p-7"
       >
         <div className="mb-5 flex items-center justify-between">
           <h2 id="crm-create-title" className="text-xl font-semibold tracking-tight text-gray-950">

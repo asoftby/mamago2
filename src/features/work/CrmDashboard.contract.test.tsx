@@ -32,3 +32,10 @@ test("CRM uses staff-only admin navigation and real canonical APIs", () => {
   assert.match(client, /\/api\/admin\/work\/items/);
   assert.match(client, /\/api\/admin\/work\/leads/);
 });
+
+test("creation form fits short mobile viewports and remains scrollable", () => {
+  const source = read("src/features/work/components/CrmCreateDialog.tsx");
+  assert.match(source, /max-h-\[calc\(100dvh-2rem\)\]/);
+  assert.match(source, /overflow-y-auto/);
+  assert.match(source, /overscroll-contain/);
+});
