@@ -13,6 +13,7 @@ model Healthcheck {
 }
 
 model User {
+  homePreference UserHomePreference?
   id                                String                           @id @default(cuid())
   email                             String                           @unique
   supportThreadsAuthored            SupportThread[]                 @relation("SupportThreadCreator")
@@ -7529,4 +7530,13 @@ model PublicSaveAvatarConsent {
   updatedAt   DateTime @updatedAt
 
   @@index([revokedAt])
+}
+
+
+/// Account-wide Home chip selection. Child access is always resolved via current family ACL.
+model UserHomePreference {
+  userId          String   @id
+  selectedChildId String?
+  updatedAt       DateTime @default(now()) @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

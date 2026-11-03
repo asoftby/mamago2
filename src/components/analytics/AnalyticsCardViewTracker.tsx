@@ -19,6 +19,8 @@ type Props = {
    * threshold=0.5, dwellMs=1000). Без значения — прежнее поведение (срабатывание сразу).
    */
   dwellMs?: number;
+  wasImpressed?: boolean;
+  onImpression?: () => void;
 };
 
 /**
@@ -33,10 +35,14 @@ export function AnalyticsCardViewTracker({
   children,
   threshold = 0.35,
   dwellMs,
+  wasImpressed = false,
+  onImpression,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const fired = useRef(false);
   const metaRef = useRef(meta);
+  const onImpressionRef = useRef(onImpression);
+  useEffect(() => { onImpressionRef.current = onImpression; }, [onImpression]);
 
   useEffect(() => {
     metaRef.current = meta;
@@ -44,11 +50,12 @@ export function AnalyticsCardViewTracker({
 
   useEffect(() => {
     const el = ref.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
+    if (wasImpressed || !el || typeof IntersectionObserver === "undefined") return;
 
     const send = () => {
       if (fired.current) return;
       fired.current = true;
+      onImpressionRef.current?.();
       const m = metaRef.current;
       void postAnalyticsEvent({
         eventType: "CARD_VIEW",
@@ -83,7 +90,7 @@ export function AnalyticsCardViewTracker({
       gate?.cancel();
       obs.disconnect();
     };
-  }, [entityId, entityType, vertical, citySlug, threshold, dwellMs]);
+  }, [entityId, entityType, vertical, citySlug, threshold, dwellMs, wasImpressed]);
 
   return (
     <div ref={ref} className="block h-full min-h-[1px] w-full">

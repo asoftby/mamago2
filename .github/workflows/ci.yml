@@ -418,6 +418,7 @@ jobs:
         run: |
           pnpm exec prisma migrate deploy
           pnpm test:family-picks-policy-integration
+          pnpm test:family-home-integration
 
       - name: Five-user WordPress recovery atomicity and rerun on PostgreSQL
         env:

@@ -21,7 +21,9 @@ const prismaKey = `prisma_${PRISMA_CACHE_VERSION}`;
 const prismaBase =
   (globalForPrisma[baseKey] as PrismaClient | undefined) ??
   new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+    log: process.env.NODE_ENV === "test" && process.env.PRISMA_QUERY_EVENTS === "1"
+      ? [{ level: "query", emit: "event" }]
+      : process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 
 const searchIndexer = globalForPrisma.searchIndexer ?? new SearchIndexerService(prismaBase);

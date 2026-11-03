@@ -1,4 +1,7 @@
-import { ptSerifHome } from "@/lib/fonts";
+import { loadHomeEvents } from "@/server/services/recommendations/familyPicks/home";
+import { HomeEventsBoundary } from "@/features/city-home/components/HomeEventsBoundary";
+import { CityHomeGeneralEvents } from "@/features/city-home/components/CityHomeGeneralEvents";
+import { CityHomeSection } from "@/features/city-home/components/CityHomeSection";
 import { Suspense } from "react";
 import { Container } from "@/components/ui/Container";
 import { StoriesSection } from "@/features/stories/components/StoriesSection";
@@ -11,12 +14,9 @@ import { HeroGreetingShell } from "@/features/hero-weather/ui/HeroGreetingShell"
 import {
   CityHomeClassesSection,
   CityHomeJournalSection,
-  CityHomeKudaSection,
   CityHomeRoutesSection,
 } from "@/features/city-home/components/CityHomeContentRows";
 import { getCurrentUser } from "@/lib/auth/server";
-import { getKudaDiscoveryFeed } from "@/server/discovery/kudaDiscoveryFeed";
-import { isHalloweenOccasionActive } from "@/server/discovery/activeHalloweenOccasion";
 import { listPublicRoutesByCity, listPublicRoutesByCityIds } from "@/server/services/route.service";
 import { getCityNominativeName } from "@/lib/city/cityDisplayNames";
 import { listCityHomeArticles } from "@/server/article/listCityHomeArticles";
@@ -95,7 +95,6 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
     ? listPublicRoutesByCity(city.id).catch(() => [])
     : Promise.resolve([]);
   const journalArticlesPromise = listCityHomeArticles(city);
-  const halloweenEnabledPromise = isHalloweenOccasionActive();
   const localClassesPromise = sectionAvailability.classes
     ? getClassesDiscoveryFeed(city.id, city.slug, { take: HOME_PERSONALIZATION_CANDIDATE_TAKE }).catch(() => [])
     : Promise.resolve([]);
@@ -115,30 +114,13 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
       )
     : Promise.resolve([]);
 
-  // Kuda ranking wants a weather-shaped bias, but must not block on the real
-  // weather fetch. Use the same deterministic fallback (real time-of-day,
-  // neutral scenario) that the hero itself uses before weather resolves.
-  const kudaPreviewPromise = userPromise.then((user) => {
-    const rankingContext = getFallbackHeroModel({
-      cityName: city.name,
-      personaMode: user ? "self" : "guest",
-      citySlug: city.slug,
-      timezone: cityTimezone,
-    });
-    return getKudaDiscoveryFeed(city.id, city.slug, user?.id ?? null, {
-      take: HOME_PERSONALIZATION_CANDIDATE_TAKE,
-      weather: {
-        scenario: rankingContext.weatherDayScenario,
-        timeOfDay: rankingContext.timeOfDay,
-      },
-    });
-  });
+  const eventsPromise = userPromise.then(user => loadHomeEvents(user?.id ?? null, city.id, city.slug))
+    .catch(() => ({ mode: "error" as const, actorId: null }));
 
   const [
     user,
     ,
-    kudaPreview,
-    halloweenEnabled,
+    events,
     localRoutes,
     journalArticles,
     localClasses,
@@ -147,8 +129,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
   ] = await Promise.all([
     userPromise,
     nearbyCitiesPromise,
-    kudaPreviewPromise,
-    halloweenEnabledPromise,
+    eventsPromise,
     localRoutesPromise,
     journalArticlesPromise,
     localClassesPromise,
@@ -201,11 +182,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
   const nearbyRouteItems = nearbyRoutesPreviewDb.slice(0, 6);
   const classesMode = localClasses.length > 0 ? "local" : nearbyClasses.length > 0 ? "nearby" : "empty";
   const routesMode = localRouteItems.length > 0 ? "local" : nearbyRouteItems.length > 0 ? "nearby" : "empty";
-  const hasHomeContent =
-    kudaPreview.length > 0 ||
-    (sectionAvailability.classes && classesMode !== "empty") ||
-    (sectionAvailability.routes && routesMode !== "empty") ||
-    journalArticles.length > 0;
+
 
   return (
     <div className="min-h-screen pb-20">
@@ -226,23 +203,14 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
           <ActivationBannerHost />
         </div>
 
-        <CityHomeFamilyPicks citySlug={city.slug} />
+        {events.mode === "error" ? <CityHomeSection title="Мероприятия для семьи"><p role="alert">Не удалось проверить профиль. Обновите страницу, чтобы повторить.</p></CityHomeSection> :
+          <HomeEventsBoundary key={`${events.actorId}:${city.slug}:${events.mode}`} actorId={events.actorId}>
+            {events.mode === "personal" ? <CityHomeFamilyPicks citySlug={city.slug} initialContext={events.context} /> :
+              <CityHomeGeneralEvents activities={events.activities} citySlug={city.slug} authenticated={Boolean(user)} />}
+          </HomeEventsBoundary>}
+
 
         <StoriesSection cityId={city.id} citySlug={city.slug} />
-
-        {!hasHomeContent ? (
-          <section className="rounded-3xl border border-dashed bg-muted/30 px-5 py-6 sm:px-6">
-            <h2 className="text-xl font-normal text-foreground" style={{ fontFamily: ptSerifHome.style.fontFamily }}>
-              В {getCityNominativeName(city.slug)} пока нет опубликованного контента
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              Когда в базе появятся опубликованные события, занятия, маршруты или статьи, они
-              автоматически отобразятся на главной странице города.
-            </p>
-          </section>
-        ) : null}
-
-        <CityHomeKudaSection activities={kudaPreview} halloweenEnabled={halloweenEnabled} />
 
         {sectionAvailability.classes ? (
           <CityHomeClassesSection
