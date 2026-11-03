@@ -30,6 +30,9 @@ test("place visit offer uses the existing OFFER model and editor", () => {
     assert.ok(page.includes(`creationIntent === "${intent}"`), intent);
   }
   assert.match(wizard, /creationIntent === "place" \? "PLACE_VISIT"/);
+  const info = readFileSync("src/components/business/wizard/offer/steps/Step2Information.tsx", "utf8");
+  assert.match(info, /isClassOffer \|\| data\.productType === "PLACE_VISIT"/);
+  assert.match(info, /<OfferCategoryPicker/);
   assert.ok(wizard.includes("...getOfferTypeSelection(selectedType)"));
   assert.match(wizard, /variant === "v2" \? "about" : creationIntent === "parties" \? "placements" : "details"/);
 });
