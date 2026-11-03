@@ -1,6 +1,6 @@
 # One-command task workflow
 
-This is the preferred local workflow for every repository-changing mamaGo task.
+This is the preferred **Local Assisted** workflow for repository-changing mamaGo tasks. **GitHub Direct** is an equally valid first-class mode: it uses a fresh remote `dev` SHA, dedicated GitHub branch and task-only PR without local worktree or pre-push hook. Select it only when the applicable final-SHA GitHub CI and review provide the evidence required by `CLAUDE.md`; otherwise use Local Assisted.
 It automates the existing safety model; it does not weaken it.
 
 ## Who should run it
