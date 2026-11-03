@@ -45,6 +45,7 @@ function resolveDefaultActionMode(
     case "PLACE_REJECTED":
     case "PLACE_UPDATE_APPROVED":
     case "PLACE_UPDATE_NEEDS_REVISION":
+    case "PLACE_IMPROVEMENT_REQUESTED":
     case "PLACE_UPDATE_REJECTED":
     case "ACTIVITY_APPROVED":
     case "ACTIVITY_NEEDS_CHANGES":
@@ -131,6 +132,7 @@ export function resolveNotificationPageUrl(params: {
     case "PLACE_REJECTED":
     case "PLACE_UPDATE_APPROVED":
     case "PLACE_UPDATE_NEEDS_REVISION":
+    case "PLACE_IMPROVEMENT_REQUESTED":
     case "PLACE_UPDATE_REJECTED":
     case "CONTENT_PUBLISHED":
     case "CONTENT_REJECTED":

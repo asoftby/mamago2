@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import { canEditPlace } from "@/lib/permissions/placeEditPermissions";
 import { PlaceWizard } from "@/components/business/wizard/place/PlaceWizard";
+import { PlaceImprovementRequestNotice } from "@/components/business/places/PlaceImprovementRequestNotice";
 import { ContentEditorChrome } from "@/components/content-editor/ContentEditorChrome";
 import {
   defaultNavForSurface,
@@ -114,6 +115,9 @@ export default async function EditorEditPlacePage({
 
   return (
     <ContentEditorChrome title={title} backHref={backHref} surface={surface}>
+      {surface === "business" && place.status === "PUBLISHED" ? (
+        <PlaceImprovementRequestNotice placeId={place.id} />
+      ) : null}
       <PlaceWizard
         mode="edit"
         place={placeForWizard}

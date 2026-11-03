@@ -74,7 +74,11 @@ export function ImprovementRequestForm({
         throw new Error(data.error || "Failed to create improvement request");
       }
 
+      const result = await response.json() as { notificationCreated?: boolean };
       toast.success("Запрос на доработку создан");
+      if (result.notificationCreated === false) {
+        toast.error("Замечание сохранено, но уведомление бизнесу не удалось создать. Проверьте доставку.");
+      }
       
       // Reset form
       setTitle("");

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import prisma from "@/lib/prisma";
 import { ContentStatus, Prisma } from "@prisma/client";
 import { formatDistanceToNow } from "date-fns";
@@ -332,7 +333,11 @@ function PlacesTable({
                   actionsMenu,
                 }) => (
                   <tr key={place.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{place.title}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      <Link href={getPlaceDetailHref(place.id, returnTo)} className="hover:text-blue-700 hover:underline focus-visible:underline">
+                        {place.title}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 text-gray-600">
                       <div>
                         <div className="font-medium">{place.city?.name || "-"}</div>
@@ -351,7 +356,14 @@ function PlacesTable({
                     <td className="px-4 py-3 text-gray-600">
                       {formatDistanceToNow(place.createdAt, { addSuffix: true, locale: ru })}
                     </td>
-                    <td className="px-4 py-3">{actionsMenu}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Link href={getPlaceDetailHref(place.id, returnTo)} className="text-sm text-blue-700 hover:underline">
+                          Карточка
+                        </Link>
+                        {actionsMenu}
+                      </div>
+                    </td>
                   </tr>
                 ),
               )}
@@ -372,7 +384,11 @@ function PlacesTable({
           }) => (
             <DataCard key={place.id}>
               <DataCardHeader
-                title={place.title}
+                title={
+                  <Link href={getPlaceDetailHref(place.id, returnTo)} className="hover:text-blue-700 hover:underline focus-visible:underline">
+                    {place.title}
+                  </Link>
+                }
                 subtitle={
                   [place.city?.name, streetAddress].filter(Boolean).join(", ") || undefined
                 }
@@ -395,7 +411,12 @@ function PlacesTable({
                   })}
                 />
               </DataCardBody>
-              <DataCardActions>{actionsMenu}</DataCardActions>
+              <DataCardActions>
+                <Link href={getPlaceDetailHref(place.id, returnTo)} className="text-sm font-medium text-blue-700 hover:underline">
+                  Карточка
+                </Link>
+                {actionsMenu}
+              </DataCardActions>
             </DataCard>
           ),
         )}
