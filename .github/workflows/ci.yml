@@ -433,6 +433,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
           APP_ENV: test
+          APP_PUBLIC_URL: https://activation-ci.example.invalid
           EMAIL_ENABLED: 'false'
           MIGRATED_USER_ACTIVATION_EMAIL_ENABLED: 'false'
           MIGRATED_USER_ACTIVATION_EMAIL_PRODUCTION_APPROVED: 'false'
