@@ -26,8 +26,8 @@ export async function GET(request: NextRequest) {
   }
   return NextResponse.json({
     article: {
-      id: article.id, slug: article.slug, title: article.title,
-      href: buildArticlePublicPath({ slug: article.slug, geoScope: row.geoScope, citySlug: row.city?.slug }),
+      id: article.id, slug: row.slug, title: article.title,
+      href: buildArticlePublicPath({ slug: row.slug, geoScope: row.geoScope, citySlug: row.city?.slug }),
       citySlug: row.geoScope === "CITY" ? row.city?.slug : null,
       excerpt: article.excerpt, publishedAt: article.publishedAt,
       blocks: article.blocks, author: article.author, tags: article.tags,
