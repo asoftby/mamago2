@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FamilyActivationAddChildOverlay } from "./FamilyActivationAddChildOverlay";
-import { AddParticipantModal } from "@/components/children/AddParticipantModal";
+import { FamilyActivationEditChildBirthOverlay } from "./FamilyActivationEditChildBirthOverlay";
 import { useAuthMe } from "@/lib/auth/useAuthMe";
 import { EventCard, EVENT_CARD_SHELL } from "@/components/events";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
@@ -226,9 +226,10 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
       <p role="status" aria-live="polite" className="sr-only">{announcement}</p>
       <FamilyActivationAddChildOverlay open={addingChild} onOpenChange={setAddingChild}
         onSuccess={() => { cache.current.clear(); router.refresh(); }} />
-      <AddParticipantModal isOpen={editingChildId != null} onClose={() => setEditingChildId(null)}
-        childData={editingChild ? { id: editingChild.id, name: editingChild.name, birthDate: null } : undefined}
-        childOnly onSaved={() => { cache.current.clear(); router.refresh(); }} />
+      <FamilyActivationEditChildBirthOverlay open={editingChildId != null}
+        onOpenChange={(open) => { if (!open) setEditingChildId(null); }}
+        child={editingChild ? { id: editingChild.id, name: editingChild.name ?? "" } : null}
+        onSuccess={() => { cache.current.clear(); router.refresh(); }} />
     </div>
   </CityHomeSection>;
 }

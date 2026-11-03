@@ -105,6 +105,8 @@ test("device dismissal storage is account-scoped, bounded and aligned with serve
 test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty states", () => {
   const ui = readFileSync("src/features/city-home/components/CityHomeFamilyPicks.tsx", "utf8");
   assert.equal((ui.match(/<SaveHeart /g) ?? []).length, 1);
+  assert.ok(ui.includes("<FamilyActivationEditChildBirthOverlay"), "birth-only editor must preserve existing interests");
+  assert.doesNotMatch(ui, /AddParticipantModal/);
   assert.doesNotMatch(ui, /saveMeta=|selectedPersonaIds|useDiscoveryFilters|startsAt.slice/);
   for (const expected of ['framing="poster"', 'aria-pressed', 'ArrowRight', 'ArrowLeft', 'context.children.length > 0', 'items.slice(0, 10)', 'role="alert"', 'horizonDays === 30', 'Все события для', '+ Ребёнок']) assert.ok(ui.includes(expected), expected);
   const page = readFileSync("src/features/city-home/pages/CityHomePage.tsx", "utf8");
