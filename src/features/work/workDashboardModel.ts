@@ -30,6 +30,14 @@ export interface CrmLead {
   businessId: string | null;
   createdAt: string;
   business: { id: string; name: string } | null;
+  workItems: Array<{
+    id: string;
+    title: string;
+    status: WorkStatus;
+    dueAt: string | null;
+    assigneeId: string;
+    assignee: { id: string; displayName: string | null };
+  }>;
 }
 
 interface Paginated {

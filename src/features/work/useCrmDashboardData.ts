@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   type CrmLead, type LeadList, type WorkItem, type WorkList,
-  isOpen, isUpcoming, sortByDeadline, uniqueItems,
+  isOpen, sortByDeadline, uniqueItems,
 } from "./workDashboardModel";
 
 interface DashboardData {
   loading: boolean;
   error: string | null;
   leads: CrmLead[];
-  recentItems: WorkItem[];
   todayItems: WorkItem[];
   upcomingItems: WorkItem[];
   totalLeads: number | null;
@@ -42,7 +41,7 @@ export function useCrmDashboardData(actorId: string): DashboardData {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [leadsResult, setLeadsResult] = useState<LeadList | null>(null);
-  const [recentResult, setRecentResult] = useState<WorkList | null>(null);
+  const [upcomingResult, setUpcomingResult] = useState<WorkList | null>(null);
   const [todayResult, setTodayResult] = useState<WorkList | null>(null);
   const [overdueResult, setOverdueResult] = useState<WorkList | null>(null);
   const [activeSales, setActiveSales] = useState<number | null>(null);
@@ -65,18 +64,19 @@ export function useCrmDashboardData(actorId: string): DashboardData {
       readJson<LeadList>("/api/admin/work/leads?take=50", signal),
       readJson<WorkList>(query(itemsBase, { ...own, due: "TODAY" }), signal),
       readJson<WorkList>(query(itemsBase, { ...own, due: "OVERDUE" }), signal),
-      readJson<WorkList>(query(itemsBase, { ...own }), signal),
+      // Query the server for future OPEN tasks before applying pagination.
+      readJson<WorkList>(query(itemsBase, { ...own, due: "UPCOMING", take: "4" }), signal),
       salesCount("NEW"), salesCount("IN_PROGRESS"), salesCount("WAITING"),
-    ]).then(([leads, today, overdue, recent, salesNew, salesInProgress, salesWaiting]) => {
+    ]).then(([leads, today, overdue, upcoming, salesNew, salesInProgress, salesWaiting]) => {
       if (signal.aborted) return;
       if (!Array.isArray(leads.leads) || !Array.isArray(today.items) ||
-        !Array.isArray(overdue.items) || !Array.isArray(recent.items)) {
+        !Array.isArray(overdue.items) || !Array.isArray(upcoming.items)) {
         throw new Error("Сервер вернул неполные данные CRM.");
       }
       setLeadsResult(leads);
       setTodayResult(today);
       setOverdueResult(overdue);
-      setRecentResult(recent);
+      setUpcomingResult(upcoming);
       setActiveSales(salesNew.total + salesInProgress.total + salesWaiting.total);
       setLoading(false);
     }).catch((cause: unknown) => {
@@ -91,15 +91,14 @@ export function useCrmDashboardData(actorId: string): DashboardData {
     uniqueItems(todayResult?.items ?? [], overdueResult?.items ?? []).filter(isOpen),
   ), [todayResult, overdueResult]);
 
-  const upcomingItems = useMemo(() => {
-    const now = new Date();
-    return sortByDeadline((recentResult?.items ?? []).filter(item => isUpcoming(item, now))).slice(0, 4);
-  }, [recentResult]);
+  const upcomingItems = useMemo(
+    () => sortByDeadline(upcomingResult?.items ?? []).slice(0, 4),
+    [upcomingResult],
+  );
 
   return {
     loading, error,
     leads: leadsResult?.leads ?? [],
-    recentItems: recentResult?.items ?? [],
     todayItems,
     upcomingItems,
     totalLeads: leadsResult?.total ?? null,

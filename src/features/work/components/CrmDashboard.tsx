@@ -9,7 +9,7 @@ import Link from "next/link";
 import { adminPath } from "@/lib/routing/surface";
 import { useCrmDashboardData } from "../useCrmDashboardData";
 import {
-  type CrmLead, type WorkItem, isOpen, minskDateTime, sortByDeadline,
+  type CrmLead, type WorkItem, minskDateTime,
   workStatusColor, workStatusLabel,
 } from "../workDashboardModel";
 import { CrmCreateDialog } from "./CrmCreateDialog";
@@ -68,10 +68,9 @@ function DataEmpty({ children }: { children: React.ReactNode }) {
 }
 
 function CrmLeadTable({
-  leads, items, actorId, onCreateTask,
+  leads, actorId, onCreateTask,
 }: {
   leads: CrmLead[];
-  items: WorkItem[];
   actorId: string;
   onCreateTask: (id: string) => void;
 }) {
@@ -89,8 +88,8 @@ function CrmLeadTable({
         </thead>
         <tbody>
           {leads.map(lead => {
-            const related = sortByDeadline(items.filter(item => item.leadId === lead.id && isOpen(item)));
-            const next = related[0];
+            // The backend provides each lead's next open task across all admins.
+            const next = lead.workItems?.[0];
             const linked = Boolean(lead.businessId);
             const status = linked ? "Клиент" : next
               ? next.status === "WAITING" ? "Ждём клиента" : "В работе"
@@ -108,7 +107,9 @@ function CrmLeadTable({
                   )}
                 </td>
                 <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${tagColor}`}>{status}</span></td>
-                <td className="px-4 py-3 text-gray-600">{next?.assigneeId === actorId ? "Вы" : "—"}</td>
+                <td className="px-4 py-3 text-gray-600">
+                  {next?.assigneeId === actorId ? "Вы" : next?.assignee?.displayName || (next ? "Сотрудник" : "—")}
+                </td>
                 <td className="px-4 py-3 text-gray-600">
                   {next?.dueAt ? (
                     <span className="inline-flex items-center gap-1.5">
@@ -337,7 +338,7 @@ export function CrmDashboard({ actorId, openSupportCount }: Props) {
         {data.loading ? <DataEmpty>Загружаем лиды…</DataEmpty> :
           data.error ? <DataEmpty>Данные лидов пока недоступны.</DataEmpty> :
           visibleLeads.length === 0 ? <DataEmpty>{query ? "По запросу лидов не найдено." : "Лидов пока нет. Добавьте первый запрос от бизнеса."}</DataEmpty> :
-          <CrmLeadTable leads={visibleLeads} items={data.recentItems} actorId={actorId}
+          <CrmLeadTable leads={visibleLeads} actorId={actorId}
             onCreateTask={leadId => setCreateState({ mode: "task", leadId })} />
         }
         {!data.loading && !data.error && data.totalLeads != null && data.totalLeads > data.leads.length && (

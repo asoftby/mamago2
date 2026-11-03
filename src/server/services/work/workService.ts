@@ -275,7 +275,21 @@ export async function listLeads(query: z.infer<typeof crmLeadListQuerySchema>) {
     prismaBase.crmLead.findMany({
       where, orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: (query.page - 1) * query.take, take: query.take,
-      include: { business: { select: { id: true, name: true } } },
+      include: {
+        business: { select: { id: true, name: true } },
+        // Each lead's actual next OPEN task, across all administrators.
+        // Relation-level take=1 avoids paginating the global WorkItem list
+        // before deriving a particular lead's lifecycle.
+        workItems: {
+          where: { status: { notIn: ["DONE", "CANCELED"] } },
+          orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }, { id: "asc" }],
+          take: 1,
+          select: {
+            id: true, title: true, status: true, dueAt: true, assigneeId: true,
+            assignee: { select: { id: true, displayName: true } },
+          },
+        },
+      },
     }),
   ]);
   return { total, page: query.page, take: query.take, leads };

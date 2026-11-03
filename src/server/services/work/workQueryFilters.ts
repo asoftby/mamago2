@@ -24,6 +24,11 @@ export function buildWorkItemWhere(
         dueAt: { lt: now },
         AND: [{ status: { notIn: ["DONE", "CANCELED"] as const } }],
       } :
+      query.due === "UPCOMING" ? {
+        // From tomorrow in Minsk (the "Ближайшие задачи" panel excludes today).
+        dueAt: { gte: end },
+        AND: [{ status: { notIn: ["DONE", "CANCELED"] as const } }],
+      } :
       query.due === "NO_DUE" ? { dueAt: null } : {}),
   };
 }

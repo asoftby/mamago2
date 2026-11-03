@@ -29,3 +29,22 @@ test("TODAY follows Minsk midnight even when the server is on UTC", () => {
     lt: new Date("2026-11-03T21:00:00Z"),
   });
 });
+
+
+test("UPCOMING selects only future open tasks after Minsk midnight", () => {
+  const where = buildWorkItemWhere(
+    workListQuerySchema.parse({ due: "UPCOMING", assigneeId: "clp0o00000000000000000001" }),
+    new Date("2026-11-03T12:00:00Z"),
+  );
+  assert.deepEqual(where.dueAt, { gte: new Date("2026-11-03T21:00:00Z") });
+  assert.deepEqual(where.AND, [{ status: { notIn: ["DONE", "CANCELED"] } }]);
+});
+
+test("UPCOMING preserves an explicitly requested status", () => {
+  const where = buildWorkItemWhere(
+    workListQuerySchema.parse({ due: "UPCOMING", status: "WAITING" }),
+    new Date("2026-11-03T12:00:00Z"),
+  );
+  assert.equal(where.status, "WAITING");
+  assert.deepEqual(where.AND, [{ status: { notIn: ["DONE", "CANCELED"] } }]);
+});
