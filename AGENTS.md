@@ -1,5 +1,15 @@
 # Agent Instructions
 
+## Product Challenge — mandatory before substantive work
+
+For **every new task or material change**, assess product value, user/business UX, smallest viable solution, existing-code reuse, architecture/ACL/security, and **runtime efficiency** (DB/API query count and cost, N+1, payload, caching, latency, hosting load). Challenge the request when a simpler or safer approach gives the same result. Avoid feature expansion, duplicate engines, and unmeasured performance claims.
+
+Before substantive coding, briefly recommend **DO / SIMPLIFY / DEFER (STOP)** with the expected UX/efficiency impact and a testable acceptance outcome. Ask for one focused decision **only when** a real trade-off changes approved scope, UX, cost, security or release priorities. Routine bug fixes and already-approved, unambiguous implementation **must proceed without repetitive questions**. Reassess if new evidence changes the plan; do not silently expand scope.
+
+**Current RC1 focus:** families find truthful, bookable/accessible activities through «Куда пойти», and businesses self-register and publish Place/Event/Offer. Release scope / GO-NO-GO: GitHub issue **#1103**, acceptance **#1101/#1102**. Suggest deferring unrelated CRM, Family OS, design polish and new features; never use this rule to bypass required freshness, review, CI, security, migration or deployment gates.
+
+The full canonical Product Challenge policy and precedence are in `CLAUDE.md`. All agents MUST follow it.
+
 ## Preferred automation — use it instead of making the user operate Git
 
 For every repository-changing task, agents with repository shell access MUST use the repository workflow scripts themselves instead of asking the user to manually create branches/worktrees or repeat routine Git commands:
