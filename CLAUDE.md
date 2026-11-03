@@ -76,6 +76,8 @@ GitHub `origin/dev` is the single source of truth. Other agents can merge PRs di
 
 `task-start.sh` wraps the freshness gate, captures exact `BASE_HEAD`, creates the isolated dated branch/worktree, and verifies its base. `task-sync.sh` automatically merges non-overlapping fresh `origin/dev` changes but stops when the same files changed on both sides. `task-check.sh` runs the shared push gate; task-specific tests are still required. `task-finish.sh` performs the final freshness/diff checks and normal push/PR handoff. Each worktree owns its `node_modules` and Prisma Client (`task-start.sh` runs `pnpm install --frozen-lockfile` + `prisma generate`; `task-sync.sh` regenerates when the schema changes). **Never symlink `node_modules` to another checkout** — the shared generated client makes `tsc` results random; the push gate fails on it (`scripts/git/worktree-deps.sh`). Never bypass a safety stop. Human shortcuts `mgtask`, `mgcheck`, and `mgfinish` are documented in `docs/engineering/one-command-task-workflow.md`.
 
+The following numbered shell steps apply to **Local Assisted only**. In GitHub Direct, obtain the fresh remote `dev` SHA through GitHub, branch from exactly that SHA, and repeat the freshness/diff checks before PR integration; there is no local worktree to inspect.
+
 1. In the canonical `dev` checkout run:
 
 ```bash
@@ -89,7 +91,7 @@ sh scripts/git/session-start-gate.sh
 BASE_HEAD=$(git rev-parse HEAD)
 ```
 
-4. Every repository-changing task must run in its **own isolated task worktree/branch created from that exact `BASE_HEAD`**. Do not implement a new task directly in a shared worktree, and do not reuse an old task worktree for a different task without re-validating it against fresh `origin/dev`.
+4. Every **Local Assisted** repository-changing task must run in its **own isolated task worktree/branch created from that exact `BASE_HEAD`**. Do not implement a new task directly in a shared worktree, and do not reuse an old task worktree for a different task without re-validating it against fresh `origin/dev`.
 5. Before pushing task output or integrating it through a PR, fetch `origin/dev` again and compare it with `BASE_HEAD`. If `origin/dev` advanced, treat the task output as potentially stale: reconcile deliberately on top of the fresh base, inspect overlapping files, and rerun relevant verification before integration.
 6. Git/GitHub commit SHA is the source of truth. `local`, DEV, and PROD are environments, not independent code histories. Never make manual code edits directly on DEV or PROD.
 7. After deployment, verify that the environment reports the expected `gitSha`/build identity before claiming the change is deployed. PROD must come from a known, verified Git commit/artifact; never treat server filesystem state as authoritative source code.
@@ -120,7 +122,7 @@ Every distinct repository-changing task gets:
 - task-only commits;
 - one PR targeting `dev`.
 
-A new distinct user request is a new task even if it arrives in the same chat/session immediately after another task. Do not continue task B in task A's branch, worktree, or PR.
+A genuinely distinct acceptance contract is a new task even inside the same chat/session. Corrections to an open PR addressing that same contract remain in the existing task; unrelated task B must never be added to task A's branch, worktree, or PR.
 
 One branch may contain multiple commits only when every commit belongs to the same logical task and is intended to be reviewed and merged together.
 
@@ -198,7 +200,7 @@ DEV/PROD deployment mechanics are separate from task integration. The code sourc
 
 ## Git / Worktree Safety — mandatory
 
-Правила обязательны для любых параллельных задач, subagents, background agents и временных worktree.
+Правила обязательны для любых параллельных задач, subagents, background agents и временных worktree. Shell/worktree commands below apply to Local Assisted; GitHub Direct must uphold the same freshness, isolation, diff-integrity and non-overwrite invariants using remote branch/SHA evidence, without claiming to have executed shell commands.
 
 ### 1. Всегда проверять base SHA
 
