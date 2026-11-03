@@ -17,12 +17,44 @@ import {
 import { getTrustedClientIp } from "@/lib/security/clientIp";
 import { activePlanScopeFor } from "@/server/family/familyAccess";
 import { canonicalSystemInterestSlugs } from "@/lib/event/eventSystemInterests";
+import { firstGuestPlanOccurrence, guestPlanDateWindow } from "@/server/services/guestPlanAvailability";
 
 /**
  * POST /api/plan/generate — подборка для «Мой план».
  * Авторизованным — без гостевой квоты.
  * Гостям — anonymousId в body (или fallback по IP + UA). Квота списывается после успешной подборки (guestPlanQuota).
  */
+/**
+ * A dated guest plan must be backed by an upcoming real occurrence. A generic
+ * ALWAYS/RECURRING offer without a confirmed time belongs in discovery, not
+ * in a specific-day itinerary.
+ */
+async function upcomingSessionByActivity(ids: string[], date?: string, dateTo?: string) {
+  if (!date || ids.length === 0) return null;
+  const range = guestPlanDateWindow(date, dateTo);
+  const now = new Date();
+  const rows = await prisma.activity.findMany({
+    where: { id: { in: ids } },
+    select: {
+      id: true,
+      nextOccurrenceAt: true,
+      _count: { select: { sessions: true } },
+      sessions: {
+        where: { startsAt: { gte: range.start, lt: range.end } },
+        select: { startsAt: true, withdrawnAt: true },
+        orderBy: { startsAt: "asc" },
+      },
+    },
+  });
+  return new Map(rows.flatMap((row) => {
+    const occurrence = firstGuestPlanOccurrence({
+      sessions: row.sessions, hasStoredSessions: row._count.sessions > 0,
+      nextOccurrenceAt: row.nextOccurrenceAt, rangeStart: range.start, rangeEnd: range.end, now,
+    });
+    return occurrence ? [[row.id, occurrence.toISOString()] as const] : [];
+  }));
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
@@ -42,7 +74,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { anonymousId, city, date, exclude, ageRanges, interests } = parsed.data;
+    const { anonymousId, city, date, dateTo, exclude, ageRanges, interests } = parsed.data;
+    const dateFilter = date ? (dateTo ? { dateFrom: date, dateTo } : { date }) : {};
     const interestSlugs = canonicalSystemInterestSlugs(interests);
     const excludeActivityIds = [...new Set((exclude ?? []).filter(Boolean))];
     const ageRangeValues = [...new Set(ageRanges ?? [])];
@@ -67,19 +100,24 @@ export async function POST(request: NextRequest) {
       const activities = await listPlanSuggestionsForCity({
         citySlug: city.toLowerCase(),
         excludeActivityIds: mergedExclude,
-        take: 6,
+        take: date ? 24 : 6,
+        ...dateFilter,
+        strictAgeMatching: Boolean(date && ageRangeValues.length > 0),
         ...(ageRangeValues.length > 0 ? { ageRangeValues } : {}),
         ...(interestSlugs.length > 0 ? { profileInterestSlugs: interestSlugs } : {}),
       });
+      const matches = await upcomingSessionByActivity(activities.map((a) => a.id), date, dateTo);
+      const eligible = activities.filter((a) => !matches || matches.has(a.id)).slice(0, 6)
+        .map((a) => ({ ...a, suggestedStartsAt: matches?.get(a.id) ?? null }));
       console.log("[API] real data used", {
         endpoint: "/api/plan/generate",
         authenticated: true,
-        count: activities.length,
+        count: eligible.length,
       });
       return NextResponse.json({
-        suggestions: activities,
-        scenario: activities,
-        ...(activities.length === 0 ? { message: "Нет данных для генерации" } : {}),
+        suggestions: eligible,
+        scenario: eligible,
+        ...(eligible.length === 0 ? { message: "Нет данных для генерации" } : {}),
         requiresAuth: false,
         remainingGenerations: null,
         authenticated: true,
@@ -119,15 +157,26 @@ export async function POST(request: NextRequest) {
     const batch = await rankPlanSuggestionsForCity({
       citySlug: city.toLowerCase(),
       excludeActivityIds,
-      take: 6,
+      take: date ? 24 : 6,
+      ...dateFilter,
+      strictAgeMatching: Boolean(date && ageRangeValues.length > 0),
       ...(ageRangeValues.length > 0 ? { ageRangeValues } : {}),
       ...(interestSlugs.length > 0 ? { profileInterestSlugs: interestSlugs } : {}),
     });
+    const matches = await upcomingSessionByActivity(batch.suggestions.map((s) => s.activity.id), date, dateTo);
+    const eligible = batch.suggestions.filter((s) => !matches || matches.has(s.activity.id)).slice(0, 6);
     console.log("[API] real data used", {
       endpoint: "/api/plan/generate",
       authenticated: false,
-      count: batch.suggestions.length,
+      count: eligible.length,
     });
+    // Empty days do not spend a guest's limited successful generations.
+    if (eligible.length === 0) {
+      return NextResponse.json({
+        suggestions: [], scenario: [], requiresAuth: false, remainingGenerations: null,
+        message: "На выбранные даты подтверждённых сеансов нет",
+      });
+    }
 
     const recorded = await recordGuestSuccessfulGeneration(key);
     if (!recorded.ok) {
@@ -161,7 +210,7 @@ export async function POST(request: NextRequest) {
       surface: RecommendationSurface.MY_PLAN,
       citySlug: city.toLowerCase(),
       targetDateFrom: date ?? null,
-      targetDateTo: date ?? null,
+      targetDateTo: dateTo ?? date ?? null,
       algorithmVersion: batch.algorithmVersion,
       candidateCount: batch.candidateCount,
       decisionContext: {
@@ -176,7 +225,7 @@ export async function POST(request: NextRequest) {
         },
         actor: { kind: "guest", id: guestAnonymousId },
       },
-      items: batch.suggestions.map((item, index) => ({
+      items: eligible.map((item, index) => ({
         entityType: AnalyticsEntityType.EVENT,
         entityId: item.activity.id,
         position: index + 1,
@@ -186,8 +235,9 @@ export async function POST(request: NextRequest) {
       })),
     });
 
-    const activities = batch.suggestions.map((item, index) => ({
+    const activities = eligible.map((item, index) => ({
       ...item.activity,
+      suggestedStartsAt: matches?.get(item.activity.id) ?? null,
       recommendationRunId: trace?.runId ?? null,
       recommendationExposureId:
         trace?.exposureIdByEntityKey.get(`EVENT:${item.activity.id}`) ?? null,

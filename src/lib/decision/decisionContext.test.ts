@@ -156,6 +156,15 @@ assert.equal(
 assert.equal(guestGenerateBodySchema.safeParse({ anonymousId: "x".repeat(500) }).success, false, "huge anonymousId rejected");
 assert.equal(guestGenerateBodySchema.safeParse({ anonymousId: "drop table; --" }).success, false, "free-text anonymousId rejected");
 
+assert.equal(guestGenerateBodySchema.safeParse({ date: "2026-11-03" }).success, true);
+assert.equal(guestGenerateBodySchema.safeParse({ date: "2026-11-07", dateTo: "2026-11-08" }).success, true);
+assert.equal(guestGenerateBodySchema.safeParse({ date: "2026-11-03", dateTo: "2026-12-28" }).success, false);
+assert.equal(guestGenerateBodySchema.safeParse({ date: "2026-11-08", dateTo: "2026-11-07" }).success, false);
+assert.equal(guestGenerateBodySchema.safeParse({ dateTo: "2026-11-08" }).success, false);
+assert.equal(guestGenerateBodySchema.safeParse({ date: "2026-02-30" }).success, false);
+assert.equal(guestGenerateBodySchema.safeParse({ date: "not-a-date" }).success, false);
+
+
 assert.deepEqual(parseCanonicalAgeRangesQuery(null), { ok: true, values: [] });
 assert.deepEqual(parseCanonicalAgeRangesQuery("3-5,1-3,3-5"), { ok: true, values: ["3-5", "1-3"] });
 assert.deepEqual(parseCanonicalAgeRangesQuery("3-5,nope"), { ok: false });

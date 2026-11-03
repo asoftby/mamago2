@@ -191,6 +191,8 @@ export type PlanSuggestionsInput = {
   take?: number;
   /** Значения возрастных групп (как в Activity.ageTags). */
   ageRangeValues?: string[];
+  /** A dated itinerary must not silently broaden to events outside the selected age. */
+  strictAgeMatching?: boolean;
   /** "YYYY-MM-DD" — один календарный день в Europe/Minsk. */
   date?: string;
   /** Опциональный диапазон для surface horizon. Игнорируется, если задан `date`. */
@@ -317,7 +319,7 @@ export async function rankPlanSuggestionsForCity(
   // An explicit adult-only search must never fall back to child-targeted
   // events just to fill the recommendation batch.
   const adultOnly = ageRangeValues.length === 1 && ageRangeValues[0] === "18+";
-  if (rows.length === 0 && ageRangeValues.length > 0 && !adultOnly) {
+  if (rows.length === 0 && ageRangeValues.length > 0 && !adultOnly && !input.strictAgeMatching) {
     ageFallbackUsed = true;
     rows = await fetchCandidateRows(false);
   }
