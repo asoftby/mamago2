@@ -14,13 +14,14 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/server";
 import prisma from "@/lib/prisma";
 import { findCityBySlug } from "@/server/geo/findCityBySlug";
-import { loadArticleMvpBySlugPublic, loadRelatedBreakingNews } from "@/lib/article/articleMvpRenderData";
+import { loadArticleMvpBySlugPublic } from "@/lib/article/articleMvpRenderData";
 import { resolveCityArticlePublicRoute } from "@/lib/article/resolveCityArticlePublicRoute";
 import { resolveCityBlogCategory } from "@/server/article/cityBlogCategories";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
 import { ArticleMvpView } from "@/components/article/mvp/ArticleMvpView";
 import { BreakingNewsView } from "@/components/article/mvp/BreakingNewsView";
+import { BreakingNewsLazyNext } from "@/components/journal/BreakingNewsLazyNext";
 import { BlogArticleSectionSync } from "../../../blog/BlogArticleSectionSync";
 import { ContinuousArticleReader } from "@/components/article/continuous/ContinuousArticleReader";
 import { JsonLd } from "@/components/seo/JsonLd";
@@ -200,7 +201,6 @@ export default async function CityArticlePage({ params }: PageProps) {
   );
 
   if (mvp.subtitle === BREAKING_NEWS_SUBTITLE) {
-    const related = await loadRelatedBreakingNews(mvp.id);
     return (
       <>
         <BlogArticleSectionSync slug={articleRow.category?.slug ?? null} />
@@ -218,12 +218,12 @@ export default async function CityArticlePage({ params }: PageProps) {
           blocks={mvp.blocks}
           author={mvp.author}
           tags={mvp.tags}
-          related={related}
           editHref={editHref}
           citySlug={city.slug}
           articleHref={canonicalPath}
           coverImageUrl={mvp.heroUrl}
         />
+        <BreakingNewsLazyNext initialArticleId={mvp.id} initialArticleHref={canonicalPath} citySlug={city.slug} />
       </>
     );
   }

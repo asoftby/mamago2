@@ -28,9 +28,10 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { buildOgMeta } from "@/lib/seo/buildOgMeta";
 import type { ArticleVm } from "@/lib/blog/articleTypes";
 import { AnalyticsDetailBeacon } from "@/components/analytics/AnalyticsDetailBeacon";
-import { loadArticleMvpBySlugPublic, loadRelatedBreakingNews } from "@/lib/article/articleMvpRenderData";
+import { loadArticleMvpBySlugPublic } from "@/lib/article/articleMvpRenderData";
 import { ArticleMvpView } from "@/components/article/mvp/ArticleMvpView";
 import { BreakingNewsView } from "@/components/article/mvp/BreakingNewsView";
+import { BreakingNewsLazyNext } from "@/components/journal/BreakingNewsLazyNext";
 import { ContinuousArticleReader } from "@/components/article/continuous/ContinuousArticleReader";
 import { BREAKING_NEWS_SUBTITLE } from "@/lib/publications/breakingNewsArticle";
 import {
@@ -397,7 +398,6 @@ export default async function ArticlePage({
     }
 
     if (mvp.subtitle === BREAKING_NEWS_SUBTITLE) {
-      const related = await loadRelatedBreakingNews(mvp.id);
       return (
         <>
           <ArticleGeoLabelSync label={articleGeoLabel} />
@@ -415,11 +415,11 @@ export default async function ArticlePage({
             blocks={mvp.blocks}
             author={mvp.author}
             tags={mvp.tags}
-            related={related}
             editHref={editHref}
             articleHref={canonicalPath}
             coverImageUrl={mvp.heroUrl}
           />
+          <BreakingNewsLazyNext initialArticleId={mvp.id} initialArticleHref={canonicalPath} />
         </>
       );
     }
