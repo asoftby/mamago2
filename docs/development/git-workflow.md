@@ -47,9 +47,11 @@ A commit with an invalid message (wrong prefix, subject too long, etc.) will be 
 
 ### pre-push
 
-`pnpm build` runs before every `git push`.
-The push is blocked if the build fails, preventing broken code from reaching the remote.
+The actual `.husky/pre-push` calls `scripts/git/run-push-gate.sh`, which checks this worktree's Prisma/dependency state and runs **`pnpm check:push`**, including TypeScript, selected regressions and the production build. A bare `pnpm build` is **not** equivalent proof.
 
+For normal tasks use `scripts/git/task-start.sh` → focused task tests → commit → `scripts/git/task-finish.sh` (sync, task diff and normal push with full pre-push gate). `task-check.sh` is optional and repeats the gate `task-finish.sh` will run; avoid calling both routinely. See `docs/engineering/one-command-task-workflow.md` and binding safety rules in `CLAUDE.md`.
 
-- [ ] `pnpm build` passes with no errors
-- [ ] `git status` is clean — no untracked or uncommitted files
+- [ ] Exact task-only diff reviewed and worktree clean before final push
+- [ ] Targeted tests for changed behavior pass
+- [ ] Normal push hook passes; no `--no-verify` or skipped failed checks
+- [ ] Required GitHub CI and review pass on the **latest PR HEAD** before merge
