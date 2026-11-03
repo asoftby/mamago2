@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { CrmDashboard } from "./components/CrmDashboard";
@@ -31,6 +31,15 @@ test("CRM uses staff-only admin navigation and real canonical APIs", () => {
   assert.match(server, /prisma\.supportThread\.count/);
   assert.match(client, /\/api\/admin\/work\/items/);
   assert.match(client, /\/api\/admin\/work\/leads/);
+  // The dashboard must never reach dev without the backing #1088 handlers.
+  for (const path of [
+    "src/app/api/admin/work/items/route.ts",
+    "src/app/api/admin/work/items/[id]/route.ts",
+    "src/app/api/admin/work/items/[id]/activities/route.ts",
+    "src/app/api/admin/work/leads/route.ts",
+  ]) {
+    assert.ok(existsSync(path), `missing server CRM route: ${path}`);
+  }
 });
 
 test("creation form fits short mobile viewports and remains scrollable", () => {
