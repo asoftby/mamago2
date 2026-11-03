@@ -1,5 +1,16 @@
 # Agent Instructions
 
+## Product Challenge — mandatory before substantive work
+
+For **every new task or material change**, assess product value, user/business UX, smallest viable solution, existing-code reuse, architecture/ACL/security, and **runtime efficiency** (DB/API query count and cost, N+1, payload, caching, latency, hosting load). Challenge the request when a simpler or safer approach gives the same result. Avoid feature expansion, duplicate engines, and unmeasured performance claims.
+
+Before substantive coding, briefly recommend **DO / SIMPLIFY / DEFER (STOP)** with the expected UX/efficiency impact and a testable acceptance outcome. Ask for one focused decision **only when** a real trade-off changes approved scope, UX, cost, security or release priorities. Routine bug fixes and already-approved, unambiguous implementation **must proceed without repetitive questions**. Reassess if new evidence changes the plan; do not silently expand scope.
+
+**Current RC1 focus:** families find truthful, bookable/accessible activities through «Куда пойти», and businesses self-register and publish Place/Event/Offer. Release scope / GO-NO-GO: GitHub issue **#1103**, acceptance **#1101/#1102**. Suggest deferring unrelated CRM, Family OS, design polish and new features; never use this rule to bypass required freshness, review, CI, security, migration or deployment gates.
+
+The full canonical Product Challenge policy and precedence are in `CLAUDE.md`. All agents MUST follow it.
+
+
 ## ChatGPT-first development — two first-class modes
 
 ChatGPT is the default task coordinator. Select **GitHub Direct** for work that can be correctly implemented/reviewed through repository APIs and verified by the applicable GitHub CI; select **Local Assisted** when local execution, browser/UI verification, a database, integration tests, debugging or build diagnosis are needed. Agents choose the mode based on task risk and available tools; do not ask the owner to operate Git, Codex, or Claude Code as a routine prerequisite. Both modes use a fresh `dev` SHA, isolated task branch, task-only PR, architecture checks, and required final-SHA CI/review. GitHub Direct does not run a local hook and must never claim it did; if GitHub CI cannot prove the required behavior, switch to Local Assisted or add an appropriate CI check. A local worktree is mandatory only in Local Assisted; GitHub Direct instead uses a dedicated remote branch.
