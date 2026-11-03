@@ -323,7 +323,9 @@ export function OfferWizard({
   // Current step key (not number)
   const [currentStepKey, setCurrentStepKey] = useState<OfferWizardStepKey>(() => {
     if (mode !== "edit" || !offer || initialStepNumber == null || initialStepNumber < 1) {
-      return mode === "create" && creationIntent ? "about" : "type";
+      return mode === "create" && creationIntent
+        ? (variant === "v2" ? "about" : "details")
+        : "type";
     }
     const fd = mapOfferToFormData(offer);
     const initialSteps = getStepsForOfferType(fd.offerWizardType ?? (freeStepNavigation ? "SINGLE" : null), fd.productType, variant);
@@ -862,7 +864,15 @@ export function OfferWizard({
         case "placements":
           return <Step2Placements {...commonProps} showAdditionalPlacements={variant !== "v2"} />;
         case "details":
-          return <Step2Information {...commonProps} v2={variant === "v2"} />;
+          return (
+            <div className="space-y-6">
+              {variant === "v1" && mode === "create" &&
+                (creationIntent === "classes" || creationIntent === "parties") && (
+                  <OfferSubtypeClarifier group={creationIntent} data={formData} onChange={handleChange} />
+                )}
+              <Step2Information {...commonProps} v2={variant === "v2"} />
+            </div>
+          );
         case "photo":
           return <Step3Media {...commonProps} wizardSessionId={wizardSessionId} />;
         case "conditions":
