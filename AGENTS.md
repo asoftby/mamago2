@@ -24,6 +24,20 @@ mgfinish
 
 These commands automate the rules below; they do not relax them. If a script stops on dirty/diverged state, overlapping files, failed verification, or missing freshness proof, do not bypass the stop with reset, force push, broad restore, automatic rebase, or `--no-verify`. Read `docs/engineering/one-command-task-workflow.md` for the exact behavior.
 
+## CRITICAL — fast delivery without weakening verification
+
+Speed means eliminating duplicated work, not bypassing safety. For every task:
+
+1. Define a minimal task-only scope, acceptance criteria, and risk level. Reuse already verified repository context; avoid unrelated refactors and repeated exploratory scans.
+2. During implementation, use focused tests and lint for changed areas, plus relevant type checks. Do not run production builds after each edit.
+3. **Run the full local push gate once by default at `task-finish.sh`.** Its pre-push hook already runs `pnpm check:push`; do not routinely run `task-check.sh` just before finishing. Use `task-check.sh` only if an earlier full preflight is actually needed. The current scripts do **not** cache the result: if both commands run, the gate runs twice.
+4. Reusing a successful full-gate result in future automation is allowed **only** with an enforced proof tied to the exact HEAD SHA, unchanged tracked tree/dependency and generated-client fingerprints, gate configuration/toolchain, and current integration base. No such reuse is currently implemented. Never skip the existing pre-push hook, use `--no-verify`, or claim an unrun check passed.
+5. Serialize memory-heavy builds per host; parallelize only independent, lightweight tasks. Preserve per-worktree dependencies and the isolated Next.js build directory.
+6. Keep targeted security/regression checks proportional to risk (especially authentication, family ACL, personal data, payments, booking, concurrency, and migrations). Required CI/review on the **current PR HEAD** and fresh-base/overlap checks remain blocking for merge.
+7. Avoid busy-polling CI or repeating already answered status checks. Report the actual SHA, verified checks, blockers, and next action, without implying a PR was merged or deployed before proof exists.
+
+See the canonical **Fast and safe execution** section in `CLAUDE.md`. All existing freshness, branch/worktree, hook, CI, and deployment safety rules remain mandatory.
+
 ## CRITICAL — mandatory start for EVERY repository-changing task
 
 A "new task" means any distinct user request that may change repository files, even when it arrives in the same chat/session immediately after another task.
