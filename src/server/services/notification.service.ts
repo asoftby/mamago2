@@ -145,6 +145,8 @@ interface CreateNotificationParams {
   modalBody?: string | null;
   metadata?: Prisma.InputJsonValue | null;
   expiresAt?: Date | null;
+  /** For action-required events, finish Telegram/in-app delivery attempts before acknowledging. */
+  waitForDelivery?: boolean;
 }
 
 type OnboardingNotificationKind = "VERIFY_EMAIL" | "VERIFY_PHONE" | "CONNECT_TELEGRAM";
@@ -233,9 +235,10 @@ export async function createNotification(params: CreateNotificationParams) {
     select: { id: true, email: true, role: true },
   });
   if (user) {
-    dispatchDelivery(notification, user).catch((e) =>
+    const attempt = dispatchDelivery(notification, user).catch((e) =>
       console.error("[notification] dispatchDelivery failed:", e),
     );
+    if (params.waitForDelivery) await attempt;
   }
 
   return notification;
@@ -416,6 +419,36 @@ export async function notifyPlaceNeedsChanges(
     body: `Ваше место «${placeName}» требует доработки. ${moderatorComment}`,
     entityType: "PLACE",
     entityId: placeId,
+  });
+}
+
+/**
+ * Editorial improvement request for an already-published place.
+ * A new request is a new event, even if the same place had a past resolved request.
+ */
+export async function notifyPlaceImprovementRequested(params: {
+  placeId: string;
+  placeName: string;
+  requestId: string;
+  ownerUserId: string;
+  requestTitle: string;
+  requestDescription: string;
+}) {
+  const summary = params.requestDescription.trim().slice(0, 500);
+  const suffix = params.requestDescription.trim().length > 500 ? "…" : "";
+  return createNotification({
+    userId: params.ownerUserId,
+    type: "PLACE_IMPROVEMENT_REQUESTED",
+    audience: "BUSINESS",
+    title: "Редакция оставила замечание к месту",
+    body: `Место «${params.placeName}»: ${params.requestTitle}. ${summary}${suffix}`,
+    entityType: "PLACE",
+    entityId: params.placeId,
+    ctaLabel: "Посмотреть замечание",
+    ctaAction: `/editor/place/${params.placeId}/edit#improvement-requests`,
+    actionMode: "PAGE",
+    metadata: { improvementRequestId: params.requestId },
+    waitForDelivery: true,
   });
 }
 
