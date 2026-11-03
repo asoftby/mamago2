@@ -6,6 +6,7 @@ import {
   createCrmLeadSchema, updateCrmLeadSchema, convertCrmLeadSchema,
   workListQuerySchema, crmLeadListQuerySchema,
 } from "./workSchemas";
+import { buildWorkItemWhere } from "./workQueryFilters";
 
 export class WorkDomainError extends Error {
   constructor(public readonly code: "NOT_FOUND" | "INVALID_LINK" | "CONFLICT", message: string) {
@@ -31,6 +32,15 @@ async function ensureAssignee(tx: Tx, id: string) {
   }
 }
 
+/**
+ * A row lock is shared by lead attachment (create/update) and conversion.
+ * Under PostgreSQL READ COMMITTED the waiting transaction sees the latest
+ * lead.businessId after the lock is granted.
+ */
+async function lockCrmLead(tx: Tx, leadId: string) {
+  await tx.$queryRaw`SELECT "id" FROM "CrmLead" WHERE "id" = ${leadId} FOR UPDATE`;
+}
+
 async function verifyLinks(tx: Tx, links: WorkLinks) {
   const { businessId, leadId, supportThreadId } = links;
   if (businessId && leadId) {
@@ -40,6 +50,7 @@ async function verifyLinks(tx: Tx, links: WorkLinks) {
     throw new WorkDomainError("INVALID_LINK", "Бизнес не найден");
   }
   if (leadId) {
+    await lockCrmLead(tx, leadId);
     const lead = await tx.crmLead.findUnique({
       where: { id: leadId }, select: { id: true, businessId: true },
     });
@@ -194,25 +205,7 @@ export async function appendWorkActivity(actor: Actor, workItemId: string, input
 }
 
 export async function listWorkItems(query: z.infer<typeof workListQuerySchema>) {
-  const now = new Date();
-  // Fixed IANA date calculation rather than server-local midnight.
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Minsk", year: "numeric", month: "2-digit", day: "2-digit",
-  }).formatToParts(now);
-  const datePart = (type: "year" | "month" | "day") =>
-    parts.find((part) => part.type === type)?.value ?? "";
-  const [year, month, day] = [datePart("year"), datePart("month"), datePart("day")];
-  const start = new Date(`${year}-${month}-${day}T00:00:00+03:00`);
-  const end = new Date(start.getTime() + 86_400_000);
-  const where: Prisma.WorkItemWhereInput = {
-    ...(query.kind ? { kind: query.kind } : {}),
-    ...(query.status ? { status: query.status } : {}),
-    ...(query.assigneeId ? { assigneeId: query.assigneeId } : {}),
-    ...(query.search ? { title: { contains: query.search, mode: "insensitive" } } : {}),
-    ...(query.due === "TODAY" ? { dueAt: { gte: start, lt: end } } :
-      query.due === "OVERDUE" ? { dueAt: { lt: now }, status: { notIn: ["DONE", "CANCELED"] } } :
-      query.due === "NO_DUE" ? { dueAt: null } : {}),
-  };
+  const where = buildWorkItemWhere(query, new Date());
   const [total, items] = await Promise.all([
     prismaBase.workItem.count({ where }),
     prismaBase.workItem.findMany({
@@ -290,6 +283,7 @@ export async function listLeads(query: z.infer<typeof crmLeadListQuerySchema>) {
 
 export async function convertLead(actor: Actor, leadId: string, input: z.infer<typeof convertCrmLeadSchema>) {
   return prismaBase.$transaction(async (tx) => {
+    await lockCrmLead(tx, leadId);
     const lead = await tx.crmLead.findUnique({ where: { id: leadId } });
     if (!lead) throw new WorkDomainError("NOT_FOUND", "Лид не найден");
     if (lead.businessId && lead.businessId !== input.businessId) {
