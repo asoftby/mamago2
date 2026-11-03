@@ -269,7 +269,7 @@ export async function POST(request: NextRequest) {
             sessionId: sessionRowId,
             anonymousId: validAnonymousId,
             eventType: "PLAN_ADD",
-          planVisibility: visibility,
+            planVisibility: visibility,
             entityType: "EVENT",
             entityId: activityId,
             vertical: "CITY",

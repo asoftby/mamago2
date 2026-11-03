@@ -37,9 +37,9 @@ async function main() {
       const row = await db.activity.create({ data: { title: "Synthetic event", shortDesc: "Test", type: "EVENT", scheduleMode: "MULTI_DATE", status: "PUBLISHED", cityId, ownerUserId: owner.id } });
       activityIds.push(row.id); return row.id;
     }
-    async function exposure(activityId: string, patch: { userId?: string; surface?: "HOME" | "MY_PLAN" | "DISCOVERY"; stale?: boolean; entityType?: "EVENT" | "PLACE" } = {}) {
-      const trace = await recordRecommendationRun({ surface: patch.surface ?? "HOME", userId: patch.userId ?? owner.id, cityId,
-        algorithmVersion: "home-analytics-test", candidateCount: 1, decisionContext: { intent: "family_picks", subjects: [], actor: { kind: "user", id: patch.userId ?? owner.id } },
+    async function exposure(activityId: string, patch: { userId?: string | null; anonymousId?: string; surface?: "HOME" | "MY_PLAN" | "DISCOVERY"; stale?: boolean; entityType?: "EVENT" | "PLACE" } = {}) {
+      const trace = await recordRecommendationRun({ surface: patch.surface ?? "HOME", userId: patch.userId === undefined ? owner.id : patch.userId, anonymousId: patch.anonymousId, cityId,
+        algorithmVersion: "home-analytics-test", candidateCount: 1, decisionContext: { intent: "family_picks", subjects: [], actor: { kind: "user", id: patch.userId === undefined ? owner.id : patch.userId } },
         items: [{ entityType: patch.entityType ?? "EVENT", entityId: activityId, position: 1 }] });
       assert.ok(trace);
       const id = [...trace.exposureIdByEntityKey.values()][0];
@@ -87,7 +87,8 @@ async function main() {
       await exposure(target);
       const wrong = kind === "missing" ? null : kind === "invalid" ? "invalid-exposure" :
         (await exposure(kind === "wrong-event" ? event : target, {
-          userId: kind === "foreign" || kind === "guest-auth" ? other.id : owner.id,
+          userId: kind === "foreign" ? other.id : kind === "guest-auth" ? null : owner.id,
+          anonymousId: kind === "guest-auth" ? randomUUID() : undefined,
           surface: kind === "my-plan" ? "MY_PLAN" : kind === "discovery" ? "DISCOVERY" : "HOME",
           entityType: kind === "wrong-type" ? "PLACE" : "EVENT", stale: kind === "stale",
         })).id;
