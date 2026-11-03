@@ -94,3 +94,21 @@ export function hasVerifiedPhoneForComments(params: {
     (params.businessContactVerifiedPhoneE164 && params.businessContactPhoneVerifiedAt)
   );
 }
+
+/**
+ * Onboarding UI hint only: a freshly OTP-confirmed phone remains verified when
+ * the user briefly switches the input to another phone and comes back.
+ * This in-memory value is NEVER accepted by the server action as verification proof.
+ */
+export function resolveOnboardingVerifiedPhone(
+  params: BusinessContactPhoneEvidence & {
+    recentlyOtpVerifiedPhoneE164?: string | null;
+  }
+): string {
+  const serverVerified = verifiedBusinessContactPhone(params);
+  if (serverVerified) return serverVerified;
+  return isVerifiedPhoneMatch({
+    currentPhoneE164: params.phoneE164,
+    verifiedPhoneE164: params.recentlyOtpVerifiedPhoneE164,
+  }) ? params.phoneE164 ?? "" : "";
+}
