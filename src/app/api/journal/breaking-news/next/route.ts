@@ -11,17 +11,13 @@ const PAGE_SIZE = 3;
  */
 export async function GET(request: NextRequest) {
   const cursor = request.nextUrl.searchParams.get("cursor");
-  const city = request.nextUrl.searchParams.get("city");
-  if (!cursor || cursor.length > 100 || !city || !/^[a-z0-9-]{1,80}$/.test(city)) {
+  if (!cursor || cursor.length > 100) {
     return NextResponse.json({ error: "Invalid cursor" }, { status: 400 });
   }
 
-  const cityRow = await prisma.city.findFirst({ where: { slug: city, isActive: true }, select: { id: true } });
-  if (!cityRow) return NextResponse.json({ items: [], nextCursor: null });
-
   const now = new Date();
   const anchor = await prisma.article.findFirst({
-    where: { ...getPublicPublishedArticleWhere(), ...activeBreakingNewsContinuationWhere(now), cityId: cityRow.id, id: cursor },
+    where: { ...getPublicPublishedArticleWhere(), ...activeBreakingNewsContinuationWhere(now), id: cursor },
     select: { id: true, publishedAt: true },
   });
   if (!anchor?.publishedAt) {
@@ -32,7 +28,6 @@ export async function GET(request: NextRequest) {
     where: {
       ...getPublicPublishedArticleWhere(),
       ...activeBreakingNewsContinuationWhere(now),
-      cityId: cityRow.id,
       OR: [
         { publishedAt: { lt: anchor.publishedAt } },
         { publishedAt: anchor.publishedAt, id: { lt: anchor.id } },

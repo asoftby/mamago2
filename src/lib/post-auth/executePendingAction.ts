@@ -1,3 +1,4 @@
+import { homePlanAttributionFields } from "@/features/save/planAttribution";
 import type { PendingPostAuthAction } from "./types";
 
 /**
@@ -59,6 +60,7 @@ export async function executePendingPostAuthAction(
         body: JSON.stringify({
           activityId: action.entityId,
           date: action.plannedDate,
+          ...homePlanAttributionFields(action.planAttribution),
           title: action.title,
           coverImageUrl: action.coverImageUrl,
         }),
