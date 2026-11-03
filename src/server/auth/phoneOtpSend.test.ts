@@ -24,6 +24,7 @@ function createHarness(initialUsers: Record<string, User> = {}) {
       return { allowed: count <= limit };
     },
     findUser: async (phone) => users.get(phone) ?? null,
+    isBusinessContactReserved: async () => false,
     createOrGetStub: async (phone, digits) => {
       const user = users.get(phone) ?? {
         id: `stub-${digits}`,
