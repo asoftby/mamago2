@@ -26,14 +26,16 @@ export function PlaceImprovementRequestNotice({ placeId }: { placeId: string }) 
 
   useEffect(() => {
     let active = true;
-    setError(false);
     fetch(`/api/business/places/${encodeURIComponent(placeId)}/improvement-requests`)
       .then(async (response) => {
         if (!response.ok) throw new Error("Failed to load improvement requests");
         return response.json() as Promise<{ requests?: RequestSummary[] }>;
       })
       .then((data) => {
-        if (active) setRequests(data.requests ?? []);
+        if (active) {
+          setError(false);
+          setRequests(data.requests ?? []);
+        }
       })
       .catch(() => {
         if (active) setError(true);
