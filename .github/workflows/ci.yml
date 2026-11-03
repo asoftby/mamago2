@@ -83,6 +83,9 @@ jobs:
       - name: Family picks profile ACL and backwards-compatible API contract
         run: pnpm test:family-picks
 
+      - name: Business Place versus PLACE_VISIT creation contract
+        run: pnpm exec tsx src/components/shared/createPublicationBusinessIntent.contract.test.ts
+
       - name: Business support notification routing contract
         run: pnpm exec tsx src/server/support/supportNoticeContract.test.ts
 
