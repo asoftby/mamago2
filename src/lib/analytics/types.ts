@@ -59,6 +59,8 @@ export type AnalyticsMetaPayload = {
 export type TrackUserEventInput = {
   /** Server-only DB-backed deduplication key; never part of the HTTP ingestion contract. */
   idempotencyKey?: string | null;
+  /** Server-only: explicit, user-owned HOME exposure; atomic awaited outcome. */
+  attributionPolicy?: "HOME_PLAN_ADD";
   userId?: string | null;
   /** Id строки Session (сервер) или клиентский anonymous id */
   sessionId?: string | null;
@@ -83,4 +85,4 @@ export type TrackUserEventInput = {
   clientClass?: UserEventClientClass | null;
 };
 
-export type TrackUserEventResult = { ok: true } | { ok: false; error: string };
+export type TrackUserEventResult = { ok: true; recommendationOutcomeLinked?: boolean } | { ok: false; error: string };

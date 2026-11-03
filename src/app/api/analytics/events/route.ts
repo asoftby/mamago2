@@ -30,6 +30,8 @@ const bodySchema = z.object({
   // ATTENDED is valid only through the authenticated explicit plan check-in API.
   eventType: z.nativeEnum(UserEventType).refine(
     (type) =>
+      type !== UserEventType.PLAN_ADD &&
+      type !== UserEventType.FIRST_PERSONALIZED_PLAN_ADD &&
       type !== UserEventType.PLAN_AUDIENCE_SNAPSHOT &&
       type !== UserEventType.ATTENDED &&
       type !== UserEventType.EXPERIENCE_FEEDBACK &&

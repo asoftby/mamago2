@@ -63,7 +63,7 @@ async function testOversizedMetaRejected() {
 }
 
 async function testServerOnlyExperienceEventsRejected() {
-  for (const eventType of ["PLAN_AUDIENCE_SNAPSHOT", "ATTENDED", "EXPERIENCE_FEEDBACK"]) {
+  for (const eventType of ["PLAN_ADD", "FIRST_PERSONALIZED_PLAN_ADD", "PLAN_AUDIENCE_SNAPSHOT", "ATTENDED", "EXPERIENCE_FEEDBACK"]) {
     const res = await postEvent({
       eventType,
       entityType: "EVENT",
