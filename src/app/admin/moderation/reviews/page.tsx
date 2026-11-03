@@ -504,7 +504,7 @@ export default function ReviewsPage() {
                       >
                         <Button variant="outline" size="sm">
                           <ExternalLink className="w-4 h-4 mr-2" />
-                          Открыть место
+                          Редакционная карточка
                         </Button>
                       </Link>
                     </>
