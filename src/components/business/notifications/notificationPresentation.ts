@@ -9,6 +9,7 @@ export function getNotificationIcon(type: string): string {
     case "CONTENT_PUBLISHED":
       return "✅";
     case "PLACE_NEEDS_CHANGES":
+    case "PLACE_IMPROVEMENT_REQUESTED":
     case "BUSINESS_ACTION_REQUIRED":
       return "⚠️";
     case "PLACE_REJECTED":
@@ -32,6 +33,7 @@ export function getNotificationTypeLabel(type: string): string {
       return "Заявки";
     case "PLACE_APPROVED":
     case "PLACE_NEEDS_CHANGES":
+    case "PLACE_IMPROVEMENT_REQUESTED":
     case "PLACE_REJECTED":
     case "CONTENT_PUBLISHED":
     case "CONTENT_REJECTED":
