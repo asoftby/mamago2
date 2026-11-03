@@ -123,6 +123,7 @@ export async function loadPlaceForBasicModeration(placeId: string) {
       logoImageId: true,
       shortDesc: true,
       status: true,
+      archivedAt: true,
       visitFormats: true,
       faqItems: true,
       floor: true,
