@@ -193,6 +193,11 @@ export type PlanSuggestionsInput = {
   ageRangeValues?: string[];
   /** A dated itinerary must not silently broaden to events outside the selected age. */
   strictAgeMatching?: boolean;
+  /**
+   * Only recommend events backed by a confirmed, upcoming occurrence.
+   * Applied in the DB before ranking/truncation, not after the top N.
+   */
+  confirmedOccurrencesOnly?: boolean;
   /** "YYYY-MM-DD" — один календарный день в Europe/Minsk. */
   date?: string;
   /** Опциональный диапазон для surface horizon. Игнорируется, если задан `date`. */
@@ -209,6 +214,23 @@ export type PlanSuggestionsInput = {
   /** Compact, server-resolved subject outcome affinity. Never client supplied. */
   experienceAffinity?: ExperienceAffinityContext;
 };
+
+/** Strict confirmed-occurrence SQL filter, applied BEFORE the ranking cap. */
+export function confirmedPlanOccurrencesWhere(
+  range: { start: Date; end: Date },
+  now: Date,
+): Prisma.ActivityWhereInput {
+  const lower = new Date(Math.max(range.start.getTime(), now.getTime()));
+  return {
+    OR: [
+      { sessions: { some: { startsAt: { gte: lower, lt: range.end }, withdrawnAt: null } } },
+      { AND: [
+        { sessions: { none: {} } },
+        { nextOccurrenceAt: { gte: lower, lt: range.end } },
+      ] },
+    ],
+  };
+}
 
 /**
  * Shared ranked EVENT batch. The function is surface-agnostic: My Plan,
@@ -246,20 +268,18 @@ export async function rankPlanSuggestionsForCity(
       : null;
 
   const scheduleFilterAnd: Prisma.ActivityWhereInput[] = requestedRange
-    ? [
-        {
+    ? input.confirmedOccurrencesOnly
+      ? [confirmedPlanOccurrencesWhere(requestedRange, new Date())]
+      : [{
           OR: [
             { sessions: { some: { startsAt: { gte: requestedRange.start, lt: requestedRange.end }, withdrawnAt: null } } },
             { nextOccurrenceAt: { gte: requestedRange.start, lt: requestedRange.end } },
-            {
-              AND: [
-                { scheduleMode: { in: ALWAYS_AVAILABLE_SCHEDULE_MODES } },
-                { nextOccurrenceAt: null },
-              ],
-            },
+            { AND: [
+              { scheduleMode: { in: ALWAYS_AVAILABLE_SCHEDULE_MODES } },
+              { nextOccurrenceAt: null },
+            ] },
           ],
-        },
-      ]
+        }]
     : [];
 
   const baseAnd: Prisma.ActivityWhereInput[] = [

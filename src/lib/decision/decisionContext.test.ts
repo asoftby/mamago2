@@ -10,7 +10,7 @@ import {
 } from "./decisionContext";
 import { isPersonalizedResult } from "./personalization";
 import { parseCanonicalAgeRangesQuery } from "./decisionContext";
-import { guestGenerateBodySchema } from "./planRequestSchemas";
+import { guestGenerateBodySchema, guestDraftRefreshSchema } from "./planRequestSchemas";
 import { parseSafeOpaqueId, readOptionalSafeOpaqueId } from "./identifiers";
 
 // Round-trip a realistic my_plan_suggestions context.
@@ -180,3 +180,9 @@ assert.deepEqual(readOptionalSafeOpaqueId("  "), { ok: true, value: null });
 assert.deepEqual(readOptionalSafeOpaqueId("bad id!"), { ok: false });
 
 console.log("decisionContext.test.ts OK");
+
+assert.equal(guestDraftRefreshSchema.safeParse({ date: "2026-11-03", ids: ["activity_001"] }).success, true);
+assert.equal(guestDraftRefreshSchema.safeParse({ date: "2026-11-07", dateTo: "2026-11-08", ids: ["activity_001"] }).success, true);
+assert.equal(guestDraftRefreshSchema.safeParse({ date: "2026-11-07", dateTo: "2026-11-10", ids: ["activity_001"] }).success, false);
+assert.equal(guestDraftRefreshSchema.safeParse({ date: "2026-11-07", ids: [] }).success, false);
+assert.equal(guestDraftRefreshSchema.safeParse({ date: "2026-02-30", ids: ["activity_001"] }).success, false);

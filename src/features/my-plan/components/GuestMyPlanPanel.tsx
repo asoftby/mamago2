@@ -210,7 +210,7 @@ export function GuestMyPlanPanel({
       restoreDoneRef.current = true;
       return;
     }
-    setPhase(draft.phase);
+    setPhase(draft.phase === "engaged" ? "generated" : draft.phase);
     setAuthGateVisible(draft.authGateVisible);
     setEngagementActionCount(draft.engagementActionCount);
     setFreeSearch(draft.freeSearch);
@@ -219,14 +219,81 @@ export function GuestMyPlanPanel({
     setWhenChoice(draft.whenChoice);
     setFormatChoice(draft.formatChoice);
     setInterests(Array.isArray(draft.interests) ? draft.interests : []);
-    setScenarioSlots(draft.scenarioSlots);
-    setCommittedBySlot(reviveCommittedFromDraft(draft));
     setGuestRemainingGenerations(draft.guestRemainingGenerations);
     setGuestQuotaBlocked(draft.guestQuotaBlocked);
     if (draft.selectedPlanDateIso) {
       setSelectedPlanDate(draft.selectedPlanDateIso);
     }
-    restoreDoneRef.current = true;
+
+    // Stored v1 drafts predate real session timestamps. Verify ALL restored
+    // cards against live published occurrences, including chosen cards, without
+    // spending another limited generation or creating recommendation exposures.
+    const chosen = reviveCommittedFromDraft(draft);
+    const ids = [...new Set([
+      ...draft.scenarioSlots.map((row) => row.activity.id),
+      ...Object.values(chosen).flatMap((item) => item?.activityId ? [item.activityId] : []),
+    ])].slice(0, 12);
+    if (!ids.length) {
+      setScenarioSlots([]);
+      setCommittedBySlot({});
+      restoreDoneRef.current = true;
+      return;
+    }
+
+    let active = true;
+    scenarioRequestAttemptedRef.current = true;
+    setLoadingScenario(true);
+    setScenarioSlots([]);
+    setCommittedBySlot({});
+    const selectedDay = draft.selectedPlanDateIso ?? todayIso;
+    void (async () => {
+      try {
+        const response = await fetch("/api/plan/guest-draft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ids,
+            date: selectedDay,
+            ...(draft.whenChoice === "weekend" ? { dateTo: addDaysIso(selectedDay, 1) } : {}),
+          }),
+        });
+        if (!response.ok) throw new Error("draft_revalidation_unavailable");
+        const result = (await response.json()) as { occurrences?: Record<string, string> };
+        if (!active) return;
+        const times = result.occurrences ?? {};
+        const validated = draft.scenarioSlots.flatMap((row) => {
+          const startsAt = times[row.activity.id];
+          return startsAt ? [{ ...row, activity: { ...row.activity, suggestedStartsAt: startsAt } }] : [];
+        });
+        const validatedChosen: Partial<Record<GuestSlot, PlanItemWithActivity>> = {};
+        for (const slot of ["morning", "afternoon", "evening"] as const) {
+          const item = chosen[slot];
+          const startsAt = item?.activityId ? times[item.activityId] : null;
+          if (!item || !startsAt) continue;
+          const actual = new Date(startsAt);
+          validatedChosen[slot] = {
+            ...item,
+            startsAt: actual,
+            date: minskGuestDay(actual),
+            activity: item.activity ? ({ ...item.activity, suggestedStartsAt: startsAt } as NonNullable<MyPlanIdea["activity"]>) : item.activity,
+          };
+        }
+        setScenarioSlots(validated);
+        setCommittedBySlot(validatedChosen);
+        if (draft.phase === "engaged" && Object.keys(validatedChosen).length > 0) setPhase("engaged");
+      } catch {
+        if (active) {
+          setPhase(draft.phase === "engaged" ? "generated" : draft.phase);
+          toast.error("Не удалось проверить старые события. Обновите подборку.");
+        }
+      } finally {
+        if (active) {
+          restoreDoneRef.current = true;
+          setLoadingScenario(false);
+        }
+      }
+    })();
+    return () => { active = false; };
   }, [citySlug, setSelectedPlanDate, todayIso]);
 
   useEffect(() => {

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { AgeRangesRequestSchema } from "@/lib/decision/decisionContext";
 import { SafeOpaqueIdSchema } from "@/lib/decision/identifiers";
 
-const calendarDaySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((day) => {
+export const calendarDaySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((day) => {
   const parsed = new Date(day + "T12:00:00Z");
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(day);
 }, "Некорректная дата");
@@ -28,3 +28,14 @@ export const guestGenerateBodySchema = z.object({
   if (!date || dateTo < date) return false;
   return (Date.parse(dateTo + "T12:00:00Z") - Date.parse(date + "T12:00:00Z")) <= 86_400_000;
 }, { message: "Дата окончания должна быть в пределах двух дней", path: ["dateTo"] });
+
+
+/** Read-only refresh for legacy guest drafts; no generation quota is consumed. */
+export const guestDraftRefreshSchema = z.object({
+  date: calendarDaySchema,
+  dateTo: calendarDaySchema.optional(),
+  ids: z.array(SafeOpaqueIdSchema).min(1).max(12),
+}).refine(
+  ({ date, dateTo }) => !dateTo || (dateTo >= date && Date.parse(dateTo + "T12:00:00Z") - Date.parse(date + "T12:00:00Z") <= 86_400_000),
+  { path: ["dateTo"], message: "Некорректный диапазон дат" },
+);

@@ -17,42 +17,16 @@ import {
 import { getTrustedClientIp } from "@/lib/security/clientIp";
 import { activePlanScopeFor } from "@/server/family/familyAccess";
 import { canonicalSystemInterestSlugs } from "@/lib/event/eventSystemInterests";
-import { firstGuestPlanOccurrence, guestPlanDateWindow } from "@/server/services/guestPlanAvailability";
+import { confirmedGuestPlanOccurrences } from "@/server/services/guestPlanAvailabilityQuery";
 
 /**
  * POST /api/plan/generate — подборка для «Мой план».
  * Авторизованным — без гостевой квоты.
  * Гостям — anonymousId в body (или fallback по IP + UA). Квота списывается после успешной подборки (guestPlanQuota).
  */
-/**
- * A dated guest plan must be backed by an upcoming real occurrence. A generic
- * ALWAYS/RECURRING offer without a confirmed time belongs in discovery, not
- * in a specific-day itinerary.
- */
+/** Actual upcoming sessions are authoritative for dated suggestions. */
 async function upcomingSessionByActivity(ids: string[], date?: string, dateTo?: string) {
-  if (!date || ids.length === 0) return null;
-  const range = guestPlanDateWindow(date, dateTo);
-  const now = new Date();
-  const rows = await prisma.activity.findMany({
-    where: { id: { in: ids } },
-    select: {
-      id: true,
-      nextOccurrenceAt: true,
-      _count: { select: { sessions: true } },
-      sessions: {
-        where: { startsAt: { gte: range.start, lt: range.end } },
-        select: { startsAt: true, withdrawnAt: true },
-        orderBy: { startsAt: "asc" },
-      },
-    },
-  });
-  return new Map(rows.flatMap((row) => {
-    const occurrence = firstGuestPlanOccurrence({
-      sessions: row.sessions, hasStoredSessions: row._count.sessions > 0,
-      nextOccurrenceAt: row.nextOccurrenceAt, rangeStart: range.start, rangeEnd: range.end, now,
-    });
-    return occurrence ? [[row.id, occurrence.toISOString()] as const] : [];
-  }));
+  return date ? confirmedGuestPlanOccurrences(ids, date, dateTo) : null;
 }
 
 export async function POST(request: NextRequest) {
@@ -103,6 +77,7 @@ export async function POST(request: NextRequest) {
         take: date ? 24 : 6,
         ...dateFilter,
         strictAgeMatching: Boolean(date && ageRangeValues.length > 0),
+        confirmedOccurrencesOnly: Boolean(date),
         ...(ageRangeValues.length > 0 ? { ageRangeValues } : {}),
         ...(interestSlugs.length > 0 ? { profileInterestSlugs: interestSlugs } : {}),
       });
@@ -160,6 +135,7 @@ export async function POST(request: NextRequest) {
       take: date ? 24 : 6,
       ...dateFilter,
       strictAgeMatching: Boolean(date && ageRangeValues.length > 0),
+      confirmedOccurrencesOnly: Boolean(date),
       ...(ageRangeValues.length > 0 ? { ageRangeValues } : {}),
       ...(interestSlugs.length > 0 ? { profileInterestSlugs: interestSlugs } : {}),
     });
