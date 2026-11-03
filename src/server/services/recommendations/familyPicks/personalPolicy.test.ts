@@ -18,10 +18,10 @@ function event(id: string, patch: Partial<PersonalFamilyCandidate> = {}): Person
 }
 const all = { mode: "ALL_FAMILY" } as const;
 
-for (const count of [0, 1, 2, 3, 4, 7, 8]) {
-  test(`${count} confirmed events: return up to seven, never hide a short result`, () => {
+for (const count of [0, 1, 2, 3, 4, 7, 8, 10, 11]) {
+  test(`${count} confirmed events: return up to ten, never hide a short result`, () => {
     const result = selectPersonalFamilyPicks(Array.from({ length: count }, (_, i) => event(`event_${i}`)), children, all);
-    assert.equal(result.length, Math.min(count, 7));
+    assert.equal(result.length, Math.min(count, 10));
     assert.ok(result.every(item => item.allChildrenMatch));
   });
 }
@@ -31,7 +31,7 @@ for (const andCount of [0, 3, 4, 7]) {
     const or = Array.from({ length: 8 }, (_, i) => event(`or_${i}`, { sharedScore: 1000, ageMaxMonths: 90 }));
     const result = selectPersonalFamilyPicks([...or, ...and], children, all);
     assert.equal(result.filter(pick => pick.allChildrenMatch).length, andCount);
-    assert.equal(result.length, andCount >= 4 ? andCount : 7);
+    assert.equal(result.length, andCount >= 4 ? andCount : Math.min(andCount + 8, 10));
     assert.ok(result.slice(0, andCount).every(pick => pick.allChildrenMatch));
     assert.ok(result.slice(andCount).every(pick => !pick.allChildrenMatch));
   });
@@ -126,7 +126,7 @@ for (const dates of [[], [at], [at, new Date("2030-11-04Z")], [new Date("2030-11
     assert.equal(result.items.length, dates.length);
     assert.equal(result.runId, null);
     assert.ok(result.items.every(item => item.exposureId === null));
-    assert.equal(result.policyVersion, "family-picks-confirmed-v2");
+    assert.equal(result.policyVersion, "family-picks-confirmed-v3");
   });
 }
 

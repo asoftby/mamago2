@@ -69,6 +69,22 @@ test("API disabled/guest/malformed/foreign/stale cannot rank or leak another act
   assert.ok(!calls.includes("delivery"));
 });
 
+test("child scoped dismissal requires an owned child and preserves context in telemetry", async () => {
+  const { deps } = dependencies();
+  const raw = { action: "dismiss", city: "minsk", eventId: "event_0001",
+    exposureId: null, token: "dismiss_owned", selectedChildId: "child_0001" };
+  assert.equal((await resolveHomeRequest({ ...raw, selectedChildId: "foreign_01" }, "account_a", null, deps, true)).status, 404);
+  let meta: Record<string, unknown> | null = null;
+  const accepted = await resolveHomeRequest(raw, "account_a", null, {
+    ...deps, track: async (input: import("@/lib/analytics/types").TrackUserEventInput) => {
+      meta = input.meta ?? {};
+      return { ok: true as const };
+    },
+  }, true);
+  assert.equal(accepted.status, 200);
+  assert.equal((meta as Record<string, unknown> | null)?.homeSelectedChildId, "child_0001");
+});
+
 test("client exposure is verified before DISMISS; failure is retryable, never trusted", async () => {
   const { deps } = dependencies();
   const request = { action: "dismiss", city: "minsk", eventId: "event_0001", exposureId: "foreign_exposure", token: "dismiss_0001" };

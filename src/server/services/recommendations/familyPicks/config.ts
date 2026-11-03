@@ -81,8 +81,8 @@ export function normalizeFamilyPicksConfig(value?: unknown): FamilyPicksConfig {
 
 /** Prepared surface policy; legacy family-picks-v1 and public callers stay unchanged. */
 export const PERSONAL_FAMILY_PICKS_POLICY = {
-  version: "family-picks-confirmed-v2",
-  resultCount: 7,
+  version: "family-picks-confirmed-v3",
+  resultCount: 10,
   orFillThreshold: 4,
   horizons: [7, 30],
 } as const;

@@ -89,13 +89,13 @@ async function main() {
     await db.activitySession.createMany({ data: activityIds.map(id => ({ activityId: id, startsAt: day(1) })) });
     const prepared = await loadHomeContext(user.id);
     const firstDelivery = await measure("800-candidate 7-day final delivery", () => deliverHomeFamilyPicks({ userId: user.id, citySlug: city.slug, ...prepared, selection: { mode: "ALL_FAMILY" }, dismissedIds: [], sessionId: null }));
-    assert.equal(firstDelivery.items.length, 7);
+    assert.equal(firstDelivery.items.length, 10);
     assert.equal(firstDelivery.candidateCount, 800);
     assert.equal(firstDelivery.window.horizonDays, 7);
     assert.ok(firstDelivery.runId);
     assert.ok(firstDelivery.items.every(item => item.exposureId));
     assert.equal(await db.recommendationRun.count({ where: { userId: user.id } }), 1);
-    assert.equal(await db.recommendationExposure.count({ where: { run: { userId: user.id } } }), 7);
+    assert.equal(await db.recommendationExposure.count({ where: { run: { userId: user.id } } }), 10);
     const picked = firstDelivery.items[0]!;
     const invalid = await resolveHomeRequest({ action: "dismiss", city: city.slug, eventId: picked.id, exposureId: picked.exposureId, token: randomUUID() }, stranger.id, null, undefined, true);
     assert.equal(invalid.status, 404);
@@ -110,7 +110,7 @@ async function main() {
     const beforeFallback = await db.recommendationRun.count({ where: { userId: user.id } });
     const expanded = await measure("800-candidate 7-to-30 final delivery", () => deliverHomeFamilyPicks({ userId: user.id, citySlug: city.slug, ...expandedContext, selection: { mode: "ALL_FAMILY" }, dismissedIds: [], sessionId: null }));
     assert.equal(expanded.window.horizonDays, 30);
-    assert.equal(expanded.items.length, 7);
+    assert.equal(expanded.items.length, 10);
     assert.equal(await db.recommendationRun.count({ where: { userId: user.id } }), beforeFallback + 1);
     // Five quick switches: only the three uncached selections deliver/trace.
     const cache = new FamilyHomeCache<HomeFamilyDelivery>(user.id);
