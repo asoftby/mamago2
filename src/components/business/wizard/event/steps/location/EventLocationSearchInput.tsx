@@ -131,7 +131,7 @@ export const EventLocationSearchInput = forwardRef<HTMLInputElement, EventLocati
         const nextPlaceholder = placeholderRef.current;
         widget.setAttribute("placeholder", nextPlaceholder);
         widget.setAttribute("aria-label", nextPlaceholder);
-        widget.setAttribute("included-region-codes", "by");
+        // Worldwide address search: no country inclusion filter.
         widget.setAttribute("requested-language", "ru");
         widget.setAttribute("requested-region", "by");
         widget.setAttribute("unit-system", "metric");
