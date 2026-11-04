@@ -51,6 +51,8 @@ export type EventRuntimeFilters = {
   genreSlugs?: string[];
   occasionSlug?: string | null;
   dateRange: DateRange | null;
+  /** Home preview only: keep events with a next occurrence but no materialized sessions. */
+  includeNextOccurrenceWithoutSessions?: boolean;
   free: boolean;
   priceMin?: number | null;
   priceMax?: number | null;
@@ -170,14 +172,16 @@ export function buildEventRuntimeWhere(
     parts.push({ occasionLinks: { some: { occasion: { slug: "halloween", isActive: true } } } });
   }
   if (filters.dateRange) {
-    parts.push({
-      sessions: {
-        some: {
-          startsAt: { gte: effectiveEventSessionStart(filters.dateRange, now), lt: filters.dateRange.end },
-          withdrawnAt: null,
-        },
-      },
-    });
+    const start = effectiveEventSessionStart(filters.dateRange, now);
+    const sessionMatch: Prisma.ActivityWhereInput = {
+      sessions: { some: { startsAt: { gte: start, lt: filters.dateRange.end }, withdrawnAt: null } },
+    };
+    parts.push(filters.includeNextOccurrenceWithoutSessions
+      ? { OR: [
+          sessionMatch,
+          { sessions: { none: {} }, nextOccurrenceAt: { gte: start, lt: filters.dateRange.end } },
+        ] }
+      : sessionMatch);
   }
   if (filters.free) parts.push(buildFreeEventWhere());
   else if (filters.priceMin != null || filters.priceMax != null) {

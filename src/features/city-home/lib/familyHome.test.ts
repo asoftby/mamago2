@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { homeCatalogHref, homeSelection, homeAgeLabel, minskPlanDate, familyHomeCacheKey, type HomeFamilyContext } from "./familyHome";
+import { homeCatalogHref, homeSelection, homeChildrenYoungestFirst, homeAgeLabel, homePeriodLabel, minskPlanDate, familyHomeCacheKey, type HomeFamilyContext } from "./familyHome";
 import { FamilyHomeCache, HOME_DISMISS_TTL_MS, drainPendingHomeDismissals, readHomeDismissals, writeHomeDismissals, type HomeDismissal } from "./familyHomeCache";
 import { parseAppliedFromUrl } from "@/features/filters/discovery/discoveryFilterParams";
 
@@ -9,6 +9,21 @@ const context: HomeFamilyContext = { actorId: "account_a", signature: "a".repeat
   selectedChildId: null, preferenceVersion: null, selectionPersistence: "account",
   children: [{ id: "child_0001", name: "А", hasBirthDate: true, ageFilter: ["3-5"] }, { id: "child_0002", name: "Б", hasBirthDate: true, ageFilter: ["9-12"] }] };
 function delivery(ids = ["event_a", "event_b"]) { return { items: ids.map(id => ({ id })), window: { horizonDays: 7 as const }, runId: "same_run" }; }
+
+test("personal rolling windows are labeled precisely, not as a calendar week", () => {
+  assert.equal(homePeriodLabel({ horizonDays: 7, dateFrom: "2026-11-04", dateTo: "2026-11-10" }), "На ближайшие 7 дней");
+  assert.equal(homePeriodLabel({ horizonDays: 30, dateFrom: "2026-11-04", dateTo: "2026-12-03" }), "На ближайшие 30 дней");
+});
+
+test("child chips are sorted youngest first, unknown DOB last, without mutating source order", () => {
+  const children = [
+    { id: "old", name: "Тая", hasBirthDate: true, ageMonths: 99, ageFilter: [] },
+    { id: "unknown", name: "Без даты", hasBirthDate: false, ageMonths: null, ageFilter: [] },
+    { id: "young", name: "Степан", hasBirthDate: true, ageMonths: 48, ageFilter: [] },
+  ];
+  assert.deepEqual(homeChildrenYoungestFirst({ ...context, children }).map(child => child.id), ["young", "old", "unknown"]);
+  assert.equal(children[0].id, "old");
+});
 
 test("catalog is explicit canonical OR, round trips; no identity in URL", () => {
   for (const selected of [null, "child_0001", "child_0002"]) {
@@ -163,10 +178,15 @@ test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty
     "persist user rejection before fetching replacement recommendations");
   assert.doesNotMatch(ui, /AddParticipantModal/);
   assert.doesNotMatch(ui, /saveMeta=|selectedPersonaIds|useDiscoveryFilters|startsAt.slice/);
-  for (const expected of ['framing="poster"', 'aria-pressed', 'ArrowRight', 'ArrowLeft', 'context.children.length > 0', 'items.slice(0, 10)', 'role="alert"', 'horizonDays === 30', 'Все события для', '+ Ребёнок']) assert.ok(ui.includes(expected), expected);
+  for (const expected of ['framing="fixed"', 'coverRatio="2/3"', 'coverFit="contain"', 'aria-pressed', 'Для кого:', 'homeChildrenYoungestFirst', 'context.children.length > 0', 'items.slice(0, 10)', 'role="alert"', 'horizonDays === 30', 'HomeMoreEventsCard', '+ Ребёнок']) assert.ok(ui.includes(expected), expected);
   const page = readFileSync("src/features/city-home/pages/CityHomePage.tsx", "utf8");
   assert.doesNotMatch(page, /CityHomeKudaSection|getKudaDiscoveryFeed|hasHomeContent|kudaPreviewPromise/);
   assert.match(page, /events.mode === "personal"/);
+  assert.ok(page.indexOf("<StoriesSection cityId=") < page.indexOf('events.mode === "error"'),
+    "stories must precede both public and personalized afisha");
   const general = readFileSync("src/features/city-home/components/CityHomeGeneralEvents.tsx", "utf8");
+  assert.match(general, /authenticated=|События, которые подходят вам/);
+  assert.doesNotMatch(general, /AGE_GROUPS|age_discovery_unavailable|\/api\/discovery\/events\/page/,
+    "guest must not launch a second discovery request for age filters");
   assert.doesNotMatch(general, /useFamilyPersona|useDiscoveryFilters|selectedPersona/);
 });

@@ -10,11 +10,19 @@ export type HomeFamilyContext = {
   day: string;
   policyVersion: string;
   audience: "guest" | "no_child_with_DOB" | "personalized";
-  children: { id: string; name: string | null; hasBirthDate: boolean; ageYears?: number | null; ageFilter: string[] }[];
+  children: { id: string; name: string | null; hasBirthDate: boolean; ageYears?: number | null; ageMonths?: number | null; ageFilter: string[] }[];
+  /** Active family members, projected after the same ACL membership read. */
+  adults?: { name: string | null; isMe: boolean }[];
   selectedChildId: string | null;
   preferenceVersion: string | null;
   selectionPersistence: "account" | "device";
 };
+/** Children youngest first; unknown DOB last. Stable without revealing birth dates. */
+export function homeChildrenYoungestFirst(context: HomeFamilyContext) {
+  const months = (child: HomeFamilyContext["children"][number]) =>
+    child.ageMonths ?? (child.ageYears == null ? Infinity : child.ageYears * 12);
+  return [...context.children].sort((a, b) => months(a) - months(b) || a.id.localeCompare(b.id));
+}
 export function homeSelection(context: HomeFamilyContext, requested: string | null) {
   return requested && context.children.some(child => child.id === requested) ? requested : null;
 }

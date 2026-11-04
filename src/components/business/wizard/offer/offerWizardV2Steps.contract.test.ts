@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { getDefaultFormData } from "./defaults";
+import { partyCategoryFromOfferCategorySlug } from "./offerTypeChoices";
 import { V2_STEPS, V2_STEP_KEYS, getV2StepMembers, isV2CompositeStepKey } from "./offerWizardV2Steps";
 
 const V2_KEYS = ["type", "about", "services", "schedule", "terms", "review"];
@@ -66,6 +67,30 @@ console.log("offerWizardV2Steps contract tests passed");
   assert.match(method, /По заявке.*не подтверждает свободное время автоматически/);
   const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.tsx", "utf8");
   assert.ok(wizard.includes("<BookingServicesEditor offerId={offerId}"));
+  // V2 keeps the main offer in one flow; operational editors load on demand.
+  assert.ok(wizard.includes("const handleSaveDraft = async (continueOnCurrentStep = false) =>"));
+  assert.ok(wizard.includes('router.replace(`${editorOfferEditHref(data.id)}?step=${currentStepNum}`);'));
+  assert.ok(wizard.includes("setAdvancedServicesOpen(true)"));
+  assert.ok(wizard.includes("setPartyScheduleOpen(true)"));
+  assert.ok(!wizard.includes('currentStepKey === "about" && mode === "create"'),
+    "V2 must not repeat the subtype already chosen on step one");
   const classSchedule = readFileSync("src/components/business/wizard/offer/steps/StepClassSchedule.tsx", "utf8");
   assert.ok(classSchedule.includes("classSchedule.groups.map"));
+}
+
+{
+  // Step one persists BOTH the searchable categoryId and the single-party type.
+  for (const [slug, expected] of [
+    ["party-venue", "VENUE"], ["party-animator", "ANIMATOR"],
+    ["party-show", "SHOW"], ["party-master-class", "MASTER_CLASS"],
+    ["party-cake", "CAKE"], ["party-food", "FOOD"],
+    ["party-decor", "DECOR"], ["party-photo", "PHOTO"],
+    ["party-program", "PROGRAM"], ["party-other", "OTHER"],
+  ]) {
+    assert.equal(partyCategoryFromOfferCategorySlug(slug), expected, slug);
+  }
+  assert.equal(partyCategoryFromOfferCategorySlug("party-future-category"), null);
+  const stepOne = readFileSync("src/components/business/wizard/offer/steps/Step1Type.tsx", "utf8");
+  assert.ok(stepOne.includes('maxSelected={data.productType === "PARTY_SERVICE" ? 1 : undefined}'));
+  assert.ok(stepOne.includes("partyCategoryFromOfferCategorySlug(option.slug)"));
 }

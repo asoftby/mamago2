@@ -1,4 +1,4 @@
-import type { OfferFormData, OfferProductType } from "./types";
+import type { OfferFormData, OfferProductType, PartyCategory } from "./types";
 
 export type OfferCreationCategoryKey = "place" | "classes" | "parties" | "camps";
 
@@ -151,4 +151,25 @@ const OFFER_TYPE_SELECTIONS: Record<OfferProductType, OfferTypeSelection> = {
 
 export function getOfferTypeSelection(productType: OfferProductType): OfferTypeSelection {
   return OFFER_TYPE_SELECTIONS[productType];
+}
+
+/** Same seeded party categories as prisma/migrations/20261013120000_offer_categories.
+ * Map the public catalogue category chosen on step one to the single party-service type.
+ * Unknown future categories retain the manual fallback instead of silently misclassifying.
+ */
+const PARTY_SERVICE_CATEGORY_BY_SLUG: Record<string, PartyCategory> = {
+  "party-venue": "VENUE",
+  "party-animator": "ANIMATOR",
+  "party-show": "SHOW",
+  "party-master-class": "MASTER_CLASS",
+  "party-cake": "CAKE",
+  "party-food": "FOOD",
+  "party-decor": "DECOR",
+  "party-photo": "PHOTO",
+  "party-program": "PROGRAM",
+  "party-other": "OTHER",
+};
+
+export function partyCategoryFromOfferCategorySlug(slug: string): PartyCategory | null {
+  return PARTY_SERVICE_CATEGORY_BY_SLUG[slug] ?? null;
 }

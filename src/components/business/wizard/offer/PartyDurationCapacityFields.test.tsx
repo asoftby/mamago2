@@ -64,4 +64,72 @@ for (const productType of ["PARTY_PACKAGE", "PARTY_SERVICE"] as const) {
   assert.ok(html.includes("90 мин"), `${productType}: duration presets in actual wizard step`);
   assert.ok(html.includes("Своя"), `${productType}: custom duration in actual wizard step`);
 }
+
+for (const [category, locationText, duration, children] of [
+  ["CAKE", "Как получить заказ?", false, false],
+  ["FOOD", "Как получить заказ?", false, false],
+  ["DECOR", "Где проходит?", false, false],
+  ["PHOTO", "Где проходит съёмка?", true, false],
+  ["ANIMATOR", "Где проходит?", true, true],
+  ["VENUE", "Где проходит?", true, true],
+  ["SHOW", "Где проходит?", true, true],
+  ["MASTER_CLASS", "Где проходит?", true, true],
+  ["PROGRAM", "Где проходит?", true, true],
+  ["OTHER", "Где проходит?", true, true],
+] as const) {
+  const data = getDefaultFormData("test-place");
+  data.productType = "PARTY_SERVICE";
+  data.partyCategory = category;
+  data.requestedPlacements = ["BIRTHDAY"];
+  const html = renderToStaticMarkup(createElement(Step2Placements, {
+    data, onChange: () => undefined, isEditable: true, v2: true,
+  }));
+  assert.ok(html.includes(locationText), `${category}: contextual location question`);
+  assert.ok(!html.includes("Какая услуга?"), `${category}: V2 does not repeat the category selected on step 1`);
+  assert.equal(html.includes("Продолжительность"), duration, `${category}: duration relevance`);
+  assert.equal(html.includes("Количество детей"), children, `${category}: children relevance`);
+  if (category === "CAKE" || category === "FOOD") {
+    assert.ok(html.includes("Самовывоз") && html.includes("Доставка"), `${category}: fulfilment choices`);
+    assert.ok(html.includes("Что входит в заказ?"), `${category}: understandable included label`);
+  }
+}
+// A hidden category-specific field must become editable again if it holds an
+// existing persisted value, otherwise the old restriction silently rejects bookings.
+for (const category of ["CAKE", "FOOD", "DECOR", "PHOTO"] as const) {
+  const base = getDefaultFormData("test-place");
+  base.productType = "PARTY_SERVICE";
+  base.partyCategory = category;
+  base.birthdayDetails.minChildren = 5;
+  base.birthdayDetails.maxChildren = 12;
+  if (category !== "PHOTO") base.birthdayDetails.durationMinutes = 90;
+  const html = renderToStaticMarkup(createElement(Step2Placements, {
+    data: base, onChange: () => undefined, isEditable: true, v2: true,
+  }));
+  assert.ok(html.includes("Количество детей"), `${category}: saved child count is editable`);
+  assert.ok(html.includes('value="5"') && html.includes('value="12"'), `${category}: saved child count remains visible`);
+  assert.ok(html.includes("Сохранённые ограничения"), `${category}: notice explains retained restrictions`);
+  if (category !== "PHOTO") {
+    assert.ok(html.includes("Продолжительность") && html.includes("90 мин"), `${category}: previously entered duration is editable`);
+  }
+}
+// A partial saved range still needs to be editable, not just a fully populated one.
+{
+  const base = getDefaultFormData("test-place");
+  base.productType = "PARTY_SERVICE";
+  base.partyCategory = "CAKE";
+  base.birthdayDetails.maxChildren = 15;
+  const html = renderToStaticMarkup(createElement(Step2Placements, {
+    data: base, onChange: () => undefined, isEditable: true, v2: true,
+  }));
+  assert.ok(html.includes("Количество детей") && html.includes('value="15"'));
+}
+{
+  const data = getDefaultFormData("test-place");
+  data.productType = "PARTY_SERVICE";
+  data.partyCategory = null;
+  const html = renderToStaticMarkup(createElement(Step2Placements, {
+    data, onChange: () => undefined, isEditable: true, v2: true,
+  }));
+  assert.ok(html.includes("Какая услуга?"), "Unknown legacy categories retain the type fallback");
+}
 console.log("Party duration/capacity render tests passed");

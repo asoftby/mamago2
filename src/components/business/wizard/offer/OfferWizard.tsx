@@ -400,6 +400,9 @@ export function OfferWizard({
   );
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Expensive business-only editors load only after the author asks for them.
+  const [advancedServicesOpen, setAdvancedServicesOpen] = useState(false);
+  const [partyScheduleOpen, setPartyScheduleOpen] = useState(false);
 
   const { wizardSessionId } = useWizardSession({
     userId,
@@ -594,7 +597,7 @@ export function OfferWizard({
   };
 
   // Save as draft
-  const handleSaveDraft = async () => {
+  const handleSaveDraft = async (continueOnCurrentStep = false) => {
     if (isSaving || isSubmitting) return;
     setIsSaving(true);
     
@@ -668,6 +671,13 @@ export function OfferWizard({
         });
         setOfferId(data.id);
         draft.markClean();
+
+        if (continueOnCurrentStep) {
+          // The saved offer ID is required by the existing booking and resource APIs.
+          // Resume on the exact step, using server-loaded data and edit permissions.
+          router.replace(`${editorOfferEditHref(data.id)}?step=${currentStepNum}`);
+          return;
+        }
 
         if (onComplete) {
           onComplete(data.id);
@@ -866,7 +876,7 @@ export function OfferWizard({
               {variant === "v1" && mode === "create" && creationIntent === "parties" && (
                 <OfferSubtypeClarifier group="parties" data={formData} onChange={handleChange} />
               )}
-              <Step2Placements {...commonProps} showAdditionalPlacements={variant !== "v2"} />
+              <Step2Placements {...commonProps} showAdditionalPlacements={variant !== "v2"} v2={variant === "v2"} />
             </div>
           );
         case "details":
@@ -892,7 +902,41 @@ export function OfferWizard({
             <div className="space-y-6">
               <Step5Pricing {...commonProps} hideCta={variant === "v2"} />
               {variant === "v2" && formData.productType !== "CAMP" && (
-                <BookingServicesEditor offerId={offerId} />
+                <div className="space-y-3 rounded-2xl border border-border/70 p-4">
+                  {!advancedServicesOpen ? (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        Если у вас одна цена без допуслуг, можно сразу продолжить.
+                      </p>
+                      <Button type="button" variant="outline" onClick={() => setAdvancedServicesOpen(true)}>
+                        Настроить дополнительные услуги и цены (необязательно)
+                      </Button>
+                    </>
+                  ) : !offerId ? (
+                    <div className="space-y-3">
+                      <p className="text-sm">
+                        Чтобы добавить допуслуги, сначала сохраните предложение как черновик.
+                        После сохранения вы вернётесь к этому шагу.
+                      </p>
+                      {formData.placeId ? (
+                        <Button type="button" disabled={isSaving || isSubmitting} onClick={() => void handleSaveDraft(true)}>
+                          {isSaving ? "Сохраняем…" : "Сохранить черновик и продолжить"}
+                        </Button>
+                      ) : (
+                        <>
+                          <p className="text-sm text-muted-foreground">
+                            Для первого сохранения пока нужно выбрать место в разделе «Условия и контакты».
+                          </p>
+                          <Button type="button" variant="outline" onClick={() => setCurrentStepKey("terms")}>
+                            Указать место и контакты
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <BookingServicesEditor offerId={offerId} />
+                  )}
+                </div>
               )}
             </div>
           );
@@ -942,16 +986,40 @@ export function OfferWizard({
       }
       return (
         <div className="space-y-10">
-          {currentStepKey === "about" && mode === "create" &&
-            (creationIntent === "classes" || creationIntent === "parties") && (
-              <OfferSubtypeClarifier group={creationIntent} data={formData} onChange={handleChange} />
-            )}
           {blocks.map((key) => (
             <div key={key}>{renderBlock(key)}</div>
           ))}
           {currentStepKey === "schedule" &&
             (formData.productType === "PARTY_SERVICE" || formData.productType === "PARTY_PACKAGE") && (
-              <PartyResourceSchedule offerId={offerId} />
+              <div className="space-y-3 rounded-2xl border border-border/70 p-4">
+                {!partyScheduleOpen ? (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Если вы принимаете заявки и подтверждаете время самостоятельно, этот блок не нужен.
+                    </p>
+                    <Button type="button" variant="outline" onClick={() => setPartyScheduleOpen(true)}>
+                      Настроить свободные интервалы для бронирования (необязательно)
+                    </Button>
+                  </>
+                ) : !offerId ? (
+                  <div className="space-y-3">
+                    <p className="text-sm">
+                      Чтобы настроить свободное время, сохраните черновик. Вы вернётесь к расписанию.
+                    </p>
+                    {formData.placeId ? (
+                      <Button type="button" disabled={isSaving || isSubmitting} onClick={() => void handleSaveDraft(true)}>
+                        {isSaving ? "Сохраняем…" : "Сохранить черновик и продолжить"}
+                      </Button>
+                    ) : (
+                      <Button type="button" variant="outline" onClick={() => setCurrentStepKey("terms")}>
+                        Сначала указать место и контакты
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <PartyResourceSchedule offerId={offerId} />
+                )}
+              </div>
             )}
         </div>
       );
@@ -1117,7 +1185,7 @@ export function OfferWizard({
         showBack={canPrev}
         onBack={handlePrev}
         showSaveDraft={showSaveDraftInBar}
-        onSaveDraft={showSaveDraftInBar ? handleSaveDraft : undefined}
+        onSaveDraft={showSaveDraftInBar ? () => { void handleSaveDraft(); } : undefined}
         saveDraftDisabled={isSaving || isSubmitting}
         isReviewStep={isReviewStep}
         onContinue={!isReviewStep ? handleNext : undefined}
