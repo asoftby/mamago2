@@ -1613,6 +1613,7 @@ model Business {
   /// Включаемые по бизнесу функции (BusinessFeatures в src/lib/business/businessFeatures.ts); отсутствующий ключ = выключено
   features                Json                          @default("{}")
   activities              Activity[]                    @relation("ActivityBusiness")
+  billingPayerProfile     BillingPayerProfile?
   billingAccount          BillingAccount?
   bookingRequests         BookingRequest[]
   partyOrderItems PartyOrderItem[]
@@ -7658,4 +7659,30 @@ model WorkActivity {
 
   @@index([workItemId, createdAt, id])
   @@index([actorId, createdAt])
+}
+
+
+/// Legal billing identity of the payer, distinct from the public Business profile.
+/// Legal applicability of fields and documents is validated by the service layer.
+model BillingPayerProfile {
+  id                 String   @id @default(cuid())
+  businessId         String   @unique
+  payerType          String
+  legalName          String
+  unp                String?
+  legalAddress       String?
+  bankName           String?
+  bankCode           String?
+  bankAccount        String?
+  contactName        String?
+  contactEmail       String?
+  contactPhone       String?
+  signatoryName      String?
+  signatoryPosition  String?
+  signatoryBasis     String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  business           Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([payerType])
 }
