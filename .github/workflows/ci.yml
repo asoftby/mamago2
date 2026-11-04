@@ -435,6 +435,19 @@ jobs:
           pnpm exec tsx src/app/api/analytics/events/route.test.ts
           pnpm exec tsx src/lib/analytics/impressionGate.test.ts
 
+      - name: Migrated-user activation HTTP and environment-gate PostgreSQL regressions
+        env:
+          DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test
+          APP_ENV: test
+          APP_PUBLIC_URL: https://activation-ci.example.invalid
+          EMAIL_ENABLED: 'false'
+          MIGRATED_USER_ACTIVATION_EMAIL_ENABLED: 'false'
+          MIGRATED_USER_ACTIVATION_EMAIL_PRODUCTION_APPROVED: 'false'
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/server/auth/activationEndpoints.integration.test.ts
+          pnpm exec tsx src/server/auth/activationRequestFlow.integration.test.ts
+
       - name: Five-user WordPress recovery atomicity and rerun on PostgreSQL
         env:
           DATABASE_URL: postgresql://seo_redirect_test:synthetic_only@127.0.0.1:5432/seo_redirect_test

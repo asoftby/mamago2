@@ -32,7 +32,11 @@ export function classifyActivationEmailBlock(
   environment = currentEnvironment(),
   approvalMode: ActivationEmailApprovalMode = "PRODUCTION_BATCH",
 ): ActivationEmailBlockReason | null {
-  if (environment.nodeEnv !== "production" || environment.appEnvironment !== "production") {
+  const appEnvironment = environment.appEnvironment?.trim().toLowerCase();
+  if (
+    environment.nodeEnv !== "production" ||
+    (appEnvironment !== "production" && appEnvironment !== "prod")
+  ) {
     return "ENVIRONMENT";
   }
   if (
