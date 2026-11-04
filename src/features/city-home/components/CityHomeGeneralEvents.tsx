@@ -18,7 +18,7 @@ const FamilyActivationEditChildBirthOverlay = dynamic(() => import("./FamilyActi
 
 /** Guests see the public afisha without age chips, registration prompts or additional filter requests. */
 export function CityHomeGeneralEvents({
-  activities, citySlug, authenticated = false, hasChildren = false, incompleteChild = null, incompleteChildren = [], periodLabel = "На этой неделе",
+  activities, citySlug, authenticated = false, hasChildren = false, incompleteChild = null, periodLabel = "На этой неделе",
 }: {
   activities: ActivityMock[]; citySlug: string; authenticated?: boolean; hasChildren?: boolean;
   periodLabel?: "На этой неделе" | "Ближайшие события";
@@ -33,16 +33,6 @@ export function CityHomeGeneralEvents({
   return <CityHomeSection
     title={authenticated ? "События, которые подходят вам" : "Куда пойти с ребёнком " + getCityLocativePhrase(citySlug)}
     subtitle={periodLabel} reserveCarouselControls>
-    {authenticated && hasChildren && incompleteChildren.length > 0 && <div className="mb-4 flex flex-wrap items-center gap-2">
-      <span className="mr-1 text-sm text-muted-foreground">Для кого:</span>
-      <span className="inline-flex min-h-11 items-center rounded-full bg-primary px-4 text-sm text-primary-foreground">Для всех</span>
-      {incompleteChildren.map(child => <button key={child.id} type="button"
-        aria-label={`Указать возраст: ${child.name?.trim() || "Ребёнок"}`}
-        onClick={() => setEditingChild(child)}
-        className="min-h-11 rounded-full border px-4 text-sm hover:border-primary hover:text-primary">
-        {child.name?.trim() || "Ребёнок"}
-      </button>)}
-    </div>}
     {authenticated && (!hasChildren || incompleteChild) && <div className="mb-4 flex flex-wrap items-center gap-3">
       <span className="text-sm text-muted-foreground">
         {incompleteChild ? "Укажите возраст ребёнка для персональной афиши." : "Добавьте ребёнка — персонализируем афишу."}
@@ -63,7 +53,7 @@ export function CityHomeGeneralEvents({
           </AnalyticsCardViewTracker>
         </div>
       ))}
-      <HomeMoreEventsCard href={catalogHref} />
+      <HomeMoreEventsCard href={catalogHref} hasEvents={activities.length > 0} />
     </HorizontalCardRow>
     {authenticated && <>
       <FamilyActivationAddChildOverlay open={addingChild} onOpenChange={setAddingChild}
