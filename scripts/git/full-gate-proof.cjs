@@ -24,9 +24,18 @@ function lockfile() {
 function environmentDigest() {
   // All effective variables, not merely known prefixes: build settings can be added
   // in next.config.ts without updating this script. Ignore shell-process metadata only.
-  const volatile = new Set(['PWD','OLDPWD','SHLVL','_']);
+  const volatile = new Set(['PWD','OLDPWD','SHLVL','_','GIT_PREFIX','GIT_EXEC_PATH']);
+  const gitExecPath = git('--exec-path');
+  // Git injects its exec-path into hooks; Husky prepends node_modules/.bin.
+  // Strip ONLY these known leading hook wrappers, not arbitrary PATH changes.
+  function normalizedPath(value) {
+    const paths = value.split(path.delimiter);
+    while (paths[0] === gitExecPath || paths[0] === 'node_modules/.bin') paths.shift();
+    return paths.join(path.delimiter);
+  }
   const env = Object.entries(process.env)
     .filter(([name]) => !volatile.has(name))
+    .map(([name,value]) => [name,name === 'PATH' ? normalizedPath(value) : value])
     .sort(([a],[b]) => a.localeCompare(b));
   // Ignored .env* files do not appear in git status; include all root Next.js env files.
   const envFiles = fs.readdirSync('.').filter(name => /^\.env(?:\.|$)/.test(name))
@@ -48,6 +57,7 @@ function fingerprint() {
     repository:fs.realpathSync(process.cwd()), node:process.version,
     nodePath:fs.realpathSync(process.execPath),
     pnpm:execFileSync('pnpm',['--version'],{encoding:'utf8'}).trim(),
+    pnpmPath:execFileSync('which',['pnpm'],{encoding:'utf8'}).trim(), gitExecPath:git('--exec-path'),
     platform:process.platform, arch:process.arch, lockHash,
     envHash:environmentDigest(), gateCommand:'pnpm check:push'
   };
