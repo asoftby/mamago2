@@ -20,7 +20,7 @@ import {
 } from "@/features/hero-weather/lib/weather-scenario-layer";
 import type { TimeOfDay } from "@/features/hero-weather/model/types";
 import { mapDiscoveryEventToActivityMock } from "@/server/discovery/mapDiscoveryEventToActivityMock";
-import { buildEventRuntimeWhere, type EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
+import { buildEventRuntimeWhere, effectiveEventSessionStart, type EventRuntimeFilters } from "@/server/discovery/eventFilterSemantics";
 import { composePromotedCards } from "@/lib/discovery/promotionComposition";
 import { recordDiscoveryExposures } from "@/server/services/recommendations/RecommendationTraceService";
 import { withImageDimensions } from "@/server/media/loadImageDimensionsByUrl";
@@ -93,7 +93,7 @@ export async function buildKudaDiscoveryWhere(cityId: string, citySlug: string, 
         { targetRegionIds: { has: ALL_BELARUS_REGIONS } },
       ],
     } } } satisfies Prisma.ActivityWhereInput] : []),
-  ] }, ...buildEventRuntimeWhere(options.eventFilters), ...defaultWindow, ...pubParts] };
+  ] }, ...buildEventRuntimeWhere(options.eventFilters, now), ...defaultWindow, ...pubParts] };
   return { where, primaryCityId, eligibility, expandedCityIds, targetRegionId };
 }
 
@@ -246,7 +246,7 @@ export async function getKudaDiscoveryFeed(
 
   const temporalById = new Map(rows.map((row) => [
     row.id,
-    eventTemporalScore({ now: runtimeFilters.dateRange?.start ?? now, nextOccurrenceAt: row.nextOccurrenceAt, sessions: row.sessions, seasonal: row.occasionLinks.length > 0 }),
+    eventTemporalScore({ now: effectiveEventSessionStart(runtimeFilters.dateRange, now), nextOccurrenceAt: row.nextOccurrenceAt, sessions: row.sessions, seasonal: row.occasionLinks.length > 0 }),
   ]));
 
   cards.sort((a, b) => {

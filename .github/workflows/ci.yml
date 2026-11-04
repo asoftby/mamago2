@@ -86,6 +86,9 @@ jobs:
       - name: Family picks profile ACL and backwards-compatible API contract
         run: pnpm test:family-picks
 
+      - name: Public event date filters exclude elapsed sessions
+        run: pnpm exec tsx src/server/discovery/eventFilterSemantics.test.ts
+
       - name: Business Place versus PLACE_VISIT creation contract
         run: pnpm exec tsx src/components/shared/createPublicationBusinessIntent.contract.test.ts
 
