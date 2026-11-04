@@ -19,6 +19,8 @@ interface Step2PlacementsProps {
   isEditable: boolean;
   /** Новый мастер: блок «другие разделы каталога» показывает «О предложении» один раз, здесь он скрыт. */
   showAdditionalPlacements?: boolean;
+  /** Context-specific questions in the new six-step wizard; legacy remains unchanged. */
+  v2?: boolean;
 }
 
 const LOCATION_OPTIONS: Array<{ value: BirthdayLocationType; label: string }> = [
@@ -45,10 +47,26 @@ export function Step2Placements({
   onChange,
   isEditable,
   showAdditionalPlacements = true,
+  v2 = false,
 }: Step2PlacementsProps) {
   const isService = data.productType === "PARTY_SERVICE";
   const isPackage = data.productType === "PARTY_PACKAGE";
   const birthday = data.birthdayDetails;
+  const orderDelivery = v2 && isService && (data.partyCategory === "CAKE" || data.partyCategory === "FOOD");
+  const photoService = v2 && isService && data.partyCategory === "PHOTO";
+  const omitDuration = v2 && isService && (
+    data.partyCategory === "CAKE" || data.partyCategory === "FOOD" || data.partyCategory === "DECOR"
+  );
+  const omitChildren = v2 && isService && (
+    data.partyCategory === "CAKE" || data.partyCategory === "FOOD" ||
+    data.partyCategory === "DECOR" || data.partyCategory === "PHOTO"
+  );
+  const locationQuestion = orderDelivery ? "Как получить заказ?" : photoService ? "Где проходит съёмка?" : "Где проходит?";
+  const locationOptions = orderDelivery
+    ? [{ value: "ON_SITE" as const, label: "Самовывоз" }, { value: "OFF_SITE" as const, label: "Доставка" }, { value: "BOTH" as const, label: "И так, и так" }]
+    : photoService
+      ? [{ value: "ON_SITE" as const, label: "В студии" }, { value: "OFF_SITE" as const, label: "С выездом" }, { value: "BOTH" as const, label: "И там, и там" }]
+      : LOCATION_OPTIONS;
   const [showMore, setShowMore] = useState(false);
   const hasAdditionalData = Boolean(
     birthday.program.trim() || birthday.note.trim() || birthday.includedCategories.length ||
@@ -95,9 +113,9 @@ export function Step2Placements({
       )}
 
       <div className="space-y-2">
-        <p className="text-sm font-medium">Где проходит? <span className="text-destructive">*</span></p>
-        <div role="group" aria-label="Где проходит" className="grid grid-cols-3 gap-2">
-          {LOCATION_OPTIONS.map((option) => (
+        <p className="text-sm font-medium">{locationQuestion} <span className="text-destructive">*</span></p>
+        <div role="group" aria-label={locationQuestion.replace("?", "")} className="grid grid-cols-3 gap-2">
+          {locationOptions.map((option) => (
             <button
               key={option.value}
               type="button"
@@ -119,15 +137,19 @@ export function Step2Placements({
         </div>
       </div>
 
-      <PartyDurationCapacityFields
-        idPrefix={isService ? "party-service" : "party-package"}
-        details={birthday}
-        onChange={updateBirthdayDetails}
-        isEditable={isEditable}
-      />
+      {(!omitDuration || !omitChildren) && (
+        <PartyDurationCapacityFields
+          idPrefix={isService ? "party-service" : "party-package"}
+          details={birthday}
+          onChange={updateBirthdayDetails}
+          isEditable={isEditable}
+          showDuration={!omitDuration}
+          showChildren={!omitChildren}
+        />
+      )}
 
       <div className="space-y-2">
-        <Label htmlFor="party-included">Что входит? <span className="text-destructive">*</span></Label>
+        <Label htmlFor="party-included">{orderDelivery ? "Что входит в заказ?" : "Что входит?"} <span className="text-destructive">*</span></Label>
         <Textarea
           id="party-included"
           value={birthday.included}

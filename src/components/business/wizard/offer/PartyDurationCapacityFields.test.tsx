@@ -64,4 +64,32 @@ for (const productType of ["PARTY_PACKAGE", "PARTY_SERVICE"] as const) {
   assert.ok(html.includes("90 мин"), `${productType}: duration presets in actual wizard step`);
   assert.ok(html.includes("Своя"), `${productType}: custom duration in actual wizard step`);
 }
+
+for (const [category, locationText, duration, children] of [
+  ["CAKE", "Как получить заказ?", false, false],
+  ["FOOD", "Как получить заказ?", false, false],
+  ["DECOR", "Где проходит?", false, false],
+  ["PHOTO", "Где проходит съёмка?", true, false],
+  ["ANIMATOR", "Где проходит?", true, true],
+  ["VENUE", "Где проходит?", true, true],
+  ["SHOW", "Где проходит?", true, true],
+  ["MASTER_CLASS", "Где проходит?", true, true],
+  ["PROGRAM", "Где проходит?", true, true],
+  ["OTHER", "Где проходит?", true, true],
+] as const) {
+  const data = getDefaultFormData("test-place");
+  data.productType = "PARTY_SERVICE";
+  data.partyCategory = category;
+  data.requestedPlacements = ["BIRTHDAY"];
+  const html = renderToStaticMarkup(createElement(Step2Placements, {
+    data, onChange: () => undefined, isEditable: true, v2: true,
+  }));
+  assert.ok(html.includes(locationText), `${category}: contextual location question`);
+  assert.equal(html.includes("Продолжительность"), duration, `${category}: duration relevance`);
+  assert.equal(html.includes("Количество детей"), children, `${category}: children relevance`);
+  if (category === "CAKE" || category === "FOOD") {
+    assert.ok(html.includes("Самовывоз") && html.includes("Доставка"), `${category}: fulfilment choices`);
+    assert.ok(html.includes("Что входит в заказ?"), `${category}: understandable included label`);
+  }
+}
 console.log("Party duration/capacity render tests passed");
