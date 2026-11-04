@@ -60,6 +60,24 @@ export function emptyClassGroup(): ClassSessionGroup {
   return { id: newClassScheduleId(), days: [], time: "17:00", seats: "" };
 }
 
+/** Create an editable pricing group before the schedule step in Offer Wizard V2.
+ * Do not synthesize days, slots, or capacity: those must be set on Schedule.
+ */
+export function addClassGroupForPricing(form: ClassScheduleForm): ClassScheduleForm {
+  if (form.groups.length >= 30) return form;
+  const group = emptyClassGroup();
+  return {
+    ...form,
+    groups: [...form.groups, {
+      ...group,
+      tariffs: [{
+        id: newClassScheduleId(), title: "", price: "", unit: "занятие",
+        periodDays: null, visitsCount: 1,
+      }],
+    }],
+  };
+}
+
 export function emptyClassDate(): ClassDateSession {
   return { id: newClassScheduleId(), date: "", time: "12:00", seats: "" };
 }

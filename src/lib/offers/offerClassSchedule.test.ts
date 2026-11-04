@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  addClassGroupForPricing,
   buildClassScheduleInput,
   classScheduleInputSchema,
   defaultClassSchedule,
@@ -191,3 +192,20 @@ const sameTimeGroups = groupsFromRules([
   { classGroupId: "grp-002", weekday: 1, startMinutes: 1020, capacity: 12 },
 ]);
 assert.deepEqual(sameTimeGroups.groups.map((g) => g.id), ["grp-001", "grp-002"]);
+
+// V2: business staff must create a group + editable tariff at step 3,
+// before the step-4 schedule. The helper must never fabricate availability.
+const initialPricing = defaultClassSchedule();
+const pricingGroup = addClassGroupForPricing(initialPricing);
+assert.equal(initialPricing.groups.length, 0);
+assert.equal(pricingGroup.groups.length, 1);
+assert.deepEqual(pricingGroup.groups[0].days, []);
+assert.equal(pricingGroup.groups[0].time, "17:00");
+assert.equal(pricingGroup.groups[0].seats, "");
+assert.equal(pricingGroup.groups[0].tariffs?.length, 1);
+assert.equal(pricingGroup.groups[0].tariffs?.[0]?.price, "");
+assert.equal(pricingGroup.groups[0].tariffs?.[0]?.title, "");
+assert.equal(addClassGroupForPricing(pricingGroup).groups.length, 2);
+const atLimit = { ...pricingGroup, groups: Array.from({ length: 30 }, (_, i) => ({ ...pricingGroup.groups[0], id: `group-${i}` })) };
+assert.equal(addClassGroupForPricing(atLimit), atLimit, "Never exceed 30 groups");
+console.log("V2 group-before-tariff progression fixtures passed");

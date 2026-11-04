@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { newClassScheduleId, type ClassSessionGroup } from "@/lib/offers/offerClassSchedule";
+import { addClassGroupForPricing, newClassScheduleId, type ClassSessionGroup } from "@/lib/offers/offerClassSchedule";
 import type { OfferFormData } from "../types";
 
 /** Same OfferClassGroup tariff objects used by schedule; no shadow pricing state. */
@@ -21,18 +21,24 @@ export function ClassTariffsEditor({ data, onChange, isEditable }: {
       },
     } });
   };
+  const addGroup = () => {
+    onChange({ schedule: {
+      ...data.schedule,
+      classSchedule: addClassGroupForPricing(data.schedule.classSchedule),
+    } });
+  };
   return (
     <section className="space-y-4" aria-label="Тарифы занятий">
       <div>
         <h2 className="text-xl font-semibold">Тарифы групп</h2>
         <p className="text-sm text-muted-foreground">
-          Группы, время и количество мест настраиваются в «Расписании».
-          Тарифы каждой группы редактируются здесь и сохраняются в тех же данных — без дублей.
+          Создайте группу и укажите её тариф. Дни занятий, время и количество мест
+          настроите на следующем шаге «Расписание».
         </p>
       </div>
       {data.schedule.classSchedule.groups.length === 0 &&
         <p className="text-sm text-muted-foreground">
-          Сначала добавьте группу на шаге «Расписание», затем вернитесь сюда для цены.
+          Добавьте первую группу и укажите её цену, чтобы перейти к расписанию.
         </p>}
       {data.schedule.classSchedule.groups.map((group, groupIndex) => (
         <div key={group.id} className="space-y-3 rounded-xl border border-border/70 p-3">
@@ -90,6 +96,10 @@ export function ClassTariffsEditor({ data, onChange, isEditable }: {
           </Button>
         </div>
       ))}
+      <Button type="button" variant="outline" disabled={!isEditable || data.schedule.classSchedule.groups.length >= 30}
+        onClick={addGroup}>
+        + Добавить группу и тариф
+      </Button>
     </section>
   );
 }

@@ -15,7 +15,7 @@ import type {
   OfferFormData,
   OfferProductType,
 } from "./types";
-import { validatePublicationAccess } from "@/features/publication-access";
+import { validatePublicationAccess } from "@/features/publication-access/validation";
 import { showCampLodgingFormFields } from "./campOfferModel";
 import { isOfferContactsComplete } from "./contacts";
 import { getScheduleMissingFields } from "@/lib/offers/offerSchedule";
