@@ -26,7 +26,7 @@ export async function loadHomeEvents(userId: string | null, cityId: string, city
   }
   const activitiesThisWeek = await deps.common(cityId, citySlug, null, {
     take: 7,
-    eventFilters: { dateRange: publicHomeWeekRange(), free: false, districtId: null, metroId: null, adultOnly: false },
+    eventFilters: { dateRange: publicHomeWeekRange(), includeNextOccurrenceWithoutSessions: true, free: false, districtId: null, metroId: null, adultOnly: false },
   });
   // A second query is needed only when the week is empty: keep a useful way
   // into the afisha, and never mislabel next month's events as this week.
