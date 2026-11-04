@@ -120,7 +120,7 @@ export function OfferCard({
               {dateLabel && priceLabel && <span aria-hidden="true">·</span>}
               {priceLabel && (
                 <span className={/бесплатно|^free$/i.test(priceLabel.trim()) ? "font-medium text-[var(--success)]" : "text-[#141210]"}>
-                  {renderPriceWithIcon(normalizeUiCurrencyText(priceLabel))}
+                  {renderPriceWithIcon(normalizeUiCurrencyText(priceLabel), { iconSize: "card" })}
                 </span>
               )}
             </div>

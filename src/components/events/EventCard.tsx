@@ -182,7 +182,7 @@ export function EventCard({
               {metaLabel && priceLabel && <span aria-hidden="true">·</span>}
               {priceLabel && (
                 <span className={isFree ? "font-medium text-[var(--success)]" : "text-[#141210]"}>
-                  {renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "sm" })}
+                  {renderCurrencyText(normalizeUiCurrencyText(priceLabel), { iconSize: "card" })}
                 </span>
               )}
             </div>
