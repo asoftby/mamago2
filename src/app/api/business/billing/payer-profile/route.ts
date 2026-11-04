@@ -14,7 +14,7 @@ async function ownerBusinessId() {
 
 export async function GET() {
   const businessId = await ownerBusinessId();
-  if (!businessId) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  if (!businessId) return NextResponse.json({ error: "Business owner access required" }, { status: 403 });
   const profile = await prisma.billingPayerProfile.findUnique({ where: { businessId } });
   return NextResponse.json({ profile });
 }
