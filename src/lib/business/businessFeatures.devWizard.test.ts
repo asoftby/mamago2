@@ -64,6 +64,23 @@ test("A BUSINESS_OWNER can create and price a recurring group before reaching sc
   assert.equal(isStepComplete("services", ready, "v2"), true, "Price passes before group schedule exists");
   assert.equal(getNextStepKey("REGULAR", "services", "REGULAR_ACTIVITY", "v2"), "schedule");
   assert.equal(isStepComplete("schedule", ready, "v2"), false, "Schedule must still be entered");
+  const fullyScheduled = {
+    ...ready,
+    classDuration: "60",
+    schedule: {
+      ...ready.schedule,
+      bookingMethod: "REQUEST_ONLY" as const,
+      classSchedule: {
+        ...ready.schedule.classSchedule,
+        groups: ready.schedule.classSchedule.groups.map((g) => ({
+          ...g, days: [1], time: "17:00", seats: "8",
+        })),
+      },
+    },
+  };
+  assert.equal(isStepComplete("schedule", fullyScheduled, "v2"), true,
+    "A valid tariff, group schedule and booking method allow BUSINESS_OWNER to finish step 4");
+  assert.equal(getNextStepKey("REGULAR", "schedule", "REGULAR_ACTIVITY", "v2"), "terms");
   const editor = readFileSync("src/components/business/wizard/offer/components/ClassTariffsEditor.tsx", "utf8");
   assert.match(editor, /onClick=\{addGroup\}/, "Group-create action is exposed on pricing step");
   assert.match(editor, /addClassGroupForPricing\(data.schedule.classSchedule\)/);

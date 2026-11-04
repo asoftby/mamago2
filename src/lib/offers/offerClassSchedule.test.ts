@@ -209,3 +209,18 @@ assert.equal(addClassGroupForPricing(pricingGroup).groups.length, 2);
 const atLimit = { ...pricingGroup, groups: Array.from({ length: 30 }, (_, i) => ({ ...pricingGroup.groups[0], id: `group-${i}` })) };
 assert.equal(addClassGroupForPricing(atLimit), atLimit, "Never exceed 30 groups");
 console.log("V2 group-before-tariff progression fixtures passed");
+
+// A numeric price must not block a fully configured regular-class schedule.
+for (const [price, valid] of [
+  ["120", true], ["120.50", true], ["120,50", true],
+  ["0", true], ["120.555", false], ["-1", false], ["abc", false],
+] as const) {
+  const form = defaultClassSchedule();
+  form.groups = [{
+    id: "priced-group", days: [1], time: "17:00", seats: "8",
+    tariffs: [{ id: "tariff-1", title: "Абонемент", price, unit: "занятие", periodDays: null, visitsCount: 1 }],
+  }];
+  const problems = getClassScheduleMissingFields(form, "REGULAR_ACTIVITY", "60");
+  assert.equal(!problems.includes("Стоимость тарифа в BYN"), valid, `price=${price}`);
+}
+console.log("Regular activity tariff prices match PostgreSQL input validation");
