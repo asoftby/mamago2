@@ -46,7 +46,7 @@ test("place visit offer uses the existing OFFER model and editor", () => {
   assert.match(info, /isClassOffer \|\| data\.productType === "PLACE_VISIT"/);
   assert.match(info, /<OfferCategoryPicker/);
   assert.ok(wizard.includes("...getOfferTypeSelection(selectedType)"));
-  assert.match(wizard, /variant === "v2" \? "about" : creationIntent === "parties" \? "placements" : "details"/);
+  assert.match(wizard, /if \(mode !== "edit" \|\| !offer \|\| initialStepNumber == null \|\| initialStepNumber < 1\) \{[\s\S]*?return "type";/);
 });
 
 test("subtype questions stay available for classes and parties", () => {
