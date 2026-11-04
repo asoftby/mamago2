@@ -104,7 +104,7 @@ export function OfferCard({
 
           {/* Price badge — bottom right */}
           {priceLabel && (
-            <span className="absolute bottom-3 right-3 inline-flex h-7 items-center rounded-full px-3 font-mono text-[11px] font-medium backdrop-blur-[4px] bg-[rgba(20,18,16,0.72)] text-white">
+            <span className="absolute bottom-3 right-3 inline-flex h-7 items-center rounded-full px-3 font-mono text-[11px] font-medium backdrop-blur-[4px] bg-[rgba(250,247,241,0.93)] text-[#141210]">
               {renderPriceWithIcon(normalizeUiCurrencyText(priceLabel ?? ""))}
             </span>
           )}
