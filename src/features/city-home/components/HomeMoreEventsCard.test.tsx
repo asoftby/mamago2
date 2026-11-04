@@ -14,4 +14,7 @@ test("one poster-height end card, only links when catalog has available events",
   assert.doesNotMatch(more, /Нет событий/);
   assert.match(empty, /aspect-\[2\/3\]/);
   assert.match(more, /aspect-\[2\/3\]/);
+  assert.match(empty, /bg-card/);
+  assert.match(more, /bg-card/);
+  assert.doesNotMatch(empty + more, /border-dashed|bg-image|background-image/);
 });
