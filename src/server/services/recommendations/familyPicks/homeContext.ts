@@ -14,7 +14,10 @@ export async function loadHomeContext(userId: string | null, snapshot?: FamilyPi
   if (profile.userId !== userId) throw new Error("profile_actor_mismatch");
   const now = new Date();
   const [membership, dismiss, plan] = userId ? await Promise.all([
-    familyReadsEnabled() ? prisma.familyMembership.findFirst({ where: { userId, leftAt: null }, select: { id: true, familyId: true, joinedAt: true } }) : null,
+    familyReadsEnabled() ? prisma.familyMembership.findFirst({ where: { userId, leftAt: null },
+      select: { id: true, familyId: true, joinedAt: true,
+        family: { select: { memberships: { where: { leftAt: null }, orderBy: { joinedAt: "asc" }, take: 10,
+          select: { userId: true, user: { select: { displayName: true } } } } } } } }) : null,
     prisma.userEvent.aggregate({ where: { userId, eventType: "DISMISS", entityType: "EVENT" }, _max: { createdAt: true }, _count: true }),
     prisma.planItem.aggregate({ where: await activePlanScopeFor(userId), _max: { updatedAt: true }, _count: true }),
   ]) : [null, null, null];
@@ -24,8 +27,11 @@ export async function loadHomeContext(userId: string | null, snapshot?: FamilyPi
   const context: HomeFamilyContext = {
     actorId: userId, signature, day, policyVersion: PERSONAL_FAMILY_PICKS_POLICY.version,
     audience: profile.audience, selectedChildId: null, preferenceVersion: null, selectionPersistence: "account",
+    adults: (membership?.family.memberships ?? []).filter(member => member.userId !== userId)
+      .map(member => ({ name: member.user.displayName, isMe: false })),
     children: children.map(child => ({ id: child.id, name: child.name, hasBirthDate: Boolean(child.birthDate),
       ageYears: ageYearsAt(child, new Date(day + "T12:00:00Z")),
+      ageMonths: ageMonthsIntervalAt(child, new Date(day + "T12:00:00Z"))?.min ?? null,
       ageFilter: (() => {
         const range = ageMonthsIntervalAt(child, new Date(`${day}T00:00:00Z`));
         return range ? ageFilterKeysForChildren([{ ageMonths: range.min }, { ageMonths: range.max }]) : [];

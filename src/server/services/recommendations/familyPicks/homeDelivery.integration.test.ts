@@ -39,13 +39,17 @@ async function main() {
     cityId = city.id;
     const user = await db.user.create({ data: { email: `home-${marker}@example.invalid` } });
     const stranger = await db.user.create({ data: { email: `home-other-${marker}@example.invalid` } });
-    userIds.push(user.id, stranger.id);
+    const partner = await db.user.create({ data: { email: `home-partner-${marker}@example.invalid`, displayName: "Таня" } });
+    userIds.push(user.id, stranger.id, partner.id);
     const family = await db.family.create({ data: { name: marker } }); familyIds.push(family.id);
     await db.familyMembership.create({ data: { userId: user.id, familyId: family.id, role: "OWNER" } });
+    await db.familyMembership.create({ data: { userId: partner.id, familyId: family.id, role: "ADULT" } });
     const first = await db.child.create({ data: { parentId: user.id, familyId: family.id, birthDate: new Date("2020-01-01Z"), birthPrecision: "DAY", name: "Первый" } });
     const second = await db.child.create({ data: { parentId: user.id, familyId: family.id, birthDate: new Date("2022-01-01Z"), birthPrecision: "MONTH", name: "Второй" } });
     const initial = await loadHomeContext(user.id);
     assert.equal(initial.context.selectionPersistence, "account");
+    assert.deepEqual(initial.context.adults, [{ name: "Таня", isMe: false }], "only active same-family adult is shown");
+    assert.deepEqual((await loadHomeContext(stranger.id)).context.adults, [], "foreign adults never leak into Home");
     assert.ok(await saveHomeSelection(user.id, first.id, initial.context.preferenceVersion));
     const fromAnotherDevice = await loadHomeContext(user.id);
     assert.equal(fromAnotherDevice.context.selectedChildId, first.id);
@@ -142,6 +146,7 @@ async function main() {
     assert.equal((await db.userHomePreference.findUnique({ where: { userId: user.id } }))?.selectedChildId, null);
     await db.familyMembership.updateMany({ where: { userId: user.id, leftAt: null }, data: { leftAt: new Date() } });
     assert.equal((await loadHomeContext(user.id)).context.audience, "no_child_with_DOB");
+    assert.deepEqual((await loadHomeContext(user.id)).context.adults, [], "leaving family revokes other adult chips");
     console.log(JSON.stringify({ benchmark: "disposable PostgreSQL 16, 800 events, 2 children, before pool optimization", measurements }, null, 2));
     console.log("Home delivery, account preference, ACL, attribution and cache integration: PASS");
   } finally {

@@ -28,6 +28,8 @@ export type EventCardProps = {
   priceLabel?: string;
   /** Отношение сторон обложки, по умолчанию 4/5 (только для framing="fixed") */
   coverRatio?: string;
+  /** Preserve the complete poster when a uniform carousel viewport is required. */
+  coverFit?: "cover" | "contain";
   /** Stored pixel size of the cover (MediaAsset); null = unknown. */
   imageWidth?: number | null;
   imageHeight?: number | null;
@@ -106,6 +108,7 @@ export function EventCard({
   metaLabel,
   priceLabel,
   coverRatio = "4/5",
+  coverFit = "cover",
   imageWidth,
   imageHeight,
   framing = "fixed",
@@ -136,7 +139,7 @@ export function EventCard({
               sizes={imageSizes ?? EVENT_CARD_IMAGE_SIZES}
               loading={imagePriority ? "eager" : "lazy"}
               fetchPriority={imagePriority ? "high" : undefined}
-              className={cn("object-cover", objectPositionClass)}
+              className={cn(coverFit === "contain" ? "object-contain" : "object-cover", objectPositionClass)}
             />
           ) : imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- unknown external hosts are intentionally outside the Next/Image allowlist.
@@ -145,7 +148,7 @@ export function EventCard({
               alt={title}
               loading={imagePriority ? "eager" : "lazy"}
               fetchPriority={imagePriority ? "high" : undefined}
-              className={cn("h-full w-full object-cover", objectPositionClass)}
+              className={cn("h-full w-full", coverFit === "contain" ? "object-contain" : "object-cover", objectPositionClass)}
             />
           ) : (
             <div

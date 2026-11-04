@@ -224,3 +224,24 @@ test("Halloween quick chip filters by linked active Occasion, not title keywords
   }]);
   assert.deepEqual(buildEventRuntimeWhere({ ...input, occasionSlug: null }), []);
 });
+
+test("home weekly preview includes no-session next occurrences without admitting out-of-range or withdrawn sessions", () => {
+  const now = new Date("2026-11-04T09:00:00.000Z");
+  const dateRange = resolveEventDateRange({ from: "2026-11-04", to: "2026-11-08" }, now);
+  assert.ok(dateRange);
+  const where = buildEventRuntimeWhere({
+    dateRange, includeNextOccurrenceWithoutSessions: true, free: false,
+    districtId: null, metroId: null, adultOnly: false,
+  }, now);
+  assert.deepEqual(where, [{
+    OR: [
+      { sessions: { some: { startsAt: { gte: now, lt: dateRange.end }, withdrawnAt: null } } },
+      { sessions: { none: {} }, nextOccurrenceAt: { gte: now, lt: dateRange.end } },
+    ],
+  }]);
+  assert.deepEqual(buildEventRuntimeWhere({
+    dateRange, free: false, districtId: null, metroId: null, adultOnly: false,
+  }, now), [{
+    sessions: { some: { startsAt: { gte: now, lt: dateRange.end }, withdrawnAt: null } },
+  }]);
+});
