@@ -21,4 +21,13 @@ export const billingPayerProfileSchema = z.discriminatedUnion("payerType", [
     legalAddress: z.string().trim().max(500).optional(),
   }),
 ]);
+const optionalText = (max: number) => z.string().trim().max(max).optional();
+export const billingPayerDetailsSchema = z.object({
+  bankName: optionalText(200), bankCode: optionalText(30), bankAccount: optionalText(64),
+  contactName: optionalText(200), contactEmail: z.union([z.literal(""), z.string().email()]).optional(),
+  contactPhone: optionalText(50), signatoryName: optionalText(200),
+  signatoryPosition: optionalText(100), signatoryBasis: optionalText(200),
+});
+export const billingPayerInputSchema = z.intersection(billingPayerProfileSchema, billingPayerDetailsSchema);
+export type BillingPayerInput = z.infer<typeof billingPayerInputSchema>;
 export type BillingPayerIdentity = z.infer<typeof billingPayerProfileSchema>;
