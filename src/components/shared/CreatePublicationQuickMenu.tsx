@@ -56,31 +56,7 @@ type Item =
       publicationType: "news" | "article" | "collection";
     };
 
-const ITEMS: Item[] = [
-  {
-    id: "event",
-    kind: "link",
-    href: "/editor/event/new",
-    label: "Событие",
-    description: "Афиша и расписание",
-    Icon: Calendar,
-  },
-  {
-    id: "offer",
-    kind: "link",
-    href: "/editor/offer/new",
-    label: "Предложение",
-    description: "Услуга или товар",
-    Icon: Tag,
-  },
-  {
-    id: "place",
-    kind: "link",
-    href: "/editor/place/new",
-    label: "Место",
-    description: "Объект для посещения",
-    Icon: MapPin,
-  },
+const ADMIN_ONLY_ITEMS: Item[] = [
   {
     id: "news",
     kind: "admin",
@@ -165,7 +141,7 @@ const BUSINESS_INTENTS: Item[] = [
 
 /**
  * Кнопка «+» и модалка выбора.
- * `full` — все пункты; `business` — только событие, предложение и место.
+ * `full` — бизнес-сценарии и административные публикации; `business` — только бизнес-сценарии.
  * `trigger` — кастомный триггер вместо стандартной кнопки «+».
  */
 export function CreatePublicationQuickMenu({
@@ -203,10 +179,9 @@ export function CreatePublicationQuickMenu({
     return null;
   }, [hydrated, pathname, searchParams]);
 
-  const visibleItems =
-    publicationMode === "full"
-      ? ITEMS
-      : BUSINESS_INTENTS;
+  const visibleItems = publicationMode === "full"
+    ? [...BUSINESS_INTENTS, ...ADMIN_ONLY_ITEMS]
+    : BUSINESS_INTENTS;
 
   const goAdminPublication = (type: "news" | "article" | "collection") => {
     setOpen(false);
@@ -223,7 +198,8 @@ export function CreatePublicationQuickMenu({
         const { Icon } = item;
         const rowClass =
           "flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-4 text-left transition-colors hover:bg-gray-50 hover:border-gray-300";
-        const itemRowClass = cn(rowClass, publicationMode === "business" && "min-h-[104px] items-center");
+        const isBusinessIntent = BUSINESS_INTENTS.some(intent => intent.id === item.id);
+        const itemRowClass = cn(rowClass, isBusinessIntent && "min-h-[104px] items-center");
 
         if (item.kind === "link") {
           const href = (() => {
@@ -239,7 +215,7 @@ export function CreatePublicationQuickMenu({
 
           return (
             <Fragment key={item.id}>
-              {publicationMode === "business" && item.id === "visit-place" && (
+              {item.id === "visit-place" && (
                 <div role="separator" aria-orientation="horizontal" className="my-2 border-t border-border" />
               )}
               <Link
@@ -255,7 +231,7 @@ export function CreatePublicationQuickMenu({
                     {item.label}
                   </span>
                   {item.description ? (
-                    <span className={cn("block text-[12px] text-muted-foreground", publicationMode === "business" && "line-clamp-2 min-h-10 max-w-[260px] leading-5")}>
+                    <span className={cn("block text-[12px] text-muted-foreground", isBusinessIntent && "line-clamp-2 min-h-10 max-w-[260px] leading-5")}>
                       {item.description}
                     </span>
                   ) : null}
@@ -266,6 +242,10 @@ export function CreatePublicationQuickMenu({
         }
 
         return (
+          <Fragment key={item.id}>
+            {publicationMode === "full" && item.id === "news" && (
+              <div role="separator" aria-orientation="horizontal" className="my-2 border-t border-border" />
+            )}
           <button
             key={item.id}
             type="button"
@@ -286,6 +266,7 @@ export function CreatePublicationQuickMenu({
               ) : null}
             </span>
           </button>
+          </Fragment>
         );
       })}
     </div>
@@ -312,7 +293,7 @@ export function CreatePublicationQuickMenu({
         <BottomSheet
           open={open}
           onOpenChange={setOpen}
-          title={publicationMode === "business" ? "Что хотите добавить?" : "Что создаём?"}
+          title="Что хотите добавить?"
           showCloseButton={true}
           height="min(85dvh, 720px)"
         >
@@ -322,11 +303,9 @@ export function CreatePublicationQuickMenu({
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>{publicationMode === "business" ? "Что хотите добавить?" : "Что создаём?"}</DialogTitle>
+              <DialogTitle>Что хотите добавить?</DialogTitle>
               <DialogDescription>
-                {publicationMode === "business"
-                  ? "Выберите понятный формат. Даты и детали уточним при заполнении."
-                  : "Выберите тип — откроется форма создания."}
+                "Выберите понятный формат. Даты и детали уточним при заполнении."
               </DialogDescription>
             </DialogHeader>
             {renderItems()}
