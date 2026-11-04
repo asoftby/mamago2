@@ -4,7 +4,6 @@
  * fallback). Гость получает «Популярное»; авторизованный — персональную выдачу. Каждый ответ с
  * карточками пишется в RecommendationRun/Exposure (exposureId = impressionId).
  */
-import { homeFamilyPicksEnabled } from "@/features/city-home/lib/familyHome";
 import { resolveHomeRequest } from "@/server/services/recommendations/familyPicks/homeRequest";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/server";
@@ -39,7 +38,7 @@ export async function POST(request: NextRequest) {
     const origin = request.headers.get("origin");
     if (origin && origin !== new URL(request.url).origin) return NextResponse.json({ error: "invalid_origin" }, { status: 403, headers });
     const user = await getCurrentUser();
-    const result = await resolveHomeRequest(await request.json(), user?.id ?? null, await getSessionRowIdFromCookies(), undefined, homeFamilyPicksEnabled(), request.signal);
+    const result = await resolveHomeRequest(await request.json(), user?.id ?? null, await getSessionRowIdFromCookies(), undefined, request.signal);
     return NextResponse.json(result.body, { status: result.status, headers });
   } catch (error) {
     if (error instanceof Error && error.message === "selection_unavailable") return NextResponse.json({ error: "selection_unavailable" }, { status: 404, headers });

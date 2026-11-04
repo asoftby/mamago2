@@ -2,7 +2,6 @@ import "server-only";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { SafeOpaqueIdSchema } from "@/lib/decision/identifiers";
-import { homeFamilyPicksEnabled } from "@/features/city-home/lib/familyHome";
 import { saveHomeSelection, loadHomeContext } from "./homeContext";
 import { deliverHomeFamilyPicks } from "./delivery";
 import { verifyRecommendationAttribution } from "../RecommendationTraceService";
@@ -22,8 +21,7 @@ const schema = z.discriminatedUnion("action", [
 const defaults = { saveSelection: saveHomeSelection, context: loadHomeContext, deliver: deliverHomeFamilyPicks, verify: verifyRecommendationAttribution, track: trackUserEvent,
   publicEvent: async (id: string): Promise<{ id: string } | null> => prisma.activity.findFirst({ where: { AND: [{ id }, getPublicActivityDetailWhere()] }, select: { id: true } }) };
 
-export async function resolveHomeRequest(raw: unknown, userId: string | null, sessionId: string | null, deps = defaults, enabled = homeFamilyPicksEnabled(), signal?: AbortSignal) {
-  if (!enabled) return { status: 409, body: { error: "home_policy_disabled" } };
+export async function resolveHomeRequest(raw: unknown, userId: string | null, sessionId: string | null, deps = defaults, signal?: AbortSignal) {
   if (!userId) return { status: 401, body: { error: "authentication_required" } };
   const parsed = schema.safeParse(raw);
   if (!parsed.success) return { status: 400, body: { error: "invalid_request" } };
