@@ -7,6 +7,9 @@ import { Container } from "@/components/ui/Container";
 import { StoriesSection } from "@/features/stories/components/StoriesSection";
 import { CityHomeFamilyPicks } from "@/features/city-home/components/CityHomeFamilyPicks";
 import { CityHomeBirthdayCta } from "@/features/city-home/components/CityHomeBirthdayCta";
+import { CityHomeBirthdayOffers } from "@/features/city-home/components/CityHomeBirthdayOffers";
+import { selectHomeBirthdayOffers } from "@/features/city-home/lib/homeBirthdayPreview";
+import { getPublicBirthdayCatalog } from "@/server/birthday/catalog.service";
 import { ActivationBannerHost } from "@/features/city-home/components/ActivationBannerHost";
 import { getFallbackHeroModel, getHeroContext } from "@/features/hero-weather/lib/get-hero-context";
 import { getCityCoordsBySlug, getDefaultBelarusFallbackCoords } from "@/features/hero-weather/lib/belarus-city-coordinates";
@@ -95,8 +98,13 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
     ? listPublicRoutesByCity(city.id).catch(() => [])
     : Promise.resolve([]);
   const journalArticlesPromise = listCityHomeArticles(city);
+  const birthdayOffersPromise = sectionAvailability.birthday
+    ? getPublicBirthdayCatalog(city.slug, 120).then(items => selectHomeBirthdayOffers(items ?? [])).catch(() => [])
+    : Promise.resolve([]);
   const localClassesPromise = sectionAvailability.classes
-    ? getClassesDiscoveryFeed(city.id, city.slug, { take: HOME_PERSONALIZATION_CANDIDATE_TAKE }).catch(() => [])
+    ? getClassesDiscoveryFeed(city.id, city.slug, {
+        take: HOME_PERSONALIZATION_CANDIDATE_TAKE, productTypes: ["REGULAR_ACTIVITY"],
+      }).catch(() => [])
     : Promise.resolve([]);
 
   const nearbyRoutesPromise = sectionAvailability.routes
@@ -108,7 +116,9 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
     ? nearbyCitiesPromise.then((nearby) =>
         Promise.all(
           nearby.map((nearbyCity) =>
-            getClassesDiscoveryFeed(nearbyCity.id, nearbyCity.slug, { take: HOME_PERSONALIZATION_CANDIDATE_TAKE }).catch(() => []),
+            getClassesDiscoveryFeed(nearbyCity.id, nearbyCity.slug, {
+              take: HOME_PERSONALIZATION_CANDIDATE_TAKE, productTypes: ["REGULAR_ACTIVITY"],
+            }).catch(() => []),
           ),
         ).then((groups) => groups.flat()),
       )
@@ -123,6 +133,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
     events,
     localRoutes,
     journalArticles,
+    birthdayOffers,
     localClasses,
     nearbyRoutes,
     nearbyClasses,
@@ -132,6 +143,7 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
     eventsPromise,
     localRoutesPromise,
     journalArticlesPromise,
+    birthdayOffersPromise,
     localClassesPromise,
     nearbyRoutesPromise,
     nearbyClassesPromise,
@@ -222,7 +234,12 @@ export default async function CityHomePage({ city }: CityHomePageProps) {
           />
         ) : null}
 
-        {sectionAvailability.birthday ? <CityHomeBirthdayCta /> : null}
+        {sectionAvailability.birthday && birthdayOffers.length > 0 ? (
+          <>
+            <CityHomeBirthdayOffers offers={birthdayOffers} />
+            <CityHomeBirthdayCta />
+          </>
+        ) : null}
 
         {sectionAvailability.routes ? (
           <CityHomeRoutesSection
