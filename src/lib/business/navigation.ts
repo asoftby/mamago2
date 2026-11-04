@@ -74,7 +74,7 @@ export const businessNavigation: BusinessNavItem[] = [
     icon: LayoutDashboard,
     match: [businessRoute("/dashboard")],
   },
-  { type: "item", label: "Сообщения", href: businessRoute("/direct"), icon: MessageSquareText },
+  { type: "item", label: "Сообщения", href: "/me/direct", icon: MessageSquareText },
   {
     type: "group",
     label: "Публикации",
