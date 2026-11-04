@@ -247,19 +247,19 @@ export function CreatePublicationQuickMenu({
                 onClick={() => setOpen(false)}
                 className={itemRowClass}
               >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Icon className="h-5 w-5" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[14px] font-semibold text-gray-900">
-                  {item.label}
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Icon className="h-5 w-5" />
                 </span>
-                {item.description ? (
-                  <span className={cn("block text-[12px] text-muted-foreground", publicationMode === "business" && "line-clamp-2 min-h-10 max-w-[260px] leading-5")}>
-                    {item.description}
+                <span className="min-w-0">
+                  <span className="block text-[14px] font-semibold text-gray-900">
+                    {item.label}
                   </span>
-                ) : null}
-              </span>
+                  {item.description ? (
+                    <span className={cn("block text-[12px] text-muted-foreground", publicationMode === "business" && "line-clamp-2 min-h-10 max-w-[260px] leading-5")}>
+                      {item.description}
+                    </span>
+                  ) : null}
+                </span>
               </Link>
             </Fragment>
           );
