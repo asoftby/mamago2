@@ -121,7 +121,18 @@ export function isStructuredFreeEvent(input: {
   return (input.scheduleJson as { pricingMode?: unknown }).pricingMode === "free";
 }
 
-export function buildEventRuntimeWhere(filters: EventRuntimeFilters): Prisma.ActivityWhereInput[] {
+/** Selected date ranges must never re-admit sessions that have already started.
+ * Reuse the same cutoff for filtering and temporal ranking.
+ * Future dates still start at their requested local-day boundary.
+ */
+export function effectiveEventSessionStart(dateRange: DateRange | null, now: Date): Date {
+  return dateRange && dateRange.start > now ? dateRange.start : now;
+}
+
+export function buildEventRuntimeWhere(
+  filters: EventRuntimeFilters,
+  now: Date = new Date(),
+): Prisma.ActivityWhereInput[] {
   const parts: Prisma.ActivityWhereInput[] = [];
   const categorySlugs = filters.categorySlugs ?? [];
   const genreSlugs = filters.genreSlugs ?? [];
@@ -139,7 +150,7 @@ export function buildEventRuntimeWhere(filters: EventRuntimeFilters): Prisma.Act
     parts.push({
       sessions: {
         some: {
-          startsAt: { gte: filters.dateRange.start, lt: filters.dateRange.end },
+          startsAt: { gte: effectiveEventSessionStart(filters.dateRange, now), lt: filters.dateRange.end },
           withdrawnAt: null,
         },
       },
