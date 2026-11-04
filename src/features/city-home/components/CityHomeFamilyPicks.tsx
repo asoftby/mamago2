@@ -319,7 +319,7 @@ export function FamilyHomeResults({ data, context, citySlug, selected, impressed
                 <AnalyticsCardViewTracker key={identity} entityType="EVENT" entityId={item.id} vertical="CITY" citySlug={citySlug} threshold={0.5} dwellMs={1000}
                   meta={meta(item)} wasImpressed={impressed.has(identity)} onImpression={() => onImpression(identity)}>
                   <div className="flex h-full flex-col" onClickCapture={event => { if ((event.target as HTMLElement).closest("a")?.getAttribute("href") === item.href) void postAnalyticsEvent({ eventType: "DETAIL_OPEN", entityType: "EVENT", entityId: item.id, vertical: "CITY", citySlug, meta: meta(item) }); }}>
-                    <EventCard id={item.id} title={item.title} href={item.href} imageUrl={item.imageUrl} imageWidth={item.imageWidth} imageHeight={item.imageHeight} framing="fixed" coverRatio="2/3" coverFit="contain" className="flex-1" imagePriority={index < 2}
+                    <EventCard id={item.id} title={item.title} href={item.href} imageUrl={item.imageUrl} imageWidth={item.imageWidth} imageHeight={item.imageHeight} framing="fixed" coverRatio="2/3" coverFit="cover" className="flex-1" imagePriority={index < 2}
                       categoryLabel={item.categoryName ?? undefined} metaLabel={`${homeAgeLabel(item)} · ${formatRuShortDayMonth(item.startsAt)}`} priceLabel={formatPublicCardPrice(item) ?? undefined} />
                     <div className="mt-auto pt-2">
                       <p className="text-xs font-medium">{badge}</p>
