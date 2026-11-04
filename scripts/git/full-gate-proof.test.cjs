@@ -125,7 +125,7 @@ test('pre-push executes a real uncached gate with GATE_DATABASE_URL and caches o
     // Reproduce the real Git pre-push hook process: Git + Husky prepend two
     // tool paths and Git supplies GIT_PREFIX / GIT_EXEC_PATH metadata.
     const gitExec = git(repo,'--exec-path');
-    const hookEnv = {PATH:`node_modules/.bin${path.delimiter}${gitExec}${path.delimiter}${env.PATH}`, GIT_EXEC_PATH:gitExec, GIT_PREFIX:''};
+    const hookEnv = {PATH:`node_modules/.bin${path.delimiter}${gitExec}${path.delimiter}${env.PATH}`, GIT_EXEC_PATH:gitExec, GIT_PREFIX:'', GIT_DIR:path.join(repo,'.git')};
     const second = invoke(hookEnv);
     assert.equal(second.status,0,`hook gate failed: ${second.stderr}`);
     assert.equal(fs.readFileSync(calls,'utf8').trim().split('\n').length,2);

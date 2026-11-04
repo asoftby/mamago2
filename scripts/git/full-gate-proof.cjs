@@ -24,7 +24,9 @@ function lockfile() {
 function environmentDigest() {
   // All effective variables, not merely known prefixes: build settings can be added
   // in next.config.ts without updating this script. Ignore shell-process metadata only.
-  const volatile = new Set(['PWD','OLDPWD','SHLVL','_','GIT_PREFIX','GIT_EXEC_PATH']);
+  // Git sets GIT_DIR, GIT_PREFIX and GIT_EXEC_PATH only inside hooks; the
+  // resolved repository, HEAD/base and toolchain are fingerprinted separately.
+  const volatile = new Set(['PWD','OLDPWD','SHLVL','_','GIT_PREFIX','GIT_EXEC_PATH','GIT_DIR']);
   const gitExecPath = git('--exec-path');
   // Git injects its exec-path into hooks; Husky prepends node_modules/.bin.
   // Strip ONLY these known leading hook wrappers, not arbitrary PATH changes.
