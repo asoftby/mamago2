@@ -66,12 +66,12 @@ console.log("offerWizardV2Steps contract tests passed");
   assert.match(method, /По заявке.*не подтверждает свободное время автоматически/);
   const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.tsx", "utf8");
   assert.ok(wizard.includes("<BookingServicesEditor offerId={offerId}"));
-  // The V2 first-save and advanced editors must not force users out of the wizard.
-  assert.match(wizard, /handleSaveDraft = async \\(continueOnCurrentStep = false\\)/);
-  assert.ok(wizard.includes("router.replace(`\u0024{editorOfferEditHref(data.id)}?step=\u0024{currentStepNum}`);"));
+  // V2 keeps the main offer in one flow; operational editors load on demand.
+  assert.ok(wizard.includes("const handleSaveDraft = async (continueOnCurrentStep = false) =>"));
+  assert.ok(wizard.includes('router.replace(`${editorOfferEditHref(data.id)}?step=${currentStepNum}`);'));
   assert.ok(wizard.includes("setAdvancedServicesOpen(true)"));
   assert.ok(wizard.includes("setPartyScheduleOpen(true)"));
-  assert.ok(wizard.includes("currentStepKey === \\"about\\" && mode === \\"create\\"") === false,
+  assert.ok(!wizard.includes('currentStepKey === "about" && mode === "create"'),
     "V2 must not repeat the subtype already chosen on step one");
   const classSchedule = readFileSync("src/components/business/wizard/offer/steps/StepClassSchedule.tsx", "utf8");
   assert.ok(classSchedule.includes("classSchedule.groups.map"));
