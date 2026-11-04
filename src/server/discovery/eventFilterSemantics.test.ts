@@ -4,6 +4,7 @@ import {
   buildEffectivePlaceDistrictWhere,
   buildEffectivePlaceMetroWhere,
   buildEventRuntimeWhere,
+  effectiveEventSessionStart,
   isStructuredFreeEvent,
   matchesCanonicalStartingPrice,
   resolveEventDateRange,
@@ -51,8 +52,50 @@ test("free also detects the wizard's free priceText, case/whitespace-insensitive
 
 test("resolved date range becomes an active ActivitySession inclusion predicate", () => {
   const dateRange = resolveEventDateRange({ from: "2026-09-12" });
-  const where = buildEventRuntimeWhere({ categorySlugs: [], genreSlugs: [], dateRange, free: false, priceMax: null, districtId: null, metroId: null, adultOnly: false });
+  const now = new Date("2026-09-01T09:00:00.000Z");
+  const where = buildEventRuntimeWhere({ categorySlugs: [], genreSlugs: [], dateRange, free: false, priceMax: null, districtId: null, metroId: null, adultOnly: false }, now);
   assert.deepEqual(where, [{ sessions: { some: { startsAt: { gte: dateRange?.start, lt: dateRange?.end }, withdrawnAt: null } } }]);
+});
+
+test("today date chip excludes already-started sessions but keeps upcoming Minsk sessions", () => {
+  const now = new Date("2026-11-04T09:03:00.000Z"); // 12:03 in Minsk
+  const today = resolveEventDateRange({ preset: "TODAY" }, now);
+  assert.ok(today);
+  const filters = { dateRange: today, free: false, districtId: null, metroId: null, adultOnly: false };
+  assert.deepEqual(buildEventRuntimeWhere(filters, now), [{
+    sessions: { some: {
+      startsAt: { gte: now, lt: today.end },
+      withdrawnAt: null,
+    } },
+  }]);
+  // 11:30 Minsk already elapsed, 18:00 Minsk is still available today.
+  const expired = new Date("2026-11-04T08:30:00.000Z");
+  const upcoming = new Date("2026-11-04T15:00:00.000Z");
+  assert.ok(expired < effectiveEventSessionStart(today, now));
+  assert.ok(upcoming >= effectiveEventSessionStart(today, now));
+  assert.ok(upcoming < today.end);
+});
+
+test("tomorrow and future-weekend filters retain their full requested day windows", () => {
+  const now = new Date("2026-11-04T09:03:00.000Z");
+  for (const preset of ["TOMORROW", "WEEKEND"] as const) {
+    const range = resolveEventDateRange({ preset }, now);
+    assert.ok(range);
+    assert.equal(effectiveEventSessionStart(range, now).toISOString(), range.start.toISOString());
+    assert.deepEqual(buildEventRuntimeWhere({
+      dateRange: range, free: false, districtId: null, metroId: null, adultOnly: false,
+    }, now), [{
+      sessions: { some: { startsAt: { gte: range.start, lt: range.end }, withdrawnAt: null } },
+    }]);
+  }
+});
+
+test("custom date windows spanning the past start no earlier than now", () => {
+  const now = new Date("2026-11-04T09:03:00.000Z");
+  const range = resolveEventDateRange({ from: "2026-11-03", to: "2026-11-05" }, now);
+  assert.ok(range);
+  assert.equal(effectiveEventSessionStart(range, now).toISOString(), now.toISOString());
+  assert.equal(effectiveEventSessionStart(null, now), now);
 });
 
 test("manual geo assignment wins and auto is used only when manual is absent", () => {

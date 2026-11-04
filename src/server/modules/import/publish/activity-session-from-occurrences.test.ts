@@ -189,8 +189,8 @@ assert.equal(shouldApplyImportedScheduleSessions("LOCKED"), false);
   );
   assert.match(
     dateFilters,
-    /startsAt:\s*\{\s*gte:\s*filters\.dateRange\.start,\s*lt:\s*filters\.dateRange\.end\s*\},\s*withdrawnAt:\s*null/,
-    "date filters must ignore withdrawn sessions",
+    /startsAt:\s*\{\s*gte:\s*effectiveEventSessionStart\(filters\.dateRange,\s*now\),\s*lt:\s*filters\.dateRange\.end\s*\},\s*withdrawnAt:\s*null/,
+    "date filters must exclude withdrawn sessions and already-started sessions",
   );
   assert.match(
     scheduleSource,
