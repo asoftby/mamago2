@@ -85,3 +85,11 @@ test("A BUSINESS_OWNER can create and price a recurring group before reaching sc
   assert.match(editor, /onClick=\{addGroup\}/, "Group-create action is exposed on pricing step");
   assert.match(editor, /addClassGroupForPricing\(data.schedule.classSchedule\)/);
 });
+
+test("Save draft never implicitly publishes an admin's unfinished regular-class offer", () => {
+  const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.tsx", "utf8");
+  assert.match(wizard, /canDirectPublish && offer\?\.status !== "DRAFT"/);
+  assert.match(wizard, /preserveClassPricingDraft: offer\?\.status === "DRAFT"/);
+  const schedule = readFileSync("src/lib/offers/offerClassSchedule.ts", "utf8");
+  assert.match(schedule, /periodDays: z\.number\(\)\.finite\(\)\.nullable\(\)\.optional\(\)/);
+});

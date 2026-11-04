@@ -233,7 +233,18 @@ const persistedPricingDraft = classPricingDraftFromDetails({ classPricingDraft: 
 assert.deepEqual(persistedPricingDraft, pricingOnly.groups,
   "Unscheduled pricing group and tariff survive serialized details");
 assert.equal(classPricingDraftFromDetails({ duration: "60" }), null);
-assert.equal(classPricingDraftFromDetails({ classPricingDraft: [{ id: "x", days: [8] }] }), null,
-  "Malformed persisted draft is not trusted");
+assert.equal(classPricingDraftFromDetails({ classPricingDraft: [{ id: 123, days: [8] }] }), null,
+  "Structurally malformed persisted draft is not trusted");
 assert.equal(classPricingDraftFromDetails({ classPricingDraft: [] })?.length, 0);
 console.log("Unscheduled class group draft roundtrip checks passed");
+
+const incompletePricingGroup = addClassGroupForPricing(defaultClassSchedule());
+incompletePricingGroup.groups[0]!.tariffs![0]!.title = "Временный тариф";
+incompletePricingGroup.groups[0]!.tariffs![0]!.price = "120";
+incompletePricingGroup.groups[0]!.tariffs![0]!.periodDays = 0;
+incompletePricingGroup.groups[0]!.tariffs![0]!.visitsCount = -2;
+const draftWithInvalidFields = classPricingDraftFromDetails({
+  classPricingDraft: JSON.parse(JSON.stringify(incompletePricingGroup.groups)),
+});
+assert.deepEqual(draftWithInvalidFields, incompletePricingGroup.groups,
+  "Unfinished numeric fields remain editable after draft save/reopen");

@@ -83,21 +83,23 @@ export function addClassGroupForPricing(form: ClassScheduleForm): ClassScheduleF
  */
 const classPricingDraftGroupSchema = z.object({
   id: z.string().min(1).max(128),
-  title: z.string().max(120).optional(),
-  days: z.array(z.number().int().min(1).max(7)).max(7),
-  time: z.string().regex(TIME_RE),
-  seats: z.string().max(12),
+  // Drafts are intentionally more permissive than publication checks.
+  // The user may save a group mid-edit, including temporarily invalid fields.
+  title: z.string().max(4096).optional(),
+  days: z.array(z.number().finite()).max(7),
+  time: z.string().max(32),
+  seats: z.string().max(4096),
   tariffs: z.array(z.object({
     id: z.string().min(1).max(128),
-    title: z.string().max(120),
-    price: z.string().max(40),
-    unit: z.string().max(80),
-    periodDays: z.number().int().min(1).max(366).nullable().optional(),
-    visitsCount: z.number().int().min(1).max(365).nullable().optional(),
+    title: z.string().max(4096),
+    price: z.string().max(4096),
+    unit: z.string().max(4096),
+    periodDays: z.number().finite().nullable().optional(),
+    visitsCount: z.number().finite().nullable().optional(),
   })).max(12).optional(),
   period: z.object({
-    from: z.string().regex(DATE_RE).nullable(),
-    to: z.string().regex(DATE_RE).nullable(),
+    from: z.string().max(32).nullable(),
+    to: z.string().max(32).nullable(),
   }).nullable().optional(),
 });
 

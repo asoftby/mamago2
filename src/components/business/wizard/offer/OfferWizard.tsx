@@ -608,7 +608,10 @@ export function OfferWizard({
 
       if (offerId) {
         const payload = buildOfferUpdatePayload(formData, {
-          ...(mode === "edit" && canDirectPublish ? { status: "PUBLISHED" as const } : {}),
+          // Saving a DRAFT must never publish it, including for ADMIN/MODERATOR.
+          // Existing published offers retain their direct-edit behavior.
+          ...(mode === "edit" && canDirectPublish && offer?.status !== "DRAFT"
+            ? { status: "PUBLISHED" as const } : {}),
           wizardCompletedSteps: completedSteps,
           includeSchedule: variant === "v2" && scheduleChanged,
           preserveClassPricingDraft: offer?.status === "DRAFT",
