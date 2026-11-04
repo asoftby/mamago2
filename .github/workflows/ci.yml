@@ -84,7 +84,10 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mamago_ci
 
       - name: Family picks profile ACL and backwards-compatible API contract
-        run: pnpm test:family-picks
+        run: |
+          pnpm test:family-picks
+          pnpm exec tsx src/features/city-home/lib/homeRecommendationLabel.test.ts
+          pnpm exec tsx src/features/city-home/components/HomeMoreEventsCard.test.tsx
 
       - name: Public event date filters exclude elapsed sessions
         run: pnpm exec tsx src/server/discovery/eventFilterSemantics.test.ts

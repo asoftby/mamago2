@@ -1,4 +1,7 @@
 import "server-only";
+import { prisma } from "@/lib/prisma";
+import { findCityBySlug } from "@/server/geo/findCityBySlug";
+import { buildKudaDiscoveryWhere } from "@/server/discovery/kudaDiscoveryFeed";
 import { loadHomeContext } from "./homeContext";
 import { loadPersonalFamilyPicks } from "./load";
 import { recordRecommendationRun } from "../RecommendationTraceService";
@@ -13,6 +16,19 @@ export async function deliverHomeFamilyPicks(input: {
 }) {
   const result = await loadPersonalFamilyPicks({ userId: input.userId, citySlug: input.citySlug,
     selection: input.selection, serverProfile: input.profile, excludeActivityIds: input.dismissedIds });
+  // Reuse the recommendation candidate pool when available. Only if it is
+  // empty, check the canonical public catalog once (not another client request).
+  // A missing personal match is not proof that the public catalog is empty.
+  let hasCatalogEvents = result.candidateCount > 0 || result.items.length > 0;
+  if (!hasCatalogEvents) {
+    const city = await findCityBySlug(input.citySlug);
+    if (city) {
+      const { where } = await buildKudaDiscoveryWhere(city.id, input.citySlug, {
+        eventFilters: { dateRange: null, free: false, districtId: null, metroId: null, adultOnly: false },
+      });
+      hasCatalogEvents = Boolean(await prisma.activity.findFirst({ where, select: { id: true } }));
+    }
+  }
   const hydrated = await withImageDimensions(result.items, item => item.imageUrl);
   const fresh = await loadHomeContext(input.userId);
   if (fresh.context.signature !== input.context.signature) throw new Error("profile_changed");
@@ -31,7 +47,7 @@ export async function deliverHomeFamilyPicks(input: {
     items: hydrated.map(item => ({ entityType: "EVENT", entityId: item.id, position: item.position, score: item.score,
       reasonCodes: [item.allChildrenMatch ? "AGE_MATCH_ALL" : "AGE_MATCH"], scoreBreakdown: { sharedScore: item.score } })),
   }) : null;
-  return { ...result, context: input.context, runId: trace?.runId ?? null,
+  return { ...result, hasCatalogEvents, context: input.context, runId: trace?.runId ?? null,
     items: hydrated.map(item => ({ ...item, exposureId: trace?.exposureIdByEntityKey.get(`EVENT:${item.id}`) ?? null })) };
 }
 export type HomeFamilyDelivery = Awaited<ReturnType<typeof deliverHomeFamilyPicks>>;

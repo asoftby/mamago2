@@ -65,12 +65,9 @@ test("catalog is a CTA event with no plan signal or family identity", () => {
   assert.equal(event.meta?.placement, "HOME_FOR_FAMILY");
   assert.doesNotMatch(JSON.stringify(event), /secret-child-id|PLAN_ADD|birthDate/);
 });
-test("passive selection sync cannot emit chip analytics; CTA retains single Link navigation", () => {
+test("home has no chip-driven requests, while keeping one catalog CTA", () => {
   const source = readFileSync(new URL("../components/CityHomeFamilyPicks.tsx", import.meta.url), "utf8");
-  assert.equal((source.match(/homeChipSelectEvent\(/g) ?? []).length, 1);
-  const select = source.slice(source.indexOf("function select("), source.indexOf("function select(") + 2200);
-  assert.match(select, /homeChipSelectEvent/);
-  assert.match(select, /if \(!interaction\) return/);
-  assert.doesNotMatch(source, /selection: props\.selectedChildId|router\.push/);
-  assert.match(source, /planAttribution=\{\{ planAddSource: "home-family-picks"/);
+  assert.doesNotMatch(source, /homeChipSelectEvent|persistHomeSelection|router.push/);
+  assert.match(source, /homeCatalogEvent/);
+  assert.ok(source.includes("<EventCard"));
 });
