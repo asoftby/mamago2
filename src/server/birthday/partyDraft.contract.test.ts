@@ -62,7 +62,8 @@ assert.throws(() => assertCompatibleSelection("HOME", pkg, []), PartyApiError); 
 for (const category of ["CAKE", "FOOD"] as const) {
   for (const partyLocationType of ["ON_SITE", "OFF_SITE", "BOTH"] as const) {
     const addon: CatalogOffer = { ...cake, category, partyLocationType };
-    assert.doesNotThrow(() => assertCompatibleSelection("HOME", mobilePackage, [addon]));
+    // A cake already included in a package cannot be added again; use a SHOW anchor.
+    assert.doesNotThrow(() => assertCompatibleSelection("HOME", show, [addon]));
     assert.doesNotThrow(() => assertCompatibleSelection("VENUE", base, [addon]));
   }
 }
