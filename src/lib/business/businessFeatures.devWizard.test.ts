@@ -4,7 +4,8 @@ import { test } from "node:test";
 
 test("all offer editor entrypoints always use six-step V2", () => {
   const wizard = readFileSync("src/components/business/wizard/offer/OfferWizard.tsx", "utf8");
-  assert.match(wizard, /const variant: OfferWizardVariant = "v2";/);
+  assert.match(wizard, /function activeOfferWizardVariant\(\): OfferWizardVariant \{\s*return "v2";\s*\}/);
+  assert.match(wizard, /const variant: OfferWizardVariant = activeOfferWizardVariant\(\);/);
   assert.doesNotMatch(wizard, /newWizard/);
   for (const path of [
     "src/app/(content-editor)/editor/offer/new/page.tsx",
