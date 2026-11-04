@@ -1,4 +1,4 @@
-import type { OfferKind, PartyCategory, PartyOccasion } from "@prisma/client";
+import type { OfferKind, OfferStatus, PartyCategory, PartyOccasion } from "@prisma/client";
 import type {
   OfferFormData,
   CampLodgingTypeKey,
@@ -24,8 +24,11 @@ import {
   defaultOfferSchedule,
   normalizeClosedDates,
   type OfferScheduleForm,
+  type OfferScheduleInput,
 } from "@/lib/offers/offerSchedule";
 import {
+  classPricingDraftFromDetails,
+  classScheduleInputSchema,
   defaultClassSchedule,
   groupsFromRules,
   offerIsClass,
@@ -615,6 +618,18 @@ export function isValidVideoUrl(url: string): boolean {
   return videoUrlPatterns.some((pattern) => pattern.test(url));
 }
 
+/** Drafts retain unfinished groups in details.classPricingDraft.
+ * Never send a partially invalid class schedule through the strict API schema:
+ * preserving the last valid persisted schedule is safer than overwriting it
+ * with a lossy conversion. Publishing always uses strict validation instead.
+ */
+function draftSafeSchedule(input: OfferScheduleInput | undefined): OfferScheduleInput | undefined {
+  if (!input?.classSchedule || classScheduleInputSchema.safeParse(input.classSchedule).success) return input;
+  const { classSchedule: _invalidClassSchedule, ...safe } = input;
+  void _invalidClassSchedule;
+  return Object.keys(safe).length ? safe : undefined;
+}
+
 /** POST /api/business/offers — matches createOfferSchema */
 export function buildOfferCreatePayload(
   data: OfferFormData,
@@ -711,14 +726,16 @@ export function buildOfferCreatePayload(
     classChipSlugs: data.classChipSlugs,
     categoryIds: data.categoryIds,
     interestSlugs: data.interestSlugs,
-    ...(opts?.includeSchedule ? { schedule: buildScheduleInput(data.schedule, productType, data.classDuration) } : {}),
+    ...(opts?.includeSchedule ? { schedule: opts.status === "DRAFT"
+      ? draftSafeSchedule(buildScheduleInput(data.schedule, productType, data.classDuration))
+      : buildScheduleInput(data.schedule, productType, data.classDuration) } : {}),
     wizardCompletedSteps: opts?.wizardCompletedSteps,
     faqItems: normalizeFaqItems(data.faqItems),
     status: opts?.status ?? "DRAFT",
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
-    details: buildTypeDetails(data),
+    details: buildTypeDetails(data, opts?.status === "DRAFT"),
     // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write)
     ...(buildPartyFilterColumns(data) ?? {}),
     // Camp/accommodation-поля — только для лагерей; данные скрытых шагов
@@ -729,7 +746,10 @@ export function buildOfferCreatePayload(
   return base;
 }
 
-function buildTypeDetails(data: OfferFormData): Record<string, unknown> | undefined {
+function buildTypeDetails(
+  data: OfferFormData,
+  includeClassPricingDraft = false,
+): Record<string, unknown> | undefined {
   if (data.productType === "PLACE_VISIT") {
     const { entryModel, amenities } = data.placeVisitDetails;
     const result: Record<string, unknown> = {};
@@ -745,6 +765,9 @@ function buildTypeDetails(data: OfferFormData): Record<string, unknown> | undefi
     if (data.classDuration) result.duration = data.classDuration;
     if (data.classGroupSize) result.groupSize = data.classGroupSize;
     if (data.classFormat != null) result.format = data.classFormat;
+    if (includeClassPricingDraft && data.productType === "REGULAR_ACTIVITY") {
+      result.classPricingDraft = data.schedule.classSchedule.groups;
+    }
     return Object.keys(result).length > 0 ? result : undefined;
   }
   if (data.productType === "PARTY_SERVICE" || data.productType === "PARTY_PACKAGE") {
@@ -851,6 +874,8 @@ export function buildOfferUpdatePayload(
     previousSchedule?: OfferScheduleForm;
     /** `classDuration` исходной формы: смена длительности пересчитывает концы занятий. */
     previousClassDuration?: string;
+    /** Save unfinished group pricing only for an existing DRAFT offer. */
+    preserveClassPricingDraft?: boolean;
   }
 ) {
   // Group tariffs are the source of truth for regular classes.
@@ -931,13 +956,17 @@ export function buildOfferUpdatePayload(
     classChipSlugs: data.classChipSlugs,
     categoryIds: data.categoryIds,
     interestSlugs: data.interestSlugs,
-    ...(opts?.includeSchedule ? { schedule: opts.previousSchedule
-      ? buildChangedScheduleInput(data.schedule, opts.previousSchedule, productType, data.classDuration, opts.previousClassDuration)
-      : buildScheduleInput(data.schedule, productType, data.classDuration) } : {}),
+    ...(opts?.includeSchedule ? { schedule: opts.preserveClassPricingDraft
+      ? draftSafeSchedule(opts.previousSchedule
+        ? buildChangedScheduleInput(data.schedule, opts.previousSchedule, productType, data.classDuration, opts.previousClassDuration)
+        : buildScheduleInput(data.schedule, productType, data.classDuration))
+      : opts.previousSchedule
+        ? buildChangedScheduleInput(data.schedule, opts.previousSchedule, productType, data.classDuration, opts.previousClassDuration)
+        : buildScheduleInput(data.schedule, productType, data.classDuration) } : {}),
     gallery: data.gallery ?? [],
     productType,
     requestedPlacements,
-    details: buildTypeDetails(data),
+    details: buildTypeDetails(data, opts?.preserveClassPricingDraft === true),
     // PARTY_SERVICE/PARTY_PACKAGE: filterable party fields → Offer columns (single-write)
     ...(buildPartyFilterColumns(data) ?? {}),
     // CAMP — camp/accommodation-данные; иначе явные null (затирание в БД)
@@ -1152,6 +1181,7 @@ export function mapOfferToFormData(offer: {
   sessions?: Array<{ startAt: Date | string; capacity?: number | null }> | null;
   contactSocialLinks?: unknown;
   details?: unknown;
+  status?: OfferStatus;
   // Phase 3b-1 party-filter columns (PARTY_SERVICE canon)
   category?: PartyCategory | null;
   partyLocationType?: BirthdayLocationType | null;
@@ -1189,6 +1219,14 @@ export function mapOfferToFormData(offer: {
   const requestedPlacements = parsePlacementKeyArray(offer.placements);
   const placementStatuses = parsePlacementStatusMap(offer.placements);
   const legacyCtaFields = inferLegacyOfferCtaFields(offer);
+  const draftClassGroups = productType === "REGULAR_ACTIVITY" && offer.status === "DRAFT"
+    ? classPricingDraftFromDetails(offer.details)
+    : null;
+  const savedSchedule = scheduleFromOffer(offer);
+  const restoredSchedule = draftClassGroups === null ? savedSchedule : {
+    ...savedSchedule,
+    classSchedule: { ...savedSchedule.classSchedule, groups: draftClassGroups },
+  };
   const socialLinks = Array.isArray(offer.contactSocialLinks)
     ? offer.contactSocialLinks
         .filter(
@@ -1306,7 +1344,7 @@ export function mapOfferToFormData(offer: {
     signalIds: offer.discoverySignalIds ?? [],
     classChipSlugs: offer.classChipSlugs ?? [],
     interestSlugs: offer.interestSlugs ?? [],
-    schedule: scheduleFromOffer(offer),
+    schedule: restoredSchedule,
     categoryIds: [...(offer.categoryLinks ?? [])]
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((link) => link.categoryId),

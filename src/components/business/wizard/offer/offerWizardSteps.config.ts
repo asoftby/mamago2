@@ -15,7 +15,7 @@ import type {
   OfferFormData,
   OfferProductType,
 } from "./types";
-import { validatePublicationAccess } from "@/features/publication-access";
+import { validatePublicationAccess } from "@/features/publication-access/validation";
 import { showCampLodgingFormFields } from "./campOfferModel";
 import { isOfferContactsComplete } from "./contacts";
 import { getScheduleMissingFields } from "@/lib/offers/offerSchedule";
@@ -94,8 +94,8 @@ export function getStepsForOfferType(
   productType?: OfferProductType | null,
   variant: OfferWizardVariant = "v1",
 ): OfferWizardStepDef[] {
-  if (!type) return [];
   if (variant === "v2") return getV2StepsForProductType(productType);
+  if (!type) return [];
 
   const priceStepTitle = type === "CAMP" ? "Участие" : "Цена";
   const priceStepDescription =

@@ -4,6 +4,7 @@
 import type { OfferFormData, OfferWizardVariant } from "./types";
 import { getStepsForOfferType, getV2StepMembers } from "./offerWizardSteps.config";
 import { getScheduleMissingFields } from "@/lib/offers/offerSchedule";
+import { getClassScheduleMissingFields } from "@/lib/offers/offerClassSchedule";
 import { validatePublicationAccess } from "@/features/publication-access";
 import { showCampLodgingFormFields } from "./campOfferModel";
 import { isOfferContactsComplete, isValidPhone, isValidUrl } from "./contacts";
@@ -539,6 +540,11 @@ export function validateForSubmit(
       case "price":
         result = validateStep5(data, variant !== "v2");
         break;
+      case "classSchedule": {
+        const missing = getClassScheduleMissingFields(data.schedule.classSchedule, data.productType, data.classDuration);
+        result = { isValid: missing.length === 0, isComplete: missing.length === 0, errors: missing, warnings: [] };
+        break;
+      }
       case "openingHours":
       case "bookingMethod": {
         const missing = getScheduleMissingFields(data.schedule, data.productType).filter((field) =>

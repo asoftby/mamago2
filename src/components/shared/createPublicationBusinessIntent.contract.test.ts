@@ -49,22 +49,15 @@ test("place visit offer uses the existing OFFER model and editor", () => {
   assert.match(wizard, /if \(mode !== "edit" \|\| !offer \|\| initialStepNumber == null \|\| initialStepNumber < 1\) \{[\s\S]*?return "type";/);
 });
 
-test("subtype questions stay available for classes and parties", () => {
-  assert.ok(wizard.includes('creationIntent === "classes" && ('));
-  assert.ok(wizard.includes('creationIntent === "parties" && ('));
-  // Legacy V1 keeps subtype reclassification after step 1 for existing drafts.
-  assert.ok(wizard.includes('<OfferSubtypeClarifier group="classes"'));
-  assert.ok(wizard.includes('<OfferSubtypeClarifier group="parties"'));
-  // V2 already offers those subtype choices on step 1, so step 2 must not ask again.
-  assert.ok(!wizard.includes("<OfferSubtypeClarifier group={creationIntent}"));
+test("V2 subtype questions are selected once on step one for classes and parties", () => {
+  assert.match(wizard, /const variant: OfferWizardVariant = activeOfferWizardVariant\(\);/);
+  assert.ok(!wizard.includes("<OfferSubtypeClarifier"),
+    "Universal V2 must not repeat class or party subtype questions on later steps");
   const typeStep = readFileSync("src/components/business/wizard/offer/steps/Step1Type.tsx", "utf8");
-  assert.ok(typeStep.includes("activeCategory.options.map"), "V2 subtype options remain on step 1");
-  const clarifier = readFileSync("src/components/business/wizard/offer/components/OfferSubtypeClarifier.tsx", "utf8");
-  for (const type of ["ONE_TIME_ACTIVITY", "REGULAR_ACTIVITY", "PARTY_SERVICE", "PARTY_PACKAGE"]) {
-    assert.ok(clarifier.includes(type));
-  }
-  assert.ok(clarifier.includes("...getOfferTypeSelection(item.type)"));
-  assert.ok(!clarifier.includes("categoryIds: []"));
+  assert.ok(typeStep.includes("activeCategory.options.map"), "Subtype options remain on V2 step one");
+  assert.ok(typeStep.includes("getOfferTypeSelection"), "Selecting subtype updates the offer product type");
+  assert.ok(wizard.includes('creationIntent === "classes" ? "REGULAR_ACTIVITY"'));
+  assert.ok(wizard.includes('creationIntent === "parties" ? "PARTY_SERVICE"'));
 });
 
 test("business creation cards have equal height and two-line descriptions, without technical captions", () => {

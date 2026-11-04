@@ -79,7 +79,7 @@ export type OfferWizardStepKey =
   | "price"
   | "contacts"
   | "faq"
-  // Новый мастер (6 шагов, флаг Business.features.newOfferWizard)
+  // Новый мастер: обязательная последовательность из шести шагов
   | "about"
   | "services"
   | "schedule"
@@ -90,7 +90,7 @@ export type OfferWizardStepKey =
   | "bookingMethod"
   | "review";
 
-/** Вариант мастера: v1 — текущий, v2 — новый мастер из 6 шагов за флагом. */
+/** Internal compatibility for legacy step validation; rendered offer wizard always uses v2. */
 export type OfferWizardVariant = "v1" | "v2";
 
 /**
