@@ -23,9 +23,13 @@ export function isVenueOffer(offer: BirthdayCatalogItem): boolean {
  * the stricter rule for unverified off-site packages.
  */
 export function isLocationCompatible(
-  offer: Pick<BirthdayCatalogItem, "locationType">,
+  offer: Pick<BirthdayCatalogItem, "locationType"> & Partial<Pick<BirthdayCatalogItem, "productType" | "category">>,
   placeType: PlaceType | null,
 ): boolean {
+  // Cake/catering fulfilment is pickup/delivery, not the celebration venue.
+  // Do not drop these add-ons when the family changes between home and venue.
+  if (offer.productType === "PARTY_SERVICE" &&
+    (offer.category === "CAKE" || offer.category === "FOOD")) return true;
   if (placeType == null || offer.locationType == null) return true;
   if (offer.locationType === "BOTH") return true;
   const onSite = placeType === "VENUE" || placeType === "PACKAGE";

@@ -59,10 +59,19 @@ assert.doesNotThrow(() => assertCompatibleSelection("HOME", mobilePackage, [show
 assert.doesNotThrow(() => assertCompatibleSelection("OUTDOOR", mobilePackage, []));
 assert.throws(() => assertCompatibleSelection("VENUE", mobilePackage, []), PartyApiError);
 assert.throws(() => assertCompatibleSelection("HOME", pkg, []), PartyApiError); // unknown location must not imply mobile
+for (const category of ["CAKE", "FOOD"] as const) {
+  for (const partyLocationType of ["ON_SITE", "OFF_SITE", "BOTH"] as const) {
+    const addon: CatalogOffer = { ...cake, category, partyLocationType };
+    // A cake already included in a package cannot be added again; use a SHOW anchor.
+    assert.doesNotThrow(() => assertCompatibleSelection("HOME", show, [addon]));
+    assert.doesNotThrow(() => assertCompatibleSelection("VENUE", base, [addon]));
+  }
+}
+// Venue-only entertainment still cannot go to a home party, and vice versa.
 assert.throws(() => assertCompatibleSelection("HOME", mobilePackage,
-  [{ ...cake, partyLocationType: "ON_SITE" }]), PartyApiError);
+  [{ ...show, partyLocationType: "ON_SITE" }]), PartyApiError);
 assert.throws(() => assertCompatibleSelection("VENUE", base,
-  [{ ...cake, partyLocationType: "OFF_SITE" }]), PartyApiError);
+  [{ ...show, partyLocationType: "OFF_SITE" }]), PartyApiError);
 // Price snapshot honours priceMode: a stale number behind ON_REQUEST is never frozen as a price.
 assert.equal(offerPriceSnapshot({ priceFrom: 500, priceMode: "ON_REQUEST", currency: "BYN" }), null);
 assert.equal(offerPriceSnapshot({ priceFrom: null, priceMode: "FREE", currency: "BYN" }), 0);

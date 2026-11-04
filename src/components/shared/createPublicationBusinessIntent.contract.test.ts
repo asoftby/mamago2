@@ -52,7 +52,13 @@ test("place visit offer uses the existing OFFER model and editor", () => {
 test("subtype questions stay available for classes and parties", () => {
   assert.ok(wizard.includes('creationIntent === "classes" && ('));
   assert.ok(wizard.includes('creationIntent === "parties" && ('));
-  assert.ok(wizard.includes("<OfferSubtypeClarifier group={creationIntent}"));
+  // Legacy V1 keeps subtype reclassification after step 1 for existing drafts.
+  assert.ok(wizard.includes('<OfferSubtypeClarifier group="classes"'));
+  assert.ok(wizard.includes('<OfferSubtypeClarifier group="parties"'));
+  // V2 already offers those subtype choices on step 1, so step 2 must not ask again.
+  assert.ok(!wizard.includes("<OfferSubtypeClarifier group={creationIntent}"));
+  const typeStep = readFileSync("src/components/business/wizard/offer/steps/Step1Type.tsx", "utf8");
+  assert.ok(typeStep.includes("activeCategory.options.map"), "V2 subtype options remain on step 1");
   const clarifier = readFileSync("src/components/business/wizard/offer/components/OfferSubtypeClarifier.tsx", "utf8");
   for (const type of ["ONE_TIME_ACTIVITY", "REGULAR_ACTIVITY", "PARTY_SERVICE", "PARTY_PACKAGE"]) {
     assert.ok(clarifier.includes(type));

@@ -10,12 +10,14 @@ type CategoryOption = { id: string; nameRu: string; slug: string };
 interface OfferCategoryPickerProps {
   productType: OfferProductType;
   value: string[];
-  onChange: (categoryIds: string[]) => void;
+  onChange: (categoryIds: string[], selectedOption?: CategoryOption) => void;
   isEditable: boolean;
+  /** Single-service offers have one primary category; other offer types can select up to 3. */
+  maxSelected?: number;
 }
 
 /** Категории предложения: до 3, справочник зависит от формата (шаг «Что предлагаете»). */
-export function OfferCategoryPicker({ productType, value, onChange, isEditable }: OfferCategoryPickerProps) {
+export function OfferCategoryPicker({ productType, value, onChange, isEditable, maxSelected = MAX_OFFER_CATEGORIES }: OfferCategoryPickerProps) {
   const [loaded, setLoaded] = useState<{ productType: OfferProductType; options: CategoryOption[] } | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -39,11 +41,17 @@ export function OfferCategoryPicker({ productType, value, onChange, isEditable }
   }, [productType]);
 
   const options = loaded?.productType === productType ? loaded.options : null;
-  const atLimit = value.length >= MAX_OFFER_CATEGORIES;
+  const atLimit = value.length >= maxSelected;
 
-  const toggle = (id: string) => {
-    if (value.includes(id)) onChange(value.filter((item) => item !== id));
-    else if (!atLimit) onChange([...value, id]);
+  const toggle = (option: CategoryOption) => {
+    if (value.includes(option.id)) {
+      onChange(value.filter((item) => item !== option.id), option);
+    } else if (maxSelected === 1) {
+      // Selecting a different service replaces the old category; never trap the user at the limit.
+      onChange([option.id], option);
+    } else if (!atLimit) {
+      onChange([...value, option.id], option);
+    }
   };
 
   const items: ChipItem[] = (options ?? []).map((option) => {
@@ -52,8 +60,8 @@ export function OfferCategoryPicker({ productType, value, onChange, isEditable }
       id: option.id,
       label: option.nameRu,
       active,
-      disabled: !isEditable || (!active && atLimit),
-      onClick: () => toggle(option.id),
+      disabled: !isEditable || (!active && atLimit && maxSelected !== 1),
+      onClick: () => toggle(option),
     };
   });
 
@@ -64,7 +72,7 @@ export function OfferCategoryPicker({ productType, value, onChange, isEditable }
           Категория <span className="text-red-500">*</span>
         </h3>
         <p className="text-sm text-muted-foreground">
-          Выберите до {MAX_OFFER_CATEGORIES}: по ним предложение находят в каталоге.
+          {maxSelected === 1 ? "Выберите один вид услуги." : `Выберите до ${maxSelected}: по ним предложение находят в каталоге.`}
         </p>
       </div>
       {failed ? (

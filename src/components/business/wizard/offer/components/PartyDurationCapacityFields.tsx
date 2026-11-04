@@ -15,6 +15,8 @@ interface PartyDurationCapacityFieldsProps {
   onChange: (patch: Partial<BirthdayDetails>) => void;
   isEditable: boolean;
   idPrefix: string;
+  showDuration?: boolean;
+  showChildren?: boolean;
 }
 
 function parseOptionalPositiveInteger(value: string): number | null {
@@ -29,6 +31,8 @@ export function PartyDurationCapacityFields({
   onChange,
   isEditable,
   idPrefix,
+  showDuration = true,
+  showChildren = true,
 }: PartyDurationCapacityFieldsProps) {
   const [customDuration, setCustomDuration] = useState(false);
   const isPreset = PARTY_DURATION_PRESETS.some((duration) => duration === details.durationMinutes);
@@ -40,7 +44,7 @@ export function PartyDurationCapacityFields({
 
   return (
     <div className="space-y-5">
-      <div className="space-y-2">
+      {showDuration && <div className="space-y-2">
         <p id={`${idPrefix}-duration-label`} className="text-sm font-medium text-foreground">
           Продолжительность
         </p>
@@ -115,9 +119,9 @@ export function PartyDurationCapacityFields({
         <p className="text-xs text-muted-foreground">
           Длительность одной программы, не время начала.
         </p>
-      </div>
+      </div>}
 
-      <div className="space-y-2">
+      {showChildren && <div className="space-y-2">
         <p id={`${idPrefix}-children-label`} className="text-sm font-medium text-foreground">
           Количество детей
         </p>
@@ -170,7 +174,7 @@ export function PartyDurationCapacityFields({
             Минимальное количество не должно превышать максимальное.
           </p>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

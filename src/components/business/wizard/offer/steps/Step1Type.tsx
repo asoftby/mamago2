@@ -16,6 +16,7 @@ import {
   OFFER_CREATION_CATEGORIES,
   getOfferCreationCategory,
   getOfferTypeSelection,
+  partyCategoryFromOfferCategorySlug,
   type OfferCreationCategory,
   type OfferCreationCategoryKey,
 } from "../offerTypeChoices";
@@ -60,6 +61,8 @@ export function Step1Type({ data, onChange, isEditable, showCategories = false }
         : prev.schedule,
       // Категории зависят от формата: при смене формата выбор сбрасывается.
       categoryIds: [],
+      // PartyCategory belongs to a specific single-service category, never a previous format.
+      partyCategory: null,
       serviceType: null,
       locationType: null,
       classFormat:
@@ -199,7 +202,22 @@ export function Step1Type({ data, onChange, isEditable, showCategories = false }
         <OfferCategoryPicker
           productType={data.productType}
           value={data.categoryIds}
-          onChange={(categoryIds) => onChange({ categoryIds })}
+          maxSelected={data.productType === "PARTY_SERVICE" ? 1 : undefined}
+          onChange={(categoryIds, option) => {
+            if (data.productType !== "PARTY_SERVICE") {
+              onChange({ categoryIds });
+              return;
+            }
+            const selectedCategory = option && categoryIds.includes(option.id)
+              ? partyCategoryFromOfferCategorySlug(option.slug)
+              : null;
+            onChange({
+              categoryIds,
+              // First-step category is the authoritative type for a single party service.
+              // Preserve an existing value for unknown legacy category slugs.
+              partyCategory: categoryIds.length === 0 ? null : (selectedCategory ?? data.partyCategory),
+            });
+          }}
           isEditable={isEditable}
         />
       )}
