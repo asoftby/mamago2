@@ -611,6 +611,7 @@ export function OfferWizard({
           ...(mode === "edit" && canDirectPublish ? { status: "PUBLISHED" as const } : {}),
           wizardCompletedSteps: completedSteps,
           includeSchedule: variant === "v2" && scheduleChanged,
+          preserveClassPricingDraft: offer?.status === "DRAFT",
           previousSchedule: (JSON.parse(baselineFormJson) as OfferFormData).schedule,
           previousClassDuration: (JSON.parse(baselineFormJson) as OfferFormData).classDuration,
         });

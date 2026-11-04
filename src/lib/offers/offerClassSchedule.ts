@@ -78,6 +78,36 @@ export function addClassGroupForPricing(form: ClassScheduleForm): ClassScheduleF
   };
 }
 
+/** Draft-only class pricing groups may have no schedule yet. Never turn them
+ * into availability slots just to save a draft.
+ */
+const classPricingDraftGroupSchema = z.object({
+  id: z.string().min(1).max(128),
+  title: z.string().max(120).optional(),
+  days: z.array(z.number().int().min(1).max(7)).max(7),
+  time: z.string().regex(TIME_RE),
+  seats: z.string().max(12),
+  tariffs: z.array(z.object({
+    id: z.string().min(1).max(128),
+    title: z.string().max(120),
+    price: z.string().max(40),
+    unit: z.string().max(80),
+    periodDays: z.number().int().min(1).max(366).nullable().optional(),
+    visitsCount: z.number().int().min(1).max(365).nullable().optional(),
+  })).max(12).optional(),
+  period: z.object({
+    from: z.string().regex(DATE_RE).nullable(),
+    to: z.string().regex(DATE_RE).nullable(),
+  }).nullable().optional(),
+});
+
+export function classPricingDraftFromDetails(details: unknown): ClassSessionGroup[] | null {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return null;
+  const raw = (details as Record<string, unknown>).classPricingDraft;
+  const parsed = z.array(classPricingDraftGroupSchema).max(30).safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
 export function emptyClassDate(): ClassDateSession {
   return { id: newClassScheduleId(), date: "", time: "12:00", seats: "" };
 }

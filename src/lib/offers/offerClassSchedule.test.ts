@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   addClassGroupForPricing,
+  classPricingDraftFromDetails,
   buildClassScheduleInput,
   classScheduleInputSchema,
   defaultClassSchedule,
@@ -224,3 +225,15 @@ for (const [price, valid] of [
   assert.equal(!problems.includes("Стоимость тарифа в BYN"), valid, `price=${price}`);
 }
 console.log("Regular activity tariff prices match PostgreSQL input validation");
+
+const pricingOnly = addClassGroupForPricing(defaultClassSchedule());
+pricingOnly.groups[0]!.tariffs![0]!.title = "Абонемент";
+pricingOnly.groups[0]!.tariffs![0]!.price = "120";
+const persistedPricingDraft = classPricingDraftFromDetails({ classPricingDraft: pricingOnly.groups });
+assert.deepEqual(persistedPricingDraft, pricingOnly.groups,
+  "Unscheduled pricing group and tariff survive serialized details");
+assert.equal(classPricingDraftFromDetails({ duration: "60" }), null);
+assert.equal(classPricingDraftFromDetails({ classPricingDraft: [{ id: "x", days: [8] }] }), null,
+  "Malformed persisted draft is not trusted");
+assert.equal(classPricingDraftFromDetails({ classPricingDraft: [] })?.length, 0);
+console.log("Unscheduled class group draft roundtrip checks passed");
