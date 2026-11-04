@@ -135,9 +135,23 @@ test("categories and genres are OR within their dimension and AND with other dim
     [
       { eventCategory: { is: { slug: { in: ["theatre", "workshops"] } } } },
       { genreSlugs: { hasSome: ["puppet", "musical"] } },
-      { priceMode: "FREE" },
+      {
+        OR: [
+          { priceMode: "FREE" },
+          { priceMode: "UNKNOWN", priceFrom: 0, priceText: { in: ["бесплатно", "free"], mode: "insensitive" } },
+        ],
+      },
     ],
   );
+});
+
+test("free price filter admits explicit legacy zero/free label but not unknown placeholders", () => {
+  assert.deepEqual(buildEventRuntimeWhere({
+    dateRange: null, free: true, districtId: null, metroId: null, adultOnly: false,
+  }), [{ OR: [
+    { priceMode: "FREE" },
+    { priceMode: "UNKNOWN", priceFrom: 0, priceText: { in: ["бесплатно", "free"], mode: "insensitive" } },
+  ] }]);
 });
 
 test("numeric max uses canonical starting price and excludes NONE and UNKNOWN", () => {
