@@ -171,8 +171,8 @@ export function Step2Information({ data, onChange, isEditable, v2 = false }: Ste
         </p>
       </div>
 
-      {v2 && isClassOffer && (
-        <section className="space-y-3" aria-label="Разделы занятий">
+      {v2 && (isClassOffer || data.productType === "PLACE_VISIT") && (
+        <section className="space-y-3" aria-label={isClassOffer ? "Разделы занятий" : "Категория посещения"}>
           <OfferCategoryPicker
             productType={data.productType!}
             value={data.categoryIds}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
@@ -118,23 +118,23 @@ const BUSINESS_INTENTS: Item[] = [
     kind: "link",
     href: "/editor/event/new",
     label: "Мероприятие",
-    description: "Спектакль, экскурсия или мастер-класс на конкретную дату",
+    description: "Спектакли, экскурсии и мастер-классы с конкретной датой и временем",
     Icon: Calendar,
   },
   {
-    id: "visit-place",
+    id: "place-offer",
     kind: "link",
-    href: "/editor/place/new",
-    label: "Место для посещения",
-    description: "Игровая комната, музей, кафе или другая площадка",
-    Icon: MapPin,
+    href: "/editor/offer/new?creationIntent=place",
+    label: "Предложение о посещении",
+    description: "Стоимость, часы работы и условия посещения вашего места",
+    Icon: Tag,
   },
   {
     id: "classes",
     kind: "link",
     href: "/editor/offer/new?creationIntent=classes",
     label: "Занятия и кружки",
-    description: "Регулярные занятия, секции, курсы и обучение",
+    description: "Кружки, секции, курсы, разовые и регулярные занятия для детей",
     Icon: GraduationCap,
   },
   {
@@ -142,7 +142,7 @@ const BUSINESS_INTENTS: Item[] = [
     kind: "link",
     href: "/editor/offer/new?creationIntent=parties",
     label: "Дни рождения и услуги",
-    description: "Аниматоры, шоу и праздничные программы на заказ",
+    description: "Аниматоры, шоу, отдельные услуги и готовые праздничные программы",
     Icon: PartyPopper,
   },
   {
@@ -150,8 +150,16 @@ const BUSINESS_INTENTS: Item[] = [
     kind: "link",
     href: "/editor/offer/new?creationIntent=camps",
     label: "Лагеря и каникулы",
-    description: "Смены, программы и отдых на каникулах",
+    description: "Детские лагеря, смены, программы и отдых во время каникул",
     Icon: Sun,
+  },
+  {
+    id: "visit-place",
+    kind: "link",
+    href: "/editor/place/new",
+    label: "Добавить место",
+    description: "Адрес, фотографии и информация об объекте",
+    Icon: MapPin,
   },
 ];
 
@@ -215,6 +223,7 @@ export function CreatePublicationQuickMenu({
         const { Icon } = item;
         const rowClass =
           "flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-4 text-left transition-colors hover:bg-gray-50 hover:border-gray-300";
+        const itemRowClass = cn(rowClass, publicationMode === "business" && "min-h-[104px] items-center");
 
         if (item.kind === "link") {
           const href = (() => {
@@ -229,26 +238,30 @@ export function CreatePublicationQuickMenu({
           })();
 
           return (
-            <Link
-              key={item.id}
-              href={href}
-              onClick={() => setOpen(false)}
-              className={rowClass}
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Icon className="h-5 w-5" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[14px] font-semibold text-gray-900">
-                  {item.label}
+            <Fragment key={item.id}>
+              {publicationMode === "business" && item.id === "visit-place" && (
+                <div role="separator" aria-orientation="horizontal" className="my-2 border-t border-border" />
+              )}
+              <Link
+                href={href}
+                onClick={() => setOpen(false)}
+                className={itemRowClass}
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Icon className="h-5 w-5" />
                 </span>
-                {item.description ? (
-                  <span className="block text-[12px] text-muted-foreground">
-                    {item.description}
+                <span className="min-w-0">
+                  <span className="block text-[14px] font-semibold text-gray-900">
+                    {item.label}
                   </span>
-                ) : null}
-              </span>
-            </Link>
+                  {item.description ? (
+                    <span className={cn("block text-[12px] text-muted-foreground", publicationMode === "business" && "line-clamp-2 min-h-10 max-w-[260px] leading-5")}>
+                      {item.description}
+                    </span>
+                  ) : null}
+                </span>
+              </Link>
+            </Fragment>
           );
         }
 
@@ -257,7 +270,7 @@ export function CreatePublicationQuickMenu({
             key={item.id}
             type="button"
             onClick={() => goAdminPublication(item.publicationType)}
-            className={cn(rowClass, "w-full")}
+            className={cn(itemRowClass, "w-full")}
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Icon className="h-5 w-5" />
@@ -267,7 +280,7 @@ export function CreatePublicationQuickMenu({
                 {item.label}
               </span>
               {item.description ? (
-                <span className="block text-[12px] text-muted-foreground">
+                <span className={cn("block text-[12px] text-muted-foreground", publicationMode === "business" && "line-clamp-2 min-h-10 max-w-[260px] leading-5")}>
                   {item.description}
                 </span>
               ) : null}
@@ -289,7 +302,7 @@ export function CreatePublicationQuickMenu({
           size="icon"
           className={cn(HEADER_CHROME_ICON_BUTTON_CLASS)}
           onClick={() => setOpen(true)}
-          aria-label="Создать публикацию"
+          aria-label={publicationMode === "business" ? "Добавить" : "Создать публикацию"}
         >
           <Plus className="h-4 w-4" />
         </Button>
