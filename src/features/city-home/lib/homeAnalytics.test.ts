@@ -69,5 +69,5 @@ test("home has no chip-driven requests, while keeping one catalog CTA", () => {
   const source = readFileSync(new URL("../components/CityHomeFamilyPicks.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(source, /homeChipSelectEvent|persistHomeSelection|router.push/);
   assert.match(source, /homeCatalogEvent/);
-  assert.match(source, /planAttribution/);
+  assert.ok(source.includes("<EventCard"));
 });

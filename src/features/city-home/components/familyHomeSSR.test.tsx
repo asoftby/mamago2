@@ -100,7 +100,7 @@ for (const count of [1, 2, 3, 5, 7]) {
 }
 
 for (const count of [0, 1, 2, 7, 8, 10, 11]) {
-  test(`real ready HTML with ${count} events has one final catalog CTA and one save per visible event`, () => {
+  test(`real ready HTML with ${count} events has one final poster card and no extra actions`, () => {
     const context: HomeFamilyContext = { actorId: "account_a", signature: "a".repeat(64), day: "2030-11-02", policyVersion: "v2", audience: "personalized", selectedChildId: null, preferenceVersion: null, selectionPersistence: "account",
       children: [{ id: "child_0001", name: "Аня", hasBirthDate: true, ageFilter: ["3-5"] }] };
     const data = { context, window: { horizonDays: 30, dateFrom: "2030-11-02", dateTo: "2030-12-01" }, runId: "run_123", policyVersion: "family-picks-confirmed-v3", sharedAlgorithmVersion: "test", candidateCount: count, hasCatalogEvents: count > 0, selection: { mode: "ALL_FAMILY" }, status: count ? "READY" : "EMPTY", items: Array.from({ length: count }, (_, i) => ({
@@ -109,13 +109,14 @@ for (const count of [0, 1, 2, 7, 8, 10, 11]) {
       startsAt: "2030-11-02T22:30:00Z", allChildrenMatch: i === 0, matchedChildIds: ["child_0001"], exposureId: `exposure_${i}`, position: i + 1, score: 1,
     })) } as import("@/server/services/recommendations/familyPicks/delivery").HomeFamilyDelivery;
     const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={{ id: "account_a" } as never}>
-      <FamilyHomeResults data={data} context={context} citySlug="minsk" impressed={new Set()} onImpression={() => {}} onDismiss={() => {}} onSave={() => {}} />
+      <FamilyHomeResults data={data} context={context} citySlug="minsk" impressed={new Set()} onImpression={() => {}} />
     </AuthProvider></AppRouterContext.Provider>);
     const visible = Math.min(count, 10);
-    assert.equal((html.match(/>В мой план</g) ?? []).length, visible);
-    assert.equal((html.match(/>Не подходит</g) ?? []).length, visible);
+    assert.doesNotMatch(html, /В мой план|Не подходит/);
+    assert.equal((html.match(/Сохранить в план или в идеи/g) ?? []).length, visible);
+    assert.equal((html.match(/data-masonry-media=/g) ?? []).length, visible);
     assert.equal((html.match(count ? /Ещё варианты</g : /Нет событий</g) ?? []).length, 1);
-    if (count) assert.ok(html.lastIndexOf("Ещё варианты") > html.lastIndexOf("Не подходит"));
+    if (count) assert.ok(html.lastIndexOf("Ещё варианты") > html.lastIndexOf("Подходит Ане"));
     assert.doesNotMatch(html, /child_0001|profile=|kids=/);
     if (!count) assert.match(html, /Нет событий/);
     else { assert.match(html, /3–14 · 3 ноя./); assert.match(html, /Бесплатно/); assert.match(html, /Подходит Ане/);

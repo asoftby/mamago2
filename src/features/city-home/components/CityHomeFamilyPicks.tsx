@@ -9,14 +9,13 @@ import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardVi
 import { CityHomeSection } from "./CityHomeSection";
 import { HorizontalCardRow } from "./HorizontalCardRow";
 import { HomeMoreEventsCard } from "./HomeMoreEventsCard";
-import { SaveHeart } from "@/features/save/SaveHeart";
 import { postAnalyticsEvent } from "@/lib/analytics/client";
 import { formatPublicCardPrice } from "@/domain/pricing/publicCardPrice";
 import { formatRuShortDayMonth } from "@/lib/formatters/date";
 import { FAMILY_PERSONAS_CHANGED_EVENT } from "@/lib/family/familyPersonaEvents";
 import { AUTH_STATE_CHANGED_EVENT } from "@/lib/auth/client";
 import { homeCatalogEvent, homeSelectionMode } from "../lib/homeInteractionTelemetry";
-import { FamilyHomeCache, drainPendingHomeDismissals, readHomeDismissals, writeHomeDismissals, HOME_DISMISS_TTL_MS, type HomeDismissal } from "../lib/familyHomeCache";
+import { FamilyHomeCache, readHomeDismissals, HOME_DISMISS_TTL_MS } from "../lib/familyHomeCache";
 import { homeAgeLabel, homePeriodLabel, minskPlanDate, type HomeFamilyContext } from "../lib/familyHome";
 import { homeRecommendationLabel } from "../lib/homeRecommendationLabel";
 import type { HomeFamilyDelivery } from "@/server/services/recommendations/familyPicks/delivery";
@@ -52,28 +51,10 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   const [impressed, setImpressed] = useState(new Set<string>());
   const cache = useRef(new FamilyHomeCache<HomeFamilyDelivery>(actor));
   const controller = useRef<AbortController | null>(null);
-  const dismissals = useRef<HomeDismissal[]>([]);
-  const dismissFlushActive = useRef(false);
+
   const mounted = useRef(false);
   const initialSignatureRef = useRef(initialContext.signature);
   const allowedActor = useRef(false);
-
-  const flushDismissals = useCallback(async () => {
-    if (dismissFlushActive.current || !allowedActor.current) return;
-    dismissFlushActive.current = true;
-    try {
-      await drainPendingHomeDismissals(
-        () => dismissals.current,
-        () => allowedActor.current,
-        async entry => { await post({ action: "dismiss", city: entry.city, eventId: entry.id,
-          exposureId: entry.exposureId, token: entry.token, selectedChildId: entry.selectedChildId ?? null }); },
-        () => writeHomeDismissals(actor, dismissals.current),
-        () => { if (mounted.current) setAnnouncement("Скрытие события будет повторено."); },
-      );
-    } finally {
-      dismissFlushActive.current = false;
-    }
-  }, [actor]);
 
   const load = useCallback(async (options?: { keepCurrent?: boolean }) => {
     if (!mounted.current || !allowedActor.current) return;
@@ -92,8 +73,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
     }, 15_000);
     try {
       const stored = readHomeDismissals(actor);
-      dismissals.current = stored;
-      void flushDismissals();
+
       // Signed context is refreshed before recommendation; child chips do not trigger
       // any additional queries, selection writes, or navigation on the home page.
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -117,7 +97,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
           result = await post({
             action: "recommend", city: citySlug, selectedChildId: null,
             signature: fresh.signature,
-            dismissedIds: dismissals.current.map(entry => entry.id),
+            dismissedIds: stored.map(entry => entry.id),
           }, abort.signal) as HomeFamilyDelivery;
         } catch (error) {
           if (valid() && attempt === 0 && error instanceof Error && error.message === "home_409") continue;
@@ -141,13 +121,12 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
     } finally {
       clearTimeout(deadline);
     }
-  }, [actor, citySlug, flushDismissals, router]);
+  }, [actor, citySlug, router]);
 
   useEffect(() => {
     mounted.current = true;
     allowedActor.current = !auth.isLoading && auth.user?.id === actor;
-    dismissals.current = readHomeDismissals(actor);
-    for (const entry of dismissals.current) cache.current.dismiss(entry.id, entry.at + HOME_DISMISS_TTL_MS, entry.selectedChildId ?? null);
+    for (const entry of readHomeDismissals(actor)) cache.current.dismiss(entry.id, entry.at + HOME_DISMISS_TTL_MS, entry.selectedChildId ?? null);
     void load();
     return () => { mounted.current = false; controller.current?.abort(); cache.current.cancel(); };
   }, [actor, load]);
@@ -187,18 +166,6 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
 
   const actorMatches = !auth.isLoading && auth.user?.id === actor;
   const catalogHref = `/${citySlug}/events`;
-  const dismiss = (item: HomeFamilyDelivery["items"][number]) => {
-    cache.current.dismiss(item.id, Date.now() + HOME_DISMISS_TTL_MS, null);
-    dismissals.current = [...dismissals.current.filter(entry => entry.id !== item.id),
-      { id: item.id, token: crypto.randomUUID(), at: Date.now(), exposureId: item.exposureId,
-        city: citySlug, saved: false, selectedChildId: null }].slice(-200);
-    writeHomeDismissals(actor, dismissals.current);
-    setData(value => value ? cache.current.filter(value, Date.now(), null) : value);
-    setAnnouncement(`«${item.title}» скрыто для семьи`);
-    void flushDismissals();
-    void load({ keepCurrent: true });
-  };
-
   return <CityHomeSection title="События, которые подходят вам"
     subtitle={data ? homePeriodLabel(data.window) : "На ближайшие 7 дней"} reserveCarouselControls>
     <div className="min-h-40" data-placement="HOME_FOR_FAMILY" aria-busy={state === "loading" && !data}>
@@ -218,8 +185,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
         </div>
       ) : data ? (
         <FamilyHomeResults data={data} context={data.context} citySlug={citySlug} impressed={impressed}
-          onImpression={identity => setImpressed(previous => new Set([...previous, identity]))}
-          onDismiss={dismiss} onSave={() => { cache.current.clear(); void load({ keepCurrent: true }); }} />
+          onImpression={identity => setImpressed(previous => new Set([...previous, identity]))} />
       ) : null}
       {state === "error" && data && <button type="button" className="mt-3 text-sm underline" onClick={() => void load({ keepCurrent: true })}>Не удалось обновить. Повторить</button>}
       <p role="status" aria-live="polite" className="sr-only">{announcement}</p>
@@ -227,10 +193,9 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
   </CityHomeSection>;
 }
 
-export function FamilyHomeResults({ data, context, citySlug, impressed, onImpression, onDismiss, onSave }: {
+export function FamilyHomeResults({ data, context, citySlug, impressed, onImpression }: {
   data: HomeFamilyDelivery; context: HomeFamilyContext; citySlug: string;
   impressed: Set<string>; onImpression: (identity: string) => void;
-  onDismiss: (item: HomeFamilyDelivery["items"][number]) => void; onSave: () => void;
 }) {
   const items = data.items;
   const href = `/${citySlug}/events`;
@@ -257,18 +222,10 @@ export function FamilyHomeResults({ data, context, citySlug, impressed, onImpres
           }}>
             <EventCard id={item.id} title={item.title} href={item.href} imageUrl={item.imageUrl}
               imageWidth={item.imageWidth} imageHeight={item.imageHeight} framing="fixed" coverRatio="2/3"
-              coverFit="cover" imagePriority={index < 2} categoryLabel={item.categoryName ?? undefined}
+              coverFit="cover" imagePriority={index < 2} saveMeta={{ dateISO: minskPlanDate(item.startsAt), source: "home-family-picks" }} categoryLabel={item.categoryName ?? undefined}
               metaLabel={`${homeAgeLabel(item)} · ${formatRuShortDayMonth(item.startsAt)}`}
               priceLabel={formatPublicCardPrice(item) ?? undefined} />
             {recommendation && <p className="pt-2 text-xs font-medium">{recommendation}</p>}
-            <div className="mt-3 flex flex-wrap gap-2">
-              <SaveHeart activityId={item.id} activityTitle={item.title} coverImageUrl={item.imageUrl}
-                eventPlanDateISO={minskPlanDate(item.startsAt)} source="home-family-picks"
-                planAttribution={{ planAddSource: "home-family-picks", recommendationExposureId: item.exposureId }}
-                triggerLabel="В мой план" onSaveChange={onSave} />
-              <button type="button" onClick={() => onDismiss(item)}
-                className="min-h-11 px-2 text-sm underline">Не подходит</button>
-            </div>
           </div>
         </AnalyticsCardViewTracker>
       </div>;
