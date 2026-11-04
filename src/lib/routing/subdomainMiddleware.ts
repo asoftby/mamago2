@@ -246,6 +246,22 @@ export function resolveSubdomainMiddlewareDecision(params: {
   }
 
   if (isBusinessHost) {
+    // Direct messages live on the public surface. A same-host /me/direct
+    // redirect would be rewritten to a non-existent /business/me/direct (404).
+    // Redirect here before the business surface rewrite, including deep links.
+    if (pathname === "/direct" || pathname.startsWith("/direct/")) {
+      return {
+        kind: "redirect",
+        location: buildPublicLocation({
+          host,
+          protocol,
+          pathname: `/me${pathname}`,
+          search: adminSafeSearch,
+          publicAppUrl,
+        }),
+      };
+    }
+
     if (isAuthRoute(pathname)) {
       return {
         kind: "redirect",
