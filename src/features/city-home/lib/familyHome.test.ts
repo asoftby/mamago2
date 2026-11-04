@@ -164,6 +164,7 @@ test("newly queued dismissals are sent while an earlier write is pending", async
 test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty states", () => {
   const ui = readFileSync("src/features/city-home/components/CityHomeFamilyPicks.tsx", "utf8");
   assert.ok(ui.includes("homeRecommendationLabel"));
+  assert.doesNotMatch(ui, /Не удалось обновить\. Повторить/, "failed background refresh must not add a technical CTA below loaded cards");
   assert.ok(ui.includes("hasCatalogEvents"));
   assert.ok(!ui.includes("homeChipSelectEvent"));
   assert.ok(ui.includes("stored.filter(entry => entry.selectedChildId == null)"));

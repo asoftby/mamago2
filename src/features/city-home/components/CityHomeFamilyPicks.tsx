@@ -210,7 +210,6 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
         <FamilyHomeResults data={data} context={data.context} citySlug={citySlug} impressed={impressed}
           onImpression={identity => setImpressed(previous => new Set([...previous, identity]))} />
       ) : null}
-      {state === "error" && data && <button type="button" className="mt-3 text-sm underline" onClick={() => void load({ keepCurrent: true })}>Не удалось обновить. Повторить</button>}
       <p role="status" aria-live="polite" className="sr-only">{announcement}</p>
     </div>
   </CityHomeSection>;
