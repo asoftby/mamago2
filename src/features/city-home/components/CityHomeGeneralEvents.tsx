@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { AnalyticsCardViewTracker } from "@/components/analytics/AnalyticsCardViewTracker";
 import { EventCard, activityMockToEventCard, EVENT_CARD_SHELL } from "@/components/events";
@@ -17,24 +18,36 @@ const FamilyActivationEditChildBirthOverlay = dynamic(() => import("./FamilyActi
 
 /** Guests see the public afisha without age chips, registration prompts or additional filter requests. */
 export function CityHomeGeneralEvents({
-  activities, citySlug, authenticated = false, hasChildren = false, incompleteChild = null, periodLabel = "На этой неделе",
+  activities, citySlug, authenticated = false, hasChildren = false, incompleteChild = null, incompleteChildren = [], periodLabel = "На этой неделе",
 }: {
   activities: ActivityMock[]; citySlug: string; authenticated?: boolean; hasChildren?: boolean;
   periodLabel?: "На этой неделе" | "Ближайшие события";
   incompleteChild?: { id: string; name: string | null } | null;
+  incompleteChildren?: { id: string; name: string | null }[];
 }) {
   const [addingChild, setAddingChild] = useState(false);
-  const [editingBirth, setEditingBirth] = useState(false);
+  const [editingChild, setEditingChild] = useState<{ id: string; name: string | null } | null>(null);
+  const router = useRouter();
   const catalogHref = "/" + citySlug + "/events";
 
   return <CityHomeSection
     title={authenticated ? "События, которые подходят вам" : "Куда пойти с ребёнком " + getCityLocativePhrase(citySlug)}
     subtitle={periodLabel} reserveCarouselControls>
+    {authenticated && hasChildren && incompleteChildren.length > 0 && <div className="mb-4 flex flex-wrap items-center gap-2">
+      <span className="mr-1 text-sm text-muted-foreground">Для кого:</span>
+      <span className="inline-flex min-h-11 items-center rounded-full bg-primary px-4 text-sm text-primary-foreground">Для всех</span>
+      {incompleteChildren.map(child => <button key={child.id} type="button"
+        aria-label={`Указать возраст: ${child.name?.trim() || "Ребёнок"}`}
+        onClick={() => setEditingChild(child)}
+        className="min-h-11 rounded-full border px-4 text-sm hover:border-primary hover:text-primary">
+        {child.name?.trim() || "Ребёнок"}
+      </button>)}
+    </div>}
     {authenticated && (!hasChildren || incompleteChild) && <div className="mb-4 flex flex-wrap items-center gap-3">
       <span className="text-sm text-muted-foreground">
         {incompleteChild ? "Укажите возраст ребёнка для персональной афиши." : "Добавьте ребёнка — персонализируем афишу."}
       </span>
-      <button type="button" onClick={() => incompleteChild ? setEditingBirth(true) : setAddingChild(true)}
+      <button type="button" onClick={() => incompleteChild ? setEditingChild(incompleteChild) : setAddingChild(true)}
         className="min-h-11 rounded-full border border-primary px-4 text-sm font-medium text-primary hover:bg-primary/5">
         {incompleteChild ? "Указать возраст" : "+ Добавить ребёнка"}
       </button>
@@ -54,10 +67,11 @@ export function CityHomeGeneralEvents({
     </HorizontalCardRow>
     {authenticated && <>
       <FamilyActivationAddChildOverlay open={addingChild} onOpenChange={setAddingChild}
-        onSuccess={() => {}} />
-      <FamilyActivationEditChildBirthOverlay open={editingBirth} onOpenChange={setEditingBirth}
-        child={incompleteChild ? { id: incompleteChild.id, name: incompleteChild.name ?? "" } : null}
-        onSuccess={() => {}} />
+        onSuccess={() => { setAddingChild(false); router.refresh(); }} />
+      <FamilyActivationEditChildBirthOverlay open={editingChild != null}
+        onOpenChange={(open) => { if (!open) setEditingChild(null); }}
+        child={editingChild ? { id: editingChild.id, name: editingChild.name ?? "" } : null}
+        onSuccess={() => { setEditingChild(null); router.refresh(); }} />
     </>}
   </CityHomeSection>;
 }

@@ -35,5 +35,6 @@ export async function loadHomeEvents(userId: string | null, cityId: string, city
   const childWithoutBirthDate = userId ? profile.children.find(child => !child.birthDate) : null;
   return { mode: "general" as const, context: null, activities, periodLabel, actorId: userId,
     hasChildren: profile.children.length > 0,
-    incompleteChild: childWithoutBirthDate ? { id: childWithoutBirthDate.id, name: childWithoutBirthDate.name } : null };
+    incompleteChild: childWithoutBirthDate ? { id: childWithoutBirthDate.id, name: childWithoutBirthDate.name } : null,
+    incompleteChildren: userId ? profile.children.filter(child => !child.birthDate).map(child => ({ id: child.id, name: child.name })) : [] };
 }

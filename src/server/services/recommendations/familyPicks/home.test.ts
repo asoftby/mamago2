@@ -89,6 +89,7 @@ test("general result carries only the ACL-visible incomplete child for authentic
   });
   assert.equal(result.mode, "general");
   assert.deepEqual(result.incompleteChild, { id: child.id, name: child.name });
+  assert.deepEqual(result.incompleteChildren, [{ id: child.id, name: child.name }]);
 });
 
 test("guest and users without complete child profiles stay on public afisha without rollout switches", async () => {
