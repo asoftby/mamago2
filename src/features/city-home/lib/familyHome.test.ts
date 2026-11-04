@@ -175,7 +175,7 @@ test("UI contract: one save control, poster, keyboard/ARIA, error and 7/30 empty
   assert.ok(page.indexOf("<StoriesSection cityId=") < page.indexOf('events.mode === "error"'),
     "stories must precede both public and personalized afisha");
   const general = readFileSync("src/features/city-home/components/CityHomeGeneralEvents.tsx", "utf8");
-  assert.match(general, /authenticated=|События, которые подходят вам/);
+  assert.match(general, /authenticated=|События, которые подходят вашей семье/);
   assert.doesNotMatch(general, /AGE_GROUPS|age_discovery_unavailable|\/api\/discovery\/events\/page/,
     "guest must not launch a second discovery request for age filters");
   assert.doesNotMatch(general, /useFamilyPersona|useDiscoveryFilters|selectedPersona/);

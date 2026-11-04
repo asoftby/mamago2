@@ -31,7 +31,7 @@ export function CityHomeGeneralEvents({
   const catalogHref = "/" + citySlug + "/events";
 
   return <CityHomeSection
-    title={authenticated ? "События, которые подходят вам" : "Куда пойти с ребёнком " + getCityLocativePhrase(citySlug)}
+    title={authenticated ? "События, которые подходят вашей семье" : "Куда пойти с ребёнком " + getCityLocativePhrase(citySlug)}
     subtitle={periodLabel} reserveCarouselControls>
     {authenticated && (!hasChildren || incompleteChild) && <div className="mb-4 flex flex-wrap items-center gap-3">
       <span className="text-sm text-muted-foreground">

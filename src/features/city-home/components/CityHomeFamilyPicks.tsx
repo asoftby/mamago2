@@ -167,7 +167,7 @@ export function CityHomeFamilyPicks({ citySlug, initialContext }: { citySlug: st
 
   const actorMatches = !auth.isLoading && auth.user?.id === actor;
   const catalogHref = `/${citySlug}/events`;
-  return <CityHomeSection title="События, которые подходят вам"
+  return <CityHomeSection title="События, которые подходят вашей семье"
     subtitle={data ? homePeriodLabel(data.window) : "На ближайшие 7 дней"} reserveCarouselControls>
     <div className="min-h-40" data-placement="HOME_FOR_FAMILY" aria-busy={state === "loading" && !data}>
       {!actorMatches || (state === "loading" && !data) ? (

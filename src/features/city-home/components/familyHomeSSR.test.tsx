@@ -52,7 +52,7 @@ test("logged-in no-child state shows add-child action, but never age filters", (
   const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={{ id: "account_a" } as never}>
     <CityHomeGeneralEvents activities={[]} citySlug="minsk" authenticated />
   </AuthProvider></AppRouterContext.Provider>);
-  assert.match(html, /События, которые подходят вам/);
+  assert.match(html, /События, которые подходят вашей семье/);
   assert.match(html, /На этой неделе/);
   assert.match(html, /Добавить ребёнка/);
   assert.doesNotMatch(html, /Возраст ребёнка|3–5 лет|Выберите возраст/);
@@ -89,7 +89,7 @@ for (const count of [1, 2, 3, 5, 7]) {
     const html = renderToStaticMarkup(<AppRouterContext.Provider value={router}><AuthProvider initialUser={{ id: "account_a" } as never}>
       <CityHomeFamilyPicks citySlug="minsk" initialContext={context} />
     </AuthProvider></AppRouterContext.Provider>);
-    assert.match(html, /События, которые подходят вам/);
+    assert.match(html, /События, которые подходят вашей семье/);
     assert.match(html, /На ближайшие 7 дней/, "loading state must describe the rolling personal window");
     assert.doesNotMatch(html, /На этой неделе/, "rolling 7 days can cross calendar weeks");
     assert.match(html, /aria-busy="true"/);
