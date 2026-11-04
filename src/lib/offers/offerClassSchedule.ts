@@ -238,7 +238,7 @@ export function getClassScheduleMissingFields(
     for (const group of form.groups) {
       for (const tariff of group.tariffs ?? []) {
         if (!tariff.title.trim()) missing.push("Название тарифа");
-        if (!/^\\d+(?:[.,]\\d{1,2})?$/.test(tariff.price.trim())) missing.push("Стоимость тарифа в BYN");
+        if (!/^\d+(?:[.,]\d{1,2})?$/.test(tariff.price.trim())) missing.push("Стоимость тарифа в BYN");
         if (!tariff.unit.trim()) missing.push("Единица тарифа");
         if (tariff.periodDays != null && (!Number.isInteger(tariff.periodDays) || tariff.periodDays < 1 || tariff.periodDays > 366)) missing.push("Срок тарифа от 1 до 366 дней");
         if (tariff.visitsCount != null && (!Number.isInteger(tariff.visitsCount) || tariff.visitsCount < 1 || tariff.visitsCount > 365)) missing.push("Количество посещений от 1 до 365");

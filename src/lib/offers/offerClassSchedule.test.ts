@@ -183,6 +183,25 @@ for (const productType of ["REGULAR_ACTIVITY", "ONE_TIME_ACTIVITY"] as const) {
 const withTariff = defaultClassSchedule();
 withTariff.groups = [{ id: "grp-001", days: [1], time: "17:00", seats: "8",
   tariffs: [{ id: "tariff-001", title: "Месяц", price: "120", unit: "BYN", periodDays: 30 }] }];
+// Existing group tariffs with ordinary numeric BYN prices must remain editable
+// when the six-step wizard reaches Schedule before the Services/pricing step.
+assert.deepEqual(getClassScheduleMissingFields(withTariff, "REGULAR_ACTIVITY", "60"), []);
+for (const price of ["0", "120", "120.50", "120,50"]) {
+  const form = {
+    ...defaultClassSchedule(),
+    groups: [{ ...withTariff.groups[0], tariffs: [{ ...withTariff.groups[0].tariffs![0], price }] }],
+  };
+  assert.deepEqual(getClassScheduleMissingFields(form, "REGULAR_ACTIVITY", "60"), [],
+    `valid group tariff price ${price}`);
+}
+for (const price of ["-1", "abc", "12.345", "10 BYN"]) {
+  const form = {
+    ...defaultClassSchedule(),
+    groups: [{ ...withTariff.groups[0], tariffs: [{ ...withTariff.groups[0].tariffs![0], price }] }],
+  };
+  assert.ok(getClassScheduleMissingFields(form, "REGULAR_ACTIVITY", "60").includes("Стоимость тарифа в BYN"),
+    `invalid group tariff price ${price}`);
+}
 const structured = classScheduleInputSchema.parse(buildClassScheduleInput(withTariff, [], "REGULAR_ACTIVITY", "60"));
 assert.equal(structured.groups[0].id, "grp-001");
 assert.deepEqual(structured.groups[0].tariffs, [{ id: "tariff-001", title: "Месяц", price: "120", unit: "BYN", periodDays: 30 }]);
